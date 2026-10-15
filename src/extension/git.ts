@@ -2,13 +2,13 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { samePath } from './samePath';
-import type { MainBranch, WorkspaceMode } from '../shared/git';
+import type { GitConfig, MainBranch, WorkspaceMode } from '../shared/git';
 import type { GitNotice } from '../shared/gitflow';
 
 /** Limite do `git fetch origin` antes de criar uma branch: o host fica travado esse tempo (#462, Riscos). */
 export const FETCH_TIMEOUT_MS = 20_000;
 
-const git = (cwd: string, args: string[], opts: { timeout?: number; env?: NodeJS.ProcessEnv } = {}): string => {
+export const git = (cwd: string, args: string[], opts: { timeout?: number; env?: NodeJS.ProcessEnv } = {}): string => {
   try {
     return execFileSync('git', args, {
       cwd,
@@ -26,7 +26,7 @@ const git = (cwd: string, args: string[], opts: { timeout?: number; env?: NodeJS
   }
 };
 
-const tryGit = (cwd: string, args: string[]): string | null => {
+export const tryGit = (cwd: string, args: string[]): string | null => {
   try {
     return git(cwd, args);
   } catch {
@@ -34,13 +34,13 @@ const tryGit = (cwd: string, args: string[]): string | null => {
   }
 };
 
-const branchExists = (repo: string, branch: string): boolean =>
+export const branchExists = (repo: string, branch: string): boolean =>
   tryGit(repo, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]) !== null;
 
-const remoteBranchExists = (repo: string, branch: string): boolean =>
+export const remoteBranchExists = (repo: string, branch: string): boolean =>
   tryGit(repo, ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`]) !== null;
 
-const hasOrigin = (repo: string): boolean => tryGit(repo, ['remote', 'get-url', 'origin']) !== null;
+export const hasOrigin = (repo: string): boolean => tryGit(repo, ['remote', 'get-url', 'origin']) !== null;
 
 /**
  * A branch principal do repositório, sem rede (RF09): o HEAD do origin; senão main ou master, local
@@ -249,15 +249,47 @@ export function prepareWorkspace(input: {
   return { branch: input.branch, path: dir, base, notices };
 }
 
-/** Remove a worktree de uma história (a branch fica). Não faz nada se ela já não existe. */
-export function removeWorktree(projectDir: string, worktreePath: string): void {
+/** Pasta onde ficam as worktrees das histórias; null sem pasta de projeto ou fora do modo worktree. */
+export function worktreeRoot(workspaceDir: string | undefined, git: GitConfig): string | null {
+  return workspaceDir && git.mode === 'worktree'
+    ? path.resolve(workspaceDir, git.worktreeDir.replace(/\{repo\}/g, path.basename(workspaceDir)))
+    : null;
+}
+
+/**
+ * `p` está dentro de `root` (ou é a própria). O git lista o caminho real (links resolvidos): compara
+ * `p` nas duas formas, como `prepareWorkspace` faz ao procurar a worktree registrada.
+ */
+export function isInside(root: string, p: string): boolean {
+  const real = fs.existsSync(p) ? fs.realpathSync.native(p) : p;
+  const rootReal = fs.existsSync(root) ? fs.realpathSync.native(root) : root;
+  const within = (base: string, target: string): boolean => {
+    const rel = path.relative(base, target);
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+  };
+  return [p, real].some((t) => [root, rootReal].some((r) => samePath(r, t) || within(r, t)));
+}
+
+/**
+ * Apaga a branch local com `-D`: o `-d` compara com o HEAD da pasta principal (arbitrário) e recusaria
+ * remoções sem perda, e sempre recusa um squash. A prova de que nada se perde vem de quem chama.
+ */
+export function deleteBranch(repo: string, branch: string): void {
+  git(repo, ['branch', '-D', branch]);
+}
+
+/**
+ * Remove a worktree de uma história (a branch fica). Não faz nada se ela já não existe. Com `force`,
+ * remove mesmo com arquivos não commitados: só depois de a pessoa aceitar a perda (#465).
+ */
+export function removeWorktree(projectDir: string, worktreePath: string, force = false): void {
   if (!fs.existsSync(worktreePath)) {
     // a pasta já foi apagada à mão: tira o registro que sobrou, para o nome poder ser usado de novo
     tryGit(projectDir, ['worktree', 'prune']);
     return;
   }
   try {
-    git(projectDir, ['worktree', 'remove', worktreePath]);
+    git(projectDir, force ? ['worktree', 'remove', '--force', worktreePath] : ['worktree', 'remove', worktreePath]);
   } catch (e) {
     // um arquivo preso (outra janela, um processo ainda rodando, o antivírus no Windows) pode deixar
     // a pasta pela metade: o registro sai, e a mensagem do git segue como veio

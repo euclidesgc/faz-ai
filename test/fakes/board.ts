@@ -3,6 +3,7 @@ import type { BoardState, Card, Column, ColumnCategory } from '../../src/shared/
 import { DEFAULT_APPEARANCE } from '../../src/shared/appearance';
 import { DEFAULT_GIT } from '../../src/shared/git';
 import { EMPTY_HARNESS } from '../../src/shared/harness';
+import { EMPTY_ORPHANS } from '../../src/shared/orphans';
 import { DEFAULT_RULES } from '../../src/shared/rules';
 import { DEFAULT_RUNNER } from '../../src/shared/runner';
 
@@ -112,11 +113,14 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     requirements: [],
     requirementsCheckedAt: 0,
     authExpired: null,
+    orphans: EMPTY_ORPHANS,
     environment: null,
     environmentFirstRun: false,
     harnessInstall: null,
     harnessSuggestions: null,
     mainBranch: null,
+    branchRenames: [],
+    branchRenameResult: null,
     ...over,
   };
 }

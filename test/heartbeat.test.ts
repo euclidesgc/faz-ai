@@ -22,6 +22,7 @@ let runner: {
   /** a origem que o heartbeat informou em cada start, na mesma ordem de `started` */
   origins: (AiRunOrigin | undefined)[];
   fail: boolean;
+  usageLimited: boolean;
   start(id: string, origin?: AiRunOrigin): void;
   stop(id: string): void;
   onDidFinish(fn: (id: string) => void): void;
@@ -77,6 +78,7 @@ beforeEach(async () => {
     started: [],
     origins: [],
     fail: false,
+    usageLimited: false,
     start(id, origin) {
       if (this.fail) throw new Error('ferramenta indisponível');
       this.running.push(id);
@@ -117,6 +119,25 @@ describe('heartbeat', () => {
     now += 60 * 60_000;
     heartbeat.tick();
     expect(rounds).toBe(2);
+  });
+
+  it('limite de uso esgotado: a rodada testa uma história e deixa as outras para a próxima rodada (#551)', () => {
+    create('A', 'Implementação'); // #1
+    create('B', 'Implementação'); // #2
+    setStatus(1, 'ready');
+    setStatus(2, 'ready');
+    runner.usageLimited = true;
+    heartbeat.runNow();
+    expect(runner.started.map(number)).toEqual([1]);
+    // a execução termina por limite: o card volta para a IA e a fila é descartada, sem iniciar a B
+    runner.finish('ready');
+    expect(runner.started.map(number)).toEqual([1]);
+    expect(heartbeat.queued).toBe(0);
+    expect(log.some((l) => /limite de uso/.test(l))).toBe(true);
+    // o limite renovou: a próxima rodada executa de novo
+    runner.usageLimited = false;
+    heartbeat.runNow();
+    expect(runner.started.map(number)).toEqual([1, 1]); // a A é a primeira da fila e tem a vaga
   });
 
   it('enqueue inicia a história na hora, mesmo com o heartbeat desligado, sem duplicar', () => {
@@ -208,6 +229,15 @@ describe('heartbeat', () => {
     heartbeat.tick();
     expect(runner.started.map(number)).toEqual([1]);
     expect(heartbeat.nextRoundAt).toBe(now + 60 * MIN);
+  });
+
+  it('a rodada que não executa nada diz o motivo no log', () => {
+    create('A', 'Implementação'); // #1
+    create('Tarefa', 'A fazer', 1); // #2
+    setStatus(1, 'running'); // uma sessão já trabalha na história
+    setStatus(2, 'ready');
+    expect(heartbeat.runNow()).toBe(0);
+    expect(log.at(-1)).toMatch(/^Heartbeat: nenhuma história pode executar agora: #1 .*já há uma execução nela/);
   });
 
   it('a execução que o heartbeat inicia é registrada no log com a origem "heartbeat"', () => {

@@ -1,4 +1,5 @@
 import type { WebviewToHost } from '../shared/messages';
+import type { BranchRenamePending } from '../shared/branchRename';
 import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from '../shared/harness';
 import type { HarnessUsage, SelectableKind } from '../shared/harnessSelection';
 import type { AgentInput } from '../shared/messages';
@@ -127,6 +128,12 @@ export const attachments = {
   saveAs: (attachmentId: Id) => post({ type: 'attachment.saveAs', attachmentId }),
 };
 
+/** Renomear a principal ou a develop também no origin (#466): as três respostas do aviso. Renomear chama o git e o gh, então espera mais. */
+export const gitRename = {
+  resolve: (p: Pick<BranchRenamePending, 'kind' | 'from' | 'to'>, action: 'confirm' | 'undo' | 'dismiss') =>
+    request({ type: 'git.rename.resolve', kind: p.kind, from: p.from, to: p.to, action }, { timeout: 120_000 }),
+};
+
 export const settings = {
   updateBoard: (patch: BoardPatch) => req({ type: 'settings.board.update', patch }),
   resetBoard: () => req({ type: 'settings.board.reset' }),
@@ -151,6 +158,14 @@ export const settings = {
   detectModels: (tool: AiTool) => req({ type: 'settings.models.detect', tool }),
   setModelRules: (rules: ModelRule[]) => post({ type: 'settings.modelRules.set', rules }),
   suggestModelRules: (tool: AiTool) => req({ type: 'settings.modelRules.suggest', tool }),
+};
+
+/** Branches e worktrees órfãs (#465): o host decide o que é seguro; a tela só pede e, nas de decisão, envia o que a pessoa viu. */
+export const orphans = {
+  scan: () => req({ type: 'git.orphans.scan' }),
+  clean: (id: string, acceptLoss?: { dirtyFiles: number; uniqueCommits: number }) =>
+    req({ type: 'git.orphans.clean', id, ...(acceptLoss ? { acceptLoss } : {}) }),
+  cleanSafe: () => req({ type: 'git.orphans.cleanSafe' }),
 };
 
 export const backup = {

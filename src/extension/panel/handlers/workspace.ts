@@ -7,15 +7,12 @@ import { isPullRequestUrl, stackBaseOf, storyOf } from '../../../shared/story';
 import { columnOf, isLive } from '../../../shared/selectors';
 import { settleDelivery } from '../../delivery';
 import { now } from '../../db/ids';
-import { prepareWorkspace } from '../../git';
+import { prepareWorkspace, worktreeRoot as rootOf } from '../../git';
+import { hasPendingRename } from './branchRename';
 import type { BoardContext, HandlerMap } from './context';
 
 /** Pasta onde ficam as worktrees das histórias. */
-function worktreeRoot(ctx: BoardContext): string | null {
-  const dir = ctx.opts.workspaceDir;
-  const { git } = ctx.state().board;
-  return dir && git.mode === 'worktree' ? path.resolve(dir, git.worktreeDir.replace(/\{repo\}/g, path.basename(dir))) : null;
-}
+const worktreeRoot = (ctx: BoardContext): string | null => rootOf(ctx.opts.workspaceDir, ctx.state().board.git);
 
 /**
  * Pastas fora do projeto em que a IA precisa poder trabalhar: a das worktrees. Vai inteira (e
@@ -44,6 +41,12 @@ function prepareStoryWorkspace(ctx: BoardContext, cardId: string): void {
   const projectDir = ctx.opts.workspaceDir;
   if (git.mode === 'off') throw new Error('A criação de branches está desligada neste board (Configurações → Git).');
   if (!projectDir) throw new Error('Nenhuma pasta de projeto aberta.');
+  // com a renomeação de uma branch esperando resposta, o nome novo ainda não existe: criar branches agora
+  // criaria a develop de novo (ou partiria de uma principal que não existe)
+  if (hasPendingRename(ctx))
+    throw new Error(
+      'Há uma renomeação de branch à espera de resposta (Renomear ou Desfazer): responda antes de criar a branch da história.',
+    );
   const story = storyOfCard(ctx, cardId);
   // a derivada parte da branch da parte anterior: sem ela ainda, a base sairia da principal e ficaria fixa
   const origin = !story.branch && story.derivedFrom ? s.cards.find((c) => c.id === story.derivedFrom) : undefined;

@@ -24,9 +24,10 @@ const GIT_AUTO_MERGE_KEY = 'fazai.git.autoMerge';
 const GIT_MERGE_METHOD_KEY = 'fazai.git.mergeMethod';
 const GIT_DECISION_RECORDS_KEY = 'fazai.git.decisionRecords';
 
-/** As seis chaves do gitflow (#462): a chave no Settings, o campo do `GitConfig` e um valor diferente do padrão. */
+/** As sete chaves do gitflow (#462 e #466): a chave no Settings, o campo do `GitConfig` e um valor diferente do padrão. */
 const GITFLOW_KEYS = [
   { setting: 'fazai.git.gitflow', field: 'gitflow', custom: false },
+  { setting: 'fazai.git.mainBranch', field: 'mainBranch', custom: 'trunk' },
   { setting: 'fazai.git.developBranch', field: 'developBranch', custom: 'integracao' },
   { setting: 'fazai.git.featurePrefix', field: 'featurePrefix', custom: 'feat/' },
   { setting: 'fazai.git.bugfixPrefix', field: 'bugfixPrefix', custom: 'fix/' },
@@ -709,6 +710,29 @@ describe('IdeSettings: gitflow (#462)', () => {
       expect(fakeConfig.updates).toHaveLength(1);
     },
   );
+
+  it('o board recusa a mudança (ex.: IA executando): o Settings volta ao valor do board e a pessoa é avisada', async () => {
+    const link = await makeLink();
+    const notices: string[] = [];
+    const refusing = {
+      ...link,
+      handle: (msg: WebviewToHost) => {
+        if (msg.type === 'settings.board.update') throw new Error('Não dá para renomear a branch agora: a IA está executando #7.');
+        return link.handle(msg);
+      },
+    };
+    new IdeSettings(
+      workspace,
+      undefined,
+      () => {},
+      (m) => notices.push(m),
+    ).bind(refusing);
+    await settled();
+    fakeConfig.set('global', 'fazai.git.developBranch', 'dev');
+    expect(notices).toEqual(['Não dá para renomear a branch agora: a IA está executando #7.']);
+    expect(link.router.snapshot().board.git.developBranch).toBe('develop');
+    expect(fakeConfig.updates.at(-1)).toEqual({ key: 'fazai.git.developBranch', value: 'develop', target: ConfigurationTarget.Global });
+  });
 
   it('as seis chaves não passam pela migração única do Git', async () => {
     const link = await makeLink();

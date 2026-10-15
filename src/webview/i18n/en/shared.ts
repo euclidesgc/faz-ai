@@ -180,6 +180,8 @@ export const shared: Record<string, string> = {
     'Instructions and support files Kimi Code loads when the task calls for them; only the description is always in view.',
   'Ajudante com instruções próprias, para o qual o Kimi Code delega partes do trabalho.':
     'A helper with its own instructions, to which Kimi Code delegates parts of the work.',
+  'Comando que roda num momento da sessão do Kimi Code. Falha em aberto (erro ou tempo esgotado deixam passar): não é controle de segurança.':
+    'A command that runs at a point in the Kimi Code session. It fails open (an error or timeout lets things through): not a security control.',
   'Suas configurações do Kimi Code (modelo, provedores e as regras permanentes de permissão), em todos os projetos.':
     'Your Kimi Code settings (model, providers and the permanent permission rules), in every project.',
   'Arquivos que a IA do Cursor não pode ler nem citar, no formato do .gitignore.':

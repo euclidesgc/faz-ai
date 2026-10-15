@@ -713,14 +713,44 @@ Opções em **Faz AI › Git**, no Settings do editor:
 | Opção | Padrão | O que faz |
 | --- | --- | --- |
 | `fazai.git.gitflow` | ligado | Desligado, toda branch parte da principal e `{fluxo}` vira `<tipo>/`. |
+| `fazai.git.mainBranch` | vazio | Branch principal fixa; vazio detecta (HEAD do `origin`, `main` ou `master`). |
 | `fazai.git.developBranch` | `develop` | Branch de integração. |
 | `fazai.git.featurePrefix` | `feature/` | Prefixo das branches de feature. |
 | `fazai.git.bugfixPrefix` | `bugfix/` | Prefixo das branches de bugfix. |
 | `fazai.git.hotfixPrefix` | `hotfix/` | Prefixo das branches de hotfix. |
 | `fazai.git.releasePrefix` | `release/` | Só informativo: nenhum tipo de card gera release. |
 
-Prefixo ou nome vazio, ou que o git não aceita, volta ao padrão. A limpeza das órfãs e o renomear da
-principal no `origin` vêm em entregas seguintes.
+Prefixo ou nome vazio, ou que o git não aceita, volta ao padrão. Branches e worktrees que sobram
+depois da história são tratadas em [Branches e worktrees órfãs](#branches-e-worktrees-órfãs).
+
+##### Renomear a principal ou a `develop` no `origin`
+
+Mudar `fazai.git.mainBranch` ou `fazai.git.developBranch` para um nome que ainda não existe, com a
+branch antiga existindo, abre um aviso no editor (a mudança também vale no `origin`, e o board não a
+faz sozinho). As opções são **Renomear** e **Desfazer**; fechar a caixa mantém o pedido e a pergunta
+volta ao reabrir o board.
+
+- **Renomear** age nesta ordem: a branch no GitHub pelo `gh` (`gh api .../branches/<antiga>/rename`);
+  `git fetch --prune`; `git branch -m` no clone (inclusive a que está numa worktree); o upstream
+  (`origin/<nova>`); e, só na principal, o `origin/HEAD`. O GitHub redireciona os PRs abertos e leva a
+  branch padrão para o nome novo (conforme a documentação da API, não testado com conta real).
+- **Sem `gh`, fora do GitHub ou sem permissão**: nada é executado. O aviso mostra os comandos prontos
+  para este clone e para os outros, com **Copiar comandos**.
+- **Falha no meio**: a mensagem diz o que já mudou e o que falta. Cada passo confere o estado antes de
+  agir, então repetir é seguro. O remoto vem primeiro: se ele falha, nada local muda.
+- **Desfazer** devolve o nome anterior à configuração e não toca o repositório.
+- **Recusado** enquanto a IA executa uma história (a mensagem traz os números).
+- **Não muda**: workflows de CI, regras de proteção, a branch padrão do GitHub (na `develop`) e os
+  outros clones. A IA não renomeia branches: não há ferramenta nova no MCP.
+
+No navegador (fora do editor) a pergunta é um diálogo do board, em qualquer tela: **Renomear** (foco
+inicial), **Desfazer** e **Fechar** (ou Esc, que não envia nada e não volta na sessão). Depois de
+Renomear, o diálogo mostra os passos feitos, o que falta, o erro e os comandos prontos, cada um com
+**Copiar comando**; na falha parcial há **Renomear de novo**. Em **Configurações → Git** ficam os campos
+**Branch principal** (vazio = detectada) e **Branch de integração**, que gravam ao sair do campo, com a
+explicação do que a renomeação faz e do que não altera. No **Diagnóstico do ambiente**, o item
+**Nome da branch principal/develop** (recomendação, não bloqueia) fica pendente enquanto houver pedido
+à espera, com o comando do clone local e o botão **Abrir a tela Git**.
 
 ### Pull request e merge na Homologação
 
@@ -769,8 +799,8 @@ comentário na conversa, com o comando para você fazer à mão:
 
 Nenhuma falha da limpeza impede a conclusão do card. Com o gitflow desligado ("direto na principal")
 nada muda: a conclusão só remove a worktree, como antes. Não há opção para desligar a limpeza à parte
-do gitflow. Branches e worktrees que já sobraram de antes ficam para a limpeza de órfãs, que vem em
-outra entrega.
+do gitflow. Branches e worktrees que já sobraram de antes são tratadas em
+[Branches e worktrees órfãs](#branches-e-worktrees-órfãs).
 
 #### Pilha e hotfix
 
@@ -783,6 +813,28 @@ outra entrega.
 - **Depois de um hotfix.** O board abre e mescla um PR `main → develop`, também com merge commit, para
   a `develop` receber a correção. Nunca há push direto. Se houver conflito, o PR fica aberto e a
   conversa do card avisa para você resolver.
+
+#### Branches e worktrees órfãs
+
+Órfã é a branch ou a worktree que o board criou e cuja história já terminou (mesclada, concluída,
+cancelada, arquivada ou na lixeira) ou nem existe mais no board. Nunca entram a branch principal, a
+`develop`, as branches em uso fora da pasta das worktrees e as bases de histórias ainda ativas
+(a pilha de PRs). O board mede o git na abertura e a cada rodada do heartbeat (depois de conferir os
+merges) e dá um veredito a cada item:
+
+- **Segura**: não há nada a perder (worktree sem arquivos alterados; branch sem commits só dela, ou
+  já mesclada na base). O board a limpa sozinho: remove a worktree e apaga a branch **local** com
+  `git branch -D`. A branch remota não é tocada por esta limpeza.
+- **Precisa de decisão**: tem arquivos não commitados, commits que só existem nela, uma história que o
+  board não conhece ou uma branch ainda em uso por uma worktree. Nada é apagado sozinho.
+
+Em **Configurações → Git → Branches e worktrees órfãs** cada item mostra a história, a situação e o
+veredito. **Limpar** remove um item; num item de decisão abre uma confirmação que diz quantos arquivos
+e commits se perdem, e só depois de confirmar o board os remove (e confere de novo no disco, antes). **Limpar
+todas as seguras** age sobre todas as seguras de uma vez; **Verificar de novo** refaz a medição.
+Quando um item não pôde ser removido, a linha mostra "Não removido" com o motivo, e a próxima rodada
+tenta de novo. Enquanto houver órfãs de decisão, o topo do board mostra o selo **N órfãs**, que abre
+essa seção. Sem heartbeat ligado, o board mede só na abertura e no **Verificar de novo**.
 
 ### Registros de decisão
 
@@ -857,7 +909,7 @@ cada uma) e de mais memória e processador enquanto várias sessões de IA, test
 juntos. No editor a aba Git e o bloco de paralelo do Harness de IA viram um link para o Settings; no
 navegador seguem como campos editáveis, como antes.
 
-- Sem pendência com a IA, nada é executado.
+- Sem pendência com a IA, nada é executado, e o log (Saída → Faz AI) diz o motivo: login vencido, história em modo autônomo, execução em andamento, com a pessoa ou esperando outro card.
 - A fila da rodada segue a ordem do board: os bugs primeiro; depois a história mais à direita (a
   mais adiantada termina antes de uma nova começar); na mesma coluna, de cima para baixo — o que
   decide é a posição do card, não o número dele nem o que já foi aprovado.
@@ -1126,7 +1178,7 @@ mesma ordem:
 | Skills | Skills | Instruções e arquivos de apoio carregados quando a tarefa pede | `.claude/skills/<nome>/SKILL.md`, `.cursor/skills`, `.agents/skills` |
 | Sub-agentes | Subagentes | Ajudantes para os quais a IA delega trabalho | `.claude/agents/*.md`, `.cursor/agents/*.md` |
 | Comandos | Comandos | Prompts prontos, chamados com `/nome` | `.claude/commands/*.md`, `.cursor/commands/*.md` |
-| Hooks | Hooks | Comandos que a ferramenta roda sozinha em certos eventos | `hooks` do `.claude/settings.json`, `.cursor/hooks.json` |
+| Hooks | Hooks | Comandos que a ferramenta roda sozinha em certos eventos | `hooks` do `.claude/settings.json`, `.cursor/hooks.json`, `[[hooks]]` do `~/.kimi-code/config.toml` |
 | MCPs | Servidores MCP | Servidores que dão ferramentas extras à IA | `.mcp.json`, `~/.claude.json`, `.cursor/mcp.json` |
 | Demais | Configurações e permissões | Como a ferramenta se comporta e o que a IA faz sem perguntar | `.claude/settings.json`, `.claude/settings.local.json`, `.cursor/cli.json`, `.cursorignore` |
 | Demais | Estilos de saída | Mudam o jeito de a IA responder | `.claude/output-styles/*.md` |
@@ -1478,6 +1530,25 @@ Precisa de Docker sem `sudo`. Há dois modos, escolhidos sozinhos:
 
 Os arquivos ficam em `scripts/e2e-cursor/`.
 
+### Teste e2e numa máquina recém-instalada (Kimi Code)
+
+`npm run e2e:kimi` sobe um contêiner Docker com Ubuntu 24.04 limpo (sem git, gh, uv, Code Review Graph
+nem a CLI `kimi`; só o Node que roda o board e o `socat`) e abre nele o board do Faz AI da branch
+atual, pelo `src/cli` (não há editor no contêiner), no projeto de teste `meu-app`. A CLI do Kimi Code
+não vem na imagem: você a instala dentro do contêiner e faz o `kimi login`, seguindo o
+[roteiro](scripts/e2e-kimi/ROTEIRO.md). Os links (login) abrem no navegador do computador. Dentro
+dele, o usuário `dev` tem `sudo` sem senha. O resultado do roteiro fica em `docs/decisoes/`.
+
+| Comando | O que faz |
+|---|---|
+| `npm run e2e:kimi` | do zero: contêiner novo, com o board da branch atual |
+| `npm run e2e:kimi -- continuar` | o mesmo contêiner (login e instalações ficam), com o board atualizado |
+| `npm run e2e:kimi -- parar` | para o contêiner |
+| `npm run e2e:kimi -- remover` | apaga o contêiner e a imagem |
+
+O board abre em `http://localhost:7878` (`FAZAI_E2E_PORTA` troca a porta, publicada só em
+`127.0.0.1`). Precisa de Docker sem `sudo` e de uma conta Kimi Code para o login.
+
 ### Preparar o ambiente de desenvolvimento
 
 O repositório tem todo o código, mas alguns itens ficam fora do git. Num clone novo (outra máquina,
@@ -1494,13 +1565,28 @@ por exemplo), eles precisam ser refeitos:
 | `.claude/skills/publicar-extensao/` | passo a passo da publicação para a IA | copiar a pasta da máquina original |
 
 Os três últimos só são necessários para publicar. A `main` só aceita mudanças por pull request, e o
-script já cuida disso: `npm run release -- <patch|minor|major>` parte da main atualizada e limpa,
-testa, cria a branch `release/vX.Y.Z` e nela ajusta a versão e os CHANGELOGs ("Não lançado" vira a
-versão), faz o commit e empacota. Publica nas duas lojas, envia a branch, abre o PR para a main e,
-com o push concluído, faz o merge (squash). Por fim atualiza a main local, apaga a branch de release
-(local e remota) e cria a tag e a GitHub Release com o `.vsix`. Se algo parar depois da publicação,
-`npm run release -- finish` retoma de onde parou (na branch de release ou na main), sem publicar de
-novo. `--dry-run` ensaia sem publicar. As opções estão no topo de `scripts/release.mjs`.
+script já cuida disso. Com o gitflow, o release parte da branch em que você está:
+
+- na `develop`: `npm run release -- <patch|minor|major>` exige a `develop` atualizada e limpa, testa,
+  cria a branch `release/vX.Y.Z` e nela ajusta a versão e os CHANGELOGs ("Não lançado" vira a
+  versão), faz o commit e empacota;
+- numa `hotfix/...`: o commit da versão vai na própria branch da correção, e o PR dela, se já
+  estiver aberto, é reaproveitado;
+- em qualquer outra branch, o script recusa e diz de onde rodar (a opção `--allow-branch` deixou de
+  existir).
+
+Depois publica nas duas lojas, envia a branch e abre o PR para a main, que entra com **merge commit**
+(nunca squash, para o commit de merge das histórias ficar na tag), e a branch não é apagada nesse
+merge. A tag e a GitHub Release com o `.vsix` saem sobre `origin/main`, sem trocar a branch da sua
+pasta. Por fim a main volta para a `develop` por PR, também com merge commit. Se algo parar depois da
+publicação, `npm run release -- finish` retoma de onde parou: cada passo confere se já foi feito
+(PR, tag, release, main contida na `develop`, branches) e não publica de novo. Se a volta para a
+`develop` der conflito, resolva no PR aberto e rode `finish`. `--dry-run` ensaia sem publicar. As
+opções estão no topo de `scripts/release.mjs`.
+
+Num hotfix (card do tipo Bug, branch `hotfix/...`), rode `npm run release` na worktree da `hotfix/`
+**antes** de aprovar o card. Aprovado antes, o PR entra na principal sem versão e a correção só sai
+no próximo release da `develop`.
 
 Num hotfix (card do tipo Bug, branch `hotfix/...`), rode `npm run release` na worktree da `hotfix/`
 **antes** de aprovar o card. Aprovado antes, o PR entra na principal sem versão e a correção só sai

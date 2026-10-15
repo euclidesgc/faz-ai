@@ -745,14 +745,47 @@ Options under **Faz AI › Git** in the editor Settings:
 | Option | Default | What it does |
 | --- | --- | --- |
 | `fazai.git.gitflow` | on | Off, every branch starts from the main branch and `{fluxo}` becomes `<type>/`. |
+| `fazai.git.mainBranch` | empty | Pinned main branch; empty detects it (`origin` HEAD, `main` or `master`). |
 | `fazai.git.developBranch` | `develop` | Integration branch. |
 | `fazai.git.featurePrefix` | `feature/` | Prefix of feature branches. |
 | `fazai.git.bugfixPrefix` | `bugfix/` | Prefix of bugfix branches. |
 | `fazai.git.hotfixPrefix` | `hotfix/` | Prefix of hotfix branches. |
 | `fazai.git.releasePrefix` | `release/` | Informational only: no card type produces a release. |
 
-An empty prefix or name, or one git doesn't accept, goes back to the default. Orphan cleanup and
-renaming the main branch on `origin` come in later deliveries.
+An empty prefix or name, or one git doesn't accept, goes back to the default. Branches and
+worktrees left over after a story are covered in
+[Orphan branches and worktrees](#orphan-branches-and-worktrees).
+
+##### Renaming the main branch or `develop` on `origin`
+
+Changing `fazai.git.mainBranch` or `fazai.git.developBranch` to a name that does not exist yet, with
+the old branch existing, opens a notice in the editor (the change also applies to `origin`, and the
+board does not do it on its own). The options are **Renomear** (Rename) and **Desfazer** (Undo); closing
+the box keeps the request and the question comes back when the board is reopened.
+
+- **Rename** acts in this order: the branch on GitHub through `gh` (`gh api .../branches/<old>/rename`);
+  `git fetch --prune`; `git branch -m` in the clone (including a branch checked out in a worktree); the
+  upstream (`origin/<new>`); and, on the main branch only, `origin/HEAD`. GitHub redirects open PRs and
+  moves the default branch to the new name (per the API documentation, not tested with a real account).
+- **Without `gh`, outside GitHub or without permission**: nothing runs. The notice shows the ready-made
+  commands for this clone and for the others, with **Copiar comandos** (Copy commands).
+- **Failure midway**: the message says what already changed and what is missing. Each step checks the
+  state before acting, so repeating is safe. The remote comes first: if it fails, nothing local changes.
+- **Undo** puts the previous name back in the setting and does not touch the repository.
+- **Refused** while the AI is running a story (the message lists the numbers).
+- **Not changed**: CI workflows, protection rules, GitHub's default branch (for `develop`) and other
+  clones. The AI does not rename branches: no new MCP tool.
+
+In the browser (outside the editor) the question is a board dialog, on any screen: **Renomear**
+(Rename, initial focus), **Desfazer** (Undo) and **Fechar** (Close, or Esc, which sends nothing and does
+not come back in the session). After Rename, the dialog shows the steps done, what is left, the error
+and the ready-made commands, each with **Copiar comando** (Copy command); on a partial failure there is
+**Renomear de novo** (Rename again). **Settings → Git** has the **Branch principal** (main branch; empty
+= detected) and **Branch de integração** (integration branch) fields, saved on leaving the field, with
+the explanation of what the rename does and what it doesn't change. In the **environment diagnostic**,
+the **Nome da branch principal/develop** item (a recommendation, it doesn't block) stays pending while a
+request is waiting, with the local clone command and the **Abrir a tela Git** (Open the Git screen)
+button.
 
 ### Pull request and merge in Homologação
 
@@ -803,8 +836,8 @@ why in a comment in the conversation, with the command to run by hand:
 
 No cleanup failure prevents the card from being concluded. With gitflow off ("straight to the main
 branch") nothing changes: the conclusion only removes the worktree, as before. There is no option to
-turn the cleanup off separately from gitflow. Branches and worktrees left over from before are for
-the orphan cleanup, which comes in another delivery.
+turn the cleanup off separately from gitflow. Branches and worktrees left over from before are
+covered in [Orphan branches and worktrees](#orphan-branches-and-worktrees).
 
 #### Stack and hotfix
 
@@ -817,6 +850,32 @@ the orphan cleanup, which comes in another delivery.
 - **After a hotfix.** The board opens and merges a `main → develop` PR, also with a merge commit, so
   `develop` receives the fix. There is never a direct push. On conflict, the PR stays open and the
   card's conversation tells you to resolve it.
+
+#### Orphan branches and worktrees
+
+An orphan is a branch or worktree the board created whose story has finished (merged, done,
+cancelled, archived or in the trash) or no longer exists on the board. The main branch, `develop`,
+branches in use outside the worktrees folder and the bases of stories that are still active (the PR
+stack) are never included. The board measures git on opening and on every heartbeat round (after
+checking the merges) and gives each item a verdict:
+
+- **Safe** (`Segura`): there is nothing to lose (a worktree with no changed files; a branch with no
+  commits only it has, or already merged into the base). The board cleans it on its own: removes the
+  worktree and deletes the **local** branch with `git branch -D`. The remote branch is not touched by
+  this cleanup.
+- **Needs a decision** (`Precisa de decisão`): it has uncommitted files, commits that exist only
+  there, a story the board doesn't know, or a branch still in use by a worktree. Nothing is deleted
+  on its own.
+
+Under **Settings → Git → Branches e worktrees órfãs** (orphan branches and worktrees) each item shows
+the story, the situation and the verdict. **Limpar** (Clear) removes one item; on a decision item it
+opens a confirmation saying how many files and commits are lost, and only after you confirm does the
+board remove it (checking the disk again first). **Limpar todas as seguras** (Clear all the safe
+ones) acts on all the safe ones at once; **Verificar de novo** (Check again) measures again. When an
+item could not be removed, its row shows "Não removido" (Not removed) with the reason, and the next
+round tries again. While there are decision orphans, the top of the board shows the **N órfãs**
+(N orphans) badge, which opens that section. With the heartbeat off, the board only measures on
+opening and on **Verificar de novo**.
 
 ### Decision records
 
@@ -895,7 +954,7 @@ dependencies installed in each) and more memory and CPU while several AI session
 run together. In the editor the Git tab and the parallel block in the AI harness become a link to
 the Settings; in the browser they stay as editable fields, as before.
 
-- With nothing pending for the AI, nothing runs.
+- With nothing pending for the AI, nothing runs, and the log (Output → Faz AI) says why: expired login, story in autonomous mode, execution already running, with the person or waiting for another card.
 - The round follows the board order: bugs first; then the rightmost story (the most advanced one
   finishes before a new one starts); within a column, top to bottom — what decides is the card's
   position, not its number nor what has already been approved.
@@ -1179,7 +1238,7 @@ the same order:
 | Skills  Skills | Instructions and support files loaded when the task calls for them | `.claude/skills/<name>/SKILL.md`, `.cursor/skills`, `.agents/skills` |
 | Sub-agentes  Subagentes (subagents) | Helpers the AI delegates work to | `.claude/agents/*.md`, `.cursor/agents/*.md` |
 | Comandos  Comandos (commands) | Ready-made prompts, called with `/name` | `.claude/commands/*.md`, `.cursor/commands/*.md` |
-| Hooks  Hooks | Commands the tool runs on its own on certain events | `hooks` in `.claude/settings.json`, `.cursor/hooks.json` |
+| Hooks  Hooks | Commands the tool runs on its own on certain events | `hooks` in `.claude/settings.json`, `.cursor/hooks.json`, `[[hooks]]` in `~/.kimi-code/config.toml` |
 | MCPs  Servidores MCP (MCP servers) | Servers that give the AI extra tools | `.mcp.json`, `~/.claude.json`, `.cursor/mcp.json` |
 | Demais  Configurações e permissões (settings and permissions) | How the tool behaves and what the AI does without asking | `.claude/settings.json`, `.claude/settings.local.json`, `.cursor/cli.json`, `.cursorignore` |
 | Demais  Estilos de saída (output styles) | Change the way the AI answers | `.claude/output-styles/*.md` |
@@ -1551,6 +1610,26 @@ It needs Docker without `sudo`. There are two modes, picked on their own:
 
 The files are in `scripts/e2e-cursor/`.
 
+### End-to-end test on a freshly installed machine (Kimi Code)
+
+`npm run e2e:kimi` starts a Docker container with a clean Ubuntu 24.04 (no git, gh, uv, Code Review
+Graph or `kimi` CLI; only the Node that runs the board and `socat`) and opens the Faz AI board of the
+current branch in it, through `src/cli` (there is no editor in the container), on the `meu-app` test
+project. The Kimi Code CLI is not in the image: you install it inside the container and run
+`kimi login`, following the [script](scripts/e2e-kimi/ROTEIRO.md). Links (sign-in) open in your
+computer's browser. Inside, the `dev` user has passwordless `sudo`. The result of the script is kept in
+`docs/decisoes/`.
+
+| Command | What it does |
+|---|---|
+| `npm run e2e:kimi` | from scratch: a new container, with the board from the current branch |
+| `npm run e2e:kimi -- continuar` | the same container (sign-in and installs stay), with the updated board |
+| `npm run e2e:kimi -- parar` | stops the container |
+| `npm run e2e:kimi -- remover` | deletes the container and the image |
+
+The board opens at `http://localhost:7878` (`FAZAI_E2E_PORTA` changes the port, published only on
+`127.0.0.1`). Needs Docker without `sudo` and a Kimi Code account for the sign-in.
+
 ### Setting up the development environment
 
 The repository has all the code, but a few items live outside git. On a fresh clone (another
@@ -1567,14 +1646,29 @@ machine, for example), they must be set up again:
 | `.claude/skills/publicar-extensao/` | the publishing walkthrough for the AI | copy the folder from the original machine |
 
 The last three are only needed to publish. `main` only accepts changes through pull requests, and
-the script already deals with that: `npm run release -- <patch|minor|major>` starts from an
-up-to-date, clean main, runs the tests, creates the `release/vX.Y.Z` branch and, on it, sets the
-version and the CHANGELOGs ("Unreleased" becomes the version), commits and packages. It publishes to
-both stores, pushes the branch, opens the PR to main and, once the push is done, merges it (squash).
-Then it updates the local main, deletes the release branch (local and remote) and creates the tag
-and the GitHub Release with the `.vsix`. If anything stops after publishing,
-`npm run release -- finish` picks up where it left off (on the release branch or on main), without
-publishing again. `--dry-run` rehearses without publishing. The options are at the top of `scripts/release.mjs`.
+the script already deals with that. With gitflow, the release starts from the branch you are on:
+
+- on `develop`: `npm run release -- <patch|minor|major>` requires an up-to-date, clean `develop`,
+  runs the tests, creates the `release/vX.Y.Z` branch and, on it, sets the version and the
+  CHANGELOGs ("Unreleased" becomes the version), commits and packages;
+- on a `hotfix/...`: the version commit goes on the fix's own branch, and its PR, if already open,
+  is reused;
+- on any other branch the script refuses and says where to run it from (the `--allow-branch`
+  option no longer exists).
+
+It then publishes to both stores, pushes the branch and opens the PR to main, which goes in with a
+**merge commit** (never squash, so the stories' merge commit stays in the tag); the branch is not
+deleted by that merge. The tag and the GitHub Release with the `.vsix` are created on `origin/main`,
+without switching your folder's branch. Finally main goes back to `develop` through a PR, also with
+a merge commit. If anything stops after publishing, `npm run release -- finish` picks up where it
+left off: each step checks whether it was already done (PR, tag, release, main contained in
+`develop`, branches) and does not publish again. If the way back to `develop` conflicts, resolve it
+in the open PR and run `finish`. `--dry-run` rehearses without publishing. The options are at the
+top of `scripts/release.mjs`.
+
+For a hotfix (a Bug card, `hotfix/...` branch), run `npm run release` in the `hotfix/` worktree
+**before** approving the card. Approved first, the PR goes into main without a version and the fix
+only ships in the next release from `develop`.
 
 For a hotfix (a Bug card, `hotfix/...` branch), run `npm run release` in the `hotfix/` worktree
 **before** approving the card. Approved first, the PR goes into main without a version and the fix

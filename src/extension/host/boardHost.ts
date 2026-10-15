@@ -14,7 +14,9 @@ import { registerClients, removeProjectServer } from '../mcp/clientConfig';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
 import { ReleaseWatcher } from '../release';
-import { detectMainBranch, removeWorktree } from '../git';
+import { deleteBranch, detectMainBranch, removeWorktree } from '../git';
+import { OrphanSweeper } from '../orphans';
+import { ghProcess } from '../branchRename';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
@@ -131,6 +133,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     extensionVersion: o.version,
     // os agentes de fábrica nascem na pasta global da ferramenta na primeira abertura
     seedAgents: true,
+    // a renomeação de branches (#466) usa o PATH do shell de login, como o `gh` das rotinas de fundo
+    gh: ghProcess(() => ({ ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}) })),
   });
   const runLog = createRunLog(handle.db, o.log);
   // execuções que a sessão anterior não fechou (a janela caiu, a máquina desligou) viram 'unknown' em
@@ -211,7 +215,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const gh = run('gh');
   const git = run('git');
   // o `git` e a principal são da limpeza da história depois do merge (#464)
-  const mainBranch = (repo: string) => detectMainBranch(repo)?.name ?? '';
+  // a principal fixada nas configurações vale (a mesma que a tela e o PR usam); sem ela, a detectada
+  const mainBranch = (repo: string) => router.mainBranchName() || (detectMainBranch(repo)?.name ?? '');
   new AutoMerger(router, {
     cwd: o.folderPath,
     log: o.log,
@@ -478,6 +483,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           workspaceDir: o.folderPath,
           skillInstalled,
           harnessIssues: harnessIssuesNow() ?? null,
+          branchRenames: s.branchRenames,
           others: await otherTools(tool),
           crgMcp: crgRegistered(tool),
           platform: process.platform,
@@ -571,13 +577,33 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     mainBranch,
     afterRound: () => releaseWatcher.sweep(),
   });
+  // as branches e worktrees órfãs (#465): o varredor mede e remove; o roteador só guarda o relatório e
+  // entrega à tela os três pedidos da pessoa. Sem timer próprio: roda na rodada do heartbeat e na abertura.
+  const orphanSweeper = new OrphanSweeper({
+    cwd: o.folderPath,
+    log: o.log,
+    git,
+    removeWorktree,
+    deleteBranch,
+    snapshot: () => router.snapshot(),
+    publish: (report) => router.setOrphans(report),
+    clearWorkspace: (cardId) => router.handle({ type: 'card.workspace.clear', cardId }),
+  });
+  router.onOrphans({
+    scan: async () => {
+      await orphanSweeper.scan();
+    },
+    clean: (id, acceptLoss) => orphanSweeper.clean(id, acceptLoss),
+    cleanSafe: () => orphanSweeper.cleanSafe(),
+  });
   const heartbeat = new Heartbeat(runner, {
     snapshot: () => router.snapshot(),
     now: () => Date.now(),
     log: o.log,
     // como o heartbeat e o autopiloto, só a janela dona do board confere os merges, para não concluir em dobro
+    // as órfãs vêm depois dos merges: uma história recém-mesclada ainda seria "decisão" antes de concluída
     onRound: () => {
-      if (!o.ownsBoard || o.ownsBoard()) void mergeWatcher.runNow();
+      if (!o.ownsBoard || o.ownsBoard()) void mergeWatcher.runNow().then(() => orphanSweeper.sweep());
     },
   });
   // publica a próxima rodada agendada; a guarda em `setHeartbeat` (só notifica se mudou) evita o laço
@@ -590,6 +616,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
   router.onDidChange(publishHeartbeat);
   publishHeartbeat();
+
+  // a varredura da abertura: só a janela dona limpa sozinha (o botão da tela age onde foi clicado)
+  if (ownsBoard) void orphanSweeper.sweep();
 
   const gitignore = path.join(o.folderPath, '.gitignore');
   const api: BoardHost = {

@@ -91,6 +91,14 @@ describe('contributes.configuration', () => {
     }
     expect(props['fazai.git.gitflow']!.default).toBe(true);
   });
+  it('fazai.git.mainBranch: vazia por padrão (detectada), escopo resource, descrita nas duas línguas', () => {
+    const p = sections[2]!.properties['fazai.git.mainBranch']!;
+    expect(p.type).toBe('string');
+    expect(p.default).toBe(DEFAULT_GIT.mainBranch);
+    expect(DEFAULT_GIT.mainBranch).toBe('');
+    expect(p.scope).toBe('resource');
+    nls(String(p.markdownDescription));
+  });
   it('git: a ordem das chaves é crescente e sem repetição', () => {
     const orders = Object.values(sections[2]!.properties).map((p) => p.order as number);
     expect(orders).toEqual([...orders].sort((a, b) => a - b));

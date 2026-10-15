@@ -12,6 +12,7 @@ import {
 } from '../shared/harnessCatalog';
 import { frontmatterOf, frontmatterValue } from './frontmatter';
 import { skillMode } from './skillMode';
+import { parseKimiHooks } from '../shared/kimiHooks';
 
 const HEAD_BYTES = 4096;
 const MAX_CONFIG_BYTES = 2 * 1024 * 1024;
@@ -237,6 +238,15 @@ function scanSource(src: HarnessSource, base: string, ctx: Ctx, source?: number)
       if (src.kind === 'hook')
         return Object.entries(section).flatMap(([event, v]) => hookEntries(v).map((h) => hookItem(event, h, target)));
       return Object.entries(section).map(([name, v]) => item(name, short(mcpSummary(v)), target));
+    }
+    case 'toml-hooks': {
+      let text = '';
+      try {
+        text = fs.readFileSync(target, 'utf8');
+      } catch {
+        return [];
+      }
+      return parseKimiHooks(text).hooks.map((h) => hookItem(h.event, { matcher: h.matcher, command: h.command, type: 'command' }, target));
     }
     case 'claude-json': {
       const json = readJson(target);

@@ -163,6 +163,16 @@ export class HostBridge {
       case 'requirements.check':
         await this.router.recheckRequirements();
         return;
+      // varrer e limpar demoram (git em cada item): o `done` só sai quando termina, para a tela saber quando parou
+      case 'git.orphans.scan':
+        await this.router.scanOrphans();
+        return;
+      case 'git.orphans.clean':
+        this.post({ type: 'notice', message: await this.router.cleanOrphan(msg.id, msg.acceptLoss) });
+        return;
+      case 'git.orphans.cleanSafe':
+        this.post({ type: 'notice', message: await this.router.cleanSafeOrphans() });
+        return;
       case 'environment.check':
         await this.router.checkEnvironment();
         return;

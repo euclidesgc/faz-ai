@@ -21,6 +21,7 @@ export type EnvCheckId =
   | 'repo'
   | 'gh'
   | 'gh-auth'
+  | 'branch-name'
   | 'crg'
   | 'uv'
   | 'crg-graph'
