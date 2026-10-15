@@ -3,6 +3,7 @@ import type { AiRunMode } from '../shared/runner';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
+import { bindBranchRenamePrompt } from './branchRenamePrompt';
 import { createBoardHost, type BoardHost } from './host/boardHost';
 import { startMcpServer } from './mcp/server';
 import { socketPath, stableBridgePath, workspaceKey } from './mcp/socketPath';
@@ -131,6 +132,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       };
       router.onDidChange(onBoardChange);
       onBoardChange();
+      // mudar o nome da principal ou da develop pergunta se renomeia a branch também no origin (#466)
+      context.subscriptions.push(
+        bindBranchRenamePrompt(router, {
+          warn: (message, modal, ...items) => vscode.window.showWarningMessage(message, { modal }, ...items),
+          info: (message, ...items) => vscode.window.showInformationMessage(message, ...items),
+          error: (message, ...items) => vscode.window.showErrorMessage(message, ...items),
+          copy: (text) => vscode.env.clipboard.writeText(text),
+        }),
+      );
       // Settings do editor (fazai.*) ↔ SQLite do board
       context.subscriptions.push(
         new IdeSettings(vscode.workspace, f.uri, log, (m) => void vscode.window.showWarningMessage(m)).bind(router),

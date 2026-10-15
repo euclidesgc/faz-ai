@@ -261,6 +261,11 @@ export const host: Record<string, string> = {
   // execução pela IA e chat
   'A IA ainda está respondendo. Espere ou interrompa.': 'The AI is still replying. Wait or stop it.',
   'A IA já está trabalhando em {ref}.': 'The AI is already working on {ref}.',
+  'Não dá para renomear a branch agora: a IA está executando {refs}. Espere terminar e tente de novo.':
+    'Cannot rename the branch now: the AI is running {refs}. Wait for it to finish and try again.',
+  'Não dá para renomear a branch agora: há uma execução da IA em andamento. Espere terminar e tente de novo.':
+    'Cannot rename the branch now: an AI run is in progress. Wait for it to finish and try again.',
+  'Não há renomeação de branch à espera de confirmação.': 'There is no branch rename waiting for confirmation.',
   'Interrompido.': 'Stopped.',
   'A resposta passou do tempo limite ({minutes} min) e foi encerrada.': 'The reply exceeded the time limit ({minutes} min) and was ended.',
   'Não foi possível executar o {tool}: {reason}': 'Could not run {tool}: {reason}',
