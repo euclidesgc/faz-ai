@@ -62,6 +62,12 @@ describe('userRegisteredTools', () => {
     expect(userRegisteredTools(project, home)).toEqual([]);
   });
 
+  it('um "faz-ai" que não aponta para a ponte do board é da pessoa: fica como está', () => {
+    writeJson(kimiFile(), { mcpServers: { 'faz-ai': { command: 'uvx', args: ['meu-servidor'] } } });
+    writeJson(path.join(home, '.claude.json'), { mcpServers: { 'faz-ai': { command: 'node', args: ['/outro/servidor.js'] } } });
+    expect(userRegisteredTools(project, home)).toEqual([]);
+  });
+
   it('o Cursor nunca entra: o registro dele é o do projeto, refeito a cada abertura da pasta', () => {
     writeJson(path.join(project, '.cursor', 'mcp.json'), server(OLD_BRIDGE, project));
     writeJson(path.join(home, '.cursor', 'mcp.json'), server(OLD_BRIDGE));

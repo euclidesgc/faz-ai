@@ -2,7 +2,7 @@ import { aiToolInfo, ALL_AI_TOOLS, type AiTool } from '../../shared/harness';
 import { runCli } from '../cliProbe';
 import { resolveCommand } from '../cliResolve';
 import { registeredServer } from '../requirements';
-import { registerClients, type RegisterOptions, type Registration } from './clientConfig';
+import { isBoardBridge, registerClients, type RegisterOptions, type Registration } from './clientConfig';
 
 /**
  * Roda os comandos de CLI que um registro pede (`Registration.run`), em ordem. Um passo marcado com
@@ -27,11 +27,16 @@ export async function runRegistrationSteps(done: Registration[], pathEnv: string
 
 /**
  * Ferramentas em que o board está registrado no global: só nelas a atualização da extensão refaz o
- * registro. O Cursor nunca entra (o registro dele é o do projeto, refeito a cada abertura da pasta), e
- * um registro só no projeto não conta: a ativação não mexe em arquivo do projeto da pessoa.
+ * registro. O Cursor nunca entra (o registro dele é o do projeto, refeito a cada abertura da pasta), um
+ * registro só no projeto não conta (a ativação não mexe em arquivo do projeto da pessoa) e um "faz-ai"
+ * que não aponta para uma ponte do board é da pessoa: fica como está.
  */
 export function userRegisteredTools(workspaceDir: string, homeDir: string): AiTool[] {
-  return ALL_AI_TOOLS.filter((tool) => tool !== 'cursor' && registeredServer(tool, workspaceDir, homeDir)?.scope === 'user');
+  return ALL_AI_TOOLS.filter((tool) => {
+    if (tool === 'cursor') return false;
+    const found = registeredServer(tool, workspaceDir, homeDir);
+    return found?.scope === 'user' && isBoardBridge(found.args[0]);
+  });
 }
 
 /**

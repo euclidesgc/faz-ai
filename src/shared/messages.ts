@@ -39,7 +39,7 @@ export type WebviewToHost =
   | { type: 'ready' }
   | { type: 'view.set'; patch: Partial<ViewState> }
   | { type: 'ui.showFilters' }
-  /** instala o servidor MCP do board numa ferramenta (padrão: a do projeto), global (padrão) ou só no projeto */
+  /** instala o servidor MCP do board no global de uma ferramenta (padrão: a do projeto); nada entra no projeto */
   | { type: 'ui.connectAI'; tool?: AiTool }
   /** tira o registro quebrado do board do arquivo do projeto (que vale sobre o global) e refaz o global */
   | { type: 'ui.fixProjectMcp'; file: string }
@@ -328,7 +328,7 @@ export type WebviewToHost =
   | { type: 'environment.allowKimiMcp' }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
   /**
-   * instala a skill do fluxo numa ferramenta (padrão: a do projeto), global (padrão) ou só no projeto;
+   * instala a skill do fluxo no global de uma ferramenta (padrão: a do projeto), nunca no projeto;
    * `replace` troca uma skill de mesmo nome que já esteja no destino (sem ele, a que existe fica)
    */
   | { type: 'harness.flowSkill.install'; tool?: AiTool; replace?: boolean }

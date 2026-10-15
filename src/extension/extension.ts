@@ -445,6 +445,8 @@ async function offerBoardUpgrade(context: vscode.ExtensionContext, router: Messa
 }
 
 const MCP_VERSION_KEY = 'fazai.mcpRegisteredVersion';
+/** Num workspace com várias pastas só a primeira refaz o registro: ele é global, e duas CLIs ao mesmo tempo escreveriam o mesmo arquivo. */
+let reinstallStarted = false;
 
 /**
  * Refaz o registro global do board nas ferramentas em que ele já está, uma vez por versão da extensão:
@@ -458,6 +460,8 @@ async function reinstallOnUpdate(
   bridgePath: string,
   output: vscode.OutputChannel,
 ): Promise<void> {
+  if (reinstallStarted) return;
+  reinstallStarted = true;
   const version = String(context.extension.packageJSON.version);
   if (context.globalState.get<string>(MCP_VERSION_KEY) === version) return;
   try {

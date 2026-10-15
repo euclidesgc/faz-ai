@@ -254,6 +254,11 @@ export function registerCursorProject(o: RegisterOptions): Registration {
   };
 }
 
+/** O argumento aponta para uma ponte do Faz AI (qualquer versão): distingue o registro do board de um "faz-ai" que a pessoa gravou à mão. */
+export function isBoardBridge(arg: string | undefined): boolean {
+  return /[\\/]mcp[\\/]bridge\.js$/.test(arg ?? '');
+}
+
 /**
  * Tira do `~/.cursor/mcp.json` o registro do board que uma versão anterior gravou no global (o que
  * aponta para uma ponte do Faz AI). Um "faz-ai" que a pessoa gravou à mão para outra coisa fica.
@@ -263,7 +268,7 @@ export function removeUserCursorServer(homeDir: string): boolean {
   const current = readEntry(file);
   if (!current || current === 'invalid') return false;
   const bridge = Array.isArray(current.args) ? String(current.args[0] ?? '') : '';
-  if (!/[\\/]mcp[\\/]bridge\.js$/.test(bridge)) return false;
+  if (!isBoardBridge(bridge)) return false;
   const config = JSON.parse(fs.readFileSync(file, 'utf8')) as { mcpServers: Record<string, unknown> };
   delete config.mcpServers[SERVER];
   fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n');
