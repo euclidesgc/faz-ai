@@ -1583,6 +1583,26 @@ It needs Docker without `sudo`. There are two modes, picked on their own:
 
 The files are in `scripts/e2e-cursor/`.
 
+### End-to-end test on a freshly installed machine (Kimi Code)
+
+`npm run e2e:kimi` starts a Docker container with a clean Ubuntu 24.04 (no git, gh, uv, Code Review
+Graph or `kimi` CLI; only the Node that runs the board and `socat`) and opens the Faz AI board of the
+current branch in it, through `src/cli` (there is no editor in the container), on the `meu-app` test
+project. The Kimi Code CLI is not in the image: you install it inside the container and run
+`kimi login`, following the [script](scripts/e2e-kimi/ROTEIRO.md). Links (sign-in) open in your
+computer's browser. Inside, the `dev` user has passwordless `sudo`. The result of the script is kept in
+`docs/decisoes/`.
+
+| Command | What it does |
+|---|---|
+| `npm run e2e:kimi` | from scratch: a new container, with the board from the current branch |
+| `npm run e2e:kimi -- continuar` | the same container (sign-in and installs stay), with the updated board |
+| `npm run e2e:kimi -- parar` | stops the container |
+| `npm run e2e:kimi -- remover` | deletes the container and the image |
+
+The board opens at `http://localhost:7878` (`FAZAI_E2E_PORTA` changes the port, published only on
+`127.0.0.1`). Needs Docker without `sudo` and a Kimi Code account for the sign-in.
+
 ### Setting up the development environment
 
 The repository has all the code, but a few items live outside git. On a fresh clone (another
