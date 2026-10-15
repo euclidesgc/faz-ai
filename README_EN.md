@@ -775,8 +775,16 @@ the box keeps the request and the question comes back when the board is reopened
 - **Not changed**: CI workflows, protection rules, GitHub's default branch (for `develop`) and other
   clones. The AI does not rename branches: no new MCP tool.
 
-The browser dialog, the fields on the Git screen and the environment diagnostic item come in a later
-delivery (#498).
+In the browser (outside the editor) the question is a board dialog, on any screen: **Renomear**
+(Rename, initial focus), **Desfazer** (Undo) and **Fechar** (Close, or Esc, which sends nothing and does
+not come back in the session). After Rename, the dialog shows the steps done, what is left, the error
+and the ready-made commands, each with **Copiar comando** (Copy command); on a partial failure there is
+**Renomear de novo** (Rename again). **Settings → Git** has the **Branch principal** (main branch; empty
+= detected) and **Branch de integração** (integration branch) fields, saved on leaving the field, with
+the explanation of what the rename does and what it doesn't change. In the **environment diagnostic**,
+the **Nome da branch principal/develop** item (a recommendation, it doesn't block) stays pending while a
+request is waiting, with the local clone command and the **Abrir a tela Git** (Open the Git screen)
+button.
 
 ### Pull request and merge in Homologação
 
@@ -1574,6 +1582,26 @@ It needs Docker without `sudo`. There are two modes, picked on their own:
   `FAZAI_E2E_MODO=novnc` forces this mode on a Linux with Wayland.
 
 The files are in `scripts/e2e-cursor/`.
+
+### End-to-end test on a freshly installed machine (Kimi Code)
+
+`npm run e2e:kimi` starts a Docker container with a clean Ubuntu 24.04 (no git, gh, uv, Code Review
+Graph or `kimi` CLI; only the Node that runs the board and `socat`) and opens the Faz AI board of the
+current branch in it, through `src/cli` (there is no editor in the container), on the `meu-app` test
+project. The Kimi Code CLI is not in the image: you install it inside the container and run
+`kimi login`, following the [script](scripts/e2e-kimi/ROTEIRO.md). Links (sign-in) open in your
+computer's browser. Inside, the `dev` user has passwordless `sudo`. The result of the script is kept in
+`docs/decisoes/`.
+
+| Command | What it does |
+|---|---|
+| `npm run e2e:kimi` | from scratch: a new container, with the board from the current branch |
+| `npm run e2e:kimi -- continuar` | the same container (sign-in and installs stay), with the updated board |
+| `npm run e2e:kimi -- parar` | stops the container |
+| `npm run e2e:kimi -- remover` | deletes the container and the image |
+
+The board opens at `http://localhost:7878` (`FAZAI_E2E_PORTA` changes the port, published only on
+`127.0.0.1`). Needs Docker without `sudo` and a Kimi Code account for the sign-in.
 
 ### Setting up the development environment
 

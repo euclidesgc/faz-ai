@@ -37,7 +37,7 @@ export function Menu({ items, title, children = <IconMore /> }: { items: MenuIte
   const toggle = () => {
     if (pos) return setPos(null);
     const r = btn.current!.getBoundingClientRect();
-    const width = 230;
+    const width = 320;
     setPos({ top: r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)) });
   };
 

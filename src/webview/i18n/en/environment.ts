@@ -33,6 +33,10 @@ export const environment: Record<string, string> = {
   'Nível de permissão das execuções': 'Permission level for runs',
   'Skill do fluxo ({name})': 'Flow skill ({name})',
   'Repositório Git nesta pasta': 'Git repository in this folder',
+  'Nome da branch principal/develop': 'Main/develop branch name',
+  'O nome novo já está nas configurações, mas o repositório ainda usa o antigo. Renomear ou Desfazer na tela Git acerta o clone, o upstream e o origin; o comando abaixo é só o do clone local.':
+    'The new name is already in the settings, but the repository still uses the old one. Rename or Undo on the Git screen fixes the clone, the upstream and the origin; the command below is only the local clone one.',
+  'Abrir a tela Git': 'Open the Git screen',
   'GitHub CLI (gh)': 'GitHub CLI (gh)',
   'O board usa o gh para fazer o merge automático do PR aprovado e para acompanhar os PRs abertos até o merge.':
     'The board uses gh to auto-merge the approved PR and to follow open PRs until they are merged.',

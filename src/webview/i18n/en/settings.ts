@@ -383,6 +383,14 @@ export const settings: Record<string, string> = {
   'Abre o formulário de um modelo novo.': 'Opens the form for a new model.',
   'O board não tem o campo "{field}".': 'The board has no "{field}" field.',
 
+  // renomeação da principal e da develop (#498)
+  'Branch principal': 'Main branch',
+  detectada: 'detected',
+  'Vazio = a detectada (<code>main</code>, <code>master</code>...). Mudar o nome de uma branch que já existe pede a sua confirmação para renomeá-la também no <code>origin</code>.':
+    'Empty = the detected one (<code>main</code>, <code>master</code>...). Changing the name of a branch that already exists asks for your confirmation to rename it on <code>origin</code> too.',
+  'Renomear a principal ou a develop': 'Rename the main or develop branch',
+  '<b>Ao mudar o nome da principal ou da develop</b>, o board pergunta Renomear ou Desfazer. Renomear muda a branch no GitHub (com o <code>gh</code>), no clone local, o upstream e, na principal, o <code>origin/HEAD</code>. <b>Não muda:</b> workflows de CI, regras de proteção, a branch padrão do GitHub (na develop) e os clones de outras pessoas; os comandos deles aparecem depois.':
+    "<b>When you change the main or develop branch name</b>, the board asks Rename or Undo. Rename changes the branch on GitHub (with <code>gh</code>), in the local clone, the upstream and, for main, <code>origin/HEAD</code>. <b>Does not change:</b> CI workflows, protection rules, the GitHub default branch (for develop) and other people's clones; their commands show up afterwards.",
   // gitflow (#462)
   'Com o gitflow, funcionalidades e correções partem da branch de integração (develop) e voltam para ela; só o hotfix parte da principal. O prefixo da branch mostra o tipo de trabalho.':
     'With gitflow, features and fixes start from the integration branch (develop) and go back to it; only the hotfix starts from the main branch. The branch prefix shows the kind of work.',
@@ -425,4 +433,39 @@ export const settings: Record<string, string> = {
   Feature: 'Feature',
   Bugfix: 'Bugfix',
   Hotfix: 'Hotfix',
+  // Aviso de renomeação da principal e da develop no navegador (BranchRenameDialog, #466/#498)
+  'atualizar as referências do origin': 'refresh the origin references',
+  'renomear no GitHub': 'rename on GitHub',
+  'renomear a branch local': 'rename the local branch',
+  'ajustar o upstream': 'adjust the upstream',
+  'apontar o origin/HEAD para a nova': 'point origin/HEAD to the new one',
+  'A branch {from} agora se chama {to} ({steps}).': 'The branch {from} is now called {to} ({steps}).',
+  'Nada a renomear: {to} já existe ou {from} não existe mais. O board passa a usar {to}.':
+    'Nothing to rename: {to} already exists or {from} no longer exists. The board now uses {to}.',
+  'O board não alterou o repositório nem o remoto ({reason}). Para renomear {from} para {to}, rode:':
+    'The board changed neither the repository nor the remote ({reason}). To rename {from} to {to}, run:',
+  'sem o gh': 'without gh',
+  'A renomeação parou em "{step}": {error}': 'The rename stopped at "{step}": {error}',
+  'um passo': 'a step',
+  erro: 'error',
+  'Já feito: {steps}.': 'Already done: {steps}.',
+  'Nada foi alterado.': 'Nothing was changed.',
+  'O que falta, neste clone:': 'What is left, in this clone:',
+  'Neste clone, rode:': 'In this clone, run:',
+  'Nos outros clones do repositório, rode:': 'In the other clones of the repository, run:',
+  'Resultado da renomeação': 'Rename result',
+  'Renomear a branch principal?': 'Rename the main branch?',
+  'Renomear a develop?': 'Rename the develop branch?',
+  'A branch {from} passa a se chamar {to}. O nome novo já está nas configurações.':
+    'The branch {from} will be called {to}. The new name is already in the settings.',
+  'Para o repositório ficar coerente, o board vai:': 'To keep the repository consistent, the board will:',
+  'renomear a branch no GitHub, com o <code>gh</code> (instalado e autenticado);':
+    'rename the branch on GitHub, with <code>gh</code> (installed and signed in);',
+  'renomear a branch no clone local e ajustar o upstream;': 'rename the branch in the local clone and adjust the upstream;',
+  'apontar o <code>origin/HEAD</code> para a nova.': 'point <code>origin/HEAD</code> to the new one.',
+  'Sem o gh, fora do GitHub ou sem permissão, o board não mexe no remoto e mostra os comandos prontos. Não muda: workflows de CI, regras de proteção, a branch padrão do GitHub e os clones de outras pessoas.':
+    "Without gh, outside GitHub or without permission, the board does not touch the remote and shows the ready commands. Does not change: CI workflows, protection rules, the GitHub default branch and other people's clones.",
+  'Desfazer volta o nome para {from} sem tocar o repositório.': 'Undo puts the name back to {from} without touching the repository.',
+  Desfazer: 'Undo',
+  'Renomear de novo': 'Rename again',
 };

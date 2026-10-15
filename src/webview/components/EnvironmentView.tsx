@@ -114,6 +114,13 @@ function texts(c: EnvCheck, projectTool: AiTool): { title: string; hint: string 
         title: t('Repositório Git nesta pasta'),
         hint: t('Os modos de branch e de worktree precisam de um repositório. Sem ele, as histórias são trabalhadas direto na pasta.'),
       };
+    case 'branch-name':
+      return {
+        title: t('Nome da branch principal/develop'),
+        hint: t(
+          'O nome novo já está nas configurações, mas o repositório ainda usa o antigo. Renomear ou Desfazer na tela Git acerta o clone, o upstream e o origin; o comando abaixo é só o do clone local.',
+        ),
+      };
     case 'gh':
       return {
         title: t('GitHub CLI (gh)'),
@@ -217,6 +224,7 @@ interface RowProps {
 function Row({ check, projectTool, busy, onFixed }: RowProps) {
   const x = texts(check, projectTool);
   const r = check.requirement;
+  const openSettings = useBoardStore((s) => s.openSettings);
   const nodeTooOld = check.id === 'node' && check.status === 'missing' && check.version;
   return (
     <li className={`env-item ${check.status}`}>
@@ -258,6 +266,14 @@ function Row({ check, projectTool, busy, onFixed }: RowProps) {
           {check.install && check.status !== 'ok' && <span className="small muted">{t('Depois:')}</span>}
           {r?.action?.kind === 'command' ? <RequirementFix r={r} variant="primary" /> : <CopyCommand command={check.command} />}
           {check.inProject && <span className="small muted">{t('Na pasta do projeto.')}</span>}
+        </div>
+      )}
+      {/* a renomeação pendente se resolve na tela Git (Renomear / Desfazer) */}
+      {check.id === 'branch-name' && check.status === 'missing' && (
+        <div className="env-fix">
+          <Button size="small" variant="primary" onClick={() => openSettings('git')}>
+            {t('Abrir a tela Git')}
+          </Button>
         </div>
       )}
       {/* o que o board resolve sozinho: o MCP, a skill e a permissão da ferramenta do projeto */}
