@@ -104,6 +104,27 @@ const report = (o: { skill?: EnvCheck['status']; optional?: boolean } = {}): Env
 const item = (title: string) => screen.getByText(title).closest('li')!;
 
 describe('Diagnóstico do ambiente', () => {
+  it('o nome da branch pendente mostra o comando e o botão que abre a tela Git', async () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show({
+      ...report(),
+      recommended: [{ id: 'branch-name', status: 'missing', command: 'git branch -m master main', inProject: true }],
+    });
+    const row = item('Nome da branch principal/develop');
+    expect(within(row).getByText('git branch -m master main')).toBeInTheDocument();
+    await userEvent.click(within(row).getByRole('button', { name: 'Abrir a tela Git' }));
+    expect(useBoardStore.getState().view).toBe('settings');
+    expect(useBoardStore.getState().settingsTab).toBe('git');
+  });
+
+  it('o nome da branch pronto não traz o botão', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show({ ...report(), recommended: [{ id: 'branch-name', status: 'ok' }] });
+    expect(screen.queryByRole('button', { name: 'Abrir a tela Git' })).not.toBeInTheDocument();
+  });
+
   it('confere ao abrir e mostra as listas de necessários, opcionais e recomendados, nessa ordem', () => {
     syncStore(router);
     renderThemed(<EnvironmentView />);

@@ -101,6 +101,35 @@ export function GitSettings() {
             </FormField>
 
             <FormField
+              label={t('Branch principal')}
+              hint={rich(
+                'Vazio = a detectada (<code>main</code>, <code>master</code>...). Mudar o nome de uma branch que já existe pede a sua confirmação para renomeá-la também no <code>origin</code>.',
+              )}
+            >
+              {(id) => (
+                <TextField.Root
+                  id={id}
+                  key={git.mainBranch}
+                  placeholder={t('detectada')}
+                  disabled={off}
+                  defaultValue={git.mainBranch}
+                  onBlur={(e) => e.target.value.trim() !== git.mainBranch && set({ mainBranch: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                />
+              )}
+            </FormField>
+            <Callout.Root color="blue" size="1" role="note" aria-label={t('Renomear a principal ou a develop')}>
+              <Callout.Icon>
+                <IconWarning />
+              </Callout.Icon>
+              <Callout.Text>
+                {rich(
+                  '<b>Ao mudar o nome da principal ou da develop</b>, o board pergunta Renomear ou Desfazer. Renomear muda a branch no GitHub (com o <code>gh</code>), no clone local, o upstream e, na principal, o <code>origin/HEAD</code>. <b>Não muda:</b> workflows de CI, regras de proteção, a branch padrão do GitHub (na develop) e os clones de outras pessoas; os comandos deles aparecem depois.',
+                )}
+              </Callout.Text>
+            </Callout.Root>
+
+            <FormField
               label={t('Pasta das worktrees')}
               hint={rich(
                 'Relativa à pasta do projeto; <code>{repo}</code> é o nome dela. O padrão (<code>{padrao}</code>) fica ao lado do projeto, fora do repositório. Cada worktree é uma cópia de trabalho: dependências (ex.: <code>node_modules</code>) precisam ser instaladas nela.',

@@ -743,8 +743,14 @@ volta ao reabrir o board.
 - **Não muda**: workflows de CI, regras de proteção, a branch padrão do GitHub (na `develop`) e os
   outros clones. A IA não renomeia branches: não há ferramenta nova no MCP.
 
-O diálogo no navegador, os campos na tela Git e o item no Diagnóstico do ambiente vêm em uma entrega
-seguinte (#498).
+No navegador (fora do editor) a pergunta é um diálogo do board, em qualquer tela: **Renomear** (foco
+inicial), **Desfazer** e **Fechar** (ou Esc, que não envia nada e não volta na sessão). Depois de
+Renomear, o diálogo mostra os passos feitos, o que falta, o erro e os comandos prontos, cada um com
+**Copiar comando**; na falha parcial há **Renomear de novo**. Em **Configurações → Git** ficam os campos
+**Branch principal** (vazio = detectada) e **Branch de integração**, que gravam ao sair do campo, com a
+explicação do que a renomeação faz e do que não altera. No **Diagnóstico do ambiente**, o item
+**Nome da branch principal/develop** (recomendação, não bloqueia) fica pendente enquanto houver pedido
+à espera, com o comando do clone local e o botão **Abrir a tela Git**.
 
 ### Pull request e merge na Homologação
 
@@ -1523,6 +1529,25 @@ Precisa de Docker sem `sudo`. Há dois modos, escolhidos sozinhos:
   `FAZAI_E2E_MODO=novnc` força este modo num Linux com Wayland.
 
 Os arquivos ficam em `scripts/e2e-cursor/`.
+
+### Teste e2e numa máquina recém-instalada (Kimi Code)
+
+`npm run e2e:kimi` sobe um contêiner Docker com Ubuntu 24.04 limpo (sem git, gh, uv, Code Review Graph
+nem a CLI `kimi`; só o Node que roda o board e o `socat`) e abre nele o board do Faz AI da branch
+atual, pelo `src/cli` (não há editor no contêiner), no projeto de teste `meu-app`. A CLI do Kimi Code
+não vem na imagem: você a instala dentro do contêiner e faz o `kimi login`, seguindo o
+[roteiro](scripts/e2e-kimi/ROTEIRO.md). Os links (login) abrem no navegador do computador. Dentro
+dele, o usuário `dev` tem `sudo` sem senha. O resultado do roteiro fica em `docs/decisoes/`.
+
+| Comando | O que faz |
+|---|---|
+| `npm run e2e:kimi` | do zero: contêiner novo, com o board da branch atual |
+| `npm run e2e:kimi -- continuar` | o mesmo contêiner (login e instalações ficam), com o board atualizado |
+| `npm run e2e:kimi -- parar` | para o contêiner |
+| `npm run e2e:kimi -- remover` | apaga o contêiner e a imagem |
+
+O board abre em `http://localhost:7878` (`FAZAI_E2E_PORTA` troca a porta, publicada só em
+`127.0.0.1`). Precisa de Docker sem `sudo` e de uma conta Kimi Code para o login.
 
 ### Preparar o ambiente de desenvolvimento
 

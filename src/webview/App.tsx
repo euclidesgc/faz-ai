@@ -13,6 +13,7 @@ import { Board } from './components/Board';
 import { CardDrawer } from './components/CardDrawer';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { Dialog } from './components/Dialog';
+import { BranchRenameDialog } from './components/BranchRenameDialog';
 import { BusyOverlay } from './components/BusyOverlay';
 import { BoardPlaceholder } from './components/ui';
 import { FilterBar } from './components/FilterBar';
@@ -205,6 +206,7 @@ export function App() {
       <AttachmentModal onSaveAs={saveAttachmentAs} />
       <HarnessFileModal />
       <Dialog />
+      <BranchRenameDialog />
       {busyOverlay && <BusyOverlay label={busyOverlay.label} />}
       <div className="toasts" aria-live="polite">
         {error && (
