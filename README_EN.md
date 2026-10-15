@@ -860,9 +860,9 @@ checking the merges) and gives each item a verdict:
   on its own.
 
 Under **Settings → Git → Branches e worktrees órfãs** (orphan branches and worktrees) each item shows
-the story, the situation and the verdict. **Limpar** (Clean) removes one item; on a decision item it
+the story, the situation and the verdict. **Limpar** (Clear) removes one item; on a decision item it
 opens a confirmation saying how many files and commits are lost, and only after you confirm does the
-board remove it (checking the disk again first). **Limpar todas as seguras** (Clean all the safe
+board remove it (checking the disk again first). **Limpar todas as seguras** (Clear all the safe
 ones) acts on all the safe ones at once; **Verificar de novo** (Check again) measures again. When an
 item could not be removed, its row shows "Não removido" (Not removed) with the reason, and the next
 round tries again. While there are decision orphans, the top of the board shows the **N órfãs**

@@ -40,7 +40,11 @@ function lossMessage(item: OrphanItem): string {
   ].filter((x): x is string => x !== null);
   const what = item.kind === 'worktree' ? t('A worktree') : t('A branch');
   return losses.length
-    ? t('{what} {ref} será removida e isto se perde, sem volta: {losses}.', { what, ref: item.ref, losses: losses.join(' e ') })
+    ? t('{what} {ref} será removida e isto se perde, sem volta: {losses}.', {
+        what,
+        ref: item.ref,
+        losses: losses.length === 2 ? t('{a} e {b}', { a: losses[0]!, b: losses[1]! }) : losses.join(''),
+      })
     : t('{what} {ref} será removida e não dá para desfazer.', { what, ref: item.ref });
 }
 
