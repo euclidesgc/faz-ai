@@ -743,8 +743,14 @@ volta ao reabrir o board.
 - **Não muda**: workflows de CI, regras de proteção, a branch padrão do GitHub (na `develop`) e os
   outros clones. A IA não renomeia branches: não há ferramenta nova no MCP.
 
-O diálogo no navegador, os campos na tela Git e o item no Diagnóstico do ambiente vêm em uma entrega
-seguinte (#498).
+No navegador (fora do editor) a pergunta é um diálogo do board, em qualquer tela: **Renomear** (foco
+inicial), **Desfazer** e **Fechar** (ou Esc, que não envia nada e não volta na sessão). Depois de
+Renomear, o diálogo mostra os passos feitos, o que falta, o erro e os comandos prontos, cada um com
+**Copiar comando**; na falha parcial há **Renomear de novo**. Em **Configurações → Git** ficam os campos
+**Branch principal** (vazio = detectada) e **Branch de integração**, que gravam ao sair do campo, com a
+explicação do que a renomeação faz e do que não altera. No **Diagnóstico do ambiente**, o item
+**Nome da branch principal/develop** (recomendação, não bloqueia) fica pendente enquanto houver pedido
+à espera, com o comando do clone local e o botão **Abrir a tela Git**.
 
 ### Pull request e merge na Homologação
 

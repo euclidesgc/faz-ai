@@ -775,8 +775,16 @@ the box keeps the request and the question comes back when the board is reopened
 - **Not changed**: CI workflows, protection rules, GitHub's default branch (for `develop`) and other
   clones. The AI does not rename branches: no new MCP tool.
 
-The browser dialog, the fields on the Git screen and the environment diagnostic item come in a later
-delivery (#498).
+In the browser (outside the editor) the question is a board dialog, on any screen: **Renomear**
+(Rename, initial focus), **Desfazer** (Undo) and **Fechar** (Close, or Esc, which sends nothing and does
+not come back in the session). After Rename, the dialog shows the steps done, what is left, the error
+and the ready-made commands, each with **Copiar comando** (Copy command); on a partial failure there is
+**Renomear de novo** (Rename again). **Settings → Git** has the **Branch principal** (main branch; empty
+= detected) and **Branch de integração** (integration branch) fields, saved on leaving the field, with
+the explanation of what the rename does and what it doesn't change. In the **environment diagnostic**,
+the **Nome da branch principal/develop** item (a recommendation, it doesn't block) stays pending while a
+request is waiting, with the local clone command and the **Abrir a tela Git** (Open the Git screen)
+button.
 
 ### Pull request and merge in Homologação
 
