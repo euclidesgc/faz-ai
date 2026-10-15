@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import os from 'node:os';
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
@@ -12,8 +14,8 @@ beforeEach(async () => {
     folderName: 'P',
     author: 'Pessoa',
     attachmentsDir: '/tmp',
-    workspaceDir: '/tmp',
-    homeDir: '/tmp',
+    workspaceDir: fs.mkdtempSync(path.join(os.tmpdir(), 'fz-ws-')),
+    homeDir: fs.mkdtempSync(path.join(os.tmpdir(), 'fz-home-')),
   });
 });
 

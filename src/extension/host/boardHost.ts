@@ -687,6 +687,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       if (enableTimer) clearInterval(enableTimer);
       // espera a conferência em andamento: sem isso ela pode gravar o board depois de o banco fechar
       await checking;
+      await orphanSweeper.idle();
       autopilot.stop(); // fechar o editor não é uma pausa da pessoa: na reabertura a fila retoma
       heartbeat.stop();
       runner.dispose();

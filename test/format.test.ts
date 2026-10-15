@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import os from 'node:os';
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
@@ -12,8 +14,8 @@ async function setup() {
     folderName: 'P',
     author: 'Pessoa',
     attachmentsDir: '/tmp',
-    workspaceDir: '/tmp',
-    homeDir: '/tmp',
+    workspaceDir: fs.mkdtempSync(path.join(os.tmpdir(), 'fz-ws-')),
+    homeDir: fs.mkdtempSync(path.join(os.tmpdir(), 'fz-home-')),
   });
   // os quatro campos de triagem são campos do board: o board padrão já os cria
   const s0 = router.snapshot();
