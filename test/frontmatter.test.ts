@@ -3,6 +3,19 @@ import { frontmatterOf, frontmatterValue } from '../src/extension/frontmatter';
 import { parseFrontmatter } from '../src/extension/harness';
 
 describe('frontmatter', () => {
+  it('lê aspas duplas como string JSON, com escapes', () => {
+    expect(frontmatterValue('description: "a \\"b\\" c"', 'description')).toBe('a "b" c');
+  });
+
+  it('aspas duplas que não são JSON válido só perdem as aspas das pontas', () => {
+    expect(frontmatterValue('description: "a \\q b"', 'description')).toBe('a \\q b');
+  });
+
+  it('aspas simples e sem aspas seguem como antes', () => {
+    expect(frontmatterValue("description: 'x y'", 'description')).toBe('x y');
+    expect(frontmatterValue('description: x y', 'description')).toBe('x y');
+  });
+
   it('valor em uma linha, com ou sem aspas', () => {
     const fm = 'name: revisor\ndescription: "Revisa a spec"\nmodel: opus';
     expect(frontmatterValue(fm, 'name')).toBe('revisor');

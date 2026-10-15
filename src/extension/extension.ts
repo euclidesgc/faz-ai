@@ -8,6 +8,7 @@ import { createBoardHost, type BoardHost } from './host/boardHost';
 import { startMcpServer } from './mcp/server';
 import { socketPath, stableBridgePath, workspaceKey } from './mcp/socketPath';
 import { registerCursorProject } from './mcp/clientConfig';
+import { reinstallUserServers } from './mcp/reinstall';
 import { resolveCommand } from './cliResolve';
 import { loginShellPath } from './spawn';
 import { BoardPanel } from './panel/BoardPanel';
@@ -245,12 +246,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         tokenFile: path.join(os.homedir(), '.faz-ai', 'web-token'),
         iconFile: path.join(context.extensionPath, 'media', 'icon.png'),
         env: {
-          async connectAI(target) {
-            const { message, toIgnore } = await h.connectAI(target);
-            return toIgnore.length
-              ? `${message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${toIgnore.join(', ')}.`
-              : message;
-          },
+          connectAI: async (target) => (await h.connectAI(target)).message,
           fixProjectMcp: (file) => h.fixProjectServer(file),
           runAi: (cardId, mode) => h.runner.start(cardId, 'manual', mode),
           stopAi: (cardId) => h.runner.stop(cardId),
@@ -407,6 +403,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // ser aberto: o chat do editor enxerga o board sem a pessoa instalar nada (o global não funciona
       // no Cursor; veja registerCursorProject)
       if (editorName === 'cursor') void registerInCursor(f.uri.fsPath, bridgePath, output);
+      // em segundo plano: a CLI da ferramenta pode demorar, e o servidor do board não depende dela
+      void reinstallOnUpdate(context, f.uri.fsPath, bridgePath, output);
       stopMcp = await startMcpServer(socketPath(f.uri.fsPath), {
         getRouter,
         getRunner: async () => {
@@ -446,6 +444,45 @@ async function offerBoardUpgrade(context: vscode.ExtensionContext, router: Messa
   else await context.globalState.update(key, version);
 }
 
+const MCP_VERSION_KEY = 'fazai.mcpRegisteredVersion';
+/** Num workspace com várias pastas só a primeira refaz o registro: ele é global, e duas CLIs ao mesmo tempo escreveriam o mesmo arquivo. */
+let reinstallStarted = false;
+
+/**
+ * Refaz o registro global do board nas ferramentas em que ele já está, uma vez por versão da extensão:
+ * o que a ferramenta guarda pode ter mudado com a atualização. A versão é gravada mesmo quando uma
+ * ferramenta falha (a CLI fora do PATH, por exemplo): repetir a cada ativação rodaria a CLI toda vez, e
+ * a faixa de requisitos já aponta o registro velho com o botão de reinstalar; a falha vai para a Saída.
+ */
+async function reinstallOnUpdate(
+  context: vscode.ExtensionContext,
+  folderPath: string,
+  bridgePath: string,
+  output: vscode.OutputChannel,
+): Promise<void> {
+  if (reinstallStarted) return;
+  reinstallStarted = true;
+  const version = String(context.extension.packageJSON.version);
+  if (context.globalState.get<string>(MCP_VERSION_KEY) === version) return;
+  try {
+    const homeDir = os.homedir();
+    const pathEnv = (await loginShellPath()) ?? process.env.PATH;
+    const nodeCommand = resolveCommand('node', pathEnv, homeDir) ?? undefined;
+    const done = await reinstallUserServers({
+      bridgePath,
+      workspaceDir: folderPath,
+      homeDir,
+      nodeCommand,
+      pathEnv,
+      log: (message) => output.appendLine(message),
+    });
+    if (done.length) output.appendLine(`Faz AI ${version}: registro do servidor do board refeito em ${done.join(', ')}.`);
+    await context.globalState.update(MCP_VERSION_KEY, version);
+  } catch (e) {
+    output.appendLine(`Faz AI: não foi possível refazer o registro do servidor do board: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
 /** O registro do board no `.cursor/mcp.json` do projeto, com o node achado no PATH do terminal. */
 async function registerInCursor(folderPath: string, bridgePath: string, output: vscode.OutputChannel): Promise<void> {
   const homeDir = os.homedir();
@@ -482,12 +519,8 @@ async function connectAI(
     vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
     return;
   }
-  if (opts?.fromBoard)
-    return done.toIgnore.length
-      ? `${done.message} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: ${done.toIgnore.join(', ')}.`
-      : done.message;
-  const choice = await vscode.window.showInformationMessage(done.message, ...(done.toIgnore.length ? ['Adicionar ao .gitignore'] : []));
-  if (choice === 'Adicionar ao .gitignore') host.addToGitignore(done.toIgnore);
+  if (opts?.fromBoard) return done.message;
+  void vscode.window.showInformationMessage(done.message);
 }
 
 /**

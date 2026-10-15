@@ -171,19 +171,15 @@ describe('i18n do host: mensagens preenchidas', () => {
     }
   });
 
-  it('Conectar IA: o servidor registrado, o próximo passo e o aviso do .gitignore', () => {
+  it('Conectar IA: o servidor registrado no global, e o próximo passo de cada ferramenta', () => {
     setLocale('en');
-    const next = 'Claude Code: abra uma sessão nova na pasta e aprove o servidor (/mcp mostra o estado).';
-    expect(t(`Servidor "faz-ai" registrado em: .mcp.json. ${next}`)).toBe(
-      'Server "faz-ai" registered in: .mcp.json. Claude Code: open a new session in the folder and approve the server (/mcp shows its state).',
+    const next = 'Claude Code: abra uma sessão nova em qualquer projeto com o board aberto (/mcp mostra o estado).';
+    expect(t(`Servidor "faz-ai" registrado em: ~/.claude.json. ${next}`)).toBe(
+      'Server "faz-ai" registered in: ~/.claude.json. Claude Code: open a new session in any project with the board open (/mcp shows its state).',
     );
     expect(
-      t(
-        `Servidor "faz-ai" registrado em: .mcp.json. ${next} Esses arquivos guardam caminhos desta máquina: considere colocar no .gitignore: .mcp.json.`,
-      ),
-    ).toBe(
-      'Server "faz-ai" registered in: .mcp.json. Claude Code: open a new session in the folder and approve the server (/mcp shows its state). These files hold paths from this machine: consider adding them to .gitignore: .mcp.json.',
-    );
+      t('Servidor "faz-ai" registrado em: .cursor/mcp.json. Cursor: se o "faz-ai" aparecer desligado em Cursor Settings → MCP, ligue.'),
+    ).toBe('Server "faz-ai" registered in: .cursor/mcp.json. Cursor: if "faz-ai" shows as off in Cursor Settings → MCP, turn it on.');
   });
 
   it('o tempo decorrido e a ausência de ligação com o Faz AI', () => {

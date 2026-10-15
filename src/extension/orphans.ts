@@ -94,6 +94,11 @@ export class OrphanSweeper {
 
   constructor(private readonly deps: OrphanDeps) {}
 
+  /** Resolve quando nenhuma varredura está em andamento ou na fila (o `dispose` espera por isto). */
+  async idle(): Promise<void> {
+    await this.queue;
+  }
+
   private now(): number {
     return this.deps.now ? this.deps.now() : Date.now();
   }

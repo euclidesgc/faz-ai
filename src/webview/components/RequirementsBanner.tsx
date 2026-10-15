@@ -307,7 +307,7 @@ export function RequirementFix({
       );
     case 'installSkill':
       return (
-        <FixButton variant={variant} run={() => harness.installFlowSkill(r.tool, 'user')} onFixed={onFixed}>
+        <FixButton variant={variant} run={() => harness.installFlowSkill(r.tool)} onFixed={onFixed}>
           {t('Instalar a skill')}
         </FixButton>
       );

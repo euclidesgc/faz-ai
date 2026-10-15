@@ -15,6 +15,14 @@ export function frontmatterValue(fm: string, key: string): string | undefined {
     }
     return block.filter(Boolean).join(' ');
   }
+  // aspas duplas: a descrição pode ter sido gravada como string JSON (com escapes), que é YAML válido
+  if (/^".*"$/.test(value) && value.length >= 2) {
+    try {
+      return String(JSON.parse(value));
+    } catch {
+      // não é JSON válido: cai na remoção simples das aspas
+    }
+  }
   return value.replace(/^["']|["']$/g, '');
 }
 
