@@ -574,6 +574,24 @@ describe('autopiloto', () => {
     expect(runner.started).toHaveLength(2);
   });
 
+  it('retomar numa janela que não é a dona do board não liga: publica o motivo e devolve false', () => {
+    owns = false;
+    create('A', 'PRD');
+    yolo(1);
+    flush();
+    expect(autopilot.resume()).toBe(false);
+    expect(autopilot.isActive).toBe(false);
+    expect(runner.started).toEqual([]);
+    expect(router.snapshot().autopilot).toEqual({ active: false, note: Autopilot.NOT_OWNER_NOTE });
+    expect(log).toContain(`Autopiloto: ${Autopilot.NOT_OWNER_NOTE}`);
+    // a janela passa a ser a dona: retomar liga e limpa a nota
+    owns = true;
+    expect(autopilot.resume()).toBe(true);
+    expect(autopilot.isActive).toBe(true);
+    expect(runner.started).toEqual([card(1).id]);
+    expect(router.snapshot().autopilot.note).toBeNull();
+  });
+
   it('liga sozinho ao abrir o editor com história em modo autônomo pendente', () => {
     owns = false;
     create('A', 'PRD');
