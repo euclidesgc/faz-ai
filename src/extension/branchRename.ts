@@ -98,6 +98,9 @@ export function runBranchRename(projectDir: string, req: RenameRequest, gh: GhRu
       // sem gh, sem login ou remoto que não é GitHub: o board não age no remoto, nem no clone
       return outcome('manual', { reason: message(e), commands: manualCommands(req), otherClones: others });
     }
+    // POST /repos/{owner}/{repo}/branches/{branch}/rename, corpo `new_name` (API REST do GitHub, "Rename a
+    // branch"): a documentação diz que PRs abertos e a branch padrão acompanham o novo nome. Conferido na
+    // documentação, não testado com uma conta real.
     try {
       gh(['api', '-X', 'POST', `repos/${nameWithOwner}/branches/${encodeURIComponent(req.from)}/rename`, '-f', `new_name=${req.to}`], repo);
     } catch (e) {
