@@ -210,6 +210,15 @@ describe('heartbeat', () => {
     expect(heartbeat.nextRoundAt).toBe(now + 60 * MIN);
   });
 
+  it('a rodada que não executa nada diz o motivo no log', () => {
+    create('A', 'Implementação'); // #1
+    create('Tarefa', 'A fazer', 1); // #2
+    setStatus(1, 'running'); // uma sessão já trabalha na história
+    setStatus(2, 'ready');
+    expect(heartbeat.runNow()).toBe(0);
+    expect(log.at(-1)).toMatch(/^Heartbeat: nenhuma história pode executar agora: #1 .*já há uma execução nela/);
+  });
+
   it('a execução que o heartbeat inicia é registrada no log com a origem "heartbeat"', () => {
     create('A', 'PRD');
     expect(heartbeat.runNow()).toBe(1);

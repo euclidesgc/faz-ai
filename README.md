@@ -857,7 +857,7 @@ cada uma) e de mais memória e processador enquanto várias sessões de IA, test
 juntos. No editor a aba Git e o bloco de paralelo do Harness de IA viram um link para o Settings; no
 navegador seguem como campos editáveis, como antes.
 
-- Sem pendência com a IA, nada é executado.
+- Sem pendência com a IA, nada é executado, e o log (Saída → Faz AI) diz o motivo: login vencido, história em modo autônomo, execução em andamento, com a pessoa ou esperando outro card.
 - A fila da rodada segue a ordem do board: os bugs primeiro; depois a história mais à direita (a
   mais adiantada termina antes de uma nova começar); na mesma coluna, de cima para baixo — o que
   decide é a posição do card, não o número dele nem o que já foi aprovado.

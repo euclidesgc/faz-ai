@@ -55,6 +55,34 @@ export function heartbeatTargets(s: BoardState): Card[] {
 }
 
 /**
+ * Por que uma rodada não tem o que executar: o motivo que vai para o log e para a pessoa. Cada causa
+ * é uma das condições em que `heartbeatTargets` ou `pump` deixam um card de fora.
+ */
+export function heartbeatIdleReason(s: BoardState): string {
+  if (blocksExecution(s)) return 'o login da ferramenta de IA venceu (veja o aviso no topo do board).';
+  const p = pendingWork(s);
+  const queue = aiQueue(s, p);
+  if (!queue.length) return 'nada pendente com a IA.';
+  const byId = new Map(s.cards.map((c) => [c.id, c]));
+  const stories = new Map<string, Card>();
+  for (const c of queue) {
+    const st = c.parentId ? byId.get(c.parentId) : c;
+    if (st) stories.set(st.id, st);
+  }
+  const why: string[] = [];
+  for (const st of stories.values()) {
+    let reason: string;
+    if (st.yolo) reason = 'em modo autônomo (é do autopiloto)';
+    else if (isAiWorking(s, st) || childrenOf(s, st.id).some((k) => isLive(k) && isAiWorking(s, k))) reason = 'já há uma execução nela';
+    else if (isWithHuman(st) && !p.ai.unanswered.some((c) => c.id === st.id)) reason = 'está com a pessoa, sem mensagem pendente';
+    else if (openPredecessors(s, st.id).length) reason = 'espera outro card em aberto';
+    else continue;
+    why.push(`${cardRef(st)} ${reason}`);
+  }
+  return why.length ? `nenhuma história pode executar agora: ${why.join('; ')}.` : 'nada pendente com a IA.';
+}
+
+/**
  * Rotina periódica: quando há pendência com a IA, executa a ferramenta do projeto para cada
  * história da fila. As vagas são por tipo de atividade (`limitOf`): histórias em fase de texto (só
  * produzem documento) vão até `parallelStories` em qualquer modo; as que mexem em código vão uma por vez
@@ -146,7 +174,7 @@ export class Heartbeat {
     this.deps.log(
       targets.length
         ? `Heartbeat: ${targets.length} história(s) com pendência: ${targets.map(cardRef).join(', ')}.`
-        : 'Heartbeat: nada pendente com a IA.',
+        : `Heartbeat: ${heartbeatIdleReason(this.deps.snapshot())}`,
     );
     this.pump();
     return targets.length;
@@ -162,6 +190,7 @@ export class Heartbeat {
     const s = this.deps.snapshot();
     // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
     if (blocksExecution(s)) {
+      if (this.queue.length) this.deps.log(`Heartbeat: ${heartbeatIdleReason(s)}`);
       this.queue = [];
       return void this.changed();
     }

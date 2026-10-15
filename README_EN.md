@@ -895,7 +895,7 @@ dependencies installed in each) and more memory and CPU while several AI session
 run together. In the editor the Git tab and the parallel block in the AI harness become a link to
 the Settings; in the browser they stay as editable fields, as before.
 
-- With nothing pending for the AI, nothing runs.
+- With nothing pending for the AI, nothing runs, and the log (Output → Faz AI) says why: expired login, story in autonomous mode, execution already running, with the person or waiting for another card.
 - The round follows the board order: bugs first; then the rightmost story (the most advanced one
   finishes before a new one starts); within a column, top to bottom — what decides is the card's
   position, not its number nor what has already been approved.

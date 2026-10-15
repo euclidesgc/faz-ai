@@ -5,6 +5,10 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **Heartbeat says why it did not run (#551).** When a round starts nothing, the log (Output → Faz AI) gives the reason: expired login, story in autonomous mode, an execution already running, story with the person and no pending message, or waiting for another card. Before, it always said "nothing pending with the AI".
+
 ## 0.44.0
 
 - **Gitflow on the branches the board creates (#462).** Gitflow is on by default (`fazai.git.gitflow`, also on existing boards). The card type sets the branch kind: História (story) and Débito técnico (tech debt) produce `feature/`, Retrabalho (rework) produces `bugfix/` and Bug produces `hotfix/`. `feature/` and `bugfix/` start from `develop`; `hotfix/` starts from the main branch; a new card type, or one without a branch kind, starts from `develop` as a feature. In the autonomous-mode stack and in derived stories the base is still the previous story's branch. Off, every branch starts from the main branch, as before.
