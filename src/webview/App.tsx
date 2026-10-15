@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAppearance } from './appearance';
-import { t } from './i18n';
+import { t, tn } from './i18n';
 import { rich } from './i18n/rich';
 import { humanQueue, pendingWork } from '../shared/pending';
 import { useBoardStore, useHostSync } from './store/boardStore';
@@ -44,7 +44,7 @@ function SettingsTab({ active, onClick }: { active: boolean; onClick: () => void
 export function App() {
   useHostSync();
   useAppearance();
-  const { state, error, notice, view, setError, setNotice, setView, openCardId, filters, setFilters, chatOpen, setChatOpen } =
+  const { state, error, notice, view, setError, setNotice, setView, openCardId, filters, setFilters, chatOpen, setChatOpen, openSettings } =
     useBoardStore();
   const busyOverlay = useBoardStore((s) => s.busyOverlay);
   const attachmentsBaseUri = useBoardStore((s) => s.attachmentsBaseUri);
@@ -93,6 +93,7 @@ export function App() {
       <BoardPlaceholder />
     );
   const trashCount = state.cards.filter((c) => c.deletedAt !== null).length;
+  const pendingOrphans = state.orphans.items.filter((i) => i.verdict === 'decision').length;
   const withYou = humanQueue(state, pendingWork(state)).length;
   const onlyMine = filters.owner === 'human';
 
@@ -121,6 +122,16 @@ export function App() {
             {trashCount > 0 && ` (${trashCount})`}
           </Button>
           <SettingsTab active={view === 'settings'} onClick={() => setView('settings')} />
+          {/* só as que dependem de decisão: as seguras o host limpa sozinho */}
+          {pendingOrphans > 0 && (
+            <Button
+              className="topbar-pending"
+              title={t('Há branches ou worktrees órfãs que dependem da sua decisão. Clique para ver na aba Git das Configurações.')}
+              onClick={() => openSettings('git')}
+            >
+              {tn(pendingOrphans, '{n} órfã', '{n} órfãs')}
+            </Button>
+          )}
         </nav>
         <span className="spacer" />
         {withYou > 0 && (
