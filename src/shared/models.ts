@@ -116,6 +116,13 @@ const CONTEXT_WINDOWS: Partial<Record<AiTool, Record<string, number>>> = {
     'claude-haiku-5-5': 1_000_000,
     'claude-haiku-4-5': 200_000,
   },
+  // Kimi Code: o `maxContextSize` de `kimi provider list --json` (CLI 2.1.1, 2026-10-13)
+  kimi: {
+    'kimi-code/kimi-for-coding': 1_048_576,
+    'kimi-code/kimi-for-coding-highspeed': 262_144,
+    'kimi-code/k3': 1_048_576,
+    'kimi-code/k3-256k': 262_144,
+  },
 };
 
 /** A janela de contexto do modelo, ou null quando o board não a conhece. */

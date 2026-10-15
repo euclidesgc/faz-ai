@@ -167,7 +167,7 @@ describe('o harness no aviso e no Diagnóstico', () => {
         workspaceDir: '/proj',
         skillInstalled: true,
         harnessIssues: issues as never,
-        other: null,
+        others: [],
         crgMcp: false,
         platform: 'linux',
         homeDir: '/home/u',

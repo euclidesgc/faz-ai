@@ -172,6 +172,16 @@ export const shared: Record<string, string> = {
   'O que o cursor-agent pode fazer sem perguntar (allow) ou nunca pode fazer (deny).':
     'What cursor-agent may do without asking (allow) or may never do (deny).',
   'Seu prompt pronto, chamado com /nome em qualquer projeto.': 'Your ready-made prompt, called with /name in any project.',
+  'Instruções do projeto no padrão aberto AGENTS.md, lidas pelo Kimi Code em toda sessão.':
+    'Project instructions in the open AGENTS.md standard, read by Kimi Code in every session.',
+  'Suas instruções no padrão AGENTS.md, lidas pelo Kimi Code em qualquer projeto.':
+    'Your instructions in the AGENTS.md standard, read by Kimi Code in any project.',
+  'Instruções e arquivos de apoio que o Kimi Code carrega quando a tarefa pede; só a descrição fica sempre à vista.':
+    'Instructions and support files Kimi Code loads when the task calls for them; only the description is always in view.',
+  'Ajudante com instruções próprias, para o qual o Kimi Code delega partes do trabalho.':
+    'A helper with its own instructions, to which Kimi Code delegates parts of the work.',
+  'Suas configurações do Kimi Code (modelo, provedores e as regras permanentes de permissão), em todos os projetos.':
+    'Your Kimi Code settings (model, providers and the permanent permission rules), in every project.',
   'Arquivos que a IA do Cursor não pode ler nem citar, no formato do .gitignore.':
     "Files Cursor's AI may not read or mention, in .gitignore format.",
   'User Rules': 'User Rules',

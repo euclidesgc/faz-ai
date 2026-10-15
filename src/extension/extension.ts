@@ -377,7 +377,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const watcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(
         wf,
-        '{CLAUDE.md,CLAUDE.local.md,AGENTS.md,AGENTS.override.md,.mcp.json,.vscode/mcp.json,.claude/**,.agents/**,.cursor/**}',
+        '{CLAUDE.md,CLAUDE.local.md,AGENTS.md,AGENTS.override.md,.mcp.json,.vscode/mcp.json,.claude/**,.agents/**,.cursor/**,.kimi-code/**}',
       ),
     );
     const refresh = () => harnessWatch?.notify();

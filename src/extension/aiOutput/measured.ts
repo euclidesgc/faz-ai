@@ -140,7 +140,7 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
     // sem o servidor do board no arquivo que a ferramenta lê, a execução rodaria sem mover nem comentar nada
     if (built.projectMcp) {
       const { file } = built.projectMcp;
-      const result = ensureProjectServer(cwd, file, built.projectMcp.entry);
+      const result = ensureProjectServer(cwd, file, built.projectMcp.entry, undefined, { stdioType: built.projectMcp.stdioType });
       if (result === 'added') deps.log(`Servidor do board registrado em ${file}, que o ${label} lê em segundo plano.`);
       if (result === 'repaired')
         deps.log(`O registro do servidor do board em ${file} apontava para outra pasta ou outro caminho; foi refeito para este projeto.`);

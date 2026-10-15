@@ -5,6 +5,10 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
+## Unreleased
+
+- **The board now works with Kimi Code.** Kimi Code (`kimi`, the Moonshot AI CLI) becomes the board's third AI tool, alongside Claude Code and Cursor: choose it in Configurações → Harness de IA. The connect button registers the board server in the project's `.kimi-code/mcp.json` or in `~/.kimi-code/mcp.json` (global), runs go through `kimi -p` with the server materialized before each call, and models are read from `kimi provider list --json`. The environment diagnostic now shows every other installed tool (not just one), and the requirements banner gains a recommended item to allow the board tools at once in Kimi Code conversations (the `mcp__faz-ai__*` rule in its `config.toml`). Kimi Code hooks and seeding the factory agents into its folders come in a future version.
+
 ## 0.44.0
 
 - **Gitflow on the branches the board creates (#462).** Gitflow is on by default (`fazai.git.gitflow`, also on existing boards). The card type sets the branch kind: História (story) and Débito técnico (tech debt) produce `feature/`, Retrabalho (rework) produces `bugfix/` and Bug produces `hotfix/`. `feature/` and `bugfix/` start from `develop`; `hotfix/` starts from the main branch; a new card type, or one without a branch kind, starts from `develop` as a feature. In the autonomous-mode stack and in derived stories the base is still the previous story's branch. Off, every branch starts from the main branch, as before.

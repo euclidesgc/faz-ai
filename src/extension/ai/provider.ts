@@ -22,9 +22,11 @@ export interface HeadlessCommand {
   format: OutputFormat;
   /**
    * Servidor do board a garantir num arquivo de configuração do projeto antes de rodar, para a
-   * ferramenta que não recebe servidores MCP pela linha de comando (o Cursor só lê `.cursor/mcp.json`).
+   * ferramenta que não recebe servidores MCP pela linha de comando (o Cursor só lê
+   * `.cursor/mcp.json`, o Kimi Code só lê `.kimi-code/mcp.json`). `stdioType` diz se a entrada leva
+   * o campo `type: "stdio"` (o Kimi Code documenta a dele sem o campo).
    */
-  projectMcp?: { file: string; entry: { command: string; args: string[]; env?: Record<string, string> } };
+  projectMcp?: { file: string; entry: { command: string; args: string[]; env?: Record<string, string> }; stdioType?: boolean };
 }
 
 export interface HeadlessInput {

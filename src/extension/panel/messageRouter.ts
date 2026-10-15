@@ -48,6 +48,8 @@ export interface EnvironmentHooks {
   seen(): void;
   /** grava o caminho completo dos MCPs que o editor não acha, e confere de novo */
   pinMcp?(): Promise<void>;
+  /** libera as ferramentas do board sem aprovação nas conversas do Kimi Code (a regra no config.toml), e confere de novo */
+  allowKimiMcp?(): void;
 }
 
 /** As mensagens do webview que o chat executa. */
@@ -85,6 +87,7 @@ const bridgeOnly = {
   'environment.check': viaBridge,
   'environment.seen': viaBridge,
   'environment.pinMcp': viaBridge,
+  'environment.allowKimiMcp': viaBridge,
   'ai.autopilot.pause': viaBridge,
   'ai.autopilot.resume': viaBridge,
   'card.workspace.open': viaBridge,
@@ -326,6 +329,10 @@ export class MessageRouter {
 
   pinEnvironmentMcp(): Promise<void> {
     return this.environmentHooks?.pinMcp?.() ?? Promise.resolve();
+  }
+
+  allowKimiMcp(): void {
+    this.environmentHooks?.allowKimiMcp?.();
   }
 
   /** A tela abriu sozinha uma vez: nas próximas aberturas, só pelo botão. */

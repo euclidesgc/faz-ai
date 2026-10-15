@@ -6,7 +6,7 @@ import type { MessageRouter } from '../../panel/messageRouter';
 import { findField, modelsOverview } from '../format';
 import type { DefineTool } from './registry';
 
-const toolArg = z.enum(ALL_AI_TOOLS as [string, ...string[]]).describe('Ferramenta de IA: claude ou cursor');
+const toolArg = z.enum(ALL_AI_TOOLS as [string, ...string[]]).describe('Ferramenta de IA: claude, cursor ou kimi');
 const models = (router: MessageRouter) => modelsOverview(router.snapshot());
 
 /** Modelos de LLM: catálogo e regras de sugestão de modelo. */

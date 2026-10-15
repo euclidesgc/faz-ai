@@ -113,7 +113,8 @@ describe('harnessTopics: busca e abas', () => {
   });
 
   it('a ferramenta do projeto vem primeiro', () => {
-    expect(toolsInOrder('cursor')).toEqual(['cursor', 'claude']);
-    expect(toolsInOrder('claude')).toEqual(['claude', 'cursor']);
+    expect(toolsInOrder('cursor')).toEqual(['cursor', 'claude', 'kimi']);
+    expect(toolsInOrder('claude')).toEqual(['claude', 'cursor', 'kimi']);
+    expect(toolsInOrder('kimi')).toEqual(['kimi', 'claude', 'cursor']);
   });
 });

@@ -105,12 +105,16 @@ export const AGENT_TOOLS: Record<AiTool, ToolGroup[]> = {
     },
   ],
   cursor: [],
+  // a CLI 2.1.1 do Kimi Code não documenta uma lista de ferramentas embutidas para o subagente: só os globs
+  // `mcp__<servidor>__*`, que o board grava sozinho (ver agentFiles.ts)
+  kimi: [],
 };
 
 /** O que o arquivo de agente de cada ferramenta aceita; o resto da tela some quando a ferramenta não aceita. */
 export const AGENT_FORMAT: Record<AiTool, { tools: boolean; skills: boolean; mcp: boolean; readonly: boolean; background: boolean }> = {
   claude: { tools: true, skills: true, mcp: true, readonly: false, background: false },
   cursor: { tools: false, skills: false, mcp: false, readonly: true, background: true },
+  kimi: { tools: true, skills: false, mcp: false, readonly: false, background: false },
 };
 
 /**
