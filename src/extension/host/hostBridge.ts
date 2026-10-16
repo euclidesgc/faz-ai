@@ -7,6 +7,7 @@ import type { HostToWebview, Tracked, WebviewToHost } from '../../shared/message
 import type { AiRunMode } from '../../shared/runner';
 import type { AiTool } from '../../shared/harness';
 import type { ViewStateStore } from '../viewState';
+import type { PrefsStore } from '../prefs';
 import type { MessageRouter } from '../panel/messageRouter';
 
 /** Mensagens que já respondem com o próprio `requestId` (payload de leitura ou resultado de gravação): não ganham `done`. */
@@ -88,12 +89,14 @@ export class HostBridge {
     private send: (msg: HostToWebview) => void,
     private router: MessageRouter,
     private viewState: ViewStateStore,
+    private prefs: PrefsStore,
     private env: HostEnv,
     private onReady?: () => void,
   ) {
     this.subs.push(router.onDidChange(() => this.postBoard()));
     this.subs.push(router.onDidError((message) => this.post({ type: 'error', message })));
     this.subs.push(viewState.onDidChange((view, origin) => origin !== this && this.post({ type: 'viewState', view })));
+    this.subs.push(prefs.onDidChange((prefs, origin) => origin !== this && this.post({ type: 'prefs', prefs })));
   }
 
   post(msg: HostToWebview): void {
@@ -130,11 +133,15 @@ export class HostBridge {
     switch (msg.type) {
       case 'ready':
         this.post({ type: 'viewState', view: this.viewState.get() });
+        this.post({ type: 'prefs', prefs: this.prefs.get() });
         this.postBoard();
         this.onReady?.();
         return;
       case 'view.set':
         this.viewState.update(msg.patch, this);
+        return;
+      case 'prefs.set':
+        this.prefs.update(msg.patch, this);
         return;
       case 'ui.showFilters':
         await this.env.showFilters();

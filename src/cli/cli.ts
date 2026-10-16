@@ -13,6 +13,7 @@ import { createBoardHost } from '../extension/host/boardHost';
 import { startMcpServer } from '../extension/mcp/server';
 import { canonicalFolder, socketPath, stableBridgePath, workspaceKey } from '../extension/mcp/socketPath';
 import { ViewStateStore, type Memento } from '../extension/viewState';
+import { PrefsStore } from '../extension/prefs';
 import { openWithSystem, revealInSystem } from '../extension/web/osOpen';
 import { preferredPort, startWebServer } from '../extension/web/webServer';
 
@@ -126,11 +127,13 @@ async function main(): Promise<void> {
   });
   const key = workspaceKey(folderPath);
   const viewState = new ViewStateStore(fileMemento(path.join(dataDir, 'view', `${key}.json`)));
+  const prefs = new PrefsStore(fileMemento(path.join(dataDir, 'prefs.json')));
 
   const web = await startWebServer({
     webviewDir: path.join(distDir, 'webview'),
     router,
     viewState,
+    prefs,
     port: port ? Number(port) : preferredPort(key),
     tokenFile: path.join(os.homedir(), '.faz-ai', 'web-token'),
     iconFile: path.join(distDir, '..', 'media', 'icon.png'),

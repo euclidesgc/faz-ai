@@ -8,12 +8,14 @@ import { parseExportFile } from '../db/boardExport';
 import { HostBridge, exportNotice, type HostEnv } from '../host/hostBridge';
 import type { MessageRouter } from '../panel/messageRouter';
 import type { ViewStateStore } from '../viewState';
+import type { PrefsStore } from '../prefs';
 
 export interface WebServerOptions {
   /** pasta com o bundle da interface (dist/webview) */
   webviewDir: string;
   router: MessageRouter;
   viewState: ViewStateStore;
+  prefs: PrefsStore;
   /** o que a página pede ao sistema; anexos, filtros e escolha de arquivos são resolvidos na própria página */
   env: Omit<HostEnv, 'attachmentsBaseUri' | 'showFilters' | 'pickFiles' | 'openInBrowser' | 'openIdeSettings'>;
   /** porta preferida; ocupada, o sistema escolhe outra */
@@ -244,7 +246,13 @@ export async function startWebServer(o: WebServerOptions): Promise<WebServer> {
       const previous = clients.get(id);
       previous?.bridge.dispose();
       previous?.res.end();
-      const bridge = new HostBridge((msg: HostToWebview) => void res.write(`data: ${JSON.stringify(msg)}\n\n`), o.router, o.viewState, env);
+      const bridge = new HostBridge(
+        (msg: HostToWebview) => void res.write(`data: ${JSON.stringify(msg)}\n\n`),
+        o.router,
+        o.viewState,
+        o.prefs,
+        env,
+      );
       const client = { bridge, res };
       clients.set(id, client);
       const ping = setInterval(() => res.write(': ping\n\n'), 25_000);

@@ -20,6 +20,7 @@ import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
 import { ChatViewProvider } from './sidebar/ChatViewProvider';
 import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
 import { ViewStateStore } from './viewState';
+import { PrefsStore } from './prefs';
 import type { AiRunner } from './runner';
 import { Autopilot } from './autopilot';
 import type { Heartbeat } from './heartbeat';
@@ -77,6 +78,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const wasmDir = path.join(context.extensionPath, 'dist');
   let routerPromise: Promise<MessageRouter> | undefined;
   const viewState = new ViewStateStore(context.workspaceState);
+  // por pessoa, não por pasta: um aviso dispensado aqui não volta em outro projeto
+  const prefs = new PrefsStore(context.globalState);
   const bridgePath = stableBridgePath();
   const windowStartedAt = Date.now();
   // o Cursor é um VS Code com outro nome: o chat dele lê o ~/.cursor/mcp.json e só carrega o que mudou ao recarregar
@@ -222,7 +225,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
       return;
     }
-    BoardPanel.show(context, router, viewState, f.name, pending);
+    BoardPanel.show(context, router, viewState, prefs, f.name, pending);
     if (servedElsewhere) {
       servedElsewhere = false; // avisa uma vez
       void vscode.window.showWarningMessage(
@@ -242,6 +245,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         webviewDir: path.join(context.extensionPath, 'dist', 'webview'),
         router,
         viewState,
+        prefs,
         port: preferredPort(workspaceKey(f.uri.fsPath)),
         tokenFile: path.join(os.homedir(), '.faz-ai', 'web-token'),
         iconFile: path.join(context.extensionPath, 'media', 'icon.png'),
@@ -315,10 +319,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     treeView,
-    vscode.window.registerWebviewViewProvider('fazai.filters', new FiltersViewProvider(context, getRouter, viewState), {
+    vscode.window.registerWebviewViewProvider('fazai.filters', new FiltersViewProvider(context, getRouter, viewState, prefs), {
       webviewOptions: { retainContextWhenHidden: true },
     }),
-    vscode.window.registerWebviewViewProvider('fazai.chat', new ChatViewProvider(context, getRouter, viewState), {
+    vscode.window.registerWebviewViewProvider('fazai.chat', new ChatViewProvider(context, getRouter, viewState, prefs), {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     // clicar no ícone da barra lateral já abre o board

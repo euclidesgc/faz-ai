@@ -8,6 +8,7 @@ import { boardDbFile } from '../src/extension/host/boardHost';
 import { workspaceKey } from '../src/extension/mcp/socketPath';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { ViewStateStore } from '../src/extension/viewState';
+import { PrefsStore } from '../src/extension/prefs';
 import { startWebServer, type WebServer } from '../src/extension/web/webServer';
 import type { HostToWebview, WebviewToHost } from '../src/shared/messages';
 
@@ -87,6 +88,7 @@ beforeEach(async () => {
     webviewDir: path.join(dir, 'webview'),
     router,
     viewState: new ViewStateStore({ get: <T>(k: string) => memory.get(k) as T | undefined, update: (k, v) => memory.set(k, v) }),
+    prefs: new PrefsStore({ get: <T>(k: string) => memory.get(k) as T | undefined, update: (k, v) => memory.set(k, v) }),
     tokenFile: path.join(dir, 'token'),
     env: {
       connectAI: () => 'Servidor registrado.',
