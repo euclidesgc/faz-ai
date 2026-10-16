@@ -147,7 +147,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'install_flow_skill',
-    'Instala a skill "faz-ai-fluxo", que ensina a conduzir os cards pelo fluxo do board (fases, documentos, revisão, pendências), e a marca como "incluir em todo contexto" neste board. Sempre no global da ferramenta (~/.claude/skills, ~/.cursor/skills, ~/.kimi-code/skills), para todos os projetos: nada entra na pasta do projeto. Não sobrescreve uma skill de mesmo nome no destino, a menos que replace seja true.',
+    'Instala a skill "faz-ai-fluxo", que ensina a conduzir os cards pelo fluxo do board (fases, documentos, pendências), junto com as skills por assunto (faz-ai-harness-do-card, faz-ai-workspace-e-pr, faz-ai-implementacao-rodadas, faz-ai-revisao-e-homologacao, faz-ai-modo-autonomo), e marca a principal como "incluir em todo contexto" neste board. Sempre no global da ferramenta (~/.claude/skills, ~/.cursor/skills, ~/.kimi-code/skills), para todos os projetos: nada entra na pasta do projeto. Não sobrescreve uma skill de mesmo nome no destino, a menos que replace seja true.',
     {
       tool: z.enum(ALL_AI_TOOLS).optional().describe('Ferramenta de IA; padrão: a do projeto'),
       replace: z.boolean().optional().describe('Troca a skill de mesmo nome que já esteja no destino'),

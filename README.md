@@ -259,7 +259,8 @@ o `faz-ai` do terminal avisa e não inicia.
    global que a ferramenta lê.
 3. No grupo **Skills** da mesma aba, clique em **Instalar (padrão da ferramenta)** para a
    skill do fluxo (`faz-ai-fluxo`): ela ensina a IA a conduzir os cards pelas fases, gerar os
-   documentos, pedir revisão e retomar pendências. Pode ser editada.
+   documentos, pedir revisão e retomar pendências. O botão instala também as skills por assunto
+   (harness do card, pasta de trabalho e PR, rodadas, revisão e homologação, modo autônomo). Podem ser editadas.
 
 **Só no global.** O servidor e a skill do fluxo ficam na configuração global da ferramenta, e nada
 disso entra na pasta do projeto (que pode ser compartilhada com quem não tem a extensão):

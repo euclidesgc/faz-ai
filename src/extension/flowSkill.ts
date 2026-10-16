@@ -96,11 +96,86 @@ quando usa o que a outra produz **ou quando as duas alteram os mesmos arquivos**
 dependência as que são de fato independentes: elas serão executadas ao mesmo tempo. Entre recortes
 igualmente fáceis de revisar, prefira o que deixa cada passo em arquivos diferentes.
 
+## Ao fechar uma fase ou sub-tarefa
+
+Ao registrar o resultado de uma fase ou sub-tarefa na conversa, resuma em três blocos (omita o que
+não houver):
+
+- **Travado em mim**: o que dependeu de uma decisão, acesso ou dado que só a pessoa tem.
+- **O que mudou**: o resultado concreto (documento anexado, arquivo alterado, card movido).
+- **O que encontrei**: achados relevantes, inclusive suposições ou dados externos que não puderam
+  ser validados (marque-os explicitamente como não validados).
+
+Se "Travado em mim" tiver qualquer item, o resumo vai no \`request_review\` com esse item em
+\`pending\` (ou em \`ask_question\`/\`block_card\`, conforme o caso), não num \`add_comment\`:
+o card precisa ficar com a pessoa.
+
+Ao revisar código (Implementação, Revisão ou Homologação), concentre-se no diff da branch da história e no
+contexto necessário dos arquivos tocados; releia o projeto inteiro só quando o pedido pedir
+expressamente uma auditoria geral.
+
+## Áreas críticas
+
+Quando o board define áreas críticas (o núcleo do projeto), \`get_card\` traz \`criticalAreas\`. Na
+Spec e no Plan, confira se a história mexe nesses caminhos e marque o campo Criticidade dela
+(\`Núcleo\` ou \`Periferia\`) com \`update_card\`. Na Revisão, revise com mais rigor os arquivos do
+núcleo; no pull request, liste-os à parte em "Como revisar". A marca não muda o fluxo: no modo
+autônomo a história do núcleo segue sem parar, como as outras.
+
+## Quando parar
+
+- Faltou uma informação ou decisão: \`ask_question\` no card, e pare de trabalhar nele.
+- Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\` com o motivo.
+- Ficou algo para a pessoa avaliar: \`request_review\` com \`pending\`, e pare.
+- Depois de \`request_review\`: pare. Só uma pessoa aprova.
+- No modo autônomo, só a coluna escolhida ao ligar o modo para a história; o resto é decisão sua.
+
+## O que não fazer
+
+- Não mova um card para a frente a partir de uma coluna que exige aprovação se o status não for \`approved\`.
+- Não continue o trabalho de um card que está com a pessoa.
+- Não decida pela pessoa: na dúvida, pergunte na conversa do card.
+- Não deixe uma pendência da pessoa só num comentário: o status do card tem de passar a vez para ela.
+
+## Skills por assunto
+
+Esta skill é o essencial. O detalhe de cada assunto fica em outra skill, que você lê só quando o
+assunto aparece (o \`get_card\` aponta qual, numa nota curta):
+
+- \`faz-ai-harness-do-card\`: \`model\`, \`requiredRules\`, \`requiredSkills\` e a escolha de skills, rules e servidores do card;
+- \`faz-ai-workspace-e-pr\`: \`prepare_workspace\`, a pasta de trabalho, a base do pull request e a pilha;
+- \`faz-ai-implementacao-rodadas\`: as rodadas da Implementação (\`subtasksNow\`);
+- \`faz-ai-revisao-e-homologacao\`: a Revisão e a Homologação;
+- \`faz-ai-modo-autonomo\`: o que muda quando o card mostra \`autonomous: true\`.
+`,
+};
+
+const HARNESS_BODY = `# Harness do card
+
+O \`get_card\` devolve o que o card exige para a execução; leia antes de começar.
+
+- \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, delegue o trabalho a um subagente com essa configuração; se não for possível, avise a pessoa em vez de executar com outra. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, e as regras do board sugerem o modelo a partir dele (\`get_models\`).
+- \`requiredRules\`: leia cada arquivo em \`path\` antes de executar o card: são as instruções que o card exige, além do contexto fixo do board.
+- \`requiredSkills\`: leia o SKILL.md de cada skill em \`path\`. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em \`files\` estão os arquivos de apoio (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.
+- Skills, rules, servidores MCP e agente do card: escolha só entre o que está no board em modo "Pelo card" (\`get_harness\`). O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.
+`;
+
+const WORKSPACE_BODY = `# Pasta de trabalho e base do pull request
+
 Antes de alterar código do projeto, chame \`prepare_workspace\` na história: o board cria a branch e a
 pasta de trabalho dela e devolve onde trabalhar (também em \`workspace\` no \`get_card\`). Altere o
 código só ali e não crie branches por conta própria. A branch parte da base do fluxo (a develop, a
 principal ou, na pilha, a branch da anterior); \`workspace.baseBranch\` diz qual foi e
 \`workspace.prBase\` é a branch para a qual o pull request deve ser aberto.
+
+Quando \`workspace.note\` trouxer uma pasta ou branch, ela vale. Abra o pull request com \`--base\` em \`workspace.prBase\`
+(ex.: \`gh pr create --base <prBase>\`); se a base não vier no \`get_card\`, use a branch principal do repositório. Se
+\`workspace.stackNote\` vier, diga na descrição do pull request de qual pull request ele depende. Numa pilha, a base
+muda quando a anterior é concluída: siga sempre o \`workspace.baseBranch\` atual e, se ele mudou, traga a nova base
+com \`git fetch origin <base>\` e \`git merge origin/<base>\`, sem rebase nem push forçado.
+`;
+
+const RODADAS_BODY = `# Rodadas da Implementação
 
 Na Implementação, trabalhe em rodadas. \`get_card\` na história traz em \`subtasksNow\` o que pode
 rodar agora (\`canRunTogether\`), o que espera outra sub-tarefa (\`waiting\`) e, quando houver, o que
@@ -127,24 +202,9 @@ Essa parte fica para quem tem permissão.
 sub-tarefa só na rodada, execute uma por vez, na ordem das dependências. Se duas sub-tarefas da
 mesma rodada precisarem do mesmo arquivo, não as rode juntas: registre a dependência com
 \`link_cards\` e deixe uma para a rodada seguinte.
+`;
 
-## Ao fechar uma fase ou sub-tarefa
-
-Ao registrar o resultado de uma fase ou sub-tarefa na conversa, resuma em três blocos (omita o que
-não houver):
-
-- **Travado em mim**: o que dependeu de uma decisão, acesso ou dado que só a pessoa tem.
-- **O que mudou**: o resultado concreto (documento anexado, arquivo alterado, card movido).
-- **O que encontrei**: achados relevantes, inclusive suposições ou dados externos que não puderam
-  ser validados (marque-os explicitamente como não validados).
-
-Se "Travado em mim" tiver qualquer item, o resumo vai no \`request_review\` com esse item em
-\`pending\` (ou em \`ask_question\`/\`block_card\`, conforme o caso), não num \`add_comment\`:
-o card precisa ficar com a pessoa.
-
-Ao revisar código (Implementação, Revisão ou Homologação), concentre-se no diff da branch da história e no
-contexto necessário dos arquivos tocados; releia o projeto inteiro só quando o pedido pedir
-expressamente uma auditoria geral.
+const REVISAO_BODY = `# Revisão e Homologação
 
 ## Revisão
 
@@ -163,13 +223,6 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
 4. Rode as checagens de novo, faça o commit, registre o resultado na conversa (ele alimenta o "Como
    revisar" do pull request) e mova a história para a próxima coluna.
 
-## Áreas críticas
-
-Quando o board define áreas críticas (o núcleo do projeto), \`get_card\` traz \`criticalAreas\`. Na
-Spec e no Plan, confira se a história mexe nesses caminhos e marque o campo Criticidade dela
-(\`Núcleo\` ou \`Periferia\`) com \`update_card\`. Na Revisão, revise com mais rigor os arquivos do
-núcleo; no pull request, liste-os à parte em "Como revisar". A marca não muda o fluxo: no modo
-autônomo a história do núcleo segue sem parar, como as outras.
 
 ## Homologação
 
@@ -197,6 +250,9 @@ Não faça o merge: ele depende da aprovação da pessoa. Com o merge automátic
 Git), a aprovação dela faz o merge e leva a história a Concluído; desligado, a IA move o card aprovado.
 
 Num hotfix (pull request para a principal), não abra pull request da principal para a \`develop\`: depois do merge, o board faz isso.
+`;
+
+const AUTONOMO_BODY = `# Modo autônomo
 
 ## Modo autônomo (YOLO)
 
@@ -237,20 +293,36 @@ rodar sozinha: ninguém aprova nem responde. Então:
 - histórias em modo autônomo formam uma fila e uma pilha de pull requests: cada uma parte da branch da
   anterior (\`workspace.baseBranch\` no \`get_card\`) e o PR é aberto com \`--base\` em \`workspace.prBase\`
   (a branch da anterior). Quando a anterior é concluída, o board passa a base da seguinte (e a do pull request dela) para a base da anterior, normalmente a \`develop\`, e avisa na conversa: siga sempre o \`workspace.baseBranch\` atual e, se ele mudou, traga a nova base para a branch com \`git fetch origin <base>\` e \`git merge origin/<base>\`, sem rebase nem push forçado. Para dividir um pedido grande, crie as próximas histórias com \`create_card\` e \`autonomous_from\`, em ordem de dependência.
+`;
 
-## Quando parar
-
-- Faltou uma informação ou decisão: \`ask_question\` no card, e pare de trabalhar nele.
-- Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\` com o motivo.
-- Ficou algo para a pessoa avaliar: \`request_review\` com \`pending\`, e pare.
-- Depois de \`request_review\`: pare. Só uma pessoa aprova.
-- No modo autônomo, só a coluna escolhida ao ligar o modo para a história; o resto é decisão sua.
-
-## O que não fazer
-
-- Não mova um card para a frente a partir de uma coluna que exige aprovação se o status não for \`approved\`.
-- Não continue o trabalho de um card que está com a pessoa.
-- Não decida pela pessoa: na dúvida, pergunte na conversa do card.
-- Não deixe uma pendência da pessoa só num comentário: o status do card tem de passar a vez para ela.
-`,
-};
+export const FLOW_SKILLS: readonly { name: string; description: string; body: string }[] = [
+  FLOW_SKILL,
+  {
+    name: 'faz-ai-harness-do-card',
+    description:
+      'Use ao ler um card com model, requiredRules, requiredSkills ou harnessNote: como executar com o modelo certo e quais rules, skills e servidores MCP usar.',
+    body: HARNESS_BODY,
+  },
+  {
+    name: 'faz-ai-workspace-e-pr',
+    description:
+      'Use ao alterar código de uma história: prepare_workspace, pasta de trabalho, branch, base do pull request e pilha de histórias.',
+    body: WORKSPACE_BODY,
+  },
+  {
+    name: 'faz-ai-implementacao-rodadas',
+    description:
+      'Use na fase de Implementação de uma história com sub-tarefas: as rodadas (subtasksNow), subagentes, ciclo de cada sub-tarefa e o que fazer sem terminal.',
+    body: RODADAS_BODY,
+  },
+  {
+    name: 'faz-ai-revisao-e-homologacao',
+    description: 'Use nas fases de Revisão e Homologação: checagens, revisão do diff, Como testar, pull request e set_pull_request.',
+    body: REVISAO_BODY,
+  },
+  {
+    name: 'faz-ai-modo-autonomo',
+    description: 'Use quando o card mostra autonomous: true ou autonomousNote: como seguir sem pedir aprovação nem fazer perguntas.',
+    body: AUTONOMO_BODY,
+  },
+];

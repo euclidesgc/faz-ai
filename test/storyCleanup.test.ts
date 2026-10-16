@@ -579,7 +579,7 @@ describe('pilha: troca de base das seguintes', () => {
     const next = await stackedOn(prev);
     const before = (await call('get_card', { card: next.number })).data.workspace;
     expect(before).toMatchObject({ baseBranch: prev.branch, prBase: prev.branch });
-    expect(before.stackNote).toContain(`empilhada sobre ${prev.branch}`);
+    expect(before.stackNote).toContain(`Empilhada sobre ${prev.branch}`);
     squashMergeOnOrigin(prev.branch);
 
     await cleanUpStory(router, deps, prev, prFacts(prev.branch));

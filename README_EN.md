@@ -272,7 +272,8 @@ navegador**; the terminal `faz-ai` warns and does not start.
    **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads.
 3. In the **Skills** group of the same tab, click **Instalar (padrão da ferramenta)** for the
    flow skill (`faz-ai-fluxo`): it teaches the AI to take cards through the phases, write the
-   documents, ask for review and pick up pending work. It can be edited.
+   documents, ask for review and pick up pending work. The button also installs the per-topic skills
+   (card harness, working folder and PR, rounds, review and acceptance, autonomous mode). They can be edited.
 
 **Global only.** The server and the flow skill live in the tool's global configuration, and none of
 it goes into the project folder (which may be shared with people who do not have the extension):

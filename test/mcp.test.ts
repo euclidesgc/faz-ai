@@ -18,6 +18,8 @@ const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 // O Claude Code corta as instruções de cada servidor e a descrição de cada ferramenta neste tamanho
 // (https://code.claude.com/docs/en/mcp, "Tool search for MCP server authors", lida em 2026-10-13): o resto a IA não lê.
 const CLAUDE_CODE_CUT = 2048;
+// teto das notas fixas do get_card de uma história autônoma com rodadas (#588): eram 2.515 caracteres numa história de teste, de 4.573 no total
+const MAX_NOTES = 1500;
 
 let dir: string;
 let router: MessageRouter;
@@ -624,7 +626,7 @@ describe('modelos de IA', () => {
     expect(card.model.value).toBe('claude:haiku');
     // a nota diz o que fazer com o modelo e separa o esforço do modelo do "Esforço da atividade"
     expect(card.model.note).toMatch(/delegue o trabalho a um subagente[\s\S]*avise a pessoa/);
-    expect(card.model.note).toContain('"Esforço da atividade": ele é o tamanho da tarefa');
+    expect(card.model.note).toContain('"Esforço da atividade" é o tamanho da tarefa');
     // o modelo veio da sugestão, então acompanha a mudança de esforço
     expect((await call('update_card', { card: 1, fields: { Esforço: 'Alto' } })).data.model.value).toBe('claude:opus@high');
     // escolhido à mão: não é mais trocado, mas a sugestão continua visível
@@ -1517,6 +1519,23 @@ describe('vínculos entre cards', () => {
     expect(single.subtasksNowNote).toBeUndefined();
   });
 
+  it('get_card de uma história em modo autônomo com sub-tarefas fica enxuto: as notas fixas vão para as skills (#588)', async () => {
+    await call('create_card', { title: 'História', column: 'Backlog', description: 'Descrição curta.' });
+    router.handle({ type: 'card.yolo.set', cardId: router.snapshot().cards[0]!.id, enabled: true });
+    await call('move_card', { card: 1, column: 'Implementação' });
+    const a = (await call('create_card', { title: 'A', parent: 1 })).data;
+    await call('create_card', { title: 'B', parent: 1, depends_on: [a.id] });
+    const got = (await call('get_card', { card: 1 })).data;
+    const size = JSON.stringify(got).length;
+    // eslint-disable-next-line no-console
+    console.log(`MEDIDA get_card #588: ${size} caracteres`);
+    const notes = JSON.stringify(got, (k, v) => (k.endsWith('Note') ? v : typeof v === 'object' ? v : undefined));
+    expect(notes.length).toBeLessThan(MAX_NOTES);
+    expect(got.harnessNote).toBeDefined();
+    expect(got.subtasksNowNote).toBeDefined();
+    expect(got.phase.autonomousNote).toContain('faz-ai-modo-autonomo');
+  });
+
   it('create_card com depends_on valida os vínculos antes de criar e ignora repetidos', async () => {
     const story = (await call('create_card', { title: 'História' })).data;
     const base = (await call('create_card', { title: 'Base', parent: story.id })).data;
@@ -1633,7 +1652,7 @@ describe('histórias derivadas e caminho curto', () => {
     const curta = (await call('create_card', { title: 'Ajuste de texto', column: 'Plan' })).data;
     const phase = (await call('get_card', { card: curta.id })).data.phase;
     expect(phase.missingArtifacts).toEqual(['DISCOVERY.md', 'PRD.md', 'SPEC.md']);
-    expect(phase.missingArtifactsNote).toContain('Não crie esses documentos');
+    expect(phase.missingArtifactsNote).toContain('não os crie');
 
     const longa = (await call('create_card', { title: 'Do começo', column: 'Discovery' })).data;
     expect((await call('get_card', { card: longa.id })).data.phase.missingArtifacts).toBeUndefined();
@@ -1762,7 +1781,7 @@ describe('modo autônomo (YOLO)', () => {
     expect(before.criticalAreas).toMatchObject({ paths: ['src/db/**'], story: 'Núcleo' });
     expect(before.criticalAreas.note).toContain('no modo autônomo nada a segura');
     expect(before.phase.requiresApproval).toBe(false);
-    expect(before.phase.autonomousNote).toContain('nem mesmo numa história do núcleo');
+    expect(before.phase.autonomousNote).toContain('nem numa história do núcleo');
     expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(false);
     expect((await call('move_card', { card: 1, column: 'PRD' })).error).toBe(false);
 
