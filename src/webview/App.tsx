@@ -22,6 +22,7 @@ import { SelectionBar } from './components/SelectionBar';
 import { AutopilotButton } from './components/AutopilotButton';
 import { HeartbeatButton } from './components/HeartbeatButton';
 import { ThemeToggle } from './components/ThemeToggle';
+import { UsageLimitBanner } from './components/UsageLimitBanner';
 import { ArchivedView } from './components/ArchivedView';
 import { TrashView } from './components/TrashView';
 import { MetricsView } from './components/metrics/MetricsView';
@@ -178,6 +179,7 @@ export function App() {
           )}
         </div>
       )}
+      <UsageLimitBanner />
       {/* a barra de filtros filtra cards, não o log: fica só no board (RF-01) */}
       {view === 'board' && <FilterBar />}
       {view === 'board' && <SelectionBar />}

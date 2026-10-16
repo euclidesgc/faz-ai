@@ -8,7 +8,7 @@ import { usePending } from '../../usePending';
 import { useAction } from '../../useAction';
 import { ai, comments } from '../../commands';
 import { BOARD_AUTHOR } from '../../../shared/gitflow';
-import { formatDateTime, t, translateGitNotice } from '../../i18n';
+import { formatDateTime, t, translateBoardNotice } from '../../i18n';
 import { useAttachmentRefs } from './attachmentRefs';
 import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
 import { aiBlockedReason } from '../RequirementsBanner';
@@ -145,16 +145,17 @@ export function CommentsTab({
 }
 
 /**
- * Traduz um comentário do board linha a linha, só pelas chaves dos avisos do gitflow (translateGitNotice): o relatório
- * da limpeza da história junta o título e uma linha "- " por item, e cada uma tem a própria chave. Linha sem tradução
- * fica como está, e os outros comentários do board (autopiloto, runner) não são tocados.
+ * Traduz um comentário do board linha a linha, só pelas chaves dos avisos do gitflow e do limite de uso
+ * (translateBoardNotice): o relatório da limpeza da história junta o título e uma linha "- " por item, e cada uma tem a
+ * própria chave; o aviso de limite vem numa linha, seguido do fim da saída da ferramenta. Linha sem tradução fica como
+ * está, e os outros comentários do board (autopiloto, merge) não são tocados.
  */
 function boardNotice(body: string): string {
   return body
     .split('\n')
     .map((line) => {
       const m = /^(\s*(?:[-*]\s+)?)(.*)$/.exec(line)!;
-      return m[1]! + translateGitNotice(m[2]!);
+      return m[1]! + translateBoardNotice(m[2]!);
     })
     .join('\n');
 }

@@ -46,8 +46,21 @@ const connectAI: Record<string, string> = Object.fromEntries(
 );
 
 /**
+ * Avisos do runner na conversa quando a execução esbarra no limite de uso do plano (história #800). Como os do gitflow,
+ * a conversa os traduz só por estas chaves (translateBoardNotice, em ../index.ts).
+ */
+export const usageLimitNotices: Record<string, string> = {
+  'O limite de uso do plano do {tool} esgotou. O card voltou para a IA, e o autopiloto repete a execução a partir das {when}.':
+    "The {tool} plan's usage limit ran out. The card went back to the AI, and the autopilot repeats the run from {when}.",
+  'O limite de uso do plano do {tool} esgotou. O card voltou para a IA, e o heartbeat repete a execução a partir das {when}.':
+    "The {tool} plan's usage limit ran out. The card went back to the AI, and the heartbeat repeats the run from {when}.",
+  'O limite de uso do plano do {tool} esgotou. O card voltou para a IA: chame a IA de novo a partir das {when} (o heartbeat está desligado).':
+    "The {tool} plan's usage limit ran out. The card went back to the AI: call the AI again from {when} (the heartbeat is off).",
+};
+
+/**
  * Avisos do board na conversa ao criar a branch (gitNoticeText, em src/shared/gitflow.ts). Ficam à parte porque a
- * conversa traduz os comentários do board só por estas chaves (translateGitNotice, em ../index.ts).
+ * conversa traduz os comentários do board só por estas chaves (translateBoardNotice, em ../index.ts).
  */
 export const gitNotices: Record<string, string> = {
   'O repositório não tem origin: a branch {branch} partiu de {base} como está nesta máquina.':
@@ -387,4 +400,5 @@ export const host: Record<string, string> = {
   '{ref} não tem nada pendente com a IA, mas ainda não foi concluído.': '{ref} has nothing pending with the AI, but is not finished yet.',
 
   ...gitNotices,
+  ...usageLimitNotices,
 };

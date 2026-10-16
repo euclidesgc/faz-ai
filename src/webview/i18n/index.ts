@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { Locale } from '../../shared/language';
-import { DEFAULT_NAMES_EN, EN, GIT_NOTICES_EN } from './en';
+import { BOARD_NOTICES_EN, DEFAULT_NAMES_EN, EN } from './en';
 
 // Internacionalização. O texto em português é a chave: `t('Novo card')`. Em português, a chave volta como está;
 // em inglês, vem de ./en. O que falta no dicionário aparece em português (e o teste de i18n barra a omissão).
@@ -82,14 +82,14 @@ export function t(key: string, params?: Params): string {
 }
 
 /**
- * Um comentário que o board escreveu na conversa, no idioma da interface. Só os avisos do gitflow são traduzidos: o board
- * os grava em português e o idioma só se resolve na tela. O resto (autopiloto, runner, merge) fica como foi escrito, e
- * por isso o casamento é só contra as chaves desses avisos: os moldes curtos do dicionário inteiro, como '{a} e {b}',
- * casariam com qualquer frase que tenha " e ".
+ * Um comentário que o board escreveu na conversa, no idioma da interface. Só os avisos do gitflow e os do limite de uso
+ * são traduzidos: o board os grava em português e o idioma só se resolve na tela. O resto (autopiloto, merge) fica como
+ * foi escrito, e por isso o casamento é só contra as chaves desses avisos: os moldes curtos do dicionário inteiro, como
+ * '{a} e {b}', casariam com qualquer frase que tenha " e ".
  */
-export function translateGitNotice(body: string): string {
+export function translateBoardNotice(body: string): string {
   if (current !== 'en') return body;
-  return GIT_NOTICES_EN[body] ?? matchPatterns(GIT_NOTICES_EN, body) ?? body;
+  return BOARD_NOTICES_EN[body] ?? matchPatterns(BOARD_NOTICES_EN, body) ?? body;
 }
 
 /**
@@ -103,6 +103,16 @@ export function dt(name: string): string {
 /** Singular ou plural conforme `n`; os dois textos são chaves e recebem `{n}`. */
 export function tn(n: number, one: string, many: string, params?: Params): string {
   return t(n === 1 ? one : many, { n, ...params });
+}
+
+/** Hora no idioma da interface, com a data curta na frente quando não é o mesmo dia de `now` (a pausa por limite pode ir até a semana seguinte). */
+export function formatClock(ms: number, now: number): string {
+  const locale = current === 'en' ? 'en-US' : 'pt-BR';
+  const d = new Date(ms);
+  const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  return d.toDateString() === new Date(now).toDateString()
+    ? time
+    : `${d.toLocaleDateString(locale, { day: '2-digit', month: '2-digit' })} ${time}`;
 }
 
 /** Data e hora no idioma da interface. */

@@ -185,6 +185,12 @@ export const board: Record<string, string> = {
   'Heartbeat parado: {reason}': 'Heartbeat stopped: {reason}',
   'Heartbeat desligado': 'Heartbeat off',
   'Próxima rodada às {time}': 'Next round at {time}',
+  // pausa por limite de uso (#800): a faixa do topo, a nota do autopiloto e a etiqueta do card
+  'Limite de uso do {tool}: a fila retoma às {time}.': 'Usage limit for {tool}: the queue resumes at {time}.',
+  'Limite de uso do {tool}: nova tentativa às {time}.': 'Usage limit for {tool}: next try at {time}.',
+  'Aguardando o limite de uso até {time}': 'Waiting for the usage limit until {time}',
+  'A ferramenta de IA esgotou o limite de uso do plano: o autopiloto e o heartbeat não disparam nada dela até a hora indicada. A execução pedida à mão continua liberada.':
+    'The AI tool ran out of its plan usage limit: the autopilot and the heartbeat start nothing on it until the time shown. A run you start by hand is still allowed.',
 
   // Barra de status (pé do board): o que a IA está fazendo agora
   'IA em {ref} ({what}, {since})': 'AI on {ref} ({what}, {since})',

@@ -4,7 +4,7 @@ import { card } from './card';
 import { defaults } from './defaults';
 import { environment } from './environment';
 import { harness } from './harness';
-import { gitNotices, host } from './host';
+import { gitNotices, host, usageLimitNotices } from './host';
 import { metrics } from './metrics';
 import { settings } from './settings';
 import { shared } from './shared';
@@ -25,5 +25,5 @@ export const EN: Record<string, string> = {
 /** Nomes do board padrão em inglês (ver ./defaults). */
 export const DEFAULT_NAMES_EN = defaults;
 
-/** Os avisos do gitflow que o board escreve na conversa (ver gitNotices em ./host). */
-export const GIT_NOTICES_EN = gitNotices;
+/** Os avisos que o board escreve na conversa e a tela traduz: os do gitflow e os do limite de uso (ver ./host). */
+export const BOARD_NOTICES_EN: Record<string, string> = { ...gitNotices, ...usageLimitNotices };

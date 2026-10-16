@@ -5,9 +5,11 @@ import { cardRef, type Card, type FieldDef } from '../../shared/model';
 import { statusInfo } from '../../shared/status';
 import { aiWorkingChildren, fieldsForType, isAiWorking, isCardCollapsed, valueOf } from '../../shared/selectors';
 import { queuePositions } from '../../shared/autopilotQueue';
+import { limitWaitingCards } from '../../shared/usageLimit';
 import { useBoardStore } from '../store/boardStore';
 import { useCardBusy } from '../store/busyCards';
-import { t } from '../i18n';
+import { formatClock, t } from '../i18n';
+import { useNow } from '../useNow';
 import { useReducedMotion } from '../useReducedMotion';
 import { FieldBadge, hasValue } from './FieldRenderer';
 import { IconParent, IconYolo } from './ui';
@@ -77,6 +79,9 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const status = archived ? null : card.status;
   // a posição na fila do modo autônomo: só enquanto o autopiloto está ligado e a história espera a vez
   const queuePosition = isParent && !archived && state.autopilot.active ? queuePositions(state).get(card.id) : undefined;
+  const now = useNow();
+  // só monta a fila da IA enquanto há pausa gravada: sem ela, nenhum card espera o limite
+  const limitUntil = state.usageLimit && limitWaitingCards(state, now).has(card.id) ? state.usageLimit.resumeAt : null;
   // pendência com a pessoa: a borda ganha a cor do status para achar de relance o que espera por ela
   const mine = status !== null && statusInfo(status).owner === 'human';
   const style = mine ? ({ '--status-color': state.board.appearance.statuses[status].color } as CSSProperties) : undefined;
@@ -157,10 +162,13 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
                 <IconParent /> {cardRef(parent)} {parent.title}
               </div>
             )}
-            {(status || queuePosition) && (
+            {(status || queuePosition || limitUntil !== null) && (
               <div className="card-status-row">
                 {status && <StatusLine card={card} />}
                 {queuePosition && <QueueBadge position={queuePosition} />}
+                {limitUntil !== null && (
+                  <span className="limit-badge">{t('Aguardando o limite de uso até {time}', { time: formatClock(limitUntil, now) })}</span>
+                )}
               </div>
             )}
             <FieldLine className="card-fields" fields={fields.filter((f) => f.kind !== 'model')} cardId={card.id} />
