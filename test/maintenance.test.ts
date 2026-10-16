@@ -16,11 +16,11 @@ let mode: 'off' | 'branch' | 'worktree';
 /** o `git` falso: o que cada comando faz, por subcomando */
 let gitFails: { revParse?: boolean; remote?: boolean; fetch?: string };
 /** os passos que o teste segura: sem entrada, o passo resolve na hora */
-let gates: Partial<Record<'merges' | 'sync' | 'orphans' | 'releases', Promise<void>>>;
-let throws: Partial<Record<'merges' | 'sync' | 'orphans' | 'releases', boolean>>;
+let gates: Partial<Record<'merges' | 'sync' | 'baseConflicts' | 'orphans' | 'releases', Promise<void>>>;
+let throws: Partial<Record<'merges' | 'sync' | 'baseConflicts' | 'orphans' | 'releases', boolean>>;
 let maintenance: Maintenance;
 
-const step = (name: 'merges' | 'sync' | 'orphans' | 'releases') => async () => {
+const step = (name: 'merges' | 'sync' | 'baseConflicts' | 'orphans' | 'releases') => async () => {
   order.push(name);
   if (throws[name]) throw new Error(`${name} quebrou`);
   await gates[name];
@@ -49,19 +49,30 @@ beforeEach(() => {
     },
     merges: step('merges'),
     sync: step('sync'),
+    baseConflicts: step('baseConflicts'),
     orphans: step('orphans'),
     releases: step('releases'),
   });
 });
 
 describe('Maintenance: a ordem da manutenção do heartbeat (#722)', () => {
-  it('fetch → merges → sync → órfãs e versões; resolve depois da sync, com órfãs e versões ainda pendentes (RF1)', async () => {
+  it('fetch → merges → sync → conflito com a base → órfãs e versões; resolve depois da conferência, com órfãs e versões ainda pendentes (RF1, #747)', async () => {
     const orphans = deferred();
     const releases = deferred();
     gates.orphans = orphans.promise;
     gates.releases = releases.promise;
     await maintenance.run();
-    expect(order).toEqual(['fetch', 'merges', 'merges fim', 'sync', 'sync fim', 'orphans', 'releases']);
+    expect(order).toEqual([
+      'fetch',
+      'merges',
+      'merges fim',
+      'sync',
+      'sync fim',
+      'baseConflicts',
+      'baseConflicts fim',
+      'orphans',
+      'releases',
+    ]);
     orphans.resolve();
     releases.resolve();
     await maintenance.idle();
@@ -100,6 +111,7 @@ describe('Maintenance: a ordem da manutenção do heartbeat (#722)', () => {
     await maintenance.run();
     await maintenance.idle();
     expect(order).not.toContain('sync');
+    expect(order).not.toContain('baseConflicts');
     expect(order).toEqual(expect.arrayContaining(['merges', 'orphans', 'releases']));
     expect(log).toEqual(['Branches: a sincronização ficou para a próxima rodada: fatal: unable to access github.com.']);
     // a mesma falha na rodada seguinte não repete a linha
@@ -122,6 +134,7 @@ describe('Maintenance: a ordem da manutenção do heartbeat (#722)', () => {
     await maintenance.idle();
     expect(order).not.toContain('fetch');
     expect(order).not.toContain('sync');
+    expect(order).not.toContain('baseConflicts');
     expect(log).toEqual(['Branches: a sincronização ficou para a próxima rodada: o repositório não tem origin.']);
   });
 
@@ -141,12 +154,27 @@ describe('Maintenance: a ordem da manutenção do heartbeat (#722)', () => {
   it('um passo que rejeita não impede os seguintes, e a falha vai para o log', async () => {
     throws.merges = true;
     throws.sync = true;
+    throws.baseConflicts = true;
     await maintenance.run();
     await maintenance.idle();
-    expect(order.filter((o) => !o.endsWith(' fim'))).toEqual(['fetch', 'merges', 'sync', 'orphans', 'releases']);
+    expect(order.filter((o) => !o.endsWith(' fim'))).toEqual(['fetch', 'merges', 'sync', 'baseConflicts', 'orphans', 'releases']);
     expect(log).toEqual([
       'Manutenção: falha inesperada em merges: merges quebrou',
       'Manutenção: falha inesperada em sincronização das branches: sync quebrou',
+      'Manutenção: falha inesperada em conflito com a base: baseConflicts quebrou',
     ]);
+  });
+
+  it('a fila da IA espera a conferência do conflito com a base (#747)', async () => {
+    const base = deferred();
+    gates.baseConflicts = base.promise;
+    let ready = false;
+    const run = maintenance.run().then(() => (ready = true));
+    await flush();
+    expect(order).toContain('baseConflicts');
+    expect(ready).toBe(false);
+    base.resolve();
+    await run;
+    expect(ready).toBe(true);
   });
 });

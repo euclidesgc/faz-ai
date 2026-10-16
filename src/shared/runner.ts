@@ -10,9 +10,11 @@ export type RunnerPermission = 'board' | 'edits' | 'full';
  * coluna pede, até passar a vez); `refine` só deixa o card claro e completo (texto, campos,
  * checklist), sem trabalhar a fase, sem mover e sem mexer em arquivos; `summarize` lê a conversa do
  * card e grava um resumo (Decisões/Observações/Pendências) como uma mensagem nova, sem mover o card
- * nem mudar o status.
+ * nem mudar o status; `conflict` atualiza a branch da história a partir da base do pull request em
+ * conflito (merge, checagens, commit e push), sem trabalhar a fase, e no fim o card volta ao status
+ * que tinha.
  */
-export type AiRunMode = 'phase' | 'refine' | 'summarize';
+export type AiRunMode = 'phase' | 'refine' | 'summarize' | 'conflict';
 
 export interface RunnerConfig {
   permission: RunnerPermission;

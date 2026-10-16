@@ -139,7 +139,7 @@ Esta skill é o essencial. O detalhe de cada assunto fica em outra skill, que vo
 assunto aparece (o \`get_card\` aponta qual, numa nota curta):
 
 - \`faz-ai-harness-do-card\`: \`model\`, \`requiredRules\`, \`requiredSkills\` e a escolha de skills, rules e servidores do card;
-- \`faz-ai-workspace-e-pr\`: \`prepare_workspace\`, a pasta de trabalho, a base do pull request e a pilha;
+- \`faz-ai-workspace-e-pr\`: \`prepare_workspace\`, a pasta de trabalho, a base do pull request, a pilha e o aviso de conflito com a base;
 - \`faz-ai-implementacao-rodadas\`: as rodadas da Implementação (\`subtasksNow\`);
 - \`faz-ai-revisao-e-homologacao\`: a Revisão e a Homologação;
 - \`faz-ai-modo-autonomo\`: o que muda quando o card mostra \`autonomous: true\`.
@@ -169,6 +169,12 @@ Quando \`workspace.note\` trouxer uma pasta ou branch, ela vale. Abra o pull req
 \`workspace.stackNote\` vier, diga na descrição do pull request de qual pull request ele depende. Numa pilha, a base
 muda quando a anterior é concluída: siga sempre o \`workspace.baseBranch\` atual e, se ele mudou, traga a nova base
 com \`git fetch origin <base>\` e \`git merge origin/<base>\`, sem rebase nem push forçado.
+
+Se a conversa trouxer o aviso de que a branch tem conflito com a base, trate antes de abrir o pull request: na
+pasta de trabalho, \`git fetch origin\` e \`git merge origin/<base>\`, resolva os conflitos, rode as checagens do
+projeto e faça o commit, sem rebase nem push forçado. Se o conflito pedir uma decisão que é da pessoa, pergunte (no
+modo autônomo, \`block_card\` com o motivo). Depois do pull request aberto, o conflito é do board: ele chama a IA
+numa execução própria para resolvê-lo.
 `;
 
 const RODADAS_BODY = `# Rodadas da Implementação
@@ -301,7 +307,7 @@ export const FLOW_SKILLS: readonly { name: string; description: string; body: st
   {
     name: 'faz-ai-workspace-e-pr',
     description:
-      'Use ao alterar código de uma história: prepare_workspace, pasta de trabalho, branch, base do pull request e pilha de histórias.',
+      'Use ao alterar código de uma história: prepare_workspace, pasta de trabalho, branch, base do pull request, pilha de histórias e o aviso de conflito com a base.',
     body: WORKSPACE_BODY,
   },
   {

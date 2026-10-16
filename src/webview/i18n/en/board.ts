@@ -191,6 +191,7 @@ export const board: Record<string, string> = {
   'IA em {n} cards: ': 'AI on {n} cards: ',
   refinando: 'refining',
   resumindo: 'summarizing',
+  'resolvendo conflito': 'resolving conflict',
   agora: 'now',
   'há {n} min': '{n} min ago',
   'há {n} h': '{n} h ago',

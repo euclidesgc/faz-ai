@@ -887,8 +887,15 @@ Quando o merge é detectado:
    atualiza a `develop` local.
 
 Se o pull request é fechado sem merge, o board registra um aviso na conversa uma única vez. Se está
-aberto com conflito, o board avisa uma vez na conversa e, quando a história estava aguardando revisão,
-devolve o card para "Pronto", para a IA atualizar a branch e resolver na próxima rodada. O merge
+aberto com conflito, o board avisa na conversa uma vez por conflito (o aviso cita o commit do PR) e,
+na mesma rodada, chama a IA numa execução só para resolvê-lo, à frente da fila: ela atualiza a branch
+por merge a partir da base do PR (sem rebase nem push forçado), resolve os conflitos, roda as
+checagens, envia a branch e registra na conversa o que fez. Vale para qualquer história, inclusive as
+autônomas e as já entregues, menos a bloqueada e a que espera a sua resposta. A execução usa o modelo
+e a permissão da fase, segue os tetos das atividades com branch, aparece no card como "resolvendo
+conflito" e, no fim, o card volta ao status que tinha. Se a IA não conseguir, ela bloqueia o card com
+o motivo; se terminar e o PR continuar em conflito no mesmo commit, o board bloqueia o card e a
+resolução fica com você (desbloquear dá à IA mais uma tentativa). O merge
 continua sendo feito pela pessoa, manualmente ou pelo merge automático; o board só observa. Falhas
 na consulta do estado do PR (sem rede, sem autenticação, sem o `gh` instalado) não bloqueiam nada
 — o aviso aparece no log, e o board tenta de novo na próxima rodada.
@@ -931,6 +938,11 @@ cada rodada ele:
   divergiu dele. Cada branch atualizada, e cada motivo de pulo (uma vez por motivo), aparece no log com o
   prefixo `Branches:`. As suas branches pessoais não são tocadas. Sem rede ou sem origin, a
   sincronização fica para a próxima rodada;
+- **confere o conflito com a base antes do PR**: para cada história com branch e ainda sem pull
+  request, pergunta ao git, só lendo (`git merge-tree`, git 2.38 ou mais novo; abaixo disso, a
+  conferência é pulada com uma linha no log), se a branch conflita com a base atual no origin. Se
+  conflita, avisa na conversa uma vez por commit da branch, com os arquivos, para a IA atualizar a
+  branch e resolver antes de abrir o PR. Nada muda no card nem nas branches;
 - **resume a conversa** das histórias com três ou mais mensagens desde o último resumo, ou duas que
   somem muito texto (ao menos uma da IA), antes de trabalhar a fase; a IA passa a receber só o resumo e o que vier depois dele;
 - **refina os cards novos do Backlog** (**Refinar os cards novos do Backlog**, nas mesmas
