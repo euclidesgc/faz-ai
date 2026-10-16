@@ -931,9 +931,16 @@ order. When the merge is detected:
    updates the local `develop`.
 
 If the pull request is closed without a merge, the board registers a warning in the conversation
-once only. If it is open with conflicts, the board warns once in the conversation and, when the
-story was waiting for review, returns the card to "Pronto" so the AI updates the branch and resolves
-it on the next round. The merge is still done by the person, manually or through automatic merge; the board
+once only. If it is open with conflicts, the board warns in the conversation once per conflict (the
+notice quotes the PR commit) and, in the same round, calls the AI in a run just to resolve it, at the
+front of the queue: it updates the branch by merging from the PR base (no rebase, no force push),
+resolves the conflicts, runs the checks, pushes the branch and records what it did in the
+conversation. This applies to any story, including autonomous and already delivered ones, except a
+blocked one and one waiting for your answer. The run uses the phase's model and permission, follows
+the limits of activities with a branch, shows on the card as "resolving conflict" and, at the end,
+the card returns to the status it had. If the AI cannot do it, it blocks the card with the reason; if
+it finishes and the PR is still in conflict at the same commit, the board blocks the card and the
+resolution is yours (unblocking gives the AI one more try). The merge is still done by the person, manually or through automatic merge; the board
 only observes. Failures in querying the PR state (no network, no authentication, no `gh`
 installed) do not block anything — the warning appears in the log, and the board tries again on the next round.
 
@@ -977,6 +984,11 @@ does. In each round it:
   and each reason for skipping one (once per reason), shows up in the log with the `Branches:` prefix.
   Your personal branches are not touched. Without network or without origin, the sync waits for the
   next round;
+- **checks for conflicts with the base before the PR**: for each story with a branch and no pull
+  request yet, it asks git, read-only (`git merge-tree`, git 2.38 or newer; below that, the check is
+  skipped with a line in the log), whether the branch conflicts with the current base on origin. If it
+  does, it posts a notice in the conversation once per branch commit, with the files, for the AI to
+  update the branch and resolve it before opening the PR. Nothing changes on the card or the branches;
 - **summarizes the conversation** of stories with three or more messages since the last summary, or
   two that add up to a lot of text (at least one from the AI), before working on the phase; the AI then receives only the summary and
   what comes after it;

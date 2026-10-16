@@ -35,7 +35,13 @@ const originLabel = (origin: AiRunOrigin): string =>
 
 /** `what` da execução: a fase (nome da coluna, sem tradução) ou o modo, traduzido. */
 const whatOf = (activity: AiActivity): string =>
-  activity.mode === 'phase' ? activity.phase : activity.mode === 'refine' ? t('refinando') : t('resumindo');
+  activity.mode === 'phase'
+    ? activity.phase
+    : activity.mode === 'refine'
+      ? t('refinando')
+      : activity.mode === 'conflict'
+        ? t('resolvendo conflito')
+        : t('resumindo');
 
 interface Entry {
   activity: AiActivity;
