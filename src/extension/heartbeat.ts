@@ -26,10 +26,12 @@ export interface HeartbeatDeps {
   now(): number;
   log(line: string): void;
   /**
-   * Começo de cada rodada, automática ou pedida: é por aqui que o board confere os pull requests das
-   * histórias entregues (detecção de merges). Não espera o fim nem trava a rodada.
+   * A manutenção de cada rodada, automática ou pedida (merges, sincronização das branches, órfãs,
+   * versões publicadas), chamada depois da arrumação. Quando devolve uma promessa, a fila da IA só é
+   * bombeada depois que ela resolve (ou rejeita): a IA encontra as branches já sincronizadas. O número
+   * da rodada sai na hora mesmo assim. Não deve rejeitar.
    */
-  onRound?: () => void;
+  onRound?: () => void | Promise<void>;
   /**
    * Aplica uma mudança no board em nome do heartbeat (devolver um card bloqueado por limite de uso,
    * avisar de um card parado). Sem ela, a rodada só executa a IA.
@@ -185,7 +187,8 @@ const MODE_LABEL: Record<AiRunMode, string> = { phase: 'fase', refine: 'refinar'
 
 /**
  * Rotina periódica: a cada rodada, primeiro arruma o board (devolve para a IA os cards bloqueados por
- * limite de uso, avisa dos cards parados com a pessoa) e depois executa a ferramenta do projeto para
+ * limite de uso, avisa dos cards parados com a pessoa), depois espera a manutenção (`onRound`: merges e
+ * sincronização das branches) e só então executa a ferramenta do projeto para
  * cada história da fila: resume a conversa que cresceu, refina os cards novos do Backlog e trabalha a
  * fase dos cards prontos. As vagas são por tipo de atividade (`limitOf`): refinar, resumir e as fases
  * de texto (só produzem documento) vão até `parallelStories` em qualquer modo; as que mexem em código
@@ -202,6 +205,10 @@ export class Heartbeat {
    * se intercalam quando disputam a mesma vaga, em vez de uma esperar a outra esvaziar.
    */
   private yieldToAutopilot = true;
+  /** A manutenção da rodada está em andamento: a fila da IA espera o fim dela (`pump` não inicia nada). */
+  private holding = false;
+  /** a manutenção que o `holding` espera: só o fim da mais recente libera a fila */
+  private maintenance: Promise<void> | null = null;
 
   constructor(
     private runner: HeartbeatRunner,
@@ -258,7 +265,7 @@ export class Heartbeat {
   }
 
   get busy(): boolean {
-    return this.queue.length > 0 || this.runner.running.length > 0;
+    return this.holding || this.queue.length > 0 || this.runner.running.length > 0;
   }
 
   get queued(): number {
@@ -277,7 +284,7 @@ export class Heartbeat {
 
   private round(): number {
     this.lastRoundAt = this.deps.now();
-    this.deps.onRound?.();
+    // a arrumação vem antes da manutenção: o card que volta para a IA já entra na fila desta rodada
     this.tidy();
     const s = this.deps.snapshot();
     this.queue = heartbeatQueue(s);
@@ -290,7 +297,24 @@ export class Heartbeat {
     this.deps.log(
       count ? `Heartbeat: ${count} história(s) na rodada: ${this.queue.map(describe).join(', ')}.` : `Heartbeat: ${heartbeatIdleReason(s)}`,
     );
-    this.pump();
+    // a fila é montada antes da manutenção (é ela que dá o número na hora); o que perder a validade
+    // enquanto isso (história concluída pelo merge, por exemplo) cai no `stillValid` do `pump`
+    const maintenance = this.deps.onRound?.();
+    if (!(maintenance instanceof Promise)) {
+      this.pump();
+      return count;
+    }
+    this.holding = true;
+    this.maintenance = maintenance;
+    this.changed();
+    void maintenance
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.maintenance !== maintenance) return;
+        this.maintenance = null;
+        this.holding = false;
+        this.pump();
+      });
     return count;
   }
 
@@ -335,6 +359,9 @@ export class Heartbeat {
    * autopiloto está esperando vaga, uma do tipo que ele quer fica guardada para ele (ver `yieldToAutopilot`).
    */
   private pump(): void {
+    // durante a manutenção nada começa: uma execução que termina ou uma aprovação esperam o fim dela,
+    // em vez de cruzar com a sincronização das branches
+    if (this.holding) return void this.changed();
     const s = this.deps.snapshot();
     // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
     if (blocksExecution(s)) {

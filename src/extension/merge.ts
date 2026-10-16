@@ -1,6 +1,7 @@
 import { cardRef, type BoardState, type Card, type Column } from '../shared/model';
 import { columnOf, columnsOf, isAiWorking, isLive, openChildren } from '../shared/selectors';
 import { gitNotice } from '../shared/gitNotices';
+import { MAINTENANCE_LIMIT, mapLimit } from './concurrency';
 import { detectMainBranch, removeWorktree } from './git';
 import type { MessageRouter } from './panel/messageRouter';
 import { cleanUpStory, parsePullRequestFacts, PR_FIELDS, type CleanupDeps, type PullRequestFacts } from './storyCleanup';
@@ -173,13 +174,8 @@ export class AutoMerger {
   }
 }
 
-export interface MergeWatchDeps extends MergeDeps {
-  /**
-   * Gancho do fim da rodada: é por aqui que a rodada de publicação (#49) acontece, na mesma rodada da
-   * detecção de merges. Um erro dele é descartado.
-   */
-  afterRound?: () => Promise<void>;
-}
+/** O que a detecção de merges precisa: o mesmo do merge. As versões publicadas vêm depois, pela `Maintenance` (#722). */
+export type MergeWatchDeps = MergeDeps;
 
 /**
  * Histórias cujo pull request o watcher consulta: toda história em aberto com pull request registrado,
@@ -238,33 +234,30 @@ export class MergeWatcher {
     if (this.busy) return 0;
     this.busy = true;
     try {
-      // uma a uma, não em paralelo: ordem previsível no log e sem rajada de processos gh
       const targets = mergeWatchTargets(this.router.snapshot());
-      for (const card of targets) await this.check(card);
-      // depois do laço, não antes: uma história cujo merge é detectado agora e cuja versão já saiu é
-      // concluída e arquivada na mesma rodada. O `catch` é a rede de segurança — quem está no gancho
-      // trata as próprias falhas, e nada daqui pode fazer a rodada rejeitar.
-      if (this.deps.afterRound) {
-        try {
-          await this.deps.afterRound();
-        } catch {
-          /* o gancho é responsável pelo próprio log */
-        }
-      }
+      // as consultas ao GitHub vão em paralelo, com o teto da manutenção (não o do board); a conclusão e
+      // a limpeza vão em série, na ordem dos alvos: mexem em refs e na develop, e o log fica previsível
+      const facts = await mapLimit(targets, MAINTENANCE_LIMIT, (card) => this.query(card));
+      for (const [i, card] of targets.entries()) await this.apply(card, facts[i]!);
       return targets.length;
     } finally {
       this.busy = false;
     }
   }
 
-  private async check(card: Card): Promise<void> {
-    if (this.checking.has(card.id)) return;
-    let pr: PullRequestFacts;
+  /** Só a consulta ao `gh`: nunca rejeita, a falha volta como `Error` para o `apply` registrar. */
+  private async query(card: Card): Promise<PullRequestFacts | Error> {
     try {
-      pr = parsePullRequestFacts(await this.deps.gh(['pr', 'view', card.prUrl, '--json', PR_FIELDS], this.deps.cwd), card.prUrl);
+      return parsePullRequestFacts(await this.deps.gh(['pr', 'view', card.prUrl, '--json', PR_FIELDS], this.deps.cwd), card.prUrl);
     } catch (e) {
-      return this.noteFailure(e instanceof Error ? e.message : String(e));
+      return e instanceof Error ? e : new Error(String(e));
     }
+  }
+
+  /** O que fazer com o estado do pull request: concluir, avisar do fechamento ou do conflito, ou nada. */
+  private async apply(card: Card, pr: PullRequestFacts | Error): Promise<void> {
+    if (this.checking.has(card.id)) return;
+    if (pr instanceof Error) return this.noteFailure(pr.message);
     this.lastFailure = null;
     try {
       // a limpeza roda em série, dentro da rodada: ordem previsível e sem dois gits na mesma branch

@@ -111,7 +111,7 @@ beforeEach(async () => {
 describe('heartbeat', () => {
   it('cada rodada, automática ou pedida, confere os merges, mesmo sem nada pendente com a IA', () => {
     let rounds = 0;
-    heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => now, log: () => {}, onRound: () => rounds++ });
+    heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => now, log: () => {}, onRound: () => void rounds++ });
     heartbeat.tick();
     expect(rounds).toBe(0); // o intervalo ainda não passou
     now += 60 * 60_000;
@@ -543,5 +543,115 @@ describe('heartbeat: refinar, resumir e arrumar o board', () => {
     heartbeat.runNow();
     expect(comments(1)).toHaveLength(2);
     expect(comments(1).at(-1)!.body).toContain('esperando a sua resposta');
+  });
+});
+
+describe('heartbeat: a manutenção da rodada vem antes da fila da IA (#722)', () => {
+  /** a manutenção simulada: cada rodada devolve uma promessa que o teste resolve ou rejeita */
+  let rounds: { resolve: () => void; reject: (e: unknown) => void }[];
+  /** o que aconteceu, em ordem: a arrumação (status do card devolvido) e o começo da manutenção */
+  let order: string[];
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  const withMaintenance = () => {
+    rounds = [];
+    order = [];
+    heartbeat = new Heartbeat(runner, {
+      snapshot: () => router.snapshot(),
+      now: () => now,
+      log: (l) => log.push(l),
+      act: (msg) => {
+        if (msg.type === 'card.status.set') order.push(`arrumação ${msg.status}`);
+        router.handle(msg, { author: 'Faz AI', source: 'ai' });
+      },
+      onRound: () => {
+        order.push('manutenção');
+        return new Promise<void>((resolve, reject) => rounds.push({ resolve, reject }));
+      },
+    });
+  };
+  beforeEach(withMaintenance);
+
+  it('com a manutenção pendente, o número sai na hora e nada começa; ao resolver, a fila começa (RF1, RF2)', async () => {
+    create('A', 'Implementação'); // #1
+    create('B', 'PRD'); // #2: fase de texto
+    expect(heartbeat.runNow()).toBe(2);
+    expect(runner.started).toEqual([]);
+    expect(heartbeat.busy).toBe(true);
+    expect(heartbeat.queued).toBe(2);
+    rounds[0]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1, 2]);
+  });
+
+  it('uma manutenção que rejeita também libera a fila', async () => {
+    create('A', 'Implementação'); // #1
+    heartbeat.runNow();
+    rounds[0]!.reject(new Error('falhou'));
+    await flush();
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+
+  it('a arrumação acontece antes da manutenção', () => {
+    create('A', 'Implementação'); // #1
+    setStatus(1, 'blocked', "O Claude Code encerrou sem responder. Fim da saída:\n\nYou've hit your limit · resets 3pm");
+    heartbeat.runNow();
+    expect(order).toEqual(['arrumação ready', 'manutenção']);
+  });
+
+  it('uma execução que termina durante a manutenção não inicia nada, e busy segue verdadeiro', async () => {
+    create('A', 'Implementação'); // #1
+    heartbeat.runNow();
+    rounds[0]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1]);
+    // a próxima rodada começa com #1 ainda rodando; #1 termina durante a manutenção dela
+    create('B', 'Implementação'); // #2
+    heartbeat.runNow();
+    runner.finish();
+    expect(runner.started.map(number)).toEqual([1]);
+    expect(heartbeat.busy).toBe(true);
+    rounds[1]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1, 2]);
+  });
+
+  it('um enqueue durante a manutenção espera o fim dela', async () => {
+    create('A', 'Implementação'); // #1
+    setStatus(1, 'waiting_review');
+    heartbeat.runNow();
+    heartbeat.enqueue(card(1).id);
+    expect(runner.started).toEqual([]);
+    setStatus(1, 'ready');
+    rounds[0]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+
+  it('as execuções da IA seguem nos tetos do board, não no teto da manutenção (RF6)', async () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallel: false, parallelStories: 2 }, git: { mode: 'branch' } } });
+    create('A', 'Discovery'); // #1
+    create('B', 'Discovery'); // #2
+    create('C', 'Discovery'); // #3
+    create('D', 'Implementação'); // #4
+    create('E', 'Implementação'); // #5
+    heartbeat.runNow();
+    rounds[0]!.resolve();
+    await flush();
+    // duas de texto ("Histórias ao mesmo tempo") e uma com branch, mesmo com a manutenção podendo 4
+    expect(runner.started.map(number).sort()).toEqual([1, 2, 4]);
+    expect(heartbeat.queued).toBe(2);
+  });
+
+  it('só o fim da manutenção mais recente libera a fila', async () => {
+    create('A', 'Implementação'); // #1
+    heartbeat.runNow();
+    heartbeat.stop(); // esvazia a fila; a próxima rodada monta outra
+    heartbeat.runNow();
+    rounds[0]!.resolve();
+    await flush();
+    expect(runner.started).toEqual([]);
+    rounds[1]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1]);
   });
 });

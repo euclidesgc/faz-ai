@@ -325,10 +325,6 @@ describe('pull request e merge na homologação', () => {
 describe('MergeWatcher', () => {
   let log: string[];
   let watcher: MergeWatcher;
-  /** o gancho do fim da rodada (a rodada de publicação, #49); por padrão não faz nada */
-  let after: () => Promise<void>;
-  /** quantas chamadas de `gh` já tinham acontecido a cada vez que o gancho rodou */
-  let afterRuns: number[];
 
   const json = (pr: Record<string, unknown>) => async () => JSON.stringify(pr);
   const MERGED = json({ state: 'MERGED', mergedAt: '2026-10-04T10:00:00Z', mergeCommit: { oid: 'abc123' } });
@@ -346,8 +342,6 @@ describe('MergeWatcher', () => {
 
   beforeEach(async () => {
     log = [];
-    after = async () => {};
-    afterRuns = [];
     watcher = new MergeWatcher(router, {
       cwd: '/projeto',
       log: (line) => log.push(line),
@@ -361,10 +355,6 @@ describe('MergeWatcher', () => {
       },
       removeWorktree: (_dir, p) => {
         removed.push(p);
-      },
-      afterRound: () => {
-        afterRuns.push(calls.length);
-        return after();
       },
     });
     await deliver(1);
@@ -570,30 +560,78 @@ describe('MergeWatcher', () => {
     expect(calls).toHaveLength(1);
   });
 
-  it('o gancho do fim da rodada roda uma vez, depois do último pull request consultado', async () => {
-    await call('create_card', { title: 'Entregue também', column: 'Homologação' }); // #2
-    await deliver(2);
-    ghResult = OPEN;
-    await watcher.runNow();
-    expect(calls).toEqual([
-      ['pr', 'view', prOf(1), '--json', FIELDS],
-      ['pr', 'view', prOf(2), '--json', FIELDS],
-    ]);
-    // uma vez só, e com as duas consultas já feitas: o gancho vem depois do laço de merges
-    expect(afterRuns).toEqual([2]);
+  it('as consultas ao gh vão em paralelo, no máximo 4 ao mesmo tempo, e todas acontecem (RF5, RF6)', async () => {
+    for (let n = 2; n <= 10; n++) {
+      await call('create_card', { title: `Entregue ${n}`, column: 'Homologação' });
+      await deliver(n);
+    }
+    let running = 0;
+    let peak = 0;
+    ghResult = async () => {
+      running++;
+      peak = Math.max(peak, running);
+      await new Promise((r) => setTimeout(r, 1));
+      running--;
+      return OPEN();
+    };
+    expect(await watcher.runNow()).toBe(10);
+    expect(calls).toHaveLength(10);
+    expect(peak).toBe(4);
   });
 
-  it('um erro do gancho não escapa da rodada e não trava a rodada seguinte', async () => {
-    ghResult = OPEN;
-    after = async () => {
-      throw new Error('falha do gancho');
+  it('com dois pull requests mesclados, a limpeza do segundo só começa depois da do primeiro (RF7)', async () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'worktree', gitflow: true } } });
+    await call('create_card', { title: 'Entregue também', column: 'Homologação' }); // #2
+    await deliver(2);
+    const wt = (n: number) => `/projeto.worktrees/${n}-login`;
+    const br = (n: number) => `historia/${n}-login`;
+    (router as any).ctx.cards.setWorkspace(card(1).id, br(1), wt(1));
+    (router as any).ctx.cards.setWorkspace(card(2).id, br(2), wt(2));
+    ghResult = async () => {
+      const url = calls.at(-1)![2]!;
+      return mergedView(url, url === prOf(1) ? br(1) : br(2));
     };
-    await expect(watcher.runNow()).resolves.toBe(1);
-    expect(log).toEqual([]);
+    // o repositório limpo das duas histórias, com uma espera em cada comando: limpezas em paralelo se cruzariam
+    const one = cleanRepo(br(1), wt(1));
+    const two = cleanRepo(br(2), wt(2));
+    const owner: number[] = [];
+    gitResult = async (args, cwd) => {
+      await new Promise((r) => setTimeout(r, 1));
+      const a = args.join(' ');
+      if (a === 'worktree list --porcelain')
+        return [
+          'worktree /projeto\nHEAD 1111\nbranch refs/heads/main\n',
+          ...[1, 2].filter((n) => !removed.includes(wt(n))).map((n) => `worktree ${wt(n)}\nHEAD feed01\nbranch refs/heads/${br(n)}\n`),
+        ].join('\n');
+      if (a.includes(br(1))) owner.push(1);
+      if (a.includes(br(2))) owner.push(2);
+      return (a.includes(br(2)) ? two : one)(args, cwd);
+    };
+    await watcher.runNow();
+    expect(columnOf(1)).toBe('Concluído');
+    expect(columnOf(2)).toBe('Concluído');
+    expect(owner).toContain(1);
+    expect(owner).toContain(2);
+    // nenhum comando da limpeza da #1 depois do primeiro da #2
+    expect(owner.lastIndexOf(1)).toBeLessThan(owner.indexOf(2));
+    expect(removed).toEqual([wt(1), wt(2)]);
+  });
 
-    // o `busy` voltou a false: a rodada seguinte acontece
-    await expect(watcher.runNow()).resolves.toBe(1);
-    expect(afterRuns).toHaveLength(2);
+  it('uma consulta que falha no meio não impede as outras, e a falha vai para o log uma vez', async () => {
+    await call('create_card', { title: 'Entregue também', column: 'Homologação' }); // #2
+    await deliver(2);
+    await call('create_card', { title: 'E mais uma', column: 'Homologação' }); // #3
+    await deliver(3);
+    ghResult = async () => {
+      const url = calls.at(-1)![2]!;
+      if (url === prOf(2)) throw new Error('HTTP 502: Bad gateway');
+      return MERGED();
+    };
+    expect(await watcher.runNow()).toBe(3);
+    expect(columnOf(1)).toBe('Concluído');
+    expect(columnOf(2)).toBe('Homologação');
+    expect(columnOf(3)).toBe('Concluído');
+    expect(log.filter((l) => l.startsWith('Merges:'))).toEqual(['Merges: HTTP 502: Bad gateway']);
   });
 
   it('PR fechado sem merge no MergeWatcher: nenhuma branch apagada', async () => {
