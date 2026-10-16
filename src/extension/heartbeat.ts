@@ -37,6 +37,11 @@ export interface HeartbeatDeps {
    * avisar de um card parado). Sem ela, a rodada só executa a IA.
    */
   act?: (msg: WebviewToHost) => void;
+  /**
+   * As histórias com conflito no pull request ainda sem tentativa da IA (`MergeWatcher.pendingConflicts`):
+   * entram no começo da fila como execuções de conflito (#747). Sem ela, a rodada não trata conflitos.
+   */
+  conflicts?: () => ReadonlySet<string>;
 }
 
 /** Dias com a pessoa (revisão, resposta ou bloqueio) a partir dos quais a rodada avisa que o card está parado. */
@@ -139,8 +144,34 @@ export function staleWithHuman(s: BoardState, now: number): Card[] {
   });
 }
 
-/** A fila de uma rodada: cada história uma vez, com o que fazer nela (resumir antes de trabalhar a fase). */
-export function heartbeatQueue(s: BoardState): HeartbeatItem[] {
+/**
+ * Histórias com conflito pendente no pull request que a rodada pode tratar agora: vivas, em coluna
+ * aberta, com pull request e sem execução (nela nem numa sub-tarefa). Entram as do modo autônomo e as
+ * que estão com a pessoa esperando revisão (resolver conflito é trabalho da IA, e o status volta no
+ * fim); ficam de fora a bloqueada e a que espera resposta, que estão com a pessoa de verdade. Pura.
+ */
+export function conflictTargets(s: BoardState, pending: ReadonlySet<string>): Card[] {
+  if (!pending.size) return [];
+  return s.cards.filter(
+    (c) =>
+      pending.has(c.id) &&
+      isLive(c) &&
+      !c.parentId &&
+      c.prUrl !== '' &&
+      columnOf(s, c)?.category === 'open' &&
+      c.status !== 'blocked' &&
+      c.status !== 'waiting_answer' &&
+      !isAiWorking(s, c) &&
+      !childrenOf(s, c.id).some((k) => isLive(k) && isAiWorking(s, k)),
+  );
+}
+
+/**
+ * A fila de uma rodada: cada história uma vez, com o que fazer nela. Os conflitos de pull request vêm
+ * primeiro (a história com conflito trabalha a fase só na rodada seguinte), depois resumir antes de
+ * trabalhar a fase, resumos e refinamentos.
+ */
+export function heartbeatQueue(s: BoardState, conflicts: ReadonlySet<string> = new Set()): HeartbeatItem[] {
   const items: HeartbeatItem[] = [];
   const seen = new Set<string>();
   const push = (card: Card, mode: AiRunMode) => {
@@ -148,6 +179,7 @@ export function heartbeatQueue(s: BoardState): HeartbeatItem[] {
     seen.add(card.id);
     items.push({ id: card.id, mode });
   };
+  for (const card of conflictTargets(s, conflicts)) push(card, 'conflict');
   const summaries = new Set(summaryTargets(s).map((c) => c.id));
   for (const card of heartbeatTargets(s)) push(card, summaries.has(card.id) ? 'summarize' : 'phase');
   for (const card of summaryTargets(s)) push(card, 'summarize');
@@ -189,8 +221,8 @@ const MODE_LABEL: Record<AiRunMode, string> = { phase: 'fase', refine: 'refinar'
  * Rotina periódica: a cada rodada, primeiro arruma o board (devolve para a IA os cards bloqueados por
  * limite de uso, avisa dos cards parados com a pessoa), depois espera a manutenção (`onRound`: merges e
  * sincronização das branches) e só então executa a ferramenta do projeto para
- * cada história da fila: resume a conversa que cresceu, refina os cards novos do Backlog e trabalha a
- * fase dos cards prontos. As vagas são por tipo de atividade (`limitOf`): refinar, resumir e as fases
+ * cada história da fila: resolve o conflito do pull request (na frente de tudo), resume a conversa que
+ * cresceu, refina os cards novos do Backlog e trabalha a fase dos cards prontos. As vagas são por tipo de atividade (`limitOf`): refinar, resumir e as fases
  * de texto (só produzem documento) vão até `parallelStories` em qualquer modo; as que mexem em código
  * vão uma por vez ou, no modo worktree com o paralelo ligado, até o limite configurado. Cada teto conta
  * as execuções já em andamento daquele tipo: a rodada ocupa só as vagas livres. Sem pendência, não
@@ -287,7 +319,7 @@ export class Heartbeat {
     // a arrumação vem antes da manutenção: o card que volta para a IA já entra na fila desta rodada
     this.tidy();
     const s = this.deps.snapshot();
-    this.queue = heartbeatQueue(s);
+    this.queue = heartbeatQueue(s, this.conflicts());
     const count = this.queue.length;
     const byId = new Map(s.cards.map((c) => [c.id, c]));
     const describe = (i: HeartbeatItem) => `${cardRef(byId.get(i.id)!)} (${MODE_LABEL[i.mode]})`;
@@ -313,9 +345,33 @@ export class Heartbeat {
         if (this.maintenance !== maintenance) return;
         this.maintenance = null;
         this.holding = false;
+        this.frontConflicts();
         this.pump();
       });
     return count;
+  }
+
+  private conflicts(): ReadonlySet<string> {
+    return this.deps.conflicts?.() ?? new Set();
+  }
+
+  /**
+   * Os conflitos que a manutenção desta rodada acabou de achar vão para o começo da fila, no lugar do que
+   * estava previsto para a mesma história: a fila foi montada antes da manutenção (é ela que dá o número
+   * da rodada na hora), e a IA trata o conflito ainda nesta rodada.
+   */
+  private frontConflicts(): void {
+    const s = this.deps.snapshot();
+    const front = conflictTargets(s, this.conflicts())
+      .filter((c) => !this.queue.some((i) => i.id === c.id && i.mode === 'conflict'))
+      .map((c): HeartbeatItem => ({ id: c.id, mode: 'conflict' }));
+    if (!front.length) return;
+    const ids = new Set(front.map((i) => i.id));
+    this.queue = [...front, ...this.queue.filter((i) => !ids.has(i.id))];
+    const byId = new Map(s.cards.map((c) => [c.id, c]));
+    this.deps.log(
+      `Heartbeat: conflito no pull request de ${front.map((i) => cardRef(byId.get(i.id)!)).join(', ')}; a IA resolve nesta rodada.`,
+    );
   }
 
   /**
@@ -349,6 +405,7 @@ export class Heartbeat {
   private stillValid(s: BoardState, item: HeartbeatItem): Card | undefined {
     if (item.mode === 'refine') return refineTargets(s).find((c) => c.id === item.id);
     if (item.mode === 'summarize') return summaryTargets(s).find((c) => c.id === item.id);
+    if (item.mode === 'conflict') return conflictTargets(s, this.conflicts()).find((c) => c.id === item.id);
     return heartbeatTargets(s).find((c) => c.id === item.id);
   }
 
@@ -379,7 +436,7 @@ export class Heartbeat {
       const current = this.deps.snapshot();
       const card = this.stillValid(current, item);
       if (!card) continue;
-      // refinar e resumir só produzem texto: nunca ocupam a vaga de branch
+      // refinar e resumir só produzem texto: nunca ocupam a vaga de branch; o conflito sempre ocupa
       const kind = activityKindOf(current, card, item.mode);
       if (counts[kind] >= limit(kind)) {
         rest.push(item);
