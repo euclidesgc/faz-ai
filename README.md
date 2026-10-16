@@ -874,7 +874,9 @@ O board observa o pull request de cada história em aberto que tem um (em qualqu
 modo autônomo; só a bloqueada e a em execução ficam de fora) e detecta quando ele é mergeado,
 concluindo a história automaticamente. Não há opção própria: a consulta acontece em cada rodada do
 [heartbeat](#heartbeat), no mesmo intervalo, e também no **Rodar o heartbeat agora**. Com o heartbeat
-desligado, ela só acontece quando você pede uma rodada. Quando o merge é detectado:
+desligado, ela só acontece quando você pede uma rodada. As consultas ao GitHub vão em paralelo, até
+quatro ao mesmo tempo; a conclusão e a limpeza de cada história vão uma por vez, na ordem do board.
+Quando o merge é detectado:
 
 1. o board grava o commit do merge no card;
 2. registra na conversa que a história foi concluída;
@@ -918,6 +920,15 @@ cada rodada ele:
   com um aviso na conversa, e **avisa uma vez** o card que está com você há dois dias ou mais;
 - **confere os pull requests** de toda história que tem um ([detecção automática de merges](#detecção-automática-de-merges))
   e limpa as branches e worktrees que sobraram ([branches e worktrees órfãs](#branches-e-worktrees-órfãs));
+- **sincroniza as branches locais** que o board conhece (a principal, a `develop` e a branch de cada
+  história em aberto) com o origin, para a próxima tarefa partir da base mais recente e a IA encontrar a
+  branch da história em dia. Só por **fast-forward**: a branch anda só quando está atrás do origin e não
+  tem nenhum commit que o origin não tenha. Nada é mesclado com commit, reescrito nem forçado. Uma branch fica como
+  está quando há uma execução da IA na história dela (ou na pasta em que ela está aberta), quando essa
+  pasta tem alterações ou arquivos não rastreados, ou quando a branch está à frente do origin ou
+  divergiu dele. Cada branch atualizada, e cada motivo de pulo (uma vez por motivo), aparece no log com o
+  prefixo `Branches:`. As suas branches pessoais não são tocadas. Sem rede ou sem origin, a
+  sincronização fica para a próxima rodada;
 - **resume a conversa** das histórias com três ou mais mensagens desde o último resumo, ou duas que
   somem muito texto (ao menos uma da IA), antes de trabalhar a fase; a IA passa a receber só o resumo e o que vier depois dele;
 - **refina os cards novos do Backlog** (**Refinar os cards novos do Backlog**, nas mesmas
@@ -950,6 +961,14 @@ cada uma) e de mais memória e processador enquanto várias sessões de IA, test
 juntos. No editor a aba Git e o bloco de paralelo do Harness de IA viram um link para o Settings; no
 navegador seguem como campos editáveis, como antes.
 
+- A rodada tem uma ordem fixa: a arrumação (limite de uso, cards parados); um `git fetch` só; os pull
+  requests (uma história mesclada perde a branch, então vem antes da sincronização); a sincronização
+  das branches; as órfãs e as versões publicadas; e, por último, a fila da IA, que espera a
+  sincronização terminar para partir das branches já atualizadas. O número de histórias da rodada sai
+  na hora, mesmo assim. Essa manutenção (consultas ao GitHub e ao git, sem IA) roda em paralelo até
+  **quatro** tarefas ao mesmo tempo. É um limite fixo e próprio do heartbeat, que não é o **Tocar
+  histórias em paralelo** nem o **Histórias ao mesmo tempo**: esses continuam valendo só para as
+  execuções da IA. Com duas janelas no mesmo board, só a dona faz a manutenção.
 - Sem pendência com a IA, nada é executado, e o log (Saída → Faz AI) diz o motivo: login vencido, história em modo autônomo, execução em andamento, com a pessoa ou esperando outro card. Com pendência, o log diz quantas histórias estão com você e o que a IA vai fazer em cada uma (fase, refinar, resumir).
 - A fila da rodada segue a ordem do board: os bugs primeiro; depois a história mais à direita (a
   mais adiantada termina antes de uma nova começar); na mesma coluna, de cima para baixo — o que
