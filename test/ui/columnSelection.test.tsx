@@ -404,3 +404,49 @@ describe('Column: posição da caixa de selecionar todos no cabeçalho', () => {
     expect(box.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
+
+describe('Column: ações contextuais compartilhadas', () => {
+  it('sem seleção, as ações continuam visíveis e desabilitadas, sem motivo', async () => {
+    const wf = parentWorkflow();
+    const cols = columnsOf(wf.id);
+    renderColumn(cols[0]!, wf, cols);
+    await openMenu();
+    for (const name of [
+      'Aprovar',
+      'Bloquear',
+      'Desbloquear',
+      'Trabalhar na fase',
+      'Refinar com IA',
+      'Parar a IA',
+      'Ligar modo autônomo',
+      'Colapsar selecionados',
+      'Arquivar selecionados',
+      'Mover selecionados para...',
+      'Concluir selecionados',
+      'Mandar selecionados para a lixeira',
+      'Limpar seleção',
+    ]) {
+      const button = within(document.querySelector('.menu') as HTMLElement).getByRole('button', { name });
+      expect(button).toBeDisabled();
+      expect(button).not.toHaveAttribute('title');
+    }
+    expect(screen.queryByText(/Selecione cards para usar/)).toBeNull();
+    // A rolagem interna do menu comprido não deve fechá-lo.
+    const menu = document.querySelector('.menu')!;
+    menu.dispatchEvent(new Event('scroll'));
+    expect(screen.getByRole('button', { name: 'Aprovar' })).toBeInTheDocument();
+  });
+
+  it('aprovar usa o mesmo filtro e a mesma mensagem em lote da barra', async () => {
+    const { wf, cols, col0, secondId } = selectTwoInSameColumn();
+    act(() => {
+      const s = state();
+      useBoardStore.setState({ state: { ...s, cards: s.cards.map((c) => (c.id === secondId ? { ...c, status: 'waiting_review' } : c)) } });
+    });
+    renderColumn(col0, wf, cols);
+    await openMenu();
+    await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Aprovar' }));
+    expect(lastSent('card.status.setMany')).toMatchObject({ cardIds: [secondId], status: 'approved' });
+  });
+});

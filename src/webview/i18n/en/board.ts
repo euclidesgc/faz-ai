@@ -1,4 +1,13 @@
 export const board: Record<string, string> = {
+  'Atinge {m} de {n} selecionados.': 'Affects {m} of {n} selected cards.',
+  'Aprovar {n} card(s)?': 'Approve {n} card(s)?',
+  'Cada card aprovado segue para a próxima coluna.': 'Each approved card moves to the next column.',
+  'Aprovando {n} card(s)…': 'Approving {n} card(s)…',
+  'Bloquear {n} card(s)?': 'Block {n} card(s)?',
+  'O motivo vai para a conversa de cada card bloqueado.': 'The reason is added to each blocked card’s conversation.',
+  Motivo: 'Reason',
+  'Bloqueando {n} card(s)…': 'Blocking {n} card(s)…',
+  'Desbloqueando {n} card(s)…': 'Unblocking {n} card(s)…',
   // App, barra de topo e avisos
   'Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.':
     'No connection to Faz AI. Reopen the board from the editor or the terminal.',

@@ -6,6 +6,7 @@
 //      (cancelar as sub-tarefas com a história, levar os filhos para a lixeira) ficam cobertas de graça;
 //   2. o que não é transição (comentário, anexo, vínculo, pull request, campo, branch, modo autônomo)
 //      vem do tipo da mensagem, que já diz o que aconteceu.
+import { canSetBulkStatus } from '../../shared/status';
 import type { CardEvent, CardEventKind } from '../../shared/log';
 import type { WebviewToHost } from '../../shared/messages';
 import type { FieldValue, LinkKind } from '../../shared/model';
@@ -110,7 +111,9 @@ export function eventsFor(
     // a aprovação da pessoa leva o card à coluna seguinte na mesma mensagem (#441): o log guarda a aprovação
     // (é ela que o retrabalho conta), e a mudança de coluna já diz que o status recomeçou lá
     const approvedThenMoved =
-      msg.type === 'card.status.set' && msg.status === 'approved' && msg.cardId === id && a.columnName !== b.columnName;
+      ((msg.type === 'card.status.set' && msg.status === 'approved' && msg.cardId === id) ||
+        (msg.type === 'card.status.setMany' && msg.status === 'approved' && msg.cardIds.includes(id) && b.status === 'waiting_review')) &&
+      a.columnName !== b.columnName;
     if (approvedThenMoved) add(b, 'status_changed', { fromValue: b.status ?? '', toValue: 'approved' });
     else if ((a.status ?? '') !== (b.status ?? '')) add(b, 'status_changed', { fromValue: b.status ?? '', toValue: a.status ?? '' });
     if (a.archived !== b.archived) add(b, a.archived ? 'archived' : 'unarchived');
@@ -131,6 +134,15 @@ export function eventsFor(
       if (!msg.note?.trim()) break;
       // sem evento próprio, a nota ainda vai para a conversa: é um comentário
       add(factsOf(msg.cardId), (msg.status && STATUS_EVENT[msg.status]) ?? 'comment');
+      break;
+    }
+    case 'card.status.setMany': {
+      if (!msg.note?.trim()) break;
+      for (const id of new Set(msg.cardIds)) {
+        const b = before.get(id);
+        if (!b || b.parentId || b.archived || b.trashed || !canSetBulkStatus(b.status, msg.status)) continue;
+        add(b, STATUS_EVENT[msg.status] ?? 'comment');
+      }
       break;
     }
     case 'comment.add':

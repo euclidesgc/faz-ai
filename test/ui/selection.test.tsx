@@ -263,3 +263,109 @@ describe('colapsar/expandir selecionados (card 349)', () => {
     expect(screen.queryByRole('button', { name: 'Colapsar selecionados' })).toBeNull();
   });
 });
+
+describe('ações contextuais da seleção', () => {
+  it('aprova só os cards aguardando revisão e avisa que a seleção é parcial', async () => {
+    const [firstId] = await selectTwoStories();
+    act(() => patchCard(firstId, { status: 'waiting_review' }));
+    await userEvent.click(bar().getByRole('button', { name: 'Aprovar' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/Atinge 1 de 2 selecionados/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Aprovar' }));
+    expect(lastSent('card.status.setMany')).toMatchObject({ cardIds: [firstId], status: 'approved' });
+    expect(bar().getByRole('button', { name: 'Aprovar' })).toBeDisabled();
+  });
+
+  it('bloquear exige motivo e envia só os ainda não bloqueados; cancelar preserva a seleção', async () => {
+    const [firstId, secondId] = await selectTwoStories();
+    act(() => patchCard(firstId, { status: 'blocked' }));
+    await userEvent.click(bar().getByRole('button', { name: 'Bloquear' }));
+    let dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Bloquear' })).toBeDisabled();
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Motivo' }), '   ');
+    expect(within(dialog).getByRole('button', { name: 'Bloquear' })).toBeDisabled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(sentOf('card.status.setMany')).toEqual([]);
+    expect(useBoardStore.getState().selectedIds.size).toBe(2);
+    await userEvent.click(bar().getByRole('button', { name: 'Bloquear' }));
+    dialog = screen.getByRole('dialog');
+    const reason = within(dialog).getByRole('textbox', { name: 'Motivo' });
+    expect(reason).toHaveValue('');
+    expect(reason).toHaveFocus();
+    await userEvent.type(reason, '  Aguardando acesso  ');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bloquear' }));
+    expect(lastSent('card.status.setMany')).toMatchObject({ cardIds: [secondId], status: 'blocked', note: 'Aguardando acesso' });
+  });
+
+  it('desbloqueia só quem está bloqueado e mantém ações indisponíveis sem explicar o motivo', async () => {
+    const [firstId] = await selectTwoStories();
+    act(() => patchCard(firstId, { status: 'blocked' }));
+    const approve = bar().getByRole('button', { name: 'Aprovar' });
+    expect(approve).toBeDisabled();
+    expect(approve).not.toHaveAttribute('title');
+    await userEvent.click(bar().getByRole('button', { name: 'Desbloquear' }));
+    expect(lastSent('card.status.setMany')).toMatchObject({ cardIds: [firstId], status: 'ready' });
+  });
+
+  it('a ferramenta indisponível desabilita trabalhar e refinar', async () => {
+    await selectTwoStories();
+    act(() => patchState(() => ({ aiRunUnsupported: 'Sem ferramenta' })));
+    for (const name of ['Trabalhar na fase', 'Refinar com IA']) expect(bar().getByRole('button', { name })).toBeDisabled();
+    expect(bar().queryByText('Sem ferramenta')).toBeNull();
+  });
+
+  it('trabalhar respeita vagas de branch e ignora cards em execução; parar atinge só execuções locais', async () => {
+    const [firstId, secondId] = await selectTwoStories();
+    act(() => {
+      const s = useBoardStore.getState().state!;
+      const implementation = s.columns.find((c) => c.name === 'Implementação')!;
+      patchCard(firstId, { columnId: implementation.id, status: 'running' });
+      patchCard(secondId, { columnId: implementation.id, status: 'ready' });
+      patchState(() => ({ aiRuns: [firstId] }));
+    });
+    expect(bar().getByRole('button', { name: 'Trabalhar na fase' })).toBeDisabled();
+    expect(bar().getByRole('button', { name: 'Refinar com IA' })).toBeEnabled();
+    act(() => patchState(() => ({ aiRuns: [] })));
+    // Uma sessão externa marcada "running" também não pode receber uma segunda execução.
+    await userEvent.click(bar().getByRole('button', { name: 'Trabalhar na fase' }));
+    expect(sentOf('ai.run').map((m) => m.cardId)).toEqual([secondId]);
+  });
+
+  it('refinar usa apenas as vagas de texto restantes', async () => {
+    const [firstId, secondId] = await selectTwoStories();
+    const thirdId = createExtraStory().id;
+    act(() => {
+      useBoardStore.getState().selectMany([firstId, secondId, thirdId]);
+      patchState(() => ({
+        aiRuns: [firstId],
+        aiActivity: [{ cardId: firstId, runId: 'run', mode: 'refine', origin: 'manual', phase: 'Backlog', model: null, startedAt: 1 }],
+      }));
+      const s = useBoardStore.getState().state!;
+      patchState(() => ({ board: { ...s.board, runner: { ...s.board.runner, parallelStories: 2 } } }));
+    });
+    await userEvent.click(bar().getByRole('button', { name: 'Refinar com IA' }));
+    expect(sentOf('ai.run')).toMatchObject([{ cardId: secondId, mode: 'refine' }]);
+  });
+
+  it('parar não altera os cards ociosos', async () => {
+    const [firstId] = await selectTwoStories();
+    act(() => patchState(() => ({ aiRuns: [firstId] })));
+    await userEvent.click(bar().getByRole('button', { name: 'Parar a IA' }));
+    expect(sentOf('ai.stop').map((m) => m.cardId)).toEqual([firstId]);
+  });
+
+  it('a barra arquiva só selecionados que continuam visíveis após mudar o filtro', async () => {
+    const [firstId, secondId] = await selectTwoStories();
+    const thirdId = createExtraStory().id;
+    act(() => {
+      patchCard(firstId, { title: 'Visível A' });
+      patchCard(secondId, { title: 'Visível B' });
+      useBoardStore.getState().selectMany([firstId, secondId, thirdId]);
+      useBoardStore.getState().setFilters({ text: 'Visível', includeRelated: false });
+    });
+    expect(bar().getByText('2 selecionados')).toBeInTheDocument();
+    await userEvent.click(bar().getByRole('button', { name: 'Arquivar selecionados' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Arquivar' }));
+    expect(lastSent('card.archiveMany').cardIds.sort()).toEqual([firstId, secondId].sort());
+  });
+});

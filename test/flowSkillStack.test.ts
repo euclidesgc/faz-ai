@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { FLOW_SKILL } from '../src/extension/flowSkill';
 import { FLOW_TEXT } from './flowSkillText';
 
 // A pilha de pull requests e o hotfix, como a skill do fluxo os ensina.

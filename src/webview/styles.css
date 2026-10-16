@@ -922,7 +922,9 @@ button.ghost.on {
   z-index: 70;
   width: max-content;
   min-width: 200px;
-  max-width: 320px;
+  max-width: min(320px, calc(100vw - var(--sp-16)));
+  max-height: calc(100dvh - var(--sp-16));
+  overflow-y: auto;
   padding: var(--sp-4);
   display: flex;
   flex-direction: column;

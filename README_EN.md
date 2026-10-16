@@ -206,6 +206,9 @@ status color, and the LED on the bar tells the card's state at a glance: green a
 
 **Select all in a column.** The checkbox at the start of a story column's header, on the same line as the cards' checkboxes (or **Selecionar todos** in the ⋯ menu), selects the column's visible stories (the active filter applies); checked again, it clears the selection. In a column with no cards, the checkbox is hidden, but its space stays reserved. With the selection made, the same menu offers **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados** and **Mandar selecionados para a lixeira**, each with a single confirmation for the whole batch; **Limpar seleção** clears it. The selection applies to one column at a time: selecting a card in another column replaces the selection. In a batch, a story with an open sub-task is not concluded (the others go ahead), and moving to a cancellation column cancels open sub-tasks.
 
+**Actions on selected cards.** The multi-select bar (two or more cards) and the column’s ⋯ menu offer the same actions: **Approve**, **Block**, **Unblock**, **Work on phase**, **Refine with AI**, **Stop AI**, autonomous mode, collapse/expand, archive, move, complete and trash. Unavailable actions stay visible and disabled, without displaying a reason; the menu also shows them with no selection. Each action affects only eligible, visible cards. Approve applies to cards waiting for review and uses the same automatic advance as individual approval; block requires a reason, recorded in each card’s conversation; unblock returns blocked cards to **Ready**. Work and refine respect the remaining parallel execution capacity: cards already running or exceeding the limit are left out. **Stop AI** only stops runs started by the board.
+
+
 ### Links between cards
 
 Besides sub-tasks, any card can be linked to another one, in any workflow, under **Vínculos**
