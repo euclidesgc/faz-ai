@@ -476,6 +476,8 @@ export class BoardRepo {
       requirements: [],
       requirementsCheckedAt: 0,
       authExpired: null,
+      // carregada e mantida pelo router, que guarda também a execução de teste (só em memória)
+      usageLimit: null,
       orphans: EMPTY_ORPHANS,
       environment: null,
       environmentFirstRun: false,

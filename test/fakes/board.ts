@@ -114,6 +114,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     requirements: [],
     requirementsCheckedAt: 0,
     authExpired: null,
+    usageLimit: null,
     orphans: EMPTY_ORPHANS,
     environment: null,
     environmentFirstRun: false,

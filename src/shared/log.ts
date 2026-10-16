@@ -2,6 +2,8 @@
 // Sem dependência de banco nem de VSCode, como o resto de `shared`. O que grava e lê este vocabulário
 // fica em `src/extension/log`; aqui só o contrato.
 
+import type { UsageLimitHint } from './usageLimit';
+
 /**
  * O que pode acontecer com um card. Fixo: depois de gravado, meses arquivados passam a depender
  * destes valores — renomear um deles quebra as séries antigas. `done` e `cancelled` são derivados e
@@ -189,6 +191,8 @@ export interface RunReport {
    * liga esta flag — o runner decide a retentativa com o modelo reserva a partir dela.
    */
   usageLimitReached: boolean;
+  /** a dica de renovação que acompanhou o limite; ausente ou null quando o leitor não achou nenhuma */
+  usageLimitReset?: UsageLimitHint | null;
 }
 
 /** Uma linha de `log_months`: o total de uma métrica (e, opcionalmente, um corte dela) num mês já arquivado. */

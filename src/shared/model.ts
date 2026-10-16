@@ -14,6 +14,7 @@ import type { AiRunMode, RunnerConfig } from './runner';
 import type { AiRunOrigin } from './log';
 import type { BranchKind, GitConfig, MainBranch } from './git';
 import type { BranchRenamePending, RenameOutcome } from './branchRename';
+import type { UsageLimitState } from './usageLimit';
 
 export type Id = string;
 
@@ -285,6 +286,8 @@ export interface BoardState {
   requirementsCheckedAt: number;
   /** a ferramenta ativa falhou por login vencido numa execução; null quando não há aviso reativo ativo */
   authExpired: AiTool | null;
+  /** pausa por limite de uso da ferramenta; null sem pausa (a gravada já vencida também aparece, até ser apagada) */
+  usageLimit: UsageLimitState | null;
   /** branches e worktrees órfãs, varridas pelo host; vazio antes da primeira varredura (runtime, não vai para o banco) */
   orphans: OrphanReport;
   /** o último Diagnóstico do ambiente; null antes de rodar a primeira vez */

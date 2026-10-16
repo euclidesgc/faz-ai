@@ -146,6 +146,7 @@ const state: BoardState = {
   requirements: [],
   requirementsCheckedAt: 0,
   authExpired: null,
+  usageLimit: null,
   orphans: { items: [], failed: {}, scannedAt: null },
   environment: null,
   environmentFirstRun: false,
