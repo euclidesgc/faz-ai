@@ -13,23 +13,25 @@ export function DescriptionSection({ cardId, draft }: { cardId: string; draft: D
     <section className="drawer-section">
       <div className="section-head">
         <h3>{t('Descrição')}</h3>
-        {editing ? (
-          // o botão fica no cabeçalho, junto do título: com uma descrição longa ele some lá embaixo
-          <Button
-            variant="primary"
-            size="small"
-            onClick={() => {
-              save();
-              setEditing(false);
-            }}
-          >
-            {t('Salvar descrição')}
-          </Button>
-        ) : (
-          <Button variant="ghost" size="small" onClick={() => setEditing(true)}>
-            {t('Editar')}
-          </Button>
-        )}
+        {/* o botão fica no cabeçalho, encostado à direita: com uma descrição longa ele some lá embaixo */}
+        <span className="section-header-actions">
+          {editing ? (
+            <Button
+              variant="primary"
+              size="small"
+              onClick={() => {
+                save();
+                setEditing(false);
+              }}
+            >
+              {t('Salvar descrição')}
+            </Button>
+          ) : (
+            <Button variant="ghost" size="small" onClick={() => setEditing(true)}>
+              {t('Editar')}
+            </Button>
+          )}
+        </span>
       </div>
       {editing ? (
         <>
