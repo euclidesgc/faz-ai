@@ -71,10 +71,11 @@ export function exportNotice(savedPath: string, warnings: string[]): string {
   return `Board exportado em ${savedPath}.${missing} O arquivo contém conversas e anexos: guarde-o com cuidado.`;
 }
 
-/** Mensagem de resultado da importação: o board, os totais e os cards cujo anexo ficou sem arquivo. */
+/** Mensagem de resultado da importação: o board, os totais, os cards cujo anexo ficou sem arquivo e os segredos de MCP a preencher. */
 export function importNotice(r: ImportResult): string {
   const missing = r.warnings.length ? ` Anexos sem arquivo: ${r.warnings.join(', ')}.` : '';
-  return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}`;
+  const secrets = r.mcpSecrets.length ? ` Preencha os valores vazios dos servidores MCP: ${r.mcpSecrets.join(', ')}.` : '';
+  return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}${secrets}`;
 }
 
 /**

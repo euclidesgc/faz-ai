@@ -541,9 +541,12 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     expect(exportNotice('/x/b.fazai.json', ['#3', '#8'])).toBe(
       'Board exportado em /x/b.fazai.json. Anexos sem arquivo: #3, #8. O arquivo contém conversas e anexos: guarde-o com cuidado.',
     );
-    expect(importNotice({ boardId: 'b', boardName: 'B', cards: 2, attachments: 1, warnings: ['#3'] })).toBe(
+    expect(importNotice({ boardId: 'b', boardName: 'B', cards: 2, attachments: 1, warnings: ['#3'], mcpSecrets: [] })).toBe(
       'Board "B" importado: 2 card(s) e 1 anexo(s). Anexos sem arquivo: #3.',
     );
+    expect(
+      importNotice({ boardId: 'b', boardName: 'B', cards: 2, attachments: 1, warnings: [], mcpSecrets: ['github: GITHUB_TOKEN', 'x: K'] }),
+    ).toBe('Board "B" importado: 2 card(s) e 1 anexo(s). Preencha os valores vazios dos servidores MCP: github: GITHUB_TOKEN, x: K.');
   });
 });
 
