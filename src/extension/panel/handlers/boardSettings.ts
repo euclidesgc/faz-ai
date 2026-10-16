@@ -97,7 +97,7 @@ export const boardSettingsHandlers = {
 } satisfies Partial<HandlerMap>;
 
 /**
- * "Fase" vale nos tipos das sub-tarefas e "Criticidade" nos das histórias. Como os campos do board não
+ * "Fase" vale só nos tipos das sub-tarefas. Como os campos do board não
  * aparecem em Configurações, o tipo novo (ou que mudou de workflow) entra neles ou sai deles sozinho.
  */
 function followBoardFields(ctx: BoardContext, typeId: Id): void {

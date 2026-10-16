@@ -20,6 +20,11 @@ export const MAX_RUNS_WITHOUT_PROGRESS = 3;
  * mensagens das fases anteriores só o incham.
  */
 export const SUMMARIZE_FROM_COMMENTS = 3;
+/**
+ * Ou antes disso, pelo tamanho: o que pesa no contexto é o texto, não a quantidade de mensagens. Duas
+ * mensagens longas da IA (um relatório de fase, por exemplo) já valem um resumo.
+ */
+export const SUMMARIZE_FROM_CHARS = 12_000;
 
 /** O que o autopiloto precisa do executor: iniciar um card e saber quando termina. */
 export interface AutopilotRunner {
@@ -152,13 +157,15 @@ function storyStep(s: BoardState, story: Card): AutopilotStep {
 }
 
 /**
- * A conversa da história merece um resumo antes da próxima execução: há mensagens de sobra desde o último
- * resumo e pelo menos uma é da IA (o trabalho de uma fase anterior; uma conversa só da pessoa é o pedido,
- * e vai inteira).
+ * A conversa da história merece um resumo antes da próxima execução: há mensagens de sobra (ou texto de
+ * sobra) desde o último resumo e pelo menos uma é da IA (o trabalho de uma fase anterior; uma conversa
+ * só da pessoa é o pedido, e vai inteira).
  */
 export function needsSummary(s: BoardState, story: Card): boolean {
   const since = commentsSinceSummary(s.comments, story.id);
-  return since.length >= SUMMARIZE_FROM_COMMENTS && since.some((c) => c.source === 'ai');
+  if (!since.some((c) => c.source === 'ai')) return false;
+  const chars = since.reduce((n, c) => n + c.body.length, 0);
+  return since.length >= SUMMARIZE_FROM_COMMENTS || (since.length >= 2 && chars >= SUMMARIZE_FROM_CHARS);
 }
 
 /** O que muda quando a história avança: coluna, status, PR e o andamento das sub-tarefas. */

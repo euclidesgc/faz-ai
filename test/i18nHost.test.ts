@@ -77,10 +77,7 @@ describe('i18n do host: mensagens preenchidas', () => {
       'The "Tags" field belongs to the board and cannot be renamed: the rules and the AI find it by its name.',
     ],
     ['As opções do campo "Skills" são mantidas pelo board.', 'The options of the "Skills" field are kept by the board.'],
-    [
-      'Os tipos de card do campo "Criticidade" são mantidos pelo board.',
-      'The card types of the "Criticidade" field are kept by the board.',
-    ],
+    ['Os tipos de card do campo "Fase" são mantidos pelo board.', 'The card types of the "Fase" field are kept by the board.'],
     ['O campo "Fase" é preenchido pelo board e pela IA, não à mão.', 'The "Fase" field is filled in by the board and the AI, not by hand.'],
     [
       'O campo "Fase" não tem valor padrão por tipo: o board o preenche em cada card.',

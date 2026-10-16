@@ -43,8 +43,7 @@ Testes em `test/` (Vitest; `test/ui/` para as telas, com Testing Library).
 
 Revise com mais rigor o que mexe em `src/extension/db/**`, `src/extension/repositories/**`,
 `src/extension/mcp/**`, `src/extension/runner.ts`, `src/extension/autopilot.ts` e
-`src/extension/flowSkill.ts`. São as áreas críticas a configurar no board deste repositório
-(Configurações → Regras → Áreas críticas).
+`src/extension/flowSkill.ts`.
 
 ## Fluxo
 

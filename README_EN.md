@@ -952,8 +952,8 @@ does. In each round it:
   days or more;
 - **checks the pull requests** of every story that has one ([automatic merge detection](#automatic-merge-detection))
   and cleans up leftover branches and worktrees ([orphan branches and worktrees](#orphan-branches-and-worktrees));
-- **summarizes the conversation** of stories with three or more messages since the last summary (at
-  least one from the AI), before working on the phase; the AI then receives only the summary and
+- **summarizes the conversation** of stories with three or more messages since the last summary, or
+  two that add up to a lot of text (at least one from the AI), before working on the phase; the AI then receives only the summary and
   what comes after it;
 - **refines new Backlog cards** (**Refinar os cards novos do Backlog**, in the same settings; on by
   default): from the title, the AI improves the description, fills in model, skills, rules and
@@ -1044,7 +1044,7 @@ story by itself, **without asking for authorization or confirmation on anything*
   answers them in the `R. >` slot, marking that it decided in autonomous mode. Only a real impediment
   (access, environment, a failure it cannot fix) blocks the card.
 - **Conversation summarized between phases**: when the story moves to another column with three or
-  more messages since the last summary (at least one from the AI), the autopilot runs **Resumir a
+  more messages since the last summary (or two that add up to a lot of text; at least one from the AI), the autopilot runs **Resumir a
   conversa** (summarize the conversation) before the new phase: the messages before the summary stay
   in the conversation but are deactivated (the AI receives only the summary and what comes after),
   so each run's context does not carry the whole conversation. One summary per column; if the AI
@@ -1112,27 +1112,6 @@ runs the previous session left open (and their sub-tasks); when a story's sessio
 sub-tasks; and every minute, any card "Em execução" with no board run for longer than one run's
 time limit (Settings → AI Harness → maximum time), with the explanation in the conversation.
 
-
-### Critical areas (core)
-
-In Settings → **Regras** (rules), **Áreas críticas (núcleo)** (critical areas, core) takes the paths
-of the project's core, one pattern per line (for example `src/db/**`). With the list filled in,
-`get_card` brings the areas in `criticalAreas`, and the AI, in Spec or Plan, marks the story's
-**Criticidade** (criticality) field: **Núcleo** (core) if it touches those paths, **Periferia**
-(periphery) if not. You can also mark it by hand.
-
-- **The mark does not change the flow**: outside autonomous mode a core story waits for your
-  approval in the columns that require approval, like any story; in autonomous mode it goes on
-  without stopping until the chosen column, like the others. The AI can mark a story as Núcleo, but
-  only you take it out.
-- **In Revisão (review) and in the pull request**, the files of the diff that are in the core are
-  reviewed more strictly and listed apart in **Como revisar** (how to review).
-- The **Criticidade** field shows on the card, filters the board and can be used in model rules (for
-  example, core with the "Alto" tier model). Being a board field, it stays out of Campos
-  personalizados (custom fields), and a new story card type joins it on its own.
-
-Boards created before get the field through **Atualizar board** (update board). Through MCP,
-`update_rules` accepts `criticalPaths`.
 
 ### Agents
 
@@ -1471,8 +1450,8 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | --- | --- |
 | Workflows e colunas | As many workflows as you want (independent cards or sub-tasks), with editable names and a position you change by dragging; **Nova coluna** (new column) on each one; names, order (drag) and meaning of the columns; where the AI works and which ones require approval; each column's phase (AI instruction and document template). Opening and closing workflows and columns happens on the board itself and is remembered |
 | Tipos de card | Story, Bug, Sub-task…, with color and default field values per type |
-| Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, Esforço da atividade and Criticidade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section |
-| Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model and the [critical areas](#critical-areas-core) |
+| Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section |
+| Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
 | Harness de IA | The project's tool, permission, default agent and heartbeat; one tab per tool, with subjects (rules, skills, sub-agents, MCPs…) and, in each, the Board, Projeto, Global and Importados origins: everything each tool loads, with what each file is, the path that opens in the board editor, search and the mode of what goes to the board (see [AI harness](#ai-harness) and [Agents](#agents)) |
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Only the Git tab in browser mode; in the editor, points to the Settings (Faz AI › Git) |

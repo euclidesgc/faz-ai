@@ -114,14 +114,6 @@ Ao revisar código (Implementação, Revisão ou Homologação), concentre-se no
 contexto necessário dos arquivos tocados; releia o projeto inteiro só quando o pedido pedir
 expressamente uma auditoria geral.
 
-## Áreas críticas
-
-Quando o board define áreas críticas (o núcleo do projeto), \`get_card\` traz \`criticalAreas\`. Na
-Spec e no Plan, confira se a história mexe nesses caminhos e marque o campo Criticidade dela
-(\`Núcleo\` ou \`Periferia\`) com \`update_card\`. Na Revisão, revise com mais rigor os arquivos do
-núcleo; no pull request, liste-os à parte em "Como revisar". A marca não muda o fluxo: no modo
-autônomo a história do núcleo segue sem parar, como as outras.
-
 ## Quando parar
 
 - Faltou uma informação ou decisão: \`ask_question\` no card, e pare de trabalhar nele.
@@ -223,7 +215,6 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
 4. Rode as checagens de novo, faça o commit, registre o resultado na conversa (ele alimenta o "Como
    revisar" do pull request) e mova a história para a próxima coluna.
 
-
 ## Homologação
 
 A entrega é para a pessoa testar, então o roteiro de testes é parte dela, em dois lugares:
@@ -262,8 +253,8 @@ rodar sozinha: ninguém aprova nem responde. Então:
 - não chame \`ask_question\` (a pergunta é recusada) nem \`request_review\`, com ou sem \`pending\`,
   exceto quando \`phase.requiresApproval\` vier verdadeiro (a coluna em que o modo para, abaixo) e na
   única situação descrita no item da Homologação: ao terminar a fase, registre na conversa o que fez e
-  mova o card para a próxima coluna. Nada segura a história antes da coluna escolhida: nem uma
-  pendência, nem a história ser do núcleo;
+  mova o card para a próxima coluna. Nada segura a história antes da coluna escolhida, nem uma
+  pendência;
 - as perguntas do documento da fase continuam: escreva cada uma na seção "Perguntas para você" com as
   alternativas, o impacto de cada uma e a sua recomendação justificada, e responda você mesmo no
   espaço \`**R.** >\` com a alternativa escolhida e "(decidido pela IA no modo autônomo)". A pessoa

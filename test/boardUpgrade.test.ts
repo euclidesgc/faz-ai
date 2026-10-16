@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Database } from 'sql.js';
 import { BOARD_TEMPLATE_VERSION, pendingUpgrade, upgradeBoard } from '../src/extension/db/boardTemplate';
-import { run } from '../src/extension/db/query';
+import { one, run, str } from '../src/extension/db/query';
 import { HOMOLOGATION_INSTRUCTION_V4, PHASE_DEFAULTS, PHASE_HISTORY } from '../src/shared/phaseDefaults';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
@@ -253,25 +253,22 @@ describe('atualização do board para o padrão atual', () => {
     expect(pendingUpgrade(db, boardId)).toEqual([]);
   });
 
-  it('versão 8: o board ganha o campo Criticidade nas histórias, sem duplicar um campo de mesmo nome', () => {
+  it('versão 11: o campo Criticidade sai do board com os valores; sem o campo, não há passo', () => {
     upgradeBoard(db, boardId);
-    db.run("DELETE FROM field_defs WHERE name = 'Criticidade'");
-    run(db, 'UPDATE boards SET template_version = 7 WHERE id = ?', [boardId]);
+    const typeId = str(one(db, 'SELECT id FROM card_types WHERE board_id = ?', [boardId])!.id);
+    db.run(
+      "INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES ('crit', ?, 'Criticidade', 'select', '[\"Núcleo\",\"Periferia\"]', ?, 'badge', 9)",
+      [boardId, JSON.stringify([typeId])],
+    );
+    run(db, 'UPDATE boards SET template_version = 10 WHERE id = ?', [boardId]);
     expect(pendingUpgrade(db, boardId)).toEqual([
-      'Novo campo "Criticidade" das histórias (Núcleo ou Periferia): a história do núcleo espera a sua aprovação nas fases que pedem aprovação, mesmo no modo autônomo.',
+      'O campo "Criticidade" das histórias (Núcleo ou Periferia) deixa de existir: ele não mudava o fluxo e sai do card, dos filtros e das regras de modelo.',
     ]);
     upgradeBoard(db, boardId);
-    const s = snap();
-    const field = s.fieldDefs.find((f) => f.name === 'Criticidade')!;
-    expect(field).toMatchObject({ kind: 'select', options: ['Núcleo', 'Periferia'], display: 'badge' });
-    const parentWf = s.workflows.find((w) => w.kind === 'parent')!.id;
-    expect(field.appliesToTypes!.sort()).toEqual(
-      s.cardTypes
-        .filter((t) => t.defaultWorkflowId === parentWf)
-        .map((t) => t.id)
-        .sort(),
-    );
-    run(db, 'UPDATE boards SET template_version = 7 WHERE id = ?', [boardId]);
+    expect(snap().fieldDefs.some((f) => f.name === 'Criticidade')).toBe(false);
+    expect(snap().board.templateVersion).toBe(BOARD_TEMPLATE_VERSION);
+
+    run(db, 'UPDATE boards SET template_version = 10 WHERE id = ?', [boardId]);
     expect(pendingUpgrade(db, boardId)).toEqual([]);
   });
 
@@ -302,7 +299,7 @@ describe('atualização do board para o padrão atual', () => {
 
   it('versão 10: a Homologação com o texto da 0.39 passa a abrir o pull request com --base em workspace.prBase; a personalizada fica', () => {
     upgradeBoard(db, boardId);
-    expect(BOARD_TEMPLATE_VERSION).toBe(10);
+    expect(BOARD_TEMPLATE_VERSION).toBe(11);
     const settings = new SettingsRepo(db);
     const v9 = PHASE_HISTORY['Homologação']!.instructions.at(-1)!;
     // o texto de fábrica anterior é o atual sem a base do PR
@@ -314,7 +311,7 @@ describe('atualização do board para o padrão atual', () => {
     upgradeBoard(db, boardId);
     expect(col('Homologação').aiInstruction).toBe(PHASE_DEFAULTS['Homologação']!.instruction);
     expect(col('Homologação').aiInstruction).toContain('gh pr create --base <workspace.prBase do get_card>');
-    expect(snap().board.templateVersion).toBe(10);
+    expect(snap().board.templateVersion).toBe(BOARD_TEMPLATE_VERSION);
 
     // editada à mão: não é mexida
     settings.updateColumn(col('Homologação').id, { aiInstruction: 'minha homologação' });

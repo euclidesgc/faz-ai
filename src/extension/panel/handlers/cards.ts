@@ -2,7 +2,6 @@ import { linkProblem } from '../../../shared/links';
 import { norm } from '../../../shared/filters';
 import { columnOf, columnsOf, isLive } from '../../../shared/selectors';
 import { isAtYoloStop, lastAiColumn, yoloStopOptions } from '../../../shared/story';
-import { CORE, CRITICALITY_FIELD, isCoreStory } from '../../../shared/critical';
 import { fieldValueBlocker } from '../../../shared/boardFields';
 import { settleDelivery } from '../../delivery';
 
@@ -14,7 +13,7 @@ import { applySuggestion, suggestionFor } from './models';
  * Muda o status de trabalho do card. Aprovar é só da pessoa; bloquear exige o motivo. Em modo autônomo
  * (YOLO) o pedido de revisão da IA vira aprovação na hora: ninguém vai revisar, e o resumo fica na conversa.
  * A única exceção, em que o card fica mesmo em "waiting_review", é a coluna até onde a pessoa liberou o
- * modo: ali o modo se desliga e a revisão é dela. Nem `pending` nem a história do núcleo seguram a fila
+ * modo: ali o modo se desliga e a revisão é dela. Nem `pending` segura a fila
  * (#441): no modo autônomo a IA decide o que ficou em aberto e registra a decisão.
  *
  * A aprovação da pessoa numa história leva o card para a próxima coluna na hora (#441): esperar a IA
@@ -304,14 +303,6 @@ export const cardHandlers = {
     if (!byAi) {
       const blocker = fieldValueBlocker(ctx.state(), msg.fieldId);
       if (blocker) throw new Error(blocker);
-    }
-    // a IA marca a história do núcleo, mas só uma pessoa a tira dele: senão ela voltaria a se aprovar sozinha
-    if (byAi && msg.value !== CORE) {
-      const state = ctx.state();
-      const field = state.fieldDefs.find((f) => f.id === msg.fieldId);
-      const card = state.cards.find((c) => c.id === msg.cardId);
-      if (field && card && norm(field.name) === norm(CRITICALITY_FIELD) && isCoreStory(state, card))
-        throw new Error(`Só uma pessoa tira a história do núcleo: o campo ${CRITICALITY_FIELD} fica em ${CORE}.`);
     }
     // se o modelo atual veio da sugestão (ou está vazio), ele acompanha a nova sugestão
     const before = suggestionFor(ctx, msg.cardId);

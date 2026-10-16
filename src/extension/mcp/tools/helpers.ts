@@ -1,18 +1,19 @@
 import type { BoardState, Card } from '../../../shared/model';
 import type { MessageRouter } from '../../panel/messageRouter';
-import { boardOverview, cardDetail, coerceFieldValue, findColumn, findField } from '../format';
+import { boardOverview, cardDetail, coerceFieldValue, findColumn, findField, type CardSection } from '../format';
 import type { ToolContext } from './registry';
 
 /** posição "no fim da coluna" */
 export const END = Number.MAX_SAFE_INTEGER;
 
 /** Detalhe do card como o get_card devolve, lido do snapshot atual. */
-export const detail = (router: MessageRouter, cardId: string) => {
+export const detail = (router: MessageRouter, cardId: string, only?: readonly CardSection[]) => {
   const s = router.snapshot();
   return cardDetail(
     s,
     s.cards.find((c) => c.id === cardId)!,
     (a) => router.store.pathOf(a),
+    only,
   );
 };
 

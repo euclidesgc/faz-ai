@@ -908,8 +908,8 @@ cada rodada ele:
   com um aviso na conversa, e **avisa uma vez** o card que está com você há dois dias ou mais;
 - **confere os pull requests** de toda história que tem um ([detecção automática de merges](#detecção-automática-de-merges))
   e limpa as branches e worktrees que sobraram ([branches e worktrees órfãs](#branches-e-worktrees-órfãs));
-- **resume a conversa** das histórias com três ou mais mensagens desde o último resumo (ao menos uma
-  da IA), antes de trabalhar a fase; a IA passa a receber só o resumo e o que vier depois dele;
+- **resume a conversa** das histórias com três ou mais mensagens desde o último resumo, ou duas que
+  somem muito texto (ao menos uma da IA), antes de trabalhar a fase; a IA passa a receber só o resumo e o que vier depois dele;
 - **refina os cards novos do Backlog** (**Refinar os cards novos do Backlog**, nas mesmas
   configurações; nasce ligado): a partir do título, a IA melhora a descrição, preenche modelo, skills,
   rules e checklist e deixa o card aguardando a sua revisão. Aprovar leva o card para a primeira fase;
@@ -989,14 +989,14 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
   aguardando a sua revisão. As colunas que exigem aprovação deixam de segurar o card, e o pedido de
   revisão da IA vira aprovação na hora, com o resumo registrado na conversa. Nada segura a história
   antes da coluna escolhida: nem uma pendência (`request_review` com `pending`, que fica registrada
-  na conversa e a IA é mandada decidir), nem a história ser do núcleo.
+  na conversa e a IA é mandada decidir).
 - **Sem perguntas**: a IA não usa `ask_question`; diante de uma dúvida ela decide e registra a
   decisão e o motivo na conversa. As perguntas do documento da fase continuam sendo escritas na
   seção **Perguntas para você**, com alternativas e recomendação, e a própria IA as responde no
   espaço `R. >`, marcando que foi decidido por ela no modo autônomo. Só um impedimento real (acesso,
   ambiente, falha que ela não resolve) bloqueia o card.
 - **Conversa resumida entre as fases**: ao passar para outra coluna com três ou mais mensagens desde
-  o último resumo (ao menos uma da IA), o autopiloto roda **Resumir a conversa** antes da fase nova:
+  o último resumo (ou duas que somem muito texto; ao menos uma da IA), o autopiloto roda **Resumir a conversa** antes da fase nova:
   as mensagens anteriores ao resumo ficam na conversa, mas desativadas (a IA recebe só o resumo e o
   que vier depois), para o contexto de cada execução não carregar a conversa inteira. Um resumo por
   coluna; se a IA não gravar o resumo, a conversa fica e a fase segue.
@@ -1062,25 +1062,6 @@ deixou abertas (e as sub-tarefas deles); ao fim da sessão de uma história, as 
 cada minuto, qualquer card "Em execução" sem execução do board há mais tempo que o limite de uma
 execução (Configurações → Harness de IA → tempo máximo), com a explicação na conversa.
 
-
-### Áreas críticas (núcleo)
-
-Em Configurações → **Regras**, **Áreas críticas (núcleo)** recebe os caminhos do núcleo do projeto, um
-padrão por linha (ex.: `src/db/**`). Com a lista preenchida, o `get_card` passa a trazer as áreas em
-`criticalAreas`, e a IA, na Spec ou no Plan, marca o campo **Criticidade** da história: **Núcleo** se
-ela mexe nesses caminhos, **Periferia** se não. Você também pode marcar à mão.
-
-- **A marca não muda o fluxo**: fora do modo autônomo, a história do núcleo espera a sua aprovação
-  nas colunas que exigem aprovação, como qualquer história; no modo autônomo ela segue sem parar até a
-  coluna escolhida, como as outras. A IA pode marcar uma história como Núcleo, mas só você a tira de lá.
-- **Na Revisão e no pull request**, os arquivos do diff que estão no núcleo são revisados com mais
-  rigor e listados à parte em **Como revisar**.
-- O campo **Criticidade** aparece no card, filtra o board e pode entrar nas regras de modelo (ex.:
-  núcleo com o modelo da faixa "Alto"). Como é um campo do board, ele fica fora de Campos
-  personalizados, e um tipo de card novo das histórias entra nele sozinho.
-
-Boards criados antes ganham o campo pelo **Atualizar board**. Pelo MCP, `update_rules` aceita
-`criticalPaths`.
 
 ### Agentes
 
@@ -1396,8 +1377,8 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | --- | --- |
 | Workflows e colunas | Quantos workflows quiser (cards independentes ou sub-tarefas), com nome editável e posição que você muda arrastando; **Nova coluna** em cada um; nomes, ordem (arrastando) e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento). Abrir e fechar workflows e colunas é feito no próprio board e fica lembrado |
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
-| Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, Esforço da atividade e Criticidade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria |
-| Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido e as [áreas críticas](#áreas-críticas-núcleo) |
+| Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria |
+| Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
 | Harness de IA | Ferramenta do projeto, permissão, agente padrão e heartbeat; uma aba por ferramenta, com assuntos (regras, skills, sub-agentes, MCPs…) e, em cada um, as origens Board, Projeto, Global e Importados: tudo que cada ferramenta carrega, com o que cada arquivo é, o caminho que abre no editor do board, a busca e o modo do que vai ao board (ver [Harness de IA](#harness-de-ia) e [Agentes](#agentes)) |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Fica só na aba Git do modo navegador; no editor, aponta para o Settings (Faz AI › Git) |

@@ -289,7 +289,7 @@ describe('servidor MCP', () => {
     const rename = await call('update_field', { field: 'Fase', name: 'Etapa' });
     expect(rename.error).toBe(true);
     expect(rename.text).toContain('não pode ser renomeado');
-    expect((await call('delete_field', { field: 'Criticidade' })).text).toContain('não pode ser apagado');
+    expect((await call('delete_field', { field: 'Esforço da atividade' })).text).toContain('não pode ser apagado');
     expect((await call('create_field', { name: 'skills', kind: 'text' })).text).toContain('é o nome de um campo do board');
     board = (await call('update_field', { field: 'Tags', options: ['web', 'mobile'], display: 'inline' })).data;
     expect(board.fields.find((f: any) => f.name === 'Tags')).toMatchObject({ board: true, options: ['web', 'mobile'], display: 'inline' });
@@ -1772,16 +1772,13 @@ describe('modo autônomo (YOLO)', () => {
     expect(card(3)).toMatchObject({ yolo: true, yoloUntil: column('Plan').id });
   });
 
-  it('história do núcleo: no modo autônomo segue sem parar, como as outras (#441); fora dele, espera a aprovação como qualquer história', async () => {
-    await call('update_rules', { criticalPaths: ['src/db/**', ' src/db/** ', ''] });
-    expect(router.snapshot().board.rules.criticalPaths).toEqual(['src/db/**']);
-    await call('create_card', { title: 'Migração', column: 'PRD', fields: { Criticidade: 'Núcleo' } });
+  it('no modo autônomo nada segura a história (#441); fora dele, ela espera a aprovação', async () => {
+    await call('create_card', { title: 'Migração', column: 'PRD' });
     setYolo(1, true);
     const before = (await call('get_card', { card: 1 })).data;
-    expect(before.criticalAreas).toMatchObject({ paths: ['src/db/**'], story: 'Núcleo' });
-    expect(before.criticalAreas.note).toContain('no modo autônomo nada a segura');
+    expect(before.criticalAreas).toBeUndefined();
     expect(before.phase.requiresApproval).toBe(false);
-    expect(before.phase.autonomousNote).toContain('nem numa história do núcleo');
+    expect(before.phase.autonomousNote).toContain('nem com pendência');
     expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(false);
     expect((await call('move_card', { card: 1, column: 'PRD' })).error).toBe(false);
 
@@ -1791,11 +1788,6 @@ describe('modo autônomo (YOLO)', () => {
     expect(card(1).yolo).toBe(true);
     expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(false);
 
-    // a IA não tira a história do núcleo; uma pessoa tira
-    const downgrade = await call('update_card', { card: 1, fields: { Criticidade: 'Periferia' } });
-    expect(downgrade.error).toBe(true);
-    expect(downgrade.text).toContain('Só uma pessoa tira a história do núcleo');
-
     // fora do modo, a revisão é da pessoa; ligar o modo libera a história que aguardava revisão
     setYolo(1, false);
     await call('request_review', { card: 1, summary: 'Spec pronta' });
@@ -1803,16 +1795,10 @@ describe('modo autônomo (YOLO)', () => {
     setYolo(1, true);
     expect(card(1).status).toBe('approved');
 
-    // na última coluna da IA, a entrega é o pull request: a fase não pede aprovação, nem no núcleo
-    await call('create_card', { title: 'Entrega', column: 'Homologação', fields: { Criticidade: 'Núcleo' } });
+    // na última coluna da IA, a entrega é o pull request: a fase não pede aprovação
+    await call('create_card', { title: 'Entrega', column: 'Homologação' });
     setYolo(2, true);
     expect((await call('get_card', { card: 2 })).data.phase.requiresApproval).toBe(false);
-
-    // a periferia segue o modo como sempre
-    await call('create_card', { title: 'Texto', column: 'PRD', fields: { Criticidade: 'Periferia' } });
-    setYolo(3, true);
-    expect((await call('request_review', { card: 3, summary: 'PRD pronto' })).data.card.work.status).toBe('approved');
-    expect((await call('get_card', { card: 3 })).data.criticalAreas.story).toBe('Periferia');
   });
 
   it('request_review com pending em YOLO não segura o card (#441): vira aprovação, a pendência fica registrada e a IA é mandada decidir', async () => {
@@ -1867,6 +1853,27 @@ describe('modo autônomo (YOLO)', () => {
     await call('set_pull_request', { card: 1, url: 'https://github.com/org/repo/pull/1' });
     expect(card(1).status).toBe(before);
     expect(card(1).prUrl).toBe('https://github.com/org/repo/pull/1');
+  });
+
+  it('get_card com `only` devolve só os blocos pedidos; o essencial do card vem sempre', async () => {
+    await call('create_card', { title: 'Login', column: 'PRD', description: 'Tela de login' });
+    await call('add_comment', { card: 1, body: 'Comecei.' });
+    await call('add_checklist_item', { card: 1, text: 'testes' });
+    const full = (await call('get_card', { card: 1 })).data;
+    expect(Object.keys(full)).toEqual(expect.arrayContaining(['phase', 'subtaskList', 'checklistItems', 'comments', 'attachments']));
+
+    const part = (await call('get_card', { card: 1, only: ['conversation'] })).data;
+    expect(part).toMatchObject({ title: 'Login', description: 'Tela de login' });
+    expect(part.comments.map((c: any) => c.body)).toEqual(['Comecei.']);
+    for (const key of ['phase', 'subtaskList', 'subtasksNow', 'checklistItems', 'attachments', 'links'])
+      expect(part).not.toHaveProperty(key);
+
+    const checklist = (await call('get_card', { card: 1, only: ['checklist', 'phase'] })).data;
+    expect(checklist.checklistItems).toHaveLength(1);
+    expect(checklist.phase).toBeDefined();
+    expect(checklist).not.toHaveProperty('comments');
+    const tools = (await client.listTools()).tools;
+    expect(tools.find((t) => t.name === 'get_card')!.description).toContain('`only`');
   });
 
   it('get_card: autonomousNote na última coluna da IA manda registrar o pull request e parar, sem mover para a conclusão', async () => {

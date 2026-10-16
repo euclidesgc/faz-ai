@@ -174,12 +174,6 @@ export function registerBoardRulesTools(tool: DefineTool): void {
         .describe(
           'Incluir no catálogo do Cursor as variantes rápidas dos modelos (respondem mais rápido e cobram mais pelos mesmos tokens). Ligar acrescenta as da última lista lida do Cursor; desligar as tira do catálogo.',
         ),
-      criticalPaths: z
-        .array(z.string())
-        .optional()
-        .describe(
-          'Áreas críticas (o núcleo) do projeto, em padrões de caminho (ex.: "src/db/**"); substitui a lista inteira. A história marcada como Núcleo no campo Criticidade espera a aprovação da pessoa nas colunas que exigem aprovação, mesmo no modo autônomo.',
-        ),
     },
     (a, router) => {
       const patch = Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined));

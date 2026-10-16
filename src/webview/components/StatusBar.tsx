@@ -94,13 +94,15 @@ export function StatusBar({ card }: { card: Card }) {
             >
               {t('Aprovar')}
             </Button>
-            <Button
-              onClick={() =>
-                start({ status: 'ready', title: t('O que precisa ser ajustado?'), confirm: t('Pedir ajustes'), required: true })
-              }
-            >
-              {t('Pedir ajustes')}
-            </Button>
+            <Hint content={t('Você diz o que precisa mudar; o card volta para "Pronto" e a IA refaz a fase com o seu pedido na conversa')}>
+              <Button
+                onClick={() =>
+                  start({ status: 'ready', title: t('O que precisa ser ajustado?'), confirm: t('Pedir ajustes'), required: true })
+                }
+              >
+                {t('Pedir ajustes')}
+              </Button>
+            </Hint>
           </>
         )}
         {card.status === 'blocked' && (
