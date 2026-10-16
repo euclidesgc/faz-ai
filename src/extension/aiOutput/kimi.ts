@@ -26,6 +26,8 @@ const USAGE_LIMIT = /provider\.auth_error[\s\S]*\b403\b[\s\S]*usage limit/i;
 export function kimiReader(): OutputReader {
   let sawEvent = false;
   let usageLimitReached = false;
+  /** a linha do erro de cota, como dica de renovação: a mensagem conhecida não tem horário (cai no backoff) */
+  let limitText: string | null = null;
   /** `kind\0name` → chamadas */
   const inventory = new Map<string, number>();
   /** os textos que o assistente escreveu, na ordem; a resposta é o último (a mensagem final é a entrega) */
@@ -59,7 +61,10 @@ export function kimiReader(): OutputReader {
   return {
     push(line: string, stream: OutputStream): string[] {
       // a cota esgotada vem como texto (stderr) ou como linha fora do stream: vale nos dois
-      if (USAGE_LIMIT.test(line)) usageLimitReached = true;
+      if (USAGE_LIMIT.test(line)) {
+        usageLimitReached = true;
+        limitText = line;
+      }
       // stderr é texto de gente, nunca passa pelo interpretador
       if (stream === 'stderr') return line ? [cut(line, RAW_MAX)] : [];
       if (!line.trim()) return [];
@@ -90,10 +95,11 @@ export function kimiReader(): OutputReader {
         return { kind: kind as InventoryKind, name: name!, calls };
       });
       const answer = saidText.at(-1) ?? '';
+      const limit = { usageLimitReached, usageLimitReset: limitText ? { resetsAt: null, text: limitText } : null };
       // sem consumo da CLI: com inventário, `partial` diz o que houve (inventário sim, consumo não);
       // a invariante do RunReport proíbe `none` com inventário não vazio (ver o leitor do Cursor)
-      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, usageLimitReached };
-      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached };
+      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, ...limit };
+      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, ...limit };
     },
 
     get sawEvent(): boolean {

@@ -139,3 +139,29 @@ describe('stream-json do Cursor', () => {
     expect(c.costUsd).toBeNull();
   });
 });
+
+describe('limite de uso do Cursor (#800; mensagem do fórum, não validada numa execução real)', () => {
+  const linha = "Error: You've hit your usage limit. Your usage limits will reset when your monthly cycle ends on 8/14/2025";
+
+  it('a mensagem no stderr liga o sinal e vira a dica de texto', () => {
+    const reader = cursorReader();
+    reader.push(linha, 'stderr');
+    expect(reader.report()).toMatchObject({ usageLimitReached: true, usageLimitReset: { resetsAt: null, text: linha } });
+  });
+
+  it('a mensagem numa linha que não é JSON também liga o sinal', () => {
+    const reader = cursorReader();
+    reader.push(linha, 'stdout');
+    expect(reader.report().usageLimitReached).toBe(true);
+  });
+
+  it('o mesmo texto dentro da resposta do assistente não liga o sinal', () => {
+    const resposta = JSON.stringify({
+      type: 'assistant',
+      session_id: 's',
+      message: { role: 'assistant', content: [{ type: 'text', text: linha }] },
+    });
+    const { reader } = read([resposta]);
+    expect(reader.report()).toMatchObject({ usageLimitReached: false, usageLimitReset: null });
+  });
+});

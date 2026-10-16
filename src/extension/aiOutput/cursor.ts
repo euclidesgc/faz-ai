@@ -25,8 +25,18 @@ function mcpSplit(name: string): string {
   return at < 0 ? rest : `${rest.slice(0, at)}/${rest.slice(at + 2)}`;
 }
 
+/**
+ * O limite de uso esgotado do Cursor: "Error: You've hit your usage limit … Your usage limits will reset when your
+ * monthly cycle ends on 8/14/2025". NÃO VALIDADO: a mensagem veio de um relato no fórum do Cursor, não da documentação
+ * nem de uma execução real (história #800, P2 da Spec). Só vale no stderr ou em linha que não é JSON, para não
+ * confundir com a resposta da IA que cite a frase; se o texto real for outro, a falha segue como falha comum.
+ */
+const USAGE_LIMIT = /you'?ve hit your usage limit/i;
+
 export function cursorReader(): OutputReader {
   let sawEvent = false;
+  /** a linha do limite esgotado, como dica de renovação (sem horário legível: cai no backoff) */
+  let limitText: string | null = null;
   let sessionId: string | null = null;
   /** `kind\0name` → chamadas */
   const inventory = new Map<string, number>();
@@ -129,12 +139,16 @@ export function cursorReader(): OutputReader {
   return {
     push(line: string, stream: OutputStream): string[] {
       // stderr é texto de gente, nunca passa pelo interpretador
-      if (stream === 'stderr') return line ? [cut(line, RAW_MAX)] : [];
+      if (stream === 'stderr') {
+        if (USAGE_LIMIT.test(line)) limitText = line;
+        return line ? [cut(line, RAW_MAX)] : [];
+      }
       if (!line.trim()) return [];
       let parsed: unknown;
       try {
         parsed = JSON.parse(line);
       } catch {
+        if (USAGE_LIMIT.test(line)) limitText = line;
         // uma linha ruim não invalida as outras: vai para o canal como texto e a leitura segue
         return [cut(line, RAW_MAX)];
       }
@@ -166,6 +180,7 @@ export function cursorReader(): OutputReader {
       // a resposta é o texto do ÚLTIMO `result`; sem nenhum `result` com texto, cai para o que o
       // assistente disse
       const answer = resultTexts.at(-1) ?? saidText.join('\n');
+      const limit = { usageLimitReached: limitText !== null, usageLimitReset: limitText ? { resetsAt: null, text: limitText } : null };
 
       if (tokens) {
         // o Cursor não informa custo, e o board não o calcula: só os tokens são medidos
@@ -181,8 +196,7 @@ export function cursorReader(): OutputReader {
           inventory: items,
           answer,
           reason: null,
-          // este leitor não interpreta eventos de limite de uso: a reserva é só do leitor do Claude
-          usageLimitReached: false,
+          ...limit,
         };
       }
 
@@ -194,8 +208,8 @@ export function cursorReader(): OutputReader {
       // não vazio e consumo nulo, o rótulo correto é `partial`: ele diz exatamente o que houve
       // (inventário sim, consumo não) sem inventar nem apagar fato. Resista à tentação de "simplificar"
       // isto para `none` — perderia informação real de graça.
-      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, usageLimitReached: false };
-      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached: false };
+      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, ...limit };
+      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, ...limit };
     },
 
     get sawEvent(): boolean {

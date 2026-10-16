@@ -88,3 +88,17 @@ describe('stream-json do Kimi Code', () => {
     expect(reader.report().usageLimitReached).toBe(false);
   });
 });
+
+describe('usageLimitReset do Kimi Code (#800)', () => {
+  it('a linha do erro de cota vira a dica de texto, sem horário', () => {
+    const reader = kimiReader();
+    const linha =
+      "error: provider.auth_error: 403 You've reached your 5-hour usage limit. Your quota will reset when the current 5-hour window ends.";
+    reader.push(linha, 'stderr');
+    expect(reader.report()).toMatchObject({ usageLimitReached: true, usageLimitReset: { resetsAt: null, text: linha } });
+  });
+
+  it('sem cota esgotada, não há dica', () => {
+    expect(kimiReader().report().usageLimitReset).toBeNull();
+  });
+});

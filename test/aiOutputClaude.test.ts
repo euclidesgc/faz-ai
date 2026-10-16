@@ -313,3 +313,39 @@ describe('usageLimitReached: detecção do limite de uso esgotado', () => {
     expect(reader.report().usageLimitReached).toBe(false);
   });
 });
+
+describe('usageLimitReset: a dica de renovação do limite (#800)', () => {
+  it('o `rate_limit_event` recusado devolve o `resetsAt` como veio (segundos)', () => {
+    const { reader } = read(RATE_LIMIT_EVENTS);
+    expect(reader.report().usageLimitReset?.resetsAt).toBe(1791135600);
+  });
+
+  it('sem `resetsAt` no evento, vale o da janela esgotada que renova mais tarde', () => {
+    const evento = JSON.stringify({
+      type: 'rate_limit_event',
+      session_id: 's',
+      rate_limit_info: {
+        status: 'allowed',
+        unifiedWindows: {
+          five_hour: { utilization: 1, resetsAt: 100 },
+          seven_day: { utilization: 1, resetsAt: 200 },
+          opus: { utilization: 0.5, resetsAt: 300 },
+        },
+      },
+    });
+    const { reader } = read([evento]);
+    expect(reader.report().usageLimitReset).toEqual({ resetsAt: 200, text: null });
+  });
+
+  it('o `result` de erro com o limite devolve o texto com o horário (RF9)', () => {
+    const texto = "You've hit your session limit · resets 1:50pm (America/Sao_Paulo)";
+    const resultado = JSON.stringify({ type: 'result', session_id: 's', is_error: true, num_turns: 1, result: texto });
+    const { reader } = read([resultado]);
+    expect(reader.report()).toMatchObject({ usageLimitReached: true, usageLimitReset: { resetsAt: null, text: texto } });
+  });
+
+  it('sem limite, não há dica', () => {
+    const { reader } = read(EVENTS);
+    expect(reader.report().usageLimitReset).toBeNull();
+  });
+});
