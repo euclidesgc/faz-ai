@@ -122,7 +122,9 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
 - **Dizer à IA o que fazer em cada fase.** Cada coluna tem uma instrução para a IA e, se a fase
   gera um documento (Discovery, PRD, Spec, Plan), o modelo desse documento. No Discovery a IA
   analisa o problema e conversa com você antes de qualquer requisito; na Homologação a história só
-  é concluída com a sua aprovação.
+  é concluída com a sua aprovação. O Discovery registra um **Mapa do código** (arquivos, funções,
+  padrões e testes), a Spec o completa, e PRD, Spec e Plan partem dele e leem só o que falta; cada
+  sub-tarefa do Plan traz na descrição os arquivos que vai tocar.
 - **Trabalhar com a IA no mesmo quadro.** A extensão expõe o board por MCP. Claude Code,
   Cursor ou outro cliente MCP podem consultar e editar tudo o que a interface permite, e
   as mudanças aparecem no board na hora.

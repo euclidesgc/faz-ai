@@ -131,7 +131,7 @@ promise a percentage: it shows, in the inventory, what is being loaded.
 - **Tell the AI what to do in each phase.** Each column has an instruction for the AI and, if the
   phase produces a document (Discovery, PRD, Spec, Plan), the template for that document. In
   Discovery the AI analyzes the problem and talks to you before any requirement is written; in
-  Homologação the story is only completed with your approval.
+  Homologação the story is only completed with your approval. Discovery records a **code map** (files, functions, patterns and tests), Spec completes it, and PRD, Spec and Plan start from it and read only what is missing; each Plan sub-task carries the files it will touch in its description.
 - **Work with the AI on the same board.** The extension exposes the board over MCP. Claude Code,
   Cursor or any other MCP client can read and edit everything the
   interface allows, and the changes show up on the board right away.

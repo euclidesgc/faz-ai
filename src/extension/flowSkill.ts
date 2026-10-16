@@ -57,7 +57,11 @@ Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela
 ## Fases que produzem documento
 
 1. Crie uma sub-tarefa na história com o campo Fase igual ao nome da coluna (\`create_card\` com \`parent\`).
-2. Construa o documento seguindo o modelo em \`phase.artifact.template\`. O que depende de uma
+2. Parta do que as fases anteriores já descobriram: o Discovery registra a seção **"Mapa do código"**
+   (arquivos, funções, padrões e testes envolvidos) e a Spec a completa. PRD, Spec e Plan começam
+   por esse mapa e leem só o que falta; use antes de Read e Grep as ferramentas de índice de código
+   que o Harness liberou, se houver. O arquivo lido continua sendo a fonte de verdade.
+   Construa o documento seguindo o modelo em \`phase.artifact.template\`. O que depende de uma
    resposta da pessoa vai na seção **"Perguntas para você"**, no fim do documento, uma pergunta por
    vez: as alternativas com o impacto de cada uma (o que custa, o que quebra, o que adia), a sua
    recomendação com a justificativa e o espaço \`**R.** >\` para ela responder. Repita as perguntas
@@ -71,7 +75,7 @@ conversa dizendo o que mudou e chame \`request_review\` de novo.
 
 ## Sub-tarefas de implementação
 
-No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, o campo "Esforço da
+No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, na descrição os arquivos que ela vai tocar (tirados do mapa do código), o campo "Esforço da
 atividade" avaliado (Baixo, Médio ou Alto; o modelo é sugerido a partir dele) e os artefatos que a
 execução pede: os campos Skills, Rules e MCPs, e o agente (\`set_card_profile\`). Escolha **só entre o
 que está no board em modo "Pelo card"** (\`get_harness\`; o que está em "Sempre" já entra sozinho):
