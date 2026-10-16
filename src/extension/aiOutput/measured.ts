@@ -67,8 +67,9 @@ const REST_MAX = 300;
 
 /**
  * O que as CLIs escrevem no `stderr` quando recusam um argumento (commander, clap, yargs, argparse e
- * companhia). Só com um destes a volta para texto culpa a versão instalada; sem eles, a falha antes
- * do primeiro evento pode ser rede, autenticação ou cota, e o motivo é genérico.
+ * companhia). Sozinho não basta para voltar para texto: a linha também precisa citar um argumento do
+ * formato (`refusesFormat`). Sem isso, a falha antes do primeiro evento pode ser rede, autenticação
+ * ou cota, e não é repetida.
  */
 const REFUSAL =
   /unknown (option|argument|flag|command)|unrecognized (option|argument|arguments)|unexpected argument|invalid (option|argument)|no such (option|flag)|requires --verbose|not a valid (option|argument)/i;
