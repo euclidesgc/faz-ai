@@ -13,7 +13,19 @@ export function DescriptionSection({ cardId, draft }: { cardId: string; draft: D
     <section className="drawer-section">
       <div className="section-head">
         <h3>{t('Descrição')}</h3>
-        {!editing && (
+        {editing ? (
+          // o botão fica no cabeçalho, junto do título: com uma descrição longa ele some lá embaixo
+          <Button
+            variant="primary"
+            size="small"
+            onClick={() => {
+              save();
+              setEditing(false);
+            }}
+          >
+            {t('Salvar descrição')}
+          </Button>
+        ) : (
           <Button variant="ghost" size="small" onClick={() => setEditing(true)}>
             {t('Editar')}
           </Button>
@@ -31,17 +43,6 @@ export function DescriptionSection({ cardId, draft }: { cardId: string; draft: D
             resolveRefs={resolve}
             placeholder={t('Descreva o problema, o contexto e o critério de aceite. Markdown suportado; cole imagens direto aqui.')}
           />
-          <div className="row end">
-            <Button
-              variant="primary"
-              onClick={() => {
-                save();
-                setEditing(false);
-              }}
-            >
-              {t('Salvar descrição')}
-            </Button>
-          </div>
         </>
       ) : (
         <div
