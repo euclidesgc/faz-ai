@@ -68,19 +68,22 @@ export function CommentsTab({
         <p className="muted">{t('Nenhuma mensagem ainda. A conversa com a IA sobre este card acontece aqui.')}</p>
       )}
       {cardComments.length >= 2 && (
-        <Hint content={summarizeHint()} disabledReason={blocked}>
-          <Button
-            variant="ghost"
-            size="small"
-            disabled={!canCall || running || summarizing}
-            onClick={() => {
-              markSummarizing(true);
-              ai.summarize(cardId);
-            }}
-          >
-            <IconSuggest /> {t('Resumir a conversa')}
-          </Button>
-        </Hint>
+        // À direita e em destaque: resumir é a ação principal de uma conversa longa, e fica onde os botões de ação do card ficam
+        <div className="row end">
+          <Hint content={summarizeHint()} disabledReason={blocked}>
+            <Button
+              variant="primary"
+              size="small"
+              disabled={!canCall || running || summarizing}
+              onClick={() => {
+                markSummarizing(true);
+                ai.summarize(cardId);
+              }}
+            >
+              <IconSuggest /> {t('Resumir a conversa')}
+            </Button>
+          </Hint>
+        </div>
       )}
       {cardComments.map((c, i) => (
         <CommentItem

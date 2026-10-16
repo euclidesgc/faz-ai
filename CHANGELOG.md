@@ -6,6 +6,7 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- Na conversa do card, o botão "Resumir a conversa" passa a ficar à direita e em destaque (botão primário).
 - **O campo Criticidade saiu do board.** Desde a #441 ele não mudava o fluxo (nada segura a história do núcleo no modo autônomo) e só servia de sinal para a revisão; saem com ele a regra **Áreas críticas (núcleo)**, o `criticalPaths` do `update_rules`, o `criticalAreas` do `get_card` e a seção da skill do fluxo. **Atualizar board** (versão 11) apaga o campo e os valores dele onde ele ainda existir.
 - **`get_card` aceita `only`** com os blocos que interessam (`phase`, `subtasks`, `checklist`, `links`, `conversation`, `attachments`): título, descrição, campos, modelo, harness e pasta de trabalho vêm sempre. A IA relê só a conversa, por exemplo, sem repetir o card inteiro no contexto.
 - **O resumo automático também olha o tamanho da conversa.** Além de três ou mais mensagens desde o último resumo, duas mensagens que somem muito texto (12 mil caracteres, ao menos uma da IA) já pedem o resumo antes da próxima fase: o que pesa no contexto é o texto, não a contagem.

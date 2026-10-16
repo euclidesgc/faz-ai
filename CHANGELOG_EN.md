@@ -7,6 +7,7 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- In the card conversation, the "Summarize the conversation" button now sits on the right as a primary button.
 - **The Criticidade (criticality) field is gone from the board.** Since #441 it no longer changed the flow (nothing holds a core story in autonomous mode) and only served as a signal for the review; gone with it are the **Áreas críticas (núcleo)** rule, `criticalPaths` in `update_rules`, `criticalAreas` in `get_card` and the flow skill section. **Atualizar board** (update board, version 11) deletes the field and its values wherever it still exists.
 - **`get_card` accepts `only`** with the blocks of interest (`phase`, `subtasks`, `checklist`, `links`, `conversation`, `attachments`): title, description, fields, model, harness and workspace always come. The AI can re-read just the conversation, for example, without repeating the whole card in its context.
 - **The automatic summary also looks at the conversation size.** Besides three or more messages since the last summary, two messages that add up to a lot of text (12,000 characters, at least one from the AI) already call for the summary before the next phase: what weighs on the context is the text, not the count.
