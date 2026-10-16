@@ -920,8 +920,9 @@ The board watches the pull request of every open story that has one (in any colu
 autonomous mode; only blocked and running stories are left out) and detects when it is merged,
 concluding the story automatically. There is no setting of its own: the check happens on every
 [heartbeat](#heartbeat) round, on the same interval, and also on **Rodar o heartbeat agora** (Run the
-heartbeat now). With the heartbeat off, it only happens when you ask for a round. When the merge is
-detected:
+heartbeat now). With the heartbeat off, it only happens when you ask for a round. The GitHub queries
+run in parallel, up to four at a time; each story's completion and cleanup run one at a time, in board
+order. When the merge is detected:
 
 1. the board records the merge commit on the card;
 2. registers in the conversation that the story was completed;
@@ -967,6 +968,15 @@ does. In each round it:
   days or more;
 - **checks the pull requests** of every story that has one ([automatic merge detection](#automatic-merge-detection))
   and cleans up leftover branches and worktrees ([orphan branches and worktrees](#orphan-branches-and-worktrees));
+- **syncs the local branches** the board knows about (the main branch, `develop` and the branch of each
+  open story) with origin, so the next task starts from the latest base and the AI finds the story
+  branch up to date. **Fast-forward only**: a branch moves only when it is behind origin and has no
+  commit that origin lacks. Nothing is merged with a commit, rewritten or forced. A branch is left as it is when an AI
+  run is on its story (or in the folder where it is checked out), when that folder has changes or
+  untracked files, or when the branch is ahead of origin or has diverged from it. Each updated branch,
+  and each reason for skipping one (once per reason), shows up in the log with the `Branches:` prefix.
+  Your personal branches are not touched. Without network or without origin, the sync waits for the
+  next round;
 - **summarizes the conversation** of stories with three or more messages since the last summary, or
   two that add up to a lot of text (at least one from the AI), before working on the phase; the AI then receives only the summary and
   what comes after it;
@@ -1001,6 +1011,14 @@ dependencies installed in each) and more memory and CPU while several AI session
 run together. In the editor the Git tab and the parallel block in the AI harness become a link to
 the Settings; in the browser they stay as editable fields, as before.
 
+- The round has a fixed order: tidying (usage limit, stalled cards); a single `git fetch`; the pull
+  requests (a merged story loses its branch, so they come before the sync); the branch sync; orphans
+  and published versions; and, last, the AI queue, which waits for the sync to finish so it starts
+  from branches already up to date. The number of stories in the round is still reported right away.
+  This maintenance (GitHub and git queries, no AI) runs up to **four** tasks in parallel. It is a fixed
+  limit of the heartbeat's own, not **Tocar histórias em paralelo** (Work on stories in parallel) nor
+  **Histórias ao mesmo tempo** (Stories at the same time): those still apply only to AI runs. With two
+  windows on the same board, only the owner window does the maintenance.
 - With nothing pending for the AI, nothing runs, and the log (Output → Faz AI) says why: expired login, story in autonomous mode, execution already running, with the person or waiting for another card.
 - The round follows the board order: bugs first; then the rightmost story (the most advanced one
   finishes before a new one starts); within a column, top to bottom — what decides is the card's
