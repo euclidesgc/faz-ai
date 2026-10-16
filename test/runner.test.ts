@@ -18,6 +18,8 @@ import {
   PERMISSION_ADVICE,
   cardPrompt,
   consumptionLine,
+  nomeDoAnexoAnterior,
+  refinePrompt,
   summarizePrompt,
   yoloStopAdvice,
 } from '../src/extension/runner';
@@ -298,6 +300,32 @@ it('summarizePrompt pede um resumo nas três seções e leva o contexto fixo e o
   expect(prompt).toContain('Este card exige também');
   expect(prompt.indexOf('Pendências')).toBeLessThan(prompt.indexOf('Contexto fixo deste board'));
   expect(prompt.indexOf('Contexto fixo deste board')).toBeLessThan(prompt.indexOf('Este card exige também'));
+});
+
+it('nomeDoAnexoAnterior formata a data e a hora locais no nome do anexo', () => {
+  expect(nomeDoAnexoAnterior(new Date(2026, 9, 16, 7, 15))).toBe('descricao-anterior-2026-10-16-0715.md');
+  expect(nomeDoAnexoAnterior(new Date(2026, 0, 3, 0, 5))).toBe('descricao-anterior-2026-01-03-0005.md');
+});
+
+it('refinePrompt grava o texto anterior em anexo antes da descrição e não o cola no comentário', () => {
+  const prompt = refinePrompt('#1', undefined, undefined, 'descricao-anterior-2026-10-16-0715.md');
+  // o nome do anexo aparece na instrução de gravar e no comentário, e a gravação vem antes do update_card
+  expect(prompt).toContain('add_attachment(card: "#1", filename: "descricao-anterior-2026-10-16-0715.md"');
+  expect(prompt.indexOf('add_attachment')).toBeLessThan(prompt.indexOf('update_card'));
+  expect(prompt).toContain('cite o anexo "descricao-anterior-2026-10-16-0715.md"');
+  expect(prompt).toContain('Não cole o texto anterior no comentário');
+  // a frase antiga que mandava colar a descrição inteira saiu do pedido
+  expect(prompt).not.toContain('inclua o texto anterior');
+});
+
+it('refinePrompt usa a data do disparo quando o chamador não passa o nome do anexo', () => {
+  expect(refinePrompt('#1')).toMatch(/descricao-anterior-\d{4}-\d{2}-\d{2}-\d{4}\.md/);
+});
+
+it('refinePrompt só permite o anexo do texto anterior, sem proibir anexos de forma absoluta', () => {
+  const prompt = refinePrompt('#1', undefined, undefined, 'descricao-anterior-2026-10-16-0715.md');
+  expect(prompt).toContain('O único anexo que pode gravar é o do passo 1');
+  expect(prompt).not.toContain('não crie sub-tarefas nem anexos');
 });
 import type { HeadlessCommand } from '../src/extension/headless';
 
