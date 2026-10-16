@@ -186,7 +186,7 @@ export const refinePrompt = (ref: string, context: PromptContext = NO_CONTEXT, c
     ...context.always,
     ...context.card,
     ...(catalog ? catalogLines(catalog) : []),
-    'Leia o card com get_card (descrição, conversa, anexos e campos) e, como apoio, get_board e get_models (tipos, campos, agentes e catálogo de modelos). Pode ler o projeto para entender o contexto.',
+    'Leia o card com get_card (descrição, conversa, anexos e campos) e, como apoio, get_board e get_models (tipos, campos, agentes e catálogo de modelos; o inventário do Harness está em get_harness). Pode ler o projeto para entender o contexto.',
     '1. Título e descrição: reescreva com update_card para ficarem claros e objetivos, mantendo a intenção e tudo o que a pessoa escreveu. Não invente requisito: o que estiver ambíguo vira uma lista "Dúvidas em aberto" no fim da descrição. Se o texto já estiver bom, não mexa.',
     '2. Campos: revise Tags, Esforço da atividade, Modelo, Skills, Rules e MCPs e aplique com update_card (fields), mesmo que já tenham valor; mantenha o que fizer sentido. Escolha o agente do card com set_card_profile quando um da lista couber melhor que o padrão. Skills, rules, servidores MCP e agente só do catálogo acima: o que não está nele não existe para este board.',
     '3. Checklist: acrescente com add_checklist_item os passos que faltam para concluir o card, sem repetir os que já existem.',

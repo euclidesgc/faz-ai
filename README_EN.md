@@ -1200,7 +1200,7 @@ the tool accepts them; the rest goes into the prompt, as instructions:
 
 Skills and rules are always passed by file path. In a conversation you open yourself, the agent
 reaches the AI through `get_card` (`execution`), as guidance. Through MCP, `get_board` lists the
-available agents, `set_card_profile` picks one for a card, and `create_agent`, `update_agent`,
+available agents (only `agents`, no `harness` or `appearance`; the inventory is in `get_harness`), `set_card_profile` picks one for a card, and `create_agent`, `update_agent`,
 `get_agent` and `delete_agent` manage the files.
 
 ## AI harness

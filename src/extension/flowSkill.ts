@@ -29,7 +29,7 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
    - \`phase\`: a instrução da fase e, se houver, o documento que ela produz e o modelo dele;
    - \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, delegue a um subagente com essa configuração; se não for possível, avise a pessoa na conversa;
    - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no caminho indicado, mesmo que não apareça na sua lista de skills: as execuções do board partem de contexto vazio e só conhecem o que está no board (Configurações → Harness).
-2. Chame \`start_work\` antes de começar.
+2. Chame \`start_work\` antes de começar. Chame \`get_board\` só quando a fase precisa dele (no Plan, para os agentes, no refinar e ao editar o board); nas demais, \`get_card\` basta, e o inventário do Harness está em \`get_harness\`.
 3. Siga a instrução de \`phase\`. Leia também os documentos das fases anteriores (anexos da história),
    quando houver. Uma história pode ser criada ou movida direto para uma fase adiante (o Plan, por
    exemplo) e começar dali: sem os documentos anteriores, trabalhe a partir da descrição, da conversa
