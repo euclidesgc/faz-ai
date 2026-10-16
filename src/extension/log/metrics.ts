@@ -51,10 +51,12 @@ import {
  * não se repete — a mesma palavra significaria duas coisas em dois lugares.
  */
 export type MetricsDim =
-  'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile' | 'card' | 'agent' | 'skill' | 'used_tool' | 'mcp_tool';
+  'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile' | 'card' | 'agent' | 'skill' | 'used_tool' | 'mcp_tool' | 'bash_command';
 
 /** As quatro dimensões de inventário e o `kind` de `ai_run_usage` que cada uma lê (o CHECK da tabela). */
-const INVENTORY_KIND: Partial<Record<MetricsDim, InventoryKind>> = {
+/** 'bash' (#604) lê `ai_run_bash`, o comando-base de cada chamada de Bash, e não `ai_run_usage`. */
+const INVENTORY_KIND: Partial<Record<MetricsDim, InventoryKind | 'bash'>> = {
+  bash_command: 'bash',
   used_tool: 'tool',
   mcp_tool: 'mcp_tool',
   agent: 'agent',
@@ -320,16 +322,26 @@ function detailByCard(db: Database, boardId: string, q: MetricsQuery): Map<strin
 }
 
 /** Linhas de inventário (used_tool/mcp_tool/agent/skill): só contagem de execuções e de usos, nunca tokens/custo (RF-03). */
-function detailByInventory(db: Database, boardId: string, q: MetricsQuery, kind: InventoryKind): Map<string, Accumulator> {
+function detailByInventory(db: Database, boardId: string, q: MetricsQuery, kind: InventoryKind | 'bash'): Map<string, Accumulator> {
   const { sql: where, params } = runsWhere(boardId, q, 'r.');
-  const rows = all(
-    db,
-    `SELECT u.name AS name, COUNT(DISTINCT u.run_id) AS n, SUM(u.calls) AS calls
-     FROM ai_run_usage u JOIN ai_runs r ON r.id = u.run_id
-     WHERE u.kind = ? AND ${where}
-     GROUP BY u.name`,
-    [kind, ...params],
-  );
+  const rows =
+    kind === 'bash'
+      ? all(
+          db,
+          `SELECT u.command AS name, COUNT(DISTINCT u.run_id) AS n, SUM(u.calls) AS calls
+           FROM ai_run_bash u JOIN ai_runs r ON r.id = u.run_id
+           WHERE ${where}
+           GROUP BY u.command`,
+          params,
+        )
+      : all(
+          db,
+          `SELECT u.name AS name, COUNT(DISTINCT u.run_id) AS n, SUM(u.calls) AS calls
+           FROM ai_run_usage u JOIN ai_runs r ON r.id = u.run_id
+           WHERE u.kind = ? AND ${where}
+           GROUP BY u.name`,
+          [kind, ...params],
+        );
   const map = new Map<string, Accumulator>();
   for (const r of rows) bump(map, str(r.name), { runs: num(r.n), calls: num(r.calls) });
   return map;
