@@ -53,8 +53,10 @@ import {
 export type MetricsDim =
   'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile' | 'card' | 'agent' | 'skill' | 'used_tool' | 'mcp_tool' | 'bash_command';
 
-/** As quatro dimensões de inventário e o `kind` de `ai_run_usage` que cada uma lê (o CHECK da tabela). */
-/** 'bash' (#604) lê `ai_run_bash`, o comando-base de cada chamada de Bash, e não `ai_run_usage`. */
+/**
+ * As dimensões de inventário e o `kind` de `ai_run_usage` que cada uma lê (o CHECK da tabela).
+ * 'bash' (#604) lê `ai_run_bash`, o comando-base de cada chamada de Bash, e não `ai_run_usage`.
+ */
 const INVENTORY_KIND: Partial<Record<MetricsDim, InventoryKind | 'bash'>> = {
   bash_command: 'bash',
   used_tool: 'tool',
