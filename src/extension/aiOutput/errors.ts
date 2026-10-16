@@ -17,14 +17,21 @@ export class MeasureRefusedError extends MeasureError {
 }
 
 /**
- * A execução no modo estruturado falhou antes do primeiro evento, sem sinal de argumento recusado no
- * `stderr` (rede, autenticação, cota): não dá para culpar a versão instalada.
+ * O que a pessoa precisa saber quando a execução caiu antes do primeiro evento e não foi repetida: a
+ * CLI pode ter alterado arquivos ou chamado o board antes de cair. O executor de cards e o chat
+ * acrescentam esta frase à mensagem de erro.
+ */
+export const NOT_REPEATED =
+  'A execução não foi repetida e pode ter feito parte do trabalho (arquivos alterados, mensagens ou cards movidos): confira o que ficou feito antes de chamar de novo.';
+
+/**
+ * A execução no modo estruturado terminou com erro antes do primeiro evento, sem recusa comprovada do
+ * argumento do formato (rede, autenticação, cota, queda, saída desconhecida): não foi repetida,
+ * porque pode ter trabalhado, e o consumo fica desconhecido.
  */
 export class MeasureEndedError extends MeasureError {
   constructor() {
-    super(
-      'A medição não foi possível nesta execução: a execução terminou antes de informar o consumo. O trabalho foi repetido em modo texto.',
-    );
+    super(`A medição não foi possível nesta execução: a execução terminou com erro antes de informar o consumo. ${NOT_REPEATED}`);
     this.name = 'MeasureEndedError';
   }
 }

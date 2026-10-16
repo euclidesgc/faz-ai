@@ -11,6 +11,7 @@
 // O custo gravado é o que a CLI informa, nunca um cálculo do board: ver `aiOutput/claude.ts`.
 import type { AiTool } from '../../shared/harness';
 import type { AiRunConfig, AiRunOrigin, AiRunOutcome, AiRunStart, RunReport } from '../../shared/log';
+import type { MeasureError } from '../aiOutput/errors';
 import { spawnMeasured, type SpawnFn } from '../aiOutput/measured';
 import type { OutputFormat } from '../aiOutput/reader';
 import { headlessUnsupported, type HeadlessCommand, type HeadlessInput } from '../headless';
@@ -73,6 +74,11 @@ export interface AiRunEnd {
   attempts: number;
   /** o formato do último processo */
   format: OutputFormat;
+  /**
+   * por que a medição não aconteceu, para quem chamou explicar a falha pela classe (`instanceof`),
+   * nunca pela frase; null quando foi medida
+   */
+  measureError: MeasureError | null;
 }
 
 export interface AiExecution {
@@ -134,6 +140,7 @@ export class AiGateway {
           return this.deps.spawn(command, cwd, out);
         },
         log: call.log,
+        runId,
       });
     } catch (e) {
       // nem chegou a existir processo (ferramenta sem suporte, plano impossível, spawn que falhou)
@@ -155,7 +162,7 @@ export class AiGateway {
       runLog.finish(runId, outcome, code);
       const report = measured.report();
       runLog.measure(runId, report);
-      const end: AiRunEnd = { code, error, outcome, stopped, timedOut, report, attempts, format };
+      const end: AiRunEnd = { code, error, outcome, stopped, timedOut, report, attempts, format, measureError: measured.failure() };
       for (const fn of listeners) fn(end);
     });
 
