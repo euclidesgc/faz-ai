@@ -261,7 +261,8 @@ o `faz-ai` do terminal avisa e não inicia.
 1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code, Cursor ou
    Kimi Code).
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
-   global que a ferramenta lê.
+   global que a ferramenta lê. Isso também acontece sozinho, em silêncio, ao abrir a pasta (e a cada
+   versão nova da extensão), sempre no escopo do usuário; só uma falha gera aviso.
 3. No grupo **Skills** da mesma aba, clique em **Instalar (padrão da ferramenta)** para a
    skill do fluxo (`faz-ai-fluxo`): ela ensina a IA a conduzir os cards pelas fases, gerar os
    documentos, pedir revisão e retomar pendências. O botão instala também as skills por assunto

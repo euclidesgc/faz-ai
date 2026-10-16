@@ -245,9 +245,20 @@ describe('requisitos do board', () => {
     fs.writeFileSync(old, '// ponte antiga');
     const server = { command: process.execPath, args: [old] };
     fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ mcpServers: { 'faz-ai': server } }));
-    expect(await checkRequirements(probe({ tool: 'claude' }))).toEqual([
+    // a versão gravada ao lado da ponte é a da extensão: o caminho antigo, sozinho, não é aviso
+    expect(await checkRequirements(probe({ tool: 'claude', installedVersion: '1.0.0', currentVersion: '1.0.0' }))).toEqual([]);
+    expect(await checkRequirements(probe({ tool: 'claude', installedVersion: '0.9.0', currentVersion: '1.0.0' }))).toEqual([
       { id: 'mcp-outdated', tool: 'claude', file: '~/.claude.json', missing: old, action: { kind: 'connect' } },
     ]);
+  });
+
+  it('registro no projeto (fora o Cursor) com versão diferente não gera aviso de desatualizado', async () => {
+    fs.writeFileSync(
+      path.join(project, '.mcp.json'),
+      JSON.stringify({ mcpServers: { 'faz-ai': { command: process.execPath, args: [BRIDGE] } } }),
+    );
+    const versions = { installedVersion: '0.9.0', currentVersion: '1.0.0' };
+    expect((await checkRequirements(probe({ tool: 'claude', ...versions }))).map((r) => r.id)).not.toContain('mcp-outdated');
   });
 });
 
