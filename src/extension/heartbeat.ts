@@ -1,20 +1,22 @@
 import type { AiRunOrigin } from '../shared/log';
+import type { WebviewToHost } from '../shared/messages';
 import { cardRef, type BoardState, type Card } from '../shared/model';
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
 import { blocksExecution } from '../shared/requirements';
-import { childrenOf, isAiWorking, isLive } from '../shared/selectors';
-import { limitOf } from '../shared/runner';
+import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
+import { limitOf, type AiRunMode } from '../shared/runner';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
+import { USAGE_LIMIT_TEXT } from '../shared/conversation';
 import { isWithHuman } from '../shared/story';
-import { autopilotStep } from './autopilot';
+import { autopilotStep, needsSummary } from './autopilot';
 
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
 export interface HeartbeatRunner {
   readonly running: string[];
   /** a última execução terminou por limite de uso do plano */
   readonly usageLimited?: boolean;
-  start(cardId: string, origin?: AiRunOrigin): void;
+  start(cardId: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(cardId: string): void;
   onDidFinish(listener: (cardId: string) => void): void;
 }
@@ -28,6 +30,24 @@ export interface HeartbeatDeps {
    * histórias entregues (detecção de merges). Não espera o fim nem trava a rodada.
    */
   onRound?: () => void;
+  /**
+   * Aplica uma mudança no board em nome do heartbeat (devolver um card bloqueado por limite de uso,
+   * avisar de um card parado). Sem ela, a rodada só executa a IA.
+   */
+  act?: (msg: WebviewToHost) => void;
+}
+
+/** Dias com a pessoa (revisão, resposta ou bloqueio) a partir dos quais a rodada avisa que o card está parado. */
+export const STALE_DAYS = 2;
+/** Parte estável do aviso de card parado: o "já avisei" é conferido na própria conversa, depois do último status. */
+const STALE_MARK = 'está com você há';
+/** Parte estável do aviso de desbloqueio por limite de uso. */
+const USAGE_RELEASE_MARK = 'voltou para a IA: o limite de uso renova sozinho';
+
+/** Um item da fila da rodada: a história e o que fazer nela. */
+export interface HeartbeatItem {
+  id: string;
+  mode: AiRunMode;
 }
 
 /**
@@ -54,6 +74,83 @@ export function heartbeatTargets(s: BoardState): Card[] {
     out.push(story);
   }
   return out;
+}
+
+/** A coluna fica antes da primeira em que a IA atua: é o Backlog (ou equivalente) do workflow. */
+function isBacklogColumn(s: BoardState, card: Card): boolean {
+  const column = columnOf(s, card);
+  if (!column || column.category !== 'open' || column.aiActive) return false;
+  const firstAi = columnsOf(s, card.workflowId).find((c) => c.aiActive);
+  return !!firstAi && column.position < firstAi.position;
+}
+
+/**
+ * Histórias do Backlog que a rodada deve refinar: ainda não refinadas, sem execução e sem estar com a
+ * pessoa (um refinamento já entregue espera a revisão dela). Só com o refinamento automático ligado.
+ * As histórias em modo autônomo ficam de fora: o autopiloto as leva direto para a primeira fase.
+ */
+export function refineTargets(s: BoardState): Card[] {
+  if (!s.board.runner.heartbeatRefine) return [];
+  return s.cards.filter(
+    (c) =>
+      isLive(c) &&
+      !c.parentId &&
+      !c.yolo &&
+      c.refinedAt === null &&
+      c.title.trim() !== '' &&
+      isBacklogColumn(s, c) &&
+      !isWithHuman(c) &&
+      !isAiWorking(s, c),
+  );
+}
+
+/**
+ * Histórias cuja conversa cresceu desde o último resumo (`needsSummary`) e que não estão em execução: a
+ * rodada resume antes de qualquer outro trabalho nelas, para a próxima execução receber só o resumo.
+ * As do modo autônomo ficam de fora: o autopiloto resume ao trocar de fase.
+ */
+export function summaryTargets(s: BoardState): Card[] {
+  return s.cards.filter(
+    (c) =>
+      isLive(c) &&
+      !c.parentId &&
+      !c.yolo &&
+      columnOf(s, c)?.category === 'open' &&
+      !isAiWorking(s, c) &&
+      !childrenOf(s, c.id).some((k) => isLive(k) && isAiWorking(s, k)) &&
+      needsSummary(s, c),
+  );
+}
+
+/** Cards bloqueados por limite de uso da ferramenta: o limite renova sozinho, então o board os devolve para a IA. */
+export function usageLimitBlocked(s: BoardState): Card[] {
+  return s.cards.filter((c) => isLive(c) && c.status === 'blocked' && USAGE_LIMIT_TEXT.test(c.statusReason));
+}
+
+/** Histórias paradas com a pessoa há `STALE_DAYS` ou mais, ainda sem o aviso desta parada na conversa. */
+export function staleWithHuman(s: BoardState, now: number): Card[] {
+  const limit = STALE_DAYS * 24 * 60 * 60_000;
+  return s.cards.filter((c) => {
+    if (!isLive(c) || c.parentId || !isWithHuman(c) || c.statusAt === null) return false;
+    if (columnOf(s, c)?.category !== 'open' || now - c.statusAt < limit) return false;
+    return !s.comments.some((m) => m.cardId === c.id && m.createdAt >= c.statusAt! && m.body.includes(STALE_MARK));
+  });
+}
+
+/** A fila de uma rodada: cada história uma vez, com o que fazer nela (resumir antes de trabalhar a fase). */
+export function heartbeatQueue(s: BoardState): HeartbeatItem[] {
+  const items: HeartbeatItem[] = [];
+  const seen = new Set<string>();
+  const push = (card: Card, mode: AiRunMode) => {
+    if (seen.has(card.id)) return;
+    seen.add(card.id);
+    items.push({ id: card.id, mode });
+  };
+  const summaries = new Set(summaryTargets(s).map((c) => c.id));
+  for (const card of heartbeatTargets(s)) push(card, summaries.has(card.id) ? 'summarize' : 'phase');
+  for (const card of summaryTargets(s)) push(card, 'summarize');
+  for (const card of refineTargets(s)) push(card, 'refine');
+  return items;
 }
 
 /**
@@ -84,16 +181,20 @@ export function heartbeatIdleReason(s: BoardState): string {
   return why.length ? `nenhuma história pode executar agora: ${why.join('; ')}.` : 'nada pendente com a IA.';
 }
 
+const MODE_LABEL: Record<AiRunMode, string> = { phase: 'fase', refine: 'refinar', summarize: 'resumir' };
+
 /**
- * Rotina periódica: quando há pendência com a IA, executa a ferramenta do projeto para cada
- * história da fila. As vagas são por tipo de atividade (`limitOf`): histórias em fase de texto (só
- * produzem documento) vão até `parallelStories` em qualquer modo; as que mexem em código vão uma por vez
- * ou, no modo worktree com o paralelo ligado, até o limite configurado. Cada teto conta as execuções já
- * em andamento daquele tipo: a rodada ocupa só as vagas livres. Sem pendência, não executa nada.
- * Não depende da API do VSCode.
+ * Rotina periódica: a cada rodada, primeiro arruma o board (devolve para a IA os cards bloqueados por
+ * limite de uso, avisa dos cards parados com a pessoa) e depois executa a ferramenta do projeto para
+ * cada história da fila: resume a conversa que cresceu, refina os cards novos do Backlog e trabalha a
+ * fase dos cards prontos. As vagas são por tipo de atividade (`limitOf`): refinar, resumir e as fases
+ * de texto (só produzem documento) vão até `parallelStories` em qualquer modo; as que mexem em código
+ * vão uma por vez ou, no modo worktree com o paralelo ligado, até o limite configurado. Cada teto conta
+ * as execuções já em andamento daquele tipo: a rodada ocupa só as vagas livres. Sem pendência, não
+ * executa nada. Não depende da API do VSCode.
  */
 export class Heartbeat {
-  private queue: string[] = [];
+  private queue: HeartbeatItem[] = [];
   private lastRoundAt: number;
   private listeners = new Set<() => void>();
   /**
@@ -138,14 +239,14 @@ export class Heartbeat {
   }
 
   /**
-   * Enfileira a história do card (ou o próprio card, se for uma história) e tenta iniciar na hora, sem
-   * esperar a rodada e sem depender de `runner.heartbeat`: é o que a aprovação de uma pessoa pede.
-   * Respeita os tetos de paralelismo; sem vaga, a história fica na fila.
+   * Enfileira a história do card (ou o próprio card, se for uma história) para trabalhar a fase e tenta
+   * iniciar na hora, sem esperar a rodada e sem depender de `runner.heartbeat`: é o que a aprovação de
+   * uma pessoa pede com o heartbeat desligado. Respeita os tetos de paralelismo; sem vaga, fica na fila.
    */
   enqueue(cardId: string): void {
     const card = this.deps.snapshot().cards.find((c) => c.id === cardId);
     const storyId = card?.parentId ?? card?.id;
-    if (storyId && !this.queue.includes(storyId)) this.queue.push(storyId);
+    if (storyId && !this.queue.some((i) => i.id === storyId)) this.queue.push({ id: storyId, mode: 'phase' });
     this.pump();
   }
 
@@ -177,15 +278,54 @@ export class Heartbeat {
   private round(): number {
     this.lastRoundAt = this.deps.now();
     this.deps.onRound?.();
-    const targets = heartbeatTargets(this.deps.snapshot());
-    this.queue = targets.map((c) => c.id);
+    this.tidy();
+    const s = this.deps.snapshot();
+    this.queue = heartbeatQueue(s);
+    const count = this.queue.length;
+    const byId = new Map(s.cards.map((c) => [c.id, c]));
+    const describe = (i: HeartbeatItem) => `${cardRef(byId.get(i.id)!)} (${MODE_LABEL[i.mode]})`;
+    // o resumo da rodada: o que está com a pessoa aparece antes do que a IA vai tocar
+    const withHuman = s.cards.filter((c) => isLive(c) && !c.parentId && isWithHuman(c) && columnOf(s, c)?.category === 'open').length;
+    if (withHuman) this.deps.log(`Heartbeat: ${withHuman} história(s) com você (revisão, resposta ou bloqueio).`);
     this.deps.log(
-      targets.length
-        ? `Heartbeat: ${targets.length} história(s) com pendência: ${targets.map(cardRef).join(', ')}.`
-        : `Heartbeat: ${heartbeatIdleReason(this.deps.snapshot())}`,
+      count ? `Heartbeat: ${count} história(s) na rodada: ${this.queue.map(describe).join(', ')}.` : `Heartbeat: ${heartbeatIdleReason(s)}`,
     );
     this.pump();
-    return targets.length;
+    return count;
+  }
+
+  /**
+   * A arrumação da rodada, sem IA: o card bloqueado por limite de uso volta para a IA (o limite renova
+   * sozinho; a execução é repetida na própria rodada), e a história parada com a pessoa há dias ganha um
+   * aviso na conversa, uma vez por parada.
+   */
+  private tidy(): void {
+    const act = this.deps.act;
+    if (!act) return;
+    const s = this.deps.snapshot();
+    for (const c of usageLimitBlocked(s)) {
+      this.deps.log(`Heartbeat: ${cardRef(c)} estava bloqueado por limite de uso; voltou para a IA.`);
+      act({ type: 'card.status.set', cardId: c.id, status: 'ready' });
+      act({ type: 'comment.add', cardId: c.id, body: `O card ${USAGE_RELEASE_MARK}, e a execução é repetida pelo heartbeat.` });
+    }
+    for (const c of staleWithHuman(s, this.deps.now())) {
+      const days = Math.floor((this.deps.now() - c.statusAt!) / (24 * 60 * 60_000));
+      const what =
+        c.status === 'blocked' ? 'bloqueado' : c.status === 'waiting_answer' ? 'esperando a sua resposta' : 'esperando a sua revisão';
+      this.deps.log(`Heartbeat: ${cardRef(c)} ${STALE_MARK} ${days} dia(s) (${what}).`);
+      act({
+        type: 'comment.add',
+        cardId: c.id,
+        body: `Este card ${STALE_MARK} ${days} dia(s), ${what}. A IA só segue depois que você resolver.`,
+      });
+    }
+  }
+
+  /** O item ainda vale, com o board de agora: a situação pode ter mudado desde que a fila foi montada. */
+  private stillValid(s: BoardState, item: HeartbeatItem): Card | undefined {
+    if (item.mode === 'refine') return refineTargets(s).find((c) => c.id === item.id);
+    if (item.mode === 'summarize') return summaryTargets(s).find((c) => c.id === item.id);
+    return heartbeatTargets(s).find((c) => c.id === item.id);
   }
 
   /**
@@ -206,26 +346,25 @@ export class Heartbeat {
     const wants = autopilotStep(s);
     const reservedKind: ActivityKind | null = this.yieldToAutopilot && s.autopilot.active && wants.kind === 'run' ? wants.activity : null;
     const limit = (kind: ActivityKind) => limitOf(s.board.runner, s.board.git.mode, kind) - (kind === reservedKind ? 1 : 0);
-    const rest: string[] = [];
+    const rest: HeartbeatItem[] = [];
     const waiting: Record<ActivityKind, number> = { text: 0, branch: 0 };
-    for (const id of this.queue) {
-      // a situação pode ter mudado desde que a fila foi montada (a pessoa agiu, outra execução resolveu)
+    for (const item of this.queue) {
       const current = this.deps.snapshot();
-      const card = heartbeatTargets(current).find((c) => c.id === id);
+      const card = this.stillValid(current, item);
       if (!card) continue;
-      const kind = activityKindOf(current, card, 'phase');
+      // refinar e resumir só produzem texto: nunca ocupam a vaga de branch
+      const kind = activityKindOf(current, card, item.mode);
       if (counts[kind] >= limit(kind)) {
-        rest.push(id);
+        rest.push(item);
         waiting[kind]++;
         continue;
       }
       try {
-        this.runner.start(id, 'heartbeat');
+        this.runner.start(item.id, 'heartbeat', item.mode);
         counts[kind]++;
         // o limite de uso esgotou na última execução: só uma de teste, as outras esperam o resultado dela
         if (this.runner.usageLimited) {
-          const left = this.queue.slice(this.queue.indexOf(id) + 1);
-          rest.push(...left);
+          rest.push(...this.queue.slice(this.queue.indexOf(item) + 1));
           break;
         }
       } catch (e) {

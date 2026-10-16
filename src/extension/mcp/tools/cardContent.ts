@@ -71,7 +71,7 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
 
   tool(
     'generate_summary',
-    'Lê a conversa do card e grava um resumo (Decisões, Observações, Pendências) como um comentário novo, igual ao botão "Resumir a conversa" do board. Exige 2 ou mais mensagens na conversa. Pode levar alguns minutos: a ferramenta só responde depois que a IA terminar de escrever o resumo (aguarda a CLI terminar); clientes MCP com timeout curto podem interromper a chamada antes disso, mesmo que o resumo apareça na conversa normalmente.',
+    'Lê a conversa do card e grava um resumo (Decisões, Observações, Pendências) como um comentário novo, igual ao botão "Resumir a conversa" do board. As mensagens anteriores ao resumo ficam na conversa, mas saem do contexto da IA (get_card devolve a partir do resumo). Exige 2 ou mais mensagens na conversa. Pode levar alguns minutos: a ferramenta só responde depois que a IA terminar de escrever o resumo (aguarda a CLI terminar); clientes MCP com timeout curto podem interromper a chamada antes disso, mesmo que o resumo apareça na conversa normalmente.',
     { card: cardArg },
     async (a, router) => {
       const card = findCard(router.snapshot(), a.card);

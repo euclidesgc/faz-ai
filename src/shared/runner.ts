@@ -22,6 +22,8 @@ export interface RunnerConfig {
   heartbeat: boolean;
   /** intervalo entre as rodadas do heartbeat, em minutos */
   heartbeatMinutes: number;
+  /** o heartbeat refina sozinho os cards do Backlog ainda não refinados e deixa cada um para a revisão da pessoa */
+  heartbeatRefine: boolean;
   /** o heartbeat toca várias histórias ao mesmo tempo com branch; só vale no modo worktree, em que cada história tem a sua pasta */
   parallel: boolean;
   /** com `parallel` ligado, quantas histórias com branch ao mesmo tempo (no mínimo duas); é também o teto das atividades sem branch (só texto), em qualquer modo, mesmo com `parallel` desligado */
@@ -58,6 +60,7 @@ export const DEFAULT_RUNNER: RunnerConfig = {
   timeoutMinutes: 45,
   heartbeat: false,
   heartbeatMinutes: 10,
+  heartbeatRefine: true,
   parallel: false,
   parallelStories: 2,
   autopilotPaused: false,
@@ -94,6 +97,8 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
     autopilotPaused: raw.autopilotPaused === true,
     defaultAgent: typeof raw.defaultAgent === 'string' ? raw.defaultAgent.trim() : '',
     heartbeat: raw.heartbeat === true,
+    // nasce ligado: quem não quer o refinamento automático desliga em Configurações → Harness de IA
+    heartbeatRefine: raw.heartbeatRefine !== false,
     heartbeatMinutes:
       Number.isFinite(interval) && interval > 0
         ? Math.min(HEARTBEAT_RANGE.max, Math.max(HEARTBEAT_RANGE.min, interval))

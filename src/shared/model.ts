@@ -140,6 +140,8 @@ export interface Card {
   yoloUntil: Id | null;
   /** história de que esta deriva (a funcionalidade dividida em entregas); null = não é derivada */
   derivedFrom: Id | null;
+  /** quando a IA refinou o card (ms); null = ainda não refinado, e o heartbeat pode refiná-lo no Backlog */
+  refinedAt: number | null;
 }
 
 /** ID do card como aparece na interface. */

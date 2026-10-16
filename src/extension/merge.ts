@@ -1,6 +1,5 @@
 import { cardRef, type BoardState, type Card, type Column } from '../shared/model';
-import { columnOf, columnsOf, openChildren } from '../shared/selectors';
-import { isDelivered } from '../shared/story';
+import { columnOf, columnsOf, isAiWorking, isLive, openChildren } from '../shared/selectors';
 import { gitNotice } from '../shared/gitNotices';
 import { detectMainBranch, removeWorktree } from './git';
 import type { MessageRouter } from './panel/messageRouter';
@@ -182,15 +181,26 @@ export interface MergeWatchDeps extends MergeDeps {
   afterRound?: () => Promise<void>;
 }
 
-/** Histórias cujo pull request o watcher consulta: as entregues (`isDelivered`), sem regra nova. */
-export const mergeWatchTargets = (s: BoardState): Card[] => s.cards.filter((c) => isDelivered(s, c));
+/**
+ * Histórias cujo pull request o watcher consulta: toda história em aberto com pull request registrado,
+ * em qualquer coluna e em qualquer modo (autônomo ou não). Ficam de fora a bloqueada (é impedimento, a
+ * pessoa resolve) e a que está em execução (a IA pode estar mexendo na branch agora).
+ */
+export const mergeWatchTargets = (s: BoardState): Card[] =>
+  s.cards.filter(
+    (c) =>
+      isLive(c) && !c.parentId && c.prUrl !== '' && c.status !== 'blocked' && columnOf(s, c)?.category === 'open' && !isAiWorking(s, c),
+  );
 
-/** Coluna de conclusão logo depois da coluna da história, se houver. */
+/** A coluna de conclusão à frente da coluna da história, se houver (a primeira delas). */
 function doneAfter(s: BoardState, card: Card): Column | null {
-  const columns = columnsOf(s, card.workflowId);
-  const next = columns[columns.findIndex((c) => c.id === card.columnId) + 1];
-  return next?.category === 'done' ? next : null;
+  const column = columnOf(s, card);
+  if (!column) return null;
+  return columnsOf(s, card.workflowId).find((c) => c.position > column.position && c.category === 'done') ?? null;
 }
+
+/** Parte estável do aviso de conflito no pull request; o "já avisei" é conferido na conversa, como em `CLOSED_MARK`. */
+const CONFLICT_MARK = 'tem conflito com a branch de destino';
 
 /**
  * Parte estável da frase do aviso de pull request fechado. O "já avisei" é verificado na própria
@@ -200,9 +210,11 @@ function doneAfter(s: BoardState, card: Card): Column | null {
 const CLOSED_MARK = 'foi fechado sem merge';
 
 /**
- * Detecção de merges, chamada a cada rodada do heartbeat (sem timer nem liga/desliga próprios): para cada história entregue (modo autônomo, na última coluna da IA, com pull
- * request), pergunta ao `gh` o estado do pull request. Mergeado: grava o commit e conclui a história;
- * fechado sem merge: avisa na conversa uma vez; aberto: nada. Falhas do `gh` vão para o log, sem
+ * Detecção de merges, chamada a cada rodada do heartbeat (sem timer nem liga/desliga próprios): para
+ * cada história em aberto com pull request (`mergeWatchTargets`), pergunta ao `gh` o estado dele.
+ * Mergeado: grava o commit e conclui a história (a coluna de conclusão à frente, de onde ela estiver);
+ * fechado sem merge: avisa na conversa uma vez; aberto com conflito: avisa uma vez e devolve o card
+ * para a IA; aberto: nada. Falhas do `gh` vão para o log, sem
  * repetir enquanto a causa for a mesma. Nenhum caminho bloqueia card nem lança para fora de `runNow()`.
  * Não depende da API do VSCode.
  */
@@ -258,6 +270,7 @@ export class MergeWatcher {
       // a limpeza roda em série, dentro da rodada: ordem previsível e sem dois gits na mesma branch
       if (pr.state === 'MERGED' || pr.mergedAt) await this.finish(card, pr);
       else if (pr.state === 'CLOSED') this.announceClosed(card);
+      else if (pr.mergeable === 'CONFLICTING') this.announceConflict(card);
     } catch (e) {
       this.noteFailure(`[${cardRef(card)}] ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -269,7 +282,7 @@ export class MergeWatcher {
     const s = this.router.snapshot();
     const live = s.cards.find((c) => c.id === card.id);
     // a situação pode ter mudado enquanto o gh respondia (outra rodada concluiu, a pessoa moveu)
-    if (!live || this.checking.has(live.id) || !isDelivered(s, live)) return;
+    if (!live || this.checking.has(live.id) || !mergeWatchTargets(s).some((c) => c.id === live.id)) return;
     const done = doneAfter(s, live);
     if (!done) return; // sem coluna de conclusão depois: nada a fazer (RF4)
     const ref = cardRef(live);
@@ -305,6 +318,28 @@ export class MergeWatcher {
       { author: AUTHOR, source: 'ai' },
     );
     this.deps.log(`[${cardRef(card)}] Pull request ${card.prUrl} fechado sem merge; a história fica onde está.`);
+  }
+
+  /**
+   * O pull request está aberto, mas com conflito: avisa na conversa uma vez por conflito (o aviso vale até
+   * a pessoa apagá-lo ou o merge acontecer) e devolve o card para a IA resolver, quando ele estava com a
+   * pessoa esperando revisão: resolver conflito é trabalho dela, não decisão da pessoa.
+   */
+  private announceConflict(card: Card): void {
+    const s = this.router.snapshot();
+    const told = s.comments.some((c) => c.cardId === card.id && c.body.includes(card.prUrl) && c.body.includes(CONFLICT_MARK));
+    if (told) return;
+    this.router.handle(
+      {
+        type: 'comment.add',
+        cardId: card.id,
+        body: `O pull request ${card.prUrl} ${CONFLICT_MARK}. Atualize a branch da história a partir da branch de destino, resolva os conflitos e envie de novo.`,
+      },
+      { author: AUTHOR, source: 'ai' },
+    );
+    if (card.status === 'waiting_review')
+      this.router.handle({ type: 'card.status.set', cardId: card.id, status: 'ready' }, { author: AUTHOR, source: 'ai' });
+    this.deps.log(`[${cardRef(card)}] Pull request ${card.prUrl} com conflito; a IA resolve na próxima rodada.`);
   }
 
   /** Uma linha de log por causa: a mesma falha em dez histórias e dez rodadas aparece uma vez (RF10). */

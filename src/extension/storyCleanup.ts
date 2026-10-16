@@ -25,10 +25,12 @@ export interface PullRequestFacts {
   baseRefName: string;
   headRefName: string;
   headRefOid: string;
+  /** MERGEABLE | CONFLICTING | UNKNOWN; '' quando o gh não informa */
+  mergeable: string;
 }
 
 /** Os campos pedidos ao `gh pr view --json`. */
-export const PR_FIELDS = 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid';
+export const PR_FIELDS = 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid,mergeable';
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
@@ -52,6 +54,7 @@ export function parsePullRequestFacts(out: string, url: string): PullRequestFact
     baseRefName: str(d.baseRefName),
     headRefName: str(d.headRefName),
     headRefOid: str(d.headRefOid),
+    mergeable: str(d.mergeable),
   };
 }
 

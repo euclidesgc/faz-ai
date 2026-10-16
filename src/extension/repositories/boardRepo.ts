@@ -378,6 +378,7 @@ export class BoardRepo {
       branchCreatedAt: str(r.branch_created_at),
       prUrl: str(r.pr_url),
       mergeCommit: str(r.merge_commit),
+      refinedAt: r.refined_at == null ? null : num(r.refined_at),
       execProfile: r.exec_profile == null ? null : str(r.exec_profile),
       yolo: num(r.yolo) === 1,
       yoloUntil: str(r.yolo_until) || null,

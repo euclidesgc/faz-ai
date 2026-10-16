@@ -125,7 +125,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
             />
             <Text as="p" size="1" color="gray">
               {t(
-                'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.',
+                'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele trabalha nos cards prontos (um card aprovado vai para a próxima coluna na hora e é trabalhado na rodada seguinte), responde às mensagens pendentes, resume as conversas que cresceram, devolve para a IA os cards bloqueados por limite de uso, confere os pull requests mergeados e limpa branches e worktrees que sobraram, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.',
                 { tool: tool.label },
               )}
             </Text>
@@ -146,6 +146,17 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
                 </div>
               )}
             </FormField>
+            <SwitchField
+              label={t('Refinar os cards novos do Backlog')}
+              checked={runner.heartbeatRefine}
+              disabled={!runner.heartbeat}
+              onChange={(heartbeatRefine) => settings.updateBoard({ runner: { heartbeatRefine } })}
+            />
+            <Text as="p" size="1" color="gray">
+              {t(
+                'A cada rodada, o heartbeat refina os cards do Backlog ainda não refinados: a partir do título, a IA melhora a descrição, preenche os campos (modelo, skills, rules) e o checklist, e deixa o card aguardando a sua revisão. Aprovar leva o card para a primeira fase.',
+              )}
+            </Text>
           </div>
           <div className="form-divider" />
           {isWeb && (

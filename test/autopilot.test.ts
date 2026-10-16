@@ -1,4 +1,5 @@
 import { noteOf } from '../src/extension/autopilot';
+import { activeComments } from '../src/shared/conversation';
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -801,7 +802,7 @@ describe('resumo automático da conversa entre as fases (#441)', () => {
   const comments = (n: number) => router.snapshot().comments.filter((c) => c.cardId === card(n).id);
   const say = (n: number, body: string) => ai({ type: 'comment.add', cardId: card(n).id, body });
 
-  it('ao trocar de coluna com a conversa cheia, resume antes da fase; o resumo substitui as mensagens anteriores', () => {
+  it('ao trocar de coluna com a conversa cheia, resume antes da fase; as mensagens anteriores ficam, mas saem do contexto da IA', () => {
     create('A', 'Discovery');
     router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Quero exportar em CSV.' });
     yolo(1);
@@ -819,13 +820,19 @@ describe('resumo automático da conversa entre as fases (#441)', () => {
     expect(log.at(-1)).toContain('resumindo a conversa de #1');
     const before = comments(1).map((c) => c.id);
     expect(before).toHaveLength(5); // o pedido + a nota do modo + 3 da IA
-    // o resumo fica, as anteriores saem, e a fase começa em seguida
+    // o resumo fica por último; nada é apagado (apagar é da pessoa), e só o resumo segue para a IA
     runner.finish(
       () => ai({ type: 'comment.add', cardId: card(1).id, body: 'Decisões: CSV com a biblioteca atual.', kind: 'summary' }),
       'summarize',
     );
-    expect(comments(1).map((c) => c.body)).toEqual(['Decisões: CSV com a biblioteca atual.']);
-    expect(comments(1)[0]!.kind).toBe('summary');
+    expect(
+      comments(1)
+        .map((c) => c.id)
+        .slice(0, 5),
+    ).toEqual(before);
+    expect(comments(1).at(-1)!.kind).toBe('summary');
+    expect(activeComments(router.snapshot().comments, card(1).id).map((c) => c.body)).toEqual(['Decisões: CSV com a biblioteca atual.']);
+    expect(log.some((l) => l.includes('5 mensagem(ns) anterior(es) saem do contexto da IA'))).toBe(true);
     expect(runner.started).toHaveLength(3);
     expect(runner.modes[2]).toBeUndefined();
     expect(columnName(1)).toBe('PRD');

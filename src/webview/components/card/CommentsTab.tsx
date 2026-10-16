@@ -14,6 +14,7 @@ import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
 import { aiBlockedReason } from '../RequirementsBanner';
 import { Button, DeleteButton, Hint, IconRun, IconSuggest } from '../ui';
 import { summarizeHint, workHint } from '../aiHints';
+import { activeComments } from '../../../shared/conversation';
 
 /** Conversa do card: é por aqui que a pessoa e a IA falam sobre o trabalho. */
 export function CommentsTab({
@@ -33,6 +34,8 @@ export function CommentsTab({
   const draft = kept ?? own;
   const setDraft = onDraft ?? setOwn;
   const cardComments = state.comments.filter((c) => c.cardId === cardId);
+  // as mensagens antes do último resumo já estão nele e não vão mais para a IA: aparecem esmaecidas
+  const active = new Set(activeComments(state.comments, cardId).map((c) => c.id));
   const card = state.cards.find((c) => c.id === cardId);
   const running = state.aiRuns.includes(cardId);
   // "Resumir a conversa" e "Trabalhar na fase" travam logo após o clique, até aiRuns refletir a execução (ou o tempo esgotar)
@@ -84,6 +87,7 @@ export function CommentsTab({
           key={c.id}
           comment={c}
           mine={c.author === state.currentUser}
+          inactive={!active.has(c.id)}
           render={resolve}
           priorIds={cardComments.slice(0, i).map((p) => p.id)}
         />
@@ -155,11 +159,14 @@ function boardNotice(body: string): string {
 function CommentItem({
   comment,
   mine,
+  inactive,
   render,
   priorIds,
 }: {
   comment: Comment;
   mine: boolean;
+  /** anterior ao último resumo: já está nele e não entra mais no contexto da IA */
+  inactive: boolean;
   render: (body: string) => string;
   /** ids dos comentários anteriores a este na conversa; usado pela recomendação de apagar o resumo */
   priorIds: string[];
@@ -180,7 +187,11 @@ function CommentItem({
   };
 
   return (
-    <article className="comment" aria-busy={busy || undefined}>
+    <article
+      className={`comment${inactive ? ' comment-inactive' : ''}${comment.kind === 'summary' ? ' comment-summary-item' : ''}`}
+      aria-busy={busy || undefined}
+      title={inactive ? t('Mensagem anterior ao resumo: já está refletida nele e não vai mais para a IA.') : undefined}
+    >
       <header className="row">
         <span className="avatar">{comment.author.slice(0, 1).toUpperCase()}</span>
         <strong>{comment.author}</strong>
@@ -235,7 +246,7 @@ function CommentItem({
           <p className="muted small">{t('Revise o resumo: concorde como está ou edite o que for preciso.')}</p>
           {priorIds.length > 0 && (
             <p className="muted small row">
-              {t('As mensagens anteriores a este resumo já estão refletidas nele. Você pode apagá-las para liberar contexto.')}
+              {t('As mensagens anteriores a este resumo já estão refletidas nele e não vão mais para a IA. Você pode apagá-las.')}
               <DeleteButton
                 variant="ghost"
                 size="small"

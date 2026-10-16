@@ -40,6 +40,7 @@ const card = (id: string, over: Partial<Card> = {}): Card => ({
   yolo: false,
   yoloUntil: null,
   derivedFrom: null,
+  refinedAt: null,
   ...over,
 });
 

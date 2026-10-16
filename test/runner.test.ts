@@ -656,6 +656,29 @@ describe('executor da IA', () => {
     expect(card().status).toBe('waiting_review');
   });
 
+  it('refinamento pedido pelo heartbeat: marca o card como refinado e o entrega para a revisão da pessoa', () => {
+    expect(card().refinedAt).toBeNull();
+    runner.start(storyId, 'heartbeat', 'refine');
+    procs[0]!.exit(0);
+    expect(card().refinedAt).not.toBeNull();
+    expect(card().status).toBe('waiting_review');
+    // a aprovação leva o card para a coluna seguinte, em Pronto, e a próxima rodada trabalha a fase
+    router.handle({ type: 'card.status.set', cardId: storyId, status: 'approved' });
+    expect(card().status).toBe('ready');
+  });
+
+  it('refinamento à mão também marca o card como refinado, mas devolve o status que tinha; o que falha não marca', () => {
+    router.handle({ type: 'card.status.set', cardId: storyId, status: 'ready' });
+    runner.start(storyId, 'manual', 'refine');
+    procs[0]!.exit(2);
+    expect(card().refinedAt).toBeNull();
+    expect(card().status).toBe('ready');
+    runner.start(storyId, 'manual', 'refine');
+    procs[1]!.exit(0);
+    expect(card().refinedAt).not.toBeNull();
+    expect(card().status).toBe('ready');
+  });
+
   describe('Resumir a conversa', () => {
     it('permissão sempre "board" e nunca autônomo, mesmo com o board em "Sem restrições" e o card em YOLO', () => {
       router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
@@ -848,6 +871,7 @@ describe('executor da IA', () => {
       timeoutMinutes: 45,
       heartbeat: false,
       heartbeatMinutes: 10,
+      heartbeatRefine: true,
       parallel: false,
       parallelStories: 2,
       autopilotPaused: false,
@@ -1324,6 +1348,16 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     procs[0]!.exit(1);
     expect(procs).toHaveLength(1);
     expect(card().status).toBe('ready');
+  });
+
+  it('a CLI atual sai com código 0 e "hit your limit" sem responder: é limite esgotado, o card volta para a IA, não bloqueia', () => {
+    ruleWithFallback(null);
+    runner.start(storyId);
+    procs[0]!.emit(JSON.stringify({ type: 'result', is_error: true, result: "You've hit your limit · resets 3pm (America/Sao_Paulo)" }));
+    procs[0]!.exit(0);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('ready');
+    expect(lastMessage()!.body).toContain('limite de uso do plano');
   });
 
   it('falha comum (sem limite esgotado), mesmo com reserva disponível: bloqueio imediato, sem segunda chamada', () => {

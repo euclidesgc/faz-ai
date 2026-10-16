@@ -237,6 +237,11 @@ manda trabalhar no card. Os comandos, conforme a documentação de cada ferramen
 Uma imagem colada numa mensagem ou na descrição do card aparece no texto como `attachment:<nome>`; o
 arquivo é o anexo de mesmo nome em `attachments` de `get_card`.
 
+A conversa em `comments` de `get_card` vem **a partir do último resumo** (a mensagem com
+`kind: "summary"`, gravada por `generate_summary` ou pelo botão "Resumir a conversa"): o que veio
+antes já está no resumo e não é enviado. As mensagens anteriores continuam no board, esmaecidas na
+tela; apagá-las é decisão da pessoa.
+
 ### Branch e pasta de trabalho
 
 `prepare_workspace` cria (ou reaproveita) a branch da história e, no modo worktree, a pasta de

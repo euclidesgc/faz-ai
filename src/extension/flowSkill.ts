@@ -24,7 +24,8 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
 
 ## Trabalhar num card
 
-1. \`get_card\` traz a descrição, a conversa, os anexos e:
+1. \`get_card\` traz a descrição, a conversa (a partir do último resumo, \`kind: "summary"\`: o que veio
+   antes já está nele), os anexos e:
    - \`phase\`: a instrução da fase e, se houver, o documento que ela produz e o modelo dele;
    - \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, delegue a um subagente com essa configuração; se não for possível, avise a pessoa na conversa;
    - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no caminho indicado, mesmo que não apareça na sua lista de skills: as execuções do board partem de contexto vazio e só conhecem o que está no board (Configurações → Harness).

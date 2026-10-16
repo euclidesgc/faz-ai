@@ -492,11 +492,14 @@ Images pasted into the message or into the card description become card attachme
   Pendências — decisions, notes, pending items) as a new AI message (`kind: "summary"`), without
   automatically deleting anything, without working on the phase, moving the card or changing its
   status — it runs with the board only, always at the "Alto" model tier (regardless of the card's
-  Esforço). You review the summary the same way you review any message: agree by leaving it as is,
-  or edit the text. Right below it, a recommendation with the **Apagar mensagens resumidas** (delete
-  summarized messages) button deletes, with confirmation, every message before the summary;
-  summarizing again creates a new record, it does not replace the previous one. It is also
-  available as the MCP tool `generate_summary`, with the same result.
+  Esforço). The summary **deactivates** the earlier messages: the AI then receives the conversation
+  from the last summary on (`comments` in `get_card`), the summary is highlighted on screen and the
+  earlier messages are dimmed. You review the summary the same way you review any message: agree by
+  leaving it as is, or edit the text. Any message can be deleted by you; right below the summary, the
+  **Apagar mensagens resumidas** (delete summarized messages) button deletes, with confirmation,
+  every message before it; summarizing again creates a new record, it does not replace the previous
+  one. It is also available as the MCP tool `generate_summary`, with the same result. The
+  [heartbeat](#heartbeat) summarizes on its own a conversation that has grown.
 - What the AI may do in these runs is set in Configurações → Harness de IA → **Execução pela
   conversa**: only the board (default), the board and project files, or no restrictions. The level
   in use is shown next to the button, with a shortcut to change it. The AI is told about the limit:
@@ -897,20 +900,23 @@ off.
 
 ### Automatic merge detection
 
-The board watches each delivered story's pull request and detects when it is merged, concluding the
-story automatically. There is no setting of its own: the check happens on every
+The board watches the pull request of every open story that has one (in any column, with or without
+autonomous mode; only blocked and running stories are left out) and detects when it is merged,
+concluding the story automatically. There is no setting of its own: the check happens on every
 [heartbeat](#heartbeat) round, on the same interval, and also on **Rodar o heartbeat agora** (Run the
 heartbeat now). With the heartbeat off, it only happens when you ask for a round. When the merge is
 detected:
 
 1. the board records the merge commit on the card;
 2. registers in the conversation that the story was completed;
-3. moves the card to Concluído and removes the working folder. With gitflow on, it also does the rest
+3. moves the card to the done column ahead and removes the working folder. With gitflow on, it also does the rest
    of the [story completion with gitflow](#story-completion-with-gitflow): deletes the branches and
    updates the local `develop`.
 
 If the pull request is closed without a merge, the board registers a warning in the conversation
-once only. The merge is still done by the person, manually or through automatic merge; the board
+once only. If it is open with conflicts, the board warns once in the conversation and, when the
+story was waiting for review, returns the card to "Pronto" so the AI updates the branch and resolves
+it on the next round. The merge is still done by the person, manually or through automatic merge; the board
 only observes. Failures in querying the PR state (no network, no authentication, no `gh`
 installed) do not block anything — the warning appears in the log, and the board tries again on the next round.
 
@@ -936,9 +942,27 @@ version, which have no merge commit recorded, stay yours to archive with one cli
 ### Heartbeat
 
 With the heartbeat on (Configurações → Harness de IA), the board calls the AI on its own at every
-interval, while the editor is open in the project folder. In each round it advances approved cards,
-answers pending messages and works on ready cards, with one run per story, and checks the pull
-request of delivered stories ([automatic merge detection](#automatic-merge-detection)). Activities **without a
+interval, while the editor is open in the project folder. The heartbeat itself does not depend on
+the AI: it is a board clock that, on each round, first tidies the board and then decides what the AI
+does. In each round it:
+
+- **returns to the AI** the cards blocked by the tool's usage limit (the limit renews on its own),
+  with a notice in the conversation, and **warns once** about a card that has been with you for two
+  days or more;
+- **checks the pull requests** of every story that has one ([automatic merge detection](#automatic-merge-detection))
+  and cleans up leftover branches and worktrees ([orphan branches and worktrees](#orphan-branches-and-worktrees));
+- **summarizes the conversation** of stories with three or more messages since the last summary (at
+  least one from the AI), before working on the phase; the AI then receives only the summary and
+  what comes after it;
+- **refines new Backlog cards** (**Refinar os cards novos do Backlog**, in the same settings; on by
+  default): from the title, the AI improves the description, fills in model, skills, rules and
+  checklist and leaves the card waiting for your review. Approving moves the card to the first phase;
+- **works on ready cards** and answers pending messages, with one run per story. An approved card
+  moves to the next column as "Pronto" (ready) right away, but the phase work starts on the next
+  round, if there is a slot (with the heartbeat off, approving calls the AI immediately). When the
+  phase is done, the AI leaves the card waiting for your review or your answer.
+
+ Activities **without a
 branch** (refine, summarize and the phases that only produce a document, such as Discovery, PRD,
 Spec and Plan on the default board; the rule is any column with an artifact before the code phase)
 run at the same time in any workspace mode, up to **Histórias ao mesmo tempo** (two by default, up to
@@ -1020,9 +1044,10 @@ story by itself, **without asking for authorization or confirmation on anything*
   (access, environment, a failure it cannot fix) blocks the card.
 - **Conversation summarized between phases**: when the story moves to another column with three or
   more messages since the last summary (at least one from the AI), the autopilot runs **Resumir a
-  conversa** (summarize the conversation) before the new phase and deletes the messages before the
-  summary, so each run's context does not carry the whole conversation. One summary per column; if
-  the AI does not write the summary, the conversation stays and the phase goes on.
+  conversa** (summarize the conversation) before the new phase: the messages before the summary stay
+  in the conversation but are deactivated (the AI receives only the summary and what comes after),
+  so each run's context does not carry the whole conversation. One summary per column; if the AI
+  does not write the summary, the conversation stays and the phase goes on.
 - **By the project's patterns**: since nobody reviews the decisions along the way, the AI follows the
   project's patterns and architecture rules (`CLAUDE.md`, `AGENTS.md`, `DESIGN.md` and the similar
   code that already exists) and, among the paths that follow them, picks the least complex one.

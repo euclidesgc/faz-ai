@@ -181,7 +181,7 @@ describe('pull request e merge na homologação', () => {
     gitResult = cleanRepo('historia/1-login', '/projeto.worktrees/1-login');
     await approve(1);
     expect(calls).toEqual([
-      ['pr', 'view', PR, '--json', 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid'],
+      ['pr', 'view', PR, '--json', 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid,mergeable'],
       ['pr', 'merge', PR, '--squash'],
     ]);
     expect(columnOf(1)).toBe('Concluído');
@@ -335,7 +335,7 @@ describe('MergeWatcher', () => {
   const CLOSED = json({ state: 'CLOSED', mergedAt: null, mergeCommit: null });
   const OPEN = json({ state: 'OPEN', mergedAt: null, mergeCommit: null });
   const prOf = (n: number) => `https://github.com/acme/app/pull/${n}`;
-  const FIELDS = 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid';
+  const FIELDS = 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid,mergeable';
   const comments = (n: number) => router.snapshot().comments.filter((c) => c.cardId === card(n).id && c.author === 'Faz AI');
   /** deixa a história entregue: modo autônomo, pull request registrado e status com a pessoa */
   const deliver = async (n: number, url = prOf(n)) => {
@@ -370,7 +370,7 @@ describe('MergeWatcher', () => {
     await deliver(1);
   });
 
-  it('consulta só as histórias entregues: uma chamada gh por alvo (RF1/RF2)', async () => {
+  it('consulta toda história em aberto com pull request, menos a bloqueada e a sub-tarefa: uma chamada gh por alvo (RF1/RF2)', async () => {
     await call('create_card', { title: 'Entregue também', column: 'Homologação' }); // #2
     await deliver(2);
     await call('create_card', { title: 'Não autônoma', column: 'Homologação' }); // #3
@@ -387,13 +387,27 @@ describe('MergeWatcher', () => {
     await call('create_card', { title: 'Sub-tarefa', parent: 1 }); // #7
     router.handle({ type: 'card.status.set', cardId: card(7).id, status: 'waiting_review' });
 
-    expect(mergeWatchTargets(router.snapshot()).map((c) => c.number)).toEqual([1, 2]);
+    // a não autônoma (#3) e a que ainda está na Implementação (#5) também entram: o merge pode vir de fora do board
+    expect(mergeWatchTargets(router.snapshot()).map((c) => c.number)).toEqual([1, 5, 2, 3]);
     ghResult = OPEN;
-    expect(await watcher.runNow()).toBe(2);
+    expect(await watcher.runNow()).toBe(4);
     expect(calls).toEqual([
       ['pr', 'view', prOf(1), '--json', FIELDS],
+      ['pr', 'view', prOf(5), '--json', FIELDS],
       ['pr', 'view', prOf(2), '--json', FIELDS],
+      ['pr', 'view', prOf(3), '--json', FIELDS],
     ]);
+  });
+
+  it('aberto com conflito: avisa uma vez e devolve o card que esperava revisão para a IA resolver', async () => {
+    ghResult = json({ state: 'OPEN', mergedAt: null, mergeCommit: null, mergeable: 'CONFLICTING' });
+    await watcher.runNow();
+    expect(card(1).status).toBe('ready');
+    expect(comments(1).at(-1)!.body).toContain('tem conflito com a branch de destino');
+    const told = comments(1).length;
+    await watcher.runNow();
+    expect(comments(1)).toHaveLength(told);
+    expect(columnOf(1)).toBe('Homologação');
   });
 
   it('mergeado: grava o commit, comenta, conclui e remove a pasta de trabalho (RF3-RF6)', async () => {
