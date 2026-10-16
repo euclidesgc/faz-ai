@@ -524,3 +524,26 @@ describe('banco gravado por uma versão mais nova', () => {
     expect(db.export()).toEqual(before);
   });
 });
+
+describe('migração 32 → 33 (ai_run_bash)', () => {
+  it('cria a tabela, preserva o dado antigo e apagar a execução apaga os comandos', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 32);
+    old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    old.run(
+      "INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x')",
+    );
+    expect(old.exec("SELECT name FROM sqlite_master WHERE name = 'ai_run_bash'")).toEqual([]);
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(33);
+    expect(old.exec('SELECT id FROM ai_runs')[0]!.values).toEqual([['r1']]);
+    old.run('PRAGMA foreign_keys = ON;');
+    old.run("INSERT INTO ai_run_bash (run_id, command, calls) VALUES ('r1', 'npm test', 2)");
+    old.run("DELETE FROM ai_runs WHERE id = 'r1'");
+    expect(old.exec('SELECT COUNT(*) FROM ai_run_bash')[0]!.values[0]![0]).toBe(0);
+  });
+});
