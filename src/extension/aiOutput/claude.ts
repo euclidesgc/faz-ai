@@ -401,7 +401,8 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
       // leu eventos e chamadas de ferramenta, mas nenhum número: o inventário vale, o consumo não
       // existe. `none` só quando não há nem uma coisa nem a outra — é a invariante que impede "não
       // medido" de parecer "medido e zero".
-      if (items.length) return { measure: 'partial', consumption: null, inventory: items, bashCommands, answer, reason: null, usageLimitReached };
+      if (items.length)
+        return { measure: 'partial', consumption: null, inventory: items, bashCommands, answer, reason: null, usageLimitReached };
       return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached };
     },
 
