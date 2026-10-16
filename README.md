@@ -1082,6 +1082,15 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
   seguidas sem avanço; bloquear uma história libera a fila para seguir com a próxima, em vez de
   travá-la — histórias que emperram podem gastar até 3 execuções cada, em todas da fila. Ao
   destravar o card, ele continua sozinho.
+- **Limite de uso do plano**: a execução que esbarra no limite de uso da ferramenta (de sessão,
+  semanal ou rate limit) não conta para o disjuntor nem bloqueia o card. O card volta para a IA e a
+  fila daquela ferramenta pausa, no autopiloto e no heartbeat, até o horário de renovação que a
+  ferramenta informou, mais 3 minutos; sem horário na saída, a espera é de 5 minutos e dobra a cada
+  nova falha, até 60. Enquanto a pausa vale, o topo do board mostra "Limite de uso do Claude Code: a
+  fila retoma às 13:53." e os cards que esperam a IA, a etiqueta "Aguardando o limite de uso até
+  13:53". Vencida a pausa, uma execução de teste roda antes das outras. A pausa fica gravada no board
+  (sobrevive a reabrir o editor); a execução pedida à mão continua liberada e, terminando bem,
+  encerra a pausa.
 
 O **botão do modo autônomo** no topo do board existe sempre que há história em aberto e diz o que
 o clique faz: **Ligar modo autônomo** (nenhuma história no modo: depois da confirmação com o "Até

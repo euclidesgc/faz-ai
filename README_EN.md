@@ -1128,6 +1128,15 @@ story by itself, **without asking for authorization or confirmation on anything*
   runs with no progress; blocking a story frees the queue to move on to the next one, instead of
   locking it up — a story that keeps getting stuck can spend up to 3 runs each, across the whole
   queue. Once you unblock the card it carries on by itself.
+- **Plan usage limit**: a run that hits the tool's usage limit (session, weekly or rate limit) does
+  not count toward the circuit breaker and does not block the card. The card goes back to the AI and
+  that tool's queue pauses, in the autopilot and in the heartbeat, until the reset time the tool
+  reported, plus 3 minutes; with no time in the output, the wait is 5 minutes and doubles on each new
+  failure, up to 60. While the pause holds, the top of the board shows "Usage limit for Claude Code:
+  the queue resumes at 1:53 PM." and the cards waiting for the AI show the label "Waiting for the
+  usage limit until 1:53 PM". Once the pause is over, one test run goes before the others. The pause
+  is saved in the board (it survives reopening the editor); a run you start by hand is still allowed
+  and, if it ends well, ends the pause.
 
 The **autonomous mode button** at the top of the board exists whenever there is an open story and
 says what the click does: **Ligar modo autônomo** (turn on; no story in the mode: after the
