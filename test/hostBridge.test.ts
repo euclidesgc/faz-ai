@@ -3,6 +3,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
+import { PrefsStore } from '../src/extension/prefs';
+import { EMPTY_PREFS } from '../src/shared/prefs';
 import { HostBridge, exportNotice, importNotice, type HostEnv } from '../src/extension/host/hostBridge';
 import { parseExportFile } from '../src/extension/db/boardExport';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
@@ -36,7 +38,45 @@ beforeEach(async () => {
   sent = [];
   shown = [];
   env = { showChat: () => void shown.push('chat'), attachmentsBaseUri: () => '' } as unknown as HostEnv;
-  bridge = new HostBridge((m) => sent.push(m), router, { get: () => ({}), onDidChange: () => () => {}, update: () => {} } as never, env);
+  bridge = new HostBridge(
+    (m) => sent.push(m),
+    router,
+    { get: () => ({}), onDidChange: () => () => {}, update: () => {} } as never,
+    { get: () => ({}), onDidChange: () => () => {}, update: () => {} } as never,
+    env,
+  );
+});
+
+describe('HostBridge: preferências da pessoa', () => {
+  it('o ready devolve as preferências guardadas e prefs.set grava no host, para o aviso dispensado não voltar', async () => {
+    const data = new Map<string, unknown>();
+    const prefs = new PrefsStore({ get: <T>(k: string) => data.get(k) as T | undefined, update: (k, v) => data.set(k, v) });
+    const other: HostToWebview[] = [];
+    const a = new HostBridge(
+      (m) => sent.push(m),
+      router,
+      { get: () => ({}), onDidChange: () => () => {}, update: () => {} } as never,
+      prefs,
+      env,
+    );
+    const b = new HostBridge(
+      (m) => other.push(m),
+      router,
+      { get: () => ({}), onDidChange: () => () => {}, update: () => {} } as never,
+      prefs,
+      env,
+    );
+    await a.handle({ type: 'ready' });
+    expect(sent.find((m) => m.type === 'prefs')).toEqual({ type: 'prefs', prefs: EMPTY_PREFS });
+    await a.handle({ type: 'prefs.set', patch: { harnessIntroSeen: true }, requestId: 'p1' });
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'p1', ok: true });
+    // quem pediu não recebe o eco; o outro painel recebe, e o próximo ready já vem com a escolha
+    expect(sent.filter((m) => m.type === 'prefs')).toHaveLength(1);
+    expect(other).toEqual([{ type: 'prefs', prefs: { ...EMPTY_PREFS, harnessIntroSeen: true } }]);
+    expect(new PrefsStore({ get: <T>(k: string) => data.get(k) as T | undefined, update: () => {} }).get().harnessIntroSeen).toBe(true);
+    a.dispose();
+    b.dispose();
+  });
 });
 
 describe('HostBridge: done (confirmação por requestId)', () => {

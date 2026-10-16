@@ -1,6 +1,7 @@
 import type { Appearance } from './appearance';
 import type { ImportSummary } from './backup';
 import type { ViewState } from './filters';
+import type { UiPrefs } from './prefs';
 import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from './harness';
 import type { HarnessUsage, SelectableKind } from './harnessSelection';
 import type { HookInput, McpServerInput } from './harnessCatalog';
@@ -38,6 +39,8 @@ import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, I
 export type WebviewToHost =
   | { type: 'ready' }
   | { type: 'view.set'; patch: Partial<ViewState> }
+  /** preferências da pessoa (avisos dispensados...), guardadas no host para valerem entre painéis e reinícios */
+  | { type: 'prefs.set'; patch: Partial<UiPrefs> }
   | { type: 'ui.showFilters' }
   /** instala o servidor MCP do board no global de uma ferramenta (padrão: a do projeto); nada entra no projeto */
   | { type: 'ui.connectAI'; tool?: AiTool }
@@ -345,6 +348,7 @@ export type HostToWebview =
   | { type: 'boardState'; state: BoardState; attachmentsBaseUri: string }
   | { type: 'ui.openCard'; cardId: Id }
   | { type: 'viewState'; view: ViewState }
+  | { type: 'prefs'; prefs: UiPrefs }
   | { type: 'error'; message: string }
   /** aviso informativo (algo deu certo ou precisa de atenção, sem ser erro) */
   | { type: 'notice'; message: string }

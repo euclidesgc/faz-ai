@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { ViewStateStore } from '../viewState';
+import type { PrefsStore } from '../prefs';
 import type { MessageRouter } from './messageRouter';
 import type { HostToWebview } from '../../shared/messages';
 import { WebviewBridge, webviewHtml, webviewOptions } from './webviewBridge';
@@ -15,6 +16,7 @@ export class BoardPanel {
     context: vscode.ExtensionContext,
     router: MessageRouter,
     viewState: ViewStateStore,
+    prefs: PrefsStore,
     folderName: string,
     pending?: HostToWebview,
   ): void {
@@ -28,7 +30,7 @@ export class BoardPanel {
       retainContextWhenHidden: true,
     });
     panel.iconPath = vscode.Uri.joinPath(context.extensionUri, 'media', 'kanban.svg');
-    BoardPanel.current = new BoardPanel(panel, context, router, viewState, pending);
+    BoardPanel.current = new BoardPanel(panel, context, router, viewState, prefs, pending);
   }
 
   /** Posta uma mensagem no painel aberto; sem painel, não faz nada. */
@@ -43,9 +45,10 @@ export class BoardPanel {
     context: vscode.ExtensionContext,
     router: MessageRouter,
     viewState: ViewStateStore,
+    prefs: PrefsStore,
     pending: HostToWebview | undefined,
   ) {
-    this.bridge = new WebviewBridge(panel.webview, router, viewState, () => {
+    this.bridge = new WebviewBridge(panel.webview, router, viewState, prefs, () => {
       if (pending) this.bridge.post(pending);
       pending = undefined;
     });

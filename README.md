@@ -1150,7 +1150,8 @@ Toda execução pelo board parte de **contexto vazio**: nenhuma regra, skill ou 
 ou do projeto entra por conta própria. Só entra o que você **envia ao board**. Ao abrir Configurações →
 **Harness de IA** pela primeira vez, o aviso **Como usar o Harness** resume isso e diz por onde
 começar (Indicar artefatos, um agente com ajuda, revisar as regras desligadas); **Entendi, não mostrar
-de novo** o dispensa, e **Como funciona** o traz de volta. As abas de assunto dizem no título quantos
+de novo** o dispensa (a escolha fica guardada por pessoa, para qualquer projeto, e não volta ao
+reabrir o board), e **Como funciona** o traz de volta. As abas de assunto dizem no título quantos
 artefatos estão no board e quantas regras esperam revisão, e um Board vazio leva direto a Projeto ou
 Global. A tela tem três níveis:
 

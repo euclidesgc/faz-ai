@@ -85,6 +85,7 @@ const viaBridge = () => false;
 const bridgeOnly = {
   ready: viaBridge,
   'view.set': viaBridge,
+  'prefs.set': viaBridge,
   'ui.showFilters': viaBridge,
   'ui.connectAI': viaBridge,
   'ui.fixProjectMcp': viaBridge,

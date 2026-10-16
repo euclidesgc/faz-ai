@@ -48,6 +48,7 @@ beforeEach(async () => {
     (m) => sent.push(m),
     router,
     { get: () => ({}), onDidChange: () => () => {}, update: () => {} } as never,
+    { get: () => ({}), onDidChange: () => () => {}, update: () => {} } as never,
     { attachmentsBaseUri: () => '' } as unknown as HostEnv,
   );
 });

@@ -634,4 +634,19 @@ describe('HarnessSettings: aviso de como usar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Como funciona' }));
     expect(note()).toBeInTheDocument();
   });
+
+  it('dispensar grava no host (prefs.set) e o que o host manda em prefs vale, para não voltar ao reabrir o painel', async () => {
+    useBoardStore.setState({ harnessIntroSeen: false });
+    renderTab('claude');
+    const note = () => screen.queryByRole('note', { name: 'Como usar o Harness' });
+    await userEvent.click(screen.getByRole('button', { name: 'Entendi, não mostrar de novo' }));
+    expect(lastSent('prefs.set')).toEqual({ type: 'prefs.set', patch: { harnessIntroSeen: true } });
+    // o painel reaberto começa sem saber e recebe as preferências do host no ready
+    act(() => useBoardStore.setState({ harnessIntroSeen: false }));
+    expect(note()).toBeInTheDocument();
+    act(() => {
+      useBoardStore.getState().setPrefs({ dontWarnYolo: false, yoloUntilName: '', harnessIntroSeen: true });
+    });
+    expect(note()).toBeNull();
+  });
 });

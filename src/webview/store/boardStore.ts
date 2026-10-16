@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type { BoardState, Id } from '../../shared/model';
 import { isLive } from '../../shared/selectors';
 import { EMPTY_FILTERS, applyFilters, type Filters, type ViewState } from '../../shared/filters';
+import { EMPTY_PREFS, type UiPrefs } from '../../shared/prefs';
 import { EMPTY_METRICS_FILTERS, SHOW_COST, type MetricsBreakdownDim, type MetricsFilters, type MetricsMeasure } from '../../shared/metrics';
 import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
 import { formatBytes, type ImportSummary } from '../../shared/backup';
@@ -81,15 +82,9 @@ interface UiState {
   openCardId: Id | null;
   /** modelo e esforço escolhidos no chat (valor do campo Modelo); null = o padrão da ferramenta */
   chatModel: string | null;
-  /** "não avisar novamente" ao ligar o modo autônomo (marcado no checkbox do diálogo de confirmação) */
-  dontWarnYolo: boolean;
-  /** o nome da coluna escolhida por último em "Até onde" ao ligar o modo autônomo; '' = até o fim */
-  yoloUntilName: string;
-  /** a pessoa já dispensou o aviso de como usar o Harness ("Entendi, não mostrar de novo") */
-  harnessIntroSeen: boolean;
 }
 
-interface BoardStore extends UiState, ViewState {
+interface BoardStore extends UiState, ViewState, UiPrefs {
   state: BoardState | null;
   /** o assunto aberto dentro da aba da ferramenta no Harness; fica na memória, não é guardado */
   harnessTopic: HarnessTopic;
@@ -135,9 +130,11 @@ interface BoardStore extends UiState, ViewState {
   pendingSettingsSection: string | null;
   clearPendingSettingsSection(): void;
   setSettingsNavCollapsed(collapsed: boolean): void;
+  /** preferências da pessoa: aplica aqui e grava no host (`prefs.set`), que as devolve ao abrir qualquer painel */
   setDontWarnYolo(value: boolean): void;
   setHarnessIntroSeen(seen: boolean): void;
   setYoloUntilName(name: string): void;
+  setPrefs(prefs: UiPrefs): void;
   selectParent(id: Id | null): void;
   /**
    * Seleção múltipla de cards no board (card 324): conceito novo e separado de `selectedParentId`
@@ -191,6 +188,11 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     set(patch);
     postToHost({ type: 'view.set', patch });
   };
+  /** aplica localmente e grava no host, por pessoa: o estado do webview some ao fechar o painel, e o aviso voltaria */
+  const setPref = (patch: Partial<UiPrefs>) => {
+    set(patch);
+    postToHost({ type: 'prefs.set', patch });
+  };
 
   return {
     state: null,
@@ -217,9 +219,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
-    dontWarnYolo: persisted?.dontWarnYolo ?? false,
-    harnessIntroSeen: persisted?.harnessIntroSeen ?? false,
-    yoloUntilName: persisted?.yoloUntilName ?? '',
+    ...EMPTY_PREFS,
     chatOpen: false,
     setChatOpen: (chatOpen) => set({ chatOpen }),
     setChatModel(chatModel) {
@@ -276,18 +276,10 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       set({ settingsNavCollapsed });
       persist(get());
     },
-    setDontWarnYolo(dontWarnYolo) {
-      set({ dontWarnYolo });
-      persist(get());
-    },
-    setHarnessIntroSeen(harnessIntroSeen) {
-      set({ harnessIntroSeen });
-      persist(get());
-    },
-    setYoloUntilName(yoloUntilName) {
-      set({ yoloUntilName });
-      persist(get());
-    },
+    setDontWarnYolo: (dontWarnYolo) => setPref({ dontWarnYolo }),
+    setHarnessIntroSeen: (harnessIntroSeen) => setPref({ harnessIntroSeen }),
+    setYoloUntilName: (yoloUntilName) => setPref({ yoloUntilName }),
+    setPrefs: (prefs) => set(prefs),
     selectParent: (id) => setShared({ selectedParentId: get().selectedParentId === id ? null : id }),
     toggleSelected(id) {
       const { state, selectedIds } = get();
@@ -343,9 +335,6 @@ function persist(s: BoardStore): void {
     settingsNavCollapsed: s.settingsNavCollapsed,
     openCardId: s.openCardId,
     chatModel: s.chatModel,
-    dontWarnYolo: s.dontWarnYolo,
-    yoloUntilName: s.yoloUntilName,
-    harnessIntroSeen: s.harnessIntroSeen,
   };
   setUiState(ui);
 }
@@ -357,6 +346,7 @@ export function useHostSync(): void {
       const s = useBoardStore.getState();
       if (msg.type === 'boardState') s.setState(msg.state, msg.attachmentsBaseUri);
       else if (msg.type === 'viewState') s.setViewState(msg.view);
+      else if (msg.type === 'prefs') s.setPrefs(msg.prefs);
       else if (msg.type === 'error') {
         s.setError(msg.message);
         s.setBackupBusy(null);

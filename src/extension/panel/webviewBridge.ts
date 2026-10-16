@@ -5,6 +5,7 @@ import * as os from 'node:os';
 import type { HostToWebview, WebviewToHost } from '../../shared/messages';
 import { HostBridge, type HostEnv } from '../host/hostBridge';
 import type { ViewStateStore } from '../viewState';
+import type { PrefsStore } from '../prefs';
 import type { MessageRouter } from './messageRouter';
 
 export type WebviewKind = 'board' | 'filters' | 'chat';
@@ -116,8 +117,8 @@ export class WebviewBridge implements vscode.Disposable {
   private bridge: HostBridge;
   private disposables: vscode.Disposable[] = [];
 
-  constructor(webview: vscode.Webview, router: MessageRouter, viewState: ViewStateStore, onReady?: () => void) {
-    this.bridge = new HostBridge((msg) => void webview.postMessage(msg), router, viewState, vscodeEnv(webview, router), onReady);
+  constructor(webview: vscode.Webview, router: MessageRouter, viewState: ViewStateStore, prefs: PrefsStore, onReady?: () => void) {
+    this.bridge = new HostBridge((msg) => void webview.postMessage(msg), router, viewState, prefs, vscodeEnv(webview, router), onReady);
     webview.onDidReceiveMessage((msg: WebviewToHost) => void this.bridge.handle(msg), null, this.disposables);
   }
 

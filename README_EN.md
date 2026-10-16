@@ -1206,7 +1206,8 @@ Every run started by the board starts from an **empty context**: no rule, skill 
 machine or the project gets in on its own. Only what you **send to the board** gets in. The first
 time you open Configurações → **Harness de IA**, the **Como usar o Harness** (how to use the Harness)
 notice sums this up and says where to start (Indicar artefatos, an agent with help, reviewing the rules
-that entered off); **Entendi, não mostrar de novo** dismisses it and **Como funciona** brings it back.
+that entered off); **Entendi, não mostrar de novo** dismisses it (the choice is kept per person, for
+any project, and does not come back when the board is reopened) and **Como funciona** brings it back.
 The subject tabs say in their title how many artifacts are on the board and how many rules await
 review, and an empty Board goes straight to Projeto or Global. The screen has three levels:
 
