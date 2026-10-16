@@ -639,8 +639,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     conflicts: () => mergeWatcher.pendingConflicts(),
   });
   // a tentativa de resolver o conflito conta no fim da execução, salvo quando o limite de uso a interrompeu
-  // (`usageLimited` é gravado antes de os ouvintes do fim serem chamados)
-  runner.onDidFinish((cardId, mode) => mergeWatcher.onRunFinished(cardId, mode, runner.usageLimited));
+  runner.onDidFinish((cardId, mode, finish) => mergeWatcher.onRunFinished(cardId, mode, finish.usageLimit));
   // publica a próxima rodada agendada; a guarda em `setHeartbeat` (só notifica se mudou) evita o laço
   // router.onDidChange → publishHeartbeat → setHeartbeat → notify
   const publishHeartbeat = () => router.setHeartbeat({ nextRoundAt: heartbeat.nextRoundAt });

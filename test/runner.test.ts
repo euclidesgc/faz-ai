@@ -1532,6 +1532,187 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
   });
 });
 
+/**
+ * A pausa por limite de uso do plano (história #800): o runner a registra quando a execução esbarra no limite sem
+ * reserva, apaga quando uma execução termina bem, marca a execução de teste depois que ela vence e diz na conversa quem
+ * repete a execução e a partir de quando. Relógio fixo: 16/10/2026 13:45 no fuso local.
+ */
+describe('pausa por limite de uso (história #800)', () => {
+  const MIN = 60_000;
+  const at = (h: number, m: number) => new Date(2026, 9, 16, h, m).getTime();
+  let now: number;
+  let limited: AiRunner;
+  const limitResult = (text = "You've hit your session limit · resets 1:50pm") =>
+    JSON.stringify({ type: 'result', is_error: true, result: text });
+  const sonnet = () => router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === 'sonnet')!;
+  const fable = () => router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === 'fable')!;
+  const modeloField = () => router.snapshot().fieldDefs.find((f) => f.kind === 'model')!;
+  const withFallback = () => {
+    router.handle({ type: 'field.setValue', cardId: storyId, fieldId: modeloField().id, value: modelValue(sonnet().id, 'medium') });
+    router.handle({
+      type: 'settings.modelRules.set',
+      rules: [
+        {
+          id: 'r1',
+          name: 'Regra',
+          enabled: true,
+          groups: [[{ fieldId: TYPE_CONDITION, op: 'is', value: 'História' }]],
+          model: modelValue(sonnet().id, 'medium'),
+          fallback: modelValue(fable().id, 'low'),
+        },
+      ],
+    });
+  };
+
+  beforeEach(() => {
+    now = at(13, 45);
+    limited = new AiRunner(router, { ...deps, now: () => now });
+  });
+
+  it('sem reserva, registra a pausa até a renovação + 3 min e o ouvinte sabe que foi o limite', () => {
+    const finishes: unknown[] = [];
+    limited.onDidFinish((_id, _mode, finish) => finishes.push(finish));
+    limited.start(storyId);
+    procs[0]!.emit(limitResult());
+    procs[0]!.exit(1);
+    expect(router.snapshot().usageLimit).toMatchObject({ tool: 'claude', resumeAt: at(13, 53), source: 'reset', probe: null });
+    expect(card().status).toBe('ready');
+    expect(finishes).toEqual([{ usageLimit: true }]);
+    expect(log).toContain('Limite de uso do Claude Code: execuções suspensas até 13:53 (renovação 13:50 + 3 min).');
+  });
+
+  it('sem horário na saída, a pausa usa o backoff', () => {
+    limited.start(storyId);
+    procs[0]!.emit(limitResult('usage limit reached'));
+    procs[0]!.exit(1);
+    expect(router.snapshot().usageLimit).toMatchObject({ resumeAt: now + 5 * MIN, source: 'backoff', attempts: 1 });
+    expect(log).toContain('Limite de uso do Claude Code: execuções suspensas até 13:50 (sem horário na saída; espera de 5 min).');
+  });
+
+  it('com reserva, repete com ela e não pausa; a reserva também no limite pausa (RF8)', () => {
+    withFallback();
+    const finishes: unknown[] = [];
+    limited.onDidFinish((_id, _mode, finish) => finishes.push(finish));
+    limited.start(storyId);
+    procs[0]!.emit(limitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(2);
+    expect(router.snapshot().usageLimit).toBeNull();
+    expect(finishes).toEqual([]);
+
+    procs[1]!.emit(limitResult());
+    procs[1]!.exit(1);
+    expect(router.snapshot().usageLimit?.resumeAt).toBe(at(13, 53));
+    expect(finishes).toEqual([{ usageLimit: true }]);
+  });
+
+  it('a falha comum não registra pausa e o ouvinte recebe usageLimit: false', () => {
+    const finishes: unknown[] = [];
+    limited.onDidFinish((_id, _mode, finish) => finishes.push(finish));
+    limited.start(storyId);
+    procs[0]!.exit(2);
+    expect(router.snapshot().usageLimit).toBeNull();
+    expect(card().status).toBe('blocked');
+    expect(finishes).toEqual([{ usageLimit: false }]);
+  });
+
+  it('uma execução que termina bem apaga a pausa (RF7)', () => {
+    router.recordUsageLimit('claude', at(13, 50), now);
+    limited.start(storyId);
+    ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
+    procs[0]!.exit(0);
+    expect(router.snapshot().usageLimit).toBeNull();
+    expect(log).toContain('Limite de uso do Claude Code renovado: execuções retomadas.');
+  });
+
+  it('interrompida pela pessoa: não cria nem apaga a pausa', () => {
+    limited.start(storyId);
+    limited.stop(storyId);
+    expect(router.snapshot().usageLimit).toBeNull();
+    router.recordUsageLimit('claude', at(13, 50), now);
+    limited.start(storyId);
+    limited.stop(storyId);
+    expect(router.snapshot().usageLimit).not.toBeNull();
+  });
+
+  describe('mensagem na conversa: quem repete e quando (RF13)', () => {
+    const body = () => lastMessage()!.body.split('\n')[0];
+
+    it('história em modo autônomo: o autopiloto', () => {
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+      limited.start(storyId);
+      procs[0]!.emit(limitResult());
+      procs[0]!.exit(1);
+      expect(body()).toBe(
+        'O limite de uso do plano do Claude Code esgotou. O card voltou para a IA, e o autopiloto repete a execução a partir das 13:53.',
+      );
+    });
+
+    it('fora do modo autônomo, com o heartbeat ligado: o heartbeat', () => {
+      router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true } } });
+      limited.start(storyId);
+      procs[0]!.emit(limitResult());
+      procs[0]!.exit(1);
+      expect(body()).toBe(
+        'O limite de uso do plano do Claude Code esgotou. O card voltou para a IA, e o heartbeat repete a execução a partir das 13:53.',
+      );
+    });
+
+    it('com o heartbeat desligado: a pessoa chama de novo', () => {
+      router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: false } } });
+      limited.start(storyId);
+      procs[0]!.emit(limitResult());
+      procs[0]!.exit(1);
+      expect(body()).toBe(
+        'O limite de uso do plano do Claude Code esgotou. O card voltou para a IA: chame a IA de novo a partir das 13:53 (o heartbeat está desligado).',
+      );
+      // o fim da saída da ferramenta continua anexado, nas linhas seguintes
+      expect(lastMessage()!.body).toContain('Fim da saída do Claude Code');
+    });
+
+    it('renovação noutro dia: a data vai na frente da hora', () => {
+      now = at(23, 0);
+      limited.start(storyId);
+      procs[0]!.emit(limitResult("You've hit your session limit · resets 1:50am"));
+      procs[0]!.exit(1);
+      expect(body()).toMatch(/a partir das 17\/10 01:53/);
+    });
+  });
+
+  describe('execução de teste depois do vencimento (RF6)', () => {
+    it('a primeira execução depois do vencimento é o teste; o fim bem-sucedido libera e apaga a pausa', () => {
+      router.recordUsageLimit('claude', at(13, 40), at(13, 30));
+      limited.start(storyId);
+      expect(router.snapshot().usageLimit?.probe).toBe(storyId);
+      ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
+      procs[0]!.exit(0);
+      expect(router.snapshot().usageLimit).toBeNull();
+    });
+
+    it('o teste que esbarra de novo renova a pausa e libera o teste', () => {
+      router.recordUsageLimit('claude', null, at(13, 30)); // backoff até 13:35, já vencido
+      limited.start(storyId);
+      procs[0]!.emit(limitResult('usage limit reached'));
+      procs[0]!.exit(1);
+      expect(router.snapshot().usageLimit).toMatchObject({ probe: null, attempts: 2, resumeAt: now + 10 * MIN });
+    });
+
+    it('o teste que falha por outro motivo libera o teste e mantém a pausa vencida', () => {
+      router.recordUsageLimit('claude', at(13, 40), at(13, 30));
+      limited.start(storyId);
+      procs[0]!.exit(2);
+      expect(router.snapshot().usageLimit).toMatchObject({ probe: null, resumeAt: at(13, 43) });
+    });
+
+    it('com a pausa ainda valendo, a execução à mão roda e não é o teste', () => {
+      router.recordUsageLimit('claude', at(13, 50), now);
+      limited.start(storyId);
+      expect(procs).toHaveLength(1);
+      expect(router.snapshot().usageLimit?.probe).toBeNull();
+    });
+  });
+});
+
 describe('parseRunner', () => {
   it('autopilotPaused ausente ou inválido vira false', () => {
     expect(parseRunner(null).autopilotPaused).toBe(false);

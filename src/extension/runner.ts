@@ -6,6 +6,7 @@ import { columnOf, isLive } from '../shared/selectors';
 import { isAtYoloStop, isWithHuman, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../shared/story';
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
+import { LIMIT_SLACK_MS, backoffMs, limitClock, resetAtOf, type UsageLimitPause } from '../shared/usageLimit';
 import { executionPlan } from './execution';
 import { effortToRun } from '../shared/execution';
 import { modelDisplay, modelValue, parseModelValue, suggestModelRule } from '../shared/models';
@@ -54,6 +55,14 @@ export interface RunnerDeps {
   bridgePath?: string;
   /** caminho do node que roda o bridge; sem ele, `node`, resolvido pelo PATH de quem inicia o servidor */
   nodePath?: string;
+  /** o relógio da pausa por limite de uso; nos testes, um relógio fixo */
+  now?: () => number;
+}
+
+/** Como a execução terminou, para quem ouve o fim: o autopiloto não conta o fim por limite de uso no disjuntor. */
+export interface RunFinish {
+  /** a execução esbarrou no limite de uso do plano e a pausa da ferramenta foi registrada */
+  usageLimit: boolean;
 }
 
 /** Par modelo/esforço no nome que a ferramenta entende (`ExecManifest.model`), não o id do catálogo. */
@@ -81,6 +90,8 @@ interface Run {
    * (uma tentativa só).
    */
   fallbackPending: ToolModel | null;
+  /** a pausa que esta execução registrou ao esbarrar no limite de uso; undefined enquanto não registrou */
+  limitPause?: UsageLimitPause;
 }
 
 const RUNNER_AUTHOR = 'Faz AI';
@@ -298,14 +309,23 @@ export const cardPrompt = (
   ].join('\n');
 
 /**
+ * A execução terminou por limite de uso do plano: o leitor da ferramenta marcou `usageLimitReached` (sinal estrutural,
+ * nunca pelo código de saída) e ela falhou ou saiu sem responder. Interrompida pela pessoa não conta.
+ */
+const limitHit = (end: AiRunEnd, replied: boolean): boolean =>
+  !end.stopped && end.report.usageLimitReached && (end.timedOut || !!end.error || end.code !== 0 || !replied);
+
+/** A execução terminou bem: a ferramenta respondeu sem erro nem limite. É o que mostra que o limite renovou (RF7). */
+const succeeded = (end: AiRunEnd): boolean =>
+  !end.stopped && !end.timedOut && !end.error && end.code === 0 && !end.report.usageLimitReached;
+
+/**
  * Roda a ferramenta de IA do projeto em segundo plano para um card. Uma execução por card; durante
  * ela o card fica "Em execução". Não depende da API do VSCode.
  */
 export class AiRunner {
   private runs = new Map<string, Run>();
-  private finishListeners: ((cardId: string, mode: AiRunMode) => void)[] = [];
-  /** a última execução terminou por limite de uso do plano: o heartbeat não insiste até uma execução voltar a funcionar */
-  usageLimited = false;
+  private finishListeners: ((cardId: string, mode: AiRunMode, finish: RunFinish) => void)[] = [];
 
   constructor(
     private router: MessageRouter,
@@ -490,6 +510,13 @@ export class AiRunner {
       origin,
     };
     this.runs.set(cardId, run);
+    // a pausa por limite já venceu e ninguém está testando: esta execução é o teste, e os despachantes esperam
+    // ela acabar antes de soltar as outras (a execução pedida à mão também serve de teste: ela não é recusada)
+    const limit = state.usageLimit;
+    if (limit && limit.tool === state.board.aiTool && limit.resumeAt <= this.now() && limit.probe === null) {
+      this.router.setLimitProbe(cardId);
+      log('Limite de uso vencido: esta execução testa se ele renovou antes de soltar a fila.');
+    }
     this.setStatus(cardId, 'running', tool.label);
     this.publish();
 
@@ -516,11 +543,16 @@ export class AiRunner {
         ),
       );
       let retry: ToolModel | undefined;
-      this.usageLimited = !end.stopped && !!end.report.usageLimitReached;
+      const replied = this.aiMessages(cardId) > messagesBefore;
       try {
         // o card continua "em execução" para o log enquanto o desfecho é aplicado: o bloqueio e a
         // mudança de status que explicam o fim da execução ficam ligados a ela
-        retry = this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
+        retry = this.settle(cardId, run, end, replied, tool.label);
+        // o limite esgotou sem reserva para repetir: a pausa vale mesmo quando a IA já tinha mudado o status
+        // do card (settle não chega ao caminho do limite nesse caso)
+        if (!retry && limitHit(end, replied)) this.recordLimit(run, end, tool.label);
+        else if (succeeded(end) && this.router.clearUsageLimit(state.board.aiTool))
+          this.deps.log(`Limite de uso do ${tool.label} renovado: execuções retomadas.`);
       } finally {
         // a limpeza precisa acontecer antes da retentativa: start() recusa começar com o card ainda em `this.runs`
         this.runs.delete(cardId);
@@ -540,13 +572,17 @@ export class AiRunner {
           this.block(cardId, `Não foi possível repetir a execução com o modelo reserva: ${e instanceof Error ? e.message : String(e)}`);
         }
       }
+      // qualquer fim do teste (bem, limite de novo, falha comum, interrompido) libera os despachantes: com a pausa
+      // apagada ou renovada a fila segue a regra nova; com ela ainda vencida, o próximo despacho é outro teste
+      if (this.router.snapshot().usageLimit?.probe === cardId) this.router.setLimitProbe(null);
       this.publish();
-      this.finishListeners.forEach((fn) => fn(cardId, run.mode));
+      const finish: RunFinish = { usageLimit: !!run.limitPause };
+      this.finishListeners.forEach((fn) => fn(cardId, run.mode, finish));
     });
   }
 
   /** Avisa quando a execução de um card termina, seja como for. Devolve uma função para cancelar o aviso. */
-  onDidFinish(listener: (cardId: string, mode: AiRunMode) => void): () => void {
+  onDidFinish(listener: (cardId: string, mode: AiRunMode, finish: RunFinish) => void): () => void {
     this.finishListeners.push(listener);
     return () => {
       this.finishListeners = this.finishListeners.filter((l) => l !== listener);
@@ -620,8 +656,13 @@ export class AiRunner {
         : code !== 0
           ? `O ${toolLabel} terminou com erro (código ${code}).${output}`
           : null;
+    // o limite esgotado vale também quando a CLI sai com código 0 sem ter respondido: o que importa é o
+    // sinal estrutural do leitor, não o código de saída
+    const usageLimited = limitHit(end, replied);
     // refinar e resumir não passam a vez, nem quando falham: o card volta ao status que tinha, e a falha fica na conversa
     if (run.mode === 'refine' || run.mode === 'summarize') {
+      // refinar e resumir também esbarram no limite da ferramenta: a pausa vale para eles (o heartbeat insistiria)
+      if (usageLimited) this.recordLimit(run, end, toolLabel);
       const summarize = run.mode === 'summarize';
       if (failure)
         this.router.handle(
@@ -654,9 +695,6 @@ export class AiRunner {
     // retentativa assume em vez de bloquear (RF-03 exige que nenhuma outra falha caia aqui: só quando o
     // leitor da ferramenta marcou `usageLimitReached`, nunca pelo código de saída ou por heurística do runner).
     // E só quando a execução falhou: uma que terminou bem não é refeita com a reserva
-    // o limite esgotado vale também quando a CLI sai com código 0 sem ter respondido: o que importa é o
-    // sinal estrutural do leitor, não o código de saída
-    const usageLimited = end.report.usageLimitReached && (!!failure || !replied);
     if (usageLimited && run.fallbackPending) {
       const state = this.router.snapshot();
       const principal = toolModelDisplay(state, run.model);
@@ -668,14 +706,11 @@ export class AiRunner {
       return run.fallbackPending;
     }
     // limite de uso do plano sem reserva: o limite renova sozinho, então o card volta para a IA em vez de
-    // ficar bloqueado esperando a pessoa (o heartbeat tenta de novo na próxima rodada)
+    // ficar bloqueado esperando a pessoa, e a pausa diz a partir de quando a fila tenta de novo
     if (usageLimited) {
+      const pause = this.recordLimit(run, end, toolLabel);
       this.router.handle(
-        {
-          type: 'comment.add',
-          cardId,
-          body: `O limite de uso do plano do ${toolLabel} esgotou. O card voltou para a IA e a execução é repetida pelo heartbeat quando o limite renovar.${output}`,
-        },
+        { type: 'comment.add', cardId, body: `${this.limitMessage(card, toolLabel, pause)}${output}` },
         { author: RUNNER_AUTHOR, source: 'ai' },
       );
       return void this.router.handle(
@@ -708,6 +743,42 @@ export class AiRunner {
     const currentStory = currentCard && storyOf(current, currentCard);
     if (currentStory && isYolo(current, currentCard) && isWithHuman(currentStory)) return;
     this.block(cardId, `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card.${output}`);
+  }
+
+  private now(): number {
+    return (this.deps.now ?? Date.now)();
+  }
+
+  /**
+   * Registra (uma vez por execução) a pausa da ferramenta pelo limite de uso: até a renovação que a saída informou, mais
+   * a folga, ou o degrau seguinte do backoff. O log diz até quando e por quê.
+   */
+  private recordLimit(run: Run, end: AiRunEnd, toolLabel: string): UsageLimitPause {
+    if (run.limitPause) return run.limitPause;
+    const now = this.now();
+    const resetAt = resetAtOf(end.report.usageLimitReset, now);
+    const pause = this.router.recordUsageLimit(this.router.snapshot().board.aiTool, resetAt, now);
+    run.limitPause = pause;
+    const until = limitClock(pause.resumeAt, now);
+    this.deps.log(
+      pause.source === 'reset'
+        ? `Limite de uso do ${toolLabel}: execuções suspensas até ${until} (renovação ${limitClock(pause.resumeAt - LIMIT_SLACK_MS, now)} + ${LIMIT_SLACK_MS / 60_000} min).`
+        : `Limite de uso do ${toolLabel}: execuções suspensas até ${until} (sem horário na saída; espera de ${backoffMs(pause.attempts) / 60_000} min).`,
+    );
+    return pause;
+  }
+
+  /**
+   * A mensagem do limite na conversa: quem repete a execução e a partir de quando. Uma linha só, porque a tela a traduz
+   * linha a linha (os textos estão em `usageLimitNotices`, na webview).
+   */
+  private limitMessage(card: Card, toolLabel: string, pause: UsageLimitPause): string {
+    const state = this.router.snapshot();
+    const when = limitClock(pause.resumeAt, this.now());
+    const head = `O limite de uso do plano do ${toolLabel} esgotou.`;
+    if (isYolo(state, card)) return `${head} O card voltou para a IA, e o autopiloto repete a execução a partir das ${when}.`;
+    if (state.board.runner.heartbeat) return `${head} O card voltou para a IA, e o heartbeat repete a execução a partir das ${when}.`;
+    return `${head} O card voltou para a IA: chame a IA de novo a partir das ${when} (o heartbeat está desligado).`;
   }
 
   /** As sub-tarefas da história que a sessão encerrada deixou "Em execução" voltam para a IA. */
