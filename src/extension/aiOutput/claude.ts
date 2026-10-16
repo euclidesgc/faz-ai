@@ -26,6 +26,7 @@
 // que a medição não aconteceu — quem sabe é o transporte (`measured.ts`), que põe ali a frase do
 // erro de domínio. Não complete este campo neste arquivo.
 import { USAGE_LIMIT_TEXT as SHARED_USAGE_LIMIT_TEXT } from '../../shared/conversation';
+import { bashCommandTerms } from '../../shared/bashCommand';
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
 import { asList, asNumber, asObject, asText, cut, type Json } from './json';
 import type { OutputReader, OutputStream, ReaderDeps } from './reader';
@@ -171,6 +172,8 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
   const tasks = new Map<string, string>();
   /** `kind\0name` → chamadas */
   const inventory = new Map<string, number>();
+  /** comando-base de Bash (#604) → chamadas */
+  const bashCounts = new Map<string, number>();
   /** os blocos de texto do assistente, que são a resposta quando nenhum `result` chegou */
   const saidText: string[] = [];
   /** `message.id` → consumo daquela mensagem, para o caso de o fluxo truncar antes do `result` */
@@ -213,6 +216,8 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
         const item = inventoryOf(name, input);
         // a chamada de `Agent` conta uma vez, como subagente, e não também como ferramenta
         count(item.kind, item.name);
+        const bashCommand = name === 'Bash' ? asText(input?.command) : null;
+        if (bashCommand) for (const term of bashCommandTerms(bashCommand)) bashCounts.set(term, (bashCounts.get(term) ?? 0) + 1);
         lines.push(toolLine(name, input));
       }
     }
@@ -335,6 +340,7 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
         const [kind, name] = key.split('\u0000');
         return { kind: kind as InventoryKind, name: name!, calls };
       });
+      const bashCommands = [...bashCounts.entries()].map(([command, calls]) => ({ command, calls }));
       // `num_turns` é do segmento: é o único campo do `result` que se soma
       const turned = results.filter((r) => r.turns !== null);
       const turns = turned.length ? turned.reduce((sum, r) => sum + r.turns!, 0) : null;
@@ -366,6 +372,7 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
             costUsd: informed,
           },
           inventory: items,
+          bashCommands,
           answer,
           reason: null,
           usageLimitReached,
@@ -384,6 +391,7 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
           measure: 'partial',
           consumption: { ...tokens, turns, sessionId, costUsd: null },
           inventory: items,
+          bashCommands,
           answer,
           reason: null,
           usageLimitReached,
@@ -393,7 +401,7 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
       // leu eventos e chamadas de ferramenta, mas nenhum número: o inventário vale, o consumo não
       // existe. `none` só quando não há nem uma coisa nem a outra — é a invariante que impede "não
       // medido" de parecer "medido e zero".
-      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, usageLimitReached };
+      if (items.length) return { measure: 'partial', consumption: null, inventory: items, bashCommands, answer, reason: null, usageLimitReached };
       return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached };
     },
 
