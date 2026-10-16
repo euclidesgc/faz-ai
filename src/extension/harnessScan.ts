@@ -135,17 +135,21 @@ export function importsOf(file: string, homeDir: string, depth = 1, seen = new S
 
 const MAX_SKILL_FILES = 100;
 
-/** Arquivos de apoio da pasta de uma skill (tudo menos o SKILL.md e arquivos ocultos), relativos a ela. */
-function skillFiles(dir: string, rel = '', depth = 0): string[] {
+/**
+ * Arquivos de apoio da pasta de uma skill (tudo menos o SKILL.md e arquivos ocultos), relativos a ela e
+ * sem limite de quantidade: a cópia para o board precisa saber o que ficou de fora pelos limites.
+ */
+export function listSkillFiles(dir: string, rel = '', depth = 0): string[] {
   if (depth > 3) return [];
-  return entries(rel ? path.join(dir, rel) : dir)
-    .flatMap((n) => {
-      if (n.startsWith('.') || n === 'node_modules' || (!rel && n === 'SKILL.md')) return [];
-      const child = rel ? `${rel}/${n}` : n;
-      return isDir(path.join(dir, child)) ? skillFiles(dir, child, depth + 1) : [child];
-    })
-    .slice(0, MAX_SKILL_FILES);
+  return entries(rel ? path.join(dir, rel) : dir).flatMap((n) => {
+    if (n.startsWith('.') || n === 'node_modules' || (!rel && n === 'SKILL.md')) return [];
+    const child = rel ? `${rel}/${n}` : n;
+    return isDir(path.join(dir, child)) ? listSkillFiles(dir, child, depth + 1) : [child];
+  });
 }
+
+/** Os arquivos de apoio que o inventário mostra: os primeiros 100. */
+const skillFiles = (dir: string): string[] => listSkillFiles(dir).slice(0, MAX_SKILL_FILES);
 
 /** O comando de um hook. */
 export const hookCommand = (h: Record<string, unknown>): string => (typeof h.command === 'string' ? h.command : '');
@@ -163,7 +167,7 @@ function hookEntries(value: unknown): { matcher: string; command: string; type: 
 }
 
 /** O que o servidor MCP roda ou onde ele está, sem argumentos, variáveis ou cabeçalhos (podem ter segredos). */
-function mcpSummary(server: unknown): string {
+export function mcpSummary(server: unknown): string {
   const s = obj(server);
   if (typeof s.command === 'string') return s.command;
   if (typeof s.url === 'string') return s.url.split('?')[0]!;
