@@ -6,8 +6,9 @@ What changed in each version of Faz AI Kanban, newest first. The interface exist
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
 ## Unreleased
-
-- **The fixed notes in `get_card` get short and the full text moves to per-topic skills (#588).** On every `get_card` the AI re-read the same instructions about harness, required rules and skills, Implementation rounds, model, working folder, pull request base and autonomous mode. Now each note is one sentence that only shows when the card's state calls for it and points to the skill (`faz-ai-harness-do-card`, `faz-ai-workspace-e-pr`, `faz-ai-implementacao-rodadas`, `faz-ai-revisao-e-homologacao`, `faz-ai-modo-autonomo`); the full text lives there, and `faz-ai-fluxo` got leaner. Installing the flow skill (button or `install_flow_skill`) installs the whole set. Card data does not change; in a test `get_card` of an autonomous story with subtasks, the notes dropped from 2,515 to about 1,400 characters (the response, from 4,573 to 3,232). **Behavior change:** anyone who already has `faz-ai-fluxo` installed must click install again (it keeps their edited copy) to get the per-topic skills.
+<<<<<<< HEAD
+=======
+>>>>>>> origin/develop
 - **The Criticidade (criticality) field is gone from the board.** Since #441 it no longer changed the flow (nothing holds a core story in autonomous mode) and only served as a signal for the review; gone with it are the **Áreas críticas (núcleo)** rule, `criticalPaths` in `update_rules`, `criticalAreas` in `get_card` and the flow skill section. **Atualizar board** (update board, version 11) deletes the field and its values wherever it still exists.
 - **`get_card` accepts `only`** with the blocks of interest (`phase`, `subtasks`, `checklist`, `links`, `conversation`, `attachments`): title, description, fields, model, harness and workspace always come. The AI can re-read just the conversation, for example, without repeating the whole card in its context.
 - **The automatic summary also looks at the conversation size.** Besides three or more messages since the last summary, two messages that add up to a lot of text (12,000 characters, at least one from the AI) already call for the summary before the next phase: what weighs on the context is the text, not the count.
