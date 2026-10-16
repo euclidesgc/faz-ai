@@ -53,6 +53,9 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'harness_selection', where: 'board_id = ?', hasId: false },
   // as pastas importadas são caminhos absolutos desta máquina: vão junto, e na outra máquina os artefatos ficam ausentes até a pessoa reimportar
   { name: 'harness_imports', where: 'board_id = ?', hasId: false, since: 30 },
+  // os artefatos do board (#615); a limpeza dos segredos dos MCPs e a validação ficam na sub-tarefa de export
+  { name: 'board_artifacts', where: 'board_id = ?', hasId: true, since: 33 },
+  { name: 'board_artifact_files', where: 'artifact_id IN (SELECT id FROM board_artifacts WHERE board_id = ?)', hasId: false, since: 33 },
 ];
 
 /** Tabelas que ficam fora do arquivo mesmo tendo `board_id` (o teste do `sqlite_master` as ignora). */

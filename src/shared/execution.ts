@@ -32,7 +32,7 @@ export interface ExecProfile {
   /** agente usado quando nem o card nem a coluna indicam um */
   isDefault: boolean;
   /** de onde o arquivo veio; `builtin` é o agente embutido, sem arquivo */
-  scope: 'project' | 'user' | 'builtin';
+  scope: 'project' | 'user' | 'builtin' | 'board';
   /** caminho absoluto do arquivo; vazio no embutido */
   path: string;
 }

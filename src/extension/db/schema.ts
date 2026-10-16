@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 32;
+export const SCHEMA_VERSION = 33;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -407,6 +407,37 @@ const MIGRATIONS: Record<number, string> = {
     -- quando a IA refinou o card: o heartbeat refina sozinho os cards do Backlog que ainda não foram
     -- refinados, e o campo é o que o impede de refinar o mesmo card duas vezes
     ALTER TABLE cards ADD COLUMN refined_at INTEGER;
+  `,
+  33: `
+    -- #615: o board guarda os próprios artefatos (regras, skills, agentes, servidores MCP), num formato
+    -- neutro, em vez de referenciar o arquivo da ferramenta. A cópia do que estava em harness_selection é
+    -- feita pelo host na abertura (o SQL não lê arquivos), como a dos perfis da migração 26.
+    CREATE TABLE IF NOT EXISTS board_artifacts (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,            -- 'rule' | 'skill' | 'agent' | 'mcp' (sem CHECK: tipo novo não pede migração)
+      name TEXT NOT NULL,            -- regra: o caminho de origem como o campo Rules o guarda
+      description TEXT NOT NULL DEFAULT '',
+      body TEXT NOT NULL DEFAULT '',
+      meta_json TEXT NOT NULL DEFAULT '{}',   -- agente: AgentMeta; mcp: {server}; skill gerada: {generated}
+      usage TEXT NOT NULL,           -- 'always' | 'contextual' | 'off' (sem CHECK: ver a migração 30)
+      origin TEXT NOT NULL DEFAULT '',        -- location de onde veio; '' = criado no board
+      origin_tool TEXT NOT NULL DEFAULT '',
+      missing INTEGER NOT NULL DEFAULT 0,
+      skipped_json TEXT NOT NULL DEFAULT '[]',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE (board_id, kind, name)
+    );
+    -- arquivos de apoio das skills; binário em base64
+    CREATE TABLE IF NOT EXISTS board_artifact_files (
+      artifact_id TEXT NOT NULL REFERENCES board_artifacts(id) ON DELETE CASCADE,
+      path TEXT NOT NULL,            -- relativo à pasta da skill, com '/'
+      content TEXT NOT NULL,
+      encoding TEXT NOT NULL CHECK (encoding IN ('utf8','base64')),
+      size INTEGER NOT NULL,         -- bytes do original
+      PRIMARY KEY (artifact_id, path)
+    );
   `,
 };
 
