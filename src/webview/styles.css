@@ -255,13 +255,20 @@ button.active {
 .terminal-mark {
   color: var(--success);
 }
+/* checkbox "selecionar todos", primeiro do cabeçalho: a margem à esquerda leva a caixa para a mesma linha
+   vertical das caixas dos cards (padding da coluna 8px + borda do card 1px + faixa do card 8px = 17px, e
+   aqui são 8px do cabeçalho + 9px) */
 .column-select {
   flex: none;
   width: 14px;
   height: 14px;
-  margin: 0;
+  margin: 0 0 0 calc(var(--sp-8) + 1px);
   accent-color: var(--accent);
   cursor: pointer;
+}
+/* coluna sem cards vivos: a caixa some, mas o lugar dela fica reservado no cabeçalho */
+.column-select--empty {
+  visibility: hidden;
 }
 .column-count {
   color: var(--muted);
