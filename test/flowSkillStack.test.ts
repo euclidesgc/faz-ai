@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { FLOW_SKILL } from '../src/extension/flowSkill';
+import { FLOW_TEXT } from './flowSkillText';
 
 // A pilha de pull requests e o hotfix, como a skill do fluxo os ensina.
 
-const homologacao = FLOW_SKILL.body.slice(FLOW_SKILL.body.indexOf('## Homologação'), FLOW_SKILL.body.indexOf('## Modo autônomo'));
+const homologacao = FLOW_TEXT.slice(FLOW_TEXT.indexOf('## Homologação'), FLOW_TEXT.indexOf('## Modo autônomo'));
 
 describe('skill', () => {
   it('skill: a pilha diz que a base muda quando a anterior é concluída, manda git merge da nova base e proíbe rebase e push forçado', () => {
-    const corpo = FLOW_SKILL.body.replace(/\s+/g, ' ');
+    const corpo = FLOW_TEXT.replace(/\s+/g, ' ');
     const trechos = corpo.split('Quando a anterior é concluída');
     expect(trechos.length - 1).toBe(2);
     for (const t of trechos.slice(1)) {

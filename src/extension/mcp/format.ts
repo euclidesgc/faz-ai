@@ -250,7 +250,7 @@ function executionOf(s: BoardState, c: Card) {
       ...(m.tools.length ? { tools: m.tools } : {}),
       ...(m.deniedTools.length ? { deniedTools: m.deniedTools } : {}),
       enforcedByBoardRun: EXEC_ASPECTS.filter((a) => how[a.id] === 'enforced').map((a) => a.id),
-      note: 'Agente do board que executa o card (`profile` é o nome; `agentFile` é o arquivo com as instruções dele). Toda execução pelo board parte de contexto vazio: só o servidor do board, os servidores MCP listados e o que está em requiredRules e requiredSkills. Numa sessão aberta pela pessoa nada disto é imposto: siga como instrução (leia o arquivo do agente e atue como ele, use só os servidores e as ferramentas listados). Na execução pelo board, os itens de `enforcedByBoardRun` são impostos por parâmetro.',
+      note: 'Agente do card (`agentFile` tem as instruções). Fora da execução pelo board, siga-o como instrução: leia o arquivo e use só os servidores e ferramentas listados; `enforcedByBoardRun` são impostos só pelo board. Skill faz-ai-harness-do-card.',
     },
   };
 }
@@ -343,13 +343,13 @@ function phaseOf(s: BoardState, c: Card) {
     ...(missing.length
       ? {
           missingArtifacts: missing,
-          missingArtifactsNote: `A história começou nesta fase, sem ${list(missing)} das fases anteriores: trabalhe a partir da descrição, da conversa e do código. Não crie esses documentos nem bloqueie por falta deles.`,
+          missingArtifactsNote: `Sem ${list(missing)} das fases anteriores: trabalhe pela descrição, conversa e código; não os crie nem bloqueie.`,
         }
       : {}),
     ...(col.artifactName
       ? {
           artifact: { filename: col.artifactName, ...(col.artifactTemplate ? { template: col.artifactTemplate } : {}) },
-          artifactNote: `Construa o documento numa sub-tarefa da história com Fase = "${col.name}" e grave-o com add_attachment (artifact: true, filename: "${col.artifactName}"): ele fica anexado à história e substitui a versão anterior.`,
+          artifactNote: `Construa o documento numa sub-tarefa com Fase = "${col.name}" e grave-o com add_attachment (artifact: true, filename: "${col.artifactName}").`,
         }
       : {}),
     ...decisionRecordOf(s, story, col),
@@ -358,10 +358,10 @@ function phaseOf(s: BoardState, c: Card) {
     ...(story.yolo
       ? {
           autonomousNote: isAtYoloStop(s, story)
-            ? `Modo autônomo (YOLO) na história ${cardRef(story)} até ${col.name}, a fase atual: é a última que a pessoa liberou para você rodar sozinho. Faça o trabalho da fase sem perguntas e, ao terminar, chame request_review na história com o resumo e pare: o modo autônomo se desliga e a revisão desta fase é da pessoa.`
+            ? `Modo autônomo (YOLO) na história ${cardRef(story)} até ${col.name}, a fase atual: faça o trabalho sem perguntas e, ao terminar, chame request_review na história com o resumo e pare (o modo se desliga). Detalhes: skill faz-ai-modo-autonomo.`
             : col.id === lastAiColumn(s, story.workflowId)?.id
-              ? `Modo autônomo (YOLO) na história ${cardRef(story)}: esta é a última coluna em que a IA atua, sem aprovação nem próxima fase. Envie a branch, abra o pull request${prBaseClause(s, story)} e registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa) e pare: a história fica com a pessoa, aguardando a revisão.`
-              : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde, nem mesmo com pendência. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Siga os padrões do projeto e as regras de arquitetura dele, escolha o caminho menos complexo entre os que os seguem, responda você mesmo as perguntas do documento da fase (seção "Perguntas para você", com a recomendação) e registre as decisões na conversa.`,
+              ? `Modo autônomo (YOLO) na história ${cardRef(story)}: última coluna da IA. Envie a branch, abra o pull request${prBaseClause(s, story)}, registre-o com set_pull_request e pare, sem avançar o card. Detalhes: skill faz-ai-modo-autonomo.`
+              : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde, nem com pendência. Ao terminar a fase, registre na conversa o que fez e as decisões, e mova o card para a próxima coluna. Detalhes: skill faz-ai-modo-autonomo.`,
         }
       : col.requiresApproval
         ? { reviewNote: `Ao terminar, chame request_review na história ${cardRef(story)} e pare.` }
@@ -376,15 +376,15 @@ function phaseOf(s: BoardState, c: Card) {
 function prBaseFields(base: PrBase | null, stackedOnLive: boolean) {
   if (!base) return {};
   if (!base.prBase) {
-    return { prNote: 'Abra o pull request contra a branch principal do repositório (ex.: gh pr create --base <a branch principal>).' };
+    return { prNote: 'Abra o pull request contra a branch principal do repositório.' };
   }
   return {
     baseBranch: base.baseBranch,
     prBase: base.prBase,
-    prNote: `Abra o pull request com --base ${base.prBase} (ex.: gh pr create --base ${base.prBase}).`,
+    prNote: `Abra o pull request com --base ${base.prBase}.`,
     ...(stackedOnLive
       ? {
-          stackNote: `Esta história está empilhada sobre ${base.baseBranch}: diga na descrição do pull request de qual pull request ele depende.`,
+          stackNote: `Empilhada sobre ${base.baseBranch}: diga no pull request de qual ele depende.`,
         }
       : {}),
   };
@@ -409,24 +409,21 @@ function workspaceOf(s: BoardState, c: Card) {
         ...(story.mergeCommit ? { mergeCommit: story.mergeCommit } : {}),
         note:
           s.board.git.mode === 'worktree'
-            ? `Altere o código só dentro de ${story.worktreePath} (worktree da história, já na branch ${story.branch}) e faça os commits lá. Não mexa na pasta principal do projeto.`
-            : `Trabalhe na branch ${story.branch}: troque para ela (git switch) antes de alterar o código.`,
+            ? `Altere o código só em ${story.worktreePath} (branch ${story.branch}) e faça os commits lá.`
+            : `Trabalhe na branch ${story.branch} (git switch antes de alterar o código).`,
       },
     };
   }
   return s.board.git.mode === 'off'
     ? {}
     : {
-        workspaceNote:
-          'Esta história ainda não tem branch. Antes de alterar código do projeto, chame prepare_workspace: o board cria a branch e a pasta de trabalho.',
+        workspaceNote: 'Sem branch ainda: antes de alterar código, chame prepare_workspace (skill faz-ai-workspace-e-pr).',
       };
 }
 
 /** O que fazer com o `model` do card; o "Esforço da atividade" tem o mesmo nome e outro sentido. */
 const MODEL_NOTE =
-  'Modelo e esforço que devem executar este card. Se forem diferentes dos seus, delegue o trabalho a um subagente com essa configuração; ' +
-  'se não for possível, avise a pessoa em vez de executar com outra. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, ' +
-  'e as regras do board sugerem o modelo a partir dele (get_models).';
+  'Execute com este modelo e esforço; se forem outros, delegue o trabalho a um subagente ou avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
 
 /**
  * Os blocos do `get_card` que a IA pode pedir em separado (`only`): o resto (título, descrição, campos,
@@ -461,19 +458,12 @@ export function cardDetail(
     ...(chosen ? { model: { ...describeModel(s, chosen), note: MODEL_NOTE } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
     harnessNote:
-      'Skills, rules, servidores MCP e agente do card: escolha só entre o que está no board em modo "Pelo card" (get_harness). O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.',
-    ...(rules.length
-      ? {
-          requiredRules: rules,
-          requiredRulesNote:
-            'Leia cada arquivo em `path` antes de executar este card: são as instruções que o card exige, além do contexto fixo do board.',
-        }
-      : {}),
+      'Escolha skills, rules, MCPs e agente só entre o que está em "Pelo card" (get_harness), o mínimo necessário. Skill faz-ai-harness-do-card.',
+    ...(rules.length ? { requiredRules: rules, requiredRulesNote: 'Leia cada arquivo em `path` antes de executar.' } : {}),
     ...(skills.length
       ? {
           requiredSkills: skills,
-          requiredSkillsNote:
-            'Leia o SKILL.md de cada skill em `path` antes de executar este card. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em `files` estão os arquivos de apoio de cada skill (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.',
+          requiredSkillsNote: 'Leia o SKILL.md de cada skill em `path` antes de executar, mesmo as fora da sua lista; `files` são apoio.',
         }
       : {}),
     ...(phase ? { phase } : {}),
@@ -532,14 +522,9 @@ export function cardDetail(
  * do servidor: o Claude Code as corta em 2.048 caracteres, e a IA só precisa disto quando há rodada.
  */
 export const SUBTASKS_NOW_NOTE =
-  'As rodadas da Implementação. `canRunTogether` são as sub-tarefas sem dependência pendente: se você tem subagentes, delegue cada uma a um subagente, ' +
-  'todos lançados na mesma mensagem para rodarem ao mesmo tempo, cada um com o modelo do card dele, na pasta de trabalho da história e sem fazer commit; ' +
-  'sem subagentes, execute uma por vez. As de `waiting` esperam outra sub-tarefa terminar (start_work as recusa). ' +
-  'Ao fim da rodada, verifique o conjunto, faça o commit e leia a história de novo para a próxima rodada. ' +
-  'Repita até não sobrar nenhuma que você possa tocar agora: as que estão com a pessoa (`withPerson`) ou já em execução (`running`) não são suas; ' +
-  'se só restarem as que estão com a pessoa, pare. ' +
-  'Testes, build e commit dependem do terminal: sem permissão para rodar comandos, implemente e registre na conversa o que falta rodar; ' +
-  'essa parte fica para quem tem permissão. Isso vale mesmo que a skill do fluxo instalada ainda diga para executar uma sub-tarefa por vez.';
+  'Rodadas: `canRunTogether` são as sub-tarefas liberadas (subagentes, se tiver, todos de uma vez; senão uma por vez); `waiting` esperam outra; ' +
+  '`withPerson` e `running` não são suas. Ao fim da rodada, verifique, faça o commit e releia a história. Sem terminal, implemente e registre o que falta rodar. ' +
+  'Vale mesmo que a skill do fluxo instalada diga uma por vez. Detalhes: skill faz-ai-implementacao-rodadas.';
 
 /**
  * As rodadas da Implementação: `canRunTogether` só traz as sub-tarefas que a IA pode tocar agora; as que

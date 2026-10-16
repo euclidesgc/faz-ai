@@ -82,7 +82,7 @@ describe('workspace do get_card (#462)', () => {
       branch: 'feature/1-card',
       baseBranch: 'develop',
       prBase: 'develop',
-      prNote: 'Abra o pull request com --base develop (ex.: gh pr create --base develop).',
+      prNote: 'Abra o pull request com --base develop.',
     });
     expect(ws).not.toHaveProperty('stackNote');
   });
@@ -111,7 +111,7 @@ describe('workspace do get_card (#462)', () => {
     const ws = detail(s, card).workspace!;
     expect(ws).toMatchObject({ baseBranch: 'feature/99-anterior', prBase: 'feature/99-anterior' });
     expect(ws.prNote).toContain('--base feature/99-anterior');
-    expect(ws.stackNote).toContain('empilhada sobre feature/99-anterior');
+    expect(ws.stackNote).toContain('Empilhada sobre feature/99-anterior');
   });
 
   it('get_card: stackNote só quando a base é branch de outra história', async () => {
@@ -120,7 +120,7 @@ describe('workspace do get_card (#462)', () => {
 
     const outra = { ...(await withBranch({})).card, id: 'anterior', number: 99, branch: 'feature/99-anterior', parentId: null };
     const viva = await withBranch({ branch: 'feature/1-card', worktreePath: '/w', baseBranch: 'feature/99-anterior' }, undefined, [outra]);
-    expect(detail(viva.s, viva.card).workspace!.stackNote).toContain('empilhada sobre feature/99-anterior');
+    expect(detail(viva.s, viva.card).workspace!.stackNote).toContain('Empilhada sobre feature/99-anterior');
 
     // a anterior concluída (coluna done) já foi mesclada: a base continua exposta, a nota some
     const done = viva.s.columns.find(
@@ -141,7 +141,7 @@ describe('workspace do get_card (#462)', () => {
       yolo: true,
       columnId: s0.columns.find((c) => c.name === 'Homologação')!.id,
     }));
-    expect(detail(s, card).phase?.autonomousNote).toContain('abra o pull request com --base develop e registre-o');
+    expect(detail(s, card).phase?.autonomousNote).toContain('abra o pull request com --base develop, registre-o');
   });
 
   it('sub-tarefa mostra o workspace e a base do PR da história', async () => {

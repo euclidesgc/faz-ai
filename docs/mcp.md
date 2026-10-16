@@ -107,7 +107,10 @@ modelo do card, rules e skills obrigatórias e pendências com a pessoa) em meno
 o tamanho em que o Claude Code corta as instruções de cada servidor e a descrição de cada ferramenta
 (documentação de 2026-10-13). O detalhe de cada passo fica onde a IA o lê quando precisa: na
 descrição da ferramenta, nas notas do `get_card` (como `subtasksNowNote`, com as rodadas da
-Implementação) e na skill `faz-ai-fluxo`.
+Implementação) e nas skills do fluxo. As notas do `get_card` são curtas e só aparecem quando o estado do
+card pede; o texto completo fica em skills por assunto (`faz-ai-harness-do-card`,
+`faz-ai-workspace-e-pr`, `faz-ai-implementacao-rodadas`, `faz-ai-revisao-e-homologacao` e
+`faz-ai-modo-autonomo`), que a nota aponta pelo nome.
 
 ### Status e revisão
 
@@ -221,7 +224,8 @@ linha de comando da ferramenta aceita é imposto por parâmetro:
 
 `withPerson` lista o que espera a pessoa. Cada mensagem da conversa traz `from` (`human` ou `ai`).
 A skill `faz-ai-fluxo`, instalada por `install_flow_skill` (sem `scope`: instala no global da ferramenta, para todos os projetos) ou pelo botão em Harness de IA, descreve
-o ciclo completo para a IA.
+o ciclo completo para a IA. A instalação grava também as skills por assunto citadas acima, que a skill
+principal e as notas do `get_card` apontam; checar se está instalada continua olhando só a `faz-ai-fluxo`.
 
 ### Execução pela conversa
 
