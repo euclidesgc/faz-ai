@@ -25,6 +25,7 @@
 // O `reason` do relatório fica sempre `null` aqui: o leitor não sabe o rótulo da ferramenta nem por
 // que a medição não aconteceu — quem sabe é o transporte (`measured.ts`), que põe ali a frase do
 // erro de domínio. Não complete este campo neste arquivo.
+import { USAGE_LIMIT_TEXT as SHARED_USAGE_LIMIT_TEXT } from '../../shared/conversation';
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
 import { asList, asNumber, asObject, asText, cut, type Json } from './json';
 import type { OutputReader, OutputStream, ReaderDeps } from './reader';
@@ -44,7 +45,9 @@ const AGENT_TOOLS = ['Agent', 'Task'];
  * esgotado. Heurística, documentada como tal: não há exemplo real da CLI 2.1.x com esse texto (ver
  * Riscos do SPEC da história #257); cobre inglês e português para não depender do idioma da CLI.
  */
-const USAGE_LIMIT_TEXT = /usage limit|rate limit|limite de uso|limite esgotado/i;
+// os textos conhecidos de limite esgotado, inclusive o "You've hit your limit · resets 3pm" das
+// versões atuais da CLI, que não trazia "usage limit" e passava como erro comum (card bloqueado)
+const USAGE_LIMIT_TEXT = SHARED_USAGE_LIMIT_TEXT;
 
 /**
  * Um `rate_limit_event` indica indisponibilidade real (não só monitoramento) quando `status` é

@@ -195,6 +195,7 @@ describe('i18n do host: mensagens preenchidas', () => {
         timeoutMinutes: 30,
         heartbeat: true,
         heartbeatMinutes: 60,
+        heartbeatRefine: true,
         parallel: false,
         parallelStories: 2,
         autopilotPaused: false,

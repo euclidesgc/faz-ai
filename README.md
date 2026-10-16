@@ -466,10 +466,13 @@ Imagens coladas na mensagem ou na descrição do card viram anexos dele e a IA a
   grava um resumo (Decisões, Observações, Pendências) como uma mensagem nova da IA (`kind:
   "summary"`), sem apagar nada automaticamente, sem trabalhar a fase, mover o card ou mudar o
   status — roda só com o board, sempre na faixa de modelo "Alto" (independente do Esforço do card).
-  Você revisa o resumo como revisa qualquer mensagem: concorda deixando como está ou edita o texto.
-  Logo abaixo dele, uma recomendação com o botão **Apagar mensagens resumidas** apaga, com
-  confirmação, todas as mensagens anteriores ao resumo; resumir de novo cria um registro novo, sem
-  substituir o anterior. Está disponível também como ferramenta MCP (`generate_summary`), com o
+  O resumo **desativa** as mensagens anteriores: a IA passa a receber a conversa a partir do último
+  resumo (`comments` do `get_card`), o resumo ganha destaque na tela e as mensagens anteriores ficam
+  esmaecidas. Você revisa o resumo como revisa qualquer mensagem: concorda deixando como está ou
+  edita o texto. Qualquer mensagem pode ser apagada por você; logo abaixo do resumo, o botão
+  **Apagar mensagens resumidas** apaga, com confirmação, todas as anteriores a ele; resumir de novo
+  cria um registro novo, sem substituir o anterior. O [heartbeat](#heartbeat) resume sozinho a
+  conversa que cresceu. Está disponível também como ferramenta MCP (`generate_summary`), com o
   mesmo resultado.
 - O que a IA pode fazer nessas execuções se define em Configurações → Harness de IA → **Execução
   pela conversa**: só o board (padrão), board e arquivos do projeto, ou sem restrições. O nível em
@@ -856,18 +859,21 @@ no corpo do PR. Assim a decisão fica no repositório, junto do código, e não 
 
 ### Detecção automática de merges
 
-O board observa o pull request de cada história entregue e detecta quando ele é mergeado, concluindo a
-história automaticamente. Não há opção própria: a consulta acontece em cada rodada do
+O board observa o pull request de cada história em aberto que tem um (em qualquer coluna, com ou sem
+modo autônomo; só a bloqueada e a em execução ficam de fora) e detecta quando ele é mergeado,
+concluindo a história automaticamente. Não há opção própria: a consulta acontece em cada rodada do
 [heartbeat](#heartbeat), no mesmo intervalo, e também no **Rodar o heartbeat agora**. Com o heartbeat
 desligado, ela só acontece quando você pede uma rodada. Quando o merge é detectado:
 
 1. o board grava o commit do merge no card;
 2. registra na conversa que a história foi concluída;
-3. move o card para Concluído e remove a pasta de trabalho. Com o gitflow ligado, faz também o resto
+3. move o card para a coluna de conclusão à frente e remove a pasta de trabalho. Com o gitflow ligado, faz também o resto
    da [conclusão da história no gitflow](#conclusão-da-história-no-gitflow): apaga as branches e
    atualiza a `develop` local.
 
-Se o pull request é fechado sem merge, o board registra um aviso na conversa uma única vez. O merge
+Se o pull request é fechado sem merge, o board registra um aviso na conversa uma única vez. Se está
+aberto com conflito, o board avisa uma vez na conversa e, quando a história estava aguardando revisão,
+devolve o card para "Pronto", para a IA atualizar a branch e resolver na próxima rodada. O merge
 continua sendo feito pela pessoa, manualmente ou pelo merge automático; o board só observa. Falhas
 na consulta do estado do PR (sem rede, sem autenticação, sem o `gh` instalado) não bloqueiam nada
 — o aviso aparece no log, e o board tenta de novo na próxima rodada.
@@ -893,9 +899,25 @@ não têm o commit do merge guardado, continuam sendo arquivadas por você, com 
 ### Heartbeat
 
 Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
-intervalo, enquanto o editor estiver aberto na pasta do projeto. Em cada rodada ela avança os cards
-aprovados, responde às mensagens pendentes e trabalha nos cards prontos, com uma execução por história,
-e confere o pull request das histórias entregues ([detecção automática de merges](#detecção-automática-de-merges)).
+intervalo, enquanto o editor estiver aberto na pasta do projeto. O heartbeat em si não depende da IA:
+é um relógio do board que, a cada rodada, primeiro arruma o board e depois decide o que a IA faz. Em
+cada rodada ele:
+
+- **devolve para a IA** os cards bloqueados por limite de uso da ferramenta (o limite renova sozinho),
+  com um aviso na conversa, e **avisa uma vez** o card que está com você há dois dias ou mais;
+- **confere os pull requests** de toda história que tem um ([detecção automática de merges](#detecção-automática-de-merges))
+  e limpa as branches e worktrees que sobraram ([branches e worktrees órfãs](#branches-e-worktrees-órfãs));
+- **resume a conversa** das histórias com três ou mais mensagens desde o último resumo (ao menos uma
+  da IA), antes de trabalhar a fase; a IA passa a receber só o resumo e o que vier depois dele;
+- **refina os cards novos do Backlog** (**Refinar os cards novos do Backlog**, nas mesmas
+  configurações; nasce ligado): a partir do título, a IA melhora a descrição, preenche modelo, skills,
+  rules e checklist e deixa o card aguardando a sua revisão. Aprovar leva o card para a primeira fase;
+- **trabalha nos cards prontos** e responde às mensagens pendentes, com uma execução por história. Um
+  card aprovado vai para a próxima coluna em "Pronto" na hora, mas o trabalho da fase começa na rodada
+  seguinte, se houver vaga (com o heartbeat desligado, aprovar chama a IA na hora). Ao terminar a fase,
+  a IA deixa o card aguardando a sua revisão ou a sua resposta.
+
+
 As atividades **sem branch** (refinar, resumir e as fases que só produzem documento, como Discovery,
 PRD, Spec e Plan no board padrão; vale a coluna que tem artefato antes da fase de código) rodam ao
 mesmo tempo em qualquer modo de workspace, até **Histórias ao mesmo tempo** (duas por padrão, até
@@ -917,7 +939,7 @@ cada uma) e de mais memória e processador enquanto várias sessões de IA, test
 juntos. No editor a aba Git e o bloco de paralelo do Harness de IA viram um link para o Settings; no
 navegador seguem como campos editáveis, como antes.
 
-- Sem pendência com a IA, nada é executado, e o log (Saída → Faz AI) diz o motivo: login vencido, história em modo autônomo, execução em andamento, com a pessoa ou esperando outro card.
+- Sem pendência com a IA, nada é executado, e o log (Saída → Faz AI) diz o motivo: login vencido, história em modo autônomo, execução em andamento, com a pessoa ou esperando outro card. Com pendência, o log diz quantas histórias estão com você e o que a IA vai fazer em cada uma (fase, refinar, resumir).
 - A fila da rodada segue a ordem do board: os bugs primeiro; depois a história mais à direita (a
   mais adiantada termina antes de uma nova começar); na mesma coluna, de cima para baixo — o que
   decide é a posição do card, não o número dele nem o que já foi aprovado.
@@ -973,9 +995,10 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
   espaço `R. >`, marcando que foi decidido por ela no modo autônomo. Só um impedimento real (acesso,
   ambiente, falha que ela não resolve) bloqueia o card.
 - **Conversa resumida entre as fases**: ao passar para outra coluna com três ou mais mensagens desde
-  o último resumo (ao menos uma da IA), o autopiloto roda **Resumir a conversa** antes da fase nova e
-  apaga as mensagens anteriores ao resumo, para o contexto de cada execução não carregar a conversa
-  inteira. Um resumo por coluna; se a IA não gravar o resumo, a conversa fica e a fase segue.
+  o último resumo (ao menos uma da IA), o autopiloto roda **Resumir a conversa** antes da fase nova:
+  as mensagens anteriores ao resumo ficam na conversa, mas desativadas (a IA recebe só o resumo e o
+  que vier depois), para o contexto de cada execução não carregar a conversa inteira. Um resumo por
+  coluna; se a IA não gravar o resumo, a conversa fica e a fase segue.
 - **Pelos padrões do projeto**: como ninguém revisa as decisões do meio do caminho, a IA segue os
   padrões e as regras de arquitetura do projeto (`CLAUDE.md`, `AGENTS.md`, `DESIGN.md` e o código
   parecido que já existe) e, entre os caminhos que os seguem, escolhe o menos complexo.

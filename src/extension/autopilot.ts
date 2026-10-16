@@ -8,6 +8,7 @@ import { limitOf, type AiRunMode } from '../shared/runner';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
 import { autopilotQueue } from '../shared/autopilotQueue';
+import { commentsSinceSummary } from '../shared/conversation';
 import type { MessageRouter } from './panel/messageRouter';
 
 const AUTHOR = 'Faz AI';
@@ -150,20 +151,13 @@ function storyStep(s: BoardState, story: Card): AutopilotStep {
   return { kind: 'paused', story, reason: `${cardRef(story)} não tem nada pendente com a IA, mas ainda não foi concluído.` };
 }
 
-/** As mensagens da conversa da história depois do último resumo (todas, se não houver resumo). */
-function commentsSinceSummary(s: BoardState, storyId: string) {
-  const all = s.comments.filter((c) => c.cardId === storyId);
-  const last = all.map((c, i) => (c.kind === 'summary' ? i : -1)).reduce((a, b) => Math.max(a, b), -1);
-  return all.slice(last + 1);
-}
-
 /**
  * A conversa da história merece um resumo antes da próxima execução: há mensagens de sobra desde o último
  * resumo e pelo menos uma é da IA (o trabalho de uma fase anterior; uma conversa só da pessoa é o pedido,
  * e vai inteira).
  */
 export function needsSummary(s: BoardState, story: Card): boolean {
-  const since = commentsSinceSummary(s, story.id);
+  const since = commentsSinceSummary(s.comments, story.id);
   return since.length >= SUMMARIZE_FROM_COMMENTS && since.some((c) => c.source === 'ai');
 }
 
@@ -201,7 +195,7 @@ export class Autopilot {
   private lastRunColumn = new Map<string, string>();
   /** a coluna em que a conversa de cada história foi resumida por último: um resumo por coluna, mesmo se ele falhar */
   private summarizedIn = new Map<string, string>();
-  /** resumos em andamento: a quantidade de mensagens quando começou, para apagar só as que o resumo cobre */
+  /** resumos em andamento: a quantidade de mensagens quando começou, para achar o resumo que a execução gravou */
   private summarizing = new Map<string, number>();
 
   constructor(
@@ -342,9 +336,10 @@ export class Autopilot {
   }
 
   /**
-   * O resumo ficou pronto: as mensagens que ele cobre saem da conversa (#441), como o botão "Apagar
-   * mensagens resumidas" do card faz. Se a IA não gravou o resumo, a conversa fica como está, e a coluna já
-   * marcada em `summarizedIn` evita insistir.
+   * O resumo ficou pronto: as mensagens que ele cobre ficam na conversa, mas desativadas (a IA só recebe
+   * a partir do resumo, `activeComments`; a tela as esmaece). Nada é apagado: apagar é decisão da pessoa.
+   * Se a IA não gravou o resumo, a conversa fica como está, e a coluna já marcada em `summarizedIn`
+   * evita insistir.
    */
   private replaceWithSummary(s: BoardState, story: Card): void {
     const before = this.summarizing.get(story.id) ?? 0;
@@ -352,9 +347,8 @@ export class Autopilot {
     const all = s.comments.filter((c) => c.cardId === story.id);
     const summary = all.slice(before).find((c) => c.kind === 'summary');
     if (!summary) return void this.deps.log(`Autopiloto: ${cardRef(story)} sem resumo gravado; a conversa fica como está.`);
-    const prior = all.filter((c) => c.createdAt < summary.createdAt && c.id !== summary.id);
-    for (const c of prior) this.router.handle({ type: 'comment.delete', commentId: c.id }, { author: AUTHOR, source: 'ai' });
-    this.deps.log(`Autopiloto: conversa de ${cardRef(story)} resumida; ${prior.length} mensagem(ns) anterior(es) apagada(s).`);
+    const prior = all.filter((c) => c.createdAt < summary.createdAt && c.id !== summary.id).length;
+    this.deps.log(`Autopiloto: conversa de ${cardRef(story)} resumida; ${prior} mensagem(ns) anterior(es) saem do contexto da IA.`);
   }
 
   /** Anuncia, uma vez por história, que uma entrega parou de ocupar a fila e o autopiloto seguiu adiante. */

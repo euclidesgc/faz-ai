@@ -1275,6 +1275,16 @@ button.ghost.on {
 .comment .markdown p {
   margin: var(--sp-4) 0;
 }
+/* anterior ao último resumo: já está nele e não vai mais para a IA */
+.comment-inactive {
+  opacity: 0.55;
+  border-style: dashed;
+}
+/* o resumo é o que a IA recebe agora: ganha o destaque que as anteriores perderam */
+.comment-summary-item {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
 .avatar {
   width: 20px;
   height: 20px;

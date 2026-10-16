@@ -3,6 +3,7 @@ import type { HarnessItem } from '../../shared/harness';
 import { isSelectableKind, selectionKey, usageOf } from '../../shared/harnessSelection';
 import { groupOf } from '../../shared/harnessCatalog';
 import { norm } from '../../shared/filters';
+import { activeComments } from '../../shared/conversation';
 import {
   describeRule,
   modelFieldOf,
@@ -503,9 +504,15 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
     ...subtasksNow(s, c.id),
     checklistItems: s.checklistItems.filter((i) => i.cardId === c.id).map((i) => ({ itemId: i.id, text: i.text, done: i.done })),
     ...linksOf(s, c),
-    comments: s.comments
-      .filter((m) => m.cardId === c.id)
-      .map((m) => ({ commentId: m.id, author: m.author, ...(m.source ? { from: m.source } : {}), at: iso(m.createdAt), body: m.body })),
+    // a partir do último resumo: as mensagens anteriores já estão nele e só inchariam o contexto
+    comments: activeComments(s.comments, c.id).map((m) => ({
+      commentId: m.id,
+      author: m.author,
+      ...(m.source ? { from: m.source } : {}),
+      ...(m.kind === 'summary' ? { kind: 'summary' } : {}),
+      at: iso(m.createdAt),
+      body: m.body,
+    })),
     attachments: s.attachments.filter((a) => a.cardId === c.id).map(attachment),
     // os artefatos das fases ficam na história; a sub-tarefa os enxerga por aqui
     ...(c.parentId ? { storyArtifacts: s.attachments.filter((a) => a.cardId === c.parentId && a.artifact).map(attachment) } : {}),

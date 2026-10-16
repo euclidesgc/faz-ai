@@ -338,8 +338,11 @@ export const harness: Record<string, string> = {
   'Tempo limite por execução': 'Timeout per run',
   minutos: 'minutes',
   'Heartbeat ligado': 'Heartbeat on',
-  'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele avança os cards aprovados, responde às mensagens pendentes e trabalha nos cards prontos, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.':
-    'With the heartbeat on and the board open in this folder (in the editor or through the faz-ai command), the board calls {tool} on its own at every interval: it moves approved cards forward, answers pending messages and works on ready cards, one story at a time or several at once, according to the limit below. With nothing pending, nothing is run.',
+  'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele trabalha nos cards prontos (um card aprovado vai para a próxima coluna na hora e é trabalhado na rodada seguinte), responde às mensagens pendentes, resume as conversas que cresceram, devolve para a IA os cards bloqueados por limite de uso, confere os pull requests mergeados e limpa branches e worktrees que sobraram, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.':
+    'With the heartbeat on and the board open in this folder (in the editor or via the faz-ai command), the board calls {tool} on its own at each interval: it works on ready cards (an approved card moves to the next column right away and is worked on in the next round), answers pending messages, summarizes conversations that have grown, returns to the AI the cards blocked by a usage limit, checks merged pull requests and cleans up leftover branches and worktrees, one story at a time or several at once, up to the limit below. With nothing pending, nothing runs.',
+  'Refinar os cards novos do Backlog': 'Refine new Backlog cards',
+  'A cada rodada, o heartbeat refina os cards do Backlog ainda não refinados: a partir do título, a IA melhora a descrição, preenche os campos (modelo, skills, rules) e o checklist, e deixa o card aguardando a sua revisão. Aprovar leva o card para a primeira fase.':
+    'On each round, the heartbeat refines the Backlog cards not yet refined: from the title, the AI improves the description, fills in the fields (model, skills, rules) and the checklist, and leaves the card waiting for your review. Approving moves the card to the first phase.',
   Intervalo: 'Interval',
 
   // --- ScopeGroup

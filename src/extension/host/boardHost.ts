@@ -606,14 +606,21 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     onRound: () => {
       if (!o.ownsBoard || o.ownsBoard()) void mergeWatcher.runNow().then(() => orphanSweeper.sweep());
     },
+    act: (msg) => router.handle(msg, { author: 'Faz AI', source: 'ai' }),
   });
   // publica a próxima rodada agendada; a guarda em `setHeartbeat` (só notifica se mudou) evita o laço
   // router.onDidChange → publishHeartbeat → setHeartbeat → notify
   const publishHeartbeat = () => router.setHeartbeat({ nextRoundAt: heartbeat.nextRoundAt });
   heartbeat.onDidChange(publishHeartbeat);
-  // aprovar uma história chama a IA na hora, respeitando os tetos de paralelismo, com ou sem heartbeat ligado
+  // aprovar uma história já a leva para a próxima coluna, em "Pronto"; com o heartbeat ligado o trabalho da
+  // fase começa na rodada seguinte, se houver vaga. Desligado, a aprovação chama a IA na hora: sem isso o
+  // card aprovado ficaria parado até alguém clicar em "Trabalhar na fase"
   router.onDidApprove((cardId) => {
-    if (!o.ownsBoard || o.ownsBoard()) heartbeat.enqueue(cardId);
+    if (!o.ownsBoard || o.ownsBoard()) {
+      if (router.snapshot().board.runner.heartbeat)
+        o.log(`[${cardId}] Aprovado: o trabalho da próxima fase começa na próxima rodada do heartbeat.`);
+      else heartbeat.enqueue(cardId);
+    }
   });
   router.onDidChange(publishHeartbeat);
   publishHeartbeat();

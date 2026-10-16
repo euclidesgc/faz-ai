@@ -308,6 +308,11 @@ export class CardRepo {
     ]);
   }
 
+  /** Marca o card como refinado pela IA; o heartbeat não o refina de novo. */
+  markRefined(cardId: string): void {
+    run(this.db, 'UPDATE cards SET refined_at = ? WHERE id = ?', [now(), cardId]);
+  }
+
   setWorkspace(cardId: string, branch: string, worktreePath: string): void {
     run(this.db, 'UPDATE cards SET branch = ?, worktree_path = ? WHERE id = ?', [branch, worktreePath, cardId]);
   }

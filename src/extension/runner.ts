@@ -69,6 +69,8 @@ interface Run {
   /** últimas linhas que a ferramenta escreveu, para explicar uma falha no próprio card */
   tail: string[];
   mode: AiRunMode;
+  /** quem pediu a execução: decide o que fazer com o card quando o refinamento termina */
+  origin: AiRunOrigin;
   /** projeção publicada ao router (ver `publish`) */
   info: AiActivity;
   /** modelo/esforço que esta execução pediu à ferramenta; usado no comentário quando a reserva assume */
@@ -438,6 +440,7 @@ export class AiRunner {
       info,
       model: activityModel ? { model: activityModel, effort: activityEffort } : null,
       fallbackPending,
+      origin,
     };
     this.runs.set(cardId, run);
     this.setStatus(cardId, 'running', tool.label);
@@ -588,6 +591,13 @@ export class AiRunner {
           { type: 'comment.add', cardId, body: 'O resumo não foi gerado: a execução terminou sem escrever a mensagem.' },
           { author: RUNNER_AUTHOR, source: 'ai' },
         );
+      // o limite de uso esgotou no meio: o refinamento fica por fazer (o heartbeat repete na próxima rodada)
+      if (!summarize && !failure && !end.report.usageLimitReached) {
+        this.router.handle({ type: 'card.refined.set', cardId }, { author: RUNNER_AUTHOR });
+        // o refinamento automático do Backlog termina com a pessoa: ela revisa o card e aprova (o board o
+        // leva para a primeira fase) ou pede ajustes na conversa
+        if (run.origin === 'heartbeat') return void this.setStatus(cardId, 'waiting_review', toolLabel);
+      }
       return void this.router.handle(
         { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
         { author: RUNNER_AUTHOR },
@@ -597,7 +607,10 @@ export class AiRunner {
     // retentativa assume em vez de bloquear (RF-03 exige que nenhuma outra falha caia aqui: só quando o
     // leitor da ferramenta marcou `usageLimitReached`, nunca pelo código de saída ou por heurística do runner).
     // E só quando a execução falhou: uma que terminou bem não é refeita com a reserva
-    if (failure && end.report.usageLimitReached && run.fallbackPending) {
+    // o limite esgotado vale também quando a CLI sai com código 0 sem ter respondido: o que importa é o
+    // sinal estrutural do leitor, não o código de saída
+    const usageLimited = end.report.usageLimitReached && (!!failure || !replied);
+    if (usageLimited && run.fallbackPending) {
       const state = this.router.snapshot();
       const principal = toolModelDisplay(state, run.model);
       const fallback = toolModelDisplay(state, run.fallbackPending);
@@ -609,12 +622,12 @@ export class AiRunner {
     }
     // limite de uso do plano sem reserva: o limite renova sozinho, então o card volta para a IA em vez de
     // ficar bloqueado esperando a pessoa (o heartbeat tenta de novo na próxima rodada)
-    if (failure && end.report.usageLimitReached) {
+    if (usageLimited) {
       this.router.handle(
         {
           type: 'comment.add',
           cardId,
-          body: `O limite de uso do plano do ${toolLabel} esgotou. O card voltou para a IA e a execução é repetida quando o limite renovar.${output}`,
+          body: `O limite de uso do plano do ${toolLabel} esgotou. O card voltou para a IA e a execução é repetida pelo heartbeat quando o limite renovar.${output}`,
         },
         { author: RUNNER_AUTHOR, source: 'ai' },
       );

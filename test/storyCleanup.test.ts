@@ -93,6 +93,7 @@ const commit = (cwd: string, file: string, content: string, msg = 'mudança') =>
 const prFacts = (branch: string, over: Partial<PullRequestFacts> = {}): PullRequestFacts => ({
   url: PR,
   state: 'MERGED',
+  mergeable: '',
   mergedAt: '2026-10-13T00:00:00Z',
   mergeCommit: '',
   baseRefName: 'develop',
@@ -206,6 +207,7 @@ describe('parsePullRequestFacts', () => {
       baseRefName: 'develop',
       headRefName: 'feature/1-x',
       headRefOid: 'def',
+      mergeable: '',
     });
     expect(parsePullRequestFacts(JSON.stringify({ state: 'OPEN', mergedAt: null, mergeCommit: null }), PR)).toEqual({
       url: PR,
@@ -215,6 +217,7 @@ describe('parsePullRequestFacts', () => {
       baseRefName: '',
       headRefName: '',
       headRefOid: '',
+      mergeable: '',
     });
   });
 

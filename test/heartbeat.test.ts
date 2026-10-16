@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
-import { Heartbeat, heartbeatTargets } from '../src/extension/heartbeat';
+import { Heartbeat, STALE_DAYS, heartbeatQueue, heartbeatTargets, refineTargets, summaryTargets } from '../src/extension/heartbeat';
+import type { AiRunMode } from '../src/shared/runner';
 import type { AiRunOrigin } from '../src/shared/log';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BUG_TYPE } from '../src/shared/priority';
@@ -21,9 +22,11 @@ let runner: {
   started: string[];
   /** a origem que o heartbeat informou em cada start, na mesma ordem de `started` */
   origins: (AiRunOrigin | undefined)[];
+  /** o modo de cada start, na mesma ordem de `started` */
+  modes: (AiRunMode | undefined)[];
   fail: boolean;
   usageLimited: boolean;
-  start(id: string, origin?: AiRunOrigin): void;
+  start(id: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(id: string): void;
   onDidFinish(fn: (id: string) => void): void;
   finish(status?: CardStatus): void;
@@ -77,13 +80,15 @@ beforeEach(async () => {
     running: [],
     started: [],
     origins: [],
+    modes: [],
     fail: false,
     usageLimited: false,
-    start(id, origin) {
+    start(id, origin, mode) {
       if (this.fail) throw new Error('ferramenta indisponível');
       this.running.push(id);
       this.started.push(id);
       this.origins.push(origin);
+      this.modes.push(mode);
       router.handle({ type: 'card.status.set', cardId: id, status: 'running' }, { source: 'ai' });
     },
     stop(id) {
@@ -432,5 +437,111 @@ describe('heartbeat', () => {
     heartbeat.runNow();
     // as duas estão em fase de texto e cabem no teto de texto (2): o login de volta libera as duas
     expect(runner.started).toHaveLength(2);
+  });
+});
+
+describe('heartbeat: refinar, resumir e arrumar o board', () => {
+  const comments = (n: number) => router.snapshot().comments.filter((c) => c.cardId === card(n).id);
+  const ai = (n: number, body: string, kind?: 'summary') =>
+    router.handle({ type: 'comment.add', cardId: card(n).id, body, kind }, { author: 'Claude Code', source: 'ai' });
+  const withAct = () => {
+    heartbeat = new Heartbeat(runner, {
+      snapshot: () => router.snapshot(),
+      now: () => now,
+      log: (l) => log.push(l),
+      act: (msg) => router.handle(msg, { author: 'Faz AI', source: 'ai' }),
+    });
+  };
+
+  it('refina os cards do Backlog ainda não refinados, um modo de texto, e deixa de refinar depois de marcado', () => {
+    create('Nova', 'Backlog'); // #1
+    create('Já refinada', 'Backlog'); // #2
+    router.handle({ type: 'card.refined.set', cardId: card(2).id });
+    create('Autônoma', 'Backlog'); // #3: é do autopiloto
+    router.handle({ type: 'card.yolo.set', cardId: card(3).id, enabled: true });
+    create('Em fase', 'PRD'); // #4: não é Backlog
+    create('Sub', 'A fazer', 4); // #5: sub-tarefa não é refinada sozinha
+    expect(refineTargets(router.snapshot()).map((c) => c.number)).toEqual([1]);
+    expect(heartbeat.runNow()).toBe(2); // #4 (fase) e #1 (refinar)
+    expect(runner.started.map(number)).toEqual([4, 1]);
+    expect(runner.modes).toEqual(['phase', 'refine']);
+    expect(runner.origins).toEqual(['heartbeat', 'heartbeat']);
+    expect(log.some((l) => l.includes('#1 (refinar)'))).toBe(true);
+    // refinado e entregue para a revisão da pessoa: não entra de novo
+    runner.running = [];
+    router.handle({ type: 'card.refined.set', cardId: card(1).id });
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'waiting_review' }, { source: 'ai' });
+    expect(refineTargets(router.snapshot())).toEqual([]);
+    // com o refinamento automático desligado, nada do Backlog entra
+    create('Outra', 'Backlog'); // #6
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeatRefine: false } } });
+    expect(refineTargets(router.snapshot())).toEqual([]);
+  });
+
+  it('resume a conversa que cresceu (3+ mensagens desde o último resumo, ao menos uma da IA) antes de trabalhar a fase', () => {
+    create('A', 'PRD'); // #1 pronta
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Quero CSV.' });
+    ai(1, 'Entendi.');
+    ai(1, 'Documento pronto.');
+    expect(summaryTargets(router.snapshot()).map((c) => c.number)).toEqual([1]);
+    expect(heartbeatQueue(router.snapshot())).toEqual([{ id: card(1).id, mode: 'summarize' }]);
+    heartbeat.runNow();
+    expect(runner.modes).toEqual(['summarize']);
+    // o resumo gravado zera a contagem: a próxima rodada trabalha a fase
+    runner.finish('ready');
+    ai(1, 'Decisões: CSV.', 'summary');
+    expect(summaryTargets(router.snapshot())).toEqual([]);
+    heartbeat.runNow();
+    expect(runner.modes).toEqual(['summarize', 'phase']);
+  });
+
+  it('a pergunta da pessoa feita antes do resumo continua sem resposta: o resumo não conta como resposta da IA', () => {
+    create('A', 'PRD'); // #1
+    setStatus(1, 'waiting_review');
+    ai(1, 'Pronto para revisar.');
+    ai(1, 'Mais um detalhe.');
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'E o formato?' });
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1]); // sem resposta
+    ai(1, 'Decisões: nada; Pendências: o formato.', 'summary');
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1]); // segue sem resposta
+  });
+
+  it('devolve para a IA o card bloqueado por limite de uso, com aviso na conversa, e o executa na rodada', () => {
+    withAct();
+    create('A', 'Implementação'); // #1
+    setStatus(1, 'blocked', "O Claude Code encerrou sem responder. Fim da saída:\n\nYou've hit your limit · resets 3pm");
+    create('B', 'Implementação'); // #2: bloqueio comum fica
+    setStatus(2, 'blocked', 'Falta acesso ao repositório.');
+    heartbeat.runNow();
+    expect(card(1).status).toBe('running');
+    expect(card(2).status).toBe('blocked');
+    expect(comments(1).at(-1)!.body).toContain('o limite de uso renova sozinho');
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+
+  it('avisa uma vez por parada que o card está com a pessoa há dias', () => {
+    withAct();
+    // o status guarda o relógio real do banco: o relógio do teste parte dele
+    now = Date.now() + MIN;
+    create('A', 'PRD'); // #1
+    setStatus(1, 'waiting_review');
+    heartbeat.runNow();
+    expect(comments(1)).toEqual([]); // recente: nada a avisar
+    now += STALE_DAYS * 24 * 60 * MIN;
+    heartbeat.runNow();
+    expect(comments(1).map((c) => c.body)).toEqual([
+      `Este card está com você há ${STALE_DAYS} dia(s), esperando a sua revisão. A IA só segue depois que você resolver.`,
+    ]);
+    // a rodada seguinte não repete; um status novo (a pessoa agiu e o card parou de novo) avisa de novo
+    now += MIN;
+    heartbeat.runNow();
+    expect(comments(1)).toHaveLength(1);
+    setStatus(1, 'ready');
+    runner.running = [];
+    setStatus(1, 'waiting_answer');
+    now = Date.now() + STALE_DAYS * 24 * 60 * MIN + MIN;
+    heartbeat.runNow();
+    expect(comments(1)).toHaveLength(2);
+    expect(comments(1).at(-1)!.body).toContain('esperando a sua resposta');
   });
 });
