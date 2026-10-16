@@ -1,4 +1,4 @@
-import { noteOf } from '../src/extension/autopilot';
+import { SUMMARIZE_FROM_CHARS, noteOf } from '../src/extension/autopilot';
 import { activeComments } from '../src/shared/conversation';
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
@@ -836,6 +836,18 @@ describe('resumo automático da conversa entre as fases (#441)', () => {
     expect(runner.started).toHaveLength(3);
     expect(runner.modes[2]).toBeUndefined();
     expect(columnName(1)).toBe('PRD');
+  });
+
+  it('duas mensagens bastam quando o texto é longo: o que pesa no contexto é o tamanho, não a contagem', () => {
+    create('A', 'Discovery');
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Quero exportar em CSV.' });
+    yolo(1);
+    flush();
+    runner.finish(() => {
+      say(1, 'Relatório da fase. ' + 'x'.repeat(SUMMARIZE_FROM_CHARS));
+      move(1, 'PRD');
+    });
+    expect(runner.modes).toEqual([undefined, 'summarize']);
   });
 
   it('conversa curta, sem troca de coluna ou sem mensagem da IA não é resumida; o resumo que falha não trava a fase', () => {

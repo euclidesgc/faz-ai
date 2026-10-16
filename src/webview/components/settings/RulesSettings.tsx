@@ -1,13 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { Badge, Button, Card, Heading, Text, TextArea } from '@radix-ui/themes';
-import {
-  DEFAULT_RULES,
-  cleanCriticalPaths,
-  type BoardRules,
-  type CancelChildrenMode,
-  type CompleteParentMode,
-  type ConfirmMode,
-} from '../../../shared/rules';
+import type { ReactNode } from 'react';
+import { Badge, Button, Card, Heading, Text } from '@radix-ui/themes';
+import { DEFAULT_RULES, type BoardRules, type CancelChildrenMode, type CompleteParentMode, type ConfirmMode } from '../../../shared/rules';
 import { columnsOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { t, dt } from '../../i18n';
@@ -68,31 +61,6 @@ function Rule({
       </dl>
       {below && <div className="rule-below">{below}</div>}
     </Card>
-  );
-}
-
-/**
- * As áreas críticas (o núcleo), um padrão de caminho por linha. Grava ao sair do campo, e só o que
- * mudou: a lista limpa (sem vazios nem repetidos) é a que vale.
- */
-function CriticalPaths({ value, onChange }: { value: string[]; onChange(paths: string[]): void }) {
-  const [draft, setDraft] = useState(value.join('\n'));
-  useEffect(() => setDraft(value.join('\n')), [value]);
-  const commit = () => {
-    const next = cleanCriticalPaths(draft.split('\n'));
-    if (JSON.stringify(next) !== JSON.stringify(value)) onChange(next);
-    else setDraft(value.join('\n'));
-  };
-  return (
-    <TextArea
-      aria-label={t('Áreas críticas, um caminho por linha')}
-      className="critical-paths"
-      rows={4}
-      placeholder={'src/db/**\nsrc/core/**'}
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-    />
   );
 }
 
@@ -227,18 +195,6 @@ export function RulesSettings() {
             onChange={(onAllChildrenDone) => set({ onAllChildrenDone })}
           />
         }
-      />
-
-      <Rule
-        title={t('Áreas críticas (núcleo)')}
-        active={rules.criticalPaths.length > 0}
-        when={t(
-          'uma história mexe nestes caminhos: a IA marca o campo "Criticidade" dela como Núcleo na Spec ou no Plan, e você também pode marcar à mão',
-        )}
-        then={t(
-          'a história do núcleo espera a sua aprovação nas colunas que exigem aprovação, mesmo no modo autônomo; na Revisão e no pull request, os arquivos do núcleo vêm à parte e são revisados com mais rigor.',
-        )}
-        below={<CriticalPaths value={rules.criticalPaths} onChange={(criticalPaths) => set({ criticalPaths })} />}
       />
 
       <Card className="form-card" aria-label={t('Preencher o modelo sugerido')}>

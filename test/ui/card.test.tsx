@@ -155,8 +155,9 @@ describe('CardDrawer', () => {
     await userEvent.type(screen.getByPlaceholderText(/Descreva o problema/), 'Contexto');
     const save = screen.getByRole('button', { name: 'Salvar descrição' });
     expect(save).toHaveClass('primary');
+    // o botão fica no cabeçalho da seção, antes do editor: visível mesmo com uma descrição longa
     expect(
-      screen.getByPlaceholderText(/Descreva o problema/).compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING,
+      screen.getByPlaceholderText(/Descreva o problema/).compareDocumentPosition(save) & Node.DOCUMENT_POSITION_PRECEDING,
     ).toBeTruthy();
     await userEvent.click(save);
     expect(lastSent('card.update')).toEqual({ type: 'card.update', cardId: board.storyId, patch: { description: 'Contexto' } });

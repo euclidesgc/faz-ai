@@ -597,6 +597,14 @@ button.chip.on:hover:where(:not(:disabled)) {
 [data-radix-popper-content-wrapper] {
   z-index: 70 !important;
 }
+/* ao abrir um seletor ou menu, o Radix trava o scroll do body e, se mediu uma barra de rolagem na
+   primeira vez, compensa a largura dela com margem no body. Aqui quem rola é .content (e o card aberto),
+   nunca o body: a margem só empurra o board inteiro para o lado a cada abertura. `html body` ganha do
+   estilo injetado, que tem a mesma regra com !important. */
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
 .drawer {
   width: min(760px, 95vw);
   max-height: min(90vh, 100%);
@@ -1523,9 +1531,6 @@ button.ghost.on {
 }
 .rule-below {
   margin-top: var(--sp-12);
-}
-.rule-below .critical-paths textarea {
-  font-family: var(--font-mono);
 }
 
 /* harness e padrões por tipo */

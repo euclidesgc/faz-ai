@@ -65,7 +65,7 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
     (a, router) => {
       const card = findCard(router.snapshot(), a.card);
       router.handle({ type: 'comment.add', cardId: card.id, body: a.body, kind: a.kind }, aiOrigin(ctx));
-      return detail(router, card.id).comments.at(-1);
+      return detail(router, card.id, ['conversation']).comments!.at(-1);
     },
   );
 
@@ -91,7 +91,7 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
           reject(e instanceof Error ? e : new Error(String(e)));
         }
       });
-      return detail(router, card.id).comments.at(-1);
+      return detail(router, card.id, ['conversation']).comments!.at(-1);
     },
   );
 
@@ -136,7 +136,7 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
       } else {
         throw new Error('Informe `path`, ou `filename` e `content`.');
       }
-      const added = detail(router, target).attachments.find((x) => !before.has(x.attachmentId));
+      const added = detail(router, target, ['attachments']).attachments!.find((x) => !before.has(x.attachmentId));
       return target === card.id ? added : { ...added, attachedTo: `#${router.snapshot().cards.find((c) => c.id === target)!.number}` };
     },
   );

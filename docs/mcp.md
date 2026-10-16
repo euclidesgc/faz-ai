@@ -90,7 +90,7 @@ de vez, mexer em checklist, na conversa do card e em anexos (inclusive ler anexo
 colunas, tipos, campos e regras. Cards são referidos pelo número (`#12`) e colunas, tipos e campos
 pelo nome. Mensagens da IA na conversa saem assinadas com o nome do cliente (ex.: "Claude Code").
 
-Os campos do board (Fase, Tags, Modelo, Skills, Rules, Esforço da atividade e Criticidade) vêm com
+Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) vêm com
 `board: true` em `get_board.fields`: as regras, a triagem e a IA dependem deles. `delete_field` e a
 troca de nome em `update_field` são recusadas neles, assim como opções e tipos de card (as opções de
 Tags são da pessoa e mudam); a exibição muda em todos. `create_field` recusa o nome de um deles.
@@ -236,6 +236,11 @@ manda trabalhar no card. Os comandos, conforme a documentação de cada ferramen
 
 Uma imagem colada numa mensagem ou na descrição do card aparece no texto como `attachment:<nome>`; o
 arquivo é o anexo de mesmo nome em `attachments` de `get_card`.
+
+`get_card` aceita `only` com os blocos que interessam (`phase`, `subtasks`, `checklist`, `links`,
+`conversation`, `attachments`): título, descrição, campos, modelo, harness e pasta de trabalho vêm
+sempre, e sem `only` vem tudo. Serve para reler só a conversa, por exemplo, sem repetir o card inteiro
+no contexto.
 
 A conversa em `comments` de `get_card` vem **a partir do último resumo** (a mensagem com
 `kind: "summary"`, gravada por `generate_summary` ou pelo botão "Resumir a conversa"): o que veio

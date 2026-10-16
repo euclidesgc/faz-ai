@@ -3,7 +3,6 @@ import type { WorkflowKind } from '../../shared/model';
 import { BOARD_TEMPLATE, BOARD_TEMPLATE_VERSION, STORY_PHASES, insertColumn } from './boardTemplate';
 import { newId } from './ids';
 import { EFFORT_FIELD, EFFORT_LEVELS } from '../../shared/models';
-import { CRITICALITY_FIELD, CRITICALITY_LEVELS } from '../../shared/critical';
 import { MCPS_FIELD, MODEL_FIELD, PHASE_FIELD, RULES_FIELD, SKILLS_FIELD, TAGS_FIELD } from '../../shared/boardFields';
 import { DEFAULT_BRANCH_KINDS } from '../../shared/git';
 
@@ -79,20 +78,6 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
     db.run(
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
       [newId(), boardId, EFFORT_FIELD, 'select', JSON.stringify(EFFORT_LEVELS), null, 'badge', 2],
-    );
-    // núcleo ou periferia: a história do núcleo espera a aprovação da pessoa mesmo no modo autônomo
-    db.run(
-      'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
-      [
-        newId(),
-        boardId,
-        CRITICALITY_FIELD,
-        'select',
-        JSON.stringify(CRITICALITY_LEVELS),
-        JSON.stringify(types.filter(([, , , wf]) => wf === parentWf).map(([id]) => id)),
-        'badge',
-        7,
-      ],
     );
     db.exec('COMMIT;');
   } catch (e) {

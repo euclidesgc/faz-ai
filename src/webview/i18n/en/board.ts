@@ -228,6 +228,8 @@ export const board: Record<string, string> = {
   Aprovar: 'Approve',
   'O que precisa ser ajustado?': 'What needs to be adjusted?',
   'Pedir ajustes': 'Request changes',
+  'Você diz o que precisa mudar; o card volta para "Pronto" e a IA refaz a fase com o seu pedido na conversa':
+    'You say what needs to change; the card goes back to "Ready" and the AI redoes the phase with your request in the conversation',
   Desbloquear: 'Unblock',
   'Interrompe o {tool}; o status volta ao que era': 'Stops {tool}; the status goes back to what it was',
   'Parar a IA': 'Stop the AI',

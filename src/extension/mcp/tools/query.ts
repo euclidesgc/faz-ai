@@ -2,7 +2,17 @@ import * as fs from 'node:fs';
 import { z } from 'zod';
 import { EMPTY_FILTERS, applyFilters } from '../../../shared/filters';
 import { ALL_CARD_STATUSES } from '../../../shared/status';
-import { boardOverview, cardStatus, cardSummary, findCard, findField, findType, findWorkflow, pendingOverview } from '../format';
+import {
+  CARD_SECTIONS,
+  boardOverview,
+  cardStatus,
+  cardSummary,
+  findCard,
+  findField,
+  findType,
+  findWorkflow,
+  pendingOverview,
+} from '../format';
 import { cardArg } from './args';
 import { detail, findColumnIds } from './helpers';
 import type { DefineTool } from './registry';
@@ -70,9 +80,18 @@ export function registerQueryTools(tool: DefineTool): void {
   tool(
     'get_card',
     'Detalhe completo de um card: descrição (markdown), campos, sub-tarefas, checklist, conversa e anexos. Em `phase` vem o que fazer na fase em que o card está e o modelo do documento que ela produz; numa sub-tarefa, `storyArtifacts` traz os documentos já anexados à história. ' +
-      'Numa história, `subtasksNow` traz as rodadas da Implementação. Uma imagem ou arquivo colado numa mensagem ou na descrição aparece como `attachment:<nome>`: o arquivo é o anexo de mesmo nome em `attachments`, e pode ser lido pelo `path`.',
-    { card: cardArg },
-    (a, router) => detail(router, findCard(router.snapshot(), a.card).id),
+      'Numa história, `subtasksNow` traz as rodadas da Implementação. Uma imagem ou arquivo colado numa mensagem ou na descrição aparece como `attachment:<nome>`: o arquivo é o anexo de mesmo nome em `attachments`, e pode ser lido pelo `path`. ' +
+      'Para poupar contexto quando já leu o card nesta sessão, peça só os blocos que precisa em `only` (ex.: ["conversation"] para ver as mensagens novas).',
+    {
+      card: cardArg,
+      only: z
+        .array(z.enum(CARD_SECTIONS))
+        .optional()
+        .describe(
+          'Só estes blocos: phase (o que fazer na fase), subtasks (sub-tarefas e rodadas), checklist, links, conversation (a conversa desde o último resumo) e attachments. Título, descrição, campos, modelo, harness e pasta de trabalho vêm sempre. Sem `only`, vem tudo.',
+        ),
+    },
+    (a, router) => detail(router, findCard(router.snapshot(), a.card).id, a.only),
     true,
   );
 

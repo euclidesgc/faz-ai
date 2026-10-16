@@ -1,10 +1,9 @@
-import { CRITICALITY_FIELD } from './critical';
 import { norm } from './filters';
 import type { BoardState, FieldDef, FieldKind, FieldValue, Id, WorkflowKind } from './model';
 import { EFFORT_FIELD } from './models';
 
 // Os campos que o board padrão cria e que o mecanismo procura pelo nome: a triagem, as regras de modelo,
-// o runner, a fase das sub-tarefas e o núcleo. Renomear, apagar ou trocar as opções de um deles quebra
+// o runner e a fase das sub-tarefas. Renomear, apagar ou trocar as opções de um deles quebra
 // esse uso sem aviso, então eles ficam fora de Configurações → Campos personalizados e o host recusa
 // essas mudanças, venham da tela ou do MCP.
 
@@ -39,7 +38,6 @@ export const BOARD_FIELDS: BoardField[] = [
   { name: RULES_FIELD },
   { name: MCPS_FIELD },
   { name: EFFORT_FIELD },
-  { name: CRITICALITY_FIELD, workflow: 'parent' },
 ];
 
 /** O campo do board com este nome, sem diferença de maiúsculas nem de acentos. */
