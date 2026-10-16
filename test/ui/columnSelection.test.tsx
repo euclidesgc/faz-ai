@@ -375,3 +375,32 @@ describe('Column: ações em lote (RF8-RF11)', () => {
     expect(useBoardStore.getState().selectedIds.size).toBe(2);
   });
 });
+
+describe('Column: posição da caixa de selecionar todos no cabeçalho', () => {
+  it('a caixa "selecionar todos" é o primeiro controle do cabeçalho, antes do botão de recolher', () => {
+    const wf = parentWorkflow();
+    const cols = columnsOf(wf.id);
+    const col0 = cols[0]!;
+    renderColumn(col0, wf, cols);
+    const box = screen.getByRole('checkbox', { name: `Selecionar todos de ${col0.name}` });
+    const header = box.closest('header.column-header')!;
+    const toggle = header.querySelector('.collapse-toggle')!;
+    // o checkbox vem antes do botão de recolher no documento (é o início da linha do cabeçalho)
+    expect(box.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(header.querySelector('input, button')).toBe(box);
+  });
+
+  it('coluna sem cards visíveis mantém a caixa no cabeçalho, com a classe column-select--empty (escondida pelo CSS, não sai do DOM)', () => {
+    const wf = parentWorkflow();
+    const cols = columnsOf(wf.id);
+    const col0 = cols[0]!;
+    renderColumn(col0, wf, cols, []);
+    // hidden: true porque o jsdom não carrega styles.css, então a caixa oculta pelo CSS ainda conta como visível aqui
+    const box = screen.getByRole('checkbox', { name: `Selecionar todos de ${col0.name}`, hidden: true });
+    expect(box).toHaveClass('column-select--empty');
+    const header = box.closest('header.column-header')!;
+    expect(header.contains(box)).toBe(true);
+    const toggle = header.querySelector('.collapse-toggle')!;
+    expect(box.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
