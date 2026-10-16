@@ -34,6 +34,7 @@ import { initModels, modelHandlers } from './handlers/models';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
 import { branchRenameHandlers } from './handlers/branchRename';
 import { settleDelivery } from '../delivery';
+import { USAGE_LIMIT_META_KEY, nextPause, parsePause, type UsageLimitPause } from '../../shared/usageLimit';
 
 export type { RouterOptions };
 
@@ -173,6 +174,10 @@ export class MessageRouter {
   private requirementsCheckedAt = 0;
   private requirementsCheck: (() => Promise<void>) | null = null;
   private authExpired: AiTool | null = null;
+  /** a pausa por limite de uso, espelho do que está gravado na `meta` (sobrevive a reabrir o editor) */
+  private usageLimit: UsageLimitPause | null = null;
+  /** o card da execução de teste depois que a pausa venceu: só em memória, para a fila nunca ficar presa num teste que não existe mais */
+  private limitProbe: string | null = null;
   private openTerminalHook: ((command: string) => void) | null = null;
   private environment: EnvironmentReport | null = null;
   private environmentFirstRun = false;
@@ -190,6 +195,7 @@ export class MessageRouter {
     initModels(this.ctx);
     // os agentes de fábrica usam as regras de modelo, que initModels acabou de criar
     this.ctx.harness.bootstrap();
+    this.usageLimit = parsePause(this.ctx.boards.getMeta(USAGE_LIMIT_META_KEY));
     dbHandle.scheduleSave();
   }
 
@@ -246,6 +252,7 @@ export class MessageRouter {
       requirements: this.requirements,
       requirementsCheckedAt: this.requirementsCheckedAt,
       authExpired: this.authExpired,
+      usageLimit: this.usageLimit ? { ...this.usageLimit, probe: this.limitProbe } : null,
       environment: this.environment,
       environmentFirstRun: this.environmentFirstRun,
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
@@ -337,6 +344,37 @@ export class MessageRouter {
     this.authExpired = tool;
     this.notify();
     return true;
+  }
+
+  /**
+   * Mais uma execução da ferramenta terminou por limite de uso: grava a pausa nova (ver `nextPause`) e a devolve. Como
+   * em `setAuthExpired`, quem chama (o runner) registra no log.
+   */
+  recordUsageLimit(tool: AiTool, resetAt: number | null, now: number): UsageLimitPause {
+    const pause = nextPause(this.usageLimit, tool, resetAt, now);
+    this.usageLimit = pause;
+    this.ctx.boards.setMeta(USAGE_LIMIT_META_KEY, JSON.stringify(pause));
+    this.ctx.dbHandle.scheduleSave();
+    this.notify();
+    return pause;
+  }
+
+  /** Uma execução da ferramenta terminou bem: o limite renovou. Devolve se havia pausa dela para apagar. */
+  clearUsageLimit(tool: AiTool): boolean {
+    if (this.usageLimit?.tool !== tool) return false;
+    this.usageLimit = null;
+    // a chave vazia é lida como "sem pausa"; apagar a linha não traria nada a mais
+    this.ctx.boards.setMeta(USAGE_LIMIT_META_KEY, '');
+    this.ctx.dbHandle.scheduleSave();
+    this.notify();
+    return true;
+  }
+
+  /** O card da execução de teste em curso depois que a pausa venceu; null quando ela termina. */
+  setLimitProbe(cardId: string | null): void {
+    if (this.limitProbe === cardId) return;
+    this.limitProbe = cardId;
+    this.notify();
   }
 
   /** O resultado do Diagnóstico do ambiente (informado pelo host, que confere). */
