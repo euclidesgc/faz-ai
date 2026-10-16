@@ -176,6 +176,29 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
   return (
     <div ref={setNodeRef} className={`column ${isOver ? 'over' : ''} ${column.isTerminal ? 'terminal' : ''}`}>
       <header className="column-header">
+        {/* primeiro lugar do cabeçalho, na linha vertical dos checkboxes dos cards; sem cards vivos a caixa
+            fica oculta (não sai do DOM), para o lugar dela continuar reservado e o cabeçalho não pular */}
+        {workflow.kind === 'parent' && (
+          <input
+            type="checkbox"
+            className={`column-select${visibleLiveIds.length === 0 ? ' column-select--empty' : ''}`}
+            checked={allSelected}
+            ref={(el) => {
+              if (el) el.indeterminate = !allSelected && selectedHere;
+            }}
+            aria-label={
+              allSelected
+                ? t('Desmarcar todos de {name}', { name: dt(column.name) })
+                : t('Selecionar todos de {name}', { name: dt(column.name) })
+            }
+            title={
+              allSelected
+                ? t('Desmarcar todos de {name}', { name: dt(column.name) })
+                : t('Selecionar todos de {name}', { name: dt(column.name) })
+            }
+            onChange={() => (allSelected ? clearSelected() : selectMany(visibleLiveIds))}
+          />
+        )}
         <Button variant="icon" className="collapse-toggle" title={t('Colapsar a coluna')} onClick={onToggle}>
           <IconChevronLeft />
         </Button>
@@ -205,27 +228,6 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
           </span>
         )}
         <span className="column-count">{count}</span>
-        {workflow.kind === 'parent' && visibleLiveIds.length > 0 && (
-          <input
-            type="checkbox"
-            className="column-select"
-            checked={allSelected}
-            ref={(el) => {
-              if (el) el.indeterminate = !allSelected && selectedHere;
-            }}
-            aria-label={
-              allSelected
-                ? t('Desmarcar todos de {name}', { name: dt(column.name) })
-                : t('Selecionar todos de {name}', { name: dt(column.name) })
-            }
-            title={
-              allSelected
-                ? t('Desmarcar todos de {name}', { name: dt(column.name) })
-                : t('Selecionar todos de {name}', { name: dt(column.name) })
-            }
-            onChange={() => (allSelected ? clearSelected() : selectMany(visibleLiveIds))}
-          />
-        )}
         <Menu
           title={t('Ações da coluna')}
           items={[
