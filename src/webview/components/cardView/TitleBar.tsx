@@ -38,6 +38,7 @@ export function TitleBar({
   card,
   type,
   work,
+  busy = false,
   overlay,
   collapsed,
   onToggleCollapse,
@@ -46,6 +47,8 @@ export function TitleBar({
   card: Card;
   type?: CardType;
   work: AiWork;
+  /** um pedido deste card está esperando o host: spinner na faixa, antes dos botões */
+  busy?: boolean;
   overlay: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -63,6 +66,7 @@ export function TitleBar({
       status={archived ? null : card.status}
       leading={leading}
     >
+      {busy && <span className="spinner" role="status" aria-label={t('Salvando…')} />}
       {!overlay && (
         <span className="card-actions">
           <CollapseToggle collapsed={collapsed} onToggle={onToggleCollapse} />

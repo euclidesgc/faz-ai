@@ -6,6 +6,7 @@ import { isCardCollapsed, isLive } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { t, dt } from '../i18n';
 import { cards, settings } from '../commands';
+import { useAction } from '../useAction';
 import { requestArchiveMany, requestConcludeMany, requestMoveMany, requestTrashMany } from '../store/actions';
 import { SortableCard } from './Card';
 import { Menu } from './Menu';
@@ -115,11 +116,14 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
   const types = state.cardTypes.filter((ct) => ct.defaultWorkflowId === workflow.id);
   const canAdd = workflow.kind === 'parent' || !!selectedParentId;
 
-  const submit = () => {
+  // o campo só limpa quando o host confirma: se a criação falhar, o título fica para tentar de novo
+  const create = useAction((type: string) =>
+    cards.create({ typeId: type, columnId: column.id, parentId: workflow.kind === 'child' ? selectedParentId : null, title: title.trim() }),
+  );
+  const submit = async () => {
     const type = typeId || types[0]?.id;
     if (!title.trim() || !type) return;
-    cards.create({ typeId: type, columnId: column.id, parentId: workflow.kind === 'child' ? selectedParentId : null, title: title.trim() });
-    setTitle('');
+    if (await create.run(type)) setTitle('');
   };
 
   const rename = () => {
@@ -138,7 +142,7 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
       confirmLabel: t('Excluir coluna'),
       danger: true,
       choices: n ? { label: t('Mover cards para'), options: others.map((c) => ({ value: c.id, label: dt(c.name) })) } : undefined,
-      onConfirm: (dest) => settings.deleteColumn(column.id, dest ?? others[0]!.id),
+      onConfirm: (dest) => void settings.deleteColumn(column.id, dest ?? others[0]!.id),
     });
   };
 
@@ -300,9 +304,10 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
               aria-label={t('Título do card')}
               placeholder={t('Título (Enter adiciona)')}
               value={title}
+              disabled={create.busy}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submit();
+                if (e.key === 'Enter') void submit();
                 if (e.key === 'Escape') setAdding(false);
               }}
             />
@@ -315,7 +320,7 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
               />
             )}
             <div className="row">
-              <Button variant="primary" onClick={submit}>
+              <Button variant="primary" loading={create.busy} onClick={() => void submit()}>
                 {workflow.kind === 'child' ? t('Criar sub-tarefa') : t('Criar card')}
               </Button>
               <Button onClick={() => setAdding(false)}>{t('Cancelar')}</Button>

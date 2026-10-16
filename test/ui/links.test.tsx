@@ -1,6 +1,6 @@
-import { choose, lastSent, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { choose, confirmLast, lastSent, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { LinksSection } from '../../src/webview/components/card/LinksSection';
@@ -45,8 +45,10 @@ describe('LinksSection', () => {
     await userEvent.type(section().getByLabelText('Buscar card para vincular'), 'cadastro');
     await userEvent.click(within(section().getByRole('list', { name: 'Cards encontrados' })).getByRole('button'));
     expect(lastSent('link.add')).toEqual({ type: 'link.add', fromId: a, toId: b, kind: 'child' });
-    // a busca limpa depois de vincular
-    expect(section().getByLabelText('Buscar card para vincular')).toHaveValue('');
+    // a busca só limpa quando o host confirma o vínculo
+    expect(section().getByLabelText('Buscar card para vincular')).toHaveValue('cadastro');
+    confirmLast();
+    await waitFor(() => expect(section().getByLabelText('Buscar card para vincular')).toHaveValue(''));
   });
 
   it('"é o pai deste card" inverte as pontas e "é relativo" não tem hierarquia', async () => {
@@ -55,6 +57,8 @@ describe('LinksSection', () => {
     await userEvent.type(section().getByLabelText('Buscar card para vincular'), 'cadastro');
     await userEvent.click(within(section().getByRole('list', { name: 'Cards encontrados' })).getByRole('button'));
     expect(lastSent('link.add')).toEqual({ type: 'link.add', fromId: b, toId: a, kind: 'child' });
+    confirmLast();
+    await waitFor(() => expect(section().getByLabelText('Buscar card para vincular')).toHaveValue(''));
     await choose(section().getByRole('combobox', { name: 'Tipo de vínculo' }), /é relativo/);
     await userEvent.type(
       section().getByLabelText('Buscar card para vincular'),

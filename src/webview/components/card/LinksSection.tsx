@@ -4,6 +4,7 @@ import { cardRef, type Card, type LinkKind } from '../../../shared/model';
 import { childrenOf, columnOf, isLive } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { links } from '../../commands';
+import { useAction } from '../../useAction';
 import { Button as RxButton, IconButton, TextField } from '@radix-ui/themes';
 import { IconTrash, SelectField } from '../ui';
 import { t, dt } from '../../i18n';
@@ -25,6 +26,24 @@ export function LinksSection({ card }: { card: Card }) {
   const openCard = useBoardStore((s) => s.openCard);
   const [relation, setRelation] = useState<Relation>('child');
   const [query, setQuery] = useState('');
+  // o card em que a pessoa clicou (adicionar ou remover) mostra a espera; os outros seguem livres
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const add = useAction(async (other: Card) => {
+    setPendingId(other.id);
+    try {
+      await links.add(...ends(other, relation), kind(relation));
+    } finally {
+      setPendingId(null);
+    }
+  });
+  const removeLink = useAction(async (id: string) => {
+    setPendingId(id);
+    try {
+      await links.remove(state.links.find((l) => (l.fromId === card.id && l.toId === id) || (l.toId === card.id && l.fromId === id))!.id);
+    } finally {
+      setPendingId(null);
+    }
+  });
   const linked = linkedCards(state, card.id);
   const progress = childProgress(state, card.id);
   const structuralParent = card.parentId ? state.cards.find((c) => c.id === card.parentId) : undefined;
@@ -51,10 +70,9 @@ export function LinksSection({ card }: { card: Card }) {
         .slice(0, RESULTS)
     : [];
 
-  const remove = (id: string) =>
-    links.remove(state.links.find((l) => (l.fromId === card.id && l.toId === id) || (l.toId === card.id && l.fromId === id))!.id);
+  const remove = (id: string) => void removeLink.run(id);
   const row = (c: Card) => (
-    <li key={c.id} className={columnOf(state, c)?.category !== 'open' ? 'done' : ''}>
+    <li key={c.id} className={columnOf(state, c)?.category !== 'open' ? 'done' : ''} aria-busy={pendingId === c.id || undefined}>
       <a onClick={() => openCard(c.id)}>
         <span className="card-id">{cardRef(c)}</span> {c.title}
       </a>
@@ -65,6 +83,8 @@ export function LinksSection({ card }: { card: Card }) {
         size="1"
         title={t('Remover o vínculo')}
         aria-label={t('Remover o vínculo com {card}', { card: cardRef(c) })}
+        loading={removeLink.busy && pendingId === c.id}
+        disabled={removeLink.busy}
         onClick={() => remove(c.id)}
       >
         <IconTrash />
@@ -151,9 +171,11 @@ export function LinksSection({ card }: { card: Card }) {
               <RxButton
                 variant="ghost"
                 size="1"
+                loading={add.busy && pendingId === c.id}
+                disabled={add.busy}
                 onClick={() => {
-                  links.add(...ends(c, relation), kind(relation));
-                  setQuery('');
+                  // o resultado da busca só some quando o host confirma o vínculo
+                  void add.run(c).then((ok) => ok && setQuery(''));
                 }}
               >
                 <span className="card-id">{cardRef(c)}</span> {c.title}{' '}

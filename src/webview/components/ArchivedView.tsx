@@ -1,6 +1,7 @@
 import { cardRef } from '../../shared/model';
 import { archivedIn } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
+import { useCardBusy } from '../store/busyCards';
 import { formatDateTime, t, tn, dt } from '../i18n';
 import { requestRestoreArchived } from '../store/actions';
 import { CardView } from './Card';
@@ -42,13 +43,7 @@ export function ArchivedView() {
                     <div className="archived-meta">
                       <span>{formatDateTime(card.archivedAt!)}</span>
                       <span className="spacer" />
-                      <Button
-                        title={t('Restaurar {title}', { title: `${cardRef(card)} ${card.title}` })}
-                        aria-label={t('Restaurar {title}', { title: `${cardRef(card)} ${card.title}` })}
-                        onClick={() => requestRestoreArchived(card.id)}
-                      >
-                        {t('Restaurar')}
-                      </Button>
+                      <RestoreButton cardId={card.id} label={t('Restaurar {title}', { title: `${cardRef(card)} ${card.title}` })} />
                     </div>
                   </div>
                 ))}
@@ -58,5 +53,15 @@ export function ArchivedView() {
         );
       })}
     </div>
+  );
+}
+
+/** Restaurar mostra a espera no próprio botão enquanto o card tem um pedido no host. */
+function RestoreButton({ cardId, label }: { cardId: string; label: string }) {
+  const busy = useCardBusy(cardId);
+  return (
+    <Button title={label} aria-label={label} loading={busy} onClick={() => requestRestoreArchived(cardId)}>
+      {t('Restaurar')}
+    </Button>
   );
 }

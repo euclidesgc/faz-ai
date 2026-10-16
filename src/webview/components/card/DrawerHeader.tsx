@@ -1,6 +1,7 @@
 import type { Card } from '../../../shared/model';
 import { cardsIn, columnsOf, typesOf, isAiWorking, aiWorkingChildren } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
+import { useCardBusy } from '../../store/busyCards';
 import { cards } from '../../commands';
 import { requestArchive, requestMove, requestRestoreArchived, requestTrash } from '../../store/actions';
 import { Menu } from '../Menu';
@@ -14,6 +15,8 @@ export function DrawerHeader({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
   const openCard = useBoardStore((s) => s.openCard);
   const close = () => openCard(null);
+  // tipo, coluna, restaurar, título, campos…: enquanto o host não responde, o spinner fica ao lado do LED
+  const busy = useCardBusy(card.id);
   const trashed = card.deletedAt !== null;
   const archived = card.archivedAt !== null;
   const isParent = state.workflows.find((w) => w.id === card.workflowId)?.kind === 'parent';
@@ -29,8 +32,9 @@ export function DrawerHeader({ card }: { card: Card }) {
   const columns = columnsOf(state, card.workflowId).map((c) => ({ value: c.id, label: dt(c.name) }));
 
   return (
-    <header className="drawer-header">
+    <header className="drawer-header" aria-busy={busy || undefined}>
       <AiLed work={work} status={archived || trashed ? null : card.status} />
+      {busy && <span className="spinner" role="status" aria-label={t('Salvando…')} />}
       <SelectField aria-label={t('Tipo')} options={types} value={card.typeId} onChange={(typeId) => cards.update(card.id, { typeId })} />
       <SelectField
         aria-label={t('Coluna')}
@@ -41,7 +45,7 @@ export function DrawerHeader({ card }: { card: Card }) {
       />
       <span className="spacer" />
       {trashed && (
-        <Button variant="primary" onClick={() => cards.restore(card.id)}>
+        <Button variant="primary" loading={busy} onClick={() => void cards.restore(card.id)}>
           {t('Restaurar')}
         </Button>
       )}

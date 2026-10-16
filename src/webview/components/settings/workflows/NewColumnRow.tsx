@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Column } from '../../../../shared/model';
 import { settings } from '../../../commands';
+import { useAction } from '../../../useAction';
 import { Button, TextField } from '@radix-ui/themes';
 import { SelectField } from '../../ui';
 import { dt, t } from '../../../i18n';
@@ -28,11 +29,14 @@ export function NewColumnRow({
   const [name, setName] = useState('');
   const [after, setAfter] = useState(() => defaultAfter(cols));
   const ready = name.trim() !== '';
+  // a linha de rascunho só fecha quando o host confirma a coluna nova
+  const create = useAction(() =>
+    settings.createColumn(workflowId, name.trim(), after === START ? 0 : cols.findIndex((c) => c.id === after) + 1),
+  );
 
-  const add = () => {
+  const add = async () => {
     if (!ready) return;
-    settings.createColumn(workflowId, name.trim(), after === START ? 0 : cols.findIndex((c) => c.id === after) + 1);
-    onDone();
+    if (await create.run()) onDone();
   };
 
   return (
@@ -46,7 +50,7 @@ export function NewColumnRow({
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') add();
+              if (e.key === 'Enter') void add();
               if (e.key === 'Escape') onDone();
             }}
           />
@@ -62,7 +66,7 @@ export function NewColumnRow({
           <Button variant="soft" color="gray" onClick={onDone}>
             {t('Cancelar')}
           </Button>
-          <Button disabled={!ready} onClick={add}>
+          <Button disabled={!ready} loading={create.busy} onClick={() => void add()}>
             {t('Criar coluna')}
           </Button>
         </div>

@@ -1,5 +1,6 @@
 import type { Tracked, WebviewToHost } from '../shared/messages';
 import { onHostMessage, postToHost } from './vscode';
+import { beginRequest } from './inFlight';
 
 /** Quanto tempo uma ação espera o `done` do host antes de desistir e destravar a tela. */
 export const REQUEST_TIMEOUT_MS = 20_000;
@@ -9,7 +10,13 @@ export const REQUEST_TIMEOUT_MESSAGE = 'O Faz AI demorou para responder. Confira
 
 const pending = new Set<() => void>();
 
-/** Desarma os pedidos em espera sem resolvê-los (a página está sendo descartada; nos testes, entre um caso e outro). */
+/** Texto do erro com que um pedido em espera é encerrado ao descartar a página (ou, nos testes, entre um caso e outro). */
+export const REQUEST_CANCELLED_MESSAGE = 'Pedido cancelado.';
+
+/**
+ * Desarma os pedidos em espera, rejeitando cada um: quem marcou um botão, um card ou a barra do topo como ocupado
+ * solta a marca (a página está sendo descartada; nos testes, entre um caso e outro).
+ */
 export function cancelPendingRequests(): void {
   pending.forEach((cancel) => cancel());
   pending.clear();
@@ -28,13 +35,19 @@ function newRequestId(): string {
  */
 export function request(msg: WebviewToHost, opts: { timeout?: number } = {}): Promise<void> {
   const requestId = newRequestId();
+  const end = beginRequest();
   const promise = new Promise<void>((resolve, reject) => {
     const cleanup = () => {
       off();
       clearTimeout(timer);
-      pending.delete(cleanup);
+      pending.delete(cancel);
+      end();
     };
-    pending.add(cleanup);
+    const cancel = () => {
+      cleanup();
+      reject(new Error(REQUEST_CANCELLED_MESSAGE));
+    };
+    pending.add(cancel);
     const off = onHostMessage((m) => {
       if (m.type !== 'done' || m.requestId !== requestId) return;
       cleanup();

@@ -2,6 +2,8 @@ import { badgeStyle } from '../../shared/color';
 import { cardRef } from '../../shared/model';
 import { columnOf } from '../../shared/selectors';
 import { useBoardStore, withOverlay } from '../store/boardStore';
+import { useCardBusy } from '../store/busyCards';
+import type { Card } from '../../shared/model';
 import { formatDateTime, t, dt } from '../i18n';
 import { cards, trash } from '../commands';
 import { Button, DeleteButton, IconParent } from './ui';
@@ -52,46 +54,55 @@ export function TrashView() {
             </tr>
           </thead>
           <tbody>
-            {roots.map((c) => {
-              const kids = deleted.filter((k) => k.parentId === c.id).length;
-              const type = state.cardTypes.find((ct) => ct.id === c.typeId);
-              const column = columnOf(state, c);
-              const parent = c.parentId ? state.cards.find((p) => p.id === c.parentId) : undefined;
-              return (
-                <tr key={c.id}>
-                  <td>
-                    <span className="card-id">{cardRef(c)}</span> <strong>{c.title}</strong>
-                    {kids > 0 && <span className="muted"> + {t('{n} sub-tarefa(s)', { n: kids })}</span>}
-                    {parent && (
-                      <div className="muted small">
-                        <IconParent /> {cardRef(parent)} {parent.title}
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    <span className="type-badge" style={badgeStyle(type?.color)}>
-                      {type && dt(type.name)}
-                    </span>
-                  </td>
-                  <td>{column && dt(column.name)}</td>
-                  <td>{formatDateTime(c.deletedAt!)}</td>
-                  <td className="row end">
-                    <Button onClick={() => cards.restore(c.id)}>{t('Restaurar')}</Button>
-                    <DeleteButton
-                      variant="ghost"
-                      question={t('Apagar "{title}" definitivamente?', { title: c.title })}
-                      message={t('Comentários, anexos e sub-tarefas deste card também serão apagados. Não dá para desfazer.')}
-                      onConfirm={() => cards.deletePermanent(c.id)}
-                    >
-                      {t('Apagar de vez')}
-                    </DeleteButton>
-                  </td>
-                </tr>
-              );
-            })}
+            {roots.map((c) => (
+              <TrashRow key={c.id} card={c} kids={deleted.filter((k) => k.parentId === c.id).length} />
+            ))}
           </tbody>
         </table>
       )}
     </div>
+  );
+}
+
+/** Uma linha da lixeira: restaurar e apagar mostram a espera no botão clicado enquanto o host responde. */
+function TrashRow({ card: c, kids }: { card: Card; kids: number }) {
+  const state = useBoardStore((s) => s.state)!;
+  const busy = useCardBusy(c.id);
+  const type = state.cardTypes.find((ct) => ct.id === c.typeId);
+  const column = columnOf(state, c);
+  const parent = c.parentId ? state.cards.find((p) => p.id === c.parentId) : undefined;
+  return (
+    <tr aria-busy={busy || undefined}>
+      <td>
+        <span className="card-id">{cardRef(c)}</span> <strong>{c.title}</strong>
+        {kids > 0 && <span className="muted"> + {t('{n} sub-tarefa(s)', { n: kids })}</span>}
+        {parent && (
+          <div className="muted small">
+            <IconParent /> {cardRef(parent)} {parent.title}
+          </div>
+        )}
+      </td>
+      <td>
+        <span className="type-badge" style={badgeStyle(type?.color)}>
+          {type && dt(type.name)}
+        </span>
+      </td>
+      <td>{column && dt(column.name)}</td>
+      <td>{formatDateTime(c.deletedAt!)}</td>
+      <td className="row end">
+        <Button loading={busy} onClick={() => void cards.restore(c.id)}>
+          {t('Restaurar')}
+        </Button>
+        <DeleteButton
+          variant="ghost"
+          disabled={busy}
+          question={t('Apagar "{title}" definitivamente?', { title: c.title })}
+          message={t('Comentários, anexos e sub-tarefas deste card também serão apagados. Não dá para desfazer.')}
+          onConfirm={() => void cards.deletePermanent(c.id)}
+        >
+          {t('Apagar de vez')}
+        </DeleteButton>
+      </td>
+    </tr>
   );
 }

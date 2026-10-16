@@ -120,7 +120,7 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
                           ? { label: t('Mover cards para'), options: others(c.id).map((x) => ({ value: x.id, label: x.name })) }
                           : undefined
                       }
-                      onConfirm={(dest) => settings.deleteColumn(c.id, dest ?? others(c.id)[0]!.id)}
+                      onConfirm={(dest) => void settings.deleteColumn(c.id, dest ?? others(c.id)[0]!.id)}
                     />
                   </td>
                 </SortableRow>

@@ -15,6 +15,7 @@ import { ChatPanel } from './components/chat/ChatPanel';
 import { Dialog } from './components/Dialog';
 import { BranchRenameDialog } from './components/BranchRenameDialog';
 import { BusyOverlay } from './components/BusyOverlay';
+import { SyncBar } from './components/SyncBar';
 import { BoardPlaceholder } from './components/ui';
 import { FilterBar } from './components/FilterBar';
 import { SelectionBar } from './components/SelectionBar';
@@ -105,6 +106,7 @@ export function App() {
       // `inert` tira foco e clique de tudo atrás do véu; o React 18 ainda não o tipa, por isso o spread
       {...(busyOverlay ? { inert: '' } : {})}
     >
+      <SyncBar />
       <header className="topbar">
         <h1 title={state.board.name}>{state.board.name}</h1>
         <nav>

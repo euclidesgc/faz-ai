@@ -31,7 +31,7 @@ export function ImportedFolders({ tool }: { tool: AiTool }) {
                   }),
                   confirmLabel: t('Remover pasta'),
                   danger: true,
-                  onConfirm: () => harness.removeImport(tool, x.dir),
+                  onConfirm: () => void harness.removeImport(tool, x.dir),
                 })
               }
             >

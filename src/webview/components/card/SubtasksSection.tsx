@@ -2,6 +2,7 @@ import { cardRef, type Card } from '../../../shared/model';
 import { childrenOf, columnOf, isAiWorking, subtaskSlot } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
+import { useAction } from '../../useAction';
 import { AddInput, Button } from '../ui';
 import { AiLed } from '../cardView/AiLed';
 import { t, dt } from '../../i18n';
@@ -11,13 +12,18 @@ export function SubtasksSection({ story }: { story: Card }) {
   const state = useBoardStore((s) => s.state)!;
   const openCard = useBoardStore((s) => s.openCard);
   const selectParent = useBoardStore((s) => s.selectParent);
+  // o campo trava até o host confirmar a sub-tarefa nova (o texto fica se falhar)
+  const add = useAction((title: string) => {
+    const slot = subtaskSlot(state);
+    if (!slot) throw new Error('Não há workflow de sub-tarefas.');
+    return cards.create({ ...slot, parentId: story.id, title });
+  });
   if (!state.workflows.some((w) => w.kind === 'child')) return null;
   const children = childrenOf(state, story.id);
 
   const addSub = (title: string) => {
-    const slot = subtaskSlot(state);
-    if (!slot) return false;
-    cards.create({ ...slot, parentId: story.id, title });
+    if (!subtaskSlot(state)) return false;
+    void add.run(title);
   };
 
   return (
@@ -53,7 +59,7 @@ export function SubtasksSection({ story }: { story: Card }) {
           );
         })}
       </ul>
-      <AddInput placeholder={t('+ Nova sub-tarefa (Enter)')} onAdd={addSub} />
+      <AddInput placeholder={t('+ Nova sub-tarefa (Enter)')} loading={add.busy} onAdd={addSub} />
     </section>
   );
 }

@@ -1,6 +1,6 @@
-import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { choose, confirmLast, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
@@ -96,7 +96,10 @@ describe('TypesSettings', () => {
     await choose(within(name.closest('tr')!).getByRole('combobox', { name: 'Workflow' }), wf.name);
     await userEvent.type(name, 'Bug{Enter}');
     expect(lastSent('settings.type.create')).toMatchObject({ name: 'Bug', defaultWorkflowId: wf.id });
-    expect(screen.queryByPlaceholderText('Nome do tipo')).toBeNull();
+    // a linha só fecha quando o host confirma
+    expect(screen.getByPlaceholderText('Nome do tipo')).toBeInTheDocument();
+    confirmLast();
+    await waitFor(() => expect(screen.queryByPlaceholderText('Nome do tipo')).toBeNull());
     expect(screen.getByRole('button', { name: 'Novo tipo' })).toBeEnabled();
   });
 
