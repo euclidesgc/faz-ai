@@ -8,7 +8,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Database } from 'sql.js';
-import { AiGateway, NO_CARD, type AiCall } from '../src/extension/ai/gateway';
+import { AiGateway, NO_CARD, type AiCall, type AiRunEnd } from '../src/extension/ai/gateway';
+import { MeasureEndedError } from '../src/extension/aiOutput/errors';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import { ChatSession } from '../src/extension/chat';
 import { openInMemory } from '../src/extension/db/database';
@@ -120,6 +121,33 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     vi.advanceTimersByTime(61_000);
 
     expect(rows().map((r) => r.outcome)).toEqual(['failed', 'stopped', 'timeout']);
+  });
+
+  it('a falha antes do primeiro evento não é repetida e fica com o consumo desconhecido, não zero (#739)', () => {
+    const logged: string[] = [];
+    const run = gateway().run(call({ log: (l) => logged.push(l) }));
+    const ends: AiRunEnd[] = [];
+    run.onExit((e) => ends.push(e));
+
+    procs[0]!.write('{"type":"assi');
+    procs[0]!.exit(1);
+
+    expect(procs).toHaveLength(1);
+    expect(ends).toHaveLength(1);
+    expect(ends[0]).toMatchObject({ attempts: 1, outcome: 'failed', code: 1 });
+    expect(ends[0]!.measureError).toBeInstanceOf(MeasureEndedError);
+    expect(rows()[0]).toMatchObject({ outcome: 'failed', measure: 'none', inputTokens: null, outputTokens: null });
+    // o canal identifica a execução e a tentativa
+    expect(logged[0]).toContain(`(tentativa 1 da execução ${run.runId})`);
+  });
+
+  it('a execução medida chega a quem chamou sem motivo de falha da medição', () => {
+    const run = gateway().run(call());
+    const ends: AiRunEnd[] = [];
+    run.onExit((e) => ends.push(e));
+    procs[0]!.write(CLAUDE_OUTPUT);
+    procs[0]!.exit(0);
+    expect(ends[0]!.measureError).toBeNull();
   });
 
   it('o Cursor grava os tokens que informou e nenhum custo: o board não calcula dinheiro', () => {

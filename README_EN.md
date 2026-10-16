@@ -610,6 +610,14 @@ one), subagents and skills, with the number of calls.
   the end of each run a summary line follows with input, output, cache read and cache creation, and
   turns, for example `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação
   de cache · 8 turnos`. Turns are left out when the tool does not report them. The line is written in Portuguese, as the board's log channel is.
+- **A run that fails before the first event is not repeated.** The board asks the tool for the
+  structured output and only repeats the call in text mode, once and with the same restrictions, when
+  the tool refuses one of those arguments before starting (an older CLI version). Any other failure
+  before the first event (network, quota, login, crash, truncated output) ends as a failure, with
+  usage "não medido" (not measured): the tool may have changed files or touched the board before
+  failing, and repeating would duplicate the effect and the usage. The blocked card and the chat error
+  say the run was not repeated, and the "Chamando…" line in the channel shows the attempt and the run
+  id.
 - **Questions in the board chat** are recorded too, with no card attached.
 - **The detail of each run is kept for a window you configure**, from 1 to 24 months (the current
   month plus the earlier ones). The default is 6 months. After the window the detail is discarded,
