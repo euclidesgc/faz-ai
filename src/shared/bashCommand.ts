@@ -3,8 +3,13 @@
  * (que podem ter caminhos ou dados da pessoa). Um termo por segmento de um comando encadeado.
  */
 
-/** Executáveis cujo subcomando também é guardado (`npm test`, `git status`). */
-const WITH_SUBCOMMAND = new Set(['npm', 'npx', 'git', 'node', 'pnpm', 'yarn', 'docker', 'gh', 'cargo', 'go', 'make']);
+/**
+ * Executáveis cujo subcomando também é guardado (`npm test`, `git status`). `node` não entra: o que
+ * vem depois dele é um arquivo, e o nome do arquivo é argumento.
+ */
+const WITH_SUBCOMMAND = new Set(['npm', 'npx', 'git', 'pnpm', 'yarn', 'docker', 'gh', 'cargo', 'go', 'make']);
+/** Um verbo de subcomando: minúsculas e hífen, sem ponto nem barra, para não gravar nome de arquivo. */
+const VERB = /^[a-z][a-z-]*$/;
 const SAFE_WORD = /^[A-Za-z0-9._-]+$/;
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 
@@ -22,7 +27,7 @@ export function bashCommandTerms(command: string): string[] {
       continue;
     }
     const sub = words[1];
-    if (WITH_SUBCOMMAND.has(base) && sub && !sub.startsWith('-') && SAFE_WORD.test(sub)) terms.push(`${base} ${sub}`);
+    if (WITH_SUBCOMMAND.has(base) && sub && VERB.test(sub)) terms.push(`${base} ${sub}`);
     else terms.push(base);
   }
   return terms;
