@@ -4,12 +4,17 @@
 //
 // Duas coisas que valem dinheiro e por isso são regra, não gosto:
 //
-// 1. **A volta para texto acontece uma vez, e só se nada aconteceu.** Se o processo morreu sem o
-//    leitor ter entendido um único evento, a CLI recusou o argumento antes de gastar token
-//    (verificado: sai na hora, código 1, `stdout` vazio) e repetir é de graça. Se morreu DEPOIS de
-//    eventos, o trabalho aconteceu e repetir cobraria duas vezes — então não repete. E se saiu com
-//    código 0 sem evento nenhum, a CLI respondeu em texto: também não repete, e as linhas viram a
-//    resposta, sem medição. O motivo só culpa a versão instalada quando o `stderr` diz que recusou.
+// 1. **A volta para texto acontece uma vez, e só com a recusa comprovada do formato.** Morrer sem
+//    um único evento reconhecido NÃO prova que nada aconteceu: a CLI pode ter alterado arquivos ou
+//    chamado o board e caído (rede, cota, queda) antes de o leitor entender um evento, e repetir
+//    duplicaria o efeito e o consumo. Só repete quando a tentativa estruturada saiu sozinha com
+//    erro, sem escrever nada no `stdout`, e o `stderr` recusou um dos argumentos que só o modo
+//    estruturado acrescenta (a CLI recusa o argumento antes de começar). Qualquer outra falha sem
+//    evento termina ali, com o motivo `MeasureEndedError` e o consumo desconhecido. Se morreu DEPOIS
+//    de eventos, o trabalho aconteceu: também não repete. E se saiu com código 0 sem evento nenhum,
+//    a CLI respondeu em texto: não repete, e as linhas viram a resposta, sem medição. A segunda
+//    tentativa é o mesmo comando sem os argumentos do formato: as restrições (permissão, ferramentas,
+//    servidores) vão iguais.
 // 2. **O `onExit` de quem chamou dispara uma vez só**, no fim da última tentativa. É isso que
 //    mantém o executor de cards e o chat sem máquina de estado nova.
 //
@@ -41,6 +46,8 @@ export interface MeasuredDeps {
    * canal do editor e para o `tail` da falha; o chat guarda para a resposta e para o `tail` do erro.
    */
   log: (line: string) => void;
+  /** o id da execução em `ai_runs`, para o canal identificar a chamada; ausente ou '' quando o log não gravou */
+  runId?: string;
 }
 
 export interface Measured {
@@ -48,6 +55,8 @@ export interface Measured {
   proc: RunningProcess;
   /** O acumulado da execução, para ler no `onExit`. */
   report: () => RunReport;
+  /** por que a medição não aconteceu (a classe diz o caso); null quando foi medida */
+  failure: () => MeasureError | null;
 }
 
 /** Tamanho de cada argumento na linha que mostra a chamada, como o executor já cortava. */
@@ -63,6 +72,30 @@ const REST_MAX = 300;
  */
 const REFUSAL =
   /unknown (option|argument|flag|command)|unrecognized (option|argument|arguments)|unexpected argument|invalid (option|argument)|no such (option|flag)|requires --verbose|not a valid (option|argument)/i;
+
+/**
+ * Os argumentos que só o modo estruturado acrescenta ao comando da ferramenta, sem os traços e em
+ * minúsculas (no Claude Code: `output-format`, `stream-json`, `verbose`). Sai da diferença entre os
+ * dois comandos que o provider monta, então uma ferramenta nova não precisa de lista própria.
+ */
+export function formatArgs(tool: AiTool, input: HeadlessInput): string[] {
+  const plain = new Set(headlessCommand(tool, { ...input, structured: false }).args);
+  return headlessCommand(tool, { ...input, structured: true })
+    .args.filter((a) => !plain.has(a))
+    .map((a) => a.replace(/^-+/, '').toLowerCase())
+    .filter(Boolean);
+}
+
+/**
+ * Se a linha do `stderr` recusa um argumento E cita um dos argumentos do formato. Recusar outro
+ * argumento (ex.: `--permission-mode`) não é motivo para voltar para texto: a segunda tentativa
+ * levaria o mesmo argumento e cairia igual, ou rodaria sem a restrição.
+ */
+export function refusesFormat(line: string, args: readonly string[]): boolean {
+  if (!REFUSAL.test(line)) return false;
+  const lower = line.toLowerCase();
+  return args.some((a) => lower.includes(a));
+}
 
 const isJson = (line: string): boolean => {
   try {
@@ -119,6 +152,9 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
   const label = aiToolInfo(tool).label;
   const provider = providerFor(tool);
   const model = input.exec?.model?.name ?? null;
+  const fmtArgs = formatArgs(tool, input);
+  /** quantas tentativas já começaram, para a linha da chamada no canal */
+  let tries = 0;
 
   const listeners: ((code: number | null, error?: Error) => void)[] = [];
   let current: RunningProcess | null = null;
@@ -161,27 +197,33 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
     const stderr = lineSplitter();
     /** as linhas cruas do `stdout` desta tentativa, para virar resposta se a CLI ignorar o formato */
     const raw: string[] = [];
-    /** se o `stderr` desta tentativa tem cara de argumento recusado */
-    let refused = false;
+    /** se o `stdout` desta tentativa recebeu algum byte: com saída, a CLI já começou a trabalhar */
+    let wrote = false;
+    /** se o `stderr` desta tentativa recusou um dos argumentos do formato */
+    let refusedFormat = false;
     const toLog = (line: string): void => {
       if (line) deps.log(line);
     };
     const feed = (text: string, stream: OutputStream): void => {
       if (stream === 'stderr') {
         for (const line of stderr.push(text)) {
-          if (REFUSAL.test(line)) refused = true;
+          if (refusesFormat(line, fmtArgs)) refusedFormat = true;
           toLog(line);
         }
         return;
       }
+      if (text) wrote = true;
       for (const line of stdout.push(text)) {
         if (format !== 'text') raw.push(line);
         for (const out of read.push(line, 'stdout')) deps.log(out);
       }
     };
-    // esta linha é onde se confere que a chamada foi com os argumentos do modo estruturado
+    // esta linha é onde se confere que a chamada foi com os argumentos do modo estruturado; o sufixo
+    // diz de que execução e de que tentativa ela é, para a pessoa ver se houve repetição
+    tries++;
+    const which = deps.runId ? `tentativa ${tries} da execução ${deps.runId}` : `tentativa ${tries}`;
     deps.log(
-      `Chamando ${label}: ${command.command} ${command.args.map((a) => (a.length > ARG_MAX ? `${a.slice(0, ARG_MAX)}…` : a)).join(' ')}`,
+      `Chamando ${label}: ${command.command} ${command.args.map((a) => (a.length > ARG_MAX ? `${a.slice(0, ARG_MAX)}…` : a)).join(' ')} (${which})`,
     );
 
     let proc: RunningProcess;
@@ -211,7 +253,7 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
         }
       }
       for (const line of stderr.flush()) {
-        if (REFUSAL.test(line)) refused = true;
+        if (refusesFormat(line, fmtArgs)) refusedFormat = true;
         toLog(line);
       }
       cleanup();
@@ -228,18 +270,31 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
         finish(code, error);
         return;
       }
-      // morreu sem ter produzido um único evento válido: nenhum token foi gasto em resposta, e repetir
-      // é de graça. Com `error` não se repete: comando que não existe não passa a existir na segunda
-      // vez. Só culpa a versão instalada quando o `stderr` disse que recusou o argumento.
-      if (silent) {
-        failure = refused ? new MeasureRefusedError(label) : new MeasureEndedError();
+      // a CLI recusou o argumento do formato antes de começar (nada no `stdout`): a versão instalada
+      // não aceita a saída estruturada, e a mesma chamada em texto é a única repetição permitida. Com
+      // `error` não se chega aqui: comando que não existe não passa a existir na segunda vez.
+      if (silent && !wrote && refusedFormat) {
+        failure = new MeasureRefusedError(label);
         deps.log(failure.message);
+        // a parada pode chegar enquanto a decisão é registrada: a segunda tentativa não começa, e o
+        // relatório não afirma uma repetição que não aconteceu
+        if (killed) {
+          failure = new MeasureEndedError();
+          finish(code, error);
+          return;
+        }
         try {
           attempt(false);
         } catch (e) {
           finish(null, e instanceof Error ? e : new Error(String(e)));
         }
         return;
+      }
+      // caiu antes do primeiro evento sem recusa comprovada do formato: pode ter trabalhado (arquivos,
+      // board) antes de cair, então não repete, e o consumo fica desconhecido
+      if (silent) {
+        failure = new MeasureEndedError();
+        deps.log(failure.message);
       }
       finish(code, error);
     });
@@ -263,5 +318,6 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
       if (report.measure !== 'none') return report;
       return { ...report, reason: (failure ?? new MeasureBrokenError(label)).message };
     },
+    failure: () => (reader.report().measure !== 'none' ? null : (failure ?? new MeasureBrokenError(label))),
   };
 }

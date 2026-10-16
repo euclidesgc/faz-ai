@@ -579,6 +579,13 @@ uma), subagentes e skills, com a contagem de chamadas.
   de cada execução vem uma linha de resumo com entrada, saída, leitura e criação de cache e turnos,
   por exemplo `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação de
   cache · 8 turnos`. Os turnos ficam de fora quando a ferramenta não os informa.
+- **A execução que cai antes do primeiro evento não é repetida.** O board pede a saída estruturada à
+  ferramenta e só repete a chamada em modo texto, uma vez e com as mesmas restrições, quando a
+  ferramenta recusa um desses argumentos antes de começar (versão antiga da CLI). Qualquer outra
+  falha antes do primeiro evento (rede, cota, login, queda, saída truncada) termina como falha, com o
+  consumo "não medido": a ferramenta pode ter alterado arquivos ou mexido no board antes de cair, e
+  repetir duplicaria o efeito e o consumo. O card bloqueado e o erro do chat avisam que a execução não
+  foi repetida, e a linha "Chamando…" do canal diz a tentativa e o id da execução.
 - **Perguntas no chat do board** também entram no registro, sem card associado.
 - **O detalhe de cada execução é guardado por uma janela que você configura**, de 1 a 24 meses (o
   mês corrente mais os anteriores). O padrão é 6 meses. Depois da janela o detalhe é descartado, mas
