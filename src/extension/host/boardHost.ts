@@ -576,7 +576,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     git,
     removeWorktree,
     mainBranch,
-    afterRound: () => releaseWatcher.sweep(),
   });
   // as branches e worktrees órfãs (#465): o varredor mede e remove; o roteador só guarda o relatório e
   // entrega à tela os três pedidos da pessoa. Sem timer próprio: roda na rodada do heartbeat e na abertura.
@@ -604,7 +603,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     // como o heartbeat e o autopiloto, só a janela dona do board confere os merges, para não concluir em dobro
     // as órfãs vêm depois dos merges: uma história recém-mesclada ainda seria "decisão" antes de concluída
     onRound: () => {
-      if (!o.ownsBoard || o.ownsBoard()) void mergeWatcher.runNow().then(() => orphanSweeper.sweep());
+      if (!o.ownsBoard || o.ownsBoard())
+        void mergeWatcher
+          .runNow()
+          .then(() => releaseWatcher.sweep())
+          .then(() => orphanSweeper.sweep());
     },
     act: (msg) => router.handle(msg, { author: 'Faz AI', source: 'ai' }),
   });
