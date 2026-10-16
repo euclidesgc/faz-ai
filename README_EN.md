@@ -680,14 +680,15 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 
 - The aggregation can group by phase (`phase`), card type (`card_type`), AI tool (`tool`), model
   (`model`), effort (`effort`), profile (`profile`), card (`card`), agent (`agent`), skill (`skill`),
-  used tool (`used_tool`) or MCP tool (`mcp_tool`). Omit to get only the period's total.
+  used tool (`used_tool`), MCP tool (`mcp_tool`) or Bash command (`bash_command`). Omit to get only the period's total.
 - `tool` and `used_tool` are not the same thing: `tool` is the AI tool that ran (claude, cursor);
   `used_tool` and `mcp_tool` are what the run used (Read, Bash, `get_card`). In `mcp_tool` the server
   comes in its own column, or "servidor não registrado" (server not recorded) when the name did not
-  carry it.
+  carry it. `bash_command` is the base command of each Bash call, without arguments (`npm test`,
+  `git status`, `cat`), Claude Code only.
 - Period filters (start and end date, in `YYYY-MM-DD`), card (e.g. `72` or `#72`), and dimensions
   (e.g. phase, model, card type).
-- On the **agent**, **skill**, **used_tool** and **mcp_tool** dimensions the table shows only the
+- On the **agent**, **skill**, **used_tool**, **mcp_tool** and **bash_command** dimensions the table shows only the
   count of runs and uses (no tokens, which cannot be split among a run's components).
   `effort` and `profile` have tokens.
 - Tokens count in every measured run, from Claude Code and from Cursor. The table has no dollar cost.
