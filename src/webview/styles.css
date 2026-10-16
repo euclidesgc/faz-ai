@@ -1525,9 +1525,6 @@ button.ghost.on {
 .rule-below {
   margin-top: var(--sp-12);
 }
-.rule-below .critical-paths textarea {
-  font-family: var(--font-mono);
-}
 
 /* harness e padrões por tipo */
 .stack {

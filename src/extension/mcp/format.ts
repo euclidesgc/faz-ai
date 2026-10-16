@@ -18,7 +18,6 @@ import { childProgress, linkedCards, openPredecessors, subtaskWaves } from '../.
 import { childrenOf, columnOf, columnsOf, isArchived, isLive, valueOf } from '../../shared/selectors';
 import { statusInfo } from '../../shared/status';
 import { isAtYoloStop, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../../shared/story';
-import { CORE, CRITICALITY_FIELD, PERIPHERY, isCoreStory } from '../../shared/critical';
 import { isBoardField } from '../../shared/boardFields';
 import { slug } from '../../shared/git';
 import { prBaseOf, type PrBase } from '../../shared/gitflow';
@@ -362,28 +361,11 @@ function phaseOf(s: BoardState, c: Card) {
             ? `Modo autônomo (YOLO) na história ${cardRef(story)} até ${col.name}, a fase atual: é a última que a pessoa liberou para você rodar sozinho. Faça o trabalho da fase sem perguntas e, ao terminar, chame request_review na história com o resumo e pare: o modo autônomo se desliga e a revisão desta fase é da pessoa.`
             : col.id === lastAiColumn(s, story.workflowId)?.id
               ? `Modo autônomo (YOLO) na história ${cardRef(story)}: esta é a última coluna em que a IA atua, sem aprovação nem próxima fase. Envie a branch, abra o pull request${prBaseClause(s, story)} e registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa) e pare: a história fica com a pessoa, aguardando a revisão.`
-              : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde, nem mesmo numa história do núcleo ou com pendência. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Siga os padrões do projeto e as regras de arquitetura dele, escolha o caminho menos complexo entre os que os seguem, responda você mesmo as perguntas do documento da fase (seção "Perguntas para você", com a recomendação) e registre as decisões na conversa.`,
+              : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde, nem mesmo com pendência. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Siga os padrões do projeto e as regras de arquitetura dele, escolha o caminho menos complexo entre os que os seguem, responda você mesmo as perguntas do documento da fase (seção "Perguntas para você", com a recomendação) e registre as decisões na conversa.`,
         }
       : col.requiresApproval
         ? { reviewNote: `Ao terminar, chame request_review na história ${cardRef(story)} e pare.` }
         : {}),
-  };
-}
-
-/**
- * As áreas críticas (o núcleo) do projeto, quando o board as define: a IA marca a Criticidade da
- * história e, no código, trata o núcleo com mais rigor e à parte no pull request.
- */
-function criticalAreasOf(s: BoardState, c: Card) {
-  const paths = s.board.rules.criticalPaths;
-  if (!paths.length) return {};
-  const story = storyOf(s, c) ?? c;
-  return {
-    criticalAreas: {
-      paths,
-      story: isCoreStory(s, story) ? CORE : (fieldsOf(s, story)[CRITICALITY_FIELD] ?? 'não marcada'),
-      note: `Áreas críticas (o núcleo) do projeto. Na Spec e no Plan, confira se a história mexe nestes caminhos e marque o campo ${CRITICALITY_FIELD} da história com update_card: "${CORE}" se mexe, "${PERIPHERY}" se não. Fora do modo autônomo, a história do núcleo espera a aprovação da pessoa nas fases que exigem aprovação, como qualquer outra; no modo autônomo nada a segura. Na Revisão, revise com mais rigor os arquivos do diff que estão nestas áreas; no pull request, liste-os à parte em "Como revisar".`,
-    },
   };
 }
 
@@ -446,10 +428,23 @@ const MODEL_NOTE =
   'se não for possível, avise a pessoa em vez de executar com outra. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, ' +
   'e as regras do board sugerem o modelo a partir dele (get_models).';
 
-export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardState['attachments'][number]) => string) {
+/**
+ * Os blocos do `get_card` que a IA pode pedir em separado (`only`): o resto (título, descrição, campos,
+ * modelo, harness e pasta de trabalho) vem sempre. Sem `only`, vem tudo.
+ */
+export const CARD_SECTIONS = ['phase', 'subtasks', 'checklist', 'links', 'conversation', 'attachments'] as const;
+export type CardSection = (typeof CARD_SECTIONS)[number];
+
+export function cardDetail(
+  s: BoardState,
+  c: Card,
+  attachmentPath: (a: BoardState['attachments'][number]) => string,
+  only?: readonly CardSection[],
+) {
+  const wants = (section: CardSection) => !only || only.includes(section);
   const skills = requiredSkills(s, c);
   const rules = requiredRules(s, c);
-  const phase = isLive(c) ? phaseOf(s, c) : undefined;
+  const phase = isLive(c) && wants('phase') ? phaseOf(s, c) : undefined;
   const attachment = (a: BoardState['attachments'][number]) => ({
     attachmentId: a.id,
     filename: a.filename,
@@ -482,40 +477,53 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
         }
       : {}),
     ...(phase ? { phase } : {}),
-    ...criticalAreasOf(s, c),
     ...executionOf(s, c),
     ...workspaceOf(s, c),
     description: c.description,
     createdAt: iso(c.createdAt),
     updatedAt: iso(c.updatedAt),
-    subtaskList: childrenOf(s, c.id)
-      .sort((a, b) => a.number - b.number)
-      .map((k) => ({
-        id: cardRef(k),
-        title: k.title,
-        column: columnOf(s, k)?.name,
-        status: cardStatus(s, k),
-        ...(workStatus(s, k) ? { work: workStatus(s, k) } : {}),
-        fields: fieldsOf(s, k),
-        ...(openPredecessors(s, k.id).length ? { waitingFor: openPredecessors(s, k.id).map(cardRef) } : {}),
-      })),
-    // o que da Implementação pode rodar agora, ao mesmo tempo, o que espera outra sub-tarefa terminar e o
-    // que não é da IA agora (com a pessoa ou já rodando)
-    ...subtasksNow(s, c.id),
-    checklistItems: s.checklistItems.filter((i) => i.cardId === c.id).map((i) => ({ itemId: i.id, text: i.text, done: i.done })),
-    ...linksOf(s, c),
-    // a partir do último resumo: as mensagens anteriores já estão nele e só inchariam o contexto
-    comments: activeComments(s.comments, c.id).map((m) => ({
-      commentId: m.id,
-      author: m.author,
-      ...(m.source ? { from: m.source } : {}),
-      ...(m.kind === 'summary' ? { kind: 'summary' } : {}),
-      at: iso(m.createdAt),
-      body: m.body,
-    })),
-    attachments: s.attachments.filter((a) => a.cardId === c.id).map(attachment),
-    // os artefatos das fases ficam na história; a sub-tarefa os enxerga por aqui
-    ...(c.parentId ? { storyArtifacts: s.attachments.filter((a) => a.cardId === c.parentId && a.artifact).map(attachment) } : {}),
+    ...(wants('subtasks')
+      ? {
+          subtaskList: childrenOf(s, c.id)
+            .sort((a, b) => a.number - b.number)
+            .map((k) => ({
+              id: cardRef(k),
+              title: k.title,
+              column: columnOf(s, k)?.name,
+              status: cardStatus(s, k),
+              ...(workStatus(s, k) ? { work: workStatus(s, k) } : {}),
+              fields: fieldsOf(s, k),
+              ...(openPredecessors(s, k.id).length ? { waitingFor: openPredecessors(s, k.id).map(cardRef) } : {}),
+            })),
+          // o que da Implementação pode rodar agora, ao mesmo tempo, o que espera outra sub-tarefa terminar e o
+          // que não é da IA agora (com a pessoa ou já rodando)
+          ...subtasksNow(s, c.id),
+        }
+      : {}),
+    ...(wants('checklist')
+      ? { checklistItems: s.checklistItems.filter((i) => i.cardId === c.id).map((i) => ({ itemId: i.id, text: i.text, done: i.done })) }
+      : {}),
+    ...(wants('links') ? linksOf(s, c) : {}),
+    ...(wants('conversation')
+      ? {
+          // a partir do último resumo: as mensagens anteriores já estão nele e só inchariam o contexto
+          comments: activeComments(s.comments, c.id).map((m) => ({
+            commentId: m.id,
+            author: m.author,
+            ...(m.source ? { from: m.source } : {}),
+            ...(m.kind === 'summary' ? { kind: 'summary' } : {}),
+            at: iso(m.createdAt),
+            body: m.body,
+          })),
+        }
+      : {}),
+    ...(wants('attachments')
+      ? {
+          attachments: s.attachments.filter((a) => a.cardId === c.id).map(attachment),
+          // os artefatos das fases ficam na história; a sub-tarefa os enxerga por aqui
+          ...(c.parentId ? { storyArtifacts: s.attachments.filter((a) => a.cardId === c.parentId && a.artifact).map(attachment) } : {}),
+        }
+      : {}),
   };
 }
 

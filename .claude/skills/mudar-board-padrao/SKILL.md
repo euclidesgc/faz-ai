@@ -30,7 +30,7 @@ novo só onde ele ainda é o padrão.
    acrescente a antiga em `PHASE_HISTORY[fase].instructions` ou `.templates`, atualizando `change`
    com o que muda para quem ainda tem o texto antigo. `phaseTextSteps` faz o resto.
 2. Coluna, campo ou opção nova: acrescente em `BOARD_TEMPLATE` (ou no seed) e escreva um passo em
-   `steps()` guardado por `if (version < NOVA)`, como `reviewSteps` e `criticalitySteps`: localize pelo
+   `steps()` guardado por `if (version < NOVA)`, como `reviewSteps` e `criticalityRemovalSteps`: localize pelo
    nome normalizado (`norm`), não faça nada se já existir ou se a âncora foi renomeada, e leia
    posições na hora de aplicar (um passo anterior pode tê-las mudado).
 3. Suba `BOARD_TEMPLATE_VERSION` em um.

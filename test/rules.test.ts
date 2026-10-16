@@ -6,7 +6,7 @@ import { migrate } from '../src/extension/db/schema';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { CardRepo } from '../src/extension/repositories/cardRepo';
 import { SettingsRepo } from '../src/extension/repositories/settingsRepo';
-import { CRITICAL_PATHS_MAX, DEFAULT_LOG_RETENTION_MONTHS, DEFAULT_RULES, parseRules } from '../src/shared/rules';
+import { DEFAULT_LOG_RETENTION_MONTHS, DEFAULT_RULES, parseRules } from '../src/shared/rules';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -251,18 +251,5 @@ describe('regra: história só avança de fase sem sub-tarefas da fase em aberto
     boards.updateRules(boardId, { blockPhaseAdvanceWithOpenChildren: false });
     cards.move(story, col('parent', 'Spec').id, 0);
     expect(columnOf(story)).toBe('Spec');
-  });
-});
-
-describe('áreas críticas', () => {
-  it('parseRules limpa a lista: texto, sem espaços nas pontas, sem vazios nem repetidos, até o teto', () => {
-    expect(parseRules(JSON.stringify({ criticalPaths: [' src/db/** ', '', 'src/db/**', 3, 'src/mcp/**'] })).criticalPaths).toEqual([
-      'src/db/**',
-      'src/mcp/**',
-    ]);
-    expect(parseRules(JSON.stringify({ criticalPaths: 'src/**' })).criticalPaths).toEqual([]);
-    expect(parseRules('{}').criticalPaths).toEqual([]);
-    const many = Array.from({ length: CRITICAL_PATHS_MAX + 5 }, (_, i) => `p${i}/**`);
-    expect(parseRules(JSON.stringify({ criticalPaths: many })).criticalPaths).toHaveLength(CRITICAL_PATHS_MAX);
   });
 });
