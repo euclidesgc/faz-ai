@@ -281,7 +281,7 @@ export function AgentsTable({ tool, scope, query = '' }: { tool: AiToolInfo; sco
                         }),
                         a.scope,
                       )}
-                      onConfirm={() => harness.deleteAgent(a.name, a.scope)}
+                      onConfirm={() => void harness.deleteAgent(a.name, a.scope)}
                     />
                   </div>
                 </td>

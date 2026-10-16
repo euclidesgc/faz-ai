@@ -47,7 +47,7 @@ export function SkillFiles({ tool, skill, editable }: { tool: AiTool; skill: Har
               title={t('Apagar o arquivo')}
               question={t('Apagar "{file}"?', { file: f })}
               message={t('O arquivo sai da skill "{name}". Se o SKILL.md aponta para ele, ajuste o texto.', { name: skill.name })}
-              onConfirm={() => harness.deleteSkillFile(tool, skill.path, f)}
+              onConfirm={() => void harness.deleteSkillFile(tool, skill.path, f)}
             />
           )}
         </div>

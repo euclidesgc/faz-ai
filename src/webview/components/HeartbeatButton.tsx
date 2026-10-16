@@ -2,6 +2,7 @@ import { heartbeatState } from '../../shared/runner';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { settings } from '../commands';
+import { useAction } from '../useAction';
 import { Button, IconHeart } from './ui';
 
 /**
@@ -12,6 +13,8 @@ export function HeartbeatButton({ offline }: { offline: boolean }) {
   const state = useBoardStore((s) => s.state)!;
   const { runner } = state.board;
   const beat = heartbeatState(runner, { offline, unsupported: state.aiRunUnsupported });
+  // ligar e desligar esperam o host: o coração fica travado (com o spinner) até a resposta
+  const toggle = useAction((heartbeat: boolean) => settings.updateBoard({ runner: { heartbeat } }));
   const every = t('a cada {n} min', { n: runner.heartbeatMinutes });
   const label =
     beat.kind === 'beating'
@@ -27,7 +30,8 @@ export function HeartbeatButton({ offline }: { offline: boolean }) {
       title={label}
       aria-label={label}
       aria-disabled={beat.kind === 'stopped'}
-      onClick={() => beat.kind !== 'stopped' && settings.updateBoard({ runner: { heartbeat: beat.kind === 'off' } })}
+      loading={toggle.busy}
+      onClick={() => beat.kind !== 'stopped' && void toggle.run(beat.kind === 'off')}
     >
       <IconHeart />
     </Button>

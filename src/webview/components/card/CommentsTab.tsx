@@ -5,6 +5,7 @@ import { RUNNER_PERMISSIONS } from '../../../shared/runner';
 import { isLive } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { usePending } from '../../usePending';
+import { useAction } from '../../useAction';
 import { ai, comments } from '../../commands';
 import { BOARD_AUTHOR } from '../../../shared/gitflow';
 import { formatDateTime, t, translateGitNotice } from '../../i18n';
@@ -34,23 +35,28 @@ export function CommentsTab({
   const cardComments = state.comments.filter((c) => c.cardId === cardId);
   const card = state.cards.find((c) => c.id === cardId);
   const running = state.aiRuns.includes(cardId);
-  // "Resumir a conversa" trava logo após o clique, até aiRuns refletir a execução (ou o tempo esgotar)
+  // "Resumir a conversa" e "Trabalhar na fase" travam logo após o clique, até aiRuns refletir a execução (ou o tempo esgotar)
   const [, summarizing, markSummarizing] = usePending(running);
+  const [, starting, markStarting] = usePending(running);
+  // a mensagem só sai do campo quando o host confirma: se falhar, o texto fica para tentar de novo
+  const send = useAction((body: string) => comments.add(cardId, body));
   const toolLabel = aiToolInfo(state.board.aiTool).label;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === state.board.runner.permission)!;
   const blocked = aiBlockedReason(state);
   const canCall = !!card && isLive(card) && !blocked;
 
-  const submit = () => {
-    if (!draft.trim()) return;
-    comments.add(cardId, draft.trim());
-    setDraft('');
+  const submit = async () => {
+    if (!draft.trim()) return false;
+    const ok = await send.run(draft.trim());
+    if (ok) setDraft('');
+    return ok;
   };
 
   /** Envia o que estiver escrito e chama a IA para o card. */
-  const callAi = () => {
-    submit();
-    ai.run(cardId);
+  const callAi = async () => {
+    if (draft.trim() && !(await submit())) return;
+    markStarting(true);
+    void ai.run(cardId);
   };
 
   return (
@@ -98,7 +104,7 @@ export function CommentsTab({
           minRows={3}
           value={draft}
           onChange={setDraft}
-          onSubmit={submit}
+          onSubmit={() => void submit()}
           onPasteFiles={pasteFiles}
           resolveRefs={resolve}
           placeholder={t('Escreva uma mensagem… (Cmd+Enter envia; cole imagens direto aqui)')}
@@ -111,11 +117,11 @@ export function CommentsTab({
             <a onClick={() => openSettings('harness')}>{t('Mudar')}</a>
           </span>
           <span className="spacer" />
-          <Button disabled={!draft.trim()} onClick={submit}>
+          <Button disabled={!draft.trim()} loading={send.busy} onClick={() => void submit()}>
             {t('Enviar')}
           </Button>
           <Hint content={workHint(toolLabel)} disabledReason={blocked}>
-            <Button variant="primary" disabled={!canCall || running} onClick={callAi}>
+            <Button variant="primary" disabled={!canCall || running} loading={starting} onClick={() => void callAi()}>
               {draft.trim() ? (
                 t('Enviar e trabalhar na fase')
               ) : (
@@ -159,17 +165,22 @@ function CommentItem({
   priorIds: string[];
 }) {
   const [editing, setEditing] = useState<string | null>(null);
+  // editar e apagar mostram a espera na própria mensagem (botão e linha esmaecida) até o host responder
+  const save = useAction((body: string) => comments.update(comment.id, body));
+  const remove = useAction(() => comments.delete(comment.id));
+  const removePrior = useAction(() => comments.deleteMany(priorIds));
+  const busy = remove.busy || removePrior.busy;
   // o board grava os avisos do gitflow em português (o idioma só se resolve na tela); os outros comentários dele e os das
   // pessoas aparecem como foram escritos
   const shown = comment.author === BOARD_AUTHOR ? boardNotice(comment.body) : comment.body;
 
-  const save = () => {
-    if (editing?.trim() && editing !== comment.body) comments.update(comment.id, editing.trim());
+  const commit = async () => {
+    if (editing?.trim() && editing !== comment.body && !(await save.run(editing.trim()))) return;
     setEditing(null);
   };
 
   return (
-    <article className="comment">
+    <article className="comment" aria-busy={busy || undefined}>
       <header className="row">
         <span className="avatar">{comment.author.slice(0, 1).toUpperCase()}</span>
         <strong>{comment.author}</strong>
@@ -189,8 +200,9 @@ function CommentItem({
             <DeleteButton
               variant="ghost"
               size="small"
+              loading={remove.busy}
               question={mine ? t('Apagar esta mensagem?') : t('Apagar a mensagem de {author}?', { author: comment.author })}
-              onConfirm={() => comments.delete(comment.id)}
+              onConfirm={() => void remove.run()}
             >
               {t('Apagar')}
             </DeleteButton>
@@ -201,10 +213,18 @@ function CommentItem({
         <div className="markdown plain" dangerouslySetInnerHTML={{ __html: renderMarkdown(render(shown)) }} />
       ) : (
         <>
-          <MarkdownEditor compact autoFocus minRows={3} value={editing} onChange={setEditing} onSubmit={save} resolveRefs={render} />
+          <MarkdownEditor
+            compact
+            autoFocus
+            minRows={3}
+            value={editing}
+            onChange={setEditing}
+            onSubmit={() => void commit()}
+            resolveRefs={render}
+          />
           <div className="row end">
             <Button onClick={() => setEditing(null)}>{t('Cancelar')}</Button>
-            <Button variant="primary" onClick={save}>
+            <Button variant="primary" loading={save.busy} onClick={() => void commit()}>
               {t('Salvar')}
             </Button>
           </div>
@@ -221,7 +241,8 @@ function CommentItem({
                 size="small"
                 question={t('Apagar as {count} mensagens anteriores a este resumo?', { count: priorIds.length })}
                 confirmLabel={t('Apagar mensagens')}
-                onConfirm={() => comments.deleteMany(priorIds)}
+                loading={removePrior.busy}
+                onConfirm={() => void removePrior.run()}
               >
                 {t('Apagar mensagens resumidas')}
               </DeleteButton>

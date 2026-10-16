@@ -165,8 +165,13 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
    cuja história está arquivada pede confirmação e restaura a história inteira (uma sub-tarefa de
    história ativa volta sozinha, sem confirmação).
 
-Toda ação que leva tempo (criar a branch, recriar o board, importar um backup, reler o harness…)
-mostra que está trabalhando, no botão, na seção ou num véu sobre o board, e avisa se falhou.
+Nada acontece em silêncio: toda ação que vai ao board espera a confirmação e mostra que está
+trabalhando. Uma barra fina no topo acende enquanto qualquer pedido está em andamento; o card que
+está sendo movido, arquivado, mudando de status ou de título esmaece e ganha um spinner na faixa
+(no board e no card aberto); o botão clicado (criar card, enviar mensagem, aprovar, restaurar…) e a
+linha afetada (item de checklist, vínculo, campo) mostram a espera no lugar; e o que troca o board
+inteiro (recriar, importar um backup, esvaziar a lixeira) fica atrás de um véu. Um campo de texto só
+limpa quando o host confirma: se a ação falhar, o aviso aparece e o que você escreveu fica.
 
 ![Card aberto: status, aprovação, campos, descrição e checklist](docs/images/card.png)
 

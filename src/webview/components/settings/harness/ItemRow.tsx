@@ -204,7 +204,7 @@ export function ItemRow({
             question={t('Remover o hook de "{name}"?', { name: i.name })}
             message={t('{detail}\n\nA entrada sai de {location}.', { detail: i.detail ?? '', location: i.location })}
             confirmLabel={t('Remover')}
-            onConfirm={() => harness.removeHook(tool, i.path, i.name, i.detail ?? '')}
+            onConfirm={() => void harness.removeHook(tool, i.path, i.name, i.detail ?? '')}
           />
         )}
         {i.kind === 'settings' && entryRemovable(i) && (
@@ -217,7 +217,7 @@ export function ItemRow({
               location: i.location,
             })}
             confirmLabel={t('Remover')}
-            onConfirm={() => harness.removePermission(tool, i.path, i.detail ?? '', i.name)}
+            onConfirm={() => void harness.removePermission(tool, i.path, i.detail ?? '', i.name)}
           />
         )}
         {i.kind === 'mcp' && entryRemovable(i) && (
@@ -226,7 +226,7 @@ export function ItemRow({
             question={t('Remover o servidor "{name}"?', { name: i.name })}
             message={withGlobalWarning(t('A entrada sai de {location}.', { location: i.location }), i.scope)}
             confirmLabel={t('Remover')}
-            onConfirm={() => harness.removeMcp(tool, i.path, i.name)}
+            onConfirm={() => void harness.removeMcp(tool, i.path, i.name)}
           />
         )}
       </div>

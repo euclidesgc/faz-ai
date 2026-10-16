@@ -51,10 +51,10 @@ export function requestMove(cardId: Id, columnId: Id, position: number): 'sent' 
         open: tn(open.length, '{n} sub-tarefa em aberto', '{n} sub-tarefas em aberto'),
       }),
       cancelLabel: t('Voltar'),
-      secondary: { label: t('Cancelar só a história'), onClick: () => cards.move(cardId, columnId, position) },
+      secondary: { label: t('Cancelar só a história'), onClick: () => void cards.move(cardId, columnId, position) },
       confirmLabel: t('Cancelar história e {tasks}', { tasks: tn(open.length, '{n} sub-tarefa', '{n} sub-tarefas') }),
       danger: true,
-      onConfirm: () => cards.move(cardId, columnId, position, true),
+      onConfirm: () => void cards.move(cardId, columnId, position, true),
     });
     return 'asked';
   }
@@ -190,10 +190,12 @@ export function requestArchiveMany(histories: Card[], after?: () => void): void 
     title: t('Arquivar {n} história(s)?', { n: histories.length }),
     message: (along ? t('Serão arquivados junto: {along}.', { along }) + ' ' : '') + t('Nada é apagado, e desarquivar traz tudo de volta.'),
     confirmLabel: t('Arquivar'),
-    onConfirm: () => {
-      cards.archiveMany(histories.map((c) => c.id));
-      after?.();
-    },
+    onConfirm: () =>
+      void withBulkStatus(
+        t('Arquivando {n} história(s)…', { n: histories.length }),
+        () => cards.archiveMany(histories.map((c) => c.id)),
+        after,
+      ),
   });
 }
 
@@ -206,19 +208,21 @@ export function requestTrashMany(histories: Card[], after?: () => void): void {
     message: (along ? t('Vão para a lixeira junto: {along}.', { along }) + ' ' : '') + t('Dá para restaurar pela aba Lixeira.'),
     confirmLabel: t('Excluir'),
     danger: true,
-    onConfirm: () => {
-      cards.trashMany(histories.map((c) => c.id));
-      after?.();
-    },
+    onConfirm: () =>
+      void withBulkStatus(
+        t('Excluindo {n} história(s)…', { n: histories.length }),
+        () => cards.trashMany(histories.map((c) => c.id)),
+        after,
+      ),
   });
 }
 
 /** Um lote de cards vai ao host: a barra de seleção mostra o status até ele confirmar, e só então `after` roda. */
-async function moveManyWithStatus(ids: Id[], columnId: Id, label: string, after?: () => void): Promise<void> {
+async function withBulkStatus(label: string, send: () => Promise<void>, after?: () => void): Promise<void> {
   const { setBulkBusy } = useBoardStore.getState();
   setBulkBusy(label);
   try {
-    await cards.moveMany(ids, columnId);
+    await send();
     after?.();
   } catch {
     /* o erro já virou toast; a seleção fica para a pessoa tentar de novo */
@@ -226,6 +230,9 @@ async function moveManyWithStatus(ids: Id[], columnId: Id, label: string, after?
     setBulkBusy(null);
   }
 }
+
+const moveManyWithStatus = (ids: Id[], columnId: Id, label: string, after?: () => void): Promise<void> =>
+  withBulkStatus(label, () => cards.moveMany(ids, columnId), after);
 
 /** Move o lote inteiro para a coluna escolhida no diálogo. */
 export function requestMoveMany(histories: Card[], destinations: Column[], after?: () => void): void {

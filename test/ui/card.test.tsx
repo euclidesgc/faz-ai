@@ -1,4 +1,4 @@
-import { choose, lastSent, posted, renderThemed, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { choose, confirmLast, lastSent, posted, renderThemed, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, vi, beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -133,6 +133,9 @@ describe('CardDrawer', () => {
     await userEvent.type(input, ' revisto');
     await userEvent.tab();
     expect(lastSent('checklist.update')).toEqual({ type: 'checklist.update', itemId: item.id, patch: { text: 'item revisto' } });
+    // a linha fica ocupada até o host confirmar; só então o X volta a funcionar
+    expect(screen.getByRole('button', { name: 'Remover o item' })).toBeDisabled();
+    confirmLast();
     await userEvent.click(screen.getByRole('button', { name: 'Remover o item' }));
     expect(lastSent('checklist.delete')).toEqual({ type: 'checklist.delete', itemId: item.id });
   });
@@ -773,6 +776,13 @@ describe('botões de IA do card', () => {
     renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
     await userEvent.click(screen.getByRole('button', { name: /Trabalhar na fase/ }));
     expect(lastSent('ai.run')).toEqual({ type: 'ai.run', cardId: storyId });
+    // o clicado mostra a espera e o outro trava, até aiRuns refletir a execução (e depois a parada)
+    expect(screen.getByRole('button', { name: /Trabalhar na fase/ })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button', { name: /Refinar com IA/ })).toBeDisabled();
+    confirmLast();
+    act(() => useBoardStore.setState({ state: { ...useBoardStore.getState().state!, aiRuns: [storyId] } }));
+    expect(screen.getByRole('button', { name: /Parar a IA/ })).toBeInTheDocument();
+    act(() => useBoardStore.setState({ state: { ...useBoardStore.getState().state!, aiRuns: [] } }));
     await userEvent.click(screen.getByRole('button', { name: /Refinar com IA/ }));
     expect(lastSent('ai.run')).toEqual({ type: 'ai.run', cardId: storyId, mode: 'refine' });
   });

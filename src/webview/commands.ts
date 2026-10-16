@@ -10,6 +10,7 @@ import type { BoardRules } from '../shared/rules';
 import type { FieldValue, Id, LinkKind, WorkflowKind } from '../shared/model';
 import { postToHost } from './vscode';
 import { request } from './request';
+import { trackCard } from './store/busyCards';
 
 /** Patch de cada mensagem `*.update`, tirado do protocolo para não repetir a forma aqui. */
 type PatchOf<T extends WebviewToHost['type']> = Extract<WebviewToHost, { type: T }> extends { patch: infer P } ? P : never;
@@ -21,9 +22,15 @@ export type FieldInput = Payload<'settings.field.create'>;
 /** Para onde copiar ou instalar itens do harness. */
 export type HarnessScope = 'project' | 'user';
 
+/** Sem confirmação: só para o que não grava nada no board (abrir, mostrar, revelar) ou já tem um estado próprio para esperar (chat, IA rodando). */
 const post = (msg: WebviewToHost): void => postToHost(msg);
-/** Como `post`, mas espera o `done` do host: para as ações que demoram e precisam mostrar a espera (`useAction`). */
+/**
+ * Espera o `done` do host: é o padrão de toda ação que grava. A barra do topo (`SyncBar`) mostra a espera por
+ * conta própria, e o botão ou a seção de onde a ação saiu usa a promessa com `useAction` para mostrar no lugar.
+ */
 const req = (msg: WebviewToHost): Promise<void> => request(msg);
+/** Como `req`, e o card fica marcado como ocupado (spinner no board e no card aberto) até a resposta. */
+const reqCard = (cardId: Id, msg: WebviewToHost): Promise<void> => trackCard(cardId, request(msg));
 
 /**
  * Tudo o que o front pede ao host, com nome de ação. Os componentes chamam `cards.trash(id)`
@@ -56,45 +63,45 @@ export const chat = {
 };
 
 export const ai = {
-  run: (cardId: Id) => post({ type: 'ai.run', cardId }),
-  refine: (cardId: Id) => post({ type: 'ai.run', cardId, mode: 'refine' }),
-  summarize: (cardId: Id) => post({ type: 'ai.run', cardId, mode: 'summarize' }),
-  stop: (cardId: Id) => post({ type: 'ai.stop', cardId }),
-  runHeartbeat: () => post({ type: 'ai.heartbeat.run' }),
+  run: (cardId: Id) => reqCard(cardId, { type: 'ai.run', cardId }),
+  refine: (cardId: Id) => reqCard(cardId, { type: 'ai.run', cardId, mode: 'refine' }),
+  summarize: (cardId: Id) => reqCard(cardId, { type: 'ai.run', cardId, mode: 'summarize' }),
+  stop: (cardId: Id) => reqCard(cardId, { type: 'ai.stop', cardId }),
+  runHeartbeat: () => req({ type: 'ai.heartbeat.run' }),
   /** a IA lê o projeto e propõe os agentes do board; o resultado vai para o chat do board */
   suggestAgents: () => post({ type: 'ai.suggestAgents' }),
   /** a IA lê o projeto e propõe regras, gravadas e enviadas ao board desligadas */
   suggestRules: () => post({ type: 'ai.suggestRules' }),
   /** a IA lê o projeto e propõe skills, gravadas e enviadas ao board em "Pelo card" */
   suggestSkills: () => post({ type: 'ai.suggestSkills' }),
-  pauseAutopilot: () => post({ type: 'ai.autopilot.pause' }),
-  resumeAutopilot: () => post({ type: 'ai.autopilot.resume' }),
+  pauseAutopilot: () => req({ type: 'ai.autopilot.pause' }),
+  resumeAutopilot: () => req({ type: 'ai.autopilot.resume' }),
 };
 
 export const cards = {
-  create: (input: Payload<'card.create'>) => post({ type: 'card.create', ...input }),
-  update: (cardId: Id, patch: PatchOf<'card.update'>) => post({ type: 'card.update', cardId, patch }),
+  create: (input: Payload<'card.create'>) => req({ type: 'card.create', ...input }),
+  update: (cardId: Id, patch: PatchOf<'card.update'>) => reqCard(cardId, { type: 'card.update', cardId, patch }),
   move: (cardId: Id, columnId: Id, position: number, cancelChildren?: boolean) =>
-    post({ type: 'card.move', cardId, columnId, position, ...(cancelChildren ? { cancelChildren } : {}) }),
-  trash: (cardId: Id) => post({ type: 'card.trash', cardId }),
-  restore: (cardId: Id) => post({ type: 'card.restore', cardId }),
-  archive: (cardId: Id) => post({ type: 'card.archive', cardId }),
-  unarchive: (cardId: Id, to?: { columnId: Id; position: number }) => post({ type: 'card.unarchive', cardId, ...to }),
-  restoreArchived: (cardId: Id) => post({ type: 'card.restoreArchived', cardId }),
-  deletePermanent: (cardId: Id) => post({ type: 'card.deletePermanent', cardId }),
+    reqCard(cardId, { type: 'card.move', cardId, columnId, position, ...(cancelChildren ? { cancelChildren } : {}) }),
+  trash: (cardId: Id) => reqCard(cardId, { type: 'card.trash', cardId }),
+  restore: (cardId: Id) => reqCard(cardId, { type: 'card.restore', cardId }),
+  archive: (cardId: Id) => reqCard(cardId, { type: 'card.archive', cardId }),
+  unarchive: (cardId: Id, to?: { columnId: Id; position: number }) => reqCard(cardId, { type: 'card.unarchive', cardId, ...to }),
+  restoreArchived: (cardId: Id) => reqCard(cardId, { type: 'card.restoreArchived', cardId }),
+  deletePermanent: (cardId: Id) => reqCard(cardId, { type: 'card.deletePermanent', cardId }),
   setStatus: (cardId: Id, status: CardStatus | null, note?: string) =>
-    post({ type: 'card.status.set', cardId, status, ...(note !== undefined ? { note } : {}) }),
-  setYolo: (cardId: Id, enabled: boolean, until?: Id | null) => post({ type: 'card.yolo.set', cardId, enabled, until }),
-  setYoloMany: (cardIds: Id[], enabled: boolean, until?: Id | null) => post({ type: 'card.yolo.setMany', cardIds, enabled, until }),
-  archiveMany: (cardIds: Id[]) => post({ type: 'card.archiveMany', cardIds }),
-  trashMany: (cardIds: Id[]) => post({ type: 'card.trashMany', cardIds }),
+    reqCard(cardId, { type: 'card.status.set', cardId, status, ...(note !== undefined ? { note } : {}) }),
+  setYolo: (cardId: Id, enabled: boolean, until?: Id | null) => reqCard(cardId, { type: 'card.yolo.set', cardId, enabled, until }),
+  setYoloMany: (cardIds: Id[], enabled: boolean, until?: Id | null) => req({ type: 'card.yolo.setMany', cardIds, enabled, until }),
+  archiveMany: (cardIds: Id[]) => req({ type: 'card.archiveMany', cardIds }),
+  trashMany: (cardIds: Id[]) => req({ type: 'card.trashMany', cardIds }),
   moveMany: (cardIds: Id[], columnId: Id) => req({ type: 'card.moveMany', cardIds, columnId }),
-  setExecProfile: (cardId: Id, profileId: Id | null) => post({ type: 'card.execProfile.set', cardId, profileId }),
-  setField: (cardId: Id, fieldId: Id, value: FieldValue) => post({ type: 'field.setValue', cardId, fieldId, value }),
-  setPr: (cardId: Id, url: string) => post({ type: 'card.pr.set', cardId, url }),
-  prepareWorkspace: (cardId: Id) => req({ type: 'card.workspace.prepare', cardId }),
+  setExecProfile: (cardId: Id, profileId: Id | null) => reqCard(cardId, { type: 'card.execProfile.set', cardId, profileId }),
+  setField: (cardId: Id, fieldId: Id, value: FieldValue) => reqCard(cardId, { type: 'field.setValue', cardId, fieldId, value }),
+  setPr: (cardId: Id, url: string) => reqCard(cardId, { type: 'card.pr.set', cardId, url }),
+  prepareWorkspace: (cardId: Id) => reqCard(cardId, { type: 'card.workspace.prepare', cardId }),
   openWorkspace: (cardId: Id) => post({ type: 'card.workspace.open', cardId }),
-  clearWorkspace: (cardId: Id) => post({ type: 'card.workspace.clear', cardId }),
+  clearWorkspace: (cardId: Id) => reqCard(cardId, { type: 'card.workspace.clear', cardId }),
 };
 
 export const trash = {
@@ -102,28 +109,28 @@ export const trash = {
 };
 
 export const comments = {
-  add: (cardId: Id, body: string) => post({ type: 'comment.add', cardId, body }),
-  update: (commentId: Id, body: string) => post({ type: 'comment.update', commentId, body }),
-  delete: (commentId: Id) => post({ type: 'comment.delete', commentId }),
-  deleteMany: (ids: Id[]) => ids.forEach((id) => comments.delete(id)),
+  add: (cardId: Id, body: string) => reqCard(cardId, { type: 'comment.add', cardId, body }),
+  update: (commentId: Id, body: string) => req({ type: 'comment.update', commentId, body }),
+  delete: (commentId: Id) => req({ type: 'comment.delete', commentId }),
+  deleteMany: (ids: Id[]) => Promise.all(ids.map((id) => comments.delete(id))).then(() => undefined),
 };
 
 export const checklist = {
-  add: (cardId: Id, text: string) => post({ type: 'checklist.add', cardId, text }),
-  update: (itemId: Id, patch: PatchOf<'checklist.update'>) => post({ type: 'checklist.update', itemId, patch }),
-  delete: (itemId: Id) => post({ type: 'checklist.delete', itemId }),
+  add: (cardId: Id, text: string) => reqCard(cardId, { type: 'checklist.add', cardId, text }),
+  update: (itemId: Id, patch: PatchOf<'checklist.update'>) => req({ type: 'checklist.update', itemId, patch }),
+  delete: (itemId: Id) => req({ type: 'checklist.delete', itemId }),
 };
 
 export const links = {
-  add: (fromId: Id, toId: Id, kind: LinkKind) => post({ type: 'link.add', fromId, toId, kind }),
-  remove: (linkId: Id) => post({ type: 'link.remove', linkId }),
+  add: (fromId: Id, toId: Id, kind: LinkKind) => req({ type: 'link.add', fromId, toId, kind }),
+  remove: (linkId: Id) => req({ type: 'link.remove', linkId }),
 };
 
 export const attachments = {
   pick: (cardId: Id) => post({ type: 'attachment.pick', cardId }),
   addData: (input: Payload<'attachment.addData'>) => req({ type: 'attachment.addData', ...input }),
   reveal: (attachmentId: Id) => post({ type: 'attachment.reveal', attachmentId }),
-  delete: (attachmentId: Id) => post({ type: 'attachment.delete', attachmentId }),
+  delete: (attachmentId: Id) => req({ type: 'attachment.delete', attachmentId }),
   /** pede ao host para abrir o diálogo nativo de "salvar como" (só faz sentido fora da web) */
   saveAs: (attachmentId: Id) => post({ type: 'attachment.saveAs', attachmentId }),
 };
@@ -138,25 +145,24 @@ export const settings = {
   updateBoard: (patch: BoardPatch) => req({ type: 'settings.board.update', patch }),
   resetBoard: () => req({ type: 'settings.board.reset' }),
   upgradeBoard: () => req({ type: 'settings.board.upgrade' }),
-  createWorkflow: (name: string, kind: WorkflowKind) => post({ type: 'settings.workflow.create', name, kind }),
+  createWorkflow: (name: string, kind: WorkflowKind) => req({ type: 'settings.workflow.create', name, kind }),
   updateWorkflow: (workflowId: Id, patch: PatchOf<'settings.workflow.update'>) =>
-    post({ type: 'settings.workflow.update', workflowId, patch }),
-  deleteWorkflow: (workflowId: Id) => post({ type: 'settings.workflow.delete', workflowId }),
+    req({ type: 'settings.workflow.update', workflowId, patch }),
+  deleteWorkflow: (workflowId: Id) => req({ type: 'settings.workflow.delete', workflowId }),
   createColumn: (workflowId: Id, name: string, position?: number) =>
-    post({ type: 'settings.column.create', workflowId, name, ...(position !== undefined ? { position } : {}) }),
-  updateColumn: (columnId: Id, patch: ColumnPatch) => post({ type: 'settings.column.update', columnId, patch }),
-  deleteColumn: (columnId: Id, moveCardsTo: Id) => post({ type: 'settings.column.delete', columnId, moveCardsTo }),
-  createType: (name: string, color: string, defaultWorkflowId: Id) =>
-    post({ type: 'settings.type.create', name, color, defaultWorkflowId }),
-  updateType: (typeId: Id, patch: PatchOf<'settings.type.update'>) => post({ type: 'settings.type.update', typeId, patch }),
-  deleteType: (typeId: Id) => post({ type: 'settings.type.delete', typeId }),
-  createField: (input: FieldInput) => post({ type: 'settings.field.create', ...input }),
-  updateField: (fieldId: Id, patch: PatchOf<'settings.field.update'>) => post({ type: 'settings.field.update', fieldId, patch }),
-  deleteField: (fieldId: Id) => post({ type: 'settings.field.delete', fieldId }),
-  updateRules: (patch: Partial<BoardRules>) => post({ type: 'settings.rules.update', patch }),
-  setModels: (catalog: ModelOption[]) => post({ type: 'settings.models.set', catalog }),
+    req({ type: 'settings.column.create', workflowId, name, ...(position !== undefined ? { position } : {}) }),
+  updateColumn: (columnId: Id, patch: ColumnPatch) => req({ type: 'settings.column.update', columnId, patch }),
+  deleteColumn: (columnId: Id, moveCardsTo: Id) => req({ type: 'settings.column.delete', columnId, moveCardsTo }),
+  createType: (name: string, color: string, defaultWorkflowId: Id) => req({ type: 'settings.type.create', name, color, defaultWorkflowId }),
+  updateType: (typeId: Id, patch: PatchOf<'settings.type.update'>) => req({ type: 'settings.type.update', typeId, patch }),
+  deleteType: (typeId: Id) => req({ type: 'settings.type.delete', typeId }),
+  createField: (input: FieldInput) => req({ type: 'settings.field.create', ...input }),
+  updateField: (fieldId: Id, patch: PatchOf<'settings.field.update'>) => req({ type: 'settings.field.update', fieldId, patch }),
+  deleteField: (fieldId: Id) => req({ type: 'settings.field.delete', fieldId }),
+  updateRules: (patch: Partial<BoardRules>) => req({ type: 'settings.rules.update', patch }),
+  setModels: (catalog: ModelOption[]) => req({ type: 'settings.models.set', catalog }),
   detectModels: (tool: AiTool) => req({ type: 'settings.models.detect', tool }),
-  setModelRules: (rules: ModelRule[]) => post({ type: 'settings.modelRules.set', rules }),
+  setModelRules: (rules: ModelRule[]) => req({ type: 'settings.modelRules.set', rules }),
   suggestModelRules: (tool: AiTool) => req({ type: 'settings.modelRules.suggest', tool }),
 };
 
@@ -179,10 +185,10 @@ export const harness = {
   refresh: () => req({ type: 'harness.refresh' }),
   openItem: (path: string) => post({ type: 'harness.item.open', path }),
   createItem: (tool: AiTool, source: number, name: string, description: string) =>
-    post({ type: 'harness.item.create', tool, source, name, description }),
+    req({ type: 'harness.item.create', tool, source, name, description }),
   /** cria o item já com o conteúdo (assistentes de regras e skills); `append` acrescenta a um arquivo fixo que já existe */
   writeItem: (tool: AiTool, source: number, name: string, content: string, files?: string[], append?: boolean) =>
-    post({
+    req({
       type: 'harness.item.write',
       tool,
       source,
@@ -191,49 +197,49 @@ export const harness = {
       ...(files?.length ? { files } : {}),
       ...(append ? { append } : {}),
     }),
-  deleteItem: (tool: AiTool, kind: HarnessKind, path: string) => post({ type: 'harness.item.delete', tool, kind, path }),
+  deleteItem: (tool: AiTool, kind: HarnessKind, path: string) => req({ type: 'harness.item.delete', tool, kind, path }),
   applyPlugins: (tool: AiTool, action: PluginAction, ids: string[]) => req({ type: 'harness.plugin.apply', tool, action, ids }),
   copyItems: (tool: AiTool, items: { kind: HarnessKind; path: string }[], to: HarnessScope) =>
     req({ type: 'harness.item.copy', tool, items, to }),
-  writeRule: (name: string, content: string) => post({ type: 'harness.rule.write', name, content }),
-  deleteRule: (name: string) => post({ type: 'harness.rule.delete', name }),
-  createSkill: (name: string, description: string, content: string) => post({ type: 'harness.skill.create', name, description, content }),
-  writeSkill: (name: string, content: string) => post({ type: 'harness.skill.write', name, content }),
-  setSkillEnabled: (name: string, enabled: boolean) => post({ type: 'harness.skill.setEnabled', name, enabled }),
-  setSkillMode: (tool: AiTool, paths: string[], mode: SkillMode) => post({ type: 'harness.skill.setMode', tool, paths, mode }),
-  deleteSkill: (name: string) => post({ type: 'harness.skill.delete', name }),
+  writeRule: (name: string, content: string) => req({ type: 'harness.rule.write', name, content }),
+  deleteRule: (name: string) => req({ type: 'harness.rule.delete', name }),
+  createSkill: (name: string, description: string, content: string) => req({ type: 'harness.skill.create', name, description, content }),
+  writeSkill: (name: string, content: string) => req({ type: 'harness.skill.write', name, content }),
+  setSkillEnabled: (name: string, enabled: boolean) => req({ type: 'harness.skill.setEnabled', name, enabled }),
+  setSkillMode: (tool: AiTool, paths: string[], mode: SkillMode) => req({ type: 'harness.skill.setMode', tool, paths, mode }),
+  deleteSkill: (name: string) => req({ type: 'harness.skill.delete', name }),
   createSkillFile: (tool: AiTool, path: string, file: string, link: boolean) =>
-    post({ type: 'harness.skill.file.create', tool, path, file, link }),
+    req({ type: 'harness.skill.file.create', tool, path, file, link }),
   openSkillFile: (tool: AiTool, path: string, file: string) => post({ type: 'harness.skill.file.open', tool, path, file }),
-  deleteSkillFile: (tool: AiTool, path: string, file: string) => post({ type: 'harness.skill.file.delete', tool, path, file }),
+  deleteSkillFile: (tool: AiTool, path: string, file: string) => req({ type: 'harness.skill.file.delete', tool, path, file }),
   /** envia artefatos ao board com um modo, muda o modo, ou os tira do board (usage null); `location` é a `selectionKey` */
   setSelection: (items: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null) =>
     req({ type: 'harness.selection.set', items, usage }),
   /** a IA pré-seleciona os artefatos do assunto que fazem mais sentido para o projeto */
   suggest: (tool: AiTool, kind: SelectableKind) => post({ type: 'harness.suggest.run', tool, kind }),
-  clearSuggestions: () => post({ type: 'harness.suggest.clear' }),
+  clearSuggestions: () => req({ type: 'harness.suggest.clear' }),
   /** abre o seletor de pasta do editor para importar artefatos */
   pickImport: (tool: AiTool) => req({ type: 'harness.import.pick', tool }),
   addImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.add', tool, dir }),
-  removeImport: (tool: AiTool, dir: string) => post({ type: 'harness.import.remove', tool, dir }),
-  createAgent: (scope: InstallScope, input: AgentInput) => post({ type: 'harness.agent.create', scope, input }),
+  removeImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.remove', tool, dir }),
+  createAgent: (scope: InstallScope, input: AgentInput) => req({ type: 'harness.agent.create', scope, input }),
   updateAgent: (name: string, scope: InstallScope, patch: Partial<AgentInput>, body?: string) =>
-    post({ type: 'harness.agent.update', name, scope, patch, ...(body !== undefined ? { body } : {}) }),
-  writeAgent: (name: string, scope: InstallScope, content: string) => post({ type: 'harness.agent.write', name, scope, content }),
-  deleteAgent: (name: string, scope: InstallScope) => post({ type: 'harness.agent.delete', name, scope }),
+    req({ type: 'harness.agent.update', name, scope, patch, ...(body !== undefined ? { body } : {}) }),
+  writeAgent: (name: string, scope: InstallScope, content: string) => req({ type: 'harness.agent.write', name, scope, content }),
+  deleteAgent: (name: string, scope: InstallScope) => req({ type: 'harness.agent.delete', name, scope }),
   seedAgents: (force = false) => req({ type: 'harness.agents.seed', force }),
-  addMcp: (tool: AiTool, source: number, server: McpServerInput) => post({ type: 'harness.mcp.add', tool, source, server }),
-  removeMcp: (tool: AiTool, path: string, name: string) => post({ type: 'harness.mcp.remove', tool, path, name }),
-  addHook: (tool: AiTool, source: number, hook: HookInput) => post({ type: 'harness.hook.add', tool, source, hook }),
+  addMcp: (tool: AiTool, source: number, server: McpServerInput) => req({ type: 'harness.mcp.add', tool, source, server }),
+  removeMcp: (tool: AiTool, path: string, name: string) => req({ type: 'harness.mcp.remove', tool, path, name }),
+  addHook: (tool: AiTool, source: number, hook: HookInput) => req({ type: 'harness.hook.add', tool, source, hook }),
   removeHook: (tool: AiTool, path: string, event: string, command: string) =>
-    post({ type: 'harness.hook.remove', tool, path, event, command }),
+    req({ type: 'harness.hook.remove', tool, path, event, command }),
   addPermission: (tool: AiTool, source: number, list: string, rule: string) =>
-    post({ type: 'harness.permission.add', tool, source, list, rule }),
+    req({ type: 'harness.permission.add', tool, source, list, rule }),
   removePermission: (tool: AiTool, path: string, list: string, rule: string) =>
-    post({ type: 'harness.permission.remove', tool, path, list, rule }),
-  createReferenceSkill: () => post({ type: 'harness.referenceSkill.create' }),
+    req({ type: 'harness.permission.remove', tool, path, list, rule }),
+  createReferenceSkill: () => req({ type: 'harness.referenceSkill.create' }),
   installFlowSkill: (tool: AiTool, replace = false) => req({ type: 'harness.flowSkill.install', tool, replace }),
   scanInstall: (source: string) => req({ type: 'harness.install.scan', source }),
   applyInstall: (tool: AiTool, to: HarnessScope, rels: string[]) => req({ type: 'harness.install.apply', tool, to, rels }),
-  cancelInstall: () => post({ type: 'harness.install.cancel' }),
+  cancelInstall: () => req({ type: 'harness.install.cancel' }),
 };

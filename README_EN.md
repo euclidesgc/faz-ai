@@ -176,9 +176,13 @@ promise a percentage: it shows, in the inventory, what is being loaded.
    story is archived asks for confirmation and restores the whole story (a sub-task of an active
    story comes back on its own, with no confirmation).
 
-Every action that takes time (creating the branch, recreating the board, importing a backup,
-rereading the harness…) shows it is working, on the button, in the section or as a veil over the
-board, and tells you if it failed.
+Nothing happens silently: every action that goes to the board waits for confirmation and shows it
+is working. A thin bar at the top lights up while any request is in progress; the card being moved,
+archived or changing status or title fades and gets a spinner on its bar (on the board and in the
+open card); the clicked button (create card, send message, approve, restore…) and the affected row
+(checklist item, link, field) show the wait in place; and what replaces the whole board (recreate,
+import a backup, empty the trash) sits behind a veil. A text field only clears when the host
+confirms: if the action fails, the warning shows up and what you typed stays.
 
 ![Open card: status, approval, fields, description and checklist](docs/images/card_en.png)
 

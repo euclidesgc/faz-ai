@@ -1,6 +1,6 @@
-import { lastSent, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { confirmLast, lastSent, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { FieldsSettings } from '../../src/webview/components/settings/FieldsSettings';
@@ -134,7 +134,10 @@ describe('FieldsSettings', () => {
       options: [],
       appliesToTypes: null,
     });
-    expect(screen.queryByLabelText('Campo novo')).toBeNull();
+    // o rascunho só fecha quando o host confirma
+    expect(screen.getByLabelText('Campo novo')).toBeInTheDocument();
+    confirmLast();
+    await waitFor(() => expect(screen.queryByLabelText('Campo novo')).toBeNull());
   });
 
   it('campo de seleção só pode ser criado com ao menos uma opção', async () => {

@@ -48,7 +48,7 @@ export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep:
             question={t('Excluir o workflow "{name}"?', { name: workflow.name })}
             message={t('As colunas dele serão apagadas. Ele não tem cards.')}
             confirmLabel={t('Excluir workflow')}
-            onConfirm={() => settings.deleteWorkflow(workflow.id)}
+            onConfirm={() => void settings.deleteWorkflow(workflow.id)}
           />
         </div>
         <ColumnsTable workflow={workflow} adding={adding} onAddDone={() => setAdding(false)} />

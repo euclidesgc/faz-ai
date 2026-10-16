@@ -9,22 +9,37 @@ interface Props extends Omit<ComponentProps<typeof TextField.Root>, 'value' | 'o
   buttonLabel?: string;
   /** controles entre o campo e o botão (ex.: um seletor), para manter a ordem que a tela já tinha */
   children?: ReactNode;
+  /** o item anterior ainda está indo ao host: o campo trava e o botão (ou o spinner ao lado) mostra a espera */
+  loading?: boolean;
 }
 
 /** Campo "digite e aperte Enter": ignora texto vazio e limpa depois de adicionar. */
-export function AddInput({ onAdd, buttonLabel, children, ...rest }: Props) {
+export function AddInput({ onAdd, buttonLabel, children, loading = false, ...rest }: Props) {
   const [text, setText] = useState('');
   const add = () => {
     const t = text.trim();
-    if (!t) return;
+    if (!t || loading) return;
     if (onAdd(t) !== false) setText('');
   };
   return (
     <>
-      <TextField.Root value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} {...rest} />
+      <TextField.Root
+        value={text}
+        disabled={loading}
+        aria-busy={loading || undefined}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && add()}
+        {...rest}
+      >
+        {loading && !buttonLabel && (
+          <TextField.Slot side="right">
+            <span className="spinner" aria-hidden />
+          </TextField.Slot>
+        )}
+      </TextField.Root>
       {children}
       {buttonLabel && (
-        <Button variant="primary" disabled={!text.trim()} onClick={add}>
+        <Button variant="primary" disabled={!text.trim()} loading={loading} onClick={add}>
           {buttonLabel}
         </Button>
       )}

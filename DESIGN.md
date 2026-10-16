@@ -134,18 +134,28 @@ olho.
 
 ## Estados de espera
 
-- Toda ação que o host leva mais de um instante para concluir mostra que está esperando; nada
-  acontece em silêncio. A tela pede confirmação com `request()` (`src/webview/request.ts`), que
-  manda a mensagem com `requestId` e espera o `done` do host, e `useAction` (`src/webview/useAction.ts`)
-  liga `busy` enquanto isso. O `boardState` chega sempre antes do `done`: quando a espera acaba, o que
-  mudou já está na tela. As ações demoradas de `commands.ts` devolvem a promessa (`req`); as demais
-  seguem `post`.
-- Três intensidades, e a regra de escolha: **botão** (`loading` do nosso `Button` ou do Radix) para a
-  ação curta que afeta só o controle clicado; **seção** (`role="status"` com `.spinner` e um texto
-  curto, `aria-busy` na seção que vai mudar) quando a espera tem um "onde" e a pessoa pode fazer outra
-  coisa; **véu** (`BusyOverlay`, `withOverlay` em `boardStore.ts`) só para o que troca o board inteiro:
-  recriar, atualizar, importar, esvaziar a lixeira. Se a espera cabe no botão, fica no botão; se tem
-  um "onde", vai na seção; se não tem, vira véu.
+- Toda ação que vai ao host espera a confirmação e mostra que está esperando; nada acontece em
+  silêncio. A tela pede confirmação com `request()` (`src/webview/request.ts`), que manda a mensagem
+  com `requestId` e espera o `done` do host, e `useAction` (`src/webview/useAction.ts`) liga `busy`
+  enquanto isso. O `boardState` chega sempre antes do `done`: quando a espera acaba, o que mudou já
+  está na tela. Em `commands.ts`, tudo o que grava devolve a promessa (`req`; `reqCard` quando a
+  ação é de um card); só o que não grava nada (abrir, mostrar, revelar) ou já tem um estado próprio
+  para esperar (chat, IA rodando) segue `post`. Um pedido cancelado (`cancelPendingRequests`) rejeita
+  a promessa, para a marca de ocupado nunca ficar presa.
+- Quatro intensidades, e a regra de escolha: **barra do topo** (`SyncBar`, lendo `inFlight.ts`) é a
+  espera de fundo de todo pedido, automática, e não bloqueia nada; **card** (`useCardBusy` de
+  `store/busyCards.ts`: o card esmaece e a faixa mostra o spinner, no board e no card aberto) para o
+  que muda um card (mover, arquivar, status, título, campo); **botão** (`loading` do nosso `Button` ou
+  do Radix) ou **linha** (`aria-busy` e o spinner no item de checklist, no vínculo, na mensagem, no
+  `FieldRow`) para a ação curta que afeta só o controle clicado, com a **seção** (`role="status"` com
+  `.spinner` e um texto curto, `aria-busy` na seção que vai mudar) quando a espera tem um "onde" e a
+  pessoa pode fazer outra coisa; **véu** (`BusyOverlay`, `withOverlay` em `boardStore.ts`) só para o
+  que troca o board inteiro: recriar, atualizar, importar, esvaziar a lixeira. Se a espera cabe no
+  botão, fica no botão; se tem um "onde", vai na seção; se não tem, vira véu.
+- Um campo de texto só limpa (e um rascunho só fecha) quando o host confirma: `useAction.run` devolve
+  `true` no sucesso, e é aí que a tela limpa. Se falhar, o toast aparece e o que a pessoa escreveu
+  fica. O mesmo para uma ação em sequência (ligar o modo autônomo e retomar): a segunda só sai depois
+  do `done` da primeira.
 - `usePending` é para valor otimista (um switch que deve virar na hora), não para espera de ação.
   Processo com vida própria (IA rodando, chat, heartbeat) mostra progresso pelo estado do board
   (`aiRuns`, `chat.busy`), não por `useAction`.

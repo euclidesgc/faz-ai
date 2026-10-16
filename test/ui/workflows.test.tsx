@@ -1,6 +1,6 @@
-import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { choose, confirmLast, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
@@ -62,7 +62,9 @@ describe('WorkflowsSettings', () => {
     expect(within(draft).getByText(/Recebe as sub-tarefas de uma história/)).toBeInTheDocument();
     await userEvent.click(within(draft).getByRole('button', { name: 'Criar workflow' }));
     expect(lastSent('settings.workflow.create')).toEqual({ type: 'settings.workflow.create', name: 'Suporte', kind: 'child' });
-    expect(screen.queryByLabelText('Workflow novo')).toBeNull();
+    // o rascunho só fecha quando o host confirma
+    confirmLast();
+    await waitFor(() => expect(screen.queryByLabelText('Workflow novo')).toBeNull());
   });
 
   it('Criar workflow fica desligado sem nome; Esc e Cancelar descartam', async () => {
@@ -95,7 +97,9 @@ describe('WorkflowsSettings', () => {
       name: 'Revisão',
       position: 2,
     });
-    expect(within(stories).queryByLabelText('Nome da coluna')).toBeNull();
+    // a linha só fecha quando o host confirma
+    confirmLast();
+    await waitFor(() => expect(within(stories).queryByLabelText('Nome da coluna')).toBeNull());
   });
 
   it('a coluna nova entra, por padrão, antes da primeira coluna de conclusão', async () => {

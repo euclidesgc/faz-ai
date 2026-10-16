@@ -255,6 +255,11 @@ describe('Column: ações em lote (RF8-RF11)', () => {
 
     const sent = lastSent('card.archiveMany');
     expect(sent.cardIds.slice().sort()).toEqual([board.storyId, secondId].sort());
+    // a seleção só limpa quando o host confirma; até lá o status diz o que está acontecendo
+    expect(useBoardStore.getState().bulkBusy).toBe('Arquivando 2 história(s)…');
+    confirmLast();
+    await act(async () => {});
+    expect(useBoardStore.getState().bulkBusy).toBeNull();
     expect(useBoardStore.getState().selectedIds.size).toBe(0);
   });
 
@@ -270,6 +275,9 @@ describe('Column: ações em lote (RF8-RF11)', () => {
 
     const sent = lastSent('card.trashMany');
     expect(sent.cardIds.slice().sort()).toEqual([board.storyId, secondId].sort());
+    expect(useBoardStore.getState().bulkBusy).toBe('Excluindo 2 história(s)…');
+    confirmLast();
+    await act(async () => {});
     expect(useBoardStore.getState().selectedIds.size).toBe(0);
   });
 

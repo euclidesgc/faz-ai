@@ -4,6 +4,7 @@ import { boardFieldNamed } from '../../../shared/boardFields';
 import { fieldsForType } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
+import { useAction } from '../../useAction';
 import { t, dt } from '../../i18n';
 import { FieldEditor } from '../FieldRenderer';
 import { Button, Card, TextField } from '@radix-ui/themes';
@@ -77,7 +78,7 @@ export function TypesSettings() {
                     disabled={used > 0}
                     title={used ? t('Tipo em uso') : t('Apagar')}
                     question={t('Apagar o tipo "{name}"?', { name: ct.name })}
-                    onConfirm={() => settings.deleteType(ct.id)}
+                    onConfirm={() => void settings.deleteType(ct.id)}
                   />
                 </td>
               </tr>
@@ -158,10 +159,11 @@ function NewTypeRow({ onDone }: { onDone: () => void }) {
   const [wf, setWf] = useState(firstWorkflow);
   const ready = name.trim() !== '' && wf !== '';
 
-  const add = () => {
+  // a linha de rascunho só fecha quando o host confirma o tipo novo
+  const create = useAction(() => settings.createType(name.trim(), color, wf));
+  const add = async () => {
     if (!ready) return;
-    settings.createType(name.trim(), color, wf);
-    onDone();
+    if (await create.run()) onDone();
   };
 
   return (
@@ -180,7 +182,7 @@ function NewTypeRow({ onDone }: { onDone: () => void }) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') add();
+            if (e.key === 'Enter') void add();
             if (e.key === 'Escape') onDone();
           }}
         />
@@ -194,7 +196,7 @@ function NewTypeRow({ onDone }: { onDone: () => void }) {
           <Button variant="soft" color="gray" onClick={onDone}>
             {t('Cancelar')}
           </Button>
-          <Button disabled={!ready} onClick={add}>
+          <Button disabled={!ready} loading={create.busy} onClick={() => void add()}>
             {t('Criar tipo')}
           </Button>
         </div>

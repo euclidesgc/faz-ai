@@ -6,6 +6,7 @@ import { statusInfo } from '../../shared/status';
 import { aiWorkingChildren, fieldsForType, isAiWorking, isCardCollapsed, valueOf } from '../../shared/selectors';
 import { queuePositions } from '../../shared/autopilotQueue';
 import { useBoardStore } from '../store/boardStore';
+import { useCardBusy } from '../store/busyCards';
 import { t } from '../i18n';
 import { useReducedMotion } from '../useReducedMotion';
 import { FieldBadge, hasValue } from './FieldRenderer';
@@ -43,6 +44,8 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const collapsedMap = useBoardStore((s) => s.collapsed);
   const setCollapsed = useBoardStore((s) => s.setCollapsed);
   const collapsed = isCardCollapsed(collapsedMap, card.id);
+  // mover, arquivar, status, título…: o card esmaece e a faixa mostra o spinner até o host responder
+  const busy = useCardBusy(card.id);
   // a faixa do card é a mesma nos dois estados, mas o corpo é remontado na troca; devolver o foco ao
   // botão de colapsar garante que Enter de novo reverte, mesmo que o botão seja recriado
   const articleRef = useRef<HTMLElement>(null);
@@ -94,6 +97,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       ref={articleRef}
       className={classes}
       style={style}
+      aria-busy={busy || undefined}
       onClick={(e) => {
         e.stopPropagation();
         if (isParent && !archived) selectParent(card.id);
@@ -114,6 +118,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
         card={card}
         type={type}
         work={work}
+        busy={busy}
         overlay={overlay}
         collapsed={collapsed}
         onToggleCollapse={() => toggleCollapse(!collapsed)}
