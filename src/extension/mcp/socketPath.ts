@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
@@ -23,6 +24,24 @@ export const workspaceKey = (folderPath: string, platform = process.platform): s
  * apontaria para uma cópia que o outro não atualiza. A mesma ponte serve aos dois e ao `faz-ai`.
  */
 export const stableBridgePath = (homeDir = os.homedir()): string => path.join(homeDir, '.faz-ai', 'mcp', 'bridge.js');
+
+/** A versão da extensão que copiou a ponte: fica ao lado dela, e é com ela que se sabe se o registro está desatualizado. */
+export const bridgeVersionPath = (homeDir = os.homedir()): string => path.join(homeDir, '.faz-ai', 'mcp', 'bridge.version');
+
+/** A versão gravada ao lado da ponte; null quando não há (instalação de antes deste arquivo). */
+export function readBridgeVersion(homeDir = os.homedir()): string | null {
+  try {
+    return fs.readFileSync(bridgeVersionPath(homeDir), 'utf8').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Grava a versão da extensão ao lado da ponte (só depois de o registro ter dado certo). */
+export function writeBridgeVersion(version: string, homeDir = os.homedir()): void {
+  fs.mkdirSync(path.dirname(bridgeVersionPath(homeDir)), { recursive: true });
+  fs.writeFileSync(bridgeVersionPath(homeDir), version);
+}
 
 /** Nome do usuário do sistema, ou '' quando não dá para saber (contas sem perfil, contêineres). */
 function userName(): string {

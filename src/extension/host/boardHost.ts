@@ -12,7 +12,7 @@ import { consolidate } from '../log/rollup';
 import { BoardRepo } from '../repositories/boardRepo';
 import { registerClients, removeProjectServer } from '../mcp/clientConfig';
 import { runRegistrationSteps } from '../mcp/reinstall';
-import { workspaceKey } from '../mcp/socketPath';
+import { readBridgeVersion, workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
 import { ReleaseWatcher } from '../release';
 import { CommandError, deleteBranch, detectMainBranch, removeWorktree } from '../git';
@@ -340,6 +340,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       workspaceDir: o.folderPath,
       homeDir,
       bridgePath: o.bridgePath,
+      installedVersion: readBridgeVersion(homeDir),
+      currentVersion: o.version,
       nodePath,
       resolve: (command) => resolveCommand(command, pathEnv, homeDir),
       signedIn: (tool, exe) => probeSignedIn(tool, exe, forceSigninCheck),
