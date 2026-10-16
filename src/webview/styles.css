@@ -739,6 +739,17 @@ html body[data-scroll-locked] {
 .children li .ai-led {
   margin-right: var(--sp-4);
 }
+/* Sub-tarefas do card aberto: o título ocupa o espaço entre o LED e o status, texto à esquerda */
+#subtasks-section .children a {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Status da sub-tarefa fica na borda direita da linha e não é espremido por títulos longos */
+#subtasks-section .children li .muted {
+  flex: none;
+  white-space: nowrap;
+}
 .children li:hover {
   background: var(--hover);
 }
