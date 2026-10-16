@@ -197,7 +197,7 @@ caminhos dos arquivos de apoio dela.
 ### Agente de cada card
 
 O agente do card define antes o que a sessão usa: instruções, skills, servidores MCP, ferramentas e
-modelo. `get_board` lista os disponíveis em `agents` (com `default`). O agente de um card é o do
+modelo. `get_board` lista os disponíveis em `agents` (com `default`; a resposta não traz `harness` nem `appearance`: o inventário está em `get_harness`, e só o Plan, o refinar e a edição do board pedem o `get_board`). O agente de um card é o do
 próprio card (`set_card_profile`, pelo nome), senão o da coluna (`update_column` com
 `exec_profile`), senão o da coluna da história (numa sub-tarefa), senão o padrão do board
 (Configurações → Harness de IA → Ferramenta e execução).

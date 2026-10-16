@@ -622,8 +622,6 @@ export function boardOverview(s: BoardState) {
       display: f.display,
     })),
     rules: s.board.rules,
-    appearance: s.board.appearance,
-    harness: harnessOverview(s),
     archivedCards: s.cards.filter(isArchived).length,
     trashedCards: s.cards.filter((c) => c.deletedAt !== null).length,
   };

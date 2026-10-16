@@ -1144,7 +1144,7 @@ ferramenta aceita; o resto segue no prompt, como instrução:
 
 As skills e as rules vão sempre pelo caminho do arquivo. Numa conversa aberta por você, o agente
 chega à IA pelo `get_card` (`execution`), como orientação. Pelo MCP, `get_board` lista os agentes
-disponíveis, `set_card_profile` escolhe o de um card e `create_agent`, `update_agent`, `get_agent` e
+(só `agents`, sem `harness` nem `appearance`; o inventário está no `get_harness`) disponíveis, `set_card_profile` escolhe o de um card e `create_agent`, `update_agent`, `get_agent` e
 `delete_agent` gerenciam os arquivos.
 
 ## Harness de IA

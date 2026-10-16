@@ -36,7 +36,7 @@ const CLIENT_NAMES: Record<string, string> = {
 export const MCP_INSTRUCTIONS =
   'Board kanban do projeto (Faz AI). As histórias (workflow pai) passam pelas fases do fluxo, que são as colunas, uma por vez até a conclusão; ' +
   'as sub-tarefas (workflow filho) ficam ligadas a uma história. Cards são identificados pelo número (#12). Sinalize o progresso movendo os cards (move_card). ' +
-  'Sem um pedido específico, comece por get_pending_work: ele lista o que está com você. get_board mostra colunas, tipos, campos e agentes. ' +
+  'Sem um pedido específico, comece por get_pending_work: ele lista o que está com você. get_board (colunas, tipos, campos, agentes): Plan, refinar, editar board. ' +
   'Cada card tem um status de trabalho em `work`: "ready" e "approved" estão com você; "waiting_review", "waiting_answer" e "blocked" estão com a pessoa. ' +
   'Ao começar um card chame start_work e siga `phase` do get_card. Nas colunas com `requiresApproval`, ao terminar o trabalho da fase chame request_review e PARE: ' +
   'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +

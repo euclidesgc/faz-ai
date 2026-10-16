@@ -850,9 +850,22 @@ describe('workflows', () => {
   });
 });
 
+describe('get_board enxuto (#598)', () => {
+  it('traz uma só lista de agentes, sem aparência nem o bloco harness; o inventário fica no get_harness', async () => {
+    const res = await call('get_board');
+    const b = res.data;
+    expect(b.appearance).toBeUndefined();
+    expect(b.harness).toBeUndefined();
+    expect(res.text).not.toContain('inventory');
+    expect(b.agents.filter((a: any) => a.default)).toHaveLength(1);
+    const h = (await call('get_harness')).data;
+    for (const key of ['inventory', 'skills', 'ruleFiles', 'agents']) expect(h[key]).toBeDefined();
+  });
+});
+
 describe('aparência', () => {
   it('guarda tema, fonte e tamanho, recusando valores fora do permitido', async () => {
-    expect((await call('get_board')).data.appearance).toMatchObject({ theme: 'system', font: 'sans', fontSize: 14 });
+    expect(router.snapshot().board.appearance).toMatchObject({ theme: 'system', font: 'sans', fontSize: 14 });
     expect((await call('set_appearance', { theme: 'dark', font_size: 16 })).data).toMatchObject({
       theme: 'dark',
       font: 'sans',

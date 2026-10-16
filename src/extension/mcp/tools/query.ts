@@ -23,8 +23,8 @@ const MAX_READ_BYTES = 256 * 1024;
 export function registerQueryTools(tool: DefineTool): void {
   tool(
     'get_board',
-    'Visão geral do board: workflows, colunas (com categoria e quantidade de cards), tipos de card, campos personalizados e regras. Chame primeiro para conhecer os nomes válidos. ' +
-      'As opções dos campos Rules e Skills e os `agents` são tudo o que o board marcou em Configurações → Harness: não indique nada fora deles.',
+    'Visão geral do board: workflows, colunas (com categoria e quantidade de cards), tipos de card, campos personalizados e regras. Chame só quando a tarefa precisa dele (Plan, refinar, editar o board): o get_card já traz o que a fase pede. ' +
+      'As opções dos campos Rules e Skills e os `agents` são tudo o que o board marcou em Configurações → Harness: não indique nada fora deles. O inventário do Harness (skills, rules, MCPs) está em get_harness; a aparência, em set_appearance.',
     {},
     (_a, router) => boardOverview(router.snapshot()),
     true,
