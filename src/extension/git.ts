@@ -5,6 +5,23 @@ import { samePath } from './samePath';
 import type { GitConfig, MainBranch, WorkspaceMode } from '../shared/git';
 import type { GitNotice } from '../shared/gitflow';
 
+/**
+ * Falha de um comando externo das rotinas de fundo (o `run()` do boardHost): a mensagem continua a do
+ * comando, e o código de saída e a saída padrão vão junto para quem precisa distinguir um resultado de
+ * uma falha. O `git merge-tree --write-tree`, por exemplo, sai com 1 quando há conflito e lista os
+ * arquivos na saída padrão.
+ */
+export class CommandError extends Error {
+  constructor(
+    message: string,
+    readonly exitCode: number | null,
+    readonly stdout: string,
+  ) {
+    super(message);
+    this.name = 'CommandError';
+  }
+}
+
 /** Limite do `git fetch origin` antes de criar uma branch: o host fica travado esse tempo (#462, Riscos). */
 export const FETCH_TIMEOUT_MS = 20_000;
 

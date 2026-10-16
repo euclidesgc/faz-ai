@@ -33,3 +33,20 @@ describe('conjunto de skills do fluxo (#588)', () => {
     expect(FLOW_SKILL.body).not.toContain('code-review-graph');
   });
 });
+
+describe('aviso de conflito com a base (#747)', () => {
+  const workspace = FLOW_SKILLS.find((k) => k.name === 'faz-ai-workspace-e-pr')!;
+
+  it('a skill da pasta de trabalho diz como tratar o aviso antes do PR, sem rebase nem push forçado', () => {
+    expect(workspace.body).toContain('Se a conversa trouxer o aviso de que a branch tem conflito com a base');
+    expect(workspace.body).toContain('trate antes de abrir o pull request');
+    expect(workspace.body).toContain('`git merge origin/<base>`, resolva os conflitos, rode as checagens');
+    expect(workspace.body).toContain('no\nmodo autônomo, `block_card` com o motivo');
+    expect(workspace.body).toContain('o conflito é do board');
+    expect(workspace.description).toContain('aviso de conflito com a base');
+  });
+
+  it('a principal aponta a skill também para o aviso de conflito', () => {
+    expect(FLOW_SKILL.body).toContain('a pilha e o aviso de conflito com a base');
+  });
+});

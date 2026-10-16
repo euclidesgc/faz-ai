@@ -183,7 +183,7 @@ export function heartbeatIdleReason(s: BoardState): string {
   return why.length ? `nenhuma história pode executar agora: ${why.join('; ')}.` : 'nada pendente com a IA.';
 }
 
-const MODE_LABEL: Record<AiRunMode, string> = { phase: 'fase', refine: 'refinar', summarize: 'resumir' };
+const MODE_LABEL: Record<AiRunMode, string> = { phase: 'fase', refine: 'refinar', summarize: 'resumir', conflict: 'conflito' };
 
 /**
  * Rotina periódica: a cada rodada, primeiro arruma o board (devolve para a IA os cards bloqueados por
