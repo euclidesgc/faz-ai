@@ -26,4 +26,10 @@ describe('conjunto de skills do fluxo (#588)', () => {
     for (const k of FLOW_SKILLS.slice(1)) expect(FLOW_SKILL.body).toContain(k.name);
     expect(SUBTASKS_NOW_NOTE).toContain('faz-ai-implementacao-rodadas');
   });
+
+  it('a principal manda partir do mapa do código e pede os arquivos de cada sub-tarefa', () => {
+    expect(FLOW_SKILL.body).toContain('Mapa do código');
+    expect(FLOW_SKILL.body).toContain('os arquivos que ela vai tocar');
+    expect(FLOW_SKILL.body).not.toContain('code-review-graph');
+  });
 });
