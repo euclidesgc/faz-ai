@@ -5,6 +5,7 @@ import { useAction } from '../../../useAction';
 import { useBoardStore } from '../../../store/boardStore';
 import { Badge, Card, Checkbox, TextField } from '@radix-ui/themes';
 import { ActionButton, SelectField, type EnumOption } from '../../ui';
+import { isWeb } from '../../../vscode';
 import { withGlobalWarning } from './text';
 import { t } from '../../../i18n';
 
@@ -15,10 +16,11 @@ const DESTINATIONS: EnumOption<HarnessScope>[] = [
 ];
 
 /** Instalar skills de uma pasta ou de um repositório git: procurar, revisar a lista e escolher o que copiar. */
-export function InstallSkills({ tool, library = false }: { tool: AiTool; library?: boolean }) {
+export function InstallSkills({ tool, library = false, onImported }: { tool: AiTool; library?: boolean; onImported?: () => void }) {
   const state = useBoardStore((s) => s.state)!;
   const ask = useBoardStore((s) => s.ask);
   const [source, setSource] = useState('');
+  const [imported, setImported] = useState(0);
   const [chosen, setChosen] = useState<string[]>([]);
   const [to, setTo] = useState<HarnessScope>('project');
   const preview = state.harnessInstall;
@@ -34,29 +36,67 @@ export function InstallSkills({ tool, library = false }: { tool: AiTool; library
   const picked = chosen.filter((rel) => installable.some((k) => k.rel === rel));
   // clonar o repositório e copiar as pastas levam segundos: os botões mostram a espera até o host confirmar
   const scan = useAction(() => harness.scanInstall(source));
+  const pick = useAction(() => harness.pickLibrarySource());
   const install = useAction(() => (library ? harness.importLibrarySkills(picked) : harness.applyInstall(tool, to, picked)));
-  const apply = () =>
+  const apply = () => {
+    if (library) {
+      const count = picked.length;
+      void install.run().then((ok) => {
+        if (ok) {
+          setChosen([]);
+          setImported(count);
+          onImported?.();
+        }
+      });
+      return;
+    }
     ask({
       title: t('Instalar {n} skill(s)?', { n: picked.length }),
-      message: library
-        ? t('Copia as skills selecionadas e seus arquivos de apoio para a biblioteca particular deste board.')
-        : withGlobalWarning(
-            t(
-              'As pastas são copiadas para {destination}. Nada é executado na instalação, mas uma skill são instruções (e às vezes scripts) que a IA vai seguir: leia o que vem de fontes que você não conhece.',
-              { destination: to === 'user' ? t('a sua pasta de usuário') : t('o projeto') },
-            ),
-            to,
-          ),
+      message: withGlobalWarning(
+        t(
+          'As pastas são copiadas para {destination}. Nada é executado na instalação, mas uma skill são instruções (e às vezes scripts) que a IA vai seguir: leia o que vem de fontes que você não conhece.',
+          { destination: to === 'user' ? t('a sua pasta de usuário') : t('o projeto') },
+        ),
+        to,
+      ),
       confirmLabel: t('Instalar'),
       onConfirm: async () => {
         if (await install.run()) setChosen([]);
       },
     });
+  };
   return (
-    <Card className="draft-card" aria-label={t('Instalar skills')}>
+    <Card className="draft-card" aria-label={library ? t('Importar skills para o board') : t('Instalar skills')}>
+      {library && (
+        <>
+          <h4>{t('Importar skills de outra pasta')}</h4>
+          <p className="muted small">
+            {t(
+              '1. Escolha a pasta de origem. 2. Marque as skills encontradas. 3. Clique em Importar selecionadas. As cópias aparecem na lista abaixo e funcionam com qualquer ferramenta.',
+            )}
+          </p>
+          {!isWeb && (
+            <ActionButton
+              loading={pick.busy}
+              variant="soft"
+              hint={t('Escolhe uma pasta e lista as skills antes de copiar para o board.')}
+              onClick={() => {
+                setImported(0);
+                void pick.run();
+              }}
+            >
+              {t('Importar de uma pasta')}
+            </ActionButton>
+          )}
+        </>
+      )}
+      {imported > 0 && (
+        <p role="status">{t('{n} skill(s) importada(s). Elas estão na aba Skills abaixo, no modo Pelo card.', { n: imported })}</p>
+      )}
       <div className="row">
         <TextField.Root
           className="grow"
+          aria-label={library ? t('Pasta de origem ou repositório') : undefined}
           value={source}
           onChange={(e) => setSource(e.target.value)}
           placeholder={t('dono/repositorio, endereço git (https ou ssh) ou o caminho de uma pasta')}
@@ -70,7 +110,7 @@ export function InstallSkills({ tool, library = false }: { tool: AiTool; library
           hint={t('Clona ou lê a origem numa pasta temporária, sem rodar nada, e lista as skills encontradas.')}
           onClick={() => void scan.run()}
         >
-          {t('Procurar skills')}
+          {library ? t('Buscar skills pelo caminho') : t('Procurar skills')}
         </ActionButton>
       </div>
       {scan.busy && (
@@ -105,7 +145,7 @@ export function InstallSkills({ tool, library = false }: { tool: AiTool; library
                   <tr key={k.rel} className={blocked ? 'off' : ''}>
                     <td>
                       <Checkbox
-                        aria-label={t('Instalar {name}', { name: k.name })}
+                        aria-label={library ? t('Importar {name}', { name: k.name }) : t('Instalar {name}', { name: k.name })}
                         disabled={!!blocked}
                         checked={picked.includes(k.rel)}
                         onCheckedChange={(on) => setChosen(on === true ? [...picked, k.rel] : picked.filter((r) => r !== k.rel))}
@@ -159,7 +199,9 @@ export function InstallSkills({ tool, library = false }: { tool: AiTool; library
               hint={t('Copia as pastas das skills marcadas para o destino escolhido.')}
               onClick={apply}
             >
-              {t('Instalar {n} selecionada(s)', { n: picked.length || '' })}
+              {library
+                ? t('Importar selecionadas ({n})', { n: picked.length })
+                : t('Instalar {n} selecionada(s)', { n: picked.length || '' })}
             </ActionButton>
           </div>
         </>

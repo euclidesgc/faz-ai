@@ -142,6 +142,7 @@ export const gitNotices: Record<string, string> = {
 };
 
 export const host: Record<string, string> = {
+  'O índice da biblioteca está inválido. Os arquivos foram preservados.': 'The library index is invalid. The files were preserved.',
   'Caminho inválido dentro da skill.': 'Invalid path inside the skill.',
   'O arquivo ultrapassa os limites da biblioteca.': 'The file exceeds the library limits.',
   ...commandNotFound,

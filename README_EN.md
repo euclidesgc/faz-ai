@@ -1320,11 +1320,17 @@ artifact from the board never deletes the source.
 **Library folder** shows the directory managed by the board, defaulting to
 `<Faz AI storage>/artifacts/<project>/`, outside the repository. Enter an empty folder and choose
 **Save folder** to recreate the copies there; the previous folder is preserved. **Open folder** opens
-it in the editor. Content is stored in the board database, and the board maintains reading copies in
-this folder; manage and edit artifacts through the board interface.
+it in the system file manager. Paste folders containing `SKILL.md` directly here or under `skills/`,
+with references, assets and scripts. Refocus the window, reopen the library or choose **Refresh list**
+to register them in **Per card** mode. They appear under **Skills**, with name, description and usage
+mode. Edits to copies are detected too. Unregistered files and folders are preserved; duplicate names
+show a notice. Use **Remove from board** to remove an item. Synchronization only removes untouched
+copies previously written by the board.
 
-To import dozens of skills, enter a collection folder or repository in **Find skills**, review the
-list, choose **Select all** or individual items, and install them in the library. Each skill includes
+To import from another location, choose **Import from a folder**, pick the source folder,
+review the list, use **Select all** or choose individual skills, then choose **Import selected**.
+The source stays intact; copies appear under Skills and in card options. In the browser, enter the
+folder path on the server computer and choose **Find skills by path**. Git repositories are also supported. Each skill includes
 `SKILL.md` and supporting references, assets and scripts, limited to 512 KB per file, 100 supporting
 files and 5 MB total; omitted files are indicated in the list. The same name and kind from a different
 source require removing the previous copy first. Private project skills, including `board-harness/`,

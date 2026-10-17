@@ -224,6 +224,7 @@ export const harness = {
   setLibraryDirectory: (dir: string) => req({ type: 'harness.library.directory', dir }),
   updateLibraryArtifact: (id: string) => req({ type: 'harness.library.update', id }),
   importLibrarySkills: (rels: string[]) => req({ type: 'harness.library.import', rels }),
+  pickLibrarySource: () => req({ type: 'harness.library.pick' }),
   openLibrary: () => req({ type: 'harness.library.open' }),
   pickImport: (tool: AiTool) => req({ type: 'harness.import.pick', tool }),
   addImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.add', tool, dir }),
