@@ -79,6 +79,17 @@ export function suggestSkillsPrompt(): string {
   ].join('\n');
 }
 
+/** A biblioteca é o destino de toda criação: a IA não escreve configurações de ferramentas. */
+export function suggestLibraryPrompt(kind: 'rule' | 'skill' | 'agent'): string {
+  return [
+    `Analise o projeto e proponha ${kind === 'rule' ? 'regras concisas em AGENTS.md' : kind === 'skill' ? 'skills para tarefas repetidas' : 'subagentes especializados'} para este board.`,
+    'Leia get_board, get_harness e get_project_profile (linguagens, ferramentas, scripts, pastas e título do README). Leia os artefatos existentes com get_board_artifact. Baseie sugestões nos dados detectados e indique pontos que exigem confirmação da pessoa. Não execute comandos nem altere arquivos do projeto.',
+    `Grave apenas na biblioteca com save_board_artifact (kind "${kind}", name, description, body). Regras novas ficam desligadas; skills e agentes ficam Pelo card. Não use create_agent, create_skill ou write_rule_file: estes são comandos de compatibilidade para fontes antigas.`,
+    'Antes de ajustar um artefato existente, leia get_board_artifact e preserve suas instruções; informe seu id. Não substitua regras personalizadas sem necessidade. Para agentes, informe skills e mcpServers apenas entre os disponíveis no board; categories: read, edit, run, net, agents. Use descrições que expliquem quando escolher cada artefato.',
+    'Não duplique o que já existe. Preserve o fluxo, as aprovações e as definições do board. Termine com um resumo em português do que criou ou ajustou e do que a pessoa deve revisar.',
+  ].join('\n');
+}
+
 /** O que cada tipo de artefato é, para o pedido de "Indicar artefatos". */
 const KIND_LABEL: Record<SelectableKind, string> = {
   instructions: 'arquivos de regras e instruções',
@@ -187,7 +198,9 @@ export class ChatSession {
   /** A IA lê o projeto e propõe os agentes do board; a conversa registra o pedido e o resultado. */
   suggestAgents(): void {
     const state = this.router.snapshot();
-    const prompt = [suggestAgentsPrompt(), ...contextLines(state).always].join('\n');
+    const prompt = [state.harness.library ? suggestLibraryPrompt('agent') : suggestAgentsPrompt(), ...contextLines(state).always].join(
+      '\n',
+    );
     // criar e marcar agentes é trabalho do board: roda só com ele
     this.run({ role: 'user', text: 'Sugerir agentes com IA: leia o projeto e proponha os agentes deste board.' }, prompt, 'board', null);
   }
@@ -195,14 +208,19 @@ export class ChatSession {
   /** A IA lê o projeto e propõe regras, gravadas desligadas; a conversa registra o pedido e o resultado. */
   suggestRules(): void {
     const state = this.router.snapshot();
-    const prompt = [suggestRulesPrompt(aiToolInfo(state.board.aiTool).rules), ...contextLines(state).always].join('\n');
+    const prompt = [
+      state.harness.library ? suggestLibraryPrompt('rule') : suggestRulesPrompt(aiToolInfo(state.board.aiTool).rules),
+      ...contextLines(state).always,
+    ].join('\n');
     this.run({ role: 'user', text: 'Sugerir regras com IA: leia o projeto e proponha regras para ele.' }, prompt, 'board', null);
   }
 
   /** A IA lê o projeto e propõe skills, enviadas ao board em "Pelo card"; a conversa registra o pedido e o resultado. */
   suggestSkills(): void {
     const state = this.router.snapshot();
-    const prompt = [suggestSkillsPrompt(), ...contextLines(state).always].join('\n');
+    const prompt = [state.harness.library ? suggestLibraryPrompt('skill') : suggestSkillsPrompt(), ...contextLines(state).always].join(
+      '\n',
+    );
     this.run({ role: 'user', text: 'Sugerir skills com IA: leia o projeto e proponha skills para ele.' }, prompt, 'board', null);
   }
 

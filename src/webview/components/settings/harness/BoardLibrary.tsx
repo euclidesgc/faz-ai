@@ -8,7 +8,11 @@ import { useBoardStore } from '../../../store/boardStore';
 import { ActionButton } from '../../ui';
 import { SectionHeader } from '../SectionHeader';
 import { BoardList } from './BoardList';
-import { InstallSkills } from './InstallSkills';
+import { LibraryImport } from './LibraryImport';
+import { LibraryEditor } from './LibraryEditor';
+import { ai } from '../../../commands';
+import { onHostMessage } from '../../../vscode';
+import { kindOfSelectable, type LibraryArtifactInput, type ArtifactKind } from '../../../../shared/artifacts';
 import { t } from '../../../i18n';
 
 /** A biblioteca pertence ao board: a ferramenta selecionada só decide como executar os artefatos. */
@@ -16,8 +20,21 @@ export function BoardLibrary() {
   const state = useBoardStore((s) => s.state)!;
   const library = state.harness.library;
   const [directory, setDirectory] = useState(library?.directory ?? '');
+  const [editor, setEditor] = useState<{ kind: ArtifactKind; guided?: boolean; initial?: LibraryArtifactInput } | null>(null);
+  useEffect(
+    () =>
+      onHostMessage((msg) => {
+        if (msg.type === 'harness.library.content') setEditor({ kind: msg.input.kind, initial: msg.input });
+      }),
+    [],
+  );
   const [query, setQuery] = useState('');
-  const [topic, setTopic] = useState<HarnessTopic>('skill');
+  const storedTopic = useBoardStore((s) => s.harnessTopic);
+  const topic: HarnessTopic = ['rules', 'skill', 'agent', 'mcp'].includes(storedTopic) ? storedTopic : 'rules';
+  const setTopic = (topic: HarnessTopic) => {
+    useBoardStore.setState({ harnessTopic: topic });
+    setEditor(null);
+  };
   useEffect(() => setDirectory(library?.directory ?? ''), [library?.directory]);
   const save = useAction(() => harness.setLibraryDirectory(directory));
   const open = useAction(() => harness.openLibrary());
@@ -32,7 +49,7 @@ export function BoardLibrary() {
   }, [refresh]);
   const topics = HARNESS_TOPICS.filter((x) => x.kind);
   return (
-    <div className="scope-harness">
+    <div className="scope-harness board-library">
       <SectionHeader
         title={t('Biblioteca do board')}
         actions={
@@ -48,52 +65,55 @@ export function BoardLibrary() {
         }
       >
         {t(
-          'Skills, agentes e regras copiados para este board ficam disponíveis com qualquer ferramenta de IA. As fontes originais são preservadas.',
+          'Crie, importe e gerencie os artefatos deste board. Cada aba reúne um tipo, disponível com qualquer ferramenta de IA conectada.',
         )}
       </SectionHeader>
-      <label className="form-field">
-        <span>{t('Pasta da biblioteca')}</span>
-        <TextField.Root
-          aria-label={t('Pasta da biblioteca')}
-          value={directory}
-          onChange={(e) => setDirectory(e.target.value)}
-          placeholder={t('Caminho completo de uma pasta vazia')}
-        />
-      </label>
-      <p className="muted small">{t('Esta é a pasta de destino do board. A pasta de origem é escolhida na importação abaixo.')}</p>
-      <div className="row wrap">
-        <ActionButton
-          variant="soft"
-          loading={save.busy}
-          disabled={!directory.trim() || directory === library?.directory}
-          disabledReason={t('Informe uma nova pasta para a biblioteca.')}
-          hint={t('Copia a biblioteca para a nova pasta e passa a usá-la. A pasta anterior é preservada.')}
-          onClick={() => void save.run()}
-        >
-          {t('Salvar pasta')}
-        </ActionButton>
-        <ActionButton
-          variant="soft"
-          color="gray"
-          loading={open.busy}
-          disabled={!library?.directory}
-          disabledReason={t('A biblioteca ainda não está disponível.')}
-          hint={t('Abre a pasta da biblioteca no gerenciador de arquivos do sistema.')}
-          onClick={() => void open.run()}
-        >
-          {t('Abrir pasta')}
-        </ActionButton>
-      </div>
-      <p className="muted small">
-        {t(
-          'A biblioteca é local e particular. As skills importadas não são distribuídas com a extensão. Atualizações da origem só entram quando você pede.',
-        )}
-      </p>
-      <p className="muted small">
-        {t(
-          'Você pode colar pastas de skills aqui. Cada pasta deve conter SKILL.md; os arquivos de apoio vão junto. Ao voltar à tela ou clicar em Atualizar lista, elas aparecem em Skills, no modo Pelo card.',
-        )}
-      </p>
+      <details className="library-storage">
+        <summary>{t('Armazenamento da biblioteca')}</summary>
+        <label className="form-field">
+          <span>{t('Pasta da biblioteca')}</span>
+          <TextField.Root
+            aria-label={t('Pasta da biblioteca')}
+            value={directory}
+            onChange={(e) => setDirectory(e.target.value)}
+            placeholder={t('Caminho completo de uma pasta vazia')}
+          />
+        </label>
+        <p className="muted small">{t('Esta é a pasta de destino do board. A pasta de origem é escolhida na importação abaixo.')}</p>
+        <div className="row wrap">
+          <ActionButton
+            variant="soft"
+            loading={save.busy}
+            disabled={!directory.trim() || directory === library?.directory}
+            disabledReason={t('Informe uma nova pasta para a biblioteca.')}
+            hint={t('Copia a biblioteca para a nova pasta e passa a usá-la. A pasta anterior é preservada.')}
+            onClick={() => void save.run()}
+          >
+            {t('Salvar pasta')}
+          </ActionButton>
+          <ActionButton
+            variant="soft"
+            color="gray"
+            loading={open.busy}
+            disabled={!library?.directory}
+            disabledReason={t('A biblioteca ainda não está disponível.')}
+            hint={t('Abre a pasta da biblioteca no gerenciador de arquivos do sistema.')}
+            onClick={() => void open.run()}
+          >
+            {t('Abrir pasta')}
+          </ActionButton>
+        </div>
+        <p className="muted small">
+          {t(
+            'A biblioteca é local e particular. As skills importadas não são distribuídas com a extensão. Atualizações da origem só entram quando você pede.',
+          )}
+        </p>
+        <p className="muted small">
+          {t(
+            'Você pode colar pastas de skills aqui. Cada pasta deve conter SKILL.md; os arquivos de apoio vão junto. Ao voltar à tela ou clicar em Atualizar lista, elas aparecem em Skills, no modo Pelo card.',
+          )}
+        </p>
+      </details>
       {library?.warnings?.map((warning) => (
         <Callout.Root key={warning.path} color="amber" size="1">
           <Callout.Text>
@@ -110,24 +130,14 @@ export function BoardLibrary() {
           </Callout.Text>
         </Callout.Root>
       ))}
-      <InstallSkills
-        tool={state.board.aiTool}
-        library
-        onImported={() => {
-          setTopic('skill');
-          setQuery('');
-        }}
-      />
-      <p className="muted small">
-        {t(
-          'Cada skill aceita arquivos de até 512 KB, até 100 arquivos de apoio e 5 MB no total. Itens omitidos aparecem na lista do board.',
-        )}
-      </p>
-      <p className="muted small">
-        {t(
-          'As skills aparecem no campo Skills dos cards e no planejamento. Pelo card só entra quando escolhido; Sempre entra em toda execução.',
-        )}
-      </p>
+      {!!library?.warnings?.length && (
+        <p className="muted small">
+          {t(
+            'Cada skill aceita arquivos de até 512 KB, até 100 arquivos de apoio e 5 MB no total. Itens omitidos aparecem na lista do board.',
+          )}
+        </p>
+      )}
+      <LibraryImport />
       <TextField.Root
         type="search"
         aria-label={t('Buscar na biblioteca')}
@@ -150,11 +160,47 @@ export function BoardLibrary() {
         </Tabs.List>
         {topics.map((x) => (
           <Tabs.Content key={x.id} value={x.id}>
-            <BoardList
-              kind={x.kind!}
-              query={query}
-              onOpenCatalog={(origin) => useBoardStore.setState({ harnessTab: state.board.aiTool, harnessOrigin: origin })}
-            />
+            <div className="actions-toolbar">
+              <ActionButton hint={t('Cria um artefato nesta aba.')} onClick={() => setEditor({ kind: kindOfSelectable(x.kind!) })}>
+                {t('Criar')}
+              </ActionButton>
+              {x.kind !== 'mcp' && (
+                <>
+                  <ActionButton
+                    variant="soft"
+                    hint={t('Responda às perguntas e revise o conteúdo antes de salvar.')}
+                    onClick={() => setEditor({ kind: kindOfSelectable(x.kind!), guided: true })}
+                  >
+                    {t('Assistente guiado')}
+                  </ActionButton>
+                  <ActionButton
+                    variant="soft"
+                    disabled={state.chat.busy}
+                    disabledReason={t('Aguarde a resposta da IA.')}
+                    hint={t('A IA analisa o projeto e cria sugestões na biblioteca. Acompanhe pela conversa do board.')}
+                    onClick={() => {
+                      if (x.kind === 'instructions') ai.suggestRules();
+                      else if (x.kind === 'skill') ai.suggestSkills();
+                      else ai.suggestAgents();
+                      useBoardStore.getState().setChatOpen(true);
+                    }}
+                  >
+                    {t('Gerar com base no projeto')}
+                  </ActionButton>
+                </>
+              )}
+            </div>
+            {editor?.kind === kindOfSelectable(x.kind!) && (
+              <LibraryEditor key={editor.initial?.id ?? `${editor.kind}-${editor.guided}`} {...editor} onClose={() => setEditor(null)} />
+            )}
+            {x.kind === 'mcp' && (
+              <p className="muted small">
+                {t(
+                  'Conecte sua ferramenta ao MCP faz-ai uma vez. Os servidores desta aba são acessados por list_board_mcp_tools e call_board_mcp_tool, sem copiar configurações entre ferramentas.',
+                )}
+              </p>
+            )}
+            <BoardList kind={x.kind!} query={query} onOpenCatalog={() => setEditor({ kind: kindOfSelectable(x.kind!) })} />
           </Tabs.Content>
         ))}
       </Tabs.Root>

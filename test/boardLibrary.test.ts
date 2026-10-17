@@ -219,3 +219,97 @@ describe('biblioteca particular do board', () => {
     expect(router.readHarnessFile(skill).content).toBe('Meu fluxo particular');
   });
 });
+
+describe('gerenciamento centralizado dos artefatos', () => {
+  it('importa uma coleção mista para as quatro abas e não sobrescreve nomes de outra origem', () => {
+    write('collection/rules/AGENTS.md', 'Use os testes do projeto.');
+    write('collection/skills/react/SKILL.md', '---\nname: react\ndescription: Componentes\n---\nSiga os contratos.');
+    write('collection/skills/react/references/api.md', 'Contrato de API');
+    write('collection/agents/revisor.md', '---\nname: revisor\ndescription: Revisa alterações\n---\nLeia o diff.');
+    write(
+      'collection/mcp.json',
+      JSON.stringify({ mcpServers: { memoria: { command: 'npx', args: ['memoria'], env: { TOKEN: 'privado' } } } }),
+    );
+    router.handle({ type: 'harness.library.scan', dir: path.join(root, 'collection') });
+    const preview = router.snapshot().harness.library!.preview!;
+    expect(preview.items.map((i) => i.kind).sort()).toEqual(['agent', 'mcp', 'rule', 'skill']);
+    expect(JSON.stringify(preview)).not.toContain('privado');
+    router.handle({ type: 'harness.library.apply', keys: preview.items.map((i) => i.key) });
+    const library = router.snapshot().harness.library!;
+    expect(library.artifacts).toHaveLength(4);
+    expect(library.artifacts.find((a) => a.kind === 'rule')).toMatchObject({ name: 'AGENTS.md', usage: 'off' });
+    expect(library.artifacts.find((a) => a.kind === 'skill')!.files).toEqual(['references/api.md']);
+    expect(JSON.stringify(router.snapshot())).not.toContain('privado');
+    expect(library.preview).toBeUndefined();
+    write('other/skills/react/SKILL.md', 'Outra skill');
+    router.handle({ type: 'harness.library.scan', dir: path.join(root, 'other') });
+    expect(() =>
+      router.handle({ type: 'harness.library.apply', keys: router.snapshot().harness.library!.preview!.items.map((i) => i.key) }),
+    ).toThrow('Já existe');
+    expect(router.snapshot().harness.library!.artifacts).toHaveLength(4);
+  });
+
+  it('cria e edita no board, preservando anexos, identidade e modo de uso', () => {
+    router.handle({
+      type: 'harness.library.save',
+      input: { kind: 'rule', name: 'AGENTS.md', description: 'Regras gerais', body: 'Use testes.' },
+    });
+    const rule = router.snapshot().harness.library!.artifacts[0]!;
+    expect(rule.usage).toBe('off');
+    expect(fs.existsSync(path.join(root, 'project/AGENTS.md'))).toBe(false);
+    router.handle({ type: 'harness.library.save', input: { ...router.readLibraryArtifact(rule.id), body: 'Use testes e lint.' } });
+    expect(fs.readFileSync(rule.path, 'utf8')).toBe('Use testes e lint.');
+    expect(router.snapshot().harness.library!.artifacts[0]!.id).toBe(rule.id);
+    expect(() =>
+      router.handle({ type: 'harness.library.save', input: { kind: 'rule', name: 'AGENTS.md', description: '', body: 'Acidental' } }),
+    ).toThrow('Já existe');
+    router = makeRouter();
+    expect(router.readLibraryArtifact(rule.id).body).toBe('Use testes e lint.');
+  });
+
+  it('agentes neutros traduzem as categorias em ferramentas de cada executor', () => {
+    router.handle({
+      type: 'harness.library.save',
+      input: {
+        kind: 'agent',
+        name: 'revisor-neutro',
+        description: 'Só leitura',
+        body: 'Revise o projeto.',
+        agent: { skills: [], mcpServers: [], model: '', tools: { categories: ['read'], native: { tool: '', allow: [], deny: [] } } },
+      },
+    });
+    for (const aiTool of ['claude', 'cursor', 'kimi'] as const) {
+      router.handle({ type: 'settings.board.update', patch: { aiTool } });
+      const profile = router.snapshot().board.execProfiles.find((a) => a.name === 'revisor-neutro')!;
+      if (aiTool !== 'claude') expect(profile.instructions).toContain('read');
+      else expect(profile.tools.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('a importação recusa links simbólicos e não confunde arquivos de apoio com regras', () => {
+    write('collection/skills/react/SKILL.md', 'Use React');
+    write('collection/skills/react/references/rules/AGENTS.md', 'Apoio, não regra');
+    const outside = write('outside/agent.md', 'Externo');
+    fs.mkdirSync(path.join(root, 'collection/agents'), { recursive: true });
+    fs.symlinkSync(outside, path.join(root, 'collection/agents/externo.md'));
+    router.handle({ type: 'harness.library.scan', dir: path.join(root, 'collection') });
+    expect(router.snapshot().harness.library!.preview!.items.map((a) => a.kind)).toEqual(['skill']);
+  });
+});
+
+it('editar a descrição da skill atualiza o YAML e preserva opções e arquivos de apoio', () => {
+  write(
+    'project/.claude/skills/revisar/SKILL.md',
+    '---\nname: revisar\ndescription: |\n  Antiga descrição\n  em bloco\ndisable-model-invocation: true\n---\nInstruções particulares.',
+  );
+  write('project/.claude/skills/revisar/references/contrato.md', 'Contrato');
+  router.refreshHarness();
+  select('skill', '.claude/skills/revisar/SKILL.md');
+  const skill = router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'skill')!;
+  router.handle({ type: 'harness.library.save', input: { ...router.readLibraryArtifact(skill.id), description: 'Nova descrição' } });
+  router.refreshHarness();
+  expect(fs.readFileSync(skill.path, 'utf8')).toContain('description: "Nova descrição"');
+  expect(fs.readFileSync(skill.path, 'utf8')).toContain('disable-model-invocation: true');
+  expect(fs.readFileSync(skill.path, 'utf8')).toContain('Instruções particulares.');
+  expect(fs.readFileSync(path.join(path.dirname(skill.path), 'references/contrato.md'), 'utf8')).toBe('Contrato');
+});

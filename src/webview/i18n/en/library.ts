@@ -1,0 +1,108 @@
+export const library: Record<string, string> = {
+  'Crie, importe e gerencie os artefatos deste board. Cada aba reúne um tipo, disponível com qualquer ferramenta de IA conectada.':
+    "Create, import and manage this board's artifacts. Each tab holds one type, available to any connected AI tool.",
+  'A <b>Biblioteca do board</b> reúne os artefatos disponíveis em qualquer ferramenta. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão. Crie e importe regras, skills, subagentes e MCPs diretamente na biblioteca.':
+    'The <b>Board library</b> holds artifacts available to any tool. <b>Tool and execution</b> selects the AI, permissions and default agent. Create and import rules, skills, subagents and MCPs directly in the library.',
+  'Armazenamento da biblioteca': 'Library storage',
+  'Cria um artefato nesta aba.': 'Creates an artifact in this tab.',
+  'Responda às perguntas e revise o conteúdo antes de salvar.': 'Answer the questions and review the content before saving.',
+  'Assistente guiado': 'Guided assistant',
+  'A IA analisa o projeto e cria sugestões na biblioteca. Acompanhe pela conversa do board.':
+    'AI analyzes the project and creates suggestions in the library. Follow along in the board chat.',
+  'Gerar com base no projeto': 'Generate from project',
+  'Conecte sua ferramenta ao MCP faz-ai uma vez. Os servidores desta aba são acessados por list_board_mcp_tools e call_board_mcp_tool, sem copiar configurações entre ferramentas.':
+    'Connect your tool to the faz-ai MCP once. Servers in this tab are accessed through list_board_mcp_tools and call_board_mcp_tool, without copying settings between tools.',
+  'Nenhum artefato nesta aba. Crie um aqui ou importe uma pasta para começar.':
+    'No artifacts in this tab. Create one here or import a folder to get started.',
+  'Edita o conteúdo e as configurações deste artefato.': "Edits this artifact's content and settings.",
+  'Excluir "{name}" da biblioteca?': 'Delete "{name}" from the library?',
+  'A cópia do board será excluída. A origem será preservada.': 'The board copy will be deleted. The source will be preserved.',
+  '<b>Para que serve.</b> Toda execução do board parte de contexto vazio. A <b>Biblioteca do board</b> guarda regras, skills, subagentes e MCPs para qualquer ferramenta conectada.':
+    '<b>What it does.</b> Every board run starts with an empty context. The <b>Board library</b> stores rules, skills, subagents and MCPs for any connected tool.',
+  '<b>Por onde começar.</b> 1) Importe uma pasta e escolha os artefatos na prévia por tipo. 2) Crie artefatos nas abas, com o assistente guiado ou com IA. 3) Revise as regras e escolha quando cada artefato entra no contexto.':
+    '<b>Where to start.</b> 1) Import a folder and select artifacts in the preview grouped by type. 2) Create artifacts in their tabs, using the guided assistant or AI. 3) Review the rules and choose when each artifact enters the context.',
+  'Cole uma definição por vez ou importe o arquivo JSON pela pasta.':
+    'Paste one definition at a time or import the JSON file from a folder.',
+  'Convenções e limites': 'Conventions and limits',
+  Verificação: 'Validation',
+  'Editor da biblioteca': 'Library editor',
+  'Qual tarefa este artefato deve orientar e quando deve ser usado?': 'What task should this artifact guide and when should it be used?',
+  Objetivo: 'Goal',
+  'Detectado no projeto: {text}': 'Detected in project: {text}',
+  'Quais convenções e limites devem ser respeitados?': 'Which conventions and limits should be followed?',
+  'Outras instruções': 'Other instructions',
+  Conteúdo: 'Content',
+  'Editar JSON diretamente': 'Edit JSON directly',
+  'Definição JSON do MCP': 'MCP JSON definition',
+  'Argumentos (lista JSON)': 'Arguments (JSON array)',
+  'O board conecta servidores stdio e HTTP e disponibiliza suas ferramentas pelo MCP faz-ai. Variáveis e cabeçalhos ficam na configuração local; use o JSON para informá-los.':
+    'The board connects to stdio and HTTP servers and exposes their tools through the faz-ai MCP. Variables and headers stay in local settings; enter them in the JSON.',
+  'Ferramentas permitidas': 'Allowed tools',
+  'A regra será salva desligada. Revise e ative quando estiver pronta.':
+    'The rule will be saved as off. Review it and enable it when ready.',
+  'Preencha nome e conteúdo.': 'Enter a name and content.',
+  'Salva apenas na biblioteca deste board.': "Saves only in this board's library.",
+  'Salvar na biblioteca': 'Save to library',
+  'Importar artefatos de uma pasta': 'Import artifacts from a folder',
+  'Escolha uma pasta de projeto ou coleção. O board identifica regras, skills, subagentes e MCPs e copia os itens selecionados para suas abas.':
+    'Choose a project folder or collection. The board detects rules, skills, subagents and MCPs and copies selected items into their tabs.',
+  'Pasta de origem': 'Source folder',
+  'Caminho completo da pasta de origem': 'Full path to the source folder',
+  'Procura os quatro tipos de artefato nesta pasta.': 'Scans this folder for all four artifact types.',
+  'Informe a pasta de origem.': 'Enter the source folder.',
+  'Examinar pasta': 'Scan folder',
+  'Escolhe a pasta pelo gerenciador de arquivos.': 'Selects a folder using the file manager.',
+  'Escolher pasta': 'Choose folder',
+  'Nenhum artefato reconhecido nesta pasta.': 'No recognized artifacts in this folder.',
+  'Selecione ao menos um artefato.': 'Select at least one artifact.',
+  'Copia os itens selecionados para a biblioteca do board.': 'Copies selected items to the board library.',
+  'Importar selecionados ({n})': 'Import selected ({n})',
+  'Importação concluída. Os artefatos estão nas abas correspondentes.': 'Import complete. Artifacts are in their corresponding tabs.',
+  'A ferramenta selecionada define a execução e os modelos dos cards. Regras, skills, subagentes e MCPs são gerenciados na biblioteca do board, compartilhada entre as ferramentas.':
+    'The selected tool determines execution and card models. Rules, skills, subagents and MCPs are managed in the board library, shared across tools.',
+  'Aguarde a resposta da IA.': 'Wait for the AI response.',
+  'Objetivo e uso': 'Goal and usage',
+  'Revisar e salvar': 'Review and save',
+  'Executar os testes do projeto': "Run the project's tests",
+  'Seguir os padrões existentes': 'Follow existing conventions',
+  'Preservar alterações do usuário': "Preserve the user's changes",
+  'Validar antes de concluir': 'Validate before finishing',
+  Subagentes: 'Subagents',
+  Comandos: 'Commands',
+  Rede: 'Network',
+  Leitura: 'Read',
+  Edição: 'Edit',
+  'Vazio usa o modelo do card ou da sessão.': 'Leave empty to use the card or session model.',
+  'Quais regras gerais devem orientar as alterações neste projeto?': 'Which general rules should guide changes in this project?',
+  'Qual tarefa repetida esta skill deve ensinar e quando deve ser usada?':
+    'Which repeated task should this skill teach and when should it be used?',
+  'Qual responsabilidade este subagente terá e quando deve ser escolhido?':
+    'What will this subagent be responsible for and when should it be chosen?',
+  'Quais são as entradas, os passos e o resultado esperado da tarefa?': 'What are the inputs, steps and expected outcome of the task?',
+  'O que o subagente deve entregar e quais decisões ele não pode tomar sozinho?':
+    'What should the subagent deliver and which decisions require help?',
+  'Marca todos os artefatos da prévia.': 'Selects all artifacts in the preview.',
+  'Desmarca todos os artefatos da prévia.': 'Deselects all artifacts in the preview.',
+  'Selecione os artefatos para importar.': 'Select artifacts to import.',
+  'Releia a pasta antes de importar.': 'Scan the folder again before importing.',
+  'Já existe "{name}" neste tipo. Renomeie ou edite o artefato existente.':
+    '"{name}" already exists in this type. Rename or edit the existing artifact.',
+  'Há nomes repetidos no mesmo tipo. Selecione apenas uma origem para cada nome.':
+    'Names are repeated within a type. Select only one source per name.',
+  'Artefato não encontrado.': 'Artifact not found.',
+  'Tipo de artefato inválido.': 'Invalid artifact type.',
+  'Nome de artefato inválido.': 'Invalid artifact name.',
+  'Nome inválido. Use letras minúsculas, números e hífens.': 'Invalid name. Use lowercase letters, numbers and hyphens.',
+  'O nome faz-ai é reservado ao MCP do board.': 'The name faz-ai is reserved for the board MCP.',
+  'Já existe um artefato com este nome. Edite o existente ou escolha outro nome.':
+    'An artifact with this name already exists. Edit it or choose another name.',
+  'O nome e o tipo de um artefato existente não podem mudar.': 'The name and type of an existing artifact cannot change.',
+  'Arquivo maior que 512 KB.': 'File larger than 512 KB.',
+  'Definição MCP inválida.': 'Invalid MCP definition.',
+  'args deve ser uma lista de textos.': 'args must be an array of strings.',
+  'Informe command e args ou uma URL HTTP do servidor MCP.': 'Enter command and args or an HTTP URL for the MCP server.',
+  '{key} deve conter pares de nome e texto.': '{key} must contain name and string pairs.',
+  'Configuração de subagente inválida.': 'Invalid subagent configuration.',
+  'Informe o caminho completo de uma pasta.': 'Enter the full path to a folder.',
+  'Informe o caminho da pasta.': 'Enter the folder path.',
+};

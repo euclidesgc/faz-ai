@@ -1,3 +1,4 @@
+import type { LibraryArtifactInput } from './artifacts';
 import type { Appearance } from './appearance';
 import type { ImportSummary } from './backup';
 import type { ViewState } from './filters';
@@ -288,6 +289,11 @@ export type WebviewToHost =
    * `usage` null): `location` é a identidade do item na marcação (`selectionKey`: o caminho como o
    * inventário o mostra, mais `#nome` numa entrada de configuração)
    */
+  | { type: 'harness.library.scan'; dir: string }
+  | { type: 'harness.library.apply'; keys: string[] }
+  | { type: 'harness.library.save'; input: LibraryArtifactInput }
+  | { type: 'harness.library.read'; id: string }
+  | { type: 'harness.library.pickArtifacts' }
   | { type: 'harness.library.directory'; dir: string }
   | { type: 'harness.library.update'; id: string }
   | { type: 'harness.library.import'; rels: string[] }
@@ -369,6 +375,7 @@ export type HostToWebview =
   /** item do harness criado pela tela: ela abre o arquivo no editor do board */
   | { type: 'harness.item.created'; path: string }
   /** resposta a `harness.project.profile`, correlacionada por `requestId` */
+  | { type: 'harness.library.content'; input: LibraryArtifactInput }
   | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }

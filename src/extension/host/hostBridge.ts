@@ -268,6 +268,15 @@ export class HostBridge {
         this.router.setInstall(msg.source.trim(), fetched.dir, fetched.cleanup);
         return;
       }
+      case 'harness.library.read':
+        this.post({ type: 'harness.library.content', input: this.router.readLibraryArtifact(msg.id) });
+        return;
+      case 'harness.library.pickArtifacts': {
+        if (!this.env.pickFolder) throw new Error('Informe o caminho da pasta.');
+        const dir = await this.env.pickFolder('Importar artefatos para o board');
+        if (dir) this.router.handle({ type: 'harness.library.scan', dir });
+        return;
+      }
       case 'harness.library.pick': {
         if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
         const dir = await this.env.pickFolder('Importar skills para o board');

@@ -7,6 +7,8 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Board-owned harness (#615).** The library brings Rules, Skills, Sub-agents and MCPs together without tool tabs. Imports preview items by type; each tab supports creation and editing, with guided assistants and project-based generation for text artifacts. MCPs offer a form and JSON editor, with a stdio/HTTP bridge through faz-ai for use across tools. New rules stay off for review; sources and private skills remain preserved.
+
 - **Fix: importing skills and pasting into the library no longer deletes files.** The library detects folders containing `SKILL.md` and local edits when reopened, focused or refreshed. Unregistered files are preserved and duplicate names show a notice. Import from a folder opens the system picker, supports reviewing and bulk selection, and confirms where items appear. Open folder uses the file manager without opening another editor project.
 
 - **Private Harness library (#615).** Settings shows the board folder and supports bulk skill imports, agents, rules and MCP definitions. Copies remain available across tool changes and source removal; updating from source is explicit. The folder can be changed without deleting the previous one. Private project skills are excluded from the extension package. **Behavior change:** sending an artifact to the board creates a copy instead of keeping a live reference to the original file.

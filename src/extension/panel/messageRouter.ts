@@ -133,6 +133,8 @@ const bridgeOnly = {
   'harness.import.pick': viaBridge,
   'harness.library.open': viaBridge,
   'harness.library.pick': viaBridge,
+  'harness.library.pickArtifacts': viaBridge,
+  'harness.library.read': viaBridge,
   'attachment.pick': viaBridge,
   'attachment.reveal': viaBridge,
   'attachment.read': viaBridge,
@@ -232,6 +234,10 @@ export class MessageRouter {
   }
 
   /** Só o executor no host recebe as definições com credenciais; o snapshot público nunca as inclui. */
+  readLibraryArtifact(id: string) {
+    return this.ctx.library.readArtifact(id);
+  }
+
   libraryMcpDefinitions(): Record<string, unknown> {
     return this.ctx.library.mcpDefinitions();
   }

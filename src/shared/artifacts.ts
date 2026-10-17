@@ -109,19 +109,22 @@ export function itemOfArtifact(a: BoardArtifact): HarnessItem {
 /** O agente no formato `Agent` (para o editor atual e para `profileOfArtifact`). */
 export function agentOfArtifact(a: BoardArtifact, tool?: AiTool): Agent {
   const m = a.agent;
-  const foreign = !!tool && !!m?.tools.native.tool && m.tools.native.tool !== tool;
+  const foreign = !!tool && m?.tools.native.tool !== tool;
   const translate = (categories: ToolCategory[]) =>
     tool ? AGENT_TOOLS[tool].filter((g) => categories.includes(g.id as ToolCategory)).flatMap((g) => g.tools.map((t) => t.name)) : [];
   return {
     name: a.name,
     description: a.description,
     model: '',
-    modelValue: foreign ? '' : (m?.model ?? ''),
+    modelValue: foreign && !m?.model.startsWith(`${tool}:`) ? '' : (m?.model ?? ''),
     scope: 'project',
     path: a.path,
     location: artifactLocation(a),
     content: a.body,
-    body: a.body,
+    body:
+      m?.tools.native.tool === '' && m.tools.categories.length
+        ? `${a.body}\n\nEscopo permitido deste agente: ${m.tools.categories.join(', ')}. Respeite apenas estas categorias (read: ler; edit: editar; run: executar comandos; net: rede; agents: delegar).`
+        : a.body,
     tools: foreign ? translate(m?.readonly ? ['read'] : (m?.tools.categories ?? [])) : (m?.tools.native.allow ?? []),
     deniedTools: foreign
       ? translate(m?.readonly ? ['edit', 'run'] : toolCategories(m?.tools.native.tool ?? '', m?.tools.native.deny ?? []))
@@ -165,4 +168,32 @@ export function toolCategories(tool: AiTool | '', tools: string[]): ToolCategory
 export function isSafeRelPath(p: string): boolean {
   if (!p || p.startsWith('/') || /^[A-Za-z]:/.test(p) || /[\\\0]/.test(p)) return false;
   return p.split('/').every((seg) => seg !== '' && seg !== '.' && seg !== '..');
+}
+
+/** Formulário neutro: o host valida os campos antes de persistir. */
+export interface LibraryArtifactInput {
+  id?: string;
+  kind: ArtifactKind;
+  name: string;
+  description: string;
+  body: string;
+  agent?: AgentMeta;
+  server?: Record<string, unknown>;
+}
+export interface LibraryImportPreview {
+  directory: string;
+  items: { key: string; kind: ArtifactKind; name: string; description: string; origin?: string }[];
+}
+
+/** Atualiza a identificação da skill sem perder as demais opções YAML ou o corpo. */
+export function skillDocument(content: string, name: string, description: string): string {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content);
+  const rest: string[] = [];
+  let skip = false;
+  for (const line of (match?.[1] ?? '').split(/\r?\n/)) {
+    if (/^(name|description):/.test(line)) skip = true;
+    else if (/^\S/.test(line)) skip = false;
+    if (!skip && line) rest.push(line);
+  }
+  return `---\nname: ${JSON.stringify(name)}\ndescription: ${JSON.stringify(description)}${rest.length ? '\n' + rest.join('\n') : ''}\n---\n${match ? content.slice(match[0].length) : '\n' + content}`;
 }
