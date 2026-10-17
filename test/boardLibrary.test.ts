@@ -167,6 +167,9 @@ describe('biblioteca particular do board', () => {
     expect(selectedItems(router.snapshot(), 'skill')[0]!.description).toBe('Componentes locais');
     expect(fs.readFileSync(path.join(library, 'rascunho.txt'), 'utf8')).toBe('Não apagar');
     expect(fs.readFileSync(path.join(library, 'react/references/form.md'), 'utf8')).toBe('Referência particular');
+    fs.writeFileSync(path.join(library, 'react/SKILL.md'), '---\nname: react\ndescription: Atualizada na pasta colada\n---\nRevisada');
+    router.refreshHarness();
+    expect(selectedItems(router.snapshot(), 'skill')[0]!.description).toBe('Atualizada na pasta colada');
   });
 
   it('preserva edições externas da cópia e atualizações explícitas da origem sem desfazer nenhuma na abertura', () => {
