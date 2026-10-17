@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import * as cliResolve from '../src/extension/cliResolve';
 import { reinstallUserServers, runRegistrationSteps, userRegisteredTools } from '../src/extension/mcp/reinstall';
 import type { Registration } from '../src/extension/mcp/clientConfig';
 
@@ -21,6 +22,7 @@ beforeEach(() => {
   emptyPath = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-reinstall-path-'));
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   if (savedKimiHome === undefined) delete process.env.KIMI_CODE_HOME;
   else process.env.KIMI_CODE_HOME = savedKimiHome;
   for (const dir of [project, home, emptyPath]) fs.rmSync(dir, { recursive: true, force: true });
@@ -118,7 +120,9 @@ describe('reinstallUserServers', () => {
   });
 
   it('a falha numa ferramenta vai para o log e não derruba as outras', async () => {
-    // o Claude Code registrado no global, mas a CLI dele fora do PATH: o registro não dá para refazer
+    // A busca também alcança instalações globais fora do PATH. Simula a ausência para não chamar
+    // uma CLI real nem alterar o registro da pessoa durante o teste.
+    vi.spyOn(cliResolve, 'resolveCommand').mockReturnValue(null);
     writeJson(path.join(home, '.claude.json'), server(OLD_BRIDGE));
     writeJson(kimiFile(), server(OLD_BRIDGE));
     const log: string[] = [];

@@ -42,3 +42,11 @@ export function parseStatusStyles(raw: unknown): StatusStyles {
     }),
   ) as StatusStyles;
 }
+
+/** Ações de status da seleção: cada uma só altera os cards que ainda precisam dela. */
+export type BulkCardStatus = 'approved' | 'blocked' | 'ready';
+export function canSetBulkStatus(current: string | null, next: BulkCardStatus): boolean {
+  if (next === 'approved') return current === 'waiting_review';
+  if (next === 'ready') return current === 'blocked';
+  return next === 'blocked' && current !== 'blocked';
+}

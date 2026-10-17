@@ -1,3 +1,4 @@
+import { canSetBulkStatus } from '../../../shared/status';
 import { linkProblem } from '../../../shared/links';
 import { norm } from '../../../shared/filters';
 import { columnOf, columnsOf, isLive } from '../../../shared/selectors';
@@ -53,6 +54,26 @@ function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author:
   if (msg.status === 'approved') {
     ctx.approved.push(msg.cardId);
     if (!byAi) advanceApproved(ctx, msg.cardId);
+  }
+}
+
+/**
+ * Muda o status de trabalho de vários cards de uma vez, reaproveitando `setStatus` (que grava o motivo na
+ * conversa e dispara o avanço automático dos aprovados). Só a pessoa usa o lote; o motivo do bloqueio é
+ * obrigatório e o lote inteiro é recusado antes de mexer em qualquer card quando ele falta.
+ */
+function setStatusMany(ctx: BoardContext, msg: MessageOf<'card.status.setMany'>, author: string, byAi: boolean): void {
+  if (byAi) throw new Error('Só uma pessoa muda o status em lote.');
+  if (!['approved', 'blocked', 'ready'].includes(msg.status)) throw new Error('Status em lote inválido.');
+  if (msg.status === 'blocked' && !msg.note?.trim()) throw new Error('Informe o motivo do bloqueio.');
+  for (const story of liveStoriesOf(ctx, msg.cardIds)) {
+    if (!canSetBulkStatus(story.status, msg.status)) continue;
+    setStatus(
+      ctx,
+      { type: 'card.status.set', cardId: story.id, status: msg.status, ...(msg.note !== undefined ? { note: msg.note } : {}) },
+      author,
+      false,
+    );
   }
 }
 
@@ -312,6 +333,10 @@ export const cardHandlers = {
   },
   'card.status.set': (msg, ctx, { author, byAi }) => {
     setStatus(ctx, msg, author, byAi);
+    return true;
+  },
+  'card.status.setMany': (msg, ctx, { author, byAi }) => {
+    setStatusMany(ctx, msg, author, byAi);
     return true;
   },
   'card.yolo.set': (msg, ctx, { author, byAi }) => {

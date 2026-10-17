@@ -6,11 +6,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
+import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
 let router: MessageRouter;
+let events: CardEventRepo;
 
 const card = (id: string) => router.snapshot().cards.find((c) => c.id === id)!;
 /** A coluna do workflow de Histórias com este nome (Backlog, Concluído e Cancelado existem nos dois workflows). */
@@ -47,6 +49,7 @@ function createSub(title: string, parentId: string): string {
 
 beforeEach(async () => {
   const db = await openInMemory(WASM_DIR);
+  events = new CardEventRepo(db);
   router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
     workspaceKey: 'ws',
     folderName: 'Projeto',
@@ -153,5 +156,74 @@ describe('card.moveMany', () => {
     expect(columnNameOf(a)).toBe('Concluído');
     // listar a sub-tarefa não a move: ela segue com a própria história, sem workflow compatível aqui
     expect(columnNameOf(sub)).toBe('A fazer');
+  });
+});
+
+describe('card.status.setMany', () => {
+  it('aprova só quem ainda espera revisão, avança uma única fase e ignora ids repetidos', () => {
+    const review = createStory('Revisar', 'PRD');
+    const ready = createStory('Ainda trabalhando', 'PRD');
+    router.handle({ type: 'card.status.set', cardId: review, status: 'waiting_review' });
+    router.handle({ type: 'card.status.setMany', cardIds: [review, ready, review, 'inexistente'], status: 'approved' });
+    expect(columnNameOf(review)).toBe('Spec');
+    expect(events.byCard(card(review).number).filter((e) => e.kind === 'status_changed' && e.toValue === 'approved')).toHaveLength(1);
+    expect(columnNameOf(ready)).toBe('PRD');
+    // Uma seleção antiga não pode aprovar novamente a fase seguinte.
+    router.handle({ type: 'card.status.setMany', cardIds: [review], status: 'approved' });
+    expect(columnNameOf(review)).toBe('Spec');
+  });
+
+  it('bloqueia só histórias vivas ainda não bloqueadas e registra um motivo por card', () => {
+    const live = createStory('Viva');
+    const blocked = createStory('Já bloqueada');
+    const archived = createStory('Arquivada');
+    const deleted = createStory('Excluída');
+    const sub = createSub('Sub-tarefa', live);
+    router.handle({ type: 'card.status.set', cardId: blocked, status: 'blocked', note: 'Anterior' });
+    router.handle({ type: 'card.archive', cardId: archived });
+    router.handle({ type: 'card.trash', cardId: deleted });
+    router.handle({
+      type: 'card.status.setMany',
+      cardIds: [live, live, blocked, archived, deleted, sub],
+      status: 'blocked',
+      note: '  Dependência externa  ',
+    });
+    expect(card(live)).toMatchObject({ status: 'blocked', statusReason: 'Dependência externa' });
+    expect(card(blocked).statusReason).toBe('Anterior');
+    expect(events.byCard(card(live).number).filter((e) => e.kind === 'blocked')).toHaveLength(1);
+    expect(events.byCard(card(blocked).number).filter((e) => e.kind === 'blocked')).toHaveLength(1);
+    for (const id of [archived, deleted, sub]) expect(card(id).status).not.toBe('blocked');
+    expect(router.snapshot().comments.filter((c) => c.body === 'Dependência externa')).toMatchObject([
+      { cardId: live, author: 'Pessoa', source: 'human' },
+    ]);
+  });
+
+  it('recusa o lote inteiro sem motivo, sem alterar nenhum card', () => {
+    const a = createStory('A');
+    const b = createStory('B');
+    const before = router.snapshot();
+    expect(() => router.handle({ type: 'card.status.setMany', cardIds: [a, b], status: 'blocked', note: '  ' })).toThrow(
+      'Informe o motivo',
+    );
+    expect(router.snapshot().cards).toEqual(before.cards);
+    expect(router.snapshot().comments).toEqual(before.comments);
+  });
+
+  it('desbloqueia só os bloqueados, preservando quem aguarda revisão', () => {
+    const blocked = createStory('Bloqueada');
+    const review = createStory('Revisão');
+    router.handle({ type: 'card.status.set', cardId: blocked, status: 'blocked', note: 'Espera' });
+    router.handle({ type: 'card.status.set', cardId: review, status: 'waiting_review' });
+    router.handle({ type: 'card.status.setMany', cardIds: [blocked, review], status: 'ready' });
+    expect(card(blocked)).toMatchObject({ status: 'ready', statusReason: '' });
+    expect(card(review).status).toBe('waiting_review');
+  });
+
+  it('a IA não pode mudar o status em lote', () => {
+    const a = createStory('A');
+    expect(() => router.handle({ type: 'card.status.setMany', cardIds: [a], status: 'blocked', note: 'Espera' }, { source: 'ai' })).toThrow(
+      'Só uma pessoa',
+    );
+    expect(card(a).status).not.toBe('blocked');
   });
 });

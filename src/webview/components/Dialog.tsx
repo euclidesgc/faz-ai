@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { TextArea } from '@radix-ui/themes';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { SelectField } from './ui';
@@ -9,10 +10,12 @@ export function Dialog() {
   const ask = useBoardStore((s) => s.ask);
   const [choice, setChoice] = useState('');
   const [checkboxChecked, setCheckboxChecked] = useState(false);
+  const [text, setText] = useState('');
 
   useEffect(() => {
     setChoice(dialog?.choices?.value ?? dialog?.choices?.options[0]?.value ?? '');
     setCheckboxChecked(false);
+    setText('');
   }, [dialog]);
 
   useEffect(() => {
@@ -35,9 +38,14 @@ export function Dialog() {
     ask(null);
     dialog.onCancel?.();
   };
+  // com texto obrigatório, confirmar só vale preenchido
+  const confirmDisabled = !!dialog.text?.required && !text.trim();
   const confirm = () => {
+    if (confirmDisabled) return;
     ask(null);
-    if (dialog.checkbox) dialog.onConfirm(dialog.choices ? choice : undefined, checkboxChecked);
+    if (dialog.text)
+      dialog.onConfirm(dialog.choices ? choice : undefined, dialog.checkbox ? checkboxChecked : undefined, text.trim() || undefined);
+    else if (dialog.checkbox) dialog.onConfirm(dialog.choices ? choice : undefined, checkboxChecked);
     else dialog.onConfirm(dialog.choices ? choice : undefined);
   };
 
@@ -58,6 +66,18 @@ export function Dialog() {
             <span>{dialog.checkbox.label}</span>
           </label>
         )}
+        {dialog.text && (
+          <label className="field-row">
+            <span>{dialog.text.label}</span>
+            <TextArea
+              autoFocus
+              rows={3}
+              placeholder={dialog.text.placeholder ?? ''}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+          </label>
+        )}
         <div className="row end wrap">
           <button onClick={cancel}>{dialog.cancelLabel ?? t('Cancelar')}</button>
           {dialog.secondary && (
@@ -70,7 +90,12 @@ export function Dialog() {
               {dialog.secondary.label}
             </button>
           )}
-          <button autoFocus className={dialog.danger ? 'primary danger-bg' : 'primary'} onClick={confirm}>
+          <button
+            autoFocus={!dialog.text}
+            className={dialog.danger ? 'primary danger-bg' : 'primary'}
+            disabled={confirmDisabled}
+            onClick={confirm}
+          >
             {dialog.confirmLabel ?? t('Confirmar')}
           </button>
         </div>

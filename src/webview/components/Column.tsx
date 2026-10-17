@@ -7,7 +7,7 @@ import { useBoardStore } from '../store/boardStore';
 import { t, dt } from '../i18n';
 import { cards, settings } from '../commands';
 import { useAction } from '../useAction';
-import { requestArchiveMany, requestConcludeMany, requestMoveMany, requestTrashMany } from '../store/actions';
+import { selectionActions, selectionMenuItems } from './selectionActions';
 import { SortableCard } from './Card';
 import { Menu } from './Menu';
 import { TextField } from '@radix-ui/themes';
@@ -156,9 +156,10 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
   // arquivar ou excluir cards que a pessoa não está vendo seria pior do que deixá-los de fora
   const selectedHistories = visibleCards.filter((c) => selectedIds.has(c.id) && isLive(c));
   const selectedHere = selectedHistories.length > 0;
+  const bulkBusy = useBoardStore((s) => s.bulkBusy);
   const allSelected = visibleLiveIds.length > 0 && visibleLiveIds.every((id) => selectedIds.has(id));
   const otherColumns = siblings.filter((c) => c.id !== column.id);
-  const doneColumn = siblings.find((c) => c.category === 'done');
+  const actions = selectionActions({ state, selected: selectedHistories, collapsed: collapsedMap, destinations: otherColumns });
   if (collapsed) {
     return (
       <CollapsedColumn
@@ -246,32 +247,9 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
                     disabled: visibleLiveIds.length === 0,
                     onClick: () => selectMany(visibleLiveIds),
                   },
-                  ...(selectedHere
-                    ? [
-                        { label: t('Limpar seleção'), onClick: clearSelected },
-                        'sep' as const,
-                        {
-                          label: t('Arquivar selecionados'),
-                          onClick: () => requestArchiveMany(selectedHistories, clearSelected),
-                        },
-                        {
-                          label: t('Mover selecionados para...'),
-                          disabled: otherColumns.length === 0,
-                          onClick: () => requestMoveMany(selectedHistories, otherColumns, clearSelected),
-                        },
-                        {
-                          label: t('Concluir selecionados'),
-                          disabled: !doneColumn,
-                          onClick: () => doneColumn && requestConcludeMany(selectedHistories, doneColumn, clearSelected),
-                        },
-                        'sep' as const,
-                        {
-                          label: t('Mandar selecionados para a lixeira'),
-                          danger: true,
-                          onClick: () => requestTrashMany(selectedHistories, clearSelected),
-                        },
-                      ]
-                    : []),
+                  { label: t('Limpar seleção'), disabled: !selectedHere, onClick: clearSelected },
+                  'sep' as const,
+                  ...selectionMenuItems(actions, !!bulkBusy),
                   'sep' as const,
                 ]
               : []),
