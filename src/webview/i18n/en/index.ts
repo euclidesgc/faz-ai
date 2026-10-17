@@ -1,4 +1,5 @@
 // Dicionário pt-BR → inglês. Um arquivo por área da interface; o texto em português é a chave.
+import { library } from './library';
 import { board } from './board';
 import { card } from './card';
 import { defaults } from './defaults';
@@ -11,6 +12,7 @@ import { shared } from './shared';
 import { workflows } from './workflows';
 
 export const EN: Record<string, string> = {
+  ...library,
   ...shared,
   ...host,
   ...board,

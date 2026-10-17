@@ -119,7 +119,7 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     mcpServers: { 'faz-ai': { command: 'node' }, github: { command: 'gh-mcp', env: { TOKEN: 'segredo' } } },
   });
   expect(plan.input.mcpBlocked).toEqual(['slack']);
-  expect(plan.advice).toEqual([]); // no Claude Code tudo isso vai por parâmetro, inclusive o agente (inline)
+  expect(plan.advice).toEqual([expect.stringContaining('list_board_mcp_tools')]); // A biblioteca ensina a ponte comum mesmo quando a CLI também aceita o servidor diretamente.
   expect(plan.input.agentDefinition).toEqual({ name: 'restrito', description: 'Restrito', prompt: 'Siga.' });
   expect(plan.summary.join(' | ')).toContain('Servidores MCP: faz-ai, github (imposto)');
   expect(plan.summary.join(' | ')).not.toContain('segredo');
@@ -153,6 +153,7 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   expect(executionPlan(router.snapshot(), card(), project, home).advice).toEqual([
     'Você atua como o agente "restrito": Restrito.',
     'Instruções do agente:\nSiga.',
+    expect.stringContaining('list_board_mcp_tools'),
     'De servidores MCP, use só o do board e: github.',
     'Use só as rules, as skills e as instruções indicadas neste pedido; ignore instruções, skills e agentes carregados por conta própria.',
   ]);

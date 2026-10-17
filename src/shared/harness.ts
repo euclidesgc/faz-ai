@@ -250,6 +250,7 @@ export interface ToolInventory {
 export interface Harness {
   /** Cópias do board, disponíveis em todas as ferramentas. Ausente em estados antigos. */
   library?: {
+    preview?: import('./artifacts').LibraryImportPreview;
     directory: string;
     artifacts: BoardArtifact[];
     warnings?: { path: string; reason: 'duplicate' | 'invalid' | 'unreadable' }[];

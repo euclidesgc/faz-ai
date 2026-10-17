@@ -463,8 +463,9 @@ describe('Sugerir regras e skills com IA', () => {
   it('ai.suggestRules e ai.suggestSkills rodam o chat com o board como única ferramenta e registram o pedido na conversa', () => {
     router.chatCommand({ type: 'ai.suggestRules' });
     expect(router.snapshot().chat.busy).toBe(true);
-    // a ferramenta do projeto é o Claude Code: o arquivo de regras é o CLAUDE.md
-    expect(spawned[0]!.command.stdin).toContain('write_rule_file em CLAUDE.md');
+    // A sugestão grava no board sem depender do arquivo nativo da ferramenta.
+    expect(spawned[0]!.command.stdin).toContain('save_board_artifact');
+    expect(spawned[0]!.command.stdin).toContain('AGENTS.md');
     expect(spawned[0]!.command.args).toContain('dontAsk');
     spawned[0]!.emit('Regras escritas.');
     spawned[0]!.exit(0);

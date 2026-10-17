@@ -155,13 +155,31 @@ pasta própria (a global fica em `~/`):
 
 ### Biblioteca do board
 
-Os artefatos enviados ao board são copiados para uma biblioteca particular compartilhada pelas
-ferramentas de IA. `get_harness` retorna por padrão os artefatos dessa biblioteca; os caminhos de
-skills e rules em `get_card` apontam para as cópias de leitura do board, incluindo os arquivos de
-apoio. Trocar de ferramenta ou apagar a origem não remove a cópia. `set_harness_selection` muda o
-modo da cópia existente; não a atualiza da origem. A atualização explícita e a pasta de armazenamento
-ficam em Configurações → Harness de IA → Biblioteca do board. `onlySelected: false` inclui o catálogo
-da ferramenta em uso e as cópias do board. As definições MCP com credenciais permanecem no host. `get_skill`, `update_skill` e `write_skill_file` priorizam a cópia da biblioteca; sem cópia, operam no projeto. `get_agent` sem escopo lê a cópia do board, quando existe. Um agente importado leva também as skills e definições MCP declaradas e encontradas na sua origem, sem substituir cópias já existentes.
+Configurações → Harness de IA concentra regras, skills, subagentes e MCPs numa biblioteca particular,
+com importação agrupada por tipo, CRUD e assistentes. `get_harness` inclui `library.artifacts`, com
+id, tipo, nome, uso e caminho de cada cópia, sem configurações MCP. Trocar de ferramenta ou apagar
+a origem não remove a cópia; `set_harness_selection` altera o modo, sem atualizar da origem.
+
+- `get_project_profile`: perfil detectado do projeto, para sugestões sem executar comandos.
+- `get_board_artifact { id }`: conteúdo completo de regra, skill ou agente; recusa MCPs.
+- `save_board_artifact { id?, kind, name, description, body, skills?, mcpServers?, categories? }`:
+  cria/atualiza apenas na biblioteca. Tipos: `rule`, `skill`, `agent`; regra nova fica desligada.
+  Edição exige id e mantém nome, arquivos de apoio e configurações omitidas. Categorias de agente:
+  `read`, `edit`, `run`, `net`, `agents`. Configurações e credenciais MCP são gerenciadas pela pessoa.
+- `list_board_mcp_tools { server, card? }`: lista ferramentas e schemas de um servidor da biblioteca.
+- `call_board_mcp_tool { server, name, arguments, card? }`: encaminha a chamada e devolve seu resultado.
+
+A ponte usa o mesmo registro **faz-ai**, independente da ferramenta cliente. MCP desligado ou ausente
+é recusado; no modo Pelo card, é obrigatório informar um card que selecione o servidor, diretamente
+ou pelo agente. Configurações são relidas em cada chamada; conexões são abertas e fechadas por
+operação. Suporta stdio, Streamable HTTP e `type: "sse"` explícito, com `env`/`headers` estáticos.
+Não conduz OAuth e não encaminha recursos ou prompts MCP. Erros de um servidor não impedem o uso
+dos demais. A IA descobre os schemas antes de chamar uma ferramenta.
+
+As definições com segredos ficam no host; apenas a leitura explícita do formulário de edição MCP
+as envia à interface, sem incluí-las no snapshot compartilhado. `get_skill`, `update_skill` e
+`write_skill_file` priorizam a cópia; `get_agent` sem escopo também. APIs de arquivos nativos seguem
+por compatibilidade. `onlySelected: false` ainda inclui fontes nativas para clientes antigos.
 
 ### Projeto, global e plugins
 
