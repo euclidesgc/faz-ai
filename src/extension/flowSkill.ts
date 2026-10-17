@@ -1,4 +1,7 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { FLOW_SKILL_NAME } from '../shared/harnessProject';
+import { skillTemplate } from './harness';
 
 /** Skill que ensina a IA a conduzir os cards pelo fluxo do board. É instalada na pasta de skills da ferramenta em uso. */
 export const FLOW_SKILL = {
@@ -57,7 +60,11 @@ Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela
 ## Fases que produzem documento
 
 1. Crie uma sub-tarefa na história com o campo Fase igual ao nome da coluna (\`create_card\` com \`parent\`).
-2. Construa o documento seguindo o modelo em \`phase.artifact.template\`. O que depende de uma
+2. Parta do que as fases anteriores já descobriram: o Discovery registra a seção **"Mapa do código"**
+   (arquivos, funções, padrões e testes envolvidos) e a Spec a completa. PRD, Spec e Plan começam
+   por esse mapa e leem só o que falta; use antes de Read e Grep as ferramentas de índice de código
+   que o Harness liberou, se houver. O arquivo lido continua sendo a fonte de verdade.
+   Construa o documento seguindo o modelo em \`phase.artifact.template\`. O que depende de uma
    resposta da pessoa vai na seção **"Perguntas para você"**, no fim do documento, uma pergunta por
    vez: as alternativas com o impacto de cada uma (o que custa, o que quebra, o que adia), a sua
    recomendação com a justificativa e o espaço \`**R.** >\` para ela responder. Repita as perguntas
@@ -71,7 +78,7 @@ conversa dizendo o que mudou e chame \`request_review\` de novo.
 
 ## Sub-tarefas de implementação
 
-No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, o campo "Esforço da
+No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, na descrição os arquivos que ela vai tocar (tirados do mapa do código), o campo "Esforço da
 atividade" avaliado (Baixo, Médio ou Alto; o modelo é sugerido a partir dele) e os artefatos que a
 execução pede: os campos Skills, Rules e MCPs, e o agente (\`set_card_profile\`). Escolha **só entre o
 que está no board em modo "Pelo card"** (\`get_harness\`; o que está em "Sempre" já entra sozinho):
@@ -135,7 +142,7 @@ Esta skill é o essencial. O detalhe de cada assunto fica em outra skill, que vo
 assunto aparece (o \`get_card\` aponta qual, numa nota curta):
 
 - \`faz-ai-harness-do-card\`: \`model\`, \`requiredRules\`, \`requiredSkills\` e a escolha de skills, rules e servidores do card;
-- \`faz-ai-workspace-e-pr\`: \`prepare_workspace\`, a pasta de trabalho, a base do pull request e a pilha;
+- \`faz-ai-workspace-e-pr\`: \`prepare_workspace\`, a pasta de trabalho, a base do pull request, a pilha e o aviso de conflito com a base;
 - \`faz-ai-implementacao-rodadas\`: as rodadas da Implementação (\`subtasksNow\`);
 - \`faz-ai-revisao-e-homologacao\`: a Revisão e a Homologação;
 - \`faz-ai-modo-autonomo\`: o que muda quando o card mostra \`autonomous: true\`.
@@ -165,6 +172,12 @@ Quando \`workspace.note\` trouxer uma pasta ou branch, ela vale. Abra o pull req
 \`workspace.stackNote\` vier, diga na descrição do pull request de qual pull request ele depende. Numa pilha, a base
 muda quando a anterior é concluída: siga sempre o \`workspace.baseBranch\` atual e, se ele mudou, traga a nova base
 com \`git fetch origin <base>\` e \`git merge origin/<base>\`, sem rebase nem push forçado.
+
+Se a conversa trouxer o aviso de que a branch tem conflito com a base, trate antes de abrir o pull request: na
+pasta de trabalho, \`git fetch origin\` e \`git merge origin/<base>\`, resolva os conflitos, rode as checagens do
+projeto e faça o commit, sem rebase nem push forçado. Se o conflito pedir uma decisão que é da pessoa, pergunte (no
+modo autônomo, \`block_card\` com o motivo). Depois do pull request aberto, o conflito é do board: ele chama a IA
+numa execução própria para resolvê-lo.
 `;
 
 const RODADAS_BODY = `# Rodadas da Implementação
@@ -297,7 +310,7 @@ export const FLOW_SKILLS: readonly { name: string; description: string; body: st
   {
     name: 'faz-ai-workspace-e-pr',
     description:
-      'Use ao alterar código de uma história: prepare_workspace, pasta de trabalho, branch, base do pull request e pilha de histórias.',
+      'Use ao alterar código de uma história: prepare_workspace, pasta de trabalho, branch, base do pull request, pilha de histórias e o aviso de conflito com a base.',
     body: WORKSPACE_BODY,
   },
   {
@@ -317,3 +330,19 @@ export const FLOW_SKILLS: readonly { name: string; description: string; body: st
     body: AUTONOMO_BODY,
   },
 ];
+
+/**
+ * Grava o conjunto de skills do fluxo na pasta de skills da ferramenta (`skillsRoot`). Sem `replace`, o
+ * que já está no disco fica como está (a pessoa pode ter ajustado a skill). Devolve os nomes gravados.
+ */
+export function installFlowSkillFiles(skillsRoot: string, replace = false): string[] {
+  const written: string[] = [];
+  for (const k of FLOW_SKILLS) {
+    const file = path.join(skillsRoot, k.name, 'SKILL.md');
+    if (!replace && fs.existsSync(file)) continue;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, skillTemplate(k.name, k.description, k.body));
+    written.push(k.name);
+  }
+  return written;
+}

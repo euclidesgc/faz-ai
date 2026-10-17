@@ -122,7 +122,9 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
 - **Dizer à IA o que fazer em cada fase.** Cada coluna tem uma instrução para a IA e, se a fase
   gera um documento (Discovery, PRD, Spec, Plan), o modelo desse documento. No Discovery a IA
   analisa o problema e conversa com você antes de qualquer requisito; na Homologação a história só
-  é concluída com a sua aprovação.
+  é concluída com a sua aprovação. O Discovery registra um **Mapa do código** (arquivos, funções,
+  padrões e testes), a Spec o completa, e PRD, Spec e Plan partem dele e leem só o que falta; cada
+  sub-tarefa do Plan traz na descrição os arquivos que vai tocar.
 - **Trabalhar com a IA no mesmo quadro.** A extensão expõe o board por MCP. Claude Code,
   Cursor ou outro cliente MCP podem consultar e editar tudo o que a interface permite, e
   as mudanças aparecem no board na hora.
@@ -193,6 +195,9 @@ pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do
 
 **Selecionar todos de uma coluna.** A caixa no início do cabeçalho de uma coluna de histórias, na mesma linha das caixas dos cards (ou **Selecionar todos**, no menu ⋯), marca as histórias visíveis da coluna (o filtro ativo vale); marcada de novo, limpa a seleção. Numa coluna sem cards, a caixa fica oculta, mas o espaço dela continua reservado. Com a seleção feita, o mesmo menu oferece **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados** e **Mandar selecionados para a lixeira**, cada uma com uma confirmação só para o lote; **Limpar seleção** desmarca tudo. A seleção vale para uma coluna por vez: marcar um card de outra coluna substitui a seleção. Na ação em lote, uma história com sub-tarefa em aberto não é concluída (as outras seguem), e mover para uma coluna de cancelamento cancela as sub-tarefas em aberto.
 
+**Ações sobre a seleção.** A barra de seleção múltipla (dois ou mais cards) e o menu ⋯ da coluna oferecem as mesmas ações: **Aprovar**, **Bloquear**, **Desbloquear**, **Trabalhar na fase**, **Refinar com IA**, **Parar a IA**, modo autônomo, colapsar/expandir, arquivar, mover, concluir e lixeira. As ações indisponíveis continuam visíveis e desabilitadas, sem mostrar o motivo; no menu, isso também vale sem seleção. Cada ação atinge só os cards elegíveis e visíveis. Aprovar vale para quem aguarda revisão e usa o avanço automático da aprovação individual; bloquear pede um motivo obrigatório, registrado na conversa de cada card; desbloquear devolve os bloqueados para **Pronto**. Trabalhar e refinar respeitam as vagas de execução em paralelo: quem já está em execução ou não cabe no limite fica de fora. **Parar a IA** interrompe só execuções iniciadas pelo board.
+
+
 ### Vínculos entre cards
 
 Além das sub-tarefas, qualquer card pode ser vinculado a outro, de qualquer workflow, em **Vínculos**
@@ -256,7 +261,8 @@ o `faz-ai` do terminal avisa e não inicia.
 1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code, Cursor ou
    Kimi Code).
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
-   global que a ferramenta lê.
+   global que a ferramenta lê. Isso também acontece sozinho, em silêncio, ao abrir a pasta (e a cada
+   versão nova da extensão), sempre no escopo do usuário; só uma falha gera aviso.
 3. No grupo **Skills** da mesma aba, clique em **Instalar (padrão da ferramenta)** para a
    skill do fluxo (`faz-ai-fluxo`): ela ensina a IA a conduzir os cards pelas fases, gerar os
    documentos, pedir revisão e retomar pendências. O botão instala também as skills por assunto
@@ -661,14 +667,15 @@ economizar tokens.
 
 - A agregação pode agrupar por fase (`phase`), tipo de card (`card_type`), ferramenta de IA
   (`tool`), modelo (`model`), esforço (`effort`), perfil (`profile`), card (`card`), agente (`agent`),
-  skill (`skill`), ferramenta usada (`used_tool`) ou ferramenta de MCP (`mcp_tool`). Omita para obter
+  skill (`skill`), ferramenta usada (`used_tool`), ferramenta de MCP (`mcp_tool`) ou comando de Bash (`bash_command`). Omita para obter
   apenas o total do período.
 - `tool` e `used_tool` não são a mesma coisa: `tool` é a ferramenta de IA que rodou (claude, cursor);
   `used_tool` e `mcp_tool` são o que a execução usou (Read, Bash, `get_card`). Em `mcp_tool` o
-  servidor vem numa coluna própria, ou "servidor não registrado" quando o nome não o trouxe.
+  servidor vem numa coluna própria, ou "servidor não registrado" quando o nome não o trouxe. `bash_command` é o comando-base de cada chamada
+  de Bash, sem argumentos (`npm test`, `git status`, `cat`), só do Claude Code.
 - Filtros de período (data inicial e final, em `AAAA-MM-DD`), card (ex. `72` ou `#72`), e dimensões
   (ex. fase, modelo, tipo de card).
-- Nas dimensões **agent**, **skill**, **used_tool** e **mcp_tool** a tabela mostra só a contagem de
+- Nas dimensões **agent**, **skill**, **used_tool**, **mcp_tool** e **bash_command** a tabela mostra só a contagem de
   execuções e de usos (sem tokens, que não é possível repartir entre componentes de uma
   execução). `effort` e `profile` têm tokens.
 - Tokens contam em toda execução medida, do Claude Code e do Cursor. A tabela não traz custo em dólar.
@@ -885,8 +892,15 @@ Quando o merge é detectado:
    atualiza a `develop` local.
 
 Se o pull request é fechado sem merge, o board registra um aviso na conversa uma única vez. Se está
-aberto com conflito, o board avisa uma vez na conversa e, quando a história estava aguardando revisão,
-devolve o card para "Pronto", para a IA atualizar a branch e resolver na próxima rodada. O merge
+aberto com conflito, o board avisa na conversa uma vez por conflito (o aviso cita o commit do PR) e,
+na mesma rodada, chama a IA numa execução só para resolvê-lo, à frente da fila: ela atualiza a branch
+por merge a partir da base do PR (sem rebase nem push forçado), resolve os conflitos, roda as
+checagens, envia a branch e registra na conversa o que fez. Vale para qualquer história, inclusive as
+autônomas e as já entregues, menos a bloqueada e a que espera a sua resposta. A execução usa o modelo
+e a permissão da fase, segue os tetos das atividades com branch, aparece no card como "resolvendo
+conflito" e, no fim, o card volta ao status que tinha. Se a IA não conseguir, ela bloqueia o card com
+o motivo; se terminar e o PR continuar em conflito no mesmo commit, o board bloqueia o card e a
+resolução fica com você (desbloquear dá à IA mais uma tentativa). O merge
 continua sendo feito pela pessoa, manualmente ou pelo merge automático; o board só observa. Falhas
 na consulta do estado do PR (sem rede, sem autenticação, sem o `gh` instalado) não bloqueiam nada
 — o aviso aparece no log, e o board tenta de novo na próxima rodada.
@@ -929,6 +943,11 @@ cada rodada ele:
   divergiu dele. Cada branch atualizada, e cada motivo de pulo (uma vez por motivo), aparece no log com o
   prefixo `Branches:`. As suas branches pessoais não são tocadas. Sem rede ou sem origin, a
   sincronização fica para a próxima rodada;
+- **confere o conflito com a base antes do PR**: para cada história com branch e ainda sem pull
+  request, pergunta ao git, só lendo (`git merge-tree`, git 2.38 ou mais novo; abaixo disso, a
+  conferência é pulada com uma linha no log), se a branch conflita com a base atual no origin. Se
+  conflita, avisa na conversa uma vez por commit da branch, com os arquivos, para a IA atualizar a
+  branch e resolver antes de abrir o PR. Nada muda no card nem nas branches;
 - **resume a conversa** das histórias com três ou mais mensagens desde o último resumo, ou duas que
   somem muito texto (ao menos uma da IA), antes de trabalhar a fase; a IA passa a receber só o resumo e o que vier depois dele;
 - **refina os cards novos do Backlog** (**Refinar os cards novos do Backlog**, nas mesmas
@@ -1458,7 +1477,7 @@ sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualqu
 
 Cada regra pode ter um **modelo reserva** (opcional). Quando a execução de um card falha porque o modelo principal esgotou o limite de uso do plano, e esse modelo veio de uma regra com reserva configurada, o sistema repete automaticamente a execução com o modelo reserva, uma única vez. Se o reserva também falhar ou não estiver configurado, o card é bloqueado como hoje. A troca automática aparece como um comentário na conversa do card ("O `<modelo principal>` esgotou o limite; a execução segue com `<modelo reserva>`"), e o campo Modelo do card continua mostrando o modelo principal — a próxima execução tenta o principal de novo.
 
-**Avisos de dependência entre configurações e links cruzados.** Várias opções de Configurações só fazem efeito por causa de outra. O board mostra uma linha discreta sob as opções dependentes (por exemplo, "Depende de **uma regra de sugestão de modelo** (agora: nenhuma)" abaixo de "Preencher o modelo sugerido automaticamente", ou "Depende de **agentes marcados como disponíveis**" abaixo de "Agente padrão"); a opção fica desabilitada quando a dependência não está satisfeita. Os links permitem navegar: clique em um para ir até a seção correspondente do board, que rola e destaca por 2 segundos, ou clique em um link do Settings para abrir o board na seção certa. No modo navegador, os links para o Settings aparecem só como texto. **"Preencher o modelo sugerido automaticamente"** saiu de Regras e foi para Modelos, onde faz mais sentido. O campo Intervalo do heartbeat fica desabilitado quando o heartbeat está desligado, sem um componente de dependência adicional. Cabeçalhos novos em Modelos, Agentes, Rules e Skills mostram "Mostrando os X do [ferramenta] · trocar ferramenta", permitindo mudar a ferramenta de qualquer uma dessas telas do board.
+**Avisos de dependência entre configurações e links cruzados.** Várias opções de Configurações só fazem efeito por causa de outra. O board mostra uma linha discreta sob as opções dependentes (por exemplo, "Depende de **uma regra de sugestão de modelo** (agora: nenhuma)" abaixo de "Preencher o modelo sugerido automaticamente", ou "Depende de **agentes marcados como disponíveis**" abaixo de "Agente padrão"); a opção fica desabilitada quando a dependência não está satisfeita. Os links permitem navegar: clique em um para ir até a seção correspondente do board, que rola e destaca por 2 segundos, ou clique em um link do Settings para abrir o board na seção certa. No modo navegador, os links para o Settings aparecem só como texto. **"Preencher o modelo sugerido automaticamente"** saiu de Regras e foi para Modelos, onde faz mais sentido — um aviso simples em Regras indica a mudança de lugar. O campo Intervalo do heartbeat fica desabilitado quando o heartbeat está desligado, sem um componente de dependência adicional. Cabeçalhos novos em Modelos, Agentes, Rules e Skills mostram "Mostrando os X do [ferramenta] · trocar ferramenta", permitindo mudar a ferramenta de qualquer uma dessas telas do board.
 
 Quando uma versão nova da extensão muda o board padrão, o board pergunta se você quer atualizá-lo
 (ou use **Faz AI: Atualizar board para o padrão atual**). A atualização só acrescenta o que falta:

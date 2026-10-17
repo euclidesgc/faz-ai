@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 33;
+export const SCHEMA_VERSION = 34;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -409,6 +409,16 @@ const MIGRATIONS: Record<number, string> = {
     ALTER TABLE cards ADD COLUMN refined_at INTEGER;
   `,
   33: `
+    -- #604: comando-base (sem argumentos) de cada chamada de Bash de uma execução de IA, para saber
+    -- o que o Bash rodou. Some junto com a execução (cascata), então segue a retenção do log.
+    CREATE TABLE IF NOT EXISTS ai_run_bash (
+      run_id TEXT NOT NULL REFERENCES ai_runs(id) ON DELETE CASCADE,
+      command TEXT NOT NULL,
+      calls INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (run_id, command)
+    );
+  `,
+  34: `
     -- #615: o board guarda os próprios artefatos (regras, skills, agentes, servidores MCP), num formato
     -- neutro, em vez de referenciar o arquivo da ferramenta. A cópia do que estava em harness_selection é
     -- feita pelo host na abertura (o SQL não lê arquivos), como a dos perfis da migração 26.

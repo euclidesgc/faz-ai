@@ -12,7 +12,7 @@ import type {
   InventoryKind,
   RunReport,
 } from '../../shared/log';
-import { monthOf, truncateTitle } from '../../shared/log';
+import { monthOf, truncateTitle, type BashCommandItem } from '../../shared/log';
 import { newId } from '../db/ids';
 import { all, num, one, run, str, strOrNull, transaction, type Row } from '../db/query';
 
@@ -219,6 +219,9 @@ export class AiRunRepo {
           item.calls,
         ]);
       }
+      for (const item of report.measure === 'none' ? [] : (report.bashCommands ?? [])) {
+        run(this.db, 'INSERT OR REPLACE INTO ai_run_bash(run_id, command, calls) VALUES (?,?,?)', [id, item.command, item.calls]);
+      }
     });
   }
 
@@ -227,6 +230,14 @@ export class AiRunRepo {
     return all(this.db, 'SELECT kind, name, calls FROM ai_run_usage WHERE run_id = ? ORDER BY kind, name', [id]).map((r) => ({
       kind: str(r.kind) as InventoryKind,
       name: str(r.name),
+      calls: num(r.calls),
+    }));
+  }
+
+  /** Os comandos de Bash gravados de uma execução (#604), ordenados por comando. */
+  bashUsage(id: string): BashCommandItem[] {
+    return all(this.db, 'SELECT command, calls FROM ai_run_bash WHERE run_id = ? ORDER BY command', [id]).map((r) => ({
+      command: str(r.command),
       calls: num(r.calls),
     }));
   }

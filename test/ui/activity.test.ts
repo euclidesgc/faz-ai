@@ -130,6 +130,15 @@ describe('activityMessage: uma execução', () => {
     });
   });
 
+  it('resolvendo conflito, em português e em inglês (#747)', () => {
+    const state = baseState({ mode: 'conflict', origin: 'heartbeat', startedAt: NOW - 3 * 60_000 });
+    const pt = activityMessage(state, { offline: false, now: NOW });
+    expect(pt.kind === 'running' && pt.items[0]!.what).toBe('resolvendo conflito');
+    setLocale('en');
+    const en = activityMessage(state, { offline: false, now: NOW });
+    expect(en.kind === 'running' && en.items[0]!.what).toBe('resolving conflict');
+  });
+
   it('em inglês: what e since traduzidos', () => {
     setLocale('en');
     const state = baseState({ mode: 'refine', origin: 'manual', startedAt: NOW - 3 * 60_000 });

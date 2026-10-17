@@ -131,7 +131,7 @@ promise a percentage: it shows, in the inventory, what is being loaded.
 - **Tell the AI what to do in each phase.** Each column has an instruction for the AI and, if the
   phase produces a document (Discovery, PRD, Spec, Plan), the template for that document. In
   Discovery the AI analyzes the problem and talks to you before any requirement is written; in
-  Homologação the story is only completed with your approval.
+  Homologação the story is only completed with your approval. Discovery records a **code map** (files, functions, patterns and tests), Spec completes it, and PRD, Spec and Plan start from it and read only what is missing; each Plan sub-task carries the files it will touch in its description.
 - **Work with the AI on the same board.** The extension exposes the board over MCP. Claude Code,
   Cursor or any other MCP client can read and edit everything the
   interface allows, and the changes show up on the board right away.
@@ -206,6 +206,9 @@ status color, and the LED on the bar tells the card's state at a glance: green a
 
 **Select all in a column.** The checkbox at the start of a story column's header, on the same line as the cards' checkboxes (or **Selecionar todos** in the ⋯ menu), selects the column's visible stories (the active filter applies); checked again, it clears the selection. In a column with no cards, the checkbox is hidden, but its space stays reserved. With the selection made, the same menu offers **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados** and **Mandar selecionados para a lixeira**, each with a single confirmation for the whole batch; **Limpar seleção** clears it. The selection applies to one column at a time: selecting a card in another column replaces the selection. In a batch, a story with an open sub-task is not concluded (the others go ahead), and moving to a cancellation column cancels open sub-tasks.
 
+**Actions on selected cards.** The multi-select bar (two or more cards) and the column’s ⋯ menu offer the same actions: **Approve**, **Block**, **Unblock**, **Work on phase**, **Refine with AI**, **Stop AI**, autonomous mode, collapse/expand, archive, move, complete and trash. Unavailable actions stay visible and disabled, without displaying a reason; the menu also shows them with no selection. Each action affects only eligible, visible cards. Approve applies to cards waiting for review and uses the same automatic advance as individual approval; block requires a reason, recorded in each card’s conversation; unblock returns blocked cards to **Ready**. Work and refine respect the remaining parallel execution capacity: cards already running or exceeding the limit are left out. **Stop AI** only stops runs started by the board.
+
+
 ### Links between cards
 
 Besides sub-tasks, any card can be linked to another one, in any workflow, under **Vínculos**
@@ -269,7 +272,7 @@ navegador**; the terminal `faz-ai` warns and does not start.
 1. In Configurações (settings) → **Harness de IA**, choose the project's tool (Claude Code,
    Cursor or Kimi Code).
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
-   **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads.
+   **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads. This also happens on its own, silently, when the folder opens (and on every new extension version), always in the user scope; only a failure raises a notice.
 3. In the **Skills** group of the same tab, click **Instalar (padrão da ferramenta)** for the
    flow skill (`faz-ai-fluxo`): it teaches the AI to take cards through the phases, write the
    documents, ask for review and pick up pending work. The button also installs the per-topic skills
@@ -691,14 +694,15 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 
 - The aggregation can group by phase (`phase`), card type (`card_type`), AI tool (`tool`), model
   (`model`), effort (`effort`), profile (`profile`), card (`card`), agent (`agent`), skill (`skill`),
-  used tool (`used_tool`) or MCP tool (`mcp_tool`). Omit to get only the period's total.
+  used tool (`used_tool`), MCP tool (`mcp_tool`) or Bash command (`bash_command`). Omit to get only the period's total.
 - `tool` and `used_tool` are not the same thing: `tool` is the AI tool that ran (claude, cursor);
   `used_tool` and `mcp_tool` are what the run used (Read, Bash, `get_card`). In `mcp_tool` the server
   comes in its own column, or "servidor não registrado" (server not recorded) when the name did not
-  carry it.
+  carry it. `bash_command` is the base command of each Bash call, without arguments (`npm test`,
+  `git status`, `cat`), Claude Code only.
 - Period filters (start and end date, in `YYYY-MM-DD`), card (e.g. `72` or `#72`), and dimensions
   (e.g. phase, model, card type).
-- On the **agent**, **skill**, **used_tool** and **mcp_tool** dimensions the table shows only the
+- On the **agent**, **skill**, **used_tool**, **mcp_tool** and **bash_command** dimensions the table shows only the
   count of runs and uses (no tokens, which cannot be split among a run's components).
   `effort` and `profile` have tokens.
 - Tokens count in every measured run, from Claude Code and from Cursor. The table has no dollar cost.
@@ -927,9 +931,16 @@ order. When the merge is detected:
    updates the local `develop`.
 
 If the pull request is closed without a merge, the board registers a warning in the conversation
-once only. If it is open with conflicts, the board warns once in the conversation and, when the
-story was waiting for review, returns the card to "Pronto" so the AI updates the branch and resolves
-it on the next round. The merge is still done by the person, manually or through automatic merge; the board
+once only. If it is open with conflicts, the board warns in the conversation once per conflict (the
+notice quotes the PR commit) and, in the same round, calls the AI in a run just to resolve it, at the
+front of the queue: it updates the branch by merging from the PR base (no rebase, no force push),
+resolves the conflicts, runs the checks, pushes the branch and records what it did in the
+conversation. This applies to any story, including autonomous and already delivered ones, except a
+blocked one and one waiting for your answer. The run uses the phase's model and permission, follows
+the limits of activities with a branch, shows on the card as "resolving conflict" and, at the end,
+the card returns to the status it had. If the AI cannot do it, it blocks the card with the reason; if
+it finishes and the PR is still in conflict at the same commit, the board blocks the card and the
+resolution is yours (unblocking gives the AI one more try). The merge is still done by the person, manually or through automatic merge; the board
 only observes. Failures in querying the PR state (no network, no authentication, no `gh`
 installed) do not block anything — the warning appears in the log, and the board tries again on the next round.
 
@@ -973,6 +984,11 @@ does. In each round it:
   and each reason for skipping one (once per reason), shows up in the log with the `Branches:` prefix.
   Your personal branches are not touched. Without network or without origin, the sync waits for the
   next round;
+- **checks for conflicts with the base before the PR**: for each story with a branch and no pull
+  request yet, it asks git, read-only (`git merge-tree`, git 2.38 or newer; below that, the check is
+  skipped with a line in the log), whether the branch conflicts with the current base on origin. If it
+  does, it posts a notice in the conversation once per branch commit, with the files, for the AI to
+  update the branch and resolve it before opening the PR. Nothing changes on the card or the branches;
 - **summarizes the conversation** of stories with three or more messages since the last summary, or
   two that add up to a lot of text (at least one from the AI), before working on the phase; the AI then receives only the summary and
   what comes after it;
@@ -1534,7 +1550,7 @@ is always a suggestion: on the card, the model and the effort can be changed at 
 
 Each rule can have a **fallback model** (optional). When a card's execution fails because the primary model hit the plan's usage limit, and that model came from a rule with a fallback configured, the system automatically retries the execution with the fallback model, once only. If the fallback also fails or is not configured, the card is blocked as usual. The automatic switch appears as a comment in the card's conversation ("The `<primary model>` hit the usage limit; execution continues with `<fallback model>`"), and the card's Model field keeps showing the primary model — the next execution will try the primary again.
 
-**Dependency warnings between settings and cross-linked navigation.** Some configuration options only work because of another. The board shows a discreet line under dependent options (for example, "Depends on **a model suggestion rule** (now: none)" below "Fill in the suggested model automatically", or "Depends on **agents marked as available**" below "Default agent"); the option stays disabled when the dependency is not met. Links let you navigate: click one to go to the matching board section, which scrolls and highlights for 2 seconds, or click a link in the Settings to open the board at the right section. In browser mode, links to the Settings appear as text only. **"Fill in the suggested model automatically"** moved from Rules to Models, where it makes more sense. The Heartbeat interval field stays disabled when the heartbeat is off, with no additional dependency component. New headers in Models, Agents, Rules and Skills show "Showing the X of [tool] · switch tool", letting you change the tool from any of these board screens.
+**Dependency warnings between settings and cross-linked navigation.** Some configuration options only work because of another. The board shows a discreet line under dependent options (for example, "Depends on **a model suggestion rule** (now: none)" below "Fill in the suggested model automatically", or "Depends on **agents marked as available**" below "Default agent"); the option stays disabled when the dependency is not met. Links let you navigate: click one to go to the matching board section, which scrolls and highlights for 2 seconds, or click a link in the Settings to open the board at the right section. In browser mode, links to the Settings appear as text only. **"Fill in the suggested model automatically"** moved from Rules to Models, where it makes more sense — a simple notice in Rules indicates the move. The Heartbeat interval field stays disabled when the heartbeat is off, with no additional dependency component. New headers in Models, Agents, Rules and Skills show "Showing the X of [tool] · switch tool", letting you change the tool from any of these board screens.
 
 When a new version of the extension changes the default board, the board asks whether you want to
 update it (or use **Faz AI: Atualizar board para o padrão atual**). The update only adds what is

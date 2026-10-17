@@ -124,6 +124,7 @@ export class EventLog {
         const ids = [...before.keys()];
         return { before, after: () => cardFacts(db, ids), cardId: null, extra: {} };
       }
+      case 'card.status.setMany':
       case 'card.yolo.setMany':
       case 'card.archiveMany':
       case 'card.trashMany':

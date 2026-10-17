@@ -389,15 +389,111 @@ describe('MergeWatcher', () => {
     ]);
   });
 
-  it('aberto com conflito: avisa uma vez e devolve o card que esperava revisão para a IA resolver', async () => {
-    ghResult = json({ state: 'OPEN', mergedAt: null, mergeCommit: null, mergeable: 'CONFLICTING' });
-    await watcher.runNow();
-    expect(card(1).status).toBe('ready');
-    expect(comments(1).at(-1)!.body).toContain('tem conflito com a branch de destino');
-    const told = comments(1).length;
-    await watcher.runNow();
-    expect(comments(1)).toHaveLength(told);
-    expect(columnOf(1)).toBe('Homologação');
+  describe('conflito no pull request aberto (#747)', () => {
+    const conflicting = (oid: string) =>
+      json({ state: 'OPEN', mergedAt: null, mergeCommit: null, mergeable: 'CONFLICTING', headRefOid: oid });
+    const mergeable = (oid: string) => json({ state: 'OPEN', mergedAt: null, mergeCommit: null, mergeable: 'MERGEABLE', headRefOid: oid });
+    const conflictNotices = (n: number) => comments(n).filter((c) => c.body.includes('tem conflito com a branch de destino'));
+    const OID_A = 'aaaaaaa1111111111111111111111111111111111';
+    const OID_B = 'bbbbbbb2222222222222222222222222222222222';
+
+    it('avisa uma vez por commit, cita o commit e não muda o status nem a coluna', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      expect(card(1).status).toBe('waiting_review');
+      expect(columnOf(1)).toBe('Homologação');
+      expect(conflictNotices(1)).toHaveLength(1);
+      expect(conflictNotices(1)[0]!.body).toContain(prOf(1));
+      expect(conflictNotices(1)[0]!.body).toContain('commit aaaaaaa');
+      expect(log.at(-1)).toBe(`[#1] Pull request ${prOf(1)} com conflito no commit aaaaaaa; a IA resolve nesta rodada.`);
+      await watcher.runNow();
+      expect(conflictNotices(1)).toHaveLength(1);
+      expect(watcher.pendingConflicts()).toEqual(new Set([card(1).id]));
+    });
+
+    it('um segundo conflito no mesmo pull request, depois de o primeiro ser resolvido, ganha aviso novo (o bug)', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      ghResult = mergeable(OID_B); // a IA resolveu e enviou
+      await watcher.runNow();
+      expect(watcher.pendingConflicts().size).toBe(0);
+      ghResult = conflicting(OID_B); // a base andou e conflitou de novo
+      await watcher.runNow();
+      expect(conflictNotices(1)).toHaveLength(2);
+      expect(conflictNotices(1)[1]!.body).toContain('commit bbbbbbb');
+    });
+
+    it('a execução de conflito terminou e o PR continua em conflito no mesmo commit: o board bloqueia e não tenta de novo', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      watcher.onRunFinished(card(1).id, 'conflict', false);
+      expect(watcher.pendingConflicts().size).toBe(0);
+      await watcher.runNow();
+      expect(card(1).status).toBe('blocked');
+      expect(card(1).statusReason).toBe(
+        `O pull request ${prOf(1)} continua com conflito no commit aaaaaaa depois da tentativa da IA. Atualize a branch e envie, ou desbloqueie o card para a IA tentar de novo.`,
+      );
+      expect(log.at(-1)).toBe(`[#1] Pull request ${prOf(1)} continua com conflito depois da tentativa da IA; card bloqueado.`);
+      expect(watcher.pendingConflicts().size).toBe(0);
+      expect(conflictNotices(1)).toHaveLength(1);
+
+      // desbloquear vale como "tente de novo": uma tentativa a mais, sem aviso novo (o commit é o mesmo)
+      router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'ready' });
+      await watcher.runNow();
+      expect(card(1).status).toBe('ready');
+      expect(watcher.pendingConflicts()).toEqual(new Set([card(1).id]));
+      expect(conflictNotices(1)).toHaveLength(1);
+    });
+
+    it('o fim por limite de uso não conta como tentativa, e outros modos não contam', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      watcher.onRunFinished(card(1).id, 'conflict', true);
+      watcher.onRunFinished(card(1).id, 'phase', false);
+      await watcher.runNow();
+      expect(card(1).status).toBe('waiting_review');
+      expect(watcher.pendingConflicts()).toEqual(new Set([card(1).id]));
+    });
+
+    it('commit novo depois da tentativa, ainda em conflito: aviso novo e outra tentativa, sem bloqueio', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      watcher.onRunFinished(card(1).id, 'conflict', false);
+      ghResult = conflicting(OID_B);
+      await watcher.runNow();
+      expect(card(1).status).toBe('waiting_review');
+      expect(conflictNotices(1)).toHaveLength(2);
+      expect(watcher.pendingConflicts()).toEqual(new Set([card(1).id]));
+    });
+
+    it('mergeable UNKNOWN (o GitHub ainda calcula) não mexe em nada', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      watcher.onRunFinished(card(1).id, 'conflict', false);
+      ghResult = json({ state: 'OPEN', mergedAt: null, mergeCommit: null, mergeable: 'UNKNOWN', headRefOid: OID_A });
+      await watcher.runNow();
+      expect(card(1).status).toBe('waiting_review');
+      ghResult = conflicting(OID_A); // a tentativa continua valendo
+      await watcher.runNow();
+      expect(card(1).status).toBe('blocked');
+    });
+
+    it('o card que espera resposta recebe o aviso e fica nos pendentes (a fila do heartbeat é que o deixa de fora)', async () => {
+      router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'waiting_answer' });
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      expect(card(1).status).toBe('waiting_answer');
+      expect(conflictNotices(1)).toHaveLength(1);
+      expect(watcher.pendingConflicts()).toEqual(new Set([card(1).id]));
+    });
+
+    it('a história que sai dos alvos (bloqueada pela pessoa ou pela IA) sai dos pendentes', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'blocked', note: 'impedimento' });
+      await watcher.runNow();
+      expect(watcher.pendingConflicts().size).toBe(0);
+    });
   });
 
   it('mergeado: grava o commit, comenta, conclui e remove a pasta de trabalho (RF3-RF6)', async () => {

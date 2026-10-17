@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { activityKindOf, codeColumnOf, isTextColumn, runningByKind, runningKindOf } from '../src/shared/activity';
-import { DEFAULT_RUNNER, limitOf, textLimit } from '../src/shared/runner';
+import { DEFAULT_RUNNER, limitOf, textLimit, type AiRunMode } from '../src/shared/runner';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -21,8 +21,8 @@ const create = (title: string, column: string, parent?: number) => {
     title,
   });
 };
-const kind = (n: number, mode?: 'phase' | 'refine' | 'summarize') => activityKindOf(router.snapshot(), card(n), mode);
-const run = (n: number, mode: 'phase' | 'refine' | 'summarize', phase: string) =>
+const kind = (n: number, mode?: AiRunMode) => activityKindOf(router.snapshot(), card(n), mode);
+const run = (n: number, mode: AiRunMode, phase: string) =>
   router.setAiRuns([{ cardId: card(n).id, runId: '', mode, origin: 'manual', phase, model: null, startedAt: 0 }]);
 
 beforeEach(async () => {
@@ -48,6 +48,12 @@ describe('activityKindOf', () => {
     expect(kind(1, 'refine')).toBe('text');
     expect(kind(1, 'summarize')).toBe('text');
     expect(kind(1, 'phase')).toBe('branch');
+  });
+
+  it('conflict é branch mesmo numa coluna de documento: mexe na worktree da história', () => {
+    create('h', 'Spec');
+    expect(kind(1, 'phase')).toBe('text');
+    expect(kind(1, 'conflict')).toBe('branch');
   });
 
   it('sub-tarefa é classificada pela coluna da história', () => {
@@ -92,6 +98,12 @@ describe('runningKindOf e runningByKind', () => {
     run(1, 'phase', 'Implementação');
     expect(runningKindOf(router.snapshot(), card(1).id)).toBe('branch');
     run(1, 'phase', 'Inexistente');
+    expect(runningKindOf(router.snapshot(), card(1).id)).toBe('branch');
+  });
+
+  it('a execução de conflito conta como branch, qualquer que seja a fase congelada', () => {
+    create('h', 'Spec');
+    run(1, 'conflict', 'Spec');
     expect(runningKindOf(router.snapshot(), card(1).id)).toBe('branch');
   });
 
