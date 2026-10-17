@@ -1325,6 +1325,34 @@ describe('log das execuções de IA', () => {
       expect(log).toContain('[#1] Consumo não medido.');
     });
 
+    it('a falha antes do primeiro evento sem recusa do formato não repete e o card diz que não foi repetida (#739)', () => {
+      speaks = false;
+      logged.start(storyId);
+      procs[0]!.emit('erro: conexão perdida com o servidor\n', 'stderr');
+      procs[0]!.exit(1);
+
+      expect(procs).toHaveLength(1);
+      expect(card().status).toBe('blocked');
+      expect(card().statusReason).toMatch(/^O Claude Code terminou com erro \(código 1\)\. A execução não foi repetida/);
+      // uma vez só: o recado da medição é do board, fica no canal e não entra no fim da saída da ferramenta
+      expect(card().statusReason!.split('não foi repetida')).toHaveLength(2);
+      expect(card().statusReason).not.toContain('A medição não foi possível');
+      expect(card().statusReason).toContain('conexão perdida');
+      expect(channel().some((l) => l.includes('A medição não foi possível'))).toBe(true);
+      expect(only()).toMatchObject({ outcome: 'failed', exitCode: 1, measure: 'none', inputTokens: null, outputTokens: null });
+      expect(log.join('\n')).not.toContain('O trabalho foi repetido');
+      expect(card().statusReason).not.toContain('O trabalho foi repetido');
+    });
+
+    it('a falha depois de eventos não ganha o aviso de execução não repetida', () => {
+      logged.start(storyId);
+      procs[0]!.emit(FIXTURE);
+      procs[0]!.exit(1);
+
+      expect(card().status).toBe('blocked');
+      expect(card().statusReason).not.toContain('não foi repetida');
+    });
+
     it('RF-07: a falha DEPOIS de eventos não repete a chamada, e o fim da saída no card é texto legível', () => {
       logged.start(storyId);
       procs[0]!.emit(FIXTURE);

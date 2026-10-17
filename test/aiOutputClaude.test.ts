@@ -140,6 +140,18 @@ describe('inventário: os nomes que o painel vai ler', () => {
       message: { id: `m-${name}`, model: 'claude-haiku-4-5', content: [{ type: 'tool_use', id: `t-${name}`, name, input }] },
     });
 
+  it('conta o comando-base de cada chamada de Bash, sem argumentos (#604)', () => {
+    const { reader } = read([
+      event('Bash', { command: 'cd x && npm test -- a.ts' }),
+      event('Bash', { command: 'npm test' }),
+      event('Bash', { command: 'cat /tmp/segredo' }),
+    ]);
+    expect(reader.report().bashCommands).toEqual([
+      { command: 'npm test', calls: 2 },
+      { command: 'cat', calls: 1 },
+    ]);
+  });
+
   it('`Task` e `Agent` são o mesmo subagente: trocar o nome da ferramenta não apaga o inventário', () => {
     const task = read([event('Task', { subagent_type: 'Explore' })]).reader.report().inventory;
     const agent = read([event('Agent', { subagent_type: 'Explore' })]).reader.report().inventory;

@@ -218,7 +218,7 @@ export function requestTrashMany(histories: Card[], after?: () => void): void {
 }
 
 /** Um lote de cards vai ao host: a barra de seleção mostra o status até ele confirmar, e só então `after` roda. */
-async function withBulkStatus(label: string, send: () => Promise<void>, after?: () => void): Promise<void> {
+export async function withBulkStatus(label: string, send: () => Promise<void>, after?: () => void): Promise<void> {
   const { setBulkBusy } = useBoardStore.getState();
   setBulkBusy(label);
   try {

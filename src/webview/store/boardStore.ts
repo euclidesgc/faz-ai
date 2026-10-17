@@ -56,7 +56,9 @@ export interface DialogSpec {
   choices?: { label: string; options: { value: string; label: string }[]; value?: string };
   /** quando presente, mostra um checkbox e passa se está marcado ao confirmar */
   checkbox?: { label: string };
-  onConfirm(choice?: string, checkboxChecked?: boolean): void;
+  /** quando presente, mostra uma área de texto e passa o conteúdo ao confirmar; `required` exige preenchimento para confirmar */
+  text?: { label: string; placeholder?: string; required?: boolean };
+  onConfirm(choice?: string, checkboxChecked?: boolean, text?: string): void;
   /** chamada quando a pessoa desiste (botão, Escape ou clique fora) */
   onCancel?(): void;
   /** ação alternativa, mostrada entre Voltar e a confirmação */

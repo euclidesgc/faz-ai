@@ -224,6 +224,30 @@ describe('ChatSession', () => {
     expect(error.text).not.toContain('Chamando');
   });
 
+  it('a falha antes do primeiro evento não é repetida e o aviso de erro diz isso (#739)', () => {
+    router.chatCommand({ type: 'chat.send', text: 'a', model: null });
+    // o fluxo estruturado não trouxe nenhum evento: só o erro no `stderr`
+    spawned[0]!.raw('');
+    spawned[0]!.emit('erro: conexão perdida com o servidor\n', 'stderr');
+    spawned[0]!.exit(1);
+
+    expect(spawned).toHaveLength(1);
+    const error = messages().at(-1)!;
+    expect(error.role).toBe('error');
+    expect(error.text).toMatch(/^O Claude Code terminou com erro \(código 1\)\. A execução não foi repetida/);
+    // uma vez só: o recado da medição é do board e não entra no fim da saída da ferramenta
+    expect(error.text.split('não foi repetida')).toHaveLength(2);
+    expect(error.text).not.toContain('A medição não foi possível');
+    expect(error.text).toContain('conexão perdida');
+  });
+
+  it('a falha depois de eventos não ganha o aviso de execução não repetida', () => {
+    router.chatCommand({ type: 'chat.send', text: 'a', model: null });
+    spawned[0]!.raw(FIXTURE);
+    spawned[0]!.exit(1);
+    expect(messages().at(-1)!.text).not.toContain('não foi repetida');
+  });
+
   it('a pergunta nova vai uma vez só no prompt, depois da conversa anterior', () => {
     router.chatCommand({ type: 'chat.send', text: 'primeira', model: null });
     spawned[0]!.emit('resposta um');

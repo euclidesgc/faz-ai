@@ -4,7 +4,7 @@ import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from 
 import type { HarnessUsage, SelectableKind } from '../shared/harnessSelection';
 import type { AgentInput } from '../shared/messages';
 import type { HookInput, McpServerInput } from '../shared/harnessCatalog';
-import type { CardStatus } from '../shared/status';
+import type { BulkCardStatus, CardStatus } from '../shared/status';
 import type { ModelOption, ModelRule } from '../shared/models';
 import type { BoardRules } from '../shared/rules';
 import type { FieldValue, Id, LinkKind, WorkflowKind } from '../shared/model';
@@ -91,6 +91,8 @@ export const cards = {
   deletePermanent: (cardId: Id) => reqCard(cardId, { type: 'card.deletePermanent', cardId }),
   setStatus: (cardId: Id, status: CardStatus | null, note?: string) =>
     reqCard(cardId, { type: 'card.status.set', cardId, status, ...(note !== undefined ? { note } : {}) }),
+  setStatusMany: (cardIds: Id[], status: BulkCardStatus, note?: string) =>
+    req({ type: 'card.status.setMany', cardIds, status, ...(note !== undefined ? { note } : {}) }),
   setYolo: (cardId: Id, enabled: boolean, until?: Id | null) => reqCard(cardId, { type: 'card.yolo.set', cardId, enabled, until }),
   setYoloMany: (cardIds: Id[], enabled: boolean, until?: Id | null) => req({ type: 'card.yolo.setMany', cardIds, enabled, until }),
   archiveMany: (cardIds: Id[]) => req({ type: 'card.archiveMany', cardIds }),

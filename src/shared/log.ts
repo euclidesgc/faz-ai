@@ -176,10 +176,18 @@ export function splitMcpName(name: string): { server: string; tool: string } {
  *   `measure: 'full'` com zeros; não medido é `null`.
  * - `costUsd === null` quando não há custo. Nunca `0` por falta de preço.
  */
+/** Quantas chamadas de Bash rodaram um comando-base (sem argumentos) numa execução (#604). */
+export interface BashCommandItem {
+  command: string;
+  calls: number;
+}
+
 export interface RunReport {
   measure: AiRunMeasure;
   consumption: AiRunConsumption | null;
   inventory: InventoryItem[];
+  /** comandos de Bash chamados (#604); ausente em quem não lê isso (Cursor, Copilot) */
+  bashCommands?: BashCommandItem[];
   /** o texto final da resposta, para o chat; '' quando não houve */
   answer: string;
   /** por que não houve medição, em português, para o canal de log — nunca para o banco */

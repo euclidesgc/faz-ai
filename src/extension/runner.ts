@@ -11,7 +11,7 @@ import { executionPlan } from './execution';
 import { effortToRun } from '../shared/execution';
 import { modelDisplay, modelValue, parseModelValue, suggestModelRule } from '../shared/models';
 import { effortTiers } from './models';
-import { MeasureBrokenError } from './aiOutput/errors';
+import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
 import { AiGateway, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
@@ -646,15 +646,20 @@ export class AiRunner {
     const freePlan = run.tail.some((l) => /free plans can only use auto/i.test(l))
       ? `\n\nO plano gratuito do Cursor só roda o modelo Auto: escolha Auto no campo Modelo do card, ou use o botão Recriar as regras de "Esforço da atividade" em Configurações → Modelos de IA, que no Cursor sugere Auto.`
       : '';
+    // o motivo da medição é recado do board no canal, não saída da ferramenta: fica fora do fim da saída
+    const notice = end.measureError ? cut(end.measureError.message, TAIL_CHARS) : null;
+    const toolTail = run.tail.filter((l) => l !== notice);
     const output =
       freePlan +
-      (run.tail.length ? `\n\nFim da saída do ${toolLabel}:\n\n\`\`\`\n${run.tail.join('\n').replace(/```/g, "'''")}\n\`\`\`` : '');
+      (toolTail.length ? `\n\nFim da saída do ${toolLabel}:\n\n\`\`\`\n${toolTail.join('\n').replace(/```/g, "'''")}\n\`\`\`` : '');
+    // caiu antes do primeiro evento e o board não repetiu: a pessoa confere o que ficou feito
+    const notRepeated = end.measureError instanceof MeasureEndedError ? ` ${NOT_REPEATED}` : '';
     const failure = end.timedOut
       ? `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Harness de IA.${output}`
       : error
         ? `Não foi possível executar o ${toolLabel}: ${error.message}`
         : code !== 0
-          ? `O ${toolLabel} terminou com erro (código ${code}).${output}`
+          ? `O ${toolLabel} terminou com erro (código ${code}).${notRepeated}${output}`
           : null;
     // o limite esgotado vale também quando a CLI sai com código 0 sem ter respondido: o que importa é o
     // sinal estrutural do leitor, não o código de saída

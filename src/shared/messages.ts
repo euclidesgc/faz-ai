@@ -10,7 +10,7 @@ import type { CardUsage } from './cardUsage';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { RenameKind } from './branchRename';
-import type { CardStatus } from './status';
+import type { BulkCardStatus, CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { BranchKind, GitConfig } from './git';
 import type { ProjectProfile } from './projectProfile';
@@ -136,6 +136,9 @@ export type WebviewToHost =
   /** muda o status de trabalho do card; `note` é o motivo do bloqueio ou o texto que vai junto para a conversa */
   /** `pending`: há algo que depende da pessoa; em modo autônomo o pedido de revisão não vira aprovação automática */
   | { type: 'card.status.set'; cardId: Id; status: CardStatus | null; note?: string; pending?: boolean }
+  /** muda o status de trabalho de vários cards de uma vez; aplica só aos cards vivos da lista e reusa o
+   * fluxo de `card.status.set` (comentário do motivo, aprovação com avanço automático) */
+  | { type: 'card.status.setMany'; cardIds: Id[]; status: BulkCardStatus; note?: string }
   | { type: 'comment.add'; cardId: Id; body: string; kind?: 'summary' }
   | { type: 'comment.update'; commentId: Id; body: string }
   | { type: 'comment.delete'; commentId: Id }

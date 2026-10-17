@@ -206,6 +206,9 @@ status color, and the LED on the bar tells the card's state at a glance: green a
 
 **Select all in a column.** The checkbox at the start of a story column's header, on the same line as the cards' checkboxes (or **Selecionar todos** in the ⋯ menu), selects the column's visible stories (the active filter applies); checked again, it clears the selection. In a column with no cards, the checkbox is hidden, but its space stays reserved. With the selection made, the same menu offers **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados** and **Mandar selecionados para a lixeira**, each with a single confirmation for the whole batch; **Limpar seleção** clears it. The selection applies to one column at a time: selecting a card in another column replaces the selection. In a batch, a story with an open sub-task is not concluded (the others go ahead), and moving to a cancellation column cancels open sub-tasks.
 
+**Actions on selected cards.** The multi-select bar (two or more cards) and the column’s ⋯ menu offer the same actions: **Approve**, **Block**, **Unblock**, **Work on phase**, **Refine with AI**, **Stop AI**, autonomous mode, collapse/expand, archive, move, complete and trash. Unavailable actions stay visible and disabled, without displaying a reason; the menu also shows them with no selection. Each action affects only eligible, visible cards. Approve applies to cards waiting for review and uses the same automatic advance as individual approval; block requires a reason, recorded in each card’s conversation; unblock returns blocked cards to **Ready**. Work and refine respect the remaining parallel execution capacity: cards already running or exceeding the limit are left out. **Stop AI** only stops runs started by the board.
+
+
 ### Links between cards
 
 Besides sub-tasks, any card can be linked to another one, in any workflow, under **Vínculos**
@@ -691,14 +694,15 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 
 - The aggregation can group by phase (`phase`), card type (`card_type`), AI tool (`tool`), model
   (`model`), effort (`effort`), profile (`profile`), card (`card`), agent (`agent`), skill (`skill`),
-  used tool (`used_tool`) or MCP tool (`mcp_tool`). Omit to get only the period's total.
+  used tool (`used_tool`), MCP tool (`mcp_tool`) or Bash command (`bash_command`). Omit to get only the period's total.
 - `tool` and `used_tool` are not the same thing: `tool` is the AI tool that ran (claude, cursor);
   `used_tool` and `mcp_tool` are what the run used (Read, Bash, `get_card`). In `mcp_tool` the server
   comes in its own column, or "servidor não registrado" (server not recorded) when the name did not
-  carry it.
+  carry it. `bash_command` is the base command of each Bash call, without arguments (`npm test`,
+  `git status`, `cat`), Claude Code only.
 - Period filters (start and end date, in `YYYY-MM-DD`), card (e.g. `72` or `#72`), and dimensions
   (e.g. phase, model, card type).
-- On the **agent**, **skill**, **used_tool** and **mcp_tool** dimensions the table shows only the
+- On the **agent**, **skill**, **used_tool**, **mcp_tool** and **bash_command** dimensions the table shows only the
   count of runs and uses (no tokens, which cannot be split among a run's components).
   `effort` and `profile` have tokens.
 - Tokens count in every measured run, from Claude Code and from Cursor. The table has no dollar cost.
@@ -1555,7 +1559,7 @@ is always a suggestion: on the card, the model and the effort can be changed at 
 
 Each rule can have a **fallback model** (optional). When a card's execution fails because the primary model hit the plan's usage limit, and that model came from a rule with a fallback configured, the system automatically retries the execution with the fallback model, once only. If the fallback also fails or is not configured, the card is blocked as usual. The automatic switch appears as a comment in the card's conversation ("The `<primary model>` hit the usage limit; execution continues with `<fallback model>`"), and the card's Model field keeps showing the primary model — the next execution will try the primary again.
 
-**Dependency warnings between settings and cross-linked navigation.** Some configuration options only work because of another. The board shows a discreet line under dependent options (for example, "Depends on **a model suggestion rule** (now: none)" below "Fill in the suggested model automatically", or "Depends on **agents marked as available**" below "Default agent"); the option stays disabled when the dependency is not met. Links let you navigate: click one to go to the matching board section, which scrolls and highlights for 2 seconds, or click a link in the Settings to open the board at the right section. In browser mode, links to the Settings appear as text only. **"Fill in the suggested model automatically"** moved from Rules to Models, where it makes more sense. The Heartbeat interval field stays disabled when the heartbeat is off, with no additional dependency component. New headers in Models, Agents, Rules and Skills show "Showing the X of [tool] · switch tool", letting you change the tool from any of these board screens.
+**Dependency warnings between settings and cross-linked navigation.** Some configuration options only work because of another. The board shows a discreet line under dependent options (for example, "Depends on **a model suggestion rule** (now: none)" below "Fill in the suggested model automatically", or "Depends on **agents marked as available**" below "Default agent"); the option stays disabled when the dependency is not met. Links let you navigate: click one to go to the matching board section, which scrolls and highlights for 2 seconds, or click a link in the Settings to open the board at the right section. In browser mode, links to the Settings appear as text only. **"Fill in the suggested model automatically"** moved from Rules to Models, where it makes more sense — a simple notice in Rules indicates the move. The Heartbeat interval field stays disabled when the heartbeat is off, with no additional dependency component. New headers in Models, Agents, Rules and Skills show "Showing the X of [tool] · switch tool", letting you change the tool from any of these board screens.
 
 When a new version of the extension changes the default board, the board asks whether you want to
 update it (or use **Faz AI: Atualizar board para o padrão atual**). The update only adds what is
