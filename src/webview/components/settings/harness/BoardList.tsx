@@ -81,7 +81,7 @@ export function BoardList({
               <div className="item-title">
                 <span className="item-name">{i.name}</span>
                 <Badge color="gray" variant="soft" title={i.plugin}>
-                  {originLabel(i)}
+                  {i.boardArtifactId ? t('Biblioteca do board') : originLabel(i)}
                 </Badge>
                 {i.plugin && (
                   <Badge color="gray" variant="outline">
@@ -94,14 +94,24 @@ export function BoardList({
                   {i.description}
                 </p>
               )}
-              <button
-                type="button"
-                className="path-link"
-                title={t('Abre o arquivo no board, para ler e editar')}
-                onClick={() => useBoardStore.getState().openHarnessFile(i.path)}
-              >
-                {i.location}
-              </button>
+              {i.path && (
+                <button
+                  type="button"
+                  className="path-link"
+                  title={t('Abre o arquivo no board, para ler e editar')}
+                  onClick={() => useBoardStore.getState().openHarnessFile(i.path)}
+                >
+                  {i.boardArtifactId ? i.path || i.location : i.location}
+                </button>
+              )}
+              {i.boardArtifactId && <p className="muted small">{t('Origem: {path}', { path: i.location })}</p>}
+              {!!state.harness.library?.artifacts.find((a) => a.id === i.boardArtifactId)?.skipped.length && (
+                <p className="muted small" role="status">
+                  {t('{n} arquivo(s) não copiado(s); consulte os limites da biblioteca.', {
+                    n: state.harness.library!.artifacts.find((a) => a.id === i.boardArtifactId)!.skipped.length,
+                  })}
+                </p>
+              )}
             </div>
             <div className="row-actions">
               {modes.length > 1 ? (
@@ -110,6 +120,23 @@ export function BoardList({
                 <Badge color="gray" variant="outline" title={t('Os cards e as fases podem escolher este agente.')}>
                   {t('Disponível no board')}
                 </Badge>
+              )}
+              {i.boardArtifactId && (
+                <ActionButton
+                  variant="ghost"
+                  size="1"
+                  hint={t('Substitui a cópia do board pelo conteúdo atual da origem.')}
+                  onClick={() =>
+                    useBoardStore.getState().ask({
+                      title: t('Atualizar "{name}" da origem?', { name: i.name }),
+                      message: t('A cópia atual do board será substituída. A origem não será alterada.'),
+                      confirmLabel: t('Atualizar da origem'),
+                      onConfirm: () => harness.updateLibraryArtifact(i.boardArtifactId!),
+                    })
+                  }
+                >
+                  {t('Atualizar da origem')}
+                </ActionButton>
               )}
               <ActionButton
                 variant="ghost"

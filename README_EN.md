@@ -1261,19 +1261,8 @@ any project, and does not come back when the board is reopened) and **Como funci
 The subject tabs say in their title how many artifacts are on the board and how many rules await
 review, and an empty Board goes straight to Projeto or Global. The screen has three levels:
 
-1. **One tab per tool.** **Ferramenta e execução** (tool and run: the project's AI, the permission,
-   the default agent and the heartbeat) and one tab for **Claude Code** and one for **Cursor**, the
-   project's tool first, with the **ferramenta deste projeto** (this project's tool) badge. On the
-   other one the board marks do not apply (runs use the project's tool): it is there to read and
-   edit files.
-2. **Where to look**, in a selector above the subject tabs that applies to all of them: **Board**,
-   **Projeto** (project), **Global** and, when there is an imported folder, **Importados**
-   (imported). Project, Global and Imported are the **catalog**: everything the tool loads from that
-   source, and being in the catalog takes no space in the AI context. **Projeto** is what the tool
-   reads in the project folder; **Global**, what it reads from your user folder (`~/.claude`,
-   `~/.cursor`…), installed plugins and your organization; **Importados**, what the board found in
-   the folders you pointed to. **Board** is what you sent, with the mode of each one. Switching
-   subject keeps the choice.
+1. **Board library**, **Ferramenta e execução** (the project's AI, permission, default agent and heartbeat), and a catalog tab per tool (Claude Code, Cursor and Kimi Code). The library is shared: switching tools preserves available artifacts. Tool catalogs let you find and copy artifacts to the board.
+2. **Where to look**, in each tool catalog: **Project**, **Global** and, when an imported folder exists, **Imported**. These are artifact sources; appearing in a catalog takes no AI context space. Project is the project folder; Global is your user folder, plugins and organization; Imported is the folders you specified. Sent items live in the **Board library**, shared across tools.
 3. **One subject per tab**: **Regras** (rules), **Skills**, **Sub-agentes** (sub-agents), **MCPs**,
    **Comandos** (commands), **Hooks** and **Demais** (other: memory, settings and permissions,
    output styles, plugins and the organization policy). Only the subjects the tool has show up, and
@@ -1322,13 +1311,28 @@ In Claude Code's **Regras principais** (main rules), the board offers to create 
 `@import` that fixes it. If it has only `AGENTS.md`, the board warns that creating a `CLAUDE.md`
 makes Claude Code stop reading it.
 
-In the **Board** origin of Regras, Skills, Sub-agentes and MCPs sit the artifacts you sent, each one
-with its **mode** selector, its origin (Projeto, Global, Importados or plugin) and a **Remover do
-board** (remove from the board) button. The board **references** the artifact by its source path, it
-does not copy it: a change in the file counts on the board, and a deleted source leaves the artifact
-with the **ausente** (missing) badge in the same list, without breaking the cards that list it
-(**Remover do board** removes the mark). For rules, skills and MCP servers in the catalog, the
-project tool's row also has the mode selector, with the **Fora do board** (off the board) option.
+In **Board library**, Rules, Skills, Sub-agents and MCPs show copied artifacts with their usage mode,
+source and **Remove from board** action. The path opens the board copy in its editor; saving affects
+only the library. Changes or removal of the source do not affect the copy. **Update from source**
+replaces it only when confirmed; an unreadable source leaves the current copy intact. Removing an
+artifact from the board never deletes the source.
+
+**Library folder** shows the directory managed by the board, defaulting to
+`<Faz AI storage>/artifacts/<project>/`, outside the repository. Enter an empty folder and choose
+**Save folder** to recreate the copies there; the previous folder is preserved. **Open folder** opens
+it in the editor. Content is stored in the board database, and the board maintains reading copies in
+this folder; manage and edit artifacts through the board interface.
+
+To import dozens of skills, enter a collection folder or repository in **Find skills**, review the
+list, choose **Select all** or individual items, and install them in the library. Each skill includes
+`SKILL.md` and supporting references, assets and scripts, limited to 512 KB per file, 100 supporting
+files and 5 MB total; omitted files are indicated in the list. The same name and kind from a different
+source require removing the previous copy first. Private project skills, including `board-harness/`,
+are excluded from the extension package.
+
+Any tool catalog can send artifacts to the board. Hooks, commands and native settings remain in tool
+catalogs and are not converted to the library. MCP credentials stay in the host and are absent from
+the UI state and reading copies. Enforcement of tool and server restrictions still depends on each CLI.
 
 - **Sempre** (always): goes into every run (work the phase, refine, board chat), whatever the card.
   It is where the flow skill, the board server and the always-on rules go.

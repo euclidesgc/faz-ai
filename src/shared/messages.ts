@@ -288,6 +288,10 @@ export type WebviewToHost =
    * `usage` null): `location` é a identidade do item na marcação (`selectionKey`: o caminho como o
    * inventário o mostra, mais `#nome` numa entrada de configuração)
    */
+  | { type: 'harness.library.directory'; dir: string }
+  | { type: 'harness.library.update'; id: string }
+  | { type: 'harness.library.import'; rels: string[] }
+  | { type: 'harness.library.open' }
   | { type: 'harness.selection.set'; items: { kind: SelectableKind; location: string }[]; usage: HarnessUsage | null }
   /** a IA analisa o projeto e o catálogo do assunto e pré-seleciona os artefatos que fazem mais sentido (resultado em `harnessSuggestions`) */
   | { type: 'harness.suggest.run'; tool: AiTool; kind: SelectableKind }

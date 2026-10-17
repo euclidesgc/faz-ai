@@ -87,6 +87,7 @@ export const boardSettingsHandlers = {
     ctx.boardId = ctx.boards.getOrCreate(ctx.opts.workspaceKey, ctx.opts.folderName).id;
     initModels(ctx);
     clearRenames(ctx);
+    ctx.harness.load();
     return true;
   },
   'settings.board.upgrade': (_msg, ctx) => {

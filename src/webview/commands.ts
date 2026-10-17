@@ -221,6 +221,10 @@ export const harness = {
   suggest: (tool: AiTool, kind: SelectableKind) => post({ type: 'harness.suggest.run', tool, kind }),
   clearSuggestions: () => req({ type: 'harness.suggest.clear' }),
   /** abre o seletor de pasta do editor para importar artefatos */
+  setLibraryDirectory: (dir: string) => req({ type: 'harness.library.directory', dir }),
+  updateLibraryArtifact: (id: string) => req({ type: 'harness.library.update', id }),
+  importLibrarySkills: (rels: string[]) => req({ type: 'harness.library.import', rels }),
+  openLibrary: () => req({ type: 'harness.library.open' }),
   pickImport: (tool: AiTool) => req({ type: 'harness.import.pick', tool }),
   addImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.add', tool, dir }),
   removeImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.remove', tool, dir }),

@@ -94,14 +94,14 @@ export function matchesQuery(query: string, ...texts: (string | undefined)[]): b
 }
 
 /** Abas de primeiro nível: a ferramenta e execução, ou uma ferramenta de IA. */
-export type HarnessTab = 'tool' | AiTool;
+export type HarnessTab = 'tool' | 'library' | AiTool;
 
 /**
  * A aba que o valor guardado ou pedido representa. Valores antigos (`project`, `user`) e desconhecidos caem
  * na ferramenta do projeto, que é onde o que eles mostravam mora agora.
  */
 export function resolveHarnessTab(value: string | null | undefined, projectTool: AiTool): HarnessTab {
-  if (value === 'tool') return 'tool';
+  if (value === 'tool' || value === 'library') return value;
   return AI_TOOLS.some((x) => x.id === value) ? (value as AiTool) : projectTool;
 }
 

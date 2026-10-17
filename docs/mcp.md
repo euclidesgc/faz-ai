@@ -153,6 +153,16 @@ pasta própria (a global fica em `~/`):
 | Cursor | `.cursor/agents` | `<nome>.md` | `model` |
 | Kimi Code | `.kimi-code/agents` | `<nome>.md` (frontmatter YAML; aceita os mesmos globs `mcp__*` em `tools`) | — |
 
+### Biblioteca do board
+
+Os artefatos enviados ao board são copiados para uma biblioteca particular compartilhada pelas
+ferramentas de IA. `get_harness` retorna por padrão os artefatos dessa biblioteca; os caminhos de
+skills e rules em `get_card` apontam para as cópias de leitura do board, incluindo os arquivos de
+apoio. Trocar de ferramenta ou apagar a origem não remove a cópia. `set_harness_selection` muda o
+modo da cópia existente; não a atualiza da origem. A atualização explícita e a pasta de armazenamento
+ficam em Configurações → Harness de IA → Biblioteca do board. `onlySelected: false` inclui o catálogo
+da ferramenta em uso e as cópias do board. As definições MCP com credenciais permanecem no host. `get_skill`, `update_skill` e `write_skill_file` priorizam a cópia da biblioteca; sem cópia, operam no projeto. `get_agent` sem escopo lê a cópia do board, quando existe. Um agente importado leva também as skills e definições MCP declaradas e encontradas na sua origem, sem substituir cópias já existentes.
+
 ### Projeto, global e plugins
 
 O board lê o harness de cada ferramenta em três escopos: a pasta do projeto (`project`), a pasta do

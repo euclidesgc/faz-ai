@@ -56,7 +56,7 @@ export function ToolHarness({ tool }: { tool: AiTool }) {
   const label = toolLabel(tool);
   // a marcação do board só vale para a ferramenta do projeto; uma origem que esta aba não tem cai em Projeto
   const origins = originsOf(
-    projectTool,
+    !state.harness.library && projectTool,
     state.harnessImports.some((x) => x.tool === tool),
   );
   const origin: HarnessOrigin = origins.includes(chosen) ? chosen : 'project';
@@ -89,7 +89,7 @@ export function ToolHarness({ tool }: { tool: AiTool }) {
         }
       >
         {rich(
-          'Tudo que o {tool} carrega. Escolha onde olhar e depois o assunto: o <b>catálogo</b> (Projeto, Global e Importados) mostra o que existe e não ocupa o contexto da IA; só o que você envia ao <b>Board</b> pode ser usado pelas execuções, no modo de cada artefato.',
+          'Tudo que o {tool} carrega. O <b>catálogo</b> (Projeto, Global e Importados) mostra as fontes. Ao enviar um artefato à <b>Biblioteca do board</b>, ele é copiado e fica disponível para as execuções com qualquer ferramenta, no modo escolhido.',
           { tool: label },
         )}
       </SectionHeader>
@@ -100,7 +100,7 @@ export function ToolHarness({ tool }: { tool: AiTool }) {
           </Badge>
         ) : (
           <span className="muted small">
-            {t('Mostrando o que o {tool} carrega. As execuções do board usam o {board}: a marcação só vale para ele.', {
+            {t('Mostrando o catálogo do {tool}. Os artefatos enviados ao board ficam disponíveis com qualquer ferramenta.', {
               tool: label,
               board: toolLabel(state.board.aiTool),
             })}

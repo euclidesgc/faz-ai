@@ -143,7 +143,7 @@ describe('ToolHarness: assuntos', () => {
     unmount();
     await show('rules', undefined, 'cursor');
     expect(screen.queryByText('ferramenta deste projeto')).toBeNull();
-    expect(screen.getByText(/Mostrando o que o Cursor carrega\. As execuções do board usam o Claude Code/)).toBeInTheDocument();
+    expect(screen.getByText(/Mostrando o catálogo do Cursor/)).toBeInTheDocument();
     expect(screen.getByText('não encontrada nesta máquina')).toBeInTheDocument();
   });
 
