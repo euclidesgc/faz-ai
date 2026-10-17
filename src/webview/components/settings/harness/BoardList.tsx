@@ -47,30 +47,38 @@ export function BoardList({
           </Callout.Text>
         </Callout.Root>
       )}
-      {total === 0 && (
-        <div className="board-empty">
-          <p className="muted small">
-            {kind === 'agent'
-              ? t(
-                  'Nenhum agente no board: toda execução roda com o escopo cheio. Crie um em Projeto ou Global, com "Criar agente com ajuda" ou pelas sugestões prontas.',
-                )
-              : kind === 'instructions'
+      {total === 0 && state.harness.library && kind === 'skill' ? (
+        <p className="muted small">
+          {t(
+            'Nenhuma skill na biblioteca. Use Importar de uma pasta acima ou cole uma pasta com SKILL.md na biblioteca e clique em Atualizar lista.',
+          )}
+        </p>
+      ) : (
+        total === 0 && (
+          <div className="board-empty">
+            <p className="muted small">
+              {kind === 'agent'
                 ? t(
-                    'Nenhuma regra no board. Envie as do projeto a partir de Projeto ou Global; elas entram desligadas, para você revisar antes de ativar.',
+                    'Nenhum agente no board: toda execução roda com o escopo cheio. Crie um em Projeto ou Global, com "Criar agente com ajuda" ou pelas sugestões prontas.',
                   )
-                : t(
-                    'Nada neste assunto no board: o planejamento dos cards não tem de onde escolher. Vá a Projeto ou Global, use "Indicar artefatos" e envie ao board.',
-                  )}
-          </p>
-          <div className="row">
-            <Button size="1" variant="soft" onClick={() => onOpenCatalog('project')}>
-              {t('Ir para Projeto')}
-            </Button>
-            <Button size="1" variant="soft" color="gray" onClick={() => onOpenCatalog('user')}>
-              {t('Ir para Global')}
-            </Button>
+                : kind === 'instructions'
+                  ? t(
+                      'Nenhuma regra no board. Envie as do projeto a partir de Projeto ou Global; elas entram desligadas, para você revisar antes de ativar.',
+                    )
+                  : t(
+                      'Nada neste assunto no board: o planejamento dos cards não tem de onde escolher. Vá a Projeto ou Global, use "Indicar artefatos" e envie ao board.',
+                    )}
+            </p>
+            <div className="row">
+              <Button size="1" variant="soft" onClick={() => onOpenCatalog('project')}>
+                {t('Ir para Projeto')}
+              </Button>
+              <Button size="1" variant="soft" color="gray" onClick={() => onOpenCatalog('user')}>
+                {t('Ir para Global')}
+              </Button>
+            </div>
           </div>
-        </div>
+        )
       )}
       {total > 0 && items.length + missing.length === 0 && <p className="muted small scope-empty">{t('Nada encontrado para a busca.')}</p>}
       <ul className="item-list">
@@ -104,7 +112,13 @@ export function BoardList({
                   {i.boardArtifactId ? i.path || i.location : i.location}
                 </button>
               )}
-              {i.boardArtifactId && <p className="muted small">{t('Origem: {path}', { path: i.location })}</p>}
+              {i.boardArtifactId && (
+                <p className="muted small">
+                  {state.harness.library?.artifacts.find((a) => a.id === i.boardArtifactId)?.origin
+                    ? t('Origem: {path}', { path: i.location })
+                    : t('Adicionada na pasta da biblioteca')}
+                </p>
+              )}
               {!!state.harness.library?.artifacts.find((a) => a.id === i.boardArtifactId)?.skipped.length && (
                 <p className="muted small" role="status">
                   {t('{n} arquivo(s) não copiado(s); consulte os limites da biblioteca.', {
@@ -121,7 +135,7 @@ export function BoardList({
                   {t('Disponível no board')}
                 </Badge>
               )}
-              {i.boardArtifactId && (
+              {i.boardArtifactId && state.harness.library?.artifacts.find((a) => a.id === i.boardArtifactId)?.origin && (
                 <ActionButton
                   variant="ghost"
                   size="1"

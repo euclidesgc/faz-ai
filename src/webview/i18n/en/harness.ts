@@ -1,4 +1,36 @@
 export const harness: Record<string, string> = {
+  'Esta é a pasta de destino do board. A pasta de origem é escolhida na importação abaixo.':
+    'This is the board destination folder. Choose the source folder in the import section below.',
+  'Adicionada na pasta da biblioteca': 'Added in the library folder',
+  'Nenhuma skill na biblioteca. Use Importar de uma pasta acima ou cole uma pasta com SKILL.md na biblioteca e clique em Atualizar lista.':
+    'No skills in the library. Use Import from a folder above, or paste a folder containing SKILL.md into the library and click Refresh list.',
+  'As skills aparecem no campo Skills dos cards e no planejamento. Pelo card só entra quando escolhido; Sempre entra em toda execução.':
+    'Skills appear in the cards’ Skills field and in planning. Per card is included only when chosen; Always is included in every run.',
+  'Importar selecionadas ({n})': 'Import selected ({n})',
+  'Importar {name}': 'Import {name}',
+  'Buscar skills pelo caminho': 'Find skills by path',
+  'Pasta de origem ou repositório': 'Source folder or repository',
+  '{n} skill(s) importada(s). Elas estão na aba Skills abaixo, no modo Pelo card.':
+    '{n} skill(s) imported. They are under the Skills tab below, in Per card mode.',
+  'Importar de uma pasta': 'Import from a folder',
+  'Escolhe uma pasta e lista as skills antes de copiar para o board.':
+    'Chooses a folder and lists skills before copying them to the board.',
+  '1. Escolha a pasta de origem. 2. Marque as skills encontradas. 3. Clique em Importar selecionadas. As cópias aparecem na lista abaixo e funcionam com qualquer ferramenta.':
+    '1. Choose the source folder. 2. Select the skills found. 3. Click Import selected. Copies appear in the list below and work with any tool.',
+  'Importar skills de outra pasta': 'Import skills from another folder',
+  'Importar skills para o board': 'Import skills to the board',
+  'Não foi possível ler "{path}". Os arquivos foram preservados; confira o SKILL.md e os limites abaixo.':
+    'Could not read "{path}". The files were preserved; check SKILL.md and the limits below.',
+  'A pasta "{path}" precisa de um nome com letras minúsculas, números e hífens.':
+    'Folder "{path}" needs a name with lowercase letters, numbers and hyphens.',
+  'A pasta "{path}" tem o mesmo nome de uma skill já cadastrada. Seus arquivos foram preservados; renomeie a pasta para importar outra skill.':
+    'Folder "{path}" has the same name as an existing skill. Your files were preserved; rename the folder to import another skill.',
+  'Você pode colar pastas de skills aqui. Cada pasta deve conter SKILL.md; os arquivos de apoio vão junto. Ao voltar à tela ou clicar em Atualizar lista, elas aparecem em Skills, no modo Pelo card.':
+    'You can paste skill folders here. Each folder must contain SKILL.md, along with its supporting files. Return to this screen or click Refresh list to see them under Skills, in Per card mode.',
+  'Abre a pasta da biblioteca no gerenciador de arquivos do sistema.': 'Opens the library folder in the system file manager.',
+  'Atualizar lista': 'Refresh list',
+  'Reconhece skills coladas na pasta e atualiza a lista sem apagar seus arquivos.':
+    'Detects skills pasted into the folder and refreshes the list without deleting your files.',
   'A <b>Biblioteca do board</b> reúne os artefatos disponíveis em qualquer ferramenta. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão. As abas das ferramentas mostram as fontes para importar.':
     'The <b>Board library</b> gathers artifacts available with any tool. <b>Tool and execution</b> chooses the AI, permission and default agent. Tool tabs show sources to import from.',
   'Tudo que o {tool} carrega. O <b>catálogo</b> (Projeto, Global e Importados) mostra as fontes. Ao enviar um artefato à <b>Biblioteca do board</b>, ele é copiado e fica disponível para as execuções com qualquer ferramenta, no modo escolhido.':

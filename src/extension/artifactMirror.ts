@@ -25,6 +25,8 @@ export class ArtifactMirror {
     private repo: ArtifactRepo,
     private boardId: string,
     private log: (m: string) => void = () => {},
+    private preserveUnknown = false,
+    private protectedPaths: ReadonlySet<string> = new Set(),
   ) {}
 
   /** Caminho relativo à pasta (com `/`) ou '' quando o artefato não tem cópia ou o nome escapa dela. */
@@ -49,7 +51,7 @@ export class ArtifactMirror {
     try {
       const want = this.desired();
       fs.mkdirSync(this.dir, { recursive: true });
-      this.sweep(this.dir, '', want);
+      if (!this.preserveUnknown) this.sweep(this.dir, '', want);
       for (const [rel, data] of want) this.write(rel, data);
     } catch (e) {
       this.log(`Cópia de leitura dos artefatos: ${errText(e)}`);
@@ -115,6 +117,14 @@ export class ArtifactMirror {
   private write(rel: string, data: Buffer): void {
     const file = path.join(this.dir, ...rel.split('/'));
     try {
+      if ([...this.protectedPaths].some((p) => file === p || file.startsWith(p + path.sep))) return;
+      if (this.preserveUnknown) {
+        let current = this.dir;
+        for (const segment of rel.split('/')) {
+          current = path.join(current, segment);
+          if (fs.existsSync(current) && fs.lstatSync(current).isSymbolicLink()) throw new Error('Link simbólico na pasta da biblioteca.');
+        }
+      }
       const st = fs.statSync(file, { throwIfNoEntry: false });
       if (st?.isFile() && st.size === data.length && sha1(fs.readFileSync(file)) === sha1(data)) return;
       fs.mkdirSync(path.dirname(file), { recursive: true });
