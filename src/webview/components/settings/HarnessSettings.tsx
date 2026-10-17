@@ -5,6 +5,7 @@ import { useBoardStore, type HarnessTab } from '../../store/boardStore';
 import { ProjectTool } from './harness/ProjectTool';
 import { RunnerSettings } from './harness/RunnerSettings';
 import { HarnessIntro } from './harness/HarnessIntro';
+import { BoardLibrary } from './harness/BoardLibrary';
 import { ToolHarness } from './harness/ToolHarness';
 import { toolLabel } from './harness/text';
 import { PageHeader } from './PageHeader';
@@ -30,7 +31,7 @@ export function HarnessSettings() {
     <div>
       <PageHeader title={t('Harness de IA')}>
         {rich(
-          'O que a IA pode usar nas execuções do board. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão; cada ferramenta tem a sua aba: primeiro onde olhar (Board, Projeto, Global ou Importados), depois um assunto por vez.',
+          'A <b>Biblioteca do board</b> reúne os artefatos disponíveis em qualquer ferramenta. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão. As abas das ferramentas mostram as fontes para importar.',
         )}
         {introSeen && (
           <>
@@ -44,6 +45,7 @@ export function HarnessSettings() {
       <HarnessIntro />
       <Tabs.Root value={tab} onValueChange={(harnessTab) => useBoardStore.setState({ harnessTab: harnessTab as HarnessTab })}>
         <Tabs.List className="harness-tabs">
+          <Tabs.Trigger value="library">{t('Biblioteca do board')}</Tabs.Trigger>
           <Tabs.Trigger value="tool">{t('Ferramenta e execução')}</Tabs.Trigger>
           {toolsInOrder(projectTool).map((id) => (
             <Tabs.Trigger key={id} value={id}>
@@ -51,6 +53,9 @@ export function HarnessSettings() {
             </Tabs.Trigger>
           ))}
         </Tabs.List>
+        <Tabs.Content value="library">
+          <BoardLibrary />
+        </Tabs.Content>
         <Tabs.Content value="tool">
           <ProjectTool tool={tool} />
           <RunnerSettings tool={tool} />

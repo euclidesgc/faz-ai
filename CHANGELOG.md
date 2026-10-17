@@ -6,6 +6,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Biblioteca particular do Harness (#615).** Configurações mostra a pasta do board e permite copiar skills em lote, agentes, regras e definições MCP. As cópias ficam disponíveis ao trocar de ferramenta e continuam funcionando sem a origem; atualizar da origem é uma ação explícita. A pasta pode ser alterada sem apagar a anterior. Skills particulares do projeto ficam fora do pacote da extensão. **Mudança de comportamento:** enviar ao board cria uma cópia, em vez de manter uma referência viva ao arquivo original.
+
 - **Ações contextuais em lote (#616).** A barra de seleção e o menu da coluna compartilham aprovar, bloquear com motivo, desbloquear, trabalhar na fase, refinar, parar a IA, modo autônomo e as ações de organização. Itens indisponíveis ficam visíveis e desabilitados, sem motivo. Seleções mistas afetam só os elegíveis; filtros e limites de execução são respeitados. Aprovações em lote avançam a fase e preservam os eventos do histórico.
 - **Correção: as sub-tarefas do card aberto ficam alinhadas (#844).** Na seção de sub-tarefas da história, o título agora ocupa o espaço até o status, que fica na borda direita da linha, em vez de ficar centralizado entre o LED e a coluna. Vale nos temas claro e escuro; os vínculos e os filhos não mudam.
 

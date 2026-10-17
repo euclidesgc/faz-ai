@@ -17,6 +17,7 @@ import { SettingsRepo } from '../../repositories/settingsRepo';
 import { detectMainBranch } from '../../git';
 import { ghProcess, type GhRunner } from '../../branchRename';
 import { parseGit, type MainBranch } from '../../../shared/git';
+import { BoardLibrary } from '../../boardLibrary';
 import { BoardHarness } from './harness';
 
 export interface RouterOptions {
@@ -24,6 +25,8 @@ export interface RouterOptions {
   folderName: string;
   author: string;
   attachmentsDir: string;
+  /** pasta gerenciada das cópias de leitura do Harness */
+  libraryDir?: string;
   /** pasta do projeto; sem ela o harness (regras e skills) fica vazio */
   workspaceDir?: string;
   /** home do usuário, de onde se leem os modelos configurados nas ferramentas; sem ela vale só a lista embutida */
@@ -49,6 +52,7 @@ export class BoardContext {
   readonly attachments: AttachmentRepo;
   readonly store: AttachmentStore;
   readonly harness: BoardHarness;
+  readonly library: BoardLibrary;
   /** o log de utilização: sonda antes do handler e registro depois, feitos pelo router */
   readonly log: EventLog;
   /** muda quando o board é recriado (settings.board.reset) */
@@ -85,6 +89,7 @@ export class BoardContext {
     this.boardId = board.id;
     // nada a mudar para chegar ao padrão atual: só registra a versão, sem perguntar
     if (!pendingUpgrade(db, board.id).length) upgradeBoard(db, board.id);
+    this.library = new BoardLibrary(this);
     this.harness = new BoardHarness(this, opts.workspaceDir ? new HarnessStore(opts.workspaceDir, board.aiTool, opts.homeDir ?? '') : null);
   }
 

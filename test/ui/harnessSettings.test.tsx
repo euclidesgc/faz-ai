@@ -145,8 +145,10 @@ describe('HarnessSettings: abas', () => {
   it('uma aba por ferramenta, a do projeto primeiro, depois de Ferramenta e execução', async () => {
     renderTool();
     const tabs = screen.getAllByRole('tab');
-    [/^Ferramenta e execução/, /^Claude Code/, /^Cursor/, /^Kimi Code/].forEach((name, i) => expect(tabs[i]).toHaveAccessibleName(name));
-    expect(tabs).toHaveLength(4);
+    [/^Biblioteca do board/, /^Ferramenta e execução/, /^Claude Code/, /^Cursor/, /^Kimi Code/].forEach((name, i) =>
+      expect(tabs[i]).toHaveAccessibleName(name),
+    );
+    expect(tabs).toHaveLength(5);
     expect(screen.getByText('Ferramenta deste projeto')).toBeInTheDocument();
     expect(screen.queryByText('Harness do Claude Code')).toBeNull();
     await userEvent.click(screen.getByRole('tab', { name: /^Claude Code/ }));
@@ -158,7 +160,7 @@ describe('HarnessSettings: abas', () => {
     await userEvent.click(screen.getByRole('tab', { name: /^Cursor/ }));
     expect(screen.getByText('Harness do Cursor')).toBeInTheDocument();
     expect(screen.queryByText('ferramenta deste projeto')).toBeNull();
-    expect(screen.getByText(/a marcação só vale para ele/)).toBeInTheDocument();
+    expect(screen.getByText(/disponíveis com qualquer ferramenta/)).toBeInTheDocument();
     expect(useBoardStore.getState().harnessTab).toBe('cursor');
     expect(screen.queryByRole('tab', { name: /^Projeto/ })).toBeNull();
   });
@@ -167,7 +169,9 @@ describe('HarnessSettings: abas', () => {
     setState((s) => ({ board: { ...s.board, aiTool: 'cursor' } }));
     renderTool();
     const tabs = screen.getAllByRole('tab');
-    [/^Ferramenta e execução/, /^Cursor/, /^Claude Code/].forEach((name, i) => expect(tabs[i]).toHaveAccessibleName(name));
+    [/^Biblioteca do board/, /^Ferramenta e execução/, /^Cursor/, /^Claude Code/].forEach((name, i) =>
+      expect(tabs[i]).toHaveAccessibleName(name),
+    );
   });
 
   it('o valor antigo das abas Projeto e Global abre a aba da ferramenta do projeto', () => {

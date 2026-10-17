@@ -1208,17 +1208,8 @@ reabrir o board), e **Como funciona** o traz de volta. As abas de assunto dizem 
 artefatos estão no board e quantas regras esperam revisão, e um Board vazio leva direto a Projeto ou
 Global. A tela tem três níveis:
 
-1. **Uma aba por ferramenta.** **Ferramenta e execução** (a IA do projeto, a permissão, o agente
-   padrão e o heartbeat) e uma aba para o **Claude Code** e outra para o **Cursor**, a da ferramenta
-   do projeto primeiro, com o selo **ferramenta deste projeto**. Na outra, a marcação do board não
-   vale (as execuções usam a ferramenta do projeto): ela serve para ler e editar os arquivos.
-2. **Onde olhar**, num seletor acima das abas de assunto, que vale para todas elas: **Board**,
-   **Projeto**, **Global** e, quando há pasta importada, **Importados**. Projeto, Global e Importados
-   são o **catálogo**: tudo que a ferramenta carrega naquela fonte, e existir no catálogo não ocupa o
-   contexto da IA. **Projeto** é o que a ferramenta lê na pasta do projeto; **Global**, o que ela lê
-   da sua pasta de usuário (`~/.claude`, `~/.cursor`…), dos plugins instalados e da sua organização;
-   **Importados**, o que o board achou nas pastas que você indicou. **Board** é o que você enviou, com
-   o modo de cada um. Trocar de assunto não muda a escolha.
+1. **Biblioteca do board**, **Ferramenta e execução** (a IA do projeto, a permissão, o agente padrão e o heartbeat) e uma aba de catálogo por ferramenta (Claude Code, Cursor e Kimi Code). A biblioteca é compartilhada: trocar de ferramenta preserva os artefatos disponíveis. Os catálogos servem para encontrar e copiar artefatos para o board.
+2. **Onde olhar**, no catálogo de cada ferramenta: **Projeto**, **Global** e, quando há pasta importada, **Importados**. São fontes de artefatos, e existir no catálogo não ocupa o contexto da IA. **Projeto** é a pasta do projeto; **Global**, sua pasta de usuário, plugins e organização; **Importados**, as pastas que você indicou. Os itens enviados ficam na **Biblioteca do board**, compartilhada entre as ferramentas.
 3. **Um assunto por aba**: **Regras**, **Skills**, **Sub-agentes**, **MCPs**, **Comandos**, **Hooks** e
    **Demais** (memória, configurações e permissões, estilos de saída, plugins e a política da
    organização). Só aparecem os assuntos que a ferramenta tem, e o título de cada aba conta o que há
@@ -1264,13 +1255,29 @@ Claude Code lê o `AGENTS.md` apenas quando não há `CLAUDE.md`, `.claude/CLAUD
 aparece como **não lido pelo Claude Code**, com o `@import` que resolve. Se tem só o `AGENTS.md`, o
 board avisa que criar um `CLAUDE.md` faz o Claude Code parar de lê-lo.
 
-Na origem **Board** de Regras, Skills, Sub-agentes e MCPs ficam os artefatos que você enviou, cada um
-com o seletor de **modo**, a origem (Projeto, Global, Importados ou plugin) e o botão **Remover do
-board**. O board **referencia** o artefato pelo caminho de origem, não o copia: uma mudança no arquivo
-vale no board, e uma origem apagada deixa o artefato com o selo **ausente** na mesma lista, sem
-quebrar os cards que o listam (**Remover do board** tira a marcação). Nas rules, skills e servidores
-MCP do catálogo, a linha da ferramenta do projeto também tem o seletor de modo, com a opção **Fora do
-board**.
+Em **Biblioteca do board**, Regras, Skills, Sub-agentes e MCPs mostram os artefatos copiados,
+com o modo de uso, a origem e **Remover do board**. O caminho abre a cópia no editor do board:
+salvar ali altera somente a biblioteca. A origem pode mudar ou desaparecer sem afetar a cópia.
+**Atualizar da origem** substitui a cópia somente quando você confirma; se a origem não puder ser
+lida, a cópia atual é preservada. Remover do board não apaga a origem.
+
+**Pasta da biblioteca** mostra o local gerenciado pelo board. Por padrão fica em
+`<armazenamento do Faz AI>/artifacts/<projeto>/`, fora do repositório. Para mudar, informe uma pasta
+vazia e clique em **Salvar pasta**: as cópias são recriadas ali e a pasta anterior é preservada.
+**Abrir pasta** abre o local no editor. O conteúdo fica no banco do board e as cópias de leitura
+nessa pasta são mantidas por ele; gerencie e edite os artefatos pela tela do board.
+
+Para importar dezenas de skills, informe uma pasta de coleção ou repositório em **Procurar skills**,
+revise a lista, use **Selecionar todas** ou escolha as desejadas e instale na biblioteca. Cada skill
+leva `SKILL.md` e os arquivos de apoio (referências, assets e scripts), com limites de 512 KB por
+arquivo, 100 arquivos de apoio e 5 MB no total; arquivos omitidos são indicados na lista. Mesmo nome
+e tipo vindos de outra origem exigem remover a cópia anterior primeiro. As skills particulares do
+projeto, incluindo `board-harness/`, não são distribuídas no pacote da extensão.
+
+O catálogo de qualquer ferramenta permite enviar artefatos ao board. Hooks, comandos e configurações
+nativas continuam no catálogo da ferramenta; não são convertidos para a biblioteca. As credenciais
+MCP ficam no host e não aparecem no estado da interface nem nas cópias de leitura. A aplicação das
+restrições de ferramentas e servidores continua dependendo dos recursos de cada CLI.
 
 - **Sempre**: entra em toda execução (trabalhar a fase, refinar, chat do board), independente do
   card. É o lugar da skill do fluxo, do servidor do board e das regras que valem sempre.
