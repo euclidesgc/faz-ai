@@ -23,8 +23,8 @@ import {
   selectionKey,
 } from '../../../shared/harnessSelection';
 import { CONDUCTOR_AGENT, migrateExecProfiles, seedAgents } from '../../agentSeeds';
-import { FLOW_SKILL, FLOW_SKILLS } from '../../flowSkill';
-import { skillTemplate, type HarnessStore } from '../../harness';
+import { FLOW_SKILL, installFlowSkillFiles } from '../../flowSkill';
+import { type HarnessStore } from '../../harness';
 import { HarnessOps } from '../../harnessOps';
 import { HooksAndPermissions } from '../../hooksAndPermissions';
 import { McpServers } from '../../mcpServers';
@@ -524,18 +524,11 @@ export const harnessHandlers = {
     const tool = msg.tool ?? ctx.state().board.aiTool;
     const file = flowSkillFile(ctx, tool);
     // o conjunto é instalado junto: a skill principal e as por assunto; só a principal é conferida e marcada
-    const pending = FLOW_SKILLS.filter(
-      (k) => msg.replace || !fs.existsSync(path.join(path.dirname(path.dirname(file)), k.name, 'SKILL.md')),
-    );
-    const written = pending.length
-      ? ctx.harness.change(() => {
-          for (const k of pending) {
-            const dir = path.join(path.dirname(path.dirname(file)), k.name);
-            fs.mkdirSync(dir, { recursive: true });
-            fs.writeFileSync(path.join(dir, 'SKILL.md'), skillTemplate(k.name, k.description, k.body));
-          }
-        })
-      : false;
+    const root = path.dirname(path.dirname(file));
+    let written = false;
+    ctx.harness.change(() => {
+      written = installFlowSkillFiles(root, msg.replace).length > 0;
+    });
     // a skill do fluxo só serve marcada em todo contexto: as execuções do board não carregam nada por conta própria
     ctx.harness.load();
     const item = ctx.harness.current.inventory

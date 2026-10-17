@@ -142,6 +142,10 @@ export interface RequirementProbe {
   homeDir: string;
   /** o bridge.js que este board registra */
   bridgePath: string;
+  /** a versão da extensão que gravou a ponte (`bridge.version`); null quando não há o arquivo */
+  installedVersion?: string | null;
+  /** a versão da extensão em uso; sem as duas versões não há como dizer que o MCP está desatualizado */
+  currentVersion?: string;
   /** o node encontrado no PATH do terminal, com caminho absoluto */
   nodePath: string | undefined;
   /** caminho do executável de um comando, ou null */
@@ -237,9 +241,15 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
         // o do projeto vale sobre o global: refazer só o global deixaria o aviso para sempre
         action: registered.scope === 'project' ? { kind: 'fixProject', file: registered.file } : { kind: 'connect' },
       });
-    // a ponte de antes ficava na pasta de dados de cada editor e não é mais atualizada: não acha o
-    // projeto aberto nos registros globais (nem a pasta que o Cursor e o Claude Code informam)
-    else if (bridge && !samePath(bridge, p.bridgePath))
+    // desatualizado é a versão gravada ao lado da ponte diferir da da extensão (o caminho da ponte não
+    // diz nada); a extensão atualiza em silêncio e, se não conseguiu, é isto que fica no aviso. Um
+    // registro do projeto não é do board atualizar (exceto o Cursor, que só tem esse)
+    else if (
+      p.installedVersion !== undefined &&
+      p.currentVersion !== undefined &&
+      p.installedVersion !== p.currentVersion &&
+      (registered.scope !== 'project' || tool === 'cursor')
+    )
       out.push({
         id: 'mcp-outdated',
         tool,

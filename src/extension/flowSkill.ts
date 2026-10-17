@@ -1,4 +1,7 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { FLOW_SKILL_NAME } from '../shared/harnessProject';
+import { skillTemplate } from './harness';
 
 /** Skill que ensina a IA a conduzir os cards pelo fluxo do board. É instalada na pasta de skills da ferramenta em uso. */
 export const FLOW_SKILL = {
@@ -327,3 +330,19 @@ export const FLOW_SKILLS: readonly { name: string; description: string; body: st
     body: AUTONOMO_BODY,
   },
 ];
+
+/**
+ * Grava o conjunto de skills do fluxo na pasta de skills da ferramenta (`skillsRoot`). Sem `replace`, o
+ * que já está no disco fica como está (a pessoa pode ter ajustado a skill). Devolve os nomes gravados.
+ */
+export function installFlowSkillFiles(skillsRoot: string, replace = false): string[] {
+  const written: string[] = [];
+  for (const k of FLOW_SKILLS) {
+    const file = path.join(skillsRoot, k.name, 'SKILL.md');
+    if (!replace && fs.existsSync(file)) continue;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, skillTemplate(k.name, k.description, k.body));
+    written.push(k.name);
+  }
+  return written;
+}
