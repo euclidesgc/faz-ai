@@ -224,6 +224,29 @@ export const summarizePrompt = (ref: string, context: PromptContext = NO_CONTEXT
   ].join('\n');
 
 /**
+ * O que a IA recebe na execução de conflito (#747): o pull request aberto da história entrou em
+ * conflito com a base, e o board a chama só para atualizar a branch por merge, resolver, rodar as
+ * checagens e enviar, sem trabalhar a fase. Nada destrutivo: sem rebase nem push forçado, e o merge
+ * pela metade é desfeito antes do bloqueio. O executor devolve o card ao status que tinha no fim.
+ */
+export const conflictPrompt = (ref: string, context: PromptContext = NO_CONTEXT, advice: string[] = []): string =>
+  [
+    `Resolva o conflito do pull request da história ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai". NÃO é trabalhar a fase.`,
+    ...context.always,
+    ...context.card,
+    'Leia o card com get_card: a pasta de trabalho e a branch estão em workspace, a base do pull request em workspace.prBase, e o aviso do conflito está na conversa.',
+    '1. Na pasta de trabalho da história, sem trocar de branch: git fetch origin e git merge origin/<prBase>. Nunca use rebase nem push --force, nem reescreva commits já enviados.',
+    '2. Resolva os conflitos preservando a intenção das duas partes.',
+    '3. Rode as checagens do projeto (como o projeto as define).',
+    '4. Faça o commit do merge e envie a branch com git push (sem --force).',
+    '5. Registre com add_comment na conversa o que conflitou, como resolveu e o resultado das checagens.',
+    'Se não conseguir (decisão que é da pessoa, checagens que não passam, sem terminal), não envie nada pela metade: desfaça o merge com git merge --abort e chame block_card com o motivo e o que a pessoa precisa fazer.',
+    'Não mova o card nem mude o status (sem start_work, move_card, request_review nem ask_question), não trabalhe a fase, não abra outro pull request e não faça o merge do pull request.',
+    ...advice,
+    'Trabalhe só neste card. Ninguém está acompanhando esta sessão.',
+  ].join('\n');
+
+/**
  * O modelo/esforço de um valor de campo do tipo modelo (`<id do catálogo>@<esforço>`), no catálogo da
  * ferramenta ativa, no formato que a chamada da ferramenta entende (nome do modelo e esforço). `null`
  * quando o valor está vazio ou o modelo não está (mais) no catálogo da ferramenta ativa.
@@ -325,6 +348,7 @@ export class AiRunner {
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
     const refine = mode === 'refine';
     const summarize = mode === 'summarize';
+    const conflict = mode === 'conflict';
     const messagesBefore = this.aiMessages(cardId);
     const tail: string[] = [];
     // conhecidos antes do gateway.run, para a projeção publicada depois (ver `info` abaixo)
@@ -358,15 +382,17 @@ export class AiRunner {
         timeoutMinutes: state.board.runner.timeoutMinutes,
         prepare: () => {
           const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '', boardServer(this.deps));
-          // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo
+          // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo.
+          // A execução de conflito segue a permissão (e o modelo) da fase: precisa de git e das checagens, como ela
           const autonomous = !refine && !summarize && isYolo(state, card);
           // refinar e resumir não mexem em arquivos: rodam só com o board
           const permission = autonomous ? 'full' : refine || summarize ? 'board' : state.board.runner.permission;
           const permissionAdvice = refine || summarize ? null : PERMISSION_ADVICE[permission];
-          const stopAdvice = autonomous ? yoloStopAdvice(state, card) : null;
+          const stopAdvice = autonomous && !conflict ? yoloStopAdvice(state, card) : null;
           if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
           if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
           if (summarize) log('Resumir a conversa: lê as mensagens e grava um resumo, sem mover o card nem mudar o status.');
+          if (conflict) log('Resolver conflito: atualiza a branch a partir da base do pull request, sem trabalhar a fase.');
           log(plan.summary.join(' | '));
           if (forceModel) {
             // a retentativa com a reserva: o modelo/esforço vêm impostos, sem voltar a resolver a regra
@@ -405,13 +431,18 @@ export class AiRunner {
                 ? refinePrompt(cardRef(card), contextLines(state, card), refineCatalog(state), nomeDoAnexoAnterior(new Date()))
                 : summarize
                   ? summarizePrompt(cardRef(card), contextLines(state, card))
-                  : cardPrompt(
-                      cardRef(card),
-                      contextLines(state, card),
-                      [...(stopAdvice ? [stopAdvice] : []), ...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
-                      autonomous,
-                      needsTriage(state, card),
-                    ),
+                  : conflict
+                    ? conflictPrompt(cardRef(card), contextLines(state, card), [
+                        ...plan.advice,
+                        ...(permissionAdvice ? [permissionAdvice] : []),
+                      ])
+                    : cardPrompt(
+                        cardRef(card),
+                        contextLines(state, card),
+                        [...(stopAdvice ? [stopAdvice] : []), ...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
+                        autonomous,
+                        needsTriage(state, card),
+                      ),
               permission,
               addDirs: this.router.aiWorkDirs(),
               // a retentativa força o modelo/esforço da reserva no que vai para a ferramenta, sem voltar a resolver o plano
@@ -658,6 +689,13 @@ export class AiRunner {
       );
     }
     if (failure) return void this.block(cardId, failure);
+    // a execução de conflito terminou bem: não passa a vez nem reavalia a entrega, o card volta ao status
+    // que tinha (quem confere se o conflito saiu é o MergeWatcher, na próxima consulta do pull request)
+    if (run.mode === 'conflict')
+      return void this.router.handle(
+        { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
+        { author: RUNNER_AUTHOR },
+      );
     // o pull request pode ter sido registrado antes do card chegar na última coluna da IA (ex.: a
     // mesma sessão fez a implementação e a homologação): reavalia a entrega agora, antes do fallback
     // de modo autônomo devolver o card para "ready".

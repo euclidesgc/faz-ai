@@ -1,4 +1,4 @@
-import { aiToolInfo, ALL_AI_TOOLS, type AiTool } from '../../shared/harness';
+import { ALL_AI_TOOLS, type AiTool } from '../../shared/harness';
 import { runCli } from '../cliProbe';
 import { resolveCommand } from '../cliResolve';
 import { registeredServer } from '../requirements';
@@ -26,10 +26,10 @@ export async function runRegistrationSteps(done: Registration[], pathEnv: string
 }
 
 /**
- * Ferramentas em que o board está registrado no global: só nelas a atualização da extensão refaz o
- * registro. O Cursor nunca entra (o registro dele é o do projeto, refeito a cada abertura da pasta), um
- * registro só no projeto não conta (a ativação não mexe em arquivo do projeto da pessoa) e um "faz-ai"
- * que não aponta para uma ponte do board é da pessoa: fica como está.
+ * Ferramentas em que o board está registrado no global (escopo do usuário). O Cursor nunca entra (o
+ * registro dele é o do projeto, refeito a cada abertura da pasta), um registro só no projeto não conta
+ * (a ativação não mexe em arquivo do projeto da pessoa) e um "faz-ai" que não aponta para uma ponte do
+ * board é da pessoa: fica como está.
  */
 export function userRegisteredTools(workspaceDir: string, homeDir: string): AiTool[] {
   return ALL_AI_TOOLS.filter((tool) => {
@@ -40,22 +40,54 @@ export function userRegisteredTools(workspaceDir: string, homeDir: string): AiTo
 }
 
 /**
- * Refaz o registro global do board nas ferramentas em que ele já está: o que a ferramenta guarda (o
- * comando, a ponte) pode ter mudado com a extensão. Não lança: a falha de uma ferramenta (CLI fora do
- * PATH, JSON inválido) vai para `log` e as outras seguem; a faixa de requisitos continua apontando o
- * registro velho. Devolve as ferramentas refeitas.
+ * Ferramentas que a instalação automática deve registrar/atualizar no usuário: as de `wanted` (a do board
+ * aberto) sem registro de usuário do board, mais as já registradas cuja versão gravada difere da atual
+ * ou cuja ponte registrada não é a de hoje. Um registro de projeto é ignorado (conta como "sem registro
+ * de usuário", mas nunca é tocado); o Cursor fica de fora.
  */
-export async function reinstallUserServers(o: RegisterOptions & { pathEnv?: string; log: (message: string) => void }): Promise<AiTool[]> {
-  const done: AiTool[] = [];
-  for (const tool of userRegisteredTools(o.workspaceDir, o.homeDir)) {
+export function toolsNeedingInstall(
+  workspaceDir: string,
+  homeDir: string,
+  bridgePath: string,
+  wanted: AiTool[],
+  installedVersion: string | null,
+  currentVersion: string,
+): AiTool[] {
+  const registered = userRegisteredTools(workspaceDir, homeDir);
+  const candidates = new Set<AiTool>([...registered, ...wanted.filter((t) => t !== 'cursor')]);
+  return ALL_AI_TOOLS.filter((tool) => {
+    if (!candidates.has(tool)) return false;
+    if (!registered.includes(tool)) {
+      // um "faz-ai" de usuário que não é a ponte do board é da pessoa: não sobrescreve
+      const found = registeredServer(tool, workspaceDir, homeDir);
+      return !(found?.scope === 'user');
+    }
+    const found = registeredServer(tool, workspaceDir, homeDir);
+    return installedVersion !== currentVersion || found?.args[0] !== bridgePath;
+  });
+}
+
+export interface EnsureResult {
+  done: AiTool[];
+  failed: { tool: AiTool; message: string }[];
+}
+
+/**
+ * Instala ou atualiza o registro global do board nas ferramentas de `tools`. Não lança: a falha de uma
+ * ferramenta (CLI fora do PATH, JSON inválido) vai em `failed`, com a linha para rodar à mão, e as
+ * outras seguem.
+ */
+export async function ensureUserServers(
+  o: RegisterOptions & { pathEnv?: string; installedVersion: string | null; currentVersion: string; wanted: AiTool[] },
+): Promise<EnsureResult> {
+  const result: EnsureResult = { done: [], failed: [] };
+  for (const tool of toolsNeedingInstall(o.workspaceDir, o.homeDir, o.bridgePath, o.wanted, o.installedVersion, o.currentVersion)) {
     try {
       await runRegistrationSteps(registerClients([tool], o), o.pathEnv, o.homeDir);
-      done.push(tool);
+      result.done.push(tool);
     } catch (e) {
-      o.log(
-        `Faz AI: não foi possível refazer o registro do board no ${aiToolInfo(tool).label}: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      result.failed.push({ tool, message: e instanceof Error ? e.message : String(e) });
     }
   }
-  return done;
+  return result;
 }

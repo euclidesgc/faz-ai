@@ -122,7 +122,9 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
 - **Dizer à IA o que fazer em cada fase.** Cada coluna tem uma instrução para a IA e, se a fase
   gera um documento (Discovery, PRD, Spec, Plan), o modelo desse documento. No Discovery a IA
   analisa o problema e conversa com você antes de qualquer requisito; na Homologação a história só
-  é concluída com a sua aprovação.
+  é concluída com a sua aprovação. O Discovery registra um **Mapa do código** (arquivos, funções,
+  padrões e testes), a Spec o completa, e PRD, Spec e Plan partem dele e leem só o que falta; cada
+  sub-tarefa do Plan traz na descrição os arquivos que vai tocar.
 - **Trabalhar com a IA no mesmo quadro.** A extensão expõe o board por MCP. Claude Code,
   Cursor ou outro cliente MCP podem consultar e editar tudo o que a interface permite, e
   as mudanças aparecem no board na hora.
@@ -193,6 +195,9 @@ pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do
 
 **Selecionar todos de uma coluna.** A caixa no início do cabeçalho de uma coluna de histórias, na mesma linha das caixas dos cards (ou **Selecionar todos**, no menu ⋯), marca as histórias visíveis da coluna (o filtro ativo vale); marcada de novo, limpa a seleção. Numa coluna sem cards, a caixa fica oculta, mas o espaço dela continua reservado. Com a seleção feita, o mesmo menu oferece **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados** e **Mandar selecionados para a lixeira**, cada uma com uma confirmação só para o lote; **Limpar seleção** desmarca tudo. A seleção vale para uma coluna por vez: marcar um card de outra coluna substitui a seleção. Na ação em lote, uma história com sub-tarefa em aberto não é concluída (as outras seguem), e mover para uma coluna de cancelamento cancela as sub-tarefas em aberto.
 
+**Ações sobre a seleção.** A barra de seleção múltipla (dois ou mais cards) e o menu ⋯ da coluna oferecem as mesmas ações: **Aprovar**, **Bloquear**, **Desbloquear**, **Trabalhar na fase**, **Refinar com IA**, **Parar a IA**, modo autônomo, colapsar/expandir, arquivar, mover, concluir e lixeira. As ações indisponíveis continuam visíveis e desabilitadas, sem mostrar o motivo; no menu, isso também vale sem seleção. Cada ação atinge só os cards elegíveis e visíveis. Aprovar vale para quem aguarda revisão e usa o avanço automático da aprovação individual; bloquear pede um motivo obrigatório, registrado na conversa de cada card; desbloquear devolve os bloqueados para **Pronto**. Trabalhar e refinar respeitam as vagas de execução em paralelo: quem já está em execução ou não cabe no limite fica de fora. **Parar a IA** interrompe só execuções iniciadas pelo board.
+
+
 ### Vínculos entre cards
 
 Além das sub-tarefas, qualquer card pode ser vinculado a outro, de qualquer workflow, em **Vínculos**
@@ -256,7 +261,8 @@ o `faz-ai` do terminal avisa e não inicia.
 1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code, Cursor ou
    Kimi Code).
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
-   global que a ferramenta lê.
+   global que a ferramenta lê. Isso também acontece sozinho, em silêncio, ao abrir a pasta (e a cada
+   versão nova da extensão), sempre no escopo do usuário; só uma falha gera aviso.
 3. No grupo **Skills** da mesma aba, clique em **Instalar (padrão da ferramenta)** para a
    skill do fluxo (`faz-ai-fluxo`): ela ensina a IA a conduzir os cards pelas fases, gerar os
    documentos, pedir revisão e retomar pendências. O botão instala também as skills por assunto
@@ -661,14 +667,15 @@ economizar tokens.
 
 - A agregação pode agrupar por fase (`phase`), tipo de card (`card_type`), ferramenta de IA
   (`tool`), modelo (`model`), esforço (`effort`), perfil (`profile`), card (`card`), agente (`agent`),
-  skill (`skill`), ferramenta usada (`used_tool`) ou ferramenta de MCP (`mcp_tool`). Omita para obter
+  skill (`skill`), ferramenta usada (`used_tool`), ferramenta de MCP (`mcp_tool`) ou comando de Bash (`bash_command`). Omita para obter
   apenas o total do período.
 - `tool` e `used_tool` não são a mesma coisa: `tool` é a ferramenta de IA que rodou (claude, cursor);
   `used_tool` e `mcp_tool` são o que a execução usou (Read, Bash, `get_card`). Em `mcp_tool` o
-  servidor vem numa coluna própria, ou "servidor não registrado" quando o nome não o trouxe.
+  servidor vem numa coluna própria, ou "servidor não registrado" quando o nome não o trouxe. `bash_command` é o comando-base de cada chamada
+  de Bash, sem argumentos (`npm test`, `git status`, `cat`), só do Claude Code.
 - Filtros de período (data inicial e final, em `AAAA-MM-DD`), card (ex. `72` ou `#72`), e dimensões
   (ex. fase, modelo, tipo de card).
-- Nas dimensões **agent**, **skill**, **used_tool** e **mcp_tool** a tabela mostra só a contagem de
+- Nas dimensões **agent**, **skill**, **used_tool**, **mcp_tool** e **bash_command** a tabela mostra só a contagem de
   execuções e de usos (sem tokens, que não é possível repartir entre componentes de uma
   execução). `effort` e `profile` têm tokens.
 - Tokens contam em toda execução medida, do Claude Code e do Cursor. A tabela não traz custo em dólar.
@@ -874,7 +881,9 @@ O board observa o pull request de cada história em aberto que tem um (em qualqu
 modo autônomo; só a bloqueada e a em execução ficam de fora) e detecta quando ele é mergeado,
 concluindo a história automaticamente. Não há opção própria: a consulta acontece em cada rodada do
 [heartbeat](#heartbeat), no mesmo intervalo, e também no **Rodar o heartbeat agora**. Com o heartbeat
-desligado, ela só acontece quando você pede uma rodada. Quando o merge é detectado:
+desligado, ela só acontece quando você pede uma rodada. As consultas ao GitHub vão em paralelo, até
+quatro ao mesmo tempo; a conclusão e a limpeza de cada história vão uma por vez, na ordem do board.
+Quando o merge é detectado:
 
 1. o board grava o commit do merge no card;
 2. registra na conversa que a história foi concluída;
@@ -883,8 +892,15 @@ desligado, ela só acontece quando você pede uma rodada. Quando o merge é dete
    atualiza a `develop` local.
 
 Se o pull request é fechado sem merge, o board registra um aviso na conversa uma única vez. Se está
-aberto com conflito, o board avisa uma vez na conversa e, quando a história estava aguardando revisão,
-devolve o card para "Pronto", para a IA atualizar a branch e resolver na próxima rodada. O merge
+aberto com conflito, o board avisa na conversa uma vez por conflito (o aviso cita o commit do PR) e,
+na mesma rodada, chama a IA numa execução só para resolvê-lo, à frente da fila: ela atualiza a branch
+por merge a partir da base do PR (sem rebase nem push forçado), resolve os conflitos, roda as
+checagens, envia a branch e registra na conversa o que fez. Vale para qualquer história, inclusive as
+autônomas e as já entregues, menos a bloqueada e a que espera a sua resposta. A execução usa o modelo
+e a permissão da fase, segue os tetos das atividades com branch, aparece no card como "resolvendo
+conflito" e, no fim, o card volta ao status que tinha. Se a IA não conseguir, ela bloqueia o card com
+o motivo; se terminar e o PR continuar em conflito no mesmo commit, o board bloqueia o card e a
+resolução fica com você (desbloquear dá à IA mais uma tentativa). O merge
 continua sendo feito pela pessoa, manualmente ou pelo merge automático; o board só observa. Falhas
 na consulta do estado do PR (sem rede, sem autenticação, sem o `gh` instalado) não bloqueiam nada
 — o aviso aparece no log, e o board tenta de novo na próxima rodada.
@@ -918,6 +934,20 @@ cada rodada ele:
   com um aviso na conversa, e **avisa uma vez** o card que está com você há dois dias ou mais;
 - **confere os pull requests** de toda história que tem um ([detecção automática de merges](#detecção-automática-de-merges))
   e limpa as branches e worktrees que sobraram ([branches e worktrees órfãs](#branches-e-worktrees-órfãs));
+- **sincroniza as branches locais** que o board conhece (a principal, a `develop` e a branch de cada
+  história em aberto) com o origin, para a próxima tarefa partir da base mais recente e a IA encontrar a
+  branch da história em dia. Só por **fast-forward**: a branch anda só quando está atrás do origin e não
+  tem nenhum commit que o origin não tenha. Nada é mesclado com commit, reescrito nem forçado. Uma branch fica como
+  está quando há uma execução da IA na história dela (ou na pasta em que ela está aberta), quando essa
+  pasta tem alterações ou arquivos não rastreados, ou quando a branch está à frente do origin ou
+  divergiu dele. Cada branch atualizada, e cada motivo de pulo (uma vez por motivo), aparece no log com o
+  prefixo `Branches:`. As suas branches pessoais não são tocadas. Sem rede ou sem origin, a
+  sincronização fica para a próxima rodada;
+- **confere o conflito com a base antes do PR**: para cada história com branch e ainda sem pull
+  request, pergunta ao git, só lendo (`git merge-tree`, git 2.38 ou mais novo; abaixo disso, a
+  conferência é pulada com uma linha no log), se a branch conflita com a base atual no origin. Se
+  conflita, avisa na conversa uma vez por commit da branch, com os arquivos, para a IA atualizar a
+  branch e resolver antes de abrir o PR. Nada muda no card nem nas branches;
 - **resume a conversa** das histórias com três ou mais mensagens desde o último resumo, ou duas que
   somem muito texto (ao menos uma da IA), antes de trabalhar a fase; a IA passa a receber só o resumo e o que vier depois dele;
 - **refina os cards novos do Backlog** (**Refinar os cards novos do Backlog**, nas mesmas
@@ -950,6 +980,14 @@ cada uma) e de mais memória e processador enquanto várias sessões de IA, test
 juntos. No editor a aba Git e o bloco de paralelo do Harness de IA viram um link para o Settings; no
 navegador seguem como campos editáveis, como antes.
 
+- A rodada tem uma ordem fixa: a arrumação (limite de uso, cards parados); um `git fetch` só; os pull
+  requests (uma história mesclada perde a branch, então vem antes da sincronização); a sincronização
+  das branches; as órfãs e as versões publicadas; e, por último, a fila da IA, que espera a
+  sincronização terminar para partir das branches já atualizadas. O número de histórias da rodada sai
+  na hora, mesmo assim. Essa manutenção (consultas ao GitHub e ao git, sem IA) roda em paralelo até
+  **quatro** tarefas ao mesmo tempo. É um limite fixo e próprio do heartbeat, que não é o **Tocar
+  histórias em paralelo** nem o **Histórias ao mesmo tempo**: esses continuam valendo só para as
+  execuções da IA. Com duas janelas no mesmo board, só a dona faz a manutenção.
 - Sem pendência com a IA, nada é executado, e o log (Saída → Faz AI) diz o motivo: login vencido, história em modo autônomo, execução em andamento, com a pessoa ou esperando outro card. Com pendência, o log diz quantas histórias estão com você e o que a IA vai fazer em cada uma (fase, refinar, resumir).
 - A fila da rodada segue a ordem do board: os bugs primeiro; depois a história mais à direita (a
   mais adiantada termina antes de uma nova começar); na mesma coluna, de cima para baixo — o que
