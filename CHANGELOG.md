@@ -6,6 +6,8 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 ## Não lançado
 
+- **Correção: importar skills e colar na biblioteca não apaga arquivos.** A biblioteca reconhece pastas com `SKILL.md` e edições locais ao reabrir, voltar à janela ou usar Atualizar lista. Arquivos não cadastrados são preservados e duplicatas aparecem com aviso. Importar de uma pasta abre o seletor do sistema, permite revisar e selecionar em lote e confirma onde os itens apareceram. Abrir pasta usa o gerenciador de arquivos, sem abrir outro projeto no editor.
+
 - **Biblioteca particular do Harness (#615).** Configurações mostra a pasta do board e permite copiar skills em lote, agentes, regras e definições MCP. As cópias ficam disponíveis ao trocar de ferramenta e continuam funcionando sem a origem; atualizar da origem é uma ação explícita. A pasta pode ser alterada sem apagar a anterior. Skills particulares do projeto ficam fora do pacote da extensão. **Mudança de comportamento:** enviar ao board cria uma cópia, em vez de manter uma referência viva ao arquivo original.
 
 - **Ações contextuais em lote (#616).** A barra de seleção e o menu da coluna compartilham aprovar, bloquear com motivo, desbloquear, trabalhar na fase, refinar, parar a IA, modo autônomo e as ações de organização. Itens indisponíveis ficam visíveis e desabilitados, sem motivo. Seleções mistas afetam só os elegíveis; filtros e limites de execução são respeitados. Aprovações em lote avançam a fase e preservam os eventos do histórico.

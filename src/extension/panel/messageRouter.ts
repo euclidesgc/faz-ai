@@ -132,6 +132,7 @@ const bridgeOnly = {
   'harness.install.scan': viaBridge,
   'harness.import.pick': viaBridge,
   'harness.library.open': viaBridge,
+  'harness.library.pick': viaBridge,
   'attachment.pick': viaBridge,
   'attachment.reveal': viaBridge,
   'attachment.read': viaBridge,

@@ -249,7 +249,11 @@ export interface ToolInventory {
 
 export interface Harness {
   /** Cópias do board, disponíveis em todas as ferramentas. Ausente em estados antigos. */
-  library?: { directory: string; artifacts: BoardArtifact[] };
+  library?: {
+    directory: string;
+    artifacts: BoardArtifact[];
+    warnings?: { path: string; reason: 'duplicate' | 'invalid' | 'unreadable' }[];
+  };
   rules: RuleFile[];
   skills: Skill[];
   agents: Agent[];

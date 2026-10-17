@@ -127,7 +127,7 @@ function readRule(location: string, dirs: SourceDirs, tool: AiTool | ''): Draft 
   return { ...d, body: main.text };
 }
 
-function readSkill(location: string, dirs: SourceDirs, tool: AiTool | ''): Draft {
+function readSkill(location: string, dirs: SourceDirs, tool: AiTool | '', useBundledFlow = true): Draft {
   // a location da skill é o SKILL.md; a pasta também vale
   const at = resolveLocation(location, dirs);
   const file = path.basename(at) === 'SKILL.md' ? at : path.join(at, 'SKILL.md');
@@ -136,7 +136,7 @@ function readSkill(location: string, dirs: SourceDirs, tool: AiTool | ''): Draft
   const d = base('skill', name, location, tool);
   // a skill do fluxo é da extensão: o board guarda a versão dela, não a que está no disco
   const flow = FLOW_SKILLS.find((k) => k.name === name);
-  if (flow)
+  if (flow && useBundledFlow)
     return { ...d, description: flow.description, body: skillTemplate(flow.name, flow.description, flow.body), meta: { generated: true } };
   const main = readMain(file);
   if ('reason' in main) return missing(d, main.reason === 'size' ? [{ path: 'SKILL.md', reason: 'size' }] : []);
@@ -208,14 +208,19 @@ function readMcp(location: string, dirs: SourceDirs, tool: AiTool | ''): Draft {
 }
 
 /** Lê o artefato da origem; nunca lança: origem ausente, ilegível ou com JSON inválido vira `missing: true`. */
-export function readSource(sel: { kind: SelectableKind; location: string }, dirs: SourceDirs, tool: AiTool | ''): ArtifactDraft {
+export function readSource(
+  sel: { kind: SelectableKind; location: string },
+  dirs: SourceDirs,
+  tool: AiTool | '',
+  useBundledFlow = true,
+): ArtifactDraft {
   const kind = kindOfSelectable(sel.kind);
   try {
     switch (kind) {
       case 'rule':
         return readRule(sel.location, dirs, tool);
       case 'skill':
-        return readSkill(sel.location, dirs, tool);
+        return readSkill(sel.location, dirs, tool, useBundledFlow);
       case 'agent':
         return readAgent(sel.location, dirs, tool);
       case 'mcp':
