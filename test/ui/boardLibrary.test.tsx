@@ -85,3 +85,30 @@ describe('biblioteca do board nas configurações', () => {
     await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Conteúdo' })).toBeNull());
   });
 });
+
+it('alternar JSON e formulário MCP preserva variáveis e cabeçalhos sem apagar edições', async () => {
+  renderThemed(<BoardLibrary />);
+  confirmLast();
+  await userEvent.click(screen.getByRole('tab', { name: /^MCPs/ }));
+  await userEvent.click(screen.getByRole('button', { name: 'Criar' }));
+  await userEvent.type(screen.getByRole('textbox', { name: 'Nome' }), 'memoria');
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Editar JSON diretamente' }));
+  const json = screen.getByRole('textbox', { name: 'Definição JSON do MCP' });
+  await userEvent.clear(json);
+  await userEvent.paste(
+    JSON.stringify({ command: 'node', args: ['servidor.js'], env: { TOKEN: 'local' }, headers: { Authorization: 'local' } }),
+  );
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Editar JSON diretamente' }));
+  expect(screen.getByRole('textbox', { name: 'Comando' })).toHaveValue('node');
+  await userEvent.clear(screen.getByRole('textbox', { name: 'Comando' }));
+  await userEvent.type(screen.getByRole('textbox', { name: 'Comando' }), 'node-local');
+  await userEvent.click(screen.getByRole('button', { name: 'Salvar na biblioteca' }));
+  expect(lastSent('harness.library.save')).toMatchObject({
+    input: {
+      kind: 'mcp',
+      name: 'memoria',
+      server: { command: 'node-local', args: ['servidor.js'], env: { TOKEN: 'local' }, headers: { Authorization: 'local' } },
+    },
+  });
+  confirmLast();
+});

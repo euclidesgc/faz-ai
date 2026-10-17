@@ -67,20 +67,46 @@ export function LibraryEditor({
   const [command, setCommand] = useState(String(initial?.server?.command ?? 'npx'));
   const [args, setArgs] = useState(JSON.stringify(initial?.server?.args ?? ['-y', 'nome-do-servidor']));
   const [url, setUrl] = useState(String(initial?.server?.url ?? ''));
-  const save = useAction(async () => {
-    let server: Record<string, unknown> | undefined;
-    if (kind === 'mcp') {
-      server = jsonMode
-        ? (JSON.parse(json) as Record<string, unknown>)
-        : transport === 'http'
-          ? { url }
-          : { command, args: JSON.parse(args) as unknown };
-      if (server.mcpServers) {
-        const entries = Object.entries(server.mcpServers as Record<string, Record<string, unknown>>);
-        if (entries.length !== 1) throw new Error(t('Cole uma definição por vez ou importe o arquivo JSON pela pasta.'));
-        server = entries[0]![1];
-      }
+  const [formatError, setFormatError] = useState('');
+  const parsedServer = (): Record<string, unknown> => {
+    let value = JSON.parse(json) as Record<string, unknown>;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(t('Definição MCP inválida.'));
+    if (value.mcpServers) {
+      const entries = Object.entries(value.mcpServers as Record<string, Record<string, unknown>>);
+      if (entries.length !== 1) throw new Error(t('Cole uma definição por vez ou importe o arquivo JSON pela pasta.'));
+      value = entries[0]![1];
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(t('Definição MCP inválida.'));
     }
+    return value;
+  };
+  const formServer = (): Record<string, unknown> => {
+    const parsed = parsedServer();
+    const server = { ...parsed };
+    for (const key of ['command', 'args', 'url', 'type']) delete server[key];
+    return {
+      ...server,
+      ...(transport === 'http' ? { url, type: parsed.type === 'sse' ? 'sse' : 'http' } : { command, args: JSON.parse(args) as unknown }),
+    };
+  };
+  const switchFormat = (checked: boolean) => {
+    try {
+      if (checked) setJson(JSON.stringify(formServer(), null, 2));
+      else {
+        const server = parsedServer();
+        setJson(JSON.stringify(server, null, 2));
+        setTransport(server.url ? 'http' : 'stdio');
+        setCommand(String(server.command ?? ''));
+        setArgs(JSON.stringify(server.args ?? []));
+        setUrl(String(server.url ?? ''));
+      }
+      setFormatError('');
+      setJsonMode(checked);
+    } catch {
+      setFormatError(t('Definição MCP inválida.'));
+    }
+  };
+  const save = useAction(async () => {
+    const server = kind === 'mcp' ? (jsonMode ? parsedServer() : formServer()) : undefined;
     await harness.saveLibraryArtifact({
       id: initial?.id,
       kind,
@@ -167,31 +193,7 @@ export function LibraryEditor({
           ) : (
             <>
               <label className="row">
-                <Checkbox
-                  checked={jsonMode}
-                  onCheckedChange={(checked) => {
-                    if (checked)
-                      setJson(
-                        JSON.stringify(
-                          transport === 'http'
-                            ? { url }
-                            : {
-                                command,
-                                args: (() => {
-                                  try {
-                                    return JSON.parse(args || '[]') as unknown;
-                                  } catch {
-                                    return [];
-                                  }
-                                })(),
-                              },
-                          null,
-                          2,
-                        ),
-                      );
-                    setJsonMode(!!checked);
-                  }}
-                />
+                <Checkbox checked={jsonMode} onCheckedChange={(checked) => switchFormat(!!checked)} />
                 {t('Editar JSON diretamente')}
               </label>
               {jsonMode ? (
@@ -311,7 +313,7 @@ export function LibraryEditor({
           {kind === 'rule' && <p className="muted small">{t('A regra será salva desligada. Revise e ative quando estiver pronta.')}</p>}
         </>
       )}
-      {save.error && <p role="alert">{save.error}</p>}
+      {(save.error || formatError) && <p role="alert">{save.error || formatError}</p>}
       <div className="form-actions">
         <Button variant="ghost" disabled={save.busy} onClick={onClose}>
           {t('Cancelar')}
