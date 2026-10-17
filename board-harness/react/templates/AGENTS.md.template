@@ -1,0 +1,104 @@
+# Contrato da aplicação
+
+Modelo inativo. Preencha e reconcilie com as decisões existentes antes de adotar como AGENTS.md. Remova instruções de preenchimento; não deixe campos pendentes como se fossem decisões aprovadas. Este arquivo resume decisões estáveis; procedimentos ficam nas skills e detalhes de produto/arquitetura em documentos vinculados.
+
+## Produto e escopo
+
+- Produto/objetivo: [preencher resultado e problema].
+- Usuários e jornadas: [preencher e vincular requisitos].
+- Limites: [preencher]; base frontend React + Vite SPA, consumo de serviços existentes.
+- Critérios do produto, design e decisões: [caminhos reais e quando consultar].
+
+## Stack e comandos
+
+- React, Vite, TypeScript, roteador, cache, formulários e estilos: [versões do package/lockfile].
+- Gerenciador/runtime: [preencher versões].
+- Dev, tipos, lint, testes afetados, build e preview: [comandos reais; não inventar scripts].
+- Contratos da API e identidade: [fonte canônica; implementação externa].
+
+## Pastas e dependências
+
+Mapa-base para aplicação nova; adaptar ao projeto existente. Criar somente as pastas usadas.
+
+```text
+src/
+  app/           raiz, providers, roteador e composição de páginas/features
+  features/      código específico por assunto do produto
+    <feature>/   api, components, hooks, stores, types, utils conforme necessidade
+  components/    UI compartilhada sem domínio específico
+  config/        configuração validada e paths
+  lib/           integrações compartilhadas e preconfiguradas
+  hooks/         hooks compartilhados
+  stores/        estado visual compartilhado justificado
+  types/         contratos realmente compartilhados
+  utils/         utilitários sem domínio específico
+  assets/        recursos estáticos compartilhados
+  testing/       utilidades e simulação de rede
+```
+
+Imports permitidos: app → features → compartilhado, e app → compartilhado. Features independentes são compostas em app. Compartilhado não importa features/app; impedir ciclos. Exceções existentes e migração: [registrar decisão explícita]. Testes: [caminhos e convenção reais].
+
+## Estado e duração
+
+- Visual: proprietário mais próximo; compartilhar somente com necessidade real.
+- Remoto: solução de cache adotada, com identidade por recurso/parâmetros/escopo.
+- Formulário: rascunho, validação e reset pela solução escolhida.
+- URL: valores navegáveis têm parsing/serialização e histórico definidos.
+- Sessão: identidade e transições únicas; dados privados são isolados/limpos na troca de conta.
+- Providers/serviços: [escopo e duração aprovados]. Derivados não ganham segunda fonte de verdade.
+
+## Convenções e proteção transversal
+
+- Nomes, idioma de código/comentários/testes, imports e tipagem: [preencher].
+- Design, tokens e i18n: [fonte canônica e regras adotadas].
+- Semântica nativa, nomes acessíveis, teclado e foco são requisitos básicos da interface.
+- Dados externos são não confiáveis; TypeScript não valida JSON nem sanitiza HTML.
+- Configuração pública/bundle não guarda segredos; não registrar credenciais ou payload privado.
+- Persistência/telemetria: [dados permitidos, finalidade, retenção e remoção].
+- Autorização do cliente orienta a experiência; proteção efetiva pertence ao serviço externo.
+- Backend, CI/CD, deploy e infraestrutura não pertencem a este catálogo.
+
+## Autoridade por decisão
+
+Cada decisão tem um dono; outras skills consomem o contrato. Carregue apenas especialistas pertinentes à etapa.
+
+| Decisão | Skill responsável |
+| --- | --- |
+| Organização de features, localização de código e direção de dependências. | react-module-boundaries |
+| Configuração coerente das ferramentas locais de desenvolvimento e verificação. | react-tooling |
+| Contrato de configuração da aplicação por ambiente. | react-env-config |
+| Composição da raiz React, providers e duração das instâncias da aplicação. | react-app-lifecycle |
+| Correspondência entre URLs, rotas e transições de navegação. | react-routing |
+| Representação de estado navegável na URL e no histórico. | react-url-state |
+| Invariantes, cálculos e transições de negócio executados no frontend. | react-business-rules |
+| API e composição dos componentes de interface. | react-component-contracts |
+| Apresentação visual consistente e responsiva. | react-styling |
+| Semântica e interação acessível dos fluxos e componentes. | react-accessibility |
+| Composição de uma página com recursos e contratos existentes. | react-page-composition |
+| Propriedade e sincronização do estado visual no cliente. | react-ui-state |
+| Formato e validação dos dados na fronteira com serviços externos. | react-api-contracts |
+| Execução de requisições e representação das respostas/falhas de transporte. | react-http-client |
+| Leitura, identificação e validade dos dados remotos em cache. | react-query-cache |
+| Escrita remota e atualização dos dados afetados no cliente. | react-mutations |
+| Ciclo de preenchimento, validação e submissão de formulários. | react-forms |
+| Identidade e ciclo da sessão consumida pelo frontend. | react-auth-session |
+| Decisões de acesso da interface a ações e recursos. | react-access-policies |
+| Tratamento seguro de conteúdo e destinos não confiáveis. | react-content-security |
+| Proteção dos dados e das fronteiras de confiança no navegador. | react-browser-data-security |
+| Risco de segurança dos pacotes consumidos pela aplicação web. | react-dependency-security |
+| Contenção, apresentação e recuperação de falhas na interface. | react-error-recovery |
+| Registro de evidências para diagnosticar a aplicação no navegador. | react-telemetry |
+| Evidência isolada de regras, cálculos e unidades relevantes. | react-unit-tests |
+| Evidência do comportamento de componentes e features integrados. | react-integration-tests |
+| Evidência das jornadas da aplicação em um navegador real. | react-e2e-tests |
+| Respostas e cenários de rede simulados para desenvolvimento e testes. | react-api-mocks |
+| Custo e tempo de carregamento da aplicação e seus recursos. | react-load-performance |
+| Custo das atualizações e renderizações da interface. | react-render-performance |
+| Mensagens e apresentação de valores conforme idioma e localidade. | react-i18n |
+| Identificação das páginas por título e metadados no navegador. | react-page-metadata |
+
+## Verificação e manutenção do contrato
+
+Verificações mínimas conforme impacto: [comandos e critérios reais]. Testar comportamentos relevantes, sem criar testes que apenas repetem implementação. Informar o que foi executado e limites concretos.
+
+Mudança transversal deve atualizar esta decisão e os consumidores afetados explicitamente. Não duplicar procedimentos das skills aqui. Decisões detalhadas: [links e gatilhos de leitura]. Se houver CLAUDE.md existente, preservar suas instruções e verificar a forma de integrar este contrato na versão utilizada, sem substituição automática.
