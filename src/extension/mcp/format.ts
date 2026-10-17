@@ -474,6 +474,17 @@ export function cardDetail(
         }
       : {}),
     ...(phase ? { phase } : {}),
+    ...(s.harness.library && manifestOf(s, c).mcpServers.length
+      ? {
+          mcpGateway: {
+            server: 'faz-ai',
+            list: 'list_board_mcp_tools',
+            call: 'call_board_mcp_tool',
+            card: `#${c.number}`,
+            servers: manifestOf(s, c).mcpServers,
+          },
+        }
+      : {}),
     ...executionOf(s, c),
     ...workspaceOf(s, c),
     description: c.description,
@@ -651,6 +662,7 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
       ? s.harness.library.artifacts.filter((a) => a.kind === 'agent' && !a.missing).map((a) => agentOfArtifact(a, s.board.aiTool))
       : s.harness.agents;
   return {
+    library: s.harness.library ? { directory: s.harness.library.directory, artifacts: s.harness.library.artifacts } : undefined,
     aiTool: s.board.aiTool,
     defaultAgent: s.board.execProfiles.find((p) => p.isDefault)?.id ?? null,
     note: onlySelected
@@ -680,6 +692,7 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
       })),
     // o que a ferramenta em uso carrega, com o escopo (project, user, plugin ou imported) e o modo no board
     inventory: inventory.map((i) => ({
+      ...(i.boardArtifactId ? { id: i.boardArtifactId } : {}),
       kind: i.kind,
       // o grupo em que a tela de Harness mostra o item (main, topic, memory, skill… plugin, managed)
       group: groupOf(s.board.aiTool, i),

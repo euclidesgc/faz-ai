@@ -78,6 +78,7 @@ export class BoardHarness {
     this.ctx.library.migrate(this.current.inventory);
     this.current.library = {
       directory: this.ctx.library.directory,
+      preview: this.ctx.library.preview,
       artifacts: this.ctx.library.materialize(),
       warnings: this.ctx.library.warnings,
     };
@@ -416,6 +417,21 @@ function markSkill(ctx: BoardContext, name: string, scope: 'project' | 'user' = 
 
 /** Harness: regras, skills, agentes, hooks, permissões, servidores MCP e instalação de skills. */
 export const harnessHandlers = {
+  'harness.library.scan': (msg, ctx) => {
+    ctx.library.scanFolder(msg.dir);
+    ctx.harness.load();
+    return true;
+  },
+  'harness.library.apply': (msg, ctx) => {
+    ctx.library.importArtifacts(msg.keys);
+    ctx.harness.load();
+    return true;
+  },
+  'harness.library.save': (msg, ctx) => {
+    ctx.library.saveArtifact(msg.input);
+    ctx.harness.load();
+    return true;
+  },
   'harness.library.directory': (msg, ctx) => {
     ctx.library.setDirectory(msg.dir);
     ctx.harness.load();

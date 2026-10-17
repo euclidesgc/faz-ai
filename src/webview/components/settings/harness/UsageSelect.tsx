@@ -21,7 +21,9 @@ export function UsageSelect({ item, allowNone = true }: { item: HarnessItem; all
   if (!isSelectableKind(item.kind) || item.kind === 'agent') return null;
   const kind = item.kind;
   const usage = usageOf(selection, item);
-  const options = usageOptions(kind).map((id) => HARNESS_USAGES.find((u) => u.id === id)!);
+  const modes = usageOptions(kind);
+  const available = item.boardArtifactId && !modes.includes('off') ? ['off' as const, ...modes] : modes;
+  const options = available.map((id) => HARNESS_USAGES.find((u) => u.id === id)!);
   return (
     <SelectField<HarnessUsage | 'none'>
       size="1"

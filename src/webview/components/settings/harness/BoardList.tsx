@@ -20,7 +20,9 @@ export function BoardList({
   kind,
   query,
   onOpenCatalog,
+  central = false,
 }: {
+  central?: boolean;
   kind: SelectableKind;
   query: string;
   /** leva à origem do catálogo (Projeto ou Global), de onde se envia ao board */
@@ -35,7 +37,7 @@ export function BoardList({
 
   return (
     <div className="board-list">
-      {kind === 'instructions' && (
+      {!central && kind === 'instructions' && (
         <Callout.Root color="amber" size="1">
           <Callout.Icon>
             <IconWarning />
@@ -47,38 +49,42 @@ export function BoardList({
           </Callout.Text>
         </Callout.Root>
       )}
-      {total === 0 && state.harness.library && kind === 'skill' ? (
-        <p className="muted small">
-          {t(
-            'Nenhuma skill na biblioteca. Use Importar de uma pasta acima ou cole uma pasta com SKILL.md na biblioteca e clique em Atualizar lista.',
-          )}
-        </p>
-      ) : (
-        total === 0 && (
-          <div className="board-empty">
-            <p className="muted small">
-              {kind === 'agent'
-                ? t(
-                    'Nenhum agente no board: toda execução roda com o escopo cheio. Crie um em Projeto ou Global, com "Criar agente com ajuda" ou pelas sugestões prontas.',
-                  )
-                : kind === 'instructions'
+      {!central &&
+        (total === 0 && state.harness.library && kind === 'skill' ? (
+          <p className="muted small">
+            {t(
+              'Nenhuma skill na biblioteca. Use Importar de uma pasta acima ou cole uma pasta com SKILL.md na biblioteca e clique em Atualizar lista.',
+            )}
+          </p>
+        ) : (
+          total === 0 && (
+            <div className="board-empty">
+              <p className="muted small">
+                {kind === 'agent'
                   ? t(
-                      'Nenhuma regra no board. Envie as do projeto a partir de Projeto ou Global; elas entram desligadas, para você revisar antes de ativar.',
+                      'Nenhum agente no board: toda execução roda com o escopo cheio. Crie um em Projeto ou Global, com "Criar agente com ajuda" ou pelas sugestões prontas.',
                     )
-                  : t(
-                      'Nada neste assunto no board: o planejamento dos cards não tem de onde escolher. Vá a Projeto ou Global, use "Indicar artefatos" e envie ao board.',
-                    )}
-            </p>
-            <div className="row">
-              <Button size="1" variant="soft" onClick={() => onOpenCatalog('project')}>
-                {t('Ir para Projeto')}
-              </Button>
-              <Button size="1" variant="soft" color="gray" onClick={() => onOpenCatalog('user')}>
-                {t('Ir para Global')}
-              </Button>
+                  : kind === 'instructions'
+                    ? t(
+                        'Nenhuma regra no board. Envie as do projeto a partir de Projeto ou Global; elas entram desligadas, para você revisar antes de ativar.',
+                      )
+                    : t(
+                        'Nada neste assunto no board: o planejamento dos cards não tem de onde escolher. Vá a Projeto ou Global, use "Indicar artefatos" e envie ao board.',
+                      )}
+              </p>
+              <div className="row">
+                <Button size="1" variant="soft" onClick={() => onOpenCatalog('project')}>
+                  {t('Ir para Projeto')}
+                </Button>
+                <Button size="1" variant="soft" color="gray" onClick={() => onOpenCatalog('user')}>
+                  {t('Ir para Global')}
+                </Button>
+              </div>
             </div>
-          </div>
-        )
+          )
+        ))}
+      {central && total === 0 && (
+        <p className="muted small">{t('Nenhum artefato nesta aba. Crie um aqui ou importe uma pasta para começar.')}</p>
       )}
       {total > 0 && items.length + missing.length === 0 && <p className="muted small scope-empty">{t('Nada encontrado para a busca.')}</p>}
       <ul className="item-list">
@@ -128,6 +134,16 @@ export function BoardList({
               )}
             </div>
             <div className="row-actions">
+              {i.boardArtifactId && (
+                <ActionButton
+                  variant="soft"
+                  size="1"
+                  hint={t('Edita o conteúdo e as configurações deste artefato.')}
+                  onClick={() => void harness.readLibraryArtifact(i.boardArtifactId!)}
+                >
+                  {t('Editar')}
+                </ActionButton>
+              )}
               {modes.length > 1 ? (
                 <UsageSelect item={i} allowNone={false} />
               ) : (
@@ -156,7 +172,16 @@ export function BoardList({
                 variant="ghost"
                 size="1"
                 hint={t('Tira do board; o arquivo de origem não é tocado.')}
-                onClick={() => remove(selectionKey(i))}
+                onClick={() =>
+                  central
+                    ? useBoardStore.getState().ask({
+                        title: t('Excluir "{name}" da biblioteca?', { name: i.name }),
+                        message: t('A cópia do board será excluída. A origem será preservada.'),
+                        confirmLabel: t('Excluir'),
+                        onConfirm: () => remove(selectionKey(i)),
+                      })
+                    : remove(selectionKey(i))
+                }
                 aria-label={t('Remover do board: {name}', { name: i.name })}
               >
                 {t('Remover do board')}
