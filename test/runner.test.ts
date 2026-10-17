@@ -17,6 +17,7 @@ import {
   AUTONOMOUS_ADVICE,
   PERMISSION_ADVICE,
   cardPrompt,
+  conflictPrompt,
   consumptionLine,
   nomeDoAnexoAnterior,
   refinePrompt,
@@ -35,6 +36,7 @@ import { monthOf, type RunReport } from '../src/shared/log';
 import { parseRunner } from '../src/shared/runner';
 import { TYPE_CONDITION, modelValue } from '../src/shared/models';
 import type { Database } from 'sql.js';
+import type { CardStatus } from '../src/shared/status';
 
 it('com o modo autônomo só até uma fase, o pedido diz até onde e, na própria fase, manda pedir a revisão e parar', () => {
   const columns = [
@@ -300,6 +302,23 @@ it('summarizePrompt pede um resumo nas três seções e leva o contexto fixo e o
   expect(prompt).toContain('Este card exige também');
   expect(prompt.indexOf('Pendências')).toBeLessThan(prompt.indexOf('Contexto fixo deste board'));
   expect(prompt.indexOf('Contexto fixo deste board')).toBeLessThan(prompt.indexOf('Este card exige também'));
+});
+
+it('conflictPrompt pede merge da base do PR, checagens e push sem força, e manda bloquear em vez de enviar pela metade (#747)', () => {
+  const prompt = conflictPrompt('#1', { always: ['Contexto fixo deste board.'], card: [] }, ['Aviso de permissão.']);
+  expect(prompt).toMatch(/^Resolva o conflito do pull request da história #1 .* NÃO é trabalhar a fase\./);
+  expect(prompt).toContain('workspace.prBase');
+  expect(prompt).toContain('git fetch origin e git merge origin/<prBase>');
+  expect(prompt).toContain('Nunca use rebase nem push --force');
+  expect(prompt).toContain('git push (sem --force)');
+  expect(prompt).toContain('Rode as checagens do projeto');
+  expect(prompt).toContain('git merge --abort e chame block_card');
+  expect(prompt).toContain('não faça o merge do pull request');
+  expect(prompt).toContain('sem start_work, move_card, request_review nem ask_question');
+  expect(prompt.indexOf('Contexto fixo deste board.')).toBeLessThan(prompt.indexOf('Leia o card'));
+  expect(prompt.indexOf('Aviso de permissão.')).toBeLessThan(prompt.indexOf('Trabalhe só neste card'));
+  // não é o pedido da fase
+  expect(prompt).not.toContain('Faça o trabalho da fase');
 });
 
 it('nomeDoAnexoAnterior formata a data e a hora locais no nome do anexo', () => {
@@ -751,6 +770,83 @@ describe('executor da IA', () => {
       expect(card().status).toBe('waiting_review');
       expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
       expect(lastMessage()!.body).toBe('O resumo não foi gerado: a execução terminou sem escrever a mensagem.');
+    });
+  });
+
+  describe('Resolver conflito (#747)', () => {
+    const status = (s: CardStatus | null) => router.handle({ type: 'card.status.set', cardId: storyId, status: s });
+
+    it('leva o pedido de conflito com a permissão e o aviso da fase, e o log diz que é a execução de conflito', () => {
+      runner.start(storyId, 'heartbeat', 'conflict');
+      const command = procs[0]!.command;
+      expect(command).toEqual(
+        headlessCommand('claude', {
+          prompt: conflictPrompt('#1', undefined, [PERMISSION_ADVICE.board!]),
+          permission: 'board',
+          addDirs: [`${dir}.worktrees`],
+          structured: true,
+        }),
+      );
+      expect(command.stdin).not.toContain('Faça o trabalho da fase');
+      expect(log.join('\n')).toContain('[#1] Resolver conflito: atualiza a branch a partir da base do pull request');
+      expect(router.snapshot().aiActivity[0]).toMatchObject({ mode: 'conflict', origin: 'heartbeat' });
+    });
+
+    it('na história autônoma roda sem restrições, sem as regras do modo autônomo no pedido', () => {
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+      runner.start(storyId, 'heartbeat', 'conflict');
+      const command = procs[0]!.command;
+      expect(command.args).toContain('bypassPermissions');
+      expect(command.stdin).toContain('Resolva o conflito do pull request');
+      expect(command.stdin).not.toContain('MODO AUTÔNOMO');
+    });
+
+    it('terminar bem devolve o status anterior, com ou sem mensagem na conversa, e não passa a vez', () => {
+      for (const previous of ['waiting_review', 'ready', null] as const) {
+        status(previous);
+        runner.start(storyId, 'heartbeat', 'conflict');
+        ai({ type: 'comment.add', cardId: storyId, body: 'Conflito resolvido e enviado.' });
+        procs.at(-1)!.exit(0);
+        expect(card().status).toBe(previous);
+      }
+      status('waiting_review');
+      runner.start(storyId, 'heartbeat', 'conflict');
+      procs.at(-1)!.exit(0); // sem mensagem: também não bloqueia
+      expect(card().status).toBe('waiting_review');
+    });
+
+    it('na história autônoma já entregue, o card continua com a pessoa', () => {
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+      (router as any).ctx.cards.setPullRequest(storyId, 'https://github.com/acme/app/pull/7');
+      status('waiting_review');
+      runner.start(storyId, 'heartbeat', 'conflict');
+      ai({ type: 'comment.add', cardId: storyId, body: 'Resolvido.' });
+      procs[0]!.exit(0);
+      expect(card().status).toBe('waiting_review');
+    });
+
+    it('falha do processo bloqueia o card; o bloqueio da própria IA vale', () => {
+      status('waiting_review');
+      runner.start(storyId, 'heartbeat', 'conflict');
+      procs[0]!.exit(1);
+      expect(card().status).toBe('blocked');
+      expect(card().statusReason).toContain('código 1');
+
+      status('waiting_review');
+      runner.start(storyId, 'heartbeat', 'conflict');
+      ai({ type: 'card.status.set', cardId: storyId, status: 'blocked', note: 'O conflito pede uma decisão da pessoa.' });
+      procs[1]!.exit(0);
+      expect(card()).toMatchObject({ status: 'blocked', statusReason: 'O conflito pede uma decisão da pessoa.' });
+    });
+
+    it('parar devolve o status anterior e o fim avisa os ouvintes com o modo conflict', () => {
+      const finished: string[] = [];
+      runner.onDidFinish((_id, mode) => finished.push(mode));
+      status('waiting_review');
+      runner.start(storyId, 'heartbeat', 'conflict');
+      runner.stop(storyId);
+      expect(card().status).toBe('waiting_review');
+      expect(finished).toEqual(['conflict']);
     });
   });
 
@@ -1227,6 +1323,34 @@ describe('log das execuções de IA', () => {
       expect(log.join('\n')).toContain('não aceita a saída estruturada');
       // o motivo já está no canal: o resumo não o repete
       expect(log).toContain('[#1] Consumo não medido.');
+    });
+
+    it('a falha antes do primeiro evento sem recusa do formato não repete e o card diz que não foi repetida (#739)', () => {
+      speaks = false;
+      logged.start(storyId);
+      procs[0]!.emit('erro: conexão perdida com o servidor\n', 'stderr');
+      procs[0]!.exit(1);
+
+      expect(procs).toHaveLength(1);
+      expect(card().status).toBe('blocked');
+      expect(card().statusReason).toMatch(/^O Claude Code terminou com erro \(código 1\)\. A execução não foi repetida/);
+      // uma vez só: o recado da medição é do board, fica no canal e não entra no fim da saída da ferramenta
+      expect(card().statusReason!.split('não foi repetida')).toHaveLength(2);
+      expect(card().statusReason).not.toContain('A medição não foi possível');
+      expect(card().statusReason).toContain('conexão perdida');
+      expect(channel().some((l) => l.includes('A medição não foi possível'))).toBe(true);
+      expect(only()).toMatchObject({ outcome: 'failed', exitCode: 1, measure: 'none', inputTokens: null, outputTokens: null });
+      expect(log.join('\n')).not.toContain('O trabalho foi repetido');
+      expect(card().statusReason).not.toContain('O trabalho foi repetido');
+    });
+
+    it('a falha depois de eventos não ganha o aviso de execução não repetida', () => {
+      logged.start(storyId);
+      procs[0]!.emit(FIXTURE);
+      procs[0]!.exit(1);
+
+      expect(card().status).toBe('blocked');
+      expect(card().statusReason).not.toContain('não foi repetida');
     });
 
     it('RF-07: a falha DEPOIS de eventos não repete a chamada, e o fim da saída no card é texto legível', () => {

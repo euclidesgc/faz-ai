@@ -1,0 +1,839 @@
+{
+  "inputs": {
+    "catalogSha256": "551991bf0f984f075af3189bfc9c434f8bbb39096c7e2e09f3b02f31f63b701e",
+    "casesSha256": "97776a870e9e4e12c8c9393d54fe9b7942d821cc4f0e3c868e15b06253a35f97",
+    "matcherSha256": "486d734907c0350a30dea7a3fdd9c467eebb9f5c99584484548528c3b45e269d"
+  },
+  "discovery": {
+    "found": 32,
+    "valid": true,
+    "referencesPerSkill": 3
+  },
+  "selection": {
+    "cases": 32,
+    "top1": 15,
+    "top3": 28,
+    "top8": 32
+  },
+  "capabilitySuggestions": [
+    {
+      "skill": "react-module-boundaries",
+      "rank": 1,
+      "suggestions": [
+        "react-module-boundaries",
+        "react-access-policies",
+        "react-component-contracts",
+        "react-query-cache",
+        "react-ui-state",
+        "react-accessibility",
+        "react-i18n",
+        "react-integration-tests"
+      ]
+    },
+    {
+      "skill": "react-tooling",
+      "rank": 1,
+      "suggestions": [
+        "react-tooling",
+        "react-accessibility",
+        "react-api-mocks",
+        "react-business-rules",
+        "react-e2e-tests",
+        "react-error-recovery",
+        "react-module-boundaries",
+        "react-page-composition"
+      ]
+    },
+    {
+      "skill": "react-env-config",
+      "rank": 3,
+      "suggestions": [
+        "react-api-mocks",
+        "react-api-contracts",
+        "react-env-config",
+        "react-url-state",
+        "react-page-metadata",
+        "react-accessibility",
+        "react-component-contracts",
+        "react-dependency-security"
+      ]
+    },
+    {
+      "skill": "react-app-lifecycle",
+      "rank": 4,
+      "suggestions": [
+        "react-integration-tests",
+        "react-query-cache",
+        "react-render-performance",
+        "react-app-lifecycle",
+        "react-page-metadata",
+        "react-browser-data-security",
+        "react-forms",
+        "react-page-composition"
+      ]
+    },
+    {
+      "skill": "react-routing",
+      "rank": 5,
+      "suggestions": [
+        "react-app-lifecycle",
+        "react-page-metadata",
+        "react-accessibility",
+        "react-page-composition",
+        "react-routing",
+        "react-access-policies",
+        "react-browser-data-security",
+        "react-dependency-security"
+      ]
+    },
+    {
+      "skill": "react-url-state",
+      "rank": 3,
+      "suggestions": [
+        "react-page-metadata",
+        "react-page-composition",
+        "react-url-state",
+        "react-query-cache",
+        "react-render-performance",
+        "react-accessibility",
+        "react-auth-session",
+        "react-browser-data-security"
+      ]
+    },
+    {
+      "skill": "react-business-rules",
+      "rank": 3,
+      "suggestions": [
+        "react-api-contracts",
+        "react-api-mocks",
+        "react-business-rules",
+        "react-component-contracts",
+        "react-unit-tests",
+        "react-accessibility",
+        "react-auth-session",
+        "react-content-security"
+      ]
+    },
+    {
+      "skill": "react-component-contracts",
+      "rank": 2,
+      "suggestions": [
+        "react-api-contracts",
+        "react-component-contracts",
+        "react-e2e-tests",
+        "react-accessibility",
+        "react-api-mocks",
+        "react-forms",
+        "react-integration-tests",
+        "react-module-boundaries"
+      ]
+    },
+    {
+      "skill": "react-styling",
+      "rank": 3,
+      "suggestions": [
+        "react-accessibility",
+        "react-page-metadata",
+        "react-styling",
+        "react-browser-data-security",
+        "react-forms",
+        "react-http-client",
+        "react-module-boundaries",
+        "react-page-composition"
+      ]
+    },
+    {
+      "skill": "react-accessibility",
+      "rank": 1,
+      "suggestions": [
+        "react-accessibility",
+        "react-module-boundaries",
+        "react-page-metadata",
+        "react-access-policies",
+        "react-auth-session",
+        "react-error-recovery",
+        "react-forms",
+        "react-query-cache"
+      ]
+    },
+    {
+      "skill": "react-page-composition",
+      "rank": 2,
+      "suggestions": [
+        "react-component-contracts",
+        "react-page-composition",
+        "react-api-contracts",
+        "react-integration-tests",
+        "react-accessibility",
+        "react-app-lifecycle",
+        "react-module-boundaries",
+        "react-page-metadata"
+      ]
+    },
+    {
+      "skill": "react-ui-state",
+      "rank": 2,
+      "suggestions": [
+        "react-api-contracts",
+        "react-ui-state",
+        "react-component-contracts",
+        "react-api-mocks",
+        "react-e2e-tests",
+        "react-module-boundaries",
+        "react-query-cache",
+        "react-accessibility"
+      ]
+    },
+    {
+      "skill": "react-api-contracts",
+      "rank": 1,
+      "suggestions": [
+        "react-api-contracts",
+        "react-component-contracts",
+        "react-auth-session",
+        "react-api-mocks",
+        "react-module-boundaries",
+        "react-page-metadata",
+        "react-access-policies",
+        "react-accessibility"
+      ]
+    },
+    {
+      "skill": "react-http-client",
+      "rank": 1,
+      "suggestions": [
+        "react-http-client",
+        "react-error-recovery",
+        "react-accessibility",
+        "react-forms",
+        "react-page-metadata",
+        "react-telemetry",
+        "react-api-contracts",
+        "react-api-mocks"
+      ]
+    },
+    {
+      "skill": "react-query-cache",
+      "rank": 1,
+      "suggestions": [
+        "react-query-cache",
+        "react-page-composition",
+        "react-page-metadata",
+        "react-load-performance",
+        "react-styling",
+        "react-accessibility",
+        "react-browser-data-security",
+        "react-e2e-tests"
+      ]
+    },
+    {
+      "skill": "react-mutations",
+      "rank": 3,
+      "suggestions": [
+        "react-page-metadata",
+        "react-error-recovery",
+        "react-mutations",
+        "react-page-composition",
+        "react-telemetry",
+        "react-accessibility",
+        "react-browser-data-security",
+        "react-e2e-tests"
+      ]
+    },
+    {
+      "skill": "react-forms",
+      "rank": 2,
+      "suggestions": [
+        "react-error-recovery",
+        "react-forms",
+        "react-query-cache",
+        "react-accessibility",
+        "react-business-rules",
+        "react-page-metadata",
+        "react-api-mocks",
+        "react-env-config"
+      ]
+    },
+    {
+      "skill": "react-auth-session",
+      "rank": 1,
+      "suggestions": [
+        "react-auth-session",
+        "react-query-cache",
+        "react-accessibility",
+        "react-browser-data-security",
+        "react-e2e-tests",
+        "react-module-boundaries",
+        "react-page-metadata",
+        "react-url-state"
+      ]
+    },
+    {
+      "skill": "react-access-policies",
+      "rank": 1,
+      "suggestions": [
+        "react-access-policies",
+        "react-mutations",
+        "react-page-metadata",
+        "react-query-cache",
+        "react-accessibility",
+        "react-auth-session",
+        "react-http-client",
+        "react-module-boundaries"
+      ]
+    },
+    {
+      "skill": "react-content-security",
+      "rank": 1,
+      "suggestions": [
+        "react-content-security",
+        "react-render-performance",
+        "react-access-policies",
+        "react-module-boundaries",
+        "react-query-cache",
+        "react-accessibility",
+        "react-api-contracts",
+        "react-app-lifecycle"
+      ]
+    },
+    {
+      "skill": "react-browser-data-security",
+      "rank": 3,
+      "suggestions": [
+        "react-accessibility",
+        "react-api-contracts",
+        "react-browser-data-security",
+        "react-query-cache",
+        "react-app-lifecycle",
+        "react-auth-session",
+        "react-business-rules",
+        "react-env-config"
+      ]
+    },
+    {
+      "skill": "react-dependency-security",
+      "rank": 1,
+      "suggestions": [
+        "react-dependency-security",
+        "react-business-rules",
+        "react-page-metadata",
+        "react-accessibility",
+        "react-app-lifecycle",
+        "react-browser-data-security",
+        "react-content-security",
+        "react-http-client"
+      ]
+    },
+    {
+      "skill": "react-error-recovery",
+      "rank": 1,
+      "suggestions": [
+        "react-error-recovery",
+        "react-accessibility",
+        "react-module-boundaries",
+        "react-page-metadata",
+        "react-access-policies",
+        "react-api-contracts",
+        "react-component-contracts",
+        "react-e2e-tests"
+      ]
+    },
+    {
+      "skill": "react-telemetry",
+      "rank": 1,
+      "suggestions": [
+        "react-telemetry",
+        "react-page-metadata",
+        "react-accessibility",
+        "react-auth-session",
+        "react-business-rules",
+        "react-module-boundaries",
+        "react-query-cache",
+        "react-routing"
+      ]
+    },
+    {
+      "skill": "react-unit-tests",
+      "rank": 1,
+      "suggestions": [
+        "react-unit-tests",
+        "react-business-rules",
+        "react-render-performance",
+        "react-accessibility",
+        "react-api-contracts",
+        "react-api-mocks",
+        "react-app-lifecycle",
+        "react-auth-session"
+      ]
+    },
+    {
+      "skill": "react-integration-tests",
+      "rank": 4,
+      "suggestions": [
+        "react-http-client",
+        "react-api-mocks",
+        "react-page-metadata",
+        "react-integration-tests",
+        "react-mutations",
+        "react-access-policies",
+        "react-accessibility",
+        "react-app-lifecycle"
+      ]
+    },
+    {
+      "skill": "react-e2e-tests",
+      "rank": 8,
+      "suggestions": [
+        "react-api-contracts",
+        "react-api-mocks",
+        "react-component-contracts",
+        "react-env-config",
+        "react-page-metadata",
+        "react-accessibility",
+        "react-content-security",
+        "react-e2e-tests"
+      ]
+    },
+    {
+      "skill": "react-api-mocks",
+      "rank": 1,
+      "suggestions": [
+        "react-api-mocks",
+        "react-unit-tests",
+        "react-accessibility",
+        "react-e2e-tests",
+        "react-env-config",
+        "react-module-boundaries",
+        "react-mutations",
+        "react-page-composition"
+      ]
+    },
+    {
+      "skill": "react-load-performance",
+      "rank": 2,
+      "suggestions": [
+        "react-accessibility",
+        "react-load-performance",
+        "react-page-metadata",
+        "react-render-performance",
+        "react-access-policies",
+        "react-browser-data-security",
+        "react-dependency-security",
+        "react-module-boundaries"
+      ]
+    },
+    {
+      "skill": "react-render-performance",
+      "rank": 2,
+      "suggestions": [
+        "react-accessibility",
+        "react-render-performance",
+        "react-url-state",
+        "react-load-performance",
+        "react-module-boundaries",
+        "react-mutations",
+        "react-page-metadata",
+        "react-query-cache"
+      ]
+    },
+    {
+      "skill": "react-i18n",
+      "rank": 3,
+      "suggestions": [
+        "react-browser-data-security",
+        "react-accessibility",
+        "react-i18n",
+        "react-module-boundaries",
+        "react-page-metadata",
+        "react-access-policies",
+        "react-api-contracts",
+        "react-component-contracts"
+      ]
+    },
+    {
+      "skill": "react-page-metadata",
+      "rank": 1,
+      "suggestions": [
+        "react-page-metadata",
+        "react-error-recovery",
+        "react-accessibility",
+        "react-load-performance",
+        "react-api-contracts",
+        "react-api-mocks",
+        "react-browser-data-security",
+        "react-business-rules"
+      ]
+    }
+  ],
+  "nonActivationSuggestions": [
+    {
+      "skill": "react-module-boundaries",
+      "expected": "react-styling",
+      "expectedRank": 0,
+      "excludedRank": 0,
+      "suggestions": []
+    },
+    {
+      "skill": "react-tooling",
+      "expected": "react-dependency-security",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": ["react-dependency-security", "react-business-rules", "react-http-client", "react-routing", "react-unit-tests"]
+    },
+    {
+      "skill": "react-env-config",
+      "expected": "react-auth-session",
+      "expectedRank": 2,
+      "excludedRank": 1,
+      "suggestions": ["react-env-config", "react-auth-session", "react-content-security", "react-e2e-tests", "react-tooling"]
+    },
+    {
+      "skill": "react-app-lifecycle",
+      "expected": "react-query-cache",
+      "expectedRank": 0,
+      "excludedRank": 0,
+      "suggestions": [
+        "react-access-policies",
+        "react-api-contracts",
+        "react-component-contracts",
+        "react-env-config",
+        "react-http-client",
+        "react-module-boundaries",
+        "react-mutations",
+        "react-page-metadata"
+      ]
+    },
+    {
+      "skill": "react-routing",
+      "expected": "react-url-state",
+      "expectedRank": 2,
+      "excludedRank": 0,
+      "suggestions": [
+        "react-query-cache",
+        "react-url-state",
+        "react-browser-data-security",
+        "react-page-composition",
+        "react-page-metadata",
+        "react-telemetry"
+      ]
+    },
+    {
+      "skill": "react-url-state",
+      "expected": "react-routing",
+      "expectedRank": 4,
+      "excludedRank": 5,
+      "suggestions": ["react-page-metadata", "react-page-composition", "react-query-cache", "react-routing", "react-url-state"]
+    },
+    {
+      "skill": "react-business-rules",
+      "expected": "react-access-policies",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": ["react-access-policies", "react-mutations"]
+    },
+    {
+      "skill": "react-component-contracts",
+      "expected": "react-page-composition",
+      "expectedRank": 1,
+      "excludedRank": 2,
+      "suggestions": [
+        "react-page-composition",
+        "react-component-contracts",
+        "react-render-performance",
+        "react-access-policies",
+        "react-accessibility",
+        "react-app-lifecycle",
+        "react-e2e-tests",
+        "react-forms"
+      ]
+    },
+    {
+      "skill": "react-styling",
+      "expected": "react-component-contracts",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": [
+        "react-component-contracts",
+        "react-page-composition",
+        "react-api-contracts",
+        "react-app-lifecycle",
+        "react-integration-tests",
+        "react-access-policies",
+        "react-accessibility",
+        "react-api-mocks"
+      ]
+    },
+    {
+      "skill": "react-accessibility",
+      "expected": "react-query-cache",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": ["react-query-cache", "react-url-state"]
+    },
+    {
+      "skill": "react-page-composition",
+      "expected": "react-api-contracts",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": ["react-api-contracts", "react-http-client"]
+    },
+    {
+      "skill": "react-ui-state",
+      "expected": "react-mutations",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": [
+        "react-mutations",
+        "react-api-contracts",
+        "react-env-config",
+        "react-access-policies",
+        "react-api-mocks",
+        "react-auth-session",
+        "react-browser-data-security",
+        "react-component-contracts"
+      ]
+    },
+    {
+      "skill": "react-api-contracts",
+      "expected": "react-http-client",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": ["react-http-client", "react-page-metadata"]
+    },
+    {
+      "skill": "react-http-client",
+      "expected": "react-query-cache",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": [
+        "react-query-cache",
+        "react-api-contracts",
+        "react-env-config",
+        "react-access-policies",
+        "react-browser-data-security",
+        "react-component-contracts",
+        "react-forms",
+        "react-module-boundaries"
+      ]
+    },
+    {
+      "skill": "react-query-cache",
+      "expected": "react-mutations",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": ["react-mutations", "react-http-client", "react-load-performance", "react-render-performance"]
+    },
+    {
+      "skill": "react-mutations",
+      "expected": "react-query-cache",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": [
+        "react-query-cache",
+        "react-url-state",
+        "react-access-policies",
+        "react-accessibility",
+        "react-api-contracts",
+        "react-component-contracts",
+        "react-env-config",
+        "react-module-boundaries"
+      ]
+    },
+    {
+      "skill": "react-forms",
+      "expected": "react-mutations",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": ["react-mutations", "react-env-config", "react-query-cache", "react-render-performance"]
+    },
+    {
+      "skill": "react-auth-session",
+      "expected": "react-access-policies",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": [
+        "react-access-policies",
+        "react-api-contracts",
+        "react-component-contracts",
+        "react-env-config",
+        "react-module-boundaries",
+        "react-mutations",
+        "react-page-metadata",
+        "react-routing"
+      ]
+    },
+    {
+      "skill": "react-access-policies",
+      "expected": "react-auth-session",
+      "expectedRank": 2,
+      "excludedRank": 0,
+      "suggestions": [
+        "react-url-state",
+        "react-auth-session",
+        "react-mutations",
+        "react-page-composition",
+        "react-page-metadata",
+        "react-query-cache"
+      ]
+    },
+    {
+      "skill": "react-content-security",
+      "expected": "react-browser-data-security",
+      "expectedRank": 4,
+      "excludedRank": 0,
+      "suggestions": [
+        "react-access-policies",
+        "react-ui-state",
+        "react-api-contracts",
+        "react-browser-data-security",
+        "react-component-contracts",
+        "react-env-config",
+        "react-i18n",
+        "react-module-boundaries"
+      ]
+    },
+    {
+      "skill": "react-browser-data-security",
+      "expected": "react-content-security",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": ["react-content-security"]
+    },
+    {
+      "skill": "react-dependency-security",
+      "expected": "react-tooling",
+      "expectedRank": 1,
+      "excludedRank": 2,
+      "suggestions": [
+        "react-tooling",
+        "react-dependency-security",
+        "react-e2e-tests",
+        "react-env-config",
+        "react-error-recovery",
+        "react-page-composition",
+        "react-styling"
+      ]
+    },
+    {
+      "skill": "react-error-recovery",
+      "expected": "react-query-cache",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": ["react-query-cache", "react-access-policies", "react-http-client", "react-mutations"]
+    },
+    {
+      "skill": "react-telemetry",
+      "expected": "react-error-recovery",
+      "expectedRank": 1,
+      "excludedRank": 8,
+      "suggestions": [
+        "react-error-recovery",
+        "react-api-mocks",
+        "react-accessibility",
+        "react-forms",
+        "react-http-client",
+        "react-i18n",
+        "react-styling",
+        "react-telemetry"
+      ]
+    },
+    {
+      "skill": "react-unit-tests",
+      "expected": "react-e2e-tests",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": [
+        "react-e2e-tests",
+        "react-accessibility",
+        "react-auth-session",
+        "react-browser-data-security",
+        "react-content-security",
+        "react-dependency-security",
+        "react-integration-tests",
+        "react-load-performance"
+      ]
+    },
+    {
+      "skill": "react-integration-tests",
+      "expected": "react-api-mocks",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": [
+        "react-api-mocks",
+        "react-load-performance",
+        "react-module-boundaries",
+        "react-mutations",
+        "react-page-composition",
+        "react-styling",
+        "react-ui-state",
+        "react-unit-tests"
+      ]
+    },
+    {
+      "skill": "react-e2e-tests",
+      "expected": "react-unit-tests",
+      "expectedRank": 0,
+      "excludedRank": 1,
+      "suggestions": [
+        "react-e2e-tests",
+        "react-browser-data-security",
+        "react-content-security",
+        "react-integration-tests",
+        "react-load-performance",
+        "react-page-metadata",
+        "react-routing"
+      ]
+    },
+    {
+      "skill": "react-api-mocks",
+      "expected": "react-integration-tests",
+      "expectedRank": 0,
+      "excludedRank": 0,
+      "suggestions": [
+        "react-unit-tests",
+        "react-forms",
+        "react-mutations",
+        "react-page-composition",
+        "react-page-metadata",
+        "react-styling"
+      ]
+    },
+    {
+      "skill": "react-load-performance",
+      "expected": "react-render-performance",
+      "expectedRank": 1,
+      "excludedRank": 2,
+      "suggestions": [
+        "react-render-performance",
+        "react-load-performance",
+        "react-browser-data-security",
+        "react-business-rules",
+        "react-content-security",
+        "react-page-composition",
+        "react-page-metadata"
+      ]
+    },
+    {
+      "skill": "react-render-performance",
+      "expected": "react-load-performance",
+      "expectedRank": 4,
+      "excludedRank": 0,
+      "suggestions": ["react-api-mocks", "react-browser-data-security", "react-forms", "react-load-performance"]
+    },
+    {
+      "skill": "react-i18n",
+      "expected": "react-business-rules",
+      "expectedRank": 1,
+      "excludedRank": 0,
+      "suggestions": ["react-business-rules", "react-api-contracts", "react-render-performance", "react-routing", "react-unit-tests"]
+    },
+    {
+      "skill": "react-page-metadata",
+      "expected": "react-routing",
+      "expectedRank": 2,
+      "excludedRank": 1,
+      "suggestions": ["react-page-metadata", "react-routing"]
+    }
+  ],
+  "note": "Ranking lexical do board com descrições reais; não executa os procedimentos das skills. Zero indica ausência das oito sugestões."
+}

@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import * as cliResolve from '../src/extension/cliResolve';
-import { reinstallUserServers, runRegistrationSteps, userRegisteredTools } from '../src/extension/mcp/reinstall';
+import { ensureUserServers, runRegistrationSteps, toolsNeedingInstall, userRegisteredTools } from '../src/extension/mcp/reinstall';
+import { installFlowSkillFiles } from '../src/extension/flowSkill';
 import type { Registration } from '../src/extension/mcp/clientConfig';
 
 let project: string;
@@ -22,7 +22,6 @@ beforeEach(() => {
   emptyPath = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-reinstall-path-'));
 });
 afterEach(() => {
-  vi.restoreAllMocks();
   if (savedKimiHome === undefined) delete process.env.KIMI_CODE_HOME;
   else process.env.KIMI_CODE_HOME = savedKimiHome;
   for (const dir of [project, home, emptyPath]) fs.rmSync(dir, { recursive: true, force: true });
@@ -37,13 +36,12 @@ const server = (bridge: string, ...rest: string[]) => ({
   mcpServers: { 'faz-ai': { command: process.execPath, args: [bridge, ...rest] } },
 });
 
-const options = (log: string[] = []) => ({
+const options = () => ({
   bridgePath: BRIDGE,
   workspaceDir: project,
   homeDir: home,
   nodeCommand: process.execPath,
   pathEnv: emptyPath,
-  log: (m: string) => log.push(m),
 });
 
 describe('userRegisteredTools', () => {
@@ -101,37 +99,84 @@ describe('runRegistrationSteps', () => {
   });
 });
 
-describe('reinstallUserServers', () => {
+describe('toolsNeedingInstall', () => {
+  it('versão igual e ponte de hoje: nada a fazer', () => {
+    writeJson(kimiFile(), server(BRIDGE));
+    expect(toolsNeedingInstall(project, home, BRIDGE, [], '1.0.0', '1.0.0')).toEqual([]);
+  });
+
+  it('versão antiga ou ausente, ou ponte de outro caminho: refaz', () => {
+    writeJson(kimiFile(), server(BRIDGE));
+    expect(toolsNeedingInstall(project, home, BRIDGE, [], '0.9.0', '1.0.0')).toEqual(['kimi']);
+    expect(toolsNeedingInstall(project, home, BRIDGE, [], null, '1.0.0')).toEqual(['kimi']);
+    writeJson(kimiFile(), server(OLD_BRIDGE));
+    expect(toolsNeedingInstall(project, home, BRIDGE, [], '1.0.0', '1.0.0')).toEqual(['kimi']);
+  });
+
+  it('a ferramenta do board sem registro de usuário entra; o Cursor não', () => {
+    expect(toolsNeedingInstall(project, home, BRIDGE, ['kimi', 'cursor'], '1.0.0', '1.0.0')).toEqual(['kimi']);
+  });
+
+  it('registro só no projeto conta como sem registro de usuário, e o arquivo do projeto não é tocado', async () => {
+    const file = path.join(project, '.mcp.json');
+    writeJson(file, server(OLD_BRIDGE, project));
+    const before = fs.readFileSync(file, 'utf8');
+    expect(toolsNeedingInstall(project, home, BRIDGE, [], '1.0.0', '1.0.0')).toEqual([]);
+    writeJson(kimiFile(), { mcpServers: {} });
+    const r = await ensureUserServers({ ...options(), installedVersion: '1.0.0', currentVersion: '1.0.0', wanted: ['kimi'] });
+    expect(r.done).toEqual(['kimi']);
+    expect(fs.readFileSync(file, 'utf8')).toBe(before);
+  });
+
+  it('um "faz-ai" de usuário que não é a ponte do board é da pessoa', () => {
+    writeJson(kimiFile(), { mcpServers: { 'faz-ai': { command: 'uvx', args: ['meu-servidor'] } } });
+    expect(toolsNeedingInstall(project, home, BRIDGE, ['kimi'], null, '1.0.0')).toEqual([]);
+  });
+});
+
+describe('ensureUserServers', () => {
+  const ensure = (wanted: 'kimi'[] = []) => ensureUserServers({ ...options(), installedVersion: '0.9.0', currentVersion: '1.0.0', wanted });
+
   it('regrava o registro global do Kimi Code com a ponte nova', async () => {
     writeJson(kimiFile(), { mcpServers: { outro: { command: 'x' }, 'faz-ai': { command: '/sumiu/node', args: [OLD_BRIDGE] } } });
-    await expect(reinstallUserServers(options())).resolves.toEqual(['kimi']);
+    await expect(ensure()).resolves.toEqual({ done: ['kimi'], failed: [] });
     expect(JSON.parse(fs.readFileSync(kimiFile(), 'utf8')).mcpServers).toEqual({
       outro: { command: 'x' },
       'faz-ai': { command: process.execPath, args: [BRIDGE] },
     });
   });
 
-  it('não cria registro onde não havia', async () => {
-    const log: string[] = [];
-    await expect(reinstallUserServers(options(log))).resolves.toEqual([]);
-    expect(fs.existsSync(kimiFile())).toBe(false);
-    expect(fs.existsSync(path.join(home, '.claude.json'))).toBe(false);
-    expect(log).toEqual([]);
+  it('instala na ferramenta do board que ainda não tinha registro', async () => {
+    await expect(ensure(['kimi'])).resolves.toEqual({ done: ['kimi'], failed: [] });
+    expect(JSON.parse(fs.readFileSync(kimiFile(), 'utf8')).mcpServers['faz-ai'].args).toEqual([BRIDGE]);
   });
 
-  it('a falha numa ferramenta vai para o log e não derruba as outras', async () => {
-    // A busca também alcança instalações globais fora do PATH. Simula a ausência para não chamar
-    // uma CLI real nem alterar o registro da pessoa durante o teste.
-    vi.spyOn(cliResolve, 'resolveCommand').mockReturnValue(null);
-    writeJson(path.join(home, '.claude.json'), server(OLD_BRIDGE));
-    writeJson(kimiFile(), server(OLD_BRIDGE));
-    const log: string[] = [];
-    await expect(reinstallUserServers(options(log))).resolves.toEqual(['kimi']);
-    expect(log).toEqual([
-      expect.stringMatching(
-        /^Faz AI: não foi possível refazer o registro do board no Claude Code: A linha de comando "claude" não foi encontrada\. Rode no terminal: claude mcp add-json --scope user faz-ai '/,
-      ),
-    ]);
-    expect(JSON.parse(fs.readFileSync(kimiFile(), 'utf8')).mcpServers['faz-ai'].args).toEqual([BRIDGE]);
+  it('não cria registro onde não havia', async () => {
+    await expect(ensure()).resolves.toEqual({ done: [], failed: [] });
+    expect(fs.existsSync(kimiFile())).toBe(false);
+    expect(fs.existsSync(path.join(home, '.claude.json'))).toBe(false);
+  });
+
+  it('a falha vai em failed, com a mensagem, e o registro de projeto fica intacto', async () => {
+    // o JSON do Kimi Code está quebrado: não dá para registrar. Nunca usa o Claude Code aqui: a CLI real
+    // da máquina escreveria no ~/.claude.json de quem roda o teste
+    fs.mkdirSync(path.dirname(kimiFile()), { recursive: true });
+    fs.writeFileSync(kimiFile(), '{ quebrado');
+    const r = await ensure(['kimi']);
+    expect(r.done).toEqual([]);
+    expect(r.failed).toEqual([{ tool: 'kimi', message: expect.any(String) }]);
+  });
+});
+
+describe('installFlowSkillFiles', () => {
+  it('grava o conjunto e é idempotente: sem replace não sobrescreve o que a pessoa ajustou', () => {
+    const root = path.join(home, 'skills');
+    const first = installFlowSkillFiles(root);
+    expect(first.length).toBeGreaterThan(0);
+    const file = path.join(root, first[0]!, 'SKILL.md');
+    fs.writeFileSync(file, 'minha versão');
+    expect(installFlowSkillFiles(root)).toEqual([]);
+    expect(fs.readFileSync(file, 'utf8')).toBe('minha versão');
+    expect(installFlowSkillFiles(root, true).length).toBe(first.length);
   });
 });

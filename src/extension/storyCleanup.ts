@@ -84,14 +84,14 @@ const WARNING = '**Aviso:**';
 /** A primeira linha da mensagem de erro, até 200 caracteres: é o que entra em `{error}`. */
 const errorLine = (e: unknown): string => (e instanceof Error ? e.message : String(e)).split('\n')[0]!.trim().slice(0, 200);
 
-interface Worktree {
+export interface Worktree {
   path: string;
   /** '' com o HEAD destacado */
   branch: string;
 }
 
-/** As worktrees do repositório, pelo `git worktree list --porcelain`. */
-async function listWorktrees(deps: CleanupDeps): Promise<Worktree[]> {
+/** As worktrees do repositório, pelo `git worktree list --porcelain`. Também da sincronização das branches (#722). */
+export async function listWorktrees(deps: Pick<CleanupDeps, 'git' | 'cwd'>): Promise<Worktree[]> {
   const out = await deps.git(['worktree', 'list', '--porcelain'], deps.cwd);
   const list: Worktree[] = [];
   for (const block of out.split(/\r?\n\r?\n/)) {
@@ -105,7 +105,7 @@ async function listWorktrees(deps: CleanupDeps): Promise<Worktree[]> {
 }
 
 /** o git lista o caminho real (links resolvidos): compara nas duas formas */
-const isWorktree = (w: Worktree, dir: string): boolean => {
+export const isWorktree = (w: Worktree, dir: string): boolean => {
   const real = fs.existsSync(dir) ? fs.realpathSync.native(dir) : dir;
   return samePath(w.path, dir) || samePath(w.path, real);
 };

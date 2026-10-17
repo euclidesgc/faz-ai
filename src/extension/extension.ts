@@ -6,9 +6,12 @@ import * as fs from 'node:fs';
 import { bindBranchRenamePrompt } from './branchRenamePrompt';
 import { createBoardHost, type BoardHost } from './host/boardHost';
 import { startMcpServer } from './mcp/server';
-import { socketPath, stableBridgePath, workspaceKey } from './mcp/socketPath';
+import { readBridgeVersion, socketPath, stableBridgePath, workspaceKey, writeBridgeVersion } from './mcp/socketPath';
 import { registerCursorProject } from './mcp/clientConfig';
-import { reinstallUserServers } from './mcp/reinstall';
+import { aiToolInfo, type AiTool } from '../shared/harness';
+import { ensureUserServers } from './mcp/reinstall';
+import { installFlowSkillFiles } from './flowSkill';
+import { copyTarget } from '../shared/harnessCatalog';
 import { resolveCommand } from './cliResolve';
 import { loginShellPath } from './spawn';
 import { BoardPanel } from './panel/BoardPanel';
@@ -119,6 +122,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         },
       });
       const router = host.router;
+      // a ferramenta do board aberto também recebe o servidor no usuário, sem a pessoa pedir
+      ensureUserInstall(context, f.uri.fsPath, bridgePath, output, [router.snapshot().board.aiTool]);
       // o que já estava com a pessoa ao abrir não gera aviso; só o que a IA passar daqui em diante
       let withHuman = humanQueueStatuses(router.snapshot());
       const onBoardChange = () => {
@@ -408,7 +413,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // no Cursor; veja registerCursorProject)
       if (editorName === 'cursor') void registerInCursor(f.uri.fsPath, bridgePath, output);
       // em segundo plano: a CLI da ferramenta pode demorar, e o servidor do board não depende dela
-      void reinstallOnUpdate(context, f.uri.fsPath, bridgePath, output);
+      ensureUserInstall(context, f.uri.fsPath, bridgePath, output, []);
       stopMcp = await startMcpServer(socketPath(f.uri.fsPath), {
         getRouter,
         getRunner: async () => {
@@ -448,43 +453,64 @@ async function offerBoardUpgrade(context: vscode.ExtensionContext, router: Messa
   else await context.globalState.update(key, version);
 }
 
-const MCP_VERSION_KEY = 'fazai.mcpRegisteredVersion';
-/** Num workspace com várias pastas só a primeira refaz o registro: ele é global, e duas CLIs ao mesmo tempo escreveriam o mesmo arquivo. */
-let reinstallStarted = false;
+/** As instalações rodam uma de cada vez: duas CLIs ao mesmo tempo escreveriam o mesmo arquivo global. */
+let ensuring: Promise<void> = Promise.resolve();
+/** Num workspace com várias pastas só a primeira instala: o registro é global. */
+let ensureFolder: string | undefined;
 
 /**
- * Refaz o registro global do board nas ferramentas em que ele já está, uma vez por versão da extensão:
- * o que a ferramenta guarda pode ter mudado com a atualização. A versão é gravada mesmo quando uma
- * ferramenta falha (a CLI fora do PATH, por exemplo): repetir a cada ativação rodaria a CLI toda vez, e
- * a faixa de requisitos já aponta o registro velho com o botão de reinstalar; a falha vai para a Saída.
+ * Instala ou atualiza, em silêncio, o MCP do board no escopo do usuário (e a skill do fluxo, se ela não
+ * existe), nas ferramentas já registradas e em `wanted` (a do board aberto). A versão da extensão só é
+ * gravada ao lado da ponte quando tudo deu certo; sucesso não mostra nada. Falha vira aviso com o
+ * caminho para instalar com um clique (a faixa do board tem o botão). Registro de projeto é ignorado.
  */
-async function reinstallOnUpdate(
+function ensureUserInstall(
   context: vscode.ExtensionContext,
   folderPath: string,
   bridgePath: string,
   output: vscode.OutputChannel,
-): Promise<void> {
-  if (reinstallStarted) return;
-  reinstallStarted = true;
-  const version = String(context.extension.packageJSON.version);
-  if (context.globalState.get<string>(MCP_VERSION_KEY) === version) return;
-  try {
-    const homeDir = os.homedir();
-    const pathEnv = (await loginShellPath()) ?? process.env.PATH;
-    const nodeCommand = resolveCommand('node', pathEnv, homeDir) ?? undefined;
-    const done = await reinstallUserServers({
-      bridgePath,
-      workspaceDir: folderPath,
-      homeDir,
-      nodeCommand,
-      pathEnv,
-      log: (message) => output.appendLine(message),
-    });
-    if (done.length) output.appendLine(`Faz AI ${version}: registro do servidor do board refeito em ${done.join(', ')}.`);
-    await context.globalState.update(MCP_VERSION_KEY, version);
-  } catch (e) {
-    output.appendLine(`Faz AI: não foi possível refazer o registro do servidor do board: ${e instanceof Error ? e.message : String(e)}`);
-  }
+  wanted: AiTool[],
+): void {
+  if (ensureFolder !== undefined && ensureFolder !== folderPath) return;
+  ensureFolder = folderPath;
+  ensuring = ensuring.then(async () => {
+    const version = String(context.extension.packageJSON.version);
+    try {
+      const homeDir = os.homedir();
+      const pathEnv = (await loginShellPath()) ?? process.env.PATH;
+      const nodeCommand = resolveCommand('node', pathEnv, homeDir) ?? undefined;
+      const installedVersion = readBridgeVersion(homeDir);
+      const { done, failed } = await ensureUserServers({
+        bridgePath,
+        workspaceDir: folderPath,
+        homeDir,
+        nodeCommand,
+        pathEnv,
+        installedVersion,
+        currentVersion: version,
+        wanted,
+      });
+      for (const tool of done) {
+        const skills = copyTarget(tool, 'skill', 'skills', 'user');
+        if (skills) installFlowSkillFiles(path.join(homeDir, skills.path));
+      }
+      if (done.length) output.appendLine(`Faz AI ${version}: servidor do board instalado no usuário em ${done.join(', ')}.`);
+      if (!failed.length) {
+        if (installedVersion !== version) writeBridgeVersion(version, homeDir);
+        return;
+      }
+      for (const f of failed)
+        output.appendLine(`Faz AI: não foi possível instalar o servidor do board no ${aiToolInfo(f.tool).label}: ${f.message}`);
+      const open = 'Abrir o board';
+      const choice = await vscode.window.showWarningMessage(
+        `Faz AI: não foi possível instalar o servidor MCP do board no ${failed.map((f) => aiToolInfo(f.tool).label).join(', ')}. Abra o board e use "Instalar" na faixa de avisos.`,
+        open,
+      );
+      if (choice === open) void vscode.commands.executeCommand('fazai.openBoard');
+    } catch (e) {
+      output.appendLine(`Faz AI: não foi possível instalar o servidor do board: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  });
 }
 
 /** O registro do board no `.cursor/mcp.json` do projeto, com o node achado no PATH do terminal. */

@@ -550,6 +550,15 @@ describe('autopiloto', () => {
     expect(card(1).status).not.toBe('blocked');
   });
 
+  it('resolver conflito não conta como execução sem progresso para o disjuntor (#747)', () => {
+    create('A', 'PRD');
+    yolo(1);
+    for (let i = 0; i < MAX_RUNS_WITHOUT_PROGRESS + 1; i++) runner.finish(() => status(1, 'ready'), 'conflict');
+    // a última volta põe o card em "Pronto": o que prova é o disjuntor nunca ter disparado
+    expect(log.some((l) => l.includes('sem progresso'))).toBe(false);
+    expect(card(1).statusReason ?? '').not.toContain('autopiloto parou');
+  });
+
   it('um avanço entre as execuções zera a contagem do disjuntor', () => {
     create('A', 'Discovery');
     yolo(1);

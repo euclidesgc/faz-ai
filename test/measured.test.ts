@@ -8,7 +8,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { spawnMeasured, cleanStaleTemp } from '../src/extension/aiOutput/measured';
+import { spawnMeasured, cleanStaleTemp, formatArgs, refusesFormat } from '../src/extension/aiOutput/measured';
+import { MeasureEndedError, MeasureRefusedError } from '../src/extension/aiOutput/errors';
 import type { OutputStream } from '../src/extension/aiOutput/reader';
 import { headlessCommand, type HeadlessCommand, type HeadlessInput } from '../src/extension/headless';
 import type { RunningProcess } from '../src/extension/runner';
@@ -49,6 +50,9 @@ const spawn = (command: HeadlessCommand, _cwd: string, out: (text: string, strea
 
 const run = (tool: Parameters<typeof spawnMeasured>[0] = 'claude', input: HeadlessInput = INPUT) =>
   spawnMeasured(tool, input, '/projeto', { spawn, log: (l) => lines.push(l) });
+
+/** A recusa do argumento do formato como a CLI escreve no `stderr`, antes de começar. */
+const REFUSE_FORMAT = "error: unknown option '--output-format'\n";
 
 beforeEach(() => {
   started = [];
@@ -117,21 +121,25 @@ describe('a volta para texto, que custa dinheiro se errar', () => {
     expect(lines.join('\n')).toContain('trabalho feito');
   });
 
-  it('falha sem nenhum evento e sem recusa de argumento no `stderr`: repete em texto, mas não culpa a versão instalada', () => {
-    const { proc, report } = run();
-    proc.onExit(() => {});
+  it('falha sem nenhum evento e sem recusa de argumento no `stderr`: NÃO repete, porque pode ter trabalhado', () => {
+    const { proc, report, failure } = run();
+    const exits: (number | null)[] = [];
+    proc.onExit((code) => exits.push(code));
 
     // uma falha qualquer antes do primeiro evento (rede, autenticação): nada indica argumento recusado
     started[0]!.emit('erro: sem conexão com o servidor\n', 'stderr');
     started[0]!.exit(1);
-    expect(started).toHaveLength(2);
-    started[1]!.exit(1);
 
+    expect(started).toHaveLength(1);
+    expect(exits).toEqual([1]);
     const r = report();
     expect(r.measure).toBe('none');
+    // consumo desconhecido, não zero
+    expect(r.consumption).toBeNull();
     expect(r.reason).not.toContain('não aceita a saída estruturada');
-    expect(r.reason).toContain('a execução terminou antes de informar o consumo');
-    expect(lines.join('\n')).not.toContain('não aceita a saída estruturada');
+    expect(r.reason).toContain('não foi repetida');
+    expect(failure()).toBeInstanceOf(MeasureEndedError);
+    expect(lines.join('\n')).not.toContain('O trabalho rodou em modo texto');
   });
 
   it('a CLI ignora a saída estruturada e responde em texto, com código 0: a resposta não se perde', () => {
@@ -193,6 +201,7 @@ describe('a volta para texto, que custa dinheiro se errar', () => {
     let vezes = 0;
     proc.onExit(() => vezes++);
 
+    started[0]!.emit(REFUSE_FORMAT, 'stderr');
     started[0]!.exit(1);
     started[1]!.exit(0);
     // o processo da segunda tentativa não dispara duas vezes nem revive a primeira
@@ -205,10 +214,192 @@ describe('a volta para texto, que custa dinheiro se errar', () => {
     const { proc } = run();
     proc.onExit(() => {});
 
+    started[0]!.emit(REFUSE_FORMAT, 'stderr');
     started[0]!.exit(1);
     started[0]!.exit(1);
 
     expect(started).toHaveLength(2);
+  });
+});
+
+describe('a falha antes do primeiro evento não é repetida (#739)', () => {
+  it('reprodução: a CLI altera um arquivo e cai com saída truncada — uma tentativa e um efeito só', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-efeito-'));
+    const effect = path.join(dir, 'efeito.txt');
+    try {
+      // cada início da CLI deixa um efeito real (como alterar um arquivo do projeto ou comentar num card)
+      const effectful = (command: HeadlessCommand, cwd: string, out: (text: string, stream: OutputStream) => void) => {
+        fs.appendFileSync(effect, 'efeito\n');
+        return spawn(command, cwd, out);
+      };
+      const { proc, report } = spawnMeasured('claude', INPUT, '/projeto', { spawn: effectful, log: (l) => lines.push(l) });
+      const exits: (number | null)[] = [];
+      proc.onExit((code) => exits.push(code));
+
+      started[0]!.emit('{"type":"assi');
+      started[0]!.exit(1);
+
+      expect(started).toHaveLength(1);
+      expect(fs.readFileSync(effect, 'utf8').split('\n').filter(Boolean)).toHaveLength(1);
+      expect(exits).toEqual([1]);
+      const r = report();
+      expect(r.measure).toBe('none');
+      expect(r.consumption).toBeNull();
+      expect(r.reason).toContain('não foi repetida');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('a recusa de OUTRO argumento não volta para texto: a segunda tentativa levaria o mesmo argumento', () => {
+    const { proc, failure } = run();
+    proc.onExit(() => {});
+
+    started[0]!.emit("error: unknown option '--permission-mode'\n", 'stderr');
+    started[0]!.exit(1);
+
+    expect(started).toHaveLength(1);
+    expect(failure()).toBeInstanceOf(MeasureEndedError);
+  });
+
+  it('a recusa do formato com algo escrito no `stdout` não volta para texto: a CLI já tinha começado', () => {
+    const { proc, failure } = run();
+    proc.onExit(() => {});
+
+    started[0]!.emit('lendo o projeto...\n');
+    started[0]!.emit(REFUSE_FORMAT, 'stderr');
+    started[0]!.exit(1);
+
+    expect(started).toHaveLength(1);
+    expect(failure()).toBeInstanceOf(MeasureEndedError);
+  });
+
+  it.each([
+    ['cota', "You've hit your limit · resets 3pm\n", 'stderr'],
+    ['login', 'Invalid API key · Please run /login\n', 'stderr'],
+    ['saída truncada', '{"type":"assistant","message":{"con', 'stdout'],
+    ['saída desconhecida', 'Segmentation fault\n', 'stdout'],
+  ] as const)('%s antes do primeiro evento não dispara a repetição', (_caso, text, stream) => {
+    const { proc, report } = run();
+    const exits: (number | null)[] = [];
+    proc.onExit((code) => exits.push(code));
+
+    started[0]!.emit(text, stream);
+    started[0]!.exit(1);
+
+    expect(started).toHaveLength(1);
+    expect(exits).toEqual([1]);
+    expect(report().measure).toBe('none');
+    expect(report().consumption).toBeNull();
+  });
+
+  it.each(['claude', 'cursor', 'kimi'] as const)(
+    '%s: a tentativa em texto leva os mesmos argumentos de restrição, só sem os do formato',
+    (tool) => {
+      const input: HeadlessInput = {
+        prompt: 'faça o trabalho',
+        permission: 'board',
+        exec: {
+          agent: '',
+          agentDefinition: null,
+          delegates: [],
+          mcpAllowed: [],
+          mcpBlocked: [],
+          mcpConfig: null,
+          tools: [],
+          deniedTools: [],
+          model: { name: 'modelo-x', effort: 'high' },
+        },
+      };
+      const fmt = formatArgs(tool, input);
+      expect(fmt).toContain('output-format');
+      const { proc } = run(tool, input);
+      proc.onExit(() => {});
+
+      started[0]!.emit(REFUSE_FORMAT, 'stderr');
+      started[0]!.exit(1);
+
+      expect(started).toHaveLength(2);
+      const first = started[0]!.command.args;
+      const second = started[1]!.command.args;
+      expect(second).toEqual(first.filter((a) => !fmt.includes(a.replace(/^-+/, '').toLowerCase())));
+      expect(second).toEqual(headlessCommand(tool, { ...input, structured: false }).args);
+    },
+  );
+
+  it('a parada durante a decisão de repetir não abre a segunda tentativa e apaga os temporários uma vez', () => {
+    const server = { command: '/usr/bin/node', args: ['/dados/bridge.js', '/projeto'] };
+    let measured: ReturnType<typeof spawnMeasured> | null = null;
+    // a pessoa para a execução no instante em que o board registra a recusa do formato
+    const log = (l: string) => {
+      lines.push(l);
+      if (l.includes('não aceita a saída estruturada')) measured!.proc.kill();
+    };
+    measured = spawnMeasured('claude', { ...INPUT, boardServer: server }, '/projeto', { spawn, log });
+    const exits: (number | null)[] = [];
+    measured.proc.onExit((code) => exits.push(code));
+
+    const args = started[0]!.command.args;
+    const config = args[args.indexOf('--mcp-config') + 1]!;
+    expect(fs.existsSync(config)).toBe(true);
+
+    started[0]!.emit(REFUSE_FORMAT, 'stderr');
+    started[0]!.exit(1);
+
+    expect(started).toHaveLength(1);
+    expect(exits).toEqual([1]);
+    expect(fs.existsSync(path.dirname(config))).toBe(false);
+    // o relatório não afirma uma repetição que não aconteceu
+    expect(measured.failure()).toBeInstanceOf(MeasureEndedError);
+    expect(measured.report().reason).not.toContain('O trabalho rodou em modo texto');
+  });
+
+  it('a linha da chamada diz a execução e a tentativa', () => {
+    const { proc, failure } = spawnMeasured('claude', INPUT, '/projeto', { spawn, log: (l) => lines.push(l), runId: 'r1' });
+    proc.onExit(() => {});
+    started[0]!.emit(REFUSE_FORMAT, 'stderr');
+    started[0]!.exit(1);
+    started[1]!.exit(0);
+
+    const calls = lines.filter((l) => l.startsWith('Chamando'));
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toMatch(/\(tentativa 1 da execução r1\)$/);
+    expect(calls[1]).toMatch(/\(tentativa 2 da execução r1\)$/);
+    expect(failure()).toBeInstanceOf(MeasureRefusedError);
+  });
+
+  it('sem o id da execução, a linha mostra só a tentativa', () => {
+    run();
+    expect(lines[0]).toMatch(/\(tentativa 1\)$/);
+  });
+
+  it('o Kimi Code com a cota no `stdout` não repete e o sinal do limite de uso chega a quem chamou', () => {
+    const { proc, report } = run('kimi');
+    proc.onExit(() => {});
+
+    started[0]!.emit("error: provider.auth_error: 403 You've reached your 5-hour usage limit.\n");
+    started[0]!.exit(1);
+
+    expect(started).toHaveLength(1);
+    expect(report().usageLimitReached).toBe(true);
+  });
+});
+
+describe('os argumentos do formato e a recusa deles', () => {
+  it('saem da diferença entre os dois comandos de cada ferramenta', () => {
+    expect(formatArgs('claude', INPUT).sort()).toEqual(['output-format', 'stream-json', 'verbose']);
+    expect(formatArgs('cursor', INPUT).sort()).toEqual(['output-format', 'stream-json']);
+    expect(formatArgs('kimi', INPUT).sort()).toEqual(['output-format', 'stream-json']);
+  });
+
+  it('só uma recusa que cita um argumento do formato conta', () => {
+    const fmt = formatArgs('claude', INPUT);
+    expect(refusesFormat("error: unknown option '--output-format'", fmt)).toBe(true);
+    expect(refusesFormat('Error: When using --print, --output-format=stream-json requires --verbose', fmt)).toBe(true);
+    // recusa, mas de outro argumento
+    expect(refusesFormat("error: unknown option '--permission-mode'", fmt)).toBe(false);
+    // cita o argumento, mas não recusa
+    expect(refusesFormat('aviso: --output-format stream-json ativo', fmt)).toBe(false);
   });
 });
 

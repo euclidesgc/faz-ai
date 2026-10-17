@@ -8,6 +8,7 @@ import { effortToRun } from '../shared/execution';
 import { parseModelValue } from '../shared/models';
 import type { BoardState } from '../shared/model';
 import { NO_CARD, type AiExecution } from './ai/gateway';
+import { MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { BOARD_SERVER, bareExec, type ExecInput } from './execution';
 import { contextLines } from './promptContext';
 import { isCliNoise } from './cliNoise';
@@ -332,8 +333,11 @@ export class ChatSession {
       else if (end.timedOut) hooks.failed(`A resposta passou do tempo limite (${state.board.runner.timeoutMinutes} min) e foi encerrada.`);
       else if (end.error) hooks.failed(`Não foi possível executar o ${tool.label}: ${end.error.message}`);
       else if (end.code !== 0) {
-        const lines = tail.join('\n');
-        hooks.failed(`O ${tool.label} terminou com erro (código ${end.code}).${lines ? `\n\n${lines}` : ''}`);
+        // o motivo da medição é recado do board no canal, não saída da ferramenta: fica fora do aviso
+        const lines = tail.filter((l) => l !== end.measureError?.message).join('\n');
+        // caiu antes do primeiro evento e o board não repetiu: a pessoa confere o que ficou feito
+        const notRepeated = end.measureError instanceof MeasureEndedError ? ` ${NOT_REPEATED}` : '';
+        hooks.failed(`O ${tool.label} terminou com erro (código ${end.code}).${notRepeated}${lines ? `\n\n${lines}` : ''}`);
       } else hooks.done(text);
     });
   }
