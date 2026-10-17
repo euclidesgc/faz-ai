@@ -8,6 +8,9 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 ## Unreleased
 
 - **Rules no longer shows the notice about the Models tab (#725).** The block saying that "Fill in the suggested model automatically" had moved to Models, with its "Open in Models" button, was removed from Settings → Rules. The option stays in Models, unchanged.
+
+- **Fix: importing skills and pasting into the library no longer deletes files.** The library detects folders containing `SKILL.md` and local edits when reopened, focused or refreshed. Unregistered files are preserved and duplicate names show a notice. Import from a folder opens the system picker, supports reviewing and bulk selection, and confirms where items appear. Open folder uses the file manager without opening another editor project.
+
 - **Private Harness library (#615).** Settings shows the board folder and supports bulk skill imports, agents, rules and MCP definitions. Copies remain available across tool changes and source removal; updating from source is explicit. The folder can be changed without deleting the previous one. Private project skills are excluded from the extension package. **Behavior change:** sending an artifact to the board creates a copy instead of keeping a live reference to the original file.
 
 - **Contextual bulk actions (#616).** The selection bar and column menu share approve, block with a reason, unblock, work on phase, refine, stop AI, autonomous mode and organization actions. Unavailable items remain visible and disabled, without a reason. Mixed selections affect only eligible cards; filters and execution limits are respected. Bulk approvals advance the phase and preserve history events.

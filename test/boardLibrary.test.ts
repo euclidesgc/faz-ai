@@ -149,4 +149,70 @@ describe('biblioteca particular do board', () => {
     expect(fs.existsSync(source)).toBe(true);
     expect(new ArtifactRepo(handle.db).list(router.boardId)).toEqual([]);
   });
+  it('reconhece pastas coladas, atualiza as opções dos cards e preserva arquivos desconhecidos ao reabrir', () => {
+    const library = router.snapshot().harness.library!.directory;
+    fs.mkdirSync(path.join(library, 'react/references'), { recursive: true });
+    fs.writeFileSync(
+      path.join(library, 'react/SKILL.md'),
+      '---\nname: react\ndescription: Componentes locais\n---\nLeia references/form.md',
+    );
+    fs.writeFileSync(path.join(library, 'react/references/form.md'), 'Referência particular');
+    fs.writeFileSync(path.join(library, 'rascunho.txt'), 'Não apagar');
+    router.refreshHarness();
+    const s = router.snapshot();
+    expect(selectedItems(s, 'skill').map((i) => i.name)).toEqual(['react']);
+    expect(s.fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['react']);
+    expect(fs.readFileSync(path.join(library, 'react/SKILL.md'), 'utf8')).toContain('Componentes locais');
+    router = makeRouter();
+    expect(selectedItems(router.snapshot(), 'skill')[0]!.description).toBe('Componentes locais');
+    expect(fs.readFileSync(path.join(library, 'rascunho.txt'), 'utf8')).toBe('Não apagar');
+    expect(fs.readFileSync(path.join(library, 'react/references/form.md'), 'utf8')).toBe('Referência particular');
+  });
+
+  it('preserva edições externas da cópia e atualizações explícitas da origem sem desfazer nenhuma na abertura', () => {
+    const source = write('project/.claude/skills/react/SKILL.md', 'Original');
+    router.refreshHarness();
+    select('skill', '.claude/skills/react/SKILL.md');
+    const a = router.snapshot().harness.library!.artifacts[0]!;
+    fs.writeFileSync(a.path, 'Editado diretamente na biblioteca');
+    router.refreshHarness();
+    router = makeRouter();
+    expect(router.readHarnessFile(a.path).content).toBe('Editado diretamente na biblioteca');
+    fs.writeFileSync(source, 'Atualizado da origem');
+    router.handle({ type: 'harness.library.update', id: a.id });
+    router = makeRouter();
+    expect(router.readHarnessFile(a.path).content).toBe('Atualizado da origem');
+  });
+
+  it('não reimporta uma pasta colada depois de remover a cópia e conserva nomes duplicados sem sobrescrever', () => {
+    const library = router.snapshot().harness.library!.directory;
+    fs.mkdirSync(path.join(library, 'react'), { recursive: true });
+    fs.writeFileSync(path.join(library, 'react/SKILL.md'), 'Colada');
+    router.refreshHarness();
+    const item = selectedItems(router.snapshot(), 'skill')[0]!;
+    const duplicate = path.join(library, 'outra/react');
+    fs.mkdirSync(duplicate, { recursive: true });
+    fs.writeFileSync(path.join(duplicate, 'SKILL.md'), 'Diferente');
+    router.refreshHarness();
+    expect(router.readHarnessFile(item.path).content).toBe('Colada');
+    expect(router.snapshot().harness.library!.warnings).toContainEqual({ path: 'outra/react/SKILL.md', reason: 'duplicate' });
+    expect(fs.readFileSync(path.join(duplicate, 'SKILL.md'), 'utf8')).toBe('Diferente');
+    fs.rmSync(duplicate, { recursive: true });
+    router.handle({ type: 'harness.selection.set', items: [{ kind: 'skill', location: item.location }], usage: null });
+    router = makeRouter();
+    expect(selectedItems(router.snapshot(), 'skill')).toEqual([]);
+    expect(fs.existsSync(path.join(library, 'react/SKILL.md'))).toBe(true);
+    fs.writeFileSync(path.join(library, 'react/SKILL.md'), 'Colada');
+    router.refreshHarness();
+    expect(selectedItems(router.snapshot(), 'skill').map((i) => i.name)).toEqual(['react']);
+  });
+  it('não substitui o conteúdo colado de uma skill do fluxo pelo conteúdo embutido na extensão', () => {
+    const library = router.snapshot().harness.library!.directory;
+    const skill = path.join(library, 'skills/faz-ai-fluxo/SKILL.md');
+    fs.mkdirSync(path.dirname(skill), { recursive: true });
+    fs.writeFileSync(skill, 'Meu fluxo particular');
+    router.refreshHarness();
+    router = makeRouter();
+    expect(router.readHarnessFile(skill).content).toBe('Meu fluxo particular');
+  });
 });

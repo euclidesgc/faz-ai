@@ -76,8 +76,12 @@ export class BoardHarness {
     );
     this.current = this.store.scan();
     this.ctx.library.migrate(this.current.inventory);
+    this.current.library = {
+      directory: this.ctx.library.directory,
+      artifacts: this.ctx.library.materialize(),
+      warnings: this.ctx.library.warnings,
+    };
     state = this.ctx.state();
-    this.current.library = { directory: this.ctx.library.directory, artifacts: this.ctx.library.materialize() };
     const view = { board: state.board, harness: this.current, harnessSelection: state.harnessSelection };
     const sync = (name: string, options: string[]) => {
       const field = state.fieldDefs.find((f) => f.name.toLowerCase() === name.toLowerCase() && f.kind === 'multiselect');
