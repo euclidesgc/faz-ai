@@ -95,7 +95,7 @@ export class LibraryDisk {
       const observation = this.observation(item.file, signature);
       if (this.index.observed[relative] === observation) continue;
       const existing = atPath ? this.repo.get(this.boardId, atPath.kind, atPath.name) : sameName;
-      if (existing && !atPath) {
+      if (existing && !atPath && existing.origin !== item.file) {
         const content = this.repo.content(existing.id);
         if (signature !== fingerprint({ ...content, description: existing.description })) {
           this.warnings.push({ path: relative, reason: 'duplicate' });
@@ -109,9 +109,9 @@ export class LibraryDisk {
               name: existing.name,
               origin: existing.origin,
               originTool: existing.originTool,
-              ...(draft.kind === 'agent' ? { meta: existing.meta } : {}),
+              ...(draft.kind === 'agent' && atPath ? { meta: existing.meta } : {}),
             }
-          : { ...draft, origin: '', originTool: '' };
+          : { ...draft, origin: this.mirror.pathOf({ ...draft, id: 'local' }) === item.file ? '' : item.file, originTool: '' };
         const unchanged = existing && signature === fingerprint({ ...this.repo.content(existing.id), description: existing.description });
         if (!unchanged) this.repo.upsert(this.boardId, imported, existing?.usage);
       }
