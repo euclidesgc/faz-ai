@@ -12,11 +12,14 @@ import { consolidate } from '../log/rollup';
 import { BoardRepo } from '../repositories/boardRepo';
 import { registerClients, removeProjectServer } from '../mcp/clientConfig';
 import { runRegistrationSteps } from '../mcp/reinstall';
-import { workspaceKey } from '../mcp/socketPath';
+import { readBridgeVersion, workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
 import { ReleaseWatcher } from '../release';
-import { deleteBranch, detectMainBranch, removeWorktree } from '../git';
+import { CommandError, deleteBranch, detectMainBranch, removeWorktree } from '../git';
 import { OrphanSweeper } from '../orphans';
+import { BranchSyncer } from '../branchSync';
+import { Maintenance } from '../maintenance';
+import { BaseConflictChecker } from '../baseConflict';
 import { ghProcess } from '../branchRename';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
@@ -32,6 +35,7 @@ import { editorMcpFiles, pinEditorCommands, registeredIn } from '../mcp/pinComma
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { selectedItems } from '../../shared/harnessSelection';
 import { harnessIssues } from '../../shared/harnessStatus';
+import type { WebviewToHost } from '../../shared/messages';
 import { resolveCommand } from '../cliResolve';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
 import { cleanStaleTemp } from '../aiOutput/measured';
@@ -192,29 +196,36 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     const exe = resolveCommand('claude', pathEnv, homeDir);
     return exe ? runCli(exe, args, pathEnv, 60_000, o.folderPath) : Promise.resolve({ code: null, stdout: '', stderr: '' });
   });
-  // os comandos externos das rotinas periódicas: resolvem com a saída padrão, rejeitam com a mensagem
-  // do comando (é ela que vai para o log). `git` aqui é assíncrono de propósito — o `src/extension/git.ts`
+  // os comandos externos das rotinas periódicas: resolvem com a saída padrão, rejeitam com `CommandError`,
+  // que traz a mensagem do comando (é ela que vai para o log), o código de saída e a saída padrão (o
+  // `merge-tree` da conferência com a base sai com 1 no conflito, #747). `git` aqui é assíncrono de propósito — o `src/extension/git.ts`
   // é síncrono, feito para o que a pessoa dispara, e travaria o processo da extensão numa rodada de fundo.
-  const run = (cmd: string) => (args: string[], cwd: string) =>
-    new Promise<string>((resolve, reject) => {
-      execFile(
-        cmd,
-        args,
-        { cwd, timeout: 120_000, env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}) } },
-        (err, stdout, stderr) =>
-          err
-            ? reject(
-                new Error(
-                  (err as NodeJS.ErrnoException).code === 'ENOENT'
-                    ? `o comando "${cmd}"${COMMAND_HINT[cmd] ?? ''} não foi encontrado.`
-                    : stderr.trim() || err.message,
-                ),
-              )
-            : resolve(stdout),
-      );
-    });
+  // o git de fundo roda sem terminal (`GIT_TERMINAL_PROMPT=0`): um pedido de senha falha na hora, em vez
+  // de prender o comando até o tempo-limite; o `gh` fica com o ambiente de sempre
+  const run =
+    (cmd: string, extraEnv: NodeJS.ProcessEnv = {}) =>
+    (args: string[], cwd: string) =>
+      new Promise<string>((resolve, reject) => {
+        execFile(
+          cmd,
+          args,
+          { cwd, timeout: 120_000, env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}), ...extraEnv } },
+          (err, stdout, stderr) =>
+            err
+              ? reject(
+                  new CommandError(
+                    err.code === 'ENOENT'
+                      ? `o comando "${cmd}"${COMMAND_HINT[cmd] ?? ''} não foi encontrado.`
+                      : stderr.trim() || err.message,
+                    typeof err.code === 'number' ? err.code : null,
+                    stdout,
+                  ),
+                )
+              : resolve(stdout),
+        );
+      });
   const gh = run('gh');
-  const git = run('git');
+  const git = run('git', { GIT_TERMINAL_PROMPT: '0' });
   // o `git` e a principal são da limpeza da história depois do merge (#464)
   // a principal fixada nas configurações vale (a mesma que a tela e o PR usam); sem ela, a detectada
   const mainBranch = (repo: string) => router.mainBranchName() || (detectMainBranch(repo)?.name ?? '');
@@ -329,6 +340,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       workspaceDir: o.folderPath,
       homeDir,
       bridgePath: o.bridgePath,
+      installedVersion: readBridgeVersion(homeDir),
+      currentVersion: o.version,
       nodePath,
       resolve: (command) => resolveCommand(command, pathEnv, homeDir),
       signedIn: (tool, exe) => probeSignedIn(tool, exe, forceSigninCheck),
@@ -566,8 +579,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     if (toolChanged && (board.aiTool === 'cursor' || board.aiTool === 'kimi')) refreshToolModels(board.aiTool);
   });
   const autopilot = new Autopilot(router, runner, { log: o.log, canRun: o.ownsBoard });
-  // sem timers próprios: a detecção de merges acontece em cada rodada do heartbeat, e o arquivamento das
-  // histórias publicadas no fim da rodada de merges
+  // sem timers próprios: a detecção de merges, a sincronização das branches, as órfãs e o arquivamento
+  // das histórias publicadas acontecem na manutenção de cada rodada do heartbeat
   const releaseWatcher = new ReleaseWatcher(router, { cwd: o.folderPath, log: o.log, gh, git });
   const mergeWatcher = new MergeWatcher(router, {
     cwd: o.folderPath,
@@ -576,7 +589,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     git,
     removeWorktree,
     mainBranch,
-    afterRound: () => releaseWatcher.sweep(),
   });
   // as branches e worktrees órfãs (#465): o varredor mede e remove; o roteador só guarda o relatório e
   // entrega à tela os três pedidos da pessoa. Sem timer próprio: roda na rodada do heartbeat e na abertura.
@@ -597,17 +609,38 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     clean: (id, acceptLoss) => orphanSweeper.clean(id, acceptLoss),
     cleanSafe: () => orphanSweeper.cleanSafe(),
   });
+  const branchSyncer = new BranchSyncer({ git, log: o.log, cwd: o.folderPath, snapshot: () => router.snapshot(), mainBranch });
+  // a ordem da manutenção é da `Maintenance` (#722): um fetch, os merges (a história mesclada perde a
+  // branch, então vêm antes da sincronização; as órfãs, depois, porque uma recém-mesclada ainda seria
+  // "decisão"), a sincronização e, por fim, órfãs e versões; a fila da IA espera até a sincronização
+  // a conferência do conflito com a base das histórias sem PR (#747): só lê, e avisa na conversa em nome do board
+  const act = (msg: WebviewToHost) => router.handle(msg, { author: 'Faz AI', source: 'ai' });
+  const baseConflicts = new BaseConflictChecker({ git, log: o.log, cwd: o.folderPath, snapshot: () => router.snapshot(), act });
+  const maintenance = new Maintenance({
+    git,
+    log: o.log,
+    cwd: o.folderPath,
+    snapshot: () => router.snapshot(),
+    merges: () => mergeWatcher.runNow(),
+    sync: () => branchSyncer.sync(),
+    baseConflicts: () => baseConflicts.runNow(),
+    orphans: () => orphanSweeper.sweep(),
+    releases: () => releaseWatcher.sweep(),
+  });
   const heartbeat = new Heartbeat(runner, {
     snapshot: () => router.snapshot(),
     now: () => Date.now(),
     log: o.log,
-    // como o heartbeat e o autopiloto, só a janela dona do board confere os merges, para não concluir em dobro
-    // as órfãs vêm depois dos merges: uma história recém-mesclada ainda seria "decisão" antes de concluída
-    onRound: () => {
-      if (!o.ownsBoard || o.ownsBoard()) void mergeWatcher.runNow().then(() => orphanSweeper.sweep());
-    },
-    act: (msg) => router.handle(msg, { author: 'Faz AI', source: 'ai' }),
+    // como o heartbeat e o autopiloto, só a janela dona do board faz a manutenção: duas janelas
+    // concluiriam em dobro e mexeriam nas mesmas branches. Nas outras, a fila da IA não espera nada
+    onRound: () => (!o.ownsBoard || o.ownsBoard() ? maintenance.run() : undefined),
+    act,
+    // os conflitos de PR ainda sem tentativa da IA entram no começo da fila como execuções de conflito (#747)
+    conflicts: () => mergeWatcher.pendingConflicts(),
   });
+  // a tentativa de resolver o conflito conta no fim da execução, salvo quando o limite de uso a interrompeu
+  // (`usageLimited` é gravado antes de os ouvintes do fim serem chamados)
+  runner.onDidFinish((cardId, mode) => mergeWatcher.onRunFinished(cardId, mode, runner.usageLimited));
   // publica a próxima rodada agendada; a guarda em `setHeartbeat` (só notifica se mudou) evita o laço
   // router.onDidChange → publishHeartbeat → setHeartbeat → notify
   const publishHeartbeat = () => router.setHeartbeat({ nextRoundAt: heartbeat.nextRoundAt });

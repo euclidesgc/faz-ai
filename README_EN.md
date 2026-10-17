@@ -131,7 +131,7 @@ promise a percentage: it shows, in the inventory, what is being loaded.
 - **Tell the AI what to do in each phase.** Each column has an instruction for the AI and, if the
   phase produces a document (Discovery, PRD, Spec, Plan), the template for that document. In
   Discovery the AI analyzes the problem and talks to you before any requirement is written; in
-  Homologação the story is only completed with your approval.
+  Homologação the story is only completed with your approval. Discovery records a **code map** (files, functions, patterns and tests), Spec completes it, and PRD, Spec and Plan start from it and read only what is missing; each Plan sub-task carries the files it will touch in its description.
 - **Work with the AI on the same board.** The extension exposes the board over MCP. Claude Code,
   Cursor or any other MCP client can read and edit everything the
   interface allows, and the changes show up on the board right away.
@@ -272,7 +272,7 @@ navegador**; the terminal `faz-ai` warns and does not start.
 1. In Configurações (settings) → **Harness de IA**, choose the project's tool (Claude Code,
    Cursor or Kimi Code).
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
-   **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads.
+   **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads. This also happens on its own, silently, when the folder opens (and on every new extension version), always in the user scope; only a failure raises a notice.
 3. In the **Skills** group of the same tab, click **Instalar (padrão da ferramenta)** for the
    flow skill (`faz-ai-fluxo`): it teaches the AI to take cards through the phases, write the
    documents, ask for review and pick up pending work. The button also installs the per-topic skills
@@ -610,6 +610,14 @@ one), subagents and skills, with the number of calls.
   the end of each run a summary line follows with input, output, cache read and cache creation, and
   turns, for example `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação
   de cache · 8 turnos`. Turns are left out when the tool does not report them. The line is written in Portuguese, as the board's log channel is.
+- **A run that fails before the first event is not repeated.** The board asks the tool for the
+  structured output and only repeats the call in text mode, once and with the same restrictions, when
+  the tool refuses one of those arguments before starting (an older CLI version). Any other failure
+  before the first event (network, quota, login, crash, truncated output) ends as a failure, with
+  usage "não medido" (not measured): the tool may have changed files or touched the board before
+  failing, and repeating would duplicate the effect and the usage. The blocked card and the chat error
+  say the run was not repeated, and the "Chamando…" line in the channel shows the attempt and the run
+  id.
 - **Questions in the board chat** are recorded too, with no card attached.
 - **The detail of each run is kept for a window you configure**, from 1 to 24 months (the current
   month plus the earlier ones). The default is 6 months. After the window the detail is discarded,
@@ -912,8 +920,9 @@ The board watches the pull request of every open story that has one (in any colu
 autonomous mode; only blocked and running stories are left out) and detects when it is merged,
 concluding the story automatically. There is no setting of its own: the check happens on every
 [heartbeat](#heartbeat) round, on the same interval, and also on **Rodar o heartbeat agora** (Run the
-heartbeat now). With the heartbeat off, it only happens when you ask for a round. When the merge is
-detected:
+heartbeat now). With the heartbeat off, it only happens when you ask for a round. The GitHub queries
+run in parallel, up to four at a time; each story's completion and cleanup run one at a time, in board
+order. When the merge is detected:
 
 1. the board records the merge commit on the card;
 2. registers in the conversation that the story was completed;
@@ -922,9 +931,16 @@ detected:
    updates the local `develop`.
 
 If the pull request is closed without a merge, the board registers a warning in the conversation
-once only. If it is open with conflicts, the board warns once in the conversation and, when the
-story was waiting for review, returns the card to "Pronto" so the AI updates the branch and resolves
-it on the next round. The merge is still done by the person, manually or through automatic merge; the board
+once only. If it is open with conflicts, the board warns in the conversation once per conflict (the
+notice quotes the PR commit) and, in the same round, calls the AI in a run just to resolve it, at the
+front of the queue: it updates the branch by merging from the PR base (no rebase, no force push),
+resolves the conflicts, runs the checks, pushes the branch and records what it did in the
+conversation. This applies to any story, including autonomous and already delivered ones, except a
+blocked one and one waiting for your answer. The run uses the phase's model and permission, follows
+the limits of activities with a branch, shows on the card as "resolving conflict" and, at the end,
+the card returns to the status it had. If the AI cannot do it, it blocks the card with the reason; if
+it finishes and the PR is still in conflict at the same commit, the board blocks the card and the
+resolution is yours (unblocking gives the AI one more try). The merge is still done by the person, manually or through automatic merge; the board
 only observes. Failures in querying the PR state (no network, no authentication, no `gh`
 installed) do not block anything — the warning appears in the log, and the board tries again on the next round.
 
@@ -959,6 +975,20 @@ does. In each round it:
   days or more;
 - **checks the pull requests** of every story that has one ([automatic merge detection](#automatic-merge-detection))
   and cleans up leftover branches and worktrees ([orphan branches and worktrees](#orphan-branches-and-worktrees));
+- **syncs the local branches** the board knows about (the main branch, `develop` and the branch of each
+  open story) with origin, so the next task starts from the latest base and the AI finds the story
+  branch up to date. **Fast-forward only**: a branch moves only when it is behind origin and has no
+  commit that origin lacks. Nothing is merged with a commit, rewritten or forced. A branch is left as it is when an AI
+  run is on its story (or in the folder where it is checked out), when that folder has changes or
+  untracked files, or when the branch is ahead of origin or has diverged from it. Each updated branch,
+  and each reason for skipping one (once per reason), shows up in the log with the `Branches:` prefix.
+  Your personal branches are not touched. Without network or without origin, the sync waits for the
+  next round;
+- **checks for conflicts with the base before the PR**: for each story with a branch and no pull
+  request yet, it asks git, read-only (`git merge-tree`, git 2.38 or newer; below that, the check is
+  skipped with a line in the log), whether the branch conflicts with the current base on origin. If it
+  does, it posts a notice in the conversation once per branch commit, with the files, for the AI to
+  update the branch and resolve it before opening the PR. Nothing changes on the card or the branches;
 - **summarizes the conversation** of stories with three or more messages since the last summary, or
   two that add up to a lot of text (at least one from the AI), before working on the phase; the AI then receives only the summary and
   what comes after it;
@@ -993,6 +1023,14 @@ dependencies installed in each) and more memory and CPU while several AI session
 run together. In the editor the Git tab and the parallel block in the AI harness become a link to
 the Settings; in the browser they stay as editable fields, as before.
 
+- The round has a fixed order: tidying (usage limit, stalled cards); a single `git fetch`; the pull
+  requests (a merged story loses its branch, so they come before the sync); the branch sync; orphans
+  and published versions; and, last, the AI queue, which waits for the sync to finish so it starts
+  from branches already up to date. The number of stories in the round is still reported right away.
+  This maintenance (GitHub and git queries, no AI) runs up to **four** tasks in parallel. It is a fixed
+  limit of the heartbeat's own, not **Tocar histórias em paralelo** (Work on stories in parallel) nor
+  **Histórias ao mesmo tempo** (Stories at the same time): those still apply only to AI runs. With two
+  windows on the same board, only the owner window does the maintenance.
 - With nothing pending for the AI, nothing runs, and the log (Output → Faz AI) says why: expired login, story in autonomous mode, execution already running, with the person or waiting for another card.
 - The round follows the board order: bugs first; then the rightmost story (the most advanced one
   finishes before a new one starts); within a column, top to bottom — what decides is the card's

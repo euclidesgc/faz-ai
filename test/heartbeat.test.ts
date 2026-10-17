@@ -2,7 +2,15 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
-import { Heartbeat, STALE_DAYS, heartbeatQueue, heartbeatTargets, refineTargets, summaryTargets } from '../src/extension/heartbeat';
+import {
+  Heartbeat,
+  STALE_DAYS,
+  conflictTargets,
+  heartbeatQueue,
+  heartbeatTargets,
+  refineTargets,
+  summaryTargets,
+} from '../src/extension/heartbeat';
 import type { AiRunMode } from '../src/shared/runner';
 import type { AiRunOrigin } from '../src/shared/log';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
@@ -111,7 +119,7 @@ beforeEach(async () => {
 describe('heartbeat', () => {
   it('cada rodada, automática ou pedida, confere os merges, mesmo sem nada pendente com a IA', () => {
     let rounds = 0;
-    heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => now, log: () => {}, onRound: () => rounds++ });
+    heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => now, log: () => {}, onRound: () => void rounds++ });
     heartbeat.tick();
     expect(rounds).toBe(0); // o intervalo ainda não passou
     now += 60 * 60_000;
@@ -543,5 +551,223 @@ describe('heartbeat: refinar, resumir e arrumar o board', () => {
     heartbeat.runNow();
     expect(comments(1)).toHaveLength(2);
     expect(comments(1).at(-1)!.body).toContain('esperando a sua resposta');
+  });
+});
+
+describe('heartbeat: a manutenção da rodada vem antes da fila da IA (#722)', () => {
+  /** a manutenção simulada: cada rodada devolve uma promessa que o teste resolve ou rejeita */
+  let rounds: { resolve: () => void; reject: (e: unknown) => void }[];
+  /** o que aconteceu, em ordem: a arrumação (status do card devolvido) e o começo da manutenção */
+  let order: string[];
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  const withMaintenance = () => {
+    rounds = [];
+    order = [];
+    heartbeat = new Heartbeat(runner, {
+      snapshot: () => router.snapshot(),
+      now: () => now,
+      log: (l) => log.push(l),
+      act: (msg) => {
+        if (msg.type === 'card.status.set') order.push(`arrumação ${msg.status}`);
+        router.handle(msg, { author: 'Faz AI', source: 'ai' });
+      },
+      onRound: () => {
+        order.push('manutenção');
+        return new Promise<void>((resolve, reject) => rounds.push({ resolve, reject }));
+      },
+    });
+  };
+  beforeEach(withMaintenance);
+
+  it('com a manutenção pendente, o número sai na hora e nada começa; ao resolver, a fila começa (RF1, RF2)', async () => {
+    create('A', 'Implementação'); // #1
+    create('B', 'PRD'); // #2: fase de texto
+    expect(heartbeat.runNow()).toBe(2);
+    expect(runner.started).toEqual([]);
+    expect(heartbeat.busy).toBe(true);
+    expect(heartbeat.queued).toBe(2);
+    rounds[0]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1, 2]);
+  });
+
+  it('uma manutenção que rejeita também libera a fila', async () => {
+    create('A', 'Implementação'); // #1
+    heartbeat.runNow();
+    rounds[0]!.reject(new Error('falhou'));
+    await flush();
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+
+  it('a arrumação acontece antes da manutenção', () => {
+    create('A', 'Implementação'); // #1
+    setStatus(1, 'blocked', "O Claude Code encerrou sem responder. Fim da saída:\n\nYou've hit your limit · resets 3pm");
+    heartbeat.runNow();
+    expect(order).toEqual(['arrumação ready', 'manutenção']);
+  });
+
+  it('uma execução que termina durante a manutenção não inicia nada, e busy segue verdadeiro', async () => {
+    create('A', 'Implementação'); // #1
+    heartbeat.runNow();
+    rounds[0]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1]);
+    // a próxima rodada começa com #1 ainda rodando; #1 termina durante a manutenção dela
+    create('B', 'Implementação'); // #2
+    heartbeat.runNow();
+    runner.finish();
+    expect(runner.started.map(number)).toEqual([1]);
+    expect(heartbeat.busy).toBe(true);
+    rounds[1]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1, 2]);
+  });
+
+  it('um enqueue durante a manutenção espera o fim dela', async () => {
+    create('A', 'Implementação'); // #1
+    setStatus(1, 'waiting_review');
+    heartbeat.runNow();
+    heartbeat.enqueue(card(1).id);
+    expect(runner.started).toEqual([]);
+    setStatus(1, 'ready');
+    rounds[0]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+
+  it('as execuções da IA seguem nos tetos do board, não no teto da manutenção (RF6)', async () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallel: false, parallelStories: 2 }, git: { mode: 'branch' } } });
+    create('A', 'Discovery'); // #1
+    create('B', 'Discovery'); // #2
+    create('C', 'Discovery'); // #3
+    create('D', 'Implementação'); // #4
+    create('E', 'Implementação'); // #5
+    heartbeat.runNow();
+    rounds[0]!.resolve();
+    await flush();
+    // duas de texto ("Histórias ao mesmo tempo") e uma com branch, mesmo com a manutenção podendo 4
+    expect(runner.started.map(number).sort()).toEqual([1, 2, 4]);
+    expect(heartbeat.queued).toBe(2);
+  });
+
+  it('só o fim da manutenção mais recente libera a fila', async () => {
+    create('A', 'Implementação'); // #1
+    heartbeat.runNow();
+    heartbeat.stop(); // esvazia a fila; a próxima rodada monta outra
+    heartbeat.runNow();
+    rounds[0]!.resolve();
+    await flush();
+    expect(runner.started).toEqual([]);
+    rounds[1]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+});
+
+describe('heartbeat: conflito no pull request (#747)', () => {
+  const PR = 'https://github.com/acme/app/pull/1';
+  let pending: Set<string>;
+  const withPr = (n: number) => (router as any).ctx.cards.setPullRequest(card(n).id, PR);
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  beforeEach(() => {
+    pending = new Set();
+    heartbeat = new Heartbeat(runner, {
+      snapshot: () => router.snapshot(),
+      now: () => now,
+      log: (l) => log.push(l),
+      conflicts: () => pending,
+    });
+  });
+
+  it('conflictTargets: inclui a autônoma e a que espera revisão; exclui bloqueada, a que espera resposta e a que está em execução', () => {
+    const ids = ['Revisão', 'Autônoma', 'Bloqueada', 'Resposta', 'Rodando', 'Sub rodando', 'Sem PR'].map((t) => create(t, 'Homologação'));
+    ids.forEach((id, i) => {
+      pending.add(id);
+      if (i < 6) withPr(i + 1);
+    });
+    setStatus(1, 'waiting_review');
+    router.handle({ type: 'card.yolo.set', cardId: card(2).id, enabled: true });
+    setStatus(2, 'waiting_review');
+    setStatus(3, 'blocked', 'impedimento');
+    setStatus(4, 'waiting_answer');
+    setStatus(5, 'running');
+    create('passo', 'Em andamento', 6); // #8
+    setStatus(8, 'running');
+    expect(conflictTargets(router.snapshot(), pending).map((c) => c.number)).toEqual([1, 2]);
+    expect(conflictTargets(router.snapshot(), new Set())).toEqual([]);
+  });
+
+  it('heartbeatQueue põe o conflito antes de tudo, e a história com conflito não trabalha a fase na mesma rodada', () => {
+    create('Pronta', 'Implementação'); // #1
+    create('Com conflito', 'Implementação'); // #2
+    withPr(2);
+    pending.add(card(2).id);
+    expect(heartbeatQueue(router.snapshot(), pending)).toEqual([
+      { id: card(2).id, mode: 'conflict' },
+      { id: card(1).id, mode: 'phase' },
+    ]);
+  });
+
+  it('a rodada inicia a execução de conflito pelo heartbeat, também numa história entregue com a pessoa', () => {
+    create('Entregue', 'Homologação'); // #1
+    withPr(1);
+    setStatus(1, 'waiting_review');
+    pending.add(card(1).id);
+    expect(heartbeat.runNow()).toBe(1);
+    expect(runner.started.map(number)).toEqual([1]);
+    expect(runner.modes).toEqual(['conflict']);
+    expect(runner.origins).toEqual(['heartbeat']);
+    expect(log.some((l) => l.includes('#1 (conflito)'))).toBe(true);
+  });
+
+  it('o conflito ocupa a vaga de branch: com ela tomada, espera na fila e não usa a vaga de texto', () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallel: false, parallelStories: 2 }, git: { mode: 'branch' } } });
+    create('Implementando', 'Implementação'); // #1
+    create('Conflito numa fase de texto', 'Spec'); // #2
+    withPr(2);
+    setStatus(2, 'waiting_review'); // com a pessoa: não entra na fila como fase de texto
+    heartbeat.runNow(); // #1 ocupa a vaga de branch
+    expect(runner.started.map(number)).toEqual([1]);
+    pending.add(card(2).id);
+    heartbeat.runNow();
+    expect(runner.started.map(number)).toEqual([1]);
+    expect(heartbeat.queued).toBe(1);
+    runner.finish();
+    expect(runner.started.map(number)).toEqual([1, 2]);
+    expect(runner.modes.at(-1)).toBe('conflict');
+  });
+
+  it('o conflito que a manutenção da rodada acha vai para a frente da fila da mesma rodada', async () => {
+    let release: () => void = () => {};
+    heartbeat = new Heartbeat(runner, {
+      snapshot: () => router.snapshot(),
+      now: () => now,
+      log: (l) => log.push(l),
+      conflicts: () => pending,
+      onRound: () => new Promise<void>((r) => (release = r)),
+    });
+    create('Pronta', 'Implementação'); // #1
+    create('Com PR', 'Implementação'); // #2
+    withPr(2);
+    expect(heartbeat.runNow()).toBe(2);
+    pending.add(card(2).id); // a manutenção (o MergeWatcher) achou o conflito
+    release();
+    await flush();
+    expect(runner.started.map(number)).toEqual([2]);
+    expect(runner.modes).toEqual(['conflict']);
+    expect(log).toContain('Heartbeat: conflito no pull request de #2; a IA resolve nesta rodada.');
+  });
+
+  it('o item de conflito perde a validade quando o conflito sai dos pendentes antes de começar', () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
+    create('Implementando', 'Implementação'); // #1
+    heartbeat.runNow();
+    create('Com conflito', 'Homologação'); // #2
+    withPr(2);
+    pending.add(card(2).id);
+    heartbeat.runNow();
+    pending.clear(); // o PR deixou de ter conflito
+    runner.finish();
+    expect(runner.started.map(number)).toEqual([1]);
   });
 });
