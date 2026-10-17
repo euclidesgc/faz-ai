@@ -217,7 +217,7 @@ function expectSameExecution(f: Fixture) {
   expect(plan.summary).toContain('Ferramentas: Read, Grep, Glob (imposto)');
   expect(plan.summary).toContain('Ferramentas negadas: Write, Edit (imposto)');
   expect(plan.summary).toContain('Modelo: sonnet · medium (imposto)');
-  expect(plan.advice).toEqual([]);
+  expect(plan.advice).toEqual([expect.stringContaining('list_board_mcp_tools')]);
 }
 
 describe('paridade da execução: o que o card recebe a partir dos artefatos', () => {

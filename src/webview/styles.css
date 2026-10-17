@@ -4384,3 +4384,44 @@ div.metrics-breakdown {
 .context-reread {
   margin-top: var(--sp-4);
 }
+
+/* Biblioteca neutra: armazenamento e importação não disputam espaço com o assunto ativo. */
+.board-library {
+  display: grid;
+  gap: var(--sp-12);
+}
+.library-storage,
+.harness-import {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-12);
+}
+.library-storage > summary,
+.harness-import > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.library-storage[open],
+.harness-import[open] {
+  display: grid;
+  gap: var(--sp-12);
+}
+.library-import-preview > section {
+  display: grid;
+  gap: var(--sp-8);
+  max-height: 320px;
+  overflow: auto;
+}
+.library-import-preview > section > label {
+  align-items: flex-start;
+}
+.library-import-label {
+  display: grid;
+  gap: var(--sp-4);
+  overflow-wrap: anywhere;
+}
+.board-library [role='tabpanel'][data-state='active'] {
+  display: grid;
+  gap: var(--sp-12);
+  padding-top: var(--sp-12);
+}

@@ -1,13 +1,17 @@
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parseAgentFile } from './agentFiles';
 import { frontmatterOf, frontmatterValue } from './frontmatter';
+import { scanLibraryFolder } from './libraryImport';
+import type { LibraryArtifactInput, LibraryImportPreview } from '../shared/artifacts';
 import { LibraryDisk } from './libraryDisk';
 import { ArtifactMirror } from './artifactMirror';
 import { readSource, readMcpByName } from './artifactSource';
 import { ArtifactRepo, type ArtifactRow } from './repositories/artifactRepo';
 import {
   kindOfSelectable,
+  skillDocument,
   isSafeRelPath,
   ARTIFACT_LIMITS,
   type AgentMeta,
@@ -25,6 +29,116 @@ export class BoardLibrary {
 
   constructor(private ctx: BoardContext) {
     this.repo = new ArtifactRepo(ctx.dbHandle.db);
+  }
+
+  private importDrafts = new Map<string, ArtifactDraft>();
+  preview?: LibraryImportPreview;
+
+  scanFolder(root: string): void {
+    const dir = path.resolve(root.startsWith('~/') ? path.join(this.ctx.home, root.slice(2)) : root);
+    const drafts = scanLibraryFolder(dir);
+    this.importDrafts = new Map(drafts.map((draft) => [randomUUID(), draft]));
+    this.preview = {
+      directory: dir,
+      items: [...this.importDrafts].map(([key, a]) => ({ key, kind: a.kind, name: a.name, description: a.description, origin: a.origin })),
+    };
+  }
+
+  importArtifacts(keys: string[]): void {
+    if (!this.preview || !keys.length) throw new Error('Selecione os artefatos para importar.');
+    const items = [...new Set(keys)].map((key) => {
+      const draft = this.importDrafts.get(key);
+      if (!draft) throw new Error('Releia a pasta antes de importar.');
+      const existing = this.repo.get(this.ctx.boardId, draft.kind, draft.name);
+      if (existing && existing.origin !== draft.origin)
+        throw new Error(`Já existe "${draft.name}" neste tipo. Renomeie ou edite o artefato existente.`);
+      return { draft, usage: existing?.usage ?? (draft.kind === 'rule' ? ('off' as const) : ('contextual' as const)) };
+    });
+    const identities = items.map(({ draft }) => `${draft.kind}:${draft.name}`);
+    if (new Set(identities).size !== identities.length)
+      throw new Error('Há nomes repetidos no mesmo tipo. Selecione apenas uma origem para cada nome.');
+    this.repo.upsertMany(this.ctx.boardId, items);
+    this.preview = undefined;
+    this.importDrafts.clear();
+  }
+
+  readArtifact(id: string): LibraryArtifactInput {
+    const item = this.repo.list(this.ctx.boardId).find((a) => a.id === id);
+    if (!item) throw new Error('Artefato não encontrado.');
+    const row = this.repo.get(this.ctx.boardId, item.kind, item.name)!;
+    return {
+      id,
+      kind: row.kind,
+      name: row.name,
+      description: row.description,
+      body: row.body,
+      ...(row.agent ? { agent: row.agent } : {}),
+      ...(row.kind === 'mcp' ? { server: (row.meta as { server: Record<string, unknown> }).server } : {}),
+    };
+  }
+
+  saveArtifact(input: LibraryArtifactInput): void {
+    if (!['rule', 'skill', 'agent', 'mcp'].includes(input.kind)) throw new Error('Tipo de artefato inválido.');
+    const name = input.name.trim();
+    if (!name || name === '.' || name === '..' || name.length > 240) throw new Error('Nome de artefato inválido.');
+    const existing = this.repo.get(this.ctx.boardId, input.kind, name);
+    if (!existing && !(input.kind === 'rule' ? /^[a-zA-Z0-9_.-]+$/.test(name) : /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)))
+      throw new Error('Nome inválido. Use letras minúsculas, números e hífens.');
+    if (name === 'faz-ai' && input.kind === 'mcp') throw new Error('O nome faz-ai é reservado ao MCP do board.');
+    if (existing && existing.id !== input.id)
+      throw new Error('Já existe um artefato com este nome. Edite o existente ou escolha outro nome.');
+    if (input.id && existing?.id !== input.id) throw new Error('O nome e o tipo de um artefato existente não podem mudar.');
+    if (Buffer.byteLength(input.body, 'utf8') > ARTIFACT_LIMITS.fileBytes) throw new Error('Arquivo maior que 512 KB.');
+    let meta: ArtifactDraft['meta'] = {};
+    if (input.kind === 'mcp') {
+      const server = input.server;
+      if (!server || typeof server !== 'object' || Array.isArray(server)) throw new Error('Definição MCP inválida.');
+      if (typeof server.command === 'string' && server.command.trim()) {
+        if (server.args !== undefined && (!Array.isArray(server.args) || !server.args.every((a) => typeof a === 'string')))
+          throw new Error('args deve ser uma lista de textos.');
+      } else if (typeof server.url === 'string' && /^https?:\/\//.test(server.url)) {
+        new URL(server.url);
+      } else throw new Error('Informe command e args ou uma URL HTTP do servidor MCP.');
+      for (const key of ['env', 'headers']) {
+        const values = server[key];
+        if (
+          values !== undefined &&
+          (!values || typeof values !== 'object' || Array.isArray(values) || !Object.values(values).every((v) => typeof v === 'string'))
+        )
+          throw new Error(`${key} deve conter pares de nome e texto.`);
+      }
+      meta = { server };
+    } else if (input.kind === 'agent') {
+      const agent = input.agent;
+      if (
+        agent &&
+        (![agent.skills, agent.mcpServers, agent.tools?.categories, agent.tools?.native?.allow, agent.tools?.native?.deny].every(
+          (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
+        ) ||
+          typeof agent.model !== 'string' ||
+          !agent.tools.categories.every((c) => ['read', 'edit', 'run', 'net', 'agents'].includes(c)))
+      )
+        throw new Error('Configuração de subagente inválida.');
+      meta = input.agent ?? { skills: [], mcpServers: [], model: '', tools: { categories: [], native: { tool: '', allow: [], deny: [] } } };
+    }
+    const body = input.kind === 'skill' ? skillDocument(input.body, name, input.description) : input.body;
+    if (Buffer.byteLength(body, 'utf8') > ARTIFACT_LIMITS.fileBytes) throw new Error('Arquivo maior que 512 KB.');
+    this.repo.upsert(
+      this.ctx.boardId,
+      {
+        kind: input.kind,
+        name,
+        description: input.description,
+        body,
+        meta,
+        origin: existing?.origin ?? '',
+        originTool: existing?.originTool ?? '',
+        missing: false,
+        skipped: existing?.skipped ?? [],
+        files: existing ? this.repo.content(existing.id).files : [],
+      },
+      existing?.usage,
+    );
   }
 
   get directory(): string {

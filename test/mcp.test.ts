@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -468,6 +469,7 @@ describe('harness e padrões pelo MCP', () => {
     );
     const inventory = (await call('get_harness')).data.inventory;
     expect(inventory.find((i: any) => i.name === 'commit')).toEqual({
+      id: expect.any(String),
       kind: 'skill',
       group: 'skill',
       scope: 'project',
@@ -2162,6 +2164,134 @@ describe('generate_summary (ferramenta MCP)', () => {
       expect(res.text).toContain('A IA já está trabalhando em #1.');
     } finally {
       fs.rmSync(d, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('biblioteca neutra pelo MCP', () => {
+  it('a IA cria e edita artefatos do board sem gravar fontes nativas', async () => {
+    const created = await call('save_board_artifact', {
+      kind: 'rule',
+      name: 'AGENTS.md',
+      description: 'Convenções',
+      body: 'Use os testes.',
+    });
+    expect(created.error).toBe(false);
+    expect(created.data).toMatchObject({ kind: 'rule', name: 'AGENTS.md', usage: 'off' });
+    expect(fs.existsSync(path.join(dir, 'AGENTS.md'))).toBe(false);
+    expect((await call('get_board_artifact', { id: created.data.id })).data.body).toBe('Use os testes.');
+    expect(
+      (
+        await call('save_board_artifact', {
+          id: created.data.id,
+          kind: 'rule',
+          name: 'AGENTS.md',
+          description: 'Convenções',
+          body: 'Use lint e testes.',
+        })
+      ).error,
+    ).toBe(false);
+    expect((await call('get_board_artifact', { id: created.data.id })).data.body).toBe('Use lint e testes.');
+    expect((await call('get_harness')).data.library.artifacts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: created.data.id })]),
+    );
+    expect((await call('get_project_profile')).error).toBe(false);
+  });
+
+  it('a ponte lista e chama um MCP stdio real e respeita o modo Pelo card', async () => {
+    const sdk = path.resolve(__dirname, '../node_modules/@modelcontextprotocol/sdk/dist/esm');
+    const fixture = path.join(dir, 'fixture.mjs');
+    fs.writeFileSync(
+      fixture,
+      `import { McpServer } from ${JSON.stringify('file://' + sdk + '/server/mcp.js')};
+import { StdioServerTransport } from ${JSON.stringify('file://' + sdk + '/server/stdio.js')};
+const server = new McpServer({ name: 'fixture', version: '1' });
+server.registerTool('ping', { inputSchema: {} }, async () => ({ content: [{ type: 'text', text: process.env.SAMPLE === 'segredo-local' ? 'pong' : 'erro' }] }));
+await server.connect(new StdioServerTransport());`,
+    );
+    router.handle({
+      type: 'harness.library.save',
+      input: {
+        kind: 'mcp',
+        name: 'memoria',
+        description: 'Fixture',
+        body: '',
+        server: { command: process.execPath, args: [fixture], env: { SAMPLE: 'segredo-local' } },
+      },
+    });
+    expect((await call('list_board_mcp_tools', { server: 'memoria' })).error).toBe(true);
+    const state = router.snapshot();
+    const id = router.createCard({ title: 'Usar memória', typeId: state.cardTypes[0]!.id, columnId: state.columns[0]!.id, parentId: null });
+    const field = router.snapshot().fieldDefs.find((f) => f.name === 'MCPs')!;
+    router.handle({ type: 'field.setValue', cardId: id, fieldId: field.id, value: ['memoria'] });
+    const card = router.snapshot().cards.find((c) => c.id === id)!.number;
+    const listed = await call('list_board_mcp_tools', { server: 'memoria', card });
+    expect(listed.error).toBe(false);
+    expect(listed.data.tools[0].name).toBe('ping');
+    const result = await call('call_board_mcp_tool', { server: 'memoria', name: 'ping', arguments: {}, card });
+    expect(result.error).toBe(false);
+    expect(result.text).toBe('pong');
+    expect(JSON.stringify(router.snapshot())).not.toContain('segredo-local');
+    const mcp = router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'mcp')!;
+    expect((await call('get_board_artifact', { id: mcp.id })).error).toBe(true);
+    router.handle({ type: 'harness.selection.set', items: [{ kind: 'mcp', location: 'board:memoria' }], usage: 'off' });
+    expect((await call('call_board_mcp_tool', { server: 'memoria', name: 'ping', arguments: {}, card })).error).toBe(true);
+  });
+});
+
+describe('ponte HTTP da biblioteca', () => {
+  it('conecta por Streamable HTTP, envia cabeçalhos locais e preserva erros MCP remotos', async () => {
+    let authorized = false;
+    const remote = createServer(async (req, res) => {
+      if (req.method !== 'POST') {
+        res.writeHead(405).end();
+        return;
+      }
+      let body = '';
+      for await (const chunk of req) body += String(chunk);
+      const message = JSON.parse(body);
+      authorized ||= req.headers.authorization === 'Bearer segredo-http';
+      if (message.id === undefined) {
+        res.writeHead(202).end();
+        return;
+      }
+      const result =
+        message.method === 'initialize'
+          ? {
+              protocolVersion: message.params.protocolVersion,
+              capabilities: { tools: {} },
+              serverInfo: { name: 'http-fixture', version: '1' },
+            }
+          : message.method === 'tools/list'
+            ? { tools: [{ name: 'ping', inputSchema: { type: 'object', properties: {} } }] }
+            : { isError: true, content: [{ type: 'text', text: 'Falha remota preservada' }] };
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result }));
+    });
+    await new Promise<void>((resolve) => remote.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = remote.address() as { port: number };
+      router.handle({
+        type: 'harness.library.save',
+        input: {
+          kind: 'mcp',
+          name: 'remoto',
+          description: '',
+          body: '',
+          server: { url: `http://127.0.0.1:${address.port}/mcp`, headers: { Authorization: 'Bearer segredo-http' } },
+        },
+      });
+      router.handle({ type: 'harness.selection.set', items: [{ kind: 'mcp', location: 'board:remoto' }], usage: 'always' });
+      const listed = await call('list_board_mcp_tools', { server: 'remoto' });
+      expect(listed.error).toBe(false);
+      expect(listed.data.tools[0].name).toBe('ping');
+      const result = await call('call_board_mcp_tool', { server: 'remoto', name: 'ping', arguments: {} });
+      expect(result).toMatchObject({ error: true, text: 'Falha remota preservada' });
+      expect(authorized).toBe(true);
+      expect(JSON.stringify(router.snapshot())).not.toContain('segredo-http');
+    } finally {
+      remote.closeAllConnections();
+      await new Promise<void>((resolve) => remote.close(() => resolve()));
     }
   });
 });

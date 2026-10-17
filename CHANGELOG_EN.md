@@ -8,6 +8,7 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 ## Unreleased
 
 - **Rules no longer shows the notice about the Models tab (#725).** The block saying that "Fill in the suggested model automatically" had moved to Models, with its "Open in Models" button, was removed from Settings → Rules. The option stays in Models, unchanged.
+- **Board-owned harness (#615).** The library brings Rules, Skills, Sub-agents and MCPs together without tool tabs. Imports preview items by type; each tab supports creation and editing, with guided assistants and project-based generation for text artifacts. MCPs offer a form and JSON editor, with a stdio/HTTP bridge through faz-ai for use across tools. New rules stay off for review; sources and private skills remain preserved.
 
 - **Fix: importing skills and pasting into the library no longer deletes files.** The library detects folders containing `SKILL.md` and local edits when reopened, focused or refreshed. Unregistered files are preserved and duplicate names show a notice. Import from a folder opens the system picker, supports reviewing and bulk selection, and confirms where items appear. Open folder uses the file manager without opening another editor project.
 

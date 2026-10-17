@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import type { AiRunner } from '../../runner';
 import type { MessageRouter } from '../../panel/messageRouter';
@@ -11,6 +12,11 @@ export interface ToolContext {
   workspaceDir: string;
   /** nome que assina os comentários feitos por esta sessão */
   author: () => string;
+}
+
+/** Resultado de uma ferramenta externa: preserva blocos de conteúdo e o isError do protocolo. */
+export class ForwardedToolResult {
+  constructor(readonly result: CallToolResult) {}
 }
 
 /** Registra uma ferramenta; o retorno vira JSON e exceções viram erro legível para o modelo. */
@@ -31,6 +37,7 @@ export function toolRegistrar(server: McpServer, ctx: ToolContext): DefineTool {
     server.registerTool(name, { description, inputSchema, annotations: { readOnlyHint: readOnly } }, (async (args: unknown) => {
       try {
         const result = await run(args as Parameters<typeof run>[0], await ctx.getRouter());
+        if (result instanceof ForwardedToolResult) return result.result;
         return { content: [{ type: 'text' as const, text: typeof result === 'string' ? result : JSON.stringify(result, null, 1) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text' as const, text: e instanceof Error ? e.message : String(e) }] };
