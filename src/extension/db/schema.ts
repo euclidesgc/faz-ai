@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 32;
+export const SCHEMA_VERSION = 33;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -407,6 +407,16 @@ const MIGRATIONS: Record<number, string> = {
     -- quando a IA refinou o card: o heartbeat refina sozinho os cards do Backlog que ainda não foram
     -- refinados, e o campo é o que o impede de refinar o mesmo card duas vezes
     ALTER TABLE cards ADD COLUMN refined_at INTEGER;
+  `,
+  33: `
+    -- #604: comando-base (sem argumentos) de cada chamada de Bash de uma execução de IA, para saber
+    -- o que o Bash rodou. Some junto com a execução (cascata), então segue a retenção do log.
+    CREATE TABLE IF NOT EXISTS ai_run_bash (
+      run_id TEXT NOT NULL REFERENCES ai_runs(id) ON DELETE CASCADE,
+      command TEXT NOT NULL,
+      calls INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (run_id, command)
+    );
   `,
 };
 

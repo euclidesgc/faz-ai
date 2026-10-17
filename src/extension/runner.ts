@@ -176,22 +176,38 @@ export interface PromptContext {
 const NO_CONTEXT: PromptContext = { always: [], card: [] };
 
 /**
+ * Nome do anexo que guarda o texto anterior da descrição quando o refinar a reescreve. A data e a
+ * hora vêm de fora (o disparo), porque a IA não tem relógio confiável; o nome ordena por data.
+ */
+export const nomeDoAnexoAnterior = (quando: Date): string => {
+  const dois = (n: number): string => String(n).padStart(2, '0');
+  const data = `${quando.getFullYear()}-${dois(quando.getMonth() + 1)}-${dois(quando.getDate())}`;
+  return `descricao-anterior-${data}-${dois(quando.getHours())}${dois(quando.getMinutes())}.md`;
+};
+
+/**
  * O que a IA recebe no "Refinar com IA": deixar o card claro e completo para quem vai trabalhar nele,
  * sem fazer o trabalho da fase. O executor devolve o card ao status que tinha quando ela termina. O
  * catálogo é tudo o que ela pode indicar: os artefatos do board em modo "Pelo card" e os agentes disponíveis.
+ * O texto anterior da descrição vai para um anexo, não para a conversa: a conversa é lida a cada get_card.
  */
-export const refinePrompt = (ref: string, context: PromptContext = NO_CONTEXT, catalog?: RefineCatalog): string =>
+export const refinePrompt = (
+  ref: string,
+  context: PromptContext = NO_CONTEXT,
+  catalog?: RefineCatalog,
+  anexoAnterior: string = nomeDoAnexoAnterior(new Date()),
+): string =>
   [
     `Refine o card ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai". Refinar é deixar o card claro e completo para quem vai trabalhar nele; NÃO é fazer o trabalho da fase.`,
     ...context.always,
     ...context.card,
     ...(catalog ? catalogLines(catalog) : []),
-    'Leia o card com get_card (descrição, conversa, anexos e campos) e, como apoio, get_board e get_models (tipos, campos, agentes e catálogo de modelos). Pode ler o projeto para entender o contexto.',
-    '1. Título e descrição: reescreva com update_card para ficarem claros e objetivos, mantendo a intenção e tudo o que a pessoa escreveu. Não invente requisito: o que estiver ambíguo vira uma lista "Dúvidas em aberto" no fim da descrição. Se o texto já estiver bom, não mexa.',
+    'Leia o card com get_card (descrição, conversa, anexos e campos) e, como apoio, get_board e get_models (tipos, campos, agentes e catálogo de modelos; o inventário do Harness está em get_harness). Pode ler o projeto para entender o contexto.',
+    `1. Título e descrição: se a descrição for mudar, grave antes o texto anterior, sem nenhuma alteração, com add_attachment(card: "${ref}", filename: "${anexoAnterior}", content: <texto anterior>), sem artifact. Só depois do anexo gravado reescreva título e descrição com update_card, para ficarem claros e objetivos, mantendo a intenção e tudo o que a pessoa escreveu. Não invente requisito: o que estiver ambíguo vira uma lista "Dúvidas em aberto" no fim da descrição. Se o texto já estiver bom, não mexa. Se a gravação do anexo falhar, não reescreva a descrição e diga isso no comentário.`,
     '2. Campos: revise Tags, Esforço da atividade, Modelo, Skills, Rules e MCPs e aplique com update_card (fields), mesmo que já tenham valor; mantenha o que fizer sentido. Escolha o agente do card com set_card_profile quando um da lista couber melhor que o padrão. Skills, rules, servidores MCP e agente só do catálogo acima: o que não está nele não existe para este board.',
     '3. Checklist: acrescente com add_checklist_item os passos que faltam para concluir o card, sem repetir os que já existem.',
-    '4. Termine com add_comment na conversa do card, resumindo o que mudou e por quê. Se reescreveu a descrição, inclua o texto anterior, para a pessoa poder voltar a ele.',
-    'Não faça o trabalho da fase: não crie sub-tarefas nem anexos, não mova o card e não mude o status (sem start_work, move_card, request_review, ask_question nem block_card). Não altere arquivos do projeto nem rode comandos.',
+    `4. Termine com add_comment na conversa do card, resumindo o que mudou e por quê. Se reescreveu a descrição, cite o anexo "${anexoAnterior}", onde está o texto anterior, para a pessoa poder voltar a ele. Não cole o texto anterior no comentário.`,
+    'Não faça o trabalho da fase: não crie sub-tarefas, não mova o card e não mude o status (sem start_work, move_card, request_review, ask_question nem block_card). O único anexo que pode gravar é o do passo 1. Não altere arquivos do projeto nem rode comandos.',
     'Trabalhe só neste card. Ninguém está acompanhando esta sessão.',
   ].join('\n');
 
@@ -386,7 +402,7 @@ export class AiRunner {
             },
             input: {
               prompt: refine
-                ? refinePrompt(cardRef(card), contextLines(state, card), refineCatalog(state))
+                ? refinePrompt(cardRef(card), contextLines(state, card), refineCatalog(state), nomeDoAnexoAnterior(new Date()))
                 : summarize
                   ? summarizePrompt(cardRef(card), contextLines(state, card))
                   : cardPrompt(

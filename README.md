@@ -459,8 +459,11 @@ e continua visível mesmo quando o botão está bloqueado.
   título e descrição (sem inventar requisito; o que estiver ambíguo vira uma lista "Dúvidas em
   aberto"), revisa Tags, Esforço da atividade, Modelo e Skills mesmo que já tenham valor e
   acrescenta ao checklist os passos que faltam. Não trabalha a fase, não cria sub-tarefas, não move
-  o card e não mexe em arquivos: roda só com o board. No fim, resume na conversa o que mudou (com o texto anterior da
-  descrição, se a reescreveu) e o card volta ao status que tinha, também quando a execução falha:
+  o card e não mexe em arquivos: roda só com o board. Antes de reescrever a descrição, grava o texto
+  anterior, sem alteração, como anexo da história (`descricao-anterior-AAAA-MM-DD-HHMM.md`, sem
+  virar artefato); a conversa não recebe o texto, só o nome do anexo. No fim, resume na conversa o
+  que mudou (citando o anexo, se reescreveu a descrição) e o card volta ao status que tinha, também
+  quando a execução falha:
   a falha fica na conversa, sem bloquear o card. Um refino não conta como execução sem progresso
   para o modo autônomo.
 
@@ -654,14 +657,15 @@ economizar tokens.
 
 - A agregação pode agrupar por fase (`phase`), tipo de card (`card_type`), ferramenta de IA
   (`tool`), modelo (`model`), esforço (`effort`), perfil (`profile`), card (`card`), agente (`agent`),
-  skill (`skill`), ferramenta usada (`used_tool`) ou ferramenta de MCP (`mcp_tool`). Omita para obter
+  skill (`skill`), ferramenta usada (`used_tool`), ferramenta de MCP (`mcp_tool`) ou comando de Bash (`bash_command`). Omita para obter
   apenas o total do período.
 - `tool` e `used_tool` não são a mesma coisa: `tool` é a ferramenta de IA que rodou (claude, cursor);
   `used_tool` e `mcp_tool` são o que a execução usou (Read, Bash, `get_card`). Em `mcp_tool` o
-  servidor vem numa coluna própria, ou "servidor não registrado" quando o nome não o trouxe.
+  servidor vem numa coluna própria, ou "servidor não registrado" quando o nome não o trouxe. `bash_command` é o comando-base de cada chamada
+  de Bash, sem argumentos (`npm test`, `git status`, `cat`), só do Claude Code.
 - Filtros de período (data inicial e final, em `AAAA-MM-DD`), card (ex. `72` ou `#72`), e dimensões
   (ex. fase, modelo, tipo de card).
-- Nas dimensões **agent**, **skill**, **used_tool** e **mcp_tool** a tabela mostra só a contagem de
+- Nas dimensões **agent**, **skill**, **used_tool**, **mcp_tool** e **bash_command** a tabela mostra só a contagem de
   execuções e de usos (sem tokens, que não é possível repartir entre componentes de uma
   execução). `effort` e `profile` têm tokens.
 - Tokens contam em toda execução medida, do Claude Code e do Cursor. A tabela não traz custo em dólar.
@@ -1147,7 +1151,7 @@ ferramenta aceita; o resto segue no prompt, como instrução:
 
 As skills e as rules vão sempre pelo caminho do arquivo. Numa conversa aberta por você, o agente
 chega à IA pelo `get_card` (`execution`), como orientação. Pelo MCP, `get_board` lista os agentes
-disponíveis, `set_card_profile` escolhe o de um card e `create_agent`, `update_agent`, `get_agent` e
+(só `agents`, sem `harness` nem `appearance`; o inventário está no `get_harness`) disponíveis, `set_card_profile` escolhe o de um card e `create_agent`, `update_agent`, `get_agent` e
 `delete_agent` gerenciam os arquivos.
 
 ## Harness de IA

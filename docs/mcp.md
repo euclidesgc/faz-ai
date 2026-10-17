@@ -97,7 +97,9 @@ Tags são da pessoa e mudam); a exibição muda em todos. `create_field` recusa 
 O valor da Fase de uma sub-tarefa é gravado pela IA (`create_card` ou `update_card` com
 `fields.Fase`); a pessoa não o muda no card, e `update_card_type` recusa a Fase em `default_fields`.
 
-Também pelo MCP: catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
+Também pelo MCP: uso, tokens e tempo do log (`get_metrics`, com `group_by` por fase, modelo, ferramenta,
+agente, skill, ferramenta usada, ferramenta MCP ou `bash_command`: o comando-base de cada chamada de
+Bash, sem argumentos, só do Claude Code), catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
 `set_model_rules`), padrões por tipo de card (`update_card_type`), recriar o board (`reset_board`) e o
 harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,
 `set_skill_enabled`, `delete_skill`…).
@@ -197,7 +199,7 @@ caminhos dos arquivos de apoio dela.
 ### Agente de cada card
 
 O agente do card define antes o que a sessão usa: instruções, skills, servidores MCP, ferramentas e
-modelo. `get_board` lista os disponíveis em `agents` (com `default`). O agente de um card é o do
+modelo. `get_board` lista os disponíveis em `agents` (com `default`; a resposta não traz `harness` nem `appearance`: o inventário está em `get_harness`, e só o Plan, o refinar e a edição do board pedem o `get_board`). O agente de um card é o do
 próprio card (`set_card_profile`, pelo nome), senão o da coluna (`update_column` com
 `exec_profile`), senão o da coluna da história (numa sub-tarefa), senão o padrão do board
 (Configurações → Harness de IA → Ferramenta e execução).
