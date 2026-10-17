@@ -151,7 +151,9 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   // noutra ferramenta, o que não vai por parâmetro vira instrução no prompt
   router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
   expect(executionPlan(router.snapshot(), card(), project, home).advice).toEqual([
-    'De servidores MCP, use só o do board.',
+    'Você atua como o agente "restrito": Restrito.',
+    'Instruções do agente:\nSiga.',
+    'De servidores MCP, use só o do board e: github.',
     'Use só as rules, as skills e as instruções indicadas neste pedido; ignore instruções, skills e agentes carregados por conta própria.',
   ]);
 

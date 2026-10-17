@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ALL_AI_TOOLS, RULE_FILES, type AiTool, type InstallScope } from '../../../shared/harness';
-import { SELECTABLE_KINDS, selectionKey, type HarnessUsage, type SelectableKind } from '../../../shared/harnessSelection';
+import { SELECTABLE_KINDS, toolItemsOf, selectionKey, type HarnessUsage, type SelectableKind } from '../../../shared/harnessSelection';
 import { FLOW_SKILL } from '../../flowSkill';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { harnessOverview } from '../format';
@@ -72,7 +72,7 @@ export function registerHarnessTools(tool: DefineTool): void {
     },
     (a, router) => {
       const s = router.snapshot();
-      const items = s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
+      const items = [...toolItemsOf(s), ...s.harness.inventory.flatMap((t) => t.items)];
       const resolved = a.items.map((i) => {
         // `location` é a `key` do get_harness (num servidor MCP, arquivo mais `#nome`); o caminho sem o nome também vale
         const found = items.find(
@@ -125,9 +125,12 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'get_skill',
-    'Lê o SKILL.md completo de uma skill do projeto.',
+    'Lê o SKILL.md completo da cópia do board; se ainda não foi adicionada, lê a skill do projeto.',
     { skill: skillArg },
-    (a, router) => skill(router, a.skill).content,
+    (a, router) => {
+      const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'skill' && i.boardArtifactId && i.name === a.skill);
+      return copy ? router.readHarnessFile(copy.path).content : skill(router, a.skill).content;
+    },
     true,
   );
 
@@ -176,9 +179,14 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'update_skill',
-    'Substitui o SKILL.md inteiro de uma skill, incluindo o frontmatter (name, description).',
+    'Substitui o SKILL.md inteiro da cópia do board, incluindo o frontmatter (name, description). Sem cópia no board, altera a skill do projeto.',
     { skill: skillArg, content: z.string().min(1) },
     (a, router) => {
+      const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'skill' && i.boardArtifactId && i.name === a.skill);
+      if (copy) {
+        router.writeHarnessFile(copy.path, a.content);
+        return harness(router);
+      }
       skill(router, a.skill);
       router.handle({ type: 'harness.skill.write', name: a.skill, content: a.content });
       return harness(router);
@@ -209,7 +217,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'write_skill_file',
-    'Grava um arquivo de apoio numa skill do projeto: um modelo de classe ou exemplo de código em `references/`, um modelo de arquivo em `assets/` ou um script em `scripts/`. Substitui o arquivo se ele já existir. Para a IA ler o arquivo quando usar a skill, o SKILL.md precisa apontar para ele (use update_skill).',
+    'Grava um arquivo de apoio na cópia da skill do board (ou no projeto se ainda não foi adicionada): um modelo de classe ou exemplo de código em `references/`, um modelo de arquivo em `assets/` ou um script em `scripts/`. Substitui o arquivo se ele já existir. Para a IA ler o arquivo quando usar a skill, o SKILL.md precisa apontar para ele (use update_skill).',
     {
       skill: z.string().describe('Nome da skill do projeto'),
       file: z.string().describe('Caminho dentro da pasta da skill, ex.: "references/modelo-de-repositorio.ts"'),
@@ -217,9 +225,7 @@ export function registerHarnessTools(tool: DefineTool): void {
     },
     (a, router) => {
       router.writeSkillFile(a.skill, a.file, a.content);
-      return harnessOverview(router.snapshot(), false).inventory.find(
-        (i) => i.kind === 'skill' && i.scope === 'project' && i.name === a.skill,
-      );
+      return harnessOverview(router.snapshot()).inventory.find((i) => i.kind === 'skill' && i.name === a.skill);
     },
   );
 
@@ -229,7 +235,10 @@ export function registerHarnessTools(tool: DefineTool): void {
     'get_agent',
     'Lê o arquivo completo de um agente do board (listado em get_harness), do projeto ou da pasta do usuário.',
     { agent: agentArg, scope: scopeArg },
-    (a, router) => agent(router, a.agent, a.scope as InstallScope | undefined).content,
+    (a, router) => {
+      const copy = !a.scope && toolItemsOf(router.snapshot()).find((i) => i.kind === 'agent' && i.boardArtifactId && i.name === a.agent);
+      return copy ? router.readHarnessFile(copy.path).content : agent(router, a.agent, a.scope as InstallScope | undefined).content;
+    },
     true,
   );
 

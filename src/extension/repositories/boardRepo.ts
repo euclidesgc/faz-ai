@@ -1,3 +1,5 @@
+import { ArtifactRepo } from './artifactRepo';
+import { selectionOf } from '../../shared/artifacts';
 import { EMPTY_CHAT } from '../../shared/chat';
 import { EMPTY_ORPHANS } from '../../shared/orphans';
 import type { Database } from 'sql.js';
@@ -192,13 +194,15 @@ export class BoardRepo {
 
   /** A marcação do harness deste board: o que as execuções podem usar. */
   selection(boardId: string): HarnessSelection[] {
-    return all(this.db, 'SELECT kind, location, usage FROM harness_selection WHERE board_id = ? ORDER BY kind, location', [boardId]).map(
-      (r) => ({
-        kind: str(r.kind) as SelectableKind,
-        location: str(r.location),
-        usage: str(r.usage) as HarnessUsage,
-      }),
-    );
+    const copied = new ArtifactRepo(this.db).list(boardId).map(selectionOf);
+    const legacy = all(this.db, 'SELECT kind, location, usage FROM harness_selection WHERE board_id = ? ORDER BY kind, location', [
+      boardId,
+    ]).map((r) => ({
+      kind: str(r.kind) as SelectableKind,
+      location: str(r.location),
+      usage: str(r.usage) as HarnessUsage,
+    }));
+    return [...copied, ...legacy.filter((i) => !copied.some((c) => c.kind === i.kind && c.location === i.location))];
   }
 
   /** Marca itens de um jeito, ou desmarca (`usage` null). */

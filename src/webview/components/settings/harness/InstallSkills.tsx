@@ -15,7 +15,7 @@ const DESTINATIONS: EnumOption<HarnessScope>[] = [
 ];
 
 /** Instalar skills de uma pasta ou de um repositório git: procurar, revisar a lista e escolher o que copiar. */
-export function InstallSkills({ tool }: { tool: AiTool }) {
+export function InstallSkills({ tool, library = false }: { tool: AiTool; library?: boolean }) {
   const state = useBoardStore((s) => s.state)!;
   const ask = useBoardStore((s) => s.ask);
   const [source, setSource] = useState('');
@@ -23,26 +23,30 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
   const [to, setTo] = useState<HarnessScope>('project');
   const preview = state.harnessInstall;
   const existing = new Set(
-    state.harness.inventory
-      .find((t) => t.tool === tool)
-      ?.items.filter((i) => i.kind === 'skill' && i.scope === to)
-      .map((i) => i.name),
+    library
+      ? state.harness.library?.artifacts.filter((a) => a.kind === 'skill').map((a) => a.name)
+      : state.harness.inventory
+          .find((t) => t.tool === tool)
+          ?.items.filter((i) => i.kind === 'skill' && i.scope === to)
+          .map((i) => i.name),
   );
   const installable = preview?.skills.filter((k) => k.valid && !existing.has(k.name)) ?? [];
   const picked = chosen.filter((rel) => installable.some((k) => k.rel === rel));
   // clonar o repositório e copiar as pastas levam segundos: os botões mostram a espera até o host confirmar
   const scan = useAction(() => harness.scanInstall(source));
-  const install = useAction(() => harness.applyInstall(tool, to, picked));
+  const install = useAction(() => (library ? harness.importLibrarySkills(picked) : harness.applyInstall(tool, to, picked)));
   const apply = () =>
     ask({
       title: t('Instalar {n} skill(s)?', { n: picked.length }),
-      message: withGlobalWarning(
-        t(
-          'As pastas são copiadas para {destination}. Nada é executado na instalação, mas uma skill são instruções (e às vezes scripts) que a IA vai seguir: leia o que vem de fontes que você não conhece.',
-          { destination: to === 'user' ? t('a sua pasta de usuário') : t('o projeto') },
-        ),
-        to,
-      ),
+      message: library
+        ? t('Copia as skills selecionadas e seus arquivos de apoio para a biblioteca particular deste board.')
+        : withGlobalWarning(
+            t(
+              'As pastas são copiadas para {destination}. Nada é executado na instalação, mas uma skill são instruções (e às vezes scripts) que a IA vai seguir: leia o que vem de fontes que você não conhece.',
+              { destination: to === 'user' ? t('a sua pasta de usuário') : t('o projeto') },
+            ),
+            to,
+          ),
       confirmLabel: t('Instalar'),
       onConfirm: async () => {
         if (await install.run()) setChosen([]);
@@ -84,12 +88,14 @@ export function InstallSkills({ tool }: { tool: AiTool }) {
           <div className="row">
             <b>{t('{n} skill(s) em {source}', { n: preview.skills.length, source: preview.source })}</b>
             <span className="spacer" />
-            <SelectField
-              aria-label={t('Onde instalar')}
-              options={DESTINATIONS.map((o) => ({ ...o, label: t(o.label) }))}
-              value={to}
-              onChange={setTo}
-            />
+            {!library && (
+              <SelectField
+                aria-label={t('Onde instalar')}
+                options={DESTINATIONS.map((o) => ({ ...o, label: t(o.label) }))}
+                value={to}
+                onChange={setTo}
+              />
+            )}
           </div>
           <table className="table">
             <tbody>

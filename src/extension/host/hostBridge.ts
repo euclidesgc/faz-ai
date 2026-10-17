@@ -268,6 +268,11 @@ export class HostBridge {
         this.router.setInstall(msg.source.trim(), fetched.dir, fetched.cleanup);
         return;
       }
+      case 'harness.library.open': {
+        const directory = this.router.snapshot().harness.library?.directory;
+        if (directory) await this.env.openFolder(directory);
+        return;
+      }
       case 'harness.import.pick': {
         if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
         const dir = await this.env.pickFolder('Importar artefatos de uma pasta');

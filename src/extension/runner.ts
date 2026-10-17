@@ -401,7 +401,14 @@ export class AiRunner {
         cwd: this.deps.cwd,
         timeoutMinutes: state.board.runner.timeoutMinutes,
         prepare: () => {
-          const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '', boardServer(this.deps));
+          const plan = executionPlan(
+            state,
+            card,
+            this.deps.cwd,
+            this.deps.homeDir ?? '',
+            boardServer(this.deps),
+            this.router.libraryMcpDefinitions(),
+          );
           // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo.
           // A execução de conflito segue a permissão (e o modelo) da fase: precisa de git e das checagens, como ela
           const autonomous = !refine && !summarize && isYolo(state, card);

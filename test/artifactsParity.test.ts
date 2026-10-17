@@ -35,6 +35,7 @@ const SONNET: ModelOption = {
 
 interface Fixture {
   s: BoardState;
+  servers: Record<string, unknown>;
   card: Card;
   projectDir: string;
   homeDir: string;
@@ -126,6 +127,7 @@ async function buildExecutionState(): Promise<Fixture> {
   const s = router.snapshot();
   return {
     s,
+    servers: router.libraryMcpDefinitions(),
     card: s.cards.find((c) => c.id === cardId)!,
     projectDir,
     homeDir,
@@ -146,7 +148,7 @@ function selectionLocation(items: { kind: string; name: string; location: string
 
 /** Tudo o que a execução do card recebe, reduzido a valores comparáveis (sem caminho absoluto). */
 function snapshotOf(f: Fixture) {
-  const plan = executionPlan(f.s, f.card, f.projectDir, f.homeDir, BOARD_SERVER);
+  const plan = executionPlan(f.s, f.card, f.projectDir, f.homeDir, BOARD_SERVER, f.servers);
   const lines = contextLines(f.s, f.card);
   return { plan, lines, skills: requiredSkills(f.s, f.card), rules: requiredRules(f.s, f.card) };
 }
@@ -190,7 +192,7 @@ function expectSameExecution(f: Fixture) {
   // skills (nome, apoio de texto e imagem) e rules do card
   expect(manifest.skills).toEqual([SKILL]);
   expect(skills).toHaveLength(1);
-  expect(skills[0]).toMatchObject({ name: SKILL, scope: 'project' });
+  expect(skills[0]).toMatchObject({ name: SKILL, scope: 'board' });
   const skill = skills[0]! as { path: string; files?: string[] };
   expect(path.basename(skill.path)).toBe('SKILL.md');
   expect((skill.files ?? []).map((p) => path.basename(p)).sort()).toEqual(['logo.png', 'referencia.md']);
@@ -223,11 +225,8 @@ describe('paridade da execução: o que o card recebe a partir dos artefatos', (
     expectSameExecution(fx);
   });
 
-  it('hoje a origem é o disco: apagá-la derruba a definição do servidor (a troca de fonte, #656/#657, troca esta asserção por expectSameExecution)', () => {
-    // o estado (marcação + snapshot) já existe; apagar projeto e home só tira os arquivos
+  it('a cópia mantém a execução completa depois de apagar as origens', () => {
     fx.removeSources();
-    // hoje a definição dos servidores é lida do disco na hora de executar; depois da troca virá do banco.
-    // Enquanto a fonte for o disco, apagar a origem faz o servidor liberado não ser encontrado:
-    expect(() => executionPlan(fx.s, fx.card, fx.projectDir, fx.homeDir, BOARD_SERVER)).toThrow(/não encontrados/);
+    expectSameExecution(fx);
   });
 });

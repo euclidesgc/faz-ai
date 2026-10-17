@@ -1,6 +1,5 @@
-// O banco de artefatos do board: o que as execuções do board podem usar, por projeto. O board referencia
-// o artefato pelo caminho de origem (não copia): uma mudança na fonte vale no board, e uma origem que
-// sumiu deixa o artefato marcado como ausente. Tudo o mais é invisível para as execuções.
+import { itemOfArtifact, selectableOfKind, artifactLocation } from './artifacts';
+// Os artefatos selecionados são cópias do board; as fontes continuam no catálogo das ferramentas.
 import type { HarnessItem, HarnessKind } from './harness';
 import type { BoardState } from './model';
 
@@ -73,17 +72,26 @@ export function usageOptions(kind: SelectableKind): HarnessUsage[] {
 export const defaultUsage = (kind: SelectableKind): HarnessUsage => (kind === 'instructions' ? 'off' : 'contextual');
 
 /** A identidade de um item do inventário na marcação: o caminho, e numa entrada de configuração o caminho mais o nome. */
-export const selectionKey = (item: Pick<HarnessItem, 'location'> & { name?: string; layout?: HarnessItem['layout'] }): string =>
-  item.layout === 'entry' ? `${item.location}#${item.name ?? ''}` : item.location;
+export const selectionKey = (
+  item: Pick<HarnessItem, 'location'> & { name?: string; layout?: HarnessItem['layout']; boardArtifactId?: string },
+): string => (!item.boardArtifactId && item.layout === 'entry' ? `${item.location}#${item.name ?? ''}` : item.location);
 
-/** Itens do inventário da ferramenta em uso. */
-export const toolItemsOf = (s: Pick<BoardState, 'board' | 'harness'>): HarnessItem[] =>
-  s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
+/** Cópias do board primeiro; referências antigas ainda não migradas usam o catálogo da ferramenta. */
+export function toolItemsOf(s: Pick<BoardState, 'board' | 'harness'>): HarnessItem[] {
+  const sources = s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
+  const artifacts = s.harness.library?.artifacts;
+  if (!artifacts) return sources;
+  const copied = new Set(artifacts.map((a) => `${selectableOfKind(a.kind)}:${artifactLocation(a)}`));
+  return [
+    ...artifacts.filter((a) => !a.missing).map(itemOfArtifact),
+    ...sources.filter((i) => !copied.has(`${i.kind}:${selectionKey(i)}`)),
+  ];
+}
 
 /** A marcação de um item do inventário, ou null quando ele não está no board. */
 export const usageOf = (
   selection: readonly HarnessSelection[],
-  item: Pick<HarnessItem, 'kind' | 'location'> & { name?: string; layout?: HarnessItem['layout'] },
+  item: Pick<HarnessItem, 'kind' | 'location'> & { name?: string; layout?: HarnessItem['layout']; boardArtifactId?: string },
 ): HarnessUsage | null => selection.find((x) => x.kind === item.kind && x.location === selectionKey(item))?.usage ?? null;
 
 /**

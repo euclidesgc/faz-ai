@@ -1,3 +1,4 @@
+import { agentOfArtifact } from '../../shared/artifacts';
 import * as path from 'node:path';
 import type { BoardRequirement } from '../../shared/requirements';
 import type { EnvironmentReport } from '../../shared/environment';
@@ -131,6 +132,7 @@ const bridgeOnly = {
   'harness.skill.file.open': viaBridge,
   'harness.install.scan': viaBridge,
   'harness.import.pick': viaBridge,
+  'harness.library.open': viaBridge,
   'attachment.pick': viaBridge,
   'attachment.reveal': viaBridge,
   'attachment.read': viaBridge,
@@ -234,13 +236,27 @@ export class MessageRouter {
     this.approveListeners.push(fn);
   }
 
+  /** Só o executor no host recebe as definições com credenciais; o snapshot público nunca as inclui. */
+  libraryMcpDefinitions(): Record<string, unknown> {
+    return this.ctx.library.mcpDefinitions();
+  }
+
   snapshot(): BoardState {
     const s = this.ctx.boards.snapshot(this.ctx.boardId, this.ctx.opts.author);
     const { current, install } = this.ctx.harness;
     return {
       ...s,
       // os agentes do board são os arquivos marcados: derivados aqui, nunca gravados
-      board: { ...s.board, execProfiles: agentProfiles(current.agents, s.harnessSelection, s.board.runner.defaultAgent) },
+      board: {
+        ...s.board,
+        execProfiles: agentProfiles(
+          current.library
+            ? current.library.artifacts.filter((a) => a.kind === 'agent' && !a.missing).map((a) => agentOfArtifact(a, s.board.aiTool))
+            : current.agents,
+          s.harnessSelection,
+          s.board.runner.defaultAgent,
+        ),
+      },
       harness: current,
       boardServer: boardServerFootprint(),
       aiRuns: this.aiRuns,

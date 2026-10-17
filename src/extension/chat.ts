@@ -258,10 +258,16 @@ export class ChatSession {
     const state = this.router.snapshot();
     const tool = aiToolInfo(state.board.aiTool);
     // sem card não há agente: contexto vazio, só o servidor do board, os servidores em modo "Sempre" e o modelo escolhido
-    const plan = bareExec(modelFor(state, model), boardServer(this.deps), state, {
-      projectDir: this.deps.cwd,
-      homeDir: this.deps.homeDir ?? '',
-    });
+    const plan = bareExec(
+      modelFor(state, model),
+      boardServer(this.deps),
+      state,
+      {
+        projectDir: this.deps.cwd,
+        homeDir: this.deps.homeDir ?? '',
+      },
+      this.router.libraryMcpDefinitions(),
+    );
     // as últimas linhas legíveis, para explicar um erro; nunca a saída crua, que no modo estruturado é JSONL
     const tail: string[] = [];
     let started = false;

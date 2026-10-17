@@ -101,7 +101,7 @@ export function HarnessGroupCard({ group, tool, scope, query, suggested, items, 
   const agentsTable = g === 'agent' && projectTool && !!aiToolInfo(tool).agents && agentsScope !== null;
 
   // plugins e a política da organização são só leitura; os agentes da ferramenta do projeto têm a tabela própria
-  const pickable = g === 'plugin' || g === 'managed' || agentsTable ? [] : items.filter((i) => bulkSelectable(i, actions, projectTool));
+  const pickable = g === 'plugin' || g === 'managed' || agentsTable ? [] : items.filter((i) => bulkSelectable(i, actions, true));
   const chosen = pickable.filter((i) => picked.has(keyOf(i)));
   const pick = (list: HarnessItem[], on: boolean) =>
     setPicked((cur) => {
@@ -276,9 +276,7 @@ export function HarnessGroupCard({ group, tool, scope, query, suggested, items, 
                 />
                 <span className="muted small">{chosen.length > 0 ? t('{n} marcados', { n: chosen.length }) : t('Selecionar todos')}</span>
               </label>
-              {chosen.length > 0 && (
-                <BulkActions items={chosen} actions={actions} projectTool={projectTool} onDone={() => setPicked(new Set())} />
-              )}
+              {chosen.length > 0 && <BulkActions items={chosen} actions={actions} projectTool={true} onDone={() => setPicked(new Set())} />}
             </div>
           )}
           <ul className="item-list">
@@ -292,7 +290,20 @@ export function HarnessGroupCard({ group, tool, scope, query, suggested, items, 
                 onSelect={pickable.includes(i) ? (on) => pick([i], on) : undefined}
                 explain
                 unread={unread(i)}
-                usage={projectTool ? <UsageSelect item={i} /> : undefined}
+                usage={
+                  i.kind === 'agent' ? (
+                    <ActionButton
+                      variant="soft"
+                      size="1"
+                      hint={t('Copia este agente para a biblioteca do board.')}
+                      onClick={() => harness.setSelection([{ kind: 'agent', location: selectionKey(i) }], 'contextual')}
+                    >
+                      {t('Enviar para o board')}
+                    </ActionButton>
+                  ) : (
+                    <UsageSelect item={i} />
+                  )
+                }
                 suggestion={suggested?.[selectionKey(i)]}
                 filesOpen={filesOpen === i.path}
                 onToggleFiles={() => setFilesOpen(filesOpen === i.path ? null : i.path)}

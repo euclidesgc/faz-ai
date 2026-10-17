@@ -211,7 +211,7 @@ describe('pastas importadas', () => {
     expect(items.filter((i) => i.scope === 'project')).toEqual([]);
   });
 
-  it('importar e tirar uma pasta pelo roteador: os artefatos entram em Importados e saem do board com a pasta', async () => {
+  it('importar e tirar uma pasta pelo roteador preserva as cópias já adicionadas ao board', async () => {
     write('colecao/.claude/skills/sql/SKILL.md', '---\nname: sql\ndescription: Consultas SQL\n---\n');
     fs.mkdirSync(path.join(root, 'projeto'));
     const db = await openInMemory(WASM_DIR);
@@ -234,12 +234,12 @@ describe('pastas importadas', () => {
     router.handle({ type: 'harness.selection.set', items: [{ kind: 'skill', location: selectionKey(skill) }], usage: 'contextual' });
     s = router.snapshot();
     expect(s.fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['sql']);
-    // a pasta sai: a skill sai do inventário e do board, sem sobrar marcação ausente
+    // A pasta sai do catálogo; a cópia particular continua disponível.
     router.handle({ type: 'harness.import.remove', tool: 'claude', dir: path.join(root, 'colecao') });
     s = router.snapshot();
     expect(s.harnessImports).toEqual([]);
-    expect(s.harnessSelection).toEqual([]);
-    expect(s.fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual([]);
+    expect(s.harnessSelection).toHaveLength(1);
+    expect(s.fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['sql']);
   });
 });
 
@@ -390,15 +390,15 @@ describe('revisão: o que a pilha corrigiu', () => {
       attachmentsDir: path.join(os.tmpdir(), 'fazai-att-x'),
     });
     const boardId = router.snapshot().board.id;
-    router.handle({
-      type: 'harness.selection.set',
-      items: [
+    new BoardRepo(db).setSelection(
+      boardId,
+      [
         { kind: 'skill', location: '/col/web/SKILL.md' },
         { kind: 'skill', location: '/colecao/x/SKILL.md' },
         { kind: 'mcp', location: 'C:\\col\\.mcp.json#github' },
       ],
-      usage: 'contextual',
-    });
+      'contextual',
+    );
     new BoardRepo(db).removeImport(boardId, 'claude', '/col');
     // a marcação sai ordenada por tipo (mcp antes de skill) e caminho
     expect(router.snapshot().harnessSelection.map((x) => x.location)).toEqual(['C:\\col\\.mcp.json#github', '/colecao/x/SKILL.md']);

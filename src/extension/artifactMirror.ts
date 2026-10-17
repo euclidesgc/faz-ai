@@ -96,6 +96,7 @@ export class ArtifactMirror {
       return;
     }
     for (const e of entries) {
+      if (!rel && e.name === '.faz-ai-library') continue;
       const childRel = rel ? `${rel}/${e.name}` : e.name;
       const childAbs = path.join(abs, e.name);
       try {

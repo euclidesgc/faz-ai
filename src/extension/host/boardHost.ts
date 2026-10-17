@@ -132,6 +132,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     folderName: o.folderName,
     author: await gitUserName(o.folderPath),
     attachmentsDir: path.join(o.storageDir, 'attachments'),
+    libraryDir: path.join(o.storageDir, 'artifacts', workspaceKey(o.folderPath)),
     workspaceDir: o.folderPath,
     homeDir,
     log: o.log,

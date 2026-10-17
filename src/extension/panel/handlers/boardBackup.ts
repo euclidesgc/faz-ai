@@ -22,6 +22,7 @@ export const boardBackupHandlers = {
     // o arquivo traz o catálogo de modelos: initModels não roda
     ctx.boardId = result.boardId;
     ctx.lastImport = result;
+    ctx.harness.load();
     return true;
   },
 } satisfies Partial<HandlerMap>;
