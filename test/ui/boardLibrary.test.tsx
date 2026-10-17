@@ -1,4 +1,4 @@
-import { lastSent, renderThemed, seedBoard } from './setup';
+import { lastSent, renderThemed, seedBoard, confirmLast } from './setup';
 import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -35,12 +35,23 @@ describe('biblioteca do board nas configurações', () => {
     });
     renderThemed(<BoardLibrary />);
     await userEvent.click(screen.getByRole('button', { name: 'Selecionar todas' }));
-    expect(screen.getByRole('checkbox', { name: 'Instalar react' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Instalar sql' })).toBeChecked();
-    await userEvent.click(screen.getByRole('button', { name: 'Instalar 2 selecionada(s)' }));
-    act(() => {
-      void useBoardStore.getState().dialog!.onConfirm();
-    });
+    expect(screen.getByRole('checkbox', { name: 'Importar react' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Importar sql' })).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Importar selecionadas (2)' }));
+    expect(useBoardStore.getState().dialog).toBeNull();
     expect(lastSent('harness.library.import')).toEqual({ type: 'harness.library.import', rels: ['react', 'sql'] });
+    confirmLast();
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      '2 skill(s) importada(s). Elas estão na aba Skills abaixo, no modo Pelo card.',
+    );
+  });
+  it('permite escolher uma pasta de origem e reler a biblioteca sem digitar caminhos', async () => {
+    renderThemed(<BoardLibrary />);
+    confirmLast();
+    await userEvent.click(screen.getByRole('button', { name: 'Importar de uma pasta' }));
+    expect(lastSent('harness.library.pick')).toEqual({ type: 'harness.library.pick' });
+    confirmLast();
+    await userEvent.click(screen.getByRole('button', { name: 'Atualizar lista' }));
+    expect(lastSent('harness.refresh')).toEqual({ type: 'harness.refresh' });
   });
 });

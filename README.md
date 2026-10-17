@@ -1273,11 +1273,19 @@ lida, a cópia atual é preservada. Remover do board não apaga a origem.
 **Pasta da biblioteca** mostra o local gerenciado pelo board. Por padrão fica em
 `<armazenamento do Faz AI>/artifacts/<projeto>/`, fora do repositório. Para mudar, informe uma pasta
 vazia e clique em **Salvar pasta**: as cópias são recriadas ali e a pasta anterior é preservada.
-**Abrir pasta** abre o local no editor. O conteúdo fica no banco do board e as cópias de leitura
-nessa pasta são mantidas por ele; gerencie e edite os artefatos pela tela do board.
+**Abrir pasta** abre o local no gerenciador de arquivos do sistema. Você pode colar pastas com
+`SKILL.md` diretamente ali (ou dentro de `skills/`), com suas referências, assets e scripts. Ao voltar
+à janela, reabrir a biblioteca ou clicar em **Atualizar lista**, elas são cadastradas no modo
+**Pelo card** e aparecem na aba **Skills**, com nome, descrição e modo de uso. Edições feitas nas
+cópias também são reconhecidas. Arquivos avulsos e pastas desconhecidas não são apagados; nomes
+repetidos recebem aviso e são preservados. Para tirar um item do board, use **Remover do board**.
+A sincronização remove apenas cópias anteriormente gravadas pelo board e que não foram editadas.
 
-Para importar dezenas de skills, informe uma pasta de coleção ou repositório em **Procurar skills**,
-revise a lista, use **Selecionar todas** ou escolha as desejadas e instale na biblioteca. Cada skill
+Para importar de outro local, clique em **Importar de uma pasta**, escolha a pasta de origem,
+revise a lista, use **Selecionar todas** ou escolha as desejadas e clique em **Importar selecionadas**.
+A origem permanece intacta; as cópias aparecem na aba Skills e nas opções dos cards. No navegador,
+informe o caminho da pasta no computador do servidor e use **Buscar skills pelo caminho**.
+Também é possível informar um repositório git. Cada skill
 leva `SKILL.md` e os arquivos de apoio (referências, assets e scripts), com limites de 512 KB por
 arquivo, 100 arquivos de apoio e 5 MB no total; arquivos omitidos são indicados na lista. Mesmo nome
 e tipo vindos de outra origem exigem remover a cópia anterior primeiro. As skills particulares do

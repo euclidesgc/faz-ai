@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parseAgentFile } from './agentFiles';
 import { frontmatterOf, frontmatterValue } from './frontmatter';
+import { LibraryDisk } from './libraryDisk';
 import { ArtifactMirror } from './artifactMirror';
 import { readSource, readMcpByName } from './artifactSource';
 import { ArtifactRepo, type ArtifactRow } from './repositories/artifactRepo';
@@ -20,6 +21,7 @@ import type { BoardContext } from './panel/handlers/context';
 /** Biblioteca do board: as fontes são lidas só na importação ou numa atualização explícita. */
 export class BoardLibrary {
   readonly repo: ArtifactRepo;
+  warnings: NonNullable<NonNullable<Harness['library']>['warnings']> = [];
 
   constructor(private ctx: BoardContext) {
     this.repo = new ArtifactRepo(ctx.dbHandle.db);
@@ -55,12 +57,24 @@ export class BoardLibrary {
 
   materialize(dir = this.directory): BoardArtifact[] {
     this.prepare(dir);
+    const disk = new LibraryDisk(dir, this.repo, this.ctx.boardId, this.ctx.state().board.aiTool);
+    disk.readChanges();
+    disk.removeObsolete();
+    this.warnings = disk.warnings;
     let failure = '';
-    const mirror = new ArtifactMirror(dir, this.repo, this.ctx.boardId, (message) => {
-      failure ||= message;
-    });
+    const mirror = new ArtifactMirror(
+      dir,
+      this.repo,
+      this.ctx.boardId,
+      (message) => {
+        failure ||= message;
+      },
+      true,
+      disk.protectedPaths,
+    );
     mirror.ensure();
     if (failure) throw new Error(failure);
+    disk.record();
     return this.repo.list(this.ctx.boardId).map((a) => {
       const file = mirror.pathOf(a);
       return { ...a, path: file, ...(!a.missing && file ? { size: fs.statSync(file).size } : {}) };

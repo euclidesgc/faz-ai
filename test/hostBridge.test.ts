@@ -619,3 +619,29 @@ describe('HostBridge: Settings do editor', () => {
     expect(sent.filter((m) => m.type === 'error')).toEqual([]);
   });
 });
+
+describe('biblioteca: importar e abrir uma pasta', () => {
+  it('o seletor lista as skills para revisão antes de copiar', async () => {
+    const source = path.join(dir, 'colecao');
+    fs.mkdirSync(path.join(source, 'react'), { recursive: true });
+    fs.writeFileSync(path.join(source, 'react/SKILL.md'), '---\nname: react\ndescription: Componentes\n---\nInstruções');
+    env.pickFolder = async () => source;
+    await bridge.handle({ type: 'harness.library.pick', requestId: 'pick-library' });
+    expect(router.snapshot().harnessInstall?.skills.map((k) => k.name)).toEqual(['react']);
+    expect(router.snapshot().harness.library!.artifacts).toEqual([]);
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'pick-library', ok: true });
+  });
+
+  it('abrir a biblioteca usa o gerenciador de arquivos sem trocar o projeto do editor', async () => {
+    let opened = '';
+    env.openExternal = (file) => {
+      opened = file;
+    };
+    env.openFolder = () => {
+      throw new Error('Não deveria trocar o projeto');
+    };
+    await bridge.handle({ type: 'harness.library.open', requestId: 'open-library' });
+    expect(opened).toBe(router.snapshot().harness.library!.directory);
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'open-library', ok: true });
+  });
+});
