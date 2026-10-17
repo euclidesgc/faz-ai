@@ -1,7 +1,7 @@
 // O que falta no banco de artefatos do board para as execuções trabalharem com artefatos de forma
 // controlada. Vira um item do Diagnóstico do ambiente e uma recomendação no aviso do topo do board:
 // o board funciona sem isso, só sem o ganho de economia e precisão.
-import { BOARD_MCP_NAME, missingSelections, selectedItems, toolItemsOf } from './harnessSelection';
+import { BOARD_MCP_NAME, missingSelections, selectedItems } from './harnessSelection';
 import type { BoardState } from './model';
 
 /**
@@ -29,7 +29,7 @@ export function harnessIssues(s: View): HarnessIssue[] {
   // só o que entra sozinho no contexto do Cursor: regras, servidores (menos o do board) e hooks do projeto
   if (
     s.board.aiTool === 'cursor' &&
-    toolItemsOf(s).some(
+    (s.harness.inventory.find((t) => t.tool === 'cursor')?.items ?? []).some(
       (i) => i.scope === 'project' && (i.kind === 'instructions' || i.kind === 'hook' || (i.kind === 'mcp' && i.name !== BOARD_MCP_NAME)),
     )
   )

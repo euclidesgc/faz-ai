@@ -1,3 +1,4 @@
+import { artifactLocation } from '../../../shared/artifacts';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -68,12 +69,15 @@ export class BoardHarness {
    */
   load(): void {
     if (!this.store) return;
-    const state = this.ctx.state();
+    let state = this.ctx.state();
     // as pastas importadas são do board: a varredura as recebe a cada leitura, para a aba refletir o que está lá
     this.store.imports = Object.fromEntries(
       ALL_AI_TOOLS.map((tool) => [tool, state.harnessImports.filter((x) => x.tool === tool).map((x) => x.dir)]),
     );
     this.current = this.store.scan();
+    this.ctx.library.migrate(this.current.inventory);
+    state = this.ctx.state();
+    this.current.library = { directory: this.ctx.library.directory, artifacts: this.ctx.library.materialize() };
     const view = { board: state.board, harness: this.current, harnessSelection: state.harnessSelection };
     const sync = (name: string, options: string[]) => {
       const field = state.fieldDefs.find((f) => f.name.toLowerCase() === name.toLowerCase() && f.kind === 'multiselect');
@@ -114,7 +118,10 @@ export class BoardHarness {
     // agentes gravados antes de a lista de ferramentas levar o servidor do board: regravados uma vez
     this.store.repairAgentTools();
     this.load();
-    if (changed) this.markSeeded();
+    if (changed) {
+      this.markSeeded();
+      this.load();
+    }
   }
 
   /** Depois de recriar os agentes de fábrica pela tela: o mesmo que na abertura. */
@@ -280,6 +287,11 @@ export class BoardHarness {
 
   /** Grava um arquivo de apoio numa skill do projeto (usado pela IA). */
   writeSkillFile(name: string, rel: string, content: string): string {
+    const copy = this.ctx.library.writeSkillFile(name, rel, content);
+    if (copy) {
+      this.load();
+      return copy;
+    }
     const tool = this.ctx.state().board.aiTool;
     const item = this.current.inventory
       .find((t) => t.tool === tool)
@@ -304,6 +316,7 @@ export class BoardHarness {
    * `~/.claude.json`, que o Claude Code reescreve o tempo todo.
    */
   private access(file: string): { readonly: boolean } {
+    if (this.ctx.library.fileArtifact(file)) return { readonly: false };
     const listed = this.current.inventory.flatMap((t) => t.items);
     const items = listed.filter((i) => i.path === file);
     if (!items.length && !listed.some((i) => i.imports?.some((x) => x.path === file))) throw new Error('Arquivo fora do harness.');
@@ -321,6 +334,11 @@ export class BoardHarness {
 
   /** Grava o texto editado no board. JSON inválido é recusado: a ferramenta deixaria de ler o arquivo inteiro. */
   writeFile(file: string, content: string): void {
+    if (this.ctx.library.fileArtifact(file)) {
+      this.ctx.library.writeFile(file, content);
+      this.load();
+      return;
+    }
     if (this.access(file).readonly) throw new Error('Este arquivo não pode ser alterado pelo board.');
     if (/\.json$/i.test(file)) {
       try {
@@ -392,12 +410,26 @@ function markSkill(ctx: BoardContext, name: string, scope: 'project' | 'user' = 
   ctx.harness.load();
 }
 
-/** Uma marcação existe para o item (em qualquer uso). */
-const isSelected = (ctx: BoardContext, location: string): boolean =>
-  ctx.state().harnessSelection.some((x) => x.kind === 'agent' && x.location === location);
-
 /** Harness: regras, skills, agentes, hooks, permissões, servidores MCP e instalação de skills. */
 export const harnessHandlers = {
+  'harness.library.directory': (msg, ctx) => {
+    ctx.library.setDirectory(msg.dir);
+    ctx.harness.load();
+    return true;
+  },
+  'harness.library.update': (msg, ctx) => {
+    ctx.library.update(msg.id);
+    ctx.harness.load();
+    return true;
+  },
+  'harness.library.import': (msg, ctx) => {
+    const source = ctx.harness.install;
+    if (!source) throw new Error('Nenhuma origem de skills carregada. Procure de novo.');
+    ctx.library.importSkills(source.dir, msg.rels, source.skills);
+    ctx.harness.clearInstall();
+    ctx.harness.load();
+    return true;
+  },
   'harness.install.apply': (msg, ctx) => {
     const h = ctx.harness;
     if (!h.install) throw new Error('Nenhuma origem de skills carregada. Procure de novo.');
@@ -481,14 +513,15 @@ export const harnessHandlers = {
     return h.changeEach(items, (item) => h.ops.setSkillMode(item, msg.mode));
   },
   'harness.selection.set': (msg, ctx) => {
-    ctx.boards.setSelection(ctx.boardId, msg.items, msg.usage);
+    ctx.library.select(msg.items, msg.usage, ctx.harness.current.inventory);
     // um agente desmarcado deixa de valer para colunas e cards que o escolheram
     if (!msg.usage)
       for (const i of msg.items)
         if (i.kind === 'agent') {
-          const name = ctx.harness.current.agents.find((a) => a.location === i.location)?.name;
-          if (name && !ctx.harness.current.agents.some((a) => a.name === name && a.location !== i.location && isSelected(ctx, a.location)))
-            ctx.boards.releaseAgent(ctx.boardId, name);
+          const name =
+            ctx.harness.current.library?.artifacts.find((a) => a.kind === 'agent' && artifactLocation(a) === i.location)?.name ??
+            ctx.harness.current.agents.find((a) => a.location === i.location)?.name;
+          if (name && !ctx.library.repo.get(ctx.boardId, 'agent', name)) ctx.boards.releaseAgent(ctx.boardId, name);
         }
     ctx.harness.load();
     return true;

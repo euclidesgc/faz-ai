@@ -56,6 +56,8 @@ export interface BoardArtifact {
   generated?: boolean;
   /** caminho da cópia de leitura (SKILL.md, arquivo da regra, arquivo do agente); '' no MCP. Preenchido pelo host */
   path: string;
+  /** Tamanho do arquivo principal da cópia, para a estimativa de contexto. */
+  size?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -80,7 +82,7 @@ export const ARTIFACT_LIMITS = { fileBytes: 512 * 1024, files: 100, totalBytes: 
 /** A identidade do artefato na marcação e nos campos: a origem; o criado no board, `board:<nome>`. */
 export const artifactLocation = (a: Pick<BoardArtifact, 'origin' | 'name'>): string => a.origin || `board:${a.name}`;
 
-export const selectionOf = (a: BoardArtifact): HarnessSelection => ({
+export const selectionOf = (a: Pick<BoardArtifact, 'kind' | 'origin' | 'name' | 'usage'>): HarnessSelection => ({
   kind: selectableOfKind(a.kind),
   location: artifactLocation(a),
   usage: a.usage,
@@ -91,6 +93,8 @@ const LAYOUT: Record<ArtifactKind, HarnessItem['layout']> = { rule: 'file', skil
 /** O artefato no formato de item do inventário, para os helpers de seleção e o contexto do pedido. */
 export function itemOfArtifact(a: BoardArtifact): HarnessItem {
   return {
+    boardArtifactId: a.id,
+    ...(a.size === undefined ? {} : { size: a.size }),
     kind: selectableOfKind(a.kind),
     scope: 'project',
     name: a.name,
@@ -103,20 +107,25 @@ export function itemOfArtifact(a: BoardArtifact): HarnessItem {
 }
 
 /** O agente no formato `Agent` (para o editor atual e para `profileOfArtifact`). */
-export function agentOfArtifact(a: BoardArtifact): Agent {
+export function agentOfArtifact(a: BoardArtifact, tool?: AiTool): Agent {
   const m = a.agent;
+  const foreign = !!tool && !!m?.tools.native.tool && m.tools.native.tool !== tool;
+  const translate = (categories: ToolCategory[]) =>
+    tool ? AGENT_TOOLS[tool].filter((g) => categories.includes(g.id as ToolCategory)).flatMap((g) => g.tools.map((t) => t.name)) : [];
   return {
     name: a.name,
     description: a.description,
     model: '',
-    modelValue: m?.model ?? '',
+    modelValue: foreign ? '' : (m?.model ?? ''),
     scope: 'project',
     path: a.path,
     location: artifactLocation(a),
     content: a.body,
     body: a.body,
-    tools: m?.tools.native.allow ?? [],
-    deniedTools: m?.tools.native.deny ?? [],
+    tools: foreign ? translate(m?.readonly ? ['read'] : (m?.tools.categories ?? [])) : (m?.tools.native.allow ?? []),
+    deniedTools: foreign
+      ? translate(m?.readonly ? ['edit', 'run'] : toolCategories(m?.tools.native.tool ?? '', m?.tools.native.deny ?? []))
+      : (m?.tools.native.deny ?? []),
     skills: m?.skills ?? [],
     mcp: m?.mcpServers ?? [],
     seed: m?.seed ?? false,

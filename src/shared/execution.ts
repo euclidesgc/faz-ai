@@ -253,7 +253,7 @@ export function manifestOf(s: BoardState, c: Card): ExecManifest {
   const skillNames = new Set([
     ...selectedSkillNames(s, 'contextual'),
     ...selectedSkillNames(s, 'always'),
-    ...s.harness.skills.filter((k) => !k.enabled).map((k) => k.name),
+    ...(s.harness.library ? [] : s.harness.skills.filter((k) => !k.enabled).map((k) => k.name)),
   ]);
   const ruleLocations = new Set([...selectedRuleLocations(s, 'contextual'), ...selectedRuleLocations(s, 'always')]);
   const mcpNames = new Set([...selectedMcpNames(s, 'contextual'), ...selectedMcpNames(s, 'always')]);
