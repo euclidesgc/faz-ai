@@ -26,3 +26,6 @@ eslint.config.mjs
 .git-blame-ignore-revs
 DESIGN.md
 CLAUDE.md
+
+board-harness/**
+.kimi-code/**

@@ -285,7 +285,7 @@ describe('importBoard', () => {
     expect(fs.existsSync(router.store.pathOf(router.snapshot().attachments[0] ?? { cardId: storyId, storedName: 'x' }))).toBe(false);
 
     const result = importBoard(target(router), parseExportFile(text));
-    expect(result).toEqual({ boardId: before.board.id, boardName: 'Meu Board', cards: 4, attachments: 2, warnings: [] });
+    expect(result).toEqual({ boardId: before.board.id, boardName: 'Meu Board', cards: 4, attachments: 2, warnings: [], mcpSecrets: [] });
 
     const other = openRouter(db, 'ws-a', 'A'); // reabre a pasta: o board é o importado
     expect(other.boardId).toBe(before.board.id);
@@ -494,5 +494,125 @@ describe('importBoard', () => {
     expect(all(reopened.db, 'SELECT COUNT(*) AS n FROM cards')[0]!.n).toBe(4);
     await reopened.close();
     await handle.close();
+  });
+});
+
+describe('artefatos do board no export e no import', () => {
+  const BIN = Buffer.from([0, 255, 1, 254, 2]);
+  const MCP_META = JSON.stringify({
+    server: { command: 'npx', env: { GITHUB_TOKEN: 'ghp_segredo', LOG: 'x' }, headers: { Authorization: 'Bearer abc' } },
+  });
+
+  function seedArtifacts(): void {
+    const b = router.boardId;
+    const ins = (id: string, kind: string, name: string, meta = '{}') =>
+      run(
+        db,
+        `INSERT INTO board_artifacts (id, board_id, kind, name, description, body, meta_json, usage, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'd', 'corpo', ?, 'always', 1, 2)`,
+        [id, b, kind, name, meta],
+      );
+    ins('a-skill', 'skill', 'revisar');
+    ins('a-agent', 'agent', 'dev');
+    ins('a-mcp', 'mcp', 'github', MCP_META);
+    run(
+      db,
+      "INSERT INTO board_artifact_files (artifact_id, path, content, encoding, size) VALUES ('a-skill', 'refs/a.md', 'texto', 'utf8', 5)",
+    );
+    run(
+      db,
+      "INSERT INTO board_artifact_files (artifact_id, path, content, encoding, size) VALUES ('a-skill', 'bin/x.dat', ?, 'base64', 5)",
+      [BIN.toString('base64')],
+    );
+  }
+
+  const artifactRows = (d: Database) => ({
+    artifacts: all(d, 'SELECT * FROM board_artifacts ORDER BY id'),
+    files: all(d, 'SELECT * FROM board_artifact_files ORDER BY artifact_id, path'),
+  });
+
+  it('o arquivo leva artefatos e arquivos de apoio, e env/headers do MCP saem com as chaves e valor vazio', () => {
+    seedArtifacts();
+    const { file } = doExport();
+    expect(file.tables.board_artifacts).toHaveLength(3);
+    expect(file.tables.board_artifact_files).toHaveLength(2);
+    const mcp = file.tables.board_artifacts!.find((r) => r.kind === 'mcp')!;
+    expect(JSON.parse(str(mcp.meta_json))).toEqual({
+      server: { command: 'npx', env: { GITHUB_TOKEN: '', LOG: '' }, headers: { Authorization: '' } },
+    });
+    expect(JSON.stringify(file)).not.toContain('ghp_segredo');
+    expect(JSON.stringify(file)).not.toContain('Bearer abc');
+    // o banco não é alterado
+    expect(str(all(db, "SELECT meta_json FROM board_artifacts WHERE id = 'a-mcp'")[0]!.meta_json)).toContain('ghp_segredo');
+  });
+
+  it('ida e volta por cima do mesmo board: artefatos e arquivo binário voltam iguais; mcpSecrets lista as chaves vazias', () => {
+    seedArtifacts();
+    const before = artifactRows(db);
+    const text = JSON.stringify(doExport().file);
+    const result = importBoard(target(router), parseExportFile(text));
+    expect(result.mcpSecrets).toEqual(['github: GITHUB_TOKEN', 'github: LOG', 'github: Authorization']);
+    const after = artifactRows(db);
+    expect(after.files).toEqual(before.files);
+    const bin = after.files.find((f) => f.path === 'bin/x.dat')!;
+    expect(Buffer.from(str(bin.content), 'base64')).toEqual(BIN);
+    // só o MCP muda (segredos zerados)
+    expect(after.artifacts.filter((a) => a.kind !== 'mcp')).toEqual(before.artifacts.filter((a) => a.kind !== 'mcp'));
+    expect(str(after.artifacts.find((a) => a.kind === 'mcp')!.meta_json)).not.toContain('ghp_segredo');
+  });
+
+  it('ida e volta num banco limpo', async () => {
+    seedArtifacts();
+    const text = JSON.stringify(doExport().file);
+    const fresh = await openInMemory(WASM_DIR);
+    const r2 = new MessageRouter({ db: fresh, scheduleSave: () => {}, close: async () => {}, backup: () => {} } as never, {
+      workspaceKey: 'ws-z',
+      folderName: 'Z',
+      author: 'Pessoa',
+      attachmentsDir: path.join(dir, 'attachments-z'),
+      workspaceDir: path.join(dir, 'ws-z'),
+      homeDir: path.join(dir, 'home'),
+    });
+    const result = importBoard({ db: fresh, store: r2.store, workspaceKey: 'ws-z', boardId: r2.boardId }, parseExportFile(text));
+    expect(result.mcpSecrets).toHaveLength(3);
+    const rows = artifactRows(fresh);
+    expect(rows.artifacts.map((a) => a.id)).toEqual(['a-agent', 'a-mcp', 'a-skill']);
+    expect(rows.files.map((f) => [f.artifact_id, f.path])).toEqual([
+      ['a-skill', 'bin/x.dat'],
+      ['a-skill', 'refs/a.md'],
+    ]);
+    expect(Buffer.from(str(rows.files[0]!.content), 'base64')).toEqual(BIN);
+  });
+
+  it('export de versão anterior à 33: as tabelas novas valem vazias', () => {
+    const f = doExport().file as any;
+    f.schemaVersion = 32;
+    delete f.tables.board_artifacts;
+    delete f.tables.board_artifact_files;
+    const parsed = parseExportFile(JSON.stringify(f));
+    expect(parsed.tables.board_artifacts).toEqual([]);
+    expect(parsed.tables.board_artifact_files).toEqual([]);
+    expect(importBoard(target(router), parsed).mcpSecrets).toEqual([]);
+  });
+
+  it('recusa nome de skill/agente e caminho de apoio inseguros', () => {
+    seedArtifacts();
+    const bad = (mut: (f: any) => void): string => {
+      const f = doExport().file;
+      mut(f);
+      return JSON.stringify(f);
+    };
+    const named = (kind: string, name: string) => bad((f) => (f.tables.board_artifacts.find((r: any) => r.kind === kind).name = name));
+    for (const n of ['../x', 'a/b', '..', '']) {
+      expect(() => parseExportFile(named('skill', n))).toThrow('Arquivo não é um export do Faz AI: nome de skill ou agente inválido.');
+      expect(() => parseExportFile(named('agent', n))).toThrow('nome de skill ou agente inválido');
+    }
+    // regra e MCP têm nome livre (caminho de origem, nome do servidor)
+    expect(() => parseExportFile(named('mcp', 'a/b'))).not.toThrow();
+    for (const p of ['../x', '/etc/passwd', 'a/../b', 'a\\b', 'C:/x', '']) {
+      expect(() => parseExportFile(bad((f) => (f.tables.board_artifact_files[0].path = p)))).toThrow(
+        'Arquivo não é um export do Faz AI: caminho de arquivo de apoio inválido.',
+      );
+    }
   });
 });

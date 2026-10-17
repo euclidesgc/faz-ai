@@ -103,6 +103,14 @@ describe('i18n do host: mensagens preenchidas', () => {
       "The agent's MCP servers were not found in the Claude Code configuration: a, b.",
     ],
     ['"foto.png" tem mais de 20 MB e não foi anexado.', '"foto.png" is larger than 20 MB and was not attached.'],
+    [
+      'Board "B" importado: 2 card(s) e 1 anexo(s). Preencha os valores vazios dos servidores MCP: github: TOKEN.',
+      'Board "B" imported: 2 card(s) and 1 attachment(s). Fill in the empty values of the MCP servers: github: TOKEN.',
+    ],
+    [
+      'Board "B" importado: 2 card(s) e 1 anexo(s). Anexos sem arquivo: #3. Preencha os valores vazios dos servidores MCP: github: TOKEN.',
+      'Board "B" imported: 2 card(s) and 1 attachment(s). Attachments without a file: #3. Fill in the empty values of the MCP servers: github: TOKEN.',
+    ],
     ['Migration 7 não encontrada', 'Migration 7 not found'],
   ];
 

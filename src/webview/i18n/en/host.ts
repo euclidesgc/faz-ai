@@ -50,6 +50,22 @@ const connectAI: Record<string, string> = Object.fromEntries(
  * conversa traduz os comentários do board só por estas chaves (translateGitNotice, em ../index.ts).
  */
 export const gitNotices: Record<string, string> = {
+  'A pasta da biblioteca não pode ser um link simbólico.': 'The library folder cannot be a symbolic link.',
+  'Escolha uma pasta vazia ou a pasta desta biblioteca do board.': 'Choose an empty folder or this board library’s folder.',
+  'Espere as execuções de IA terminarem antes de mudar a pasta da biblioteca.':
+    'Wait for AI runs to finish before changing the library folder.',
+  'Informe o caminho completo da pasta da biblioteca.': 'Enter the full path to the library folder.',
+  'Não foi possível ler o artefato de origem. Releia as pastas e tente novamente.':
+    'Could not read the source artifact. Refresh the folders and try again.',
+  'Já existe um artefato "{name}" na biblioteca. Remova a cópia anterior antes de importar outra origem.':
+    'An artifact "{name}" already exists in the library. Remove the previous copy before importing another source.',
+  'Mais de uma origem para o artefato "{name}". Importe uma origem por vez.':
+    'More than one source for artifact "{name}". Import one source at a time.',
+  'Skill não encontrada na origem selecionada.': 'Skill not found in the selected source.',
+  'Este artefato não tem uma origem para atualizar.': 'This artifact has no source to update from.',
+  'A origem não está disponível. A cópia do board foi preservada.': 'The source is not available. The board copy was preserved.',
+  'Arquivo fora da biblioteca do board.': 'File outside the board library.',
+
   'O repositório não tem origin: a branch {branch} partiu de {base} como está nesta máquina.':
     'The repository has no origin: branch {branch} started from {base} as it is on this machine.',
   'Não foi possível atualizar as refs do origin antes de criar a branch {branch} ({error}). Ela partiu de {base} como está nesta máquina, que pode estar desatualizada.':
@@ -126,6 +142,8 @@ export const gitNotices: Record<string, string> = {
 };
 
 export const host: Record<string, string> = {
+  'Caminho inválido dentro da skill.': 'Invalid path inside the skill.',
+  'O arquivo ultrapassa os limites da biblioteca.': 'The file exceeds the library limits.',
   ...commandNotFound,
   ...connectAI,
   'A linha de comando "{command}" não foi encontrada. Rode no terminal: {manual}':
@@ -197,6 +215,10 @@ export const host: Record<string, string> = {
     'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s).',
   'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}.':
     'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Preencha os valores vazios dos servidores MCP: {secrets}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Fill in the empty values of the MCP servers: {secrets}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}. Preencha os valores vazios dos servidores MCP: {secrets}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}. Fill in the empty values of the MCP servers: {secrets}.',
   'Espere a execução da IA terminar para importar o board.': 'Wait for the AI run to finish before importing the board.',
   'O arquivo é grande demais para enviar (limite de 200 MB).': 'The file is too large to send (200 MB limit).',
   'Não foi possível ler o arquivo.': 'Could not read the file.',
@@ -228,6 +250,9 @@ export const host: Record<string, string> = {
   'Arquivo não é um export do Faz AI: conteúdo de anexo inválido.': 'The file is not a Faz AI export: invalid attachment content.',
   'Arquivo não é um export do Faz AI: a tabela "{table}" não existe no banco versão {schema}.':
     'The file is not a Faz AI export: the "{table}" table does not exist in database version {schema}.',
+  'Arquivo não é um export do Faz AI: nome de skill ou agente inválido.': 'The file is not a Faz AI export: invalid skill or agent name.',
+  'Arquivo não é um export do Faz AI: caminho de arquivo de apoio inválido.':
+    'The file is not a Faz AI export: invalid supporting file path.',
   'O chat não está disponível neste board.': 'Chat is not available on this board.',
 
   // modelos e esforço

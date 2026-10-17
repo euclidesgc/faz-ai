@@ -7,6 +7,8 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 ## Unreleased
 
+- **Private Harness library (#615).** Settings shows the board folder and supports bulk skill imports, agents, rules and MCP definitions. Copies remain available across tool changes and source removal; updating from source is explicit. The folder can be changed without deleting the previous one. Private project skills are excluded from the extension package. **Behavior change:** sending an artifact to the board creates a copy instead of keeping a live reference to the original file.
+
 - **Contextual bulk actions (#616).** The selection bar and column menu share approve, block with a reason, unblock, work on phase, refine, stop AI, autonomous mode and organization actions. Unavailable items remain visible and disabled, without a reason. Mixed selections affect only eligible cards; filters and execution limits are respected. Bulk approvals advance the phase and preserve history events.
 - **Fix: the sub-tasks of the open card are aligned (#844).** In the story's sub-tasks section, the title now takes the space up to the status, which sits on the right edge of the row, instead of being centered between the LED and the column. Applies to light and dark themes; links and children are unchanged.
 
