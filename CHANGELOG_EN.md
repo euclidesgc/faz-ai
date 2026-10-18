@@ -5,9 +5,9 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
-## Unreleased
+The **Unreleased** section includes only changes integrated into `develop` and awaiting release. Each versioned section describes changes included in that release. Work exclusive to other branches stays out of these notes.
 
-Changes integrated into `develop` and awaiting release. When publishing, this section becomes the version containing these deliveries. Work that remains only on another branch is not part of these notes.
+## Unreleased
 
 - **Fix: the plan's usage limit no longer blocks cards; the queue pauses until the reset (#800).** When the AI tool hits the plan's usage limit (session, weekly or rate limit), the failed run no longer counts toward the block after 3 consecutive runs without progress, and the autopilot and the heartbeat stop dispatching cards for that tool until the reset time shown in the output, plus 3 minutes of slack. With no time in the output, the wait is 5 minutes and doubles on each new failure, up to 60 minutes. Once the pause is over, one test run goes first before the others are released; if it hits the limit again, the pause starts over. The top of the board shows "Usage limit for Claude Code: the queue resumes at 1:53 PM." and the cards waiting for the AI get the label "Waiting for the usage limit until 1:53 PM". The pause is saved in the board and survives reopening the editor; a run you start by hand is still allowed and, if it ends well, ends the pause. The message in the conversation says who repeats the run (the autopilot or the heartbeat) and from when. Applies to Claude Code, Kimi Code and Cursor; Cursor's limit message has not yet been confirmed in a real run. Ordinary failures still count toward the block, as before.
 - **Rules no longer shows the notice about the Models tab (#725).** The block saying that "Fill in the suggested model automatically" had moved to Models, with its "Open in Models" button, was removed from Settings → Rules. The option stays in Models, unchanged.

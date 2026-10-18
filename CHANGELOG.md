@@ -4,9 +4,9 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não lançado
+A seção **Não lançado** reúne apenas mudanças integradas na `develop`, aguardando release. Cada seção versionada descreve as mudanças incluídas naquela release. Trabalho exclusivo de outras branches fica fora destas notas.
 
-Mudanças integradas na `develop`, ainda sem release. Ao publicar, esta seção passa a identificar a versão que contém essas entregas. Trabalho que permanece apenas em outra branch não faz parte destas notas.
+## Não lançado
 
 - **Correção: o limite de uso do plano não bloqueia mais os cards; a fila pausa até a renovação (#800).** Quando a ferramenta de IA esgota o limite de uso do plano (de sessão, semanal ou rate limit), a execução que falhou não conta mais para o bloqueio das 3 execuções seguidas sem avanço, e o autopiloto e o heartbeat param de disparar cards daquela ferramenta até o horário de renovação informado na saída, mais 3 minutos de folga. Sem horário na saída, a espera é de 5 minutos e dobra a cada nova falha, até 60 minutos. Vencida a pausa, uma execução de teste roda antes de soltar as outras; se ela esbarrar no limite de novo, a pausa recomeça. O topo do board mostra "Limite de uso do Claude Code: a fila retoma às 13:53." e os cards que esperam a IA ganham a etiqueta "Aguardando o limite de uso até 13:53". A pausa fica gravada no board e sobrevive a reabrir o editor; a execução pedida à mão continua liberada e, se terminar bem, encerra a pausa. A mensagem na conversa diz quem repete a execução (o autopiloto ou o heartbeat) e a partir de quando. Vale para Claude Code, Kimi Code e Cursor; a mensagem de limite do Cursor ainda não foi confirmada numa execução real. As falhas comuns continuam contando para o bloqueio, como antes.
 - **Regras não mostra mais o aviso sobre a aba Modelos (#725).** O bloco que dizia que "Preencher o modelo sugerido automaticamente" tinha mudado para Modelos, com o botão "Abrir em Modelos", saiu de Configurações → Regras. A opção continua na aba Modelos, sem mudança.
