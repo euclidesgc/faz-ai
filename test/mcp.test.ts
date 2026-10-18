@@ -8,6 +8,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { openInMemory } from '../src/extension/db/database';
 import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
+import { FLOW_SKILLS } from '../src/extension/flowSkill';
 import { createMcpServer, MCP_INSTRUCTIONS, startMcpServer } from '../src/extension/mcp/server';
 import { boardServerFootprint } from '../src/extension/mcp/footprint';
 import { toolDefinitions } from '../src/extension/mcp/tools';
@@ -146,6 +147,19 @@ describe('servidor MCP', () => {
     expect(description('link_cards')).toMatch(/usa o que a outra produz ou quando as duas alteram os mesmos arquivos/);
     expect(description('add_attachment')).toContain('`artifact: true`');
     expect(description('get_harness')).toContain('contexto vazio');
+  });
+
+  it('nenhum texto do MCP nem da skill do fluxo diz que o board lê os agentes da pasta da ferramenta (o board guarda a própria cópia)', async () => {
+    const tools = (await client.listTools()).tools;
+    const texts = [MCP_INSTRUCTIONS, ...tools.map((t) => t.description ?? ''), ...FLOW_SKILLS.map((k) => k.body)];
+    for (const text of texts) {
+      expect(text).not.toContain('referencia, não copia');
+      expect(text).not.toMatch(/arquivo de agente da ferramenta|pasta de agentes global/);
+    }
+    const description = (name: string) => tools.find((t) => t.name === name)!.description;
+    expect(description('create_agent')).toContain('fica guardado no próprio board (não na pasta da ferramenta de IA)');
+    expect(description('update_agent')).toContain('vale para as próximas execuções; as já iniciadas seguem com a versão delas');
+    expect(description('delete_agent')).toContain('o arquivo de origem de um agente copiado não é apagado');
   });
 
   it('o pull request é aberto com --base em workspace.prBase: instruções, prepare_workspace, set_pull_request e nota do modo autônomo (#462)', async () => {
@@ -374,7 +388,7 @@ describe('perfis de execução', () => {
       ],
       usage: 'contextual',
     });
-    // os agentes são arquivos na pasta global da ferramenta, e nascem disponíveis no board
+    // os agentes nascem no board (não na pasta da ferramenta), disponíveis para os cards
     await call('create_agent', { name: 'geral', description: 'Geral', content: 'Instruções gerais', skills: ['testar'] });
     await call('create_agent', {
       name: 'planejador',
@@ -385,7 +399,11 @@ describe('perfis de execução', () => {
       deniedTools: ['WebFetch'],
       model: 'claude:opus@high',
     });
-    expect(fs.existsSync(path.join(home, '.claude/agents/planejador.md'))).toBe(true);
+    expect(fs.existsSync(path.join(home, '.claude/agents/planejador.md'))).toBe(false);
+    // o servidor que o agente libera também precisa estar no board
+    fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({ mcpServers: { github: { command: 'gh' } } }));
+    router.refreshHarness();
+    await call('set_harness_selection', { items: [{ kind: 'mcp', name: 'github' }], usage: 'contextual' });
     router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'geral' } } });
     await call('create_card', { title: 'História', fields: { Skills: ['testar'] } });
     // sem escolha no card nem na coluna: vale o padrão do board, e as skills do card somam às do agente sem repetir
@@ -422,11 +440,9 @@ describe('perfis de execução', () => {
     expect(s.columns.every((c) => c.execProfile === null)).toBe(true);
     expect(s.cards.every((c) => c.execProfile === null)).toBe(true);
     expect((await call('get_card', { card: 1 })).data.execution.profile).toBe('geral');
-    // o arquivo continua no disco: só saiu da marcação
-    expect(fs.existsSync(path.join(home, '.claude/agents/planejador.md'))).toBe(true);
+    // tirar do board um agente criado no board o apaga: ele não tinha arquivo na pasta da ferramenta
     expect((await call('get_harness', { onlySelected: false })).data.agents.map((a: any) => [a.name, a.usage])).toEqual([
       ['geral', 'contextual'],
-      ['planejador', null],
     ]);
   });
 });
@@ -1040,8 +1056,9 @@ describe('status do card e checkpoint de revisão', () => {
     expect(p.next).toContain('order');
   });
 
-  it('cria, edita e apaga agentes na pasta da ferramenta em uso, global por padrão ou no projeto', async () => {
+  it('cria, edita e apaga agentes no board, sem gravar na pasta da ferramenta; o agente só da ferramenta segue no arquivo', async () => {
     const home = path.join(dir, 'home-do-usuario');
+    const stored = (name: string) => router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'agent' && a.name === name);
     expect((await call('get_harness')).data.agents).toEqual([]);
     const h = (
       await call('create_agent', {
@@ -1054,46 +1071,37 @@ describe('status do card e checkpoint de revisão', () => {
       })
     ).data;
     expect(h.agents).toEqual([
-      {
+      expect.objectContaining({
         name: 'revisor-de-spec',
-        scope: 'project',
         description: 'Revisa uma Spec antes do Plan',
-        model: 'claude:opus@high',
-        tools: ['Read', 'Grep'],
         usage: 'contextual',
         path: libraryPath('agent', 'revisor-de-spec'),
-      },
+      }),
     ]);
-    const file = path.join(dir, '.claude/agents/revisor-de-spec.md');
-    expect(fs.readFileSync(file, 'utf8')).toBe(
-      '---\nname: "revisor-de-spec"\ndescription: "Revisa uma Spec antes do Plan"\ntools: Read, Grep, mcp__faz-ai__*\nmodel: opus\nfaz-ai-model: "claude:opus@high"\n---\n\nLeia a spec e aponte lacunas.\n',
-    );
+    // o escopo é ignorado: nada vai para a pasta de agentes do projeto nem da pessoa
+    expect(fs.existsSync(path.join(dir, '.claude/agents'))).toBe(false);
+    expect(fs.existsSync(path.join(home, '.claude/agents'))).toBe(false);
+    expect(stored('revisor-de-spec')).toMatchObject({ origin: '', body: 'Leia a spec e aponte lacunas.' });
+    expect(stored('revisor-de-spec')!.agent).toMatchObject({ model: 'claude:opus@high', tools: { native: { allow: ['Read', 'Grep'] } } });
     expect((await call('get_agent', { agent: 'revisor-de-spec' })).text).toContain('aponte lacunas');
     expect((await call('create_agent', { name: 'revisor-de-spec', description: 'd', content: 'c', scope: 'project' })).text).toContain(
       'Já existe',
     );
     expect((await call('create_agent', { name: 'Nome Inválido', description: 'd', content: 'c' })).error).toBe(true);
 
-    // o patch regrava só o que vier; o arquivo inteiro substitui tudo
+    // o patch regrava só o que vier; o conteúdo inteiro substitui tudo
     await call('update_agent', { agent: 'revisor-de-spec', description: 'Nova descrição', skills: ['x'] });
-    expect(fs.readFileSync(file, 'utf8')).toContain(
-      'description: "Nova descrição"\ntools: Read, Grep, mcp__faz-ai__*\nmodel: opus\nskills: x\n',
-    );
+    expect(stored('revisor-de-spec')).toMatchObject({ description: 'Nova descrição', body: 'Leia a spec e aponte lacunas.' });
+    expect(stored('revisor-de-spec')!.agent).toMatchObject({ skills: ['x'], model: 'claude:opus@high' });
     await call('update_agent', {
       agent: 'revisor-de-spec',
       content: '---\nname: revisor-de-spec\ndescription: Outra\n---\nNovo corpo',
     });
-    const stored = router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'agent' && a.name === 'revisor-de-spec')!;
-    router.handle({ type: 'harness.library.update', id: stored.id });
-    expect((await call('get_harness')).data.agents[0]).toEqual({
-      name: 'revisor-de-spec',
-      scope: 'project',
-      description: 'Outra',
-      usage: 'contextual',
-      path: libraryPath('agent', 'revisor-de-spec'),
-    });
+    expect(stored('revisor-de-spec')).toMatchObject({ description: 'Outra', body: 'Novo corpo' });
+    expect(fs.existsSync(path.join(dir, '.claude/agents'))).toBe(false);
 
-    // agente criado por fora aparece no inventário completo, mas só entra no board depois de marcado
+    // agente criado por fora aparece no inventário completo, mas só entra no board depois de enviado
+    fs.mkdirSync(path.join(dir, '.claude/agents'), { recursive: true });
     fs.writeFileSync(path.join(dir, '.claude/agents/planejador.md'), '---\nname: planejador\ndescription: Quebra a spec em passos\n---\nx');
     router.refreshHarness();
     expect((await call('get_harness')).data.agents.map((a: any) => a.name)).toEqual(['revisor-de-spec']);
@@ -1101,24 +1109,23 @@ describe('status do card e checkpoint de revisão', () => {
       'planejador',
       'revisor-de-spec',
     ]);
-    // sem escopo, o padrão é a pasta global da ferramenta
-    await call('create_agent', { name: 'global', description: 'd', content: 'c' });
-    expect(fs.existsSync(path.join(home, '.claude/agents/global.md'))).toBe(true);
 
+    // no Cursor o agente guarda somente leitura e segundo plano; update_agent liga e desliga
     await call('set_ai_tool', { tool: 'cursor' });
-    await call('create_agent', { name: 'verificador', description: 'd', content: 'c', scope: 'project' });
-    expect(fs.existsSync(path.join(dir, '.cursor/agents/verificador.md'))).toBe(true);
-    // no Cursor o arquivo guarda somente leitura e segundo plano; update_agent liga e desliga
     await call('create_agent', { name: 'leitor', description: 'd', content: 'c', scope: 'project', readonly: true });
-    expect(fs.readFileSync(path.join(dir, '.cursor/agents/leitor.md'), 'utf8')).toContain('readonly: true\n');
+    expect(stored('leitor')!.agent).toMatchObject({ readonly: true });
     await call('update_agent', { agent: 'leitor', readonly: false, background: true });
-    expect(fs.readFileSync(path.join(dir, '.cursor/agents/leitor.md'), 'utf8')).toMatch(/is_background: true\n/);
-    expect(fs.readFileSync(path.join(dir, '.cursor/agents/leitor.md'), 'utf8')).not.toContain('readonly');
+    expect(stored('leitor')!.agent).toMatchObject({ background: true });
+    expect(stored('leitor')!.agent!.readonly).toBeUndefined();
+    expect(fs.existsSync(path.join(dir, '.cursor/agents'))).toBe(false);
     await call('set_ai_tool', { tool: 'claude' });
 
+    // o agente só da ferramenta tem o arquivo apagado; o do board sai do board
     await call('delete_agent', { agent: 'planejador' });
     expect(fs.existsSync(path.join(dir, '.claude/agents/planejador.md'))).toBe(false);
     expect((await call('delete_agent', { agent: 'planejador' })).text).toContain('não encontrado');
+    await call('delete_agent', { agent: 'revisor-de-spec' });
+    expect(stored('revisor-de-spec')).toBeUndefined();
   });
 
   it('instala a skill do fluxo sempre no global da ferramenta, sem sobrescrever', async () => {

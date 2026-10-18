@@ -324,7 +324,7 @@ export type WebviewToHost =
   | { type: 'harness.import.add'; tool: AiTool; dir: string }
   /** tira a pasta importada da lista; os artefatos dela saem do board */
   | { type: 'harness.import.remove'; tool: AiTool; dir: string }
-  /** cria um agente na pasta de agentes da ferramenta (global por padrão) e o marca como disponível no board */
+  /** cria um agente no board (guardado no banco, não na pasta da ferramenta), disponível para os cards; `scope` é ignorado */
   | { type: 'harness.agent.create'; scope?: InstallScope; input: AgentInput }
   /** reescreve o frontmatter (o que vier em `patch`) e, se vier, o corpo de um agente, preservando o resto */
   | { type: 'harness.agent.update'; name: string; scope: InstallScope; patch: Partial<AgentInput>; body?: string }

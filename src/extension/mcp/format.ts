@@ -665,10 +665,18 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
       ? toolItems(s)
       : [...sourceItems, ...(s.harness.library ? s.harness.library.artifacts.filter((a) => !a.missing).map(itemOfArtifact) : [])]
   ).filter((i) => !onlySelected || usage(i));
-  const agents =
-    onlySelected && s.harness.library
-      ? s.harness.library.artifacts.filter((a) => a.kind === 'agent' && !a.missing).map((a) => agentOfArtifact(a, s.board.aiTool))
-      : s.harness.agents;
+  // os agentes do board (no banco) e, na lista completa, também os arquivos da ferramenta que não estão no board
+  const boardAgents = s.harness.library
+    ? s.harness.library.artifacts.filter((a) => a.kind === 'agent' && !a.missing).map((a) => agentOfArtifact(a, s.board.aiTool))
+    : null;
+  const agents = !boardAgents
+    ? s.harness.agents
+    : onlySelected
+      ? boardAgents
+      : [...boardAgents, ...s.harness.agents.filter((t) => !boardAgents.some((a) => a.location === t.location))].sort((x, y) =>
+          x.name.localeCompare(y.name),
+        );
+  const inBoard = (a: { location: string }) => !!boardAgents?.some((b) => b.location === a.location);
   return {
     library: s.harness.library ? { directory: s.harness.library.directory, artifacts: s.harness.library.artifacts } : undefined,
     aiTool: s.board.aiTool,
@@ -696,7 +704,7 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
         ...(a.tools.length ? { tools: a.tools } : {}),
         ...(a.mcp.length ? { mcpServers: a.mcp } : {}),
         usage: usageOf(s.harnessSelection, { kind: 'agent', location: a.location }),
-        path: onlySelected && s.harness.library ? a.path : a.location,
+        path: inBoard(a) ? a.path : a.location,
       })),
     // o que a ferramenta em uso carrega, com o escopo (project, user, plugin ou imported) e o modo no board
     inventory: inventory.map((i) => ({

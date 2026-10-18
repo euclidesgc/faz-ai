@@ -11,7 +11,10 @@ const skillArg = z.string().describe('Nome da skill (nome da pasta), ex.: "revis
 const agentArg = z.string().describe('Nome do agente (nome do arquivo, sem a extensão), ex.: "revisor-de-spec"');
 
 const harness = (router: MessageRouter) => harnessOverview(router.snapshot());
-const scopeArg = z.enum(['user', 'project']).optional().describe('"user" (pasta do usuário, o padrão) ou "project" (só neste projeto)');
+const agentScopeArg = z
+  .enum(['user', 'project'])
+  .optional()
+  .describe('Só para um agente que existe apenas na pasta da ferramenta: "user" (pasta do usuário) ou "project"; o agente do board ignora');
 const listArg = (what: string) => z.array(z.string()).optional().describe(what);
 
 /** Skill do projeto pelo nome; lança se não existir. */
@@ -21,7 +24,11 @@ const skill = (router: MessageRouter, name: string) => {
   return k;
 };
 
-/** Agente pelo nome (e escopo, quando informado); lança com a lista dos existentes. */
+/** O agente guardado no board com esse nome, se houver: é nele que as ferramentas de agente agem. */
+const boardAgent = (router: MessageRouter, name: string) =>
+  router.snapshot().harness.library?.artifacts.find((x) => x.kind === 'agent' && x.name === name && !x.missing);
+
+/** Agente só da pasta da ferramenta, pelo nome (e escopo, quando informado); lança com a lista dos existentes. */
 const agent = (router: MessageRouter, name: string, scope?: InstallScope) => {
   const all = router.snapshot().harness.agents.filter((x) => x.name === name && (!scope || x.scope === scope));
   // com o mesmo nome nos dois escopos, vale o do projeto (como na execução)
@@ -238,10 +245,10 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'get_agent',
-    'Lê o arquivo completo de um agente do board (listado em get_harness), do projeto ou da pasta do usuário.',
-    { agent: agentArg, scope: scopeArg },
+    'Lê um agente do board (listado em get_harness): o arquivo da cópia guardada no board, com o frontmatter. Um agente que só existe na pasta da ferramenta (fora do board) é lido de lá; `scope` escolhe entre o do projeto e o da pasta do usuário.',
+    { agent: agentArg, scope: agentScopeArg },
     (a, router) => {
-      const copy = !a.scope && toolItemsOf(router.snapshot()).find((i) => i.kind === 'agent' && i.boardArtifactId && i.name === a.agent);
+      const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'agent' && i.boardArtifactId && i.name === a.agent);
       return copy ? router.readHarnessFile(copy.path).content : agent(router, a.agent, a.scope as InstallScope | undefined).content;
     },
     true,
@@ -249,12 +256,12 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'create_agent',
-    'Cria um agente do board: um arquivo de agente da ferramenta de IA em uso, na pasta de agentes global (padrão) ou do projeto, e o marca como disponível para os cards. O frontmatter guarda o que a sessão recebe; o corpo é o papel dela.',
+    'Cria um agente do board: ele fica guardado no próprio board (não na pasta da ferramenta de IA) e já disponível para os cards ("Pelo card"). As ferramentas, o modelo, as skills e os servidores MCP são o que a sessão recebe; as instruções são o papel dela. Vale para as próximas execuções.',
     {
       name: z.string().describe('Letras minúsculas, números e hífens'),
       description: z.string().min(1).describe('Quando usar este agente, em uma frase; é por ela que o refinar escolhe'),
       content: z.string().describe('Instruções do agente em markdown (sem o frontmatter)'),
-      scope: scopeArg,
+      scope: z.enum(['user', 'project']).optional().describe('Aceito por compatibilidade e ignorado: o agente fica no board'),
       model: z.string().optional().describe('Valor do campo Modelo (ex.: "claude:sonnet@medium"); sem ele o agente usa o modelo da sessão'),
       tools: listArg('Ferramentas embutidas liberadas (nomes do Claude Code); vazio = as da permissão'),
       deniedTools: listArg('Ferramentas retiradas da sessão'),
@@ -289,10 +296,10 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'update_agent',
-    'Altera um agente do board: com `content`, substitui o arquivo inteiro (com o frontmatter); com os demais campos, reescreve só o que vier, preservando o resto.',
+    'Altera um agente do board: com `content`, substitui o agente inteiro (frontmatter e instruções, no formato da ferramenta em uso); com os demais campos, reescreve só o que vier, preservando o resto. A mudança fica no board e vale para as próximas execuções; as já iniciadas seguem com a versão delas. O arquivo de origem de um agente copiado não é alterado.',
     {
       agent: agentArg,
-      scope: scopeArg,
+      scope: agentScopeArg,
       content: z.string().min(1).optional().describe('Arquivo inteiro, com o frontmatter'),
       description: z.string().optional(),
       body: z.string().optional().describe('Instruções (sem o frontmatter)'),
@@ -305,7 +312,9 @@ export function registerHarnessTools(tool: DefineTool): void {
       background: z.boolean().optional().describe('Só no Cursor: roda em segundo plano'),
     },
     (a, router) => {
-      const found = agent(router, a.agent, a.scope as InstallScope | undefined);
+      const found = boardAgent(router, a.agent)
+        ? { name: a.agent, scope: 'user' as const }
+        : agent(router, a.agent, a.scope as InstallScope | undefined);
       if (a.content) router.handle({ type: 'harness.agent.write', name: found.name, scope: found.scope, content: a.content });
       else
         router.handle({
@@ -330,10 +339,12 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'delete_agent',
-    'Apaga o arquivo de um agente. Não pode ser desfeito pelo board.',
-    { agent: agentArg, scope: scopeArg },
+    'Tira um agente do board; o arquivo de origem de um agente copiado não é apagado. Um agente que só existe na pasta da ferramenta (fora do board) tem o arquivo apagado. Não pode ser desfeito pelo board.',
+    { agent: agentArg, scope: agentScopeArg },
     (a, router) => {
-      const found = agent(router, a.agent, a.scope as InstallScope | undefined);
+      const found = boardAgent(router, a.agent)
+        ? { name: a.agent, scope: 'user' as const }
+        : agent(router, a.agent, a.scope as InstallScope | undefined);
       router.handle({ type: 'harness.agent.delete', name: found.name, scope: found.scope });
       return harness(router);
     },
