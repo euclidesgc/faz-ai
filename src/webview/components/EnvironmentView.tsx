@@ -30,7 +30,7 @@ function texts(c: EnvCheck, projectTool: AiTool): { title: string; hint: string 
         : {
             title: t('{tool} (encontrado na máquina)', { tool }),
             hint: t(
-              'Outra ferramenta de IA nesta máquina. O board passa a usá-la se você a escolher em Configurações → Harness de IA, e aí instala nela o MCP e a skill do board.',
+              'Outra ferramenta de IA nesta máquina. O board passa a usá-la se você a escolher em Configurações → Harness, e aí instala nela o MCP e a skill do board.',
             ),
           };
     case 'cli':
@@ -98,7 +98,7 @@ function texts(c: EnvCheck, projectTool: AiTool): { title: string; hint: string 
     case 'permission':
       return {
         title: t('Nível de permissão das execuções'),
-        hint: t('Diz o que a IA do {tool} pode fazer sozinha nas execuções pelo board. É escolhido em Configurações → Harness de IA.', {
+        hint: t('Diz o que a IA do {tool} pode fazer sozinha nas execuções pelo board. É escolhido em Configurações → Harness.', {
           tool,
         }),
       };

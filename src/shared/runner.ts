@@ -99,7 +99,7 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
     autopilotPaused: raw.autopilotPaused === true,
     defaultAgent: typeof raw.defaultAgent === 'string' ? raw.defaultAgent.trim() : '',
     heartbeat: raw.heartbeat === true,
-    // nasce ligado: quem não quer o refinamento automático desliga em Configurações → Harness de IA
+    // nasce ligado: quem não quer o refinamento automático desliga em Configurações → Harness
     heartbeatRefine: raw.heartbeatRefine !== false,
     heartbeatMinutes:
       Number.isFinite(interval) && interval > 0

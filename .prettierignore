@@ -11,3 +11,5 @@ docs/
 board-harness/
 
 .kimi-code/
+
+.cursor/

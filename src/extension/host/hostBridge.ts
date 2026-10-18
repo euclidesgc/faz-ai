@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs/promises';
 import { fetchSource, parseSource } from '../skillInstall';
@@ -15,6 +16,7 @@ const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'attachment.read',
   'harness.file.read',
   'harness.project.profile',
+  'harness.agent.assist',
   'metrics.query',
   'card.usage.query',
 ]);
@@ -271,6 +273,28 @@ export class HostBridge {
       case 'harness.library.read':
         this.post({ type: 'harness.library.content', input: this.router.readLibraryArtifact(msg.id) });
         return;
+      case 'harness.library.folders': {
+        const input = msg.dir.trim();
+        if (input && !path.isAbsolute(input) && !input.startsWith('~/')) throw new Error('Informe o caminho completo de uma pasta.');
+        const directory = path.resolve(input.startsWith('~/') ? path.join(os.homedir(), input.slice(2)) : input || os.homedir());
+        const entries = await fs.readdir(directory, { withFileTypes: true });
+        this.post({
+          type: 'harness.library.foldersResult',
+          directory,
+          parent: path.dirname(directory),
+          folders: entries
+            .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((e) => ({ name: e.name, path: path.join(directory, e.name) })),
+        });
+        return;
+      }
+      case 'harness.library.pickDirectory': {
+        if (!this.env.pickFolder) throw new Error('Informe o caminho da pasta.');
+        const dir = await this.env.pickFolder('Pasta da biblioteca');
+        if (dir) this.post({ type: 'harness.library.directorySelected', directory: dir });
+        return;
+      }
       case 'harness.library.pickArtifacts': {
         if (!this.env.pickFolder) throw new Error('Informe o caminho da pasta.');
         const dir = await this.env.pickFolder('Importar artefatos para o board');
@@ -304,6 +328,17 @@ export class HostBridge {
           type: 'harness.item.created',
           path: this.router.writeHarnessItem(msg.tool, msg.source, msg.name, msg.content, msg.files, msg.append),
         });
+        return;
+      case 'harness.agent.assist':
+        try {
+          this.post({ type: 'harness.agent.assistResult', requestId: msg.requestId, result: await this.router.assistAgent(msg.input) });
+        } catch (error) {
+          this.post({
+            type: 'harness.agent.assistResult',
+            requestId: msg.requestId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
         return;
       case 'harness.project.profile':
         // ler o projeto não muda o board: o erro vai na própria resposta

@@ -75,7 +75,7 @@ export function AgentsTable({ tool, scope, query = '' }: { tool: AiToolInfo; sco
         <ActionButton
           variant="ghost"
           size="1"
-          aria-label={t('Trocar a ferramenta de IA, em Harness de IA')}
+          aria-label={t('Trocar a ferramenta de IA, em Harness')}
           hint={t('Vai a "Ferramenta deste projeto", na aba Ferramenta e execução.')}
           onClick={() => useBoardStore.getState().goToSection('harness-tool')}
         >

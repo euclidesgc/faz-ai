@@ -69,7 +69,7 @@ describe('faixa de requisitos do board', () => {
     expect(sentOf('ui.connectAI')).toHaveLength(0);
     expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'harness', harnessTab: 'claude', harnessTopic: 'mcp' });
     useBoardStore.setState({ view: 'board' });
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir Harness de IA' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir Harness' }));
     expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'harness' });
   });
 
@@ -232,7 +232,7 @@ describe('aviso compacto do que falta (no lugar da faixa no topo do board)', () 
 });
 
 describe('faixa de requisitos: definição do harness', () => {
-  it('é só recomendação: a linha discreta diz o que falta e leva ao Harness de IA', async () => {
+  it('é só recomendação: a linha discreta diz o que falta e leva ao Harness', async () => {
     // o teste anterior monta o App, que deixa a interface no idioma do navegador (inglês no jsdom)
     setLocale('pt-BR');
     set([{ id: 'harness', tool: 'cursor', optional: true, harnessIssues: ['artifacts', 'rules'], action: { kind: 'settings' } }]);
@@ -243,7 +243,7 @@ describe('faixa de requisitos: definição do harness', () => {
     expect(
       screen.getByText(/nenhuma skill, agente ou servidor MCP em modo "Pelo card"; regras no board ainda desligadas/),
     ).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir Harness de IA' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir Harness' }));
     expect(useBoardStore.getState().view).toBe('settings');
   });
 });

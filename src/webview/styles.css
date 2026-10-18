@@ -4425,3 +4425,130 @@ div.metrics-breakdown {
   gap: var(--sp-12);
   padding-top: var(--sp-12);
 }
+
+.library-wizard-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4) var(--sp-12);
+  margin: 0;
+  font-size: var(--fs-xs);
+  list-style: none;
+  padding: 0;
+  color: var(--muted);
+}
+.library-wizard-steps [aria-current='step'] {
+  color: var(--fg);
+  font-weight: 600;
+  border-bottom: 2px solid var(--accent);
+}
+.artifact-help {
+  display: grid;
+  gap: var(--sp-8);
+  margin: 0;
+}
+.artifact-help-notice {
+  display: flex;
+}
+.artifact-help-content {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: var(--sp-12);
+}
+.artifact-help-dismiss {
+  justify-self: end;
+}
+.board-library p:not(.markdown p) {
+  margin-block: 0;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+}
+.board-library .rt-CalloutText {
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+}
+.library-storage,
+.library-editor,
+.library-guide-question {
+  display: grid;
+  gap: var(--sp-8);
+}
+.library-guide-example {
+  padding: var(--sp-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid;
+  justify-items: start;
+  gap: var(--sp-6);
+  font-size: var(--fs-xs);
+}
+.library-guide-example p {
+  white-space: pre-wrap;
+}
+.library-import-preview [role='tabpanel'] > label {
+  margin-block: var(--sp-8);
+}
+.library-folder-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  max-height: 40vh;
+  overflow: auto;
+  margin-block: var(--sp-16);
+}
+
+/* Mantém a ação legível enquanto o indicador gira ao lado do rótulo. */
+.action-button-loading:disabled {
+  color: var(--fg);
+}
+
+.library-agent-editor .rt-TabsList {
+  flex-wrap: wrap;
+  height: auto;
+}
+.library-agent-editor [role='tabpanel'][data-state='active'] {
+  gap: var(--sp-8);
+}
+.agent-permission-list,
+.agent-ai-proposal {
+  display: grid;
+  gap: var(--sp-8);
+}
+.agent-permission-option,
+.agent-dependency-option {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: var(--sp-8);
+  align-items: start;
+  padding: var(--sp-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+}
+.agent-dependency-option > span {
+  display: grid;
+  gap: var(--sp-4);
+}
+.agent-ai-proposal {
+  padding: var(--sp-12);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+}
+.agent-ai-proposal ul {
+  margin: 0;
+  padding-left: var(--sp-20);
+}
+
+/* Tipografia compartilhada pelas caixas de sugestões dos assistentes. */
+.agent-ai-proposal,
+.wizard-suggestion {
+  font-size: var(--fs-md);
+  line-height: 1.55;
+}
+.board-library :is(.agent-ai-proposal, .wizard-suggestion) p:not(.markdown p),
+:is(.agent-ai-proposal, .wizard-suggestion) .wizard-preview {
+  font-size: inherit;
+  line-height: inherit;
+}

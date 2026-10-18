@@ -1,5 +1,5 @@
 import { forwardRef, type ReactNode } from 'react';
-import { Button, IconButton, type ButtonProps, type IconButtonProps } from '@radix-ui/themes';
+import { Button, IconButton, Spinner, type ButtonProps, type IconButtonProps } from '@radix-ui/themes';
 import { Hint } from './Hint';
 
 interface Extra {
@@ -16,14 +16,24 @@ export type ActionButtonProps = ButtonProps & Extra;
  * faz, e tamanho 2 por padrão (o 1 fica para as ações de linha). Ver DESIGN.md, "Componentes".
  */
 export const ActionButton = forwardRef<HTMLButtonElement, ActionButtonProps>(function ActionButton(
-  { hint, disabledReason, size = '2', disabled, loading, ...rest },
+  { hint, disabledReason, size = '2', disabled, loading, children, className, ...rest },
   ref,
 ) {
   // com `disabledReason` o wrapper do Hint existe sempre; o motivo só aparece enquanto está desabilitado
   const reason = disabledReason === undefined ? undefined : disabled && !loading ? disabledReason : null;
   return (
     <Hint content={hint} disabledReason={reason}>
-      <Button ref={ref} size={size} disabled={disabled} loading={loading} {...rest} />
+      <Button
+        {...rest}
+        ref={ref}
+        size={size}
+        disabled={disabled || loading}
+        aria-busy={loading || rest['aria-busy']}
+        className={[className, loading ? 'action-button-loading' : ''].filter(Boolean).join(' ')}
+      >
+        {children}
+        {loading && <Spinner size="1" aria-hidden="true" />}
+      </Button>
     </Hint>
   );
 });

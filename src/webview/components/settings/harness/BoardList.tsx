@@ -1,8 +1,18 @@
-import { Badge, Button, Callout } from '@radix-ui/themes';
+import { useState } from 'react';
+import { Badge, Button, Callout, Checkbox } from '@radix-ui/themes';
 import { HARNESS_SCOPES, type HarnessItem } from '../../../../shared/harness';
-import { missingSelections, selectedItems, selectionKey, usageOptions, type SelectableKind } from '../../../../shared/harnessSelection';
+import {
+  HARNESS_USAGES,
+  missingSelections,
+  selectedItems,
+  selectionKey,
+  usageOptions,
+  type HarnessUsage,
+  type SelectableKind,
+} from '../../../../shared/harnessSelection';
 import { matchesQuery, type HarnessOrigin } from '../../../../shared/harnessTopics';
 import { harness } from '../../../commands';
+import { useAction } from '../../../useAction';
 import { useBoardStore } from '../../../store/boardStore';
 import { ActionButton, IconWarning } from '../../ui';
 import { UsageSelect } from './UsageSelect';
@@ -29,7 +39,32 @@ export function BoardList({
   onOpenCatalog: (origin: HarnessOrigin) => void;
 }) {
   const state = useBoardStore((s) => s.state)!;
-  const items = selectedItems(state, kind).filter((i) => matchesQuery(query, i.name, i.description));
+  const allItems = selectedItems(state, kind);
+  const items = allItems.filter((i) => matchesQuery(query, i.name, i.description));
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const keyOf = (item: HarnessItem) => item.boardArtifactId ?? selectionKey(item);
+  const chosen = allItems.filter((item) => picked.has(keyOf(item)));
+  const bulkEnabled = central && ['skill', 'agent', 'mcp'].includes(kind);
+  const bulkLabels =
+    kind === 'agent'
+      ? { group: 'Ações em massa de subagentes', visible: 'Selecionar subagentes visíveis', item: 'Selecionar subagente: {name}' }
+      : kind === 'mcp'
+        ? { group: 'Ações em massa de MCPs', visible: 'Selecionar MCPs visíveis', item: 'Selecionar MCP: {name}' }
+        : { group: 'Ações em massa de skills', visible: 'Selecionar skills visíveis', item: 'Selecionar skill: {name}' };
+  const pick = (list: HarnessItem[], checked: boolean) =>
+    setPicked((previous) => {
+      const next = new Set(previous);
+      for (const item of list) {
+        if (checked) next.add(keyOf(item));
+        else next.delete(keyOf(item));
+      }
+      return next;
+    });
+  const bulk = useAction(async (targets: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null) => {
+    await harness.setSelection(targets, usage);
+    setPicked(new Set());
+  });
+  const targets = chosen.map((item) => ({ kind, location: selectionKey(item) }));
   const missing = missingSelections(state).filter((x) => x.kind === kind && matchesQuery(query, x.location));
   const remove = (location: string) => harness.setSelection([{ kind, location }], null);
   const modes = usageOptions(kind);
@@ -87,10 +122,80 @@ export function BoardList({
         <p className="muted small">{t('Nenhum artefato nesta aba. Crie um aqui ou importe uma pasta para começar.')}</p>
       )}
       {total > 0 && items.length + missing.length === 0 && <p className="muted small scope-empty">{t('Nada encontrado para a busca.')}</p>}
+      {bulkEnabled && allItems.length > 0 && (
+        <div className="item-list-head" role="group" aria-label={t(bulkLabels.group)}>
+          <label className="item-check-all">
+            <Checkbox
+              aria-label={t(bulkLabels.visible)}
+              disabled={bulk.busy || items.length === 0}
+              checked={
+                items.length > 0 && items.every((item) => picked.has(keyOf(item)))
+                  ? true
+                  : items.some((item) => picked.has(keyOf(item)))
+                    ? 'indeterminate'
+                    : false
+              }
+              onCheckedChange={(checked) => pick(items, checked === true)}
+            />
+            <span className="muted small">{t('Selecionar todos')}</span>
+          </label>
+          {chosen.length > 0 && (
+            <>
+              <span className="muted small">{t('{n} selecionados', { n: chosen.length })}</span>
+              <Button size="1" variant="ghost" disabled={bulk.busy} onClick={() => setPicked(new Set())}>
+                {t('Limpar seleção')}
+              </Button>
+              {HARNESS_USAGES.filter((mode) => kind !== 'agent' || mode.id === 'contextual').map((mode) => (
+                <ActionButton
+                  key={mode.id}
+                  size="1"
+                  variant="soft"
+                  loading={bulk.busy}
+                  hint={t(mode.hint)}
+                  onClick={() => void bulk.run(targets, mode.id)}
+                >
+                  {t(kind === 'agent' ? 'Disponível no board' : mode.label)}
+                </ActionButton>
+              ))}
+              <ActionButton
+                size="1"
+                variant="soft"
+                color="red"
+                loading={bulk.busy}
+                hint={t('Exclui os artefatos selecionados da biblioteca. Os arquivos de origem serão preservados.')}
+                onClick={() =>
+                  useBoardStore.getState().ask({
+                    title: t('Excluir {n} artefatos da biblioteca?', { n: chosen.length }),
+                    message:
+                      t('As cópias selecionadas serão excluídas. As origens serão preservadas. Esta ação não pode ser desfeita.') +
+                      '\n\n' +
+                      chosen.map((item) => `- ${item.name}`).join('\n'),
+                    confirmLabel: t('Excluir'),
+                    danger: true,
+                    onConfirm: () => void bulk.run(targets, null),
+                  })
+                }
+              >
+                {t('Excluir selecionadas')}
+              </ActionButton>
+            </>
+          )}
+        </div>
+      )}
+      {bulk.error && <p role="alert">{bulk.error}</p>}
       <ul className="item-list">
         {items.map((i) => (
-          <li key={`${i.kind}:${selectionKey(i)}`} className="item-row">
-            <span className="item-check" />
+          <li key={`${i.kind}:${selectionKey(i)}`} className={`item-row${bulkEnabled && picked.has(keyOf(i)) ? ' selected' : ''}`}>
+            <span className="item-check">
+              {bulkEnabled && (
+                <Checkbox
+                  aria-label={t(bulkLabels.item, { name: i.name })}
+                  checked={picked.has(keyOf(i))}
+                  disabled={bulk.busy}
+                  onCheckedChange={(checked) => pick([i], checked === true)}
+                />
+              )}
+            </span>
             <div className="item-main">
               <div className="item-title">
                 <span className="item-name">{i.name}</span>
@@ -103,11 +208,17 @@ export function BoardList({
                   </Badge>
                 )}
               </div>
-              {i.description && (
+              {i.kind === 'mcp' ? (
+                <p className="item-hint">
+                  {i.description && i.description !== state.harness.library?.artifacts.find((a) => a.id === i.boardArtifactId)?.mcpSummary
+                    ? i.description
+                    : t('Sem descrição cadastrada. Use Editar para explicar o que este MCP oferece e quando usá-lo.')}
+                </p>
+              ) : i.description ? (
                 <p className="item-hint" title={i.description}>
                   {i.description}
                 </p>
-              )}
+              ) : null}
               {i.path && (
                 <button
                   type="button"
@@ -151,27 +262,29 @@ export function BoardList({
                   {t('Disponível no board')}
                 </Badge>
               )}
-              {i.boardArtifactId && state.harness.library?.artifacts.find((a) => a.id === i.boardArtifactId)?.origin && (
-                <ActionButton
-                  variant="ghost"
-                  size="1"
-                  hint={t('Substitui a cópia do board pelo conteúdo atual da origem.')}
-                  onClick={() =>
-                    useBoardStore.getState().ask({
-                      title: t('Atualizar "{name}" da origem?', { name: i.name }),
-                      message: t('A cópia atual do board será substituída. A origem não será alterada.'),
-                      confirmLabel: t('Atualizar da origem'),
-                      onConfirm: () => harness.updateLibraryArtifact(i.boardArtifactId!),
-                    })
-                  }
-                >
-                  {t('Atualizar da origem')}
-                </ActionButton>
-              )}
+              {kind === 'instructions' &&
+                i.boardArtifactId &&
+                state.harness.library?.artifacts.find((a) => a.id === i.boardArtifactId)?.origin && (
+                  <ActionButton
+                    variant="ghost"
+                    size="1"
+                    hint={t('Substitui a cópia do board pelo conteúdo atual da origem.')}
+                    onClick={() =>
+                      useBoardStore.getState().ask({
+                        title: t('Atualizar "{name}" da origem?', { name: i.name }),
+                        message: t('A cópia atual do board será substituída. A origem não será alterada.'),
+                        confirmLabel: t('Atualizar da origem'),
+                        onConfirm: () => harness.updateLibraryArtifact(i.boardArtifactId!),
+                      })
+                    }
+                  >
+                    {t('Atualizar da origem')}
+                  </ActionButton>
+                )}
               <ActionButton
                 variant="ghost"
                 size="1"
-                hint={t('Tira do board; o arquivo de origem não é tocado.')}
+                hint={t('Exclui a cópia da biblioteca; o arquivo de origem será preservado.')}
                 onClick={() =>
                   central
                     ? useBoardStore.getState().ask({
@@ -182,9 +295,9 @@ export function BoardList({
                       })
                     : remove(selectionKey(i))
                 }
-                aria-label={t('Remover do board: {name}', { name: i.name })}
+                aria-label={t('Excluir: {name}', { name: i.name })}
               >
-                {t('Remover do board')}
+                {t('Excluir')}
               </ActionButton>
             </div>
           </li>
@@ -205,13 +318,8 @@ export function BoardList({
               </div>
             </div>
             <div className="row-actions">
-              <Button
-                variant="ghost"
-                size="1"
-                onClick={() => remove(x.location)}
-                aria-label={t('Remover do board: {name}', { name: x.location })}
-              >
-                {t('Remover do board')}
+              <Button variant="ghost" size="1" onClick={() => remove(x.location)} aria-label={t('Excluir: {name}', { name: x.location })}>
+                {t('Excluir')}
               </Button>
             </div>
           </li>

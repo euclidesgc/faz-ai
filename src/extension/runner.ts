@@ -100,7 +100,7 @@ const AUTH_FAILURE_PATTERNS: Record<AiTool, RegExp[]> = {
 const TAIL_LINES = 12;
 /** Tamanho de cada linha do `tail`: a explicação da falha no card não vira despejo de saída. */
 const TAIL_CHARS = 300;
-const WHERE = 'Configurações → Harness de IA → "O que a IA pode fazer"';
+const WHERE = 'Configurações → Harness → "O que a IA pode fazer"';
 
 /** O que a IA precisa saber sobre o limite da execução, para explicar à pessoa em vez de falhar sem contexto. */
 export const PERMISSION_ADVICE: Record<RunnerPermission, string | null> = {
@@ -626,7 +626,7 @@ export class AiRunner {
     // caiu antes do primeiro evento e o board não repetiu: a pessoa confere o que ficou feito
     const notRepeated = end.measureError instanceof MeasureEndedError ? ` ${NOT_REPEATED}` : '';
     const failure = end.timedOut
-      ? `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Harness de IA.${output}`
+      ? `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Harness.${output}`
       : error
         ? `Não foi possível executar o ${toolLabel}: ${error.message}`
         : code !== 0

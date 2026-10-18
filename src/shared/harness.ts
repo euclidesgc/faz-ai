@@ -1,5 +1,5 @@
 import type { BoardArtifact } from './artifacts';
-/** Harness de IA do projeto: arquivos de regras e skills, gerenciados pelo board. */
+/** Harness do projeto: arquivos de regras e skills, gerenciados pelo board. */
 
 /**
  * Como a ferramenta chega a uma skill: `auto` deixa a descrição à vista da IA, que decide quando usar;
@@ -251,6 +251,7 @@ export interface Harness {
   /** Cópias do board, disponíveis em todas as ferramentas. Ausente em estados antigos. */
   library?: {
     preview?: import('./artifacts').LibraryImportPreview;
+    importResult?: import('./artifacts').LibraryImportResult;
     directory: string;
     artifacts: BoardArtifact[];
     warnings?: { path: string; reason: 'duplicate' | 'invalid' | 'unreadable' }[];

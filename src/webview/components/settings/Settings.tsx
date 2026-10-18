@@ -43,7 +43,7 @@ const TABS: [SettingsTab, string, Icon][] = [
   ['types', 'Tipos de card', IconTypes],
   ['fields', 'Campos personalizados', IconFields],
   ['rules', 'Regras do board', IconRules],
-  ['harness', 'Harness de IA', IconHarness],
+  ['harness', 'Harness', IconHarness],
   ['models', 'Modelos de IA', IconModels],
   ['git', 'Git', IconBranch],
   ['appearance', 'Aparência', IconAppearance],
