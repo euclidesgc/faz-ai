@@ -389,3 +389,12 @@ Schema 42 acrescenta `ai_profiles` à exportação e ao estado público do board
 
 
 `AiTool` agora identifica o perfil persistido; os dados nativos usam `AiBase` e `AI_BASES`/`ALL_AI_BASES`/`baseInfo`. O default do board valida perfis ligados/revisados e conserva IDs de cópias. Metadados desconhecidos são neutros, sem ampliar suporte/permissões. A gestão MCP do catálogo e a seleção por perfil ainda precisam da etapa #689; o enum público desses comandos continua restrito às três bases nesta etapa. Cópias/personalizados são recusados pelo provider atual, sem redirecionamento silencioso. O gateway do host também recusa perfis ausentes/desativados/pendentes antes de preparar snapshots ou iniciar CLI.
+
+
+### Consultas de versão/login por perfil
+
+`resolveCommand` aceita `onlyPath`; personalizados usam somente o comando exato no PATH ou caminho absoluto, sem aliases/extensões/pastas usuais. `resolveProfileCommand` considera o PATH privado do perfil. `profileVersion` e `profileSignedIn` são adaptadores internos do host, sem ferramenta MCP nova; a interface não envia comandos para sondar. O host resolve a configuração pelo ID e recusa consultas de perfis pendentes/desativados ou sem credencial local.
+
+As sondas de perfil usam `execFile` sem shell, inclusive as consultas nativas; shims `.cmd`/`.bat` no Windows ficam desconhecidos nesse caminho. A versão retorna somente o trecho numérico reconhecido, com ocultação prévia dos valores privados; stdout/stderr brutos não vão ao estado. Sem `statusArgs`, personalizado não consulta/cobra login. Código zero/um/indisponível conserva verdadeiro/falso/desconhecido. As consultas configuradas exigem revisão humana e não comprovam capacidades. O cache é por perfil, executável e referência de credenciais.
+
+Requisitos de perfis configuráveis expõem nome público em `cli`, nunca comando/args/env. Link de instalação HTTPS revisado pode aparecer como metadado público; URL com usuário, senha, query ou fragmento é omitida. Cópias/personalizados não dependem do registro MCP global de outra conta. A execução e a admissão dos providers configuráveis ainda dependem de #687/#729.

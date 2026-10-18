@@ -9,6 +9,8 @@ The **Unreleased** section includes only changes integrated into `develop` and a
 
 ## Unreleased
 
+- **CLI resolution and probes per profile.** Custom profiles resolve the exact command only through PATH or an absolute path, without aliases, common installation directories or editor bundles. Reviewed probes use separate arguments and no shell, returning version/login without raw output. Pending, disabled or locally unavailable profiles run no queries. Requirements use the public profile label and skip native MCP registration for custom/copied profiles. Login caching distinguishes profile, executable and credential reference. This does not prove capabilities or enable execution.
+
 - **Profile IDs separated from CLI bases.** `AiTool` accepts persisted IDs; native file, builtin model and tool tables use `AiBase`. Only enabled/reviewed profiles can become the default. Copies use the base catalog while retaining their identity; custom profiles receive neutral metadata without an assumed native inventory. The host rejects disabled/imported profiles before preparation. Running copied/custom profiles still awaits provider integration.
 
 - **CLI profile domain and persistence.** Schema 42 adds builtin, copied and custom profiles without changing existing defaults/models. Commands, arguments, environment and extensions remain in the local vault; public state and exports carry references. Imported profiles are disabled/pending, with a notice and explicit human review. Copies receive their own reference and inherit neither review nor verified capabilities. Runtime and profile UI integration remain pending.

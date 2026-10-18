@@ -1,3 +1,6 @@
+import type { AiProfile } from '../shared/aiProfiles';
+import { profileCanProbe, profileSignedIn } from './cliProbe';
+import { profileCommand } from './cliResolve';
 import { baseValue } from '../shared/harness';
 import type { AiBase } from '../shared/aiProfiles';
 import * as fs from 'node:fs';
@@ -139,6 +142,9 @@ export function allowKimiMcp(homeDir: string): boolean {
 }
 
 export interface RequirementProbe {
+  /** Configuração privada, resolvida pelo host; não vem do pedido da interface. */
+  profile?: AiProfile;
+  profileSignedIn?(profile: AiProfile, executable: string): Promise<boolean | null>;
   tool: AiTool;
   permission: RunnerPermission;
   workspaceDir: string;
@@ -152,7 +158,7 @@ export interface RequirementProbe {
   /** o node encontrado no PATH do terminal, com caminho absoluto */
   nodePath: string | undefined;
   /** caminho do executável de um comando, ou null */
-  resolve(command: string): string | null;
+  resolve(command: string, options?: { onlyPath?: boolean; pathEnv?: string }): string | null;
   /** se a CLI está autenticada; null quando a ferramenta não tem como dizer */
   signedIn(tool: AiTool, executable: string): Promise<boolean | null>;
   /** o editor em que o board está aberto; ausente fora do editor (o `faz-ai` no terminal) */
@@ -202,26 +208,67 @@ const modifiedAt = (file: string): number => {
  */
 export async function checkRequirements(p: RequirementProbe): Promise<BoardRequirement[]> {
   const out: BoardRequirement[] = [];
-  const tool = p.tool;
+  const profile = p.profile;
+  const tool = profile?.id ?? p.tool;
+  if (profile && !profileCanProbe(profile))
+    return [
+      {
+        id: 'permission',
+        tool,
+        reason:
+          profile.enabled && profile.credentials?.review === 'reviewed' && !profile.credentials.available
+            ? 'Configuração local do perfil indisponível.'
+            : 'Perfil desativado ou pendente de revisão.',
+        action: { kind: 'settings' },
+      },
+    ];
 
   if (!p.nodePath) out.push({ id: 'node', tool, action: null });
 
-  const built = headlessCommand(tool, { prompt: '', permission: 'full' });
-  const cli = built.command;
-  const executable = p.resolve(cli);
+  const command = profile ? profileCommand(profile) : headlessCommand(tool, { prompt: '', permission: 'full' }).command;
+  // Command pode conter valores privados; o requisito usa o nome público do perfil configurável.
+  const cli = profile && profile.kind !== 'builtin' ? profile.name : command;
+  const executable = p.resolve(
+    command,
+    profile
+      ? { onlyPath: profile.kind === 'custom', pathEnv: profile.kind === 'builtin' ? undefined : profile.config.env?.PATH }
+      : undefined,
+  );
   if (!executable) {
-    const install = baseValue(INSTALL, tool) ?? { command: null, where: '' };
+    const install = baseValue(INSTALL, profile?.base ?? tool) ?? { command: null, where: '' };
+    const url = profile ? profileInstallUrl(profile) : null;
     out.push({
       id: 'cli',
       tool,
       cli,
-      where: install.where,
-      action: install.command ? { kind: 'command', command: install.command } : null,
+      where: url ?? install.where,
+      action: url ? null : install.command ? { kind: 'command', command: install.command } : null,
     });
   }
 
-  if (cli && executable && (await p.signedIn(tool, executable)) === false)
-    out.push({ id: 'signin', tool, cli, action: { kind: 'command', command: baseValue(LOGIN_COMMAND, tool) ?? '', terminal: true } });
+  const signedIn = executable
+    ? profile
+      ? profile.kind === 'custom' && !profile.config.statusArgs?.trim()
+        ? null
+        : await (p.profileSignedIn?.(profile, executable) ?? profileSignedIn(profile, executable, p.homeDir))
+      : await p.signedIn(tool, executable)
+    : null;
+  if (signedIn === false)
+    out.push({
+      id: 'signin',
+      tool,
+      cli,
+      action:
+        profile && profile.kind !== 'builtin'
+          ? { kind: 'settings' }
+          : { kind: 'command', command: baseValue(LOGIN_COMMAND, tool) ?? '', terminal: true },
+    });
+  // O perfil configurável recebe MCP na execução; registro global de outra conta não é requisito dele.
+  if (profile && profile.kind !== 'builtin') {
+    const unsupported = headlessUnsupported(tool, p.permission);
+    if (unsupported) out.push({ id: 'permission', tool, reason: unsupported, action: { kind: 'settings' } });
+    return out;
+  }
 
   // o MCP e a skill do fluxo são necessários em todas as ferramentas: mesmo onde as execuções pelo board
   // levam o servidor sozinhas (Claude, Cursor), a conversa no chat do editor ou no terminal depende dele
@@ -302,4 +349,16 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
     out.push({ id: 'permission-mcp', tool, file: '~/.kimi-code/config.toml', optional: true, action: { kind: 'allowKimiMcp' } });
 
   return out;
+}
+
+/** Link de instalação é metadado público revisado; URLs com credenciais/parâmetros não são divulgadas. */
+export function profileInstallUrl(profile: AiProfile): string | null {
+  if (!profileCanProbe(profile) || profile.kind === 'builtin' || typeof profile.config.installUrl !== 'string') return null;
+  try {
+    const value = profile.config.installUrl.trim(),
+      url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash ? value : null;
+  } catch {
+    return null;
+  }
 }

@@ -5,7 +5,7 @@ import { act, cleanup, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HarnessSelection } from '../../src/shared/harnessSelection';
 import { HARNESS_CATALOG } from '../../src/shared/harnessCatalog';
-import type { HarnessItem } from '../../src/shared/harness';
+import type { AiTool, HarnessItem } from '../../src/shared/harness';
 import type { HarnessTopic } from '../../src/shared/harnessTopics';
 import type { BoardState } from '../../src/shared/model';
 import { ToolHarness } from '../../src/webview/components/settings/harness/ToolHarness';

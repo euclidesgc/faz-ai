@@ -8,6 +8,8 @@ A seção **Não lançado** reúne apenas mudanças integradas na `develop`, agu
 
 ## Não lançado
 
+- **Resolução e sondas por perfil de CLI.** Personalizados procuram o comando exato apenas no PATH ou no caminho absoluto; não usam aliases, instalações usuais ou binários de extensões. Sondas revisadas usam argumentos separados e nenhum shell, retornando versão/login sem saída bruta. Perfis pendentes, desativados ou sem credencial local não executam consultas. Requisitos usam o rótulo público do perfil e não cobram registro MCP nativo de personalizados/cópias. O cache de login distingue perfil, executável e referência de credenciais. Isso não comprova capacidades nem habilita execução.
+
 - **IDs de perfis separados das bases de CLI.** `AiTool` aceita os IDs persistidos; tabelas de arquivos, modelos embutidos e ferramentas nativas usam `AiBase`. O padrão aceita somente perfil ligado/revisado. Cópias consultam o catálogo da base preservando sua identidade; personalizados recebem metadados neutros, sem inventário nativo presumido. Host recusa perfis desativados/importados antes da preparação. A execução de cópias/personalizados aguarda a integração dos providers.
 
 - **Domínio e persistência de perfis de CLI.** Schema 42 adiciona perfis prontos, cópias e personalizados sem alterar padrões/modelos existentes. Comandos, argumentos, ambiente e extensões ficam no cofre local; estado e exportação carregam referências. Perfis importados entram desativados/pendentes, com aviso e revisão humana. Cópias ganham referência própria e não herdam revisão ou capacidades comprovadas. A integração dos perfis com execução e telas continua pendente.

@@ -36,6 +36,13 @@ class PrivateValues {
     }
   }
 }
+/** Saídas de sondas usam a mesma ocultação de valores dos comandos de execução. */
+export function redactCredentialValues(text: string, value: unknown): string {
+  const privateValues = new PrivateValues();
+  privateValues.remember(value);
+  return privateValues.redact(text);
+}
+
 export const validSecretRef = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const stores = new WeakMap<Database, CredentialStore>();
 /** Cada banco em memória tem um cofre próprio; testes nunca escrevem no cofre da pessoa. */

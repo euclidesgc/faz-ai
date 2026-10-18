@@ -159,6 +159,12 @@ export class AiProfileRepo {
     if (!config) throw new Error('Configuração local do perfil indisponível.');
     return config;
   }
+  /** Somente adaptadores internos do host recebem valores privados para sondar ou executar. */
+  resolveProfile(boardId: string, id: string): AiProfile {
+    const meta = this.list(boardId).find((p) => p.id === id);
+    if (!meta) throw new Error('Perfil indisponível neste board.');
+    return { ...meta, config: this.resolveConfig(boardId, id) };
+  }
   private defaultId(boardId: string): string {
     const row = one(this.db, 'SELECT ai_tools_json FROM boards WHERE id = ?', [boardId]);
     try {

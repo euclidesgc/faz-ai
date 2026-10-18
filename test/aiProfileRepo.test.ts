@@ -1,3 +1,4 @@
+import { profileVersion, profileSignedIn } from '../src/extension/cliProbe';
 import { beforeEach, afterEach, expect, it } from 'vitest';
 import path from 'node:path';
 import type { Database } from 'sql.js';
@@ -144,4 +145,14 @@ it('o padrão aceita perfil ligado e revisado, ignorando perfil ausente, desliga
   run(db, "UPDATE ai_profiles SET enabled=1, review_state='pending' WHERE board_id=? AND id=?", [boardId, copy.id]);
   boards.updateBoard(boardId, { aiTool: copy.id });
   expect(boards.snapshot(boardId).board.aiTool).toBe('claude');
+});
+
+it('sonda um processo Node real com a configuração privada revisada, sem shell ou inferência', async () => {
+  const saved = repo.save(boardId, draft({ config: { command: process.execPath, statusArgs: '-e process.exit(0)' } }), 'person');
+  const profile = repo.resolveProfile(boardId, saved.id);
+  expect(await profileVersion(profile, process.execPath)).toBe(process.versions.node);
+  expect(await profileSignedIn(profile, process.execPath, '/unused')).toBe(true);
+  expect(
+    await profileSignedIn({ ...profile, config: { ...profile.config, statusArgs: '-e process.exit(1)' } }, process.execPath, '/unused'),
+  ).toBe(false);
 });

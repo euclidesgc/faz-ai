@@ -51,7 +51,7 @@ export type RequirementAction =
 export interface BoardRequirement {
   id: RequirementId;
   tool: AiTool;
-  /** o comando da CLI procurado (`cursor-agent`, `claude`…), em `cli` e `signin` */
+  /** Comando público dos prontos, ou nome do perfil configurável; comandos privados não saem do host. */
   cli?: string;
   /** onde instalar quando não há comando de uma linha, em `cli` */
   where?: string;

@@ -1,3 +1,6 @@
+import type { AiProfile } from '../../shared/aiProfiles';
+import { AiProfileRepo } from '../repositories/aiProfileRepo';
+import { profileCanProbe, profileSignedIn } from '../cliProbe';
 import { baseValue } from '../../shared/harness';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -323,19 +326,18 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   /** o host encerrou: nenhuma conferência nova começa e a que estava em andamento não mexe mais no board */
   let disposed = false;
   const SIGNIN_CACHE_MS = 3 * 60_000;
-  const signinCache = new Map<AiTool, { at: number; value: boolean | null }>();
+  const signinCache = new Map<AiTool, { at: number; value: boolean | null; binding: string }>();
   // dispatch por ferramenta: cada uma tem o seu probe (o do Kimi Code não usa o executável: lê a
   // pasta de credenciais); quando o probe não sabe dizer (`null`), vale só o sinal reativo de falha
   // na execução
-  const probeSignedIn = async (tool: AiTool, exe: string, force: boolean): Promise<boolean | null> => {
+  const probeSignedIn = async (tool: AiTool, exe: string, force: boolean, profile?: AiProfile): Promise<boolean | null> => {
+    const binding = JSON.stringify([exe, profile?.credentials?.secretRef || 'builtin']);
     const cached = !force && signinCache.get(tool);
-    if (cached && Date.now() - cached.at < SIGNIN_CACHE_MS) return cached.value;
-    const value = await (tool === 'cursor'
-      ? cursorSignedIn(exe, pathEnv)
-      : tool === 'kimi'
-        ? kimiSignedIn(homeDir)
-        : claudeSignedIn(exe, pathEnv));
-    signinCache.set(tool, { at: Date.now(), value });
+    if (cached && cached.binding === binding && Date.now() - cached.at < SIGNIN_CACHE_MS) return cached.value;
+    const value = profile
+      ? await profileSignedIn(profile, exe, homeDir, { pathEnv })
+      : await (tool === 'cursor' ? cursorSignedIn(exe, pathEnv) : tool === 'kimi' ? kimiSignedIn(homeDir) : claudeSignedIn(exe, pathEnv));
+    signinCache.set(tool, { at: Date.now(), value, binding });
     return value;
   };
   /** O que falta no banco de artefatos; undefined sem o inventário lido (a pasta do projeto não existe). */
@@ -350,13 +352,24 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return checking;
     }
     const { board } = router.snapshot();
+    const meta = board.aiProfiles.find((p) => p.id === board.aiTool);
+    let profile = meta;
+    if (meta && profileCanProbe(meta) && meta.kind !== 'builtin') {
+      try {
+        profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, meta.id);
+      } catch {
+        profile = { ...meta, credentials: { ...meta.credentials!, available: false } };
+      }
+    }
     // a pessoa pode ter instalado o node com o board aberto: o registro do MCP no editor, gravado sem
     // ele, passa a ter o caminho completo (o editor não o acha no PATH de quando abriu)
     const hadNode = !!nodePath;
     nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
-    if (!hadNode && nodePath) pinMcp();
+    if (!hadNode && nodePath && (!profile || (profile.kind === 'builtin' && profileCanProbe(profile)))) pinMcp();
     lastCheckError = null;
     checking = checkRequirements({
+      profile,
+      profileSignedIn: (selected, exe) => probeSignedIn(selected.id, exe, forceSigninCheck, selected),
       tool: board.aiTool,
       permission: board.runner.permission,
       workspaceDir: o.folderPath,
@@ -365,7 +378,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       installedVersion: readBridgeVersion(homeDir),
       currentVersion: o.version,
       nodePath,
-      resolve: (command) => resolveCommand(command, pathEnv, homeDir),
+      resolve: (command, options) => resolveCommand(command, options?.pathEnv ?? pathEnv, homeDir, options),
       signedIn: (tool, exe) => probeSignedIn(tool, exe, forceSigninCheck),
       editor: o.editor?.name,
       windowStartedAt: o.editor?.startedAt,

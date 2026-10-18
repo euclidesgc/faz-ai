@@ -219,3 +219,14 @@ Validação direcionada cobre domínio, migração de dois boards, persistência
 O host fornece consulta de perfil ao gateway: ausência, desativação e revisão pendente bloqueiam antes de preparar arquivos. O registro de providers desta etapa aceita somente os três prontos; cópias/personalizados recebem indisponibilidade explícita na prévia/chamada, sem cair para outro executor. Isso é a fronteira anterior à integração #687, não a conclusão dela. #686–#692, #699/#700/#701/#702, políticas nos chamadores e admissão real continuam pendentes.
 
 Verificações desta etapa são direcionadas, conforme orientação da pessoa: tipos, lint/formatação dos arquivos alterados, domínio/banco/resolução, runner/chat/gateway, tabelas/varredura nativas e telas afetadas. A suíte inteira permanece reservada para consolidação.
+
+
+## Resolução e sondas por perfil — #686
+
+Resolução personalizada somente pelo PATH/caminho absoluto, sem aliases, caminhos usuais ou bundle do editor; o PATH configurado é respeitado. Sondas usam configuração privada revisada do host, argumentos separados e `execFile` sem shell. Perfis importados/desativados/sem credencial não iniciam consulta. Versão retorna somente o número reconhecido; login mantém true/false/null e não é cobrado sem statusArgs. Nenhuma sonda atualiza provas de isolamento/capacidades.
+
+Requisitos recebem o perfil; comandos privados viram rótulos públicos, links de instalação revisados são filtrados e não há cobrança de registro MCP nativo para cópia/personalizado. O host resolve os valores via AiProfileRepo, reutiliza cache ligado ao perfil/executável/secretRef e evita reparo automático de MCP para perfil inapto. Foi corrigida também a importação de AiTool ausente em test/ui/toolHarness.test.tsx, remanescente da rodada #684; a checagem integral de tipos desta etapa confirma a correção.
+
+Verificação direcionada: resolução, probes, requisitos, cofre e repositório, além de um processo Node real para versão/status 0/1. Sem CLI de IA remota ou suíte completa. Windows .cmd/.bat não usa shell neste caminho e retorna desconhecido. Providers configuráveis, host/telas e admissão real continuam nas próximas etapas.
+
+Documentação oficial consultada nesta etapa: [Claude Code CLI](https://code.claude.com/docs/en/cli-reference), [Cursor CLI](https://cursor.com/docs/cli/reference/parameters) e [Kimi Code CLI](https://moonshotai.github.io/kimi-cli/en/reference/kimi-command.html). Essas consultas documentais não equivalem à verificação de capacidades de produção.

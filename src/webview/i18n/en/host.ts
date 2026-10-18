@@ -142,6 +142,8 @@ export const gitNotices: Record<string, string> = {
 };
 
 export const host: Record<string, string> = {
+  'Perfil desativado ou pendente de revisão.': 'Profile disabled or pending review.',
+  'Configuração local do perfil indisponível.': 'Local profile configuration is unavailable.',
   'Perfil de CLI ainda não disponível para execução.': 'CLI profile is not available for execution yet.',
   'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Perfis desativados para revisão local: {profiles}.':
     'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Profiles disabled for local review: {profiles}.',

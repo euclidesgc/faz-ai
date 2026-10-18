@@ -348,3 +348,45 @@ describe('Kimi Code', () => {
     expect(kimiMcpAllowed(home)).toBe(false);
   });
 });
+describe('requisitos por perfil configurável', () => {
+  const custom = {
+    id: 'local',
+    name: 'CLI local',
+    kind: 'custom' as const,
+    base: 'generic' as const,
+    enabled: true,
+    position: 3,
+    config: { command: 'comando-privado', installUrl: 'https://example.org/install' },
+    credentials: { secretRef: 'a'.repeat(64), review: 'reviewed' as const, available: true },
+  };
+  it('personalizado ausente indica instalação sem expor comando e não exige registro MCP', async () => {
+    const list = await checkRequirements(probe({ profile: custom, resolve: () => null }));
+    expect(list.find((r) => r.id === 'cli')).toMatchObject({
+      tool: 'local',
+      cli: 'CLI local',
+      where: 'https://example.org/install',
+      action: null,
+    });
+    expect(list.some((r) => r.id.startsWith('mcp') || r.id === 'signin' || r.id === 'skill')).toBe(false);
+    expect(JSON.stringify(list)).not.toContain('comando-privado');
+  });
+  it('sem statusArgs não cobra login; perfil pendente não resolve nem sonda', async () => {
+    const { vi } = await import('vitest');
+    const query = vi.fn(async () => false),
+      resolve = vi.fn(() => '/bin/local');
+    const list = await checkRequirements(probe({ profile: custom, profileSignedIn: query, resolve }));
+    expect(list.some((r) => r.id === 'signin')).toBe(false);
+    expect(query).not.toHaveBeenCalled();
+    expect(resolve).toHaveBeenCalledWith('comando-privado', expect.objectContaining({ onlyPath: true }));
+    resolve.mockClear();
+    const pending = { ...custom, credentials: { ...custom.credentials, review: 'pending' as const } };
+    expect(await checkRequirements(probe({ profile: pending, profileSignedIn: query, resolve }))).toMatchObject([{ id: 'permission' }]);
+    expect(resolve).not.toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
+  });
+  it('URL com credencial/parâmetro não aparece no requisito', async () => {
+    const profile = { ...custom, config: { ...custom.config, installUrl: 'https://example.org/install?token=segredo' } };
+    const list = await checkRequirements(probe({ profile, resolve: () => null }));
+    expect(JSON.stringify(list)).not.toContain('segredo');
+  });
+});
