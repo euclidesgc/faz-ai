@@ -370,3 +370,7 @@ O hook interno de host `AiCall.beforeStart(identity)` pode aguardar persistênci
 ### Verificação real do contrato do provider
 
 `npm run test:cli-real` executa Claude Code instalado contra uma API local que emite chamadas determinadas e MCPs HTTP locais. O controle positivo conecta o MCP da configuração do projeto; `--strict-mcp-config` deve excluí-lo no caminho estrito. O servidor permitido anuncia duas operações, mas somente a autorizada pode alcançar seu handler. Uma chamada deliberada à outra operação precisa receber erro. Isso testa a imposição da CLI; não substitui os testes de identidade e escopo do servidor do board nem a prova do ambiente de produção. Não grava recibos de admissão; os registros de consumo da fixture ficam somente no SQLite descartável, separados dos boards da pessoa. Políticas gerenciadas e Cursor/Kimi permanecem não verificados.
+
+### Políticas versionadas — base de domínio
+
+O schema 41 acrescenta definições e histórico de políticas. A importação força revisão local pendente, preservando a intenção e as versões originais; a definição importada não é uma autorização. Não existe ferramenta MCP para salvar/ativar políticas executáveis. O repositório recusa gravação pela IA. O avaliador e a simulação compartilham a mesma função pura; ela não inicia processos, não resolve segredos e não grava o board. Sua integração às portas de inferência, à prévia e à auditoria de cada run ainda está pendente. Os dados de disponibilidade/admissão usados em execução deverão vir do host; parâmetros de simulação não constituem evidência.

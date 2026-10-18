@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 40;
+export const SCHEMA_VERSION = 41;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -510,6 +510,23 @@ const MIGRATIONS: Record<number, string> = {
     ALTER TABLE board_artifacts ADD COLUMN secret_ref TEXT;
     ALTER TABLE board_artifacts ADD COLUMN review_state TEXT NOT NULL DEFAULT 'legacy'
       CHECK (review_state IN ('legacy', 'pending', 'reviewed'));
+  `,
+  41: `
+    CREATE TABLE execution_policies (
+      id TEXT PRIMARY KEY, board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      review_state TEXT NOT NULL CHECK (review_state IN ('pending','reviewed')),
+      policy_json TEXT NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER
+    );
+    CREATE INDEX idx_execution_policies_board ON execution_policies(board_id);
+    CREATE TABLE execution_policy_versions (
+      policy_id TEXT NOT NULL REFERENCES execution_policies(id) ON DELETE CASCADE,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      review_state TEXT NOT NULL CHECK (review_state IN ('pending','reviewed')),
+      policy_json TEXT NOT NULL, updated_at INTEGER NOT NULL,
+      PRIMARY KEY (policy_id, revision)
+    );
   `,
 };
 

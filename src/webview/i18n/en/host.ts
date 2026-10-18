@@ -142,6 +142,20 @@ export const gitNotices: Record<string, string> = {
 };
 
 export const host: Record<string, string> = {
+  'Política de execução inválida ou versão não suportada.': 'Invalid execution policy or unsupported version.',
+  'Snapshot de políticas inválido.': 'Invalid policy snapshot.',
+  'Versão de política inválida.': 'Invalid policy version.',
+  'Identidade de política repetida.': 'Duplicate policy identity.',
+  'Políticas executáveis exigem revisão humana.': 'Executable policies require human review.',
+  'Revisão de política inválida.': 'Invalid policy revision.',
+  'Política indisponível neste board.': 'Policy unavailable on this board.',
+  'A política mudou. Releia antes de salvar.': 'The policy changed. Read it again before saving.',
+  'Destino da política inválido ou indisponível no catálogo.': 'Policy target is invalid or unavailable in the catalog.',
+  'Políticas conflitantes: {problems}.': 'Conflicting policies: {problems}.',
+  'Histórico de política incompleto ou fora do board.': 'Policy history is incomplete or outside the board.',
+  'Versão atual diverge do histórico da política.': 'The current version differs from policy history.',
+  'Histórico de política fora do board.': 'Policy history is outside the board.',
+
   'Revise as configurações locais dos servidores MCP: {secrets}.': 'Review the local MCP server configurations: {secrets}.',
 
   'Configurações MCP não são devolvidas ao editor. Use a biblioteca para salvar uma nova definição.':

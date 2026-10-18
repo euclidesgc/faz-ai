@@ -1,3 +1,5 @@
+import { ExecutionPolicyRepo } from '../repositories/executionPolicyRepo';
+import { validateExecutionPolicy } from '../../shared/executionPolicies';
 import { ContextPlanningRepo } from '../repositories/contextPlanningRepo';
 import { ArtifactRepo, protectImportedMcpRow } from '../repositories/artifactRepo';
 import { validateActivityContext, validateAgentContext, validateContextTarget, validateContextReason } from '../../shared/contextPlanning';
@@ -59,10 +61,12 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'harness_selection', where: 'board_id = ?', hasId: false },
   // as pastas importadas são caminhos absolutos desta máquina: vão junto, e na outra máquina os artefatos ficam ausentes até a pessoa reimportar
   { name: 'harness_imports', where: 'board_id = ?', hasId: false, since: 30 },
-  // os artefatos do board (#615); no export, `env`/`headers` dos MCPs saem com valor vazio (`scrubMcpSecrets`)
+  // Os artefatos do board (#615) exportam somente referências às configurações MCP locais.
   { name: 'board_artifacts', where: 'board_id = ?', hasId: true, since: 34 },
   { name: 'agent_context_contracts', where: 'board_id = ?', hasId: false, since: 35 },
   { name: 'activity_context_selections', where: 'board_id = ?', hasId: true, since: 35 },
+  { name: 'execution_policies', where: 'board_id = ?', hasId: true, since: 41 },
+  { name: 'execution_policy_versions', where: 'board_id = ?', hasId: false, since: 41 },
   { name: 'board_artifact_files', where: 'artifact_id IN (SELECT id FROM board_artifacts WHERE board_id = ?)', hasId: false, since: 34 },
 ];
 
@@ -109,6 +113,7 @@ export function exportBoard(
   if (!boardRow) throw new Error('Board não encontrado');
   new ArtifactRepo(db).protectLegacy();
   new ContextPlanningRepo(db).validateBoard(boardId);
+  new ExecutionPolicyRepo(db).validateBoard(boardId);
   validateAdmissionRows(all(db, 'SELECT * FROM ai_runs WHERE board_id = ?', [boardId]));
   const board: Row = {};
   for (const [k, v] of Object.entries(boardRow)) if (!OMIT_BOARD_KEYS.includes(k)) board[k] = omitSecrets(k, v);
@@ -262,6 +267,8 @@ export function parseExportFile(text: string): BoardExportFile {
     validateContextTarget({ cardId: r.card_id, workflowId: r.workflow_id, phaseId: r.phase_id, action: r.action });
     if (!Number.isSafeInteger(r.revision) || Number(r.revision) < 1) throw invalid('revisão de atividade inválida.');
   }
+  for (const table of ['execution_policies', 'execution_policy_versions'])
+    for (const row of tables[table] as Row[]) validateExecutionPolicy(JSON.parse(str(row.policy_json)));
   if (!Array.isArray(f.files)) throw invalid('falta a lista de arquivos dos anexos.');
   for (const file of f.files) {
     if (!isRow(file) || typeof file.attachmentId !== 'string') throw invalid('item inválido na lista de arquivos dos anexos.');
@@ -373,6 +380,9 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
     }
     migrate(mem);
     new ContextPlanningRepo(mem).validateBoard(newBoardId);
+    new ExecutionPolicyRepo(mem).validateBoard(newBoardId);
+    // Revisão humana local nunca acompanha uma configuração executável importada.
+    run(mem, "UPDATE execution_policies SET review_state = 'pending' WHERE board_id = ?", [newBoardId]);
     validateAdmissionRows(all(mem, 'SELECT * FROM ai_runs WHERE board_id = ?', [newBoardId]));
 
     // 3. o outro board com o mesmo id (o mesmo arquivo importado em duas pastas do mesmo banco) não pode ser engolido
