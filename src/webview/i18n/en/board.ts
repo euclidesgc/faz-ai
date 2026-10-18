@@ -423,7 +423,7 @@ export const board: Record<string, string> = {
   Copiado: 'Copied',
   'Não foi possível copiar. Selecione o comando e copie com o teclado.':
     'Could not copy. Select the command and copy it with the keyboard.',
-  'Abrir Harness de IA': 'Open AI harness',
+  'Abrir Harness': 'Open Harness',
   'Node.js não encontrado': 'Node.js not found',
   'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 22 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.':
     "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 22 or newer, and it is not on the terminal's PATH. Without it, {tool} cannot reach the board. Install Node.js and click Check again.",

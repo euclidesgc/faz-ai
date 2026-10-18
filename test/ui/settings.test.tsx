@@ -257,7 +257,7 @@ describe('TypesSettings: skills por tipo', () => {
 });
 
 describe('Settings: menu lateral', () => {
-  it('Modelos de IA vem logo depois do Harness de IA', () => {
+  it('Modelos de IA vem logo depois do Harness', () => {
     useBoardStore.setState({ settingsNavCollapsed: false, settingsTab: 'columns' });
     render(
       <Theme>
@@ -269,7 +269,7 @@ describe('Settings: menu lateral', () => {
       .getAllByRole('button')
       .map((x) => x.textContent);
     const at = (label: string) => labels.indexOf(label);
-    expect(at('Modelos de IA')).toBe(at('Harness de IA') + 1);
+    expect(at('Modelos de IA')).toBe(at('Harness') + 1);
   });
 
   it('recolhe numa faixa de ícones: rótulos somem, as seções seguem acessíveis pelo nome e o estado fica lembrado', async () => {
@@ -287,7 +287,7 @@ describe('Settings: menu lateral', () => {
     expect(nav).not.toHaveTextContent('Tipos de card');
     await userEvent.click(within(nav).getByRole('button', { name: 'Tipos de card' }));
     expect(useBoardStore.getState().settingsTab).toBe('types');
-    // a instalação do MCP fica na seção da ferramenta, no Harness de IA, e não no menu
+    // a instalação do MCP fica na seção da ferramenta, no Harness, e não no menu
     expect(screen.queryByRole('button', { name: /MCP/ })).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Expandir o menu' }));

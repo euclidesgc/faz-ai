@@ -347,7 +347,7 @@ describe('Diagnóstico do ambiente: definição do harness', () => {
     const harness = item('Definição do harness');
     expect(within(harness).getByText('Artefatos no board')).toBeInTheDocument();
     expect(within(harness).getByText('Artefatos do projeto fora do board')).toBeInTheDocument();
-    expect(within(harness).getByRole('button', { name: 'Abrir Harness de IA' })).toBeInTheDocument();
+    expect(within(harness).getByRole('button', { name: 'Abrir Harness' })).toBeInTheDocument();
     fireEvent.focus(screen.getByText('Artefatos do projeto fora do board'));
     expect((await screen.findByRole('tooltip')).textContent).toMatch(/não desliga nada/);
   });

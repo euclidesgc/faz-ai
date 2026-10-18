@@ -65,3 +65,41 @@ export function request(msg: WebviewToHost, opts: { timeout?: number } = {}): Pr
   promise.catch(() => {});
   return promise;
 }
+
+/** A assistência pode durar mais que uma ação de banco e devolve uma proposta correlacionada. */
+export function requestAgentAssistance(
+  input: import('../shared/agentAssistance').AgentAssistInput,
+  timeout: number,
+): Promise<import('../shared/agentAssistance').AgentAssistResult> {
+  const requestId = newRequestId();
+  const end = beginRequest();
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      off();
+      clearTimeout(timer);
+      pending.delete(cancel);
+      end();
+    };
+    const cancel = () => {
+      cleanup();
+      reject(new Error(REQUEST_CANCELLED_MESSAGE));
+    };
+    const off = onHostMessage((message) => {
+      if (message.type !== 'harness.agent.assistResult' || message.requestId !== requestId) return;
+      cleanup();
+      if (message.result) resolve(message.result);
+      else reject(new Error(message.error ?? 'A IA não respondeu no formato esperado. Tente novamente.'));
+    });
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(REQUEST_TIMEOUT_MESSAGE));
+    }, timeout);
+    pending.add(cancel);
+    try {
+      postToHost({ type: 'harness.agent.assist', requestId, input });
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
+}

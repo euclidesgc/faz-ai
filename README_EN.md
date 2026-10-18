@@ -66,7 +66,7 @@ In five minutes you have a task moving on the board, with the AI working on it.
 1. **Install and open.** Install **Faz AI Kanban** in VS Code or Cursor (from the tool's own
    marketplace), open your project's folder and click the **Faz AI** icon in the sidebar. Each
    folder has its own board, already set up with the workflow phases.
-2. **Connect the AI to the board.** In **Configurações → Harness de IA** (Settings → AI harness),
+2. **Connect the AI to the board.** In **Configurações → Harness** (Settings → Harness),
    pick the project's tool (Claude Code, Cursor or Kimi Code). In the **Projeto** (project) tab, click
    **Instalar (padrão da ferramenta)** (install, tool default) in the **Servidores MCP** (MCP servers)
    group and again in the **Skills** group, for the flow skill, which teaches the AI to drive the
@@ -100,7 +100,7 @@ is needed, at the right time:
   everything, the AI opens the card through the board (`get_card`), does that piece of work and
   stops. The history stays on the card, not in the context window.
 - **Empty context by default.** Every run started by the board begins with no rule, skill, agent,
-  hook or plugin from your machine or the project: only what you checked under **Harness de IA**
+  hook or plugin from your machine or the project: only what you checked under **Harness**
   gets in. In Claude Code this is enforced by parameter (`--setting-sources ""`,
   `--disable-slash-commands` and an MCP servers file with the board's server only); in the other
   tools, whatever the command line accepts (see the [Agents](#agents) table).
@@ -269,7 +269,7 @@ navegador**; the terminal `faz-ai` warns and does not start.
 
 ## Using it with AI
 
-1. In Configurações (settings) → **Harness de IA**, choose the project's tool (Claude Code,
+1. In Configurações (settings) → **Harness**, choose the project's tool (Claude Code,
    Cursor or Kimi Code).
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
    **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads. This also happens on its own, silently, when the folder opens (and on every new extension version), always in the user scope; only a failure raises a notice.
@@ -321,7 +321,7 @@ item says what it affects and brings the action: the command to copy, **Instalar
 (install the board MCP, which opens the tool's MCP servers section), **Corrigir o registro** (fix the
 registration: a broken one in the project file takes precedence over the global one; fixing removes
 it from there and leaves the global one in effect), **Recarregar a janela** (reload the window) or
-the shortcut to the AI harness. The icon goes away on its own when the last item is solved. The
+the shortcut to the Harness. The icon goes away on its own when the last item is solved. The
 check runs when the board opens, when the tool or permission changes, after connecting, every 5
 minutes and on **Verificar de novo** (check again), which also rereads the terminal PATH (a node
 installed with the board open is found without reloading the window), and says when nothing
@@ -363,7 +363,7 @@ Graph). Hover over an item to see how the board uses it.
   "Indicar artefatos"), no board agent, rules sent and still off, an artifact that vanished from its
   source and, in Cursor, project rules, servers or hooks that enter the context without going
   through the board. The same shows in the banner at the top of the board as a discreet
-  recommendation line, with the shortcut to the AI Harness.
+  recommendation line, with the shortcut to the Harness.
 - **Optional:** the other AI tool, when it is on the machine (its command line on the PATH or, in
   Cursor, the editor itself). A project on Claude Code shows Cursor here, and vice versa. The list only
   shows the state: the board installs its MCP and skill there when it becomes the project's tool.
@@ -507,7 +507,7 @@ Images pasted into the message or into the card description become card attachme
   every message before it; summarizing again creates a new record, it does not replace the previous
   one. It is also available as the MCP tool `generate_summary`, with the same result. The
   [heartbeat](#heartbeat) summarizes on its own a conversation that has grown.
-- What the AI may do in these runs is set in Configurações → Harness de IA → **Execução pela
+- What the AI may do in these runs is set in Configurações → Harness → **Execução pela
   conversa**: only the board (default), the board and project files, or no restrictions. The level
   in use is shown next to the button, with a shortcut to change it. The AI is told about the limit:
   if the work needs more than the level allows, it blocks the card saying which option to choose.
@@ -965,7 +965,7 @@ version, which have no merge commit recorded, stay yours to archive with one cli
 
 ### Heartbeat
 
-With the heartbeat on (Configurações → Harness de IA), the board calls the AI on its own at every
+With the heartbeat on (Configurações → Harness), the board calls the AI on its own at every
 interval, while the editor is open in the project folder. The heartbeat itself does not depend on
 the AI: it is a board clock that, on each round, first tidies the board and then decides what the AI
 does. In each round it:
@@ -1020,7 +1020,7 @@ description of each Git key in the Settings explains why in each mode: with a br
 folder, two stories at once would switch the branch under each other and mix their changes; with
 worktrees they are isolated, at the cost of one more copy of the files on disk per story (with
 dependencies installed in each) and more memory and CPU while several AI sessions, tests and builds
-run together. In the editor the Git tab and the parallel block in the AI harness become a link to
+run together. In the editor the Git tab and the parallel block in the Harness become a link to
 the Settings; in the browser they stay as editable fields, as before.
 
 - The round has a fixed order: tidying (usage limit, stalled cards); a single `git fetch`; the pull
@@ -1155,7 +1155,7 @@ AI running, the story session finished with a sub-task marked by `start_work`, a
 the board crashed), the board sends it back to Pronto (ready): when the board opens, the cards of
 runs the previous session left open (and their sub-tasks); when a story's session ends, its
 sub-tasks; and every minute, any card "Em execução" with no board run for longer than one run's
-time limit (Settings → AI Harness → maximum time), with the explanation in the conversation.
+time limit (Settings → Harness → maximum time), with the explanation in the conversation.
 
 
 ### Agents
@@ -1165,12 +1165,13 @@ categories and dependencies on skills and MCPs. Creating or editing through the 
 the board and its reading copies, without creating files in tool folders. Existing native agent
 files can be imported.
 
-Runs select the card's agent, otherwise the phase's agent, then the default from **AI harness →
+Runs select the card's agent, otherwise the phase's agent, then the default from **Harness →
 Tool and execution**. With no available agents, the built-in agent adds no instructions. Removing an
 agent releases card and phase selections that used it. Existing factory agents remain in the library.
 
-The **Sub-agents** tab offers **Create**, **Guided assistant** and **Generate from project**. Its
-editor reviews instructions, selects skills and MCPs from the library, and sets Read, Edit,
+The **Sub-agents** tab offers **Create**, **Guided assistant** and **Generate from project**.
+Its creation and editing form opens in a modal with a dimmed background, separated from the existing agent list. Clicking outside keeps the draft open; use Cancel to leave.
+The editor reviews instructions, selects skills and MCPs from the library, and sets Read, Edit,
 Commands, Network and Subagents categories. An empty model follows the card or session; models
 from other tools are not imposed when switching executors.
 
@@ -1184,41 +1185,52 @@ Through MCP, `get_board` lists available agents, `set_card_profile` selects a ca
 `get_board_artifact`/`save_board_artifact` read and edit the library. Native-file APIs `create_agent`,
 `update_agent`, `get_agent` and `delete_agent` remain for compatibility.
 
-## AI harness
+## Harness
 
-The board manages a **private library**, independent of the AI tool. Under **Settings → AI harness**,
+The board manages a **private library**, independent of the AI tool. Under **Settings → Harness**,
 **Board library** provides CRUD for **Rules**, **Skills**, **Sub-agents** and **MCPs**. **Tool and
 execution** selects AI, models, permissions, default agent and heartbeat, and connects the selected
 tool to the board MCP server. Switching tools preserves artifacts and selections.
 
-**Import artifacts from a folder** accepts a project or collection. Choose a folder or enter its
+Each artifact notice has an outlined button below the text on the right to dismiss it and keep it hidden. The information icon shows the notice again.
+
+**Import artifacts** accepts a project or collection. Choose a folder or enter its
 path on the computer running the board. The preview groups all four types with counts and
 checkboxes; **Import selected** copies each item into its tab. It recognizes native tool formats
 and neutral collections: `AGENTS.md`, `rules/`, `agents/`, and skills containing `SKILL.md`, including
-nested folders. `mcp.json` and `.mcp.json` use `mcpServers`. For duplicate names within a type, select
-one source or rename the artifact before importing.
+nested folders. `mcp.json` and `.mcp.json` use `mcpServers`. The preview has four tabs, including
+empty ones, with independent filters. Selections persist across tabs and filters. Duplicate names
+within a type are skipped while other items are imported; the summary groups conflicts and offers
+an explicit confirmation before overwriting them.
+
+In **Skills**, select items individually or all visible items and apply **Always**, **Per card** or **Off** in bulk. Selections persist across searches; **Clear selection** clears them. **Delete selected** requires confirmation and preserves source files. Subagents also support bulk selection and deletion or making them available on the board; MCPs support bulk usage changes and deletion. Skills, subagents and MCPs do not offer Update from source. The rules form only has Name and Content.
 
 Each tab offers **Create**, search, counts and actions to **Edit**, change usage, update from source
 and remove with confirmation. Rules, skills and subagents also offer a **Guided assistant**
-(questions, options, free text and review before saving) and **Generate from project** (AI uses the
+(steps by section, hints, placeholders, editable examples and review before saving) and **Generate from project** (AI uses the
 detected project profile and existing artifacts, saves to the library and reports in board chat).
-The rules assistant proposes `AGENTS.md`; subagents can select tool categories, skills and MCPs
+The rules assistant proposes `AGENTS.md`, covering project, code map, commands and validation, conventions, non-negotiable rules and limits; subagents can select tool categories, skills and MCPs
 from the library. Agents act as runner profiles and delegation guidance in external conversations;
 native subagent support still depends on the tool.
+
+The **Sub-agents** editor separates Instructions, Model, Permissions, Skills, MCPs and Review. Instructions cover responsibility, scope, method and delivery, with examples and **Get AI help** for each part. Models come from the tool catalog; an empty value inherits the card or session model. Every permission has an explanation. Skills and MCPs show descriptions, search and **Get AI recommendations**; **Select recommended** applies justified recommendations. **Review and save** requests analysis of the complete definition before writing: apply content improvements or save as is. Changes after review require a new analysis. If AI is unavailable, the draft is preserved and saving without review is an explicit choice.
 
 - **Always**: included in every board run.
 - **Per card**: available to planning and the Skills, Rules and MCPs fields; included when selected
   by the card or its agent.
 - **Off**: kept in the library but excluded from execution. New rules start off for review.
 
-**Library storage** shows the destination, defaulting to
-`<Faz AI storage>/artifacts/<project>/`, outside the repository. **Open folder** opens the file
+**Library folder** shows the destination, defaulting to
+`~/faz-ai-library/<project>/`, outside the repository. Existing libraries keep their destination.
+The field accepts any other name and path; **Select folder** helps choose the location. **Open folder** opens the file
 manager; **Save folder** accepts an empty folder, recreates copies there and preserves the previous
 folder. Pasted skills and their support files are recognized when returning to the screen or using
 **Refresh list**. Private and unknown files are preserved. Each skill accepts 512 KB per file,
 100 support files and 5 MB total; skipped files are reported. Private skills, including
 `board-harness/`, are not bundled with the extension. Editing the library does not change the source;
-**Update from source** replaces the copy only after confirmation.
+In Rules, **Update from source** replaces the copy only after confirmation.
+
+**MCPs** display their saved functional description ahead of command or URL. Import reuses descriptions from configuration when available; use **Edit** to explain missing ones. The list does not automatically connect to servers to discover descriptions.
 
 **MCPs** can be created with a form (`command` and `args` for stdio, URL for HTTP) or **Edit JSON
 directly**, including a single definition wrapped in `mcpServers`. `env` variables and `headers`
@@ -1245,7 +1257,7 @@ commands and settings are still managed by their respective tool.
 | Tipos de card | Story, Bug, Sub-task…, with color and default field values per type |
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section |
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
-| Harness de IA | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, default agent and heartbeat (see [AI harness](#ai-harness) and [Agents](#agents)) |
+| Harness | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, default agent and heartbeat (see [Harness](#harness) and [Agents](#agents)) |
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Only the Git tab in browser mode; in the editor, points to the Settings (Faz AI › Git) |
 | Aparência | **Language** (automatic, Português (Brasil) or English; in the editor Settings along with theme, font and size); statuses (name and color, in the Workflows tab; here only in browser mode) |
@@ -1260,7 +1272,7 @@ four sections, in this order:
 | --- | --- |
 | Installation | A short text and the **Open the Environment Diagnostics** link, which opens the board on the environment check screen |
 | Appearance | **Language** (`fazai.appearance.language`), **Theme** (`fazai.appearance.theme`), **Font** (`fazai.appearance.font`) and **Size** (`fazai.appearance.fontSize`), all with User scope — apply to all this person's projects. Statuses (name and color of each status) stay on the board, now in the Workflows tab |
-| Git | The eight `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6; the "Histórias ao mesmo tempo" cap also applies, in any mode, to text-only phases), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase) and `fazai.git.decisionRecords` (the folder of the [decision records](#decision-records); empty = off). In the editor, the Git tab and the parallel block in the AI harness become a link to these keys; in the browser they stay as editable fields |
+| Git | The eight `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6; the "Histórias ao mesmo tempo" cap also applies, in any mode, to text-only phases), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase) and `fazai.git.decisionRecords` (the folder of the [decision records](#decision-records); empty = off). In the editor, the Git tab and the parallel block in the Harness become a link to these keys; in the browser they stay as editable fields |
 | Backup | Two action links: **Export the board now** and **Import a board**, which trigger the palette commands |
 
 Three new commands in the palette (`Ctrl+Shift+P`): **Faz AI: Open the Environment Diagnostics**,
@@ -1375,6 +1387,11 @@ npm test
 npm run typecheck
 ```
 
+New features are integrated into `develop`. The **Unreleased** changelog section includes only
+changes already integrated into that branch; work still in progress stays on its branches and
+cards. At release time, this section takes the published version and describes the code included
+in that release. Integrating into `develop` does not publish the extension.
+
 `npm test` also runs the linter and checks formatting; `npm run format` formats everything. To make
 `git blame` skip the formatting-only commit: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
@@ -1471,10 +1488,6 @@ left off: each step checks whether it was already done (PR, tag, release, main c
 `develop`, branches) and does not publish again. If the way back to `develop` conflicts, resolve it
 in the open PR and run `finish`. `--dry-run` rehearses without publishing. The options are at the
 top of `scripts/release.mjs`.
-
-For a hotfix (a Bug card, `hotfix/...` branch), run `npm run release` in the `hotfix/` worktree
-**before** approving the card. Approved first, the PR goes into main without a version and the fix
-only ships in the next release from `develop`.
 
 For a hotfix (a Bug card, `hotfix/...` branch), run `npm run release` in the `hotfix/` worktree
 **before** approving the card. Approved first, the PR goes into main without a version and the fix

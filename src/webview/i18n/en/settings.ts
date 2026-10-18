@@ -2,7 +2,7 @@ export const settings: Record<string, string> = {
   'Workflows e colunas': 'Workflows and columns',
   'Tipos de card': 'Card types',
   'Regras do board': 'Board rules',
-  'Harness de IA': 'AI harness',
+  Harness: 'Harness',
   Agentes: 'Agents',
   'Modelos de IA': 'AI models',
   Git: 'Git',
@@ -226,8 +226,8 @@ export const settings: Record<string, string> = {
     'read from the cursor-agent models command, with the account in use; without the CLI signed in, the list built into the extension',
   'lida do comando kimi provider list --json, com os provedores configurados; sem a CLI, lista embutida na extensão':
     'read from the kimi provider list --json command, with the configured providers; without the CLI, the list built into the extension',
-  'Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards. A ferramenta é escolhida em Harness de IA.':
-    'Models of the tool in use in the project, with the effort levels of each. This is where the options of the cards\' "Model" field come from. The tool is chosen in AI harness.',
+  'Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards. A ferramenta é escolhida em Harness.':
+    'Models of the tool in use in the project, with the effort levels of each. This is where the options of the cards\' "Model" field come from. The tool is chosen in Harness.',
   '{count} modelo(s)': '{count} model(s)',
   'Ao detectar: {source}. Modelos que você acrescentou à mão são mantidos.': 'On detect: {source}. Models you added by hand are kept.',
   'Esforços aceitos (separados por vírgula)': 'Accepted efforts (comma-separated)',
@@ -358,11 +358,11 @@ export const settings: Record<string, string> = {
   'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"); desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.':
     'Cursor has a fast version of many models: it answers sooner and charges more for the same tokens. When on, each one enters the catalog as a separate model (for example, "Claude Opus 5.5 1M Fast"); when off, they leave the catalog. The list comes from the cursor-agent models command, read with the CLI signed in.',
   'ferramenta Cursor': 'Cursor tool',
-  'em Harness de IA': 'in AI harness',
+  'em Harness': 'in Harness',
   'Mostrando os modelos do {tool}': 'Showing the {tool} models',
   'Mostrando os agentes do {tool}': 'Showing the {tool} agents',
   'trocar ferramenta': 'switch tool',
-  'Trocar a ferramenta de IA, em Harness de IA': 'Switch the AI tool, in AI harness',
+  'Trocar a ferramenta de IA, em Harness': 'Switch the AI tool, in Harness',
   'Preencher o modelo sugerido automaticamente': 'Fill in the suggested model automatically',
   'Ao criar ou mudar um card, preenche o campo "Modelo" com a sugestão das regras abaixo, se ele estiver vazio ou com a sugestão anterior. Um modelo escolhido à mão nunca é trocado.':
     'When a card is created or changed, fills in the "Model" field with the rules\' suggestion below, if it is empty or still has the previous suggestion. A hand-picked model is never replaced.',

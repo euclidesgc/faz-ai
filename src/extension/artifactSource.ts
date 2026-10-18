@@ -204,7 +204,11 @@ function readMcp(location: string, dirs: SourceDirs, tool: AiTool | ''): Draft {
   const json = readJson(file);
   const server = json && serverIn(json, file, name, dirs);
   if (!server) return missing(d);
-  return { ...d, description: mcpSummary(server), meta: { server } };
+  return {
+    ...d,
+    description: typeof server.description === 'string' && server.description.trim() ? server.description.trim() : mcpSummary(server),
+    meta: { server },
+  };
 }
 
 /** Lê o artefato da origem; nunca lança: origem ausente, ilegível ou com JSON inválido vira `missing: true`. */

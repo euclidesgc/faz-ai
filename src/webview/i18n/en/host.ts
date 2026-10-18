@@ -300,8 +300,8 @@ export const host: Record<string, string> = {
   'Não foi possível rodar o Diagnóstico do ambiente: {error}': 'Could not run the environment Diagnosis: {error}',
   'O {tool} terminou com erro (código {code}).\n\n{tail}': '{tool} finished with an error (code {code}).\n\n{tail}',
   'A IA terminou sem escrever uma resposta.': 'The AI finished without writing a reply.',
-  'O agente restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Instale o servidor em Configurações → Harness de IA → Tudo que a ferramenta carrega → Claude Code → Servidores MCP.':
-    'The agent restricts MCP servers, but the board server is not registered for Claude Code in this folder. Install the server in Settings → AI harness → Everything the tool loads → Claude Code → MCP servers.',
+  'O agente restringe os servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Instale o servidor em Configurações → Harness → Tudo que a ferramenta carrega → Claude Code → Servidores MCP.':
+    'The agent restricts MCP servers, but the board server is not registered for Claude Code in this folder. Install the server in Settings → Harness → Everything the tool loads → Claude Code → MCP servers.',
   'Servidores MCP do agente não encontrados na configuração do Claude Code: {servers}.':
     "The agent's MCP servers were not found in the Claude Code configuration: {servers}.",
 

@@ -79,6 +79,7 @@ export class BoardHarness {
     this.current.library = {
       directory: this.ctx.library.directory,
       preview: this.ctx.library.preview,
+      importResult: this.ctx.library.importResult,
       artifacts: this.ctx.library.materialize(),
       warnings: this.ctx.library.warnings,
     };
@@ -423,7 +424,7 @@ export const harnessHandlers = {
     return true;
   },
   'harness.library.apply': (msg, ctx) => {
-    ctx.library.importArtifacts(msg.keys);
+    ctx.library.importArtifacts(msg.keys, msg.overwrite);
     ctx.harness.load();
     return true;
   },

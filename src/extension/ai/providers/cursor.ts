@@ -44,7 +44,7 @@ export function cursorModelId(name: string, effort: string | null): string {
 export const cursorProvider: AiProvider = {
   tool: 'cursor',
   measure: 'tokens',
-  command: ({ prompt, permission, addDirs = [], exec, boardServer, structured }) => {
+  command: ({ prompt, permission, addDirs = [], exec, boardServer, structured, draftOnly }) => {
     // `--force` aprova sem perguntar o que a sessão pode usar; nos níveis menores, `--allowed-tools`
     // tira da sessão todo o resto (o modelo nem vê as outras ferramentas)
     const modes: Record<RunnerPermission, string[]> = {
@@ -61,7 +61,7 @@ export const cursorProvider: AiProvider = {
         '--force',
         '--approve-mcps',
         '--trust',
-        ...modes[permission],
+        ...(draftOnly ? ['--allowed-tools', 'read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call'] : modes[permission]),
         ...addDirs.flatMap((d) => ['--add-dir', d]),
         ...(model ? ['--model', model] : []),
       ],

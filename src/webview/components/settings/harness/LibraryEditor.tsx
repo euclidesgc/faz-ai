@@ -1,64 +1,44 @@
 import { useState } from 'react';
 import { Button, Card, Checkbox, TextArea, TextField } from '@radix-ui/themes';
-import type { ArtifactKind, LibraryArtifactInput, ToolCategory } from '../../../../shared/artifacts';
+import type { ArtifactKind, LibraryArtifactInput } from '../../../../shared/artifacts';
 import { harness } from '../../../commands';
 import { useAction } from '../../../useAction';
 import { ActionButton, FormField } from '../../ui';
-import { useBoardStore } from '../../../store/boardStore';
-import { useProjectProfile } from './useProjectProfile';
 import { ARTIFACT_LABELS } from './LibraryImport';
+import { MarkdownEditor } from '../../MarkdownEditor';
+import { LIBRARY_GUIDE } from './libraryGuide';
+import { LibraryAgentEditor } from './LibraryAgentEditor';
 import { t } from '../../../i18n';
 
-const QUESTIONS = ['Objetivo e uso', 'Convenções e limites', 'Revisar e salvar'];
-const GOALS = {
-  rule: 'Quais regras gerais devem orientar as alterações neste projeto?',
-  skill: 'Qual tarefa repetida esta skill deve ensinar e quando deve ser usada?',
-  agent: 'Qual responsabilidade este subagente terá e quando deve ser escolhido?',
-  mcp: '',
-};
-const DETAILS = {
-  rule: 'Quais convenções e limites devem ser respeitados?',
-  skill: 'Quais são as entradas, os passos e o resultado esperado da tarefa?',
-  agent: 'O que o subagente deve entregar e quais decisões ele não pode tomar sozinho?',
-  mcp: '',
-};
-const OPTIONS = [
-  'Executar os testes do projeto',
-  'Seguir os padrões existentes',
-  'Preservar alterações do usuário',
-  'Validar antes de concluir',
-];
-const CATEGORY_LABELS = { read: 'Leitura', edit: 'Edição', run: 'Comandos', net: 'Rede', agents: 'Subagentes' } as const;
+export function LibraryEditor(props: { kind: ArtifactKind; initial?: LibraryArtifactInput; guided?: boolean; onClose: () => void }) {
+  return props.kind === 'agent' ? (
+    <LibraryAgentEditor initial={props.initial} guided={props.guided} onClose={props.onClose} />
+  ) : (
+    <ArtifactEditor {...props} kind={props.kind} />
+  );
+}
 
 /** Criação neutra com revisão final; o mesmo editor mantém metadados e dependências na edição. */
-export function LibraryEditor({
+function ArtifactEditor({
   kind,
   initial,
   guided = false,
   onClose,
 }: {
-  kind: ArtifactKind;
+  kind: Exclude<ArtifactKind, 'agent'>;
   initial?: LibraryArtifactInput;
   guided?: boolean;
   onClose: () => void;
 }) {
-  const { profile } = useProjectProfile();
-  const artifacts = useBoardStore((s) => s.state!.harness.library?.artifacts ?? []);
-  const [step, setStep] = useState(guided ? 0 : 2);
+  const sections = LIBRARY_GUIDE[kind];
+  const reviewStep = sections.length;
+  const [step, setStep] = useState(guided ? 0 : sections.length);
+  const current = sections[step];
   const [name, setName] = useState(initial?.name ?? (kind === 'rule' ? 'AGENTS.md' : ''));
   const [description, setDescription] = useState(initial?.description ?? '');
-  const [goal, setGoal] = useState('');
-  const [limits, setLimits] = useState('');
-  const [picked, setPicked] = useState<string[]>([]);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
   const [body, setBody] = useState(initial?.body ?? '');
-  const [agent, setAgent] = useState(
-    initial?.agent ?? {
-      skills: [],
-      mcpServers: [],
-      model: '',
-      tools: { categories: [], native: { tool: '' as const, allow: [], deny: [] } },
-    },
-  );
+  const [draftedInputs, setDraftedInputs] = useState('');
   const [json, setJson] = useState(
     JSON.stringify(initial?.server ?? { command: 'npx', args: ['-y', 'nome-do-servidor'], env: {} }, null, 2),
   );
@@ -113,83 +93,124 @@ export function LibraryEditor({
       name,
       description,
       body,
-      ...(kind === 'agent' ? { agent } : {}),
       ...(server ? { server } : {}),
     });
     onClose();
   });
   const next = () => {
-    if (step === 1) {
-      const conventions = picked.map((x) => `- ${t(x)}`).join('\n');
-      const commands = Object.entries(profile.scripts)
-        .filter(([key]) => /test|lint|check/.test(key))
-        .map(([key, value]) => `- ${key}: ${value}`)
-        .join('\n');
+    const inputs = JSON.stringify(answers);
+    if (step === reviewStep - 1 && draftedInputs !== inputs) {
+      setDraftedInputs(inputs);
       setBody(
-        `# ${name || t(ARTIFACT_LABELS[kind])}\n\n${goal}\n\n## ${t('Convenções e limites')}\n${conventions}\n${limits}\n\n## ${t('Verificação')}\n${commands}`,
+        [
+          `# ${name || t(ARTIFACT_LABELS[kind])}`,
+          ...sections.flatMap((section, index) => {
+            const answer = answers[index]?.trim();
+            return answer ? [`## ${t(section.title)}\n\n${answer}`] : [];
+          }),
+        ].join('\n\n'),
       );
     }
     setStep(step + 1);
   };
   return (
-    <Card className="draft-card wizard" aria-label={t('Editor da biblioteca')}>
+    <Card className="draft-card wizard library-editor" aria-label={t('Editor da biblioteca')}>
       <div className="wizard-head">
         <strong>
-          {t(ARTIFACT_LABELS[kind])} · {t(QUESTIONS[step]!)}
+          {t(ARTIFACT_LABELS[kind])} · {current ? t(current.title) : t('Revisar e salvar')}
         </strong>
-        {guided && <p className="muted small">{t('Passo {n} de {total}', { n: step + 1, total: 3 })}</p>}
-      </div>
-      {step === 0 && (
-        <>
-          <p>{t(GOALS[kind])}</p>
-          <FormField label={t('Objetivo')}>
-            {(id) => <TextArea id={id} aria-label={t('Objetivo')} value={goal} onChange={(e) => setGoal(e.target.value)} />}
-          </FormField>
-          <p className="muted small">
-            {t('Detectado no projeto: {text}', { text: [...profile.languages, ...profile.tools].join(', ') || profile.readme || '—' })}
-          </p>
-          <div className="row wrap">
-            {profile.folders.map((folder) => (
-              <Button key={folder} variant="soft" size="1" onClick={() => setGoal(`${goal}${goal ? '\n' : ''}${folder}`)}>
-                {folder}
-              </Button>
+        {guided && (
+          <ol className="library-wizard-steps" aria-label={t('Etapas do assistente')}>
+            {[...sections.map((section) => section.title), 'Revisar e salvar'].map((question, index) => (
+              <li key={question} aria-current={step === index ? 'step' : undefined}>
+                <span>
+                  {index + 1}. {t(question)}
+                </span>
+              </li>
             ))}
-          </div>
-        </>
-      )}
-      {step === 1 && (
-        <>
-          <p>{t(DETAILS[kind])}</p>
-          {OPTIONS.map((option) => (
-            <label className="row" key={option}>
-              <Checkbox
-                checked={picked.includes(option)}
-                onCheckedChange={(checked) => setPicked(checked ? [...picked, option] : picked.filter((x) => x !== option))}
+          </ol>
+        )}
+      </div>
+      {guided && current && (
+        <section className="library-guide-question">
+          <p className="muted small">{t(current.hint)}</p>
+          <FormField
+            label={t(current.title)}
+            hint={t('Escreva com suas palavras ou use o exemplo e adapte ao seu projeto. As etapas após a primeira são opcionais.')}
+          >
+            {(id) => (
+              <MarkdownEditor
+                id={id}
+                ariaLabel={t(current.title)}
+                value={answers[step] ?? ''}
+                onChange={(value) => setAnswers({ ...answers, [step]: value })}
+                placeholder={t('{instruction}\n\nExemplo:\n{example}', { instruction: t(current.hint), example: t(current.example) })}
+                minRows={5}
               />
-              {t(option)}
-            </label>
-          ))}
-          <FormField label={t('Outras instruções')}>
-            {(id) => <TextArea id={id} aria-label={t('Outras instruções')} value={limits} onChange={(e) => setLimits(e.target.value)} />}
+            )}
           </FormField>
-        </>
+          <div className="library-guide-example">
+            <strong>{t('Exemplo para adaptar')}</strong>
+            <p>{t(current.example)}</p>
+            <Button
+              size="1"
+              variant="soft"
+              onClick={() =>
+                setAnswers({ ...answers, [step]: answers[step]?.trim() ? `${answers[step]}\n\n${t(current.example)}` : t(current.example) })
+              }
+            >
+              {t('Usar este exemplo')}
+            </Button>
+          </div>
+        </section>
       )}
-      {step === 2 && (
+      {step === reviewStep && (
         <>
+          {guided && (
+            <p className="muted small">{t('Revise o Markdown montado com suas respostas. Ajuste o nome e o conteúdo antes de salvar.')}</p>
+          )}
           <FormField label={t('Nome')}>
             {(id) => (
               <TextField.Root id={id} aria-label={t('Nome')} value={name} disabled={!!initial} onChange={(e) => setName(e.target.value)} />
             )}
           </FormField>
-          <FormField label={t('Descrição')}>
-            {(id) => (
-              <TextField.Root id={id} aria-label={t('Descrição')} value={description} onChange={(e) => setDescription(e.target.value)} />
-            )}
-          </FormField>
-          {kind !== 'mcp' ? (
-            <FormField label={t('Conteúdo')}>
-              {(id) => <TextArea id={id} aria-label={t('Conteúdo')} rows={12} value={body} onChange={(e) => setBody(e.target.value)} />}
+          {kind !== 'rule' && (
+            <FormField
+              label={kind === 'mcp' ? t('Para que serve este MCP?') : t('Descrição')}
+              hint={
+                kind === 'mcp'
+                  ? t(
+                      'Explique o que este MCP oferece e quando usá-lo. Exemplo: consulta issues e pull requests do GitHub para acompanhar o desenvolvimento.',
+                    )
+                  : undefined
+              }
+            >
+              {(id) =>
+                kind === 'mcp' ? (
+                  <TextArea
+                    id={id}
+                    aria-label={t('Para que serve este MCP?')}
+                    rows={3}
+                    value={description}
+                    placeholder={t('Exemplo: consulta issues e pull requests do GitHub para acompanhar o desenvolvimento.')}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                ) : (
+                  <TextField.Root
+                    id={id}
+                    aria-label={t('Descrição')}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                )
+              }
             </FormField>
+          )}
+          {kind !== 'mcp' ? (
+            <div className="form-field">
+              <span>{t('Conteúdo')}</span>
+              <MarkdownEditor value={body} onChange={setBody} minRows={12} placeholder={t('Conteúdo')} />
+            </div>
           ) : (
             <>
               <label className="row">
@@ -250,66 +271,6 @@ export function LibraryEditor({
               </p>
             </>
           )}
-          {kind === 'agent' && (
-            <>
-              <FormField label={t('Modelo')} hint={t('Vazio usa o modelo do card ou da sessão.')}>
-                {(id) => (
-                  <TextField.Root
-                    id={id}
-                    aria-label={t('Modelo')}
-                    value={agent.model}
-                    onChange={(e) => setAgent({ ...agent, model: e.target.value })}
-                  />
-                )}
-              </FormField>
-              <p>{t('Ferramentas permitidas')}</p>
-              <div className="row wrap">
-                {Object.entries(CATEGORY_LABELS).map(([category, label]) => (
-                  <label className="row" key={category}>
-                    <Checkbox
-                      checked={agent.tools.categories.includes(category as ToolCategory)}
-                      onCheckedChange={(checked) =>
-                        setAgent({
-                          ...agent,
-                          tools: {
-                            categories: checked
-                              ? [...agent.tools.categories, category as ToolCategory]
-                              : agent.tools.categories.filter((c) => c !== category),
-                            native: { tool: '', allow: [], deny: [] },
-                          },
-                        })
-                      }
-                    />
-                    {t(label)}
-                  </label>
-                ))}
-              </div>
-              {(['skill', 'mcp'] as const).map((type) => (
-                <section key={type}>
-                  <p>{t(ARTIFACT_LABELS[type])}</p>
-                  {artifacts
-                    .filter((a) => a.kind === type)
-                    .map((a) => {
-                      const field = type === 'skill' ? 'skills' : 'mcpServers';
-                      return (
-                        <label className="row" key={a.id}>
-                          <Checkbox
-                            checked={agent[field].includes(a.name)}
-                            onCheckedChange={(checked) =>
-                              setAgent({
-                                ...agent,
-                                [field]: checked ? [...agent[field], a.name] : agent[field].filter((n) => n !== a.name),
-                              })
-                            }
-                          />
-                          {a.name}
-                        </label>
-                      );
-                    })}
-                </section>
-              ))}
-            </>
-          )}
           {kind === 'rule' && <p className="muted small">{t('A regra será salva desligada. Revise e ative quando estiver pronta.')}</p>}
         </>
       )}
@@ -323,9 +284,9 @@ export function LibraryEditor({
             {t('Voltar')}
           </Button>
         )}
-        {step < 2 ? (
-          <Button disabled={step === 0 && !goal.trim()} onClick={next}>
-            {t('Continuar')}
+        {step < reviewStep ? (
+          <Button disabled={step === 0 && !answers[0]?.trim()} onClick={next}>
+            {step > 0 && !answers[step]?.trim() ? t('Pular esta parte') : t('Continuar')}
           </Button>
         ) : (
           <ActionButton
