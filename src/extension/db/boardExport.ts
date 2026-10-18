@@ -66,7 +66,7 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
 ];
 
 /** Tabelas que ficam fora do arquivo mesmo tendo `board_id` (o teste do `sqlite_master` as ignora). */
-export const NOT_EXPORTED = ['boards', 'log_months'];
+export const NOT_EXPORTED = ['boards', 'log_months', 'ai_work', 'ai_work_attempts'];
 
 /** Colunas de `boards` que nunca saem no arquivo: `workspace_key` liga o board à pasta desta máquina. */
 export const OMIT_BOARD_KEYS = ['workspace_key'];
@@ -349,6 +349,8 @@ const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
  */
 export function importBoard(target: ImportTarget, file: BoardExportFile): ImportResult {
   const db = target.db;
+  if (one(db, "SELECT 1 FROM ai_work WHERE board_id = ? AND state IN ('prepared','started','reconciling')", [target.boardId]))
+    throw new Error('Há trabalho em execução ou reconciliação. Resolva a posse antes de importar o board.');
   const newBoardId = str(file.board.id);
   const boardName = str(file.board.name);
 

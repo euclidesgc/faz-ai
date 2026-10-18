@@ -406,4 +406,6 @@ export const host: Record<string, string> = {
   '{ref} não tem nada pendente com a IA, mas ainda não foi concluído.': '{ref} has nothing pending with the AI, but is not finished yet.',
 
   ...gitNotices,
+  'Há trabalho em execução ou reconciliação. Resolva a posse antes de importar o board.':
+    'Work is running or being reconciled. Resolve ownership before importing the board.',
 };

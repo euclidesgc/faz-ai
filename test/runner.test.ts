@@ -993,6 +993,7 @@ describe('executor da IA', () => {
 
   it('guarda permissão e tempo limite, recusando valores inválidos', () => {
     expect(router.snapshot().board.runner).toEqual({
+      parallelSubtasks: 2,
       defaultAgent: '',
       permission: 'board',
       timeoutMinutes: 45,

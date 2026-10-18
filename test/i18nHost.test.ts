@@ -203,6 +203,7 @@ describe('i18n do host: mensagens preenchidas', () => {
         heartbeatRefine: true,
         parallel: false,
         parallelStories: 2,
+        parallelSubtasks: 2,
         autopilotPaused: false,
         defaultAgent: '',
       },

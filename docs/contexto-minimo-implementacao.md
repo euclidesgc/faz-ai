@@ -79,6 +79,20 @@ Testes reais de filesystem e banco cobrem A/v1, B/v2, exclusão, referências de
 
 **Pendente para concluir #727/E5:** identidade/escopo MCP #823 para `get_skill` e demais leituras consumirem o snapshot autenticado; referências externas legadas ainda não são congeladas. O manifesto é dos arquivos selecionados, não da configuração v1 completa nem da decisão versionada de modelo/política. A resolução, admissão real, orquestração e políticas da E5 continuam pendentes. Essa infraestrutura conserva as seleções legadas; não ativa contratos v1 nem remove delegação nativa.
 
+## E5 — Fundação de posse e reconciliação (#621/#736/#819/#820, parcial)
+
+A leitura somente de consulta dos anexos `SPEC.md` e `PLAN.md` da #621 confirmou que as partes citadas em #823/#824/#825 ainda não existem nesta branch. A implementação introduz uma única base compartilhada para elas, sem criar outro scheduler ou motor de modelos:
+
+- `shared/orchestration.ts`: estados/transições, regras de rodadas com `subtaskWaves`, chaves por IDs, conclusão/revisão/repetição segura/decisão/encerramento não confirmado e limites efetivos. A chave de fechamento usa serialização canônica completa dos IDs e revisões em vez de hash curto, evitando colisões. Código zero com card aberto não conclui; efeitos desconhecidos impedem repetição. O pedido `parallelSubtasks` é persistido pelo parser (padrão 2), mas o limite calculado para escritores na mesma pasta é 1. Essa regra ainda não governa o runtime legado e não é apresentada como limite já imposto na UI.
+- Schema **39**: `ai_work` e `ai_work_attempts` locais, fora do export. `WorkRepo` faz posse transacional no host dono do sql.js, protege card/pasta/chave, confere owner e geração, armazena somente hash do token, vincula run/card/board e identidade do processo, conta mutações e revoga gerações antigas. Nova instância coloca posses anteriores em reconciliação sem soltar a pasta. Uma falha requer autorização explícita do host para nova tentativa. A integração ainda precisa comprovar a decisão humana que autoriza essa repetição.
+- Comentário de resultado e conclusão podem ser gravados em uma transação, com idempotência por tentativa. Rollback conserva ambos; repetição não cria comentário duplicado. Importação não carrega posses, ignora tabelas locais injetadas e recusa substituir um board com trabalho vivo.
+- `workspaceLock.ts`: reserva por caminho real em raiz global do usuário, com geração própria, diário sincronizado e exclusão por mkdir. Alias simbólico, board ou diretório de dados diferente não permitem outro escritor. Adotar requer controlador comprovadamente morto; grupo vivo/desconhecido continua retido. Diário inválido ou recuperação interrompida permanece reservado para decisão, sem remoção automática de prova ambígua.
+- `DbHandle.flush()` agora usa temporário exclusivo, sincroniza os bytes antes do rename e o diretório no POSIX. Falha de publicação conserva o banco anterior e é propagada, sem autorizar spawn.
+
+Testes cobrem transições, geração, proprietário, origem de card/fase, token revogado, importação, comentário idempotente, arquivo reaberto após perda da memória, falha de publicação e disputa entre processos Node reais. A queda do controlador com descendente vivo não libera o workspace. Windows continua sem confirmação da árvore; testes POSIX não validam esse caso. Nenhuma CLI de IA foi declarada validada.
+
+**Ainda não concluído:** `Orchestrator` e integração durável com launcher/runner, ownership da janela nos três gatilhos, reconciliação completa de pasta/resultados e ciclos de devolução humana, autenticação MCP #823, remoção nativa #825 e limites/políticas #730/#731. As regras de associação do campo Fase ainda leem rótulos legados e precisam de tratamento conservador ao renomear antes da ativação. Esta entrega é fundação; não encerra #621/#737/#738 nem ativa E5.
+
 ## Dependências identificadas no board
 
 Consulta local somente de leitura ao board deste projeto em 17/10/2026:

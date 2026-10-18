@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
@@ -535,6 +535,30 @@ describe('banco novo', () => {
 });
 
 describe('persistência em arquivo', () => {
+  it('falha na publicação preserva o banco anterior e flush seguinte pode confirmar o estado novo', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'fazai-flush-'));
+    const file = path.join(dir, 'board.db');
+    const handle = await openFile(file, WASM_DIR);
+    try {
+      const boards = new BoardRepo(handle.db);
+      const boardId = boards.getOrCreate('ws', 'Antes').id;
+      await handle.flush();
+      const before = await fs.readFile(file);
+      handle.db.run('UPDATE boards SET name = ? WHERE id = ?', ['Depois', boardId]);
+      const rename = vi.spyOn(fs, 'rename').mockRejectedValueOnce(Object.assign(new Error('Falha de disco'), { code: 'EIO' }));
+      await expect(handle.flush()).rejects.toThrow('Falha de disco');
+      rename.mockRestore();
+      expect(await fs.readFile(file)).toEqual(before);
+      expect((await fs.readdir(dir)).filter((n) => n.endsWith('.tmp'))).toEqual([]);
+      await handle.flush();
+      expect(await fs.readFile(file)).not.toEqual(before);
+      if (process.platform !== 'win32') expect((await fs.stat(file)).mode & 0o777).toBe(0o600);
+    } finally {
+      vi.restoreAllMocks();
+      await handle.close();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
   it('grava, fecha e reabre mantendo os dados', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'fazai-'));
     const file = path.join(dir, 'nested', 'fazai.db');

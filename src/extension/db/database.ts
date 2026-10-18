@@ -1,6 +1,7 @@
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js';
 import { promises as fs, mkdirSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { migrate } from './schema';
 
 export interface DbHandle {
@@ -128,10 +129,28 @@ export async function openFile(filePath: string, wasmDir: string, debounceMs = 5
   const write = async () => {
     const data = exportBytes(db);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
-    const tmp = `${filePath}.tmp`;
-    await fs.writeFile(tmp, Buffer.from(data));
-    // no Windows a troca falha enquanto outro programa está com o arquivo aberto: tenta de novo
-    await retryBusy(() => fs.rename(tmp, filePath));
+    const tmp = `${filePath}.${randomUUID()}.tmp`;
+    try {
+      const file = await fs.open(tmp, 'wx', 0o600);
+      try {
+        await file.writeFile(Buffer.from(data));
+        await file.sync();
+      } finally {
+        await file.close();
+      }
+      // A posse pode liberar um comando depois do flush: bytes e troca precisam estar confirmados.
+      await retryBusy(() => fs.rename(tmp, filePath));
+      if (process.platform !== 'win32') {
+        const directory = await fs.open(path.dirname(filePath), 'r');
+        try {
+          await directory.sync();
+        } finally {
+          await directory.close();
+        }
+      }
+    } finally {
+      await fs.rm(tmp, { force: true });
+    }
   };
 
   const flush = async () => {

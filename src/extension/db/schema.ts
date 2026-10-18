@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 38;
+export const SCHEMA_VERSION = 39;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -483,6 +483,28 @@ const MIGRATIONS: Record<number, string> = {
   `,
   38: `
     ALTER TABLE board_artifacts ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+  `,
+  39: `
+    CREATE TABLE ai_work (
+      id TEXT PRIMARY KEY, board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      work_key TEXT NOT NULL, kind TEXT NOT NULL, story_id TEXT, card_id TEXT, column_id TEXT NOT NULL,
+      state TEXT NOT NULL, generation INTEGER NOT NULL DEFAULT 0, owner TEXT, workspace TEXT,
+      reason TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+      UNIQUE(board_id, work_key)
+    );
+    CREATE INDEX idx_ai_work_open ON ai_work(board_id, state);
+    CREATE UNIQUE INDEX idx_ai_work_live_card ON ai_work(board_id, card_id)
+      WHERE card_id IS NOT NULL AND state IN ('prepared', 'started', 'reconciling');
+    CREATE UNIQUE INDEX idx_ai_work_live_workspace ON ai_work(workspace)
+      WHERE workspace IS NOT NULL AND state IN ('prepared', 'started', 'reconciling');
+    CREATE TABLE ai_work_attempts (
+      id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES ai_work(id) ON DELETE CASCADE,
+      generation INTEGER NOT NULL, run_id TEXT, token_hash TEXT, identity_json TEXT,
+      workspace_before TEXT, mutations INTEGER NOT NULL DEFAULT 0, outcome TEXT, result_comment_id TEXT,
+      started_at INTEGER NOT NULL, ended_at INTEGER, UNIQUE(work_id, generation)
+    );
+    CREATE UNIQUE INDEX idx_ai_work_attempts_token ON ai_work_attempts(token_hash) WHERE token_hash IS NOT NULL;
+    CREATE UNIQUE INDEX idx_ai_work_attempts_run ON ai_work_attempts(run_id) WHERE run_id IS NOT NULL;
   `,
 };
 
