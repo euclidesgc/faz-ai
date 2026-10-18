@@ -156,3 +156,13 @@ O piloto de E7 exige tarefas representativas e medições de execuções aceitas
 Schema 40 e `LocalCredentials` guardam a definição inteira cifrada em `.credentials`, ao lado dos bancos. A publicação exclusiva com fsync precede a troca por `secretRef`; falhas preservam o JSON anterior. O editor não recebe configurações salvas, permite editar metadados e exige substituição explícita para revisar. Importações ficam pendentes mesmo com referência local disponível; prévia, preparação, sessões e encaminhamento recusam execução. Export, banco, leitura MCP e interface não devolvem os valores. Gateway e resultados externos ocultam valores conhecidos.
 
 `credentials.test.ts` cobre persistência/reabertura, posse, corrupção, permissões, falha e retomada da migração, bytes SQLite/export sem sentinelas, revisão humana e logs. Os testes MCP usam processos Node, sem inferência de CLI real. O cofre usa AES-256-GCM com chave local; não é chaveiro do sistema nem isolamento contra processos do mesmo usuário. Perfis CLI, caminhos legados de arquivos nativos e cobertura completa de #728 continuam pendentes; E3 e ativação E5 não estão concluídas.
+
+## Sincronização dos cards após a etapa de credenciais
+
+Após o commit `369ad95`, o MCP do board recebeu e confirmou por releitura 39 registros com a marca `[contexto-minimo:369ad95]`, antes de iniciar outra implementação:
+
+- Histórias #615, #618, #619, #620, #621, #823, #824 e #825: registro consolidado de entregas, commits, evidências e pendências; permanecem em Implementação.
+- Subtarefas com avanço parcial, movidas de A fazer para Em andamento: #710, #711, #712, #727, #728, #729, #736, #737, #738, #819, #820, #821, #822, #828, #829, #831, #832, #833, #835, #836, #838, #840. Cada conversa registra o que foi entregue e o que impede a conclusão.
+- Subtarefas ainda em A fazer, com pendências registradas: #730, #731, #830, #834, #837, #841, #842, #843, #845.
+
+Nenhum card foi marcado concluído nesta sincronização. Os registros distinguem a fundação testada da ativação de produção, perfis/CLIs reais e piloto ainda pendentes. Validação do commit: 227 arquivos / 3.285 testes, tipos, lint/formatação e build da interface; o ajuste final de preparação também passou em 105 testes direcionados. As mudanças permanecem nesta branch, sem push ou integração.
