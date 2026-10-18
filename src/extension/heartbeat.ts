@@ -8,14 +8,14 @@ import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/
 import { limitOf, type AiRunMode } from '../shared/runner';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
 import { USAGE_LIMIT_TEXT } from '../shared/conversation';
+import { aiToolInfo } from '../shared/harness';
+import { canDispatch, limitClock, limitHolds } from '../shared/usageLimit';
 import { isWithHuman } from '../shared/story';
 import { autopilotStep, needsSummary } from './autopilot';
 
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
 export interface HeartbeatRunner {
   readonly running: string[];
-  /** a última execução terminou por limite de uso do plano */
-  readonly usageLimited?: boolean;
   start(cardId: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(cardId: string): void;
   onDidFinish(listener: (cardId: string) => void): void;
@@ -187,12 +187,19 @@ export function heartbeatQueue(s: BoardState, conflicts: ReadonlySet<string> = n
   return items;
 }
 
+/** A frase da pausa por limite de uso (RF14): a ferramenta e a hora em que a fila volta a disparar. */
+function limitHoldReason(s: BoardState, now: number): string {
+  return `limite de uso do ${aiToolInfo(s.board.aiTool).label}; nada é disparado até ${limitClock(s.usageLimit!.resumeAt, now)}.`;
+}
+
 /**
  * Por que uma rodada não tem o que executar: o motivo que vai para o log e para a pessoa. Cada causa
  * é uma das condições em que `heartbeatTargets` ou `pump` deixam um card de fora.
  */
-export function heartbeatIdleReason(s: BoardState): string {
+export function heartbeatIdleReason(s: BoardState, now: number): string {
   if (blocksExecution(s)) return 'o login da ferramenta de IA venceu (veja o aviso no topo do board).';
+  // a pausa por limite de uso vem logo depois do login: enquanto vale, nada é disparado, qualquer que seja a fila
+  if (s.usageLimit && limitHolds(s, now)) return limitHoldReason(s, now);
   const p = pendingWork(s);
   const queue = aiQueue(s, p);
   if (!queue.length) return 'nada pendente com a IA.';
@@ -241,6 +248,11 @@ export class Heartbeat {
   private holding = false;
   /** a manutenção que o `holding` espera: só o fim da mais recente libera a fila */
   private maintenance: Promise<void> | null = null;
+  /**
+   * A fila ficou guardada porque a pausa por limite de uso segurava: quando ela vence, o `tick` retoma na hora,
+   * sem esperar o próximo intervalo da rodada (ou o próximo clique de aprovação).
+   */
+  private limitHeld = false;
 
   constructor(
     private runner: HeartbeatRunner,
@@ -250,10 +262,11 @@ export class Heartbeat {
     this.lastRoundAt = deps.now();
     runner.onDidFinish((cardId) => {
       this.yieldToAutopilot = !this.isAutopilotRun(cardId);
-      // limite de uso esgotado: as demais histórias da fila falhariam do mesmo jeito; fica para a próxima rodada
-      if (this.runner.usageLimited && this.queue.length) {
-        this.deps.log(`Heartbeat: limite de uso da ferramenta esgotado; ${this.queue.length} história(s) ficam para a próxima rodada.`);
-        this.queue = [];
+      // limite de uso esgotado: as demais histórias da fila falhariam do mesmo jeito; ficam guardadas até a pausa vencer
+      const s = this.deps.snapshot();
+      if (this.queue.length && s.usageLimit && limitHolds(s, this.deps.now())) {
+        this.deps.log(`Heartbeat: limite de uso esgotado; ${this.queue.length} história(s) ficam guardadas até a pausa vencer.`);
+        this.limitHeld = true;
         return this.changed();
       }
       this.pump();
@@ -262,7 +275,16 @@ export class Heartbeat {
 
   /** Chamado de tempos em tempos (ex.: a cada minuto): começa uma rodada se o intervalo já passou. */
   tick(): void {
-    const { runner } = this.deps.snapshot().board;
+    const snap = this.deps.snapshot();
+    const { runner } = snap.board;
+    // a pausa venceu com a fila guardada (RF6): retoma na hora. Com o heartbeat ligado começa uma rodada nova
+    // (que refaz a fila com o board de agora); desligado, volta a bombear os cards aprovados que ficaram esperando
+    if (this.limitHeld && canDispatch(snap, this.deps.now())) {
+      this.limitHeld = false;
+      if (runner.heartbeat) this.round();
+      else this.pump();
+      return;
+    }
     // uma rodada com histórias ainda na fila não é atropelada; execuções em andamento não impedem a rodada,
     // que usa as vagas livres
     if (!runner.heartbeat || this.queue.length) return;
@@ -326,8 +348,12 @@ export class Heartbeat {
     // o resumo da rodada: o que está com a pessoa aparece antes do que a IA vai tocar
     const withHuman = s.cards.filter((c) => isLive(c) && !c.parentId && isWithHuman(c) && columnOf(s, c)?.category === 'open').length;
     if (withHuman) this.deps.log(`Heartbeat: ${withHuman} história(s) com você (revisão, resposta ou bloqueio).`);
+    // durante a pausa por limite de uso a rodada só arruma e confere merges: o log diz por quê (RF14)
+    const paused = !!s.usageLimit && limitHolds(s, this.deps.now());
     this.deps.log(
-      count ? `Heartbeat: ${count} história(s) na rodada: ${this.queue.map(describe).join(', ')}.` : `Heartbeat: ${heartbeatIdleReason(s)}`,
+      count && !paused
+        ? `Heartbeat: ${count} história(s) na rodada: ${this.queue.map(describe).join(', ')}.`
+        : `Heartbeat: ${heartbeatIdleReason(s, this.deps.now())}`,
     );
     // a fila é montada antes da manutenção (é ela que dá o número na hora); o que perder a validade
     // enquanto isso (história concluída pelo merge, por exemplo) cai no `stillValid` do `pump`
@@ -422,10 +448,17 @@ export class Heartbeat {
     const s = this.deps.snapshot();
     // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
     if (blocksExecution(s)) {
-      if (this.queue.length) this.deps.log(`Heartbeat: ${heartbeatIdleReason(s)}`);
+      if (this.queue.length) this.deps.log(`Heartbeat: ${heartbeatIdleReason(s, this.deps.now())}`);
       this.queue = [];
       return void this.changed();
     }
+    // pausa por limite de uso (RF5): a fila fica guardada. Vencida, só a execução de teste sai: enquanto ela roda
+    // (`canDispatch` falso) nada mais começa, e o fim dela bombeia de novo
+    if (!canDispatch(s, this.deps.now())) {
+      this.limitHeld = this.queue.length > 0 && limitHolds(s, this.deps.now());
+      return void this.changed();
+    }
+    this.limitHeld = false;
     const counts = runningByKind(s, this.runner.running);
     const wants = autopilotStep(s);
     const reservedKind: ActivityKind | null = this.yieldToAutopilot && s.autopilot.active && wants.kind === 'run' ? wants.activity : null;
@@ -446,8 +479,8 @@ export class Heartbeat {
       try {
         this.runner.start(item.id, 'heartbeat', item.mode);
         counts[kind]++;
-        // o limite de uso esgotou na última execução: só uma de teste, as outras esperam o resultado dela
-        if (this.runner.usageLimited) {
+        // a pausa venceu e esta foi a execução de teste: as outras esperam o resultado dela
+        if (!canDispatch(this.deps.snapshot(), this.deps.now())) {
           rest.push(...this.queue.slice(this.queue.indexOf(item) + 1));
           break;
         }

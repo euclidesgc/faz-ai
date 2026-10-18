@@ -16,6 +16,7 @@ import type { AiRunOrigin } from '../src/shared/log';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BUG_TYPE } from '../src/shared/priority';
 import type { CardStatus } from '../src/shared/status';
+import { limitClock } from '../src/shared/usageLimit';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 const MIN = 60_000;
@@ -33,11 +34,12 @@ let runner: {
   /** o modo de cada start, na mesma ordem de `started` */
   modes: (AiRunMode | undefined)[];
   fail: boolean;
-  usageLimited: boolean;
   start(id: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(id: string): void;
   onDidFinish(fn: (id: string) => void): void;
   finish(status?: CardStatus): void;
+  /** a execução em andamento esbarra no limite de uso: o card volta para a IA e a pausa é registrada, como faz o runner */
+  finishByLimit(resetAt: number | null): void;
 };
 
 const number = (id: string) => router.snapshot().cards.find((c) => c.id === id)!.number;
@@ -90,7 +92,6 @@ beforeEach(async () => {
     origins: [],
     modes: [],
     fail: false,
-    usageLimited: false,
     start(id, origin, mode) {
       if (this.fail) throw new Error('ferramenta indisponível');
       this.running.push(id);
@@ -98,6 +99,9 @@ beforeEach(async () => {
       this.origins.push(origin);
       this.modes.push(mode);
       router.handle({ type: 'card.status.set', cardId: id, status: 'running' }, { source: 'ai' });
+      // como o runner de verdade: a primeira execução depois que a pausa por limite venceu é o teste
+      const pause = router.snapshot().usageLimit;
+      if (pause && pause.resumeAt <= now && pause.probe === null) router.setLimitProbe(id);
     },
     stop(id) {
       this.running = this.running.filter((x) => x !== id);
@@ -109,6 +113,16 @@ beforeEach(async () => {
     finish(status = 'waiting_review') {
       const id = this.running.shift()!;
       router.handle({ type: 'card.status.set', cardId: id, status, note: status === 'blocked' ? 'erro' : undefined }, { source: 'ai' });
+      // como o runner de verdade: o fim bem-sucedido apaga a pausa (o limite renovou) e libera o teste
+      router.clearUsageLimit(router.snapshot().board.aiTool);
+      if (router.snapshot().usageLimit?.probe === id) router.setLimitProbe(null);
+      listener(id);
+    },
+    finishByLimit(resetAt) {
+      const id = this.running.shift()!;
+      router.handle({ type: 'card.status.set', cardId: id, status: 'ready' }, { source: 'ai' });
+      router.recordUsageLimit(router.snapshot().board.aiTool, resetAt, now);
+      if (router.snapshot().usageLimit?.probe === id) router.setLimitProbe(null);
       listener(id);
     },
   };
@@ -134,23 +148,81 @@ describe('heartbeat', () => {
     expect(rounds).toBe(2);
   });
 
-  it('limite de uso esgotado: a rodada testa uma história e deixa as outras para a próxima rodada (#551)', () => {
+  it('limite de uso esgotado: a rodada testa uma história e guarda as outras até a pausa vencer (#551)', () => {
     create('A', 'Implementação'); // #1
     create('B', 'Implementação'); // #2
     setStatus(1, 'ready');
     setStatus(2, 'ready');
-    runner.usageLimited = true;
+    // a pausa gravada já venceu: a rodada sai com uma execução de teste
+    router.recordUsageLimit(router.snapshot().board.aiTool, null, now - 10 * MIN);
     heartbeat.runNow();
     expect(runner.started.map(number)).toEqual([1]);
-    // a execução termina por limite: o card volta para a IA e a fila é descartada, sem iniciar a B
-    runner.finish('ready');
+    // o teste termina por limite: o card volta para a IA e a fila fica guardada, sem iniciar a B
+    runner.finishByLimit(null);
     expect(runner.started.map(number)).toEqual([1]);
-    expect(heartbeat.queued).toBe(0);
+    expect(heartbeat.queued).toBe(1);
     expect(log.some((l) => /limite de uso/.test(l))).toBe(true);
-    // o limite renovou: a próxima rodada executa de novo
-    runner.usageLimited = false;
-    heartbeat.runNow();
+    // o limite renovou: a rodada seguinte executa de novo, começando por outro teste
+    now = router.snapshot().usageLimit!.resumeAt;
+    heartbeat.tick();
     expect(runner.started.map(number)).toEqual([1, 1]); // a A é a primeira da fila e tem a vaga
+  });
+
+  describe('pausa por limite de uso do plano (#800)', () => {
+    const pauseUntil = () => router.snapshot().usageLimit!.resumeAt;
+
+    it('RF5 e RF14: a rodada durante a pausa não dispara nada e registra no log a ferramenta e a hora', () => {
+      create('A', 'Implementação'); // #1
+      setStatus(1, 'ready');
+      router.recordUsageLimit(router.snapshot().board.aiTool, now + 10 * MIN, now); // renovação + 3 min de folga
+      expect(heartbeat.runNow()).toBe(1);
+      expect(runner.started).toEqual([]);
+      expect(log).toContain(`Heartbeat: limite de uso do Claude Code; nada é disparado até ${limitClock(pauseUntil(), now)}.`);
+      expect(log.some((l) => l.includes('na rodada:'))).toBe(false);
+      // minutos antes da hora, o relógio não solta a fila
+      now = pauseUntil() - 1;
+      heartbeat.tick();
+      expect(runner.started).toEqual([]);
+    });
+
+    it('RF6: vencida a pausa, o tick começa a rodada na hora com uma execução de teste; as outras esperam ela terminar', () => {
+      router.handle({ type: 'settings.board.update', patch: { runner: { parallelStories: 2 } } });
+      create('A', 'Discovery'); // #1
+      create('B', 'PRD'); // #2
+      setStatus(1, 'ready');
+      setStatus(2, 'ready');
+      router.recordUsageLimit(router.snapshot().board.aiTool, now + 10 * MIN, now);
+      heartbeat.runNow();
+      expect(runner.started).toEqual([]);
+      now = pauseUntil();
+      heartbeat.tick(); // sem esperar o intervalo de 60 min da rodada
+      expect(runner.started).toHaveLength(1);
+      heartbeat.tick();
+      expect(runner.started).toHaveLength(1); // o teste em curso segura a outra
+      runner.finish('ready'); // o teste terminou bem: a pausa foi apagada e a fila solta
+      expect(router.snapshot().usageLimit).toBeNull();
+      expect(runner.started.map(number).sort()).toEqual([1, 2]);
+    });
+
+    it('com o heartbeat desligado, a aprovação feita durante a pausa fica guardada e é retomada quando ela vence', () => {
+      router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: false } } });
+      create('A', 'Implementação'); // #1
+      router.recordUsageLimit(router.snapshot().board.aiTool, now + 10 * MIN, now);
+      heartbeat.enqueue(card(1).id);
+      expect(runner.started).toEqual([]);
+      expect(heartbeat.queued).toBe(1);
+      now = pauseUntil();
+      heartbeat.tick();
+      expect(runner.started.map(number)).toEqual([1]);
+    });
+
+    it('a pausa de outra ferramenta não segura a rodada', () => {
+      create('A', 'Implementação'); // #1
+      setStatus(1, 'ready');
+      router.recordUsageLimit(router.snapshot().board.aiTool === 'claude' ? 'cursor' : 'claude', now + 10 * MIN, now);
+      heartbeat.runNow();
+      expect(runner.started.map(number)).toEqual([1]);
+    });
   });
 
   it('enqueue inicia a história na hora, mesmo com o heartbeat desligado, sem duplicar', () => {
