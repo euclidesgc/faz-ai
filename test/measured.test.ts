@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { spawnMeasured, cleanStaleTemp, formatArgs, refusesFormat } from '../src/extension/aiOutput/measured';
+import { spawnMeasured, cleanStaleTemp, formatArgs, refusesFormat, type SpawnFn } from '../src/extension/aiOutput/measured';
 import { MeasureEndedError, MeasureRefusedError } from '../src/extension/aiOutput/errors';
 import type { OutputStream } from '../src/extension/aiOutput/reader';
 import { headlessCommand, type HeadlessCommand, type HeadlessInput } from '../src/extension/headless';
@@ -30,16 +30,21 @@ let started: Fake[];
 let lines: string[];
 
 /** O `spawn` falso: guarda cada chamada e deixa o teste decidir o que o processo escreve e como sai. */
-const spawn = (command: HeadlessCommand, _cwd: string, out: (text: string, stream: OutputStream) => void): RunningProcess => {
+const spawn: SpawnFn = (command, _cwd, out): RunningProcess => {
   let listener: (code: number | null, error?: Error) => void = () => {};
+  let confirmed = false;
   const fake: Fake = {
     command,
     emit: (text, stream = 'stdout') => out(text, stream),
-    exit: (code, error) => listener(code, error),
+    exit: (code, error) => {
+      confirmed = true;
+      listener(code, error);
+    },
     killed: false,
   };
   started.push(fake);
   return {
+    terminationConfirmed: () => confirmed,
     onExit: (fn) => (listener = fn),
     kill: () => {
       fake.killed = true;
@@ -520,63 +525,84 @@ describe('a leitura do fluxo, do byte ao relatório', () => {
   });
 });
 
-describe('o servidor do board para o Cursor em segundo plano', () => {
+describe('empréstimo MCP no transporte medido', () => {
   const server = { command: '/usr/bin/node', args: ['/dados/bridge.js', '/projeto'] };
-
-  it('registra no .cursor/mcp.json antes de rodar, sem esperar "Conectar ao board", e o exclui do git localmente', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-cursor-'));
+  function setup() {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-measured-lease-'));
+    return { dir, deps: { spawn, log: (l: string) => lines.push(l), leaseCoordinationDir: path.join(dir, 'coordination') } };
+  }
+  it.each(['cursor', 'kimi'] as const)('empresta antes do spawn e restaura no fim: %s', (tool) => {
+    const { dir, deps } = setup();
+    const file = path.join(dir, tool === 'cursor' ? '.cursor/mcp.json' : '.kimi-code/mcp.json');
     try {
-      fs.mkdirSync(path.join(dir, '.git', 'info'), { recursive: true });
-      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
-      const config = JSON.parse(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8'));
-      expect(config.mcpServers['faz-ai']).toEqual({ type: 'stdio', ...server });
-      expect(fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8')).toContain('.cursor/mcp.json');
-      expect(lines.some((l) => l.includes('Servidor do board registrado'))).toBe(true);
-
-      // um registro feito pela pessoa (outro node) fica como está, e o resto do arquivo também
-      config.mcpServers['faz-ai'].command = process.execPath;
-      config.mcpServers.github = { command: 'gh-mcp' };
-      fs.writeFileSync(path.join(dir, '.cursor', 'mcp.json'), JSON.stringify(config));
-      lines.length = 0;
-      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
-      expect(JSON.parse(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8'))).toEqual(config);
-      expect(lines.some((l) => l.includes('Servidor do board registrado'))).toBe(false);
-
-      // um registro de outra pasta (veio de um colega, ou o projeto mudou de lugar) é refeito, mantendo o node da pessoa
-      config.mcpServers['faz-ai'].args = ['/dados/bridge.js', '/outro/projeto'];
-      fs.writeFileSync(path.join(dir, '.cursor', 'mcp.json'), JSON.stringify(config));
-      lines.length = 0;
-      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
-      const repaired = JSON.parse(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8'));
-      expect(repaired.mcpServers['faz-ai']).toEqual({ type: 'stdio', command: process.execPath, args: server.args });
-      expect(repaired.mcpServers.github).toEqual({ command: 'gh-mcp' });
-      expect(lines.some((l) => l.includes('foi refeito'))).toBe(true);
-
-      // um arquivo que não é JSON (com comentário) não impede a execução: fica como está, com aviso no log
-      fs.writeFileSync(path.join(dir, '.cursor', 'mcp.json'), '// meu\n{}');
-      lines.length = 0;
-      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
-      expect(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8')).toBe('// meu\n{}');
-      expect(lines.some((l) => l.includes('não é um JSON válido'))).toBe(true);
-      expect(started.length).toBeGreaterThan(0);
+      const run = spawnMeasured(tool, { ...INPUT, boardServer: server }, dir, deps);
+      const entry = JSON.parse(fs.readFileSync(file, 'utf8')).mcpServers['faz-ai'];
+      expect(entry).toEqual({ ...(tool === 'cursor' ? { type: 'stdio' } : {}), ...server });
+      run.proc.onExit(() => {});
+      started[0]!.exit(0);
+      expect(fs.existsSync(file)).toBe(false);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
-});
-
-describe('o servidor do board para o Kimi Code em segundo plano', () => {
-  const server = { command: '/usr/bin/node', args: ['/dados/bridge.js', '/projeto'] };
-
-  it('registra no .kimi-code/mcp.json antes de rodar, sem o campo type que a CLI não usa, e o exclui do git localmente', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-kimi-'));
+  it('JSON inválido que impede o servidor obrigatório bloqueia antes do spawn', () => {
+    const { dir, deps } = setup();
     try {
-      fs.mkdirSync(path.join(dir, '.git', 'info'), { recursive: true });
-      spawnMeasured('kimi', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
-      const config = JSON.parse(fs.readFileSync(path.join(dir, '.kimi-code', 'mcp.json'), 'utf8'));
-      expect(config.mcpServers['faz-ai']).toEqual(server);
-      expect(fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8')).toContain('.kimi-code/mcp.json');
-      expect(lines.some((l) => l.includes('Servidor do board registrado'))).toBe(true);
+      fs.mkdirSync(path.join(dir, '.cursor'));
+      fs.writeFileSync(path.join(dir, '.cursor/mcp.json'), '// inválido');
+      expect(() => spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, deps)).toThrow();
+      expect(started).toHaveLength(0);
+      expect(fs.readFileSync(path.join(dir, '.cursor/mcp.json'), 'utf8')).toBe('// inválido');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('duas tentativas de formato compartilham um único empréstimo', () => {
+    const { dir, deps } = setup();
+    try {
+      const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, deps);
+      started[0]!.emit(REFUSE_FORMAT, 'stderr');
+      started[0]!.exit(1);
+      expect(started).toHaveLength(2);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toHaveLength(1);
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(true);
+      started[1]!.exit(0);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
+      expect(run.report().measure).toBe('none');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('cancelamento só devolve o arquivo quando a árvore termina', () => {
+    const { dir, deps } = setup();
+    try {
+      const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, deps);
+      run.proc.kill();
+      expect(started[0]!.killed).toBe(true);
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('árvore sem confirmação retém o empréstimo e não informa sucesso', () => {
+    const { dir, deps } = setup();
+    try {
+      const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, {
+        ...deps,
+        spawn: (...args) => {
+          const proc = spawn(...args);
+          return { onExit: proc.onExit, kill: proc.kill };
+        },
+      });
+      let error: Error | undefined;
+      run.proc.onExit((_code, e) => {
+        error = e;
+      });
+      started[0]!.exit(0);
+      expect(error?.message).toContain('não foi confirmado');
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(true);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toHaveLength(1);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -603,4 +629,27 @@ describe('pastas temporárias de execuções antigas', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+});
+
+it('personalizado em texto usa o transporte uma vez e conserva consumo desconhecido sem erro de medição', () => {
+  const profile: import('../src/shared/aiProfiles').AiProfile = {
+    id: 'custom',
+    name: 'Custom',
+    kind: 'custom',
+    base: 'generic',
+    enabled: true,
+    position: 3,
+    config: { command: 'node', boardServer: 'none' },
+  };
+  const measured = run(profile);
+  started[0]!.emit('resposta\n');
+  started[0]!.exit(0);
+  expect(started).toHaveLength(1);
+  expect(started[0]!.command).toMatchObject({ lookup: { onlyPath: true }, noShell: true, format: 'text' });
+  expect(measured.report()).toMatchObject({
+    measure: 'none',
+    consumption: null,
+    reason: 'Este perfil fornece apenas texto; consumo desconhecido.',
+  });
+  expect(measured.failure()).toBeNull();
 });

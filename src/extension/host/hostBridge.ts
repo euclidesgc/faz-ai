@@ -19,6 +19,9 @@ const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'harness.agent.assist',
   'metrics.query',
   'card.usage.query',
+  'contextPlanning.preview',
+  'executionPolicy.read',
+  'executionPolicy.simulate',
 ]);
 
 /** O que depende de onde o board está rodando: dentro do editor ou num navegador. */
@@ -76,8 +79,9 @@ export function exportNotice(savedPath: string, warnings: string[]): string {
 /** Mensagem de resultado da importação: o board, os totais, os cards cujo anexo ficou sem arquivo e os segredos de MCP a preencher. */
 export function importNotice(r: ImportResult): string {
   const missing = r.warnings.length ? ` Anexos sem arquivo: ${r.warnings.join(', ')}.` : '';
-  const secrets = r.mcpSecrets.length ? ` Preencha os valores vazios dos servidores MCP: ${r.mcpSecrets.join(', ')}.` : '';
-  return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}${secrets}`;
+  const secrets = r.mcpSecrets.length ? ` Revise as configurações locais dos servidores MCP: ${r.mcpSecrets.join(', ')}.` : '';
+  const profiles = r.profileReviews?.length ? ` Perfis desativados para revisão local: ${r.profileReviews.join(', ')}.` : '';
+  return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}${secrets}${profiles}`;
 }
 
 /**
@@ -396,6 +400,48 @@ export class HostBridge {
           this.post({ type: 'metrics.result', requestId: msg.requestId, result: this.router.panelMetrics(msg.query) });
         } catch (e) {
           this.post({ type: 'metrics.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'executionPolicy.read': {
+        try {
+          this.post({
+            type: 'executionPolicy.result',
+            requestId: msg.requestId,
+            ...(msg.id
+              ? this.router.executionPolicyHistory(msg.id, msg.beforeRevision)
+              : { library: this.router.executionPolicyLibrary() }),
+          });
+        } catch (e) {
+          this.post({ type: 'executionPolicy.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'executionPolicy.simulate': {
+        try {
+          this.post({
+            type: 'executionPolicy.result',
+            requestId: msg.requestId,
+            simulation: this.router.simulateExecutionPolicy(msg.scenario),
+          });
+        } catch (e) {
+          this.post({ type: 'executionPolicy.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'contextPlanning.preview': {
+        try {
+          this.post({
+            type: 'contextPlanning.preview.result',
+            requestId: msg.requestId,
+            preview: this.router.previewContextDraft(msg.target),
+          });
+        } catch (e) {
+          this.post({
+            type: 'contextPlanning.preview.result',
+            requestId: msg.requestId,
+            error: e instanceof Error ? e.message : String(e),
+          });
         }
         return;
       }

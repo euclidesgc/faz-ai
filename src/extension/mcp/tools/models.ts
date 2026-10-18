@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { ALL_AI_TOOLS, type AiTool } from '../../../shared/harness';
+import { ALL_AI_BASES, type AiTool } from '../../../shared/harness';
 import { TYPE_CONDITION, modelId, resolveModelInput, type ModelRule } from '../../../shared/models';
 import { newId } from '../../db/ids';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { findField, modelsOverview } from '../format';
 import type { DefineTool } from './registry';
 
-const toolArg = z.enum(ALL_AI_TOOLS as [string, ...string[]]).describe('Ferramenta de IA: claude, cursor ou kimi');
+const toolArg = z.enum(ALL_AI_BASES as [string, ...string[]]).describe('Ferramenta de IA: claude, cursor ou kimi');
 const models = (router: MessageRouter) => modelsOverview(router.snapshot());
 
 /** Modelos de LLM: catálogo e regras de sugestão de modelo. */

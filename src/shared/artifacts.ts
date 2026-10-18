@@ -1,3 +1,4 @@
+import { baseValue } from './harness';
 // Artefatos do board (#615): regras, skills, agentes e servidores MCP guardados pelo próprio board, num
 // formato neutro. Só tipos e funções puras: sem banco, sem `vscode`.
 import { AGENT_TOOLS } from './agentTools';
@@ -52,6 +53,7 @@ export interface BoardArtifact {
   agent?: AgentMeta;
   /** só no MCP: o resumo (comando ou endereço); a definição fica no host */
   mcpSummary?: string;
+  mcpCredential?: { secretRef: string; available: boolean; review: 'pending' | 'reviewed'; transport: 'stdio' | 'http' | 'sse' | '' };
   /** só na skill: gerada pela extensão (skill do fluxo), regravada a cada abertura */
   generated?: boolean;
   /** caminho da cópia de leitura (SKILL.md, arquivo da regra, arquivo do agente); '' no MCP. Preenchido pelo host */
@@ -60,6 +62,8 @@ export interface BoardArtifact {
   size?: number;
   createdAt: number;
   updatedAt: number;
+  /** Revisão monotônica no banco; ausente somente em estados legados. */
+  revision?: number;
 }
 
 /** O que se grava: o artefato inteiro, com o conteúdo e os arquivos. */
@@ -69,7 +73,11 @@ export interface ArtifactDraft {
   description: string;
   /** regra: o arquivo; skill: o SKILL.md inteiro; agente: as instruções; mcp: '' */
   body: string;
-  meta: AgentMeta | { server: Record<string, unknown> } | { generated: true } | Record<string, never>;
+  meta:
+    | AgentMeta
+    | { server: Record<string, unknown>; transport?: 'stdio' | 'http' | 'sse' | '' }
+    | { generated: true }
+    | Record<string, never>;
   origin: string;
   originTool: AiTool | '';
   missing: boolean;
@@ -107,11 +115,17 @@ export function itemOfArtifact(a: BoardArtifact): HarnessItem {
 }
 
 /** O agente no formato `Agent` (para o editor atual e para `profileOfArtifact`). */
-export function agentOfArtifact(a: BoardArtifact, tool?: AiTool): Agent {
+export type AgentArtifact = Pick<BoardArtifact, 'name' | 'description' | 'body' | 'agent' | 'path' | 'origin'>;
+
+export function agentOfArtifact(a: AgentArtifact, tool?: AiTool): Agent {
   const m = a.agent;
   const foreign = !!tool && m?.tools.native.tool !== tool;
   const translate = (categories: ToolCategory[]) =>
-    tool ? AGENT_TOOLS[tool].filter((g) => categories.includes(g.id as ToolCategory)).flatMap((g) => g.tools.map((t) => t.name)) : [];
+    tool
+      ? (baseValue(AGENT_TOOLS, tool) ?? [])
+          .filter((g) => categories.includes(g.id as ToolCategory))
+          .flatMap((g) => g.tools.map((t) => t.name))
+      : [];
   return {
     name: a.name,
     description: a.description,
@@ -138,7 +152,7 @@ export function agentOfArtifact(a: BoardArtifact, tool?: AiTool): Agent {
 }
 
 /** O agente no formato de perfil de execução (escopo `board`, `path` = cópia de leitura). */
-export function profileOfArtifact(a: BoardArtifact, isDefault: boolean): ExecProfile {
+export function profileOfArtifact(a: AgentArtifact, isDefault: boolean): ExecProfile {
   const g = agentOfArtifact(a);
   return {
     id: g.name,
@@ -156,10 +170,10 @@ export function profileOfArtifact(a: BoardArtifact, isDefault: boolean): ExecPro
   };
 }
 
-/** Grupos de AGENT_TOOLS[tool] que contêm alguma ferramenta da lista (na ordem dos grupos). */
+/** Grupos de (baseValue(AGENT_TOOLS, tool) ?? []) que contêm alguma ferramenta da lista (na ordem dos grupos). */
 export function toolCategories(tool: AiTool | '', tools: string[]): ToolCategory[] {
   if (!tool) return [];
-  return AGENT_TOOLS[tool]
+  return (baseValue(AGENT_TOOLS, tool) ?? [])
     .filter((g) => TOOL_CATEGORIES.includes(g.id) && g.tools.some((t) => tools.includes(t.name)))
     .map((g) => g.id as ToolCategory);
 }
@@ -179,6 +193,7 @@ export interface LibraryArtifactInput {
   body: string;
   agent?: AgentMeta;
   server?: Record<string, unknown>;
+  mcpCredential?: BoardArtifact['mcpCredential'];
 }
 export interface LibraryImportResult {
   imported: number;

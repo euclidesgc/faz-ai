@@ -1,0 +1,2348 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`preserva os comandos nativos de claude 1`] = `
+[
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "text",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{"faz-ai":{"type":"stdio","command":"node","args":["bridge.js"]}}}",
+      },
+    },
+    "permission": "board",
+    "structured": false,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "claude-stream-json",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{"faz-ai":{"type":"stdio","command":"node","args":["bridge.js"]}}}",
+      },
+    },
+    "permission": "board",
+    "structured": true,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--add-dir",
+        "/pasta adicional",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "text",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{"faz-ai":{"type":"stdio","command":"node","args":["bridge.js"]}}}",
+      },
+    },
+    "permission": "board",
+    "structured": false,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--add-dir",
+        "/pasta adicional",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "claude-stream-json",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{"faz-ai":{"type":"stdio","command":"node","args":["bridge.js"]}}}",
+      },
+    },
+    "permission": "board",
+    "structured": true,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--model",
+        "modelo-fixo",
+        "--effort",
+        "high",
+        "--agents",
+        "{"especialista":{"description":"Especialista","prompt":"Instrução fixa"}}",
+        "--agent",
+        "especialista",
+        "--tools",
+        "Read",
+        "--disallowedTools",
+        "Bash",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "text",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{}}",
+      },
+    },
+    "permission": "board",
+    "structured": false,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--model",
+        "modelo-fixo",
+        "--effort",
+        "high",
+        "--agents",
+        "{"especialista":{"description":"Especialista","prompt":"Instrução fixa"}}",
+        "--agent",
+        "especialista",
+        "--tools",
+        "Read",
+        "--disallowedTools",
+        "Bash",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "claude-stream-json",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{}}",
+      },
+    },
+    "permission": "board",
+    "structured": true,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--add-dir",
+        "/pasta adicional",
+        "--model",
+        "modelo-fixo",
+        "--effort",
+        "high",
+        "--agents",
+        "{"especialista":{"description":"Especialista","prompt":"Instrução fixa"}}",
+        "--agent",
+        "especialista",
+        "--tools",
+        "Read",
+        "--disallowedTools",
+        "Bash",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "text",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{}}",
+      },
+    },
+    "permission": "board",
+    "structured": false,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--add-dir",
+        "/pasta adicional",
+        "--model",
+        "modelo-fixo",
+        "--effort",
+        "high",
+        "--agents",
+        "{"especialista":{"description":"Especialista","prompt":"Instrução fixa"}}",
+        "--agent",
+        "especialista",
+        "--tools",
+        "Read",
+        "--disallowedTools",
+        "Bash",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "claude-stream-json",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{}}",
+      },
+    },
+    "permission": "board",
+    "structured": true,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--permission-mode",
+        "acceptEdits",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "text",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{"faz-ai":{"type":"stdio","command":"node","args":["bridge.js"]}}}",
+      },
+    },
+    "permission": "edits",
+    "structured": false,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "acceptEdits",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "claude-stream-json",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{"faz-ai":{"type":"stdio","command":"node","args":["bridge.js"]}}}",
+      },
+    },
+    "permission": "edits",
+    "structured": true,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--permission-mode",
+        "acceptEdits",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--add-dir",
+        "/pasta adicional",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "text",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{"faz-ai":{"type":"stdio","command":"node","args":["bridge.js"]}}}",
+      },
+    },
+    "permission": "edits",
+    "structured": false,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "acceptEdits",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--add-dir",
+        "/pasta adicional",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "claude-stream-json",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{"faz-ai":{"type":"stdio","command":"node","args":["bridge.js"]}}}",
+      },
+    },
+    "permission": "edits",
+    "structured": true,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--permission-mode",
+        "acceptEdits",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--model",
+        "modelo-fixo",
+        "--effort",
+        "high",
+        "--agents",
+        "{"especialista":{"description":"Especialista","prompt":"Instrução fixa"}}",
+        "--agent",
+        "especialista",
+        "--tools",
+        "Read",
+        "--disallowedTools",
+        "Bash",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "text",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{}}",
+      },
+    },
+    "permission": "edits",
+    "structured": false,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "acceptEdits",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--model",
+        "modelo-fixo",
+        "--effort",
+        "high",
+        "--agents",
+        "{"especialista":{"description":"Especialista","prompt":"Instrução fixa"}}",
+        "--agent",
+        "especialista",
+        "--tools",
+        "Read",
+        "--disallowedTools",
+        "Bash",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "claude-stream-json",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{}}",
+      },
+    },
+    "permission": "edits",
+    "structured": true,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--permission-mode",
+        "acceptEdits",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--add-dir",
+        "/pasta adicional",
+        "--model",
+        "modelo-fixo",
+        "--effort",
+        "high",
+        "--agents",
+        "{"especialista":{"description":"Especialista","prompt":"Instrução fixa"}}",
+        "--agent",
+        "especialista",
+        "--tools",
+        "Read",
+        "--disallowedTools",
+        "Bash",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "text",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{}}",
+      },
+    },
+    "permission": "edits",
+    "structured": false,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "acceptEdits",
+        "--allowedTools",
+        "mcp__faz-ai__*",
+        "Read",
+        "Glob",
+        "Grep",
+        "--add-dir",
+        "/pasta adicional",
+        "--model",
+        "modelo-fixo",
+        "--effort",
+        "high",
+        "--agents",
+        "{"especialista":{"description":"Especialista","prompt":"Instrução fixa"}}",
+        "--agent",
+        "especialista",
+        "--tools",
+        "Read",
+        "--disallowedTools",
+        "Bash",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "claude-stream-json",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{}}",
+      },
+    },
+    "permission": "edits",
+    "structured": true,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--permission-mode",
+        "bypassPermissions",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "text",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{"faz-ai":{"type":"stdio","command":"node","args":["bridge.js"]}}}",
+      },
+    },
+    "permission": "full",
+    "structured": false,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "bypassPermissions",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "claude-stream-json",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{"faz-ai":{"type":"stdio","command":"node","args":["bridge.js"]}}}",
+      },
+    },
+    "permission": "full",
+    "structured": true,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--permission-mode",
+        "bypassPermissions",
+        "--add-dir",
+        "/pasta adicional",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "text",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{"faz-ai":{"type":"stdio","command":"node","args":["bridge.js"]}}}",
+      },
+    },
+    "permission": "full",
+    "structured": false,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "bypassPermissions",
+        "--add-dir",
+        "/pasta adicional",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "claude-stream-json",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{"faz-ai":{"type":"stdio","command":"node","args":["bridge.js"]}}}",
+      },
+    },
+    "permission": "full",
+    "structured": true,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--permission-mode",
+        "bypassPermissions",
+        "--model",
+        "modelo-fixo",
+        "--effort",
+        "high",
+        "--agents",
+        "{"especialista":{"description":"Especialista","prompt":"Instrução fixa"}}",
+        "--agent",
+        "especialista",
+        "--tools",
+        "Read",
+        "--disallowedTools",
+        "Bash",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "text",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{}}",
+      },
+    },
+    "permission": "full",
+    "structured": false,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "bypassPermissions",
+        "--model",
+        "modelo-fixo",
+        "--effort",
+        "high",
+        "--agents",
+        "{"especialista":{"description":"Especialista","prompt":"Instrução fixa"}}",
+        "--agent",
+        "especialista",
+        "--tools",
+        "Read",
+        "--disallowedTools",
+        "Bash",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "claude-stream-json",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{}}",
+      },
+    },
+    "permission": "full",
+    "structured": true,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--permission-mode",
+        "bypassPermissions",
+        "--add-dir",
+        "/pasta adicional",
+        "--model",
+        "modelo-fixo",
+        "--effort",
+        "high",
+        "--agents",
+        "{"especialista":{"description":"Especialista","prompt":"Instrução fixa"}}",
+        "--agent",
+        "especialista",
+        "--tools",
+        "Read",
+        "--disallowedTools",
+        "Bash",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "text",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{}}",
+      },
+    },
+    "permission": "full",
+    "structured": false,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "bypassPermissions",
+        "--add-dir",
+        "/pasta adicional",
+        "--model",
+        "modelo-fixo",
+        "--effort",
+        "high",
+        "--agents",
+        "{"especialista":{"description":"Especialista","prompt":"Instrução fixa"}}",
+        "--agent",
+        "especialista",
+        "--tools",
+        "Read",
+        "--disallowedTools",
+        "Bash",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{tmp:mcp.json}",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+      ],
+      "command": "claude",
+      "format": "claude-stream-json",
+      "stdin": "Pedido fixo
+com espaço",
+      "tempFiles": {
+        "mcp.json": "{"mcpServers":{}}",
+      },
+    },
+    "permission": "full",
+    "structured": true,
+    "withDirs": true,
+    "withExec": true,
+  },
+]
+`;
+
+exports[`preserva os comandos nativos de cursor 1`] = `
+[
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call",
+      ],
+      "command": "cursor-agent",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "board",
+    "structured": false,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call",
+      ],
+      "command": "cursor-agent",
+      "format": "cursor-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "board",
+    "structured": true,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call",
+        "--add-dir",
+        "/pasta adicional",
+      ],
+      "command": "cursor-agent",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "board",
+    "structured": false,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call",
+        "--add-dir",
+        "/pasta adicional",
+      ],
+      "command": "cursor-agent",
+      "format": "cursor-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "board",
+    "structured": true,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call",
+        "--model",
+        "modelo-fixo-high",
+      ],
+      "command": "cursor-agent",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "board",
+    "structured": false,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call",
+        "--model",
+        "modelo-fixo-high",
+      ],
+      "command": "cursor-agent",
+      "format": "cursor-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "board",
+    "structured": true,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call",
+        "--add-dir",
+        "/pasta adicional",
+        "--model",
+        "modelo-fixo-high",
+      ],
+      "command": "cursor-agent",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "board",
+    "structured": false,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call",
+        "--add-dir",
+        "/pasta adicional",
+        "--model",
+        "modelo-fixo-high",
+      ],
+      "command": "cursor-agent",
+      "format": "cursor-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "board",
+    "structured": true,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call,edit_tool_call,delete_tool_call,apply_agent_diff_tool_call",
+      ],
+      "command": "cursor-agent",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "edits",
+    "structured": false,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call,edit_tool_call,delete_tool_call,apply_agent_diff_tool_call",
+      ],
+      "command": "cursor-agent",
+      "format": "cursor-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "edits",
+    "structured": true,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call,edit_tool_call,delete_tool_call,apply_agent_diff_tool_call",
+        "--add-dir",
+        "/pasta adicional",
+      ],
+      "command": "cursor-agent",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "edits",
+    "structured": false,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call,edit_tool_call,delete_tool_call,apply_agent_diff_tool_call",
+        "--add-dir",
+        "/pasta adicional",
+      ],
+      "command": "cursor-agent",
+      "format": "cursor-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "edits",
+    "structured": true,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call,edit_tool_call,delete_tool_call,apply_agent_diff_tool_call",
+        "--model",
+        "modelo-fixo-high",
+      ],
+      "command": "cursor-agent",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "edits",
+    "structured": false,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call,edit_tool_call,delete_tool_call,apply_agent_diff_tool_call",
+        "--model",
+        "modelo-fixo-high",
+      ],
+      "command": "cursor-agent",
+      "format": "cursor-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "edits",
+    "structured": true,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call,edit_tool_call,delete_tool_call,apply_agent_diff_tool_call",
+        "--add-dir",
+        "/pasta adicional",
+        "--model",
+        "modelo-fixo-high",
+      ],
+      "command": "cursor-agent",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "edits",
+    "structured": false,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--allowed-tools",
+        "read_tool_call,glob_tool_call,grep_tool_call,ls_tool_call,sem_search_tool_call,read_lints_tool_call,read_todos_tool_call,update_todos_tool_call,mcp_tool_call,get_mcp_tools_tool_call,list_mcp_resources_tool_call,read_mcp_resource_tool_call,edit_tool_call,delete_tool_call,apply_agent_diff_tool_call",
+        "--add-dir",
+        "/pasta adicional",
+        "--model",
+        "modelo-fixo-high",
+      ],
+      "command": "cursor-agent",
+      "format": "cursor-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "edits",
+    "structured": true,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+      ],
+      "command": "cursor-agent",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "full",
+    "structured": false,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+      ],
+      "command": "cursor-agent",
+      "format": "cursor-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "full",
+    "structured": true,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--add-dir",
+        "/pasta adicional",
+      ],
+      "command": "cursor-agent",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "full",
+    "structured": false,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--add-dir",
+        "/pasta adicional",
+      ],
+      "command": "cursor-agent",
+      "format": "cursor-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "full",
+    "structured": true,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--model",
+        "modelo-fixo-high",
+      ],
+      "command": "cursor-agent",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "full",
+    "structured": false,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--model",
+        "modelo-fixo-high",
+      ],
+      "command": "cursor-agent",
+      "format": "cursor-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "full",
+    "structured": true,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--add-dir",
+        "/pasta adicional",
+        "--model",
+        "modelo-fixo-high",
+      ],
+      "command": "cursor-agent",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "full",
+    "structured": false,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--force",
+        "--approve-mcps",
+        "--trust",
+        "--add-dir",
+        "/pasta adicional",
+        "--model",
+        "modelo-fixo-high",
+      ],
+      "command": "cursor-agent",
+      "format": "cursor-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".cursor/mcp.json",
+      },
+      "stdin": "Pedido fixo
+com espaço",
+    },
+    "permission": "full",
+    "structured": true,
+    "withDirs": true,
+    "withExec": true,
+  },
+]
+`;
+
+exports[`preserva os comandos nativos de kimi 1`] = `
+[
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+      ],
+      "command": "kimi",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "board",
+    "structured": false,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--output-format",
+        "stream-json",
+      ],
+      "command": "kimi",
+      "format": "kimi-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "board",
+    "structured": true,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--add-dir",
+        "/pasta adicional",
+      ],
+      "command": "kimi",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "board",
+    "structured": false,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--output-format",
+        "stream-json",
+        "--add-dir",
+        "/pasta adicional",
+      ],
+      "command": "kimi",
+      "format": "kimi-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "board",
+    "structured": true,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "-m",
+        "modelo-fixo",
+      ],
+      "command": "kimi",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "board",
+    "structured": false,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--output-format",
+        "stream-json",
+        "-m",
+        "modelo-fixo",
+      ],
+      "command": "kimi",
+      "format": "kimi-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "board",
+    "structured": true,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--add-dir",
+        "/pasta adicional",
+        "-m",
+        "modelo-fixo",
+      ],
+      "command": "kimi",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "board",
+    "structured": false,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--output-format",
+        "stream-json",
+        "--add-dir",
+        "/pasta adicional",
+        "-m",
+        "modelo-fixo",
+      ],
+      "command": "kimi",
+      "format": "kimi-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "board",
+    "structured": true,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+      ],
+      "command": "kimi",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "edits",
+    "structured": false,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--output-format",
+        "stream-json",
+      ],
+      "command": "kimi",
+      "format": "kimi-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "edits",
+    "structured": true,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--add-dir",
+        "/pasta adicional",
+      ],
+      "command": "kimi",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "edits",
+    "structured": false,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--output-format",
+        "stream-json",
+        "--add-dir",
+        "/pasta adicional",
+      ],
+      "command": "kimi",
+      "format": "kimi-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "edits",
+    "structured": true,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "-m",
+        "modelo-fixo",
+      ],
+      "command": "kimi",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "edits",
+    "structured": false,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--output-format",
+        "stream-json",
+        "-m",
+        "modelo-fixo",
+      ],
+      "command": "kimi",
+      "format": "kimi-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "edits",
+    "structured": true,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--add-dir",
+        "/pasta adicional",
+        "-m",
+        "modelo-fixo",
+      ],
+      "command": "kimi",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "edits",
+    "structured": false,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--output-format",
+        "stream-json",
+        "--add-dir",
+        "/pasta adicional",
+        "-m",
+        "modelo-fixo",
+      ],
+      "command": "kimi",
+      "format": "kimi-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "edits",
+    "structured": true,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+      ],
+      "command": "kimi",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "full",
+    "structured": false,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--output-format",
+        "stream-json",
+      ],
+      "command": "kimi",
+      "format": "kimi-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "full",
+    "structured": true,
+    "withDirs": false,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--add-dir",
+        "/pasta adicional",
+      ],
+      "command": "kimi",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "full",
+    "structured": false,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--output-format",
+        "stream-json",
+        "--add-dir",
+        "/pasta adicional",
+      ],
+      "command": "kimi",
+      "format": "kimi-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "full",
+    "structured": true,
+    "withDirs": true,
+    "withExec": false,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "-m",
+        "modelo-fixo",
+      ],
+      "command": "kimi",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "full",
+    "structured": false,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--output-format",
+        "stream-json",
+        "-m",
+        "modelo-fixo",
+      ],
+      "command": "kimi",
+      "format": "kimi-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "full",
+    "structured": true,
+    "withDirs": false,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--add-dir",
+        "/pasta adicional",
+        "-m",
+        "modelo-fixo",
+      ],
+      "command": "kimi",
+      "format": "text",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "full",
+    "structured": false,
+    "withDirs": true,
+    "withExec": true,
+  },
+  {
+    "command": {
+      "args": [
+        "-p",
+        "Pedido fixo
+com espaço",
+        "--output-format",
+        "stream-json",
+        "--add-dir",
+        "/pasta adicional",
+        "-m",
+        "modelo-fixo",
+      ],
+      "command": "kimi",
+      "format": "kimi-stream-json",
+      "projectMcp": {
+        "entry": {
+          "args": [
+            "bridge.js",
+          ],
+          "command": "node",
+        },
+        "file": ".kimi-code/mcp.json",
+        "stdioType": false,
+      },
+    },
+    "permission": "full",
+    "structured": true,
+    "withDirs": true,
+    "withExec": true,
+  },
+]
+`;

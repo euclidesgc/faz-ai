@@ -1,5 +1,5 @@
 import { RadioGroup } from '@radix-ui/themes';
-import { AI_TOOLS, type AiTool } from '../../../../shared/harness';
+import { AI_BASES, type AiTool } from '../../../../shared/harness';
 import type { AiToolInfo } from '../../../../shared/harnessProject';
 import { settings } from '../../../commands';
 import { useAction } from '../../../useAction';
@@ -40,7 +40,7 @@ export function ProjectTool({ tool }: { tool: AiToolInfo }) {
             </tr>
           </thead>
           <tbody>
-            {AI_TOOLS.map((x) => (
+            {AI_BASES.map((x) => (
               <tr key={x.id} className={x.id === tool.id ? '' : 'off'}>
                 <td>
                   <RadioGroup.Item value={x.id} aria-label={x.label} />

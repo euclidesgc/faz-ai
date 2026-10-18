@@ -2169,6 +2169,71 @@ describe('generate_summary (ferramenta MCP)', () => {
 });
 
 describe('biblioteca neutra pelo MCP', () => {
+  it('a prévia v1 pelo MCP reutiliza o host sem corpos, credenciais, escrita ou inferência', async () => {
+    router.handle({
+      type: 'harness.library.save',
+      input: { kind: 'agent', name: 'revisor', description: 'Revisor', body: 'instrucoes-privadas' },
+    });
+    const agent = router.snapshot().harness.library!.artifacts.find((a) => a.name === 'revisor')!;
+    router.handle({
+      type: 'contextPlanning.save',
+      input: {
+        kind: 'agent',
+        artifactId: agent.id,
+        expectedRevision: 0,
+        contract: {
+          version: 1,
+          role: 'papel-privado',
+          instructions: 'instrucoes-do-contrato',
+          essentialSkillIds: [],
+          availableSkillIds: [],
+          allowedMcpIds: [],
+          tools: { categories: ['read'], native: { tool: '', allow: [], deny: [] } },
+        },
+      },
+    });
+    const target = { cardId: null, workflowId: null, phaseId: '', action: 'work' as const };
+    router.handle({
+      type: 'contextPlanning.save',
+      input: {
+        kind: 'activity',
+        target,
+        expectedRevision: 0,
+        selection: {
+          version: 1,
+          agent: { mode: 'explicit', value: agent.id },
+          model: { mode: 'inherit' },
+          additionalSkillIds: { mode: 'inherit' },
+          activeMcpIds: { mode: 'inherit' },
+          inputAttachmentIds: [],
+          expectedResult: '',
+        },
+      },
+    });
+    const before = changes;
+    const expected = router.previewContextDraft(target);
+    const result = await call('preview_context_draft', { target });
+    expect(result.error).toBe(false);
+    expect(result.data).toEqual(expected);
+    expect(result.data.agent).toEqual({ artifactId: agent.id, revision: 1 });
+    expect(result.data.canExecute).toBe(false);
+    expect(result.data.admission).toEqual({ state: 'unavailable', dependency: 729 });
+    expect(result.text).not.toContain('instrucoes-privadas');
+    expect(result.text).not.toContain('instrucoes-do-contrato');
+    expect(result.text).not.toContain('papel-privado');
+    expect(changes).toBe(before);
+    expect((await client.listTools()).tools.find((t) => t.name === 'preview_context_draft')!.annotations!.readOnlyHint).toBe(true);
+  });
+
+  it('a prévia MCP recusa parâmetros extras e explica alvos que não existem', async () => {
+    const target = { cardId: null, workflowId: null, phaseId: '', action: 'work' };
+    expect((await call('preview_context_draft', { target: { ...target, contract: {} } })).error).toBe(true);
+    expect((await call('preview_context_draft', { target: { ...target, action: 'execute' } })).error).toBe(true);
+    const result = await call('preview_context_draft', { target: { ...target, cardId: 'ausente' } });
+    expect(result.data.diagnostics).toContainEqual({ code: 'invalid-target' });
+    expect(result.data.canExecute).toBe(false);
+  });
+
   it('a IA cria e edita artefatos do board sem gravar fontes nativas', async () => {
     const created = await call('save_board_artifact', {
       kind: 'rule',
@@ -2207,6 +2272,7 @@ describe('biblioteca neutra pelo MCP', () => {
 import { StdioServerTransport } from ${JSON.stringify('file://' + sdk + '/server/stdio.js')};
 const server = new McpServer({ name: 'fixture', version: '1' });
 server.registerTool('ping', { inputSchema: {} }, async () => ({ content: [{ type: 'text', text: process.env.SAMPLE === 'segredo-local' ? 'pong' : 'erro' }] }));
+server.registerTool('echo', { inputSchema: {} }, async () => ({ content: [{ type: 'text', text: process.env.SAMPLE }] }));
 await server.connect(new StdioServerTransport());`,
     );
     router.handle({
@@ -2231,6 +2297,9 @@ await server.connect(new StdioServerTransport());`,
     const result = await call('call_board_mcp_tool', { server: 'memoria', name: 'ping', arguments: {}, card });
     expect(result.error).toBe(false);
     expect(result.text).toBe('pong');
+    const echo = await call('call_board_mcp_tool', { server: 'memoria', name: 'echo', arguments: {}, card });
+    expect(echo.error).toBe(false);
+    expect(echo.text).toBe('[credencial local]');
     expect(JSON.stringify(router.snapshot())).not.toContain('segredo-local');
     const mcp = router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'mcp')!;
     expect((await call('get_board_artifact', { id: mcp.id })).error).toBe(true);

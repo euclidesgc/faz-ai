@@ -1,6 +1,7 @@
+import { baseValue } from '../shared/harness';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { AI_TOOLS } from '../shared/harness';
+import { AI_BASES } from '../shared/harness';
 import { HARNESS_CATALOG, PLUGIN_ROOTS, claudeProjectKey, type HarnessSource } from '../shared/harnessCatalog';
 import { CLAUDE_PLUGIN_STATE } from './plugins';
 
@@ -19,7 +20,7 @@ export interface Disposable {
 /** Liga um watcher num caminho; `onEvent` é chamado a cada mudança nele. */
 export type WatchFn = (target: WatchTarget, onEvent: () => void) => Disposable;
 
-const ALL_SOURCES = AI_TOOLS.flatMap((t) => HARNESS_CATALOG[t.id]);
+const ALL_SOURCES = AI_BASES.flatMap((t) => baseValue(HARNESS_CATALOG, t.id) ?? []);
 
 /** O caminho de uma fonte do catálogo: as pastas são lidas com as subpastas, os arquivos sozinhos. */
 function sourceTarget(src: HarnessSource, base: string, projectDir: string): WatchTarget[] {
@@ -89,7 +90,7 @@ export function userWatchTargets(homeDir: string, projectDir: string): WatchTarg
 export function projectWatchTargets(projectDir: string): WatchTarget[] {
   if (!projectDir) return [];
   const own = ALL_SOURCES.filter((s) => s.scope === 'project').flatMap((s) => sourceTarget(s, projectDir, projectDir));
-  const disabled = AI_TOOLS.map((t) => ({ path: path.join(projectDir, `${t.skills}-disabled`), recursive: true }));
+  const disabled = AI_BASES.map((t) => ({ path: path.join(projectDir, `${t.skills}-disabled`), recursive: true }));
   const targets = unique([...own, ...disabled]);
   return unique([...targets, ...links(targets)]);
 }

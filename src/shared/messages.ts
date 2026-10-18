@@ -1,3 +1,7 @@
+import type { PolicyReply, PolicyScenario } from './policyManagement';
+import type { ExecutionPolicy } from './executionPolicies';
+import type { ContextDraftResolution } from './contextDraftResolution';
+import type { ContextActivityTarget, ContextPlanningWrite, ActivityContextWrite } from './contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from './agentAssistance';
 import type { LibraryArtifactInput } from './artifacts';
 import type { Appearance } from './appearance';
@@ -296,6 +300,13 @@ export type WebviewToHost =
   | { type: 'harness.library.pickDirectory' }
   | { type: 'harness.library.folders'; dir: string }
   | { type: 'harness.library.save'; input: LibraryArtifactInput }
+  | { type: 'executionPolicy.read'; requestId: string; id?: string; beforeRevision?: number }
+  | { type: 'executionPolicy.simulate'; requestId: string; scenario: PolicyScenario }
+  | { type: 'settings.executionPolicy.save'; policy: ExecutionPolicy; expectedRevision: number; reviewed: boolean }
+  | { type: 'settings.executionPolicy.remove'; id: string; expectedRevision: number }
+  | { type: 'contextPlanning.save'; input: ContextPlanningWrite }
+  | { type: 'contextPlanning.saveBatch'; inputs: ActivityContextWrite[] }
+  | { type: 'contextPlanning.preview'; requestId: string; target: ContextActivityTarget }
   | { type: 'harness.library.read'; id: string }
   | { type: 'harness.library.pickArtifacts' }
   | { type: 'harness.library.directory'; dir: string }
@@ -386,6 +397,9 @@ export type HostToWebview =
   | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
+  /** prévia dos contratos salvos, sem corpos de artefatos, inferência ou admissão */
+  | ({ type: 'executionPolicy.result'; requestId: string } & PolicyReply)
+  | { type: 'contextPlanning.preview.result'; requestId: string; preview?: ContextDraftResolution; error?: string }
   /** resposta a `card.usage.query`, correlacionada por `requestId` */
   | { type: 'card.usage.result'; requestId: string; usage?: CardUsage; error?: string }
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */

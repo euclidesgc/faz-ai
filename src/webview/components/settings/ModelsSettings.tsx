@@ -1,5 +1,6 @@
+import type { AiBase } from '../../../shared/aiProfiles';
 import { useState, type KeyboardEvent } from 'react';
-import { AI_TOOLS, type AiTool } from '../../../shared/harness';
+import { AI_BASES, type AiTool } from '../../../shared/harness';
 import { modelId, type ModelOption } from '../../../shared/models';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
@@ -20,7 +21,7 @@ const splitList = (s: string): string[] =>
     .filter(Boolean);
 
 /** De onde vem a lista de modelos de cada ferramenta ao clicar em "Detectar". */
-const SOURCES: Record<AiTool, string> = {
+const SOURCES: Record<AiBase, string> = {
   claude: 'lista embutida na extensão (o Claude Code não guarda a lista em arquivo)',
   cursor: 'lida do comando cursor-agent models, com a conta em uso; sem a CLI autenticada, lista embutida na extensão',
   kimi: 'lida do comando kimi provider list --json, com os provedores configurados; sem a CLI, lista embutida na extensão',
@@ -122,7 +123,7 @@ export function ModelsSettings() {
     setCatalog(sent.current().map((o) => (o.id === id ? { ...o, ...patch } : o)));
 
   // o projeto trabalha com uma ferramenta por vez: só os modelos dela aparecem
-  const tools = AI_TOOLS.filter((tl) => tl.id === aiTool);
+  const tools = AI_BASES.filter((tl) => tl.id === aiTool);
 
   return (
     <div>

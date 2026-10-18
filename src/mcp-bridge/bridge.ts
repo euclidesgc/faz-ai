@@ -32,6 +32,11 @@ function resolveFolder(): string {
 
 const folder = resolveFolder();
 const target = socketPath(folder);
+const runToken = process.env.FAZAI_RUN_TOKEN;
+if (runToken !== undefined && !/^[a-f0-9]{64}$/.test(runToken)) {
+  process.stderr.write('faz-ai: token de execução inválido.\n');
+  process.exit(1);
+}
 const OFFLINE = `O board do Faz AI não está acessível. Abra a pasta "${folder}" no editor com a extensão Faz AI ativa, ou rode "faz-ai" nessa pasta, e reconecte.`;
 
 function connect(attempt = 0): void {
@@ -50,6 +55,7 @@ function connect(attempt = 0): void {
     });
     socket.on('close', () => process.exit(0));
     process.stdin.on('end', () => socket.end());
+    if (runToken !== undefined) socket.write(JSON.stringify({ fazai: { run: runToken } }) + '\n');
     process.stdin.pipe(socket);
     socket.pipe(process.stdout);
   });

@@ -1,5 +1,7 @@
+import { authFailed } from './ai/profileAuth';
+import type { AiProfile } from '../shared/aiProfiles';
+import { toolInfo, activeProfile, catalogTool, resolveModelOption } from '../shared/aiProfiles';
 import { cardRef } from '../shared/model';
-import { aiToolInfo, type AiTool } from '../shared/harness';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { SHOW_COST } from '../shared/metrics';
 import { columnOf, isLive } from '../shared/selectors';
@@ -7,12 +9,13 @@ import { isAtYoloStop, isWithHuman, isYolo, lastAiColumn, storyOf, yoloStopOf } 
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
+import { runArtifactRequest } from './runArtifactSnapshot';
 import { effortToRun } from '../shared/execution';
-import { modelDisplay, modelValue, parseModelValue, suggestModelRule } from '../shared/models';
+import { modelDisplay, modelValue, suggestModelRule } from '../shared/models';
 import { effortTiers } from './models';
 import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
-import { AiGateway, type AiExecution, type AiRunEnd } from './ai/gateway';
+import { AiGateway, type AiCall, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
 import { catalogLines, contextLines, refineCatalog, type RefineCatalog } from './promptContext';
@@ -21,6 +24,9 @@ import type { AiActivity, BoardState, Card } from '../shared/model';
 
 /** Processo da ferramenta de IA em execução. */
 export interface RunningProcess {
+  readonly identity?: import('./processIdentity').ProcessIdentity;
+  /** Prova do transporte de que a árvore encerrou; ausência não autoriza liberar recursos emprestados. */
+  terminationConfirmed?(): boolean;
   /** chamado uma vez, com o código de saída ou o erro que impediu a execução */
   onExit(listener: (code: number | null, error?: Error) => void): void;
   kill(): void;
@@ -55,6 +61,15 @@ export interface RunnerDeps {
   /** caminho do node que roda o bridge; sem ele, `node`, resolvido pelo PATH de quem inicia o servidor */
   nodePath?: string;
 }
+export interface RunOptions {
+  origin: AiRunOrigin;
+  mode?: AiRunMode;
+  workId?: string;
+  token?: string;
+  advice?: string[];
+  beforeStart?: AiCall['beforeStart'];
+  onExit?(end: AiRunEnd): void;
+}
 
 /** Par modelo/esforço no nome que a ferramenta entende (`ExecManifest.model`), não o id do catálogo. */
 interface ToolModel {
@@ -63,6 +78,7 @@ interface ToolModel {
 }
 
 interface Run {
+  profile: AiProfile;
   exec: AiExecution;
   /** status que o card tinha antes de a execução começar */
   previous: CardStatus | null;
@@ -90,12 +106,6 @@ const RUNNER_AUTHOR = 'Faz AI';
  * um bloqueio do card. Risco já documentado na Spec: a lista pode ficar desatualizada se a CLI mudar o
  * texto de erro; qualquer saída que não bata nenhum padrão segue o caminho atual (RF7).
  */
-const AUTH_FAILURE_PATTERNS: Record<AiTool, RegExp[]> = {
-  claude: [/oauth session expired/i, /failed to authenticate/i, /not logged in/i, /invalid api key/i],
-  cursor: [/not authenticated/i, /please (log|sign) in/i],
-  // calibrável: a CLI 2.1.1 não documenta os textos de erro de autenticação; amplie com saídas reais
-  kimi: [/\b401\b/i, /unauthorized/i, /not logged in/i, /login required/i, /invalid api key/i],
-};
 
 const TAIL_LINES = 12;
 /** Tamanho de cada linha do `tail`: a explicação da falha no card não vira despejo de saída. */
@@ -252,9 +262,10 @@ export const conflictPrompt = (ref: string, context: PromptContext = NO_CONTEXT,
  * quando o valor está vazio ou o modelo não está (mais) no catálogo da ferramenta ativa.
  */
 function resolvedModel(state: BoardState, value: string | null | undefined): { name: string; effort: string | null } | null {
-  const chosen = parseModelValue(value ?? undefined);
-  const option = chosen ? state.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === state.board.aiTool) : undefined;
-  return option ? { name: option.model, effort: effortToRun(option, chosen!.effort) } : null;
+  const resolved = resolveModelOption(state.board, value ?? undefined);
+  return resolved
+    ? { name: resolved.name, effort: resolved.option ? effortToRun(resolved.option, resolved.effort) : resolved.effort }
+    : null;
 }
 
 /**
@@ -263,7 +274,7 @@ function resolvedModel(state: BoardState, value: string | null | undefined): { n
  * independente do Esforço do card.
  */
 function highTierModel(state: BoardState): { name: string; effort: string | null } | null {
-  const tier = effortTiers(state.board.aiTool, state.board.modelCatalog).find(([level]) => level === 'Alto');
+  const tier = effortTiers(catalogTool(activeProfile(state.board)), state.board.modelCatalog).find(([level]) => level === 'Alto');
   return tier ? resolvedModel(state, tier[1]) : null;
 }
 
@@ -273,7 +284,7 @@ function highTierModel(state: BoardState): { name: string; effort: string | null
  */
 function toolModelDisplay(state: BoardState, pair: ToolModel | null): string {
   if (!pair) return '';
-  const option = state.board.modelCatalog.find((o) => o.tool === state.board.aiTool && o.model === pair.model);
+  const option = state.board.modelCatalog.find((o) => o.tool === catalogTool(activeProfile(state.board)) && o.model === pair.model);
   return option ? modelDisplay(state.board.modelCatalog, modelValue(option.id, pair.effort)) : pair.model;
 }
 
@@ -333,7 +344,16 @@ export class AiRunner {
    * modelo/esforço que o plano decidiria e nunca recebe `fallbackPending` (uma tentativa só). Quem
    * chama de fora (painel, MCP) nunca informa este parâmetro.
    */
-  start(cardId: string, origin: AiRunOrigin = 'manual', mode: AiRunMode = 'phase', forceModel?: ToolModel): void {
+  start(cardId: string, originOrOptions: AiRunOrigin | RunOptions = 'manual', mode: AiRunMode = 'phase', forceModel?: ToolModel): void {
+    const options: RunOptions = typeof originOrOptions === 'string' ? { origin: originOrOptions, mode } : originOrOptions;
+    const origin = options.origin;
+    mode = options.mode ?? mode;
+    if ((options.token === undefined) !== (options.workId === undefined))
+      throw new Error('A unidade exige token e identidade de trabalho juntos.');
+    if (options.token !== undefined) {
+      const { work } = this.router.executions.assert(options.token);
+      if (work.id !== options.workId || work.cardId !== cardId) throw new Error('A unidade não pertence ao card desta execução.');
+    }
     const state = this.router.snapshot();
     const card = state.cards.find((c) => c.id === cardId);
     if (!card || !isLive(card)) throw new Error('Card não encontrado.');
@@ -343,8 +363,8 @@ export class AiRunner {
     // bloqueia, para o login que o probe não soube confirmar poder se recuperar com uma execução
     // manual que dá certo (RF9, limpa em settle()) — sem essa válvula, authExpired nunca mais sairia de `true`
     if (state.requirements.some((r) => r.id === 'signin'))
-      throw new Error(`O login do ${aiToolInfo(state.board.aiTool).label} venceu: veja o aviso no topo do board.`);
-    const tool = aiToolInfo(state.board.aiTool);
+      throw new Error(`O login do ${toolInfo(activeProfile(state.board)).label} venceu: veja o aviso no topo do board.`);
+    const tool = toolInfo(activeProfile(state.board));
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
     const refine = mode === 'refine';
     const summarize = mode === 'summarize';
@@ -367,6 +387,7 @@ export class AiRunner {
       exec = this.deps.gateway.run({
         origin,
         tool: state.board.aiTool,
+        profile: activeProfile(state.board),
         // o contexto gravado é o do momento da chamada, congelado: a IA move o card durante o trabalho,
         // e o painel precisa saber de que coluna a execução partiu
         context: {
@@ -380,6 +401,7 @@ export class AiRunner {
         },
         cwd: this.deps.cwd,
         timeoutMinutes: state.board.runner.timeoutMinutes,
+        beforeStart: options.beforeStart,
         prepare: () => {
           const plan = executionPlan(
             state,
@@ -421,6 +443,8 @@ export class AiRunner {
             }
           }
           return {
+            ...(options.token !== undefined ? { work: { id: options.workId!, token: options.token } } : {}),
+            artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state, card) : undefined,
             // a configuração completa só existe depois do plano; é a mesma que o resumo manda para o canal de log
             config: {
               model: activityModel,
@@ -446,7 +470,12 @@ export class AiRunner {
                     : cardPrompt(
                         cardRef(card),
                         contextLines(state, card),
-                        [...(stopAdvice ? [stopAdvice] : []), ...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
+                        [
+                          ...(stopAdvice ? [stopAdvice] : []),
+                          ...plan.advice,
+                          ...(permissionAdvice ? [permissionAdvice] : []),
+                          ...(options.advice ?? []),
+                        ],
                         autonomous,
                         needsTriage(state, card),
                       ),
@@ -487,6 +516,7 @@ export class AiRunner {
       startedAt: exec.startedAt,
     };
     const run: Run = {
+      profile: structuredClone(activeProfile(state.board)),
       exec,
       previous: card.status,
       mode,
@@ -527,19 +557,25 @@ export class AiRunner {
       try {
         // o card continua "em execução" para o log enquanto o desfecho é aplicado: o bloqueio e a
         // mudança de status que explicam o fim da execução ficam ligados a ela
-        retry = this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
+        if (options.workId === undefined) retry = this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
+        else {
+          const expired = end.authExpired || authFailed(run.profile, run.tail);
+          if (expired) this.router.setAuthExpired(state.board.aiTool);
+          else if (!end.stopped && !end.error && end.code === 0 && this.router.snapshot().authExpired === state.board.aiTool)
+            this.router.setAuthExpired(null);
+        }
       } finally {
         // a limpeza precisa acontecer antes da retentativa: start() recusa começar com o card ainda em `this.runs`
         this.runs.delete(cardId);
       }
       // a sessão da história é quem marca as sub-tarefas "Em execução" (start_work); com ela encerrada, nenhuma
       // continua em execução de verdade. Sem isto a sub-tarefa ficava presa e segurava a história para sempre
-      if (!retry) this.releaseSubtasks(cardId, tool.label);
+      if (!retry && options.workId === undefined) this.releaseSubtasks(cardId, tool.label);
       if (retry) {
         // o modelo principal esgotou o limite e há reserva: uma nova execução assume, sem publicar nem
         // avisar o fim desta (quem decide o desfecho final é a execução da reserva)
         try {
-          this.start(cardId, origin, mode, retry);
+          this.start(cardId, { ...options, mode }, mode, retry);
           return;
         } catch (e) {
           // a retentativa nem começou (card arquivado, gateway recusou): o card não pode ficar "em
@@ -548,6 +584,7 @@ export class AiRunner {
         }
       }
       this.publish();
+      options.onExit?.(end);
       this.finishListeners.forEach((fn) => fn(cardId, run.mode));
     });
   }
@@ -588,12 +625,12 @@ export class AiRunner {
         { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
         { author: RUNNER_AUTHOR },
       );
-    const toolId = this.router.snapshot().board.aiTool;
-    const authFailed = AUTH_FAILURE_PATTERNS[toolId]?.some((re) => run.tail.some((l) => re.test(l))) ?? false;
+    const toolId = run.profile.id;
+    const expired = end.authExpired || authFailed(run.profile, run.tail);
     // falha de autenticação vale para o board inteiro, não só para este card: não bloqueia, e o aviso
     // global (RF3) é quem explica à pessoa o que fazer. Entra antes do caminho de "refinar" porque RF6
     // vale para os dois modos, e antes do `failure` genérico, que continua tratando qualquer outra falha
-    if (authFailed) {
+    if (expired) {
       if (this.router.setAuthExpired(toolId)) this.deps.log(`Login do ${toolLabel} vencido: execuções suspensas.`);
       this.router.handle(
         {

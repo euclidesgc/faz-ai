@@ -1,7 +1,7 @@
 import { Checkbox, Select, TextField as RxTextField } from '@radix-ui/themes';
 import { modelDisplay } from '../modelText';
 import type { FieldDef, FieldValue } from '../../shared/model';
-import { AI_TOOLS } from '../../shared/harness';
+import { AI_BASES } from '../../shared/harness';
 import { effortLabel, modelValue, parseModelValue } from '../../shared/models';
 import { useBoardStore } from '../store/boardStore';
 import { ChipsEditor, IconExternal, OptionLabel, optionChip, SelectField, TextField } from './ui';
@@ -137,7 +137,7 @@ export function ModelEditor({
       <Select.Content position="popper">
         <Select.Item value={NO_MODEL}>—</Select.Item>
         {current && !option && <Select.Item value={current.id}>{t('{id} (fora do catálogo)', { id: current.id })}</Select.Item>}
-        {AI_TOOLS.filter((tl) => catalog.some((o) => o.tool === tl.id)).map((tl) => (
+        {AI_BASES.filter((tl) => catalog.some((o) => o.tool === tl.id)).map((tl) => (
           <Select.Group key={tl.id}>
             <Select.Label>{tl.label}</Select.Label>
             {catalog

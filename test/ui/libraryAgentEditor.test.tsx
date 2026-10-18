@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { renderThemed, seedBoard, lastSent, sentOf, confirmLast } from './setup';
@@ -175,4 +175,17 @@ it('uma mudança após a revisão exige nova análise e falhas da IA não apagam
   expect(sentOf('harness.library.save')).toHaveLength(0);
   await userEvent.click(screen.getByRole('tab', { name: 'Instruções' }));
   expect(screen.getByRole('textbox', { name: 'Conteúdo' })).toHaveValue('Revise autenticação.');
+});
+
+it('a prévia acompanha o rascunho sem salvar nem chamar assistência de IA', async () => {
+  renderThemed(<LibraryAgentEditor onClose={() => {}} />);
+  await fill();
+  await userEvent.click(screen.getByText('Contexto da execução'));
+  const preview = screen.getByText('Contexto da execução').closest('details')!;
+  expect(within(preview).getByText('revisor')).toBeVisible();
+  const before = preview.textContent;
+  await userEvent.type(screen.getByRole('textbox', { name: 'Conteúdo' }), ' Acrescente evidências detalhadas dos testes executados.');
+  expect(preview.textContent).not.toBe(before);
+  expect(sentOf('harness.agent.assist')).toHaveLength(0);
+  expect(sentOf('harness.library.save')).toHaveLength(0);
 });

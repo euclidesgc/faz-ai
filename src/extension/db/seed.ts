@@ -1,3 +1,4 @@
+import { BUILTIN_PROFILES } from '../../shared/aiProfiles';
 import type { Database } from 'sql.js';
 import type { WorkflowKind } from '../../shared/model';
 import { BOARD_TEMPLATE, BOARD_TEMPLATE_VERSION, STORY_PHASES, insertColumn } from './boardTemplate';
@@ -17,6 +18,8 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
       name,
       BOARD_TEMPLATE_VERSION,
     ]);
+
+    insertBuiltinProfiles(db, boardId);
 
     const parentWf = newId();
     const childWf = newId();
@@ -85,4 +88,13 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
     throw e;
   }
   return boardId;
+}
+
+/** A criação de um board novo usa as mesmas identidades da migração. */
+export function insertBuiltinProfiles(db: Database, boardId: string): void {
+  for (const p of BUILTIN_PROFILES)
+    db.run(
+      "INSERT OR IGNORE INTO ai_profiles(board_id,id,name,enabled,kind,base,position,review_state) VALUES (?,?,?,?,?,?,?,'reviewed')",
+      [boardId, p.id, p.name, 1, p.kind, p.base, p.position],
+    );
 }

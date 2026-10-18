@@ -1,10 +1,12 @@
+import { isAiBase, EMPTY_HARNESS } from '../shared/harness';
+import type { AiBase } from '../shared/aiProfiles';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
-  ALL_AI_TOOLS,
+  ALL_AI_BASES,
   RULE_FILES,
   SKILL_NAME_PATTERN,
-  aiToolInfo,
+  baseInfo,
   type Agent,
   type AgentSpec,
   type AiTool,
@@ -60,7 +62,7 @@ export class HarnessStore {
   claudePlugins: PluginInstall[] | null = null;
 
   /** As pastas importadas de cada ferramenta (caminhos absolutos), varridas junto com o resto. */
-  imports: Partial<Record<AiTool, string[]>> = {};
+  imports: Partial<Record<AiBase, string[]>> = {};
 
   setTool(tool: AiTool): void {
     this.tool = tool;
@@ -68,11 +70,13 @@ export class HarnessStore {
 
   /** Pasta de skills da ferramenta em uso, e a pasta ao lado onde ficam as desligadas. */
   private get dirs() {
-    const enabled = aiToolInfo(this.tool).skills;
+    const enabled = baseInfo(this.tool).skills;
+    if (!enabled) throw new Error('Este perfil não tem pasta nativa de skills.');
     return { enabled, disabled: `${enabled}-disabled` };
   }
 
   scan(): Harness {
+    if (!isAiBase(this.tool)) return structuredClone(EMPTY_HARNESS);
     const rules: RuleFile[] = RULE_FILES.map(({ name }) => {
       const file = path.join(this.workspaceDir, name);
       const exists = fs.existsSync(file) && fs.statSync(file).isFile();
@@ -87,7 +91,7 @@ export class HarnessStore {
   /** O que cada ferramenta carrega, no projeto, na pasta do usuário e em plugins. */
   private inventory(): ToolInventory[] {
     const installed = detectTools(this.homeDir);
-    return ALL_AI_TOOLS.map((tool) => ({
+    return ALL_AI_BASES.map((tool) => ({
       tool,
       installed: installed.includes(tool),
       items: scanInventory(
@@ -103,15 +107,15 @@ export class HarnessStore {
 
   /** Onde a ferramenta em uso guarda os agentes; lança erro se ela não tem agentes em arquivo. */
   private get agentSpec(): AgentSpec {
-    const info = aiToolInfo(this.tool);
-    if (!info.agents) throw new Error(`O ${info.label} não tem agentes definidos em arquivos.`);
+    const info = baseInfo(this.tool);
+    if (!info.agents.dir) throw new Error(`O ${info.label} não tem agentes definidos em arquivos.`);
     return info.agents;
   }
 
   /** Pasta de agentes de um escopo (base absoluta e caminho relativo), ou null quando a ferramenta ou a máquina não a tem. */
   private agentDir(scope: InstallScope): { base: string; rel: string } | null {
-    const spec = aiToolInfo(this.tool).agents;
-    if (!spec) return null;
+    const spec = baseInfo(this.tool).agents;
+    if (!spec.dir) return null;
     if (scope === 'project') return { base: this.workspaceDir, rel: spec.dir };
     const target = copyTarget(this.tool, 'agent', 'files', 'user');
     return this.homeDir && target ? { base: this.homeDir, rel: target.path } : null;
@@ -119,8 +123,8 @@ export class HarnessStore {
 
   /** Os agentes da ferramenta em uso, do projeto e da pasta do usuário, lidos do disco. */
   agents(): Agent[] {
-    const spec = aiToolInfo(this.tool).agents;
-    if (!spec) return [];
+    const spec = baseInfo(this.tool).agents;
+    if (!spec.dir) return [];
     const scopes: InstallScope[] = ['project', 'user'];
     return scopes
       .flatMap((scope) => {
@@ -152,7 +156,7 @@ export class HarnessStore {
     const dir = this.agentDir(scope);
     if (!dir)
       throw new Error(
-        scope === 'user' ? 'Sem pasta de usuário para guardar o agente.' : `O ${aiToolInfo(this.tool).label} não tem agentes em arquivos.`,
+        scope === 'user' ? 'Sem pasta de usuário para guardar o agente.' : `O ${baseInfo(this.tool).label} não tem agentes em arquivos.`,
       );
     return path.join(dir.base, dir.rel, `${name}${this.agentSpec.ext}`);
   }

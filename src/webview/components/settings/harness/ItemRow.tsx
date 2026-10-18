@@ -1,3 +1,4 @@
+import { baseValue } from '../../../../shared/harness';
 import type { ReactNode } from 'react';
 import { SKILL_MODES, type AiTool, type HarnessItem, type SkillMode } from '../../../../shared/harness';
 import { HARNESS_CATALOG } from '../../../../shared/harnessCatalog';
@@ -48,7 +49,7 @@ export function ItemRow({
   onToggleFiles,
 }: Props) {
   const { copyable, twin, copy, setMode, deletable, remove, entryRemovable } = actions;
-  const src = i.source === undefined ? undefined : HARNESS_CATALOG[tool][i.source];
+  const src = i.source === undefined ? undefined : (baseValue(HARNESS_CATALOG, tool) ?? [])[i.source];
   const inProject = i.scope !== 'project' ? twin(i, 'project') : undefined;
   // o modo nativo da skill (automática ou só quando indicada) não vale no board, e numa pasta importada ele é de quem a mantém
   const editable = i.scope !== 'plugin' && i.scope !== 'imported' && i.layout !== 'entry';

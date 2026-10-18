@@ -1,9 +1,11 @@
-import { aiToolInfo } from '../../../shared/harness';
+import { ExecutionPoliciesSettings } from './policies/ExecutionPoliciesSettings';
+import { baseInfo } from '../../../shared/harness';
 import { Button, Tabs } from '@radix-ui/themes';
 import { resolveHarnessTab } from '../../../shared/harnessTopics';
 import { useBoardStore, type HarnessTab } from '../../store/boardStore';
 import { ProjectTool } from './harness/ProjectTool';
 import { RunnerSettings } from './harness/RunnerSettings';
+import { ContextPlanDefaults } from '../card/ExecutionPlanPanel';
 import { HarnessIntro } from './harness/HarnessIntro';
 import { BoardLibrary } from './harness/BoardLibrary';
 import { PageHeader } from './PageHeader';
@@ -18,7 +20,7 @@ export function HarnessSettings() {
   const projectTool = useBoardStore((s) => s.state!.board.aiTool);
   const introSeen = useBoardStore((s) => s.harnessIntroSeen);
   const setIntroSeen = useBoardStore((s) => s.setHarnessIntroSeen);
-  const tool = aiToolInfo(projectTool);
+  const tool = baseInfo(projectTool);
   // Links antigos de ferramenta ou origem passam a abrir a biblioteca.
   const resolved = resolveHarnessTab(
     useBoardStore((s) => s.harnessTab),
@@ -51,7 +53,9 @@ export function HarnessSettings() {
         </Tabs.Content>
         <Tabs.Content value="tool">
           <ProjectTool tool={tool} />
+          <ExecutionPoliciesSettings />
           <RunnerSettings tool={tool} />
+          <ContextPlanDefaults />
         </Tabs.Content>
       </Tabs.Root>
     </div>

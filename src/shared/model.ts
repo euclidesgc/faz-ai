@@ -1,3 +1,5 @@
+import type { AiProfile } from './aiProfiles';
+import type { ContextPlanningState } from './contextPlanning';
 import type { OrphanReport } from './orphans';
 import type { BoardRequirement } from './requirements';
 import type { EnvironmentReport } from './environment';
@@ -30,6 +32,8 @@ export interface Board {
   rules: BoardRules;
   /** ferramenta de IA com que o projeto trabalha; define regras, pasta de skills, MCP e modelos */
   aiTool: AiTool;
+  /** Configuração pública dos perfis; valores executáveis permanecem no cofre do host. */
+  aiProfiles: AiProfile[];
   /** modelos de LLM disponíveis, por ferramenta */
   modelCatalog: ModelOption[];
   /** sugestão de modelo conforme os campos do card */
@@ -243,6 +247,10 @@ export interface Autopilot {
 
 /** Snapshot completo enviado ao webview após cada mutação. */
 export interface BoardState {
+  /** Invalida cenários quando as políticas salvas mudam em outra janela. */
+  executionPolicyRevision?: string;
+  /** Rascunhos versionados, separados do manifesto legado ainda em execução. */
+  contextPlanning?: ContextPlanningState;
   board: Board;
   workflows: Workflow[];
   columns: Column[];

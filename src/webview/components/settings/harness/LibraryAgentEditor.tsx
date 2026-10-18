@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Badge, Button, Checkbox, Dialog, Tabs, TextField } from '@radix-ui/themes';
-import type { AgentMeta, LibraryArtifactInput, ToolCategory } from '../../../../shared/artifacts';
+import { profileOfArtifact, type AgentMeta, type LibraryArtifactInput, type ToolCategory } from '../../../../shared/artifacts';
 import type { AgentAssistInput, AgentAssistResult, AgentAssistStep } from '../../../../shared/agentAssistance';
+import { agentContextOf } from '../../../../shared/executionContext';
+import { ExecutionContext } from '../../card/ExecutionContext';
 import { chat, harness, settings } from '../../../commands';
 import { requestAgentAssistance } from '../../../request';
 import { useAction } from '../../../useAction';
@@ -12,6 +14,7 @@ import { MarkdownEditor } from '../../MarkdownEditor';
 import { ModelEditor } from '../../FieldRenderer';
 import { LIBRARY_GUIDE } from './libraryGuide';
 import { modelDisplay } from '../../../../shared/models';
+import { AgentContractEditor } from './AgentContractEditor';
 
 const TABS = {
   instructions: 'Instruções',
@@ -64,6 +67,7 @@ export function LibraryAgentEditor({
   const state = useBoardStore((s) => s.state)!;
   const [returnFocus] = useState(() => document.activeElement);
   const [tab, setTab] = useState<Tab>('instructions');
+  const [editingContract, setEditingContract] = useState(false);
   const [section, setSection] = useState<AgentAssistStep>(guided ? 'responsibility' : 'content');
   const [name, setName] = useState(initial?.name ?? '');
   const [body, setBody] = useState(initial?.body ?? '');
@@ -83,6 +87,12 @@ export function LibraryAgentEditor({
       .join('\n\n');
   const assembledBody = buildBody();
   const effectiveBody = (!body.trim() || body === lastBuilt) && assembledBody ? assembledBody : body;
+  const description =
+    initial?.description ||
+    (answers.responsibility || effectiveBody.split('\n').find((line) => line.trim() && !line.startsWith('#')) || name)
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 240);
   const draft: AgentAssistInput = {
     name,
     body: effectiveBody,
@@ -116,12 +126,7 @@ export function LibraryAgentEditor({
       id: initial?.id,
       kind: 'agent',
       name,
-      description:
-        initial?.description ||
-        (answers.responsibility || effectiveBody.split('\n').find((line) => line.trim() && !line.startsWith('#')) || name)
-          .replace(/\s+/g, ' ')
-          .trim()
-          .slice(0, 240),
+      description,
       body: effectiveBody,
       agent,
     });
@@ -167,6 +172,8 @@ export function LibraryAgentEditor({
   const selectedField = tab === 'mcp' ? 'mcpServers' : 'skills';
   const blocked = assist.busy || save.busy;
 
+  if (editingContract && initial?.id) return <AgentContractEditor artifactId={initial.id} onClose={() => setEditingContract(false)} />;
+
   return (
     <Dialog.Root open onOpenChange={(open) => !open && !blocked && onClose()}>
       <Dialog.Content
@@ -200,6 +207,28 @@ export function LibraryAgentEditor({
               />
             )}
           </FormField>
+          <ExecutionContext
+            agent
+            preview={agentContextOf(
+              state,
+              profileOfArtifact(
+                {
+                  name,
+                  description,
+                  body: effectiveBody,
+                  agent,
+                  path: '',
+                  origin: '',
+                },
+                false,
+              ),
+            )}
+          />
+          {initial?.id && (
+            <Button variant="soft" disabled={blocked} onClick={() => setEditingContract(true)}>
+              {t('Editar contrato de contexto (rascunho)')}
+            </Button>
+          )}
           <Tabs.Root value={tab} onValueChange={(value) => changeTab(value as Tab)}>
             <Tabs.List aria-label={t('Definição do subagente')}>
               {Object.entries(TABS).map(([id, label]) => (

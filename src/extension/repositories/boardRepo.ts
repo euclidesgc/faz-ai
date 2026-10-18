@@ -1,3 +1,7 @@
+import { AiProfileRepo } from './aiProfileRepo';
+import { createHash } from 'node:crypto';
+import { ContextPlanningRepo } from './contextPlanningRepo';
+import { legacyContextPlanning } from '../../shared/contextPlanning';
 import { ArtifactRepo } from './artifactRepo';
 import { selectionOf } from '../../shared/artifacts';
 import { EMPTY_CHAT } from '../../shared/chat';
@@ -30,7 +34,7 @@ import type { HarnessSelection, HarnessUsage, SelectableKind } from '../../share
 import { BRANCH_KINDS, parseGit, type BranchKind, type GitConfig } from '../../shared/git';
 import { parseAppearance, type Appearance } from '../../shared/appearance';
 import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
-import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTool, type AiTool, type HarnessImport } from '../../shared/harness';
+import { EMPTY_HARNESS, parseAiTool, type AiTool, type HarnessImport } from '../../shared/harness';
 import { RENAME_PENDING_KEY, RENAME_RESULT_KEY, parsePending, parseResult } from '../../shared/branchRename';
 
 /** Valor gravado fora de BRANCH_KINDS (banco editado à mão) cai em feature, o padrão da coluna. */
@@ -66,12 +70,17 @@ export class BoardRepo {
       // a série do log começa quando o board nasce: nada é inventado para trás (RF-24)
       run(this.db, 'UPDATE boards SET log_since = ? WHERE id = ?', [Date.now(), str(row.id)]);
     }
+    const aiProfiles = new AiProfileRepo(this.db).list(str(row.id));
     return {
       id: str(row.id),
       workspaceKey: str(row.workspace_key),
       name: str(row.name),
       rules: parseRules(str(row.rules_json)),
-      aiTool: parseAiTool(str(row.ai_tools_json)),
+      aiTool: parseAiTool(
+        str(row.ai_tools_json),
+        aiProfiles.filter((p) => p.enabled && p.credentials?.review !== 'pending').map((p) => p.id),
+      ),
+      aiProfiles,
       modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)),
       modelRules: parseModelRules(str(row.model_rules_json)),
       appearance: parseAppearance(str(row.appearance_json)),
@@ -158,7 +167,10 @@ export class BoardRepo {
         boardId,
       ]);
     }
-    if (patch.aiTool !== undefined && ALL_AI_TOOLS.includes(patch.aiTool))
+    if (
+      patch.aiTool !== undefined &&
+      new AiProfileRepo(this.db).list(boardId).some((p) => p.id === patch.aiTool && p.enabled && p.credentials?.review !== 'pending')
+    )
       run(this.db, 'UPDATE boards SET ai_tools_json = ? WHERE id = ?', [JSON.stringify(patch.aiTool), boardId]);
   }
 
@@ -301,14 +313,27 @@ export class BoardRepo {
 
   snapshot(boardId: string, currentUser = ''): BoardState {
     const db = this.db;
-    const b = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
+    // Cabeçalhos na consulta já existente: invalida cenários sem mais consultas nem definições no estado.
+    const b = one(
+      db,
+      `SELECT b.*, (
+      SELECT group_concat(hex(id) || ':' || revision || ':' || review_state || ':' || coalesce(deleted_at, ''), '|')
+      FROM (SELECT id, revision, review_state, deleted_at FROM execution_policies WHERE board_id = ? ORDER BY id)
+    ) AS policy_revision FROM boards b WHERE b.id = ?`,
+      [boardId, boardId],
+    );
     if (!b) throw new Error('Board não encontrado');
+    const aiProfiles = new AiProfileRepo(db).list(boardId);
     const board: Board = {
       id: str(b.id),
       workspaceKey: str(b.workspace_key),
       name: str(b.name),
       rules: parseRules(str(b.rules_json)),
-      aiTool: parseAiTool(str(b.ai_tools_json)),
+      aiTool: parseAiTool(
+        str(b.ai_tools_json),
+        aiProfiles.filter((p) => p.enabled && p.credentials?.review !== 'pending').map((p) => p.id),
+      ),
+      aiProfiles,
       modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)),
       modelRules: parseModelRules(str(b.model_rules_json)),
       appearance: parseAppearance(str(b.appearance_json)),
@@ -454,6 +479,12 @@ export class BoardRepo {
     }));
 
     return {
+      executionPolicyRevision: createHash('sha256').update(str(b.policy_revision)).digest('hex'),
+      contextPlanning: {
+        runtime: 'legacy',
+        legacy: legacyContextPlanning({ cards, fieldDefs, fieldValues }, new ArtifactRepo(db).list(boardId)),
+        ...new ContextPlanningRepo(db).read(boardId),
+      },
       board,
       workflows,
       columns,

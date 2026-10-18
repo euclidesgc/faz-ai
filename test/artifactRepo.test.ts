@@ -99,20 +99,23 @@ describe('ArtifactRepo', () => {
     expect(by('rule').body).toBe('');
     expect(by('agent').body).toBe('instruções');
     expect(by('agent').agent?.tools.native.tool).toBe('claude');
-    expect(by('mcp').mcpSummary).toBe('npx');
+    expect(by('mcp').mcpSummary).toBe('MCP stdio');
     expect(JSON.stringify(list)).not.toContain('segredo');
     expect(JSON.stringify(list)).not.toContain('meta');
   });
 
-  it('o resumo do MCP é o comando, ou a url sem a query', () => {
+  it('o resumo do MCP não expõe comando nem partes da URL', () => {
     repo.upsert(boardId, mcp('web', { url: 'https://x.test/mcp?key=abc' }));
-    expect(repo.get(boardId, 'mcp', 'web')!.mcpSummary).toBe('https://x.test/mcp');
+    expect(repo.get(boardId, 'mcp', 'web')!.mcpSummary).toBe('MCP HTTP');
   });
 
   it('mcpDefinitions traz as definições com segredos, só dos não ausentes', () => {
     repo.upsert(boardId, mcp('gh', { command: 'npx', env: { TOKEN: 'segredo' } }));
     repo.upsert(boardId, mcp('web', { url: 'https://x.test', headers: { Authorization: 'Bearer z' } }));
     repo.upsert(boardId, mcp('gone', { command: 'x' }, { missing: true }));
+    expect(repo.mcpDefinitions(boardId)).toEqual({});
+    repo.upsert(boardId, mcp('gh', { command: 'npx', env: { TOKEN: 'segredo' } }), undefined, true);
+    repo.upsert(boardId, mcp('web', { url: 'https://x.test', headers: { Authorization: 'Bearer z' } }), undefined, true);
     expect(repo.mcpDefinitions(boardId)).toEqual({
       gh: { command: 'npx', env: { TOKEN: 'segredo' } },
       web: { url: 'https://x.test', headers: { Authorization: 'Bearer z' } },

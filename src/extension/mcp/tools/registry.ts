@@ -12,6 +12,7 @@ export interface ToolContext {
   workspaceDir: string;
   /** nome que assina os comentários feitos por esta sessão */
   author: () => string;
+  sessionToken?: () => string | undefined;
 }
 
 /** Resultado de uma ferramenta externa: preserva blocos de conteúdo e o isError do protocolo. */
@@ -35,12 +36,32 @@ export function toolRegistrar(server: McpServer, ctx: ToolContext): DefineTool {
     // ferramenta seguir com o padrão (um `parent` escrito errado criaria uma história, não a sub-tarefa)
     const inputSchema = z.object(shape).strict();
     server.registerTool(name, { description, inputSchema, annotations: { readOnlyHint: readOnly } }, (async (args: unknown) => {
+      let redact = (text: string) => text;
       try {
-        const result = await run(args as Parameters<typeof run>[0], await ctx.getRouter());
-        if (result instanceof ForwardedToolResult) return result.result;
-        return { content: [{ type: 'text' as const, text: typeof result === 'string' ? result : JSON.stringify(result, null, 1) }] };
+        const router = await ctx.getRouter();
+        redact = (text) => router.executions.redact(router.redactCredentials(text));
+        const token = ctx.sessionToken?.();
+        if (token !== undefined) router.executions.assert(token);
+        const cleanArgs = router.executions.sanitize(args);
+        const operation = router.executions.tool(router, token, name, cleanArgs, readOnly, router.executions.redact(ctx.author()));
+        const result = await run(cleanArgs as Parameters<typeof run>[0], operation.router);
+        operation.assert();
+        if (result instanceof ForwardedToolResult)
+          return JSON.parse(
+            JSON.stringify(router.executions.sanitize(result.result), (_key, value: unknown) =>
+              typeof value === 'string' ? redact(value) : value,
+            ),
+          ) as typeof result.result;
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: router.executions.redact(typeof result === 'string' ? result : JSON.stringify(result, null, 1)),
+            },
+          ],
+        };
       } catch (e) {
-        return { isError: true, content: [{ type: 'text' as const, text: e instanceof Error ? e.message : String(e) }] };
+        return { isError: true, content: [{ type: 'text' as const, text: redact(e instanceof Error ? e.message : String(e)) }] };
       }
     }) as never);
   };

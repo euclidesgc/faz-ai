@@ -1,0 +1,57 @@
+import { expect, it } from 'vitest';
+import path from 'node:path';
+import { openInMemory, newDatabase } from '../src/extension/db/database';
+import { migrate } from '../src/extension/db/schema';
+import { seedBoard } from '../src/extension/db/seed';
+import { all, run } from '../src/extension/db/query';
+
+it('origem test preserva execuções/inventário/Bash e mantém cascatas após a migração 42 → 43', async () => {
+  (await openInMemory(path.resolve('node_modules/sql.js/dist'))).close();
+  const db = newDatabase();
+  try {
+    migrate(db, 42);
+    const board = seedBoard(db, 'migration-profile', 'Perfis');
+    run(
+      db,
+      "INSERT INTO ai_runs(id,board_id,started_at,month,origin,tool,permission,admission_json) VALUES ('run',?,1,'2026-10','manual','claude','board','{}')",
+      [board],
+    );
+    run(db, "INSERT INTO ai_run_usage(run_id,kind,name,calls) VALUES ('run','tool','Read',2)");
+    run(db, "INSERT INTO ai_run_bash(run_id,command,calls) VALUES ('run','echo oi',1)");
+    const before = all(db, 'SELECT * FROM ai_runs');
+    migrate(db);
+    expect(all(db, 'SELECT * FROM ai_runs')).toEqual(before);
+    expect(all(db, 'SELECT * FROM ai_run_usage')).toHaveLength(1);
+    expect(all(db, 'SELECT * FROM ai_run_bash')).toHaveLength(1);
+    run(
+      db,
+      "INSERT INTO ai_runs(id,board_id,started_at,month,origin,tool,permission) VALUES ('probe',?,2,'2026-10','test','profile-id','full')",
+      [board],
+    );
+    expect(all(db, 'PRAGMA foreign_key_check')).toEqual([]);
+    expect(() => run(db, "INSERT INTO ai_run_usage(run_id,kind,name) VALUES ('missing','tool','Read')")).toThrow();
+    run(db, "DELETE FROM ai_runs WHERE id='run'");
+    expect(all(db, 'SELECT * FROM ai_run_usage')).toEqual([]);
+    expect(all(db, 'SELECT * FROM ai_run_bash')).toEqual([]);
+  } finally {
+    db.close();
+  }
+});
+
+it('falha de integridade desfaz reconstrução e restaura chaves estrangeiras sem perder registros', async () => {
+  (await openInMemory(path.resolve('node_modules/sql.js/dist'))).close();
+  const db = newDatabase();
+  try {
+    migrate(db, 42);
+    seedBoard(db, 'rollback', 'Rollback');
+    db.run('PRAGMA foreign_keys=OFF');
+    run(db, "INSERT INTO ai_run_usage(run_id,kind,name,calls) VALUES ('orphan','tool','Read',1)");
+    db.run('PRAGMA foreign_keys=ON');
+    expect(() => migrate(db)).toThrow('Referências inválidas');
+    expect(all(db, "SELECT value FROM meta WHERE key='schema_version'")[0]?.value).toBe('42');
+    expect(all(db, 'SELECT * FROM ai_run_usage')).toHaveLength(1);
+    expect(() => run(db, "INSERT INTO ai_run_usage(run_id,kind,name) VALUES ('another','tool','Read')")).toThrow();
+  } finally {
+    db.close();
+  }
+});

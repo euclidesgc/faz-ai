@@ -1,7 +1,9 @@
-import type { Agent, AiTool } from './harness';
+import { resolveModelOption } from './aiProfiles';
+import type { AiBase } from './aiProfiles';
+import type { Agent } from './harness';
 import { BOARD_MCP_NAME, selectedMcpNames, selectedRuleLocations, selectedSkillNames, type HarnessSelection } from './harnessSelection';
 import type { BoardState, Card } from './model';
-import { parseModelValue, type ModelOption } from './models';
+import { type ModelOption } from './models';
 import { columnOf, valueOf } from './selectors';
 
 /**
@@ -216,10 +218,8 @@ export interface ExecDelegate {
 }
 
 /** O modelo do catálogo da ferramenta em uso para um valor do campo Modelo (`<id>@<esforço>`). */
-const catalogModel = (s: BoardState, value: string | null | undefined): { option: ModelOption; effort: string | null } | undefined => {
-  const chosen = parseModelValue(value);
-  const option = chosen ? s.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === s.board.aiTool) : undefined;
-  return option ? { option, effort: chosen!.effort } : undefined;
+const catalogModel = (s: BoardState, value: string | null | undefined) => {
+  return resolveModelOption(s.board, value ?? undefined) ?? undefined;
 };
 
 /** Os agentes do board que a sessão de uma história recebe como subagentes: todos os de arquivo, menos o dela. */
@@ -234,10 +234,10 @@ export const delegatesOf = (s: BoardState, c: Card, own: ExecProfile | undefined
           instructions: p.instructions,
           tools: p.tools,
           deniedTools: p.deniedTools,
-          model: catalogModel(s, p.model)?.option.model ?? null,
+          model: catalogModel(s, p.model)?.name ?? null,
         }));
 
-const listField = (s: BoardState, c: Card, name: string): string[] => {
+const executionFieldValues = (s: BoardState, c: Card, name: string): string[] => {
   const field = s.fieldDefs.find((f) => f.kind === 'multiselect' && f.name.toLowerCase() === name);
   const v = field ? valueOf(s, c.id, field.id) : undefined;
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
@@ -247,7 +247,17 @@ const listField = (s: BoardState, c: Card, name: string): string[] => {
 const inBoard = (names: Set<string>, name: string): boolean => names.has(name);
 
 export function manifestOf(s: BoardState, c: Card): ExecManifest {
-  const profile = profileOf(s, c);
+  return manifestWithProfile(s, c, profileOf(s, c));
+}
+
+/** Prévia isolada do agente: os padrões do board, sem campos, fase ou delegados de um card. */
+export function agentManifestOf(s: BoardState, profile: ExecProfile): ExecManifest {
+  return manifestWithProfile(s, null, profile);
+}
+
+/** Seleções do card aceitas pelo contrato legado, compartilhadas com a proveniência da prévia. */
+export function executionCardSelectionsOf(s: BoardState, c: Card | null): { skills: string[]; rules: string[]; mcps: string[] } {
+  const listField = (name: string) => (c ? executionFieldValues(s, c, name) : []);
   // uma skill do projeto desligada (movida para a pasta ao lado) some do inventário, mas o card que já a
   // indicava continua recebendo o caminho dela: desligar é guardar, não tirar do board
   const skillNames = new Set([
@@ -257,33 +267,38 @@ export function manifestOf(s: BoardState, c: Card): ExecManifest {
   ]);
   const ruleLocations = new Set([...selectedRuleLocations(s, 'contextual'), ...selectedRuleLocations(s, 'always')]);
   const mcpNames = new Set([...selectedMcpNames(s, 'contextual'), ...selectedMcpNames(s, 'always')]);
-  const modelField = s.fieldDefs.find((f) => f.kind === 'model');
-  const chosen = parseModelValue(modelField ? valueOf(s, c.id, modelField.id) : undefined) ?? parseModelValue(profile?.model || null);
-  const option = chosen ? s.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === s.board.aiTool) : undefined;
   return {
-    delegates: delegatesOf(s, c, profile),
+    skills: listField('skills').filter((n) => inBoard(skillNames, n)),
+    rules: listField('rules').filter((l) => inBoard(ruleLocations, l)),
+    mcps: listField('mcps').filter((n) => inBoard(mcpNames, n)),
+  };
+}
+
+function manifestWithProfile(s: BoardState, c: Card | null, profile: ExecProfile | undefined): ExecManifest {
+  const selected = executionCardSelectionsOf(s, c);
+  const modelField = s.fieldDefs.find((f) => f.kind === 'model');
+  const rawModel = (modelField && c ? valueOf(s, c.id, modelField.id) : undefined) || profile?.model;
+  const resolved = resolveModelOption(s.board, rawModel);
+  return {
+    delegates: c ? delegatesOf(s, c, profile) : [],
     profile: profile?.name ?? null,
     agent: profile && profile.scope !== 'builtin' ? profile.id : '',
     purpose: profile?.purpose ?? '',
     instructions: profile?.instructions ?? '',
     // as skills "Sempre" entram pelo contexto fixo (promptContext), não por aqui; o que o card lista e saiu do
     // board (ou passou para "Desligado") fica de fora sem quebrar o card: o board referencia, não copia
-    skills: [...new Set([...(profile?.skills ?? []), ...listField(s, c, 'skills').filter((n) => inBoard(skillNames, n))])],
-    rules: listField(s, c, 'rules').filter((l) => inBoard(ruleLocations, l)),
+    skills: [...new Set([...(profile?.skills ?? []), ...selected.skills])],
+    rules: selected.rules,
     // os servidores do agente, os do campo MCPs do card e os do board em modo "Sempre"; o do board vai sempre, sem marcação
-    mcpServers: [
-      ...new Set([
-        ...(profile?.mcpServers ?? []),
-        ...listField(s, c, 'mcps').filter((n) => inBoard(mcpNames, n)),
-        ...selectedMcpNames(s, 'always'),
-      ]),
-    ].filter((n) => n !== BOARD_MCP_NAME),
+    mcpServers: [...new Set([...(profile?.mcpServers ?? []), ...selected.mcps, ...selectedMcpNames(s, 'always')])].filter(
+      (n) => n !== BOARD_MCP_NAME,
+    ),
     tools: profile?.tools ?? [],
     deniedTools: profile?.deniedTools ?? [],
-    model: option
+    model: resolved
       ? {
-          name: option.model,
-          effort: effortToRun(option, chosen!.effort),
+          name: resolved.name,
+          effort: resolved.option ? effortToRun(resolved.option, resolved.effort) : resolved.effort,
         }
       : null,
   };
@@ -316,7 +331,7 @@ export const EXEC_ASPECTS: { id: ExecAspect; label: string }[] = [
  * as rules vão sempre pelo caminho do arquivo; `context` é o contexto vazio (nada do usuário nem do
  * projeto carregado por conta própria).
  */
-export const EXEC_ENFORCEMENT: Record<AiTool, Record<ExecAspect, 'enforced' | 'advised'>> = {
+export const EXEC_ENFORCEMENT: Record<AiBase, Record<ExecAspect, 'enforced' | 'advised'>> = {
   claude: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced', context: 'enforced' },
   cursor: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', context: 'advised' },
   // Kimi Code 2.1.1: o servidor do board entra pelo `.kimi-code/mcp.json` do projeto, materializado antes

@@ -1,11 +1,13 @@
+import { toolInfo, activeProfile } from '../../../shared/aiProfiles';
+import { catalogTool } from '../../../shared/aiProfiles';
+import { ContextPlanningRepo } from '../../repositories/contextPlanningRepo';
 import { artifactLocation } from '../../../shared/artifacts';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
-  ALL_AI_TOOLS,
+  ALL_AI_BASES,
   EMPTY_HARNESS,
   REFERENCE_SKILL,
-  aiToolInfo,
   type AiTool,
   type Harness,
   type HarnessItem,
@@ -72,7 +74,7 @@ export class BoardHarness {
     let state = this.ctx.state();
     // as pastas importadas são do board: a varredura as recebe a cada leitura, para a aba refletir o que está lá
     this.store.imports = Object.fromEntries(
-      ALL_AI_TOOLS.map((tool) => [tool, state.harnessImports.filter((x) => x.tool === tool).map((x) => x.dir)]),
+      ALL_AI_BASES.map((tool) => [tool, state.harnessImports.filter((x) => x.tool === tool).map((x) => x.dir)]),
     );
     this.current = this.store.scan();
     this.ctx.library.migrate(this.current.inventory);
@@ -241,7 +243,8 @@ export class BoardHarness {
 
   /** Passa a varrer a pasta de skills da ferramenta. */
   setTool(tool: AiTool): void {
-    this.store?.setTool(tool);
+    const profile = this.ctx.state().board.aiProfiles.find((p) => p.id === tool);
+    this.store?.setTool(profile ? catalogTool(profile) : tool);
     this.load();
   }
 
@@ -334,6 +337,8 @@ export class BoardHarness {
   /** Conteúdo de um arquivo do harness para o editor do board. */
   readFile(file: string): { content: string; readonly: boolean } {
     const { readonly } = this.access(file);
+    if (this.current.inventory.some((t) => t.items.some((i) => i.kind === 'mcp' && i.path === file)))
+      throw new Error('Configurações MCP não são devolvidas ao editor. Use a biblioteca para salvar uma nova definição.');
     if (fs.statSync(file).size > MAX_EDIT_BYTES) throw new Error('Arquivo maior que 512 KB: abra no editor.');
     return { content: fs.readFileSync(file, 'utf8'), readonly };
   }
@@ -418,6 +423,16 @@ function markSkill(ctx: BoardContext, name: string, scope: 'project' | 'user' = 
 
 /** Harness: regras, skills, agentes, hooks, permissões, servidores MCP e instalação de skills. */
 export const harnessHandlers = {
+  'contextPlanning.save': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('Contratos de contexto exigem revisão humana; a IA não pode alterar autorizações.');
+    new ContextPlanningRepo(ctx.dbHandle.db).save(ctx.boardId, msg.input);
+    return true;
+  },
+  'contextPlanning.saveBatch': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('Contratos de contexto exigem revisão humana; a IA não pode alterar autorizações.');
+    new ContextPlanningRepo(ctx.dbHandle.db).saveBatch(ctx.boardId, msg.inputs);
+    return true;
+  },
   'harness.library.scan': (msg, ctx) => {
     ctx.library.scanFolder(msg.dir);
     ctx.harness.load();
@@ -428,7 +443,8 @@ export const harnessHandlers = {
     ctx.harness.load();
     return true;
   },
-  'harness.library.save': (msg, ctx) => {
+  'harness.library.save': (msg, ctx, actor) => {
+    if (actor.byAi && msg.input.kind === 'mcp') throw new Error('Configurações e credenciais MCP exigem revisão humana.');
     ctx.library.saveArtifact(msg.input);
     ctx.harness.load();
     return true;
@@ -474,7 +490,7 @@ export const harnessHandlers = {
     const changed = ctx.harness.op((h) => {
       h.createSkill(REFERENCE_SKILL.name, REFERENCE_SKILL.description, REFERENCE_SKILL.body);
       h.setSkillMode(REFERENCE_SKILL.name, 'manual');
-      fs.mkdirSync(path.join(h.workspaceDir, aiToolInfo(ctx.state().board.aiTool).skills, REFERENCE_SKILL.name, 'references'), {
+      fs.mkdirSync(path.join(h.workspaceDir, toolInfo(activeProfile(ctx.state().board)).skills, REFERENCE_SKILL.name, 'references'), {
         recursive: true,
       });
     });

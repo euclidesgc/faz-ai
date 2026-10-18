@@ -566,6 +566,48 @@ ring shows only the total. In Cursor, which does not enforce the empty context, 
 its own is also left out, and the MCP tool definitions count in full. What the run actually spent
 shows up afterwards, in the consumption of each run.
 
+The **Run context** block under **Usage → Next run** shows the agent, native delegation candidates,
+rules, skills and MCP servers with all their sources: card, agent, phase, story, default or Always.
+A file selected by multiple sources appears once per identity (the board copy ID, when available).
+The agent editors show the same block for the draft and Always items, without selections from a card.
+
+The preview uses the current manifest and neither starts a run nor calls AI. It distinguishes
+restrictions enforced by the executor from prompt advice, flags identical paragraphs in agent
+instructions and explains that rule and skill contents are not compared. Unknown sizes remain
+unmeasured; initial context size does not predict total task usage. This delivery makes current
+behavior visible; configuration per action and new authorization boundaries are not active yet.
+
+Persistence now separates **version 1** context contracts from legacy fields, with revisions and
+selections keyed by action and phase ID. Inheritance and explicit empty selections are distinct.
+New contracts are drafts and do not govern runtime execution yet.
+The preview identifies legacy mode. Migration to schema 35 preserves original fields; its
+compatibility view identifies agent skills as essential and card skills as selected, including
+missing references. Legacy MCP selections do not become permissions in the new contract.
+Export/import preserves drafts and versions without embedding MCP definitions in these contracts;
+exports contain only local references to MCP configurations, without their values.
+
+When editing a saved library subagent, **Edit context contract (draft)** opens the v1 contract: role, instructions, essential skills, suggested skills, allowed MCPs and tool restrictions. The contract has a separate save action, without AI and with optimistic revisions; it does not automatically copy legacy permissions. The preview shows essentials and Always items, keeps optional resources inactive and explains missing resources or incompatible MCPs. Missing references remain available for review.
+
+The host–webview protocol and the `preview_context_draft` MCP tool preview saved drafts: they resolve inheritance, sources and conflicts without inference and return artifact metadata. Capability admission from #729 remains pending; previews do not authorize execution.
+
+The **Execution plan** tab lets you review the agent, model, additional skills, active MCPs, input attachments and expected result for each action. Stories include rows for open phases; tasks have four independent actions (work, refinement, summary and conflict resolution). Under **Settings → Harness → Tool**, board and workflow defaults use the same editor, including conversation and assistants without a card. The preview shows sources and incompatibilities. The catalog shows short descriptions without opening specialists’ instruction bodies.
+
+Changes remain drafts until **Compare changes** and **Apply reviewed drafts**, with differences, reasons and an estimate of the known context portion. Copying between activities also requires comparison. Criteria and dependencies reference the original card. Schema 37 stores reasons; the host saves the batch in one transaction and rejects stale revisions without partial writes. Failures preserve drafts, which also survive switching card tabs. This configuration prepares the plan; execution remains on the legacy path until E5 activation.
+
+Transport that requires project MCP files (Cursor and Kimi) uses a lease coordinated by the real file path. A protected journal under `~/.faz-ai/mcp-leases` precedes mutation; format attempts reuse the same ownership. After confirmed termination, the previous configuration is restored while preserving servers added by the person. Conflicting changes to the `faz-ai` entry or invalid JSON are not overwritten. Without confirmation that the process tree has ended, the lease is retained and a new run on that file is refused. The launcher receives the CLI command only after its identity is journaled. On startup, a demonstrably dead owner allows recovery of preparations whose command was never released and recorded process groups with confirmed termination. Old or ambiguous journals remain retained. Windows does not yet provide process-tree confirmation in this transport; that case requires reconciliation. This does not prove CLI isolation or complete #729.
+
+On the host, runner and chat publish selected library files under `run-artifacts/<boardId>/<runId>`, with revisions and SHA-256 hashes. Prompts and additional directories use that copy. Updating or deleting an artifact or its cache does not rewrite the snapshot; required materialization failures block process startup. Schema 38 adds monotonic artifact revisions. Published snapshots are preserved, including inconclusive runs; automatic cleanup is not implemented yet. This freezes prompt file references; managed MCP sessions also use the copy, as described below. External legacy sources and full v1 resolution have not been activated in E5.
+
+The local orchestration foundation uses `ai_work` and `ai_work_attempts` (schema 39), with unit ownership, generations, token hashes, process identity and mutation counts. These tables are excluded from exports; imports do not create ownership and are refused while local work is running or being reconciled. Database flush synchronizes the file before atomic replacement and the directory on POSIX systems. A cross-process lock keyed by the real workspace path releases a writer only after process-group termination is confirmed; adopting a dead host’s reservation does not release it automatically. Pure rules calculate rounds, reconciliation and requested/effective limits. Trigger integration remains pending; this foundation does not change who executes subtasks or prove CLI isolation.
+
+Managed runs now have per-attempt MCP identity: the host injects `FAZAI_RUN_TOKEN` only into the bridge environment, and the transport consumes its preface before the MCP protocol. Every call validates owner, generation and revocation; mutations are attributed to the authenticated run and counted. `get_skill`, `get_agent`, `get_board_artifact` and `read_rule_file` use the captured snapshot, and external forwarding freezes selected servers and operations. External sessions remain available but cannot take over a card reserved by the board. The runner accepts identity and guidance from the orchestrator without completing work solely on exit code zero. This API is not connected to triggers yet: automatic activation, persistence before CLI release and #824/#825 remain pending.
+
+The gateway also accepts asynchronous identity recording (`beforeStart`): the launcher waits for it before receiving the command. Failure, cancellation or revocation while waiting prevents late release. The measured transport preserves process identity and termination confirmation for reconciliation. The Orchestrator described below connects this hook to flush and workspace ownership through an injected UnitStarter; production triggers remain pending.
+
+The `Orchestrator` now provides `drive`, round continuation, startup reconciliation, sweeping and cancellation through an injected `UnitStarter`. It synchronizes preparation and process identity before releasing the CLI, confirms the process group and saves the result before releasing the lock. The workspace reference remains persisted until physical release is confirmed, including crashes in that interval; imports also respect that reservation. Tests using Node processes, the MCP bridge and an on-disk database cover three sequential children, one closing run, partial work, cancellation with a descendant and a real controller restart. Host creation and trigger integration remain pending, along with human return cycles and stable phase association. This does not activate the v1 plan or validate real AI CLIs yet.
+
+The v1 gateway admission foundation distinguishes conversation, artifacts, permissions, MCP and delegation, requiring local receipts bound to the current configuration. Decisions are recorded in history (schema 36), and export/import does not turn them into authorization. An empty list means no tools; strict Claude mapping uses exact tools and MCP operations without bypassing permissions. This foundation still awaits the real CLI verifier and activation across E5 actions: current execution remains legacy, and no executor is verified automatically.
+
 ### Card Usage tab
 
 The open card has the **Consumo** (usage) tab, which brings the two numbers together:
@@ -1233,15 +1275,15 @@ In Rules, **Update from source** replaces the copy only after confirmation.
 **MCPs** display their saved functional description ahead of command or URL. Import reuses descriptions from configuration when available; use **Edit** to explain missing ones. The list does not automatically connect to servers to discover descriptions.
 
 **MCPs** can be created with a form (`command` and `args` for stdio, URL for HTTP) or **Edit JSON
-directly**, including a single definition wrapped in `mcpServers`. `env` variables and `headers`
-stay in the host and are exposed only when explicitly opening that MCP's editor, never in the
-shared snapshot or reading copies. The **faz-ai** MCP bridge provides `list_board_mcp_tools` and
+directly**, including a single definition wrapped in `mcpServers`. The entire definition, including command, arguments, URL, `env` and `headers`, is encrypted in the local host vault; the database, exports, interface and APIs receive only references and status. You can edit the description without reading saved values; **Replace saved configuration** requires a new definition. Imported MCPs remain pending and cannot run until this human review, even when their reference exists on this machine. The **faz-ai** MCP bridge provides `list_board_mcp_tools` and
 `call_board_mcp_tool`: any MCP client connected to the board can discover schemas and call tools
 from registered servers without copying their settings to each AI tool. Disabled servers are
 rejected; Per card requests must include a card selecting that server directly or through its
 agent. The bridge supports stdio, Streamable HTTP and explicit SSE with static credentials; it does
 not handle OAuth login. This version forwards tools, not MCP resources or prompts, and opens and
 closes a connection per operation.
+
+Schema 40 migrates library MCP configurations only after confirming the secret on disk. The `.credentials` vault beside the databases stores its key and encrypted files with restricted local permissions; it is excluded from exports. This does not replace operating system isolation against processes of the same user. CLI profiles and legacy native-file paths still require the complete #728 review.
 
 The `get_project_profile`, `get_board_artifact` and `save_board_artifact` MCP tools let assistants
 work in the library. Legacy tool-specific file APIs remain for compatibility; native hooks,
@@ -1307,6 +1349,10 @@ which is why Cursor's suggestion rules all start
 at Auto. Suggestion rules combine
 conditions with AND and OR, for example `Esforço da atividade = Alto E Tags = backend`. The result
 is always a suggestion: on the card, the model and the effort can be changed at any time.
+
+The **CLI profile** foundation uses schema 42: three builtin profiles, copied and custom profiles with separate identities and initially unknown capabilities. Commands, arguments and environment variables stay in the local vault shared with MCPs; public state carries references and availability without saved values. Imports disable profiles and require review; reviewing builtins does not enable them automatically. Copies have their own reference, stay pending/disabled and inherit no isolation evidence. Domain, persistence and profile IDs are available: only enabled/reviewed profiles can become the default, and copies use the base catalog. Labels retain the profile name/identity; generic profiles receive no native directories. The host blocks imported/disabled profiles before preparing files. The three builtin providers retain their earlier behavior; copied/custom profile adapters already build commands through the shared transport, while activation requires a contract and capability admission for each action. Copies need their own evidence bound to the configuration; generic profiles without a verified mapping stay blocked. Management UI and execution preparation still await integration. Profile probes already use reviewed commands without a shell and do not run for pending imports or missing credentials. Custom profiles search only PATH/absolute paths and do not require native MCP registration; without `statusArgs`, login remains unknown without an authentication requirement. Version/login do not prove isolation or capabilities. Installation links are reviewed public metadata; URLs containing credentials, query parameters or fragments are not disclosed.
+
+The new **execution and fallback policy** foundation separates versioned definitions, local human review and history (schema 41). Target resolution does not replace an invalid explicit choice with a default or redirect a prefix to a default copied profile. Evaluation and simulation share one function with explained rejections, ordered targets, accumulated limits and reconciliation for partial or unknown work. Imported policies remain pending review; edits do not change earlier snapshots. Under **Settings → Harness → Tool and execution → Manage policies**, the manual editor supports conditions, ordered targets, limits, duplication, removal and paginated history. A complete comparison precedes explicit human review; saving as pending grants no execution authority. Revision conflicts preserve the draft and let the user reload the base before reviewing again. The host simulator uses the same evaluator without AI, identifying credential/admission settings as scenario assumptions. Changes to saved policies or context invalidate the displayed result. This foundation is not yet connected to the runner, chat or assistants; the description below covers the legacy fallback model, which will migrate to a disabled proposal during integration.
 
 Each rule can have a **fallback model** (optional). When a card's execution fails because the primary model hit the plan's usage limit, and that model came from a rule with a fallback configured, the system automatically retries the execution with the fallback model, once only. If the fallback also fails or is not configured, the card is blocked as usual. The automatic switch appears as a comment in the card's conversation ("The `<primary model>` hit the usage limit; execution continues with `<fallback model>`"), and the card's Model field keeps showing the primary model — the next execution will try the primary again.
 
@@ -1386,6 +1432,8 @@ npm run build
 npm test
 npm run typecheck
 ```
+
+`npm run test:cli-real` separately checks the provider contract with **installed Claude Code**, using temporary project/configuration directories and local test API and MCP servers. It requires no login and calls no remote model; the API controls responses so forbidden attempts do not depend on model behavior. Positive controls load project, user, ancestor and additional-directory sentinels, plus a skill, agent, hook and external MCP; the strict path must exclude them. The test also reproduces the inherited additional-memory regression. A missing CLI or Windows platform fails explicitly. The seven tests use the real gateway and measured transport with disposable on-disk SQLite; they also check cancellation, forced termination, failure before release, no retry and private file cleanup. They do not enable a production profile: managed policies, the real authentication/API environment, Cursor/Kimi and accepted-task consumption still need validation.
 
 New features are integrated into `develop`. The **Unreleased** changelog section includes only
 changes already integrated into that branch; work still in progress stays on its branches and

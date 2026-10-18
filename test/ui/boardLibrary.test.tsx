@@ -195,24 +195,26 @@ it('permite preencher a finalidade do MCP existente e preserva a configuração 
   renderThemed(<BoardLibrary />);
   confirmLast();
   await userEvent.click(screen.getByRole('tab', { name: /^MCPs/ }));
-  const server = { command: 'node', args: ['github.js'], env: { TOKEN: 'local' } };
+  const mcpCredential = { secretRef: 'a'.repeat(64), transport: 'stdio', review: 'reviewed', available: true };
   act(() => {
     window.dispatchEvent(
       new MessageEvent('message', {
         data: {
           type: 'harness.library.content',
-          input: { id: 'mcp-github', kind: 'mcp', name: 'github', description: '', body: '', server },
+          input: { id: 'mcp-github', kind: 'mcp', name: 'github', description: '', body: '', mcpCredential },
         },
       }),
     );
   });
   const purpose = screen.getByRole('textbox', { name: 'Para que serve este MCP?' });
+  expect(screen.queryByRole('textbox', { name: 'Definição JSON do MCP' })).toBeNull();
   expect(purpose.tagName).toBe('TEXTAREA');
   await userEvent.type(purpose, 'Consulta issues e pull requests.');
   await userEvent.click(screen.getByRole('button', { name: 'Salvar na biblioteca' }));
   expect(lastSent('harness.library.save')).toMatchObject({
-    input: { id: 'mcp-github', kind: 'mcp', description: 'Consulta issues e pull requests.', server },
+    input: { id: 'mcp-github', kind: 'mcp', description: 'Consulta issues e pull requests.' },
   });
+  expect(lastSent('harness.library.save')!.input).not.toHaveProperty('server');
   confirmLast();
 });
 

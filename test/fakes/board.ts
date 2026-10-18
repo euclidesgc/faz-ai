@@ -1,3 +1,4 @@
+import { BUILTIN_PROFILES } from '../../src/shared/aiProfiles';
 import { EMPTY_CHAT } from '../../src/shared/chat';
 import type { BoardState, Card, Column, ColumnCategory } from '../../src/shared/model';
 import { DEFAULT_APPEARANCE } from '../../src/shared/appearance';
@@ -70,6 +71,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
       name: 'B',
       rules: DEFAULT_RULES,
       aiTool: 'claude',
+      aiProfiles: structuredClone([...BUILTIN_PROFILES]),
       modelCatalog: [],
       modelRules: [],
       appearance: DEFAULT_APPEARANCE,

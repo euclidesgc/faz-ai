@@ -1,5 +1,8 @@
+import { baseValue } from '../../../../shared/harness';
 import { useState } from 'react';
 import { Badge, Button, Checkbox, TextArea, TextField } from '@radix-ui/themes';
+import { agentContextOf } from '../../../../shared/executionContext';
+import { ExecutionContext } from '../../card/ExecutionContext';
 import { AGENT_FORMAT } from '../../../../shared/agentTools';
 import { EXEC_ENFORCEMENT, TOOL_PRESETS, type ExecAspect } from '../../../../shared/execution';
 import { selectedMcpNames } from '../../../../shared/harnessSelection';
@@ -18,7 +21,14 @@ import { t } from '../../../i18n';
 export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: AiToolInfo; onClose: () => void }) {
   const state = useBoardStore((s) => s.state)!;
   const [body, setBody] = useState(a.body);
-  const how = EXEC_ENFORCEMENT[tool.id];
+  const how = baseValue(EXEC_ENFORCEMENT, tool.id) ?? {
+    agent: 'advised',
+    skills: 'advised',
+    mcp: 'advised',
+    tools: 'advised',
+    model: 'advised',
+    context: 'advised',
+  };
   const servers = [
     ...new Set(
       (state.harness.inventory.find((x) => x.tool === tool.id)?.items ?? [])
@@ -26,7 +36,7 @@ export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: A
         .map((i) => i.name),
     ),
   ].sort();
-  const format = AGENT_FORMAT[tool.id];
+  const format = baseValue(AGENT_FORMAT, tool.id) ?? { tools: false, skills: false, mcp: false, readonly: false, background: false };
   const boardServers = selectedMcpNames(state);
   const patch = (p: Partial<AgentInput>) => harness.updateAgent(a.name, a.scope, p);
   const badge = (aspect: ExecAspect) => (
@@ -45,6 +55,26 @@ export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: A
   const dirty = body !== a.body;
   return (
     <div className="profile-editor" aria-label={t('Agente {name}', { name: a.name })}>
+      <ExecutionContext
+        agent
+        preview={agentContextOf(
+          { ...state, board: { ...state.board, aiTool: tool.id } },
+          {
+            id: a.name,
+            name: a.name,
+            purpose: a.description,
+            instructions: body,
+            skills: a.skills,
+            mcpServers: a.mcp,
+            tools: a.tools,
+            deniedTools: a.deniedTools,
+            model: a.modelValue,
+            isDefault: false,
+            scope: a.scope,
+            path: a.path,
+          },
+        )}
+      />
       <FormField label={t('O que este agente faz')} hint={t('Uma frase: é por ela que o "Refinar com IA" escolhe o agente de um card.')}>
         {(id) => (
           <TextField.Root

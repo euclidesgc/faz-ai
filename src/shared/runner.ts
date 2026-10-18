@@ -30,6 +30,8 @@ export interface RunnerConfig {
   parallel: boolean;
   /** com `parallel` ligado, quantas histórias com branch ao mesmo tempo (no mínimo duas); é também o teto das atividades sem branch (só texto), em qualquer modo, mesmo com `parallel` desligado */
   parallelStories: number;
+  /** Pedido por história; escritores na mesma pasta continuam limitados a um. */
+  parallelSubtasks: number;
   /** a pessoa pausou o autopiloto; vale até retomar, mesmo depois de reabrir o editor */
   autopilotPaused: boolean;
   /** nome do agente (arquivo marcado no Harness) usado quando nem o card nem a fase indicam um; vazio = o primeiro marcado, ou o embutido */
@@ -65,6 +67,7 @@ export const DEFAULT_RUNNER: RunnerConfig = {
   heartbeatRefine: true,
   parallel: false,
   parallelStories: 2,
+  parallelSubtasks: 2,
   autopilotPaused: false,
   defaultAgent: '',
 };
@@ -95,6 +98,7 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
   const minutes = Math.round(Number(raw.timeoutMinutes));
   const interval = Math.round(Number(raw.heartbeatMinutes));
   const parallel = Math.round(Number(raw.parallelStories));
+  const subtasks = Math.round(Number(raw.parallelSubtasks));
   return {
     autopilotPaused: raw.autopilotPaused === true,
     defaultAgent: typeof raw.defaultAgent === 'string' ? raw.defaultAgent.trim() : '',
@@ -106,6 +110,7 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
         ? Math.min(HEARTBEAT_RANGE.max, Math.max(HEARTBEAT_RANGE.min, interval))
         : DEFAULT_RUNNER.heartbeatMinutes,
     parallel: raw.parallel === true,
+    parallelSubtasks: Number.isFinite(subtasks) && subtasks > 0 ? Math.min(6, Math.max(1, subtasks)) : DEFAULT_RUNNER.parallelSubtasks,
     parallelStories:
       Number.isFinite(parallel) && parallel > 0
         ? Math.min(PARALLEL_RANGE.max, Math.max(PARALLEL_RANGE.min, parallel))

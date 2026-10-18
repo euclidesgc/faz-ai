@@ -161,6 +161,7 @@ id, tipo, nome, uso e caminho de cada cópia, sem configurações MCP. Trocar de
 a origem não remove a cópia; `set_harness_selection` altera o modo, sem atualizar da origem.
 
 - `get_project_profile`: perfil detectado do projeto, para sugestões sem executar comandos.
+- `preview_context_draft { target: { cardId, workflowId, phaseId, action } }`: prévia dos contratos v1 salvos, somente leitura. Use IDs estáveis (não números); `cardId` e `workflowId` são nulos ou mutuamente exclusivos e `phaseId` vazio indica ação sem fase. Ações: `work`, `refine`, `summary`, `conflict`, `chat`, `harness-agent`, `harness-rule`, `harness-skill`, `harness-suggest`. Retorna metadados, origens, revisões, caminho de herança e incompatibilidades, sem corpos de artefatos ou definições MCP. Não salva, não infere, não altera o runtime legado nem autoriza execução (`canExecute: false`, admissão #729 indisponível). Não há ferramenta MCP de escrita de contratos ou permissões.
 - `get_board_artifact { id }`: conteúdo completo de regra, skill ou agente; recusa MCPs.
 - `save_board_artifact { id?, kind, name, description, body, skills?, mcpServers?, categories? }`:
   cria/atualiza apenas na biblioteca. Tipos: `rule`, `skill`, `agent`; regra nova fica desligada.
@@ -169,15 +170,18 @@ a origem não remove a cópia; `set_harness_selection` altera o modo, sem atuali
 - `list_board_mcp_tools { server, card? }`: lista ferramentas e schemas de um servidor da biblioteca.
 - `call_board_mcp_tool { server, name, arguments, card? }`: encaminha a chamada e devolve seu resultado.
 
+Quando o executor precisa de configuração MCP por arquivo de projeto, o transporte empresta esse arquivo com posse por caminho real e diário anterior à escrita. O launcher só recebe o comando depois do registro de sua identidade. A recuperação não restaura sobre uma execução órfã ainda viva ou de término desconhecido; conflitos da entrada `faz-ai` são preservados. Isso não concede acesso adicional ao MCP nem comprova isolamento de artefatos pela CLI.
+
+Decisões v1 presentes no histórico/export são auditoria, não recibos de capacidade. A evidência local da máquina não tem endpoint de escrita na UI/MCP e não é importada com o board. A prévia de rascunhos continua sem autorizar execução até a integração do verificador real.
+
 A ponte usa o mesmo registro **faz-ai**, independente da ferramenta cliente. MCP desligado ou ausente
 é recusado; no modo Pelo card, é obrigatório informar um card que selecione o servidor, diretamente
-ou pelo agente. Configurações são relidas em cada chamada; conexões são abertas e fechadas por
+ou pelo agente. Nas sessões externas, configurações são relidas em cada chamada; conexões são abertas e fechadas por
 operação. Suporta stdio, Streamable HTTP e `type: "sse"` explícito, com `env`/`headers` estáticos.
 Não conduz OAuth e não encaminha recursos ou prompts MCP. Erros de um servidor não impedem o uso
 dos demais. A IA descobre os schemas antes de chamar uma ferramenta.
 
-As definições com segredos ficam no host; apenas a leitura explícita do formulário de edição MCP
-as envia à interface, sem incluí-las no snapshot compartilhado. `get_skill`, `update_skill` e
+As definições MCP da biblioteca ficam cifradas no cofre local do host. Leituras, inclusive do editor, devolvem apenas referência, transporte e estado de revisão/disponibilidade. `save_board_artifact` por IA não pode gravar configurações MCP. A pessoa substitui a definição no editor; importações ficam pendentes e são recusadas antes da preparação e do encaminhamento. A leitura de arquivos de configuração MCP pela interface também é recusada. Logs e resultados encaminhados ocultam valores conhecidos pelo cofre. Perfis de CLI e APIs legadas de arquivos nativos ainda não têm a cobertura completa de #728. `get_skill`, `update_skill` e
 `write_skill_file` priorizam a cópia; `get_agent` sem escopo também. APIs de arquivos nativos seguem
 por compatibilidade. `onlySelected: false` ainda inclui fontes nativas para clientes antigos.
 
@@ -350,3 +354,56 @@ não permite. Isso é uma orientação ao cliente de IA: cada ferramenta decide 
 Fluxo SDD sugerido: a IA lê a história e a fase (`phase`), cria uma sub-tarefa com o campo Fase,
 constrói nela o documento da fase e o anexa à história (`artifact: true`), pede a revisão na
 história e para. Com a aprovação, move a história para a próxima coluna.
+
+## Identidade de execuções controladas
+
+A API interna `AiRunner.start(cardId, { origin, mode?, workId, token, advice?, beforeStart?, onExit? })` preserva a assinatura legada. Unidades controladas exigem snapshot explícito e ponte do board; não há fallback silencioso para sessão externa. O host põe `FAZAI_RUN_TOKEN` apenas no ambiente dessa ponte. Ela envia `{"fazai":{"run":"<token>"}}` antes da primeira mensagem MCP. O transporte consome o cabeçalho, fixa a identidade da conexão e recusa cabeçalho tardio ou token malformado. Clientes externos sem variável mantêm o protocolo anterior. O token não é parâmetro de ferramenta, argumento de CLI, conteúdo de prompt ou dado exportado.
+
+Todas as chamadas autenticadas revalidam token, geração e dono. Após revogação, inclusive depois de esperas assíncronas, a resposta é `Esta execução foi encerrada pelo board; nada foi alterado.`. Mutações aceitas são contadas conservadoramente antes de aguardar; eventos usam o run autenticado. O host remove tokens conhecidos de argumentos, resultados e logs. Sessões externas não herdam o run corrente e não podem iniciar ou mover um card reservado por outra unidade. Uma sessão de história não assume a execução dos filhos orquestráveis.
+
+Leituras de skills, agentes, regras e artefatos de sessões controladas usam a cópia fixada, sem retorno ao cache compartilhado. O relay externo usa as definições privadas capturadas, limita servidores e, em contratos explícitos, operações; revogar interrompe conexões em curso. Alterar a biblioteca afeta execuções futuras. O snapshot ativo é somente leitura.
+
+A API já é usada pelo Orchestrator com UnitStarter injetado nos testes; gatilhos legados não passam a criar unidades automaticamente. Testes usam servidor MCP e ponte compilada reais, com processos Node; não comprovam isolamento de uma CLI de IA, ativação v1 completa ou conclusão de #824/#825.
+
+O hook interno de host `AiCall.beforeStart(identity)` pode aguardar persistência assíncrona. A CLI permanece atrás do launcher até a confirmação; ao sair da espera, token, snapshot e admissão são revalidados. Parar ou revogar durante a espera impede liberação tardia. O Orchestrator liga o hook ao flush e à posse da pasta por um UnitStarter injetado. A criação no host e a ativação nos gatilhos continuam pendentes.
+
+### Verificação real do contrato do provider
+
+`npm run test:cli-real` executa Claude Code instalado contra uma API local que emite chamadas determinadas e MCPs HTTP locais. O controle positivo conecta o MCP da configuração do projeto; `--strict-mcp-config` deve excluí-lo no caminho estrito. O servidor permitido anuncia duas operações, mas somente a autorizada pode alcançar seu handler. Uma chamada deliberada à outra operação precisa receber erro. Isso testa a imposição da CLI; não substitui os testes de identidade e escopo do servidor do board nem a prova do ambiente de produção. Não grava recibos de admissão; os registros de consumo da fixture ficam somente no SQLite descartável, separados dos boards da pessoa. Políticas gerenciadas e Cursor/Kimi permanecem não verificados.
+
+### Políticas versionadas — base de domínio
+
+O schema 41 acrescenta definições e histórico de políticas. A importação força revisão local pendente, preservando a intenção e as versões originais; a definição importada não é uma autorização. Não existe ferramenta MCP para salvar/ativar políticas executáveis. O repositório recusa gravação pela IA. O avaliador e a simulação compartilham a mesma função pura; ela não inicia processos, não resolve segredos e não grava o board. Sua integração às portas de inferência, à prévia e à auditoria de cada run ainda está pendente. Os dados de disponibilidade/admissão usados em execução deverão vir do host; parâmetros de simulação não constituem evidência.
+
+
+### Gestão humana de políticas no host
+
+A webview e o navegador usam `executionPolicy.read` (biblioteca ou histórico paginado) e `executionPolicy.simulate` com respostas correlacionadas por `requestId`. A simulação usa uma cópia do rascunho e não grava, resolve segredos, gera recibos nem inicia CLI. Instalação, credenciais e admissão no cenário são hipóteses declaradas, não estado comprovado do host. O catálogo contém apenas metadados dos providers integrados.
+
+`settings.executionPolicy.save` e `settings.executionPolicy.remove` exigem ação da pessoa e revisão otimista; IA, MCP externo e tokens de execução são recusados. A UI permite salvar pendente ou confirmar revisão após comparar todas as condições/destinos/limites, preserva o rascunho em conflitos e permite recarregar a versão atual para nova comparação. Remoção cria revisão desativada e mantém o histórico. Rascunhos inválidos para o catálogo podem ser desativados ou removidos. Não foram adicionadas ferramentas MCP de escrita/ativação. A integração do avaliador com as inferências e a prévia Próxima execução continua pendente.
+
+
+### Perfis de CLI persistidos
+
+Schema 42 acrescenta `ai_profiles` à exportação e ao estado público do board. `config` é vazio nessa leitura; comandos/args/env e campos privados futuros ficam no mesmo cofre local dos MCPs, com posse por board/perfil. Importações aceitam somente referências, sem valores executáveis no JSON, e desativam os perfis até revisão humana local. A resposta da importação informa `profileReviews` com os nomes a revisar; não resolve credenciais nem executa probes. Duplicação explícita cria outra referência local e conserva revisão pendente/capacidades desconhecidas. Não há ferramenta MCP para criar/revisar/ativar perfis. Integração de perfis no gateway, catálogo/MCP e telas permanece para as etapas seguintes.
+
+
+`AiTool` agora identifica o perfil persistido; os dados nativos usam `AiBase` e `AI_BASES`/`ALL_AI_BASES`/`baseInfo`. O default do board valida perfis ligados/revisados e conserva IDs de cópias. Metadados desconhecidos são neutros, sem ampliar suporte/permissões. A gestão MCP do catálogo e a seleção por perfil ainda precisam da etapa #689; o enum público desses comandos continua restrito às três bases nesta etapa. Cópias/personalizados são recusados pelo provider atual, sem redirecionamento silencioso. O gateway do host também recusa perfis ausentes/desativados/pendentes antes de preparar snapshots ou iniciar CLI.
+
+
+### Consultas de versão/login por perfil
+
+`resolveCommand` aceita `onlyPath`; personalizados usam somente o comando exato no PATH ou caminho absoluto, sem aliases/extensões/pastas usuais. `resolveProfileCommand` considera o PATH privado do perfil. `profileVersion` e `profileSignedIn` são adaptadores internos do host, sem ferramenta MCP nova; a interface não envia comandos para sondar. O host resolve a configuração pelo ID e recusa consultas de perfis pendentes/desativados ou sem credencial local.
+
+As sondas de perfil usam `execFile` sem shell, inclusive as consultas nativas; shims `.cmd`/`.bat` no Windows ficam desconhecidos nesse caminho. A versão retorna somente o trecho numérico reconhecido, com ocultação prévia dos valores privados; stdout/stderr brutos não vão ao estado. Sem `statusArgs`, personalizado não consulta/cobra login. Código zero/um/indisponível conserva verdadeiro/falso/desconhecido. As consultas configuradas exigem revisão humana e não comprovam capacidades. O cache é por perfil, executável e referência de credenciais.
+
+Requisitos de perfis configuráveis expõem nome público em `cli`, nunca comando/args/env. Link de instalação HTTPS revisado pode aparecer como metadado público; URL com usuário, senha, query ou fragmento é omitida. Cópias/personalizados não dependem do registro MCP global de outra conta. A execução e a admissão dos providers configuráveis ainda dependem de #687/#729.
+
+
+### Providers configuráveis e origem de teste
+
+O gateway recebe a identidade/perfil escolhido, resolve a configuração privada pelo cofre no host e conserva uma cópia por run. `ai_runs.tool` guarda o ID real do perfil; não vira a base. Configuráveis exigem contrato v1 e admissão antes do spawn. A cópia usa a tradução da base com evidência própria: configuração/comando/args/env entram no vínculo, e recibos de outra configuração não autorizam execução. O genérico sem tradução continua recusado; argumentos declarados não comprovam restrições. Não foi criado endpoint MCP de ativação/revisão de perfil.
+
+O adaptador genérico monta stdin/argv, destinos MCP CLI/projeto/nenhum, modelo/esforço/pastas e argumentos por permissão. Caminho MCP precisa ficar no projeto; ausência de argumentos restritos recusa montagem. Lookup é exato por PATH/absoluto e não usa shell. Seu leitor de texto retorna `measure: none`, consumo/custo desconhecidos e não transforma isso em medição quebrada ou zero. O gateway oculta valores privados e classifica frases literais de autenticação antes da ocultação; não interpreta essas frases como regex.
+
+Schema 43 amplia o CHECK de `ai_runs.origin` para `test`. A reconstrução transacional preserva IDs, consumo, auditoria, inventário e Bash; as FKs dos filhos são conferidas e restauradas. Import/export continua versionado. A migração foi exercitada apenas em bancos descartáveis nesta implementação; o banco vivo do board não foi alterado diretamente.

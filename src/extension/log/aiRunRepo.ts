@@ -14,10 +14,13 @@ import type {
 } from '../../shared/log';
 import { monthOf, truncateTitle, type BashCommandItem } from '../../shared/log';
 import { newId } from '../db/ids';
+import { validateAdmissionDecision, type ExecutionAdmissionDecision } from '../../shared/executionAdmission';
 import { all, num, one, run, str, strOrNull, transaction, type Row } from '../db/query';
 
 /** Uma linha de `ai_runs`, como lida de volta (ver `AiRunStart`/`AiRunConfig` para o que cada campo significa). */
 export interface AiRun {
+  admission?: ExecutionAdmissionDecision;
+  admissionCorrupt?: true;
   id: string;
   boardId: string;
   startedAt: number;
@@ -62,7 +65,18 @@ const numOrNull = (v: Row[string] | undefined): number | null => (v == null ? nu
 
 function toRun(r: Row): AiRun {
   const mcpJson = strOrNull(r.mcp_json);
+  let admission: Pick<AiRun, 'admission' | 'admissionCorrupt'> = {};
+  if (r.admission_json != null) {
+    try {
+      const value: unknown = JSON.parse(str(r.admission_json));
+      validateAdmissionDecision(value);
+      admission = { admission: value };
+    } catch {
+      admission = { admissionCorrupt: true };
+    }
+  }
   return {
+    ...admission,
     id: str(r.id),
     boardId: str(r.board_id),
     startedAt: num(r.started_at),
@@ -141,10 +155,15 @@ export class AiRunRepo {
    * `mcp: null` quer dizer "sem restrição de servidores MCP".
    */
   describe(id: string, config: AiRunConfig): void {
+    if (config.admission) {
+      validateAdmissionDecision(config.admission);
+      if (!one(this.db, 'SELECT id FROM ai_runs WHERE id = ?', [id]))
+        throw new Error('Execução de IA não encontrada para registrar a admissão.');
+    }
     run(
       this.db,
       `UPDATE ai_runs SET model = ?, effort = ?, profile = ?, agent = ?, permission = ?, autonomous = ?, clean = ?,
-         skills_json = ?, mcp_json = ?
+         skills_json = ?, mcp_json = ?, admission_json = ?
        WHERE id = ?`,
       [
         config.model,
@@ -156,6 +175,7 @@ export class AiRunRepo {
         config.clean ? 1 : 0,
         JSON.stringify(config.skills),
         config.mcp == null ? null : JSON.stringify(config.mcp),
+        config.admission ? JSON.stringify(config.admission) : null,
         id,
       ],
     );

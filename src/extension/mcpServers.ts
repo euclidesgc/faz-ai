@@ -1,3 +1,4 @@
+import { baseValue } from '../shared/harness';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AiTool, HarnessItem } from '../shared/harness';
@@ -45,7 +46,7 @@ export class McpServers {
   }
 
   private source(tool: AiTool, index: number): HarnessSource {
-    const src = HARNESS_CATALOG[tool][index];
+    const src = (baseValue(HARNESS_CATALOG, tool) ?? [])[index];
     if (!src || src.kind !== 'mcp' || src.layout !== 'json-keys')
       throw new Error('Este arquivo de servidores MCP não é editado pelo board.');
     return src;
@@ -73,7 +74,7 @@ export class McpServers {
   /** Remove o servidor do arquivo em que a varredura o encontrou. */
   remove(tool: AiTool, item: HarnessItem): void {
     if (item.kind !== 'mcp' || item.scope === 'plugin') throw new Error('Servidores de plugin não podem ser removidos pelo board.');
-    const src = HARNESS_CATALOG[tool].find(
+    const src = (baseValue(HARNESS_CATALOG, tool) ?? []).find(
       (x) => x.kind === 'mcp' && x.layout === 'json-keys' && x.scope === item.scope && this.file(x) === item.path,
     );
     if (!src)

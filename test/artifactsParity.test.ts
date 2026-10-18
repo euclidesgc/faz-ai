@@ -111,6 +111,10 @@ async function buildExecutionState(): Promise<Fixture> {
   mark('instructions', ['CLAUDE.md'], 'always');
   mark('instructions', [RULE], 'contextual');
   mark('mcp', ['memoria', 'github'], 'contextual');
+  for (const [name, server] of Object.entries({ memoria: MEMORIA, github: GITHUB })) {
+    const item = router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'mcp' && a.name === name)!;
+    router.handle({ type: 'harness.library.save', input: { ...router.readLibraryArtifact(item.id), server } });
+  }
 
   // um card com a rule indicada no campo Rules
   const s0 = router.snapshot();

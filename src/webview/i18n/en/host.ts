@@ -142,6 +142,87 @@ export const gitNotices: Record<string, string> = {
 };
 
 export const host: Record<string, string> = {
+  'O perfil resolvido não corresponde ao alvo solicitado.': 'The resolved profile does not match the requested target.',
+  'A admissão não corresponde ao perfil solicitado.': 'Admission does not match the requested profile.',
+  'O perfil precisa de executável direto, sem shell.': 'The profile requires a direct executable without a shell.',
+  'Perfil pronto inválido.': 'Invalid builtin profile.',
+
+  'Este perfil fornece apenas texto; consumo desconhecido.': 'This profile returns text only; usage is unknown.',
+  'Perfis configuráveis exigem contrato e admissão por capacidades.': 'Configurable profiles require a contract and capability admission.',
+  'Perfil genérico sem tradução do contrato neutro.': 'Generic profile has no neutral contract mapping.',
+  'O perfil não declara argumentos para esta permissão restrita.': 'The profile declares no arguments for this restricted permission.',
+  'Arquivo MCP do perfil precisa ser relativo ao projeto.': 'The profile MCP file must be relative to the project.',
+
+  'Perfil desativado ou pendente de revisão.': 'Profile disabled or pending review.',
+  'Configuração local do perfil indisponível.': 'Local profile configuration is unavailable.',
+  'Perfil de CLI ainda não disponível para execução.': 'CLI profile is not available for execution yet.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Perfis desativados para revisão local: {profiles}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Profiles disabled for local review: {profiles}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Revise as configurações locais dos servidores MCP: {secrets}. Perfis desativados para revisão local: {profiles}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Review the local MCP server configurations: {secrets}. Profiles disabled for local review: {profiles}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}. Perfis desativados para revisão local: {profiles}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}. Profiles disabled for local review: {profiles}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}. Revise as configurações locais dos servidores MCP: {secrets}. Perfis desativados para revisão local: {profiles}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}. Review the local MCP server configurations: {secrets}. Profiles disabled for local review: {profiles}.',
+  'Política de execução inválida ou versão não suportada.': 'Invalid execution policy or unsupported version.',
+  'Snapshot de políticas inválido.': 'Invalid policy snapshot.',
+  'Versão de política inválida.': 'Invalid policy version.',
+  'Identidade de política repetida.': 'Duplicate policy identity.',
+  'Políticas executáveis exigem revisão humana.': 'Executable policies require human review.',
+  'Revisão de política inválida.': 'Invalid policy revision.',
+  'Política indisponível neste board.': 'Policy unavailable on this board.',
+  'A política mudou. Releia antes de salvar.': 'The policy changed. Read it again before saving.',
+  'Destino da política inválido ou indisponível no catálogo.': 'Policy target is invalid or unavailable in the catalog.',
+  'Políticas conflitantes: {problems}.': 'Conflicting policies: {problems}.',
+  'Histórico de política incompleto ou fora do board.': 'Policy history is incomplete or outside the board.',
+  'Versão atual diverge do histórico da política.': 'The current version differs from policy history.',
+  'Histórico de política fora do board.': 'Policy history is outside the board.',
+
+  'Revise as configurações locais dos servidores MCP: {secrets}.': 'Review the local MCP server configurations: {secrets}.',
+
+  'Configurações MCP não são devolvidas ao editor. Use a biblioteca para salvar uma nova definição.':
+    'MCP configurations are not returned to the editor. Use the library to save a new definition.',
+  'Configurações e credenciais MCP exigem revisão humana.': 'MCP configurations and credentials require human review.',
+  'Este MCP exige revisão humana ou configuração local antes de executar.':
+    'This MCP requires human review or local configuration before execution.',
+  'MCPs exigem revisão humana ou configuração local: {names}.': 'MCPs require human review or local configuration: {names}.',
+  'Referências salvas não podem ser substituídas pelo editor.': 'Saved references cannot be replaced by the editor.',
+  'Referência de credencial fora deste artefato.': 'The credential reference does not belong to this artifact.',
+  'Definição MCP importada inválida.': 'Invalid imported MCP definition.',
+  'Definição MCP legada inválida; valores originais preservados.': 'Invalid legacy MCP definition; original values have been preserved.',
+  'Arquivo de credenciais sem proteção local adequada.': 'The credentials file lacks adequate local protection.',
+  'Pasta de credenciais sem proteção local adequada.': 'The credentials folder lacks adequate local protection.',
+  'Chave local de credenciais inválida.': 'Invalid local credentials key.',
+
+  'A reconciliação da abertura precisa terminar antes de executar.': 'Startup reconciliation must finish before running.',
+  'A unidade foi cancelada antes de liberar a execução.': 'The work unit was cancelled before releasing the run.',
+  'A história mudou de fase ou foi encerrada antes de liberar a execução.': 'The story changed phase or ended before releasing the run.',
+  'A unidade ou a pasta já está reservada.': 'The work unit or workspace is already reserved.',
+  'A pasta já tem outro escritor ou aguarda reconciliação.': 'The workspace already has another writer or is awaiting reconciliation.',
+  'A tentativa precisa estar vinculada ao log antes de iniciar.': 'The attempt must be linked to the log before starting.',
+  'Não foi possível preparar ou iniciar a execução; confira o ambiente antes de tentar de novo.':
+    'The run could not be prepared or started; check the environment before trying again.',
+  'Não foi possível reservar a pasta antes de executar.': 'The workspace could not be reserved before running.',
+  'A unidade não iniciou: {reason}': 'The work unit did not start: {reason}',
+  'A unidade viva ainda reserva a pasta.': 'The live work unit still reserves the workspace.',
+  'Esta execução foi encerrada pelo board; nada foi alterado.': 'This run was ended by the board; nothing was changed.',
+  'A unidade exige token e identidade de trabalho juntos.': 'The work unit requires both a token and a work identity.',
+  'A unidade não pertence ao card desta execução.': 'The work unit does not belong to this run’s card.',
+  'A execução controlada exige a ponte MCP do board.': 'A managed run requires the board MCP bridge.',
+  'O token não pertence à unidade desta execução.': 'The token does not belong to this run’s work unit.',
+  'Snapshot incompatível com a sessão MCP.': 'The snapshot is incompatible with the MCP session.',
+  'Snapshot obrigatório da execução indisponível.': 'The required run snapshot is unavailable.',
+  'Operação MCP fora do contrato desta execução.': 'The MCP operation is outside this run’s contract.',
+  'Card fora do escopo desta execução.': 'The card is outside this run’s scope.',
+  'Servidor MCP fora do snapshot desta execução.': 'The MCP server is outside this run’s snapshot.',
+  'Método fora da sessão MCP.': 'The method is outside the MCP session.',
+  'Artefatos externos não pertencem ao snapshot desta execução.': 'External artifacts do not belong to this run’s snapshot.',
+  'O snapshot da execução é somente leitura.': 'The run snapshot is read-only.',
+  'Configuração global fora do escopo desta execução.': 'Global configuration is outside this run’s scope.',
+  'O board está executando #{number}; acompanhe pelo get_card.': 'The board is executing #{number}; follow its progress through get_card.',
+  'O board executa as sub-tarefas desta fase; a sessão da história apenas as planeja.':
+    'The board executes this phase’s subtasks; the story session only plans them.',
+
   'O índice da biblioteca está inválido. Os arquivos foram preservados.': 'The library index is invalid. The files were preserved.',
   'Caminho inválido dentro da skill.': 'Invalid path inside the skill.',
   'O arquivo ultrapassa os limites da biblioteca.': 'The file exceeds the library limits.',
@@ -216,6 +297,10 @@ export const host: Record<string, string> = {
     'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s).',
   'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}.':
     'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Revise as configurações locais dos servidores MCP: {secrets}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Review the local MCP server configurations: {secrets}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}. Revise as configurações locais dos servidores MCP: {secrets}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}. Review the local MCP server configurations: {secrets}.',
   'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Preencha os valores vazios dos servidores MCP: {secrets}.':
     'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Fill in the empty values of the MCP servers: {secrets}.',
   'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}. Preencha os valores vazios dos servidores MCP: {secrets}.':
@@ -406,4 +491,6 @@ export const host: Record<string, string> = {
   '{ref} não tem nada pendente com a IA, mas ainda não foi concluído.': '{ref} has nothing pending with the AI, but is not finished yet.',
 
   ...gitNotices,
+  'Há trabalho em execução ou reconciliação. Resolva a posse antes de importar o board.':
+    'Work is running or being reconciled. Resolve ownership before importing the board.',
 };

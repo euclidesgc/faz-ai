@@ -1,3 +1,4 @@
+import { HarnessStore } from '../src/extension/harness';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -201,7 +202,7 @@ describe('varredura do harness por ferramenta e escopo', () => {
     });
     // nada que possa ser segredo vai para a lista
     expect(JSON.stringify(items)).not.toContain('segredo');
-    expect(items.find((i) => i.name === 'remoto')?.description).toBe('https://exemplo.dev/mcp');
+    expect(items.find((i) => i.name === 'remoto')?.description).toBe('MCP HTTP');
   });
 
   it('Cursor: caminhos da ferramenta', () => {
@@ -579,4 +580,14 @@ describe('arquivos de apoio das skills', () => {
       ),
     ).toThrow('plugin');
   });
+});
+
+it('perfil genérico não presume pastas ou inventário de outra ferramenta', () => {
+  write(project, 'CLAUDE.md', 'Sentinela nativa');
+  write(project, '.claude/skills/x/SKILL.md', skill('Sentinela skill'));
+  expect(scanInventory('claude', project, home).length).toBeGreaterThan(0);
+  expect(scanInventory('personalizado', project, home, undefined, null, [project])).toEqual([]);
+  expect(new HarnessStore(project, 'personalizado', home).scan()).toEqual({ rules: [], skills: [], agents: [], inventory: [] });
+  expect(createTargets('personalizado')).toEqual([]);
+  expect(permissionTargets('personalizado')).toEqual([]);
 });

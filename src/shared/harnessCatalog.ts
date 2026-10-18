@@ -1,3 +1,5 @@
+import { baseValue } from './harness';
+import type { AiBase } from './aiProfiles';
 import type { AiTool, HarnessKind } from './harness';
 
 /**
@@ -140,7 +142,7 @@ const CURSOR_AGENT = 'Ajudante com instruções próprias, para o qual o Cursor 
 const KIMI_SKILL = 'Instruções e arquivos de apoio que o Kimi Code carrega quando a tarefa pede; só a descrição fica sempre à vista.';
 const KIMI_AGENT = 'Ajudante com instruções próprias, para o qual o Kimi Code delega partes do trabalho.';
 
-export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
+export const HARNESS_CATALOG: Record<AiBase, HarnessSource[]> = {
   claude: [
     file('instructions', 'project', 'CLAUDE.md', {
       group: 'main',
@@ -361,7 +363,7 @@ export const HARNESS_CATALOG: Record<AiTool, HarnessSource[]> = {
  * O que a ferramenta carrega sem um arquivo que o board possa mostrar: fica nas configurações dela ou
  * num painel da web. Aparece no grupo como aviso, sem caminho.
  */
-export const HARNESS_NOTES: Record<AiTool, { group: HarnessGroup; scope: Scope; name: string; hint: string }[]> = {
+export const HARNESS_NOTES: Record<AiBase, { group: HarnessGroup; scope: Scope; name: string; hint: string }[]> = {
   claude: [],
   kimi: [],
   cursor: [
@@ -401,7 +403,7 @@ export function managedDir(platform: string): string {
  * `agents-md`, na ordem do catálogo (o `CLAUDE.md` da raiz, onde um `@AGENTS.md` costuma ir, vem primeiro).
  */
 export function instructionRoles<T extends { source?: number }>(tool: AiTool, items: T[]): { claudeMd: T[]; agentsMd: T[] } {
-  const role = (i: T) => (i.source === undefined ? undefined : HARNESS_CATALOG[tool][i.source]?.role);
+  const role = (i: T) => (i.source === undefined ? undefined : (baseValue(HARNESS_CATALOG, tool) ?? [])[i.source]?.role);
   const sorted = [...items].sort((x, y) => (x.source ?? 0) - (y.source ?? 0));
   return { claudeMd: sorted.filter((i) => role(i) === 'claude-md'), agentsMd: sorted.filter((i) => role(i) === 'agents-md') };
 }
@@ -418,7 +420,7 @@ export const claudeProjectKey = (projectDir: string): string => projectDir.repla
 /** Grupo de um item no catálogo do Harness: o da fonte de onde ele veio; os de plugin ficam em Plugins. */
 export function groupOf(tool: AiTool, item: { scope: string; kind: HarnessKind; source?: number }): HarnessGroup {
   if (item.scope === 'plugin') return 'plugin';
-  const src = item.source === undefined ? undefined : HARNESS_CATALOG[tool][item.source];
+  const src = item.source === undefined ? undefined : (baseValue(HARNESS_CATALOG, tool) ?? [])[item.source];
   return src?.group ?? (item.kind === 'instructions' ? 'main' : (item.kind as HarnessGroup));
 }
 
@@ -426,7 +428,7 @@ export function groupOf(tool: AiTool, item: { scope: string; kind: HarnessKind; 
  * Onde ficam os plugins instalados de cada ferramenta (a partir da home) e os arquivos que marcam
  * a raiz de um plugin. O Cursor só documenta a pasta dos plugins locais.
  */
-export const PLUGIN_ROOTS: Record<AiTool, { path: string; manifests: string[] }[]> = {
+export const PLUGIN_ROOTS: Record<AiBase, { path: string; manifests: string[] }[]> = {
   claude: [{ path: '.claude/plugins', manifests: ['.claude-plugin/plugin.json'] }],
   cursor: [{ path: '.cursor/plugins/local', manifests: ['.cursor-plugin/plugin.json', 'plugin.json'] }],
   // o Kimi Code copia os plugins instalados para a pasta gerenciada (documentação da CLI 2.1.1)
@@ -435,7 +437,7 @@ export const PLUGIN_ROOTS: Record<AiTool, { path: string; manifests: string[] }[
 
 /** Um lugar onde o board pode criar um item novo: arquivo fixo que ainda não existe, arquivo de uma pasta ou pasta de skill. */
 export interface CreateTarget {
-  /** índice da fonte em `HARNESS_CATALOG[tool]` */
+  /** índice da fonte em `(baseValue(HARNESS_CATALOG, tool) ?? [])` */
   source: number;
   kind: HarnessKind;
   scope: 'project' | 'user';
@@ -445,7 +447,7 @@ export interface CreateTarget {
 }
 
 export function createTargets(tool: AiTool): CreateTarget[] {
-  return HARNESS_CATALOG[tool].flatMap((src, source): CreateTarget[] => {
+  return (baseValue(HARNESS_CATALOG, tool) ?? []).flatMap((src, source): CreateTarget[] => {
     if (src.builtin || src.noCreate || (src.layout !== 'file' && src.layout !== 'files' && src.layout !== 'skills')) return [];
     const base = `${src.scope === 'user' ? '~/' : ''}${src.path}`;
     const label = src.layout === 'file' ? base : src.layout === 'skills' ? `${base}/<nome>/SKILL.md` : `${base}/<nome>${src.ext}`;
@@ -460,12 +462,14 @@ export function copyTarget(
   layout: 'files' | 'skills',
   scope: 'project' | 'user',
 ): HarnessSource | undefined {
-  return HARNESS_CATALOG[tool].find((s) => !s.builtin && !s.noCreate && s.kind === kind && s.scope === scope && s.layout === layout);
+  return (baseValue(HARNESS_CATALOG, tool) ?? []).find(
+    (s) => !s.builtin && !s.noCreate && s.kind === kind && s.scope === scope && s.layout === layout,
+  );
 }
 
 /** Um arquivo de configuração em que o board pode acrescentar e remover servidores MCP. */
 export interface McpTarget {
-  /** índice da fonte em `HARNESS_CATALOG[tool]` */
+  /** índice da fonte em `(baseValue(HARNESS_CATALOG, tool) ?? [])` */
   source: number;
   scope: 'project' | 'user';
   /** caminho do arquivo, a partir do projeto ou de `~` */
@@ -477,7 +481,7 @@ export interface McpTarget {
  * o tempo todo com outros dados, e o caminho documentado para ele é `claude mcp add --scope user`.
  */
 export function mcpTargets(tool: AiTool): McpTarget[] {
-  return HARNESS_CATALOG[tool].flatMap((src, source): McpTarget[] =>
+  return (baseValue(HARNESS_CATALOG, tool) ?? []).flatMap((src, source): McpTarget[] =>
     src.kind === 'mcp' && src.layout === 'json-keys'
       ? [{ source, scope: src.scope, label: `${src.scope === 'user' ? '~/' : ''}${src.path}` }]
       : [],
@@ -506,7 +510,7 @@ export const MCP_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
  */
 export type HookFormat = 'nested' | 'flat' | 'toml';
 
-const HOOK_FORMAT: Partial<Record<AiTool, HookFormat>> = {
+const HOOK_FORMAT: Partial<Record<AiBase, HookFormat>> = {
   claude: 'nested',
   cursor: 'flat',
   kimi: 'toml',
@@ -521,16 +525,16 @@ export interface HookTarget {
 
 /** Arquivos de hooks que o board edita. */
 export function hookTargets(tool: AiTool): HookTarget[] {
-  const format = HOOK_FORMAT[tool];
+  const format = baseValue(HOOK_FORMAT, tool) ?? undefined;
   if (!format) return [];
-  return HARNESS_CATALOG[tool].flatMap((src, source): HookTarget[] => {
+  return (baseValue(HARNESS_CATALOG, tool) ?? []).flatMap((src, source): HookTarget[] => {
     if (src.kind !== 'hook' || (format === 'toml' ? src.layout !== 'toml-hooks' : src.layout !== 'json-keys')) return [];
     return [{ source, scope: src.scope, label: `${src.scope === 'user' ? '~/' : ''}${src.path}`, format }];
   });
 }
 
 /** Eventos de hook de cada ferramenta, conforme as páginas de hooks delas. */
-export const HOOK_EVENTS: Record<AiTool, string[]> = {
+export const HOOK_EVENTS: Record<AiBase, string[]> = {
   claude: [
     'PreToolUse',
     'PostToolUse',
@@ -615,7 +619,7 @@ export interface PermissionTarget {
 }
 
 export function permissionTargets(tool: AiTool): PermissionTarget[] {
-  return HARNESS_CATALOG[tool].flatMap((src, source): PermissionTarget[] =>
+  return (baseValue(HARNESS_CATALOG, tool) ?? []).flatMap((src, source): PermissionTarget[] =>
     src.layout === 'json-permissions'
       ? [{ source, scope: src.scope, label: `${src.scope === 'user' ? '~/' : ''}${src.path}`, lists: src.lists }]
       : [],
@@ -629,7 +633,7 @@ export const PERMISSION_LIST_LABEL: Record<string, string> = { allow: 'permitir'
  * O board mostra os comandos; quem os roda é a pessoa, no terminal ou na sessão da ferramenta.
  * Ferramenta sem plugins documentados (o Kimi Code) fica de fora: o grupo de plugins não mostra o bloco.
  */
-export const PLUGIN_COMMANDS: Partial<Record<AiTool, { where: string; commands: string[] }>> = {
+export const PLUGIN_COMMANDS: Partial<Record<AiBase, { where: string; commands: string[] }>> = {
   claude: {
     where: 'no terminal',
     commands: [

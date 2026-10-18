@@ -1,4 +1,4 @@
-import { aiToolInfo } from '../shared/harness';
+import { toolInfo, activeProfile } from '../shared/aiProfiles';
 import { isDeliverableStory } from '../shared/story';
 import { statusInfo } from '../shared/status';
 import type { BoardContext } from './panel/handlers/context';
@@ -23,7 +23,7 @@ export function settleDelivery(ctx: BoardContext, storyId: string): boolean {
   if (story.status !== null && statusInfo(story.status).owner === 'human') return false;
   // a entrega é sempre anunciada pela IA, seja quem for que moveu o card ou registrou o pull request:
   // o autor é o mesmo que o runner usa ao fim de uma execução (o nome da ferramenta de IA)
-  const author = aiToolInfo(state.board.aiTool).label;
+  const author = toolInfo(activeProfile(state.board)).label;
   ctx.cards.setStatus(story.id, 'waiting_review', '', author);
   ctx.comments.add(story.id, author, `História entregue com o pull request ${story.prUrl}; aguardando a revisão da pessoa.`, 'ai');
   return true;

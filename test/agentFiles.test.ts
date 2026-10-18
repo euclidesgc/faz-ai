@@ -6,7 +6,7 @@ import { agentInputOf, lacksBoardTools, nativeModelOf, parseAgentFile, renderAge
 import { AGENT_SEEDS, CONDUCTOR_AGENT } from '../src/extension/agentSeeds';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { aiToolInfo } from '../src/shared/harness';
+import { baseInfo } from '../src/shared/harness';
 import type { AgentInput } from '../src/shared/messages';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -24,7 +24,7 @@ const input: AgentInput = {
 
 describe('arquivos de agente', () => {
   it('markdown: grava as chaves da ferramenta e as do board, e lê de volta o mesmo agente', () => {
-    const spec = aiToolInfo('claude').agents;
+    const spec = baseInfo('claude').agents;
     const text = renderAgentFile(spec, input, true);
     expect(text).toBe(
       [
@@ -56,7 +56,7 @@ describe('arquivos de agente', () => {
   });
 
   it('markdown escrito por fora: lista em bloco YAML, sem as chaves do board', () => {
-    const spec = aiToolInfo('claude').agents;
+    const spec = baseInfo('claude').agents;
     const text = '---\nname: x\ndescription: "Entre aspas"\ntools:\n  - Read\n  - Grep\nmodel: opus\n---\nCorpo\n';
     const agent = parseAgentFile(
       spec,
@@ -76,7 +76,7 @@ describe('arquivos de agente', () => {
   });
 
   it('o que o board grava é YAML válido para a ferramenta: descrição com dois-pontos vai entre aspas', () => {
-    const spec = aiToolInfo('claude').agents;
+    const spec = baseInfo('claude').agents;
     const seed = { ...input, description: 'Frontend web em React/TypeScript: componentes, estado e testes.' };
     const text = renderAgentFile(spec, seed);
     // sem aspas, um parser de YAML lê `React/TypeScript: componentes` como um mapa dentro do valor e recusa o arquivo
@@ -87,7 +87,7 @@ describe('arquivos de agente', () => {
   });
 
   it('a lista de ferramentas vai ao arquivo com as do servidor do board e volta sem elas; vazia fica vazia; no Cursor nada muda', () => {
-    const claude = aiToolInfo('claude').agents;
+    const claude = baseInfo('claude').agents;
     const found = { name: 'x', scope: 'user' as const, path: '/h/x.md', location: '~/x.md' };
     // uma lista fechada deixaria o board de fora quando o agente roda no chat do editor
     expect(renderAgentFile(claude, { ...input, tools: ['Read', 'mcp__faz-ai__*'] })).toContain('tools: Read, mcp__faz-ai__*\n');
@@ -97,11 +97,11 @@ describe('arquivos de agente', () => {
     const old = parseAgentFile(claude, found, '---\nname: x\ndescription: "d"\ntools: Read, Grep\nfaz-ai-seed: true\n---\nCorpo\n');
     expect(old.tools).toEqual(['Read', 'Grep']);
     expect(lacksBoardTools(claude, old)).toBe(true);
-    const cursor = aiToolInfo('cursor').agents;
+    const cursor = baseInfo('cursor').agents;
     expect(renderAgentFile(cursor, input)).toContain('tools: Read, Edit\n');
     expect(lacksBoardTools(cursor, parseAgentFile(cursor, found, renderAgentFile(cursor, input)))).toBe(false);
     // o Kimi Code lê os mesmos globs `mcp__*` no frontmatter (documentação da CLI 2.1.1): também leva as do board
-    const kimi = aiToolInfo('kimi').agents;
+    const kimi = baseInfo('kimi').agents;
     expect(renderAgentFile(kimi, input)).toContain('tools: Read, Edit, mcp__faz-ai__*\n');
     expect(parseAgentFile(kimi, found, renderAgentFile(kimi, input)).tools).toEqual(['Read', 'Edit']);
     // sem `model:` nem `skills:` (a CLI os ignora), mas o valor do board fica em faz-ai-model
@@ -111,11 +111,11 @@ describe('arquivos de agente', () => {
     expect(kimiText).toContain('faz-ai-model: "claude:sonnet@medium"');
     expect(kimiText).not.toContain('subagents');
     expect(renderAgentFile(kimi, { ...input, tools: ['Read', 'Agent'] })).toContain('subagents: "*"\n');
-    expect(renderAgentFile(aiToolInfo('claude').agents, { ...input, tools: ['Agent'] })).not.toContain('subagents');
+    expect(renderAgentFile(baseInfo('claude').agents, { ...input, tools: ['Agent'] })).not.toContain('subagents');
   });
 
   it('no Cursor, readonly e is_background são gravados e lidos; no Claude Code não existem', () => {
-    const cursor = aiToolInfo('cursor').agents;
+    const cursor = baseInfo('cursor').agents;
     const found = { name: 'x', scope: 'user' as const, path: '/h/x.md', location: '~/x.md' };
     const text = renderAgentFile(cursor, { ...input, tools: [], deniedTools: [], skills: [], mcp: [], readonly: true, background: true });
     expect(text).toContain('model: sonnet\nreadonly: true\nis_background: true\n');
@@ -129,7 +129,7 @@ describe('arquivos de agente', () => {
     expect(plain).toMatchObject({ readonly: false, background: false });
     expect(agentInputOf(plain)).toEqual({ ...input, name: 'x' });
     // a pasta do Claude Code não grava nem lê as chaves do Cursor
-    const claude = aiToolInfo('claude').agents;
+    const claude = baseInfo('claude').agents;
     expect(renderAgentFile(claude, { ...input, readonly: true, background: true })).not.toMatch(/readonly|is_background/);
     expect(parseAgentFile(claude, found, '---\nname: x\ndescription: "d"\nreadonly: true\nis_background: true\n---\nC\n')).toMatchObject({
       readonly: false,

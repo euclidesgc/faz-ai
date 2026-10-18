@@ -1,3 +1,4 @@
+import { baseValue } from '../../../../shared/harness';
 import { Badge, Checkbox } from '@radix-ui/themes';
 import { AGENT_TOOLS, extraToolNames, mcpToolPattern } from '../../../../shared/agentTools';
 import type { AiTool } from '../../../../shared/harness';
@@ -25,7 +26,7 @@ interface Props {
  * `Bash(git diff *)`) aparece como chip marcado, que dá para tirar; `servers` oferece acrescentar um servidor.
  */
 export function ToolChecklist({ tool, value, onChange, deny = false, servers = [], prefix = '' }: Props) {
-  const groups = AGENT_TOOLS[tool];
+  const groups = baseValue(AGENT_TOOLS, tool) ?? [];
   const toggle = (name: string, on: boolean) => onChange(on ? [...value, name] : value.filter((v) => v !== name));
   const extras = extraToolNames(tool, value);
   const addable = servers.filter((s) => !value.includes(mcpToolPattern(s)));

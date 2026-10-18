@@ -202,6 +202,7 @@ function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
       ];
     }
   }
+  return [];
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 34;
+export const SCHEMA_VERSION = 43;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -449,6 +449,141 @@ const MIGRATIONS: Record<number, string> = {
       PRIMARY KEY (artifact_id, path)
     );
   `,
+  35: `
+    -- Contratos novos ficam separados: nenhum campo legado muda de significado ou vira autorização.
+    CREATE TABLE agent_context_contracts (
+      artifact_id TEXT PRIMARY KEY REFERENCES board_artifacts(id) ON DELETE CASCADE,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      contract_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE activity_context_selections (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      card_id TEXT REFERENCES cards(id) ON DELETE CASCADE,
+      workflow_id TEXT REFERENCES workflows(id) ON DELETE CASCADE,
+      phase_id TEXT NOT NULL DEFAULT '',
+      action TEXT NOT NULL,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      selection_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      CHECK (card_id IS NULL OR workflow_id IS NULL)
+    );
+    -- A fase removida permanece identificável para revisão; seu nome nunca é a identidade.
+    CREATE UNIQUE INDEX activity_context_target ON activity_context_selections
+      (board_id, COALESCE(card_id, ''), COALESCE(workflow_id, ''), phase_id, action);
+  `,
+  36: `
+    -- Decisão auditável separada dos recibos locais; nunca é uma autorização reutilizável.
+    ALTER TABLE ai_runs ADD COLUMN admission_json TEXT;
+  `,
+  37: `
+    ALTER TABLE activity_context_selections ADD COLUMN review_reason TEXT NOT NULL DEFAULT '';
+  `,
+  38: `
+    ALTER TABLE board_artifacts ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+  `,
+  39: `
+    CREATE TABLE ai_work (
+      id TEXT PRIMARY KEY, board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      work_key TEXT NOT NULL, kind TEXT NOT NULL, story_id TEXT, card_id TEXT, column_id TEXT NOT NULL,
+      state TEXT NOT NULL, generation INTEGER NOT NULL DEFAULT 0, owner TEXT, workspace TEXT,
+      reason TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+      UNIQUE(board_id, work_key)
+    );
+    CREATE INDEX idx_ai_work_open ON ai_work(board_id, state);
+    CREATE UNIQUE INDEX idx_ai_work_live_card ON ai_work(board_id, card_id)
+      WHERE card_id IS NOT NULL AND state IN ('prepared', 'started', 'reconciling');
+    CREATE UNIQUE INDEX idx_ai_work_live_workspace ON ai_work(workspace)
+      WHERE workspace IS NOT NULL AND state IN ('prepared', 'started', 'reconciling');
+    CREATE TABLE ai_work_attempts (
+      id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES ai_work(id) ON DELETE CASCADE,
+      generation INTEGER NOT NULL, run_id TEXT, token_hash TEXT, identity_json TEXT,
+      workspace_before TEXT, mutations INTEGER NOT NULL DEFAULT 0, outcome TEXT, result_comment_id TEXT,
+      started_at INTEGER NOT NULL, ended_at INTEGER, UNIQUE(work_id, generation)
+    );
+    CREATE UNIQUE INDEX idx_ai_work_attempts_token ON ai_work_attempts(token_hash) WHERE token_hash IS NOT NULL;
+    CREATE UNIQUE INDEX idx_ai_work_attempts_run ON ai_work_attempts(run_id) WHERE run_id IS NOT NULL;
+  `,
+  40: `
+    ALTER TABLE board_artifacts ADD COLUMN secret_ref TEXT;
+    ALTER TABLE board_artifacts ADD COLUMN review_state TEXT NOT NULL DEFAULT 'legacy'
+      CHECK (review_state IN ('legacy', 'pending', 'reviewed'));
+  `,
+  41: `
+    CREATE TABLE execution_policies (
+      id TEXT PRIMARY KEY, board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      review_state TEXT NOT NULL CHECK (review_state IN ('pending','reviewed')),
+      policy_json TEXT NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER
+    );
+    CREATE INDEX idx_execution_policies_board ON execution_policies(board_id);
+    CREATE TABLE execution_policy_versions (
+      policy_id TEXT NOT NULL REFERENCES execution_policies(id) ON DELETE CASCADE,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      review_state TEXT NOT NULL CHECK (review_state IN ('pending','reviewed')),
+      policy_json TEXT NOT NULL, updated_at INTEGER NOT NULL,
+      PRIMARY KEY (policy_id, revision)
+    );
+  `,
+  42: `
+    -- #618: perfis são dados; comandos e variáveis ficam no cofre local de #728.
+    CREATE TABLE ai_profiles (
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      id TEXT NOT NULL, name TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1,
+      kind TEXT NOT NULL, base TEXT NOT NULL, config_json TEXT NOT NULL DEFAULT '{}',
+      position INTEGER NOT NULL DEFAULT 0, secret_ref TEXT,
+      review_state TEXT NOT NULL DEFAULT 'pending' CHECK (review_state IN ('pending', 'reviewed')),
+      PRIMARY KEY (board_id, id)
+    );
+    INSERT INTO ai_profiles(board_id,id,name,kind,base,position,review_state) SELECT id,'claude','Claude Code','builtin','claude',0,'reviewed' FROM boards;
+    INSERT INTO ai_profiles(board_id,id,name,kind,base,position,review_state) SELECT id,'cursor','Cursor','builtin','cursor',1,'reviewed' FROM boards;
+    INSERT INTO ai_profiles(board_id,id,name,kind,base,position,review_state) SELECT id,'kimi','Kimi Code','builtin','kimi',2,'reviewed' FROM boards;
+  `,
+  43: `
+    -- A nova origem não pode reutilizar 'chat': preserva-se também inventário/Bash e auditoria.
+    CREATE TABLE ai_runs_v43 (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      started_at INTEGER NOT NULL,
+      ended_at INTEGER,
+      duration_ms INTEGER,
+      month TEXT NOT NULL,
+      outcome TEXT,
+      exit_code INTEGER,
+      origin TEXT NOT NULL CHECK (origin IN ('manual','heartbeat','autopilot','chat','test')),
+
+      card_id TEXT,
+      card_number INTEGER,
+      card_title TEXT NOT NULL DEFAULT '',
+      card_type TEXT NOT NULL DEFAULT '',
+      workflow TEXT NOT NULL DEFAULT '',
+      column_name TEXT NOT NULL DEFAULT '',
+      phase TEXT NOT NULL DEFAULT '',
+
+      tool TEXT NOT NULL,
+      model TEXT, effort TEXT, profile TEXT, agent TEXT,
+      permission TEXT NOT NULL,
+      autonomous INTEGER NOT NULL DEFAULT 0,
+      clean INTEGER NOT NULL DEFAULT 0,
+      skills_json TEXT NOT NULL DEFAULT '[]',
+      mcp_json TEXT,
+
+      input_tokens INTEGER, output_tokens INTEGER,
+      cache_read_tokens INTEGER, cache_write_tokens INTEGER,
+      cost_usd REAL,
+      turns INTEGER, session_id TEXT, cost_estimated INTEGER,
+      measure TEXT NOT NULL DEFAULT 'none', admission_json TEXT
+    );
+    INSERT INTO ai_runs_v43 SELECT * FROM ai_runs;
+    DROP TABLE ai_runs;
+    ALTER TABLE ai_runs_v43 RENAME TO ai_runs;
+    CREATE INDEX idx_ai_runs_month ON ai_runs(board_id, month, started_at);
+    CREATE INDEX idx_ai_runs_card ON ai_runs(board_id, card_number, started_at);
+    CREATE INDEX idx_ai_runs_open ON ai_runs(board_id, outcome);
+  `,
 };
 
 /** Aplica as migrações pendentes até `upTo` (por padrão, a versão atual). */
@@ -469,15 +604,25 @@ export function migrate(db: Database, upTo = SCHEMA_VERSION): void {
     const next = current + 1;
     const sql = MIGRATIONS[next];
     if (!sql) throw new Error(`Migration ${next} não encontrada`);
-    db.exec('BEGIN;');
+    // Recriar a tabela-pai exige suspender FKs antes da transação para não cascatear os filhos.
+    const rebuildRuns = next === 43;
+    if (rebuildRuns) db.run('PRAGMA foreign_keys = OFF;');
+    let begun = false;
     try {
+      db.exec('BEGIN;');
+      begun = true;
       db.exec(sql);
+      if (rebuildRuns && db.exec('PRAGMA foreign_key_check').some((r) => r.values.length))
+        throw new Error('Referências inválidas após reconstruir o log de execuções.');
       db.run("INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)", [String(next)]);
       db.exec('COMMIT;');
+      begun = false;
     } catch (e) {
-      db.exec('ROLLBACK;');
+      if (begun) db.exec('ROLLBACK;');
       // qual migração falhou: sem isso o erro do SQLite não diz em que passo o banco parou
       throw new Error(`Migração ${next} do banco do board: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      if (rebuildRuns) db.run('PRAGMA foreign_keys = ON;');
     }
     current = next;
   }

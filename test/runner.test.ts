@@ -110,6 +110,12 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     },
   });
   router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'restrito' } } });
+  const pendingMcp = router.snapshot().harness.library?.artifacts.find((a) => a.kind === 'mcp' && a.name === 'github');
+  if (pendingMcp)
+    router.handle({
+      type: 'harness.library.save',
+      input: { ...router.readLibraryArtifact(pendingMcp.id), server: { command: 'gh-mcp', env: { TOKEN: 'segredo' } } },
+    });
   const s0 = router.snapshot();
   const cardId = router.createCard({ typeId: s0.cardTypes[0]!.id, columnId: s0.columns[0]!.id, parentId: null, title: 'x' });
   const card = () => router.snapshot().cards.find((c) => c.id === cardId)!;
@@ -953,6 +959,7 @@ describe('executor da IA', () => {
     expect([...CURSOR_TOOLS.board, ...CURSOR_TOOLS.edits]).not.toContain('shell_tool_call');
     expect(headlessUnsupported('claude', 'board')).toBeNull();
     expect(headlessUnsupported('cursor', 'board')).toBeNull();
+    expect(headlessUnsupported('perfil-personalizado', 'board')).toContain('ainda não disponível');
     // o Claude Code recusa pular as permissões como root
     expect(headlessUnsupported('claude', 'full', 0)).toContain('root');
     expect(headlessUnsupported('claude', 'full', 1000)).toBeNull();
@@ -993,6 +1000,7 @@ describe('executor da IA', () => {
 
   it('guarda permissão e tempo limite, recusando valores inválidos', () => {
     expect(router.snapshot().board.runner).toEqual({
+      parallelSubtasks: 2,
       defaultAgent: '',
       permission: 'board',
       timeoutMinutes: 45,
@@ -1451,15 +1459,18 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
   it('regra com reserva + limite esgotado: segunda chamada ao gateway com o modelo reserva, comentário na conversa, sem bloqueio', () => {
     useSonnetMedium();
     ruleWithFallback(modelValue(fable().id, 'low'));
-    runner.start(storyId);
+    const done = vi.fn();
+    runner.start(storyId, { origin: 'manual', advice: ['ORIENTAÇÃO PRESERVADA'], onExit: done });
     expect(procs).toHaveLength(1);
     procs[0]!.emit(usageLimitResult());
     procs[0]!.exit(1);
+    expect(done).not.toHaveBeenCalled();
 
     expect(procs).toHaveLength(2);
     const args = procs[1]!.command.args;
     expect(args[args.indexOf('--model') + 1]).toBe('fable');
     expect(args[args.indexOf('--effort') + 1]).toBe('low');
+    expect(procs[1]!.command.stdin).toContain('ORIENTAÇÃO PRESERVADA');
     expect(card().status).toBe('running'); // não bloqueou nem esperou resposta: a reserva está em curso
     expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
     expect(lastMessage()!.body).toBe('O `Sonnet 5.5 - médio` esgotou o limite; a execução segue com `Fable 5.1 - baixo`.');
@@ -1467,6 +1478,7 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     // a retentativa termina bem: segue como qualquer execução normal (aqui, a IA só respondeu na conversa)
     ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
     procs[1]!.exit(0);
+    expect(done).toHaveBeenCalledOnce();
     expect(card().status).toBe('waiting_answer');
   });
 
