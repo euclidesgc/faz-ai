@@ -50,6 +50,7 @@ export interface AgentContractRecord {
   contract: AgentContextContract;
 }
 export interface ActivitySelectionRecord extends ContextActivityTarget {
+  reason?: string;
   id: string;
   revision: number;
   updatedAt: number;
@@ -74,7 +75,8 @@ export interface ContextPlanningState {
 }
 export type ContextPlanningWrite =
   | { kind: 'agent'; artifactId: string; expectedRevision: number; contract: AgentContextContract }
-  | { kind: 'activity'; target: ContextActivityTarget; expectedRevision: number; selection: ActivityContextSelection };
+  | { kind: 'activity'; target: ContextActivityTarget; expectedRevision: number; selection: ActivityContextSelection; reason?: string };
+export type ActivityContextWrite = Extract<ContextPlanningWrite, { kind: 'activity' }>;
 
 /** Projeção de compatibilidade, sempre lida dos campos originais para não criar duas cópias divergentes. */
 export function legacyContextPlanning(
@@ -162,6 +164,9 @@ export function validateActivityContext(v: unknown): asserts v is ActivityContex
   choice(v.model, (x) => text(x, 240));
   choice(v.additionalSkillIds, ids);
   choice(v.activeMcpIds, ids);
+}
+export function validateContextReason(value: unknown): void {
+  if (value !== undefined && !text(value, 4000)) throw new Error('Justificativa de contexto inválida.');
 }
 export function validateContextTarget(v: unknown): asserts v is ContextActivityTarget {
   keys(v, ['cardId', 'workflowId', 'phaseId', 'action']);

@@ -59,6 +59,16 @@ A identidade da evidência inclui perfil, caminho/binário, argumentos relevante
 
 **Ainda pendente:** implementar o coletor/verificador das CLIs reais, produzir recibos de isolamento e integrar sua leitura na prévia e nos preparadores de todas as ações. O host mantém fontes externas como desconhecidas; nenhum executor real foi habilitado por estes testes. Os recibos dos testes são sintéticos. E3 e #729 continuam parciais; E5 não foi ativada.
 
+## E4 — Painel e revisão humana do plano
+
+A aba **Plano de execução** usa o resolvedor puro para mostrar as ações de cada card. Histórias acrescentam trabalho por ID de fase aberta; tarefas mantêm quatro ações independentes sem herdar o condutor. Cada atividade tem agente, modelo explícito/herdado, skills adicionais, MCPs ativos, anexos de entrada, resultado e justificativa. Essenciais e Sempre aparecem na prévia, sugestões continuam opcionais e MCP incompatível permanece visível e removível. O catálogo exibe somente nomes e descrições curtas.
+
+Os padrões do board e dos workflows ficam na ferramenta do Harness e incluem chat e assistentes sem card. Critérios e dependências são referências às estruturas originais. Origens, revisões, diferenças e estimativa conhecida/desconhecida aparecem antes de aplicar alterações, inclusive cópias entre fases. A estimativa não declara consumo total nem economia comprovada.
+
+O schema **37** acrescenta justificativa revisada. `contextPlanning.saveBatch` é exclusivo da pessoa e grava até 100 atividades em uma transação com revisão otimista; duplicatas e revisão atrasada recusam o lote inteiro. Export/import valida e preserva a justificativa. Falha ao salvar conserva os rascunhos; atualizar revisões exige nova comparação. A troca de abas do card preserva rascunhos locais. Fechar o card descarta edições ainda não aplicadas.
+
+Testes cobrem migração 36→37, rollback, importação, alvos estáveis, precedência, independência por ação, estimativas desconhecidas, revisão de lote, cópia, falha, concorrência, troca de agente, recursos ausentes, tradução e navegação por teclado. **A interface da E4 está implementada em modo de rascunho.** A pendência da admissão real da E3 permanece; essa entrega não habilita E5 nem comprova isolamento do executor.
+
 ## Dependências identificadas no board
 
 Consulta local somente de leitura ao board deste projeto em 17/10/2026:
@@ -85,6 +95,6 @@ Lidas as descrições de #729, #619, #711, #712, #618, #727 e #728 e o anexo nor
 
 ## Trabalho ainda pendente
 
-E3 está parcialmente implementada; falta a integração dos limites de #729, sub-tarefa cadastrada no board e ainda em A fazer. E4–E7 continuam pendentes; E5 requer também os snapshots e os contratos de orquestração e políticas citados no plano. Não substituir essas dependências por outro scheduler, outro motor de modelos ou permissões somente na interface.
+E3 está parcialmente implementada; falta a integração dos limites de #729, sub-tarefa cadastrada no board e ainda em A fazer. E4 tem interface e salvamento revisável em modo de rascunho; E5–E7 continuam pendentes; E5 requer também os snapshots e os contratos de orquestração e políticas citados no plano. Não substituir essas dependências por outro scheduler, outro motor de modelos ou permissões somente na interface.
 
 O piloto de E7 exige tarefas representativas e medições de execuções aceitas; não foi executado como efeito desta entrega. Nenhuma redução de consumo ou preservação de qualidade foi demonstrada ainda.

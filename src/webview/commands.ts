@@ -30,6 +30,7 @@ const post = (msg: WebviewToHost): void => postToHost(msg);
  */
 const req = (msg: WebviewToHost): Promise<void> => request(msg);
 export const contextPlanning = {
+  saveBatch: (inputs: import('../shared/contextPlanning').ActivityContextWrite[]) => req({ type: 'contextPlanning.saveBatch', inputs }),
   save: (input: import('../shared/contextPlanning').ContextPlanningWrite) => req({ type: 'contextPlanning.save', input }),
 };
 /** Como `req`, e o card fica marcado como ocupado (spinner no board e no card aberto) até a resposta. */

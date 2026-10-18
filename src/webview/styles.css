@@ -4588,3 +4588,51 @@ div.metrics-breakdown {
   border: 0;
   min-width: 0;
 }
+
+.execution-plan,
+.context-plan-defaults {
+  display: grid;
+  gap: var(--sp-12);
+  min-width: 0;
+}
+.context-plan-defaults {
+  margin-top: var(--sp-24);
+}
+.context-plan-table-wrap {
+  overflow-x: auto;
+}
+.context-plan-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.context-plan-table th,
+.context-plan-table td {
+  padding: var(--sp-8);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.context-plan-table details {
+  margin-top: var(--sp-8);
+}
+.context-plan-table dl {
+  margin: 0;
+  min-width: 12rem;
+}
+.context-plan-table dt {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.context-plan-table dd {
+  margin: 0 0 var(--sp-8);
+  overflow-wrap: anywhere;
+}
+.context-plan-review {
+  display: grid;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  background: var(--col-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}

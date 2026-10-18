@@ -424,6 +424,11 @@ export const harnessHandlers = {
     new ContextPlanningRepo(ctx.dbHandle.db).save(ctx.boardId, msg.input);
     return true;
   },
+  'contextPlanning.saveBatch': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('Contratos de contexto exigem revisão humana; a IA não pode alterar autorizações.');
+    new ContextPlanningRepo(ctx.dbHandle.db).saveBatch(ctx.boardId, msg.inputs);
+    return true;
+  },
   'harness.library.scan': (msg, ctx) => {
     ctx.library.scanFolder(msg.dir);
     ctx.harness.load();

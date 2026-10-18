@@ -4,10 +4,12 @@ import {
   validateActivityContext,
   validateAgentContext,
   validateContextTarget,
+  validateContextReason,
   type ActivitySelectionRecord,
   type AgentContractRecord,
   type ContextActivityTarget,
   type ContextPlanningWrite,
+  type ActivityContextWrite,
 } from '../../shared/contextPlanning';
 import { all, num, one, run, str, transaction, type Row } from '../db/query';
 import { newId, now } from '../db/ids';
@@ -28,70 +30,95 @@ export class ContextPlanningRepo {
         validateRecord(r);
         const selection: unknown = JSON.parse(str(r.selection_json));
         validateActivityContext(selection);
+        validateContextReason(r.review_reason);
         const target = targetOfRow(r);
         validateContextTarget(target);
-        return { id: str(r.id), ...target, revision: num(r.revision), updatedAt: num(r.updated_at), selection };
+        return {
+          id: str(r.id),
+          ...target,
+          revision: num(r.revision),
+          updatedAt: num(r.updated_at),
+          selection,
+          ...(r.review_reason ? { reason: str(r.review_reason) } : {}),
+        };
       }),
     };
   }
 
   /** Revisão otimista evita que uma edição atrasada substitua outra já revisada. */
   save(boardId: string, input: ContextPlanningWrite): void {
+    transaction(this.db, () => this.write(boardId, input));
+  }
+
+  saveBatch(boardId: string, inputs: ActivityContextWrite[]): void {
+    if (!Array.isArray(inputs) || !inputs.length || inputs.length > 100 || inputs.some((i) => i?.kind !== 'activity'))
+      throw new Error('Lote de contexto inválido.');
+    const targets = inputs.map((i) => {
+      validateContextTarget(i.target);
+      return JSON.stringify([i.target.cardId, i.target.workflowId, i.target.phaseId, i.target.action]);
+    });
+    if (new Set(targets).size !== targets.length) throw new Error('O lote contém a mesma atividade mais de uma vez.');
+    transaction(this.db, () => {
+      for (const input of inputs) this.write(boardId, input);
+    });
+  }
+
+  private write(boardId: string, input: ContextPlanningWrite): void {
     if (!input || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0)
       throw new Error('Revisão de contexto inválida.');
-    transaction(this.db, () => {
-      const stamp = now();
-      if (input.kind === 'agent') {
-        validateAgentContext(input.contract);
-        this.owner(boardId, 'board_artifacts', input.artifactId, 'agent');
-        const old = one(this.db, 'SELECT revision FROM agent_context_contracts WHERE artifact_id = ? AND board_id = ?', [
-          input.artifactId,
-          boardId,
-        ]);
-        this.revision(old, input.expectedRevision);
-        this.artifacts(boardId, input.contract.essentialSkillIds, 'skill');
-        this.artifacts(boardId, input.contract.availableSkillIds, 'skill');
-        this.artifacts(boardId, input.contract.allowedMcpIds, 'mcp');
-        run(
-          this.db,
-          `INSERT INTO agent_context_contracts (artifact_id, board_id, revision, contract_json, updated_at)
+    const stamp = now();
+    if (input.kind === 'agent') {
+      validateAgentContext(input.contract);
+      this.owner(boardId, 'board_artifacts', input.artifactId, 'agent');
+      const old = one(this.db, 'SELECT revision FROM agent_context_contracts WHERE artifact_id = ? AND board_id = ?', [
+        input.artifactId,
+        boardId,
+      ]);
+      this.revision(old, input.expectedRevision);
+      this.artifacts(boardId, input.contract.essentialSkillIds, 'skill');
+      this.artifacts(boardId, input.contract.availableSkillIds, 'skill');
+      this.artifacts(boardId, input.contract.allowedMcpIds, 'mcp');
+      run(
+        this.db,
+        `INSERT INTO agent_context_contracts (artifact_id, board_id, revision, contract_json, updated_at)
           VALUES (?, ?, ?, ?, ?) ON CONFLICT(artifact_id) DO UPDATE SET revision = excluded.revision, contract_json = excluded.contract_json, updated_at = excluded.updated_at`,
-          [input.artifactId, boardId, input.expectedRevision + 1, JSON.stringify(input.contract), stamp],
-        );
-      } else if (input.kind === 'activity') {
-        validateActivityContext(input.selection);
-        validateContextTarget(input.target);
-        const t = input.target;
-        this.target(boardId, t, true);
-        const old = one(
-          this.db,
-          `SELECT * FROM activity_context_selections WHERE board_id = ? AND card_id IS ? AND workflow_id IS ? AND phase_id = ? AND action = ?`,
-          [boardId, t.cardId, t.workflowId, t.phaseId, t.action],
-        );
-        this.revision(old, input.expectedRevision);
-        const c = input.selection;
-        if (c.agent.mode === 'explicit' && c.agent.value !== null) this.artifacts(boardId, [c.agent.value], 'agent');
-        if (c.additionalSkillIds.mode === 'explicit') this.artifacts(boardId, c.additionalSkillIds.value, 'skill');
-        if (c.activeMcpIds.mode === 'explicit') this.artifacts(boardId, c.activeMcpIds.value, 'mcp');
-        for (const id of c.inputAttachmentIds) this.reference(boardId, 'attachments', id);
-        run(
-          this.db,
-          `INSERT INTO activity_context_selections (id, board_id, card_id, workflow_id, phase_id, action, revision, selection_json, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET revision = excluded.revision, selection_json = excluded.selection_json, updated_at = excluded.updated_at`,
-          [
-            old ? str(old.id) : newId(),
-            boardId,
-            t.cardId,
-            t.workflowId,
-            t.phaseId,
-            t.action,
-            input.expectedRevision + 1,
-            JSON.stringify(c),
-            stamp,
-          ],
-        );
-      } else throw new Error('Tipo de configuração de contexto inválido.');
-    });
+        [input.artifactId, boardId, input.expectedRevision + 1, JSON.stringify(input.contract), stamp],
+      );
+    } else if (input.kind === 'activity') {
+      validateActivityContext(input.selection);
+      validateContextReason(input.reason);
+      validateContextTarget(input.target);
+      const t = input.target;
+      this.target(boardId, t, true);
+      const old = one(
+        this.db,
+        `SELECT * FROM activity_context_selections WHERE board_id = ? AND card_id IS ? AND workflow_id IS ? AND phase_id = ? AND action = ?`,
+        [boardId, t.cardId, t.workflowId, t.phaseId, t.action],
+      );
+      this.revision(old, input.expectedRevision);
+      const c = input.selection;
+      if (c.agent.mode === 'explicit' && c.agent.value !== null) this.artifacts(boardId, [c.agent.value], 'agent');
+      if (c.additionalSkillIds.mode === 'explicit') this.artifacts(boardId, c.additionalSkillIds.value, 'skill');
+      if (c.activeMcpIds.mode === 'explicit') this.artifacts(boardId, c.activeMcpIds.value, 'mcp');
+      for (const id of c.inputAttachmentIds) this.reference(boardId, 'attachments', id);
+      run(
+        this.db,
+        `INSERT INTO activity_context_selections (id, board_id, card_id, workflow_id, phase_id, action, revision, selection_json, updated_at, review_reason)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET revision = excluded.revision, selection_json = excluded.selection_json, updated_at = excluded.updated_at, review_reason = excluded.review_reason`,
+        [
+          old ? str(old.id) : newId(),
+          boardId,
+          t.cardId,
+          t.workflowId,
+          t.phaseId,
+          t.action,
+          input.expectedRevision + 1,
+          JSON.stringify(c),
+          stamp,
+          input.reason ?? '',
+        ],
+      );
+    } else throw new Error('Tipo de configuração de contexto inválido.');
   }
 
   /** Validação após materializar um import em memória, antes de substituir o board real. */

@@ -4,6 +4,7 @@ import { resolveHarnessTab } from '../../../shared/harnessTopics';
 import { useBoardStore, type HarnessTab } from '../../store/boardStore';
 import { ProjectTool } from './harness/ProjectTool';
 import { RunnerSettings } from './harness/RunnerSettings';
+import { ContextPlanDefaults } from '../card/ExecutionPlanPanel';
 import { HarnessIntro } from './harness/HarnessIntro';
 import { BoardLibrary } from './harness/BoardLibrary';
 import { PageHeader } from './PageHeader';
@@ -52,6 +53,7 @@ export function HarnessSettings() {
         <Tabs.Content value="tool">
           <ProjectTool tool={tool} />
           <RunnerSettings tool={tool} />
+          <ContextPlanDefaults />
         </Tabs.Content>
       </Tabs.Root>
     </div>

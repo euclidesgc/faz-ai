@@ -1,5 +1,5 @@
 import { ContextPlanningRepo } from '../repositories/contextPlanningRepo';
-import { validateActivityContext, validateAgentContext, validateContextTarget } from '../../shared/contextPlanning';
+import { validateActivityContext, validateAgentContext, validateContextTarget, validateContextReason } from '../../shared/contextPlanning';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Database, SqlValue } from 'sql.js';
@@ -268,6 +268,7 @@ export function parseExportFile(text: string): BoardExportFile {
       throw invalid('contrato de agente inválido.');
   }
   for (const r of tables.activity_context_selections as Row[]) {
+    validateContextReason(r.review_reason);
     validateActivityContext(JSON.parse(str(r.selection_json)));
     validateContextTarget({ cardId: r.card_id, workflowId: r.workflow_id, phaseId: r.phase_id, action: r.action });
     if (!Number.isSafeInteger(r.revision) || Number(r.revision) < 1) throw invalid('revisão de atividade inválida.');

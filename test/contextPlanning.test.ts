@@ -264,6 +264,71 @@ describe('contratos de contexto versionados', () => {
     expect(next.contextPlanning?.agents[0]?.revision).toBe(1);
   });
 
+  it('salva lote revisado por ação e preserva justificativa no export/import', () => {
+    const inputs = (['work', 'refine'] as const).map((action) => ({
+      kind: 'activity' as const,
+      target: { ...target(), action },
+      expectedRevision: 0,
+      selection: { ...selection(), expectedResult: action },
+      reason: `Revisado para ${action}`,
+    }));
+    router.handle({ type: 'contextPlanning.saveBatch', inputs });
+    const before = repo.read(router.boardId).activities;
+    expect(before).toHaveLength(2);
+    expect(before.every((a) => a.revision === 1 && a.reason === `Revisado para ${a.action}`)).toBe(true);
+    importFile(parseExportFile(JSON.stringify(exported())));
+    expect(repo.read(router.boardId).activities).toEqual(before);
+  });
+
+  it('reverte todo o lote quando a segunda atividade tem revisão atrasada', () => {
+    saveActivity();
+    const before = repo.read(router.boardId);
+    expect(() =>
+      repo.saveBatch(router.boardId, [
+        { kind: 'activity', target: { ...target(), action: 'refine' }, expectedRevision: 0, selection: selection() },
+        { kind: 'activity', target: target(), expectedRevision: 0, selection: selection() },
+      ]),
+    ).toThrow('mudou');
+    expect(repo.read(router.boardId)).toEqual(before);
+  });
+
+  it('recusa duplicação de alvos mesmo com ordem diferente das propriedades e escrita por IA', () => {
+    const input = { kind: 'activity' as const, target: target(), expectedRevision: 0, selection: selection() };
+    const reordered = { action: 'work' as const, phaseId, workflowId: null, cardId };
+    expect(() => repo.saveBatch(router.boardId, [input, { ...input, target: reordered }])).toThrow('mesma atividade');
+    expect(() => router.handle({ type: 'contextPlanning.saveBatch', inputs: [input] }, { source: 'ai' })).toThrow('revisão humana');
+    expect(repo.read(router.boardId).activities).toEqual([]);
+  });
+
+  it('valida justificativas antes de salvar ou substituir o board por importação', () => {
+    const input = { kind: 'activity' as const, target: target(), expectedRevision: 0, selection: selection() };
+    for (const reason of ['x'.repeat(4001), 'inválida\0'])
+      expect(() => repo.saveBatch(router.boardId, [{ ...input, reason }])).toThrow('Justificativa');
+    repo.saveBatch(router.boardId, [{ ...input, reason: 'Revisão humana' }]);
+    const before = repo.read(router.boardId);
+    const file = exported();
+    file.tables.activity_context_selections![0]!.review_reason = 'x'.repeat(4001);
+    expect(() => parseExportFile(JSON.stringify(file))).toThrow('Justificativa');
+    expect(repo.read(router.boardId)).toEqual(before);
+  });
+
+  it('migra seleções do schema 36 mantendo revisões e resultado sem inventar justificativa', () => {
+    const old = newDatabase();
+    migrate(old, 36);
+    const board = { ...exported().board, workspace_key: 'old' };
+    const keys = Object.keys(board);
+    old.run(`INSERT INTO boards (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`, Object.values(board));
+    old.run(
+      `INSERT INTO activity_context_selections (id, board_id, card_id, workflow_id, phase_id, action, revision, selection_json, updated_at)
+      VALUES (?, ?, NULL, NULL, '', 'work', 4, ?, 1)`,
+      ['old', router.boardId, JSON.stringify(selection())],
+    );
+    migrate(old);
+    expect(new ContextPlanningRepo(old).read(router.boardId).activities[0]).toMatchObject({ revision: 4, selection: selection() });
+    expect(new ContextPlanningRepo(old).read(router.boardId).activities[0]!.reason).toBeUndefined();
+    old.close();
+  });
+
   it('export/import preserva contrato e revisões, esvazia credenciais e mantém o manifesto', () => {
     saveAgent();
     saveAgent(contract(), 1);

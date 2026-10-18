@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 36;
+export const SCHEMA_VERSION = 37;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -477,6 +477,9 @@ const MIGRATIONS: Record<number, string> = {
   36: `
     -- Decisão auditável separada dos recibos locais; nunca é uma autorização reutilizável.
     ALTER TABLE ai_runs ADD COLUMN admission_json TEXT;
+  `,
+  37: `
+    ALTER TABLE activity_context_selections ADD COLUMN review_reason TEXT NOT NULL DEFAULT '';
   `,
 };
 

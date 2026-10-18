@@ -579,7 +579,7 @@ behavior visible; configuration per action and new authorization boundaries are 
 
 Persistence now separates **version 1** context contracts from legacy fields, with revisions and
 selections keyed by action and phase ID. Inheritance and explicit empty selections are distinct.
-New contracts are drafts: the per-action editor and runtime enforcement are not available yet.
+New contracts are drafts and do not govern runtime execution yet.
 The preview identifies legacy mode. Migration to schema 35 preserves original fields; its
 compatibility view identifies agent skills as essential and card skills as selected, including
 missing references. Legacy MCP selections do not become permissions in the new contract.
@@ -588,7 +588,11 @@ MCP credential values continue to be removed from exports.
 
 When editing a saved library subagent, **Edit context contract (draft)** opens the v1 contract: role, instructions, essential skills, suggested skills, allowed MCPs and tool restrictions. The contract has a separate save action, without AI and with optimistic revisions; it does not automatically copy legacy permissions. The preview shows essentials and Always items, keeps optional resources inactive and explains missing resources or incompatible MCPs. Missing references remain available for review.
 
-The host–webview protocol and the `preview_context_draft` MCP tool preview saved drafts: they resolve inheritance, sources and conflicts without inference and return artifact metadata. Capability admission from #729 remains pending; previews do not authorize execution. The per-activity selection editor belongs to the next delivery.
+The host–webview protocol and the `preview_context_draft` MCP tool preview saved drafts: they resolve inheritance, sources and conflicts without inference and return artifact metadata. Capability admission from #729 remains pending; previews do not authorize execution.
+
+The **Execution plan** tab lets you review the agent, model, additional skills, active MCPs, input attachments and expected result for each action. Stories include rows for open phases; tasks have four independent actions (work, refinement, summary and conflict resolution). Under **Settings → Harness → Tool**, board and workflow defaults use the same editor, including conversation and assistants without a card. The preview shows sources and incompatibilities. The catalog shows short descriptions without opening specialists’ instruction bodies.
+
+Changes remain drafts until **Compare changes** and **Apply reviewed drafts**, with differences, reasons and an estimate of the known context portion. Copying between activities also requires comparison. Criteria and dependencies reference the original card. Schema 37 stores reasons; the host saves the batch in one transaction and rejects stale revisions without partial writes. Failures preserve drafts, which also survive switching card tabs. This configuration prepares the plan; execution remains on the legacy path until E5 activation.
 
 Transport that requires project MCP files (Cursor and Kimi) uses a lease coordinated by the real file path. A protected journal under `~/.faz-ai/mcp-leases` precedes mutation; format attempts reuse the same ownership. After confirmed termination, the previous configuration is restored while preserving servers added by the person. Conflicting changes to the `faz-ai` entry or invalid JSON are not overwritten. Without confirmation that the process tree has ended, the lease is retained and a new run on that file is refused. The launcher receives the CLI command only after its identity is journaled. On startup, a demonstrably dead owner allows recovery of preparations whose command was never released and recorded process groups with confirmed termination. Old or ambiguous journals remain retained. Windows does not yet provide process-tree confirmation in this transport; that case requires reconciliation. This does not prove CLI isolation or complete #729.
 

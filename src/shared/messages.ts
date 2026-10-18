@@ -1,5 +1,5 @@
 import type { ContextDraftResolution } from './contextDraftResolution';
-import type { ContextActivityTarget, ContextPlanningWrite } from './contextPlanning';
+import type { ContextActivityTarget, ContextPlanningWrite, ActivityContextWrite } from './contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from './agentAssistance';
 import type { LibraryArtifactInput } from './artifacts';
 import type { Appearance } from './appearance';
@@ -299,6 +299,7 @@ export type WebviewToHost =
   | { type: 'harness.library.folders'; dir: string }
   | { type: 'harness.library.save'; input: LibraryArtifactInput }
   | { type: 'contextPlanning.save'; input: ContextPlanningWrite }
+  | { type: 'contextPlanning.saveBatch'; inputs: ActivityContextWrite[] }
   | { type: 'contextPlanning.preview'; requestId: string; target: ContextActivityTarget }
   | { type: 'harness.library.read'; id: string }
   | { type: 'harness.library.pickArtifacts' }

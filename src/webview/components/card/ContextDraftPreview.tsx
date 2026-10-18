@@ -1,7 +1,7 @@
 import type { ContextDraftDiagnostic, ContextDraftOrigin, ContextDraftResolution } from '../../../shared/contextDraftResolution';
 import { t } from '../../i18n';
 
-const ORIGINS: Record<ContextDraftOrigin, string> = {
+export const CONTEXT_DRAFT_ORIGINS: Record<ContextDraftOrigin, string> = {
   'card-phase': 'Fase no card',
   'card-action': 'Ação no card',
   'workflow-phase': 'Fase no workflow',
@@ -34,7 +34,7 @@ export function ContextDraftPreview({ preview }: { preview: ContextDraftResoluti
         {preview.items.map((item) => (
           <div key={item.artifactId}>
             <dt>{item.name}</dt>
-            <dd>{item.origins.map((origin) => t(ORIGINS[origin])).join(' · ')}</dd>
+            <dd>{item.origins.map((origin) => t(CONTEXT_DRAFT_ORIGINS[origin])).join(' · ')}</dd>
           </div>
         ))}
       </dl>

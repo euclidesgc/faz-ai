@@ -8,6 +8,8 @@ A seção **Não lançado** reúne apenas mudanças integradas na `develop`, agu
 
 ## Não lançado
 
+- **Plano de execução revisável por atividade.** Histórias mostram fases abertas; tarefas mantêm trabalho, refino, resumo e conflito independentes. O editor configura agente, modelo, skills, MCPs, entradas e resultado, com padrões de board/workflow e ações sem card. Antes de aplicar um lote, mostra diferenças, origens, justificativa e estimativa conhecida. Salvamento atômico com revisão otimista, schema 37, rascunhos preservados em falhas e entre abas. Os planos continuam rascunhos; o runtime permanece legado.
+
 - **Base de admissão de contratos v1 no gateway.** Cinco capacidades independentes e recibos locais vinculados à configuração substituem declarações manuais como fonte de prova no novo caminho. O mapeamento estrito do Claude intersecta ferramentas e operações MCP, impõe vazio explícito e revalida as restrições antes de iniciar. O schema 36 preserva a decisão de auditoria, sem exportar recibos locais nem reutilizar autorização importada. O verificador de CLIs reais e a ativação das ações continuam pendentes; execuções atuais permanecem legadas.
 
 - **Identidade registrada antes de iniciar a IA.** O launcher aguarda o registro durável da identidade antes de receber o comando. A recuperação distingue queda antes da liberação, execução órfã ainda viva e grupo comprovadamente encerrado. Testes com processos reais cobrem essas fronteiras; identidades ambíguas e a árvore Windows permanecem sem confirmação.

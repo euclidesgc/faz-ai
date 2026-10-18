@@ -4,6 +4,7 @@ import { AttachmentsTab } from './card/AttachmentsTab';
 import { CardHeading } from './card/CardHeading';
 import { CardTabs, type CardTab } from './card/CardTabs';
 import { UsageTab } from './card/UsageTab';
+import { ExecutionPlanPanel, type ExecutionPlanDrafts } from './card/ExecutionPlanPanel';
 import { ChecklistSection } from './card/ChecklistSection';
 import { CommentsTab } from './card/CommentsTab';
 import { DescriptionSection } from './card/DescriptionSection';
@@ -28,12 +29,14 @@ export function CardDrawer({ cardId }: { cardId: string }) {
   const [tab, setTab] = useState<CardTab>('details');
   // a mensagem sendo escrita na conversa sobrevive à troca de aba
   const [message, setMessage] = useState('');
+  const [planDrafts, setPlanDrafts] = useState<ExecutionPlanDrafts>({});
   // a descrição fica aqui para não se perder ao trocar de aba
   const draft = useDescriptionDraft(card, cardId);
 
   useEffect(() => {
     setTab('details');
     setMessage('');
+    setPlanDrafts({});
   }, [card?.id]);
 
   useEffect(() => {
@@ -72,6 +75,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
         {tab === 'comments' && <CommentsTab cardId={card.id} draft={message} onDraft={setMessage} />}
         {tab === 'attachments' && <AttachmentsTab cardId={card.id} />}
         {tab === 'usage' && <UsageTab card={card} />}
+        {tab === 'plan' && <ExecutionPlanPanel card={card} drafts={planDrafts} onDrafts={setPlanDrafts} />}
 
         {tab === 'details' && (
           <>

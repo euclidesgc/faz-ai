@@ -556,7 +556,7 @@ ativos.
 
 A persistência já separa contratos de contexto **versão 1** dos campos legados, com revisões e
 seleções por ação e ID de fase. Herança e seleção vazia são valores distintos. Os contratos novos
-são rascunhos: ainda não há editor por ação nem aplicação no runtime. A prévia identifica esse modo
+são rascunhos e ainda não governam o runtime. A prévia identifica esse modo
 legado. A migração para o schema 35 mantém os campos originais; sua leitura de compatibilidade
 identifica skills dos agentes como essenciais e skills dos cards como selecionadas, inclusive
 referências ausentes. MCPs legados não viram autorizações do contrato novo. Exportar e importar
@@ -565,7 +565,11 @@ credenciais MCP continuam removidos da exportação.
 
 Ao editar um subagente já salvo na biblioteca, **Editar contrato de contexto (rascunho)** abre o contrato v1: papel, instruções, skills essenciais, skills sugeridas, MCPs permitidos e restrições de ferramentas. O contrato tem salvamento próprio, sem IA e com revisão otimista; não copia automaticamente autorizações legadas. A prévia mostra essenciais e itens Sempre, mantém opcionais inativos e explica recursos ausentes ou MCPs incompatíveis. Referências ausentes permanecem revisáveis.
 
-O protocolo host–webview e o MCP `preview_context_draft` oferecem a prévia dos rascunhos salvos: resolvem herança, origens e incompatibilidades sem inferência e retornam metadados dos artefatos. A admissão por capacidades de #729 continua pendente; a prévia não autoriza execução. O editor de seleções por atividade pertence à próxima entrega.
+O protocolo host–webview e o MCP `preview_context_draft` oferecem a prévia dos rascunhos salvos: resolvem herança, origens e incompatibilidades sem inferência e retornam metadados dos artefatos. A admissão por capacidades de #729 continua pendente; a prévia não autoriza execução.
+
+A aba **Plano de execução** permite revisar agente, modelo, skills adicionais, MCPs ativos, anexos de entrada e resultado esperado por ação. Histórias incluem linhas por fase aberta; tarefas têm quatro ações independentes (trabalho, refino, resumo e conflito). Em **Configurações → Harness → Ferramenta**, os padrões do board e dos workflows usam o mesmo editor, incluindo conversa e assistentes sem card. As origens e incompatibilidades ficam na prévia. O catálogo mostra descrições curtas, sem abrir os corpos dos especialistas.
+
+As alterações ficam em rascunho até **Comparar alterações** e **Aplicar rascunhos revisados**, com diferenças, justificativa e estimativa da parcela conhecida do contexto. Copiar entre atividades também exige comparação. Critérios e dependências referenciam o card original. O schema 37 guarda justificativas; o host salva o lote em uma transação e recusa revisões atrasadas sem gravar parcialmente. Falhas preservam os rascunhos, que também sobrevivem à troca de abas do card. Essa configuração prepara o plano; a execução continua legada até a ativação da E5.
 
 O transporte que precisa de MCP por arquivo (Cursor e Kimi) usa um empréstimo coordenado pelo caminho real. O diário protegido em `~/.faz-ai/mcp-leases` precede a alteração; tentativas de formato reutilizam a mesma posse. Ao terminar com confirmação, o arquivo volta ao estado anterior, preservando servidores acrescentados pela pessoa. Alterações conflitantes da entrada `faz-ai` ou JSON inválido não são sobrescritos. Sem confirmação do fim da árvore de processos, o empréstimo fica retido e uma nova execução no mesmo arquivo é recusada. O launcher recebe o comando da CLI somente depois de sua identidade ser gravada no diário. Na abertura, um dono comprovadamente morto permite recuperar preparações sem comando liberado e grupos registrados cujo término foi confirmado. Diários antigos ou ambíguos permanecem retidos. O Windows ainda não tem confirmação de árvore nesse transporte; esse caso exige reconciliação. Isso não comprova isolamento da CLI nem conclui #729.
 
