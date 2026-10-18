@@ -1779,7 +1779,7 @@ code {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-/* o card espera a pausa por limite de uso (#800): a mesma família de aviso da faixa do topo */
+/* o card espera a pausa por limite de uso (história 800): a mesma família de aviso da faixa do topo */
 .limit-badge {
   font-size: var(--fs-xs);
   color: var(--warn-border);
