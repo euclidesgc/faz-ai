@@ -1,3 +1,5 @@
+import type { PolicyReply, PolicyScenario } from './policyManagement';
+import type { ExecutionPolicy } from './executionPolicies';
 import type { ContextDraftResolution } from './contextDraftResolution';
 import type { ContextActivityTarget, ContextPlanningWrite, ActivityContextWrite } from './contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from './agentAssistance';
@@ -298,6 +300,10 @@ export type WebviewToHost =
   | { type: 'harness.library.pickDirectory' }
   | { type: 'harness.library.folders'; dir: string }
   | { type: 'harness.library.save'; input: LibraryArtifactInput }
+  | { type: 'executionPolicy.read'; requestId: string; id?: string; beforeRevision?: number }
+  | { type: 'executionPolicy.simulate'; requestId: string; scenario: PolicyScenario }
+  | { type: 'settings.executionPolicy.save'; policy: ExecutionPolicy; expectedRevision: number; reviewed: boolean }
+  | { type: 'settings.executionPolicy.remove'; id: string; expectedRevision: number }
   | { type: 'contextPlanning.save'; input: ContextPlanningWrite }
   | { type: 'contextPlanning.saveBatch'; inputs: ActivityContextWrite[] }
   | { type: 'contextPlanning.preview'; requestId: string; target: ContextActivityTarget }
@@ -392,6 +398,7 @@ export type HostToWebview =
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
   /** prévia dos contratos salvos, sem corpos de artefatos, inferência ou admissão */
+  | ({ type: 'executionPolicy.result'; requestId: string } & PolicyReply)
   | { type: 'contextPlanning.preview.result'; requestId: string; preview?: ContextDraftResolution; error?: string }
   /** resposta a `card.usage.query`, correlacionada por `requestId` */
   | { type: 'card.usage.result'; requestId: string; usage?: CardUsage; error?: string }

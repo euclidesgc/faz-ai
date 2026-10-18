@@ -374,3 +374,10 @@ O hook interno de host `AiCall.beforeStart(identity)` pode aguardar persistênci
 ### Políticas versionadas — base de domínio
 
 O schema 41 acrescenta definições e histórico de políticas. A importação força revisão local pendente, preservando a intenção e as versões originais; a definição importada não é uma autorização. Não existe ferramenta MCP para salvar/ativar políticas executáveis. O repositório recusa gravação pela IA. O avaliador e a simulação compartilham a mesma função pura; ela não inicia processos, não resolve segredos e não grava o board. Sua integração às portas de inferência, à prévia e à auditoria de cada run ainda está pendente. Os dados de disponibilidade/admissão usados em execução deverão vir do host; parâmetros de simulação não constituem evidência.
+
+
+### Gestão humana de políticas no host
+
+A webview e o navegador usam `executionPolicy.read` (biblioteca ou histórico paginado) e `executionPolicy.simulate` com respostas correlacionadas por `requestId`. A simulação usa uma cópia do rascunho e não grava, resolve segredos, gera recibos nem inicia CLI. Instalação, credenciais e admissão no cenário são hipóteses declaradas, não estado comprovado do host. O catálogo contém apenas metadados dos providers integrados.
+
+`settings.executionPolicy.save` e `settings.executionPolicy.remove` exigem ação da pessoa e revisão otimista; IA, MCP externo e tokens de execução são recusados. A UI permite salvar pendente ou confirmar revisão após comparar todas as condições/destinos/limites, preserva o rascunho em conflitos e permite recarregar a versão atual para nova comparação. Remoção cria revisão desativada e mantém o histórico. Rascunhos inválidos para o catálogo podem ser desativados ou removidos. Não foram adicionadas ferramentas MCP de escrita/ativação. A integração do avaliador com as inferências e a prévia Próxima execução continua pendente.

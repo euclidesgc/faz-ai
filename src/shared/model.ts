@@ -244,6 +244,8 @@ export interface Autopilot {
 
 /** Snapshot completo enviado ao webview após cada mutação. */
 export interface BoardState {
+  /** Invalida cenários quando as políticas salvas mudam em outra janela. */
+  executionPolicyRevision?: string;
   /** Rascunhos versionados, separados do manifesto legado ainda em execução. */
   contextPlanning?: ContextPlanningState;
   board: Board;

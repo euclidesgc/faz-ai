@@ -187,4 +187,13 @@ O domínio v1 contém condições de origem, ação, agente, fase/tipo por ID e 
 
 Schema 41 e `ExecutionPolicyRepo` guardam cabeçalho e versões imutáveis, com revisão otimista, remoção lógica, snapshots congelados e validação do histórico antes da substituição por import. Importação conserva definições/versões, mas marca o cabeçalho como pendente de revisão local; o enabled original no histórico não autoriza execução. Não há escrita por IA ou endpoint MCP executável.
 
-**Ainda pendente:** ligar a resolução aos perfis/estado reais de #699/#700; congelar política/decisão no run de #701 e integrar um caminho único em #702/#732; editor/simulador #733, rascunhos assistidos #734 e migração do reserva legado #735. O domínio novo não está ativo em produção. O runner legado ainda usa sua regra antiga; ela deve ser substituída, sem dois avaliadores executáveis em paralelo, na integração. Não é conclusão de E5 nem de todo #730/#731.
+**Ainda pendente:** ligar a resolução aos perfis/estado reais de #699/#700; congelar política/decisão no run de #701 e integrar um caminho único em #702/#732; conclusão do editor/simulador #733, rascunhos assistidos #734 e migração do reserva legado #735. O domínio novo não está ativo em produção. O runner legado ainda usa sua regra antiga; ela deve ser substituída, sem dois avaliadores executáveis em paralelo, na integração. Não é conclusão de E5 nem de todo #730/#731.
+
+
+## Editor manual e simulação no host — avanço parcial de #732/#733
+
+Configurações → Harness → Ferramenta e execução oferece gestão manual de políticas com campos estruturados, destinos ordenados, condições por IDs estáveis, tentativas/prazo/backoff e concorrência global/por perfil. Comparação integral e confirmação explícita distinguem revisão de salvamento pendente. Histórico paginado permite recuperar versão como novo rascunho, mantendo a revisão atual como base. Conflitos preservam a edição; recarregar a base exige nova comparação e confirmação.
+
+O protocolo de leitura/simulação é correlacionado e cancelável, com erro de transporte/timeout. Simulação usa o avaliador puro no host, cópia do rascunho e cenários explicitamente hipotéticos. Não inicia IA, grava dados ou produz evidência de admissão. Alterações no cenário, política, catálogo/contexto e token dos cabeçalhos de políticas salvas marcam o resultado desatualizado. A revisão/remoção é recusada para origem IA/MCP/tentativa autenticada. Remover/desativar política com destino indisponível continua possível.
+
+Esta etapa não conclui #732/#733: ainda faltam perfis reais e catálogo de #705, Próxima execução pelo avaliador, integração de todos os chamadores e auditoria de decisões no runtime. A tela está na configuração de Harness existente; a organização definitiva em Ferramentas de IA acompanha os perfis. O modelo reserva legado continua ativo somente no caminho anterior, separado da simulação. Não há assistente de propostas #734 nem migração #735 nesta entrega.

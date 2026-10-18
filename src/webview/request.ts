@@ -103,3 +103,47 @@ export function requestAgentAssistance(
     }
   });
 }
+
+/** Leituras e simulações compartilham correlação, cancelamento e limite de tempo com as ações. */
+export function requestExecutionPolicy(
+  input:
+    | { type: 'executionPolicy.read'; id?: string; beforeRevision?: number }
+    | { type: 'executionPolicy.simulate'; scenario: import('../shared/policyManagement').PolicyScenario },
+): Promise<import('../shared/policyManagement').PolicyReply> {
+  const requestId = newRequestId();
+  const end = beginRequest();
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      off();
+      clearTimeout(timer);
+      pending.delete(cancel);
+      end();
+    };
+    const cancel = () => {
+      cleanup();
+      reject(new Error(REQUEST_CANCELLED_MESSAGE));
+    };
+    const off = onHostMessage((message) => {
+      if (message.type === 'done' && message.requestId === requestId && !message.ok) {
+        cleanup();
+        reject(new Error(message.error ?? 'Falhou.'));
+        return;
+      }
+      if (message.type !== 'executionPolicy.result' || message.requestId !== requestId) return;
+      cleanup();
+      if (message.error) reject(new Error(message.error));
+      else resolve(message);
+    });
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(REQUEST_TIMEOUT_MESSAGE));
+    }, REQUEST_TIMEOUT_MS);
+    pending.add(cancel);
+    try {
+      postToHost({ ...input, requestId });
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
+}

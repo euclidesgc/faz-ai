@@ -51,11 +51,17 @@ export class ExecutionPolicyRepo {
   snapshot(boardId: string): ExecutionPolicySnapshot {
     return freeze({ version: 1, records: this.read(boardId) });
   }
-  history(boardId: string, id: string): ExecutionPolicyRecord[] {
-    const rows = all(this.db, 'SELECT * FROM execution_policy_versions WHERE board_id = ? AND policy_id = ? ORDER BY revision', [
-      boardId,
-      id,
-    ]).map(parse);
+  history(boardId: string, id: string, page?: { before: number; limit: number }): ExecutionPolicyRecord[] {
+    if (
+      page &&
+      (!Number.isSafeInteger(page.before) || page.before < 1 || !Number.isSafeInteger(page.limit) || page.limit < 1 || page.limit > 100)
+    )
+      throw new Error('Página de histórico inválida.');
+    const rows = all(
+      this.db,
+      `SELECT * FROM execution_policy_versions WHERE board_id = ? AND policy_id = ?${page ? ' AND revision < ? ORDER BY revision DESC LIMIT ?' : ' ORDER BY revision'}`,
+      page ? [boardId, id, page.before, page.limit] : [boardId, id],
+    ).map(parse);
     for (const record of rows) validateExecutionPolicySnapshot({ version: 1, records: [record] });
     return rows;
   }
@@ -75,9 +81,10 @@ export class ExecutionPolicyRepo {
     const old = one(this.db, 'SELECT * FROM execution_policies WHERE id = ?', [input.policy.id]);
     if (old && (old.board_id !== boardId || old.deleted_at !== null)) throw new Error('Política indisponível neste board.');
     if ((old ? num(old.revision) : 0) !== input.expectedRevision) throw new Error('A política mudou. Releia antes de salvar.');
-    for (const target of input.policy.targets)
-      if (targetProblem(target, catalog.profiles, catalog.models))
-        throw new Error('Destino da política inválido ou indisponível no catálogo.');
+    if (input.reviewed && input.policy.enabled)
+      for (const target of input.policy.targets)
+        if (targetProblem(target, catalog.profiles, catalog.models))
+          throw new Error('Destino da política inválido ou indisponível no catálogo.');
     const record: ExecutionPolicyRecord = {
       policy: structuredClone(input.policy),
       revision: input.expectedRevision + 1,
@@ -87,7 +94,8 @@ export class ExecutionPolicyRepo {
     const records = this.read(boardId).filter((r) => r.policy.id !== input.policy.id);
     records.push(record);
     validateExecutionPolicySnapshot({ version: 1, records });
-    const problems = executionPolicyProblems(records, catalog.profiles, catalog.models);
+    const problems =
+      record.review === 'reviewed' && record.policy.enabled ? executionPolicyProblems(records, catalog.profiles, catalog.models) : [];
     if (problems.length)
       throw new Error(`Políticas conflitantes: ${problems.map((p) => `${p.code} (${p.policyIds.join(', ')})`).join('; ')}.`);
     const json = JSON.stringify(record.policy);

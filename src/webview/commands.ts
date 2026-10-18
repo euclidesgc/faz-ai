@@ -29,6 +29,11 @@ const post = (msg: WebviewToHost): void => postToHost(msg);
  * conta própria, e o botão ou a seção de onde a ação saiu usa a promessa com `useAction` para mostrar no lugar.
  */
 const req = (msg: WebviewToHost): Promise<void> => request(msg);
+export const executionPolicies = {
+  save: (policy: import('../shared/executionPolicies').ExecutionPolicy, expectedRevision: number, reviewed: boolean) =>
+    req({ type: 'settings.executionPolicy.save', policy, expectedRevision, reviewed }),
+  remove: (id: string, expectedRevision: number) => req({ type: 'settings.executionPolicy.remove', id, expectedRevision }),
+};
 export const contextPlanning = {
   saveBatch: (inputs: import('../shared/contextPlanning').ActivityContextWrite[]) => req({ type: 'contextPlanning.saveBatch', inputs }),
   save: (input: import('../shared/contextPlanning').ContextPlanningWrite) => req({ type: 'contextPlanning.save', input }),

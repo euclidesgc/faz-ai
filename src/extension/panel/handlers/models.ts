@@ -1,3 +1,4 @@
+import { builtinPolicyCatalog } from '../../../shared/policyManagement';
 import type { AiTool } from '../../../shared/harness';
 import type { FieldDef } from '../../../shared/model';
 import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelOption, type ModelRule } from '../../../shared/models';
@@ -137,6 +138,17 @@ export function applySuggestion(ctx: BoardContext, cardId: string, previous: str
 
 /** Catálogo de modelos e regras de sugestão. */
 export const modelHandlers = {
+  'settings.executionPolicy.save': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('Políticas executáveis exigem revisão humana.');
+    const catalog = builtinPolicyCatalog(ctx.state());
+    ctx.executionPolicies.save(ctx.boardId, msg, catalog, 'person');
+    return true;
+  },
+  'settings.executionPolicy.remove': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('Políticas executáveis exigem revisão humana.');
+    ctx.executionPolicies.remove(ctx.boardId, msg.id, msg.expectedRevision, builtinPolicyCatalog(ctx.state()), 'person');
+    return true;
+  },
   'settings.models.set': (msg, ctx) => {
     ctx.boards.setModelCatalog(ctx.boardId, msg.catalog);
     return true;

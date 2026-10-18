@@ -20,6 +20,8 @@ const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'metrics.query',
   'card.usage.query',
   'contextPlanning.preview',
+  'executionPolicy.read',
+  'executionPolicy.simulate',
 ]);
 
 /** O que depende de onde o board está rodando: dentro do editor ou num navegador. */
@@ -397,6 +399,32 @@ export class HostBridge {
           this.post({ type: 'metrics.result', requestId: msg.requestId, result: this.router.panelMetrics(msg.query) });
         } catch (e) {
           this.post({ type: 'metrics.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'executionPolicy.read': {
+        try {
+          this.post({
+            type: 'executionPolicy.result',
+            requestId: msg.requestId,
+            ...(msg.id
+              ? this.router.executionPolicyHistory(msg.id, msg.beforeRevision)
+              : { library: this.router.executionPolicyLibrary() }),
+          });
+        } catch (e) {
+          this.post({ type: 'executionPolicy.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'executionPolicy.simulate': {
+        try {
+          this.post({
+            type: 'executionPolicy.result',
+            requestId: msg.requestId,
+            simulation: this.router.simulateExecutionPolicy(msg.scenario),
+          });
+        } catch (e) {
+          this.post({ type: 'executionPolicy.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
         }
         return;
       }

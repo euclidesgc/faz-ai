@@ -40,7 +40,7 @@ export function policy(over: Partial<ExecutionPolicy> = {}): ExecutionPolicy {
       explicit: 'include',
     },
     action: 'auto',
-    targets: [alternative, other],
+    targets: [structuredClone(alternative), structuredClone(other)],
     limits: { maxAttempts: 3, maxElapsedMs: 1000, backoffMs: 0, globalProcesses: 2, perProfile: { claude: 1 } },
     ...over,
   };

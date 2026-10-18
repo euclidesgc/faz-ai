@@ -1,3 +1,4 @@
+import { builtinPolicyCatalog, simulatePolicyScenario, type PolicyLibrary, type PolicyScenario } from '../../shared/policyManagement';
 import { resolveContextDraft, type ContextDraftResolution } from '../../shared/contextDraftResolution';
 import type { ContextActivityTarget } from '../../shared/contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
@@ -157,6 +158,8 @@ const bridgeOnly = {
   'metrics.query': viaBridge,
   'card.usage.query': viaBridge,
   'contextPlanning.preview': viaBridge,
+  'executionPolicy.read': viaBridge,
+  'executionPolicy.simulate': viaBridge,
   'backup.export': viaBridge,
   'backup.import.pick': viaBridge,
   'backup.import.cancel': viaBridge,
@@ -221,6 +224,18 @@ export class MessageRouter {
 
   get boardId(): string {
     return this.ctx.boardId;
+  }
+  executionPolicyLibrary(): PolicyLibrary {
+    return { snapshot: this.ctx.executionPolicies.snapshot(this.boardId), ...builtinPolicyCatalog(this.snapshot()) };
+  }
+  executionPolicyHistory(id: string, before = Number.MAX_SAFE_INTEGER) {
+    if (!Number.isSafeInteger(before) || before < 1 || typeof id !== 'string' || !id || id.length > 240)
+      throw new Error('Página de histórico inválida.');
+    const records = this.ctx.executionPolicies.history(this.boardId, id, { before, limit: 51 });
+    return { history: records.slice(0, 50), nextBefore: records.length > 50 ? records[49]!.revision : null };
+  }
+  simulateExecutionPolicy(scenario: PolicyScenario) {
+    return simulatePolicyScenario(this.snapshot(), this.ctx.executionPolicies.snapshot(this.boardId), scenario);
   }
   get work(): WorkRepo {
     return new WorkRepo(this.ctx.dbHandle.db, this.ctx.boardId);
@@ -315,6 +330,11 @@ export class MessageRouter {
    */
   handle(msg: WebviewToHost, ctx: Origin = {}): BoardState {
     // o mapa garante o handler do tipo certo; o cast só junta a união de handlers numa assinatura
+    if (
+      (msg.type === 'settings.executionPolicy.save' || msg.type === 'settings.executionPolicy.remove') &&
+      (ctx.source === 'ai' || ctx.externalMcp || ctx.runToken !== undefined)
+    )
+      throw new Error('Políticas executáveis exigem revisão humana.');
     const handler = HANDLERS[msg.type] as Handler<MessageType>;
     const actor = this.actorOf(ctx);
     // o log: sonda antes, registro depois — só quando o handler diz que o board mudou (o que não aconteceu não entra)

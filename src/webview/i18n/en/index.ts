@@ -1,3 +1,4 @@
+import { policies } from './policies';
 // Dicionário pt-BR → inglês. Um arquivo por área da interface; o texto em português é a chave.
 import { library } from './library';
 import { board } from './board';
@@ -13,6 +14,7 @@ import { workflows } from './workflows';
 
 export const EN: Record<string, string> = {
   ...library,
+  ...policies,
   ...shared,
   ...host,
   ...board,

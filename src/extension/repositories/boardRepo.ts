@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { ContextPlanningRepo } from './contextPlanningRepo';
 import { legacyContextPlanning } from '../../shared/contextPlanning';
 import { ArtifactRepo } from './artifactRepo';
@@ -303,7 +304,15 @@ export class BoardRepo {
 
   snapshot(boardId: string, currentUser = ''): BoardState {
     const db = this.db;
-    const b = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
+    // Cabeçalhos na consulta já existente: invalida cenários sem mais consultas nem definições no estado.
+    const b = one(
+      db,
+      `SELECT b.*, (
+      SELECT group_concat(hex(id) || ':' || revision || ':' || review_state || ':' || coalesce(deleted_at, ''), '|')
+      FROM (SELECT id, revision, review_state, deleted_at FROM execution_policies WHERE board_id = ? ORDER BY id)
+    ) AS policy_revision FROM boards b WHERE b.id = ?`,
+      [boardId, boardId],
+    );
     if (!b) throw new Error('Board não encontrado');
     const board: Board = {
       id: str(b.id),
@@ -456,6 +465,7 @@ export class BoardRepo {
     }));
 
     return {
+      executionPolicyRevision: createHash('sha256').update(str(b.policy_revision)).digest('hex'),
       contextPlanning: {
         runtime: 'legacy',
         legacy: legacyContextPlanning({ cards, fieldDefs, fieldValues }, new ArtifactRepo(db).list(boardId)),

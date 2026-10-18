@@ -1,3 +1,4 @@
+import { ExecutionPolicyRepo } from '../../repositories/executionPolicyRepo';
 import type { DbHandle } from '../../db/database';
 import type { BoardState } from '../../../shared/model';
 import type { WebviewToHost } from '../../../shared/messages';
@@ -44,6 +45,7 @@ export interface RouterOptions {
 /** Repositórios, anexos e harness do board aberto, compartilhados pelo router e pelos handlers. */
 export class BoardContext {
   readonly boards: BoardRepo;
+  readonly executionPolicies: ExecutionPolicyRepo;
   readonly cards: CardRepo;
   readonly checklist: ChecklistRepo;
   readonly links: LinkRepo;
@@ -77,6 +79,7 @@ export class BoardContext {
     const db = dbHandle.db;
     this.gh = opts.gh ?? ghProcess();
     this.boards = new BoardRepo(db);
+    this.executionPolicies = new ExecutionPolicyRepo(db);
     this.cards = new CardRepo(db);
     this.checklist = new ChecklistRepo(db);
     this.links = new LinkRepo(db);
