@@ -53,7 +53,7 @@ describe('DependsOn', () => {
           label="ferramenta Cursor"
           satisfied={false}
           target={{ kind: 'board', section: 'harness-tool' }}
-          targetHint="em Harness de IA"
+          targetHint="em Harness"
         />
       </Theme>,
     );

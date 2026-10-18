@@ -15,7 +15,7 @@ export interface DependsOnProps {
   /** false = destaque (laranja/aviso); normalmente o controle do chamador também está desabilitado com a mesma condição. */
   satisfied: boolean;
   target: DependsOnTarget;
-  /** onde a opção de destino está, para o rótulo acessível do link (ex.: "em Harness de IA"). */
+  /** onde a opção de destino está, para o rótulo acessível do link (ex.: "em Harness"). */
   targetHint: string;
 }
 

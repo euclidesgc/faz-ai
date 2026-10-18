@@ -60,7 +60,7 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
 1. **Instale e abra.** Instale **Faz AI Kanban** no VS Code ou no Cursor (pelo marketplace da
    própria ferramenta), abra a pasta do seu projeto e clique no ícone **Faz AI** na barra lateral.
    Cada pasta tem o seu board, já com as fases do fluxo.
-2. **Conecte a IA ao board.** Em **Configurações → Harness de IA**, escolha a ferramenta do projeto
+2. **Conecte a IA ao board.** Em **Configurações → Harness**, escolha a ferramenta do projeto
    (Claude Code, Cursor ou Kimi Code). Na aba **Projeto**, clique em **Instalar (padrão da ferramenta)** no
    grupo **Servidores MCP** e de novo no grupo **Skills**, para a skill do fluxo, que ensina a IA a
    conduzir as fases.
@@ -92,7 +92,7 @@ necessário, na hora certa:
   card pelo board (`get_card`), faz aquele trabalho e para. O histórico fica no card, e não na janela
   de contexto.
 - **Contexto vazio por padrão.** Toda execução pelo board começa sem nenhuma regra, skill, agente,
-  hook ou plugin da sua máquina ou do projeto: só entra o que você marcou em **Harness de IA**. No
+  hook ou plugin da sua máquina ou do projeto: só entra o que você marcou em **Harness**. No
   Claude Code isso é imposto por parâmetro (`--setting-sources ""`, `--disable-slash-commands` e um
   arquivo de servidores MCP só com o do board); nas outras ferramentas, o que a linha de comando
   aceita (ver a tabela de [Agentes](#agentes)).
@@ -258,7 +258,7 @@ o `faz-ai` do terminal avisa e não inicia.
 
 ## Usando com IA
 
-1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code, Cursor ou
+1. Em Configurações → **Harness**, escolha a ferramenta do projeto (Claude Code, Cursor ou
    Kimi Code).
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
    global que a ferramenta lê. Isso também acontece sozinho, em silêncio, ao abrir a pasta (e a cada
@@ -308,7 +308,7 @@ que não existe mais, para outra pasta ou para a ponte de uma versão anterior, 
 permissão. Cada item diz o efeito e traz a ação: o comando para copiar, **Instalar o MCP do board**
 (abre a seção Servidores MCP da ferramenta), **Corrigir o registro** (um registro quebrado no arquivo
 do projeto vale no lugar do global; corrigir tira ele dali e deixa o global valendo), **Recarregar a
-janela** ou o atalho para o Harness de IA. O ícone some sozinho quando o último item é resolvido. A conferência roda ao abrir o board, quando a
+janela** ou o atalho para o Harness. O ícone some sozinho quando o último item é resolvido. A conferência roda ao abrir o board, quando a
 ferramenta ou a permissão mudam, depois de conectar, a cada 5 minutos e em **Verificar de novo**,
 que relê também o PATH do terminal (um node instalado com o board aberto é encontrado sem recarregar
 a janela), e diz quando nada mudou. Ao lado, no editor, **Recarregar a janela** reinicia a extensão:
@@ -349,7 +349,7 @@ board o usa.
   artefatos"), nenhum agente do board, regras enviadas e ainda desligadas, artefato que sumiu da
   origem e, no Cursor, regras, servidores ou hooks do projeto que entram no contexto sem passar pelo
   board. O mesmo aparece no aviso do topo do board como linha discreta de recomendação, com o atalho
-  para o Harness de IA.
+  para o Harness.
 - **Opcionais:** a outra ferramenta de IA, quando está na máquina (a linha de comando no PATH ou, no
   Cursor, o próprio editor). Projeto com o Claude Code mostra o Cursor aqui, e vice-versa. A lista só
   mostra o estado: o board instala o MCP e a skill nela quando ela vira a ferramenta do projeto.
@@ -442,7 +442,7 @@ das próximas mensagens (a escolha fica lembrada). Enter envia, Shift+Enter queb
 interrompe e **Limpar** apaga a conversa. O histórico fica guardado por projeto.
 
 O chat usa a mesma execução em segundo plano dos cards, então vale o limite de Configurações →
-Harness de IA → "O que a IA pode fazer" (por padrão, só o board) e o tempo limite de lá.
+Harness → "O que a IA pode fazer" (por padrão, só o board) e o tempo limite de lá.
 
 ### Trabalhar na fase e Refinar com IA
 
@@ -484,7 +484,7 @@ Imagens coladas na mensagem ou na descrição do card viram anexos dele e a IA a
   cria um registro novo, sem substituir o anterior. O [heartbeat](#heartbeat) resume sozinho a
   conversa que cresceu. Está disponível também como ferramenta MCP (`generate_summary`), com o
   mesmo resultado.
-- O que a IA pode fazer nessas execuções se define em Configurações → Harness de IA → **Execução
+- O que a IA pode fazer nessas execuções se define em Configurações → Harness → **Execução
   pela conversa**: só o board (padrão), board e arquivos do projeto, ou sem restrições. O nível em
   uso aparece ao lado do botão, com um atalho para mudar. A IA é avisada do limite: se o trabalho
   pedir mais do que o nível permite, ela bloqueia o card dizendo qual opção escolher.
@@ -925,7 +925,7 @@ não têm o commit do merge guardado, continuam sendo arquivadas por você, com 
 
 ### Heartbeat
 
-Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
+Com o heartbeat ligado (Configurações → Harness), o board chama a IA sozinho a cada
 intervalo, enquanto o editor estiver aberto na pasta do projeto. O heartbeat em si não depende da IA:
 é um relógio do board que, a cada rodada, primeiro arruma o board e depois decide o que a IA faz. Em
 cada rodada ele:
@@ -977,7 +977,7 @@ Settings explica o motivo em cada modo: com branch na própria pasta, duas hist�
 trocariam a branch uma debaixo da outra e misturariam alterações; com worktree elas ficam isoladas,
 ao custo de mais uma cópia dos arquivos em disco por história (com as dependências instaladas em
 cada uma) e de mais memória e processador enquanto várias sessões de IA, testes e builds rodam
-juntos. No editor a aba Git e o bloco de paralelo do Harness de IA viram um link para o Settings; no
+juntos. No editor a aba Git e o bloco de paralelo do Harness viram um link para o Settings; no
 navegador seguem como campos editáveis, como antes.
 
 - A rodada tem uma ordem fixa: a arrumação (limite de uso, cards parados); um `git fetch` só; os pull
@@ -1108,7 +1108,7 @@ sessão da história terminou com uma sub-tarefa marcada por `start_work`, uma s
 caiu), o board o devolve para Pronto: na abertura, os cards das execuções que a sessão anterior
 deixou abertas (e as sub-tarefas deles); ao fim da sessão de uma história, as sub-tarefas dela; e, a
 cada minuto, qualquer card "Em execução" sem execução do board há mais tempo que o limite de uma
-execução (Configurações → Harness de IA → tempo máximo), com a explicação na conversa.
+execução (Configurações → Harness → tempo máximo), com a explicação na conversa.
 
 
 ### Agentes
@@ -1119,12 +1119,13 @@ board e nas cópias de leitura, sem criar arquivos nas pastas das ferramentas. A
 nessas pastas podem ser importados.
 
 A execução escolhe o agente do card; na ausência dele, o agente da fase; depois, o padrão de
-**Harness de IA → Ferramenta e execução**. Sem agentes disponíveis, usa o agente embutido, sem
+**Harness → Ferramenta e execução**. Sem agentes disponíveis, usa o agente embutido, sem
 instruções adicionais. Remover um agente libera as seleções dos cards e fases que o utilizavam.
 Os agentes de fábrica existentes são mantidos na biblioteca.
 
-Na aba **Sub-agentes**, use **Criar**, **Assistente guiado** ou **Gerar com base no projeto**. O
-editor permite revisar as instruções, selecionar skills e MCPs da própria biblioteca e definir as
+Na aba **Sub-agentes**, use **Criar**, **Assistente guiado** ou **Gerar com base no projeto**.
+O formulário de criação e edição abre em um modal com fundo escurecido, separado da lista de agentes existentes. Clicar fora dele mantém o rascunho aberto; use Cancelar para sair.
+O editor permite revisar as instruções, selecionar skills e MCPs da própria biblioteca e definir as
 categorias Leitura, Edição, Comandos, Rede e Subagentes. Um modelo vazio segue o card ou a sessão;
 um modelo de outra ferramenta não é imposto ao trocar o executor.
 
@@ -1138,29 +1139,37 @@ Pelo MCP, `get_board` lista os agentes disponíveis, `set_card_profile` escolhe 
 `get_board_artifact`/`save_board_artifact` leem e editam a biblioteca. As APIs de arquivos nativos
 `create_agent`, `update_agent`, `get_agent` e `delete_agent` continuam por compatibilidade.
 
-## Harness de IA
+## Harness
 
 O board gerencia uma **biblioteca particular**, independente da ferramenta de IA. Em
-**Configurações → Harness de IA**, a aba **Biblioteca do board** concentra o CRUD de **Regras**,
+**Configurações → Harness**, a aba **Biblioteca do board** concentra o CRUD de **Regras**,
 **Skills**, **Sub-agentes** e **MCPs**. **Ferramenta e execução** escolhe a IA, os modelos, as
 permissões, o agente padrão e o heartbeat; também conecta a ferramenta ao servidor MCP do board.
 Trocar de ferramenta preserva os artefatos e suas seleções.
 
-**Importar artefatos de uma pasta** aceita um projeto ou uma coleção. Escolha a pasta pelo seletor
+Os avisos de cada tipo têm um botão com contorno, abaixo do texto e à direita, para fechar e não exibir mais. O ícone de informação permite exibir o aviso novamente.
+
+**Importar artefatos** aceita um projeto ou uma coleção. Escolha a pasta pelo seletor
 ou informe seu caminho no computador onde o board roda. A prévia mostra os quatro tipos, suas
 quantidades e caixas de seleção; **Importar selecionados** copia cada item para sua aba. O board
 reconhece formatos das ferramentas e coleções neutras: `AGENTS.md`, pastas `rules/`, `agents/` e
 skills com `SKILL.md`, inclusive em subpastas. Arquivos `mcp.json` e `.mcp.json` usam `mcpServers`.
-Nomes repetidos do mesmo tipo exigem escolher uma origem ou renomear o artefato antes de importar.
+A prévia tem quatro abas, inclusive vazias, com filtro por nome ou descrição. Seleções são mantidas
+ao trocar de aba e filtrar. Nomes repetidos do mesmo tipo são ignorados: os demais itens entram,
+e o resumo agrupa os conflitos e oferece uma confirmação explícita para sobrescrevê-los.
+
+Em **Skills**, selecione os itens individualmente ou todos os visíveis e aplique **Sempre**, **Pelo card** ou **Desligado** em massa. A seleção acompanha a busca; **Limpar seleção** a desfaz. **Excluir selecionadas** pede confirmação e preserva os arquivos de origem. Subagentes também permitem selecionar e excluir em massa ou manter disponíveis no board; MCPs permitem alterar o modo e excluir em massa. Skills, subagentes e MCPs não oferecem Atualizar da origem. O formulário de regras tem apenas Nome e Conteúdo.
 
 Cada aba tem **Criar**, busca, quantidade e ações de **Editar**, mudar o modo de uso, atualizar da
 origem e remover com confirmação. Regras, skills e subagentes também oferecem **Assistente guiado**
-(perguntas, opções, respostas livres e revisão antes de salvar) e **Gerar com base no projeto**
+(etapas por seção, dicas, placeholders, exemplos editáveis e revisão antes de salvar) e **Gerar com base no projeto**
 (a IA usa o perfil detectado do projeto e os artefatos existentes, grava na biblioteca e registra o
-resultado na conversa do board). O assistente de regras propõe `AGENTS.md`; o de subagentes permite
+resultado na conversa do board). O assistente de regras propõe `AGENTS.md`, com projeto, mapa do código, comandos e validação, convenções, regras inegociáveis e limites; o de subagentes permite
 escolher categorias de ferramentas, skills e MCPs da biblioteca. Os agentes são usados como perfis
 pelo runner e como orientação de delegação nas conversas externas; o suporte nativo a subagentes
 continua dependendo da ferramenta.
+
+O editor de **Sub-agentes** separa Instruções, Modelo, Permissões, Skills, MCPs e Revisão. As instruções têm partes de responsabilidade, escopo, método e entrega, com exemplos e **Ajudar com IA** em cada parte. O modelo é escolhido no catálogo da ferramenta; vazio herda o do card ou sessão. Cada permissão tem uma explicação. Skills e MCPs exibem descrições, busca e **Indicar com IA**; **Selecionar indicadas** aplica as recomendações justificadas. **Revisar e salvar** pede uma análise da definição completa antes de gravar: é possível aplicar a melhoria do conteúdo ou salvar como está. Alterar a definição depois da revisão exige nova análise. Se a IA estiver indisponível, o rascunho é preservado e há uma escolha explícita de salvar sem revisão.
 
 - **Sempre**: entra no contexto de toda execução do board.
 - **Pelo card**: fica disponível no planejamento e nos campos Skills, Rules e MCPs; entra quando o
@@ -1168,14 +1177,17 @@ continua dependendo da ferramenta.
 - **Desligado**: permanece na biblioteca sem participar da execução. Regras novas entram assim,
   para revisão antes da ativação.
 
-**Armazenamento da biblioteca** mostra a pasta de destino, por padrão
-`<storage do Faz AI>/artifacts/<projeto>/`, fora do repositório. **Abrir pasta** abre o gerenciador de
+**Pasta da biblioteca** mostra o destino, por padrão
+`~/faz-ai-library/<projeto>/`, fora do repositório. Bibliotecas existentes preservam seu destino.
+O campo aceita outro nome e caminho; **Selecionar pasta** ajuda a escolher o local. **Abrir pasta** abre o gerenciador de
 arquivos; **Salvar pasta** aceita uma pasta vazia, recria as cópias ali e preserva a pasta anterior.
 Skills coladas com seus arquivos de apoio são reconhecidas ao voltar à tela ou usar **Atualizar
 lista**. Os arquivos particulares e desconhecidos são preservados. Cada skill aceita 512 KB por
 arquivo, 100 arquivos de apoio e 5 MB no total; omissões aparecem na lista. As skills particulares,
 incluindo `board-harness/`, não são distribuídas com a extensão. Editar a biblioteca não altera a
-origem; **Atualizar da origem** substitui a cópia somente com confirmação.
+origem; em Regras, **Atualizar da origem** substitui a cópia somente com confirmação.
+
+**MCPs** exibem a descrição funcional cadastrada, com prioridade sobre comando ou URL. Ao importar, uma descrição presente na configuração é aproveitada; se faltar, use **Editar** para explicar a finalidade. A lista não conecta servidores automaticamente para descobrir descrições.
 
 **MCPs** têm criação por formulário (`command` e `args` para stdio, URL para HTTP) e **Editar JSON
 diretamente**, inclusive uma definição envolvida por `mcpServers`. Variáveis `env` e cabeçalhos
@@ -1202,7 +1214,7 @@ compatibilidade; hooks, comandos e configurações nativas continuam sob gerenci
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
 | Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria |
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
-| Harness de IA | Biblioteca única de regras, skills, subagentes e MCPs, com importação por tipo, CRUD e assistentes; ferramenta, permissão, agente padrão e heartbeat (ver [Harness de IA](#harness-de-ia) e [Agentes](#agentes)) |
+| Harness | Biblioteca única de regras, skills, subagentes e MCPs, com importação por tipo, CRUD e assistentes; ferramenta, permissão, agente padrão e heartbeat (ver [Harness](#harness) e [Agentes](#agentes)) |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Fica só na aba Git do modo navegador; no editor, aponta para o Settings (Faz AI › Git) |
 | Aparência | **Idioma** (automático, Português (Brasil) ou English; fica no Settings do editor junto com tema, fonte e tamanho); status (nome e cor, na aba Fluxos; aqui só no modo navegador) |
@@ -1217,7 +1229,7 @@ quatro seções, nesta ordem:
 | --- | --- |
 | Instalação | Um texto curto e o link **Abrir o Diagnóstico do ambiente**, que abre o board na tela do Diagnóstico |
 | Aparência | **Idioma** (`fazai.appearance.language`), **Tema** (`fazai.appearance.theme`), **Fonte** (`fazai.appearance.font`) e **Tamanho** (`fazai.appearance.fontSize`), todos com escopo Usuário — valem em todos os projetos desta pessoa. Status (rótulo e cor de cada status) continuam no board, agora na aba Fluxos |
-| Git | As oito chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.decisionRecords` (a pasta dos [registros de decisão](#registros-de-decisão); vazio = desligado). No editor, a aba Git e o bloco de paralelo do Harness de IA viram link para estas chaves; no navegador seguem como campos editáveis |
+| Git | As oito chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.decisionRecords` (a pasta dos [registros de decisão](#registros-de-decisão); vazio = desligado). No editor, a aba Git e o bloco de paralelo do Harness viram link para estas chaves; no navegador seguem como campos editáveis |
 | Backup | Dois links de ação: **Exportar o board agora** e **Importar um board**, que disparam os comandos da paleta |
 
 Três comandos novos na paleta (`Ctrl+Shift+P`): **Faz AI: Abrir o Diagnóstico do ambiente**,
@@ -1326,6 +1338,11 @@ npm test
 npm run typecheck
 ```
 
+Novas funcionalidades são integradas na `develop`. A seção **Não lançado** do changelog reúne
+apenas mudanças que já chegaram a essa branch; itens ainda em desenvolvimento ficam nas suas
+branches e nos cards. Na release, essa seção recebe a versão publicada e descreve o código que
+a release contém. Integrar na `develop` não publica a extensão.
+
 O `npm test` também roda o lint e confere a formatação; `npm run format` formata tudo. Para o
 `git blame` pular o commit que só formatou o código: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
@@ -1420,10 +1437,6 @@ publicação, `npm run release -- finish` retoma de onde parou: cada passo confe
 (PR, tag, release, main contida na `develop`, branches) e não publica de novo. Se a volta para a
 `develop` der conflito, resolva no PR aberto e rode `finish`. `--dry-run` ensaia sem publicar. As
 opções estão no topo de `scripts/release.mjs`.
-
-Num hotfix (card do tipo Bug, branch `hotfix/...`), rode `npm run release` na worktree da `hotfix/`
-**antes** de aprovar o card. Aprovado antes, o PR entra na principal sem versão e a correção só sai
-no próximo release da `develop`.
 
 Num hotfix (card do tipo Bug, branch `hotfix/...`), rode `npm run release` na worktree da `hotfix/`
 **antes** de aprovar o card. Aprovado antes, o PR entra na principal sem versão e a correção só sai

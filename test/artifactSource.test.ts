@@ -191,6 +191,19 @@ describe('readSource', () => {
     expect(readSource({ kind: 'mcp', location: '.mcp.json#web' }, dirs, 'claude').description).toBe('https://x.dev/mcp');
   });
 
+  it('MCP importa a descrição funcional quando a configuração fornece uma', () => {
+    write(
+      dirs.projectDir,
+      '.mcp.json',
+      JSON.stringify({
+        mcpServers: {
+          github: { command: 'npx', description: 'Consulta issues e pull requests', env: { TOKEN: 'segredo' } },
+        },
+      }),
+    );
+    expect(readSource({ kind: 'mcp', location: '.mcp.json#github' }, dirs, 'claude').description).toBe('Consulta issues e pull requests');
+  });
+
   it('MCP no ~/.claude.json: vale primeiro o da pasta do projeto, depois o global', () => {
     write(
       dirs.homeDir,

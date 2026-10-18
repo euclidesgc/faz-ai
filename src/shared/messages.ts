@@ -1,3 +1,4 @@
+import type { AgentAssistInput, AgentAssistResult } from './agentAssistance';
 import type { LibraryArtifactInput } from './artifacts';
 import type { Appearance } from './appearance';
 import type { ImportSummary } from './backup';
@@ -249,6 +250,7 @@ export type WebviewToHost =
   | { type: 'harness.item.write'; tool: AiTool; source: number; name: string; content: string; files?: string[]; append?: boolean }
   /** o perfil do projeto (linguagens, comandos, ferramentas, pastas) para os assistentes; a resposta é `harness.project.profileResult` */
   | { type: 'harness.project.profile'; requestId: string }
+  | { type: 'harness.agent.assist'; requestId: string; input: AgentAssistInput }
   /** apaga um arquivo ou uma pasta de skill do projeto ou da pasta do usuário */
   | { type: 'harness.item.delete'; tool: AiTool; kind: HarnessKind; path: string }
   /** desinstala, desativa ou ativa plugins pela ferramenta; `ids` são os de `HarnessItem.install` */
@@ -290,7 +292,9 @@ export type WebviewToHost =
    * inventário o mostra, mais `#nome` numa entrada de configuração)
    */
   | { type: 'harness.library.scan'; dir: string }
-  | { type: 'harness.library.apply'; keys: string[] }
+  | { type: 'harness.library.apply'; keys: string[]; overwrite?: boolean }
+  | { type: 'harness.library.pickDirectory' }
+  | { type: 'harness.library.folders'; dir: string }
   | { type: 'harness.library.save'; input: LibraryArtifactInput }
   | { type: 'harness.library.read'; id: string }
   | { type: 'harness.library.pickArtifacts' }
@@ -376,6 +380,9 @@ export type HostToWebview =
   | { type: 'harness.item.created'; path: string }
   /** resposta a `harness.project.profile`, correlacionada por `requestId` */
   | { type: 'harness.library.content'; input: LibraryArtifactInput }
+  | { type: 'harness.agent.assistResult'; requestId: string; result?: AgentAssistResult; error?: string }
+  | { type: 'harness.library.directorySelected'; directory: string }
+  | { type: 'harness.library.foldersResult'; directory: string; parent: string; folders: { name: string; path: string }[] }
   | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }

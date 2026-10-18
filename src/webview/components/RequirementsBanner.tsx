@@ -145,7 +145,7 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
       return {
         title: t('O harness do board ainda não está definido'),
         detail: t(
-          'O board funciona assim, mas as execuções não ganham a economia e a precisão de um harness definido. Falta: {list}. Resolva em Configurações → Harness de IA.',
+          'O board funciona assim, mas as execuções não ganham a economia e a precisão de um harness definido. Falta: {list}. Resolva em Configurações → Harness.',
           {
             list: (r.harnessIssues ?? []).map((i) => issue[i] ?? i).join('; '),
           },
@@ -345,7 +345,7 @@ export function RequirementFix({
     case 'settings':
       return (
         <Button size="small" variant={variant} onClick={() => openSettings('harness')}>
-          {t('Abrir Harness de IA')}
+          {t('Abrir Harness')}
         </Button>
       );
   }

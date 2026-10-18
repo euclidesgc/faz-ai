@@ -53,6 +53,10 @@ describe('ActionButton', () => {
     const button = screen.getByRole('button', { name: 'Procurar' });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('data-disabled');
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toHaveTextContent('Procurar');
+    expect(button.querySelector('[style*="visibility: hidden"]')).toBeNull();
+    expect(button.querySelector('.rt-Spinner')).not.toBeNull();
   });
 
   it('o botão só com ícone exige o nome acessível e também abre o hint', async () => {

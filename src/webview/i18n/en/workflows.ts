@@ -135,8 +135,8 @@ export const workflows: Record<string, string> = {
   'Modelo e esforço': 'Model and effort',
   'O modelo indicado no card tem preferência.': 'The model chosen on the card takes precedence.',
   'Subagente do {tool}': '{tool} subagent',
-  'Opcional: um arquivo de agente do {tool} (em Harness de IA → Agentes) que conduz a sessão; vazio = o agente padrão da ferramenta.':
-    "Optional: a {tool} agent file (in AI harness → Agents) that drives the session; empty = the tool's default agent.",
+  'Opcional: um arquivo de agente do {tool} (em Harness → Agentes) que conduz a sessão; vazio = o agente padrão da ferramenta.':
+    "Optional: a {tool} agent file (in Harness → Agents) that drives the session; empty = the tool's default agent.",
   Subagente: 'Subagent',
   'Sessão limpa {badge}: sem as personalizações da sua pasta de usuário e sem invocação automática de skills':
     'Clean session {badge}: without the customizations from your user folder and without automatic skill invocation',

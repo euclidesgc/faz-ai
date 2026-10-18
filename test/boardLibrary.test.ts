@@ -53,7 +53,7 @@ describe('biblioteca particular do board', () => {
     router.refreshHarness();
     select('skill', '.claude/skills/react/SKILL.md');
     const item = selectedItems(router.snapshot(), 'skill')[0]!;
-    expect(item.path).toContain('/artifacts/library-test/skills/react/SKILL.md');
+    expect(item.path).toContain('/faz-ai-library/library-test/skills/react/SKILL.md');
     expect(fs.readFileSync(path.join(path.dirname(item.path), 'references/forms.md'), 'utf8')).toBe('Referência');
     router.writeHarnessFile(item.path, '---\nname: react\ndescription: Particular\n---\nCópia editada');
     expect(fs.readFileSync(path.join(root, 'project/.claude/skills/react/SKILL.md'), 'utf8')).toContain('Original');
@@ -243,10 +243,17 @@ describe('gerenciamento centralizado dos artefatos', () => {
     expect(library.preview).toBeUndefined();
     write('other/skills/react/SKILL.md', 'Outra skill');
     router.handle({ type: 'harness.library.scan', dir: path.join(root, 'other') });
-    expect(() =>
-      router.handle({ type: 'harness.library.apply', keys: router.snapshot().harness.library!.preview!.items.map((i) => i.key) }),
-    ).toThrow('Já existe');
-    expect(router.snapshot().harness.library!.artifacts).toHaveLength(4);
+    write('other/rules/new.md', 'Nova regra');
+    router.handle({ type: 'harness.library.scan', dir: path.join(root, 'other') });
+    router.handle({ type: 'harness.library.apply', keys: router.snapshot().harness.library!.preview!.items.map((i) => i.key) });
+    const result = router.snapshot().harness.library!.importResult!;
+    expect(result).toMatchObject({ imported: 1, skipped: [{ kind: 'skill', name: 'react' }] });
+    const oldSkill = router.snapshot().harness.library!.artifacts.find((i) => i.name === 'react')!;
+    expect(router.readLibraryArtifact(oldSkill.id).body).toContain('Siga os contratos.');
+    router.handle({ type: 'harness.library.apply', keys: result.skipped.map((i) => i.key), overwrite: true });
+    expect(router.readLibraryArtifact(oldSkill.id).body).toBe('Outra skill');
+    expect(router.snapshot().harness.library!.importResult).toEqual({ imported: 1, skipped: [] });
+    expect(router.snapshot().harness.library!.artifacts).toHaveLength(5);
   });
 
   it('cria e edita no board, preservando anexos, identidade e modo de uso', () => {
@@ -312,4 +319,40 @@ it('editar a descrição da skill atualiza o YAML e preserva opções e arquivos
   expect(fs.readFileSync(skill.path, 'utf8')).toContain('disable-model-invocation: true');
   expect(fs.readFileSync(skill.path, 'utf8')).toContain('Instruções particulares.');
   expect(fs.readFileSync(path.join(path.dirname(skill.path), 'references/contrato.md'), 'utf8')).toBe('Contrato');
+});
+
+it('preserva também artefatos de mesma origem e exige uma nova confirmação para sobrescrever', () => {
+  write('source/rules/base.md', 'Versão original');
+  const source = path.join(root, 'source');
+  router.handle({ type: 'harness.library.scan', dir: source });
+  router.handle({ type: 'harness.library.apply', keys: router.snapshot().harness.library!.preview!.items.map((i) => i.key) });
+  const artifact = router.snapshot().harness.library!.artifacts[0]!;
+  router.handle({ type: 'harness.library.save', input: { ...router.readLibraryArtifact(artifact.id), body: 'Versão personalizada' } });
+  write('source/rules/base.md', 'Versão atualizada');
+  router.handle({ type: 'harness.library.scan', dir: source });
+  const keys = router.snapshot().harness.library!.preview!.items.map((i) => i.key);
+  expect(() => router.handle({ type: 'harness.library.apply', keys, overwrite: true })).toThrow('Releia');
+  router.handle({ type: 'harness.library.apply', keys });
+  expect(router.readLibraryArtifact(artifact.id).body).toBe('Versão personalizada');
+  expect(router.snapshot().harness.library!.importResult).toMatchObject({ imported: 0, skipped: [{ name: 'base.md' }] });
+  router.handle({ type: 'harness.library.apply', keys, overwrite: true });
+  expect(router.readLibraryArtifact(artifact.id).body).toBe('Versão atualizada');
+  expect(router.snapshot().harness.library!.preview).toBeUndefined();
+});
+
+it('consulta o conteúdo dos artefatos do projeto para gerar sugestões sem expor definições MCP', () => {
+  write('project/AGENTS.md', 'Regras da raiz');
+  write('project/.claude/skills/task/SKILL.md', '---\nname: task\ndescription: Uma tarefa\n---\nProcedimento');
+  write('project/.claude/agents/reviewer.md', '---\nname: reviewer\ndescription: Revisão\n---\nEntregue evidências');
+  write('project/.mcp.json', JSON.stringify({ mcpServers: { service: { command: 'node', env: { SECRET: 'private-value' } } } }));
+  const evidence = router.projectArtifacts();
+  expect(evidence).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ kind: 'rule', body: 'Regras da raiz' }),
+      expect.objectContaining({ kind: 'skill', name: 'task' }),
+      expect.objectContaining({ kind: 'agent', name: 'reviewer' }),
+    ]),
+  );
+  expect(JSON.stringify(evidence)).not.toContain('private-value');
+  expect(evidence.some((a) => a.kind === 'mcp')).toBe(false);
 });
