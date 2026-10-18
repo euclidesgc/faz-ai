@@ -166,3 +166,9 @@ Após o commit `369ad95`, o MCP do board recebeu e confirmou por releitura 39 re
 - Subtarefas ainda em A fazer, com pendências registradas: #730, #731, #830, #834, #837, #841, #842, #843, #845.
 
 Nenhum card foi marcado concluído nesta sincronização. Os registros distinguem a fundação testada da ativação de produção, perfis/CLIs reais e piloto ainda pendentes. Validação do commit: 227 arquivos / 3.285 testes, tipos, lint/formatação e build da interface; o ajuste final de preparação também passou em 105 testes direcionados. As mudanças permanecem nesta branch, sem push ou integração.
+
+## Verificação real do provider — continuação de #717/#729
+
+Acrescentados `vitest.cli-real.config.ts` e `test/cli-real/` para o comando separado `npm run test:cli-real`. A CLI real consome respostas determinadas de API local e tenta operações permitidas e proibidas; controles positivos demonstram a detecção de fontes externas. Isso encontrou uma regressão concreta: a variável herdada de memória adicional contornava `--setting-sources` vazio. O provider estrito agora fixa essa variável em `0`, com mutação de controle reproduzindo a falha. As evidências e seus limites estão em `contexto-minimo-verificacao-cli.md`.
+
+O teste não habilita admissão nem mede inferência/qualidade. As políticas gerenciadas e o ambiente de produção continuam sem prova; E3, #729 e o runtime E5 permanecem parciais. #728 também continua dependendo da integração de perfis CLI e caminhos legados.

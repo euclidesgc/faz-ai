@@ -57,6 +57,8 @@ export const claudeProvider: AiProvider = {
       args,
       stdin: prompt,
       format: structured ? 'claude-stream-json' : 'text',
+      // --setting-sources vazio não impede memória de --add-dir quando esta variável é herdada.
+      ...(strict ? { env: { CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '0' } } : {}),
       ...(mcpConfig ? { tempFiles: { [MCP_CONFIG]: mcpConfig } } : {}),
     };
   },

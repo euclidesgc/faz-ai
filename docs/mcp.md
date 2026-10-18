@@ -366,3 +366,7 @@ Leituras de skills, agentes, regras e artefatos de sessões controladas usam a c
 A API já é usada pelo Orchestrator com UnitStarter injetado nos testes; gatilhos legados não passam a criar unidades automaticamente. Testes usam servidor MCP e ponte compilada reais, com processos Node; não comprovam isolamento de uma CLI de IA, ativação v1 completa ou conclusão de #824/#825.
 
 O hook interno de host `AiCall.beforeStart(identity)` pode aguardar persistência assíncrona. A CLI permanece atrás do launcher até a confirmação; ao sair da espera, token, snapshot e admissão são revalidados. Parar ou revogar durante a espera impede liberação tardia. O Orchestrator liga o hook ao flush e à posse da pasta por um UnitStarter injetado. A criação no host e a ativação nos gatilhos continuam pendentes.
+
+### Verificação real do contrato do provider
+
+`npm run test:cli-real` executa Claude Code instalado contra uma API local que emite chamadas determinadas e MCPs HTTP locais. O controle positivo conecta o MCP da configuração do projeto; `--strict-mcp-config` deve excluí-lo no caminho estrito. O servidor permitido anuncia duas operações, mas somente a autorizada pode alcançar seu handler. Uma chamada deliberada à outra operação precisa receber erro. Isso testa a imposição da CLI; não substitui os testes de identidade e escopo do servidor do board nem a prova do ambiente de produção. Não grava recibos de admissão nem registros de consumo. Políticas gerenciadas e Cursor/Kimi permanecem não verificados.

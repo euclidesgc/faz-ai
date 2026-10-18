@@ -1389,6 +1389,8 @@ a release contém. Integrar na `develop` não publica a extensão.
 O `npm test` também roda o lint e confere a formatação; `npm run format` formata tudo. Para o
 `git blame` pular o commit que só formatou o código: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
+`npm run test:cli-real` roda separadamente o contrato do provider com o **Claude Code instalado**, em pasta e configuração temporárias, com API e MCPs locais de teste. Não requer login e não chama um modelo remoto; a API controla as respostas para testar tentativas proibidas sem depender do comportamento do modelo. Controles positivos carregam sentinelas do projeto, usuário, ancestrais e pasta adicional, além de skill, agente, hook e MCP externo; o caminho estrito precisa excluí-los. O teste também reproduz a regressão da variável de memória adicional. Ausência de CLI ou plataforma Windows produz falha explícita. Os três testes não habilitam um perfil de produção: políticas gerenciadas, ambiente real de autenticação/API, Cursor/Kimi e consumo de tarefas aceitas ainda precisam de validação.
+
 Pressione `F5` para abrir o Extension Development Host. O código fica em `src/extension` (host e
 servidor MCP), `src/webview` (interface em React), `src/shared` (modelo, protocolo e as regras do
 board usadas pelo host e pela interface), `src/mcp-bridge` (ponte stdio usada pelos clientes de IA)
