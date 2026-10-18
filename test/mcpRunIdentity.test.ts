@@ -27,6 +27,7 @@ import { run } from '../src/extension/db/query';
 import { monthOf } from '../src/shared/log';
 import type { HeadlessCommand } from '../src/extension/headless';
 import { AiRunner } from '../src/extension/runner';
+import { spawnHeadless } from '../src/extension/spawn';
 
 let dir: string;
 let db: Database;
@@ -340,6 +341,53 @@ await server.connect(new StdioServerTransport());`,
 });
 
 describe('guardas do host depois de await', () => {
+  it('o gateway revalida a revogação depois do flush, antes de liberar um launcher real', async () => {
+    const c = claim();
+    let confirm!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      confirm = resolve;
+    });
+    const marker = path.join(dir, 'started');
+    const gateway = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      snapshots,
+      sessions: router.executions,
+      spawn: (_command, cwd, out, control) =>
+        spawnHeadless(
+          { command: process.execPath, args: ['-e', `require('fs').writeFileSync(${JSON.stringify(marker)},'inferiu')`], format: 'text' },
+          cwd,
+          out,
+          undefined,
+          control,
+        ),
+    });
+    const execution = gateway.run({
+      origin: 'manual',
+      tool: 'claude',
+      context: { ...NO_CARD, cardId },
+      cwd: dir,
+      timeoutMinutes: 1,
+      log: () => {},
+      beforeStart: () => pending,
+      prepare: () => ({
+        work: { id: c.work.id, token: c.token },
+        artifacts: { directory: '', artifacts: [] },
+        input: { permission: 'board', prompt: 'Teste', boardServer: { command: 'node', args: ['bridge.js'] } },
+        config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: true, skills: [], mcp: [] },
+      }),
+    });
+    const ended = new Promise<AiRunEnd>((resolve) => execution.onExit(resolve));
+    expect(execution.identity?.pid).toBeGreaterThan(0);
+    router.executions.revoke(c.token);
+    confirm();
+    const end = await ended;
+    expect(end.error?.cause).toEqual(new Error(ENDED_RUN));
+    expect(end.process?.identity).toEqual(execution.identity);
+    expect(end.process?.terminationConfirmed).toBe(process.platform !== 'win32');
+    expect(execution.terminationConfirmed?.()).toBe(process.platform !== 'win32');
+    expect(fs.existsSync(marker)).toBe(false);
+  });
   it('o runner recebe identidade e orientação, devolve o resultado ao dono e não aplica o desfecho legado', () => {
     const c = claim();
     let exit!: (code: number) => void;

@@ -339,6 +339,10 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
 
   return {
     proc: {
+      get identity() {
+        return current?.identity;
+      },
+      terminationConfirmed: () => current?.terminationConfirmed?.() === true,
       onExit: (fn) => listeners.push(fn),
       kill: () => {
         killed = true;

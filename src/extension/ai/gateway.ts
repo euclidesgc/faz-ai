@@ -20,6 +20,7 @@ import type { StrictExecutionRequest } from '../../shared/executionAdmission';
 import { AdmissionBlockedError, type ExecutionAdmission, type AdmittedExecution } from './admission';
 import type { RunArtifactRequest, RunArtifactSnapshots } from '../runArtifactSnapshot';
 import type { RunMcpSessions } from '../mcp/runSessions';
+import type { ProcessIdentity } from '../processIdentity';
 
 /** O contexto da execução que o log congela na hora da chamada: a IA move o card durante o trabalho. */
 export type AiRunContext = Omit<AiRunStart, 'boardId' | 'startedAt' | 'origin' | 'tool'>;
@@ -63,6 +64,8 @@ export interface AiCall {
    * ponto em que quem chama pode começar a mostrar a execução (o chat põe aqui a pergunta da pessoa).
    */
   beforeSpawn?(): void;
+  /** Persiste a identidade e aguarda o flush antes de o launcher receber o comando. Somente host. */
+  beforeStart?(identity: ProcessIdentity): void | Promise<void>;
   /** cada linha legível que a ferramenta produziu, mais os recados do board sobre a execução */
   log(line: string): void;
   /** a cada processo aberto: o primeiro e, na volta para texto, o segundo */
@@ -71,6 +74,7 @@ export interface AiCall {
 
 /** Como a execução terminou, já com o desfecho que o log gravou. */
 export interface AiRunEnd {
+  process?: { identity?: ProcessIdentity; terminationConfirmed: boolean };
   code: number | null;
   error?: Error;
   outcome: AiRunOutcome;
@@ -90,6 +94,8 @@ export interface AiRunEnd {
 }
 
 export interface AiExecution {
+  readonly identity?: ProcessIdentity;
+  terminationConfirmed?(): boolean;
   /** o id da linha em `ai_runs`; `''` quando o log não conseguiu gravar */
   readonly runId: string;
   /** o mesmo valor passado a `runLog.start`: sem segundo relógio */
@@ -198,21 +204,28 @@ export class AiGateway {
           call.onAttempt?.(command);
           snapshot?.validate();
           const checked = admitted?.command(command) ?? command;
+          const validate = () => {
+            if (workToken !== undefined) this.deps.sessions!.assert(workToken);
+            snapshot?.validate();
+            admitted?.command(checked);
+          };
           return this.deps.spawn(
             checked,
             cwd,
             out,
-            control && (admitted || snapshot)
+            control && (admitted || snapshot || call.beforeStart)
               ? {
                   beforePreparation: () => {
-                    snapshot?.validate();
-                    admitted?.command(checked);
+                    validate();
                     control.beforePreparation();
                   },
                   beforeStart: (identity) => {
-                    snapshot?.validate();
-                    admitted?.command(checked);
-                    control.beforeStart(identity);
+                    validate();
+                    const previous = control.beforeStart(identity);
+                    const record = () => call.beforeStart?.(identity);
+                    const ready = previous ? previous.then(record) : record();
+                    if (ready) return ready.then(validate);
+                    validate();
                   },
                 }
               : control,
@@ -253,11 +266,26 @@ export class AiGateway {
       runLog.finish(runId, outcome, code);
       const report = this.deps.sessions?.sanitize(measured.report()) ?? measured.report();
       runLog.measure(runId, report);
-      const end: AiRunEnd = { code, error, outcome, stopped, timedOut, report, attempts, format, measureError: measured.failure() };
+      const end: AiRunEnd = {
+        code,
+        error,
+        outcome,
+        stopped,
+        timedOut,
+        report,
+        attempts,
+        format,
+        measureError: measured.failure(),
+        process: { identity: measured.proc.identity, terminationConfirmed: measured.proc.terminationConfirmed?.() === true },
+      };
       for (const fn of listeners) fn(end);
     });
 
     return {
+      get identity() {
+        return measured.proc.identity;
+      },
+      terminationConfirmed: () => measured.proc.terminationConfirmed?.() === true,
       runId,
       startedAt,
       stop: () => {

@@ -144,25 +144,8 @@ export function spawnHeadless(
   }
   child.stdin.on('error', () => {});
   let identity: ProcessIdentity | undefined;
-  if (control && child.pid) {
-    identity = {
-      pid: child.pid,
-      birth: processBirth(child.pid),
-      platform: process.platform,
-      groupId: process.platform === 'win32' ? null : child.pid,
-      generation: randomUUID(),
-    };
-    try {
-      control.beforeStart(identity);
-    } catch (e) {
-      // Nenhuma descrição foi enviada ao launcher: a CLI não chegou a existir.
-      child.stdin.destroy();
-      child.kill('SIGKILL');
-      throw new SpawnNotStartedError('Não foi possível registrar a identidade da execução antes de iniciar a IA.', e);
-    }
-    child.stdin.end(JSON.stringify({ version: 1, ...launch, cwd, env, stdin: command.stdin ?? '' }));
-  } else child.stdin.end(control ? '' : (command.stdin ?? ''));
-
+  let cancelled = false;
+  let startError: Error | undefined;
   let exited = false;
   let directClosed = false;
   const listeners: ((code: number | null, error?: Error) => void)[] = [];
@@ -174,8 +157,37 @@ export function spawnHeadless(
   child.on('error', (e: NodeJS.ErrnoException) => finish(null, e.code === 'ENOENT' ? new Error(commandNotFound(command.command)) : e));
   child.on('close', (code) => {
     directClosed = true;
-    finish(code);
+    finish(code, startError);
   });
+  if (control && child.pid) {
+    identity = {
+      pid: child.pid,
+      birth: processBirth(child.pid),
+      platform: process.platform,
+      groupId: process.platform === 'win32' ? null : child.pid,
+      generation: randomUUID(),
+    };
+    const release = () => {
+      // Parar ou queda do launcher durante o flush não pode liberar uma CLI atrasada.
+      if (cancelled || exited || child.stdin.destroyed) return;
+      child.stdin.end(JSON.stringify({ version: 1, ...launch, cwd, env, stdin: command.stdin ?? '' }));
+    };
+    try {
+      const ready = control.beforeStart(identity);
+      if (ready) {
+        void ready.then(release).catch((e: unknown) => {
+          startError = new SpawnNotStartedError('Não foi possível registrar a identidade da execução antes de iniciar a IA.', e);
+          child.stdin.destroy();
+          child.kill('SIGKILL');
+        });
+      } else release();
+    } catch (e) {
+      // Nenhuma descrição foi enviada ao launcher: a CLI não chegou a existir.
+      child.stdin.destroy();
+      child.kill('SIGKILL');
+      throw new SpawnNotStartedError('Não foi possível registrar a identidade da execução antes de iniciar a IA.', e);
+    }
+  } else child.stdin.end(control ? '' : (command.stdin ?? ''));
 
   return {
     identity,
@@ -192,6 +204,7 @@ export function spawnHeadless(
     },
     onExit: (fn) => listeners.push(fn),
     kill: () => {
+      cancelled = true;
       // a árvore inteira: no Windows pelo taskkill (pelo cmd.exe, o filho direto é só o shell), e nos
       // outros pelo grupo de processos. Se o taskkill falhar (fora do PATH, acesso negado), sobra o filho
       const signal = (sig: NodeJS.Signals) => {

@@ -103,6 +103,12 @@ A ponte compilada envia prefácio reservado antes do MCP. A conexão não troca 
 
 **Pendente para ativar:** Orchestrator, gatilhos, persistência e identidade antes da liberação da CLI, reconciliação e snapshot da configuração v1 completa. Chamadas legadas ainda não recebem unidades/tokens automaticamente. Isso não encerra E5 nem valida isolamento de CLIs reais.
 
+### Espera durável no launcher — protocolo de #737
+
+`SpawnControl.beforeStart` admite `Promise<void>` e o gateway expõe o mesmo hook ao host. O comando só atravessa o stdin depois da confirmação. As guardas de snapshot, admissão e token são revalidadas ao sair da espera. Rejeição informa processo não iniciado; Parar impede liberação tardia. O transporte medido e o gateway propagam identidade e confirmação do grupo, inclusive no resultado, para evitar que a reconciliação dependa apenas do código de saída.
+
+Testes com launcher Node real cobrem espera, rejeição assíncrona, cancelamento antes da confirmação, revogação durante a espera e queda real do host enquanto o hook está pendente. A confirmação Windows permanece desconhecida. **Não conclui #737:** falta o orquestrador persistir a unidade e a identidade, sincronizar o banco e registrar a posse da pasta por esse hook em cada tentativa.
+
 ## Dependências identificadas no board
 
 Consulta local somente de leitura ao board deste projeto em 17/10/2026:

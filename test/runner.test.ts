@@ -1452,15 +1452,18 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
   it('regra com reserva + limite esgotado: segunda chamada ao gateway com o modelo reserva, comentário na conversa, sem bloqueio', () => {
     useSonnetMedium();
     ruleWithFallback(modelValue(fable().id, 'low'));
-    runner.start(storyId);
+    const done = vi.fn();
+    runner.start(storyId, { origin: 'manual', advice: ['ORIENTAÇÃO PRESERVADA'], onExit: done });
     expect(procs).toHaveLength(1);
     procs[0]!.emit(usageLimitResult());
     procs[0]!.exit(1);
+    expect(done).not.toHaveBeenCalled();
 
     expect(procs).toHaveLength(2);
     const args = procs[1]!.command.args;
     expect(args[args.indexOf('--model') + 1]).toBe('fable');
     expect(args[args.indexOf('--effort') + 1]).toBe('low');
+    expect(procs[1]!.command.stdin).toContain('ORIENTAÇÃO PRESERVADA');
     expect(card().status).toBe('running'); // não bloqueou nem esperou resposta: a reserva está em curso
     expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
     expect(lastMessage()!.body).toBe('O `Sonnet 5.5 - médio` esgotou o limite; a execução segue com `Fable 5.1 - baixo`.');
@@ -1468,6 +1471,7 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     // a retentativa termina bem: segue como qualquer execução normal (aqui, a IA só respondeu na conversa)
     ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
     procs[1]!.exit(0);
+    expect(done).toHaveBeenCalledOnce();
     expect(card().status).toBe('waiting_answer');
   });
 

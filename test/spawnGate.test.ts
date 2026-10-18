@@ -52,6 +52,54 @@ it('falha ao registrar a identidade não executa o comando e produz erro tipado 
   expect(fs.existsSync(marker())).toBe(false);
 });
 
+it('aguarda a confirmação assíncrona antes de liberar qualquer efeito da ferramenta', async () => {
+  let confirm!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    confirm = resolve;
+  });
+  const proc = spawnHeadless({ command: process.execPath, args: ['-e', code()], format: 'text' }, dir, () => {}, undefined, {
+    beforePreparation: () => {},
+    beforeStart: () => pending,
+  });
+  const ended = new Promise<void>((resolve) => proc.onExit(() => resolve()));
+  expect(proc.identity?.pid).toBeGreaterThan(0);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  expect(fs.existsSync(marker())).toBe(false);
+  confirm();
+  await ended;
+  expect(fs.readFileSync(marker(), 'utf8')).toBe('executou');
+});
+
+it('falha assíncrona do flush informa não iniciado e nunca libera o comando', async () => {
+  const proc = spawnHeadless({ command: process.execPath, args: ['-e', code()], format: 'text' }, dir, () => {}, undefined, {
+    beforePreparation: () => {},
+    beforeStart: async () => {
+      throw new Error('disco cheio');
+    },
+  });
+  const error = await new Promise<Error | undefined>((resolve) => proc.onExit((_code, failure) => resolve(failure)));
+  expect(error).toBeInstanceOf(SpawnNotStartedError);
+  expect(error?.cause).toEqual(new Error('disco cheio'));
+  expect(fs.existsSync(marker())).toBe(false);
+  expect(proc.terminationConfirmed?.()).toBe(process.platform !== 'win32');
+});
+
+it('Parar durante o flush impede liberação tardia mesmo quando a gravação termina depois', async () => {
+  let confirm!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    confirm = resolve;
+  });
+  const proc = spawnHeadless({ command: process.execPath, args: ['-e', code()], format: 'text' }, dir, () => {}, undefined, {
+    beforePreparation: () => {},
+    beforeStart: () => pending,
+  });
+  const ended = new Promise<void>((resolve) => proc.onExit(() => resolve()));
+  proc.kill();
+  confirm();
+  await ended;
+  expect(fs.existsSync(marker())).toBe(false);
+});
+
 it('registra identidade antes do primeiro efeito da CLI e transporta stdin sem colocá-lo nos argumentos', async () => {
   let identity: ProcessIdentity | undefined;
   let output = '';
@@ -83,7 +131,7 @@ it('registra identidade antes do primeiro efeito da CLI e transporta stdin sem c
 });
 
 /** Processo separado representa uma janela/host que pode morrer em cada fronteira do protocolo. */
-function crashHost(boundary: 'before-record' | 'after-record' | 'running'): Promise<ChildProcess> {
+function crashHost(boundary: 'before-record' | 'after-record' | 'flushing' | 'running'): Promise<ChildProcess> {
   const bundle = path.join(dir, 'host.cjs');
   buildSync({
     stdin: {
@@ -107,6 +155,7 @@ spawnHeadless({command:process.execPath,args:['-e',${JSON.stringify(code() + 'se
    if(boundary==='before-record') { fs.writeSync(1,'ready\\n'); process.kill(process.pid,'SIGKILL'); }
    lease.recordControlledProcess(identity);
    if(boundary==='after-record') { fs.writeSync(1,'ready\\n'); process.kill(process.pid,'SIGKILL'); }
+   if(boundary==='flushing') { fs.writeSync(1,'ready\\n'); return new Promise(()=>{}); }
  }
 });
 `;
@@ -133,12 +182,13 @@ function recordedIdentity(): ProcessIdentity {
 }
 
 describe('queda real do host', () => {
-  it.each(['before-record', 'after-record'] as const)('recupera %s sem executar a ferramenta', async (boundary) => {
+  it.each(['before-record', 'after-record', 'flushing'] as const)('recupera %s sem executar a ferramenta', async (boundary) => {
     const host = await crashHost(boundary);
+    if (boundary === 'flushing') host.kill('SIGKILL');
     await dead(host);
     const options = { coordinationDir: path.join(dir, 'leases'), log: () => {} };
     // Após registrar, o launcher pode levar alguns milissegundos para receber EOF do host morto.
-    if (boundary === 'after-record' && process.platform === 'win32') {
+    if (boundary !== 'before-record' && process.platform === 'win32') {
       expect(recoverProjectServers(options)).toBe(0);
       expect(fs.existsSync(marker())).toBe(false);
       return; // A árvore Windows permanece desconhecida; não declarar esta fronteira validada.

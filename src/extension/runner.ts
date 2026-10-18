@@ -13,7 +13,7 @@ import { modelDisplay, modelValue, parseModelValue, suggestModelRule } from '../
 import { effortTiers } from './models';
 import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
-import { AiGateway, type AiExecution, type AiRunEnd } from './ai/gateway';
+import { AiGateway, type AiCall, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
 import { catalogLines, contextLines, refineCatalog, type RefineCatalog } from './promptContext';
@@ -65,6 +65,7 @@ export interface RunOptions {
   workId?: string;
   token?: string;
   advice?: string[];
+  beforeStart?: AiCall['beforeStart'];
   onExit?(end: AiRunEnd): void;
 }
 
@@ -401,6 +402,7 @@ export class AiRunner {
         },
         cwd: this.deps.cwd,
         timeoutMinutes: state.board.runner.timeoutMinutes,
+        beforeStart: options.beforeStart,
         prepare: () => {
           const plan = executionPlan(
             state,
@@ -573,7 +575,7 @@ export class AiRunner {
         // o modelo principal esgotou o limite e há reserva: uma nova execução assume, sem publicar nem
         // avisar o fim desta (quem decide o desfecho final é a execução da reserva)
         try {
-          this.start(cardId, origin, mode, retry);
+          this.start(cardId, { ...options, mode }, mode, retry);
           return;
         } catch (e) {
           // a retentativa nem começou (card arquivado, gateway recusou): o card não pode ficar "em

@@ -86,7 +86,7 @@ export function validProcessIdentity(value: unknown): value is ProcessIdentity {
 /** Protocolo interno do transporte; nunca é uma declaração de capacidade fornecida pela UI ou pela IA. */
 export interface SpawnControl {
   beforePreparation(): void;
-  beforeStart(identity: ProcessIdentity): void;
+  beforeStart(identity: ProcessIdentity): void | Promise<void>;
 }
 export class SpawnNotStartedError extends Error {
   constructor(message: string, cause?: unknown) {
