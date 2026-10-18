@@ -4,9 +4,9 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não lançado
+A seção **Não lançado** reúne apenas mudanças integradas na `develop`, aguardando release. Cada seção versionada descreve as mudanças incluídas naquela release. Trabalho exclusivo de outras branches fica fora destas notas.
 
-Mudanças integradas na `develop`, ainda sem release. Ao publicar, esta seção passa a identificar a versão que contém essas entregas. Trabalho que permanece apenas em outra branch não faz parte destas notas.
+## Não lançado
 
 - **Regras não mostra mais o aviso sobre a aba Modelos (#725).** O bloco que dizia que "Preencher o modelo sugerido automaticamente" tinha mudado para Modelos, com o botão "Abrir em Modelos", saiu de Configurações → Regras. A opção continua na aba Modelos, sem mudança.
 

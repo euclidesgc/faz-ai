@@ -5,9 +5,9 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
-## Unreleased
+The **Unreleased** section includes only changes integrated into `develop` and awaiting release. Each versioned section describes changes included in that release. Work exclusive to other branches stays out of these notes.
 
-Changes integrated into `develop` and awaiting release. When publishing, this section becomes the version containing these deliveries. Work that remains only on another branch is not part of these notes.
+## Unreleased
 
 - **Rules no longer shows the notice about the Models tab (#725).** The block saying that "Fill in the suggested model automatically" had moved to Models, with its "Open in Models" button, was removed from Settings → Rules. The option stays in Models, unchanged.
 
