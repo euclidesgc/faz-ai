@@ -1,12 +1,13 @@
 // O transporte ACP: uma execução do board = um processo do agente, uma sessão, um `session/prompt`.
 // Devolve o mesmo `Measured` do transporte das CLIs (`aiOutput/measured.ts`) — `proc.onExit` uma vez,
 // `proc.kill`, `report()` no fim —, e é isso que faz o desenho caber no gateway sem mexer no ciclo do
-// log de uso: o gateway escolhe `spawnMeasured` ou `spawnAcp` pelo provider e o resto é o mesmo.
+// log de uso: o gateway escolhe `spawnMeasured` ou `spawnAcp` pela ferramenta e o resto é o mesmo.
+// Um transporte para todos os agentes ACP; o que muda de um para outro é dado (`acp/agents.ts`).
 //
 // O que muda em relação ao `-p`:
 // - o `stdin` fica aberto: o board responde no meio do trabalho (`session/request_permission`);
 // - os servidores MCP (o do board e os liberados pelo agente do card) vão no `session/new`. Nenhum
-//   arquivo é escrito na pasta do projeto;
+//   arquivo é escrito na pasta do projeto, exceto para o agente que só lê o dele (`projectMcpFile`);
 // - Parar é `session/cancel`, e só depois de uma folga o processo é morto: o agente responde o
 //   prompt com `cancelled` e o que ele já tinha medido chega.
 //
@@ -18,9 +19,10 @@ import { lineSplitter } from '../../aiOutput/lines';
 import { asList, asObject, asText, cut, type Json } from '../../aiOutput/json';
 import { MeasureBrokenError } from '../../aiOutput/errors';
 import { BOARD_SERVER } from '../../execution';
+import { ensureProjectServer } from '../../mcp/clientConfig';
 import type { HeadlessInput } from '../provider';
 import { AUTH_REQUIRED, RpcError, rpcConnection } from './connection';
-import type { AcpMcpServer, AcpProcess, AcpProvider, AcpSpawnFn, AcpToolCall } from './provider';
+import { acpCommand, acpMcpToolOf, type AcpAgent, type AcpMcpServer, type AcpProcess, type AcpSpawnFn, type AcpToolCall } from './provider';
 import { acpReader, toolCallOf } from './reader';
 
 /** A versão do protocolo que este cliente fala. */
@@ -32,6 +34,8 @@ const GRACE_MS = 5_000;
 export interface AcpDeps extends Omit<MeasuredDeps, 'spawn'> {
   spawn: AcpSpawnFn;
   graceMs?: number;
+  /** a pasta do usuário, onde fica o registro global do servidor do board; nos testes, uma temporária */
+  homeDir?: string;
 }
 
 /** Os servidores MCP da execução no formato do `session/new`. */
@@ -79,9 +83,16 @@ function pickOption(params: Json, allow: boolean): string | null {
   return null;
 }
 
-export function spawnAcp(provider: AcpProvider, input: HeadlessInput, cwd: string, deps: AcpDeps): Measured {
-  const reader = acpReader(provider);
+export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, deps: AcpDeps): Measured {
   const servers = acpMcpServers(input);
+  const names = servers.map((s) => s.name);
+  const mcpToolOf = (call: AcpToolCall) => acpMcpToolOf(agent, call, names);
+  const reader = acpReader({
+    mcpToolOf,
+    quota: agent.quota,
+    inputIncludesCache: agent.inputIncludesCache,
+    undercounts: agent.usage.tokens === 'last_request' ? agent.label : undefined,
+  });
   const graceMs = deps.graceMs ?? GRACE_MS;
   const listeners: ((code: number | null, error?: Error) => void)[] = [];
   let sessionId: string | null = null;
@@ -92,8 +103,16 @@ export function spawnAcp(provider: AcpProvider, input: HeadlessInput, cwd: strin
   let done = false;
   let exited = false;
 
-  const built = provider.command(input);
-  deps.log(`Chamando ${provider.label} (ACP): ${built.command} ${built.args.join(' ')}`);
+  const built = acpCommand(agent, input);
+  deps.log(`Chamando ${agent.label} (ACP): ${built.command} ${built.args.join(' ')}`);
+  // o agente que não lê o `session/new` precisa do servidor do board no arquivo dele, como no `-p`
+  if (agent.projectMcpFile && input.boardServer) {
+    const registered = ensureProjectServer(cwd, agent.projectMcpFile, input.boardServer, deps.homeDir);
+    if (registered === 'added' || registered === 'repaired')
+      deps.log(`Servidor do board registrado em ${agent.projectMcpFile}, que o ${agent.label} lê no modo ACP.`);
+    if (registered === 'invalid')
+      deps.log(`${agent.projectMcpFile} não é um JSON válido: o ${agent.label} pode rodar sem acesso ao board. Corrija o arquivo.`);
+  }
 
   const stdout = lineSplitter();
   const stderr = lineSplitter();
@@ -108,17 +127,12 @@ export function spawnAcp(provider: AcpProvider, input: HeadlessInput, cwd: strin
       if (method !== 'session/request_permission') throw new RpcError(-32601, `método não suportado pelo board: ${method}`);
       const call = toolCallOf(asObject(params.toolCall)) ?? { toolCallId: '?', title: null, kind: null };
       if (killed) return { outcome: { outcome: 'cancelled' } };
-      const mcp = provider.mcpToolOf(call);
-      const allow = boardAllows(
-        input.permission,
-        call,
-        mcp,
-        servers.map((s) => s.name),
-      );
+      const mcp = mcpToolOf(call);
+      const allow = boardAllows(input.permission, call, mcp, names);
       const optionId = pickOption(params, allow);
       const what = mcp ? `${mcp.server}/${mcp.tool}` : (call.title ?? call.kind ?? 'ferramenta');
       deps.log(
-        `${provider.label} pediu permissão para ${cut(what, 120)}: ${allow ? 'permitido' : 'negado'} pelo board (nível ${input.permission}).`,
+        `${agent.label} pediu permissão para ${cut(what, 120)}: ${allow ? 'permitido' : 'negado'} pelo board (nível ${input.permission}).`,
       );
       // sem a opção pedida na lista, o board não inventa uma: cancela, que todo agente precisa aceitar.
       // A resposta é imediata (a regra do nível decide, como o `dontAsk` do Claude Code): não fica
@@ -160,7 +174,7 @@ export function spawnAcp(provider: AcpProvider, input: HeadlessInput, cwd: strin
   proc.onExit((code, error) => {
     exited = true;
     for (const line of [...stdout.flush(), ...stderr.flush()]) if (line && !rpc.receive(line)) deps.log(cut(line, 300));
-    const gone = error ?? new Error(`${provider.label} saiu (código ${code}) antes de terminar o pedido.`);
+    const gone = error ?? new Error(`${agent.label} saiu (código ${code}) antes de terminar o pedido.`);
     rpc.close(gone);
     for (const line of reader.flush()) deps.log(line);
     // saiu antes de o prompt responder: o código é o do processo (ou 1, se ele saiu "bem" no meio)
@@ -178,14 +192,14 @@ export function spawnAcp(provider: AcpProvider, input: HeadlessInput, cwd: strin
     });
     const version = init.protocolVersion;
     if (version !== ACP_PROTOCOL_VERSION)
-      throw new Error(`${provider.label} fala a versão ${String(version)} do ACP; o board fala a ${ACP_PROTOCOL_VERSION}.`);
+      throw new Error(`${agent.label} fala a versão ${String(version)} do ACP; o board fala a ${ACP_PROTOCOL_VERSION}.`);
 
     const session = await rpc.request('session/new', { cwd, mcpServers: servers });
     sessionId = asText(session.sessionId);
-    if (!sessionId) throw new Error(`${provider.label} abriu a sessão sem id.`);
+    if (!sessionId) throw new Error(`${agent.label} abriu a sessão sem id.`);
     deps.log(`Sessão ACP aberta com ${servers.length ? servers.map((s) => s.name).join(', ') : 'nenhum servidor MCP'}.`);
 
-    const mode = provider.modeFor(input.permission);
+    const mode = input.permission === 'full' ? agent.fullMode : undefined;
     const modes = asList(asObject(session.modes)?.availableModes).map((m) => asText(asObject(m)?.id));
     // um modo recusado não derruba a execução: no modo padrão o board responde a cada pedido
     if (mode && modes.includes(mode))
@@ -211,7 +225,7 @@ export function spawnAcp(provider: AcpProvider, input: HeadlessInput, cwd: strin
       // sem login o agente recusa a sessão; o board não abre o navegador da pessoa sozinho
       const msg =
         err instanceof RpcError && err.code === AUTH_REQUIRED
-          ? `${provider.label} pede login. Rode \`${built.command}\` no terminal uma vez e entre com a sua conta.`
+          ? `${agent.label} pede login. Rode \`${agent.login}\` no terminal uma vez e entre com a sua conta.`
           : err.message;
       deps.log(msg);
       failure = new Error(msg);
@@ -235,7 +249,7 @@ export function spawnAcp(provider: AcpProvider, input: HeadlessInput, cwd: strin
     report: () => {
       const report = reader.report(sessionId);
       if (report.measure !== 'none') return report;
-      return { ...report, reason: new MeasureBrokenError(provider.label).message };
+      return { ...report, reason: new MeasureBrokenError(agent.label).message };
     },
   };
 }

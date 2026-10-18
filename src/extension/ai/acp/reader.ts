@@ -1,6 +1,7 @@
 // O leitor do ACP: transforma os `session/update` e a resposta do `session/prompt` nas linhas do canal
 // de log e no mesmo `RunReport` que os leitores das CLIs devolvem ao gateway. Um só para todo agente
-// ACP — o formato é do protocolo —, com o provider dizendo só como reconhecer a ferramenta MCP.
+// ACP — o formato é do protocolo —, com o registro do agente dizendo só o que é dele (a ferramenta MCP
+// no título, o formato próprio de tokens, se o `inputTokens` já traz o cache).
 //
 // O que o protocolo dá para medir (agentclientprotocol.com, conferido em 2026-10-18):
 // - `usage_update` (estável desde 2026-06-05): o contexto ocupado (`used` de `size`) e, opcional, o
@@ -12,7 +13,20 @@
 // Sem nenhum dos dois, sobra o inventário de ferramentas: `partial`, como o Cursor sem `usage`.
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../../shared/log';
 import { asNumber, asObject, asText, cut, type Json } from '../../aiOutput/json';
-import type { AcpProvider, AcpToolCall } from './provider';
+import type { AcpToolCall } from './provider';
+
+export interface AcpReaderOptions {
+  mcpToolOf(call: AcpToolCall): { server: string; tool: string } | null;
+  /** tokens num formato próprio do agente, quando a resposta não traz o `usage` do protocolo */
+  quota?(result: Json): AiRunTokens | null;
+  /** o `inputTokens` do agente já inclui o cache lido (o board guarda os dois separados e os soma) */
+  inputIncludesCache?: boolean;
+  /**
+   * O `usage` do agente conta a menos (só o último pedido ao modelo, como o adaptador do Codex): não é
+   * gravado, para o painel não mostrar menos do que foi gasto. O nome vai na linha que explica.
+   */
+  undercounts?: string;
+}
 
 const LINE_MAX = 300;
 
@@ -32,7 +46,7 @@ export const toolCallOf = (o: Json | null): AcpToolCall | null => {
   return id ? { toolCallId: id, title: asText(o?.title), kind: asText(o?.kind) } : null;
 };
 
-export function acpReader(provider: Pick<AcpProvider, 'mcpToolOf'>): AcpReader {
+export function acpReader(opts: AcpReaderOptions): AcpReader {
   let sawEvent = false;
   /** o texto do agente ainda sem `\n`, para o canal não receber um pedaço por linha */
   let pending = '';
@@ -58,7 +72,7 @@ export function acpReader(provider: Pick<AcpProvider, 'mcpToolOf'>): AcpReader {
   const onToolCall = (o: Json): string[] => {
     const call = toolCallOf(o);
     if (!call) return [];
-    const mcp = provider.mcpToolOf(call);
+    const mcp = opts.mcpToolOf(call);
     // a categoria do protocolo é o nome estável; o título é texto para gente e muda a cada chamada
     if (mcp) count('mcp_tool', `${mcp.server}/${mcp.tool}`);
     else count('tool', call.kind ?? 'other');
@@ -107,18 +121,26 @@ export function acpReader(provider: Pick<AcpProvider, 'mcpToolOf'>): AcpReader {
     finish(result) {
       const lines = drain(true);
       const usage = asObject(result.usage);
-      if (usage) {
+      if (usage && opts.undercounts)
+        lines.push(
+          `O ${opts.undercounts} informa só o último pedido ao modelo; o board não grava esses tokens para não mostrar menos do que foi gasto.`,
+        );
+      else if (usage) {
         const input = asNumber(usage.inputTokens);
         const output = asNumber(usage.outputTokens);
         // os dois obrigatórios no rascunho; sem eles o bloco não vira um consumo de zero, que pareceria medido
-        if (input !== null && output !== null)
+        if (input !== null && output !== null) {
+          const cacheRead = asNumber(usage.cachedReadTokens) ?? 0;
           tokens = {
-            inputTokens: input,
+            // sem o desconto, o cache contaria duas vezes no total do painel
+            inputTokens: opts.inputIncludesCache ? Math.max(0, input - cacheRead) : input,
             outputTokens: output + (asNumber(usage.thoughtTokens) ?? 0),
-            cacheReadTokens: asNumber(usage.cachedReadTokens) ?? 0,
+            cacheReadTokens: cacheRead,
             cacheWriteTokens: asNumber(usage.cachedWriteTokens) ?? 0,
           };
+        }
       }
+      tokens ??= opts.quota?.(result) ?? null;
       if (otherCurrency) lines.push(`O agente informou o custo em ${otherCurrency}; o board só grava custo em dólar e não converte.`);
       const stop = asText(result.stopReason);
       lines.push(stop === 'end_turn' ? 'Pronto' : `Terminou: ${stop ?? 'sem motivo informado'}`);

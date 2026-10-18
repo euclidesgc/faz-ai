@@ -1,13 +1,14 @@
-// O protótipo do transporte ACP (spike): um agente falso que fala o Agent Client Protocol pelo
-// `stdin`/`stdout` e o provider do Gemini CLI. Mostra o que o board ganha e o que sobra de medição:
+// O protótipo do conector ACP (spike): um agente falso que fala o Agent Client Protocol pelo
+// `stdin`/`stdout`, o catálogo de agentes e, em detalhe, o Gemini CLI. Mostra o que o board ganha e o
+// que sobra de medição:
 // pedido, eventos, permissão respondida pelo board, servidor MCP do board no `session/new` (sem
 // arquivo no projeto), Parar pelo `session/cancel` e o `RunReport` que o gateway gravaria.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { geminiAcpProvider } from '../src/extension/ai/acp/gemini';
-import type { AcpSpawnFn } from '../src/extension/ai/acp/provider';
+import { ACP_AGENTS, acpAgent } from '../src/extension/ai/acp/agents';
+import type { AcpAgent, AcpSpawnFn } from '../src/extension/ai/acp/provider';
 import { acpMcpServers, spawnAcp } from '../src/extension/ai/acp/run';
 import type { HeadlessInput } from '../src/extension/ai/provider';
 import type { RunReport } from '../src/shared/log';
@@ -143,19 +144,27 @@ class FakeAgent {
 
 const BOARD = { command: '/usr/local/bin/node', args: ['/ext/dist/mcp-bridge.js', '/projeto'], env: { FAZAI_TOKEN: 'x' } };
 
+const gemini = acpAgent('gemini')!;
+
 let dir: string;
+let home: string;
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-acp-'));
+  home = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-acp-home-'));
 });
-afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+afterEach(() => {
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(home, { recursive: true, force: true });
+});
 
 /** Roda até o fim e devolve o que o gateway receberia: código, erro, relatório e as linhas do canal. */
-function run(agent: FakeAgent, input: Partial<HeadlessInput> = {}) {
+function run(agent: FakeAgent, input: Partial<HeadlessInput> = {}, spec: AcpAgent = gemini) {
   const lines: string[] = [];
-  const measured = spawnAcp(geminiAcpProvider, { prompt: 'Trabalhe o card #12', permission: 'board', boardServer: BOARD, ...input }, dir, {
+  const measured = spawnAcp(spec, { prompt: 'Trabalhe o card #12', permission: 'board', boardServer: BOARD, ...input }, dir, {
     spawn: agent.spawn,
     log: (l) => lines.push(l),
     graceMs: 10,
+    homeDir: home,
   });
   const ended = new Promise<{ code: number | null; error?: Error; report: RunReport }>((resolve) =>
     measured.proc.onExit((code, error) => resolve({ code, error, report: measured.report() })),
@@ -183,7 +192,7 @@ const typicalTurn = async (agent: FakeAgent) => {
   };
 };
 
-describe('transporte ACP (protótipo, Gemini CLI)', () => {
+describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
   it('abre a sessão com o servidor do board no session/new e manda o pedido do card como texto', async () => {
     const agent = new FakeAgent({ onPrompt: () => ({ stopReason: 'end_turn' }) });
     const { ended } = run(agent);
@@ -281,7 +290,8 @@ describe('transporte ACP (protótipo, Gemini CLI)', () => {
     expect(report).toEqual({
       measure: 'full',
       consumption: {
-        inputTokens: 1200,
+        // o `inputTokens` do Gemini já traz os 800 do cache: descontados, o total do painel não os conta duas vezes
+        inputTokens: 400,
         // o raciocínio entra como saída, como o Claude Code conta
         outputTokens: 450,
         cacheReadTokens: 800,
@@ -402,5 +412,142 @@ describe('transporte ACP (protótipo, Gemini CLI)', () => {
     const { ended, lines } = run(agent);
     expect((await ended).code).toBe(0);
     expect(lines).toContain('Aviso: nova versão disponível');
+  });
+});
+
+describe('catálogo do conector ACP', () => {
+  // os comandos do registro oficial do ACP (registry.json, 2026-10-18), com o executável da instalação
+  it('cada agente com o comando do registro do ACP', () => {
+    expect(Object.fromEntries(ACP_AGENTS.map((a) => [a.id, [a.command, ...a.args].join(' ')]))).toEqual({
+      gemini: 'gemini --acp',
+      opencode: 'opencode acp',
+      'codex-acp': 'codex-acp',
+      cursor: 'cursor-agent acp',
+      kimi: 'kimi acp',
+      'github-copilot-cli': 'copilot --acp',
+      'qwen-code': 'qwen --acp',
+      goose: 'goose acp',
+    });
+  });
+
+  it('o Claude fica de fora: segue pela CLI `claude`, a única que pode usar a assinatura da pessoa', () => {
+    expect(ACP_AGENTS.map((a) => a.id)).not.toContain('claude-acp');
+    expect(ACP_AGENTS.some((a) => /claude/i.test(a.command))).toBe(false);
+  });
+
+  it.each(ACP_AGENTS.map((a) => [a.label, a] as const))(
+    '%s roda pelo mesmo transporte, com o MCP do board no session/new',
+    async (_label, spec) => {
+      const agent = new FakeAgent({ onPrompt: () => ({ stopReason: 'end_turn' }) });
+      const end = await run(agent, {}, spec).ended;
+      expect(agent.command).toEqual({ command: spec.command, args: [...spec.args] });
+      expect(agent.methods()).toEqual(['initialize', 'session/new', 'session/prompt']);
+      expect(agent.received.find((m) => m.method === 'session/new')!.params.mcpServers.map((s: { name: string }) => s.name)).toEqual([
+        'faz-ai',
+      ]);
+      // só o agente que, pela documentação, ignora o session/new ganha o arquivo dele no projeto
+      if (spec.projectMcpFile)
+        expect(JSON.parse(fs.readFileSync(path.join(dir, spec.projectMcpFile), 'utf8')).mcpServers['faz-ai']).toMatchObject({
+          args: BOARD.args,
+        });
+      else expect(fs.readdirSync(dir)).toEqual([]);
+      expect(end.code).toBe(0);
+    },
+  );
+
+  it('o modelo do card vai na linha de comando de quem aceita', () => {
+    const exec = { model: { name: 'gemini-3-pro', effort: 'high' } } as never;
+    const agent = new FakeAgent({ onPrompt: () => ({ stopReason: 'end_turn' }) });
+    run(agent, { exec }, gemini);
+    expect(agent.command!.args).toEqual(['--acp', '--model', 'gemini-3-pro']);
+  });
+
+  it('sem padrão de título, a ferramenta MCP é reconhecida pelo nome do servidor que o board passou', async () => {
+    const answers: unknown[] = [];
+    const agent = new FakeAgent({
+      onPrompt: async (a) => {
+        a.update({ sessionUpdate: 'tool_call', toolCallId: 't1', title: 'faz-ai: get_card', kind: 'other' });
+        answers.push(await a.ask({ toolCallId: 't1', title: 'faz-ai: get_card', kind: 'other' }));
+        // uma ferramenta "other" de fora dos servidores do board não passa no nível "board"
+        answers.push(await a.ask({ toolCallId: 't2', title: 'slack: post_message', kind: 'other' }));
+        return { stopReason: 'end_turn' };
+      },
+    });
+    const { report } = await run(agent, {}, acpAgent('opencode')!).ended;
+    expect(answers).toEqual([
+      { outcome: { outcome: 'selected', optionId: 'opt-allow_once' } },
+      { outcome: { outcome: 'selected', optionId: 'opt-reject_once' } },
+    ]);
+    expect(report.inventory).toEqual([{ kind: 'mcp_tool', name: 'faz-ai/get_card', calls: 1 }]);
+  });
+
+  it('OpenCode: tokens do turno e custo da sessão, a medição mais completa do catálogo', async () => {
+    const agent = new FakeAgent({
+      onPrompt: (a) => {
+        a.update({ sessionUpdate: 'usage_update', used: 5000, size: 200000, cost: { amount: 0.042, currency: 'USD' } });
+        return { stopReason: 'end_turn', usage: { inputTokens: 3000, outputTokens: 900, totalTokens: 3900 } };
+      },
+    });
+    const { report } = await run(agent, {}, acpAgent('opencode')!).ended;
+    expect(report.measure).toBe('full');
+    expect(report.consumption).toMatchObject({ inputTokens: 3000, outputTokens: 900, costUsd: 0.042 });
+  });
+
+  it('Gemini anterior ao usage do protocolo: os tokens saem do _meta.quota', async () => {
+    const agent = new FakeAgent({
+      onPrompt: () => ({
+        stopReason: 'end_turn',
+        _meta: { quota: { token_count: { input_tokens: 700, output_tokens: 120 }, model_usage: [] } },
+      }),
+    });
+    const { report } = await run(agent).ended;
+    expect(report.consumption).toMatchObject({ inputTokens: 700, outputTokens: 120, cacheReadTokens: 0, costUsd: null });
+  });
+
+  it('Codex: "sem restrições" pede o modo agent-full-access quando o adaptador o anuncia', async () => {
+    const agent = new FakeAgent({
+      sessionNew: () => ({
+        sessionId: 'sess-1',
+        modes: { currentModeId: 'agent', availableModes: [{ id: 'read-only' }, { id: 'agent' }, { id: 'agent-full-access' }] },
+      }),
+      onPrompt: () => ({ stopReason: 'end_turn' }),
+    });
+    await run(agent, { permission: 'full' }, acpAgent('codex-acp')!).ended;
+    expect(agent.received.find((m) => m.method === 'session/set_mode')!.params.modeId).toBe('agent-full-access');
+  });
+
+  it('Codex: o usage do adaptador (só o último pedido) não é gravado, para não mostrar menos do que foi gasto', async () => {
+    const agent = new FakeAgent({
+      onPrompt: (a) => {
+        a.update({ sessionUpdate: 'tool_call', toolCallId: 't1', title: 'Ler README.md', kind: 'read' });
+        return { stopReason: 'end_turn', usage: { inputTokens: 70000, outputTokens: 800, totalTokens: 70800 } };
+      },
+    });
+    const { ended, lines } = run(agent, {}, acpAgent('codex-acp')!);
+    const { report } = await ended;
+    expect(report.measure).toBe('partial');
+    expect(report.consumption).toBeNull();
+    expect(lines).toContain(
+      'O Codex informa só o último pedido ao modelo; o board não grava esses tokens para não mostrar menos do que foi gasto.',
+    );
+  });
+
+  it('modo recusado não derruba a execução: o board segue respondendo as permissões', async () => {
+    const agent = new FakeAgent({ onPrompt: () => ({ stopReason: 'end_turn' }) });
+    const original = agent.spawn;
+    agent.spawn = (command, cwd, out) => {
+      const proc = original(command, cwd, out);
+      const write = proc.write;
+      // o agente responde o set_mode com erro
+      proc.write = (text) => {
+        const msg = JSON.parse(text);
+        if (msg.method === 'session/set_mode') return agent.send({ id: msg.id, error: { code: -32602, message: 'modo inválido' } });
+        write(text);
+      };
+      return proc;
+    };
+    const { ended, lines } = run(agent, { permission: 'full' });
+    expect((await ended).code).toBe(0);
+    expect(lines).toContain('Modo yolo recusado: modo inválido');
   });
 });
