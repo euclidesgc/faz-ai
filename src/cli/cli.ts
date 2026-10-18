@@ -157,6 +157,8 @@ async function main(): Promise<void> {
 
   const timer = setInterval(() => {
     heartbeat.tick();
+    // o mesmo relógio acorda o autopiloto quando a pausa por limite de uso vence (sem timer próprio)
+    host.autopilot.tick();
   }, 60_000);
   // regras e skills editadas por fora aparecem no board: os watchers avisam na hora, e a releitura de
   // cada minuto cobre o que eles não veem (regras de subpasta, sistemas de arquivos de rede)

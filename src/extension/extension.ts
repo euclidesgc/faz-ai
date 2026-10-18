@@ -169,6 +169,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (stopMcp) {
           host?.sweepStaleRuns();
           heartbeat?.tick();
+          // o mesmo relógio acorda o autopiloto quando a pausa por limite de uso vence (sem timer próprio)
+          autopilot?.tick();
         }
       }, 60_000);
       void offerBoardUpgrade(context, router);

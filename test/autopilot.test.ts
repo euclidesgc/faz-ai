@@ -14,6 +14,7 @@ import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { gatewayFor } from './helpers/gateway';
 import type { CardStatus } from '../src/shared/status';
 import type { Database } from 'sql.js';
+import type { RunFinish } from '../src/extension/runner';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -22,6 +23,8 @@ let db: Database;
 let autopilot: Autopilot;
 let log: string[];
 let owns: boolean;
+/** o relógio que o autopiloto vê (a pausa por limite de uso o consulta); começa às 13:40 de um dia fixo, no fuso local */
+let clock: number;
 /** o que o autopiloto adiou para depois do passo atual; `flush` executa */
 let deferred: (() => void)[];
 const flush = () => {
@@ -38,8 +41,8 @@ let runner: {
   failToStart: string | null;
   start(id: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(id: string): void;
-  onDidFinish(fn: (id: string, mode?: AiRunMode) => void): void;
-  finish(act?: () => void, mode?: AiRunMode): void;
+  onDidFinish(fn: (id: string, mode?: AiRunMode, finish?: RunFinish) => void): void;
+  finish(act?: () => void, mode?: AiRunMode, finish?: RunFinish): void;
 };
 
 const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
@@ -96,7 +99,8 @@ beforeEach(async () => {
   log = [];
   owns = true;
   deferred = [];
-  let listener: (id: string, mode?: AiRunMode) => void = () => {};
+  clock = new Date(2026, 9, 18, 13, 40).getTime();
+  let listener: (id: string, mode?: AiRunMode, finish?: RunFinish) => void = () => {};
   runner = {
     running: [],
     started: [],
@@ -110,6 +114,9 @@ beforeEach(async () => {
       this.origins.push(origin);
       this.modes.push(mode);
       router.handle({ type: 'card.status.set', cardId: id, status: 'running' }, { source: 'ai' });
+      // como o runner de verdade: a primeira execução depois que a pausa por limite venceu é o teste
+      const pause = router.snapshot().usageLimit;
+      if (pause && pause.resumeAt <= clock && pause.probe === null) router.setLimitProbe(id);
     },
     stop(id) {
       this.running = this.running.filter((x) => x !== id);
@@ -119,15 +126,24 @@ beforeEach(async () => {
     onDidFinish(fn) {
       listener = fn;
     },
-    finish(act = () => {}, mode) {
+    finish(act = () => {}, mode, finish) {
       const id = this.running.shift()!;
       act();
+      // como o runner de verdade: o fim bem-sucedido apaga a pausa (o limite renovou) e qualquer fim libera o teste
+      const tool = router.snapshot().board.aiTool;
+      if (!finish?.usageLimit) router.clearUsageLimit(tool);
+      if (router.snapshot().usageLimit?.probe === id) router.setLimitProbe(null);
       // a execução termina com o card ainda "Em execução" se a IA não mexeu no status
-      listener(id, mode);
+      listener(id, mode, finish);
       flush(); // o que o board avisou durante a execução, já depois do aviso de que ela terminou
     },
   };
-  autopilot = new Autopilot(router, runner, { log: (l) => log.push(l), canRun: () => owns, defer: (fn) => deferred.push(fn) });
+  autopilot = new Autopilot(router, runner, {
+    log: (l) => log.push(l),
+    canRun: () => owns,
+    defer: (fn) => deferred.push(fn),
+    now: () => clock,
+  });
 });
 
 describe('autopilotStep', () => {
@@ -794,6 +810,167 @@ describe('autopiloto', () => {
     flush();
     const deliveredLines = log.filter((l) => l.includes('entregue'));
     expect(deliveredLines).toHaveLength(1);
+  });
+});
+
+describe('pausa por limite de uso do plano (#800)', () => {
+  const at = (h: number, m: number) => new Date(2026, 9, 18, h, m).getTime();
+  const tool = () => router.snapshot().board.aiTool;
+  /** a execução em andamento esbarra no limite: o card volta para a IA e a pausa é registrada, como faz o runner */
+  const finishByLimit = (resetAt: number | null, act: () => void = () => status(1, 'ready')) =>
+    runner.finish(
+      () => {
+        act();
+        router.recordUsageLimit(tool(), resetAt, clock);
+      },
+      undefined,
+      { usageLimit: true },
+    );
+  const pause = () => router.snapshot().usageLimit!;
+  const note = () => router.snapshot().autopilot.note;
+
+  it('RF1: três falhas seguidas por limite de uso não bloqueiam a história; a quarta execução sai depois da renovação', () => {
+    create('A', 'PRD');
+    yolo(1);
+    for (let i = 0; i < MAX_RUNS_WITHOUT_PROGRESS; i++) {
+      expect(runner.running).toHaveLength(1);
+      finishByLimit(null);
+      expect(runner.running).toEqual([]); // a pausa segura a próxima tentativa
+      clock = pause().resumeAt;
+      autopilot.tick();
+    }
+    expect(card(1).status).not.toBe('blocked');
+    expect(runner.started).toHaveLength(MAX_RUNS_WITHOUT_PROGRESS + 1);
+    expect(log.some((l) => l.includes('sem progresso'))).toBe(false);
+  });
+
+  it('RF2: as falhas comuns continuam contando para o disjuntor, com a mesma mensagem, mesmo com falhas por limite no meio', () => {
+    create('A', 'PRD');
+    yolo(1);
+    runner.finish(() => status(1, 'ready')); // 1ª sem avanço
+    finishByLimit(null); // não conta
+    clock = pause().resumeAt;
+    autopilot.tick();
+    runner.finish(() => status(1, 'ready')); // 2ª sem avanço (e o fim bem-sucedido apaga a pausa)
+    expect(router.snapshot().usageLimit).toBeNull();
+    expect(card(1).status).not.toBe('blocked');
+    runner.finish(() => status(1, 'ready')); // 3ª sem avanço
+    expect(card(1).status).toBe('blocked');
+    expect(card(1).statusReason).toBe(
+      `O autopiloto parou: ${MAX_RUNS_WITHOUT_PROGRESS} execuções seguidas não avançaram a história. Veja a conversa e o log, destrave o card e retome.`,
+    );
+  });
+
+  it('RF5: com a pausa valendo nada é disparado; a nota e o log dizem até quando, e o log só uma vez por pausa', () => {
+    router.recordUsageLimit(tool(), at(13, 50), clock); // renovação 13:50 + 3 min de folga
+    create('A', 'PRD');
+    create('B', 'Spec');
+    yolo(1);
+    yolo(2);
+    flush();
+    expect(runner.started).toEqual([]);
+    expect(note()).toBe('Limite de uso do Claude Code: a fila retoma às 13:53.');
+    // outras mudanças no board e minutos antes da hora não disparam nem repetem o log
+    ai({ type: 'comment.add', cardId: card(1).id, body: 'Uma mensagem qualquer.' });
+    flush();
+    clock = at(13, 52);
+    autopilot.tick();
+    expect(runner.started).toEqual([]);
+    expect(log.filter((l) => l === 'Autopiloto: limite de uso do Claude Code; a fila retoma às 13:53.')).toHaveLength(1);
+  });
+
+  it('RF5: a pausa também segura o resumo da conversa entre as fases', () => {
+    const say = (body: string) => ai({ type: 'comment.add', cardId: card(1).id, body });
+    create('A', 'Discovery');
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Quero exportar em CSV.' });
+    yolo(1);
+    flush();
+    // a IA trabalha a fase, conversa bastante, avança a história e só então esbarra no limite
+    finishByLimit(at(14, 0), () => {
+      say('Li o código.');
+      say('Decidi usar a biblioteca que o projeto já tem.');
+      say('Discovery pronto.');
+      move(1, 'PRD');
+    });
+    expect(runner.started).toHaveLength(1); // nem o resumo começa
+    clock = at(14, 3);
+    autopilot.tick();
+    expect(runner.started).toHaveLength(2);
+    expect(runner.modes[1]).toBe('summarize');
+  });
+
+  describe('com duas histórias em fase de texto em paralelo', () => {
+    beforeEach(() => {
+      router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' }, runner: { parallelStories: 2 } } });
+    });
+
+    it('RF3 e RF6: a retomada só acontece depois da renovação + folga, com uma execução de teste que segura as outras até terminar', () => {
+      router.recordUsageLimit(tool(), at(13, 50), clock);
+      create('A', 'PRD'); // #1
+      create('B', 'Spec'); // #2
+      yolo(1);
+      yolo(2);
+      flush();
+      clock = at(13, 50); // a hora da renovação ainda não basta: falta a folga
+      autopilot.tick();
+      expect(runner.started).toEqual([]);
+      clock = at(13, 53);
+      autopilot.tick();
+      expect(runner.started).toHaveLength(1); // só o teste
+      expect(log.some((l) => /^Autopiloto: limite de uso vencido; testando com #\d+ antes de soltar a fila\.$/.test(l))).toBe(true);
+      autopilot.tick();
+      flush();
+      expect(runner.started).toHaveLength(1); // o teste em curso segura a outra
+      const probe = router.snapshot().cards.find((c) => c.id === runner.started[0])!.number;
+      runner.finish(() => status(probe, 'ready'));
+      // o teste terminou bem: a pausa foi apagada e a fila solta
+      expect(router.snapshot().usageLimit).toBeNull();
+      expect(new Set(runner.started)).toEqual(new Set([card(1).id, card(2).id]));
+    });
+
+    it('RF6: a execução de teste esbarrando de novo no limite renova a pausa e nada mais sai', () => {
+      router.recordUsageLimit(tool(), at(13, 50), clock);
+      create('A', 'PRD');
+      create('B', 'Spec');
+      yolo(1);
+      yolo(2);
+      clock = at(13, 53);
+      autopilot.tick();
+      flush();
+      expect(runner.started).toHaveLength(1);
+      runner.finish(() => router.recordUsageLimit(tool(), at(18, 50), clock), undefined, { usageLimit: true });
+      expect(runner.started).toHaveLength(1);
+      expect(note()).toBe('Limite de uso do Claude Code: a fila retoma às 18:53.');
+    });
+  });
+
+  it('RF4: sem horário na mensagem, as esperas seguem o backoff (5 min, depois 10)', () => {
+    create('A', 'PRD');
+    yolo(1);
+    const t0 = clock;
+    finishByLimit(null);
+    expect(note()).toBe('Limite de uso do Claude Code: nova tentativa às 13:45.');
+    clock = t0 + 5 * 60_000 - 1;
+    autopilot.tick();
+    expect(runner.started).toHaveLength(1);
+    clock = t0 + 5 * 60_000;
+    autopilot.tick();
+    expect(runner.started).toHaveLength(2); // o teste
+    const t1 = clock;
+    finishByLimit(null); // o teste esbarrou de novo: o degrau sobe
+    clock = t1 + 10 * 60_000 - 1;
+    autopilot.tick();
+    expect(runner.started).toHaveLength(2);
+    clock = t1 + 10 * 60_000;
+    autopilot.tick();
+    expect(runner.started).toHaveLength(3);
+  });
+
+  it('a pausa de outra ferramenta não segura a fila da ferramenta ativa', () => {
+    router.recordUsageLimit(tool() === 'claude' ? 'cursor' : 'claude', at(13, 50), clock);
+    create('A', 'PRD');
+    yolo(1);
+    expect(runner.started).toEqual([card(1).id]);
   });
 });
 

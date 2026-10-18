@@ -9,7 +9,10 @@ import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/
 import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
 import { autopilotQueue } from '../shared/autopilotQueue';
 import { commentsSinceSummary } from '../shared/conversation';
+import { aiToolInfo } from '../shared/harness';
+import { canDispatch, limitClock, limitHolds } from '../shared/usageLimit';
 import type { MessageRouter } from './panel/messageRouter';
+import type { RunFinish } from './runner';
 
 const AUTHOR = 'Faz AI';
 /** Execuções seguidas sem nenhum progresso na história antes de o autopiloto desistir e bloquear o card. */
@@ -31,7 +34,8 @@ export interface AutopilotRunner {
   readonly running: string[];
   start(cardId: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(cardId: string): void;
-  onDidFinish(listener: (cardId: string, mode?: AiRunMode) => void): void;
+  /** `finish.usageLimit`: a execução esbarrou no limite de uso do plano, e não conta no disjuntor */
+  onDidFinish(listener: (cardId: string, mode?: AiRunMode, finish?: RunFinish) => void): void;
 }
 
 export interface AutopilotDeps {
@@ -44,6 +48,8 @@ export interface AutopilotDeps {
    * ver esse aviso (e medir o progresso) antes de decidir o passo seguinte.
    */
   defer?(fn: () => void): void;
+  /** o relógio da pausa por limite de uso; padrão: `Date.now` (nos testes, um relógio fixo) */
+  now?(): number;
 }
 
 /** Uma história que o autopiloto pode iniciar agora, com o tipo da atividade (texto ou branch). */
@@ -204,6 +210,10 @@ export class Autopilot {
   private summarizedIn = new Map<string, string>();
   /** resumos em andamento: a quantidade de mensagens quando começou, para achar o resumo que a execução gravou */
   private summarizing = new Map<string, number>();
+  /** a fila ficou segurada pela pausa por limite de uso: o `tick` de cada minuto a retoma quando ela vence */
+  private heldByLimit = false;
+  /** o `resumeAt` da pausa já anunciada no log: uma linha por pausa, não uma a cada mudança do board */
+  private limitLoggedFor: number | null = null;
 
   constructor(
     private router: MessageRouter,
@@ -212,7 +222,7 @@ export class Autopilot {
   ) {
     this.known = new Set(yoloStories(router.snapshot()).map((c) => c.id));
     router.onDidChange(() => this.onBoardChange());
-    runner.onDidFinish((cardId, mode) => this.onRunFinished(cardId, mode));
+    runner.onDidFinish((cardId, mode, finish) => this.onRunFinished(cardId, mode, finish));
     // histórias que já estavam em modo autônomo ao abrir o editor continuam sozinhas: a pessoa ligou o
     // modo para não precisar voltar ao board; só a pausa dela segura a fila (#240)
     (deps.defer ?? queueMicrotask)(() => this.autoResume());
@@ -308,13 +318,56 @@ export class Autopilot {
     });
   }
 
-  private onRunFinished(cardId: string, mode?: AiRunMode): void {
+  /**
+   * Chamado a cada minuto pelo mesmo relógio do heartbeat (sem timer próprio): se a fila foi segurada pela pausa por
+   * limite de uso e ela venceu, trata a fila agora, sem esperar uma mudança no board.
+   */
+  tick(): void {
+    if (!this.heldByLimit || !this.active) return;
+    if (!canDispatch(this.router.snapshot(), this.now())) return;
+    this.heldByLimit = false;
+    this.evaluate();
+  }
+
+  private now(): number {
+    return this.deps.now?.() ?? Date.now();
+  }
+
+  /**
+   * A pausa por limite de uso segura a fila (RF5): nada é iniciado, nem resumo. A nota usa o mesmo texto do aviso do
+   * topo do board, para a tela traduzir; o log registra uma vez por pausa.
+   */
+  private holdForLimit(s: BoardState, now: number): void {
+    this.heldByLimit = true;
+    // vencida, mas com a execução de teste em curso: sem nota, e o fim dela trata a fila de novo
+    if (!s.usageLimit || !limitHolds(s, now)) return this.publish(null);
+    const tool = aiToolInfo(s.board.aiTool).label;
+    const time = limitClock(s.usageLimit.resumeAt, now);
+    this.publish(
+      s.usageLimit.source === 'backoff'
+        ? `Limite de uso do ${tool}: nova tentativa às ${time}.`
+        : `Limite de uso do ${tool}: a fila retoma às ${time}.`,
+    );
+    if (this.limitLoggedFor === s.usageLimit.resumeAt) return;
+    this.limitLoggedFor = s.usageLimit.resumeAt;
+    this.deps.log(`Autopiloto: limite de uso do ${tool}; a fila retoma às ${time}.`);
+  }
+
+  /** O passo é iniciar uma execução e só a pausa por limite de uso o impede (o login vencido é conferido antes). */
+  private limitedRun(step: AutopilotStep): boolean {
+    const s = this.router.snapshot();
+    return step.kind === 'run' && !blocksExecution(s) && !canDispatch(s, this.now());
+  }
+
+  private onRunFinished(cardId: string, mode?: AiRunMode, finish?: RunFinish): void {
     const s = this.router.snapshot();
     const card = s.cards.find((c) => c.id === cardId);
     const story = card && (card.parentId ? s.cards.find((c) => c.id === card.parentId) : card);
     if (mode === 'summarize' && story && this.summarizing.has(story.id)) this.replaceWithSummary(s, story);
-    // refinar, resumir e resolver conflito não movem a história de propósito: não contam como execução sem progresso
-    if (story?.yolo && this.active && mode !== 'refine' && mode !== 'summarize' && mode !== 'conflict') this.checkProgress(s, story);
+    // refinar, resumir e resolver conflito não movem a história de propósito: não contam como execução sem progresso.
+    // O fim por limite de uso também não (RF1): a IA nem chegou a trabalhar, e a pausa segura a próxima tentativa
+    const counts = mode !== 'refine' && mode !== 'summarize' && mode !== 'conflict' && !finish?.usageLimit;
+    if (story?.yolo && this.active && counts) this.checkProgress(s, story);
     // decide depois dos demais ouvintes do fim da execução: o heartbeat guarda a vaga para o autopiloto
     // quando a execução que terminou era dele, e a toma quando era do autopiloto (as filas se intercalam)
     (this.deps.defer ?? queueMicrotask)(() => this.evaluate());
@@ -381,7 +434,9 @@ export class Autopilot {
         this.recoverStale();
         this.logDelivered(this.router.snapshot());
         const step = autopilotStep(this.router.snapshot());
-        this.publish(step.kind === 'paused' ? step.reason : null);
+        // com a fila segurada pelo limite de uso, a nota é a da pausa (`holdForLimit`): publicar as duas a cada volta
+        // trocaria a nota duas vezes, e cada troca avisa o board e traz o autopiloto de volta aqui
+        if (!this.limitedRun(step)) this.publish(step.kind === 'paused' ? step.reason : null);
         if (step.kind === 'idle') {
           this.finish();
           return;
@@ -397,9 +452,15 @@ export class Autopilot {
         if (step.kind !== 'run') return;
         // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
         if (blocksExecution(this.router.snapshot())) return;
+        const s = this.router.snapshot();
+        const now = this.now();
+        // pausa por limite de uso da ferramenta (RF5): as execuções falhariam do mesmo jeito; a fila espera a renovação
+        if (!canDispatch(s, now)) return this.holdForLimit(s, now);
+        this.heldByLimit = false;
+        // a pausa venceu e não há teste em curso: a primeira execução que sair é o teste (RF6)
+        const probing = s.usageLimit?.tool === s.board.aiTool;
         // o teto é por tipo de atividade e conta toda execução em andamento (heartbeat, chamadas à mão):
         // o autopiloto usa as vagas livres de cada tipo, na ordem da fila
-        const s = this.router.snapshot();
         const counts = runningByKind(s, this.runner.running);
         for (const r of autopilotRuns(s)) {
           // a história passou de fase desde a última execução e a conversa está cheia: primeiro o resumo (uma
@@ -412,9 +473,15 @@ export class Autopilot {
             needsSummary(s, r.story);
           const activity: ActivityKind = summarize ? 'text' : r.activity;
           if (counts[activity] >= limitOf(s.board.runner, s.board.git.mode, activity)) continue;
+          if (probing) this.deps.log(`Autopiloto: limite de uso vencido; testando com ${cardRef(r.story)} antes de soltar a fila.`);
           if (summarize) this.startSummary(s, r.story);
           else this.start(r.story);
           counts[activity]++;
+          // a execução de teste em curso segura as outras até terminar (o runner a marca ao iniciar)
+          if (!canDispatch(this.router.snapshot(), now)) {
+            this.heldByLimit = true;
+            break;
+          }
         }
         return;
       }
