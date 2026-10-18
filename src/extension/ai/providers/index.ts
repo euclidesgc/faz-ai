@@ -1,4 +1,6 @@
-import type { AiBase } from '../../../shared/aiProfiles';
+import { BUILTIN_PROFILES, validateProfile, type AiBase, type AiProfile } from '../../../shared/aiProfiles';
+import { copyOf } from './copy';
+import { genericProvider } from './generic';
 // O registro dos providers: um por ferramenta, e o tipo `Record<AiBase, …>` faz o compilador exigir que
 // uma ferramenta nova traga o seu antes de poder ser chamada.
 import { isAiBase, type AiTool } from '../../../shared/harness';
@@ -13,8 +15,24 @@ const PROVIDERS: Record<AiBase, AiProvider> = {
   kimi: kimiProvider,
 };
 
-/** Nesta etapa só os três providers prontos podem executar; perfil desconhecido nunca vira Claude. */
-export const providerFor = (tool: AiTool): AiProvider => {
-  if (!isAiBase(tool)) throw new Error('Perfil de CLI ainda não disponível para execução.');
-  return PROVIDERS[tool];
-};
+export type AiExecutor = AiTool | AiProfile;
+/** Compatibilidade dos chamadores nativos; um ID desconhecido nunca vira outro executor. */
+export function executorProfile(executor: AiExecutor): AiProfile {
+  if (typeof executor === 'string') {
+    const found = BUILTIN_PROFILES.find((p) => p.id === executor);
+    if (!found) throw new Error('Perfil de CLI ainda não disponível para execução.');
+    return structuredClone(found);
+  }
+  if (!executor || typeof executor.id !== 'string' || !executor.id) throw new Error('Identidade de perfil inválida.');
+  return executor;
+}
+export function providerFor(executor: AiExecutor): AiProvider {
+  const profile = executorProfile(executor);
+  if (profile.kind === 'builtin') {
+    if (!isAiBase(profile.id) || profile.base !== profile.id) throw new Error('Perfil pronto inválido.');
+    return PROVIDERS[profile.id];
+  }
+  const errors = validateProfile(profile);
+  if (errors.length) throw new Error(errors.join(' '));
+  return profile.kind === 'copy' && isAiBase(profile.base) ? copyOf(PROVIDERS[profile.base], profile) : genericProvider(profile);
+}

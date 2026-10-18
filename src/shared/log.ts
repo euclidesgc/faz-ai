@@ -33,8 +33,8 @@ export type CardEventKind =
   | 'done'
   | 'cancelled';
 
-/** Quem disparou a execução de IA: manual (botão/comando), heartbeat, autopiloto ou o chat do board. */
-export type AiRunOrigin = 'manual' | 'heartbeat' | 'autopilot' | 'chat';
+/** Quem disparou a execução: pessoa, heartbeat, autopiloto, conversa ou teste explícito de perfil. */
+export type AiRunOrigin = 'manual' | 'heartbeat' | 'autopilot' | 'chat' | 'test';
 
 /** Como uma execução de IA terminou. `unknown` é só para execuções que a sessão anterior não chegou a fechar (ver `closeOpen`). */
 export type AiRunOutcome = 'done' | 'failed' | 'unsupported' | 'timeout' | 'stopped' | 'unknown';

@@ -1,8 +1,8 @@
+import { executorProfile, type AiExecutor } from './providers';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { admitExecution, type StrictExecutionRequest, type ExecutionAdmissionDecision } from '../../shared/executionAdmission';
-import type { AiTool } from '../../shared/harness';
 import { resolveCommand } from '../cliResolve';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import { boardOnlyMcpConfig } from '../execution';
@@ -51,13 +51,19 @@ function digestFile(file: string): string {
 export class ExecutionAdmission {
   constructor(private readonly options: AdmissionOptions) {}
   binding(
-    tool: AiTool,
+    executor: AiExecutor,
     profileId: string,
     input: HeadlessInput,
     cwd: string,
   ): { binding: string; executable: string; environmentComplete: boolean } {
-    const template = headlessCommand(tool, { ...input, prompt: '<prompt-da-execucao>', structured: true });
-    const executable = resolveCommand(template.command, this.options.pathEnv(), this.options.homeDir);
+    const profile = executorProfile(executor);
+    const template = headlessCommand(profile, { ...input, prompt: '<prompt-da-execucao>', structured: true });
+    const executable = resolveCommand(
+      template.command,
+      template.env?.PATH ?? this.options.pathEnv(),
+      this.options.homeDir,
+      template.lookup,
+    );
     if (!executable) throw new Error('Executor indisponível para admissão.');
     const real = fs.realpathSync(executable);
     const environment = this.options.environmentEvidence();
@@ -68,7 +74,8 @@ export class ExecutionAdmission {
       arch: process.arch,
       hostRuntime: process.versions.node,
       profileId,
-      tool,
+      tool: profile.base,
+      ...(profile.kind !== 'builtin' ? { profileConfig: profile.config } : {}),
       executable: real,
       binary: digestFile(real),
       permission: input.permission,
@@ -84,8 +91,10 @@ export class ExecutionAdmission {
       environmentComplete: environment.state === 'complete' && /^[a-f0-9]{64}$/.test(environment.digest),
     };
   }
-  prepare(tool: AiTool, profileId: string, input: HeadlessInput, cwd: string, request: StrictExecutionRequest): AdmittedExecution {
+  prepare(executor: AiExecutor, profileId: string, input: HeadlessInput, cwd: string, request: StrictExecutionRequest): AdmittedExecution {
     if (!profileId.trim() || profileId.length > 240 || profileId.includes('\0')) throw new Error('Identidade de perfil inválida.');
+    const profile = structuredClone(executorProfile(executor));
+    const tool = profile.base;
     const preliminary = admitExecution(tool, input.permission, request, '', [], this.options.now?.() ?? Date.now());
     if (preliminary.reasons.some((r) => r.code !== 'capability-not-verified')) throw new AdmissionBlockedError(preliminary);
     // O contexto da CLI fica fechado, mesmo sem MCP: nunca recorrer ao arquivo do usuário implicitamente.
@@ -133,7 +142,7 @@ export class ExecutionAdmission {
         disallowedTools: [...preliminary.deniedTools],
       };
     }
-    const bound = this.binding(tool, profileId, effective, cwd);
+    const bound = this.binding(profile, profileId, effective, cwd);
     const decision = admitExecution(
       tool,
       input.permission,
@@ -154,9 +163,9 @@ export class ExecutionAdmission {
       input: effective,
       decision,
       command: (command) => {
-        if (this.binding(tool, profileId, effective, cwd).binding !== bound.binding)
+        if (this.binding(profile, profileId, effective, cwd).binding !== bound.binding)
           throw new Error('O executor ou o ambiente mudou após a admissão.');
-        const expected = headlessCommand(tool, { ...effective, structured: command.format !== 'text' });
+        const expected = headlessCommand(profile, { ...effective, structured: command.format !== 'text' });
         if (
           (command.command !== expected.command && command.command !== bound.executable) ||
           command.args.length !== expected.args.length ||
@@ -164,7 +173,9 @@ export class ExecutionAdmission {
           command.stdin !== expected.stdin ||
           command.format !== expected.format ||
           canonical(command.projectMcp) !== canonical(expected.projectMcp) ||
-          canonical(command.tempFiles) !== canonical(expected.tempFiles)
+          canonical(command.tempFiles) !== canonical(expected.tempFiles) ||
+          canonical(command.lookup) !== canonical(expected.lookup) ||
+          command.noShell !== expected.noShell
         )
           throw new Error('O comando mudou após a admissão.');
         for (let i = 0; i < expected.args.length; i++) {

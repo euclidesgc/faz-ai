@@ -1,3 +1,5 @@
+import { toolInfo } from '../../shared/aiProfiles';
+import { executorProfile, type AiExecutor } from '../ai/providers';
 // O transporte da execução medida: monta o comando no modo estruturado, inicia o processo, passa
 // cada pedaço de `stdout` pelo partidor de linhas e pelo leitor, e devolve o mesmo
 // `RunningProcess` de sempre mais um `report()` lido no fim.
@@ -23,7 +25,6 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { baseInfo, type AiTool } from '../../shared/harness';
 import type { RunReport } from '../../shared/log';
 import { leaseProjectServer, type ProjectServerLease } from '../mcp/projectServerLease';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
@@ -87,7 +88,7 @@ const REFUSAL =
  * minúsculas (no Claude Code: `output-format`, `stream-json`, `verbose`). Sai da diferença entre os
  * dois comandos que o provider monta, então uma ferramenta nova não precisa de lista própria.
  */
-export function formatArgs(tool: AiTool, input: HeadlessInput): string[] {
+export function formatArgs(tool: AiExecutor, input: HeadlessInput): string[] {
   const plain = new Set(headlessCommand(tool, { ...input, structured: false }).args);
   return headlessCommand(tool, { ...input, structured: true })
     .args.filter((a) => !plain.has(a))
@@ -157,8 +158,8 @@ export function materialize(command: HeadlessCommand): { command: HeadlessComman
   return { command: { ...command, args }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
-export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, deps: MeasuredDeps): Measured {
-  const label = baseInfo(tool).label;
+export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: string, deps: MeasuredDeps): Measured {
+  const label = toolInfo(executorProfile(tool)).label;
   const provider = providerFor(tool);
   const model = input.exec?.model?.name ?? null;
   const fmtArgs = formatArgs(tool, input);
@@ -355,8 +356,9 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
       // aconteceu com o processo. Sem nada medido e sem motivo conhecido, o formato veio e não
       // trouxe consumo.
       if (report.measure !== 'none') return report;
+      if (provider.measure === 'none') return { ...report, reason: 'Este perfil fornece apenas texto; consumo desconhecido.' };
       return { ...report, reason: (failure ?? new MeasureBrokenError(label)).message };
     },
-    failure: () => (reader.report().measure !== 'none' ? null : (failure ?? new MeasureBrokenError(label))),
+    failure: () => (provider.measure === 'none' || reader.report().measure !== 'none' ? null : (failure ?? new MeasureBrokenError(label))),
   };
 }

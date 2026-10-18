@@ -82,7 +82,7 @@ export function spawnHeadless(
   control?: SpawnControl,
 ): RunningProcess {
   // quem só usa a extensão da ferramenta no editor não tem a CLI no PATH: procura também onde ela costuma ficar
-  const executable = resolveCommand(command.command, pathEnv, os.homedir());
+  const executable = resolveCommand(command.command, command.env?.PATH ?? pathEnv, os.homedir(), command.lookup);
   if (!executable) throw new SpawnNotStartedError(commandNotFound(command.command));
   // um editor aberto de dentro de uma sessão do Claude Code herda as variáveis dela; a execução do board é uma sessão própria
   const env: NodeJS.ProcessEnv = { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}), ...command.env };
@@ -97,7 +97,9 @@ export function spawnHeadless(
   ])
     delete env[name];
   // no Windows as CLIs instaladas pelo npm são .cmd e só rodam pelo shell, com os argumentos escapados
-  const launch = launchSpec(executable, command.args);
+  if (command.noShell && process.platform === 'win32' && /\.(cmd|bat)$/i.test(executable))
+    throw new SpawnNotStartedError('O perfil precisa de executável direto, sem shell.');
+  const launch = command.noShell ? { file: executable, args: command.args, shell: false } : launchSpec(executable, command.args);
   try {
     control?.beforePreparation();
   } catch (e) {

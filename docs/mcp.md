@@ -398,3 +398,12 @@ Schema 42 acrescenta `ai_profiles` à exportação e ao estado público do board
 As sondas de perfil usam `execFile` sem shell, inclusive as consultas nativas; shims `.cmd`/`.bat` no Windows ficam desconhecidos nesse caminho. A versão retorna somente o trecho numérico reconhecido, com ocultação prévia dos valores privados; stdout/stderr brutos não vão ao estado. Sem `statusArgs`, personalizado não consulta/cobra login. Código zero/um/indisponível conserva verdadeiro/falso/desconhecido. As consultas configuradas exigem revisão humana e não comprovam capacidades. O cache é por perfil, executável e referência de credenciais.
 
 Requisitos de perfis configuráveis expõem nome público em `cli`, nunca comando/args/env. Link de instalação HTTPS revisado pode aparecer como metadado público; URL com usuário, senha, query ou fragmento é omitida. Cópias/personalizados não dependem do registro MCP global de outra conta. A execução e a admissão dos providers configuráveis ainda dependem de #687/#729.
+
+
+### Providers configuráveis e origem de teste
+
+O gateway recebe a identidade/perfil escolhido, resolve a configuração privada pelo cofre no host e conserva uma cópia por run. `ai_runs.tool` guarda o ID real do perfil; não vira a base. Configuráveis exigem contrato v1 e admissão antes do spawn. A cópia usa a tradução da base com evidência própria: configuração/comando/args/env entram no vínculo, e recibos de outra configuração não autorizam execução. O genérico sem tradução continua recusado; argumentos declarados não comprovam restrições. Não foi criado endpoint MCP de ativação/revisão de perfil.
+
+O adaptador genérico monta stdin/argv, destinos MCP CLI/projeto/nenhum, modelo/esforço/pastas e argumentos por permissão. Caminho MCP precisa ficar no projeto; ausência de argumentos restritos recusa montagem. Lookup é exato por PATH/absoluto e não usa shell. Seu leitor de texto retorna `measure: none`, consumo/custo desconhecidos e não transforma isso em medição quebrada ou zero. O gateway oculta valores privados e classifica frases literais de autenticação antes da ocultação; não interpreta essas frases como regex.
+
+Schema 43 amplia o CHECK de `ai_runs.origin` para `test`. A reconstrução transacional preserva IDs, consumo, auditoria, inventário e Bash; as FKs dos filhos são conferidas e restauradas. Import/export continua versionado. A migração foi exercitada apenas em bancos descartáveis nesta implementação; o banco vivo do board não foi alterado diretamente.

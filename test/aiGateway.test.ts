@@ -233,9 +233,9 @@ describe('um provider por ferramenta', () => {
   });
 });
 
-describe('as quatro origens passam pelo mesmo gateway', () => {
+describe('as origens passam pelo mesmo gateway', () => {
   /** Uma entrada por origem: se o tipo ganhar uma origem nova, este objeto deixa de compilar até ela ser coberta. */
-  const ORIGINS: Record<AiRunOrigin, true> = { manual: true, heartbeat: true, autopilot: true, chat: true };
+  const ORIGINS: Record<AiRunOrigin, true> = { manual: true, heartbeat: true, autopilot: true, chat: true, test: true };
 
   it('manual, heartbeat e autopiloto (executor de cards) e chat deixam uma linha cada um', () => {
     const g = gateway();
@@ -256,17 +256,18 @@ describe('as quatro origens passam pelo mesmo gateway', () => {
     runner.start(card('C'), 'autopilot');
     router.chatCommand({ type: 'chat.send', text: 'oi', model: null });
 
-    expect(procs).toHaveLength(4);
-    expect(rows().map((r) => r.origin)).toEqual(['manual', 'heartbeat', 'autopilot', 'chat']);
+    g.run(call({ origin: 'test' }));
+    expect(procs).toHaveLength(5);
+    expect(rows().map((r) => r.origin)).toEqual(['manual', 'heartbeat', 'autopilot', 'chat', 'test']);
     expect(new Set(rows().map((r) => r.origin))).toEqual(new Set(Object.keys(ORIGINS)));
     for (const p of procs) p.exit(0);
-    expect(rows().map((r) => r.outcome)).toEqual(['done', 'done', 'done', 'done']);
+    expect(rows().map((r) => r.outcome)).toEqual(['done', 'done', 'done', 'done', 'done']);
 
     // "Sugerir agentes com IA" é uma execução do chat sem pergunta da pessoa: entra pela mesma porta, como origem `chat`
     router.chatCommand({ type: 'ai.suggestAgents' });
-    expect(procs).toHaveLength(5);
-    procs[4]!.exit(0);
-    expect(rows()[4]).toMatchObject({ origin: 'chat', outcome: 'done', cardId: null });
+    expect(procs).toHaveLength(6);
+    procs[5]!.exit(0);
+    expect(rows()[5]).toMatchObject({ origin: 'chat', outcome: 'done', cardId: null });
   });
 });
 
@@ -365,6 +366,68 @@ describe('o contrato v1 não contorna a admissão no gateway', () => {
     expect(procs).toHaveLength(0);
     expect(rows()[0]).toMatchObject({ outcome: 'unsupported', admission: { state: 'blocked', regime: 'exclusive' } });
   });
+  it('a cópia não herda recibos; prova própria fica vinculada ao ambiente/configuração', () => {
+    const { strict, run, authorizeFixture, executable, admission } = fixture();
+    authorizeFixture();
+    const profile: import('../src/shared/aiProfiles').AiProfile = {
+      id: 'claude-work',
+      name: 'Claude Work',
+      kind: 'copy',
+      base: 'claude',
+      enabled: true,
+      position: 3,
+      config: { command: executable, env: { ACCOUNT: 'work' }, authPatterns: ['private-auth expired'] },
+      credentials: { secretRef: 'b'.repeat(64), review: 'reviewed', available: true },
+    };
+    const copy: AiCall = {
+      ...strict,
+      tool: profile.id,
+      profile,
+      prepare: () => {
+        const prepared = strict.prepare();
+        return { ...prepared, strict: { ...prepared.strict!, profileId: profile.id } };
+      },
+    };
+    expect(() => run().run(copy)).toThrow(AdmissionBlockedError);
+    expect(procs).toHaveLength(0);
+    let binding = '';
+    try {
+      admission.prepare(profile, profile.id, copy.prepare().input, dir, copy.prepare().strict!.request);
+    } catch (e) {
+      if (!(e instanceof AdmissionBlockedError)) throw e;
+      binding = e.decision.binding;
+    }
+    const store = new CapabilityEvidenceStore(path.join(dir, 'evidence')),
+      now = Date.now();
+    for (const capability of EXECUTOR_CAPABILITIES)
+      store.record({
+        version: 1,
+        capability,
+        binding,
+        source: 'host-probe',
+        checkedAt: now - 1,
+        expiresAt: now + 60000,
+        checks: CAPABILITY_CHECKS[capability].map((id) => ({ id, outcome: 'passed', receipt: 'a'.repeat(64) })),
+      });
+    // Recibos sintéticos apenas neste teste; não representam verificação de CLI real.
+    const logs: string[] = [];
+    const started = run().run({ ...copy, log: (line) => logs.push(line) });
+    let authExpired = false;
+    started.onExit((end) => {
+      authExpired = !!end.authExpired;
+    });
+    expect(procs).toHaveLength(1);
+    procs[0]!.write('private-auth ex');
+    procs[0]!.write('pired\n');
+    procs[0]!.write(CLAUDE_OUTPUT);
+    procs[0]!.exit(0);
+    expect(rows().find((r) => r.outcome === 'done')?.tool).toBe(profile.id);
+    expect(authExpired).toBe(true);
+    expect(logs.join('\n')).not.toContain('private-auth expired');
+    profile.config.env = { ACCOUNT: 'personal' };
+    expect(() => run().run(copy)).toThrow(AdmissionBlockedError);
+    expect(procs).toHaveLength(1);
+  });
   it('aplica o conjunto admitido e persiste a decisão antes de chamar o transporte', () => {
     const { strict, run, authorizeFixture } = fixture();
     authorizeFixture(); // Recibos sintéticos do verificador de teste, não validação de CLI real.
@@ -416,4 +479,27 @@ it('o host recusa perfil desligado ou importado antes de preparar arquivos ou in
   }
   expect(procs).toHaveLength(0);
   expect(() => providerFor('perfil-customizado')).toThrow('Perfil de CLI ainda não disponível');
+});
+
+it('perfil configurável sem contrato não inicia CLI nem assume o provider base', () => {
+  const profile: import('../src/shared/aiProfiles').AiProfile = {
+    id: 'personalizado',
+    name: 'Personalizado',
+    kind: 'custom',
+    base: 'generic',
+    enabled: true,
+    position: 3,
+    config: { command: 'private-command', env: { TOKEN: 'private-secret' } },
+    credentials: { secretRef: 'b'.repeat(64), review: 'reviewed', available: true },
+  };
+  expect(() => gateway().run(call({ tool: profile.id, profile, origin: 'test' }))).toThrow('contrato e admissão');
+  expect(procs).toHaveLength(0);
+  expect(rows()[0]).toMatchObject({
+    tool: profile.id,
+    origin: 'test',
+    outcome: 'unsupported',
+    measure: 'none',
+    inputTokens: null,
+    costUsd: null,
+  });
 });

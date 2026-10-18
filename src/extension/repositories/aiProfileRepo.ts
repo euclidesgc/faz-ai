@@ -26,7 +26,7 @@ const knownConfigKeys = [
   'statusArgs',
   'authPatterns',
 ];
-const copyKeys = ['command', 'env', 'extraArgs', 'installUrl'];
+const copyKeys = ['command', 'env', 'extraArgs', 'installUrl', 'authPatterns'];
 /** Configuração livre nunca passa pelo SQLite nem retorna ao editor. */
 export class AiProfileRepo {
   constructor(private readonly db: Database) {}

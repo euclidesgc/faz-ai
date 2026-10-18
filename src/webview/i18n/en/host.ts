@@ -142,6 +142,17 @@ export const gitNotices: Record<string, string> = {
 };
 
 export const host: Record<string, string> = {
+  'O perfil resolvido não corresponde ao alvo solicitado.': 'The resolved profile does not match the requested target.',
+  'A admissão não corresponde ao perfil solicitado.': 'Admission does not match the requested profile.',
+  'O perfil precisa de executável direto, sem shell.': 'The profile requires a direct executable without a shell.',
+  'Perfil pronto inválido.': 'Invalid builtin profile.',
+
+  'Este perfil fornece apenas texto; consumo desconhecido.': 'This profile returns text only; usage is unknown.',
+  'Perfis configuráveis exigem contrato e admissão por capacidades.': 'Configurable profiles require a contract and capability admission.',
+  'Perfil genérico sem tradução do contrato neutro.': 'Generic profile has no neutral contract mapping.',
+  'O perfil não declara argumentos para esta permissão restrita.': 'The profile declares no arguments for this restricted permission.',
+  'Arquivo MCP do perfil precisa ser relativo ao projeto.': 'The profile MCP file must be relative to the project.',
+
   'Perfil desativado ou pendente de revisão.': 'Profile disabled or pending review.',
   'Configuração local do perfil indisponível.': 'Local profile configuration is unavailable.',
   'Perfil de CLI ainda não disponível para execução.': 'CLI profile is not available for execution yet.',

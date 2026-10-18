@@ -230,3 +230,16 @@ Requisitos recebem o perfil; comandos privados viram rótulos públicos, links d
 Verificação direcionada: resolução, probes, requisitos, cofre e repositório, além de um processo Node real para versão/status 0/1. Sem CLI de IA remota ou suíte completa. Windows .cmd/.bat não usa shell neste caminho e retorna desconhecido. Providers configuráveis, host/telas e admissão real continuam nas próximas etapas.
 
 Documentação oficial consultada nesta etapa: [Claude Code CLI](https://code.claude.com/docs/en/cli-reference), [Cursor CLI](https://cursor.com/docs/cli/reference/parameters) e [Kimi Code CLI](https://moonshotai.github.io/kimi-cli/en/reference/kimi-command.html). Essas consultas documentais não equivalem à verificação de capacidades de produção.
+
+
+## Providers por perfil — avanço de #687
+
+Antes das alterações foram gravados e aprovados os retratos dos três providers prontos, cobrindo permissão, exec ausente/presente, pastas adicionais e formato. Os mesmos snapshots passaram depois, sem atualização. `copyOf` mantém leitor/medição/MCP da base e combina comando/env/extraArgs. `genericProvider` monta stdin/argv, MCP CLI/projeto/nenhum e somente argumentos da permissão corrente, com lookup exato e sem shell; não aceita contrato neutro explícito ainda sem tradução nem representa flags declarados como suporte comprovado.
+
+Gateway e transporte agora normalizam perfis, conservam o ID no log e resolvem os valores pelo host. Cópias/configuráveis sem contrato/admissão são recusados; o binding inclui a configuração e impede herdar recibos da base. Teste com recibos sintéticos próprios demonstra a fronteira e a invalidação após mudança, sem habilitar produção. Saída genérica é texto, `measure: none`, consumo null e motivo explícito; ausência de medição esperada não vira erro de formato. Node real atravessa provider/transporte/launcher e confirma argumento com espaços/quebra e encerramento, sem inferência de IA.
+
+Frases privadas de autenticação são literais, classificadas antes da ocultação. O scanner de frases não interpreta números de eventos estruturados como erro nativo; padrões nativos continuam sobre o texto legível do runner. A identidade inicial do perfil fica presa à execução mesmo se o padrão mudar.
+
+Schema 43 reconstrói ai_runs para incluir origem test, sem mudar migrações anteriores. Segue o [procedimento de reconstrução do SQLite](https://www.sqlite.org/lang_altertable.html#making_other_kinds_of_table_schema_changes), com FKs suspensas fora da transação, cópia, verificação e restauração. Testes preservam histórico/inventário/Bash e confirmam rollback quando há inconsistência. A origem de teste passa pelo gateway e recebe rótulo próprio na atividade.
+
+**#687 ainda parcial:** faltam preparadores de contrato/admissão em todos os chamadores, tradutores/verificador de produção para os perfis suportados e prova real do fluxo personalizado aceito. O genérico configurável permanece bloqueado onde não há tradução; o teste de Node não é recibo de capacidades. Integrações #688–#692, #699/#700/#701/#702/#732 e E3/E5 seguem pendentes. Mensagem de comando ausente com link público de instalação e o restante do fluxo por perfil devem ser fechados junto dos adaptadores do host.

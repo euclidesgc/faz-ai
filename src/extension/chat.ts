@@ -335,6 +335,7 @@ export class ChatSession {
       execution = this.deps.gateway.run({
         origin: 'chat',
         tool: state.board.aiTool,
+        profile: activeProfile(state.board),
         context: NO_CARD,
         cwd: this.deps.cwd,
         timeoutMinutes: state.board.runner.timeoutMinutes,

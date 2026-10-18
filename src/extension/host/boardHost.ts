@@ -190,6 +190,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
   // a única porta para chamar a IA: o executor de cards e o chat passam por ela, e é ela que escreve o log de uso
   const gateway = new AiGateway({
+    resolveProfile: (id) => new AiProfileRepo(handle.db).resolveProfile(router.boardId, id),
     profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
     boardId: router.boardId,
     runLog,

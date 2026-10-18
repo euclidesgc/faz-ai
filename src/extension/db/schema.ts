@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 42;
+export const SCHEMA_VERSION = 43;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -542,6 +542,48 @@ const MIGRATIONS: Record<number, string> = {
     INSERT INTO ai_profiles(board_id,id,name,kind,base,position,review_state) SELECT id,'cursor','Cursor','builtin','cursor',1,'reviewed' FROM boards;
     INSERT INTO ai_profiles(board_id,id,name,kind,base,position,review_state) SELECT id,'kimi','Kimi Code','builtin','kimi',2,'reviewed' FROM boards;
   `,
+  43: `
+    -- A nova origem não pode reutilizar 'chat': preserva-se também inventário/Bash e auditoria.
+    CREATE TABLE ai_runs_v43 (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      started_at INTEGER NOT NULL,
+      ended_at INTEGER,
+      duration_ms INTEGER,
+      month TEXT NOT NULL,
+      outcome TEXT,
+      exit_code INTEGER,
+      origin TEXT NOT NULL CHECK (origin IN ('manual','heartbeat','autopilot','chat','test')),
+
+      card_id TEXT,
+      card_number INTEGER,
+      card_title TEXT NOT NULL DEFAULT '',
+      card_type TEXT NOT NULL DEFAULT '',
+      workflow TEXT NOT NULL DEFAULT '',
+      column_name TEXT NOT NULL DEFAULT '',
+      phase TEXT NOT NULL DEFAULT '',
+
+      tool TEXT NOT NULL,
+      model TEXT, effort TEXT, profile TEXT, agent TEXT,
+      permission TEXT NOT NULL,
+      autonomous INTEGER NOT NULL DEFAULT 0,
+      clean INTEGER NOT NULL DEFAULT 0,
+      skills_json TEXT NOT NULL DEFAULT '[]',
+      mcp_json TEXT,
+
+      input_tokens INTEGER, output_tokens INTEGER,
+      cache_read_tokens INTEGER, cache_write_tokens INTEGER,
+      cost_usd REAL,
+      turns INTEGER, session_id TEXT, cost_estimated INTEGER,
+      measure TEXT NOT NULL DEFAULT 'none', admission_json TEXT
+    );
+    INSERT INTO ai_runs_v43 SELECT * FROM ai_runs;
+    DROP TABLE ai_runs;
+    ALTER TABLE ai_runs_v43 RENAME TO ai_runs;
+    CREATE INDEX idx_ai_runs_month ON ai_runs(board_id, month, started_at);
+    CREATE INDEX idx_ai_runs_card ON ai_runs(board_id, card_number, started_at);
+    CREATE INDEX idx_ai_runs_open ON ai_runs(board_id, outcome);
+  `,
 };
 
 /** Aplica as migrações pendentes até `upTo` (por padrão, a versão atual). */
@@ -562,15 +604,25 @@ export function migrate(db: Database, upTo = SCHEMA_VERSION): void {
     const next = current + 1;
     const sql = MIGRATIONS[next];
     if (!sql) throw new Error(`Migration ${next} não encontrada`);
-    db.exec('BEGIN;');
+    // Recriar a tabela-pai exige suspender FKs antes da transação para não cascatear os filhos.
+    const rebuildRuns = next === 43;
+    if (rebuildRuns) db.run('PRAGMA foreign_keys = OFF;');
+    let begun = false;
     try {
+      db.exec('BEGIN;');
+      begun = true;
       db.exec(sql);
+      if (rebuildRuns && db.exec('PRAGMA foreign_key_check').some((r) => r.values.length))
+        throw new Error('Referências inválidas após reconstruir o log de execuções.');
       db.run("INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)", [String(next)]);
       db.exec('COMMIT;');
+      begun = false;
     } catch (e) {
-      db.exec('ROLLBACK;');
+      if (begun) db.exec('ROLLBACK;');
       // qual migração falhou: sem isso o erro do SQLite não diz em que passo o banco parou
       throw new Error(`Migração ${next} do banco do board: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      if (rebuildRuns) db.run('PRAGMA foreign_keys = ON;');
     }
     current = next;
   }

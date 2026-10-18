@@ -630,3 +630,26 @@ describe('pastas temporárias de execuções antigas', () => {
     }
   });
 });
+
+it('personalizado em texto usa o transporte uma vez e conserva consumo desconhecido sem erro de medição', () => {
+  const profile: import('../src/shared/aiProfiles').AiProfile = {
+    id: 'custom',
+    name: 'Custom',
+    kind: 'custom',
+    base: 'generic',
+    enabled: true,
+    position: 3,
+    config: { command: 'node', boardServer: 'none' },
+  };
+  const measured = run(profile);
+  started[0]!.emit('resposta\n');
+  started[0]!.exit(0);
+  expect(started).toHaveLength(1);
+  expect(started[0]!.command).toMatchObject({ lookup: { onlyPath: true }, noShell: true, format: 'text' });
+  expect(measured.report()).toMatchObject({
+    measure: 'none',
+    consumption: null,
+    reason: 'Este perfil fornece apenas texto; consumo desconhecido.',
+  });
+  expect(measured.failure()).toBeNull();
+});

@@ -1,6 +1,6 @@
+import { authFailed } from './ai/profileAuth';
+import type { AiProfile } from '../shared/aiProfiles';
 import { toolInfo, activeProfile, catalogTool, resolveModelOption } from '../shared/aiProfiles';
-import { baseValue } from '../shared/harness';
-import type { AiBase } from '../shared/aiProfiles';
 import { cardRef } from '../shared/model';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { SHOW_COST } from '../shared/metrics';
@@ -78,6 +78,7 @@ interface ToolModel {
 }
 
 interface Run {
+  profile: AiProfile;
   exec: AiExecution;
   /** status que o card tinha antes de a execução começar */
   previous: CardStatus | null;
@@ -105,12 +106,6 @@ const RUNNER_AUTHOR = 'Faz AI';
  * um bloqueio do card. Risco já documentado na Spec: a lista pode ficar desatualizada se a CLI mudar o
  * texto de erro; qualquer saída que não bata nenhum padrão segue o caminho atual (RF7).
  */
-const AUTH_FAILURE_PATTERNS: Record<AiBase, RegExp[]> = {
-  claude: [/oauth session expired/i, /failed to authenticate/i, /not logged in/i, /invalid api key/i],
-  cursor: [/not authenticated/i, /please (log|sign) in/i],
-  // calibrável: a CLI 2.1.1 não documenta os textos de erro de autenticação; amplie com saídas reais
-  kimi: [/\b401\b/i, /unauthorized/i, /not logged in/i, /login required/i, /invalid api key/i],
-};
 
 const TAIL_LINES = 12;
 /** Tamanho de cada linha do `tail`: a explicação da falha no card não vira despejo de saída. */
@@ -392,6 +387,7 @@ export class AiRunner {
       exec = this.deps.gateway.run({
         origin,
         tool: state.board.aiTool,
+        profile: activeProfile(state.board),
         // o contexto gravado é o do momento da chamada, congelado: a IA move o card durante o trabalho,
         // e o painel precisa saber de que coluna a execução partiu
         context: {
@@ -520,6 +516,7 @@ export class AiRunner {
       startedAt: exec.startedAt,
     };
     const run: Run = {
+      profile: structuredClone(activeProfile(state.board)),
       exec,
       previous: card.status,
       mode,
@@ -562,9 +559,8 @@ export class AiRunner {
         // mudança de status que explicam o fim da execução ficam ligados a ela
         if (options.workId === undefined) retry = this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
         else {
-          const authFailed =
-            (baseValue(AUTH_FAILURE_PATTERNS, state.board.aiTool) ?? [])?.some((re) => run.tail.some((l) => re.test(l))) ?? false;
-          if (authFailed) this.router.setAuthExpired(state.board.aiTool);
+          const expired = end.authExpired || authFailed(run.profile, run.tail);
+          if (expired) this.router.setAuthExpired(state.board.aiTool);
           else if (!end.stopped && !end.error && end.code === 0 && this.router.snapshot().authExpired === state.board.aiTool)
             this.router.setAuthExpired(null);
         }
@@ -629,12 +625,12 @@ export class AiRunner {
         { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
         { author: RUNNER_AUTHOR },
       );
-    const toolId = this.router.snapshot().board.aiTool;
-    const authFailed = (baseValue(AUTH_FAILURE_PATTERNS, toolId) ?? [])?.some((re) => run.tail.some((l) => re.test(l))) ?? false;
+    const toolId = run.profile.id;
+    const expired = end.authExpired || authFailed(run.profile, run.tail);
     // falha de autenticação vale para o board inteiro, não só para este card: não bloqueia, e o aviso
     // global (RF3) é quem explica à pessoa o que fazer. Entra antes do caminho de "refinar" porque RF6
     // vale para os dois modos, e antes do `failure` genérico, que continua tratando qualquer outra falha
-    if (authFailed) {
+    if (expired) {
       if (this.router.setAuthExpired(toolId)) this.deps.log(`Login do ${toolLabel} vencido: execuções suspensas.`);
       this.router.handle(
         {

@@ -1,3 +1,6 @@
+import { executorProfile } from './providers';
+import { redactCredentialValues } from '../credentials';
+import { authFailed } from './profileAuth';
 import type { AiProfile } from '../../shared/aiProfiles';
 // A única porta por onde o board chama uma ferramenta de IA. Toda execução — de um card (a pessoa, o
 // heartbeat ou o autopiloto) ou do chat — passa por `AiGateway.run`, e é aqui que o log de uso é
@@ -51,6 +54,8 @@ export interface AiPrepared {
 export interface AiCall {
   origin: AiRunOrigin;
   tool: AiTool;
+  /** Perfil escolhido; o host substitui a configuração pública pelos valores do cofre. */
+  profile?: AiProfile;
   context: AiRunContext;
   cwd: string;
   /** tempo máximo da execução, em minutos */
@@ -75,6 +80,8 @@ export interface AiCall {
 
 /** Como a execução terminou, já com o desfecho que o log gravou. */
 export interface AiRunEnd {
+  /** Classificado no host antes da ocultação das frases privadas. */
+  authExpired?: boolean;
   process?: { identity?: ProcessIdentity; terminationConfirmed: boolean };
   code: number | null;
   error?: Error;
@@ -110,6 +117,7 @@ export interface AiExecution {
 export interface AiGatewayDeps {
   /** O host confere também perfis importados no caminho legado antes de preparar arquivos. */
   profile?(id: string): AiProfile | null;
+  resolveProfile?(id: string): AiProfile;
   redact?(text: string): string;
   sessions?: RunMcpSessions;
   snapshots?: Pick<RunArtifactSnapshots, 'capture'>;
@@ -152,8 +160,13 @@ export class AiGateway {
     let attempts = 0;
     let format: OutputFormat = 'text';
     let workToken: string | undefined;
-    const redact = (text: string) =>
-      this.deps.redact?.(this.deps.sessions?.redact(text) ?? text) ?? this.deps.sessions?.redact(text) ?? text;
+    let profile: AiProfile | undefined;
+    let privateAuthFailed = false;
+    const authTails = { stdout: '', stderr: '' };
+    const redact = (text: string) => {
+      const safe = redactCredentialValues(text, profile?.config);
+      return this.deps.redact?.(this.deps.sessions?.redact(safe) ?? safe) ?? this.deps.sessions?.redact(safe) ?? safe;
+    };
     const revoke = () => {
       if (workToken === undefined) return;
       try {
@@ -172,7 +185,19 @@ export class AiGateway {
         if (!profile || !profile.enabled || profile.credentials?.review === 'pending')
           throw new Error('Perfil desativado ou pendente de revisão.');
       }
+      profile = structuredClone(this.deps.resolveProfile?.(call.tool) ?? call.profile ?? executorProfile(call.tool));
+      if (profile.id !== call.tool) throw new Error('O perfil resolvido não corresponde ao alvo solicitado.');
+      if (
+        !profile.enabled ||
+        profile.credentials?.review === 'pending' ||
+        (profile.kind !== 'builtin' && (profile.credentials?.review !== 'reviewed' || !profile.credentials.available))
+      )
+        throw new Error('Perfil desativado ou pendente de revisão.');
       const prepared = call.prepare();
+      if (profile.kind !== 'builtin' && !prepared.strict)
+        throw new Error('Perfis configuráveis exigem contrato e admissão por capacidades.');
+      if (profile.kind !== 'builtin' && prepared.strict?.profileId !== profile.id)
+        throw new Error('A admissão não corresponde ao perfil solicitado.');
       const { config } = prepared;
       let input = prepared.input;
       if (prepared.work) {
@@ -189,7 +214,7 @@ export class AiGateway {
       if (prepared.strict) {
         if (!this.deps.admission) throw new Error('Admissão por capacidades indisponível; execução v1 bloqueada.');
         try {
-          admitted = this.deps.admission.prepare(call.tool, prepared.strict.profileId, input, call.cwd, prepared.strict.request);
+          admitted = this.deps.admission.prepare(profile, prepared.strict.profileId, input, call.cwd, prepared.strict.request);
         } catch (e) {
           if (e instanceof AdmissionBlockedError)
             runLog.describe(runId, { ...config, permission: input.permission, admission: e.decision });
@@ -198,7 +223,7 @@ export class AiGateway {
         input = admitted.input;
       }
       // a ferramenta sem suporte para esta permissão nem começa: confere antes de gravar a configuração
-      const unsupported = admitted ? null : headlessUnsupported(call.tool, input.permission);
+      const unsupported = admitted ? null : headlessUnsupported(profile, input.permission);
       if (unsupported) throw new Error(unsupported);
       if (admitted) {
         if (!runLog.describeRequired) throw new Error('Registro obrigatório da admissão indisponível.');
@@ -207,7 +232,7 @@ export class AiGateway {
       if (workToken !== undefined && snapshot) this.deps.sessions!.register(runId, snapshot, input);
       call.beforeSpawn?.();
       snapshot?.validate();
-      measured = spawnMeasured(call.tool, input, call.cwd, {
+      measured = spawnMeasured(profile, input, call.cwd, {
         spawn: (command, cwd, out, control) => {
           attempts++;
           format = command.format;
@@ -222,7 +247,13 @@ export class AiGateway {
           return this.deps.spawn(
             checked,
             cwd,
-            out,
+            (text, stream) => {
+              if (profile!.kind !== 'builtin' && profile!.config.authPatterns?.length) {
+                authTails[stream] = (authTails[stream] + text).slice(-200000);
+                privateAuthFailed ||= authFailed(profile!, Object.values(authTails), false);
+              }
+              out(text, stream);
+            },
             control && (admitted || snapshot || call.beforeStart)
               ? {
                   beforePreparation: () => {
@@ -287,6 +318,7 @@ export class AiGateway {
       const report = this.deps.sessions?.sanitize(safeReport) ?? safeReport;
       runLog.measure(runId, report);
       const end: AiRunEnd = {
+        ...(privateAuthFailed ? { authExpired: true } : {}),
         code,
         error,
         outcome,

@@ -12,6 +12,9 @@ import type { OutputFormat, OutputReader, ReaderDeps } from '../aiOutput/reader'
 /** Comando que roda a CLI de uma ferramenta de IA sem interface, para um prompt, até terminar. */
 export interface HeadlessCommand {
   command: string;
+  /** Personalizado não procura aliases/bundles nem recorre a shell implícito. */
+  lookup?: { onlyPath: boolean };
+  noShell?: boolean;
   args: string[];
   /** prompt enviado pela entrada padrão, quando a CLI aceita (evita problemas de aspas no argumento) */
   stdin?: string;
@@ -53,7 +56,7 @@ export interface HeadlessInput {
 export const tmpArg = (name: string) => `{tmp:${name}}`;
 
 /** O que o board consegue medir de uma ferramenta: o custo que a CLI informa, ou só os tokens. */
-export type AiMeasure = 'cost' | 'tokens';
+export type AiMeasure = 'cost' | 'tokens' | 'none';
 
 export interface AiProvider {
   readonly tool: AiTool;
