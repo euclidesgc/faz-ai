@@ -8,7 +8,7 @@ import {
   type WorkState,
   type WorkUnit,
 } from '../../shared/orchestration';
-import { validProcessIdentity, type ProcessIdentity } from '../processIdentity';
+import { validProcessIdentity, processGroupState, type ProcessIdentity } from '../processIdentity';
 import { all, one, run, str, num, strOrNull, transaction, type Row } from '../db/query';
 import { newId } from '../db/ids';
 
@@ -103,6 +103,28 @@ export class WorkRepo {
       record,
     );
   }
+  records(): WorkRecord[] {
+    return all(this.db, 'SELECT * FROM ai_work WHERE board_id = ? ORDER BY created_at, id', [this.boardId]).map(record);
+  }
+  /** Inclui o intervalo entre a conclusão durável e a liberação física da trava. */
+  reservations(): WorkRecord[] {
+    return this.records().filter((w) => w.workspace !== null);
+  }
+  workspaceReleased(id: string, generation: number, owner: string): void {
+    transaction(this.db, () => {
+      const work = this.owned(id, generation, owner);
+      if (LIVE_WORK_STATES.includes(work.state)) throw new Error('A unidade viva ainda reserva a pasta.');
+      run(this.db, 'UPDATE ai_work SET workspace = NULL WHERE id = ?', [id]);
+    });
+  }
+  preparedWorkspace(id: string, generation: number, owner: string, before: string): void {
+    if (!text(before, 65536)) throw new Error('Impressão da pasta inválida.');
+    transaction(this.db, () => {
+      const work = this.owned(id, generation, owner);
+      if (work.state !== 'prepared') throw new Error('A unidade não está preparada.');
+      run(this.db, 'UPDATE ai_work_attempts SET workspace_before = ? WHERE work_id = ? AND generation = ?', [before, id, generation]);
+    });
+  }
   latest(workId: string): WorkAttempt | undefined {
     if (!this.get(workId)) return undefined;
     const row = one(this.db, 'SELECT * FROM ai_work_attempts WHERE work_id = ? ORDER BY generation DESC LIMIT 1', [workId]);
@@ -127,12 +149,13 @@ export class WorkRepo {
       if (old && (old.cardId !== unit.cardId || old.storyId !== unit.storyId || old.columnId !== unit.columnId || old.kind !== unit.kind))
         throw new Error('A chave de trabalho pertence a outra unidade.');
       if (old && old.state !== 'waiting' && !(old.state === 'failed' && retryFailed)) return null;
+      if (old?.workspace) return null;
       if (
         unit.cardId &&
         one(this.db, `SELECT 1 FROM ai_work WHERE board_id = ? AND card_id = ? AND state IN ${liveSql}`, [this.boardId, unit.cardId])
       )
         return null;
-      if (workspace && one(this.db, `SELECT 1 FROM ai_work WHERE workspace = ? AND state IN ${liveSql}`, [workspace])) return null;
+      if (workspace && one(this.db, 'SELECT 1 FROM ai_work WHERE workspace = ?', [workspace])) return null;
       for (const id of [unit.storyId, unit.cardId])
         if (id && !one(this.db, 'SELECT 1 FROM cards WHERE id = ? AND board_id = ?', [id, this.boardId]))
           throw new Error('Card da unidade ausente ou fora do board.');
@@ -190,8 +213,11 @@ export class WorkRepo {
     if (workspaceBefore !== null && !text(workspaceBefore, 65536)) throw new Error('Impressão da pasta inválida.');
     transaction(this.db, () => {
       const work = this.owned(id, generation, owner);
-      if (work.state !== 'prepared') throw new Error('A unidade não está preparada.');
-      const boundRun = this.latest(id)!.runId;
+      const previous = this.latest(id)!;
+      if (work.state !== 'prepared' && work.state !== 'started') throw new Error('A unidade não está preparada.');
+      if (work.state === 'started' && (!previous.process || processGroupState(previous.process) !== 'dead'))
+        throw new Error('A tentativa anterior ainda não teve o fim confirmado.');
+      const boundRun = previous.runId;
       if (boundRun !== null && boundRun !== runId) throw new Error('A tentativa já está vinculada a outra execução.');
       if (
         !one(
@@ -269,6 +295,8 @@ export class WorkRepo {
           work.id,
         ]);
       }
+      for (const work of this.reservations().filter((w) => !LIVE_WORK_STATES.includes(w.state) && w.owner !== owner))
+        run(this.db, 'UPDATE ai_work SET owner = ? WHERE id = ?', [owner, work.id]);
       return stale.map((w) => this.get(w.id)!);
     });
   }
@@ -323,7 +351,7 @@ export class WorkRepo {
       next,
       reason,
       this.now(),
-      LIVE_WORK_STATES.includes(next) ? work.workspace : null,
+      work.workspace,
       work.id,
     ]);
   }

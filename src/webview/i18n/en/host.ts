@@ -142,6 +142,17 @@ export const gitNotices: Record<string, string> = {
 };
 
 export const host: Record<string, string> = {
+  'A reconciliação da abertura precisa terminar antes de executar.': 'Startup reconciliation must finish before running.',
+  'A unidade foi cancelada antes de liberar a execução.': 'The work unit was cancelled before releasing the run.',
+  'A história mudou de fase ou foi encerrada antes de liberar a execução.': 'The story changed phase or ended before releasing the run.',
+  'A unidade ou a pasta já está reservada.': 'The work unit or workspace is already reserved.',
+  'A pasta já tem outro escritor ou aguarda reconciliação.': 'The workspace already has another writer or is awaiting reconciliation.',
+  'A tentativa precisa estar vinculada ao log antes de iniciar.': 'The attempt must be linked to the log before starting.',
+  'Não foi possível preparar ou iniciar a execução; confira o ambiente antes de tentar de novo.':
+    'The run could not be prepared or started; check the environment before trying again.',
+  'Não foi possível reservar a pasta antes de executar.': 'The workspace could not be reserved before running.',
+  'A unidade não iniciou: {reason}': 'The work unit did not start: {reason}',
+  'A unidade viva ainda reserva a pasta.': 'The live work unit still reserves the workspace.',
   'Esta execução foi encerrada pelo board; nada foi alterado.': 'This run was ended by the board; nothing was changed.',
   'A unidade exige token e identidade de trabalho juntos.': 'The work unit requires both a token and a work identity.',
   'A unidade não pertence ao card desta execução.': 'The work unit does not belong to this run’s card.',

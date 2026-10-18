@@ -83,6 +83,41 @@ export function validProcessIdentity(value: unknown): value is ProcessIdentity {
   );
 }
 
+/** Só sinaliza um grupo cuja liderança ainda corresponde à identidade gravada. */
+export async function terminateProcessGroup(identity: ProcessIdentity): Promise<boolean> {
+  if (processGroupState(identity) === 'dead') return true;
+  if (
+    identity.platform !== process.platform ||
+    process.platform === 'win32' ||
+    identity.groupId !== identity.pid ||
+    processState(identity) !== 'alive'
+  )
+    return false;
+  const wait = async (milliseconds: number) => {
+    const until = Date.now() + milliseconds;
+    do {
+      if (processGroupState(identity) === 'dead') return true;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    } while (Date.now() < until);
+    return false;
+  };
+  try {
+    process.kill(-identity.groupId, 'SIGTERM');
+  } catch {
+    return processGroupState(identity) === 'dead';
+  }
+  if (await wait(500)) return true;
+  // Um novo líder com o mesmo PID não pertence à tentativa que estamos encerrando.
+  const birth = processBirth(identity.pid);
+  if (birth && birth !== identity.birth) return false;
+  try {
+    process.kill(-identity.groupId, 'SIGKILL');
+  } catch {
+    return processGroupState(identity) === 'dead';
+  }
+  return wait(3000);
+}
+
 /** Protocolo interno do transporte; nunca é uma declaração de capacidade fornecida pela UI ou pela IA. */
 export interface SpawnControl {
   beforePreparation(): void;

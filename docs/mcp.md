@@ -364,6 +364,6 @@ Todas as chamadas autenticadas revalidam token, geração e dono. Após revogaç
 
 Leituras de skills, agentes, regras e artefatos de sessões controladas usam a cópia fixada, sem retorno ao cache compartilhado. O relay externo usa as definições privadas capturadas, limita servidores e, em contratos explícitos, operações; revogar interrompe conexões em curso. Alterar a biblioteca afeta execuções futuras. O snapshot ativo é somente leitura.
 
-Esta integração ainda é uma API para o orquestrador: gatilhos legados não passam a criar unidades automaticamente. Testes usam servidor MCP e ponte compilada reais, com processos Node; não comprovam isolamento de uma CLI de IA, ativação v1 completa ou conclusão de #824/#825.
+A API já é usada pelo Orchestrator com UnitStarter injetado nos testes; gatilhos legados não passam a criar unidades automaticamente. Testes usam servidor MCP e ponte compilada reais, com processos Node; não comprovam isolamento de uma CLI de IA, ativação v1 completa ou conclusão de #824/#825.
 
-O hook interno de host `AiCall.beforeStart(identity)` pode aguardar persistência assíncrona. A CLI permanece atrás do launcher até a confirmação; ao sair da espera, token, snapshot e admissão são revalidados. Parar ou revogar durante a espera impede liberação tardia. A ligação ao banco e à posse da pasta pelo orquestrador continua pendente.
+O hook interno de host `AiCall.beforeStart(identity)` pode aguardar persistência assíncrona. A CLI permanece atrás do launcher até a confirmação; ao sair da espera, token, snapshot e admissão são revalidados. Parar ou revogar durante a espera impede liberação tardia. O Orchestrator liga o hook ao flush e à posse da pasta por um UnitStarter injetado. A criação no host e a ativação nos gatilhos continuam pendentes.

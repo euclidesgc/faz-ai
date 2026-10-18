@@ -91,7 +91,7 @@ A leitura somente de consulta dos anexos `SPEC.md` e `PLAN.md` da #621 confirmou
 
 Testes cobrem transições, geração, proprietário, origem de card/fase, token revogado, importação, comentário idempotente, arquivo reaberto após perda da memória, falha de publicação e disputa entre processos Node reais. A queda do controlador com descendente vivo não libera o workspace. Windows continua sem confirmação da árvore; testes POSIX não validam esse caso. Nenhuma CLI de IA foi declarada validada.
 
-**Ainda não concluído:** `Orchestrator` e integração durável com launcher/runner, ownership da janela nos três gatilhos, reconciliação completa de pasta/resultados e ciclos de devolução humana, ativação da autenticação MCP #823 nos gatilhos, remoção nativa #825 e limites/políticas #730/#731. As regras de associação do campo Fase ainda leem rótulos legados e precisam de tratamento conservador ao renomear antes da ativação. Esta entrega é fundação; não encerra #621/#737/#738 nem ativa E5.
+**Ainda não concluído nesta fundação inicial (ver continuação abaixo):** ativação do `Orchestrator` no host, ownership da janela nos três gatilhos, reconciliação completa de pasta/resultados e ciclos de devolução humana, ativação da autenticação MCP #823 nos gatilhos, remoção nativa #825 e limites/políticas #730/#731. As regras de associação do campo Fase ainda leem rótulos legados e precisam de tratamento conservador ao renomear antes da ativação. Esta entrega é fundação; não encerra #621/#737/#738 nem ativa E5.
 
 ### Identidade MCP por tentativa — API de #823
 
@@ -101,13 +101,25 @@ A ponte compilada envia prefácio reservado antes do MCP. A conexão não troca 
 
 `mcpRunIdentity.test.ts` cobre servidor/ponte reais, dono e geração antigos, chamadas após revogação, espera por runner, scopes indiretos, artefato v1 após edição v2, MCP externo stdio fixado, operações proibidas, contagem, atribuição e sentinelas em logs/export. O teste com runner real confirma orientação, callback e ausência de conclusão automática por código zero.
 
-**Pendente para ativar:** Orchestrator, gatilhos, persistência e identidade antes da liberação da CLI, reconciliação e snapshot da configuração v1 completa. Chamadas legadas ainda não recebem unidades/tokens automaticamente. Isso não encerra E5 nem valida isolamento de CLIs reais.
+**Pendente para ativar:** criação do Orchestrator no host, gatilhos e snapshot da configuração v1 completa. A continuação abaixo exercita persistência, identidade e reconciliação por UnitStarter injetado. Chamadas legadas ainda não recebem unidades/tokens automaticamente. Isso não encerra E5 nem valida isolamento de CLIs reais.
 
 ### Espera durável no launcher — protocolo de #737
 
 `SpawnControl.beforeStart` admite `Promise<void>` e o gateway expõe o mesmo hook ao host. O comando só atravessa o stdin depois da confirmação. As guardas de snapshot, admissão e token são revalidadas ao sair da espera. Rejeição informa processo não iniciado; Parar impede liberação tardia. O transporte medido e o gateway propagam identidade e confirmação do grupo, inclusive no resultado, para evitar que a reconciliação dependa apenas do código de saída.
 
 Testes com launcher Node real cobrem espera, rejeição assíncrona, cancelamento antes da confirmação, revogação durante a espera e queda real do host enquanto o hook está pendente. A confirmação Windows permanece desconhecida. **Não conclui #737:** falta o orquestrador persistir a unidade e a identidade, sincronizar o banco e registrar a posse da pasta por esse hook em cada tentativa.
+
+### Orchestrator persistido e recuperação com processos reais
+
+`src/extension/orchestrator.ts` liga `storyPlan`, admissão de limites, `WorkRepo`, sessões MCP, trava por pasta real e o hook assíncrono do gateway por um `UnitStarter` injetado. Uma fila de controle serializa decisões sem aguardar o término da CLI. `drive` e `continue` usam a mesma posse; a abertura deve reconciliar antes de admitir trabalho. Processos de fora das unidades entram nos tetos por `otherProcesses`, e perfis desconhecidos são contados conservadoramente. O fingerprint e a terminação são dependências explícitas do host; desconhecido não vira ausência de efeitos.
+
+A preparação e a impressão inicial chegam ao disco antes de iniciar; o WAL da pasta recebe a identidade antes de gravá-la no banco e liberar o comando. Tentativas de formato só substituem a identidade após confirmar o grupo anterior. O cancelamento revoga todas as sessões antes de sinalizar processos e impede liberação tardia. `terminateProcessGroup` confere liderança/nascimento no POSIX antes de sinalizar e confirma o grupo após a escalada; identidade ambígua e Windows continuam sem liberação.
+
+A reconciliação distingue card concluído, passagem à pessoa, sessão que criou trabalho, efeitos parciais e falta de confirmação. O comentário de resultado é atômico e idempotente com o estado e contém a referência e até 600 caracteres da última mensagem da IA. Código zero sozinho não conclui o card. Estado terminal conserva `workspace` até a trava ser liberada: falha ou queda entre esses passos não perde o vínculo, e importação permanece bloqueada enquanto há reserva. A varredura repete flush antes de liberar um resultado que só tinha chegado à memória.
+
+`orchestrator.test.ts` usa gateway, ponte MCP, processos Node, trava e SQLite em disco: disputa entre dois gatilhos, três filhas que escrevem na mesma pasta, dependência A→C e fechamento único; trabalho parcial sem JSON; flush recusado; cancelamento durante flush; descendente que confirma ter instalado seu handler de SIGTERM; falha entre conclusão e liberação; reabertura dos bytes duráveis depois da liberação física. `orchestratorIntegration.test.ts` mata o controlador com SIGKILL, abre outro processo, encerra o grupo órfão e confirma que duas reaberturas não repetem a CLI nem o comentário.
+
+**Ainda necessário para #737/#738/E5:** adaptador do host com fingerprint completo e pasta real da história; gatilhos e projeção/staleRuns de #824; ciclos de devolução humana e associação estável da Fase; regras de parada após reconciliação não confirmada; cobertura das demais fronteiras de queda, perfis/modelos distintos e custo de flush em board grande. Remoção nativa #825, políticas #730/#731, credenciais/admissão real e piloto continuam pendentes. Os testes Node não são evidência de isolamento de uma CLI de IA, e a API ainda não foi ativada na produção.
 
 ## Dependências identificadas no board
 

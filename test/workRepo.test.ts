@@ -130,6 +130,8 @@ describe('posse persistida de unidades', () => {
     reconciling(c);
     expect(repo.tokenAlive(c.token)).toBe(false);
     repo.finish(c.work.id, 1, owner, { kind: 'retry-safe', reason: 'Sem efeito comprovado' });
+    expect(repo.claim(unit, 'host-b', '/real/workspace')).toBeNull();
+    repo.workspaceReleased(c.work.id, 1, owner);
     const next = repo.claim(unit, 'host-b', '/real/workspace')!;
     expect(next.work.generation).toBe(2);
     expect(next.attempt.mutations).toBe(0);
@@ -162,6 +164,7 @@ describe('posse persistida de unidades', () => {
     reconciling(c);
     repo.finish(c.work.id, 1, owner, { kind: 'needs-decision', reason: 'Efeito parcial' });
     expect(repo.claim(unit, owner, null)).toBeNull();
+    repo.workspaceReleased(c.work.id, 1, owner);
     const second = repo.claim(unit, owner, null, true)!;
     expect(second.work.generation).toBe(2);
     reconciling(second);
@@ -209,6 +212,8 @@ describe('posse persistida de unidades', () => {
     expect(repo.tokenAlive(c.token)).toBe(true);
     reconciling(c);
     repo.finish(c.work.id, 1, owner, { kind: 'done' });
+    expect(() => importBoard({ db, store: router.store, workspaceKey: 'test', boardId: router.boardId }, parsed)).toThrow('reconciliação');
+    repo.workspaceReleased(c.work.id, 1, owner);
     importBoard({ db, store: router.store, workspaceKey: 'test', boardId: router.boardId }, parsed);
     expect(repo.live()).toEqual([]);
     expect(repo.tokenAlive(c.token)).toBe(false);

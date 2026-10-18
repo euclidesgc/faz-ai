@@ -349,7 +349,11 @@ const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
  */
 export function importBoard(target: ImportTarget, file: BoardExportFile): ImportResult {
   const db = target.db;
-  if (one(db, "SELECT 1 FROM ai_work WHERE board_id = ? AND state IN ('prepared','started','reconciling')", [target.boardId]))
+  if (
+    one(db, "SELECT 1 FROM ai_work WHERE board_id = ? AND (state IN ('prepared','started','reconciling') OR workspace IS NOT NULL)", [
+      target.boardId,
+    ])
+  )
     throw new Error('Há trabalho em execução ou reconciliação. Resolva a posse antes de importar o board.');
   const newBoardId = str(file.board.id);
   const boardName = str(file.board.name);
