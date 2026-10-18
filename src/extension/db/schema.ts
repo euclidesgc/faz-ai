@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 37;
+export const SCHEMA_VERSION = 38;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -480,6 +480,9 @@ const MIGRATIONS: Record<number, string> = {
   `,
   37: `
     ALTER TABLE activity_context_selections ADD COLUMN review_reason TEXT NOT NULL DEFAULT '';
+  `,
+  38: `
+    ALTER TABLE board_artifacts ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
   `,
 };
 

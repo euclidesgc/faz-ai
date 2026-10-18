@@ -7,6 +7,7 @@ import { isAtYoloStop, isWithHuman, isYolo, lastAiColumn, storyOf, yoloStopOf } 
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
+import { runArtifactRequest } from './runArtifactSnapshot';
 import { effortToRun } from '../shared/execution';
 import { modelDisplay, modelValue, parseModelValue, suggestModelRule } from '../shared/models';
 import { effortTiers } from './models';
@@ -424,6 +425,7 @@ export class AiRunner {
             }
           }
           return {
+            artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state, card) : undefined,
             // a configuração completa só existe depois do plano; é a mesma que o resumo manda para o canal de log
             config: {
               model: activityModel,

@@ -9,6 +9,8 @@ The **Unreleased** section includes only changes integrated into `develop` and a
 
 ## Unreleased
 
+- **Library files frozen per run.** The host atomically publishes selected runner/chat artifacts with monotonic revisions (schema 38), a manifest and hashes. Prompts use per-run paths; library edits do not change published files. Required failures block startup and integrity is checked before attempts. Snapshots are preserved without automatic cleanup. Run-bound MCP reads (#823), external legacy sources and full E5 activation remain pending.
+
 - **Reviewable execution plans per activity.** Stories show open phases; tasks keep work, refinement, summary and conflict resolution independent. The editor configures agents, models, skills, MCPs, inputs and results, with board/workflow defaults and actions without cards. Batch application requires reviewing differences, sources, reasons and known context estimates. Atomic saves use optimistic revisions and schema 37; drafts survive failures and tab changes. Plans remain drafts; runtime execution stays on the legacy path.
 
 - **V1 contract admission foundation in the gateway.** Five independent capabilities and local receipts bound to the current configuration replace manual declarations as proof in the new path. Strict Claude mapping intersects tools and MCP operations, enforces explicit empty sets, and revalidates restrictions before startup. Schema 36 preserves the audit decision without exporting local receipts or reusing imported authorization. Real CLI verification and action activation remain pending; current runs stay on the legacy path.

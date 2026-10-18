@@ -257,9 +257,12 @@ export function parseExportFile(text: string): BoardExportFile {
     if (typeof a.stored_name !== 'string' || !isSafeSegment(a.stored_name)) throw invalid('nome de anexo inválido.');
   }
   // skill e agente viram pasta/arquivo em disco, e o arquivo de apoio um caminho dentro da pasta da skill
-  for (const a of tables.board_artifacts as Row[])
+  for (const a of tables.board_artifacts as Row[]) {
+    if (a.revision !== undefined && (!Number.isSafeInteger(a.revision) || Number(a.revision) < 1))
+      throw invalid('revisão de artefato inválida.');
     if ((a.kind === 'skill' || a.kind === 'agent') && (typeof a.name !== 'string' || !isSafeSegment(a.name)))
       throw invalid('nome de skill ou agente inválido.');
+  }
   for (const f of tables.board_artifact_files as Row[])
     if (typeof f.path !== 'string' || !isSafeRelPath(f.path)) throw invalid('caminho de arquivo de apoio inválido.');
   for (const r of tables.agent_context_contracts as Row[]) {

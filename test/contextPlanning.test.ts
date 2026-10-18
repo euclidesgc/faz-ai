@@ -130,10 +130,10 @@ describe('contratos de contexto versionados', () => {
     // Materializa um board legado a partir das tabelas originais, antes da nova migração.
     const insert = (name: string, rows: Record<string, unknown>[]) => {
       for (const r of rows) {
-        const keys = Object.keys(r);
+        const keys = Object.keys(r).filter((key) => name !== 'board_artifacts' || key !== 'revision');
         old.run(
           `INSERT INTO ${name} (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`,
-          Object.values(r) as (string | number | null)[],
+          keys.map((key) => r[key]) as (string | number | null)[],
         );
       }
     };
@@ -144,7 +144,7 @@ describe('contratos de contexto versionados', () => {
     const raw = all(old, 'SELECT * FROM board_artifacts');
     migrate(old);
     const after = executionState(old);
-    expect(all(old, 'SELECT * FROM board_artifacts')).toEqual(raw);
+    expect(all(old, 'SELECT * FROM board_artifacts')).toEqual(raw.map((row) => ({ ...row, revision: 1 })));
     expect(after.fieldValues).toEqual(before.fieldValues);
     expect(manifestOf(before, before.cards[0]!).skills).toContain('testes');
     expect(manifestOf(before, before.cards[0]!).mcpServers).toContain('github');
@@ -339,6 +339,17 @@ describe('contratos de contexto versionados', () => {
     importFile(parseExportFile(JSON.stringify(file)));
     expect(router.snapshot().contextPlanning).toEqual(before);
     expect(repo.read(router.boardId).agents[0]?.revision).toBe(2);
+  });
+
+  it('preserva revisões dos artefatos e recusa revisão inválida antes do import', () => {
+    artifacts.upsert(router.boardId, draft('skill', 'testes'));
+    const revision = artifacts.get(router.boardId, 'skill', 'testes')!.revision;
+    expect(revision).toBe(2);
+    const file = exported();
+    importFile(parseExportFile(JSON.stringify(file)));
+    expect(artifacts.get(router.boardId, 'skill', 'testes')!.revision).toBe(revision);
+    file.tables.board_artifacts![0]!.revision = -1;
+    expect(() => parseExportFile(JSON.stringify(file))).toThrow('revisão de artefato');
   });
 
   it('a prévia do host usa contratos salvos e retorna somente metadados dos artefatos', () => {

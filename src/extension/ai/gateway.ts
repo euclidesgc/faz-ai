@@ -18,6 +18,7 @@ import { headlessUnsupported, type HeadlessCommand, type HeadlessInput } from '.
 import type { RunLog } from '../log/runLog';
 import type { StrictExecutionRequest } from '../../shared/executionAdmission';
 import { AdmissionBlockedError, type ExecutionAdmission, type AdmittedExecution } from './admission';
+import type { RunArtifactRequest, RunArtifactSnapshots } from '../runArtifactSnapshot';
 
 /** O contexto da execução que o log congela na hora da chamada: a IA move o card durante o trabalho. */
 export type AiRunContext = Omit<AiRunStart, 'boardId' | 'startedAt' | 'origin' | 'tool'>;
@@ -35,6 +36,7 @@ export const NO_CARD: AiRunContext = {
 
 /** O que a execução precisa depois que a linha do log já abriu. */
 export interface AiPrepared {
+  artifacts?: RunArtifactRequest;
   /** Contrato v1 preparado pelo host; não aceita evidência ou selo de verificação do cliente. */
   strict?: { profileId: string; request: StrictExecutionRequest };
   input: HeadlessInput;
@@ -97,6 +99,7 @@ export interface AiExecution {
 }
 
 export interface AiGatewayDeps {
+  snapshots?: Pick<RunArtifactSnapshots, 'capture'>;
   admission?: ExecutionAdmission;
   leaseCoordinationDir?: string;
   boardId: string;
@@ -117,6 +120,10 @@ export function outcomeOf(end: { stopped: boolean; timedOut: boolean; code: numb
 export class AiGateway {
   constructor(private deps: AiGatewayDeps) {}
 
+  get supportsSnapshots(): boolean {
+    return !!this.deps.snapshots;
+  }
+
   /**
    * Abre a linha do log, confere se a ferramenta roda com a permissão pedida, inicia o processo e
    * devolve a execução. Lança erro se não for possível começar — e, nesse caso, a linha do log já
@@ -135,6 +142,9 @@ export class AiGateway {
       const prepared = call.prepare();
       const { config } = prepared;
       let input = prepared.input;
+      if (prepared.artifacts && !this.deps.snapshots) throw new Error('Snapshot de artefatos indisponível; execução bloqueada.');
+      const snapshot = this.deps.snapshots?.capture(runId, prepared.artifacts);
+      if (snapshot) input = snapshot.rewrite(input);
       let admitted: AdmittedExecution | undefined;
       if (prepared.strict) {
         if (!this.deps.admission) throw new Error('Admissão por capacidades indisponível; execução v1 bloqueada.');
@@ -155,24 +165,28 @@ export class AiGateway {
         runLog.describeRequired(runId, { ...config, permission: input.permission, admission: admitted.decision });
       } else runLog.describe(runId, { ...config, permission: input.permission });
       call.beforeSpawn?.();
+      snapshot?.validate();
       measured = spawnMeasured(call.tool, input, call.cwd, {
         spawn: (command, cwd, out, control) => {
           attempts++;
           format = command.format;
           call.onAttempt?.(command);
+          snapshot?.validate();
           const checked = admitted?.command(command) ?? command;
           return this.deps.spawn(
             checked,
             cwd,
             out,
-            control && admitted
+            control && (admitted || snapshot)
               ? {
                   beforePreparation: () => {
-                    admitted.command(checked);
+                    snapshot?.validate();
+                    admitted?.command(checked);
                     control.beforePreparation();
                   },
                   beforeStart: (identity) => {
-                    admitted.command(checked);
+                    snapshot?.validate();
+                    admitted?.command(checked);
                     control.beforeStart(identity);
                   },
                 }

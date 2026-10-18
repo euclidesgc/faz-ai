@@ -8,6 +8,8 @@ A seção **Não lançado** reúne apenas mudanças integradas na `develop`, agu
 
 ## Não lançado
 
+- **Arquivos da biblioteca fixados por execução.** O host publica uma cópia atômica dos artefatos selecionados do runner/chat, com revisões monotônicas (schema 38), manifesto e hashes. Os prompts usam caminhos por run; editar a biblioteca não altera os arquivos já publicados. Falha obrigatória impede o processo e a integridade é conferida antes das tentativas. Snapshots são preservados sem coleta automática. A leitura MCP vinculada ao run (#823), as fontes externas legadas e a ativação completa da E5 continuam pendentes.
+
 - **Plano de execução revisável por atividade.** Histórias mostram fases abertas; tarefas mantêm trabalho, refino, resumo e conflito independentes. O editor configura agente, modelo, skills, MCPs, entradas e resultado, com padrões de board/workflow e ações sem card. Antes de aplicar um lote, mostra diferenças, origens, justificativa e estimativa conhecida. Salvamento atômico com revisão otimista, schema 37, rascunhos preservados em falhas e entre abas. Os planos continuam rascunhos; o runtime permanece legado.
 
 - **Base de admissão de contratos v1 no gateway.** Cinco capacidades independentes e recibos locais vinculados à configuração substituem declarações manuais como fonte de prova no novo caminho. O mapeamento estrito do Claude intersecta ferramentas e operações MCP, impõe vazio explícito e revalida as restrições antes de iniciar. O schema 36 preserva a decisão de auditoria, sem exportar recibos locais nem reutilizar autorização importada. O verificador de CLIs reais e a ativação das ações continuam pendentes; execuções atuais permanecem legadas.

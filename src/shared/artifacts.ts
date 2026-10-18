@@ -60,6 +60,8 @@ export interface BoardArtifact {
   size?: number;
   createdAt: number;
   updatedAt: number;
+  /** Revisão monotônica no banco; ausente somente em estados legados. */
+  revision?: number;
 }
 
 /** O que se grava: o artefato inteiro, com o conteúdo e os arquivos. */

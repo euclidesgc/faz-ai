@@ -69,6 +69,16 @@ O schema **37** acrescenta justificativa revisada. `contextPlanning.saveBatch` �
 
 Testes cobrem migração 36→37, rollback, importação, alvos estáveis, precedência, independência por ação, estimativas desconhecidas, revisão de lote, cópia, falha, concorrência, troca de agente, recursos ausentes, tradução e navegação por teclado. **A interface da E4 está implementada em modo de rascunho.** A pendência da admissão real da E3 permanece; essa entrega não habilita E5 nem comprova isolamento do executor.
 
+## E5 — Snapshots dos arquivos da biblioteca (#727, parcial)
+
+O host configura `RunArtifactSnapshots` no gateway. Runner e chat selecionam as cópias de rules/skills efetivamente referenciadas pelo contexto legado e os agentes da sessão/delegação. O serviço lê o banco, recusa revisões atrasadas ou arquivos obrigatórios inválidos, grava uma área privada temporária com fsync e publica por rename em `run-artifacts/<boardId>/<runId>`. Cada manifesto tem identidades, revisões e hashes SHA-256; definições MCP não entram nesses arquivos. O schema **38** acrescenta revisão monotônica, incrementada em conteúdo e marcação, sem depender da resolução do relógio.
+
+Prompts, referências de apoio e diretórios extras usam a cópia publicada. O gateway valida o manifesto e os arquivos depois de `beforeSpawn`, antes de cada tentativa e nos controles anteriores à liberação do launcher. Falhas não recorrem ao cache compartilhado. Publicar outro run não substitui o primeiro; editar/apagar a biblioteca ou cache não apaga snapshots. Não há coleta automática: runs ativos ou em reconciliação não são removidos pelo serviço.
+
+Testes reais de filesystem e banco cobrem A/v1, B/v2, exclusão, referências de apoio, revisão no mesmo milissegundo, publicação duplicada, corrupção/link simbólico, falha de escrita, rollback de preparação e integração runner/chat com transporte falso. Não houve inferência de CLI real.
+
+**Pendente para concluir #727/E5:** identidade/escopo MCP #823 para `get_skill` e demais leituras consumirem o snapshot autenticado; referências externas legadas ainda não são congeladas. O manifesto é dos arquivos selecionados, não da configuração v1 completa nem da decisão versionada de modelo/política. A resolução, admissão real, orquestração e políticas da E5 continuam pendentes. Essa infraestrutura conserva as seleções legadas; não ativa contratos v1 nem remove delegação nativa.
+
 ## Dependências identificadas no board
 
 Consulta local somente de leitura ao board deste projeto em 17/10/2026:

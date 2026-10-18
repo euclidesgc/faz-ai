@@ -7,6 +7,8 @@ import { dayOf } from '../../shared/log';
 import { Autopilot } from '../autopilot';
 import { Heartbeat } from '../heartbeat';
 import { AiGateway } from '../ai/gateway';
+import { RunArtifactSnapshots } from '../runArtifactSnapshot';
+import { ArtifactRepo } from '../repositories/artifactRepo';
 import { createRunLog } from '../log/runLog';
 import { consolidate } from '../log/rollup';
 import { BoardRepo } from '../repositories/boardRepo';
@@ -186,6 +188,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const gateway = new AiGateway({
     boardId: router.boardId,
     runLog,
+    snapshots: new RunArtifactSnapshots(path.join(o.storageDir, 'run-artifacts'), new ArtifactRepo(handle.db), router.boardId),
     admission: new ExecutionAdmission({
       pathEnv: () => pathEnv,
       homeDir,

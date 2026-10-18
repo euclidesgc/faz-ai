@@ -100,7 +100,12 @@ export class ArtifactRepo {
   }
 
   setUsage(boardId: string, id: string, usage: HarnessUsage): void {
-    run(this.db, 'UPDATE board_artifacts SET usage = ?, updated_at = ? WHERE id = ? AND board_id = ?', [usage, now(), id, boardId]);
+    run(this.db, 'UPDATE board_artifacts SET usage = ?, updated_at = ?, revision = revision + 1 WHERE id = ? AND board_id = ?', [
+      usage,
+      now(),
+      id,
+      boardId,
+    ]);
   }
 
   /** Os arquivos de apoio saem pelo ON DELETE CASCADE. */
@@ -173,7 +178,7 @@ export class ArtifactRepo {
       run(
         this.db,
         `UPDATE board_artifacts SET description = ?, body = ?, meta_json = ?, origin = ?, origin_tool = ?, missing = ?,
-           skipped_json = ?, updated_at = ?, usage = ? WHERE id = ?`,
+           skipped_json = ?, updated_at = ?, usage = ?, revision = revision + 1 WHERE id = ?`,
         [...common, keep, id],
       );
       run(this.db, 'DELETE FROM board_artifact_files WHERE artifact_id = ?', [id]);
@@ -221,6 +226,7 @@ export class ArtifactRepo {
       meta,
       createdAt: num(row.created_at),
       updatedAt: num(row.updated_at),
+      revision: num(row.revision),
     };
     if (kind === 'agent') a.agent = meta as AgentMeta;
     if (kind === 'mcp') a.mcpSummary = mcpSummaryOf(serverOf(meta));

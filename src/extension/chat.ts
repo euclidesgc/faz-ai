@@ -13,6 +13,7 @@ import { NO_CARD, type AiExecution } from './ai/gateway';
 import { MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { BOARD_SERVER, bareExec, type ExecInput } from './execution';
 import { contextLines } from './promptContext';
+import { runArtifactRequest } from './runArtifactSnapshot';
 import { isCliNoise } from './cliNoise';
 import type { MessageRouter } from './panel/messageRouter';
 import { boardServer, PERMISSION_ADVICE, type RunnerDeps } from './runner';
@@ -338,6 +339,7 @@ export class ChatSession {
         timeoutMinutes: state.board.runner.timeoutMinutes,
         // no chat não há agente do board nem subagente escolhido: `null` é "não definido", não "vazio"
         prepare: () => ({
+          artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state) : undefined,
           config: {
             model: plan.model?.name ?? null,
             effort: plan.model?.effort ?? null,
