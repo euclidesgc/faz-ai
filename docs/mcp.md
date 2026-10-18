@@ -176,7 +176,7 @@ Decisões v1 presentes no histórico/export são auditoria, não recibos de capa
 
 A ponte usa o mesmo registro **faz-ai**, independente da ferramenta cliente. MCP desligado ou ausente
 é recusado; no modo Pelo card, é obrigatório informar um card que selecione o servidor, diretamente
-ou pelo agente. Configurações são relidas em cada chamada; conexões são abertas e fechadas por
+ou pelo agente. Nas sessões externas, configurações são relidas em cada chamada; conexões são abertas e fechadas por
 operação. Suporta stdio, Streamable HTTP e `type: "sse"` explícito, com `env`/`headers` estáticos.
 Não conduz OAuth e não encaminha recursos ou prompts MCP. Erros de um servidor não impedem o uso
 dos demais. A IA descobre os schemas antes de chamar uma ferramenta.
@@ -355,3 +355,13 @@ não permite. Isso é uma orientação ao cliente de IA: cada ferramenta decide 
 Fluxo SDD sugerido: a IA lê a história e a fase (`phase`), cria uma sub-tarefa com o campo Fase,
 constrói nela o documento da fase e o anexa à história (`artifact: true`), pede a revisão na
 história e para. Com a aprovação, move a história para a próxima coluna.
+
+## Identidade de execuções controladas
+
+A API interna `AiRunner.start(cardId, { origin, mode?, workId, token, advice?, onExit? })` preserva a assinatura legada. Unidades controladas exigem snapshot explícito e ponte do board; não há fallback silencioso para sessão externa. O host põe `FAZAI_RUN_TOKEN` apenas no ambiente dessa ponte. Ela envia `{"fazai":{"run":"<token>"}}` antes da primeira mensagem MCP. O transporte consome o cabeçalho, fixa a identidade da conexão e recusa cabeçalho tardio ou token malformado. Clientes externos sem variável mantêm o protocolo anterior. O token não é parâmetro de ferramenta, argumento de CLI, conteúdo de prompt ou dado exportado.
+
+Todas as chamadas autenticadas revalidam token, geração e dono. Após revogação, inclusive depois de esperas assíncronas, a resposta é `Esta execução foi encerrada pelo board; nada foi alterado.`. Mutações aceitas são contadas conservadoramente antes de aguardar; eventos usam o run autenticado. O host remove tokens conhecidos de argumentos, resultados e logs. Sessões externas não herdam o run corrente e não podem iniciar ou mover um card reservado por outra unidade. Uma sessão de história não assume a execução dos filhos orquestráveis.
+
+Leituras de skills, agentes, regras e artefatos de sessões controladas usam a cópia fixada, sem retorno ao cache compartilhado. O relay externo usa as definições privadas capturadas, limita servidores e, em contratos explícitos, operações; revogar interrompe conexões em curso. Alterar a biblioteca afeta execuções futuras. O snapshot ativo é somente leitura.
+
+Esta integração ainda é uma API para o orquestrador: gatilhos legados não passam a criar unidades automaticamente. Testes usam servidor MCP e ponte compilada reais, com processos Node; não comprovam isolamento de uma CLI de IA, ativação v1 completa ou conclusão de #824/#825.

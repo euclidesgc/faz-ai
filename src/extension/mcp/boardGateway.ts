@@ -15,12 +15,17 @@ export async function withBoardMcp<T>(
   workspaceDir: string,
   run: (client: Client) => Promise<T>,
 ): Promise<T> {
-  const state = router.snapshot();
-  const artifact = state.harness.library?.artifacts.find((a) => a.kind === 'mcp' && a.name === name && !a.missing);
-  if (!artifact || artifact.usage === 'off') throw new Error('Servidor MCP indisponível ou desligado na biblioteca.');
-  if (artifact.usage !== 'always' && (card === undefined || !manifestOf(state, findCard(state, card)).mcpServers.includes(name)))
-    throw new Error('Este MCP está no modo Pelo card. Informe um card que o selecione, diretamente ou pelo agente.');
-  const definition = router.libraryMcpDefinitions()[name] as Record<string, unknown> | undefined;
+  const access = router.mcpAccess();
+  let definition: Record<string, unknown> | undefined;
+  if (access) definition = access.definition(name);
+  else {
+    const state = router.snapshot();
+    const artifact = state.harness.library?.artifacts.find((a) => a.kind === 'mcp' && a.name === name && !a.missing);
+    if (!artifact || artifact.usage === 'off') throw new Error('Servidor MCP indisponível ou desligado na biblioteca.');
+    if (artifact.usage !== 'always' && (card === undefined || !manifestOf(state, findCard(state, card)).mcpServers.includes(name)))
+      throw new Error('Este MCP está no modo Pelo card. Informe um card que o selecione, diretamente ou pelo agente.');
+    definition = router.libraryMcpDefinitions()[name] as Record<string, unknown> | undefined;
+  }
   if (!definition) throw new Error('Definição MCP não encontrada.');
   const client = new Client({ name: 'faz-ai-board', version: '1.0.0' });
   let transport: Transport;
@@ -38,8 +43,34 @@ export async function withBoardMcp<T>(
     transport = definition.type === 'sse' ? new SSEClientTransport(url, options) : new StreamableHTTPClientTransport(url, options);
   }
   try {
-    await client.connect(transport, { timeout: 15_000 });
-    return await run(client);
+    access?.assert();
+    const abort = () => {
+      void client.close().catch(() => {});
+      void transport.close().catch(() => {});
+    };
+    access?.signal.addEventListener('abort', abort, { once: true });
+    try {
+      await client.connect(transport, { timeout: 15_000 });
+      access?.assert();
+      const checked = access
+        ? new Proxy(client, {
+            get(target, key) {
+              const value = Reflect.get(target, key, target);
+              return typeof value === 'function'
+                ? (...args: unknown[]) => {
+                    access.assert();
+                    return Reflect.apply(value, target, args);
+                  }
+                : value;
+            },
+          })
+        : client;
+      const result = await run(checked);
+      access?.assert();
+      return result;
+    } finally {
+      access?.signal.removeEventListener('abort', abort);
+    }
   } finally {
     await client.close().catch(() => {});
     await transport.close().catch(() => {});

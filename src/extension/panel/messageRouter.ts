@@ -39,6 +39,8 @@ import { initModels, modelHandlers } from './handlers/models';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
 import { branchRenameHandlers } from './handlers/branchRename';
 import { settleDelivery } from '../delivery';
+import { WorkRepo } from '../repositories/workRepo';
+import { RunMcpSessions, type RunMcpAccess } from '../mcp/runSessions';
 
 export type { RouterOptions };
 
@@ -46,6 +48,9 @@ export type { RouterOptions };
 export interface Origin {
   author?: string;
   source?: 'human' | 'ai';
+  /** Somente o host liga a origem à apresentação da conexão MCP. */
+  runToken?: string;
+  externalMcp?: true;
 }
 
 /** O que o host faz pelo Diagnóstico do ambiente. */
@@ -171,6 +176,7 @@ const HANDLERS: HandlerMap = {
 
 /** Aplica mensagens do webview no banco. Não depende da API do VSCode. */
 export class MessageRouter {
+  readonly executions: RunMcpSessions;
   private ctx: BoardContext;
   private listeners = new Set<() => void>();
   private errorListeners = new Set<(message: string) => void>();
@@ -197,6 +203,12 @@ export class MessageRouter {
 
   constructor(dbHandle: DbHandle, opts: RouterOptions) {
     this.ctx = new BoardContext(dbHandle, opts);
+    this.executions = new RunMcpSessions({
+      repo: () => this.work,
+      state: () => this.snapshot(),
+      definitions: () => this.libraryMcpDefinitions(),
+      save: () => dbHandle.scheduleSave(),
+    });
     this.store = this.ctx.store;
     this.harnessStore = this.ctx.harness.store;
     this.ctx.harness.load();
@@ -208,6 +220,13 @@ export class MessageRouter {
 
   get boardId(): string {
     return this.ctx.boardId;
+  }
+  get work(): WorkRepo {
+    return new WorkRepo(this.ctx.dbHandle.db, this.ctx.boardId);
+  }
+  /** A sessão MCP devolve uma capacidade restrita pelo proxy; a interface humana não a recebe. */
+  mcpAccess(): RunMcpAccess | null {
+    return null;
   }
 
   /** Lê um valor da tabela meta do board (ex.: config do Git da IDE); undefined se não existir. */
@@ -329,7 +348,11 @@ export class MessageRouter {
   }
 
   private actorOf(ctx: Origin): Actor {
-    return { author: ctx.author ?? this.ctx.opts.author, byAi: ctx.source === 'ai' };
+    if (ctx.runToken !== undefined) {
+      const binding = this.executions.assert(ctx.runToken);
+      return { author: ctx.author ?? 'IA', byAi: true, runId: binding.attempt.runId };
+    }
+    return { author: ctx.author ?? this.ctx.opts.author, byAi: ctx.source === 'ai', ...(ctx.externalMcp ? { runId: null } : {}) };
   }
 
   /** O que falta para o board trabalhar com a ferramenta de IA (informado pelo host, que confere). */

@@ -188,6 +188,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const gateway = new AiGateway({
     boardId: router.boardId,
     runLog,
+    sessions: router.executions,
     snapshots: new RunArtifactSnapshots(path.join(o.storageDir, 'run-artifacts'), new ArtifactRepo(handle.db), router.boardId),
     admission: new ExecutionAdmission({
       pathEnv: () => pathEnv,

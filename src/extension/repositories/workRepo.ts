@@ -191,6 +191,8 @@ export class WorkRepo {
     transaction(this.db, () => {
       const work = this.owned(id, generation, owner);
       if (work.state !== 'prepared') throw new Error('A unidade não está preparada.');
+      const boundRun = this.latest(id)!.runId;
+      if (boundRun !== null && boundRun !== runId) throw new Error('A tentativa já está vinculada a outra execução.');
       if (
         !one(
           this.db,
@@ -213,6 +215,22 @@ export class WorkRepo {
   }
   tokenAlive(token: string): boolean {
     return !!this.forToken(token);
+  }
+  /** O log abre antes do processo; esse vínculo permite atribuir o MCP sem inferir pelo card. */
+  bindRun(id: string, generation: number, owner: string, runId: string): void {
+    transaction(this.db, () => {
+      const work = this.owned(id, generation, owner);
+      const current = this.latest(id)!;
+      if (
+        work.state !== 'prepared' ||
+        current.endedAt !== null ||
+        (current.runId !== null && current.runId !== runId) ||
+        !one(this.db, 'SELECT 1 FROM ai_work_attempts WHERE id = ? AND token_hash IS NOT NULL', [current.id]) ||
+        !one(this.db, 'SELECT 1 FROM ai_runs WHERE id = ? AND board_id = ? AND card_id IS ?', [runId, this.boardId, work.cardId])
+      )
+        throw new Error('Não foi possível vincular a tentativa à execução.');
+      run(this.db, 'UPDATE ai_work_attempts SET run_id = ? WHERE id = ?', [runId, current.id]);
+    });
   }
   forToken(token: string): { work: WorkRecord; attempt: WorkAttempt } | null {
     if (!/^[a-f0-9]{64}$/.test(token)) return null;

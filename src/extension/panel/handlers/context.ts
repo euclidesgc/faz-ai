@@ -119,6 +119,7 @@ export class BoardContext {
 export interface Actor {
   author: string;
   byAi: boolean;
+  runId?: string | null;
 }
 
 export type MessageType = WebviewToHost['type'];

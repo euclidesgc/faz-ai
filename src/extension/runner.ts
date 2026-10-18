@@ -59,6 +59,14 @@ export interface RunnerDeps {
   /** caminho do node que roda o bridge; sem ele, `node`, resolvido pelo PATH de quem inicia o servidor */
   nodePath?: string;
 }
+export interface RunOptions {
+  origin: AiRunOrigin;
+  mode?: AiRunMode;
+  workId?: string;
+  token?: string;
+  advice?: string[];
+  onExit?(end: AiRunEnd): void;
+}
 
 /** Par modelo/esforço no nome que a ferramenta entende (`ExecManifest.model`), não o id do catálogo. */
 interface ToolModel {
@@ -337,7 +345,16 @@ export class AiRunner {
    * modelo/esforço que o plano decidiria e nunca recebe `fallbackPending` (uma tentativa só). Quem
    * chama de fora (painel, MCP) nunca informa este parâmetro.
    */
-  start(cardId: string, origin: AiRunOrigin = 'manual', mode: AiRunMode = 'phase', forceModel?: ToolModel): void {
+  start(cardId: string, originOrOptions: AiRunOrigin | RunOptions = 'manual', mode: AiRunMode = 'phase', forceModel?: ToolModel): void {
+    const options: RunOptions = typeof originOrOptions === 'string' ? { origin: originOrOptions, mode } : originOrOptions;
+    const origin = options.origin;
+    mode = options.mode ?? mode;
+    if ((options.token === undefined) !== (options.workId === undefined))
+      throw new Error('A unidade exige token e identidade de trabalho juntos.');
+    if (options.token !== undefined) {
+      const { work } = this.router.executions.assert(options.token);
+      if (work.id !== options.workId || work.cardId !== cardId) throw new Error('A unidade não pertence ao card desta execução.');
+    }
     const state = this.router.snapshot();
     const card = state.cards.find((c) => c.id === cardId);
     if (!card || !isLive(card)) throw new Error('Card não encontrado.');
@@ -425,6 +442,7 @@ export class AiRunner {
             }
           }
           return {
+            ...(options.token !== undefined ? { work: { id: options.workId!, token: options.token } } : {}),
             artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state, card) : undefined,
             // a configuração completa só existe depois do plano; é a mesma que o resumo manda para o canal de log
             config: {
@@ -451,7 +469,12 @@ export class AiRunner {
                     : cardPrompt(
                         cardRef(card),
                         contextLines(state, card),
-                        [...(stopAdvice ? [stopAdvice] : []), ...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
+                        [
+                          ...(stopAdvice ? [stopAdvice] : []),
+                          ...plan.advice,
+                          ...(permissionAdvice ? [permissionAdvice] : []),
+                          ...(options.advice ?? []),
+                        ],
                         autonomous,
                         needsTriage(state, card),
                       ),
@@ -532,14 +555,20 @@ export class AiRunner {
       try {
         // o card continua "em execução" para o log enquanto o desfecho é aplicado: o bloqueio e a
         // mudança de status que explicam o fim da execução ficam ligados a ela
-        retry = this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
+        if (options.workId === undefined) retry = this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
+        else {
+          const authFailed = AUTH_FAILURE_PATTERNS[state.board.aiTool]?.some((re) => run.tail.some((l) => re.test(l))) ?? false;
+          if (authFailed) this.router.setAuthExpired(state.board.aiTool);
+          else if (!end.stopped && !end.error && end.code === 0 && this.router.snapshot().authExpired === state.board.aiTool)
+            this.router.setAuthExpired(null);
+        }
       } finally {
         // a limpeza precisa acontecer antes da retentativa: start() recusa começar com o card ainda em `this.runs`
         this.runs.delete(cardId);
       }
       // a sessão da história é quem marca as sub-tarefas "Em execução" (start_work); com ela encerrada, nenhuma
       // continua em execução de verdade. Sem isto a sub-tarefa ficava presa e segurava a história para sempre
-      if (!retry) this.releaseSubtasks(cardId, tool.label);
+      if (!retry && options.workId === undefined) this.releaseSubtasks(cardId, tool.label);
       if (retry) {
         // o modelo principal esgotou o limite e há reserva: uma nova execução assume, sem publicar nem
         // avisar o fim desta (quem decide o desfecho final é a execução da reserva)
@@ -553,6 +582,7 @@ export class AiRunner {
         }
       }
       this.publish();
+      options.onExit?.(end);
       this.finishListeners.forEach((fn) => fn(cardId, run.mode));
     });
   }

@@ -142,6 +142,24 @@ export const gitNotices: Record<string, string> = {
 };
 
 export const host: Record<string, string> = {
+  'Esta execução foi encerrada pelo board; nada foi alterado.': 'This run was ended by the board; nothing was changed.',
+  'A unidade exige token e identidade de trabalho juntos.': 'The work unit requires both a token and a work identity.',
+  'A unidade não pertence ao card desta execução.': 'The work unit does not belong to this run’s card.',
+  'A execução controlada exige a ponte MCP do board.': 'A managed run requires the board MCP bridge.',
+  'O token não pertence à unidade desta execução.': 'The token does not belong to this run’s work unit.',
+  'Snapshot incompatível com a sessão MCP.': 'The snapshot is incompatible with the MCP session.',
+  'Snapshot obrigatório da execução indisponível.': 'The required run snapshot is unavailable.',
+  'Operação MCP fora do contrato desta execução.': 'The MCP operation is outside this run’s contract.',
+  'Card fora do escopo desta execução.': 'The card is outside this run’s scope.',
+  'Servidor MCP fora do snapshot desta execução.': 'The MCP server is outside this run’s snapshot.',
+  'Método fora da sessão MCP.': 'The method is outside the MCP session.',
+  'Artefatos externos não pertencem ao snapshot desta execução.': 'External artifacts do not belong to this run’s snapshot.',
+  'O snapshot da execução é somente leitura.': 'The run snapshot is read-only.',
+  'Configuração global fora do escopo desta execução.': 'Global configuration is outside this run’s scope.',
+  'O board está executando #{number}; acompanhe pelo get_card.': 'The board is executing #{number}; follow its progress through get_card.',
+  'O board executa as sub-tarefas desta fase; a sessão da história apenas as planeja.':
+    'The board executes this phase’s subtasks; the story session only plans them.',
+
   'O índice da biblioteca está inválido. Os arquivos foram preservados.': 'The library index is invalid. The files were preserved.',
   'Caminho inválido dentro da skill.': 'Invalid path inside the skill.',
   'O arquivo ultrapassa os limites da biblioteca.': 'The file exceeds the library limits.',

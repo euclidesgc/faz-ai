@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import type { BoardState, Card } from '../shared/model';
-import type { BoardArtifact } from '../shared/artifacts';
+import type { BoardArtifact, LibraryArtifactInput } from '../shared/artifacts';
 import { ARTIFACT_LIMITS, isSafeRelPath } from '../shared/artifacts';
 import { manifestOf } from '../shared/execution';
 import type { ArtifactRepo } from './repositories/artifactRepo';
@@ -33,6 +33,9 @@ export interface FrozenRunArtifacts {
   manifest: RunArtifactManifest;
   rewrite(input: HeadlessInput): HeadlessInput;
   validate(): void;
+  catalog(): BoardArtifact[];
+  artifact(id: string): LibraryArtifactInput;
+  readFile(file: string): { content: string; readonly: true };
 }
 
 /** Congela apenas as cópias efetivamente referenciadas; o inventário externo continua sendo legado. */
@@ -114,6 +117,8 @@ export class RunArtifactSnapshots {
       fs.mkdirSync(stage, { mode: 0o700 });
       const known = new Map(this.repo.list(this.boardId).map((a) => [a.id, a]));
       const files = new Map<string, Buffer>();
+      const catalog: BoardArtifact[] = [];
+      const contents = new Map<string, LibraryArtifactInput>();
       const mirror = new ArtifactMirror(request.directory, this.repo, this.boardId);
       const manifest: RunArtifactManifest = { version: 1, boardId: this.boardId, runId, createdAt: Date.now(), artifacts: [] };
       for (const ref of request.artifacts) {
@@ -136,6 +141,15 @@ export class RunArtifactSnapshots {
         if (!request.directory || !path.isAbsolute(request.directory) || !isSafeRelPath(rel))
           throw new Error('Origem de snapshot inválida.');
         const content = this.repo.content(ref.id);
+        catalog.push({ ...structuredClone(current), path: path.join(destination, rel) });
+        contents.set(ref.id, {
+          id: ref.id,
+          kind: ref.kind,
+          name: ref.name,
+          description: current.description,
+          body: content.body,
+          ...(current.agent ? { agent: structuredClone(current.agent) } : {}),
+        });
         const body =
           ref.kind === 'agent'
             ? `---\nname: ${JSON.stringify(ref.name)}\ndescription: ${JSON.stringify(current.description.replace(/\r?\n/g, ' ').trim())}\n---\n\n${content.body.trim()}\n`
@@ -220,6 +234,23 @@ export class RunArtifactSnapshots {
         directory: destination,
         manifest: structuredClone(manifest),
         validate,
+        catalog: () => {
+          validate();
+          return structuredClone(catalog);
+        },
+        artifact: (id) => {
+          validate();
+          const item = contents.get(id);
+          if (!item) throw new Error('Artefato fora do snapshot desta execução.');
+          return structuredClone(item);
+        },
+        readFile: (file) => {
+          validate();
+          const rel = path.relative(destination, path.resolve(file)).split(path.sep).join('/');
+          if (!expectedFiles.some((entry) => entry.relative === rel) || rel === 'manifest.json')
+            throw new Error('Arquivo fora do snapshot desta execução.');
+          return { content: fs.readFileSync(plainFile(destination, rel), 'utf8'), readonly: true };
+        },
         rewrite: (input) => {
           const result = structuredClone(input);
           result.prompt = replace(result.prompt);

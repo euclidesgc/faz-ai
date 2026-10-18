@@ -19,6 +19,7 @@ import type { RunLog } from '../log/runLog';
 import type { StrictExecutionRequest } from '../../shared/executionAdmission';
 import { AdmissionBlockedError, type ExecutionAdmission, type AdmittedExecution } from './admission';
 import type { RunArtifactRequest, RunArtifactSnapshots } from '../runArtifactSnapshot';
+import type { RunMcpSessions } from '../mcp/runSessions';
 
 /** O contexto da execução que o log congela na hora da chamada: a IA move o card durante o trabalho. */
 export type AiRunContext = Omit<AiRunStart, 'boardId' | 'startedAt' | 'origin' | 'tool'>;
@@ -36,6 +37,7 @@ export const NO_CARD: AiRunContext = {
 
 /** O que a execução precisa depois que a linha do log já abriu. */
 export interface AiPrepared {
+  work?: { id: string; token: string };
   artifacts?: RunArtifactRequest;
   /** Contrato v1 preparado pelo host; não aceita evidência ou selo de verificação do cliente. */
   strict?: { profileId: string; request: StrictExecutionRequest };
@@ -99,6 +101,7 @@ export interface AiExecution {
 }
 
 export interface AiGatewayDeps {
+  sessions?: RunMcpSessions;
   snapshots?: Pick<RunArtifactSnapshots, 'capture'>;
   admission?: ExecutionAdmission;
   leaseCoordinationDir?: string;
@@ -138,10 +141,31 @@ export class AiGateway {
     let measured: ReturnType<typeof spawnMeasured>;
     let attempts = 0;
     let format: OutputFormat = 'text';
+    let workToken: string | undefined;
+    const redact = (text: string) => this.deps.sessions?.redact(text) ?? text;
+    const revoke = () => {
+      if (workToken === undefined) return;
+      try {
+        this.deps.sessions?.revoke(workToken);
+      } catch (e) {
+        call.log(
+          redact(
+            `Não foi possível persistir a revogação; a sessão permanece recusada e exige reconciliação: ${e instanceof Error ? e.message : String(e)}`,
+          ),
+        );
+      }
+    };
     try {
       const prepared = call.prepare();
       const { config } = prepared;
       let input = prepared.input;
+      if (prepared.work) {
+        if (!this.deps.sessions || !this.deps.snapshots) throw new Error('Identidade MCP e snapshot obrigatórios indisponíveis.');
+        this.deps.sessions.bind(prepared.work.token, prepared.work.id, runId);
+        workToken = prepared.work.token;
+        if (!prepared.artifacts) throw new Error('A unidade precisa declarar os artefatos do snapshot, inclusive quando não há arquivos.');
+        input = this.deps.sessions.injectToken(workToken, input);
+      }
       if (prepared.artifacts && !this.deps.snapshots) throw new Error('Snapshot de artefatos indisponível; execução bloqueada.');
       const snapshot = this.deps.snapshots?.capture(runId, prepared.artifacts);
       if (snapshot) input = snapshot.rewrite(input);
@@ -164,6 +188,7 @@ export class AiGateway {
         if (!runLog.describeRequired) throw new Error('Registro obrigatório da admissão indisponível.');
         runLog.describeRequired(runId, { ...config, permission: input.permission, admission: admitted.decision });
       } else runLog.describe(runId, { ...config, permission: input.permission });
+      if (workToken !== undefined && snapshot) this.deps.sessions!.register(runId, snapshot, input);
       call.beforeSpawn?.();
       snapshot?.validate();
       measured = spawnMeasured(call.tool, input, call.cwd, {
@@ -193,11 +218,16 @@ export class AiGateway {
               : control,
           );
         },
-        log: call.log,
+        log: (line) => call.log(redact(line)),
         runId,
         leaseCoordinationDir: this.deps.leaseCoordinationDir,
       });
     } catch (e) {
+      revoke();
+      if (e instanceof Error) {
+        e.message = redact(e.message);
+        if (e.stack) e.stack = redact(e.stack);
+      }
       // nem chegou a existir processo (ferramenta sem suporte, plano impossível, spawn que falhou)
       runLog.finish(runId, 'unsupported');
       throw e;
@@ -207,15 +237,21 @@ export class AiGateway {
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
+      revoke();
       measured.proc.kill();
     }, call.timeoutMinutes * 60_000);
     const listeners: ((end: AiRunEnd) => void)[] = [];
 
     measured.proc.onExit((code, error) => {
       clearTimeout(timer);
+      revoke();
+      if (error) {
+        error.message = redact(error.message);
+        if (error.stack) error.stack = redact(error.stack);
+      }
       const outcome = outcomeOf({ stopped, timedOut, code, error });
       runLog.finish(runId, outcome, code);
-      const report = measured.report();
+      const report = this.deps.sessions?.sanitize(measured.report()) ?? measured.report();
       runLog.measure(runId, report);
       const end: AiRunEnd = { code, error, outcome, stopped, timedOut, report, attempts, format, measureError: measured.failure() };
       for (const fn of listeners) fn(end);
@@ -226,6 +262,7 @@ export class AiGateway {
       startedAt,
       stop: () => {
         stopped = true;
+        revoke();
         measured.proc.kill();
       },
       onExit: (fn) => listeners.push(fn),

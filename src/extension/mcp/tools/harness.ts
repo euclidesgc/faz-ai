@@ -101,6 +101,11 @@ export function registerHarnessTools(tool: DefineTool): void {
     'Lê um arquivo de regras do projeto.',
     { file: ruleArg },
     (a, router) => {
+      if (router.mcpAccess()) {
+        const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'instructions' && i.boardArtifactId && i.name === a.file);
+        if (!copy) throw new Error('Arquivo fora do snapshot desta execução.');
+        return router.readHarnessFile(copy.path).content;
+      }
       const r = router.snapshot().harness.rules.find((x) => x.name === a.file);
       if (!r?.exists) throw new Error(`${a.file} não existe neste projeto.`);
       return r.content;
