@@ -1,3 +1,4 @@
+import { baseValue } from '../../../../shared/harness';
 import { useState } from 'react';
 import { Badge, Button, Checkbox, TextArea, TextField } from '@radix-ui/themes';
 import { agentContextOf } from '../../../../shared/executionContext';
@@ -20,7 +21,14 @@ import { t } from '../../../i18n';
 export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: AiToolInfo; onClose: () => void }) {
   const state = useBoardStore((s) => s.state)!;
   const [body, setBody] = useState(a.body);
-  const how = EXEC_ENFORCEMENT[tool.id];
+  const how = baseValue(EXEC_ENFORCEMENT, tool.id) ?? {
+    agent: 'advised',
+    skills: 'advised',
+    mcp: 'advised',
+    tools: 'advised',
+    model: 'advised',
+    context: 'advised',
+  };
   const servers = [
     ...new Set(
       (state.harness.inventory.find((x) => x.tool === tool.id)?.items ?? [])
@@ -28,7 +36,7 @@ export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: A
         .map((i) => i.name),
     ),
   ].sort();
-  const format = AGENT_FORMAT[tool.id];
+  const format = baseValue(AGENT_FORMAT, tool.id) ?? { tools: false, skills: false, mcp: false, readonly: false, background: false };
   const boardServers = selectedMcpNames(state);
   const patch = (p: Partial<AgentInput>) => harness.updateAgent(a.name, a.scope, p);
   const badge = (aspect: ExecAspect) => (

@@ -1,3 +1,4 @@
+import { baseInfo, parseAiTool } from '../src/shared/harness';
 import { expect, it } from 'vitest';
 import {
   activeProfile,
@@ -72,4 +73,15 @@ it('resolve catálogo do base da cópia, modelo livre só no personalizado e fal
   expect(resolveModelOption(board, 'copy:novo-modelo')).toBeNull();
   expect(activeProfile({ ...board, aiTool: 'ausente' }).id).toBe('claude');
   expect(activeProfile({ ...board, aiProfiles: [...BUILTIN_PROFILES, { ...copy, enabled: false }] }).id).toBe('claude');
+});
+
+it('identidade do perfil é aberta e metadados de cópia preservam nome e identidade', () => {
+  expect(parseAiTool('["claude-trabalho"]', ['claude-trabalho'])).toBe('claude-trabalho');
+  expect(parseAiTool('["ausente"]', ['claude-trabalho'])).toBe('claude');
+  expect(baseInfo('personalizado')).toMatchObject({ id: 'personalizado', rules: '', skills: '' });
+  expect(toolInfo({ ...custom, id: 'minha-copia', name: 'Minha cópia', kind: 'copy', base: 'claude' })).toMatchObject({
+    id: 'minha-copia',
+    label: 'Minha cópia',
+    skills: '.claude/skills',
+  });
 });

@@ -1,6 +1,7 @@
+import { baseValue } from '../../../../shared/harness';
 import { useEffect, useState } from 'react';
 import { Badge, Callout, SegmentedControl, Tabs, TextField } from '@radix-ui/themes';
-import { HARNESS_SCOPES, aiToolInfo, type AiTool } from '../../../../shared/harness';
+import { HARNESS_SCOPES, baseInfo, type AiTool } from '../../../../shared/harness';
 import {
   TOOL_REGIME,
   originsOf,
@@ -112,7 +113,7 @@ export function ToolHarness({ tool }: { tool: AiTool }) {
           </Badge>
         )}
       </div>
-      {TOOL_REGIME[tool] === 'person' && (
+      {(baseValue(TOOL_REGIME, tool) ?? 'person') === 'person' && (
         <Callout.Root color="amber" size="1" className="harness-callout">
           <Callout.Icon>
             <IconWarning />
@@ -120,7 +121,7 @@ export function ToolHarness({ tool }: { tool: AiTool }) {
           <Callout.Text>
             {t(
               'A linha de comando do {tool} não desliga artefatos: regras, servidores MCP e o mais que estiver no projeto entram no contexto conforme o {tool} decidir. Para o "tudo desligado" valer, desligue nas configurações do {tool} ou remova do projeto o que você não quer no contexto das tarefas. O board só avisa.',
-              { tool: aiToolInfo(tool).label },
+              { tool: baseInfo(tool).label },
             )}
           </Callout.Text>
         </Callout.Root>

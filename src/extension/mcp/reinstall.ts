@@ -1,4 +1,4 @@
-import { ALL_AI_TOOLS, type AiTool } from '../../shared/harness';
+import { ALL_AI_BASES, type AiTool } from '../../shared/harness';
 import { runCli } from '../cliProbe';
 import { resolveCommand } from '../cliResolve';
 import { registeredServer } from '../requirements';
@@ -32,7 +32,7 @@ export async function runRegistrationSteps(done: Registration[], pathEnv: string
  * board é da pessoa: fica como está.
  */
 export function userRegisteredTools(workspaceDir: string, homeDir: string): AiTool[] {
-  return ALL_AI_TOOLS.filter((tool) => {
+  return ALL_AI_BASES.filter((tool) => {
     if (tool === 'cursor') return false;
     const found = registeredServer(tool, workspaceDir, homeDir);
     return found?.scope === 'user' && isBoardBridge(found.args[0]);
@@ -55,7 +55,7 @@ export function toolsNeedingInstall(
 ): AiTool[] {
   const registered = userRegisteredTools(workspaceDir, homeDir);
   const candidates = new Set<AiTool>([...registered, ...wanted.filter((t) => t !== 'cursor')]);
-  return ALL_AI_TOOLS.filter((tool) => {
+  return ALL_AI_BASES.filter((tool) => {
     if (!candidates.has(tool)) return false;
     if (!registered.includes(tool)) {
       // um "faz-ai" de usuário que não é a ponte do board é da pessoa: não sobrescreve

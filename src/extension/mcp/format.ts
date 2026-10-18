@@ -1,3 +1,4 @@
+import { baseValue } from '../../shared/harness';
 import { agentOfArtifact, itemOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
@@ -240,7 +241,14 @@ export function modelsOverview(s: BoardState) {
 function executionOf(s: BoardState, c: Card) {
   const m = manifestOf(s, c);
   if (!m.profile) return {};
-  const how = EXEC_ENFORCEMENT[s.board.aiTool];
+  const how = baseValue(EXEC_ENFORCEMENT, s.board.aiTool) ?? {
+    agent: 'advised',
+    skills: 'advised',
+    mcp: 'advised',
+    tools: 'advised',
+    model: 'advised',
+    context: 'advised',
+  };
   const profile = s.board.execProfiles.find((p) => p.name === m.profile);
   return {
     execution: {

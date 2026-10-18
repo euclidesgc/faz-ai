@@ -1,3 +1,4 @@
+import { baseValue } from '../../../../shared/harness';
 import { useState } from 'react';
 import type { AiTool } from '../../../../shared/harness';
 import { HOOK_EVENTS, type HookTarget } from '../../../../shared/harnessCatalog';
@@ -13,7 +14,7 @@ import { t } from '../../../i18n';
 /** Formulário de um hook novo: em que arquivo, em que evento, com que filtro e que comando roda. */
 export function NewHook({ tool, targets, onClose }: { tool: AiTool; targets: HookTarget[]; onClose: () => void }) {
   const { source, setSource, target, submit } = useTargetForm(targets, onClose);
-  const [event, setEvent] = useState(HOOK_EVENTS[tool][0] ?? '');
+  const [event, setEvent] = useState((baseValue(HOOK_EVENTS, tool) ?? [])[0] ?? '');
   const [matcher, setMatcher] = useState('');
   const [command, setCommand] = useState('');
   const [timeout, setTimeout_] = useState('');
@@ -38,7 +39,7 @@ export function NewHook({ tool, targets, onClose }: { tool: AiTool; targets: Hoo
           <SelectField
             id={id}
             aria-label={t('Evento')}
-            options={HOOK_EVENTS[tool].map((e) => ({ value: e, label: e }))}
+            options={(baseValue(HOOK_EVENTS, tool) ?? []).map((e) => ({ value: e, label: e }))}
             value={event}
             onChange={setEvent}
           />

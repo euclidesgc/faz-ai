@@ -11,7 +11,7 @@ import { EXEC_ASPECTS, TOOL_PRESETS, defaultAgent } from '../src/shared/executio
 import { RULE_CONFLICT_REASONS } from '../src/shared/ruleConflicts';
 import { RULE_IDEAS, RULE_WIZARD_STEPS, conventionItems, pathSuggestions } from '../src/shared/ruleWizard';
 import { SKILL_WIZARD_STEPS } from '../src/shared/skillWizard';
-import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, RULE_FILES, SKILL_FOLDERS, SKILL_MODES } from '../src/shared/harness';
+import { AI_BASES, HARNESS_KINDS, HARNESS_SCOPES, RULE_FILES, SKILL_FOLDERS, SKILL_MODES } from '../src/shared/harness';
 import { HARNESS_CATALOG, HARNESS_GROUPS, HARNESS_NOTES, PERMISSION_LIST_LABEL, PLUGIN_COMMANDS } from '../src/shared/harnessCatalog';
 import { BRANCH_KINDS, MERGE_METHODS, WORKSPACE_MODES } from '../src/shared/git';
 import { gitNoticeText, type GitNotice } from '../src/shared/gitflow';
@@ -261,7 +261,7 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
     ['HARNESS_KINDS', HARNESS_KINDS.flatMap((x) => [x.label, x.hint])],
     ['HARNESS_SCOPES', HARNESS_SCOPES.flatMap((x) => [x.label, x.hint, x.summary])],
     ['SKILL_FOLDERS', SKILL_FOLDERS.map((x) => x.hint)],
-    ['AI_TOOLS', AI_TOOLS.map((x) => x.mcp)],
+    ['AI_BASES', AI_BASES.map((x) => x.mcp)],
     ['RULE_FILES', RULE_FILES.map((x) => x.readBy).filter((x) => x.includes(' e '))],
     ['PERMISSION_LIST_LABEL', Object.values(PERMISSION_LIST_LABEL)],
     [

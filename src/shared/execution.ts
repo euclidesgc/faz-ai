@@ -1,7 +1,9 @@
-import type { Agent, AiTool } from './harness';
+import { resolveModelOption } from './aiProfiles';
+import type { AiBase } from './aiProfiles';
+import type { Agent } from './harness';
 import { BOARD_MCP_NAME, selectedMcpNames, selectedRuleLocations, selectedSkillNames, type HarnessSelection } from './harnessSelection';
 import type { BoardState, Card } from './model';
-import { parseModelValue, type ModelOption } from './models';
+import { type ModelOption } from './models';
 import { columnOf, valueOf } from './selectors';
 
 /**
@@ -216,10 +218,8 @@ export interface ExecDelegate {
 }
 
 /** O modelo do catálogo da ferramenta em uso para um valor do campo Modelo (`<id>@<esforço>`). */
-const catalogModel = (s: BoardState, value: string | null | undefined): { option: ModelOption; effort: string | null } | undefined => {
-  const chosen = parseModelValue(value);
-  const option = chosen ? s.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === s.board.aiTool) : undefined;
-  return option ? { option, effort: chosen!.effort } : undefined;
+const catalogModel = (s: BoardState, value: string | null | undefined) => {
+  return resolveModelOption(s.board, value ?? undefined) ?? undefined;
 };
 
 /** Os agentes do board que a sessão de uma história recebe como subagentes: todos os de arquivo, menos o dela. */
@@ -234,7 +234,7 @@ export const delegatesOf = (s: BoardState, c: Card, own: ExecProfile | undefined
           instructions: p.instructions,
           tools: p.tools,
           deniedTools: p.deniedTools,
-          model: catalogModel(s, p.model)?.option.model ?? null,
+          model: catalogModel(s, p.model)?.name ?? null,
         }));
 
 const executionFieldValues = (s: BoardState, c: Card, name: string): string[] => {
@@ -277,8 +277,8 @@ export function executionCardSelectionsOf(s: BoardState, c: Card | null): { skil
 function manifestWithProfile(s: BoardState, c: Card | null, profile: ExecProfile | undefined): ExecManifest {
   const selected = executionCardSelectionsOf(s, c);
   const modelField = s.fieldDefs.find((f) => f.kind === 'model');
-  const chosen = parseModelValue(modelField && c ? valueOf(s, c.id, modelField.id) : undefined) ?? parseModelValue(profile?.model || null);
-  const option = chosen ? s.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === s.board.aiTool) : undefined;
+  const rawModel = (modelField && c ? valueOf(s, c.id, modelField.id) : undefined) || profile?.model;
+  const resolved = resolveModelOption(s.board, rawModel);
   return {
     delegates: c ? delegatesOf(s, c, profile) : [],
     profile: profile?.name ?? null,
@@ -295,10 +295,10 @@ function manifestWithProfile(s: BoardState, c: Card | null, profile: ExecProfile
     ),
     tools: profile?.tools ?? [],
     deniedTools: profile?.deniedTools ?? [],
-    model: option
+    model: resolved
       ? {
-          name: option.model,
-          effort: effortToRun(option, chosen!.effort),
+          name: resolved.name,
+          effort: resolved.option ? effortToRun(resolved.option, resolved.effort) : resolved.effort,
         }
       : null,
   };
@@ -331,7 +331,7 @@ export const EXEC_ASPECTS: { id: ExecAspect; label: string }[] = [
  * as rules vão sempre pelo caminho do arquivo; `context` é o contexto vazio (nada do usuário nem do
  * projeto carregado por conta própria).
  */
-export const EXEC_ENFORCEMENT: Record<AiTool, Record<ExecAspect, 'enforced' | 'advised'>> = {
+export const EXEC_ENFORCEMENT: Record<AiBase, Record<ExecAspect, 'enforced' | 'advised'>> = {
   claude: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced', context: 'enforced' },
   cursor: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', context: 'advised' },
   // Kimi Code 2.1.1: o servidor do board entra pelo `.kimi-code/mcp.json` do projeto, materializado antes

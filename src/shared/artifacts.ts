@@ -1,3 +1,4 @@
+import { baseValue } from './harness';
 // Artefatos do board (#615): regras, skills, agentes e servidores MCP guardados pelo próprio board, num
 // formato neutro. Só tipos e funções puras: sem banco, sem `vscode`.
 import { AGENT_TOOLS } from './agentTools';
@@ -120,7 +121,11 @@ export function agentOfArtifact(a: AgentArtifact, tool?: AiTool): Agent {
   const m = a.agent;
   const foreign = !!tool && m?.tools.native.tool !== tool;
   const translate = (categories: ToolCategory[]) =>
-    tool ? AGENT_TOOLS[tool].filter((g) => categories.includes(g.id as ToolCategory)).flatMap((g) => g.tools.map((t) => t.name)) : [];
+    tool
+      ? (baseValue(AGENT_TOOLS, tool) ?? [])
+          .filter((g) => categories.includes(g.id as ToolCategory))
+          .flatMap((g) => g.tools.map((t) => t.name))
+      : [];
   return {
     name: a.name,
     description: a.description,
@@ -165,10 +170,10 @@ export function profileOfArtifact(a: AgentArtifact, isDefault: boolean): ExecPro
   };
 }
 
-/** Grupos de AGENT_TOOLS[tool] que contêm alguma ferramenta da lista (na ordem dos grupos). */
+/** Grupos de (baseValue(AGENT_TOOLS, tool) ?? []) que contêm alguma ferramenta da lista (na ordem dos grupos). */
 export function toolCategories(tool: AiTool | '', tools: string[]): ToolCategory[] {
   if (!tool) return [];
-  return AGENT_TOOLS[tool]
+  return (baseValue(AGENT_TOOLS, tool) ?? [])
     .filter((g) => TOOL_CATEGORIES.includes(g.id) && g.tools.some((t) => tools.includes(t.name)))
     .map((g) => g.id as ToolCategory);
 }

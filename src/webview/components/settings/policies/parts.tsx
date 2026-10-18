@@ -2,7 +2,7 @@ import { CONTEXT_ACTION_LABELS } from '../../../../shared/contextPlan';
 import { useBoardStore } from '../../../store/boardStore';
 import { Checkbox, Select, TextField } from '@radix-ui/themes';
 import type { ExecutionPolicy, ExecutionTarget, PolicyFailure } from '../../../../shared/executionPolicies';
-import { AI_TOOLS } from '../../../../shared/harness';
+import { AI_BASES } from '../../../../shared/harness';
 import type { PolicyLibrary } from '../../../../shared/policyManagement';
 import { t } from '../../../i18n';
 import { FormField } from '../../ui';
@@ -56,7 +56,7 @@ export const REASON_LABELS: Record<string, string> = {
 };
 export const profileLabel = (library: PolicyLibrary, id: string): string => {
   const p = library.profiles.find((p) => p.id === id);
-  const name = AI_TOOLS.find((tool) => tool.id === p?.tool)?.label;
+  const name = AI_BASES.find((tool) => tool.id === p?.tool)?.label;
   return name ? (id === p?.tool ? name : `${id} (${name})`) : t('Ausente: {name}', { name: id });
 };
 export const targetLabel = (library: PolicyLibrary, target: ExecutionTarget) =>

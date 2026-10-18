@@ -1,3 +1,4 @@
+import type { AiBase } from '../src/shared/aiProfiles';
 // A garantia de que nenhuma chamada à IA escapa do log de uso: toda execução passa por `AiGateway`, e
 // o gateway grava a linha de `ai_runs` sozinho. Três camadas:
 //   1. o gateway, sozinho: o que ele grava em cada desfecho;
@@ -21,7 +22,7 @@ import { providerFor } from '../src/extension/ai/providers';
 import { ExecutionAdmission, AdmissionBlockedError } from '../src/extension/ai/admission';
 import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
 import { CAPABILITY_CHECKS, EXECUTOR_CAPABILITIES, type StrictExecutionRequest } from '../src/shared/executionAdmission';
-import { ALL_AI_TOOLS, type AiTool } from '../src/shared/harness';
+import { ALL_AI_BASES } from '../src/shared/harness';
 import { monthOf, type AiRunOrigin } from '../src/shared/log';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -208,7 +209,7 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
 
 describe('um provider por ferramenta', () => {
   it('o Claude Code é medido com custo; Cursor e Kimi Code, só com tokens', () => {
-    expect(Object.fromEntries(ALL_AI_TOOLS.map((t) => [t, providerFor(t).measure]))).toEqual({
+    expect(Object.fromEntries(ALL_AI_BASES.map((t) => [t, providerFor(t).measure]))).toEqual({
       claude: 'cost',
       cursor: 'tokens',
       kimi: 'tokens',
@@ -217,12 +218,12 @@ describe('um provider por ferramenta', () => {
 
   it('o formato que o comando anuncia é o que o leitor do mesmo provider entende', () => {
     // a primeira linha válida de cada formato de stream
-    const hello: Record<AiTool, string> = {
+    const hello: Record<AiBase, string> = {
       claude: JSON.stringify({ type: 'system', subtype: 'init', session_id: 's' }),
       cursor: JSON.stringify({ type: 'system', subtype: 'init', session_id: 's' }),
       kimi: JSON.stringify({ role: 'meta', type: 'system.version', version: '2.1.1' }),
     };
-    for (const tool of ALL_AI_TOOLS) {
+    for (const tool of ALL_AI_BASES) {
       const command = providerFor(tool).command({ prompt: 'p', permission: 'full', structured: true })!;
       expect(command.format, tool).not.toBe('text');
       const reader = providerFor(tool).reader(command.format, { model: null });
@@ -405,4 +406,14 @@ describe('o contrato v1 não contorna a admissão no gateway', () => {
     expect(() => run(spawn, runLog).run(strict)).toThrow('disco cheio');
     expect(procs).toHaveLength(0);
   });
+});
+it('o host recusa perfil desligado ou importado antes de preparar arquivos ou iniciar a CLI', () => {
+  for (const profile of [null, { id: 'claude', enabled: false }, { id: 'claude', enabled: true, credentials: { review: 'pending' } }]) {
+    const prepare = vi.fn(call().prepare);
+    const guarded = new AiGateway({ boardId: router.boardId, runLog: createRunLog(db), spawn, profile: () => profile as never });
+    expect(() => guarded.run(call({ prepare }))).toThrow('Perfil desativado ou pendente');
+    expect(prepare).not.toHaveBeenCalled();
+  }
+  expect(procs).toHaveLength(0);
+  expect(() => providerFor('perfil-customizado')).toThrow('Perfil de CLI ainda não disponível');
 });

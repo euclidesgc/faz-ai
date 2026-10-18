@@ -959,6 +959,7 @@ describe('executor da IA', () => {
     expect([...CURSOR_TOOLS.board, ...CURSOR_TOOLS.edits]).not.toContain('shell_tool_call');
     expect(headlessUnsupported('claude', 'board')).toBeNull();
     expect(headlessUnsupported('cursor', 'board')).toBeNull();
+    expect(headlessUnsupported('perfil-personalizado', 'board')).toContain('ainda não disponível');
     // o Claude Code recusa pular as permissões como root
     expect(headlessUnsupported('claude', 'full', 0)).toContain('root');
     expect(headlessUnsupported('claude', 'full', 1000)).toBeNull();

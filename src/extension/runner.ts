@@ -1,5 +1,7 @@
+import { toolInfo, activeProfile, catalogTool, resolveModelOption } from '../shared/aiProfiles';
+import { baseValue } from '../shared/harness';
+import type { AiBase } from '../shared/aiProfiles';
 import { cardRef } from '../shared/model';
-import { aiToolInfo, type AiTool } from '../shared/harness';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { SHOW_COST } from '../shared/metrics';
 import { columnOf, isLive } from '../shared/selectors';
@@ -9,7 +11,7 @@ import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
 import { runArtifactRequest } from './runArtifactSnapshot';
 import { effortToRun } from '../shared/execution';
-import { modelDisplay, modelValue, parseModelValue, suggestModelRule } from '../shared/models';
+import { modelDisplay, modelValue, suggestModelRule } from '../shared/models';
 import { effortTiers } from './models';
 import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
@@ -103,7 +105,7 @@ const RUNNER_AUTHOR = 'Faz AI';
  * um bloqueio do card. Risco já documentado na Spec: a lista pode ficar desatualizada se a CLI mudar o
  * texto de erro; qualquer saída que não bata nenhum padrão segue o caminho atual (RF7).
  */
-const AUTH_FAILURE_PATTERNS: Record<AiTool, RegExp[]> = {
+const AUTH_FAILURE_PATTERNS: Record<AiBase, RegExp[]> = {
   claude: [/oauth session expired/i, /failed to authenticate/i, /not logged in/i, /invalid api key/i],
   cursor: [/not authenticated/i, /please (log|sign) in/i],
   // calibrável: a CLI 2.1.1 não documenta os textos de erro de autenticação; amplie com saídas reais
@@ -265,9 +267,10 @@ export const conflictPrompt = (ref: string, context: PromptContext = NO_CONTEXT,
  * quando o valor está vazio ou o modelo não está (mais) no catálogo da ferramenta ativa.
  */
 function resolvedModel(state: BoardState, value: string | null | undefined): { name: string; effort: string | null } | null {
-  const chosen = parseModelValue(value ?? undefined);
-  const option = chosen ? state.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === state.board.aiTool) : undefined;
-  return option ? { name: option.model, effort: effortToRun(option, chosen!.effort) } : null;
+  const resolved = resolveModelOption(state.board, value ?? undefined);
+  return resolved
+    ? { name: resolved.name, effort: resolved.option ? effortToRun(resolved.option, resolved.effort) : resolved.effort }
+    : null;
 }
 
 /**
@@ -276,7 +279,7 @@ function resolvedModel(state: BoardState, value: string | null | undefined): { n
  * independente do Esforço do card.
  */
 function highTierModel(state: BoardState): { name: string; effort: string | null } | null {
-  const tier = effortTiers(state.board.aiTool, state.board.modelCatalog).find(([level]) => level === 'Alto');
+  const tier = effortTiers(catalogTool(activeProfile(state.board)), state.board.modelCatalog).find(([level]) => level === 'Alto');
   return tier ? resolvedModel(state, tier[1]) : null;
 }
 
@@ -286,7 +289,7 @@ function highTierModel(state: BoardState): { name: string; effort: string | null
  */
 function toolModelDisplay(state: BoardState, pair: ToolModel | null): string {
   if (!pair) return '';
-  const option = state.board.modelCatalog.find((o) => o.tool === state.board.aiTool && o.model === pair.model);
+  const option = state.board.modelCatalog.find((o) => o.tool === catalogTool(activeProfile(state.board)) && o.model === pair.model);
   return option ? modelDisplay(state.board.modelCatalog, modelValue(option.id, pair.effort)) : pair.model;
 }
 
@@ -365,8 +368,8 @@ export class AiRunner {
     // bloqueia, para o login que o probe não soube confirmar poder se recuperar com uma execução
     // manual que dá certo (RF9, limpa em settle()) — sem essa válvula, authExpired nunca mais sairia de `true`
     if (state.requirements.some((r) => r.id === 'signin'))
-      throw new Error(`O login do ${aiToolInfo(state.board.aiTool).label} venceu: veja o aviso no topo do board.`);
-    const tool = aiToolInfo(state.board.aiTool);
+      throw new Error(`O login do ${toolInfo(activeProfile(state.board)).label} venceu: veja o aviso no topo do board.`);
+    const tool = toolInfo(activeProfile(state.board));
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
     const refine = mode === 'refine';
     const summarize = mode === 'summarize';
@@ -559,7 +562,8 @@ export class AiRunner {
         // mudança de status que explicam o fim da execução ficam ligados a ela
         if (options.workId === undefined) retry = this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
         else {
-          const authFailed = AUTH_FAILURE_PATTERNS[state.board.aiTool]?.some((re) => run.tail.some((l) => re.test(l))) ?? false;
+          const authFailed =
+            (baseValue(AUTH_FAILURE_PATTERNS, state.board.aiTool) ?? [])?.some((re) => run.tail.some((l) => re.test(l))) ?? false;
           if (authFailed) this.router.setAuthExpired(state.board.aiTool);
           else if (!end.stopped && !end.error && end.code === 0 && this.router.snapshot().authExpired === state.board.aiTool)
             this.router.setAuthExpired(null);
@@ -626,7 +630,7 @@ export class AiRunner {
         { author: RUNNER_AUTHOR },
       );
     const toolId = this.router.snapshot().board.aiTool;
-    const authFailed = AUTH_FAILURE_PATTERNS[toolId]?.some((re) => run.tail.some((l) => re.test(l))) ?? false;
+    const authFailed = (baseValue(AUTH_FAILURE_PATTERNS, toolId) ?? [])?.some((re) => run.tail.some((l) => re.test(l))) ?? false;
     // falha de autenticação vale para o board inteiro, não só para este card: não bloqueia, e o aviso
     // global (RF3) é quem explica à pessoa o que fazer. Entra antes do caminho de "refinar" porque RF6
     // vale para os dois modos, e antes do `failure` genérico, que continua tratando qualquer outra falha

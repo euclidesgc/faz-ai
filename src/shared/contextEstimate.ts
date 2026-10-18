@@ -1,3 +1,4 @@
+import { activeProfile, catalogTool } from './aiProfiles';
 import { agentManifestOf, manifestOf, type ExecProfile } from './execution';
 import { contextFilesOf } from './contextSources';
 import type { AiTool, HarnessItem } from './harness';
@@ -191,12 +192,14 @@ function estimateManifestContext(s: BoardState, m: ReturnType<typeof manifestOf>
     entries: byGroup[id],
   }));
   const entries = groups.flatMap((g) => g.entries);
-  const option = m.model ? s.board.modelCatalog.find((o) => o.tool === tool && o.model === m.model!.name) : undefined;
+  const option = m.model
+    ? s.board.modelCatalog.find((o) => o.tool === catalogTool(activeProfile(s.board)) && o.model === m.model!.name)
+    : undefined;
   const col = c ? columnOf(s, c) : undefined;
   return {
     tool,
     total: groups.reduce((n, g) => n + g.tokens, 0),
-    window: m.model ? contextWindowOf(tool, m.model.name) : null,
+    window: m.model ? contextWindowOf(catalogTool(activeProfile(s.board)), m.model.name) : null,
     model: option?.label ?? m.model?.name ?? null,
     phase: col?.aiActive ? col.name : null,
     groups,

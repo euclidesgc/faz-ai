@@ -1,3 +1,4 @@
+import { baseValue } from './harness';
 import { estimateAgentContext, estimateContext, tokensOf, type ContextEstimate } from './contextEstimate';
 import { contextAgentOrigin, contextFilesOf, type ContextOrigin } from './contextSources';
 import {
@@ -102,7 +103,14 @@ function preview(s: BoardState, m: ExecManifest, estimate: ContextEstimate, p: E
   return {
     estimate,
     items,
-    enforcement: EXEC_ENFORCEMENT[s.board.aiTool],
+    enforcement: baseValue(EXEC_ENFORCEMENT, s.board.aiTool) ?? {
+      agent: 'advised',
+      skills: 'advised',
+      mcp: 'advised',
+      tools: 'advised',
+      model: 'advised',
+      context: 'advised',
+    },
     overlaps: instructionOverlaps(s.board.aiTool === 'claude' ? m : { ...m, delegates: [] }),
   };
 }

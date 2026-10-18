@@ -1,3 +1,4 @@
+import type { AiProfile } from '../../shared/aiProfiles';
 // A única porta por onde o board chama uma ferramenta de IA. Toda execução — de um card (a pessoa, o
 // heartbeat ou o autopiloto) ou do chat — passa por `AiGateway.run`, e é aqui que o log de uso é
 // escrito: abre a linha (`start`), grava a configuração (`describe`), fecha o desfecho (`finish`) e
@@ -107,6 +108,8 @@ export interface AiExecution {
 }
 
 export interface AiGatewayDeps {
+  /** O host confere também perfis importados no caminho legado antes de preparar arquivos. */
+  profile?(id: string): AiProfile | null;
   redact?(text: string): string;
   sessions?: RunMcpSessions;
   snapshots?: Pick<RunArtifactSnapshots, 'capture'>;
@@ -164,6 +167,11 @@ export class AiGateway {
       }
     };
     try {
+      if (this.deps.profile) {
+        const profile = this.deps.profile(call.tool);
+        if (!profile || !profile.enabled || profile.credentials?.review === 'pending')
+          throw new Error('Perfil desativado ou pendente de revisão.');
+      }
       const prepared = call.prepare();
       const { config } = prepared;
       let input = prepared.input;

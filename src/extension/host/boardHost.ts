@@ -1,3 +1,4 @@
+import { baseValue } from '../../shared/harness';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -28,7 +29,7 @@ import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
 import { claudeSignedIn, cursorModels, cursorSignedIn, kimiModels, kimiSignedIn, runCli } from '../cliProbe';
-import { aiToolInfo, ALL_AI_TOOLS, type AiTool } from '../../shared/harness';
+import { baseInfo, ALL_AI_BASES, type AiTool } from '../../shared/harness';
 import { allowKimiMcp, checkRequirements, registeredServer } from '../requirements';
 import { headlessCommand, headlessUnsupported } from '../headless';
 import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
@@ -186,6 +187,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
   // a única porta para chamar a IA: o executor de cards e o chat passam por ela, e é ela que escreve o log de uso
   const gateway = new AiGateway({
+    profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
     boardId: router.boardId,
     runLog,
     sessions: router.executions,
@@ -276,7 +278,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let readingModels: Promise<void> | null = null;
   /** as ferramentas cuja CLI lista os modelos (hoje: Cursor e Kimi Code) */
   const readToolModels = async (tool: 'cursor' | 'kimi') => {
-    const exe = resolveCommand(CLI_COMMAND[tool], pathEnv, homeDir);
+    const exe = resolveCommand(baseValue(CLI_COMMAND, tool) ?? '', pathEnv, homeDir);
     if (!exe) return;
     const found = await (tool === 'cursor' ? cursorModels(exe, pathEnv) : kimiModels(exe, pathEnv));
     if (!found.length) return;
@@ -294,7 +296,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const refreshToolModels = (tool: 'cursor' | 'kimi') => {
     if (!ownsBoard || readingModels) return;
     readingModels = readToolModels(tool)
-      .catch((e) => o.log(`Não foi possível ler os modelos do ${aiToolInfo(tool).label}: ${e instanceof Error ? e.message : String(e)}`))
+      .catch((e) => o.log(`Não foi possível ler os modelos do ${baseInfo(tool).label}: ${e instanceof Error ? e.message : String(e)}`))
       .finally(() => (readingModels = null));
   };
   // o que falta para o board trabalhar com a ferramenta (CLI, login, servidor MCP, permissão): vira a
@@ -387,7 +389,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         // manual que dá certo, em `runner.ts`). Ao trocar de ferramenta o sinal já foi limpo incondicionalmente
         const expired = router.snapshot().authExpired;
         if (expired && signinCache.get(expired)?.value === true && router.setAuthExpired(null))
-          o.log(`Login do ${aiToolInfo(expired).label} de volta: execuções retomadas.`);
+          o.log(`Login do ${baseInfo(expired).label} de volta: execuções retomadas.`);
         // ligar o MCP no Cursor é com a pessoa, fora do board: enquanto falta, confere a cada 10 s, para
         // o aviso sumir logo depois que ela liga (a conferência lê só uma pasta). O login (`signin`) entra
         // no mesmo timer: a ferramenta com probe (Claude, Cursor) retoma em até 10 s, sem esperar
@@ -475,9 +477,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const otherTools = async (tool: AiTool): Promise<OtherToolProbe[]> => {
     const s = router.snapshot();
     const out: OtherToolProbe[] = [];
-    for (const other of ALL_AI_TOOLS) {
+    for (const other of ALL_AI_BASES) {
       if (other === tool) continue;
-      const cli = resolveHere(CLI_COMMAND[other]);
+      const cli = resolveHere(baseValue(CLI_COMMAND, other) ?? '');
       if (!cli && !(other === 'cursor' && o.editor?.name === 'cursor')) continue;
       const inventory = s.harness.inventory.find((t) => t.tool === other);
       out.push({
@@ -508,7 +510,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       const cliName = 'unsupported' in built ? null : built.command;
       const syntheticSignin: BoardRequirement | null =
         s.authExpired === tool && cliName && !s.requirements.some((r) => r.id === 'signin')
-          ? { id: 'signin', tool, cli: cliName, action: { kind: 'command', command: LOGIN_COMMAND[tool], terminal: true } }
+          ? { id: 'signin', tool, cli: cliName, action: { kind: 'command', command: baseValue(LOGIN_COMMAND, tool) ?? '', terminal: true } }
           : null;
       router.setEnvironment(
         await checkEnvironment({

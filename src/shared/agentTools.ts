@@ -1,3 +1,5 @@
+import { baseValue } from './harness';
+import type { AiBase } from './aiProfiles';
 import type { AiTool } from './harness';
 
 /** Uma ferramenta embutida que dá para marcar num agente. */
@@ -24,7 +26,7 @@ export interface ToolGroup {
  * o arquivo dele só aceita `readonly` e `is_background` (cursor.com/docs/context/subagents).
  * O servidor do board entra sempre por `BOARD_TOOLS` e nunca aparece aqui.
  */
-export const AGENT_TOOLS: Record<AiTool, ToolGroup[]> = {
+export const AGENT_TOOLS: Record<AiBase, ToolGroup[]> = {
   claude: [
     {
       id: 'read',
@@ -122,7 +124,7 @@ export const AGENT_TOOLS: Record<AiTool, ToolGroup[]> = {
 };
 
 /** O que o arquivo de agente de cada ferramenta aceita; o resto da tela some quando a ferramenta não aceita. */
-export const AGENT_FORMAT: Record<AiTool, { tools: boolean; skills: boolean; mcp: boolean; readonly: boolean; background: boolean }> = {
+export const AGENT_FORMAT: Record<AiBase, { tools: boolean; skills: boolean; mcp: boolean; readonly: boolean; background: boolean }> = {
   claude: { tools: true, skills: true, mcp: true, readonly: false, background: false },
   cursor: { tools: false, skills: false, mcp: false, readonly: true, background: true },
   kimi: { tools: true, skills: false, mcp: false, readonly: false, background: false },
@@ -143,11 +145,11 @@ export const AGENT_TOOLS_ALWAYS_REMOVED = [
 ];
 
 /** Só os nomes de uma ferramenta, na ordem dos grupos. */
-export const agentToolNames = (tool: AiTool): string[] => AGENT_TOOLS[tool].flatMap((g) => g.tools.map((x) => x.name));
+export const agentToolNames = (tool: AiTool): string[] => (baseValue(AGENT_TOOLS, tool) ?? []).flatMap((g) => g.tools.map((x) => x.name));
 
 /** O grupo de uma ferramenta embutida, ou undefined quando o nome não é da lista (ex.: `mcp__github__*`, `Bash(git push *)`). */
 export const agentToolGroup = (tool: AiTool, name: string): ToolGroup | undefined =>
-  AGENT_TOOLS[tool].find((g) => g.tools.some((x) => x.name === name));
+  (baseValue(AGENT_TOOLS, tool) ?? []).find((g) => g.tools.some((x) => x.name === name));
 
 /** `mcp__<servidor>__*`: todas as ferramentas de um servidor MCP, no nome que o Claude Code usa. */
 export const mcpToolPattern = (server: string): string => `mcp__${server}__*`;

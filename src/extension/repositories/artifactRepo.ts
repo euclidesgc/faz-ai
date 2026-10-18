@@ -3,7 +3,7 @@
 import type { Database } from 'sql.js';
 import { selectableOfKind, type AgentMeta, type ArtifactDraft, type ArtifactKind, type BoardArtifact } from '../../shared/artifacts';
 import { defaultUsage, type HarnessSelection, type HarnessUsage } from '../../shared/harnessSelection';
-import { ALL_AI_TOOLS, type AiTool } from '../../shared/harness';
+import { isAiBase, type AiTool } from '../../shared/harness';
 import { all, bool, num, one, run, str, transaction, type Row } from '../db/query';
 import { newId, now } from '../db/ids';
 import { credentialsFor, validSecretRef } from '../credentials';
@@ -278,7 +278,7 @@ export class ArtifactRepo {
       description: str(row.description),
       usage,
       origin: str(row.origin),
-      originTool: ALL_AI_TOOLS.includes(str(row.origin_tool) as AiTool) ? (str(row.origin_tool) as AiTool) : '',
+      originTool: isAiBase(row.origin_tool) ? (str(row.origin_tool) as AiTool) : '',
       missing: bool(row.missing),
       skipped: parseJson<BoardArtifact['skipped']>(str(row.skipped_json), []),
       files,

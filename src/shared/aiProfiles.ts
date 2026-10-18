@@ -1,4 +1,4 @@
-import { AI_TOOLS } from './harness';
+import { AI_BASES } from './harness';
 import { slug } from './git';
 import { parseModelValue, type ModelOption } from './models';
 import type { FieldValue } from './model';
@@ -62,7 +62,7 @@ export interface AiProfile {
   capabilities?: Partial<Record<ProfileCapability, CapabilityState>>;
 }
 export type AiProfileDraft = Omit<AiProfile, 'id' | 'credentials' | 'capabilities'> & { id?: string };
-export const BUILTIN_PROFILES: readonly AiProfile[] = AI_TOOLS.map((tool, position) =>
+export const BUILTIN_PROFILES: readonly AiProfile[] = AI_BASES.map((tool, position) =>
   Object.freeze({
     id: tool.id,
     name: tool.label,
@@ -162,10 +162,10 @@ export function expandArgLines(
     );
   });
 }
-export function toolInfo(profile: AiProfile): Omit<(typeof AI_TOOLS)[number], 'id'> & { id: string } {
-  const base = AI_TOOLS.find((tool) => tool.id === profileBase(profile));
+export function toolInfo(profile: AiProfile): Omit<(typeof AI_BASES)[number], 'id'> & { id: string } {
+  const base = AI_BASES.find((tool) => tool.id === profileBase(profile));
   return base
-    ? base
+    ? { ...base, id: profile.id, label: profile.name }
     : { id: profile.id, label: profile.name, rules: '', skills: '', mcp: '', mcpUser: '', agents: { dir: '', ext: '.md' } };
 }
 export function resolveModelOption(
@@ -178,9 +178,7 @@ export function resolveModelOption(
     tool = catalogTool(profile);
   const option = board.modelCatalog.find((m) => m.id === parsed.id && m.tool === tool);
   if (option)
-    return parsed.effort && !option.efforts.includes(parsed.effort)
-      ? null
-      : { option, name: option.model, effort: parsed.effort ?? option.defaultEffort };
+    return parsed.effort && !option.efforts.includes(parsed.effort) ? null : { option, name: option.model, effort: parsed.effort };
   if (profile.kind !== 'custom' || !parsed.id.startsWith(`${profile.id}:`)) return null;
   const name = parsed.id.slice(profile.id.length + 1);
   return name && !/[\s\0:@]/.test(name) ? { option: null, name, effort: parsed.effort } : null;

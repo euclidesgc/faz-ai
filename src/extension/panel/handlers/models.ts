@@ -1,3 +1,5 @@
+import { catalogTool } from '../../../shared/aiProfiles';
+import { isAiBase } from '../../../shared/harness';
 import { builtinPolicyCatalog } from '../../../shared/policyManagement';
 import type { AiTool } from '../../../shared/harness';
 import type { FieldDef } from '../../../shared/model';
@@ -16,6 +18,10 @@ export function initModels(ctx: BoardContext): void {
   const { board } = ctx.state();
   if (board.modelCatalog.length) return dropSavedPrices(ctx);
   const installed = detectTools(ctx.home);
+  if (!isAiBase(board.aiTool)) {
+    useTool(ctx, board.aiTool);
+    return;
+  }
   const tool = installed.includes(board.aiTool) ? board.aiTool : (installed[0] ?? board.aiTool);
   if (tool !== board.aiTool) ctx.boards.updateBoard(ctx.boardId, { aiTool: tool });
   useTool(ctx, tool);
@@ -48,8 +54,10 @@ function withoutPrices(o: ModelOption): ModelOption {
 /** Passa a trabalhar com a ferramenta: pasta de skills, modelos e regras de esforço dela. */
 export function useTool(ctx: BoardContext, tool: AiTool): void {
   ctx.harness.setTool(tool);
-  detectModels(ctx, tool);
-  suggestRules(ctx, tool);
+  const profile = ctx.state().board.aiProfiles.find((p) => p.id === tool);
+  const base = profile ? catalogTool(profile) : tool;
+  detectModels(ctx, base);
+  suggestRules(ctx, base);
 }
 
 /** Junta ao catálogo os modelos atuais da ferramenta, atualizando os que já existem. */

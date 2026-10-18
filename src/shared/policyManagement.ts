@@ -1,4 +1,4 @@
-import { ALL_AI_TOOLS } from './harness';
+import { ALL_AI_BASES } from './harness';
 import type { BoardState } from './model';
 import type { ModelOption } from './models';
 import { CONTEXT_ACTIONS } from './contextPlanning';
@@ -60,7 +60,7 @@ export function builtinPolicyCatalog(state: BoardState): { profiles: PolicyProfi
   }));
   return {
     models,
-    profiles: ALL_AI_TOOLS.map((tool) => ({
+    profiles: ALL_AI_BASES.map((tool) => ({
       id: tool,
       tool,
       enabled: true,

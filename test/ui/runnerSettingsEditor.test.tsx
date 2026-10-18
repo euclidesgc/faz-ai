@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
-import { aiToolInfo } from '../../src/shared/harness';
+import { baseInfo } from '../../src/shared/harness';
 import { lastSent, seedBoard, syncStore, type SeededBoard } from './setup';
 import { RunnerSettings } from '../../src/webview/components/settings/harness/RunnerSettings';
 
@@ -15,7 +15,7 @@ const show = () => {
   syncStore(board.router);
   return render(
     <Theme>
-      <RunnerSettings tool={aiToolInfo('claude')} />
+      <RunnerSettings tool={baseInfo('claude')} />
     </Theme>,
   );
 };

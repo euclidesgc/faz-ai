@@ -208,3 +208,14 @@ Os sete aspectos de capacidades, incluindo cancelamento e saída, começam desco
 `AiProfileRepo` separa a configuração completa no cofre já existente e devolve metadados/referências. Travas de prontos/padrão e escrita humana valem no repositório, incluindo a tentativa de desativar o padrão pelo salvamento. Campos privados futuros já salvos sobrevivem à edição. Duplicação humana recebe outra referência, pendente/desativada; não é fallback. Importação valida antes do backup/substituição, recusa valores livres e avisa os nomes a revisar. Prontos importados têm revisão explícita que não os liga; personalizados exigem configuração revisada. Leitura completa prontos ausentes sem escrever.
 
 Validação direcionada cobre domínio, migração de dois boards, persistência/segredos, exportação/importação, repositórios, avisos/tradução e orçamento de consultas. Conforme orientação da pessoa, a suíte inteira fica para a consolidação final. Ainda faltam #684 (AiTool aberto), resolução/probe/providers e host/telas #686–#692, ligação de capacidades/admissão e política aos chamadores reais. E3/E5 e a história #618 continuam em implementação.
+
+
+## Separação de identidade do perfil e base nativa — #684
+
+`AiTool` passa a ser o ID aberto do perfil; `AiBase` mantém a união de Claude/Cursor/Kimi para tabelas nativas. Renomeadas `AI_BASES`, `ALL_AI_BASES` e `baseInfo`. Não há `Record<AiTool` em src. Consultas a tabelas de bases usam guarda de identidade e valores neutros para desconhecidos; inventário de perfil genérico não varre diretórios nativos ou importados. Operações sem destino nativo válido são recusadas.
+
+`parseAiTool` aceita a lista de IDs válidos do board. A leitura conserva o ID do perfil habilitado/revisado e `updateBoard` ignora perfil ausente/desligado/pendente. Inicializar catálogo vazio não troca uma escolha de perfil por outra CLI instalada. O harness e o catálogo das cópias consultam a base, preservando identidade e rótulo nas chamadas. Resolução de modelo em manifesto, delegados, runner e chat reutiliza `resolveModelOption`; a janela de contexto consulta o catálogo da base. O comportamento dos três prontos foi exercitado nas suítes direcionadas.
+
+O host fornece consulta de perfil ao gateway: ausência, desativação e revisão pendente bloqueiam antes de preparar arquivos. O registro de providers desta etapa aceita somente os três prontos; cópias/personalizados recebem indisponibilidade explícita na prévia/chamada, sem cair para outro executor. Isso é a fronteira anterior à integração #687, não a conclusão dela. #686–#692, #699/#700/#701/#702, políticas nos chamadores e admissão real continuam pendentes.
+
+Verificações desta etapa são direcionadas, conforme orientação da pessoa: tipos, lint/formatação dos arquivos alterados, domínio/banco/resolução, runner/chat/gateway, tabelas/varredura nativas e telas afetadas. A suíte inteira permanece reservada para consolidação.

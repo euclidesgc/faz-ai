@@ -23,7 +23,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { aiToolInfo, type AiTool } from '../../shared/harness';
+import { baseInfo, type AiTool } from '../../shared/harness';
 import type { RunReport } from '../../shared/log';
 import { leaseProjectServer, type ProjectServerLease } from '../mcp/projectServerLease';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
@@ -158,7 +158,7 @@ export function materialize(command: HeadlessCommand): { command: HeadlessComman
 }
 
 export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, deps: MeasuredDeps): Measured {
-  const label = aiToolInfo(tool).label;
+  const label = baseInfo(tool).label;
   const provider = providerFor(tool);
   const model = input.exec?.model?.name ?? null;
   const fmtArgs = formatArgs(tool, input);

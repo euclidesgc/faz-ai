@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ALL_AI_TOOLS, RULE_FILES, type AiTool, type InstallScope } from '../../../shared/harness';
+import { ALL_AI_BASES, RULE_FILES, type AiTool, type InstallScope } from '../../../shared/harness';
 import { SELECTABLE_KINDS, toolItemsOf, selectionKey, type HarnessUsage, type SelectableKind } from '../../../shared/harnessSelection';
 import { FLOW_SKILL } from '../../flowSkill';
 import type { MessageRouter } from '../../panel/messageRouter';
@@ -89,7 +89,7 @@ export function registerHarnessTools(tool: DefineTool): void {
   tool(
     'set_ai_tool',
     'Define a ferramenta de IA com que o projeto trabalha (uma por vez). Isso troca a pasta de skills (.claude/skills ou .cursor/skills), o arquivo de regras, os modelos e as regras de esforço.',
-    { tool: z.enum(ALL_AI_TOOLS as [string, ...string[]]) },
+    { tool: z.enum(ALL_AI_BASES as [string, ...string[]]) },
     (a, router) => {
       router.handle({ type: 'settings.board.update', patch: { aiTool: a.tool as AiTool } });
       return harness(router);
@@ -157,7 +157,7 @@ export function registerHarnessTools(tool: DefineTool): void {
     'install_flow_skill',
     'Instala a skill "faz-ai-fluxo", que ensina a conduzir os cards pelo fluxo do board (fases, documentos, pendências), junto com as skills por assunto (faz-ai-harness-do-card, faz-ai-workspace-e-pr, faz-ai-implementacao-rodadas, faz-ai-revisao-e-homologacao, faz-ai-modo-autonomo), e marca a principal como "incluir em todo contexto" neste board. Sempre no global da ferramenta (~/.claude/skills, ~/.cursor/skills, ~/.kimi-code/skills), para todos os projetos: nada entra na pasta do projeto. Não sobrescreve uma skill de mesmo nome no destino, a menos que replace seja true.',
     {
-      tool: z.enum(ALL_AI_TOOLS).optional().describe('Ferramenta de IA; padrão: a do projeto'),
+      tool: z.enum(ALL_AI_BASES).optional().describe('Ferramenta de IA; padrão: a do projeto'),
       replace: z.boolean().optional().describe('Troca a skill de mesmo nome que já esteja no destino'),
     },
     (a, router) => {

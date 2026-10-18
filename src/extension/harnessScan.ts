@@ -1,3 +1,5 @@
+import { isAiBase } from '../shared/harness';
+import { baseValue } from '../shared/harness';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -322,7 +324,7 @@ function installedPluginDirs(
       install,
     }));
   }
-  return PLUGIN_ROOTS[tool].flatMap((root) => {
+  return (baseValue(PLUGIN_ROOTS, tool) ?? []).flatMap((root) => {
     const base = path.join(ctx.homeDir, root.path);
     const skip = tool === 'claude' ? ['marketplaces', 'data'] : [];
     const found = entries(base)
@@ -373,7 +375,7 @@ function scanPlugins(tool: AiTool, ctx: Ctx, claude: PluginInstall[] | null | un
 function scanImported(tool: AiTool, dir: string, ctx: Ctx): Found[] {
   if (!isDir(dir)) return [];
   const found: Found[] = [];
-  HARNESS_CATALOG[tool].forEach((src, source) => {
+  (baseValue(HARNESS_CATALOG, tool) ?? []).forEach((src, source) => {
     // as regras de subpasta e a memória são do projeto; o ~/.claude.json é do Claude Code
     if (src.scope !== 'project' || src.layout === 'nested' || src.path.includes('{project}') || src.base) return;
     found.push(...scanSource(src, dir, ctx, source));
@@ -394,9 +396,10 @@ export function scanInventory(
   /** pastas importadas pela pessoa para esta ferramenta */
   imports: string[] = [],
 ): HarnessItem[] {
+  if (!isAiBase(tool)) return [];
   const ctx: Ctx = { projectDir, homeDir };
   const found: Found[] = [];
-  HARNESS_CATALOG[tool].forEach((src, source) => {
+  (baseValue(HARNESS_CATALOG, tool) ?? []).forEach((src, source) => {
     const base = src.base === 'managed' ? managed : src.scope === 'project' ? projectDir : homeDir;
     // a memória fica numa pasta com o nome do projeto: sem projeto, não há o que procurar
     if (base && (projectDir || !src.path.includes('{project}'))) found.push(...scanSource(src, base, ctx, source));

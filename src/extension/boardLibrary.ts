@@ -19,7 +19,7 @@ import {
   type BoardArtifact,
 } from '../shared/artifacts';
 import { selectionKey, type HarnessUsage, type SelectableKind } from '../shared/harnessSelection';
-import { aiToolInfo, type Harness, type HarnessItem } from '../shared/harness';
+import { baseInfo, type Harness, type HarnessItem } from '../shared/harness';
 import type { BoardContext } from './panel/handlers/context';
 
 /** Biblioteca do board: as fontes são lidas só na importação ou numa atualização explícita. */
@@ -360,7 +360,7 @@ export class BoardLibrary {
       Object.assign(f, { content, encoding: 'utf8', size: Buffer.byteLength(content, 'utf8') });
     } else if (a.kind === 'agent') {
       const agent = parseAgentFile(
-        aiToolInfo(a.originTool || 'claude').agents,
+        baseInfo(a.originTool || 'claude').agents,
         { name: a.name, scope: 'project', path: file, location: a.origin },
         content,
       );

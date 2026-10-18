@@ -1,3 +1,4 @@
+import { HarnessStore } from '../src/extension/harness';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -579,4 +580,14 @@ describe('arquivos de apoio das skills', () => {
       ),
     ).toThrow('plugin');
   });
+});
+
+it('perfil genérico não presume pastas ou inventário de outra ferramenta', () => {
+  write(project, 'CLAUDE.md', 'Sentinela nativa');
+  write(project, '.claude/skills/x/SKILL.md', skill('Sentinela skill'));
+  expect(scanInventory('claude', project, home).length).toBeGreaterThan(0);
+  expect(scanInventory('personalizado', project, home, undefined, null, [project])).toEqual([]);
+  expect(new HarnessStore(project, 'personalizado', home).scan()).toEqual({ rules: [], skills: [], agents: [], inventory: [] });
+  expect(createTargets('personalizado')).toEqual([]);
+  expect(permissionTargets('personalizado')).toEqual([]);
 });

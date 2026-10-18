@@ -130,3 +130,18 @@ it('importa referências desativadas/pendentes, conserva o alvo antigo e recusa 
   expect(repo.list(boardId)).toHaveLength(3);
   expect(repo.list(boardId).every((p) => !p.enabled)).toBe(true);
 });
+it('o padrão aceita perfil ligado e revisado, ignorando perfil ausente, desligado ou importado', () => {
+  const boards = new BoardRepo(db);
+  const copy = repo.save(boardId, draft({ kind: 'copy', base: 'cursor', config: {} }), 'person');
+  boards.updateBoard(boardId, { aiTool: copy.id });
+  expect(boards.snapshot(boardId).board.aiTool).toBe(copy.id);
+  boards.updateBoard(boardId, { aiTool: 'inexistente' });
+  expect(boards.snapshot(boardId).board.aiTool).toBe(copy.id);
+  boards.updateBoard(boardId, { aiTool: 'claude' });
+  repo.setEnabled(boardId, copy.id, false, 'person');
+  boards.updateBoard(boardId, { aiTool: copy.id });
+  expect(boards.snapshot(boardId).board.aiTool).toBe('claude');
+  run(db, "UPDATE ai_profiles SET enabled=1, review_state='pending' WHERE board_id=? AND id=?", [boardId, copy.id]);
+  boards.updateBoard(boardId, { aiTool: copy.id });
+  expect(boards.snapshot(boardId).board.aiTool).toBe('claude');
+});

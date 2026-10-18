@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { choose, lastSent, posted, renderThemed, seedBoard, sentOf } from './setup';
-import { aiToolInfo, type Agent, type HarnessItem } from '../../src/shared/harness';
+import { baseInfo, type Agent, type HarnessItem } from '../../src/shared/harness';
 import { AgentEditor } from '../../src/webview/components/settings/harness/AgentEditor';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import type { BoardState } from '../../src/shared/model';
@@ -55,7 +55,7 @@ beforeEach(async () => {
 });
 
 const renderEditor = (a: Agent, tool: 'claude' | 'cursor' = 'claude') =>
-  renderThemed(<AgentEditor agent={a} tool={aiToolInfo(tool)} onClose={() => {}} />);
+  renderThemed(<AgentEditor agent={a} tool={baseInfo(tool)} onClose={() => {}} />);
 
 describe('editor de agente: Claude Code', () => {
   it('as ferramentas são listas marcáveis por grupo: marcar e desmarcar grava a lista inteira', async () => {

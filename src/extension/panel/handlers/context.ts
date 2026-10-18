@@ -1,3 +1,4 @@
+import { activeProfile, catalogTool } from '../../../shared/aiProfiles';
 import { ExecutionPolicyRepo } from '../../repositories/executionPolicyRepo';
 import type { DbHandle } from '../../db/database';
 import type { BoardState } from '../../../shared/model';
@@ -93,7 +94,10 @@ export class BoardContext {
     // nada a mudar para chegar ao padrão atual: só registra a versão, sem perguntar
     if (!pendingUpgrade(db, board.id).length) upgradeBoard(db, board.id);
     this.library = new BoardLibrary(this);
-    this.harness = new BoardHarness(this, opts.workspaceDir ? new HarnessStore(opts.workspaceDir, board.aiTool, opts.homeDir ?? '') : null);
+    this.harness = new BoardHarness(
+      this,
+      opts.workspaceDir ? new HarnessStore(opts.workspaceDir, catalogTool(activeProfile(board)), opts.homeDir ?? '') : null,
+    );
   }
 
   /** Estado do board como está no banco (sem harness nem execuções). */

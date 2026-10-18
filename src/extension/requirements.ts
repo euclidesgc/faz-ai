@@ -1,3 +1,5 @@
+import { baseValue } from '../shared/harness';
+import type { AiBase } from '../shared/aiProfiles';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AiTool } from '../shared/harness';
@@ -88,10 +90,11 @@ export function registeredServer(tool: AiTool, workspaceDir: string, homeDir: st
         fromJson(path.join(kimiHome(homeDir), 'mcp.json'), '~/.kimi-code/mcp.json', server)
       );
   }
+  return null;
 }
 
 /** Como instalar a CLI de cada ferramenta, quando há um comando de uma linha para isso. */
-const INSTALL: Record<AiTool, { command: string | null; where: string }> = {
+const INSTALL: Record<AiBase, { command: string | null; where: string }> = {
   claude: { command: null, where: 'https://claude.com/claude-code' },
   cursor: {
     command: process.platform === 'win32' ? null : 'curl https://cursor.com/install -fsS | bash',
@@ -207,7 +210,7 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
   const cli = built.command;
   const executable = p.resolve(cli);
   if (!executable) {
-    const install = INSTALL[tool];
+    const install = baseValue(INSTALL, tool) ?? { command: null, where: '' };
     out.push({
       id: 'cli',
       tool,
@@ -218,7 +221,7 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
   }
 
   if (cli && executable && (await p.signedIn(tool, executable)) === false)
-    out.push({ id: 'signin', tool, cli, action: { kind: 'command', command: LOGIN_COMMAND[tool], terminal: true } });
+    out.push({ id: 'signin', tool, cli, action: { kind: 'command', command: baseValue(LOGIN_COMMAND, tool) ?? '', terminal: true } });
 
   // o MCP e a skill do fluxo são necessários em todas as ferramentas: mesmo onde as execuções pelo board
   // levam o servidor sozinhas (Claude, Cursor), a conversa no chat do editor ou no terminal depende dele

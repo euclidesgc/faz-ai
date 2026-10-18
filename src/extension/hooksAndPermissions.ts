@@ -1,3 +1,4 @@
+import { baseValue } from '../shared/harness';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AiTool, HarnessItem } from '../shared/harness';
@@ -42,7 +43,7 @@ export class HooksAndPermissions {
   /** A fonte do catálogo que corresponde ao arquivo de um item listado. */
   private sourceOf(tool: AiTool, item: HarnessItem, match: (src: HarnessSource) => boolean): HarnessSource {
     if (item.scope === 'plugin') throw new Error('Itens de plugin não podem ser alterados pelo board.');
-    const src = HARNESS_CATALOG[tool].find(
+    const src = (baseValue(HARNESS_CATALOG, tool) ?? []).find(
       (x) => match(x) && x.scope === item.scope && path.join(this.base(x.scope), x.path) === item.path,
     );
     if (!src) throw new Error('Este item fica num arquivo que o board não edita. Abra o arquivo e edite-o à mão.');
@@ -52,14 +53,14 @@ export class HooksAndPermissions {
   /** Acrescenta um hook ao arquivo indicado, no formato da ferramenta, e devolve o caminho do arquivo. */
   addHook(tool: AiTool, index: number, input: HookInput): string {
     const target = hookTargets(tool).find((t) => t.source === index);
-    const src = HARNESS_CATALOG[tool][index];
+    const src = (baseValue(HARNESS_CATALOG, tool) ?? [])[index];
     if (!target || !src) throw new Error('Este arquivo de hooks não é editado pelo board.');
     const event = input.event.trim();
     const command = input.command.trim();
     const matcher = input.matcher.trim();
     if (target.format === 'toml') {
       const hook = { event, matcher, command, timeout: Number.isFinite(input.timeout) ? input.timeout : 0 };
-      const error = validateKimiHook(hook, HOOK_EVENTS[tool]);
+      const error = validateKimiHook(hook, baseValue(HOOK_EVENTS, tool) ?? []);
       if (error) throw new Error(error);
       const tomlFile = path.join(this.base(src.scope), src.path);
       const text = fs.existsSync(tomlFile) ? fs.readFileSync(tomlFile, 'utf8') : '';
@@ -122,7 +123,7 @@ export class HooksAndPermissions {
 
   /** Acrescenta uma regra a uma das listas de permissão (allow, ask, deny) do arquivo indicado. */
   addPermission(tool: AiTool, index: number, list: string, rule: string): string {
-    const src = HARNESS_CATALOG[tool][index];
+    const src = (baseValue(HARNESS_CATALOG, tool) ?? [])[index];
     if (!src || src.layout !== 'json-permissions' || !src.lists.includes(list))
       throw new Error('Este arquivo de permissões não é editado pelo board.');
     const text = rule.trim();

@@ -1,6 +1,7 @@
+import { baseValue } from '../../../../shared/harness';
 import { useEffect, useState } from 'react';
 import { Badge, Callout, Checkbox } from '@radix-ui/themes';
-import { REFERENCE_SKILL, aiToolInfo, type AiTool, type HarnessItem, type HarnessScope } from '../../../../shared/harness';
+import { REFERENCE_SKILL, baseInfo, type AiTool, type HarnessItem, type HarnessScope } from '../../../../shared/harness';
 import {
   HARNESS_CATALOG,
   HARNESS_NOTES,
@@ -68,10 +69,12 @@ export function HarnessGroupCard({ group, tool, scope, query, suggested, items, 
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const g = group.id;
   const projectTool = tool === state.board.aiTool;
-  const catalog = HARNESS_CATALOG[tool];
+  const catalog = baseValue(HARNESS_CATALOG, tool) ?? [];
   const sources = catalog.flatMap((src, source) => (src.group === g && src.scope === scope ? [{ src, source }] : []));
   const searching = query.trim() !== '';
-  const notes = HARNESS_NOTES[tool].filter((n) => n.group === g && n.scope === scope && matchesQuery(query, n.name, n.hint));
+  const notes = (baseValue(HARNESS_NOTES, tool) ?? []).filter(
+    (n) => n.group === g && n.scope === scope && matchesQuery(query, n.name, n.hint),
+  );
   // por padrão o Claude Code lê o AGENTS.md do projeto só quando não há CLAUDE.md, .claude/CLAUDE.md nem CLAUDE.local.md
   const { claudeMd, agentsMd } = g === 'main' && scope === 'project' ? instructionRoles(tool, all) : { claudeMd: [], agentsMd: [] };
   // arquivo fixo que a ferramenta leria, mas que ainda não existe: dá para criar daqui
@@ -98,7 +101,7 @@ export function HarnessGroupCard({ group, tool, scope, query, suggested, items, 
   const permissions = g === 'settings' ? permissionTargets(tool).filter((x) => x.scope === scope) : [];
   // os agentes da ferramenta do projeto têm a tabela própria, com a marcação, o padrão e o editor do board
   const agentsScope = scope === 'project' || scope === 'user' ? scope : null;
-  const agentsTable = g === 'agent' && projectTool && !!aiToolInfo(tool).agents && agentsScope !== null;
+  const agentsTable = g === 'agent' && projectTool && !!baseInfo(tool).agents && agentsScope !== null;
 
   // plugins e a política da organização são só leitura; os agentes da ferramenta do projeto têm a tabela própria
   const pickable = g === 'plugin' || g === 'managed' || agentsTable ? [] : items.filter((i) => bulkSelectable(i, actions, true));
@@ -198,11 +201,13 @@ export function HarnessGroupCard({ group, tool, scope, query, suggested, items, 
           </Callout.Text>
         </Callout.Root>
       )}
-      {g === 'plugin' && PLUGIN_COMMANDS[tool] && (
+      {g === 'plugin' && (baseValue(PLUGIN_COMMANDS, tool) ?? undefined) && (
         <div className="muted small">
-          {t('Plugins são instalados pela própria ferramenta, {where}:', { where: t(PLUGIN_COMMANDS[tool]!.where) })}
+          {t('Plugins são instalados pela própria ferramenta, {where}:', {
+            where: t((baseValue(PLUGIN_COMMANDS, tool) ?? undefined)!.where),
+          })}
           <ul>
-            {PLUGIN_COMMANDS[tool]!.commands.map((c) => (
+            {(baseValue(PLUGIN_COMMANDS, tool) ?? undefined)!.commands.map((c) => (
               <li key={c}>
                 <code>{t(c)}</code>
               </li>
@@ -261,7 +266,7 @@ export function HarnessGroupCard({ group, tool, scope, query, suggested, items, 
         <NewPermission key={`new-permission:${tool}`} tool={tool} targets={permissions} onClose={() => onOpen(null)} />
       )}
       {agentsTable ? (
-        <AgentsTable tool={aiToolInfo(tool)} scope={agentsScope!} query={query} />
+        <AgentsTable tool={baseInfo(tool)} scope={agentsScope!} query={query} />
       ) : g === 'plugin' ? (
         <PluginGroup tool={tool} items={items} actions={actions} />
       ) : (

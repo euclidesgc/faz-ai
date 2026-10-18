@@ -1,12 +1,13 @@
+import { toolInfo, activeProfile } from '../../../shared/aiProfiles';
+import { catalogTool } from '../../../shared/aiProfiles';
 import { ContextPlanningRepo } from '../../repositories/contextPlanningRepo';
 import { artifactLocation } from '../../../shared/artifacts';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
-  ALL_AI_TOOLS,
+  ALL_AI_BASES,
   EMPTY_HARNESS,
   REFERENCE_SKILL,
-  aiToolInfo,
   type AiTool,
   type Harness,
   type HarnessItem,
@@ -73,7 +74,7 @@ export class BoardHarness {
     let state = this.ctx.state();
     // as pastas importadas são do board: a varredura as recebe a cada leitura, para a aba refletir o que está lá
     this.store.imports = Object.fromEntries(
-      ALL_AI_TOOLS.map((tool) => [tool, state.harnessImports.filter((x) => x.tool === tool).map((x) => x.dir)]),
+      ALL_AI_BASES.map((tool) => [tool, state.harnessImports.filter((x) => x.tool === tool).map((x) => x.dir)]),
     );
     this.current = this.store.scan();
     this.ctx.library.migrate(this.current.inventory);
@@ -242,7 +243,8 @@ export class BoardHarness {
 
   /** Passa a varrer a pasta de skills da ferramenta. */
   setTool(tool: AiTool): void {
-    this.store?.setTool(tool);
+    const profile = this.ctx.state().board.aiProfiles.find((p) => p.id === tool);
+    this.store?.setTool(profile ? catalogTool(profile) : tool);
     this.load();
   }
 
@@ -488,7 +490,7 @@ export const harnessHandlers = {
     const changed = ctx.harness.op((h) => {
       h.createSkill(REFERENCE_SKILL.name, REFERENCE_SKILL.description, REFERENCE_SKILL.body);
       h.setSkillMode(REFERENCE_SKILL.name, 'manual');
-      fs.mkdirSync(path.join(h.workspaceDir, aiToolInfo(ctx.state().board.aiTool).skills, REFERENCE_SKILL.name, 'references'), {
+      fs.mkdirSync(path.join(h.workspaceDir, toolInfo(activeProfile(ctx.state().board)).skills, REFERENCE_SKILL.name, 'references'), {
         recursive: true,
       });
     });
