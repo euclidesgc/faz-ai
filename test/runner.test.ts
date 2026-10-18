@@ -110,6 +110,8 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     },
   });
   router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'restrito' } } });
+  // o agente nasce no board; o servidor que ele libera também precisa estar no board
+  router.handle({ type: 'harness.selection.set', items: [{ kind: 'mcp', location: '.mcp.json#github' }], usage: 'contextual' });
   const pendingMcp = router.snapshot().harness.library?.artifacts.find((a) => a.kind === 'mcp' && a.name === 'github');
   if (pendingMcp)
     router.handle({

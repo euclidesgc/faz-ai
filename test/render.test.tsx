@@ -306,7 +306,8 @@ describe('telas montam sem erro', () => {
       'Rodar o heartbeat agora',
       'Agente padrão',
       'revisor-de-spec',
-      '.claude/agents/revisor-de-spec.md',
+      // o agente criado pela tela vive no board: o caminho é o da cópia de leitura, não o da pasta da ferramenta
+      'agents/revisor-de-spec.md',
     ])
       expect(harness).toContain(text);
   });

@@ -105,6 +105,44 @@ describe('biblioteca particular do board', () => {
     expect(router.snapshot().cards.find((c) => c.id === cardId)!.execProfile).toBeNull();
   });
 
+  it('agentes criados e editados pelo board ficam no banco: nada é gravado na pasta da ferramenta, nem na origem copiada', () => {
+    const origin = write('project/.claude/agents/copiado.md', '---\nname: copiado\ndescription: Original\n---\nCorpo original.');
+    router.refreshHarness();
+    select('agent', '.claude/agents/copiado.md');
+    router.handle({
+      type: 'harness.agent.create',
+      scope: 'user',
+      input: { name: 'novo', description: 'Novo', body: 'Faça.', model: '', tools: ['Read'], deniedTools: [], skills: [], mcp: [] },
+    });
+    expect(fs.existsSync(path.join(root, 'home/.claude/agents'))).toBe(false);
+    const agent = (name: string) => router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'agent' && a.name === name)!;
+    expect(agent('novo')).toMatchObject({ usage: 'contextual', origin: '', body: 'Faça.' });
+
+    router.handle({
+      type: 'harness.agent.update',
+      name: 'copiado',
+      scope: 'project',
+      patch: { description: 'Editado' },
+      body: 'Corpo novo.',
+    });
+    expect(agent('copiado')).toMatchObject({ description: 'Editado', body: 'Corpo novo.' });
+    expect(fs.readFileSync(origin, 'utf8')).toContain('Corpo original.');
+    expect(router.snapshot().board.execProfiles.find((p) => p.id === 'copiado')!.instructions).toBe('Corpo novo.');
+
+    router.handle({
+      type: 'harness.agent.write',
+      name: 'novo',
+      scope: 'user',
+      content: '---\nname: novo\ndescription: Pelo editor\ntools: Read, Grep\n---\nInstruções do editor.',
+    });
+    expect(agent('novo')).toMatchObject({ description: 'Pelo editor', body: 'Instruções do editor.' });
+    expect(agent('novo').agent!.tools.native.allow).toEqual(['Read', 'Grep']);
+
+    router.handle({ type: 'harness.agent.delete', name: 'copiado', scope: 'project' });
+    expect(router.snapshot().harness.library!.artifacts.some((a) => a.name === 'copiado')).toBe(false);
+    expect(fs.existsSync(origin)).toBe(true);
+  });
+
   it('atualiza só sob pedido e preserva a cópia quando a origem não está disponível', () => {
     const source = write('project/.claude/skills/react/SKILL.md', 'Primeira versão');
     router.refreshHarness();

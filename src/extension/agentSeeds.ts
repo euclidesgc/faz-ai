@@ -1,5 +1,4 @@
 import { FLOW_SKILL_NAME, toItemName } from '../shared/harnessProject';
-import type { AgentInput } from '../shared/messages';
 import { CONDUCTOR_AGENT, TOOL_PRESETS, defaultAgent } from '../shared/execution';
 import { EFFORT_FIELD } from '../shared/models';
 import type { BoardState } from '../shared/model';
@@ -163,37 +162,37 @@ function modelFor(state: BoardState, level: Level): string {
 }
 
 /**
- * Cria na pasta global de agentes da ferramenta em uso os agentes de fábrica que ainda não existem (em
- * nenhum escopo) e nunca foram oferecidos a este board; com `force`, também os já oferecidos que a
- * pessoa apagou. Marca cada um como disponível e, sem agente padrão definido, faz do condutor o padrão.
- * Devolve os nomes criados.
+ * Cria no board (no banco, nunca na pasta da ferramenta) os agentes de fábrica que ainda não estão nele e
+ * nunca foram oferecidos a este board; com `force`, também os já oferecidos que a pessoa apagou. Cada um
+ * nasce disponível ("Pelo card") e, sem agente padrão definido, o condutor vira o padrão. Os oferecidos
+ * ficam registrados: apagar um depois é decisão da pessoa, e ele não volta sozinho. Devolve os nomes criados.
  */
-export function seedAgents(ctx: BoardContext, store: HarnessStore, force = false): string[] {
+export function seedAgents(ctx: BoardContext, force = false): string[] {
   const state = ctx.state();
   const offered = new Set(ctx.boards.seededAgents(ctx.boardId));
-  const existing = new Set(store.agents().map((a) => a.name));
   const created: string[] = [];
   for (const seed of AGENT_SEEDS) {
-    if (existing.has(seed.name) || (!force && offered.has(seed.name))) continue;
-    const input: AgentInput = {
-      name: seed.name,
-      description: seed.description,
-      body: seed.body,
-      model: modelFor(state, seed.level),
-      tools: seed.tools,
-      deniedTools: [],
-      skills: seed.skills,
-      mcp: [],
-    };
-    try {
-      store.createAgent(input, 'user', true);
-      created.push(seed.name);
-    } catch {
-      // sem pasta de usuário ou sem agentes nesta ferramenta: nada a semear
-      return created;
-    }
+    if (ctx.library.hasAgent(seed.name) || (!force && offered.has(seed.name))) continue;
+    ctx.library.createAgent(
+      {
+        name: seed.name,
+        description: seed.description,
+        body: seed.body,
+        model: modelFor(state, seed.level),
+        tools: seed.tools,
+        deniedTools: [],
+        skills: seed.skills,
+        mcp: [],
+      },
+      true,
+    );
+    created.push(seed.name);
   }
-  if (created.length) ctx.boards.addSeededAgents(ctx.boardId, created);
+  if (created.length) {
+    ctx.boards.addSeededAgents(ctx.boardId, created);
+    if (!state.board.runner.defaultAgent && created.includes(CONDUCTOR_AGENT))
+      ctx.boards.updateBoard(ctx.boardId, { runner: { defaultAgent: CONDUCTOR_AGENT } });
+  }
   return created;
 }
 
