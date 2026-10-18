@@ -180,12 +180,12 @@ describe('telas montam sem erro', () => {
   });
 
   it('configurações', () => {
-    expect(html(<Settings />)).toContain('Harness de IA');
+    expect(html(<Settings />)).toContain('Harness');
     // menu recolhido: só ícones, com o nome da seção no aria-label
     useBoardStore.setState({ settingsNavCollapsed: true });
     const collapsed = html(<Settings />);
     expect(collapsed).toContain('settings-side collapsed');
-    expect(collapsed).toContain('aria-label="Harness de IA"');
+    expect(collapsed).toContain('aria-label="Harness"');
     useBoardStore.setState({ settingsNavCollapsed: false });
     // no editor (isWeb false em teste), a GitSettings mostra só o aviso e o link para o Settings do editor
     expect(html(<GitSettings />)).toContain('O Git agora fica no Settings do editor.');
@@ -288,27 +288,22 @@ describe('telas montam sem erro', () => {
       'type="radio"',
       'Claude Code',
       'Cursor',
-      'AGENTS.md',
-      'Harness do Claude Code',
-      'Harness do Cursor',
+      'Biblioteca do board',
+      'Criar',
+      'Assistente guiado',
       'Importar artefatos',
       'Sub-agentes',
-      'A linha de comando do Cursor não desliga artefatos',
-      'Regras principais',
+      'Gerar com base no projeto',
       'Modo no board',
       'revisar-spec',
-      '.cursor/skills',
-      'Servidores MCP',
-      'Hooks',
+      'MCPs',
       'deste projeto',
-      'não encontrada',
       'Instalar (padrão da ferramenta)',
       'Execução pela conversa e heartbeat',
       'A IA lê o projeto e usa as ferramentas do board',
       'Tempo limite por execução',
       'Heartbeat ligado',
       'Rodar o heartbeat agora',
-      'Subagentes',
       'Agente padrão',
       'revisor-de-spec',
       '.claude/agents/revisor-de-spec.md',

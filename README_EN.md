@@ -66,7 +66,7 @@ In five minutes you have a task moving on the board, with the AI working on it.
 1. **Install and open.** Install **Faz AI Kanban** in VS Code or Cursor (from the tool's own
    marketplace), open your project's folder and click the **Faz AI** icon in the sidebar. Each
    folder has its own board, already set up with the workflow phases.
-2. **Connect the AI to the board.** In **Configurações → Harness de IA** (Settings → AI harness),
+2. **Connect the AI to the board.** In **Configurações → Harness** (Settings → Harness),
    pick the project's tool (Claude Code, Cursor or Kimi Code). In the **Projeto** (project) tab, click
    **Instalar (padrão da ferramenta)** (install, tool default) in the **Servidores MCP** (MCP servers)
    group and again in the **Skills** group, for the flow skill, which teaches the AI to drive the
@@ -100,7 +100,7 @@ is needed, at the right time:
   everything, the AI opens the card through the board (`get_card`), does that piece of work and
   stops. The history stays on the card, not in the context window.
 - **Empty context by default.** Every run started by the board begins with no rule, skill, agent,
-  hook or plugin from your machine or the project: only what you checked under **Harness de IA**
+  hook or plugin from your machine or the project: only what you checked under **Harness**
   gets in. In Claude Code this is enforced by parameter (`--setting-sources ""`,
   `--disable-slash-commands` and an MCP servers file with the board's server only); in the other
   tools, whatever the command line accepts (see the [Agents](#agents) table).
@@ -206,6 +206,9 @@ status color, and the LED on the bar tells the card's state at a glance: green a
 
 **Select all in a column.** The checkbox at the start of a story column's header, on the same line as the cards' checkboxes (or **Selecionar todos** in the ⋯ menu), selects the column's visible stories (the active filter applies); checked again, it clears the selection. In a column with no cards, the checkbox is hidden, but its space stays reserved. With the selection made, the same menu offers **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados** and **Mandar selecionados para a lixeira**, each with a single confirmation for the whole batch; **Limpar seleção** clears it. The selection applies to one column at a time: selecting a card in another column replaces the selection. In a batch, a story with an open sub-task is not concluded (the others go ahead), and moving to a cancellation column cancels open sub-tasks.
 
+**Actions on selected cards.** The multi-select bar (two or more cards) and the column’s ⋯ menu offer the same actions: **Approve**, **Block**, **Unblock**, **Work on phase**, **Refine with AI**, **Stop AI**, autonomous mode, collapse/expand, archive, move, complete and trash. Unavailable actions stay visible and disabled, without displaying a reason; the menu also shows them with no selection. Each action affects only eligible, visible cards. Approve applies to cards waiting for review and uses the same automatic advance as individual approval; block requires a reason, recorded in each card’s conversation; unblock returns blocked cards to **Ready**. Work and refine respect the remaining parallel execution capacity: cards already running or exceeding the limit are left out. **Stop AI** only stops runs started by the board.
+
+
 ### Links between cards
 
 Besides sub-tasks, any card can be linked to another one, in any workflow, under **Vínculos**
@@ -266,7 +269,7 @@ navegador**; the terminal `faz-ai` warns and does not start.
 
 ## Using it with AI
 
-1. In Configurações (settings) → **Harness de IA**, choose the project's tool (Claude Code,
+1. In Configurações (settings) → **Harness**, choose the project's tool (Claude Code,
    Cursor or Kimi Code).
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
    **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads. This also happens on its own, silently, when the folder opens (and on every new extension version), always in the user scope; only a failure raises a notice.
@@ -318,7 +321,7 @@ item says what it affects and brings the action: the command to copy, **Instalar
 (install the board MCP, which opens the tool's MCP servers section), **Corrigir o registro** (fix the
 registration: a broken one in the project file takes precedence over the global one; fixing removes
 it from there and leaves the global one in effect), **Recarregar a janela** (reload the window) or
-the shortcut to the AI harness. The icon goes away on its own when the last item is solved. The
+the shortcut to the Harness. The icon goes away on its own when the last item is solved. The
 check runs when the board opens, when the tool or permission changes, after connecting, every 5
 minutes and on **Verificar de novo** (check again), which also rereads the terminal PATH (a node
 installed with the board open is found without reloading the window), and says when nothing
@@ -360,7 +363,7 @@ Graph). Hover over an item to see how the board uses it.
   "Indicar artefatos"), no board agent, rules sent and still off, an artifact that vanished from its
   source and, in Cursor, project rules, servers or hooks that enter the context without going
   through the board. The same shows in the banner at the top of the board as a discreet
-  recommendation line, with the shortcut to the AI Harness.
+  recommendation line, with the shortcut to the Harness.
 - **Optional:** the other AI tool, when it is on the machine (its command line on the PATH or, in
   Cursor, the editor itself). A project on Claude Code shows Cursor here, and vice versa. The list only
   shows the state: the board installs its MCP and skill there when it becomes the project's tool.
@@ -504,7 +507,7 @@ Images pasted into the message or into the card description become card attachme
   every message before it; summarizing again creates a new record, it does not replace the previous
   one. It is also available as the MCP tool `generate_summary`, with the same result. The
   [heartbeat](#heartbeat) summarizes on its own a conversation that has grown.
-- What the AI may do in these runs is set in Configurações → Harness de IA → **Execução pela
+- What the AI may do in these runs is set in Configurações → Harness → **Execução pela
   conversa**: only the board (default), the board and project files, or no restrictions. The level
   in use is shown next to the button, with a shortcut to change it. The AI is told about the limit:
   if the work needs more than the level allows, it blocks the card saying which option to choose.
@@ -691,14 +694,15 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 
 - The aggregation can group by phase (`phase`), card type (`card_type`), AI tool (`tool`), model
   (`model`), effort (`effort`), profile (`profile`), card (`card`), agent (`agent`), skill (`skill`),
-  used tool (`used_tool`) or MCP tool (`mcp_tool`). Omit to get only the period's total.
+  used tool (`used_tool`), MCP tool (`mcp_tool`) or Bash command (`bash_command`). Omit to get only the period's total.
 - `tool` and `used_tool` are not the same thing: `tool` is the AI tool that ran (claude, cursor);
   `used_tool` and `mcp_tool` are what the run used (Read, Bash, `get_card`). In `mcp_tool` the server
   comes in its own column, or "servidor não registrado" (server not recorded) when the name did not
-  carry it.
+  carry it. `bash_command` is the base command of each Bash call, without arguments (`npm test`,
+  `git status`, `cat`), Claude Code only.
 - Period filters (start and end date, in `YYYY-MM-DD`), card (e.g. `72` or `#72`), and dimensions
   (e.g. phase, model, card type).
-- On the **agent**, **skill**, **used_tool** and **mcp_tool** dimensions the table shows only the
+- On the **agent**, **skill**, **used_tool**, **mcp_tool** and **bash_command** dimensions the table shows only the
   count of runs and uses (no tokens, which cannot be split among a run's components).
   `effort` and `profile` have tokens.
 - Tokens count in every measured run, from Claude Code and from Cursor. The table has no dollar cost.
@@ -961,7 +965,7 @@ version, which have no merge commit recorded, stay yours to archive with one cli
 
 ### Heartbeat
 
-With the heartbeat on (Configurações → Harness de IA), the board calls the AI on its own at every
+With the heartbeat on (Configurações → Harness), the board calls the AI on its own at every
 interval, while the editor is open in the project folder. The heartbeat itself does not depend on
 the AI: it is a board clock that, on each round, first tidies the board and then decides what the AI
 does. In each round it:
@@ -1016,7 +1020,7 @@ description of each Git key in the Settings explains why in each mode: with a br
 folder, two stories at once would switch the branch under each other and mix their changes; with
 worktrees they are isolated, at the cost of one more copy of the files on disk per story (with
 dependencies installed in each) and more memory and CPU while several AI sessions, tests and builds
-run together. In the editor the Git tab and the parallel block in the AI harness become a link to
+run together. In the editor the Git tab and the parallel block in the Harness become a link to
 the Settings; in the browser they stay as editable fields, as before.
 
 - The round has a fixed order: tidying (usage limit, stalled cards); a single `git fetch`; the pull
@@ -1151,337 +1155,97 @@ AI running, the story session finished with a sub-task marked by `start_work`, a
 the board crashed), the board sends it back to Pronto (ready): when the board opens, the cards of
 runs the previous session left open (and their sub-tasks); when a story's session ends, its
 sub-tasks; and every minute, any card "Em execução" with no board run for longer than one run's
-time limit (Settings → AI Harness → maximum time), with the explanation in the conversation.
+time limit (Settings → Harness → maximum time), with the explanation in the conversation.
 
 
 ### Agents
 
-![Agent with intent, chosen skills and read-only tools](docs/images/agents_en.png)
+Subagents are **Board library** artifacts with instructions, description, optional model, tool
+categories and dependencies on skills and MCPs. Creating or editing through the Harness writes to
+the board and its reading copies, without creating files in tool folders. Existing native agent
+files can be imported.
 
-An agent is an **agent file of the AI tool** (`~/.claude/agents/<name>.md`,
-`~/.cursor/agents/<name>.md`): the instructions are the session
-role, and the frontmatter sets the model and effort, the tools (available and denied), the skills and
-the MCP servers it gets. For the board, agent and execution profile are the same thing. The files are
-read from disk; the board only stores, per project, which ones are **available** and which is the
-**default** (Harness de IA → Ferramenta e execução). Every run started by the board goes through an
-agent: the one chosen on the card; otherwise the phase's (Workflows e colunas → Fase); otherwise the
-default. With none checked, the built-in agent applies, with no instructions.
+Runs select the card's agent, otherwise the phase's agent, then the default from **Harness →
+Tool and execution**. With no available agents, the built-in agent adds no instructions. Removing an
+agent releases card and phase selections that used it. Existing factory agents remain in the library.
 
-Agents the board creates go to the tool's global folder (they apply in any project), and the ones
-already in the project show up under the **Projeto** tab. On the board's first opening, ten factory
-agents are created globally, checked as available, with **condutor-do-board** as the default: it
-drives cards through the flow, picks the right specialist for each subtask and, in Implementação,
-delegates each one to that specialist as a subagent (a story's session receives the board's other
-available agents as subagents). The others
-(frontend-web, backend-node, backend-python, mobile-flutter, documentacao-tecnica, qa-testes,
-revisor-de-codigo, devops-infra, dados-sql) have minimal instructions, for you or the AI to adapt to
-the project. What you delete does not come back on its own; **Recriar os agentes padrão** (recreate
-the default agents) recreates whatever is missing.
+The **Sub-agents** tab offers **Create**, **Guided assistant** and **Generate from project**.
+Its creation and editing form opens in a modal with a dimmed background, separated from the existing agent list. Clicking outside keeps the draft open; use Cancel to leave.
+The editor reviews instructions, selects skills and MCPs from the library, and sets Read, Edit,
+Commands, Network and Subagents categories. An empty model follows the card or session; models
+from other tools are not imposed when switching executors.
 
-On the Agentes tab of each scope:
+The board translates categories into native tools where documented support exists. Instructions
+also carry the scope, because Cursor and some Kimi tools have no equivalent parameter restriction.
+Claude Code can receive inline agents, tool restrictions and models; other executors receive part
+of the profile as prompt guidance. The MCP bridge enforces Always/Per card/Off server usage
+independently of the executor.
 
-- **Disponível no board** (available on the board): cards and phases can pick the agent. **Tornar
-  padrão** (make default) makes it run when none of them picks.
-- **Novo agente** (new agent): name, description (it is how Refine with AI picks), model and
-  instructions.
-- **Criar agente com ajuda** (create agent with help): a seven-step assistant for a narrow-scope
-  agent (see below).
-- **Sugestões prontas** (ready-made suggestions): read-only reviewer, test writer, documentation
-  writer and migration runner; each opens the assistant with the answers filled in, for you to adjust
-  and confirm. They are local, with no AI.
-- **Editar** (edit): the editor shows only what the agent's tool accepts (table below). Each
-  frontmatter field saves on blur; the instructions have Save. Skills come from the same picker as
-  the card (checked ones only). In Claude Code, the available and denied tools are **checkable
-  lists** grouped by scope (reading, file editing, commands, network, other agents and others), with
-  the **amplia o escopo** (widens the scope) warning on the groups that give the agent more power,
-  and there are ready-made sets (**Só leitura** read-only, **Editar código** edit code). What the file
-  already has and the list does not know (such as `mcp__github__*` or `Bash(git diff *)`) shows as a
-  checked chip you can remove, and you can add a board MCP server as `mcp__<name>__*`. In Cursor
-  there is no tool list: the editor shows only **Somente leitura** (read-only) and **Em segundo
-  plano** (in the background).
-- **Sugerir agentes com IA** (suggest agents with AI): the AI reads the project (structure,
-  dependencies, README) and creates or adjusts 3 to 8 agents for it through MCP, leaving them
-  available. The result lands in the board chat.
+Through MCP, `get_board` lists available agents, `set_card_profile` selects a card's agent, and
+`get_board_artifact`/`save_board_artifact` read and edit the library. Native-file APIs `create_agent`,
+`update_agent`, `get_agent` and `delete_agent` remain for compatibility.
 
-What the agent file of each tool accepts (official documentation read on 2026-10-14):
+## Harness
 
-| Tool | Agent frontmatter | The editor shows |
-| --- | --- | --- |
-| Claude Code | `description`, `tools`, `disallowedTools`, `model`, `skills`, among others | instructions, model and effort, skills, MCP servers, available and denied tools |
-| Cursor | `description`, `model`, `readonly`, `is_background`; no list of tools, skills or MCP (inherits everything from the main conversation) | instructions, model and effort, **Somente leitura** and **Em segundo plano** |
+The board manages a **private library**, independent of the AI tool. Under **Settings → Harness**,
+**Board library** provides CRUD for **Rules**, **Skills**, **Sub-agents** and **MCPs**. **Tool and
+execution** selects AI, models, permissions, default agent and heartbeat, and connects the selected
+tool to the board MCP server. Switching tools preserves artifacts and selections.
 
-An agent created for one tool lives in that tool's folder and only shows under its tab.
+Each artifact notice has an outlined button below the text on the right to dismiss it and keep it hidden. The information icon shows the notice again.
 
-**Criar agente com ajuda.** One step at a time, in a card, with **Voltar** (back) and **Continuar**
-(continue); each step brings an example answer and a suggestion without hiding the other options,
-and nothing is written before the last one. (1) **Para que serve** (what it is for): the role and
-goal (example: "Reviews a branch's diff before the pull request and points out bugs, changing
-nothing."). (2) **Ferramentas** (tools): the minimum set from the guideline (review, read and
-analyze: `Read`, `Grep`, `Glob`; edit, implement and fix: also `Edit`, `Write` and `Bash`; test and
-run: `Bash`; search the web: `WebFetch` and `WebSearch`; never `Agent` by default), with the reason
-for each, the full list and the warning for what widens the scope; in Cursor the step is the choice
-of **Somente leitura**. (3) **Servidores MCP**: only the board's, which always goes along; the
-board's others as options. (4) **Skills de apoio** (supporting skills): the board's in Per card
-mode, with the ones tied to the guideline suggested and the one-per-subject rule. (5) **Modelo e
-esforço** (model and effort): reading and review ask for the smallest catalog model with low effort;
-planning, architecture and implementation, a larger one. (6) **Instruções** (instructions): a draft
-generated from the answers (how it works, standards, what it never does), editable. (7) **Resumo**
-(summary): the whole agent and the name (derived from the guideline, editable and validated); only
-**Criar agente** writes. In Cursor, the MCP servers and skills steps say the agent file does not
-accept them.
+**Import artifacts** accepts a project or collection. Choose a folder or enter its
+path on the computer running the board. The preview groups all four types with counts and
+checkboxes; **Import selected** copies each item into its tab. It recognizes native tool formats
+and neutral collections: `AGENTS.md`, `rules/`, `agents/`, and skills containing `SKILL.md`, including
+nested folders. `mcp.json` and `.mcp.json` use `mcpServers`. The preview has four tabs, including
+empty ones, with independent filters. Selections persist across tabs and filters. Duplicate names
+within a type are skipped while other items are imported; the summary groups conflicts and offers
+an explicit confirmation before overwriting them.
 
-Each run started by the board ("Trabalhar na fase", "Refinar com IA" and the heartbeat) is a new,
-empty-context session, with only what is on the card. The agent becomes command-line parameters where
-the tool accepts them; the rest goes into the prompt, as instructions:
+In **Skills**, select items individually or all visible items and apply **Always**, **Per card** or **Off** in bulk. Selections persist across searches; **Clear selection** clears them. **Delete selected** requires confirmation and preserves source files. Subagents also support bulk selection and deletion or making them available on the board; MCPs support bulk usage changes and deletion. Skills, subagents and MCPs do not offer Update from source. The rules form only has Name and Content.
 
-| Tool | Enforced by parameter | Advised only |
-| --- | --- | --- |
-| Claude Code | agent (inline, in `--agents`), MCP servers, tools, model and effort, empty context | skills and rules |
-| Cursor | model | everything else |
+Each tab offers **Create**, search, counts and actions to **Edit**, change usage, update from source
+and remove with confirmation. Rules, skills and subagents also offer a **Guided assistant**
+(steps by section, hints, placeholders, editable examples and review before saving) and **Generate from project** (AI uses the
+detected project profile and existing artifacts, saves to the library and reports in board chat).
+The rules assistant proposes `AGENTS.md`, covering project, code map, commands and validation, conventions, non-negotiable rules and limits; subagents can select tool categories, skills and MCPs
+from the library. Agents act as runner profiles and delegation guidance in external conversations;
+native subagent support still depends on the tool.
 
-Skills and rules are always passed by file path. In a conversation you open yourself, the agent
-reaches the AI through `get_card` (`execution`), as guidance. Through MCP, `get_board` lists the
-available agents (only `agents`, no `harness` or `appearance`; the inventory is in `get_harness`), `set_card_profile` picks one for a card, and `create_agent`, `update_agent`,
-`get_agent` and `delete_agent` manage the files.
+The **Sub-agents** editor separates Instructions, Model, Permissions, Skills, MCPs and Review. Instructions cover responsibility, scope, method and delivery, with examples and **Get AI help** for each part. Models come from the tool catalog; an empty value inherits the card or session model. Every permission has an explanation. Skills and MCPs show descriptions, search and **Get AI recommendations**; **Select recommended** applies justified recommendations. **Review and save** requests analysis of the complete definition before writing: apply content improvements or save as is. Changes after review require a new analysis. If AI is unavailable, the draft is preserved and saving without review is an explicit choice.
 
-## AI harness
+- **Always**: included in every board run.
+- **Per card**: available to planning and the Skills, Rules and MCPs fields; included when selected
+  by the card or its agent.
+- **Off**: kept in the library but excluded from execution. New rules start off for review.
 
-![Project and global skills, with the flow skill install in the global scope](docs/images/harness_en.png)
+**Library folder** shows the destination, defaulting to
+`~/faz-ai-library/<project>/`, outside the repository. Existing libraries keep their destination.
+The field accepts any other name and path; **Select folder** helps choose the location. **Open folder** opens the file
+manager; **Save folder** accepts an empty folder, recreates copies there and preserves the previous
+folder. Pasted skills and their support files are recognized when returning to the screen or using
+**Refresh list**. Private and unknown files are preserved. Each skill accepts 512 KB per file,
+100 support files and 5 MB total; skipped files are reported. Private skills, including
+`board-harness/`, are not bundled with the extension. Editing the library does not change the source;
+In Rules, **Update from source** replaces the copy only after confirmation.
 
-Every run started by the board starts from an **empty context**: no rule, skill or agent from your
-machine or the project gets in on its own. Only what you **send to the board** gets in. The first
-time you open Configurações → **Harness de IA**, the **Como usar o Harness** (how to use the Harness)
-notice sums this up and says where to start (Indicar artefatos, an agent with help, reviewing the rules
-that entered off); **Entendi, não mostrar de novo** dismisses it (the choice is kept per person, for
-any project, and does not come back when the board is reopened) and **Como funciona** brings it back.
-The subject tabs say in their title how many artifacts are on the board and how many rules await
-review, and an empty Board goes straight to Projeto or Global. The screen has three levels:
+**MCPs** display their saved functional description ahead of command or URL. Import reuses descriptions from configuration when available; use **Edit** to explain missing ones. The list does not automatically connect to servers to discover descriptions.
 
-1. **One tab per tool.** **Ferramenta e execução** (tool and run: the project's AI, the permission,
-   the default agent and the heartbeat) and one tab for **Claude Code** and one for **Cursor**, the
-   project's tool first, with the **ferramenta deste projeto** (this project's tool) badge. On the
-   other one the board marks do not apply (runs use the project's tool): it is there to read and
-   edit files.
-2. **Where to look**, in a selector above the subject tabs that applies to all of them: **Board**,
-   **Projeto** (project), **Global** and, when there is an imported folder, **Importados**
-   (imported). Project, Global and Imported are the **catalog**: everything the tool loads from that
-   source, and being in the catalog takes no space in the AI context. **Projeto** is what the tool
-   reads in the project folder; **Global**, what it reads from your user folder (`~/.claude`,
-   `~/.cursor`…), installed plugins and your organization; **Importados**, what the board found in
-   the folders you pointed to. **Board** is what you sent, with the mode of each one. Switching
-   subject keeps the choice.
-3. **One subject per tab**: **Regras** (rules), **Skills**, **Sub-agentes** (sub-agents), **MCPs**,
-   **Comandos** (commands), **Hooks** and **Demais** (other: memory, settings and permissions,
-   output styles, plugins and the organization policy). Only the subjects the tool has show up, and
-   each tab's title counts what the chosen scope has ("3 no board" on the Board; the number of
-   artifacts in the catalog). On the Board, Comandos, Hooks and Demais say they do not go on the
-   board. Only the subject in view is mounted, which keeps the screen light in an environment with
-   many artifacts.
+**MCPs** can be created with a form (`command` and `args` for stdio, URL for HTTP) or **Edit JSON
+directly**, including a single definition wrapped in `mcpServers`. `env` variables and `headers`
+stay in the host and are exposed only when explicitly opening that MCP's editor, never in the
+shared snapshot or reading copies. The **faz-ai** MCP bridge provides `list_board_mcp_tools` and
+`call_board_mcp_tool`: any MCP client connected to the board can discover schemas and call tools
+from registered servers without copying their settings to each AI tool. Disabled servers are
+rejected; Per card requests must include a card selecting that server directly or through its
+agent. The bridge supports stdio, Streamable HTTP and explicit SSE with static credentials; it does
+not handle OAuth login. This version forwards tools, not MCP resources or prompts, and opens and
+closes a connection per operation.
 
-Next to the selector is the **search** field, which filters rows by part of the name or the
-description, in the catalog and on the Board. Every action button on the screen (Reler pastas, Novo agente, Sugerir
-agentes com IA, Enviar para o board…) has a **hint** that says what the click does, opened on hover
-or on keyboard focus; when disabled, the hint says why. The catalog groups are always the same, in
-the same order:
-
-| Subject | Group | What it is | Examples |
-| --- | --- | --- | --- |
-| Regras  Regras principais (main rules) | Loaded at the start of every conversation; subfolder ones when the AI works in that folder | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `~/.claude/CLAUDE.md`, `packages/api/CLAUDE.md`; in Cursor, `AGENTS.md` (also in subfolders) and a notice about User Rules (which live in its settings) |
-| Regras  Regras por assunto (rules by topic) | Rules by topic; some only load when the AI works on certain files | `.claude/rules/*.md`, `~/.claude/rules/*.md`, `.cursor/rules/*.mdc` |
-| Demais  Memória (memory, Projeto) | Notes Claude Code keeps on its own about the project | `~/.claude/projects/<project>/memory/` |
-| Skills  Skills | Instructions and support files loaded when the task calls for them | `.claude/skills/<name>/SKILL.md`, `.cursor/skills`, `.agents/skills` |
-| Sub-agentes  Subagentes (subagents) | Helpers the AI delegates work to | `.claude/agents/*.md`, `.cursor/agents/*.md` |
-| Comandos  Comandos (commands) | Ready-made prompts, called with `/name` | `.claude/commands/*.md`, `.cursor/commands/*.md` |
-| Hooks  Hooks | Commands the tool runs on its own on certain events | `hooks` in `.claude/settings.json`, `.cursor/hooks.json`, `[[hooks]]` in `~/.kimi-code/config.toml` |
-| MCPs  Servidores MCP (MCP servers) | Servers that give the AI extra tools | `.mcp.json`, `~/.claude.json`, `.cursor/mcp.json` |
-| Demais  Configurações e permissões (settings and permissions) | How the tool behaves and what the AI does without asking | `.claude/settings.json`, `.claude/settings.local.json`, `.cursor/cli.json`, `.cursorignore` |
-| Demais  Estilos de saída (output styles) | Change the way the AI answers | `.claude/output-styles/*.md` |
-| Demais  Plugins (Global) | Installed packages, one block per plugin with what it brings | the ones `claude plugin list` shows, `~/.cursor/plugins/local` |
-| Demais  Organização (organization, Global) | The company policy, read-only | `CLAUDE.md` and `managed-settings.json` in the system folder (`/Library/Application Support/ClaudeCode` on macOS) |
-
-Each item shows its name, **what it is in one simple sentence**, whether it is **always loaded** or
-**on demand**, the file's own description and its path. Claude Code instructions also list the files
-they import with `@path` (which load along with them, up to four levels), and each one opens in the
-board's editor. **Clicking the path opens the file in the
-board's editor**, the same one used for attachments: formatted Markdown or code, with **Editar**
-(edit), **Salvar** (save) and **Cancelar** (cancel), and **Abrir no editor** (open in editor) for
-those who prefer VS Code. Invalid JSON is not saved; files from plugins, `~/.claude.json` and the
-organization policy open read-only. Files the tool would read but that do not exist yet show up at
-the end of the group with a **Criar** (create) button and a sentence on each, and the new file opens
-right away in the editor.
-
-In Claude Code's **Regras principais** (main rules), the board offers to create `CLAUDE.md`,
-`CLAUDE.local.md` (yours only, outside git) and, only when the project has no `CLAUDE.md`,
-`AGENTS.md`: by default, Claude Code reads `AGENTS.md` only when there is no `CLAUDE.md`,
-`.claude/CLAUDE.md` or `CLAUDE.local.md`. If the project has both and no `CLAUDE.md` imports
-`AGENTS.md` with `@`, it shows as **não lido pelo Claude Code** (not read by Claude Code), with the
-`@import` that fixes it. If it has only `AGENTS.md`, the board warns that creating a `CLAUDE.md`
-makes Claude Code stop reading it.
-
-In the **Board** origin of Regras, Skills, Sub-agentes and MCPs sit the artifacts you sent, each one
-with its **mode** selector, its origin (Projeto, Global, Importados or plugin) and a **Remover do
-board** (remove from the board) button. The board **references** the artifact by its source path, it
-does not copy it: a change in the file counts on the board, and a deleted source leaves the artifact
-with the **ausente** (missing) badge in the same list, without breaking the cards that list it
-(**Remover do board** removes the mark). For rules, skills and MCP servers in the catalog, the
-project tool's row also has the mode selector, with the **Fora do board** (off the board) option.
-
-- **Sempre** (always): goes into every run (work the phase, refine, board chat), whatever the card.
-  It is where the flow skill, the board server and the always-on rules go.
-- **Pelo card** (per card): does not get in on its own. Becomes an option of the cards' **Rules**,
-  **Skills** and **MCPs** fields (and of the agents' skills and servers), and the phase planning or
-  **Refinar com IA** picks it when the task calls for it, choosing only among what is on the board.
-  The minimum wins: at most one skill per subject, and only the servers the task needs.
-- **Desligado** (off, rules only): it is on the board, but gets into nothing. Every rule starts like
-  this, because a `CLAUDE.md` written for another context may conflict with the board's flow and
-  definitions: the Rules' Board origin warns you and invites you to review the text before turning it
-  on.
-- **Fora do board** (off the board): the run does not see it, even if the tool loads it in a
-  conversation of yours.
-
-The card shows everything that will be used: besides what the agent and the planning pick, artifacts
-in **Sempre** mode show up in the agent summary marked **(always)**, so you see the full cost and can
-decide whether to keep one always on.
-
-**Importar artefatos (import artifacts).** Not every useful artifact lives in the project or in the
-global folder. The **Importar artefatos** button, at the top of each tool's tab, opens the editor's
-folder picker (in browser mode, a field to type the path on the computer where the board runs) and
-imports an outside folder (another repository, a team collection, a downloaded folder): the board
-scans the folder for what the tool recognizes in a project (rules, skills, agents, commands, hooks,
-MCP servers and settings, or the folder itself as a skills folder) and lists what it found in the
-**Importados** origin, which only shows up when there is an imported folder. Nothing enters the board
-until you send it. The folders are kept by the board and scanned again on every read; in Importados,
-each folder has **Remover pasta** (remove folder), which asks for confirmation and also removes its
-artifacts from the board.
-
-**Indicar artefatos (suggest artifacts).** Since an environment may have many skills, agents and
-servers, every subject of the project's tool has the **Indicar artefatos** button (in the Projeto,
-Global and Importados origins). The AI reads the project (structure, dependencies, README,
-`CLAUDE.md`) and that subject's catalog, only what is not on the board yet, and returns the ones that
-make the most sense, few and each with its reason; the screen leaves them **pre-selected**, with the
-**indicado** (suggested) badge, for you to check and use **Enviar para o board** or uncheck some
-first. Nothing enters the board without your confirmation, and the run is read-only (nothing is
-written). The suggestion runs through the same tool as the board chat, without entering the
-conversation; **Descartar indicação** (discard suggestion) clears the pre-selection.
-
-**The planning picks only from the board.** **Refinar com IA** and the phase planning (the flow
-skill, in Plan) pick skills, rules, MCP servers and the agent **only among what is on the board in
-Pelo card mode**; the Global, Projeto and Importados catalog does not exist for them. The minimum
-wins: at most one skill per subject (more than one is fine if they are of different subjects) and only
-the servers the task needs, for the story and for each sub-task.
-
-**Multiple selection and bulk actions.** Every catalog row that accepts some action has a checkbox,
-and the one at the top of the group checks them all. The main action of the bar that shows up is
-**Enviar para o board** (send to the board), which takes the checked items in the entry mode of each
-kind (**Pelo card**; rules enter **Desligadas**, off). There is also the mode on the board (Sempre,
-Pelo card, Desligado), **Remover do board** (for what is already on it), the skill mode, copying to
-the project or to global, **Apagar** (delete files and folders) and **Remover** (remove hook,
-permission rule and MCP server entries). The bar offers only what applies to the checked items; when
-an action applies to only part of them, the button says how many. Deleting and removing ask for
-confirmation first. The organization policy, which is read-only, has no checkbox.
-
-**Plugins.** Claude Code's list comes from `claude plugin list --json`: only what it loads shows up,
-never the marketplaces' catalog. With plugins checked, the bar offers **Desativar** (disable),
-**Ativar** (enable) and **Desinstalar** (uninstall), done by the CLI itself (`claude plugin disable`,
-`enable` and `uninstall`, in each scope the plugin is installed at). Plugins synced from claude.ai
-and the organization's can only be disabled. In Cursor, which has no command for it, uninstalling
-removes the plugin's folder from `~/.cursor/plugins/local`. Uninstalling asks for confirmation, and
-the change takes effect in the tool's next session (in Claude Code, also after `/reload-plugins`).
-
-**Create rule and skill with help.** Whoever starts a project from scratch with the board has no
-rules or skills at all. In the Projeto and Global origins of the project's tool, the **Regras**
-(rules) and **Skills** subjects have an assistant, with the same principles as the agents one
-(question by question, an example answer in each, suggestions that do not hide the options, nothing
-written before the last step):
-
-- **Criar regra com ajuda** (5 steps): (1) where it applies: the **main** rule (the tool's rules
-  file, created or appended to at the end if it already exists) or **by subject** (a new file in
-  `.claude/rules/<name>.md` or `.cursor/rules/<name>.mdc`, with `paths:` in Claude Code or `globs:`
-  in Cursor); (2) what it guarantees; (3) project conventions, which the board reads without AI
-  (languages, test, lint and format commands from `package.json`, tools such as eslint, prettier,
-  vitest, pytest and ruff, and the main folders) and offers as checkable items; (4) a check against
-  the board's flow, which points out passages that say not to use MCP, ignore the board, not ask for
-  review, skip the approval, commit straight to main or not create a branch; (5) editable draft and
-  summary. The rule **enters the board switched off**; a file that was already on the board keeps the
-  mode you gave it.
-- **Criar skill com ajuda** (6 steps): (1) the task the skill teaches, which becomes the description;
-  (2) when to use it, which goes in the description; (3) the steps, proposed from the task's verbs and
-  the project's commands, as an editable list; (4) what the skill never does; (5) optional supporting
-  files in `references/`, `assets/` and `scripts/`, created empty; (6) the full `SKILL.md` and the
-  summary. The skill is written to Projeto or Global and sent to the board as **Pelo card** (per card).
-- **Sugerir regras com IA** and **Sugerir skills com IA** (suggest rules / skills with AI): the AI
-  reads the project and writes 3 to 5 ready-filled items (rules in the tool's rules file, without
-  deleting what exists, and switched off on the board; skills as Per card). The result lands in the
-  board chat.
-
-The sub-agents of the project's tool keep their own table in the Projeto and Global origins, with
-**Disponível no board** (available on the board), the default and the editor for the board's fields;
-in the Board origin, the list of available agents, with **Remover do board**. Skills and agents
-created or installed through the board are born marked. What still gets in despite the empty context
-depends on the tool: in Claude Code 2.1 nothing from your folder or the project (verified against the
-CLI). **In Cursor**, the command line does not turn artifacts off: rules, MCP servers and anything
-else in the project enter the context as Cursor sees fit. The Cursor tab carries a fixed notice: for
-"everything off" to hold, turn them off in Cursor's settings or remove from the project what you do
-not want in the context of tasks; the board only warns.
-
-What else you can do in each group:
-
-- **Create** an item in the place and format the tool expects, **delete** it, and **copy** skills,
-  subagents, commands and rules from global or from a plugin into the project (and from the project to
-  global). Every change to your user folder asks for confirmation.
-- **MCP servers**: add and remove them, in each file's format.
-- **Hooks and permissions**: add and remove hooks and allow, ask and deny rules.
-- **Find and install skills** from a folder or a git repository: the board lists the skills it
-  finds and copies only the ones you pick. Nothing from the repository is executed.
-
-**Changes made outside the board.** The board rereads the harness on its own when a file changes
-outside it (in the editor, by the AI, by git), and folds the changes of one burst (300 ms) into a
-single reread. In the project, that covers `CLAUDE.md`, `AGENTS.md`, `.mcp.json` and everything in
-`.claude/`, `.cursor/` and `.agents/`. In your user folder, only the folders and files the Global
-origin shows, never the whole home folder: `~/.claude/CLAUDE.md`, the rules, skills, subagents,
-commands and styles folders, the settings, `~/.claude.json` and the Cursor equivalents; from
-`~/.claude/projects`, only this project's `memory` folder (the rest gets session transcripts all the
-time); for plugins, Claude Code's registry of installed plugins and Cursor's local plugins. A skill
-or subagent installed as a link to another folder is watched too. In the editor, the user folder is
-watched once the board loads. In browser mode, the same global files are watched and, in the
-project, the folders and files the Projeto origin shows (without the worktrees kept in `.claude/`), and
-the board rereads everything every minute for what a watcher doesn't see. Rules in
-subfolders and the organization policy aren't watched: they come in with the next reread.
-
-### On-demand skills
-
-Each skill has a mode:
-
-- **Automática** (automatic): the AI sees the description in every session and decides when to use
-  it.
-- **Só quando indicada** (only when named): the AI does not invoke it on its own; it applies when a
-  card names it or when it is called by name.
-- **Desligada** (off, project only): the tool does not see it, and it leaves the board's options.
-
-The mode says how the tool treats the skill in a conversation of yours; in board runs what counts is
-the check mark. The card's "Skills" field shows a summary of what is selected and opens a window to
-choose among the skills on the board in **Pelo card** mode: search by name or description,
-**Todas / Marcadas / Projeto / Globais / Plugins** tabs (all / selected / project / global / plugins)
-and one checkbox per skill, with its origin in view. The "Rules" field does the same with the checked
-instruction files. The card hands the AI the path of each file, so it does not need to be visible to
-the tool to be used. That lets you keep many skills available without filling the context of every
-session. The context saving is
-documented for Claude Code and Cursor; for the other tools, the documentation only says the AI
-stops invoking the skill on its own.
-
-To avoid ticking skills card by card, set them on the type: in Configurações → **Tipos de card** →
-**Padrões por tipo** (defaults per type), the "Skills" field (and the model) come pre-filled on
-every new card of that type. Each card can still change them.
-
-### Templates and references
-
-Class templates and code examples live inside the skill's folder (`references/`, `assets/`,
-`scripts/`). Each skill's **Arquivos** (files) button lists, creates and deletes those files, and
-**Criar skill de modelos** creates a project skill meant for them. A card that names the skill
-receives the paths of its supporting files.
-
-The editor has to be open in the project folder for the AI to reach the board. Manual registration,
-each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Portuguese).
+The `get_project_profile`, `get_board_artifact` and `save_board_artifact` MCP tools let assistants
+work in the library. Legacy tool-specific file APIs remain for compatibility; native hooks,
+commands and settings are still managed by their respective tool.
 
 ## Settings
 
@@ -1493,7 +1257,7 @@ each tool's formats and troubleshooting are in [docs/mcp.md](docs/mcp.md) (in Po
 | Tipos de card | Story, Bug, Sub-task…, with color and default field values per type |
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section |
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
-| Harness de IA | The project's tool, permission, default agent and heartbeat; one tab per tool, with subjects (rules, skills, sub-agents, MCPs…) and, in each, the Board, Projeto, Global and Importados origins: everything each tool loads, with what each file is, the path that opens in the board editor, search and the mode of what goes to the board (see [AI harness](#ai-harness) and [Agents](#agents)) |
+| Harness | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, default agent and heartbeat (see [Harness](#harness) and [Agents](#agents)) |
 | Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
 | Git | Only the Git tab in browser mode; in the editor, points to the Settings (Faz AI › Git) |
 | Aparência | **Language** (automatic, Português (Brasil) or English; in the editor Settings along with theme, font and size); statuses (name and color, in the Workflows tab; here only in browser mode) |
@@ -1508,7 +1272,7 @@ four sections, in this order:
 | --- | --- |
 | Installation | A short text and the **Open the Environment Diagnostics** link, which opens the board on the environment check screen |
 | Appearance | **Language** (`fazai.appearance.language`), **Theme** (`fazai.appearance.theme`), **Font** (`fazai.appearance.font`) and **Size** (`fazai.appearance.fontSize`), all with User scope — apply to all this person's projects. Statuses (name and color of each status) stay on the board, now in the Workflows tab |
-| Git | The eight `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6; the "Histórias ao mesmo tempo" cap also applies, in any mode, to text-only phases), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase) and `fazai.git.decisionRecords` (the folder of the [decision records](#decision-records); empty = off). In the editor, the Git tab and the parallel block in the AI harness become a link to these keys; in the browser they stay as editable fields |
+| Git | The eight `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6; the "Histórias ao mesmo tempo" cap also applies, in any mode, to text-only phases), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase) and `fazai.git.decisionRecords` (the folder of the [decision records](#decision-records); empty = off). In the editor, the Git tab and the parallel block in the Harness become a link to these keys; in the browser they stay as editable fields |
 | Backup | Two action links: **Export the board now** and **Import a board**, which trigger the palette commands |
 
 Three new commands in the palette (`Ctrl+Shift+P`): **Faz AI: Open the Environment Diagnostics**,
@@ -1623,6 +1387,11 @@ npm test
 npm run typecheck
 ```
 
+New features are integrated into `develop`. The **Unreleased** changelog section includes only
+changes already integrated into that branch; work still in progress stays on its branches and
+cards. At release time, this section takes the published version and describes the code included
+in that release. Integrating into `develop` does not publish the extension.
+
 `npm test` also runs the linter and checks formatting; `npm run format` formats everything. To make
 `git blame` skip the formatting-only commit: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
@@ -1719,10 +1488,6 @@ left off: each step checks whether it was already done (PR, tag, release, main c
 `develop`, branches) and does not publish again. If the way back to `develop` conflicts, resolve it
 in the open PR and run `finish`. `--dry-run` rehearses without publishing. The options are at the
 top of `scripts/release.mjs`.
-
-For a hotfix (a Bug card, `hotfix/...` branch), run `npm run release` in the `hotfix/` worktree
-**before** approving the card. Approved first, the PR goes into main without a version and the fix
-only ships in the next release from `develop`.
 
 For a hotfix (a Bug card, `hotfix/...` branch), run `npm run release` in the `hotfix/` worktree
 **before** approving the card. Approved first, the PR goes into main without a version and the fix

@@ -50,13 +50,14 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'card_events', where: 'board_id = ?', hasId: true },
   { name: 'ai_runs', where: 'board_id = ?', hasId: true },
   { name: 'ai_run_usage', where: 'run_id IN (SELECT id FROM ai_runs WHERE board_id = ?)', hasId: false },
+  { name: 'ai_run_bash', where: 'run_id IN (SELECT id FROM ai_runs WHERE board_id = ?)', hasId: false, since: 33 },
   // a marcação do harness é deste board: vai junto (os caminhos relativos ao projeto e a `~` valem na outra máquina)
   { name: 'harness_selection', where: 'board_id = ?', hasId: false },
   // as pastas importadas são caminhos absolutos desta máquina: vão junto, e na outra máquina os artefatos ficam ausentes até a pessoa reimportar
   { name: 'harness_imports', where: 'board_id = ?', hasId: false, since: 30 },
   // os artefatos do board (#615); no export, `env`/`headers` dos MCPs saem com valor vazio (`scrubMcpSecrets`)
-  { name: 'board_artifacts', where: 'board_id = ?', hasId: true, since: 33 },
-  { name: 'board_artifact_files', where: 'artifact_id IN (SELECT id FROM board_artifacts WHERE board_id = ?)', hasId: false, since: 33 },
+  { name: 'board_artifacts', where: 'board_id = ?', hasId: true, since: 34 },
+  { name: 'board_artifact_files', where: 'artifact_id IN (SELECT id FROM board_artifacts WHERE board_id = ?)', hasId: false, since: 34 },
 ];
 
 /** Tabelas que ficam fora do arquivo mesmo tendo `board_id` (o teste do `sqlite_master` as ignora). */

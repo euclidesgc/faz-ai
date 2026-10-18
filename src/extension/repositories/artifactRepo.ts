@@ -92,6 +92,13 @@ export class ArtifactRepo {
     return transaction(this.db, () => this.write(boardId, draft, usage));
   }
 
+  /** Importação em lote: nenhum item fica pela metade se uma gravação falhar. */
+  upsertMany(boardId: string, items: { draft: ArtifactDraft; usage?: HarnessUsage }[]): void {
+    transaction(this.db, () => {
+      for (const { draft, usage } of items) this.write(boardId, draft, usage);
+    });
+  }
+
   setUsage(boardId: string, id: string, usage: HarnessUsage): void {
     run(this.db, 'UPDATE board_artifacts SET usage = ?, updated_at = ? WHERE id = ? AND board_id = ?', [usage, now(), id, boardId]);
   }

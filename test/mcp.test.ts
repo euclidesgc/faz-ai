@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -25,6 +26,13 @@ let dir: string;
 let router: MessageRouter;
 let client: Client;
 let changes: number;
+
+const libraryPath = (kind: 'skill' | 'agent', name: string) => {
+  const a = router.snapshot().harness.library!.artifacts.find((a) => a.kind === kind && a.name === name)!;
+  expect(a.path.startsWith(router.snapshot().harness.library!.directory)).toBe(true);
+  return a.path;
+};
+const copiedSkill = (name: string) => ({ name, scope: 'board', path: libraryPath('skill', name) });
 
 const call = async (name: string, args: Record<string, unknown> = {}) => {
   const res = await client.callTool({ name, arguments: args });
@@ -345,9 +353,9 @@ describe('modelos e referências nas skills', () => {
     expect(card.requiredSkills).toEqual([
       {
         name: 'modelos-do-projeto',
-        scope: 'project',
-        path: '.claude/skills/modelos-do-projeto/SKILL.md',
-        files: ['.claude/skills/modelos-do-projeto/references/repositorio.ts'],
+        scope: 'board',
+        path: libraryPath('skill', 'modelos-do-projeto'),
+        files: [path.join(path.dirname(libraryPath('skill', 'modelos-do-projeto')), 'references/repositorio.ts')],
       },
     ]);
   });
@@ -394,7 +402,7 @@ describe('perfis de execução', () => {
     card = (await call('get_card', { card: 1 })).data;
     expect(card.execution).toMatchObject({
       profile: 'planejador',
-      agentFile: path.join(home, '.claude/agents/planejador.md'),
+      agentFile: libraryPath('agent', 'planejador'),
       mcpServers: ['faz-ai', 'github'],
       deniedTools: ['WebFetch'],
     });
@@ -446,43 +454,30 @@ describe('harness e padrões pelo MCP', () => {
       usage: 'contextual',
     });
     const field = router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
-    expect(field.options).toEqual(['revisar-spec', 'commit', 'critica']);
+    expect(field.options).toEqual(['commit', 'critica', 'revisar-spec']);
     const card = (await call('create_card', { title: 'História', fields: { Skills: ['commit', 'critica', 'revisar-spec'] } })).data;
-    expect(card.requiredSkills).toEqual([
-      { name: 'commit', scope: 'user', path: path.join(home, '.claude/skills/commit/SKILL.md') },
-      {
-        name: 'critica',
-        scope: 'plugin',
-        path: path.join(home, '.claude/plugins/cache/loja/design/skills/critica/SKILL.md'),
-        plugin: 'design',
-      },
-      { name: 'revisar-spec', scope: 'project', path: '.claude/skills/revisar-spec/SKILL.md' },
-    ]);
+    expect(card.requiredSkills).toEqual(['commit', 'critica', 'revisar-spec'].map(copiedSkill));
     // copiar a skill global para o projeto: ela passa a existir nos dois escopos e o card usa a do projeto
     const global = router
       .snapshot()
       .harness.inventory.find((t) => t.tool === 'claude')!
       .items.find((i) => i.name === 'commit')!;
     router.handle({ type: 'harness.item.copy', tool: 'claude', items: [{ kind: 'skill', path: global.path }], to: 'project' });
-    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({
-      name: 'commit',
-      scope: 'project',
-      path: '.claude/skills/commit/SKILL.md',
-    });
+    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual(copiedSkill('commit'));
     expect(() => router.handle({ type: 'harness.item.delete', tool: 'claude', kind: 'skill', path: '/etc/passwd' })).toThrow(
       'não encontrado',
     );
     const inventory = (await call('get_harness')).data.inventory;
-    expect(inventory.find((i: any) => i.name === 'commit' && i.scope === 'user')).toEqual({
+    expect(inventory.find((i: any) => i.name === 'commit')).toEqual({
+      id: expect.any(String),
       kind: 'skill',
       group: 'skill',
-      scope: 'user',
+      scope: 'project',
       usage: 'contextual',
       key: '~/.claude/skills/commit/SKILL.md',
       name: 'commit',
-      mode: 'auto',
       description: 'Escreve o commit',
-      path: '~/.claude/skills/commit/SKILL.md',
+      path: libraryPath('skill', 'commit'),
     });
   });
 
@@ -502,9 +497,9 @@ describe('harness e padrões pelo MCP', () => {
       {
         name: 'revisar-spec',
         enabled: true,
-        mode: 'auto',
+        mode: 'manual',
         description: 'Use ao revisar uma spec',
-        path: '.claude/skills/revisar-spec/SKILL.md',
+        path: libraryPath('skill', 'revisar-spec'),
       },
     ]);
     expect((await call('get_skill', { skill: 'revisar-spec' })).text).toContain('name: revisar-spec');
@@ -513,21 +508,19 @@ describe('harness e padrões pelo MCP', () => {
 
     // skill marcada no card aparece como obrigatória, com o caminho do SKILL.md
     const card = (await call('create_card', { title: 'História', fields: { Skills: ['revisar-spec'], Modelo: 'Claude Haiku 4.5' } })).data;
-    expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', scope: 'project', path: '.claude/skills/revisar-spec/SKILL.md' }]);
+    expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', scope: 'board', path: libraryPath('skill', 'revisar-spec') }]);
     expect(card.model).toMatchObject({ tool: 'claude', model: 'haiku', effort: null, value: 'claude:haiku' });
 
     await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false });
     expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'revisar-spec'))).toBe(false);
     expect(fs.existsSync(path.join(dir, '.claude', 'skills-disabled', 'revisar-spec', 'SKILL.md'))).toBe(true);
-    // desligada, a skill sai do inventário (e das opções), mas o card que já a indicava ainda recebe o caminho
-    expect(skillsField().options).toEqual([]);
-    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({
-      name: 'revisar-spec',
-      scope: 'project',
-      path: '.claude/skills-disabled/revisar-spec/SKILL.md',
-    });
+    // Desligar ou apagar a fonte nativa não remove a cópia da biblioteca.
+    expect(skillsField().options).toEqual(['revisar-spec']);
+    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual(copiedSkill('revisar-spec'));
     await call('set_skill_enabled', { skill: 'revisar-spec', enabled: true });
     await call('delete_skill', { skill: 'revisar-spec' });
+    expect((await call('get_harness')).data.skills.map((k: any) => k.name)).toEqual(['revisar-spec']);
+    await call('set_harness_selection', { items: [{ kind: 'skill', name: 'revisar-spec' }], usage: null });
     expect((await call('get_harness')).data.skills).toEqual([]);
 
     // arquivo criado por fora aparece depois de refreshHarness
@@ -1068,7 +1061,7 @@ describe('status do card e checkpoint de revisão', () => {
         model: 'claude:opus@high',
         tools: ['Read', 'Grep'],
         usage: 'contextual',
-        path: '.claude/agents/revisor-de-spec.md',
+        path: libraryPath('agent', 'revisor-de-spec'),
       },
     ]);
     const file = path.join(dir, '.claude/agents/revisor-de-spec.md');
@@ -1090,12 +1083,14 @@ describe('status do card e checkpoint de revisão', () => {
       agent: 'revisor-de-spec',
       content: '---\nname: revisor-de-spec\ndescription: Outra\n---\nNovo corpo',
     });
+    const stored = router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'agent' && a.name === 'revisor-de-spec')!;
+    router.handle({ type: 'harness.library.update', id: stored.id });
     expect((await call('get_harness')).data.agents[0]).toEqual({
       name: 'revisor-de-spec',
       scope: 'project',
       description: 'Outra',
       usage: 'contextual',
-      path: '.claude/agents/revisor-de-spec.md',
+      path: libraryPath('agent', 'revisor-de-spec'),
     });
 
     // agente criado por fora aparece no inventário completo, mas só entra no board depois de marcado
@@ -1200,7 +1195,7 @@ describe('status do card e checkpoint de revisão', () => {
 describe('ferramentas de IA', () => {
   const skillMd = (base: string) => path.join(dir, base, 'revisar-spec', 'SKILL.md');
 
-  it('trabalha só com a pasta de skills da ferramenta em uso', async () => {
+  it('cria nas pastas nativas e mantém as cópias do board ao trocar de ferramenta', async () => {
     const names = async () => (await call('get_harness')).data.skills.map((k: any) => k.name);
     await call('create_skill', { name: 'revisar-spec', description: 'd', content: 'c' });
     expect(fs.existsSync(skillMd('.claude/skills'))).toBe(true);
@@ -1210,19 +1205,19 @@ describe('ferramentas de IA', () => {
     // (`.claude/skills` está no catálogo dele), então a marcação segue valendo e a skill continua opção do campo
     const h = (await call('set_ai_tool', { tool: 'cursor' })).data;
     expect(h.aiTool).toBe('cursor');
-    expect(h.skills).toEqual([]);
+    expect(h.skills.map((k: any) => k.name)).toEqual(['revisar-spec']);
     expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['revisar-spec']);
     await call('create_skill', { name: 'do-cursor', description: 'd', content: 'c' });
     expect(fs.existsSync(path.join(dir, '.cursor/skills/do-cursor/SKILL.md'))).toBe(true);
     expect(fs.existsSync(skillMd('.claude/skills'))).toBe(true);
-    expect(await names()).toEqual(['do-cursor']);
+    expect(await names()).toEqual(['do-cursor', 'revisar-spec']);
     await call('set_skill_enabled', { skill: 'do-cursor', enabled: false });
     expect(fs.existsSync(path.join(dir, '.cursor/skills-disabled/do-cursor/SKILL.md'))).toBe(true);
     expect((await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false })).error).toBe(true); // skill de outra ferramenta
 
     await call('set_ai_tool', { tool: 'claude' });
-    expect(await names()).toEqual(['revisar-spec']);
-    expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['revisar-spec']);
+    expect(await names()).toEqual(['do-cursor', 'revisar-spec']);
+    expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['do-cursor', 'revisar-spec']);
   });
 
   it('registra o servidor MCP no formato de cada ferramenta: o Claude Code no global, o Cursor no projeto', async () => {
@@ -2169,6 +2164,134 @@ describe('generate_summary (ferramenta MCP)', () => {
       expect(res.text).toContain('A IA já está trabalhando em #1.');
     } finally {
       fs.rmSync(d, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('biblioteca neutra pelo MCP', () => {
+  it('a IA cria e edita artefatos do board sem gravar fontes nativas', async () => {
+    const created = await call('save_board_artifact', {
+      kind: 'rule',
+      name: 'AGENTS.md',
+      description: 'Convenções',
+      body: 'Use os testes.',
+    });
+    expect(created.error).toBe(false);
+    expect(created.data).toMatchObject({ kind: 'rule', name: 'AGENTS.md', usage: 'off' });
+    expect(fs.existsSync(path.join(dir, 'AGENTS.md'))).toBe(false);
+    expect((await call('get_board_artifact', { id: created.data.id })).data.body).toBe('Use os testes.');
+    expect(
+      (
+        await call('save_board_artifact', {
+          id: created.data.id,
+          kind: 'rule',
+          name: 'AGENTS.md',
+          description: 'Convenções',
+          body: 'Use lint e testes.',
+        })
+      ).error,
+    ).toBe(false);
+    expect((await call('get_board_artifact', { id: created.data.id })).data.body).toBe('Use lint e testes.');
+    expect((await call('get_harness')).data.library.artifacts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: created.data.id })]),
+    );
+    expect((await call('get_project_profile')).error).toBe(false);
+  });
+
+  it('a ponte lista e chama um MCP stdio real e respeita o modo Pelo card', async () => {
+    const sdk = path.resolve(__dirname, '../node_modules/@modelcontextprotocol/sdk/dist/esm');
+    const fixture = path.join(dir, 'fixture.mjs');
+    fs.writeFileSync(
+      fixture,
+      `import { McpServer } from ${JSON.stringify('file://' + sdk + '/server/mcp.js')};
+import { StdioServerTransport } from ${JSON.stringify('file://' + sdk + '/server/stdio.js')};
+const server = new McpServer({ name: 'fixture', version: '1' });
+server.registerTool('ping', { inputSchema: {} }, async () => ({ content: [{ type: 'text', text: process.env.SAMPLE === 'segredo-local' ? 'pong' : 'erro' }] }));
+await server.connect(new StdioServerTransport());`,
+    );
+    router.handle({
+      type: 'harness.library.save',
+      input: {
+        kind: 'mcp',
+        name: 'memoria',
+        description: 'Fixture',
+        body: '',
+        server: { command: process.execPath, args: [fixture], env: { SAMPLE: 'segredo-local' } },
+      },
+    });
+    expect((await call('list_board_mcp_tools', { server: 'memoria' })).error).toBe(true);
+    const state = router.snapshot();
+    const id = router.createCard({ title: 'Usar memória', typeId: state.cardTypes[0]!.id, columnId: state.columns[0]!.id, parentId: null });
+    const field = router.snapshot().fieldDefs.find((f) => f.name === 'MCPs')!;
+    router.handle({ type: 'field.setValue', cardId: id, fieldId: field.id, value: ['memoria'] });
+    const card = router.snapshot().cards.find((c) => c.id === id)!.number;
+    const listed = await call('list_board_mcp_tools', { server: 'memoria', card });
+    expect(listed.error).toBe(false);
+    expect(listed.data.tools[0].name).toBe('ping');
+    const result = await call('call_board_mcp_tool', { server: 'memoria', name: 'ping', arguments: {}, card });
+    expect(result.error).toBe(false);
+    expect(result.text).toBe('pong');
+    expect(JSON.stringify(router.snapshot())).not.toContain('segredo-local');
+    const mcp = router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'mcp')!;
+    expect((await call('get_board_artifact', { id: mcp.id })).error).toBe(true);
+    router.handle({ type: 'harness.selection.set', items: [{ kind: 'mcp', location: 'board:memoria' }], usage: 'off' });
+    expect((await call('call_board_mcp_tool', { server: 'memoria', name: 'ping', arguments: {}, card })).error).toBe(true);
+  });
+});
+
+describe('ponte HTTP da biblioteca', () => {
+  it('conecta por Streamable HTTP, envia cabeçalhos locais e preserva erros MCP remotos', async () => {
+    let authorized = false;
+    const remote = createServer(async (req, res) => {
+      if (req.method !== 'POST') {
+        res.writeHead(405).end();
+        return;
+      }
+      let body = '';
+      for await (const chunk of req) body += String(chunk);
+      const message = JSON.parse(body);
+      authorized ||= req.headers.authorization === 'Bearer segredo-http';
+      if (message.id === undefined) {
+        res.writeHead(202).end();
+        return;
+      }
+      const result =
+        message.method === 'initialize'
+          ? {
+              protocolVersion: message.params.protocolVersion,
+              capabilities: { tools: {} },
+              serverInfo: { name: 'http-fixture', version: '1' },
+            }
+          : message.method === 'tools/list'
+            ? { tools: [{ name: 'ping', inputSchema: { type: 'object', properties: {} } }] }
+            : { isError: true, content: [{ type: 'text', text: 'Falha remota preservada' }] };
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result }));
+    });
+    await new Promise<void>((resolve) => remote.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = remote.address() as { port: number };
+      router.handle({
+        type: 'harness.library.save',
+        input: {
+          kind: 'mcp',
+          name: 'remoto',
+          description: '',
+          body: '',
+          server: { url: `http://127.0.0.1:${address.port}/mcp`, headers: { Authorization: 'Bearer segredo-http' } },
+        },
+      });
+      router.handle({ type: 'harness.selection.set', items: [{ kind: 'mcp', location: 'board:remoto' }], usage: 'always' });
+      const listed = await call('list_board_mcp_tools', { server: 'remoto' });
+      expect(listed.error).toBe(false);
+      expect(listed.data.tools[0].name).toBe('ping');
+      const result = await call('call_board_mcp_tool', { server: 'remoto', name: 'ping', arguments: {} });
+      expect(result).toMatchObject({ error: true, text: 'Falha remota preservada' });
+      expect(authorized).toBe(true);
+      expect(JSON.stringify(router.snapshot())).not.toContain('segredo-http');
+    } finally {
+      remote.closeAllConnections();
+      await new Promise<void>((resolve) => remote.close(() => resolve()));
     }
   });
 });

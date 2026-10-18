@@ -619,3 +619,96 @@ describe('HostBridge: Settings do editor', () => {
     expect(sent.filter((m) => m.type === 'error')).toEqual([]);
   });
 });
+
+describe('biblioteca: importar e abrir uma pasta', () => {
+  it('o seletor lista as skills para revisão antes de copiar', async () => {
+    const source = path.join(dir, 'colecao');
+    fs.mkdirSync(path.join(source, 'react'), { recursive: true });
+    fs.writeFileSync(path.join(source, 'react/SKILL.md'), '---\nname: react\ndescription: Componentes\n---\nInstruções');
+    env.pickFolder = async () => source;
+    await bridge.handle({ type: 'harness.library.pick', requestId: 'pick-library' });
+    expect(router.snapshot().harnessInstall?.skills.map((k) => k.name)).toEqual(['react']);
+    expect(router.snapshot().harness.library!.artifacts).toEqual([]);
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'pick-library', ok: true });
+  });
+
+  it('abrir a biblioteca usa o gerenciador de arquivos sem trocar o projeto do editor', async () => {
+    let opened = '';
+    env.openExternal = (file) => {
+      opened = file;
+    };
+    env.openFolder = () => {
+      throw new Error('Não deveria trocar o projeto');
+    };
+    await bridge.handle({ type: 'harness.library.open', requestId: 'open-library' });
+    expect(opened).toBe(router.snapshot().harness.library!.directory);
+    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'open-library', ok: true });
+  });
+});
+
+it('lista pastas no host para o seletor web e não altera o destino da biblioteca', async () => {
+  fs.mkdirSync(path.join(dir, 'collection'));
+  fs.mkdirSync(path.join(dir, '.hidden'));
+  fs.writeFileSync(path.join(dir, 'file.txt'), 'text');
+  const previous = router.snapshot().harness.library!.directory;
+  await bridge.handle({ type: 'harness.library.folders', dir, requestId: 'folders' });
+  const result = sent.find((m) => m.type === 'harness.library.foldersResult');
+  expect(result).toMatchObject({
+    directory: dir,
+    parent: path.dirname(dir),
+    folders: expect.arrayContaining([{ name: 'collection', path: path.join(dir, 'collection') }]),
+  });
+  expect(JSON.stringify(result)).not.toContain('.hidden');
+  expect(JSON.stringify(result)).not.toContain('file.txt');
+  expect(router.snapshot().harness.library!.directory).toBe(previous);
+  expect(sent).toContainEqual({ type: 'done', requestId: 'folders', ok: true });
+});
+
+it('a assistência do agente responde com a correlação original e não grava nem envia done', async () => {
+  const result = {
+    explanation: 'Bom escopo.',
+    suggestions: [],
+    content: 'Revise sem editar.',
+    skills: [],
+    mcpServers: [],
+    categories: [] as never[],
+    model: '',
+  };
+  router.setAgentAssistHandler(async () => result);
+  const before = saves;
+  await bridge.handle({
+    type: 'harness.agent.assist',
+    requestId: 'agent-review',
+    input: {
+      step: 'review',
+      name: 'revisor',
+      body: 'Revise.',
+      sections: {},
+      language: 'pt-BR',
+      agent: { skills: [], mcpServers: [], model: '', tools: { categories: [], native: { tool: '', allow: [], deny: [] } } },
+    },
+  });
+  expect(sent).toContainEqual({ type: 'harness.agent.assistResult', requestId: 'agent-review', result });
+  expect(sent.some((message) => message.type === 'done')).toBe(false);
+  expect(saves).toBe(before);
+});
+
+it('a assistência indisponível responde com erro próprio para destravar o editor', async () => {
+  await bridge.handle({
+    type: 'harness.agent.assist',
+    requestId: 'agent-error',
+    input: {
+      step: 'review',
+      name: 'revisor',
+      body: 'Revise.',
+      sections: {},
+      language: 'pt-BR',
+      agent: { skills: [], mcpServers: [], model: '', tools: { categories: [], native: { tool: '', allow: [], deny: [] } } },
+    },
+  });
+  expect(sent).toContainEqual({
+    type: 'harness.agent.assistResult',
+    requestId: 'agent-error',
+    error: 'A assistência de IA não está disponível neste board.',
+  });
+});

@@ -114,6 +114,7 @@ export function executionPlan(
   homeDir: string,
   /** o servidor do board desta execução: vale mais que um registro de arquivo, que pode ser de outra pasta */
   board?: BoardServerSpec,
+  libraryServers?: Record<string, unknown>,
 ): ExecPlan {
   const tool: AiTool = s.board.aiTool;
   const manifest = manifestOf(s, c);
@@ -128,7 +129,8 @@ export function executionPlan(
   // linha de comando segue sem restrição de servidores (só acontece fora da extensão)
   let mcpConfig: string | null = null;
   if (tool === 'claude') {
-    const defs = allowed.length || !board ? claudeServers(projectDir, homeDir) : {};
+    const defs = libraryServers ?? (allowed.length || !board ? claudeServers(projectDir, homeDir) : {});
+    if (!board && libraryServers) defs[BOARD_SERVER] = claudeServers(projectDir, homeDir)[BOARD_SERVER];
     // um servidor do board que vem de uma pasta importada não está na configuração do Claude Code: a
     // definição é lida do arquivo em que a varredura o encontrou
     for (const name of allowed)
@@ -140,7 +142,7 @@ export function executionPlan(
     if (board) defs[BOARD_SERVER] = { type: 'stdio', ...board };
     if (!defs[BOARD_SERVER] && allowed.length)
       throw new Error(
-        'O agente libera servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Instale o servidor em Configurações → Harness de IA → Claude Code → MCPs.',
+        'O agente libera servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Instale o servidor em Configurações → Harness → Claude Code → MCPs.',
       );
     const missing = allowed.filter((n) => !defs[n]);
     if (missing.length) throw new Error(`Servidores MCP do agente não encontrados na configuração do Claude Code: ${missing.join(', ')}.`);
@@ -192,6 +194,10 @@ export function executionPlan(
     );
   }
   if (manifest.agent && (how.agent === 'advised' || (tool === 'claude' && !agentDefinition))) advice.push(...agentAdvice(manifest));
+  if (s.harness.library && allowed.length)
+    advice.push(
+      `MCPs da biblioteca: use list_board_mcp_tools e call_board_mcp_tool do servidor faz-ai, com server e card #${c.number}. Disponíveis: ${allowed.join(', ')}.`,
+    );
   if (how.mcp === 'advised') advice.push(`De servidores MCP, use só o do board${allowed.length ? ` e: ${allowed.join(', ')}` : ''}.`);
   if (how.tools === 'advised') {
     if (manifest.tools.length) advice.push(`Use só estas ferramentas: ${manifest.tools.join(', ')}.`);
@@ -251,9 +257,10 @@ export function bareExec(
   board?: BoardServerSpec,
   s?: BoardState,
   dirs?: { projectDir: string; homeDir: string },
+  libraryServers?: Record<string, unknown>,
 ): ExecInput {
   const always = s && s.board.aiTool === 'claude' && dirs ? selectedMcpNames(s, 'always') : [];
-  const defs = always.length ? claudeServers(dirs!.projectDir, dirs!.homeDir) : {};
+  const defs = libraryServers ?? (always.length ? claudeServers(dirs!.projectDir, dirs!.homeDir) : {});
   for (const name of always)
     if (!defs[name]) {
       const item = s!.harness.inventory.find((t) => t.tool === 'claude')?.items.find((i) => i.kind === 'mcp' && i.name === name);

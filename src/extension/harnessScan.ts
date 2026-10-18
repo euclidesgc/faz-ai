@@ -144,6 +144,12 @@ export function listSkillFiles(dir: string, rel = '', depth = 0): string[] {
   return entries(rel ? path.join(dir, rel) : dir).flatMap((n) => {
     if (n.startsWith('.') || n === 'node_modules' || (!rel && n === 'SKILL.md')) return [];
     const child = rel ? `${rel}/${n}` : n;
+    // Uma referência não deve copiar arquivos que o link aponta fora da skill.
+    try {
+      if (fs.lstatSync(path.join(dir, child)).isSymbolicLink()) return [];
+    } catch {
+      return [];
+    }
     return isDir(path.join(dir, child)) ? listSkillFiles(dir, child, depth + 1) : [child];
   });
 }

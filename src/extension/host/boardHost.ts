@@ -132,6 +132,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     folderName: o.folderName,
     author: await gitUserName(o.folderPath),
     attachmentsDir: path.join(o.storageDir, 'attachments'),
+    libraryDir: fs.existsSync(path.join(o.storageDir, 'artifacts', workspaceKey(o.folderPath)))
+      ? path.join(o.storageDir, 'artifacts', workspaceKey(o.folderPath))
+      : undefined,
     workspaceDir: o.folderPath,
     homeDir,
     log: o.log,
@@ -560,7 +563,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let toolInUse = router.snapshot().board.aiTool;
   let permissionInUse = router.snapshot().board.runner.permission;
   if (toolInUse === 'cursor' || toolInUse === 'kimi') refreshToolModels(toolInUse);
-  // a skill do fluxo instalada ou apagada (pelo Diagnóstico, pelo Harness de IA, à mão) muda o aviso
+  // a skill do fluxo instalada ou apagada (pelo Diagnóstico, pelo Harness, à mão) muda o aviso
   let skillInUse = flowSkillInstalled();
   router.onDidChange(() => {
     const skill = flowSkillInstalled();

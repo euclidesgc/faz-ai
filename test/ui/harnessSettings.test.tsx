@@ -14,6 +14,7 @@ import { choose, confirmLast, lastSent, posted, seedBoard, sentOf } from './setu
 import { RUNNER_PERMISSIONS } from '../../src/shared/runner';
 import { profileOfAgent } from '../../src/shared/execution';
 import { Dialog } from '../../src/webview/components/Dialog';
+import { ToolHarness } from '../../src/webview/components/settings/harness/ToolHarness';
 import { HarnessSettings } from '../../src/webview/components/settings/HarnessSettings';
 import type { HarnessTopic } from '../../src/shared/harnessTopics';
 import { useBoardStore, type HarnessTab } from '../../src/webview/store/boardStore';
@@ -123,7 +124,7 @@ const renderTab = (tab: HarnessTab) => {
   useBoardStore.setState({ harnessTab: tab });
   return render(
     <Theme>
-      <HarnessSettings />
+      {tab === 'tool' ? <HarnessSettings /> : <ToolHarness tool={tab === 'cursor' || tab === 'kimi' ? tab : 'claude'} />}
       <Dialog />
     </Theme>,
   );
@@ -142,44 +143,33 @@ const row = (name: string | RegExp) => within(screen.getAllByRole('row', { name 
 const dialog = () => within(screen.getByRole('dialog'));
 
 describe('HarnessSettings: abas', () => {
-  it('uma aba por ferramenta, a do projeto primeiro, depois de Ferramenta e execução', async () => {
+  it('concentra os artefatos na biblioteca e mantém execução em outra aba', async () => {
     renderTool();
-    const tabs = screen.getAllByRole('tab');
-    [/^Ferramenta e execução/, /^Claude Code/, /^Cursor/, /^Kimi Code/].forEach((name, i) => expect(tabs[i]).toHaveAccessibleName(name));
-    expect(tabs).toHaveLength(4);
-    expect(screen.getByText('Ferramenta deste projeto')).toBeInTheDocument();
-    expect(screen.queryByText('Harness do Claude Code')).toBeNull();
-    await userEvent.click(screen.getByRole('tab', { name: /^Claude Code/ }));
-    expect(screen.getByText('Harness do Claude Code')).toBeInTheDocument();
-    expect(screen.getByText('ferramenta deste projeto')).toBeInTheDocument();
-    expect(useBoardStore.getState().harnessTab).toBe('claude');
-    // abrir uma ferramenta relê as pastas (a do usuário não é vigiada)
-    expect(sentOf('harness.refresh').length).toBeGreaterThan(0);
-    await userEvent.click(screen.getByRole('tab', { name: /^Cursor/ }));
-    expect(screen.getByText('Harness do Cursor')).toBeInTheDocument();
-    expect(screen.queryByText('ferramenta deste projeto')).toBeNull();
-    expect(screen.getByText(/a marcação só vale para ele/)).toBeInTheDocument();
-    expect(useBoardStore.getState().harnessTab).toBe('cursor');
-    expect(screen.queryByRole('tab', { name: /^Projeto/ })).toBeNull();
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
+    expect(screen.queryByRole('tab', { name: /^Claude Code/ })).toBeNull();
+    await userEvent.click(screen.getByRole('tab', { name: /^Biblioteca do board/ }));
+    for (const name of ['Regras', 'Skills', 'Sub-agentes', 'MCPs'])
+      expect(screen.getByRole('tab', { name: new RegExp(`^${name}`) })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Global' })).toBeNull();
   });
 
-  it('com o Cursor como ferramenta do projeto, ele vem primeiro', () => {
+  it('as abas da biblioteca são as mesmas com Cursor selecionado', async () => {
     setState((s) => ({ board: { ...s.board, aiTool: 'cursor' } }));
     renderTool();
-    const tabs = screen.getAllByRole('tab');
-    [/^Ferramenta e execução/, /^Cursor/, /^Claude Code/].forEach((name, i) => expect(tabs[i]).toHaveAccessibleName(name));
+    await userEvent.click(screen.getByRole('tab', { name: /^Biblioteca do board/ }));
+    expect(screen.getByRole('tab', { name: /^Regras/ })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /^Cursor/ })).toBeNull();
   });
 
-  it('o valor antigo das abas Projeto e Global abre a aba da ferramenta do projeto', () => {
-    // a sessão anterior deixou "project" guardado
-    useBoardStore.setState({ harnessTab: 'project' as HarnessTab, harnessTopic: 'rules' });
+  it('o endereço antigo de uma ferramenta abre a biblioteca central', () => {
+    useBoardStore.setState({ harnessTab: 'claude', harnessTopic: 'rules' });
     render(
       <Theme>
         <HarnessSettings />
       </Theme>,
     );
-    expect(screen.getByRole('tab', { name: /^Claude Code/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByText('Harness do Claude Code')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^Biblioteca do board/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /^Regras/ })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('as seções harness-project e harness-user levam à ferramenta do projeto, e harness-agents ao assunto Sub-agentes', () => {
@@ -260,7 +250,7 @@ describe('HarnessSettings: rules', () => {
     await renderScreen('rules', 'Board');
     const missing = within(screen.getByText('.claude/rules/velha.md').closest('li')!);
     expect(missing.getByText('ausente')).toBeInTheDocument();
-    await userEvent.click(missing.getByRole('button', { name: /^Remover do board/ }));
+    await userEvent.click(missing.getByRole('button', { name: /^Excluir:/ }));
     expect(lastSent('harness.selection.set')).toEqual({
       type: 'harness.selection.set',
       items: [{ kind: 'instructions', location: '.claude/rules/velha.md' }],
@@ -474,10 +464,10 @@ describe('HarnessSettings: ferramenta e execução', () => {
     expect(lastSent('settings.board.update')).toEqual({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
   });
 
-  it('a aba da ferramenta não instala o MCP: aponta para a seção da ferramenta', () => {
+  it('a aba de execução permite conectar o MCP e explica a biblioteca compartilhada', () => {
     renderTool();
     expect(screen.queryByRole('button', { name: /MCP/ })).toBeNull();
-    expect(screen.getByText(/na aba de cada ferramenta, nos assuntos MCPs e Skills, em Projeto/)).toBeInTheDocument();
+    expect(screen.getByText(/biblioteca do board, compartilhada entre as ferramentas/)).toBeInTheDocument();
   });
 
   it('permissão, tempo limite, heartbeat e Rodar o heartbeat agora', async () => {
@@ -623,7 +613,7 @@ describe('HarnessSettings: instalar o MCP e a skill do fluxo na seção de cada 
 describe('HarnessSettings: aviso de como usar', () => {
   it('aparece até a pessoa dispensar, fica guardado, e volta pelo "Como funciona"', async () => {
     useBoardStore.setState({ harnessIntroSeen: false });
-    renderTab('claude');
+    renderTool();
     const note = () => screen.queryByRole('note', { name: 'Como usar o Harness' });
     expect(note()).toBeInTheDocument();
     expect(note()).toHaveTextContent('Por onde começar');
@@ -637,7 +627,7 @@ describe('HarnessSettings: aviso de como usar', () => {
 
   it('dispensar grava no host (prefs.set) e o que o host manda em prefs vale, para não voltar ao reabrir o painel', async () => {
     useBoardStore.setState({ harnessIntroSeen: false });
-    renderTab('claude');
+    renderTool();
     const note = () => screen.queryByRole('note', { name: 'Como usar o Harness' });
     await userEvent.click(screen.getByRole('button', { name: 'Entendi, não mostrar de novo' }));
     expect(lastSent('prefs.set')).toEqual({ type: 'prefs.set', patch: { harnessIntroSeen: true } });

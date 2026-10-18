@@ -1,0 +1,527 @@
+{
+  "schema_version": 1,
+  "runtime": "React + Vite SPA",
+  "language": "pt-BR",
+  "skills": [
+    {
+      "name": "react-module-boundaries",
+      "path": "react-module-boundaries/SKILL.md",
+      "description": "Organizar pastas, features, módulos e camadas; definir imports permitidos, extrair código compartilhado e eliminar ciclos de dependências.",
+      "responsibility": "Organização de features, localização de código e direção de dependências.",
+      "boundary": "Não define comportamento do negócio ou conteúdo das telas.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/project-structure.md", "apps/react-vite/.eslintrc.cjs"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-tooling",
+      "path": "react-tooling/SKILL.md",
+      "description": "Configurar ferramentas locais: TypeScript, Vite, aliases, ESLint, formatação, scripts de desenvolvimento, build e preview; resolver incompatibilidades de configuração.",
+      "responsibility": "Configuração coerente das ferramentas locais de desenvolvimento e verificação.",
+      "boundary": "Não define variáveis de produto, vulnerabilidades de pacotes ou CI/CD.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/project-standards.md", "apps/react-vite/package.json", "apps/react-vite/vite.config.ts"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-env-config",
+      "path": "react-env-config/SKILL.md",
+      "description": "Definir variáveis de ambiente, configuração pública, defaults e validação de valores no Vite; diagnosticar configuração ausente ou inválida.",
+      "responsibility": "Contrato de configuração da aplicação por ambiente.",
+      "boundary": "Não configura hosting nem transporte HTTP.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["apps/react-vite/src/config/env.ts"],
+        "complement": false,
+        "official": [
+          {
+            "title": "Vite: ambiente e modos",
+            "url": "https://vite.dev/guide/env-and-mode"
+          }
+        ]
+      }
+    },
+    {
+      "name": "react-app-lifecycle",
+      "path": "react-app-lifecycle/SKILL.md",
+      "description": "Compor entrada e raiz da aplicação, providers e instâncias globais; controlar ordem, duração, preparação e limpeza dos recursos da aplicação.",
+      "responsibility": "Composição da raiz React, providers e duração das instâncias da aplicação.",
+      "boundary": "Não define chaves de cache, regras de sessão ou efeitos específicos de uma feature.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["apps/react-vite/src/main.tsx", "apps/react-vite/src/app/index.tsx", "apps/react-vite/src/app/provider.tsx"],
+        "complement": false,
+        "official": [
+          {
+            "title": "React: sincronização e limpeza de efeitos",
+            "url": "https://react.dev/learn/synchronizing-with-effects"
+          }
+        ]
+      }
+    },
+    {
+      "name": "react-routing",
+      "path": "react-routing/SKILL.md",
+      "description": "Definir caminhos, parâmetros de rota, links, rotas aninhadas, loaders e transições de navegação em uma SPA; tratar destinos desconhecidos.",
+      "responsibility": "Correspondência entre URLs, rotas e transições de navegação.",
+      "boundary": "Não define filtros na query string nem decisões de autorização.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["apps/react-vite/src/app/router.tsx", "apps/react-vite/src/config/paths.ts"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-url-state",
+      "path": "react-url-state/SKILL.md",
+      "description": "Sincronizar filtros, busca, paginação e ordenação com URL/query string; definir parsing, serialização, defaults, recarga e restauração ao voltar/avançar no histórico.",
+      "responsibility": "Representação de estado navegável na URL e no histórico.",
+      "boundary": "Não configura a árvore de rotas nem a política de cache remoto.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/state-management.md", "apps/react-vite/src/features/discussions/components/discussions-list.tsx"],
+        "complement": false,
+        "official": [
+          {
+            "title": "React Router: useSearchParams",
+            "url": "https://reactrouter.com/api/hooks/useSearchParams"
+          }
+        ]
+      }
+    },
+    {
+      "name": "react-business-rules",
+      "path": "react-business-rules/SKILL.md",
+      "description": "Modelar regras de negócio do frontend: invariantes, cálculos, elegibilidade e transições do domínio; preservar significado durante correções e refatorações.",
+      "responsibility": "Invariantes, cálculos e transições de negócio executados no frontend.",
+      "boundary": "Não define DTOs externos, políticas de acesso ou persistência do backend.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/application-overview.md", "apps/react-vite/src/features/discussions/api/create-discussion.ts"],
+        "complement": true,
+        "official": []
+      }
+    },
+    {
+      "name": "react-component-contracts",
+      "path": "react-component-contracts/SKILL.md",
+      "description": "Definir API de componentes: props, eventos, composição, slots, refs e modos controlado/não controlado; extrair componentes reutilizáveis sem acoplamento à feature.",
+      "responsibility": "API e composição dos componentes de interface.",
+      "boundary": "Não define tokens visuais, experiência completa da página ou procedimento de auditoria acessível.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/components-and-styling.md", "apps/react-vite/src/components/ui/button/button.tsx"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-styling",
+      "path": "react-styling/SKILL.md",
+      "description": "Aplicar design visual, tokens, temas, variantes e layout responsivo; corrigir estilos, overflow, contraste visual e consistência entre tamanhos de tela.",
+      "responsibility": "Apresentação visual consistente e responsiva.",
+      "boundary": "Não redefine contratos dos componentes ou regras de negócio.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/components-and-styling.md", "apps/react-vite/src/components/ui/button/button.tsx"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-accessibility",
+      "path": "react-accessibility/SKILL.md",
+      "description": "Projetar e verificar acessibilidade: semântica, nomes acessíveis, teclado, foco, diálogos, anúncios e mensagens de erro em componentes e fluxos interativos.",
+      "responsibility": "Semântica e interação acessível dos fluxos e componentes.",
+      "boundary": "Não altera a regra do produto ou estabelece o design visual completo.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["apps/react-vite/src/components/ui/dialog/dialog.tsx", "apps/react-vite/.eslintrc.cjs"],
+        "complement": true,
+        "official": [
+          {
+            "title": "W3C APG: diálogo modal",
+            "url": "https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/"
+          }
+        ]
+      }
+    },
+    {
+      "name": "react-page-composition",
+      "path": "react-page-composition/SKILL.md",
+      "description": "Compor telas e páginas combinando features, layouts e contratos existentes; conectar ações e estados de carregamento, vazio, sucesso e falha na camada da aplicação.",
+      "responsibility": "Composição de uma página com recursos e contratos existentes.",
+      "boundary": "Não reimplementa consultas, validação, políticas de acesso ou componentes básicos.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/project-structure.md", "apps/react-vite/src/app/routes/app/discussions/discussion.tsx"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-ui-state",
+      "path": "react-ui-state/SKILL.md",
+      "description": "Definir propriedade do estado visual local ou compartilhado: hooks, reducers, stores, seletores, derivações, efeitos e reset de modais, seleção e preferências de interface, incluindo abertura/fechamento e troca de item selecionado.",
+      "responsibility": "Propriedade e sincronização do estado visual no cliente.",
+      "boundary": "Não define estado remoto, de formulário, de URL ou de sessão.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": [
+          "docs/state-management.md",
+          "apps/react-vite/src/hooks/use-disclosure.ts",
+          "apps/react-vite/src/components/ui/notifications/notifications-store.ts"
+        ],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-api-contracts",
+      "path": "react-api-contracts/SKILL.md",
+      "description": "Definir contratos de dados externos: DTOs, payloads, schemas de validação runtime, normalização e mapeamento entre API e domínio do frontend.",
+      "responsibility": "Formato e validação dos dados na fronteira com serviços externos.",
+      "boundary": "Não implementa backend, cliente HTTP ou ciclo de cache.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": [
+          "docs/api-layer.md",
+          "apps/react-vite/src/types/api.ts",
+          "apps/react-vite/src/features/discussions/api/create-discussion.ts"
+        ],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-http-client",
+      "path": "react-http-client/SKILL.md",
+      "description": "Implementar cliente HTTP e fetchers: base URL, headers, credenciais, serialização, cancelamento e normalização de erros de transporte no consumo de APIs existentes.",
+      "responsibility": "Execução de requisições e representação das respostas/falhas de transporte.",
+      "boundary": "Não define DTOs, políticas de login, retry de queries ou cache.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/api-layer.md", "apps/react-vite/src/lib/api-client.ts"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-query-cache",
+      "path": "react-query-cache/SKILL.md",
+      "description": "Organizar leitura remota e cache de consultas: query keys, validade, paginação, refetch, retry, prefetch e integração de loaders com TanStack Query ou solução adotada.",
+      "responsibility": "Leitura, identificação e validade dos dados remotos em cache.",
+      "boundary": "Não define operação de escrita ou contratos HTTP; publica as chaves usadas pela invalidação.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/state-management.md", "docs/api-layer.md", "apps/react-vite/src/features/discussions/api/get-discussions.ts"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-mutations",
+      "path": "react-mutations/SKILL.md",
+      "description": "Coordenar escrita remota: mutations, invalidação de consultas, reconciliação, atualização otimista, rollback e concorrência após criar, editar ou excluir recursos.",
+      "responsibility": "Escrita remota e atualização dos dados afetados no cliente.",
+      "boundary": "Não redefine chaves de consulta, formato do endpoint ou campos do formulário.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/api-layer.md", "apps/react-vite/src/features/discussions/api/create-discussion.ts"],
+        "complement": false,
+        "official": [
+          {
+            "title": "TanStack Query: atualização otimista",
+            "url": "https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates"
+          }
+        ]
+      }
+    },
+    {
+      "name": "react-forms",
+      "path": "react-forms/SKILL.md",
+      "description": "Construir formulários: campos, valores iniciais, validação, erros por campo, submissão, dirty state, dependências e reset; integrar contratos de negócio e mutations existentes.",
+      "responsibility": "Ciclo de preenchimento, validação e submissão de formulários.",
+      "boundary": "Não redefine invariantes de negócio, DTOs ou invalidação de cache.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": [
+          "docs/state-management.md",
+          "apps/react-vite/src/components/ui/form/form.tsx",
+          "apps/react-vite/src/features/auth/components/register-form.tsx"
+        ],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-auth-session",
+      "path": "react-auth-session/SKILL.md",
+      "description": "Gerir autenticação e sessão no frontend: restauração da identidade, login, logout, expiração, estados anônimo/autenticado e limpeza de dados vinculados ao usuário.",
+      "responsibility": "Identidade e ciclo da sessão consumida pelo frontend.",
+      "boundary": "Não emite tokens nem define papéis e permissões do produto.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/security.md", "apps/react-vite/src/lib/auth.tsx", "apps/react-vite/src/lib/api-client.ts"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-access-policies",
+      "path": "react-access-policies/SKILL.md",
+      "description": "Definir autorização da interface: permissões, papéis, propriedade do recurso, políticas de acesso a ações e comportamento de acesso negado ou resposta 403.",
+      "responsibility": "Decisões de acesso da interface a ações e recursos.",
+      "boundary": "Não autentica usuários nem substitui a autorização do serviço externo.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/security.md", "apps/react-vite/src/lib/authorization.tsx"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-content-security",
+      "path": "react-content-security/SKILL.md",
+      "description": "Proteger renderização de conteúdo não confiável e destinos de navegação: HTML, Markdown, XSS, URLs perigosas e redirecionamentos abertos.",
+      "responsibility": "Tratamento seguro de conteúdo e destinos não confiáveis.",
+      "boundary": "Não define rotas, armazenamento ou segurança de dependências.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/security.md", "apps/react-vite/src/components/ui/md-preview/md-preview.tsx"],
+        "complement": true,
+        "official": [
+          {
+            "title": "OWASP: DOM XSS",
+            "url": "https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html"
+          }
+        ]
+      }
+    },
+    {
+      "name": "react-browser-data-security",
+      "path": "react-browser-data-security/SKILL.md",
+      "description": "Avaliar exposição e retenção de dados no navegador: storage, cache persistido, segredos no bundle, telemetria sensível, postMessage e integração de proteção CSRF existente.",
+      "responsibility": "Proteção dos dados e das fronteiras de confiança no navegador.",
+      "boundary": "Não emite cookies HttpOnly, configura headers do servidor ou redefine o ciclo de sessão.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/security.md", "apps/react-vite/src/config/env.ts"],
+        "complement": true,
+        "official": [
+          {
+            "title": "OWASP: dados e mensagens no navegador",
+            "url": "https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html"
+          }
+        ]
+      }
+    },
+    {
+      "name": "react-dependency-security",
+      "path": "react-dependency-security/SKILL.md",
+      "description": "Avaliar segurança de dependências diretas e transitivas: avisos de vulnerabilidade, exposição real, versão corrigida, substituição pontual e risco de adoção de pacotes.",
+      "responsibility": "Risco de segurança dos pacotes consumidos pela aplicação web.",
+      "boundary": "Não configura CI/CD nem substitui a responsabilidade de compatibilidade das ferramentas.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": [],
+        "complement": true,
+        "official": [
+          {
+            "title": "npm: auditoria de dependências",
+            "url": "https://docs.npmjs.com/cli/commands/npm-audit/"
+          }
+        ]
+      }
+    },
+    {
+      "name": "react-error-recovery",
+      "path": "react-error-recovery/SKILL.md",
+      "description": "Conter falhas e recuperar a interface: error boundaries, fallbacks, mensagens acionáveis, notificações e reset de seções quebradas; evitar erros engolidos ou duplicados.",
+      "responsibility": "Contenção, apresentação e recuperação de falhas na interface.",
+      "boundary": "Não define retry de query nem coleta e envio de telemetria.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/error-handling.md", "apps/react-vite/src/components/errors/main.tsx", "apps/react-vite/src/app/provider.tsx"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-telemetry",
+      "path": "react-telemetry/SKILL.md",
+      "description": "Instrumentar diagnóstico no cliente: eventos de erro, contexto técnico, correlação, deduplicação e filtragem de dados sensíveis usando a ferramenta de telemetria adotada.",
+      "responsibility": "Registro de evidências para diagnosticar a aplicação no navegador.",
+      "boundary": "Não provisiona infraestrutura, define recuperação visual ou instrumenta tudo sem necessidade.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/error-handling.md"],
+        "complement": true,
+        "official": []
+      }
+    },
+    {
+      "name": "react-unit-tests",
+      "path": "react-unit-tests/SKILL.md",
+      "description": "Escrever e revisar testes unitários de regras, cálculos, transições e hooks isolados; escolher fronteiras, exemplos e asserts que detectam regressões de comportamento.",
+      "responsibility": "Evidência isolada de regras, cálculos e unidades relevantes.",
+      "boundary": "Não testa jornada completa nem exige teste para toda função.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/testing.md", "apps/react-vite/src/hooks/__tests__/use-disclosure.test.ts"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-integration-tests",
+      "path": "react-integration-tests/SKILL.md",
+      "description": "Testar componentes e features integrados com providers, interações e rede simulada; verificar fluxos de UI, estados assíncronos e contratos entre partes.",
+      "responsibility": "Evidência do comportamento de componentes e features integrados.",
+      "boundary": "Não define os handlers compartilhados de rede nem toda jornada no navegador.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/testing.md", "apps/react-vite/src/testing/test-utils.tsx"],
+        "complement": false,
+        "official": [
+          {
+            "title": "Testing Library: princípios",
+            "url": "https://testing-library.com/docs/guiding-principles/"
+          }
+        ]
+      }
+    },
+    {
+      "name": "react-e2e-tests",
+      "path": "react-e2e-tests/SKILL.md",
+      "description": "Testar jornadas no navegador real com Playwright: navegação, formulários, sessão, rede controlada, isolamento de dados e diagnósticos de falhas ponta a ponta.",
+      "responsibility": "Evidência das jornadas da aplicação em um navegador real.",
+      "boundary": "Não exige backend real nem substitui toda verificação por E2E.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/testing.md", "apps/react-vite/playwright.config.ts"],
+        "complement": false,
+        "official": [
+          {
+            "title": "Playwright: boas práticas",
+            "url": "https://playwright.dev/docs/best-practices"
+          }
+        ]
+      }
+    },
+    {
+      "name": "react-api-mocks",
+      "path": "react-api-mocks/SKILL.md",
+      "description": "Simular API com MSW: handlers HTTP, fixtures, cenários de erro/latência, inicialização em desenvolvimento/teste e reset de dados conforme contrato do serviço.",
+      "responsibility": "Respostas e cenários de rede simulados para desenvolvimento e testes.",
+      "boundary": "Não implementa backend de produção nem escreve os asserts da feature.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/testing.md", "apps/react-vite/src/testing/mocks/browser.ts", "apps/react-vite/src/testing/mocks/server.ts"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-load-performance",
+      "path": "react-load-performance/SKILL.md",
+      "description": "Diagnosticar e otimizar carregamento: tamanho de bundle, chunks, lazy loading, imagens, recursos bloqueantes, prefetch e waterfalls de navegação com medidas comparáveis.",
+      "responsibility": "Custo e tempo de carregamento da aplicação e seus recursos.",
+      "boundary": "Não altera semântica do cache ou implementa otimização especulativa.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/performance.md", "apps/react-vite/src/app/router.tsx"],
+        "complement": false,
+        "official": []
+      }
+    },
+    {
+      "name": "react-render-performance",
+      "path": "react-render-performance/SKILL.md",
+      "description": "Diagnosticar lentidão de interações e renderizações com profiler; otimizar seletores, composição, cálculos e listas com evidência de custo e preservação de comportamento.",
+      "responsibility": "Custo das atualizações e renderizações da interface.",
+      "boundary": "Não redefine propriedade do estado sem respeitar seu contrato.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["docs/performance.md", "docs/state-management.md"],
+        "complement": false,
+        "official": [
+          {
+            "title": "React: Profiler",
+            "url": "https://react.dev/reference/react/Profiler"
+          }
+        ]
+      }
+    },
+    {
+      "name": "react-i18n",
+      "path": "react-i18n/SKILL.md",
+      "description": "Gerir internacionalização: catálogos, traduções, pluralização, interpolação, fallback, idioma e formatação localizada de datas, números e moedas.",
+      "responsibility": "Mensagens e apresentação de valores conforme idioma e localidade.",
+      "boundary": "Não calcula regras de negócio nem define metadados das páginas.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["apps/react-vite/src/utils/format.ts"],
+        "complement": true,
+        "official": [
+          {
+            "title": "MDN: Intl",
+            "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl"
+          }
+        ]
+      }
+    },
+    {
+      "name": "react-page-metadata",
+      "path": "react-page-metadata/SKILL.md",
+      "description": "Definir e atualizar título, descrição e metadados das páginas durante navegação SPA; integrar Head/Helmet ou solução existente e evitar valores residuais entre rotas.",
+      "responsibility": "Identificação das páginas por título e metadados no navegador.",
+      "boundary": "Não promete indexação garantida nem introduz SSR ou infraestrutura.",
+      "modes": ["projetar", "implementar", "revisar"],
+      "provenance": {
+        "bulletproof_commit": "9506629ed003a561c6627735480cce4994244bb4",
+        "files": ["apps/react-vite/src/components/seo/head.tsx", "apps/react-vite/src/app/provider.tsx"],
+        "complement": false,
+        "official": []
+      }
+    }
+  ]
+}

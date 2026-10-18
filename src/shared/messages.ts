@@ -1,3 +1,5 @@
+import type { AgentAssistInput, AgentAssistResult } from './agentAssistance';
+import type { LibraryArtifactInput } from './artifacts';
 import type { Appearance } from './appearance';
 import type { ImportSummary } from './backup';
 import type { ViewState } from './filters';
@@ -10,7 +12,7 @@ import type { CardUsage } from './cardUsage';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { RenameKind } from './branchRename';
-import type { CardStatus } from './status';
+import type { BulkCardStatus, CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { BranchKind, GitConfig } from './git';
 import type { ProjectProfile } from './projectProfile';
@@ -136,6 +138,9 @@ export type WebviewToHost =
   /** muda o status de trabalho do card; `note` é o motivo do bloqueio ou o texto que vai junto para a conversa */
   /** `pending`: há algo que depende da pessoa; em modo autônomo o pedido de revisão não vira aprovação automática */
   | { type: 'card.status.set'; cardId: Id; status: CardStatus | null; note?: string; pending?: boolean }
+  /** muda o status de trabalho de vários cards de uma vez; aplica só aos cards vivos da lista e reusa o
+   * fluxo de `card.status.set` (comentário do motivo, aprovação com avanço automático) */
+  | { type: 'card.status.setMany'; cardIds: Id[]; status: BulkCardStatus; note?: string }
   | { type: 'comment.add'; cardId: Id; body: string; kind?: 'summary' }
   | { type: 'comment.update'; commentId: Id; body: string }
   | { type: 'comment.delete'; commentId: Id }
@@ -245,6 +250,7 @@ export type WebviewToHost =
   | { type: 'harness.item.write'; tool: AiTool; source: number; name: string; content: string; files?: string[]; append?: boolean }
   /** o perfil do projeto (linguagens, comandos, ferramentas, pastas) para os assistentes; a resposta é `harness.project.profileResult` */
   | { type: 'harness.project.profile'; requestId: string }
+  | { type: 'harness.agent.assist'; requestId: string; input: AgentAssistInput }
   /** apaga um arquivo ou uma pasta de skill do projeto ou da pasta do usuário */
   | { type: 'harness.item.delete'; tool: AiTool; kind: HarnessKind; path: string }
   /** desinstala, desativa ou ativa plugins pela ferramenta; `ids` são os de `HarnessItem.install` */
@@ -285,6 +291,18 @@ export type WebviewToHost =
    * `usage` null): `location` é a identidade do item na marcação (`selectionKey`: o caminho como o
    * inventário o mostra, mais `#nome` numa entrada de configuração)
    */
+  | { type: 'harness.library.scan'; dir: string }
+  | { type: 'harness.library.apply'; keys: string[]; overwrite?: boolean }
+  | { type: 'harness.library.pickDirectory' }
+  | { type: 'harness.library.folders'; dir: string }
+  | { type: 'harness.library.save'; input: LibraryArtifactInput }
+  | { type: 'harness.library.read'; id: string }
+  | { type: 'harness.library.pickArtifacts' }
+  | { type: 'harness.library.directory'; dir: string }
+  | { type: 'harness.library.update'; id: string }
+  | { type: 'harness.library.import'; rels: string[] }
+  | { type: 'harness.library.open' }
+  | { type: 'harness.library.pick' }
   | { type: 'harness.selection.set'; items: { kind: SelectableKind; location: string }[]; usage: HarnessUsage | null }
   /** a IA analisa o projeto e o catálogo do assunto e pré-seleciona os artefatos que fazem mais sentido (resultado em `harnessSuggestions`) */
   | { type: 'harness.suggest.run'; tool: AiTool; kind: SelectableKind }
@@ -361,6 +379,10 @@ export type HostToWebview =
   /** item do harness criado pela tela: ela abre o arquivo no editor do board */
   | { type: 'harness.item.created'; path: string }
   /** resposta a `harness.project.profile`, correlacionada por `requestId` */
+  | { type: 'harness.library.content'; input: LibraryArtifactInput }
+  | { type: 'harness.agent.assistResult'; requestId: string; result?: AgentAssistResult; error?: string }
+  | { type: 'harness.library.directorySelected'; directory: string }
+  | { type: 'harness.library.foldersResult'; directory: string; parent: string; folders: { name: string; path: string }[] }
   | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }

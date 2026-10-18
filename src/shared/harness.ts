@@ -1,4 +1,5 @@
-/** Harness de IA do projeto: arquivos de regras e skills, gerenciados pelo board. */
+import type { BoardArtifact } from './artifacts';
+/** Harness do projeto: arquivos de regras e skills, gerenciados pelo board. */
 
 /**
  * Como a ferramenta chega a uma skill: `auto` deixa a descrição à vista da IA, que decide quando usar;
@@ -151,6 +152,8 @@ export const HARNESS_SCOPES: { id: HarnessScope; label: string; hint: string; su
 
 /** Um item que a ferramenta carrega. Não leva o conteúdo: o arquivo é aberto no editor. */
 export interface HarnessItem {
+  /** Identidade da cópia na biblioteca do board. */
+  boardArtifactId?: string;
   kind: HarnessKind;
   scope: HarnessScope;
   name: string;
@@ -245,6 +248,14 @@ export interface ToolInventory {
 }
 
 export interface Harness {
+  /** Cópias do board, disponíveis em todas as ferramentas. Ausente em estados antigos. */
+  library?: {
+    preview?: import('./artifacts').LibraryImportPreview;
+    importResult?: import('./artifacts').LibraryImportResult;
+    directory: string;
+    artifacts: BoardArtifact[];
+    warnings?: { path: string; reason: 'duplicate' | 'invalid' | 'unreadable' }[];
+  };
   rules: RuleFile[];
   skills: Skill[];
   agents: Agent[];

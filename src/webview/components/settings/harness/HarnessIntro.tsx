@@ -18,12 +18,12 @@ export function HarnessIntro() {
       <Callout.Icon>
         <IconInfo />
       </Callout.Icon>
-      <Callout.Text>
+      <div>
         <strong>{t('Como usar o Harness')}</strong>
         <ul>
           <li>
             {rich(
-              '<b>Para que serve.</b> Toda execução do board parte de contexto vazio. Esta tela é o catálogo do que existe na sua máquina e no projeto; o <b>Board</b> é só o que a IA pode usar.',
+              '<b>Para que serve.</b> Toda execução do board parte de contexto vazio. A <b>Biblioteca do board</b> guarda regras, skills, subagentes e MCPs para qualquer ferramenta conectada.',
             )}
           </li>
           <li>
@@ -33,14 +33,14 @@ export function HarnessIntro() {
           </li>
           <li>
             {rich(
-              '<b>Por onde começar.</b> 1) Abra a aba da ferramenta do projeto e, em Skills e MCPs, use <b>Indicar artefatos</b> e envie ao Board. 2) Em Sub-agentes, crie um agente com ajuda. 3) Em Regras, revise as que entraram desligadas e ative as que valem.',
+              '<b>Por onde começar.</b> 1) Importe uma pasta e escolha os artefatos na prévia por tipo. 2) Crie artefatos nas abas, com o assistente guiado ou com IA. 3) Revise as regras e escolha quando cada artefato entra no contexto.',
             )}
           </li>
         </ul>
         <Button size="1" variant="soft" onClick={() => setSeen(true)}>
           {t('Entendi, não mostrar de novo')}
         </Button>
-      </Callout.Text>
+      </div>
     </Callout.Root>
   );
 }

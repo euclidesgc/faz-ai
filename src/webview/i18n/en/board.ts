@@ -1,4 +1,13 @@
 export const board: Record<string, string> = {
+  'Atinge {m} de {n} selecionados.': 'Affects {m} of {n} selected cards.',
+  'Aprovar {n} card(s)?': 'Approve {n} card(s)?',
+  'Cada card aprovado segue para a próxima coluna.': 'Each approved card moves to the next column.',
+  'Aprovando {n} card(s)…': 'Approving {n} card(s)…',
+  'Bloquear {n} card(s)?': 'Block {n} card(s)?',
+  'O motivo vai para a conversa de cada card bloqueado.': 'The reason is added to each blocked card’s conversation.',
+  Motivo: 'Reason',
+  'Bloqueando {n} card(s)…': 'Blocking {n} card(s)…',
+  'Desbloqueando {n} card(s)…': 'Unblocking {n} card(s)…',
   // App, barra de topo e avisos
   'Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.':
     'No connection to Faz AI. Reopen the board from the editor or the terminal.',
@@ -414,7 +423,7 @@ export const board: Record<string, string> = {
   Copiado: 'Copied',
   'Não foi possível copiar. Selecione o comando e copie com o teclado.':
     'Could not copy. Select the command and copy it with the keyboard.',
-  'Abrir Harness de IA': 'Open AI harness',
+  'Abrir Harness': 'Open Harness',
   'Node.js não encontrado': 'Node.js not found',
   'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 22 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.':
     "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 22 or newer, and it is not on the terminal's PATH. Without it, {tool} cannot reach the board. Install Node.js and click Check again.",

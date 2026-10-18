@@ -1,6 +1,74 @@
 export const harness: Record<string, string> = {
+  'Esta é a pasta de destino do board. A pasta de origem é escolhida na importação abaixo.':
+    'This is the board destination folder. Choose the source folder in the import section below.',
+  'Adicionada na pasta da biblioteca': 'Added in the library folder',
+  'Nenhuma skill na biblioteca. Use Importar de uma pasta acima ou cole uma pasta com SKILL.md na biblioteca e clique em Atualizar lista.':
+    'No skills in the library. Use Import from a folder above, or paste a folder containing SKILL.md into the library and click Refresh list.',
+  'As skills aparecem no campo Skills dos cards e no planejamento. Pelo card só entra quando escolhido; Sempre entra em toda execução.':
+    'Skills appear in the cards’ Skills field and in planning. Per card is included only when chosen; Always is included in every run.',
+  'Importar selecionadas ({n})': 'Import selected ({n})',
+  'Importar {name}': 'Import {name}',
+  'Buscar skills pelo caminho': 'Find skills by path',
+  'Pasta de origem ou repositório': 'Source folder or repository',
+  '{n} skill(s) importada(s). Elas estão na aba Skills abaixo, no modo Pelo card.':
+    '{n} skill(s) imported. They are under the Skills tab below, in Per card mode.',
+  'Importar de uma pasta': 'Import from a folder',
+  'Escolhe uma pasta e lista as skills antes de copiar para o board.':
+    'Chooses a folder and lists skills before copying them to the board.',
+  '1. Escolha a pasta de origem. 2. Marque as skills encontradas. 3. Clique em Importar selecionadas. As cópias aparecem na lista abaixo e funcionam com qualquer ferramenta.':
+    '1. Choose the source folder. 2. Select the skills found. 3. Click Import selected. Copies appear in the list below and work with any tool.',
+  'Importar skills de outra pasta': 'Import skills from another folder',
+  'Importar skills para o board': 'Import skills to the board',
+  'Não foi possível ler "{path}". Os arquivos foram preservados; confira o SKILL.md e os limites abaixo.':
+    'Could not read "{path}". The files were preserved; check SKILL.md and the limits below.',
+  'A pasta "{path}" precisa de um nome com letras minúsculas, números e hífens.':
+    'Folder "{path}" needs a name with lowercase letters, numbers and hyphens.',
+  'A pasta "{path}" tem o mesmo nome de uma skill já cadastrada. Seus arquivos foram preservados; renomeie a pasta para importar outra skill.':
+    'Folder "{path}" has the same name as an existing skill. Your files were preserved; rename the folder to import another skill.',
+  'Você pode colar pastas de skills aqui. Cada pasta deve conter SKILL.md; os arquivos de apoio vão junto. Ao voltar à tela ou clicar em Atualizar lista, elas aparecem em Skills, no modo Pelo card.':
+    'You can paste skill folders here. Each folder must contain SKILL.md, along with its supporting files. Return to this screen or click Refresh list to see them under Skills, in Per card mode.',
+  'Abre a pasta da biblioteca no gerenciador de arquivos do sistema.': 'Opens the library folder in the system file manager.',
+  'Atualizar lista': 'Refresh list',
+  'Reconhece skills coladas na pasta e atualiza a lista sem apagar seus arquivos.':
+    'Detects skills pasted into the folder and refreshes the list without deleting your files.',
+  'A <b>Biblioteca do board</b> reúne os artefatos disponíveis em qualquer ferramenta. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão. As abas das ferramentas mostram as fontes para importar.':
+    'The <b>Board library</b> gathers artifacts available with any tool. <b>Tool and execution</b> chooses the AI, permission and default agent. Tool tabs show sources to import from.',
+  'Tudo que o {tool} carrega. O <b>catálogo</b> (Projeto, Global e Importados) mostra as fontes. Ao enviar um artefato à <b>Biblioteca do board</b>, ele é copiado e fica disponível para as execuções com qualquer ferramenta, no modo escolhido.':
+    'Everything {tool} loads. The <b>catalog</b> (Project, Global and Imported) shows sources. Sending an artifact to the <b>Board library</b> copies it and makes it available for runs with any tool, in the chosen mode.',
+
+  'Abrir pasta': 'Open folder',
+  'Origem: {path}': 'Source: {path}',
+  '{n} arquivo(s) não copiado(s); consulte os limites da biblioteca.': '{n} file(s) not copied; check the library limits.',
+  'Cada skill aceita arquivos de até 512 KB, até 100 arquivos de apoio e 5 MB no total. Itens omitidos aparecem na lista do board.':
+    'Each skill accepts files up to 512 KB, up to 100 supporting files and 5 MB in total. Omitted items are shown in the board list.',
+
+  'Copia este agente para a biblioteca do board.': 'Copies this agent to the board library.',
+  'Biblioteca do board': 'Board library',
+  'Skills, agentes e regras copiados para este board ficam disponíveis com qualquer ferramenta de IA. As fontes originais são preservadas.':
+    'Skills, agents and rules copied to this board are available with any AI tool. Original sources are preserved.',
+  'Pasta da biblioteca': 'Library folder',
+  'Caminho completo de uma pasta vazia': 'Full path to an empty folder',
+  'Informe uma nova pasta para a biblioteca.': 'Enter a new folder for the library.',
+  'Copia a biblioteca para a nova pasta e passa a usá-la. A pasta anterior é preservada.':
+    'Copies the library to the new folder and starts using it. The previous folder is preserved.',
+  'Salvar pasta': 'Save folder',
+  'A biblioteca ainda não está disponível.': 'The library is not available yet.',
+  'Abre a pasta da biblioteca no editor.': 'Opens the library folder in the editor.',
+  'A biblioteca é local e particular. As skills importadas não são distribuídas com a extensão. Atualizações da origem só entram quando você pede.':
+    'The library is local and private. Imported skills are not distributed with the extension. Source updates are applied only when you request them.',
+  'Buscar na biblioteca': 'Search the library',
+  'Copia as skills selecionadas e seus arquivos de apoio para a biblioteca particular deste board.':
+    'Copies the selected skills and their supporting files to this board’s private library.',
+  'Substitui a cópia do board pelo conteúdo atual da origem.': 'Replaces the board copy with the current source content.',
+  'Atualizar "{name}" da origem?': 'Update "{name}" from the source?',
+  'A cópia atual do board será substituída. A origem não será alterada.':
+    'The current board copy will be replaced. The source will not be changed.',
+  'Atualizar da origem': 'Update from source',
+  'Mostrando o catálogo do {tool}. Os artefatos enviados ao board ficam disponíveis com qualquer ferramenta.':
+    'Showing the {tool} catalog. Artifacts sent to the board are available with any tool.',
+
   // --- HarnessSettings
-  'Harness de IA': 'AI harness',
+  Harness: 'Harness',
   'O que a IA lê e usa neste projeto. <b>Ferramenta e execução</b> escolhe com qual IA o board trabalha; <b>Do projeto</b> reúne o que faz parte do repositório e é editável aqui; <b>Tudo que a ferramenta carrega</b> mostra também o que vem da sua pasta de usuário e de plugins.':
     'What the AI reads and uses in this project. <b>Tool and execution</b> chooses which AI the board works with; <b>From the project</b> gathers what is part of the repository and can be edited here; <b>Everything the tool loads</b> also shows what comes from your user folder and from plugins.',
   'Ferramenta e execução': 'Tool and execution',

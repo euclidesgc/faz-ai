@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { registerBoardRulesTools, registerBoardTools } from './board';
 import { registerCardContentTools } from './cardContent';
 import { registerCardTools } from './cards';
+import { registerLibraryTools } from './library';
 import { registerHarnessTools } from './harness';
 import { registerLifecycleTools } from './lifecycle';
 import { registerMetricsTools } from './metrics';
@@ -27,6 +28,7 @@ function defineTools(tool: DefineTool, ctx: ToolContext): void {
   registerBoardRulesTools(tool);
   registerModelTools(tool);
   registerHarnessTools(tool);
+  registerLibraryTools(tool, ctx);
 }
 
 /** Registra todas as ferramentas MCP do board no servidor. */

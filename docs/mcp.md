@@ -97,7 +97,9 @@ Tags são da pessoa e mudam); a exibição muda em todos. `create_field` recusa 
 O valor da Fase de uma sub-tarefa é gravado pela IA (`create_card` ou `update_card` com
 `fields.Fase`); a pessoa não o muda no card, e `update_card_type` recusa a Fase em `default_fields`.
 
-Também pelo MCP: catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
+Também pelo MCP: uso, tokens e tempo do log (`get_metrics`, com `group_by` por fase, modelo, ferramenta,
+agente, skill, ferramenta usada, ferramenta MCP ou `bash_command`: o comando-base de cada chamada de
+Bash, sem argumentos, só do Claude Code), catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
 `set_model_rules`), padrões por tipo de card (`update_card_type`), recriar o board (`reset_board`) e o
 harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,
 `set_skill_enabled`, `delete_skill`…).
@@ -150,6 +152,34 @@ pasta própria (a global fica em `~/`):
 | Claude Code | `.claude/agents` | `<nome>.md` (frontmatter YAML) | `model` |
 | Cursor | `.cursor/agents` | `<nome>.md` | `model` |
 | Kimi Code | `.kimi-code/agents` | `<nome>.md` (frontmatter YAML; aceita os mesmos globs `mcp__*` em `tools`) | — |
+
+### Biblioteca do board
+
+Configurações → Harness de IA concentra regras, skills, subagentes e MCPs numa biblioteca particular,
+com importação agrupada por tipo, CRUD e assistentes. `get_harness` inclui `library.artifacts`, com
+id, tipo, nome, uso e caminho de cada cópia, sem configurações MCP. Trocar de ferramenta ou apagar
+a origem não remove a cópia; `set_harness_selection` altera o modo, sem atualizar da origem.
+
+- `get_project_profile`: perfil detectado do projeto, para sugestões sem executar comandos.
+- `get_board_artifact { id }`: conteúdo completo de regra, skill ou agente; recusa MCPs.
+- `save_board_artifact { id?, kind, name, description, body, skills?, mcpServers?, categories? }`:
+  cria/atualiza apenas na biblioteca. Tipos: `rule`, `skill`, `agent`; regra nova fica desligada.
+  Edição exige id e mantém nome, arquivos de apoio e configurações omitidas. Categorias de agente:
+  `read`, `edit`, `run`, `net`, `agents`. Configurações e credenciais MCP são gerenciadas pela pessoa.
+- `list_board_mcp_tools { server, card? }`: lista ferramentas e schemas de um servidor da biblioteca.
+- `call_board_mcp_tool { server, name, arguments, card? }`: encaminha a chamada e devolve seu resultado.
+
+A ponte usa o mesmo registro **faz-ai**, independente da ferramenta cliente. MCP desligado ou ausente
+é recusado; no modo Pelo card, é obrigatório informar um card que selecione o servidor, diretamente
+ou pelo agente. Configurações são relidas em cada chamada; conexões são abertas e fechadas por
+operação. Suporta stdio, Streamable HTTP e `type: "sse"` explícito, com `env`/`headers` estáticos.
+Não conduz OAuth e não encaminha recursos ou prompts MCP. Erros de um servidor não impedem o uso
+dos demais. A IA descobre os schemas antes de chamar uma ferramenta.
+
+As definições com segredos ficam no host; apenas a leitura explícita do formulário de edição MCP
+as envia à interface, sem incluí-las no snapshot compartilhado. `get_skill`, `update_skill` e
+`write_skill_file` priorizam a cópia; `get_agent` sem escopo também. APIs de arquivos nativos seguem
+por compatibilidade. `onlySelected: false` ainda inclui fontes nativas para clientes antigos.
 
 ### Projeto, global e plugins
 

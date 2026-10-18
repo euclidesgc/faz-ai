@@ -10,7 +10,7 @@ import { executionPlan } from './execution';
 import { effortToRun } from '../shared/execution';
 import { modelDisplay, modelValue, parseModelValue, suggestModelRule } from '../shared/models';
 import { effortTiers } from './models';
-import { MeasureBrokenError } from './aiOutput/errors';
+import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
 import { AiGateway, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
@@ -100,7 +100,7 @@ const AUTH_FAILURE_PATTERNS: Record<AiTool, RegExp[]> = {
 const TAIL_LINES = 12;
 /** Tamanho de cada linha do `tail`: a explicação da falha no card não vira despejo de saída. */
 const TAIL_CHARS = 300;
-const WHERE = 'Configurações → Harness de IA → "O que a IA pode fazer"';
+const WHERE = 'Configurações → Harness → "O que a IA pode fazer"';
 
 /** O que a IA precisa saber sobre o limite da execução, para explicar à pessoa em vez de falhar sem contexto. */
 export const PERMISSION_ADVICE: Record<RunnerPermission, string | null> = {
@@ -381,7 +381,14 @@ export class AiRunner {
         cwd: this.deps.cwd,
         timeoutMinutes: state.board.runner.timeoutMinutes,
         prepare: () => {
-          const plan = executionPlan(state, card, this.deps.cwd, this.deps.homeDir ?? '', boardServer(this.deps));
+          const plan = executionPlan(
+            state,
+            card,
+            this.deps.cwd,
+            this.deps.homeDir ?? '',
+            boardServer(this.deps),
+            this.router.libraryMcpDefinitions(),
+          );
           // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo.
           // A execução de conflito segue a permissão (e o modelo) da fase: precisa de git e das checagens, como ela
           const autonomous = !refine && !summarize && isYolo(state, card);
@@ -610,15 +617,20 @@ export class AiRunner {
     const freePlan = run.tail.some((l) => /free plans can only use auto/i.test(l))
       ? `\n\nO plano gratuito do Cursor só roda o modelo Auto: escolha Auto no campo Modelo do card, ou use o botão Recriar as regras de "Esforço da atividade" em Configurações → Modelos de IA, que no Cursor sugere Auto.`
       : '';
+    // o motivo da medição é recado do board no canal, não saída da ferramenta: fica fora do fim da saída
+    const notice = end.measureError ? cut(end.measureError.message, TAIL_CHARS) : null;
+    const toolTail = run.tail.filter((l) => l !== notice);
     const output =
       freePlan +
-      (run.tail.length ? `\n\nFim da saída do ${toolLabel}:\n\n\`\`\`\n${run.tail.join('\n').replace(/```/g, "'''")}\n\`\`\`` : '');
+      (toolTail.length ? `\n\nFim da saída do ${toolLabel}:\n\n\`\`\`\n${toolTail.join('\n').replace(/```/g, "'''")}\n\`\`\`` : '');
+    // caiu antes do primeiro evento e o board não repetiu: a pessoa confere o que ficou feito
+    const notRepeated = end.measureError instanceof MeasureEndedError ? ` ${NOT_REPEATED}` : '';
     const failure = end.timedOut
-      ? `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Harness de IA.${output}`
+      ? `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Harness.${output}`
       : error
         ? `Não foi possível executar o ${toolLabel}: ${error.message}`
         : code !== 0
-          ? `O ${toolLabel} terminou com erro (código ${code}).${output}`
+          ? `O ${toolLabel} terminou com erro (código ${code}).${notRepeated}${output}`
           : null;
     // refinar e resumir não passam a vez, nem quando falham: o card volta ao status que tinha, e a falha fica na conversa
     if (run.mode === 'refine' || run.mode === 'summarize') {

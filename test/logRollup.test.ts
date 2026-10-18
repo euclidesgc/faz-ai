@@ -321,6 +321,25 @@ describe('consolidate', () => {
     expect(db.exec('SELECT COUNT(*) FROM ai_run_usage')[0]!.values[0]![0]).toBe(0);
   });
 
+  it('os comandos de Bash gravados (#604): measure grava, não duplica e a cascata apaga', () => {
+    const id = run(at(2024, 3), 1000);
+    const report = {
+      ...measured({}, []),
+      bashCommands: [
+        { command: 'npm test', calls: 2 },
+        { command: 'cat', calls: 1 },
+      ],
+    };
+    runs.measure(id, report);
+    runs.measure(id, report);
+    expect(runs.bashUsage(id)).toEqual([
+      { command: 'cat', calls: 1 },
+      { command: 'npm test', calls: 2 },
+    ]);
+    consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS);
+    expect(db.exec('SELECT COUNT(*) FROM ai_run_bash')[0]!.values[0]![0]).toBe(0);
+  });
+
   it('nada a consolidar: grava o dia e não mexe no detalhe', () => {
     event(at(2026, 6));
     expect(consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS)).toEqual([]);

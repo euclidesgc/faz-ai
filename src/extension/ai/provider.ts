@@ -45,6 +45,8 @@ export interface HeadlessInput {
    * saindo na hora, com `stdout` vazio e zero token gasto.
    */
   structured?: boolean;
+  /** Assistência de rascunho: sem necessidade de ferramentas de alteração. */
+  draftOnly?: boolean;
 }
 
 /** Arquivo temporário que o executor cria antes de rodar e apaga ao terminar; nos argumentos entra como `{tmp:<nome>}`. */

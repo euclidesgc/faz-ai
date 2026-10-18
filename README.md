@@ -60,7 +60,7 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
 1. **Instale e abra.** Instale **Faz AI Kanban** no VS Code ou no Cursor (pelo marketplace da
    própria ferramenta), abra a pasta do seu projeto e clique no ícone **Faz AI** na barra lateral.
    Cada pasta tem o seu board, já com as fases do fluxo.
-2. **Conecte a IA ao board.** Em **Configurações → Harness de IA**, escolha a ferramenta do projeto
+2. **Conecte a IA ao board.** Em **Configurações → Harness**, escolha a ferramenta do projeto
    (Claude Code, Cursor ou Kimi Code). Na aba **Projeto**, clique em **Instalar (padrão da ferramenta)** no
    grupo **Servidores MCP** e de novo no grupo **Skills**, para a skill do fluxo, que ensina a IA a
    conduzir as fases.
@@ -92,7 +92,7 @@ necessário, na hora certa:
   card pelo board (`get_card`), faz aquele trabalho e para. O histórico fica no card, e não na janela
   de contexto.
 - **Contexto vazio por padrão.** Toda execução pelo board começa sem nenhuma regra, skill, agente,
-  hook ou plugin da sua máquina ou do projeto: só entra o que você marcou em **Harness de IA**. No
+  hook ou plugin da sua máquina ou do projeto: só entra o que você marcou em **Harness**. No
   Claude Code isso é imposto por parâmetro (`--setting-sources ""`, `--disable-slash-commands` e um
   arquivo de servidores MCP só com o do board); nas outras ferramentas, o que a linha de comando
   aceita (ver a tabela de [Agentes](#agentes)).
@@ -195,6 +195,9 @@ pendência sua ganham a borda na cor do status, e o LED da barra diz o estado do
 
 **Selecionar todos de uma coluna.** A caixa no início do cabeçalho de uma coluna de histórias, na mesma linha das caixas dos cards (ou **Selecionar todos**, no menu ⋯), marca as histórias visíveis da coluna (o filtro ativo vale); marcada de novo, limpa a seleção. Numa coluna sem cards, a caixa fica oculta, mas o espaço dela continua reservado. Com a seleção feita, o mesmo menu oferece **Arquivar selecionados**, **Mover selecionados para...**, **Concluir selecionados** e **Mandar selecionados para a lixeira**, cada uma com uma confirmação só para o lote; **Limpar seleção** desmarca tudo. A seleção vale para uma coluna por vez: marcar um card de outra coluna substitui a seleção. Na ação em lote, uma história com sub-tarefa em aberto não é concluída (as outras seguem), e mover para uma coluna de cancelamento cancela as sub-tarefas em aberto.
 
+**Ações sobre a seleção.** A barra de seleção múltipla (dois ou mais cards) e o menu ⋯ da coluna oferecem as mesmas ações: **Aprovar**, **Bloquear**, **Desbloquear**, **Trabalhar na fase**, **Refinar com IA**, **Parar a IA**, modo autônomo, colapsar/expandir, arquivar, mover, concluir e lixeira. As ações indisponíveis continuam visíveis e desabilitadas, sem mostrar o motivo; no menu, isso também vale sem seleção. Cada ação atinge só os cards elegíveis e visíveis. Aprovar vale para quem aguarda revisão e usa o avanço automático da aprovação individual; bloquear pede um motivo obrigatório, registrado na conversa de cada card; desbloquear devolve os bloqueados para **Pronto**. Trabalhar e refinar respeitam as vagas de execução em paralelo: quem já está em execução ou não cabe no limite fica de fora. **Parar a IA** interrompe só execuções iniciadas pelo board.
+
+
 ### Vínculos entre cards
 
 Além das sub-tarefas, qualquer card pode ser vinculado a outro, de qualquer workflow, em **Vínculos**
@@ -255,7 +258,7 @@ o `faz-ai` do terminal avisa e não inicia.
 
 ## Usando com IA
 
-1. Em Configurações → **Harness de IA**, escolha a ferramenta do projeto (Claude Code, Cursor ou
+1. Em Configurações → **Harness**, escolha a ferramenta do projeto (Claude Code, Cursor ou
    Kimi Code).
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
    global que a ferramenta lê. Isso também acontece sozinho, em silêncio, ao abrir a pasta (e a cada
@@ -305,7 +308,7 @@ que não existe mais, para outra pasta ou para a ponte de uma versão anterior, 
 permissão. Cada item diz o efeito e traz a ação: o comando para copiar, **Instalar o MCP do board**
 (abre a seção Servidores MCP da ferramenta), **Corrigir o registro** (um registro quebrado no arquivo
 do projeto vale no lugar do global; corrigir tira ele dali e deixa o global valendo), **Recarregar a
-janela** ou o atalho para o Harness de IA. O ícone some sozinho quando o último item é resolvido. A conferência roda ao abrir o board, quando a
+janela** ou o atalho para o Harness. O ícone some sozinho quando o último item é resolvido. A conferência roda ao abrir o board, quando a
 ferramenta ou a permissão mudam, depois de conectar, a cada 5 minutos e em **Verificar de novo**,
 que relê também o PATH do terminal (um node instalado com o board aberto é encontrado sem recarregar
 a janela), e diz quando nada mudou. Ao lado, no editor, **Recarregar a janela** reinicia a extensão:
@@ -346,7 +349,7 @@ board o usa.
   artefatos"), nenhum agente do board, regras enviadas e ainda desligadas, artefato que sumiu da
   origem e, no Cursor, regras, servidores ou hooks do projeto que entram no contexto sem passar pelo
   board. O mesmo aparece no aviso do topo do board como linha discreta de recomendação, com o atalho
-  para o Harness de IA.
+  para o Harness.
 - **Opcionais:** a outra ferramenta de IA, quando está na máquina (a linha de comando no PATH ou, no
   Cursor, o próprio editor). Projeto com o Claude Code mostra o Cursor aqui, e vice-versa. A lista só
   mostra o estado: o board instala o MCP e a skill nela quando ela vira a ferramenta do projeto.
@@ -439,7 +442,7 @@ das próximas mensagens (a escolha fica lembrada). Enter envia, Shift+Enter queb
 interrompe e **Limpar** apaga a conversa. O histórico fica guardado por projeto.
 
 O chat usa a mesma execução em segundo plano dos cards, então vale o limite de Configurações →
-Harness de IA → "O que a IA pode fazer" (por padrão, só o board) e o tempo limite de lá.
+Harness → "O que a IA pode fazer" (por padrão, só o board) e o tempo limite de lá.
 
 ### Trabalhar na fase e Refinar com IA
 
@@ -481,7 +484,7 @@ Imagens coladas na mensagem ou na descrição do card viram anexos dele e a IA a
   cria um registro novo, sem substituir o anterior. O [heartbeat](#heartbeat) resume sozinho a
   conversa que cresceu. Está disponível também como ferramenta MCP (`generate_summary`), com o
   mesmo resultado.
-- O que a IA pode fazer nessas execuções se define em Configurações → Harness de IA → **Execução
+- O que a IA pode fazer nessas execuções se define em Configurações → Harness → **Execução
   pela conversa**: só o board (padrão), board e arquivos do projeto, ou sem restrições. O nível em
   uso aparece ao lado do botão, com um atalho para mudar. A IA é avisada do limite: se o trabalho
   pedir mais do que o nível permite, ela bloqueia o card dizendo qual opção escolher.
@@ -664,14 +667,15 @@ economizar tokens.
 
 - A agregação pode agrupar por fase (`phase`), tipo de card (`card_type`), ferramenta de IA
   (`tool`), modelo (`model`), esforço (`effort`), perfil (`profile`), card (`card`), agente (`agent`),
-  skill (`skill`), ferramenta usada (`used_tool`) ou ferramenta de MCP (`mcp_tool`). Omita para obter
+  skill (`skill`), ferramenta usada (`used_tool`), ferramenta de MCP (`mcp_tool`) ou comando de Bash (`bash_command`). Omita para obter
   apenas o total do período.
 - `tool` e `used_tool` não são a mesma coisa: `tool` é a ferramenta de IA que rodou (claude, cursor);
   `used_tool` e `mcp_tool` são o que a execução usou (Read, Bash, `get_card`). Em `mcp_tool` o
-  servidor vem numa coluna própria, ou "servidor não registrado" quando o nome não o trouxe.
+  servidor vem numa coluna própria, ou "servidor não registrado" quando o nome não o trouxe. `bash_command` é o comando-base de cada chamada
+  de Bash, sem argumentos (`npm test`, `git status`, `cat`), só do Claude Code.
 - Filtros de período (data inicial e final, em `AAAA-MM-DD`), card (ex. `72` ou `#72`), e dimensões
   (ex. fase, modelo, tipo de card).
-- Nas dimensões **agent**, **skill**, **used_tool** e **mcp_tool** a tabela mostra só a contagem de
+- Nas dimensões **agent**, **skill**, **used_tool**, **mcp_tool** e **bash_command** a tabela mostra só a contagem de
   execuções e de usos (sem tokens, que não é possível repartir entre componentes de uma
   execução). `effort` e `profile` têm tokens.
 - Tokens contam em toda execução medida, do Claude Code e do Cursor. A tabela não traz custo em dólar.
@@ -921,7 +925,7 @@ não têm o commit do merge guardado, continuam sendo arquivadas por você, com 
 
 ### Heartbeat
 
-Com o heartbeat ligado (Configurações → Harness de IA), o board chama a IA sozinho a cada
+Com o heartbeat ligado (Configurações → Harness), o board chama a IA sozinho a cada
 intervalo, enquanto o editor estiver aberto na pasta do projeto. O heartbeat em si não depende da IA:
 é um relógio do board que, a cada rodada, primeiro arruma o board e depois decide o que a IA faz. Em
 cada rodada ele:
@@ -973,7 +977,7 @@ Settings explica o motivo em cada modo: com branch na própria pasta, duas hist�
 trocariam a branch uma debaixo da outra e misturariam alterações; com worktree elas ficam isoladas,
 ao custo de mais uma cópia dos arquivos em disco por história (com as dependências instaladas em
 cada uma) e de mais memória e processador enquanto várias sessões de IA, testes e builds rodam
-juntos. No editor a aba Git e o bloco de paralelo do Harness de IA viram um link para o Settings; no
+juntos. No editor a aba Git e o bloco de paralelo do Harness viram um link para o Settings; no
 navegador seguem como campos editáveis, como antes.
 
 - A rodada tem uma ordem fixa: a arrumação (limite de uso, cards parados); um `git fetch` só; os pull
@@ -1104,314 +1108,101 @@ sessão da história terminou com uma sub-tarefa marcada por `start_work`, uma s
 caiu), o board o devolve para Pronto: na abertura, os cards das execuções que a sessão anterior
 deixou abertas (e as sub-tarefas deles); ao fim da sessão de uma história, as sub-tarefas dela; e, a
 cada minuto, qualquer card "Em execução" sem execução do board há mais tempo que o limite de uma
-execução (Configurações → Harness de IA → tempo máximo), com a explicação na conversa.
+execução (Configurações → Harness → tempo máximo), com a explicação na conversa.
 
 
 ### Agentes
 
-![Agente com intenção, skills escolhidas e ferramentas só de leitura](docs/images/agents.png)
+Os subagentes são artefatos da **Biblioteca do board**, com instruções, descrição, modelo opcional,
+categorias de ferramentas e dependências de skills e MCPs. Criar ou editar pelo Harness grava no
+board e nas cópias de leitura, sem criar arquivos nas pastas das ferramentas. Agentes existentes
+nessas pastas podem ser importados.
 
-Um agente é um **arquivo de agente da ferramenta de IA** (`~/.claude/agents/<nome>.md`,
-`~/.cursor/agents/<nome>.md`): as instruções são o papel da
-sessão, e o frontmatter diz o modelo e o esforço, as ferramentas (disponíveis e negadas), as skills e
-os servidores MCP que ela recebe. Para o board, agente e perfil de execução são a mesma coisa. Os
-arquivos são lidos do disco; o board só guarda, por projeto, quais estão **disponíveis** e qual é o
-**padrão** (Harness de IA → Ferramenta e execução). Toda execução pelo board roda através de um
-agente: o escolhido no card; senão, o da fase (Workflows e colunas → Fase); senão, o padrão. Sem
-nenhum marcado, vale o agente embutido, sem instruções.
+A execução escolhe o agente do card; na ausência dele, o agente da fase; depois, o padrão de
+**Harness → Ferramenta e execução**. Sem agentes disponíveis, usa o agente embutido, sem
+instruções adicionais. Remover um agente libera as seleções dos cards e fases que o utilizavam.
+Os agentes de fábrica existentes são mantidos na biblioteca.
 
-Os agentes que o board cria vão para a pasta global da ferramenta (valem em qualquer projeto), e os
-que já existem no projeto aparecem na aba **Projeto**. Na primeira abertura do board, dez agentes de
-fábrica são criados no global, marcados como disponíveis, com o **condutor-do-board** como padrão:
-ele conduz os cards pelo fluxo, indica o especialista certo em cada sub-tarefa e, na Implementação,
-delega cada uma a esse especialista como subagente (a sessão da história recebe os outros agentes
-disponíveis do board como subagentes). Os outros
-(frontend-web, backend-node, backend-python, mobile-flutter, documentacao-tecnica, qa-testes,
-revisor-de-codigo, devops-infra, dados-sql) têm instruções mínimas, para você ou a IA adaptar ao
-projeto. O que você apagar não volta sozinho; **Recriar os agentes padrão** recria o que faltar.
+Na aba **Sub-agentes**, use **Criar**, **Assistente guiado** ou **Gerar com base no projeto**.
+O formulário de criação e edição abre em um modal com fundo escurecido, separado da lista de agentes existentes. Clicar fora dele mantém o rascunho aberto; use Cancelar para sair.
+O editor permite revisar as instruções, selecionar skills e MCPs da própria biblioteca e definir as
+categorias Leitura, Edição, Comandos, Rede e Subagentes. Um modelo vazio segue o card ou a sessão;
+um modelo de outra ferramenta não é imposto ao trocar o executor.
 
-Na aba Agentes de cada escopo:
+O board traduz categorias para ferramentas nativas quando há suporte documentado. As instruções
+levam o escopo também, pois Cursor e parte das ferramentas do Kimi não oferecem restrição equivalente
+por parâmetro. No Claude Code, o agente pode ser entregue inline com restrições de ferramentas e
+modelo; nos demais executores, parte do perfil é orientação no prompt. A ponte MCP aplica o modo
+Sempre/Pelo card/Desligado dos servidores da biblioteca independentemente do executor.
 
-- **Disponível no board**: os cards e as fases podem escolher o agente. **Tornar padrão** o faz
-  executar quando nenhum deles escolhe.
-- **Novo agente**: nome, descrição (é por ela que o Refinar com IA escolhe), modelo e instruções.
-- **Criar agente com ajuda**: um assistente de sete passos para um agente de escopo reduzido (ver
-  abaixo).
-- **Sugestões prontas**: revisor somente leitura, escritor de testes, redator de documentação e
-  executor de migrações; cada uma abre o assistente com as respostas preenchidas, para você ajustar
-  e confirmar. São locais, sem IA.
-- **Editar**: o editor mostra só o que a ferramenta do agente aceita (tabela abaixo). Cada campo
-  do frontmatter grava ao sair; as instruções têm Salvar. As skills vêm da mesma janela do card (só as
-  marcadas). No Claude Code, as ferramentas disponíveis e as negadas são **listas marcáveis**
-  agrupadas por escopo (leitura, edição de arquivos, comandos, rede, outros agentes e outras), com o
-  aviso **amplia o escopo** nos grupos que dão mais poder ao agente, e há conjuntos prontos (**Só
-  leitura**, **Editar código**). O que o arquivo já tem e a lista não conhece (como
-  `mcp__github__*` ou `Bash(git diff *)`) aparece como um chip marcado que dá para tirar, e dá para
-  acrescentar um servidor MCP do board como `mcp__<nome>__*`. No Cursor não há lista de ferramentas:
-  o editor mostra só **Somente leitura** e **Em segundo plano**.
-- **Sugerir agentes com IA**: a IA lê o projeto (estrutura, dependências, README) e cria ou ajusta
-  de 3 a 8 agentes para ele, pelo MCP, deixando-os disponíveis. O resultado fica no chat do board.
+Pelo MCP, `get_board` lista os agentes disponíveis, `set_card_profile` escolhe o do card e
+`get_board_artifact`/`save_board_artifact` leem e editam a biblioteca. As APIs de arquivos nativos
+`create_agent`, `update_agent`, `get_agent` e `delete_agent` continuam por compatibilidade.
 
-O que o arquivo de agente de cada ferramenta aceita (documentação oficial lida em 2026-10-14):
+## Harness
 
-| Ferramenta | Frontmatter do agente | O editor mostra |
-| --- | --- | --- |
-| Claude Code | `description`, `tools`, `disallowedTools`, `model`, `skills`, entre outros | instruções, modelo e esforço, skills, servidores MCP, ferramentas disponíveis e negadas |
-| Cursor | `description`, `model`, `readonly`, `is_background`; sem lista de ferramentas, skills nem MCP (herda tudo da conversa principal) | instruções, modelo e esforço, **Somente leitura** e **Em segundo plano** |
+O board gerencia uma **biblioteca particular**, independente da ferramenta de IA. Em
+**Configurações → Harness**, a aba **Biblioteca do board** concentra o CRUD de **Regras**,
+**Skills**, **Sub-agentes** e **MCPs**. **Ferramenta e execução** escolhe a IA, os modelos, as
+permissões, o agente padrão e o heartbeat; também conecta a ferramenta ao servidor MCP do board.
+Trocar de ferramenta preserva os artefatos e suas seleções.
 
-Um agente criado para uma ferramenta fica na pasta dela e só aparece na aba dela.
+Os avisos de cada tipo têm um botão com contorno, abaixo do texto e à direita, para fechar e não exibir mais. O ícone de informação permite exibir o aviso novamente.
 
-**Criar agente com ajuda.** Um passo por vez, num cartão, com **Voltar** e **Continuar**; cada passo
-traz um exemplo de resposta e uma sugestão, sem esconder as outras opções, e nada é gravado antes do
-último. (1) **Para que serve**: o papel e o objetivo (exemplo: "Revisa o diff de uma branch antes do
-pull request e aponta bugs, sem alterar nada."). (2) **Ferramentas**: o conjunto mínimo pela
-diretriz (revisar, ler e analisar: `Read`, `Grep`, `Glob`; editar, implementar e corrigir: também
-`Edit`, `Write` e `Bash`; testar e rodar: `Bash`; pesquisar na web: `WebFetch` e `WebSearch`; nunca
-`Agent` por padrão), com o porquê de cada uma, a lista completa e o aviso do que amplia o escopo;
-no Cursor o passo é a escolha de **Somente leitura**. (3) **Servidores MCP**: só o do board, que vai
-sempre; os outros do board como opções. (4) **Skills de apoio**: as do board em modo Pelo card, com as
-ligadas à diretriz sugeridas e a regra de uma por assunto. (5) **Modelo e esforço**: leitura e
-revisão pedem o menor modelo do catálogo com esforço baixo; planejamento, arquitetura e
-implementação, um maior. (6) **Instruções**: um rascunho gerado das respostas (como trabalha,
-padrões, o que nunca faz), editável. (7) **Resumo**: o agente inteiro e o nome (derivado da diretriz,
-editável e validado); só **Criar agente** grava. No Cursor, os passos de servidores MCP e de skills
-avisam que o arquivo do agente não os aceita.
+**Importar artefatos** aceita um projeto ou uma coleção. Escolha a pasta pelo seletor
+ou informe seu caminho no computador onde o board roda. A prévia mostra os quatro tipos, suas
+quantidades e caixas de seleção; **Importar selecionados** copia cada item para sua aba. O board
+reconhece formatos das ferramentas e coleções neutras: `AGENTS.md`, pastas `rules/`, `agents/` e
+skills com `SKILL.md`, inclusive em subpastas. Arquivos `mcp.json` e `.mcp.json` usam `mcpServers`.
+A prévia tem quatro abas, inclusive vazias, com filtro por nome ou descrição. Seleções são mantidas
+ao trocar de aba e filtrar. Nomes repetidos do mesmo tipo são ignorados: os demais itens entram,
+e o resumo agrupa os conflitos e oferece uma confirmação explícita para sobrescrevê-los.
 
-Cada execução pelo board ("Trabalhar na fase", "Refinar com IA" e heartbeat) é uma sessão nova, de
-contexto vazio, só com o que está no card. O agente vira parâmetros da linha de comando onde a
-ferramenta aceita; o resto segue no prompt, como instrução:
+Em **Skills**, selecione os itens individualmente ou todos os visíveis e aplique **Sempre**, **Pelo card** ou **Desligado** em massa. A seleção acompanha a busca; **Limpar seleção** a desfaz. **Excluir selecionadas** pede confirmação e preserva os arquivos de origem. Subagentes também permitem selecionar e excluir em massa ou manter disponíveis no board; MCPs permitem alterar o modo e excluir em massa. Skills, subagentes e MCPs não oferecem Atualizar da origem. O formulário de regras tem apenas Nome e Conteúdo.
 
-| Ferramenta | Imposto por parâmetro | Só orientado |
-| --- | --- | --- |
-| Claude Code | agente (inline, em `--agents`), servidores MCP, ferramentas, modelo e esforço, contexto vazio | skills e rules |
-| Cursor | modelo | todo o resto |
+Cada aba tem **Criar**, busca, quantidade e ações de **Editar**, mudar o modo de uso, atualizar da
+origem e remover com confirmação. Regras, skills e subagentes também oferecem **Assistente guiado**
+(etapas por seção, dicas, placeholders, exemplos editáveis e revisão antes de salvar) e **Gerar com base no projeto**
+(a IA usa o perfil detectado do projeto e os artefatos existentes, grava na biblioteca e registra o
+resultado na conversa do board). O assistente de regras propõe `AGENTS.md`, com projeto, mapa do código, comandos e validação, convenções, regras inegociáveis e limites; o de subagentes permite
+escolher categorias de ferramentas, skills e MCPs da biblioteca. Os agentes são usados como perfis
+pelo runner e como orientação de delegação nas conversas externas; o suporte nativo a subagentes
+continua dependendo da ferramenta.
 
-As skills e as rules vão sempre pelo caminho do arquivo. Numa conversa aberta por você, o agente
-chega à IA pelo `get_card` (`execution`), como orientação. Pelo MCP, `get_board` lista os agentes
-(só `agents`, sem `harness` nem `appearance`; o inventário está no `get_harness`) disponíveis, `set_card_profile` escolhe o de um card e `create_agent`, `update_agent`, `get_agent` e
-`delete_agent` gerenciam os arquivos.
+O editor de **Sub-agentes** separa Instruções, Modelo, Permissões, Skills, MCPs e Revisão. As instruções têm partes de responsabilidade, escopo, método e entrega, com exemplos e **Ajudar com IA** em cada parte. O modelo é escolhido no catálogo da ferramenta; vazio herda o do card ou sessão. Cada permissão tem uma explicação. Skills e MCPs exibem descrições, busca e **Indicar com IA**; **Selecionar indicadas** aplica as recomendações justificadas. **Revisar e salvar** pede uma análise da definição completa antes de gravar: é possível aplicar a melhoria do conteúdo ou salvar como está. Alterar a definição depois da revisão exige nova análise. Se a IA estiver indisponível, o rascunho é preservado e há uma escolha explícita de salvar sem revisão.
 
-## Harness de IA
+- **Sempre**: entra no contexto de toda execução do board.
+- **Pelo card**: fica disponível no planejamento e nos campos Skills, Rules e MCPs; entra quando o
+  card ou seu agente o escolhe.
+- **Desligado**: permanece na biblioteca sem participar da execução. Regras novas entram assim,
+  para revisão antes da ativação.
 
-![Skills do projeto e globais, com a instalação da skill do fluxo no global](docs/images/harness.png)
+**Pasta da biblioteca** mostra o destino, por padrão
+`~/faz-ai-library/<projeto>/`, fora do repositório. Bibliotecas existentes preservam seu destino.
+O campo aceita outro nome e caminho; **Selecionar pasta** ajuda a escolher o local. **Abrir pasta** abre o gerenciador de
+arquivos; **Salvar pasta** aceita uma pasta vazia, recria as cópias ali e preserva a pasta anterior.
+Skills coladas com seus arquivos de apoio são reconhecidas ao voltar à tela ou usar **Atualizar
+lista**. Os arquivos particulares e desconhecidos são preservados. Cada skill aceita 512 KB por
+arquivo, 100 arquivos de apoio e 5 MB no total; omissões aparecem na lista. As skills particulares,
+incluindo `board-harness/`, não são distribuídas com a extensão. Editar a biblioteca não altera a
+origem; em Regras, **Atualizar da origem** substitui a cópia somente com confirmação.
 
-Toda execução pelo board parte de **contexto vazio**: nenhuma regra, skill ou agente da sua máquina
-ou do projeto entra por conta própria. Só entra o que você **envia ao board**. Ao abrir Configurações →
-**Harness de IA** pela primeira vez, o aviso **Como usar o Harness** resume isso e diz por onde
-começar (Indicar artefatos, um agente com ajuda, revisar as regras desligadas); **Entendi, não mostrar
-de novo** o dispensa (a escolha fica guardada por pessoa, para qualquer projeto, e não volta ao
-reabrir o board), e **Como funciona** o traz de volta. As abas de assunto dizem no título quantos
-artefatos estão no board e quantas regras esperam revisão, e um Board vazio leva direto a Projeto ou
-Global. A tela tem três níveis:
+**MCPs** exibem a descrição funcional cadastrada, com prioridade sobre comando ou URL. Ao importar, uma descrição presente na configuração é aproveitada; se faltar, use **Editar** para explicar a finalidade. A lista não conecta servidores automaticamente para descobrir descrições.
 
-1. **Uma aba por ferramenta.** **Ferramenta e execução** (a IA do projeto, a permissão, o agente
-   padrão e o heartbeat) e uma aba para o **Claude Code** e outra para o **Cursor**, a da ferramenta
-   do projeto primeiro, com o selo **ferramenta deste projeto**. Na outra, a marcação do board não
-   vale (as execuções usam a ferramenta do projeto): ela serve para ler e editar os arquivos.
-2. **Onde olhar**, num seletor acima das abas de assunto, que vale para todas elas: **Board**,
-   **Projeto**, **Global** e, quando há pasta importada, **Importados**. Projeto, Global e Importados
-   são o **catálogo**: tudo que a ferramenta carrega naquela fonte, e existir no catálogo não ocupa o
-   contexto da IA. **Projeto** é o que a ferramenta lê na pasta do projeto; **Global**, o que ela lê
-   da sua pasta de usuário (`~/.claude`, `~/.cursor`…), dos plugins instalados e da sua organização;
-   **Importados**, o que o board achou nas pastas que você indicou. **Board** é o que você enviou, com
-   o modo de cada um. Trocar de assunto não muda a escolha.
-3. **Um assunto por aba**: **Regras**, **Skills**, **Sub-agentes**, **MCPs**, **Comandos**, **Hooks** e
-   **Demais** (memória, configurações e permissões, estilos de saída, plugins e a política da
-   organização). Só aparecem os assuntos que a ferramenta tem, e o título de cada aba conta o que há
-   no escopo escolhido ("3 no board" no Board; o número de artefatos no catálogo). No Board, Comandos,
-   Hooks e Demais dizem que não entram no board. Só o assunto à vista é montado, o que mantém a tela
-   leve num ambiente com muitos artefatos.
+**MCPs** têm criação por formulário (`command` e `args` para stdio, URL para HTTP) e **Editar JSON
+diretamente**, inclusive uma definição envolvida por `mcpServers`. Variáveis `env` e cabeçalhos
+`headers` ficam no host e aparecem apenas ao abrir explicitamente o editor desse MCP; não entram no
+snapshot geral ou nas cópias de leitura. A ponte do MCP **faz-ai** oferece `list_board_mcp_tools` e
+`call_board_mcp_tool`: qualquer cliente MCP conectado ao board pode descobrir os schemas e chamar
+as ferramentas dos servidores cadastrados, sem copiar suas configurações para cada ferramenta.
+Servidores desligados são recusados; no modo Pelo card, a chamada deve informar um card que o
+selecione, diretamente ou por seu agente. A ponte suporta stdio, Streamable HTTP e SSE explícito,
+com credenciais estáticas; não conduz login OAuth. Nesta versão encaminha ferramentas, não recursos
+ou prompts MCP, e abre/fecha uma conexão a cada operação.
 
-Ao lado do seletor há o campo de **busca**, que filtra as linhas por parte do nome ou da descrição,
-no catálogo e no Board. Todo botão de ação da tela (Reler pastas, Novo agente, Sugerir agentes com IA,
-Enviar para o board…) tem um **hint** que diz o que o clique faz, aberto ao passar o mouse ou ao
-focar pelo teclado; desabilitado, o hint diz por quê. Os grupos do catálogo são sempre os mesmos, na
-mesma ordem:
-
-| Assunto | Grupo | O que é | Exemplos |
-| --- | --- | --- | --- |
-| Regras | Regras principais | Entram no começo de toda conversa; as de subpasta, quando a IA mexe nela | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `~/.claude/CLAUDE.md`, `packages/api/CLAUDE.md`; no Cursor, `AGENTS.md` (também de subpastas) e o aviso das User Rules (que ficam nas configurações dele) |
-| Regras | Regras por assunto | Regras por tema; algumas só entram quando a IA mexe em certos arquivos | `.claude/rules/*.md`, `~/.claude/rules/*.md`, `.cursor/rules/*.mdc` |
-| Demais | Memória (Projeto) | Anotações que o Claude Code guarda sozinho sobre o projeto | `~/.claude/projects/<projeto>/memory/` |
-| Skills | Skills | Instruções e arquivos de apoio carregados quando a tarefa pede | `.claude/skills/<nome>/SKILL.md`, `.cursor/skills`, `.agents/skills` |
-| Sub-agentes | Subagentes | Ajudantes para os quais a IA delega trabalho | `.claude/agents/*.md`, `.cursor/agents/*.md` |
-| Comandos | Comandos | Prompts prontos, chamados com `/nome` | `.claude/commands/*.md`, `.cursor/commands/*.md` |
-| Hooks | Hooks | Comandos que a ferramenta roda sozinha em certos eventos | `hooks` do `.claude/settings.json`, `.cursor/hooks.json`, `[[hooks]]` do `~/.kimi-code/config.toml` |
-| MCPs | Servidores MCP | Servidores que dão ferramentas extras à IA | `.mcp.json`, `~/.claude.json`, `.cursor/mcp.json` |
-| Demais | Configurações e permissões | Como a ferramenta se comporta e o que a IA faz sem perguntar | `.claude/settings.json`, `.claude/settings.local.json`, `.cursor/cli.json`, `.cursorignore` |
-| Demais | Estilos de saída | Mudam o jeito de a IA responder | `.claude/output-styles/*.md` |
-| Demais | Plugins (Global) | Pacotes instalados, um bloco por plugin com o que ele traz | os que `claude plugin list` mostra, `~/.cursor/plugins/local` |
-| Demais | Organização (Global) | A política da empresa, só leitura | `CLAUDE.md` e `managed-settings.json` da pasta do sistema (`/Library/Application Support/ClaudeCode` no macOS) |
-
-Cada item mostra o nome, **o que é numa frase simples**, se é **sempre carregado** ou **sob
-demanda**, a descrição do próprio arquivo e o caminho. Nas instruções do Claude Code aparecem também
-os arquivos que elas importam com `@caminho` (que entram junto, até quatro níveis), e cada um abre
-no editor do board. **Clicar no caminho abre o arquivo no editor
-do board**, o mesmo dos anexos: Markdown formatado ou código, com **Editar**, **Salvar** e
-**Cancelar**, e **Abrir no editor** para quem preferir o VS Code. JSON inválido não é gravado; o que
-vem de plugin, o `~/.claude.json` e a política da organização abrem só para leitura. Os arquivos
-que a ferramenta leria e ainda não existem aparecem no fim do grupo, com o botão **Criar** e a frase
-de cada um, e o arquivo novo já abre no editor.
-
-Em **Regras principais** do Claude Code, o board oferece criar o `CLAUDE.md`, o `CLAUDE.local.md`
-(só seu, fora do git) e, só quando o projeto não tem `CLAUDE.md`, o `AGENTS.md`: por padrão, o
-Claude Code lê o `AGENTS.md` apenas quando não há `CLAUDE.md`, `.claude/CLAUDE.md` nem
-`CLAUDE.local.md`. Se o projeto tem os dois e nenhum `CLAUDE.md` importa o `AGENTS.md` com `@`, ele
-aparece como **não lido pelo Claude Code**, com o `@import` que resolve. Se tem só o `AGENTS.md`, o
-board avisa que criar um `CLAUDE.md` faz o Claude Code parar de lê-lo.
-
-Na origem **Board** de Regras, Skills, Sub-agentes e MCPs ficam os artefatos que você enviou, cada um
-com o seletor de **modo**, a origem (Projeto, Global, Importados ou plugin) e o botão **Remover do
-board**. O board **referencia** o artefato pelo caminho de origem, não o copia: uma mudança no arquivo
-vale no board, e uma origem apagada deixa o artefato com o selo **ausente** na mesma lista, sem
-quebrar os cards que o listam (**Remover do board** tira a marcação). Nas rules, skills e servidores
-MCP do catálogo, a linha da ferramenta do projeto também tem o seletor de modo, com a opção **Fora do
-board**.
-
-- **Sempre**: entra em toda execução (trabalhar a fase, refinar, chat do board), independente do
-  card. É o lugar da skill do fluxo, do servidor do board e das regras que valem sempre.
-- **Pelo card**: não entra sozinho. Vira opção dos campos **Rules**, **Skills** e **MCPs** dos cards
-  (e das skills e servidores dos agentes), e o planejamento da fase ou o **Refinar com IA** o indica
-  quando a tarefa pede, escolhendo só entre o que está no board. Vale o mínimo: no máximo uma skill
-  por assunto, e só os servidores de que a tarefa precisa.
-- **Desligado** (só nas regras): está no board, mas não entra em nada. Toda regra entra assim, porque
-  um `CLAUDE.md` escrito para outro contexto pode conflitar com o fluxo e as definições do board: a
-  origem Board das Regras avisa e convida a revisar o texto antes de ativar.
-- **Fora do board**: a execução não o vê, mesmo que a ferramenta o carregue numa conversa sua.
-
-O card mostra tudo que vai ser usado: além do que o agente e o planejamento indicam, os artefatos em
-modo **Sempre** aparecem no resumo do agente marcados com **(sempre)**, para você ver o custo
-completo e decidir se mantém algum sempre ligado.
-
-**Importar artefatos.** Nem todo artefato útil está no projeto ou na pasta global. O botão
-**Importar artefatos**, no alto da aba de cada ferramenta, abre o seletor de pasta do editor (no modo
-navegador, um campo para digitar o caminho no computador onde o board roda) e importa uma pasta de
-fora (outro repositório, uma coleção do time, uma pasta baixada): o board varre a pasta
-atrás do que a ferramenta reconhece num projeto (regras, skills, agentes, comandos, hooks, servidores
-MCP e configurações, ou a própria pasta como pasta de skills) e lista o que achou na origem
-**Importados**, que só aparece quando há pasta importada. Nada entra no board sem você enviar. As
-pastas ficam guardadas no board e são varridas de novo a cada leitura; em Importados, cada pasta tem
-**Remover pasta**, que pede confirmação e tira dela também os artefatos do board.
-
-**Indicar artefatos.** Como o ambiente pode ter muitas skills, agentes e servidores, cada assunto
-da ferramenta do projeto tem o botão **Indicar artefatos** (nas origens Projeto, Global e Importados).
-A IA lê o projeto (estrutura, dependências, README, `CLAUDE.md`) e o catálogo daquele assunto, só o que
-ainda não está no board, e devolve os que fazem mais sentido, poucos e com o motivo de cada um; a tela
-os deixa **pré-selecionados**, com o selo **indicado**, para você conferir e usar **Enviar para o
-board** ou desmarcar alguns antes. Nada entra no board sem a sua confirmação, e a execução é só de
-leitura (nada é gravado). A indicação roda pela mesma ferramenta do chat do board, sem entrar na
-conversa; **Descartar indicação** limpa a pré-seleção.
-
-**O planejamento escolhe só do board.** O **Refinar com IA** e o planejamento da fase (a skill do
-fluxo, no Plan) indicam skills, rules, servidores MCP e agente escolhendo **só entre o que está no
-board em modo Pelo card**; o catálogo Global, Projeto e Importados não existe para eles. Vale o
-mínimo: no máximo uma skill por assunto (pode haver mais de uma, se forem de assuntos diferentes) e só
-os servidores de que a tarefa precisa, tanto na história quanto em cada sub-tarefa.
-
-**Seleção múltipla e ações em massa.** Cada linha do catálogo que aceita alguma ação tem uma caixa, e
-a do topo do grupo marca todas. A ação principal da barra que aparece é **Enviar para o board**, que
-leva os marcados com o modo de entrada de cada tipo (**Pelo card**; as regras entram **Desligadas**).
-Também há o modo no board (Sempre, Pelo card, Desligado), **Remover do board** (para o que já está
-nele), o modo da skill, copiar para o projeto ou para o global, **Apagar** (arquivos e pastas) e
-**Remover** (entradas de hook, regra de permissão e servidor MCP). A barra mostra só o que vale para o
-que foi marcado; quando uma ação vale só para parte dos marcados, o botão diz para quantos. Apagar e
-remover pedem confirmação antes. A política da organização, que é só leitura, não tem caixa.
-
-**Plugins.** A lista do Claude Code vem de `claude plugin list --json`: só aparece o que ele carrega,
-nunca o catálogo dos marketplaces. Marcando plugins, a barra oferece **Desativar**, **Ativar** e
-**Desinstalar**, feitos pela própria CLI (`claude plugin disable`, `enable` e `uninstall`, em cada
-escopo em que o plugin está instalado). Os sincronizados do claude.ai e os da organização só se
-desativam. No Cursor, que não tem comando para isso, desinstalar tira a pasta do plugin de
-`~/.cursor/plugins/local`. Desinstalar pede confirmação, e a mudança vale na próxima sessão da
-ferramenta (no Claude Code, também depois de `/reload-plugins`).
-
-**Criar regra e skill com ajuda.** Quem começa um projeto do zero com o board não tem regra nem
-skill nenhuma. Nas origens Projeto e Global da ferramenta do projeto, os assuntos **Regras** e
-**Skills** têm um assistente, com os mesmos princípios do de agentes (pergunta a pergunta, exemplo
-de resposta em cada uma, sugestões sem esconder as opções, nada gravado antes do último passo):
-
-- **Criar regra com ajuda** (5 passos): (1) onde vale: a regra **principal** (o arquivo de regras
-  da ferramenta, criado ou acrescentado ao fim se já existir) ou **por assunto** (um arquivo novo em
-  `.claude/rules/<nome>.md` ou `.cursor/rules/<nome>.mdc`, com `paths:` no Claude Code ou `globs:` no
-  Cursor); (2) o que ela garante; (3) convenções do projeto, que o board lê sem IA (linguagens,
-  comandos de teste, lint e formatação do `package.json`, ferramentas como eslint, prettier, vitest,
-  pytest e ruff, e as pastas principais) e oferece como itens marcáveis; (4) conferência contra o
-  fluxo do board, que aponta os trechos que mandam não usar o MCP, ignorar o board, não pedir revisão,
-  pular a aprovação, commitar direto na main ou não criar branch; (5) rascunho editável e resumo. A
-  regra **entra no board desligada**; um arquivo que já estava no board mantém o modo que você deu.
-- **Criar skill com ajuda** (6 passos): (1) a tarefa que a skill ensina, que vira a descrição; (2)
-  quando usar, que entra na descrição; (3) o passo a passo, proposto a partir dos verbos da tarefa e
-  dos comandos do projeto, em lista editável; (4) o que a skill nunca faz; (5) arquivos de apoio
-  opcionais em `references/`, `assets/` e `scripts/`, criados vazios; (6) o `SKILL.md` completo e o
-  resumo. A skill é gravada no Projeto ou no Global e enviada ao board em **Pelo card**.
-- **Sugerir regras com IA** e **Sugerir skills com IA**: a IA lê o projeto e escreve de 3 a 5 itens
-  já preenchidos (as regras no arquivo de regras da ferramenta, sem apagar o que existe, e
-  desligadas no board; as skills em Pelo card). O resultado fica no chat do board.
-
-Os sub-agentes da ferramenta do projeto têm a tabela própria nas origens Projeto e Global, com
-**Disponível no board**, o padrão e o editor dos campos do board; na origem Board, a lista dos agentes
-disponíveis, com **Remover do board**. Skills e agentes criados ou instalados pelo board já nascem
-marcados. O que ainda entra apesar do contexto vazio depende da ferramenta: no Claude Code 2.1 nada
-da sua pasta nem do projeto (verificado na CLI). **No Cursor**, a linha de comando não desliga
-artefatos: regras, servidores MCP e o mais que estiver no projeto entram conforme o Cursor decidir.
-A aba do Cursor traz um aviso fixo: para o "tudo desligado" valer, desligue nas configurações do
-Cursor ou remova do projeto o que você não quer no contexto das tarefas; o board só avisa.
-
-O que mais dá para fazer em cada grupo:
-
-- **Criar** um item no lugar e no formato que a ferramenta espera, **apagar**, e **copiar** skills,
-  subagentes, comandos e regras do global ou de um plugin para o projeto (e do projeto para o global).
-  Toda alteração na pasta do usuário pede confirmação.
-- **Servidores MCP**: acrescentar e remover, no formato de cada arquivo.
-- **Hooks e permissões**: acrescentar e remover hooks e regras de permitir, perguntar e negar.
-- **Buscar e instalar skills** de uma pasta ou de um repositório git: o board lista as skills
-  encontradas e copia só as que você escolher. Nada do repositório é executado.
-
-**Mudanças feitas por fora.** O board relê o harness sozinho quando um arquivo muda fora dele (no
-editor, pela IA, pelo git), e junta numa releitura só as mudanças de uma mesma rajada (300 ms). No
-projeto, valem o `CLAUDE.md`, o `AGENTS.md`, o `.mcp.json` e tudo de `.claude/`, `.cursor/` e
-`.agents/`. Na pasta do usuário, só as pastas e os arquivos que a origem Global mostra, nunca a home
-inteira: o `~/.claude/CLAUDE.md`, as pastas de regras, skills, subagentes, comandos e estilos, os
-settings, o `~/.claude.json` e os equivalentes do Cursor; de `~/.claude/projects`, só a pasta
-`memory` deste projeto (o resto recebe as transcrições das sessões o tempo todo); dos plugins, o
-registro de instalados do Claude Code e os plugins locais do Cursor. Uma skill ou um subagente
-instalado como link para outra pasta também é observado. No editor, a pasta do usuário passa a ser
-observada quando o board carrega. No modo navegador, são observados os mesmos arquivos globais e, no
-projeto, as pastas e os arquivos que a origem Projeto mostra (sem as worktrees que ficam em `.claude/`),
-e o board relê tudo a cada minuto para o que um watcher não vê. As regras
-de subpasta e a política da organização não são observadas: entram na releitura seguinte.
-
-### Skills sob demanda
-
-Cada skill tem um modo:
-
-- **Automática**: a IA vê a descrição em toda sessão e decide quando usar.
-- **Só quando indicada**: a IA não a invoca sozinha; vale quando um card a indica ou quando é
-  chamada pelo nome.
-- **Desligada** (só no projeto): a ferramenta não a enxerga, e ela sai das opções do board.
-
-O modo diz como a ferramenta trata a skill numa conversa sua; nas execuções do board o que vale é a
-marcação. O campo "Skills" do card mostra um resumo do que está marcado e abre uma janela para
-escolher entre as skills que estão no board em modo **Pelo card**: busca por nome ou descrição,
-abas **Todas / Marcadas / Projeto / Globais / Plugins** e uma caixa de seleção por skill, com a
-origem à vista. O campo "Rules" faz o mesmo com os arquivos de instruções marcados. O card entrega à
-IA o caminho de cada arquivo, então ele não precisa estar à vista da ferramenta para ser usado. Assim
-dá para ter muitas skills disponíveis sem ocupar o contexto de toda sessão. A economia de contexto é documentada no Claude Code e no Cursor;
-nas outras ferramentas, a documentação diz só que a IA deixa de invocar a skill sozinha.
-
-Para não marcar skills card a card, escolha-as no tipo: em Configurações → **Tipos de card** →
-**Padrões por tipo**, as skills do campo "Skills" (e o modelo) ficam preenchidas em todo card novo
-daquele tipo. Cada card ainda pode mudá-las.
-
-### Modelos e referências
-
-Modelos de classe e exemplos de código ficam dentro da pasta da skill (`references/`, `assets/`,
-`scripts/`). O botão **Arquivos** de cada skill lista, cria e apaga esses arquivos, e **Criar skill
-de modelos** cria no projeto uma skill própria para eles. O card que indica a skill recebe os
-caminhos dos arquivos de apoio.
-
-O editor precisa estar aberto na pasta do projeto para a IA alcançar o board. O registro manual, os
-formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](docs/mcp.md).
+As ferramentas MCP `get_project_profile`, `get_board_artifact` e `save_board_artifact` permitem aos
+assistentes trabalhar na biblioteca. As APIs antigas de arquivos por ferramenta permanecem por
+compatibilidade; hooks, comandos e configurações nativas continuam sob gerenciamento da ferramenta.
 
 ## Configurações
 
@@ -1423,7 +1214,7 @@ formatos de cada ferramenta e a solução de problemas estão em [docs/mcp.md](d
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
 | Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria |
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
-| Harness de IA | Ferramenta do projeto, permissão, agente padrão e heartbeat; uma aba por ferramenta, com assuntos (regras, skills, sub-agentes, MCPs…) e, em cada um, as origens Board, Projeto, Global e Importados: tudo que cada ferramenta carrega, com o que cada arquivo é, o caminho que abre no editor do board, a busca e o modo do que vai ao board (ver [Harness de IA](#harness-de-ia) e [Agentes](#agentes)) |
+| Harness | Biblioteca única de regras, skills, subagentes e MCPs, com importação por tipo, CRUD e assistentes; ferramenta, permissão, agente padrão e heartbeat (ver [Harness](#harness) e [Agentes](#agentes)) |
 | Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
 | Git | Fica só na aba Git do modo navegador; no editor, aponta para o Settings (Faz AI › Git) |
 | Aparência | **Idioma** (automático, Português (Brasil) ou English; fica no Settings do editor junto com tema, fonte e tamanho); status (nome e cor, na aba Fluxos; aqui só no modo navegador) |
@@ -1438,7 +1229,7 @@ quatro seções, nesta ordem:
 | --- | --- |
 | Instalação | Um texto curto e o link **Abrir o Diagnóstico do ambiente**, que abre o board na tela do Diagnóstico |
 | Aparência | **Idioma** (`fazai.appearance.language`), **Tema** (`fazai.appearance.theme`), **Fonte** (`fazai.appearance.font`) e **Tamanho** (`fazai.appearance.fontSize`), todos com escopo Usuário — valem em todos os projetos desta pessoa. Status (rótulo e cor de cada status) continuam no board, agora na aba Fluxos |
-| Git | As oito chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.decisionRecords` (a pasta dos [registros de decisão](#registros-de-decisão); vazio = desligado). No editor, a aba Git e o bloco de paralelo do Harness de IA viram link para estas chaves; no navegador seguem como campos editáveis |
+| Git | As oito chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.decisionRecords` (a pasta dos [registros de decisão](#registros-de-decisão); vazio = desligado). No editor, a aba Git e o bloco de paralelo do Harness viram link para estas chaves; no navegador seguem como campos editáveis |
 | Backup | Dois links de ação: **Exportar o board agora** e **Importar um board**, que disparam os comandos da paleta |
 
 Três comandos novos na paleta (`Ctrl+Shift+P`): **Faz AI: Abrir o Diagnóstico do ambiente**,
@@ -1547,6 +1338,11 @@ npm test
 npm run typecheck
 ```
 
+Novas funcionalidades são integradas na `develop`. A seção **Não lançado** do changelog reúne
+apenas mudanças que já chegaram a essa branch; itens ainda em desenvolvimento ficam nas suas
+branches e nos cards. Na release, essa seção recebe a versão publicada e descreve o código que
+a release contém. Integrar na `develop` não publica a extensão.
+
 O `npm test` também roda o lint e confere a formatação; `npm run format` formata tudo. Para o
 `git blame` pular o commit que só formatou o código: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
@@ -1641,10 +1437,6 @@ publicação, `npm run release -- finish` retoma de onde parou: cada passo confe
 (PR, tag, release, main contida na `develop`, branches) e não publica de novo. Se a volta para a
 `develop` der conflito, resolva no PR aberto e rode `finish`. `--dry-run` ensaia sem publicar. As
 opções estão no topo de `scripts/release.mjs`.
-
-Num hotfix (card do tipo Bug, branch `hotfix/...`), rode `npm run release` na worktree da `hotfix/`
-**antes** de aprovar o card. Aprovado antes, o PR entra na principal sem versão e a correção só sai
-no próximo release da `develop`.
 
 Num hotfix (card do tipo Bug, branch `hotfix/...`), rode `npm run release` na worktree da `hotfix/`
 **antes** de aprovar o card. Aprovado antes, o PR entra na principal sem versão e a correção só sai

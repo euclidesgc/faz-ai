@@ -7,3 +7,9 @@ README*.md
 docs/
 .impeccable/
 .claude/
+
+board-harness/
+
+.kimi-code/
+
+.cursor/

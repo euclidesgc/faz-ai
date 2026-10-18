@@ -439,13 +439,15 @@ describe('migração 30 → 31 (branch_kind do tipo de card)', () => {
   });
 });
 
-describe('migração 32 → 33 (artefatos do board)', () => {
+describe('migração 33 → 34 (artefatos do board)', () => {
   const setup = async () => {
     const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
     const old = new SQL.Database();
-    migrate(old, 32);
+    migrate(old, 33);
     old.run(`
       INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto');
+      INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x');
+      INSERT INTO ai_run_bash (run_id, command, calls) VALUES ('r1', 'npm test', 2);
       INSERT INTO harness_selection (board_id, kind, location, usage) VALUES ('b', 'skill', '.claude/skills/x/SKILL.md', 'always');
       INSERT INTO harness_selection (board_id, kind, location, usage) VALUES ('b', 'mcp', '.mcp.json#gh', 'off');
     `);
@@ -453,18 +455,19 @@ describe('migração 32 → 33 (artefatos do board)', () => {
   };
   const count = (db: import('sql.js').Database, table: string) => Number(db.exec(`SELECT COUNT(*) FROM ${table}`)[0]!.values[0]![0]);
 
-  it('um banco com harness_selection migra para 33 e as linhas antigas ficam intactas', async () => {
+  it('um banco com harness_selection migra para 34 e as linhas antigas ficam intactas', async () => {
     const old = await setup();
-    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe('32');
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe('33');
 
     migrate(old);
 
     expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
-    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(33);
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(34);
     expect(old.exec('SELECT kind, location, usage FROM harness_selection ORDER BY kind')[0]!.values).toEqual([
       ['mcp', '.mcp.json#gh', 'off'],
       ['skill', '.claude/skills/x/SKILL.md', 'always'],
     ]);
+    expect(old.exec('SELECT run_id, command, calls FROM ai_run_bash')[0]!.values).toEqual([['r1', 'npm test', 2]]);
     expect(count(old, 'board_artifacts')).toBe(0);
     expect(count(old, 'board_artifact_files')).toBe(0);
   });
@@ -588,5 +591,28 @@ describe('banco gravado por uma versão mais nova', () => {
     db.run('PRAGMA foreign_keys = ON;');
     expect(() => migrate(db)).toThrow(/versão mais nova do Faz AI \(formato \d+; esta versão conhece até o \d+\)\. Atualize a extensão/);
     expect(db.export()).toEqual(before);
+  });
+});
+
+describe('migração 32 → 33 (ai_run_bash)', () => {
+  it('cria a tabela, preserva o dado antigo e apagar a execução apaga os comandos', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 32);
+    old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    old.run(
+      "INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x')",
+    );
+    expect(old.exec("SELECT name FROM sqlite_master WHERE name = 'ai_run_bash'")).toEqual([]);
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(33);
+    expect(old.exec('SELECT id FROM ai_runs')[0]!.values).toEqual([['r1']]);
+    old.run('PRAGMA foreign_keys = ON;');
+    old.run("INSERT INTO ai_run_bash (run_id, command, calls) VALUES ('r1', 'npm test', 2)");
+    old.run("DELETE FROM ai_runs WHERE id = 'r1'");
+    expect(old.exec('SELECT COUNT(*) FROM ai_run_bash')[0]!.values[0]![0]).toBe(0);
   });
 });

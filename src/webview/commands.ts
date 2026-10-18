@@ -4,7 +4,7 @@ import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from 
 import type { HarnessUsage, SelectableKind } from '../shared/harnessSelection';
 import type { AgentInput } from '../shared/messages';
 import type { HookInput, McpServerInput } from '../shared/harnessCatalog';
-import type { CardStatus } from '../shared/status';
+import type { BulkCardStatus, CardStatus } from '../shared/status';
 import type { ModelOption, ModelRule } from '../shared/models';
 import type { BoardRules } from '../shared/rules';
 import type { FieldValue, Id, LinkKind, WorkflowKind } from '../shared/model';
@@ -63,6 +63,9 @@ export const chat = {
 };
 
 export const ai = {
+  /** Confirma o início da geração; a execução continua em `chat.busy`. */
+  generateLibrary: (kind: 'rule' | 'skill' | 'agent') =>
+    req({ type: kind === 'rule' ? 'ai.suggestRules' : kind === 'skill' ? 'ai.suggestSkills' : 'ai.suggestAgents' }),
   run: (cardId: Id) => reqCard(cardId, { type: 'ai.run', cardId }),
   refine: (cardId: Id) => reqCard(cardId, { type: 'ai.run', cardId, mode: 'refine' }),
   summarize: (cardId: Id) => reqCard(cardId, { type: 'ai.run', cardId, mode: 'summarize' }),
@@ -91,6 +94,8 @@ export const cards = {
   deletePermanent: (cardId: Id) => reqCard(cardId, { type: 'card.deletePermanent', cardId }),
   setStatus: (cardId: Id, status: CardStatus | null, note?: string) =>
     reqCard(cardId, { type: 'card.status.set', cardId, status, ...(note !== undefined ? { note } : {}) }),
+  setStatusMany: (cardIds: Id[], status: BulkCardStatus, note?: string) =>
+    req({ type: 'card.status.setMany', cardIds, status, ...(note !== undefined ? { note } : {}) }),
   setYolo: (cardId: Id, enabled: boolean, until?: Id | null) => reqCard(cardId, { type: 'card.yolo.set', cardId, enabled, until }),
   setYoloMany: (cardIds: Id[], enabled: boolean, until?: Id | null) => req({ type: 'card.yolo.setMany', cardIds, enabled, until }),
   archiveMany: (cardIds: Id[]) => req({ type: 'card.archiveMany', cardIds }),
@@ -219,6 +224,19 @@ export const harness = {
   suggest: (tool: AiTool, kind: SelectableKind) => post({ type: 'harness.suggest.run', tool, kind }),
   clearSuggestions: () => req({ type: 'harness.suggest.clear' }),
   /** abre o seletor de pasta do editor para importar artefatos */
+  scanLibraryFolder: (dir: string) => req({ type: 'harness.library.scan', dir }),
+  applyLibraryImport: (keys: string[], overwrite?: boolean) =>
+    req({ type: 'harness.library.apply', keys, ...(overwrite ? { overwrite } : {}) }),
+  pickLibraryDirectory: () => req({ type: 'harness.library.pickDirectory' }),
+  listLibraryFolders: (dir: string) => req({ type: 'harness.library.folders', dir }),
+  saveLibraryArtifact: (input: import('../shared/artifacts').LibraryArtifactInput) => req({ type: 'harness.library.save', input }),
+  readLibraryArtifact: (id: string) => req({ type: 'harness.library.read', id }),
+  pickLibraryArtifacts: () => req({ type: 'harness.library.pickArtifacts' }),
+  setLibraryDirectory: (dir: string) => req({ type: 'harness.library.directory', dir }),
+  updateLibraryArtifact: (id: string) => req({ type: 'harness.library.update', id }),
+  importLibrarySkills: (rels: string[]) => req({ type: 'harness.library.import', rels }),
+  pickLibrarySource: () => req({ type: 'harness.library.pick' }),
+  openLibrary: () => req({ type: 'harness.library.open' }),
   pickImport: (tool: AiTool) => req({ type: 'harness.import.pick', tool }),
   addImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.add', tool, dir }),
   removeImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.remove', tool, dir }),

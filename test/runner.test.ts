@@ -119,7 +119,7 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     mcpServers: { 'faz-ai': { command: 'node' }, github: { command: 'gh-mcp', env: { TOKEN: 'segredo' } } },
   });
   expect(plan.input.mcpBlocked).toEqual(['slack']);
-  expect(plan.advice).toEqual([]); // no Claude Code tudo isso vai por parâmetro, inclusive o agente (inline)
+  expect(plan.advice).toEqual([expect.stringContaining('list_board_mcp_tools')]); // A biblioteca ensina a ponte comum mesmo quando a CLI também aceita o servidor diretamente.
   expect(plan.input.agentDefinition).toEqual({ name: 'restrito', description: 'Restrito', prompt: 'Siga.' });
   expect(plan.summary.join(' | ')).toContain('Servidores MCP: faz-ai, github (imposto)');
   expect(plan.summary.join(' | ')).not.toContain('segredo');
@@ -151,7 +151,10 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   // noutra ferramenta, o que não vai por parâmetro vira instrução no prompt
   router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
   expect(executionPlan(router.snapshot(), card(), project, home).advice).toEqual([
-    'De servidores MCP, use só o do board.',
+    'Você atua como o agente "restrito": Restrito.',
+    'Instruções do agente:\nSiga.',
+    expect.stringContaining('list_board_mcp_tools'),
+    'De servidores MCP, use só o do board e: github.',
     'Use só as rules, as skills e as instruções indicadas neste pedido; ignore instruções, skills e agentes carregados por conta própria.',
   ]);
 
@@ -1323,6 +1326,34 @@ describe('log das execuções de IA', () => {
       expect(log.join('\n')).toContain('não aceita a saída estruturada');
       // o motivo já está no canal: o resumo não o repete
       expect(log).toContain('[#1] Consumo não medido.');
+    });
+
+    it('a falha antes do primeiro evento sem recusa do formato não repete e o card diz que não foi repetida (#739)', () => {
+      speaks = false;
+      logged.start(storyId);
+      procs[0]!.emit('erro: conexão perdida com o servidor\n', 'stderr');
+      procs[0]!.exit(1);
+
+      expect(procs).toHaveLength(1);
+      expect(card().status).toBe('blocked');
+      expect(card().statusReason).toMatch(/^O Claude Code terminou com erro \(código 1\)\. A execução não foi repetida/);
+      // uma vez só: o recado da medição é do board, fica no canal e não entra no fim da saída da ferramenta
+      expect(card().statusReason!.split('não foi repetida')).toHaveLength(2);
+      expect(card().statusReason).not.toContain('A medição não foi possível');
+      expect(card().statusReason).toContain('conexão perdida');
+      expect(channel().some((l) => l.includes('A medição não foi possível'))).toBe(true);
+      expect(only()).toMatchObject({ outcome: 'failed', exitCode: 1, measure: 'none', inputTokens: null, outputTokens: null });
+      expect(log.join('\n')).not.toContain('O trabalho foi repetido');
+      expect(card().statusReason).not.toContain('O trabalho foi repetido');
+    });
+
+    it('a falha depois de eventos não ganha o aviso de execução não repetida', () => {
+      logged.start(storyId);
+      procs[0]!.emit(FIXTURE);
+      procs[0]!.exit(1);
+
+      expect(card().status).toBe('blocked');
+      expect(card().statusReason).not.toContain('não foi repetida');
     });
 
     it('RF-07: a falha DEPOIS de eventos não repete a chamada, e o fim da saída no card é texto legível', () => {

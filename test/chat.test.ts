@@ -224,6 +224,30 @@ describe('ChatSession', () => {
     expect(error.text).not.toContain('Chamando');
   });
 
+  it('a falha antes do primeiro evento não é repetida e o aviso de erro diz isso (#739)', () => {
+    router.chatCommand({ type: 'chat.send', text: 'a', model: null });
+    // o fluxo estruturado não trouxe nenhum evento: só o erro no `stderr`
+    spawned[0]!.raw('');
+    spawned[0]!.emit('erro: conexão perdida com o servidor\n', 'stderr');
+    spawned[0]!.exit(1);
+
+    expect(spawned).toHaveLength(1);
+    const error = messages().at(-1)!;
+    expect(error.role).toBe('error');
+    expect(error.text).toMatch(/^O Claude Code terminou com erro \(código 1\)\. A execução não foi repetida/);
+    // uma vez só: o recado da medição é do board e não entra no fim da saída da ferramenta
+    expect(error.text.split('não foi repetida')).toHaveLength(2);
+    expect(error.text).not.toContain('A medição não foi possível');
+    expect(error.text).toContain('conexão perdida');
+  });
+
+  it('a falha depois de eventos não ganha o aviso de execução não repetida', () => {
+    router.chatCommand({ type: 'chat.send', text: 'a', model: null });
+    spawned[0]!.raw(FIXTURE);
+    spawned[0]!.exit(1);
+    expect(messages().at(-1)!.text).not.toContain('não foi repetida');
+  });
+
   it('a pergunta nova vai uma vez só no prompt, depois da conversa anterior', () => {
     router.chatCommand({ type: 'chat.send', text: 'primeira', model: null });
     spawned[0]!.emit('resposta um');
@@ -439,8 +463,9 @@ describe('Sugerir regras e skills com IA', () => {
   it('ai.suggestRules e ai.suggestSkills rodam o chat com o board como única ferramenta e registram o pedido na conversa', () => {
     router.chatCommand({ type: 'ai.suggestRules' });
     expect(router.snapshot().chat.busy).toBe(true);
-    // a ferramenta do projeto é o Claude Code: o arquivo de regras é o CLAUDE.md
-    expect(spawned[0]!.command.stdin).toContain('write_rule_file em CLAUDE.md');
+    // A sugestão grava no board sem depender do arquivo nativo da ferramenta.
+    expect(spawned[0]!.command.stdin).toContain('save_board_artifact');
+    expect(spawned[0]!.command.stdin).toContain('AGENTS.md');
     expect(spawned[0]!.command.args).toContain('dontAsk');
     spawned[0]!.emit('Regras escritas.');
     spawned[0]!.exit(0);
@@ -459,4 +484,36 @@ describe('Sugerir regras e skills com IA', () => {
     router.chatCommand({ type: 'ai.suggestRules' });
     expect(() => router.chatCommand({ type: 'ai.suggestSkills' })).toThrow('A IA ainda está respondendo');
   });
+});
+
+it('a assistência de subagente usa o gateway medido, sem gravar o agente nem conversar no chat', async () => {
+  const before = router.snapshot().harness.library?.artifacts;
+  const promise = router.assistAgent({
+    step: 'review',
+    name: 'revisor',
+    body: 'Revise sem editar.',
+    sections: {},
+    language: 'pt-BR',
+    agent: { skills: [], mcpServers: [], model: '', tools: { categories: ['read'], native: { tool: '', allow: [], deny: [] } } },
+  });
+  expect(router.snapshot().chat.busy).toBe(true);
+  expect(spawned[0]!.command.args).toContain('Read,Glob,Grep');
+  expect(spawned[0]!.command.stdin).toContain('Produza apenas uma proposta');
+  spawned[0]!.emit(
+    JSON.stringify({
+      explanation: 'Defina a entrega.',
+      suggestions: ['Inclua evidências.'],
+      content: 'Revise sem editar e entregue evidências.',
+      skills: [],
+      mcpServers: [],
+      categories: ['read'],
+      model: '',
+    }),
+  );
+  spawned[0]!.exit(0);
+  await expect(promise).resolves.toMatchObject({ content: 'Revise sem editar e entregue evidências.' });
+  expect(router.snapshot().harness.library?.artifacts).toEqual(before);
+  expect(messages()).toHaveLength(0);
+  expect(router.snapshot().chat.busy).toBe(false);
+  expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))).toHaveLength(1);
 });

@@ -1,6 +1,7 @@
+import { agentOfArtifact, itemOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
-import { isSelectableKind, selectionKey, usageOf } from '../../shared/harnessSelection';
+import { isSelectableKind, selectionKey, usageOf, toolItemsOf } from '../../shared/harnessSelection';
 import { groupOf } from '../../shared/harnessCatalog';
 import { norm } from '../../shared/filters';
 import { activeComments } from '../../shared/conversation';
@@ -256,7 +257,7 @@ function executionOf(s: BoardState, c: Card) {
 }
 
 /** Itens do harness da ferramenta com que o projeto trabalha. */
-const toolItems = (s: BoardState) => s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
+const toolItems = toolItemsOf;
 
 /** Arquivos de apoio da skill (referências, modelos, scripts), com o caminho ao lado do SKILL.md. */
 function supportFiles(skillMd: string, files: string[]) {
@@ -276,6 +277,12 @@ export function requiredRules(s: BoardState, c: Card) {
 export function requiredSkills(s: BoardState, c: Card) {
   // as skills do card somam às do agente
   return manifestOf(s, c).skills.map((name) => {
+    if (s.harness.library) {
+      const copy = toolItems(s).find((i) => i.kind === 'skill' && i.name === name);
+      return copy
+        ? { name, scope: copy.boardArtifactId ? 'board' : copy.scope, path: copy.path, ...supportFiles(copy.path, copy.files ?? []) }
+        : { name, note: 'skill não encontrada' };
+    }
     const skill = s.harness.skills.find((k) => k.name === name);
     if (skill) {
       const files = toolItems(s).find((i) => i.kind === 'skill' && i.scope === 'project' && i.location === skill.path)?.files ?? [];
@@ -467,6 +474,17 @@ export function cardDetail(
         }
       : {}),
     ...(phase ? { phase } : {}),
+    ...(s.harness.library && manifestOf(s, c).mcpServers.length
+      ? {
+          mcpGateway: {
+            server: 'faz-ai',
+            list: 'list_board_mcp_tools',
+            call: 'call_board_mcp_tool',
+            card: `#${c.number}`,
+            servers: manifestOf(s, c).mcpServers,
+          },
+        }
+      : {}),
     ...executionOf(s, c),
     ...workspaceOf(s, c),
     description: c.description,
@@ -633,18 +651,33 @@ export function boardOverview(s: BoardState) {
  */
 export function harnessOverview(s: BoardState, onlySelected = true) {
   const usage = (i: HarnessItem) => (isSelectableKind(i.kind) ? usageOf(s.harnessSelection, i) : null);
-  const inventory = toolItems(s).filter((i) => !onlySelected || usage(i));
+  const sourceItems = s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
+  const inventory = (
+    onlySelected
+      ? toolItems(s)
+      : [...sourceItems, ...(s.harness.library ? s.harness.library.artifacts.filter((a) => !a.missing).map(itemOfArtifact) : [])]
+  ).filter((i) => !onlySelected || usage(i));
+  const agents =
+    onlySelected && s.harness.library
+      ? s.harness.library.artifacts.filter((a) => a.kind === 'agent' && !a.missing).map((a) => agentOfArtifact(a, s.board.aiTool))
+      : s.harness.agents;
   return {
+    library: s.harness.library ? { directory: s.harness.library.directory, artifacts: s.harness.library.artifacts } : undefined,
     aiTool: s.board.aiTool,
     defaultAgent: s.board.execProfiles.find((p) => p.isDefault)?.id ?? null,
     note: onlySelected
       ? 'Só o que está no board (Configurações → Harness): é tudo o que as execuções do board usam. `usage` "always" (Sempre) entra em toda execução; "contextual" (Pelo card) só quando indicado no card (campos Rules, Skills e MCPs) ou escolhido no planejamento e no refinar; "off" (Desligado) está no board sem entrar em nada. Para ver tudo que a ferramenta carrega, chame get_harness com onlySelected = false.'
       : 'Tudo que a ferramenta carrega nesta máquina, e o que há nas pastas importadas; `usage` diz o modo de cada item no board (null = fora do board: invisível para as execuções).',
     ruleFiles: s.harness.rules.map((r) => ({ name: r.name, exists: r.exists, ...(r.exists ? { bytes: r.content.length } : {}) })),
-    skills: s.harness.skills
-      .filter((k) => !onlySelected || toolItems(s).some((i) => i.kind === 'skill' && i.location === k.path && usage(i)))
-      .map((k) => ({ name: k.name, enabled: k.enabled, mode: k.mode, description: k.description, path: k.path })),
-    agents: s.harness.agents
+    skills:
+      onlySelected && s.harness.library
+        ? toolItems(s)
+            .filter((i) => i.kind === 'skill' && usage(i))
+            .map((i) => ({ name: i.name, enabled: true, mode: 'manual', description: i.description, path: i.path }))
+        : s.harness.skills
+            .filter((k) => !onlySelected || toolItems(s).some((i) => i.kind === 'skill' && i.location === k.path && usage(i)))
+            .map((k) => ({ name: k.name, enabled: k.enabled, mode: k.mode, description: k.description, path: k.path })),
+    agents: agents
       .filter((a) => !onlySelected || usageOf(s.harnessSelection, { kind: 'agent', location: a.location }))
       .map((a) => ({
         name: a.name,
@@ -655,10 +688,11 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
         ...(a.tools.length ? { tools: a.tools } : {}),
         ...(a.mcp.length ? { mcpServers: a.mcp } : {}),
         usage: usageOf(s.harnessSelection, { kind: 'agent', location: a.location }),
-        path: a.location,
+        path: onlySelected && s.harness.library ? a.path : a.location,
       })),
     // o que a ferramenta em uso carrega, com o escopo (project, user, plugin ou imported) e o modo no board
     inventory: inventory.map((i) => ({
+      ...(i.boardArtifactId ? { id: i.boardArtifactId } : {}),
       kind: i.kind,
       // o grupo em que a tela de Harness mostra o item (main, topic, memory, skill… plugin, managed)
       group: groupOf(s.board.aiTool, i),
@@ -669,7 +703,7 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
       ...(i.mode ? { mode: i.mode } : {}),
       ...(i.files?.length ? { files: i.files } : {}),
       ...(i.description ? { description: i.description } : {}),
-      path: i.location,
+      path: i.boardArtifactId ? i.path : i.location,
       ...(i.plugin ? { plugin: i.plugin } : {}),
     })),
   };
