@@ -4,9 +4,9 @@
 
 As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga.
 
-## Não lançado
+A seção **Não lançado** reúne apenas mudanças integradas na `develop`, aguardando release. Cada seção versionada descreve as mudanças incluídas naquela release. Trabalho exclusivo de outras branches fica fora destas notas.
 
-Mudanças integradas na `develop`, ainda sem release. Ao publicar, esta seção passa a identificar a versão que contém essas entregas. Trabalho que permanece apenas em outra branch não faz parte destas notas.
+## Não lançado
 
 - **Harness e biblioteca do board (#615).** O menu e o título passam a usar Harness, com Ferramenta e execução antes de Biblioteca do board. Regras, skills, subagentes e MCPs ficam numa biblioteca particular compartilhada entre ferramentas, com pasta padrão dentro de `~/faz-ai-library`. O campo Pasta da biblioteca permite escolher outro destino; salvar transfere a biblioteca, preservando a pasta anterior. Skills particulares ficam fora do pacote da extensão.
 - **Importação por tipo, com revisão e proteção contra duplicatas.** A prévia mantém abas de regras, skills, subagentes e MCPs, inclusive vazias, com filtro por nome e seleção entre abas para uma única importação. Artefatos de mesmo nome e tipo não são substituídos: os demais são importados e os ignorados são listados por tipo, com opção de sobrescrever após confirmação explícita. Importar e colar pastas não apaga arquivos; Atualizar lista reconhece as skills e edições locais. Abrir pasta usa o gerenciador de arquivos.

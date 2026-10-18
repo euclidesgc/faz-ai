@@ -5,9 +5,9 @@
 What changed in each version of Faz AI Kanban, newest first. The interface exists in Portuguese and
 English; names of screens and buttons appear here as they are in the Portuguese interface.
 
-## Unreleased
+The **Unreleased** section includes only changes integrated into `develop` and awaiting release. Each versioned section describes changes included in that release. Work exclusive to other branches stays out of these notes.
 
-Changes integrated into `develop` and awaiting release. When publishing, this section becomes the version containing these deliveries. Work that remains only on another branch is not part of these notes.
+## Unreleased
 
 - **Harness and board library (#615).** The menu and title now use Harness, with Tool and execution before Board library. Rules, skills, subagents and MCPs live in a private library shared across tools, with a default folder under `~/faz-ai-library`. The Library folder field lets you choose another destination; saving transfers the library while preserving the previous folder. Private skills stay out of the extension package.
 - **Import by type, with review and duplicate protection.** The preview keeps rules, skills, subagents and MCP tabs visible even when empty, with name filters and selection across tabs for a single import. Artifacts with the same name and type are skipped: other items are imported and skipped items are grouped by type, with an option to overwrite after explicit confirmation. Importing or pasting folders does not delete files; Refresh list recognizes skills and local edits. Open folder uses the file manager.
