@@ -28,7 +28,14 @@ export const posted = vi.fn<(msg: WebviewToHost) => void>();
 // (metrics.query, attachment.read...) têm o seu requestId e seguem inteiras.
 const { requestIds, SELF_ANSWERING } = vi.hoisted(() => ({
   requestIds: [] as string[],
-  SELF_ANSWERING: new Set<string>(['attachment.read', 'harness.file.read', 'harness.project.profile', 'metrics.query', 'card.usage.query']),
+  SELF_ANSWERING: new Set<string>([
+    'attachment.read',
+    'harness.file.read',
+    'harness.project.profile',
+    'harness.agent.assist',
+    'metrics.query',
+    'card.usage.query',
+  ]),
 }));
 export { requestIds };
 vi.mock('../../src/webview/vscode', async (original) => {

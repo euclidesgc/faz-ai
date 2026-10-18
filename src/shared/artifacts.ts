@@ -98,7 +98,7 @@ export function itemOfArtifact(a: BoardArtifact): HarnessItem {
     kind: selectableOfKind(a.kind),
     scope: 'project',
     name: a.name,
-    description: a.kind === 'mcp' ? (a.mcpSummary ?? a.description) : a.description,
+    description: a.kind === 'mcp' ? a.description.trim() || a.mcpSummary || '' : a.description,
     path: a.path,
     location: artifactLocation(a),
     layout: LAYOUT[a.kind],
@@ -179,6 +179,10 @@ export interface LibraryArtifactInput {
   body: string;
   agent?: AgentMeta;
   server?: Record<string, unknown>;
+}
+export interface LibraryImportResult {
+  imported: number;
+  skipped: { key: string; kind: ArtifactKind; name: string }[];
 }
 export interface LibraryImportPreview {
   directory: string;

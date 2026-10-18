@@ -14,6 +14,8 @@ export interface ChatState {
   messages: ChatMessage[];
   /** a IA está respondendo agora */
   busy: boolean;
+  /** Trabalho no rascunho do editor, sem resposta na conversa. */
+  activity?: 'agent-assistance';
 }
 
 export const EMPTY_CHAT: ChatState = { messages: [], busy: false };

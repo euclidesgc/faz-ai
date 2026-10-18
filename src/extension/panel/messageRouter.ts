@@ -1,3 +1,5 @@
+import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
+import { scanLibraryFolder } from '../libraryImport';
 import { agentOfArtifact } from '../../shared/artifacts';
 import * as path from 'node:path';
 import type { BoardRequirement } from '../../shared/requirements';
@@ -127,6 +129,7 @@ const bridgeOnly = {
   'harness.item.create': viaBridge,
   'harness.item.write': viaBridge,
   'harness.project.profile': viaBridge,
+  'harness.agent.assist': viaBridge,
   'harness.skill.file.create': viaBridge,
   'harness.skill.file.open': viaBridge,
   'harness.install.scan': viaBridge,
@@ -134,6 +137,8 @@ const bridgeOnly = {
   'harness.library.open': viaBridge,
   'harness.library.pick': viaBridge,
   'harness.library.pickArtifacts': viaBridge,
+  'harness.library.pickDirectory': viaBridge,
+  'harness.library.folders': viaBridge,
   'harness.library.read': viaBridge,
   'attachment.pick': viaBridge,
   'attachment.reveal': viaBridge,
@@ -488,6 +493,15 @@ export class MessageRouter {
     this.notify();
   }
 
+  private agentAssistHandler?: (input: AgentAssistInput) => Promise<AgentAssistResult>;
+  setAgentAssistHandler(handler: (input: AgentAssistInput) => Promise<AgentAssistResult>): void {
+    this.agentAssistHandler = handler;
+  }
+  assistAgent(input: AgentAssistInput): Promise<AgentAssistResult> {
+    if (!this.agentAssistHandler) return Promise.reject(new Error('A assistência de IA não está disponível neste board.'));
+    return this.agentAssistHandler(input);
+  }
+
   /** Quem executa as mensagens `chat.*`: a sessão de chat do host. */
   setChatHandler(fn: (msg: ChatMessageIn) => void): void {
     this.chatHandler = fn;
@@ -633,6 +647,15 @@ export class MessageRouter {
   }
 
   /** O perfil do projeto aberto, para os assistentes de regras e de skills. */
+  projectArtifacts(): { kind: string; name: string; origin: string; body: string }[] {
+    const dir = this.ctx.opts.workspaceDir;
+    if (!dir) throw new Error('Abra um projeto existente para gerar artefatos.');
+    return scanLibraryFolder(dir)
+      .filter((a) => a.kind !== 'mcp')
+      .slice(0, 60)
+      .map((a) => ({ kind: a.kind, name: a.name, origin: a.origin, body: a.body.slice(0, 4000) }));
+  }
+
   projectProfile(): ProjectProfile {
     return readProjectProfile(this.ctx.opts.workspaceDir ?? '');
   }

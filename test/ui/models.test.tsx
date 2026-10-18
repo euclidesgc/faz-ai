@@ -208,7 +208,7 @@ describe('ModelsSettings: preencher o modelo sugerido (RF01/RF07)', () => {
 describe('ModelsSettings: cabeçalho da ferramenta (RF09)', () => {
   it('mostra a ferramenta atual e troca para a seção de ferramenta em Harness ao clicar', async () => {
     show();
-    const link = screen.getByRole('button', { name: 'Trocar a ferramenta de IA, em Harness de IA' });
+    const link = screen.getByRole('button', { name: 'Trocar a ferramenta de IA, em Harness' });
     await userEvent.click(link);
     const s = useBoardStore.getState();
     expect(s.settingsTab).toBe('harness');

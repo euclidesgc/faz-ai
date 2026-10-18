@@ -472,7 +472,7 @@ describe('ToolHarness: origem Board', () => {
     });
     const revisar = within(rows[1] as HTMLElement);
     expect(revisar.getByText('Global')).toBeInTheDocument();
-    await userEvent.click(revisar.getByRole('button', { name: 'Remover do board: revisar' }));
+    await userEvent.click(revisar.getByRole('button', { name: 'Excluir: revisar' }));
     expect(lastSent('harness.selection.set')).toEqual({
       type: 'harness.selection.set',
       items: [{ kind: 'skill', location: '~/.claude/skills/revisar/SKILL.md' }],
@@ -502,7 +502,7 @@ describe('ToolHarness: origem Board', () => {
     expect(missing.getByText('ausente')).toBeInTheDocument();
     // a marcação de outro tipo não aparece aqui
     expect(screen.queryByText('outra-regra.md')).toBeNull();
-    await userEvent.click(missing.getByRole('button', { name: 'Remover do board: .claude/skills/sumida/SKILL.md' }));
+    await userEvent.click(missing.getByRole('button', { name: 'Excluir: .claude/skills/sumida/SKILL.md' }));
     expect(lastSent('harness.selection.set')).toEqual({
       type: 'harness.selection.set',
       items: [{ kind: 'skill', location: '.claude/skills/sumida/SKILL.md' }],
@@ -537,7 +537,7 @@ describe('ToolHarness: origem Board', () => {
     const row = within(document.querySelector('.item-row') as HTMLElement);
     expect(row.getByText('Disponível no board')).toBeInTheDocument();
     expect(row.queryByRole('combobox')).toBeNull();
-    await userEvent.click(row.getByRole('button', { name: 'Remover do board: revisor' }));
+    await userEvent.click(row.getByRole('button', { name: 'Excluir: revisor' }));
     expect(lastSent('harness.selection.set').usage).toBeNull();
   });
 });

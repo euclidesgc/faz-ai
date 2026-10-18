@@ -71,9 +71,10 @@ describe('identidade e conversões', () => {
       kind: 'instructions',
       layout: 'file',
     });
-    const mcp = itemOfArtifact(base({ kind: 'mcp', name: 'gh', origin: '.mcp.json#gh', mcpSummary: 'npx gh', files: [] }));
+    const mcp = itemOfArtifact(base({ kind: 'mcp', name: 'gh', origin: '.mcp.json#gh', mcpSummary: 'npx gh', description: '', files: [] }));
     expect(mcp).toMatchObject({ kind: 'mcp', layout: 'entry', location: '.mcp.json#gh', description: 'npx gh' });
     expect(mcp.files).toBeUndefined();
+    expect(itemOfArtifact(base({ kind: 'mcp', description: 'Consulta issues', mcpSummary: 'npx' })).description).toBe('Consulta issues');
   });
 
   const agent = base({

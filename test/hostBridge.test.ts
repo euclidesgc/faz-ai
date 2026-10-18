@@ -645,3 +645,70 @@ describe('biblioteca: importar e abrir uma pasta', () => {
     expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'open-library', ok: true });
   });
 });
+
+it('lista pastas no host para o seletor web e não altera o destino da biblioteca', async () => {
+  fs.mkdirSync(path.join(dir, 'collection'));
+  fs.mkdirSync(path.join(dir, '.hidden'));
+  fs.writeFileSync(path.join(dir, 'file.txt'), 'text');
+  const previous = router.snapshot().harness.library!.directory;
+  await bridge.handle({ type: 'harness.library.folders', dir, requestId: 'folders' });
+  const result = sent.find((m) => m.type === 'harness.library.foldersResult');
+  expect(result).toMatchObject({
+    directory: dir,
+    parent: path.dirname(dir),
+    folders: expect.arrayContaining([{ name: 'collection', path: path.join(dir, 'collection') }]),
+  });
+  expect(JSON.stringify(result)).not.toContain('.hidden');
+  expect(JSON.stringify(result)).not.toContain('file.txt');
+  expect(router.snapshot().harness.library!.directory).toBe(previous);
+  expect(sent).toContainEqual({ type: 'done', requestId: 'folders', ok: true });
+});
+
+it('a assistência do agente responde com a correlação original e não grava nem envia done', async () => {
+  const result = {
+    explanation: 'Bom escopo.',
+    suggestions: [],
+    content: 'Revise sem editar.',
+    skills: [],
+    mcpServers: [],
+    categories: [] as never[],
+    model: '',
+  };
+  router.setAgentAssistHandler(async () => result);
+  const before = saves;
+  await bridge.handle({
+    type: 'harness.agent.assist',
+    requestId: 'agent-review',
+    input: {
+      step: 'review',
+      name: 'revisor',
+      body: 'Revise.',
+      sections: {},
+      language: 'pt-BR',
+      agent: { skills: [], mcpServers: [], model: '', tools: { categories: [], native: { tool: '', allow: [], deny: [] } } },
+    },
+  });
+  expect(sent).toContainEqual({ type: 'harness.agent.assistResult', requestId: 'agent-review', result });
+  expect(sent.some((message) => message.type === 'done')).toBe(false);
+  expect(saves).toBe(before);
+});
+
+it('a assistência indisponível responde com erro próprio para destravar o editor', async () => {
+  await bridge.handle({
+    type: 'harness.agent.assist',
+    requestId: 'agent-error',
+    input: {
+      step: 'review',
+      name: 'revisor',
+      body: 'Revise.',
+      sections: {},
+      language: 'pt-BR',
+      agent: { skills: [], mcpServers: [], model: '', tools: { categories: [], native: { tool: '', allow: [], deny: [] } } },
+    },
+  });
+  expect(sent).toContainEqual({
+    type: 'harness.agent.assistResult',
+    requestId: 'agent-error',
+    error: 'A assistência de IA não está disponível neste board.',
+  });
+});
