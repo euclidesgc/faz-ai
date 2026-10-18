@@ -184,7 +184,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const gateway = new AiGateway({
     boardId: router.boardId,
     runLog,
-    spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
+    spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
   });
   const runner = new AiRunner(router, {
     gateway,

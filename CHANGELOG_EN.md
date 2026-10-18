@@ -9,6 +9,8 @@ The **Unreleased** section includes only changes integrated into `develop` and a
 
 ## Unreleased
 
+- **Identity recorded before AI startup.** The launcher waits for durable identity recording before receiving the command. Recovery distinguishes a crash before release, a live orphaned run, and a process group with confirmed termination. Tests with real processes cover these boundaries; ambiguous identities and Windows process trees remain unconfirmed.
+
 - **Project MCP configuration borrowed during a run.** Cursor and Kimi transport coordinates the file by its real path, journals before writing, and restores the previous configuration when termination is confirmed. Format attempts share the lease. Invalid JSON blocks AI startup; conflicting edits are preserved. Unknown process termination retains the lease for reconciliation.
 
 - **Versioned context contract foundation.** Schema 35 separates draft agent contracts and per-action selections from legacy fields, with stable IDs, revisions, host validation and export/import. Inheritance differs from an explicit empty selection. Migration preserves current choices and the preview identifies legacy mode; new contracts do not govern executions yet. Legacy MCP selections do not become permissions automatically. The draft preview protocol resolves inheritance and conflicts without inference and returns metadata. The v1 contract editor is available for saved library subagents, with essentials, suggestions, allowed MCPs, restrictions and a preview. It saves separately without AI and preserves missing references; stale revisions are rejected. The same preview is available through the `preview_context_draft` MCP tool. Capability admission from #729 remains pending.

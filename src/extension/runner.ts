@@ -21,6 +21,7 @@ import type { AiActivity, BoardState, Card } from '../shared/model';
 
 /** Processo da ferramenta de IA em execução. */
 export interface RunningProcess {
+  readonly identity?: import('./processIdentity').ProcessIdentity;
   /** Prova do transporte de que a árvore encerrou; ausência não autoriza liberar recursos emprestados. */
   terminationConfirmed?(): boolean;
   /** chamado uma vez, com o código de saída ou o erro que impediu a execução */

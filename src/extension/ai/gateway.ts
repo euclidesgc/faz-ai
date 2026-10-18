@@ -134,11 +134,11 @@ export class AiGateway {
       runLog.describe(runId, { ...config, permission: input.permission });
       call.beforeSpawn?.();
       measured = spawnMeasured(call.tool, input, call.cwd, {
-        spawn: (command, cwd, out) => {
+        spawn: (command, cwd, out, control) => {
           attempts++;
           format = command.format;
           call.onAttempt?.(command);
-          return this.deps.spawn(command, cwd, out);
+          return this.deps.spawn(command, cwd, out, control);
         },
         log: call.log,
         runId,

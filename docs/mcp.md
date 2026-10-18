@@ -170,6 +170,8 @@ a origem não remove a cópia; `set_harness_selection` altera o modo, sem atuali
 - `list_board_mcp_tools { server, card? }`: lista ferramentas e schemas de um servidor da biblioteca.
 - `call_board_mcp_tool { server, name, arguments, card? }`: encaminha a chamada e devolve seu resultado.
 
+Quando o executor precisa de configuração MCP por arquivo de projeto, o transporte empresta esse arquivo com posse por caminho real e diário anterior à escrita. O launcher só recebe o comando depois do registro de sua identidade. A recuperação não restaura sobre uma execução órfã ainda viva ou de término desconhecido; conflitos da entrada `faz-ai` são preservados. Isso não concede acesso adicional ao MCP nem comprova isolamento de artefatos pela CLI.
+
 A ponte usa o mesmo registro **faz-ai**, independente da ferramenta cliente. MCP desligado ou ausente
 é recusado; no modo Pelo card, é obrigatório informar um card que selecione o servidor, diretamente
 ou pelo agente. Configurações são relidas em cada chamada; conexões são abertas e fechadas por

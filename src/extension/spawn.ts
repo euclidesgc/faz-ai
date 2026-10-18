@@ -5,6 +5,9 @@ import type { OutputStream } from './aiOutput/reader';
 import type { HeadlessCommand } from './headless';
 import type { RunningProcess } from './runner';
 import { commandNotFound, resolveCommand } from './cliResolve';
+import { randomUUID } from 'node:crypto';
+import { processBirth, processGroupState, SpawnNotStartedError, type SpawnControl, type ProcessIdentity } from './processIdentity';
+import { SPAWN_GATE } from './spawnGate';
 
 let shellPath: Promise<string | undefined> | undefined;
 
@@ -76,10 +79,11 @@ export function spawnHeadless(
   cwd: string,
   out: (text: string, stream: OutputStream) => void,
   pathEnv: string | undefined,
+  control?: SpawnControl,
 ): RunningProcess {
   // quem só usa a extensão da ferramenta no editor não tem a CLI no PATH: procura também onde ela costuma ficar
   const executable = resolveCommand(command.command, pathEnv, os.homedir());
-  if (!executable) throw new Error(commandNotFound(command.command));
+  if (!executable) throw new SpawnNotStartedError(commandNotFound(command.command));
   // um editor aberto de dentro de uma sessão do Claude Code herda as variáveis dela; a execução do board é uma sessão própria
   const env: NodeJS.ProcessEnv = { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}), ...command.env };
   for (const name of [
@@ -94,18 +98,35 @@ export function spawnHeadless(
     delete env[name];
   // no Windows as CLIs instaladas pelo npm são .cmd e só rodam pelo shell, com os argumentos escapados
   const launch = launchSpec(executable, command.args);
-  const child = spawn(launch.file, launch.args, {
-    cwd,
-    env,
-    stdio: ['pipe', 'pipe', 'pipe'],
-    shell: launch.shell,
-    windowsVerbatimArguments: launch.shell,
-    // no Windows, o shell abriria uma janela do cmd.exe a cada execução
-    windowsHide: true,
-    // fora do Windows, um grupo de processos próprio: Parar encerra a CLI e tudo o que ela iniciou
-    // (servidores MCP, testes, comandos do terminal), e não só o processo direto
-    detached: process.platform !== 'win32',
-  });
+  try {
+    control?.beforePreparation();
+  } catch (e) {
+    throw new SpawnNotStartedError('Não foi possível preparar a identidade da execução.', e);
+  }
+  const launcherEnv: NodeJS.ProcessEnv = { ...env };
+  // No Windows, as variáveis são case-insensitive; nenhuma variante pode carregar código antes do WAL.
+  for (const key of Object.keys(launcherEnv))
+    if (['NODE_OPTIONS', 'NODE_PATH', 'ELECTRON_RUN_AS_NODE'].includes(key.toUpperCase())) delete launcherEnv[key];
+  launcherEnv.ELECTRON_RUN_AS_NODE = '1';
+  const child = (() => {
+    try {
+      return spawn(control ? process.execPath : launch.file, control ? ['-e', SPAWN_GATE] : launch.args, {
+        cwd,
+        env: control ? launcherEnv : env,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: control ? false : launch.shell,
+        windowsVerbatimArguments: control ? false : launch.shell,
+        // no Windows, o shell abriria uma janela do cmd.exe a cada execução
+        windowsHide: true,
+        // fora do Windows, um grupo de processos próprio: Parar encerra a CLI e tudo o que ela iniciou
+        // (servidores MCP, testes, comandos do terminal), e não só o processo direto
+        detached: process.platform !== 'win32',
+      });
+    } catch (e) {
+      throw new SpawnNotStartedError('Não foi possível criar o processo da ferramenta de IA.', e);
+    }
+  })();
+  child.once('error', () => {});
   // um decodificador por canal: o pipe corta onde quiser, inclusive no meio de um caractere acentuado,
   // e `Buffer.toString()` em cada pedaço trocaria as duas metades por `\uFFFD`. O decodificador guarda
   // a metade até o próximo pedaço; o `end` devolve o que sobrou quando o canal fecha.
@@ -122,7 +143,25 @@ export function spawnHeadless(
     });
   }
   child.stdin.on('error', () => {});
-  child.stdin.end(command.stdin ?? '');
+  let identity: ProcessIdentity | undefined;
+  if (control && child.pid) {
+    identity = {
+      pid: child.pid,
+      birth: processBirth(child.pid),
+      platform: process.platform,
+      groupId: process.platform === 'win32' ? null : child.pid,
+      generation: randomUUID(),
+    };
+    try {
+      control.beforeStart(identity);
+    } catch (e) {
+      // Nenhuma descrição foi enviada ao launcher: a CLI não chegou a existir.
+      child.stdin.destroy();
+      child.kill('SIGKILL');
+      throw new SpawnNotStartedError('Não foi possível registrar a identidade da execução antes de iniciar a IA.', e);
+    }
+    child.stdin.end(JSON.stringify({ version: 1, ...launch, cwd, env, stdin: command.stdin ?? '' }));
+  } else child.stdin.end(control ? '' : (command.stdin ?? ''));
 
   let exited = false;
   let directClosed = false;
@@ -139,7 +178,9 @@ export function spawnHeadless(
   });
 
   return {
+    identity,
     terminationConfirmed: () => {
+      if (identity && directClosed) return processGroupState(identity) === 'dead';
       if (!child.pid) return true;
       if (!directClosed || process.platform === 'win32') return false;
       try {

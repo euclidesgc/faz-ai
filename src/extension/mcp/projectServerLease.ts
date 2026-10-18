@@ -4,7 +4,14 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import {
+  processBirth,
+  processState,
+  processGroupState,
+  validProcessIdentity,
+  type ProcessIdentity,
+  type ProcessState,
+} from '../processIdentity';
 import type { HeadlessCommand } from '../headless';
 import { excludeLocally } from './pinCommands';
 
@@ -22,6 +29,8 @@ interface Journal {
   createdDirs: string[];
   mode: number;
   phase: 'prepared' | 'process-unconfirmed';
+  /** Ausente em diários antigos: não pode receber a garantia do protocolo novo. */
+  gate?: { version: 1; process: ProcessIdentity | null };
 }
 export interface LeaseOptions {
   /** A mesma raiz por usuário, independente da janela, board ou diretório de dados da extensão. */
@@ -36,6 +45,9 @@ export interface ProjectServerLease {
   readonly result: 'kept' | 'added' | 'repaired';
   /** Antes de iniciar qualquer processo. Uma queda aqui exige reconciliação, não restauração cega. */
   markProcessUnconfirmed(): void;
+  /** O launcher controlado ainda não recebeu a descrição que lhe permite iniciar a CLI. */
+  prepareControlledProcess(): void;
+  recordControlledProcess(identity: ProcessIdentity): void;
   /** Somente após confirmar o fim da árvore de processos, inclusive em cancelamento. */
   confirmProcessStopped(): void;
   /** false = conflito/estado ambíguo, diário e trava preservados. */
@@ -54,30 +66,6 @@ function config(text: string): JsonObject & { mcpServers?: JsonObject } {
   if (!object(value) || (value.mcpServers !== undefined && !object(value.mcpServers))) throw new Error('Configuração MCP inválida.');
   return value;
 }
-/** Identidade de nascimento; não usar só PID como evidência de posse. Falha de probe não comprova morte. */
-function birthOf(pid: number): string | null {
-  try {
-    if (process.platform === 'linux') {
-      const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
-      return `${fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()}:${stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]}`;
-    }
-    if (process.platform !== 'win32')
-      return execFileSync('ps', ['-p', String(pid), '-o', 'lstart=', '-o', 'comm='], { encoding: 'utf8', timeout: 2000 }).trim() || null;
-  } catch {
-    /* desconhecido: a recuperação mantém a trava */
-  }
-  return null;
-}
-function ownerState(owner: Owner): 'alive' | 'dead' | 'unknown' {
-  try {
-    process.kill(owner.pid, 0);
-  } catch (e) {
-    return (e as NodeJS.ErrnoException).code === 'ESRCH' ? 'dead' : 'unknown';
-  }
-  const birth = birthOf(owner.pid);
-  return birth && owner.birth && birth === owner.birth ? 'alive' : 'unknown';
-}
-
 /** Resolve também caminhos cujo arquivo e diretórios finais ainda não existem. */
 export function realLeasePath(file: string): string {
   const tail: string[] = [];
@@ -145,7 +133,9 @@ function journalAt(lock: string): Journal {
     !Array.isArray(value.createdDirs) ||
     !value.createdDirs.every((d) => typeof d === 'string' && path.isAbsolute(d)) ||
     !Number.isInteger(value.mode) ||
-    !['prepared', 'process-unconfirmed'].includes(String(value.phase))
+    !['prepared', 'process-unconfirmed'].includes(String(value.phase)) ||
+    (value.gate !== undefined &&
+      (!object(value.gate) || value.gate.version !== 1 || (value.gate.process !== null && !validProcessIdentity(value.gate.process))))
   )
     throw new Error('Diário MCP inválido; reconciliação necessária.');
   const journal = value as unknown as Journal;
@@ -247,7 +237,7 @@ export function leaseProjectServer(cwd: string, spec: ProjectMcpSpec, options: L
     journal = {
       version: 1,
       file,
-      owner: { pid: process.pid, generation: randomUUID(), birth: birthOf(process.pid) },
+      owner: { pid: process.pid, generation: randomUUID(), birth: processBirth(process.pid) },
       before,
       expected,
       beforeEntry,
@@ -277,10 +267,11 @@ export function leaseProjectServer(cwd: string, spec: ProjectMcpSpec, options: L
     throw e;
   }
   let released = false;
-  const phase = (value: Journal['phase']) => {
+  const phase = (value: Journal['phase'], gate?: Journal['gate']) => {
     if (released) throw new Error('Empréstimo MCP já encerrado.');
     owned(lock, journal);
-    const next = { ...journal, phase: value };
+    const { gate: _oldGate, ...previous } = journal;
+    const next: Journal = { ...previous, phase: value, ...(gate ? { gate } : {}) };
     atomicWrite(path.join(lock, 'journal.json'), JSON.stringify(next));
     journal = next;
   };
@@ -289,6 +280,12 @@ export function leaseProjectServer(cwd: string, spec: ProjectMcpSpec, options: L
     generation: journal.owner.generation,
     result: journal.before === journal.expected ? 'kept' : journal.beforeEntry === null ? 'added' : 'repaired',
     markProcessUnconfirmed: () => phase('process-unconfirmed'),
+    prepareControlledProcess: () => phase('process-unconfirmed', { version: 1, process: null }),
+    recordControlledProcess: (identity) => {
+      if (journal.gate?.version !== 1 || journal.gate.process !== null || !validProcessIdentity(identity))
+        throw new Error('Identidade do launcher inválida ou já registrada.');
+      phase('process-unconfirmed', { version: 1, process: { ...identity } });
+    },
     confirmProcessStopped: () => phase('prepared'),
     release: () => {
       if (released) return true;
@@ -299,7 +296,11 @@ export function leaseProjectServer(cwd: string, spec: ProjectMcpSpec, options: L
 }
 
 /** Só recupera preparação sem processo e dono comprovadamente morto. Ambiguidade conserva tudo. */
-export function recoverProjectServers(options: LeaseOptions, stateOf: (owner: Owner) => 'alive' | 'dead' | 'unknown' = ownerState): number {
+export function recoverProjectServers(
+  options: LeaseOptions,
+  stateOf: (owner: Owner) => ProcessState = processState,
+  groupState: (identity: ProcessIdentity) => ProcessState = processGroupState,
+): number {
   const root = rootOf(options);
   if (!fs.existsSync(root)) return 0;
   let count = 0;
@@ -307,7 +308,7 @@ export function recoverProjectServers(options: LeaseOptions, stateOf: (owner: Ow
     if (!/^[a-f0-9]{64}$/.test(name)) continue;
     const lock = path.join(root, name);
     try {
-      const j = journalAt(lock);
+      let j = journalAt(lock);
       if (lockOf(root, j.file) !== lock || stateOf(j.owner) !== 'dead') continue;
       // Trava de recuperação independente: duas janelas não restauram o mesmo diário simultaneamente.
       const recovery = path.join(lock, 'recovery');
@@ -319,8 +320,13 @@ export function recoverProjectServers(options: LeaseOptions, stateOf: (owner: Ow
       try {
         // A geração continua a mesma; a aquisição normal nunca remove uma trava órfã por conta própria.
         if (j.phase === 'process-unconfirmed') {
-          options.log('Execução MCP órfã exige reconciliação dos processos; configuração e diário preservados.');
-          continue;
+          if (!j.gate || (j.gate.process !== null && groupState(j.gate.process) !== 'dead')) {
+            options.log('Execução MCP órfã exige reconciliação dos processos; configuração e diário preservados.');
+            continue;
+          }
+          // Sem identidade registrada, o launcher nunca recebeu a descrição. Com ela, exige grupo ausente.
+          j = { ...j, phase: 'prepared' };
+          atomicWrite(path.join(lock, 'journal.json'), JSON.stringify(j));
         }
         if (restore(lock, j, options)) count++;
       } finally {

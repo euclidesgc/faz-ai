@@ -28,6 +28,7 @@ import type { RunReport } from '../../shared/log';
 import { leaseProjectServer, type ProjectServerLease } from '../mcp/projectServerLease';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import type { RunningProcess } from '../runner';
+import { SpawnNotStartedError, type SpawnControl } from '../processIdentity';
 import { MeasureBrokenError, MeasureEndedError, MeasureIgnoredError, MeasureRefusedError, type MeasureError } from './errors';
 import { cut } from './json';
 import { lineSplitter } from './lines';
@@ -36,7 +37,12 @@ import { providerFor } from '../ai/providers';
 import { textReader } from './text';
 
 /** Como o board inicia um processo da CLI. O `out` recebe de qual canal cada pedaço veio. */
-export type SpawnFn = (command: HeadlessCommand, cwd: string, out: (text: string, stream: OutputStream) => void) => RunningProcess;
+export type SpawnFn = (
+  command: HeadlessCommand,
+  cwd: string,
+  out: (text: string, stream: OutputStream) => void,
+  control?: SpawnControl,
+) => RunningProcess;
 
 export interface MeasuredDeps {
   /** Raiz compartilhada de coordenação; nos testes usa uma pasta temporária própria. */
@@ -240,9 +246,16 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
     try {
       projectLease?.markProcessUnconfirmed();
       processMayExist = true;
-      proc = deps.spawn(command, cwd, feed);
+      proc = deps.spawn(command, cwd, feed, {
+        beforePreparation: () => projectLease?.prepareControlledProcess(),
+        beforeStart: (identity) => projectLease?.recordControlledProcess(identity),
+      });
     } catch (e) {
       cleanup();
+      if (e instanceof SpawnNotStartedError && projectLease) {
+        projectLease.confirmProcessStopped();
+        projectLease.release();
+      }
       throw e;
     }
     current = proc;

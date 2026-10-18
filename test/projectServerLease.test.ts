@@ -169,6 +169,54 @@ describe('empréstimo coordenado do MCP', () => {
     expect(lease.release()).toBe(true);
   });
 
+  it('um launcher sem identidade registrada nunca recebeu o comando e permite recuperar após morte do host', () => {
+    const lease = leaseProjectServer(dir, spec, options);
+    lease.prepareControlledProcess();
+    expect(recoverProjectServers(options, () => 'alive')).toBe(0);
+    expect(recoverProjectServers(options, () => 'dead')).toBe(1);
+    expect(fs.existsSync(target())).toBe(false);
+  });
+
+  it('recupera processo registrado só com prova de que o grupo acabou, sem usar o PID do host como atalho', () => {
+    const lease = leaseProjectServer(dir, spec, options);
+    lease.prepareControlledProcess();
+    lease.recordControlledProcess({ pid: 123, birth: 'nascimento', groupId: 123, platform: process.platform, generation: 'tentativa' });
+    expect(
+      recoverProjectServers(
+        options,
+        () => 'dead',
+        () => 'alive',
+      ),
+    ).toBe(0);
+    expect(
+      recoverProjectServers(
+        options,
+        () => 'dead',
+        () => 'unknown',
+      ),
+    ).toBe(0);
+    expect(
+      recoverProjectServers(
+        options,
+        () => 'dead',
+        () => 'dead',
+      ),
+    ).toBe(1);
+    expect(fs.existsSync(target())).toBe(false);
+  });
+
+  it('recusa identidade inválida ou um segundo processo sem preparar nova tentativa', () => {
+    const lease = leaseProjectServer(dir, spec, options);
+    const identity = { pid: 123, birth: 'nascimento', groupId: 123, platform: process.platform, generation: 'tentativa' };
+    expect(() => lease.recordControlledProcess(identity)).toThrow('inválida');
+    lease.prepareControlledProcess();
+    expect(() => lease.recordControlledProcess({ ...identity, pid: -1 })).toThrow('inválida');
+    lease.recordControlledProcess(identity);
+    expect(() => lease.recordControlledProcess(identity)).toThrow('registrada');
+    lease.confirmProcessStopped();
+    expect(lease.release()).toBe(true);
+  });
+
   it('não sobrescreve edição que chega durante o cálculo da restauração', () => {
     const lease = leaseProjectServer(dir, spec, {
       ...options,

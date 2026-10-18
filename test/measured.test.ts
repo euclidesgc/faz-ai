@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { spawnMeasured, cleanStaleTemp, formatArgs, refusesFormat } from '../src/extension/aiOutput/measured';
+import { spawnMeasured, cleanStaleTemp, formatArgs, refusesFormat, type SpawnFn } from '../src/extension/aiOutput/measured';
 import { MeasureEndedError, MeasureRefusedError } from '../src/extension/aiOutput/errors';
 import type { OutputStream } from '../src/extension/aiOutput/reader';
 import { headlessCommand, type HeadlessCommand, type HeadlessInput } from '../src/extension/headless';
@@ -30,7 +30,7 @@ let started: Fake[];
 let lines: string[];
 
 /** O `spawn` falso: guarda cada chamada e deixa o teste decidir o que o processo escreve e como sai. */
-const spawn = (command: HeadlessCommand, _cwd: string, out: (text: string, stream: OutputStream) => void): RunningProcess => {
+const spawn: SpawnFn = (command, _cwd, out): RunningProcess => {
   let listener: (code: number | null, error?: Error) => void = () => {};
   let confirmed = false;
   const fake: Fake = {
