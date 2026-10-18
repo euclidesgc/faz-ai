@@ -584,7 +584,7 @@ The preview identifies legacy mode. Migration to schema 35 preserves original fi
 compatibility view identifies agent skills as essential and card skills as selected, including
 missing references. Legacy MCP selections do not become permissions in the new contract.
 Export/import preserves drafts and versions without embedding MCP definitions in these contracts;
-MCP credential values continue to be removed from exports.
+exports contain only local references to MCP configurations, without their values.
 
 When editing a saved library subagent, **Edit context contract (draft)** opens the v1 contract: role, instructions, essential skills, suggested skills, allowed MCPs and tool restrictions. The contract has a separate save action, without AI and with optimistic revisions; it does not automatically copy legacy permissions. The preview shows essentials and Always items, keeps optional resources inactive and explains missing resources or incompatible MCPs. Missing references remain available for review.
 
@@ -1275,15 +1275,15 @@ In Rules, **Update from source** replaces the copy only after confirmation.
 **MCPs** display their saved functional description ahead of command or URL. Import reuses descriptions from configuration when available; use **Edit** to explain missing ones. The list does not automatically connect to servers to discover descriptions.
 
 **MCPs** can be created with a form (`command` and `args` for stdio, URL for HTTP) or **Edit JSON
-directly**, including a single definition wrapped in `mcpServers`. `env` variables and `headers`
-stay in the host and are exposed only when explicitly opening that MCP's editor, never in the
-shared snapshot or reading copies. The **faz-ai** MCP bridge provides `list_board_mcp_tools` and
+directly**, including a single definition wrapped in `mcpServers`. The entire definition, including command, arguments, URL, `env` and `headers`, is encrypted in the local host vault; the database, exports, interface and APIs receive only references and status. You can edit the description without reading saved values; **Replace saved configuration** requires a new definition. Imported MCPs remain pending and cannot run until this human review, even when their reference exists on this machine. The **faz-ai** MCP bridge provides `list_board_mcp_tools` and
 `call_board_mcp_tool`: any MCP client connected to the board can discover schemas and call tools
 from registered servers without copying their settings to each AI tool. Disabled servers are
 rejected; Per card requests must include a card selecting that server directly or through its
 agent. The bridge supports stdio, Streamable HTTP and explicit SSE with static credentials; it does
 not handle OAuth login. This version forwards tools, not MCP resources or prompts, and opens and
 closes a connection per operation.
+
+Schema 40 migrates library MCP configurations only after confirming the secret on disk. The `.credentials` vault beside the databases stores its key and encrypted files with restricted local permissions; it is excluded from exports. This does not replace operating system isolation against processes of the same user. CLI profiles and legacy native-file paths still require the complete #728 review.
 
 The `get_project_profile`, `get_board_artifact` and `save_board_artifact` MCP tools let assistants
 work in the library. Legacy tool-specific file APIs remain for compatibility; native hooks,

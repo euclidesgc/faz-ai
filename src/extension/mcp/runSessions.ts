@@ -54,6 +54,18 @@ export class RunMcpSessions {
     if (snapshot.manifest.runId !== runId || snapshot.manifest.boardId !== this.options.repo().boardId || this.runs.has(runId))
       throw new Error('Snapshot incompatível com a sessão MCP.');
     const names = new Set(input.exec?.mcpAllowed ?? []);
+    if (
+      this.options
+        .state()
+        .harness.library?.artifacts.some(
+          (a) =>
+            a.kind === 'mcp' &&
+            names.has(a.name) &&
+            a.mcpCredential &&
+            (a.mcpCredential.review !== 'reviewed' || !a.mcpCredential.available),
+        )
+    )
+      throw new Error('Este MCP exige revisão humana ou configuração local antes de executar.');
     const mcps = structuredClone(
       this.options
         .state()

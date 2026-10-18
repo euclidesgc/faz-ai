@@ -77,6 +77,12 @@ describe('biblioteca particular do board', () => {
     router.refreshHarness();
     select('agent', '.claude/agents/revisor.md');
     select('mcp', '.mcp.json#memoria');
+    const pending = router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'mcp')!;
+    expect(router.libraryMcpDefinitions()).toEqual({});
+    router.handle({
+      type: 'harness.library.save',
+      input: { ...router.readLibraryArtifact(pending.id), server: { command: 'memoria', env: { TOKEN: 'segredo-particular' } } },
+    });
     fs.rmSync(path.join(root, 'project/.claude'), { recursive: true });
     fs.rmSync(path.join(root, 'project/.mcp.json'));
     router.refreshHarness();

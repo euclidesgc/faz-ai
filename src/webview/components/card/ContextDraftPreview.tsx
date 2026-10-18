@@ -20,6 +20,8 @@ const DIAGNOSTICS: Record<ContextDraftDiagnostic['code'], string> = {
   'invalid-contract': 'O contrato do agente é inválido.',
   'missing-artifact': 'Recurso ausente.',
   'disabled-artifact': 'Recurso desligado ou indisponível.',
+  'mcp-review-required': 'Este MCP exige revisão humana antes de executar.',
+  'mcp-credential-missing': 'A configuração local deste MCP está ausente.',
   'wrong-kind': 'O recurso tem um tipo diferente do esperado.',
   'mcp-outside-agent': 'MCP fora do contrato do agente.',
   'missing-input': 'Anexo de entrada ausente.',

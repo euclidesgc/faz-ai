@@ -531,19 +531,17 @@ describe('artefatos do board no export e no import', () => {
     files: all(d, 'SELECT * FROM board_artifact_files ORDER BY artifact_id, path'),
   });
 
-  it('o arquivo leva artefatos e arquivos de apoio, e env/headers do MCP saem com as chaves e valor vazio', () => {
+  it('o arquivo leva referências MCP sem valores de configuração', () => {
     seedArtifacts();
     const { file } = doExport();
     expect(file.tables.board_artifacts).toHaveLength(3);
     expect(file.tables.board_artifact_files).toHaveLength(2);
     const mcp = file.tables.board_artifacts!.find((r) => r.kind === 'mcp')!;
-    expect(JSON.parse(str(mcp.meta_json))).toEqual({
-      server: { command: 'npx', env: { GITHUB_TOKEN: '', LOG: '' }, headers: { Authorization: '' } },
-    });
+    expect(JSON.parse(str(mcp.meta_json))).toEqual({ server: { secretRef: mcp.secret_ref }, transport: 'stdio' });
     expect(JSON.stringify(file)).not.toContain('ghp_segredo');
     expect(JSON.stringify(file)).not.toContain('Bearer abc');
-    // o banco não é alterado
-    expect(str(all(db, "SELECT meta_json FROM board_artifacts WHERE id = 'a-mcp'")[0]!.meta_json)).toContain('ghp_segredo');
+    // O legado só troca os valores por referência depois de confirmar o cofre.
+    expect(str(all(db, "SELECT meta_json FROM board_artifacts WHERE id = 'a-mcp'")[0]!.meta_json)).not.toContain('ghp_segredo');
   });
 
   it('ida e volta por cima do mesmo board: artefatos e arquivo binário voltam iguais; mcpSecrets lista as chaves vazias', () => {
@@ -551,7 +549,7 @@ describe('artefatos do board no export e no import', () => {
     const before = artifactRows(db);
     const text = JSON.stringify(doExport().file);
     const result = importBoard(target(router), parseExportFile(text));
-    expect(result.mcpSecrets).toEqual(['github: GITHUB_TOKEN', 'github: LOG', 'github: Authorization']);
+    expect(result.mcpSecrets).toEqual(['github: revisão da configuração local']);
     const after = artifactRows(db);
     expect(after.files).toEqual(before.files);
     const bin = after.files.find((f) => f.path === 'bin/x.dat')!;
@@ -574,7 +572,7 @@ describe('artefatos do board no export e no import', () => {
       homeDir: path.join(dir, 'home'),
     });
     const result = importBoard({ db: fresh, store: r2.store, workspaceKey: 'ws-z', boardId: r2.boardId }, parseExportFile(text));
-    expect(result.mcpSecrets).toHaveLength(3);
+    expect(result.mcpSecrets).toHaveLength(1);
     const rows = artifactRows(fresh);
     expect(rows.artifacts.map((a) => a.id)).toEqual(['a-agent', 'a-mcp', 'a-skill']);
     expect(rows.files.map((f) => [f.artifact_id, f.path])).toEqual([

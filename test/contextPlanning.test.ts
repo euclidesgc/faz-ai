@@ -130,7 +130,11 @@ describe('contratos de contexto versionados', () => {
     // Materializa um board legado a partir das tabelas originais, antes da nova migração.
     const insert = (name: string, rows: Record<string, unknown>[]) => {
       for (const r of rows) {
-        const keys = Object.keys(r).filter((key) => name !== 'board_artifacts' || key !== 'revision');
+        if (name === 'board_artifacts' && r.kind === 'mcp')
+          r.meta_json = JSON.stringify({ server: { command: 'github', env: { TOKEN: 'segredo-local' } } });
+        const keys = Object.keys(r).filter(
+          (key) => name !== 'board_artifacts' || !['revision', 'secret_ref', 'review_state'].includes(key),
+        );
         old.run(
           `INSERT INTO ${name} (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`,
           keys.map((key) => r[key]) as (string | number | null)[],
@@ -144,7 +148,10 @@ describe('contratos de contexto versionados', () => {
     const raw = all(old, 'SELECT * FROM board_artifacts');
     migrate(old);
     const after = executionState(old);
-    expect(all(old, 'SELECT * FROM board_artifacts')).toEqual(raw.map((row) => ({ ...row, revision: 1 })));
+    expect(all(old, "SELECT * FROM board_artifacts WHERE kind != 'mcp'")).toEqual(
+      raw.filter((r) => r.kind !== 'mcp').map((row) => ({ ...row, revision: 1, secret_ref: null, review_state: 'legacy' })),
+    );
+    expect(new ArtifactRepo(old).mcpDefinitions(router.boardId).github).toEqual({ command: 'github', env: { TOKEN: 'segredo-local' } });
     expect(after.fieldValues).toEqual(before.fieldValues);
     expect(manifestOf(before, before.cards[0]!).skills).toContain('testes');
     expect(manifestOf(before, before.cards[0]!).mcpServers).toContain('github');

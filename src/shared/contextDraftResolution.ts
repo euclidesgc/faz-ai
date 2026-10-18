@@ -25,6 +25,8 @@ export interface ContextDraftDiagnostic {
     | 'invalid-contract'
     | 'missing-artifact'
     | 'disabled-artifact'
+    | 'mcp-review-required'
+    | 'mcp-credential-missing'
     | 'wrong-kind'
     | 'mcp-outside-agent'
     | 'missing-input'
@@ -169,6 +171,16 @@ export function resolveContextDraft(s: BoardState, target: ContextActivityTarget
     if (a.usage === 'off') {
       diagnostic('disabled-artifact', id);
       return undefined;
+    }
+    if (a.kind === 'mcp' && a.mcpCredential) {
+      if (a.mcpCredential.review !== 'reviewed') {
+        diagnostic('mcp-review-required', id);
+        return undefined;
+      }
+      if (!a.mcpCredential.available) {
+        diagnostic('mcp-credential-missing', id);
+        return undefined;
+      }
     }
     return a;
   };

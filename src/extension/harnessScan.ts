@@ -175,8 +175,8 @@ function hookEntries(value: unknown): { matcher: string; command: string; type: 
 /** O que o servidor MCP roda ou onde ele está, sem argumentos, variáveis ou cabeçalhos (podem ter segredos). */
 export function mcpSummary(server: unknown): string {
   const s = obj(server);
-  if (typeof s.command === 'string') return s.command;
-  if (typeof s.url === 'string') return s.url.split('?')[0]!;
+  if (typeof s.command === 'string') return 'MCP stdio';
+  if (typeof s.url === 'string') return 'MCP HTTP';
   return '';
 }
 

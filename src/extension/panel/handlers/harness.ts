@@ -335,6 +335,8 @@ export class BoardHarness {
   /** Conteúdo de um arquivo do harness para o editor do board. */
   readFile(file: string): { content: string; readonly: boolean } {
     const { readonly } = this.access(file);
+    if (this.current.inventory.some((t) => t.items.some((i) => i.kind === 'mcp' && i.path === file)))
+      throw new Error('Configurações MCP não são devolvidas ao editor. Use a biblioteca para salvar uma nova definição.');
     if (fs.statSync(file).size > MAX_EDIT_BYTES) throw new Error('Arquivo maior que 512 KB: abra no editor.');
     return { content: fs.readFileSync(file, 'utf8'), readonly };
   }
@@ -439,7 +441,8 @@ export const harnessHandlers = {
     ctx.harness.load();
     return true;
   },
-  'harness.library.save': (msg, ctx) => {
+  'harness.library.save': (msg, ctx, actor) => {
+    if (actor.byAi && msg.input.kind === 'mcp') throw new Error('Configurações e credenciais MCP exigem revisão humana.');
     ctx.library.saveArtifact(msg.input);
     ctx.harness.load();
     return true;

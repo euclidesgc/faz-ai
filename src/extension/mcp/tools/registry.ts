@@ -39,14 +39,19 @@ export function toolRegistrar(server: McpServer, ctx: ToolContext): DefineTool {
       let redact = (text: string) => text;
       try {
         const router = await ctx.getRouter();
-        redact = (text) => router.executions.redact(text);
+        redact = (text) => router.executions.redact(router.redactCredentials(text));
         const token = ctx.sessionToken?.();
         if (token !== undefined) router.executions.assert(token);
         const cleanArgs = router.executions.sanitize(args);
         const operation = router.executions.tool(router, token, name, cleanArgs, readOnly, router.executions.redact(ctx.author()));
         const result = await run(cleanArgs as Parameters<typeof run>[0], operation.router);
         operation.assert();
-        if (result instanceof ForwardedToolResult) return router.executions.sanitize(result.result);
+        if (result instanceof ForwardedToolResult)
+          return JSON.parse(
+            JSON.stringify(router.executions.sanitize(result.result), (_key, value: unknown) =>
+              typeof value === 'string' ? redact(value) : value,
+            ),
+          ) as typeof result.result;
         return {
           content: [
             {

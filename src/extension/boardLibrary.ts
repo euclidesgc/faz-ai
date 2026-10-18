@@ -86,7 +86,7 @@ export class BoardLibrary {
       description: row.description,
       body: row.body,
       ...(row.agent ? { agent: row.agent } : {}),
-      ...(row.kind === 'mcp' ? { server: (row.meta as { server: Record<string, unknown> }).server } : {}),
+      ...(row.kind === 'mcp' ? { mcpCredential: row.mcpCredential } : {}),
     };
   }
 
@@ -104,9 +104,11 @@ export class BoardLibrary {
     if (Buffer.byteLength(input.body, 'utf8') > ARTIFACT_LIMITS.fileBytes) throw new Error('Arquivo maior que 512 KB.');
     let meta: ArtifactDraft['meta'] = {};
     if (input.kind === 'mcp') {
-      const server = input.server;
+      const server = input.server ?? (existing?.meta as { server?: Record<string, unknown> } | undefined)?.server;
       if (!server || typeof server !== 'object' || Array.isArray(server)) throw new Error('Definição MCP inválida.');
-      if (typeof server.command === 'string' && server.command.trim()) {
+      if (input.server?.secretRef !== undefined) throw new Error('Referências salvas não podem ser substituídas pelo editor.');
+      if (!input.server && existing) meta = existing.meta;
+      else if (typeof server.command === 'string' && server.command.trim()) {
         if (server.args !== undefined && (!Array.isArray(server.args) || !server.args.every((a) => typeof a === 'string')))
           throw new Error('args deve ser uma lista de textos.');
       } else if (typeof server.url === 'string' && /^https?:\/\//.test(server.url)) {
@@ -120,7 +122,7 @@ export class BoardLibrary {
         )
           throw new Error(`${key} deve conter pares de nome e texto.`);
       }
-      meta = { server };
+      if (input.server) meta = { server };
     } else if (input.kind === 'agent') {
       const agent = input.agent;
       if (
@@ -151,6 +153,7 @@ export class BoardLibrary {
         files: existing ? this.repo.content(existing.id).files : [],
       },
       existing?.usage,
+      input.kind === 'mcp' && input.server !== undefined,
     );
   }
 

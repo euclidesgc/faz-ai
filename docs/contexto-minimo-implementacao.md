@@ -150,3 +150,9 @@ Lidas as descrições de #729, #619, #711, #712, #618, #727 e #728 e o anexo nor
 E3 está parcialmente implementada; falta a integração dos limites de #729, sub-tarefa cadastrada no board e ainda em A fazer. E4 tem interface e salvamento revisável em modo de rascunho; E5–E7 continuam pendentes; E5 requer também os snapshots e os contratos de orquestração e políticas citados no plano. Não substituir essas dependências por outro scheduler, outro motor de modelos ou permissões somente na interface.
 
 O piloto de E7 exige tarefas representativas e medições de execuções aceitas; não foi executado como efeito desta entrega. Nenhuma redução de consumo ou preservação de qualidade foi demonstrada ainda.
+
+## Credenciais MCP — primeira entrega de #728
+
+Schema 40 e `LocalCredentials` guardam a definição inteira cifrada em `.credentials`, ao lado dos bancos. A publicação exclusiva com fsync precede a troca por `secretRef`; falhas preservam o JSON anterior. O editor não recebe configurações salvas, permite editar metadados e exige substituição explícita para revisar. Importações ficam pendentes mesmo com referência local disponível; prévia, preparação, sessões e encaminhamento recusam execução. Export, banco, leitura MCP e interface não devolvem os valores. Gateway e resultados externos ocultam valores conhecidos.
+
+`credentials.test.ts` cobre persistência/reabertura, posse, corrupção, permissões, falha e retomada da migração, bytes SQLite/export sem sentinelas, revisão humana e logs. Os testes MCP usam processos Node, sem inferência de CLI real. O cofre usa AES-256-GCM com chave local; não é chaveiro do sistema nem isolamento contra processos do mesmo usuário. Perfis CLI, caminhos legados de arquivos nativos e cobertura completa de #728 continuam pendentes; E3 e ativação E5 não estão concluídas.

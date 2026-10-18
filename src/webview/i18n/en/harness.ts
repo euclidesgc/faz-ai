@@ -1,4 +1,15 @@
 export const harness: Record<string, string> = {
+  'Revisão humana pendente': 'Human review pending',
+  'Configuração local ausente': 'Local configuration missing',
+  'Este MCP exige revisão humana antes de executar.': 'This MCP requires human review before execution.',
+  'A configuração local deste MCP está ausente.': 'The local configuration for this MCP is missing.',
+  'A configuração salva fica apenas no host e não é devolvida ao editor. Sem substituir, os valores atuais são preservados.':
+    'Saved configuration stays on the host and is not returned to the editor. Unless replaced, its current values are preserved.',
+  'Este MCP está pendente de revisão. Informe uma nova definição para revisar e habilitar a execução.':
+    'This MCP is pending review. Enter a new definition to review and enable execution.',
+  'A configuração local desta referência não está disponível nesta máquina.':
+    'The local configuration for this reference is unavailable on this machine.',
+  'Substituir a configuração salva': 'Replace saved configuration',
   Sugestão: 'Suggestion',
   Nenhum: 'None',
   'Recursos e resultado': 'Resources and result',

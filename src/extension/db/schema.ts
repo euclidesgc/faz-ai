@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 39;
+export const SCHEMA_VERSION = 40;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -505,6 +505,11 @@ const MIGRATIONS: Record<number, string> = {
     );
     CREATE UNIQUE INDEX idx_ai_work_attempts_token ON ai_work_attempts(token_hash) WHERE token_hash IS NOT NULL;
     CREATE UNIQUE INDEX idx_ai_work_attempts_run ON ai_work_attempts(run_id) WHERE run_id IS NOT NULL;
+  `,
+  40: `
+    ALTER TABLE board_artifacts ADD COLUMN secret_ref TEXT;
+    ALTER TABLE board_artifacts ADD COLUMN review_state TEXT NOT NULL DEFAULT 'legacy'
+      CHECK (review_state IN ('legacy', 'pending', 'reviewed'));
   `,
 };
 

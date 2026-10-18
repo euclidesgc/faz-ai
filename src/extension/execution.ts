@@ -110,6 +110,17 @@ export const agentAdvice = (m: ExecManifest): string[] =>
  * de contexto vazio: só o servidor do board e os servidores que o agente libera; o agente vai por
  * parâmetro onde a ferramenta aceita, e como texto nas demais.
  */
+function requireReviewedMcps(state: BoardState, names: readonly string[]): void {
+  const denied =
+    state.harness.library?.artifacts.filter(
+      (a) =>
+        a.kind === 'mcp' &&
+        names.includes(a.name) &&
+        a.mcpCredential &&
+        (a.mcpCredential.review !== 'reviewed' || !a.mcpCredential.available),
+    ) ?? [];
+  if (denied.length) throw new Error(`MCPs exigem revisão humana ou configuração local: ${denied.map((a) => a.name).join(', ')}.`);
+}
 export function executionPlan(
   s: BoardState,
   c: Card,
@@ -125,6 +136,7 @@ export function executionPlan(
   const items = s.harness.inventory.find((t) => t.tool === tool)?.items ?? [];
   const known = [...new Set(items.filter((i) => i.kind === 'mcp').map((i) => i.name))].filter((n) => n !== BOARD_SERVER);
   const allowed = manifest.mcpServers;
+  requireReviewedMcps(s, allowed);
   const blocked = known.filter((n) => !allowed.includes(n));
 
   // o Claude Code recebe um arquivo só com o servidor do board e os liberados; sem servidor do board
@@ -137,7 +149,7 @@ export function executionPlan(
     // um servidor do board que vem de uma pasta importada não está na configuração do Claude Code: a
     // definição é lida do arquivo em que a varredura o encontrou
     for (const name of allowed)
-      if (!defs[name]) {
+      if (!defs[name] && !s.harness.library?.artifacts.some((a) => a.kind === 'mcp' && a.name === name)) {
         const item = items.find((i) => i.kind === 'mcp' && i.name === name && i.path.endsWith('.json'));
         const def = item && obj(readJson(item.path).mcpServers)[name];
         if (def) defs[name] = def;
@@ -252,8 +264,8 @@ export function executionPlan(
 /**
  * Execução sem agente e sem card (chat do board, sugestões, "Indicar artefatos"): contexto vazio, só o
  * servidor do board e, com `s`, os servidores do board em modo "Sempre" (eles entram em toda
- * interação). Um servidor Sempre sem definição conhecida fica de fora, sem erro: o chat não pode parar
- * por causa dele.
+ * interação). Uma configuração local da biblioteca precisa ser resolvida; falha impede execução.
+ * Fontes legadas sem definição conhecida mantêm o tratamento anterior.
  */
 export function bareExec(
   model: ExecInput['model'],
@@ -263,13 +275,16 @@ export function bareExec(
   libraryServers?: Record<string, unknown>,
 ): ExecInput {
   const always = s && s.board.aiTool === 'claude' && dirs ? selectedMcpNames(s, 'always') : [];
+  if (s) requireReviewedMcps(s, always);
   const defs = libraryServers ?? (always.length ? claudeServers(dirs!.projectDir, dirs!.homeDir) : {});
   for (const name of always)
-    if (!defs[name]) {
+    if (!defs[name] && !s!.harness.library?.artifacts.some((a) => a.kind === 'mcp' && a.name === name)) {
       const item = s!.harness.inventory.find((t) => t.tool === 'claude')?.items.find((i) => i.kind === 'mcp' && i.name === name);
       const def = item?.path.endsWith('.json') ? obj(readJson(item.path).mcpServers)[name] : undefined;
       if (def) defs[name] = def;
     }
+  const missing = always.filter((n) => !defs[n] && s?.harness.library?.artifacts.some((a) => a.kind === 'mcp' && a.name === n));
+  if (missing.length) throw new Error(`MCPs exigem revisão humana ou configuração local: ${missing.join(', ')}.`);
   const allowed = always.filter((n) => defs[n]);
   if (board) defs[BOARD_SERVER] = { type: 'stdio', ...board };
   return {

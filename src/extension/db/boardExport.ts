@@ -1,4 +1,5 @@
 import { ContextPlanningRepo } from '../repositories/contextPlanningRepo';
+import { ArtifactRepo, protectImportedMcpRow } from '../repositories/artifactRepo';
 import { validateActivityContext, validateAgentContext, validateContextTarget, validateContextReason } from '../../shared/contextPlanning';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -106,6 +107,7 @@ export function exportBoard(
 ): ExportResult {
   const boardRow = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
   if (!boardRow) throw new Error('Board não encontrado');
+  new ArtifactRepo(db).protectLegacy();
   new ContextPlanningRepo(db).validateBoard(boardId);
   validateAdmissionRows(all(db, 'SELECT * FROM ai_runs WHERE board_id = ?', [boardId]));
   const board: Row = {};
@@ -113,9 +115,6 @@ export function exportBoard(
 
   const tables: Record<string, Row[]> = {};
   for (const t of EXPORT_TABLES) tables[t.name] = all(db, `SELECT * FROM ${t.name} WHERE ${t.where} ORDER BY rowid`, [boardId]);
-  tables.board_artifacts = tables.board_artifacts!.map((r) =>
-    r.kind === 'mcp' ? { ...r, meta_json: scrubMcpSecrets(r.meta_json ?? null) } : r,
-  );
 
   const warnings: string[] = [];
   const numbers = new Map(tables.cards!.map((c) => [str(c.id), num(c.number)]));
@@ -149,23 +148,6 @@ export function exportBoard(
 /** O mapa `env`/`headers` do servidor MCP de um artefato, se houver (`meta_json.server`). */
 const SECRET_MAPS = ['env', 'headers'] as const;
 
-/** Mantém as chaves de `server.env` e `server.headers` e zera os valores: o segredo não sai da máquina. */
-function scrubMcpSecrets(metaJson: SqlValue): SqlValue {
-  if (typeof metaJson !== 'string') return metaJson;
-  try {
-    const meta: unknown = JSON.parse(metaJson);
-    const server = isPlain(meta) ? meta.server : undefined;
-    if (!isPlain(meta) || !isPlain(server)) return metaJson;
-    for (const k of SECRET_MAPS) {
-      const map = server[k];
-      if (isPlain(map)) server[k] = Object.fromEntries(Object.keys(map).map((key) => [key, '']));
-    }
-    return JSON.stringify(meta);
-  } catch {
-    return metaJson;
-  }
-}
-
 const isPlain = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** `"<servidor>: <CHAVE>"` de cada chave de `env`/`headers` sem valor nos MCPs do arquivo: o que a pessoa precisa preencher. */
@@ -177,6 +159,10 @@ function mcpSecretsOf(rows: Row[]): string[] {
       const meta: unknown = JSON.parse(r.meta_json);
       const server = isPlain(meta) ? meta.server : undefined;
       if (!isPlain(server)) continue;
+      if (typeof server.secretRef === 'string') {
+        out.push(`${str(r.name)}: revisão da configuração local`);
+        continue;
+      }
       for (const k of SECRET_MAPS) {
         const map = server[k];
         if (isPlain(map)) for (const [key, v] of Object.entries(map)) if (v === '') out.push(`${str(r.name)}: ${key}`);
@@ -401,8 +387,10 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
     transaction(db, () => {
       run(db, 'DELETE FROM boards WHERE id = ?', [target.boardId]);
       insertRows(db, 'boards', all(mem, 'SELECT * FROM boards WHERE id = ?', [newBoardId]));
-      for (const t of EXPORT_TABLES)
-        insertRows(db, t.name, all(mem, `SELECT * FROM ${t.name} WHERE ${t.where} ORDER BY rowid`, [newBoardId]));
+      for (const t of EXPORT_TABLES) {
+        const rows = all(mem, `SELECT * FROM ${t.name} WHERE ${t.where} ORDER BY rowid`, [newBoardId]);
+        insertRows(db, t.name, t.name === 'board_artifacts' ? rows.map((r) => protectImportedMcpRow(db, r)) : rows);
+      }
     });
 
     // 6. arquivos de anexos, depois do COMMIT; os do board substituído vão para a pasta de backup

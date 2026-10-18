@@ -201,7 +201,7 @@ describe('varredura do harness por ferramenta e escopo', () => {
     });
     // nada que possa ser segredo vai para a lista
     expect(JSON.stringify(items)).not.toContain('segredo');
-    expect(items.find((i) => i.name === 'remoto')?.description).toBe('https://exemplo.dev/mcp');
+    expect(items.find((i) => i.name === 'remoto')?.description).toBe('MCP HTTP');
   });
 
   it('Cursor: caminhos da ferramenta', () => {

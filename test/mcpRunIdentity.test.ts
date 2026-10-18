@@ -127,7 +127,7 @@ describe('identidade MCP com servidor e ponte reais', () => {
       `import { McpServer } from ${JSON.stringify('file://' + sdk + '/server/mcp.js')};
 import { StdioServerTransport } from ${JSON.stringify('file://' + sdk + '/server/stdio.js')};
 const server = new McpServer({ name: 'fixture', version: '1' });
-server.registerTool('ping', { inputSchema: {} }, async () => ({ content: [{ type: 'text', text: process.env.REVISION }] }));
+server.registerTool('ping', { inputSchema: {} }, async () => ({ content: [{ type: 'text', text: process.env.REVISION === 'v1' ? 'snapshot-antigo' : 'snapshot-novo' }] }));
 await server.connect(new StdioServerTransport());`,
     );
     const save = (revision: string) =>
@@ -169,7 +169,7 @@ await server.connect(new StdioServerTransport());`,
     const client = await connect(c.token);
     expect(await call(client, 'call_board_mcp_tool', { server: 'selected-remote', name: 'ping', arguments: {} })).toEqual({
       error: false,
-      text: 'v1',
+      text: 'snapshot-antigo',
     });
     expect((await call(client, 'call_board_mcp_tool', { server: 'other', name: 'ping', arguments: {} })).error).toBe(true);
     expect((await call(client, 'call_board_mcp_tool', { server: 'selected-remote', name: 'other', arguments: {} })).error).toBe(true);

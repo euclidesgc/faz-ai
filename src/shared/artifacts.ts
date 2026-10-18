@@ -52,6 +52,7 @@ export interface BoardArtifact {
   agent?: AgentMeta;
   /** só no MCP: o resumo (comando ou endereço); a definição fica no host */
   mcpSummary?: string;
+  mcpCredential?: { secretRef: string; available: boolean; review: 'pending' | 'reviewed'; transport: 'stdio' | 'http' | 'sse' | '' };
   /** só na skill: gerada pela extensão (skill do fluxo), regravada a cada abertura */
   generated?: boolean;
   /** caminho da cópia de leitura (SKILL.md, arquivo da regra, arquivo do agente); '' no MCP. Preenchido pelo host */
@@ -71,7 +72,11 @@ export interface ArtifactDraft {
   description: string;
   /** regra: o arquivo; skill: o SKILL.md inteiro; agente: as instruções; mcp: '' */
   body: string;
-  meta: AgentMeta | { server: Record<string, unknown> } | { generated: true } | Record<string, never>;
+  meta:
+    | AgentMeta
+    | { server: Record<string, unknown>; transport?: 'stdio' | 'http' | 'sse' | '' }
+    | { generated: true }
+    | Record<string, never>;
   origin: string;
   originTool: AiTool | '';
   missing: boolean;
@@ -183,6 +188,7 @@ export interface LibraryArtifactInput {
   body: string;
   agent?: AgentMeta;
   server?: Record<string, unknown>;
+  mcpCredential?: BoardArtifact['mcpCredential'];
 }
 export interface LibraryImportResult {
   imported: number;

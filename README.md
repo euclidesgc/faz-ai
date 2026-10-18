@@ -560,8 +560,7 @@ são rascunhos e ainda não governam o runtime. A prévia identifica esse modo
 legado. A migração para o schema 35 mantém os campos originais; sua leitura de compatibilidade
 identifica skills dos agentes como essenciais e skills dos cards como selecionadas, inclusive
 referências ausentes. MCPs legados não viram autorizações do contrato novo. Exportar e importar
-preserva os rascunhos e suas versões, sem incluir definições MCP nesses contratos; os valores de
-credenciais MCP continuam removidos da exportação.
+preserva os rascunhos e suas versões, sem incluir definições MCP nesses contratos; a exportação contém somente referências locais das configurações MCP, sem seus valores.
 
 Ao editar um subagente já salvo na biblioteca, **Editar contrato de contexto (rascunho)** abre o contrato v1: papel, instruções, skills essenciais, skills sugeridas, MCPs permitidos e restrições de ferramentas. O contrato tem salvamento próprio, sem IA e com revisão otimista; não copia automaticamente autorizações legadas. A prévia mostra essenciais e itens Sempre, mantém opcionais inativos e explica recursos ausentes ou MCPs incompatíveis. Referências ausentes permanecem revisáveis.
 
@@ -1234,15 +1233,15 @@ origem; em Regras, **Atualizar da origem** substitui a cópia somente com confir
 **MCPs** exibem a descrição funcional cadastrada, com prioridade sobre comando ou URL. Ao importar, uma descrição presente na configuração é aproveitada; se faltar, use **Editar** para explicar a finalidade. A lista não conecta servidores automaticamente para descobrir descrições.
 
 **MCPs** têm criação por formulário (`command` e `args` para stdio, URL para HTTP) e **Editar JSON
-diretamente**, inclusive uma definição envolvida por `mcpServers`. Variáveis `env` e cabeçalhos
-`headers` ficam no host e aparecem apenas ao abrir explicitamente o editor desse MCP; não entram no
-snapshot geral ou nas cópias de leitura. A ponte do MCP **faz-ai** oferece `list_board_mcp_tools` e
+diretamente**, inclusive uma definição envolvida por `mcpServers`. A definição inteira, incluindo comando, argumentos, URL, `env` e `headers`, fica cifrada no cofre local do host; banco, exportação, interface e APIs recebem somente referência e estado. O editor permite alterar a descrição sem ler valores salvos; **Substituir a configuração salva** exige uma definição nova. MCPs importados ficam pendentes e não executam até essa revisão humana, mesmo quando a referência existe nesta máquina. A ponte do MCP **faz-ai** oferece `list_board_mcp_tools` e
 `call_board_mcp_tool`: qualquer cliente MCP conectado ao board pode descobrir os schemas e chamar
 as ferramentas dos servidores cadastrados, sem copiar suas configurações para cada ferramenta.
 Servidores desligados são recusados; no modo Pelo card, a chamada deve informar um card que o
 selecione, diretamente ou por seu agente. A ponte suporta stdio, Streamable HTTP e SSE explícito,
 com credenciais estáticas; não conduz login OAuth. Nesta versão encaminha ferramentas, não recursos
 ou prompts MCP, e abre/fecha uma conexão a cada operação.
+
+O schema 40 migra configurações MCP da biblioteca somente após confirmar o segredo no disco. O cofre `.credentials`, ao lado dos bancos, guarda chave e arquivos cifrados com permissões locais restritas; não acompanha a exportação. A proteção não substitui o isolamento do sistema operacional para processos do mesmo usuário. Perfis de CLI e os caminhos legados de arquivos nativos ainda precisam da revisão completa de #728.
 
 As ferramentas MCP `get_project_profile`, `get_board_artifact` e `save_board_artifact` permitem aos
 assistentes trabalhar na biblioteca. As APIs antigas de arquivos por ferramenta permanecem por

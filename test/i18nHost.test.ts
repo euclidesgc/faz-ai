@@ -111,6 +111,14 @@ describe('i18n do host: mensagens preenchidas', () => {
       'Board "B" importado: 2 card(s) e 1 anexo(s). Anexos sem arquivo: #3. Preencha os valores vazios dos servidores MCP: github: TOKEN.',
       'Board "B" imported: 2 card(s) and 1 attachment(s). Attachments without a file: #3. Fill in the empty values of the MCP servers: github: TOKEN.',
     ],
+    [
+      'Board "B" importado: 2 card(s) e 1 anexo(s). Revise as configurações locais dos servidores MCP: github: revisão da configuração local.',
+      'Board "B" imported: 2 card(s) and 1 attachment(s). Review the local MCP server configurations: github: revisão da configuração local.',
+    ],
+    [
+      'Board "B" importado: 2 card(s) e 1 anexo(s). Anexos sem arquivo: #3. Revise as configurações locais dos servidores MCP: github.',
+      'Board "B" imported: 2 card(s) and 1 attachment(s). Attachments without a file: #3. Review the local MCP server configurations: github.',
+    ],
     ['Migration 7 não encontrada', 'Migration 7 not found'],
   ];
 

@@ -22,6 +22,8 @@ export async function withBoardMcp<T>(
     const state = router.snapshot();
     const artifact = state.harness.library?.artifacts.find((a) => a.kind === 'mcp' && a.name === name && !a.missing);
     if (!artifact || artifact.usage === 'off') throw new Error('Servidor MCP indisponível ou desligado na biblioteca.');
+    if (artifact.mcpCredential && (artifact.mcpCredential.review !== 'reviewed' || !artifact.mcpCredential.available))
+      throw new Error('Este MCP exige revisão humana ou configuração local antes de executar.');
     if (artifact.usage !== 'always' && (card === undefined || !manifestOf(state, findCard(state, card)).mcpServers.includes(name)))
       throw new Error('Este MCP está no modo Pelo card. Informe um card que o selecione, diretamente ou pelo agente.');
     definition = router.libraryMcpDefinitions()[name] as Record<string, unknown> | undefined;

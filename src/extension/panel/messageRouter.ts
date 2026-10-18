@@ -40,6 +40,7 @@ import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
 import { branchRenameHandlers } from './handlers/branchRename';
 import { settleDelivery } from '../delivery';
 import { WorkRepo } from '../repositories/workRepo';
+import { credentialsFor } from '../credentials';
 import { RunMcpSessions, type RunMcpAccess } from '../mcp/runSessions';
 
 export type { RouterOptions };
@@ -267,6 +268,9 @@ export class MessageRouter {
 
   libraryMcpDefinitions(): Record<string, unknown> {
     return this.ctx.library.mcpDefinitions();
+  }
+  redactCredentials(text: string): string {
+    return credentialsFor(this.ctx.dbHandle.db).redact(text);
   }
 
   snapshot(): BoardState {

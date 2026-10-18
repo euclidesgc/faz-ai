@@ -181,8 +181,7 @@ operação. Suporta stdio, Streamable HTTP e `type: "sse"` explícito, com `env`
 Não conduz OAuth e não encaminha recursos ou prompts MCP. Erros de um servidor não impedem o uso
 dos demais. A IA descobre os schemas antes de chamar uma ferramenta.
 
-As definições com segredos ficam no host; apenas a leitura explícita do formulário de edição MCP
-as envia à interface, sem incluí-las no snapshot compartilhado. `get_skill`, `update_skill` e
+As definições MCP da biblioteca ficam cifradas no cofre local do host. Leituras, inclusive do editor, devolvem apenas referência, transporte e estado de revisão/disponibilidade. `save_board_artifact` por IA não pode gravar configurações MCP. A pessoa substitui a definição no editor; importações ficam pendentes e são recusadas antes da preparação e do encaminhamento. A leitura de arquivos de configuração MCP pela interface também é recusada. Logs e resultados encaminhados ocultam valores conhecidos pelo cofre. Perfis de CLI e APIs legadas de arquivos nativos ainda não têm a cobertura completa de #728. `get_skill`, `update_skill` e
 `write_skill_file` priorizam a cópia; `get_agent` sem escopo também. APIs de arquivos nativos seguem
 por compatibilidade. `onlySelected: false` ainda inclui fontes nativas para clientes antigos.
 

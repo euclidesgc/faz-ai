@@ -182,13 +182,13 @@ describe('readSource', () => {
     expect(readSource({ kind: 'mcp', location: '.mcp.json#srv' }, dirs, 'claude')).toMatchObject({
       kind: 'mcp',
       name: 'srv',
-      description: 'npx',
+      description: 'MCP stdio',
       body: '',
       meta: { server },
       origin: '.mcp.json#srv',
       missing: false,
     });
-    expect(readSource({ kind: 'mcp', location: '.mcp.json#web' }, dirs, 'claude').description).toBe('https://x.dev/mcp');
+    expect(readSource({ kind: 'mcp', location: '.mcp.json#web' }, dirs, 'claude').description).toBe('MCP HTTP');
   });
 
   it('MCP importa a descrição funcional quando a configuração fornece uma', () => {

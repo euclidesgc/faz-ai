@@ -110,6 +110,12 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     },
   });
   router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'restrito' } } });
+  const pendingMcp = router.snapshot().harness.library?.artifacts.find((a) => a.kind === 'mcp' && a.name === 'github');
+  if (pendingMcp)
+    router.handle({
+      type: 'harness.library.save',
+      input: { ...router.readLibraryArtifact(pendingMcp.id), server: { command: 'gh-mcp', env: { TOKEN: 'segredo' } } },
+    });
   const s0 = router.snapshot();
   const cardId = router.createCard({ typeId: s0.cardTypes[0]!.id, columnId: s0.columns[0]!.id, parentId: null, title: 'x' });
   const card = () => router.snapshot().cards.find((c) => c.id === cardId)!;

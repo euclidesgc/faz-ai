@@ -107,6 +107,7 @@ export interface AiExecution {
 }
 
 export interface AiGatewayDeps {
+  redact?(text: string): string;
   sessions?: RunMcpSessions;
   snapshots?: Pick<RunArtifactSnapshots, 'capture'>;
   admission?: ExecutionAdmission;
@@ -148,7 +149,8 @@ export class AiGateway {
     let attempts = 0;
     let format: OutputFormat = 'text';
     let workToken: string | undefined;
-    const redact = (text: string) => this.deps.sessions?.redact(text) ?? text;
+    const redact = (text: string) =>
+      this.deps.redact?.(this.deps.sessions?.redact(text) ?? text) ?? this.deps.sessions?.redact(text) ?? text;
     const revoke = () => {
       if (workToken === undefined) return;
       try {
@@ -264,7 +266,17 @@ export class AiGateway {
       }
       const outcome = outcomeOf({ stopped, timedOut, code, error });
       runLog.finish(runId, outcome, code);
-      const report = this.deps.sessions?.sanitize(measured.report()) ?? measured.report();
+      const rawReport = measured.report();
+      const safeReport = {
+        ...rawReport,
+        answer: redact(rawReport.answer),
+        reason: rawReport.reason === null ? null : redact(rawReport.reason),
+        inventory: rawReport.inventory.map((item) => ({ ...item, name: redact(item.name) })),
+        ...(rawReport.bashCommands
+          ? { bashCommands: rawReport.bashCommands.map((item) => ({ ...item, command: redact(item.command) })) }
+          : {}),
+      };
+      const report = this.deps.sessions?.sanitize(safeReport) ?? safeReport;
       runLog.measure(runId, report);
       const end: AiRunEnd = {
         code,

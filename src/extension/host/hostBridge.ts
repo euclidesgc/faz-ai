@@ -77,7 +77,7 @@ export function exportNotice(savedPath: string, warnings: string[]): string {
 /** Mensagem de resultado da importação: o board, os totais, os cards cujo anexo ficou sem arquivo e os segredos de MCP a preencher. */
 export function importNotice(r: ImportResult): string {
   const missing = r.warnings.length ? ` Anexos sem arquivo: ${r.warnings.join(', ')}.` : '';
-  const secrets = r.mcpSecrets.length ? ` Preencha os valores vazios dos servidores MCP: ${r.mcpSecrets.join(', ')}.` : '';
+  const secrets = r.mcpSecrets.length ? ` Revise as configurações locais dos servidores MCP: ${r.mcpSecrets.join(', ')}.` : '';
   return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}${secrets}`;
 }
 

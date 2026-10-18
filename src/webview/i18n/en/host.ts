@@ -142,6 +142,22 @@ export const gitNotices: Record<string, string> = {
 };
 
 export const host: Record<string, string> = {
+  'Revise as configurações locais dos servidores MCP: {secrets}.': 'Review the local MCP server configurations: {secrets}.',
+
+  'Configurações MCP não são devolvidas ao editor. Use a biblioteca para salvar uma nova definição.':
+    'MCP configurations are not returned to the editor. Use the library to save a new definition.',
+  'Configurações e credenciais MCP exigem revisão humana.': 'MCP configurations and credentials require human review.',
+  'Este MCP exige revisão humana ou configuração local antes de executar.':
+    'This MCP requires human review or local configuration before execution.',
+  'MCPs exigem revisão humana ou configuração local: {names}.': 'MCPs require human review or local configuration: {names}.',
+  'Referências salvas não podem ser substituídas pelo editor.': 'Saved references cannot be replaced by the editor.',
+  'Referência de credencial fora deste artefato.': 'The credential reference does not belong to this artifact.',
+  'Definição MCP importada inválida.': 'Invalid imported MCP definition.',
+  'Definição MCP legada inválida; valores originais preservados.': 'Invalid legacy MCP definition; original values have been preserved.',
+  'Arquivo de credenciais sem proteção local adequada.': 'The credentials file lacks adequate local protection.',
+  'Pasta de credenciais sem proteção local adequada.': 'The credentials folder lacks adequate local protection.',
+  'Chave local de credenciais inválida.': 'Invalid local credentials key.',
+
   'A reconciliação da abertura precisa terminar antes de executar.': 'Startup reconciliation must finish before running.',
   'A unidade foi cancelada antes de liberar a execução.': 'The work unit was cancelled before releasing the run.',
   'A história mudou de fase ou foi encerrada antes de liberar a execução.': 'The story changed phase or ended before releasing the run.',
@@ -245,6 +261,10 @@ export const host: Record<string, string> = {
     'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s).',
   'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}.':
     'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Revise as configurações locais dos servidores MCP: {secrets}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Review the local MCP server configurations: {secrets}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}. Revise as configurações locais dos servidores MCP: {secrets}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}. Review the local MCP server configurations: {secrets}.',
   'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Preencha os valores vazios dos servidores MCP: {secrets}.':
     'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Fill in the empty values of the MCP servers: {secrets}.',
   'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}. Preencha os valores vazios dos servidores MCP: {secrets}.':

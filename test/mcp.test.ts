@@ -2272,6 +2272,7 @@ describe('biblioteca neutra pelo MCP', () => {
 import { StdioServerTransport } from ${JSON.stringify('file://' + sdk + '/server/stdio.js')};
 const server = new McpServer({ name: 'fixture', version: '1' });
 server.registerTool('ping', { inputSchema: {} }, async () => ({ content: [{ type: 'text', text: process.env.SAMPLE === 'segredo-local' ? 'pong' : 'erro' }] }));
+server.registerTool('echo', { inputSchema: {} }, async () => ({ content: [{ type: 'text', text: process.env.SAMPLE }] }));
 await server.connect(new StdioServerTransport());`,
     );
     router.handle({
@@ -2296,6 +2297,9 @@ await server.connect(new StdioServerTransport());`,
     const result = await call('call_board_mcp_tool', { server: 'memoria', name: 'ping', arguments: {}, card });
     expect(result.error).toBe(false);
     expect(result.text).toBe('pong');
+    const echo = await call('call_board_mcp_tool', { server: 'memoria', name: 'echo', arguments: {}, card });
+    expect(echo.error).toBe(false);
+    expect(echo.text).toBe('[credencial local]');
     expect(JSON.stringify(router.snapshot())).not.toContain('segredo-local');
     const mcp = router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'mcp')!;
     expect((await call('get_board_artifact', { id: mcp.id })).error).toBe(true);

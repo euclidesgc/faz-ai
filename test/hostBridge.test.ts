@@ -229,7 +229,9 @@ describe('HostBridge: harness.file.read / harness.file.write', () => {
 
     const claudeJson = path.join(dir, 'h', '.claude.json');
     await bridge.handle({ type: 'harness.file.read', requestId: 'r3', path: claudeJson });
-    expect(result()).toMatchObject({ readonly: true });
+    expect(result()).toMatchObject({
+      error: 'Configurações MCP não são devolvidas ao editor. Use a biblioteca para salvar uma nova definição.',
+    });
     await bridge.handle({ type: 'harness.file.write', requestId: 'w3', path: claudeJson, content: '{}' });
     expect(result()).toMatchObject({ ok: false, error: 'Este arquivo não pode ser alterado pelo board.' });
   });
@@ -546,7 +548,7 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     );
     expect(
       importNotice({ boardId: 'b', boardName: 'B', cards: 2, attachments: 1, warnings: [], mcpSecrets: ['github: GITHUB_TOKEN', 'x: K'] }),
-    ).toBe('Board "B" importado: 2 card(s) e 1 anexo(s). Preencha os valores vazios dos servidores MCP: github: GITHUB_TOKEN, x: K.');
+    ).toBe('Board "B" importado: 2 card(s) e 1 anexo(s). Revise as configurações locais dos servidores MCP: github: GITHUB_TOKEN, x: K.');
   });
 });
 
