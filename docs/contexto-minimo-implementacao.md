@@ -35,7 +35,13 @@ Os campos livres de instrução e resultado são conteúdo fornecido pela pessoa
 
 O resultado publica o caminho de resolução e as origens por ID, agrupa repetições e explica artefatos ausentes/desligados, tipo incorreto, agente sem contrato e MCPs fora do contrato (inclusive Sempre). Não traduz nomes nativos para uma permissão universal nem decide modelo/fallback: devolve restrições e modelo solicitados para integração futura com os mecanismos existentes.
 
-`contextPlanning.preview` expõe essa leitura no protocolo host–webview, sem salvar, inferir ou iniciar execução. A resposta contém metadados, sem corpos de artefatos ou definições MCP. A admissão está explicitamente indisponível (`dependency: 729`, `canExecute: false`); isso não altera o runtime legado. O editor dos contratos, a leitura MCP e a integração com #729 continuam pendentes. Não é a conclusão de E3.
+`contextPlanning.preview` expõe essa leitura no protocolo host–webview, sem salvar, inferir ou iniciar execução. A resposta contém metadados, sem corpos de artefatos ou definições MCP. A admissão está explicitamente indisponível (`dependency: 729`, `canExecute: false`); isso não altera o runtime legado. O editor e a leitura MCP foram acrescentados na continuação abaixo. A integração com #729 continua pendente. Não é a conclusão de E3.
+
+### Editor e prévia pelo MCP
+
+Na edição de um subagente já salvo da biblioteca, **Editar contrato de contexto (rascunho)** abre um formulário separado para papel, instruções, essenciais, sugestões, MCPs permitidos e restrições de ferramentas. O salvamento não usa IA, não altera campos legados e envia a revisão base ao host. Uma atualização concorrente é sinalizada sem sobrescrever o rascunho; recursos ausentes ou desligados permanecem visíveis e removíveis. Contratos novos começam sem permissões copiadas automaticamente do legado.
+
+A prévia do formulário usa `resolveContextDraft` com o contrato não salvo, essenciais e Sempre, sem complementos de atividade. Sugestões e MCPs permitidos não são ativados antecipadamente. `preview_context_draft` no MCP delega à mesma entrada de leitura do host, com parâmetros estritos e metadados seguros. Nenhuma ferramenta de escrita de contratos foi exposta à IA.
 
 ## Dependências identificadas no board
 
@@ -63,6 +69,6 @@ Lidas as descrições de #729, #619, #711, #712, #618, #727 e #728 e o anexo nor
 
 ## Trabalho ainda pendente
 
-E3 está parcialmente implementada; faltam o editor e a integração dos limites de #729, sub-tarefa cadastrada no board e ainda em A fazer. E4–E7 continuam pendentes; E5 requer também os snapshots e os contratos de orquestração e políticas citados no plano. Não substituir essas dependências por outro scheduler, outro motor de modelos ou permissões somente na interface.
+E3 está parcialmente implementada; falta a integração dos limites de #729, sub-tarefa cadastrada no board e ainda em A fazer. E4–E7 continuam pendentes; E5 requer também os snapshots e os contratos de orquestração e políticas citados no plano. Não substituir essas dependências por outro scheduler, outro motor de modelos ou permissões somente na interface.
 
 O piloto de E7 exige tarefas representativas e medições de execuções aceitas; não foi executado como efeito desta entrega. Nenhuma redução de consumo ou preservação de qualidade foi demonstrada ainda.

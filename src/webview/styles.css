@@ -4579,3 +4579,12 @@ div.metrics-breakdown {
 .execution-context-items code {
   overflow-wrap: anywhere;
 }
+
+.context-contract-fields {
+  display: grid;
+  gap: var(--sp-16);
+  padding: 0;
+  margin: var(--sp-16) 0;
+  border: 0;
+  min-width: 0;
+}

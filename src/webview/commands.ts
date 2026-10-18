@@ -29,6 +29,9 @@ const post = (msg: WebviewToHost): void => postToHost(msg);
  * conta própria, e o botão ou a seção de onde a ação saiu usa a promessa com `useAction` para mostrar no lugar.
  */
 const req = (msg: WebviewToHost): Promise<void> => request(msg);
+export const contextPlanning = {
+  save: (input: import('../shared/contextPlanning').ContextPlanningWrite) => req({ type: 'contextPlanning.save', input }),
+};
 /** Como `req`, e o card fica marcado como ocupado (spinner no board e no card aberto) até a resposta. */
 const reqCard = (cardId: Id, msg: WebviewToHost): Promise<void> => trackCard(cardId, request(msg));
 

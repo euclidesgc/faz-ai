@@ -958,4 +958,54 @@ export const harness: Record<string, string> = {
     'Everything {tool} loads. Pick where to look and then the subject: the <b>catalog</b> (Projeto, Global and Importados) shows what exists and takes no space in the AI context; only what you send to the <b>Board</b> can be used by runs, in the mode of each artifact.',
   'Este assunto não entra no board: a ferramenta carrega esses arquivos por conta própria. Veja em Projeto ou Global.':
     'This subject does not go on the board: the tool loads these files on its own. See Projeto or Global.',
+  'Contrato de contexto: {name}': 'Context contract: {name}',
+  'Rascunho v1. Salvar não altera a execução legada. A admissão por capacidades ainda está indisponível (#729).':
+    'Version 1 draft. Saving does not change legacy execution. Capability admission is still unavailable (#729).',
+  'Papel do agente': 'Agent role',
+  'Instruções do contrato': 'Contract instructions',
+  'Skills essenciais': 'Essential skills',
+  'Entram em toda atividade deste agente.': 'Included in every activity of this agent.',
+  'Skills sugeridas': 'Suggested skills',
+  'São sugestões para a atividade; não entram antecipadamente no contexto.':
+    'Suggestions for the activity; they are not loaded into context in advance.',
+  'MCPs permitidos': 'Allowed MCPs',
+  'Delimitam os MCPs que uma atividade pode selecionar; não ativam servidores por si só.':
+    'Limit which MCPs an activity can select; they do not activate servers by themselves.',
+  'Nenhum recurso deste tipo cadastrado.': 'No resources of this type registered.',
+  'Restrições de ferramentas': 'Tool restrictions',
+  'Categorias solicitadas no contrato. A tradução e a imposição dependem da admissão do executor. Lista vazia não concede todas as ferramentas.':
+    'Categories requested in the contract. Translation and enforcement depend on executor admission. An empty list does not grant all tools.',
+  'Ferramenta das restrições nativas': 'Tool for native restrictions',
+  'Permitir nativas (uma por linha)': 'Allow native tools (one per line)',
+  'Negar nativas (uma por linha)': 'Deny native tools (one per line)',
+  'Prévia do contrato com essenciais e itens Sempre. Complementos da atividade não estão selecionados.':
+    'Contract preview with essentials and Always items. Activity additions are not selected.',
+  'O contrato mudou em outra edição. Feche e abra novamente para carregar a revisão atual.':
+    'The contract changed in another editor. Close and reopen to load the current revision.',
+  'Salvar rascunho do contrato': 'Save contract draft',
+  'Prévia do contrato': 'Contract preview',
+  'Editar contrato de contexto (rascunho)': 'Edit context contract (draft)',
+  'Fase no card': 'Card phase',
+  'Ação no card': 'Card action',
+  'Fase no workflow': 'Workflow phase',
+  'Ação no workflow': 'Workflow action',
+  'Fase no board': 'Board phase',
+  'Ação no board': 'Board action',
+  'Essencial do agente': 'Agent essential',
+  'Admissão indisponível (#729). Esta prévia não autoriza execução.':
+    'Admission unavailable (#729). This preview does not authorize execution.',
+  'O alvo da atividade não pertence ao board ou à fase indicada.':
+    'The activity target does not belong to the board or the selected phase.',
+  'Seleção de contexto inválida.': 'Invalid context selection.',
+  'Escolha um agente válido para a atividade.': 'Choose a valid agent for the activity.',
+  'O agente ainda não tem contrato v1.': 'The agent does not have a v1 contract yet.',
+  'O contrato do agente é inválido.': 'The agent contract is invalid.',
+  'Recurso ausente.': 'Missing resource.',
+  'Recurso desligado ou indisponível.': 'Resource disabled or unavailable.',
+  'O recurso tem um tipo diferente do esperado.': 'The resource has a different type than expected.',
+  'MCP fora do contrato do agente.': 'MCP outside the agent contract.',
+  'Anexo de entrada ausente.': 'Missing input attachment.',
+  'Anexo de entrada de outro board.': 'Input attachment from another board.',
+  Indisponível: 'Unavailable',
+  Nenhuma: 'None',
 };

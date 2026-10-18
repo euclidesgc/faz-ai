@@ -586,7 +586,9 @@ missing references. Legacy MCP selections do not become permissions in the new c
 Export/import preserves drafts and versions without embedding MCP definitions in these contracts;
 MCP credential values continue to be removed from exports.
 
-The host–webview protocol also previews saved drafts: it resolves inheritance, sources and conflicts without inference and returns artifact metadata. This E3 foundation does not include the contract editor or capability admission from #729; preview results remain unauthorized for execution.
+When editing a saved library subagent, **Edit context contract (draft)** opens the v1 contract: role, instructions, essential skills, suggested skills, allowed MCPs and tool restrictions. The contract has a separate save action, without AI and with optimistic revisions; it does not automatically copy legacy permissions. The preview shows essentials and Always items, keeps optional resources inactive and explains missing resources or incompatible MCPs. Missing references remain available for review.
+
+The host–webview protocol and the `preview_context_draft` MCP tool preview saved drafts: they resolve inheritance, sources and conflicts without inference and return artifact metadata. Capability admission from #729 remains pending; previews do not authorize execution. The per-activity selection editor belongs to the next delivery.
 
 ### Card Usage tab
 

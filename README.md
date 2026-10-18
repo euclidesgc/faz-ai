@@ -563,7 +563,9 @@ referências ausentes. MCPs legados não viram autorizações do contrato novo. 
 preserva os rascunhos e suas versões, sem incluir definições MCP nesses contratos; os valores de
 credenciais MCP continuam removidos da exportação.
 
-O protocolo host–webview também oferece a prévia dos rascunhos salvos: resolve herança, origens e incompatibilidades sem inferência e retorna metadados dos artefatos. Essa base da E3 ainda não inclui o editor dos contratos nem a admissão por capacidades de #729; a prévia permanece sem autorização para executar.
+Ao editar um subagente já salvo na biblioteca, **Editar contrato de contexto (rascunho)** abre o contrato v1: papel, instruções, skills essenciais, skills sugeridas, MCPs permitidos e restrições de ferramentas. O contrato tem salvamento próprio, sem IA e com revisão otimista; não copia automaticamente autorizações legadas. A prévia mostra essenciais e itens Sempre, mantém opcionais inativos e explica recursos ausentes ou MCPs incompatíveis. Referências ausentes permanecem revisáveis.
+
+O protocolo host–webview e o MCP `preview_context_draft` oferecem a prévia dos rascunhos salvos: resolvem herança, origens e incompatibilidades sem inferência e retornam metadados dos artefatos. A admissão por capacidades de #729 continua pendente; a prévia não autoriza execução. O editor de seleções por atividade pertence à próxima entrega.
 
 ### Aba Consumo do card
 

@@ -14,6 +14,7 @@ import { MarkdownEditor } from '../../MarkdownEditor';
 import { ModelEditor } from '../../FieldRenderer';
 import { LIBRARY_GUIDE } from './libraryGuide';
 import { modelDisplay } from '../../../../shared/models';
+import { AgentContractEditor } from './AgentContractEditor';
 
 const TABS = {
   instructions: 'Instruções',
@@ -66,6 +67,7 @@ export function LibraryAgentEditor({
   const state = useBoardStore((s) => s.state)!;
   const [returnFocus] = useState(() => document.activeElement);
   const [tab, setTab] = useState<Tab>('instructions');
+  const [editingContract, setEditingContract] = useState(false);
   const [section, setSection] = useState<AgentAssistStep>(guided ? 'responsibility' : 'content');
   const [name, setName] = useState(initial?.name ?? '');
   const [body, setBody] = useState(initial?.body ?? '');
@@ -170,6 +172,8 @@ export function LibraryAgentEditor({
   const selectedField = tab === 'mcp' ? 'mcpServers' : 'skills';
   const blocked = assist.busy || save.busy;
 
+  if (editingContract && initial?.id) return <AgentContractEditor artifactId={initial.id} onClose={() => setEditingContract(false)} />;
+
   return (
     <Dialog.Root open onOpenChange={(open) => !open && !blocked && onClose()}>
       <Dialog.Content
@@ -220,6 +224,11 @@ export function LibraryAgentEditor({
               ),
             )}
           />
+          {initial?.id && (
+            <Button variant="soft" disabled={blocked} onClick={() => setEditingContract(true)}>
+              {t('Editar contrato de contexto (rascunho)')}
+            </Button>
+          )}
           <Tabs.Root value={tab} onValueChange={(value) => changeTab(value as Tab)}>
             <Tabs.List aria-label={t('Definição do subagente')}>
               {Object.entries(TABS).map(([id, label]) => (

@@ -161,6 +161,7 @@ id, tipo, nome, uso e caminho de cada cópia, sem configurações MCP. Trocar de
 a origem não remove a cópia; `set_harness_selection` altera o modo, sem atualizar da origem.
 
 - `get_project_profile`: perfil detectado do projeto, para sugestões sem executar comandos.
+- `preview_context_draft { target: { cardId, workflowId, phaseId, action } }`: prévia dos contratos v1 salvos, somente leitura. Use IDs estáveis (não números); `cardId` e `workflowId` são nulos ou mutuamente exclusivos e `phaseId` vazio indica ação sem fase. Ações: `work`, `refine`, `summary`, `conflict`, `chat`, `harness-agent`, `harness-rule`, `harness-skill`, `harness-suggest`. Retorna metadados, origens, revisões, caminho de herança e incompatibilidades, sem corpos de artefatos ou definições MCP. Não salva, não infere, não altera o runtime legado nem autoriza execução (`canExecute: false`, admissão #729 indisponível). Não há ferramenta MCP de escrita de contratos ou permissões.
 - `get_board_artifact { id }`: conteúdo completo de regra, skill ou agente; recusa MCPs.
 - `save_board_artifact { id?, kind, name, description, body, skills?, mcpServers?, categories? }`:
   cria/atualiza apenas na biblioteca. Tipos: `rule`, `skill`, `agent`; regra nova fica desligada.
