@@ -100,6 +100,7 @@ describe('suggestModelRule e suggestModel', () => {
       name: 'B',
       rules: DEFAULT_RULES,
       aiTool: 'claude',
+      aiProfiles: [],
       modelCatalog: [],
       modelRules,
       appearance: DEFAULT_APPEARANCE,

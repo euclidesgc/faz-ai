@@ -1,3 +1,4 @@
+import { AiProfileRepo } from './aiProfileRepo';
 import { createHash } from 'node:crypto';
 import { ContextPlanningRepo } from './contextPlanningRepo';
 import { legacyContextPlanning } from '../../shared/contextPlanning';
@@ -75,6 +76,7 @@ export class BoardRepo {
       name: str(row.name),
       rules: parseRules(str(row.rules_json)),
       aiTool: parseAiTool(str(row.ai_tools_json)),
+      aiProfiles: new AiProfileRepo(this.db).list(str(row.id)),
       modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)),
       modelRules: parseModelRules(str(row.model_rules_json)),
       appearance: parseAppearance(str(row.appearance_json)),
@@ -320,6 +322,7 @@ export class BoardRepo {
       name: str(b.name),
       rules: parseRules(str(b.rules_json)),
       aiTool: parseAiTool(str(b.ai_tools_json)),
+      aiProfiles: new AiProfileRepo(db).list(boardId),
       modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)),
       modelRules: parseModelRules(str(b.model_rules_json)),
       appearance: parseAppearance(str(b.appearance_json)),

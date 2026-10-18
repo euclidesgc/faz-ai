@@ -1,3 +1,4 @@
+import { validateProfileRows } from '../repositories/aiProfileRepo';
 import { ExecutionPolicyRepo } from '../repositories/executionPolicyRepo';
 import { validateExecutionPolicy } from '../../shared/executionPolicies';
 import { ContextPlanningRepo } from '../repositories/contextPlanningRepo';
@@ -65,6 +66,7 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'board_artifacts', where: 'board_id = ?', hasId: true, since: 34 },
   { name: 'agent_context_contracts', where: 'board_id = ?', hasId: false, since: 35 },
   { name: 'activity_context_selections', where: 'board_id = ?', hasId: true, since: 35 },
+  { name: 'ai_profiles', where: 'board_id = ?', hasId: false, since: 42 },
   { name: 'execution_policies', where: 'board_id = ?', hasId: true, since: 41 },
   { name: 'execution_policy_versions', where: 'board_id = ?', hasId: false, since: 41 },
   { name: 'board_artifact_files', where: 'artifact_id IN (SELECT id FROM board_artifacts WHERE board_id = ?)', hasId: false, since: 34 },
@@ -120,6 +122,8 @@ export function exportBoard(
 
   const tables: Record<string, Row[]> = {};
   for (const t of EXPORT_TABLES) tables[t.name] = all(db, `SELECT * FROM ${t.name} WHERE ${t.where} ORDER BY rowid`, [boardId]);
+
+  validateProfileRows(tables.ai_profiles!, boardId);
 
   const warnings: string[] = [];
   const numbers = new Map(tables.cards!.map((c) => [str(c.id), num(c.number)]));
@@ -329,6 +333,8 @@ export interface ImportResult {
   attachmentsBackup?: string;
   /** `"<servidor>: <CHAVE>"` das chaves de `env`/`headers` dos MCPs que vieram vazias e precisam ser preenchidas */
   mcpSecrets: string[];
+  /** Perfis importados entram desativados e exigem revisão local. */
+  profileReviews?: string[];
 }
 
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -381,6 +387,8 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
     migrate(mem);
     new ContextPlanningRepo(mem).validateBoard(newBoardId);
     new ExecutionPolicyRepo(mem).validateBoard(newBoardId);
+    validateProfileRows(all(mem, 'SELECT * FROM ai_profiles WHERE board_id = ?', [newBoardId]), newBoardId);
+    run(mem, "UPDATE ai_profiles SET enabled = 0, review_state = 'pending' WHERE board_id = ?", [newBoardId]);
     // Revisão humana local nunca acompanha uma configuração executável importada.
     run(mem, "UPDATE execution_policies SET review_state = 'pending' WHERE board_id = ?", [newBoardId]);
     validateAdmissionRows(all(mem, 'SELECT * FROM ai_runs WHERE board_id = ?', [newBoardId]));
@@ -438,6 +446,9 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
       attachments: attachmentRows.length,
       warnings,
       mcpSecrets: mcpSecretsOf(file.tables.board_artifacts ?? []),
+      profileReviews: all(mem, 'SELECT name FROM ai_profiles WHERE board_id = ? ORDER BY position,id', [newBoardId]).map((r) =>
+        str(r.name),
+      ),
     };
     if (attachmentsBackup) result.attachmentsBackup = attachmentsBackup;
     return result;

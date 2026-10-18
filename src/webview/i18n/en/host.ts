@@ -142,6 +142,14 @@ export const gitNotices: Record<string, string> = {
 };
 
 export const host: Record<string, string> = {
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Perfis desativados para revisão local: {profiles}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Profiles disabled for local review: {profiles}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Revise as configurações locais dos servidores MCP: {secrets}. Perfis desativados para revisão local: {profiles}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Review the local MCP server configurations: {secrets}. Profiles disabled for local review: {profiles}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}. Perfis desativados para revisão local: {profiles}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}. Profiles disabled for local review: {profiles}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}. Revise as configurações locais dos servidores MCP: {secrets}. Perfis desativados para revisão local: {profiles}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}. Review the local MCP server configurations: {secrets}. Profiles disabled for local review: {profiles}.',
   'Política de execução inválida ou versão não suportada.': 'Invalid execution policy or unsupported version.',
   'Snapshot de políticas inválido.': 'Invalid policy snapshot.',
   'Versão de política inválida.': 'Invalid policy version.',

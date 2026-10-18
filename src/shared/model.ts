@@ -1,3 +1,4 @@
+import type { AiProfile } from './aiProfiles';
 import type { ContextPlanningState } from './contextPlanning';
 import type { OrphanReport } from './orphans';
 import type { BoardRequirement } from './requirements';
@@ -31,6 +32,8 @@ export interface Board {
   rules: BoardRules;
   /** ferramenta de IA com que o projeto trabalha; define regras, pasta de skills, MCP e modelos */
   aiTool: AiTool;
+  /** Configuração pública dos perfis; valores executáveis permanecem no cofre do host. */
+  aiProfiles: AiProfile[];
   /** modelos de LLM disponíveis, por ferramenta */
   modelCatalog: ModelOption[];
   /** sugestão de modelo conforme os campos do card */

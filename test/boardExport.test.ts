@@ -285,12 +285,26 @@ describe('importBoard', () => {
     expect(fs.existsSync(router.store.pathOf(router.snapshot().attachments[0] ?? { cardId: storyId, storedName: 'x' }))).toBe(false);
 
     const result = importBoard(target(router), parseExportFile(text));
-    expect(result).toEqual({ boardId: before.board.id, boardName: 'Meu Board', cards: 4, attachments: 2, warnings: [], mcpSecrets: [] });
+    expect(result).toEqual({
+      boardId: before.board.id,
+      boardName: 'Meu Board',
+      cards: 4,
+      attachments: 2,
+      warnings: [],
+      mcpSecrets: [],
+      profileReviews: ['Claude Code', 'Cursor', 'Kimi Code'],
+    });
 
     const other = openRouter(db, 'ws-a', 'A'); // reabre a pasta: o board é o importado
     expect(other.boardId).toBe(before.board.id);
     const after = comparable(other.snapshot());
-    expect(after).toEqual(before);
+    expect(after).toEqual({
+      ...before,
+      board: {
+        ...before.board,
+        aiProfiles: before.board.aiProfiles.map((p) => ({ ...p, enabled: false, credentials: { ...p.credentials!, review: 'pending' } })),
+      },
+    });
     expect(other.snapshot().board.workspaceKey).toBe('ws-a');
     expect(readAll(other)).toEqual(files);
     expect(
@@ -585,6 +599,7 @@ describe('artefatos do board no export e no import', () => {
   it('export de versão anterior à 33: as tabelas novas valem vazias', () => {
     const f = doExport().file as any;
     f.schemaVersion = 32;
+    delete f.tables.ai_profiles;
     delete f.tables.board_artifacts;
     delete f.tables.board_artifact_files;
     const parsed = parseExportFile(JSON.stringify(f));

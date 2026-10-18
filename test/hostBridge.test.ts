@@ -501,7 +501,11 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     let changes = 0;
     router.onDidChange(() => changes++);
     await bridge.handle({ type: 'backup.import.apply', token: summary.token });
-    expect(sent.at(-1)).toEqual({ type: 'notice', message: 'Board "Meu Board" importado: 1 card(s) e 0 anexo(s).' });
+    expect(sent.at(-1)).toEqual({
+      type: 'notice',
+      message:
+        'Board "Meu Board" importado: 1 card(s) e 0 anexo(s). Perfis desativados para revisão local: Claude Code, Cursor, Kimi Code.',
+    });
     expect(changes).toBe(1);
     expect(router.boardId).toBe(oldBoardId); // o arquivo veio deste mesmo board: os ids se preservam
     expect(router.snapshot().cards.map((c) => c.title)).toEqual(['Card 1']);

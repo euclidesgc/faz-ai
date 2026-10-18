@@ -197,3 +197,14 @@ Configurações → Harness → Ferramenta e execução oferece gestão manual d
 O protocolo de leitura/simulação é correlacionado e cancelável, com erro de transporte/timeout. Simulação usa o avaliador puro no host, cópia do rascunho e cenários explicitamente hipotéticos. Não inicia IA, grava dados ou produz evidência de admissão. Alterações no cenário, política, catálogo/contexto e token dos cabeçalhos de políticas salvas marcam o resultado desatualizado. A revisão/remoção é recusada para origem IA/MCP/tentativa autenticada. Remover/desativar política com destino indisponível continua possível.
 
 Esta etapa não conclui #732/#733: ainda faltam perfis reais e catálogo de #705, Próxima execução pelo avaliador, integração de todos os chamadores e auditoria de decisões no runtime. A tela está na configuração de Harness existente; a organização definitiva em Ferramentas de IA acompanha os perfis. O modelo reserva legado continua ativo somente no caminho anterior, separado da simulação. Não há assistente de propostas #734 nem migração #735 nesta entrega.
+
+
+## Perfis CLI — domínio e persistência de #682/#683
+
+Schema 42 adiciona `ai_profiles`, com seed/migração dos três prontos, sem reescrever `ai_tools_json`, catálogo ou regras. O domínio puro oferece identidades/nomes, validação, argumentos com marcadores (valores nunca são divididos), consulta de catálogo do base e modelo livre do personalizado. O fallback de `activeProfile` é somente compatibilidade do seletor legado; admissão estrita mantém a resolução explícita de `executionPolicies`.
+
+Os sete aspectos de capacidades, incluindo cancelamento e saída, começam desconhecidos. O contrato de evidência inclui vínculo a binário/versão e digests de args/ambiente/configuração, reaproveitando o formato de evidência existente; esta etapa não produz provas nem admissão. Salvar, duplicar e importar nunca herdam selo de execução.
+
+`AiProfileRepo` separa a configuração completa no cofre já existente e devolve metadados/referências. Travas de prontos/padrão e escrita humana valem no repositório, incluindo a tentativa de desativar o padrão pelo salvamento. Campos privados futuros já salvos sobrevivem à edição. Duplicação humana recebe outra referência, pendente/desativada; não é fallback. Importação valida antes do backup/substituição, recusa valores livres e avisa os nomes a revisar. Prontos importados têm revisão explícita que não os liga; personalizados exigem configuração revisada. Leitura completa prontos ausentes sem escrever.
+
+Validação direcionada cobre domínio, migração de dois boards, persistência/segredos, exportação/importação, repositórios, avisos/tradução e orçamento de consultas. Conforme orientação da pessoa, a suíte inteira fica para a consolidação final. Ainda faltam #684 (AiTool aberto), resolução/probe/providers e host/telas #686–#692, ligação de capacidades/admissão e política aos chamadores reais. E3/E5 e a história #618 continuam em implementação.

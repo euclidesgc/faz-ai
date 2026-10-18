@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 41;
+export const SCHEMA_VERSION = 42;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -527,6 +527,20 @@ const MIGRATIONS: Record<number, string> = {
       policy_json TEXT NOT NULL, updated_at INTEGER NOT NULL,
       PRIMARY KEY (policy_id, revision)
     );
+  `,
+  42: `
+    -- #618: perfis são dados; comandos e variáveis ficam no cofre local de #728.
+    CREATE TABLE ai_profiles (
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      id TEXT NOT NULL, name TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1,
+      kind TEXT NOT NULL, base TEXT NOT NULL, config_json TEXT NOT NULL DEFAULT '{}',
+      position INTEGER NOT NULL DEFAULT 0, secret_ref TEXT,
+      review_state TEXT NOT NULL DEFAULT 'pending' CHECK (review_state IN ('pending', 'reviewed')),
+      PRIMARY KEY (board_id, id)
+    );
+    INSERT INTO ai_profiles(board_id,id,name,kind,base,position,review_state) SELECT id,'claude','Claude Code','builtin','claude',0,'reviewed' FROM boards;
+    INSERT INTO ai_profiles(board_id,id,name,kind,base,position,review_state) SELECT id,'cursor','Cursor','builtin','cursor',1,'reviewed' FROM boards;
+    INSERT INTO ai_profiles(board_id,id,name,kind,base,position,review_state) SELECT id,'kimi','Kimi Code','builtin','kimi',2,'reviewed' FROM boards;
   `,
 };
 
