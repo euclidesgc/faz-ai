@@ -25,7 +25,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { aiToolInfo, type AiTool } from '../../shared/harness';
 import type { RunReport } from '../../shared/log';
-import { ensureProjectServer } from '../mcp/clientConfig';
+import { leaseProjectServer, type ProjectServerLease } from '../mcp/projectServerLease';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import type { RunningProcess } from '../runner';
 import { MeasureBrokenError, MeasureEndedError, MeasureIgnoredError, MeasureRefusedError, type MeasureError } from './errors';
@@ -39,6 +39,8 @@ import { textReader } from './text';
 export type SpawnFn = (command: HeadlessCommand, cwd: string, out: (text: string, stream: OutputStream) => void) => RunningProcess;
 
 export interface MeasuredDeps {
+  /** Raiz compartilhada de coordenação; nos testes usa uma pasta temporária própria. */
+  leaseCoordinationDir?: string;
   spawn: SpawnFn;
   /**
    * Cada linha legível que a ferramenta produziu, mais os recados do board sobre a execução (a
@@ -161,6 +163,8 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
   let current: RunningProcess | null = null;
   let killed = false;
   let done = false;
+  let projectLease: ProjectServerLease | null = null;
+  let processMayExist = false;
   /** o leitor da tentativa em curso; o `report()` é sempre o da última */
   let reader: OutputReader = textReader();
   /** por que a medição não aconteceu, quando não aconteceu */
@@ -169,22 +173,27 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
   const finish = (code: number | null, error?: Error): void => {
     if (done) return;
     done = true;
+    if (projectLease) {
+      if (current?.terminationConfirmed?.() === true) {
+        try {
+          projectLease.confirmProcessStopped();
+          projectLease.release();
+        } catch {
+          deps.log('Não foi possível restaurar o empréstimo MCP; diário preservado para reconciliação.');
+        }
+      } else {
+        deps.log('O fim da árvore de processos não foi confirmado; empréstimo MCP retido para reconciliação.');
+        error ??= new Error('O encerramento da árvore de processos ainda não foi confirmado.');
+      }
+    }
     for (const fn of listeners) fn(code, error);
   };
 
   const attempt = (structured: boolean): void => {
     const built = headlessCommand(tool, { ...input, structured });
-    // sem o servidor do board no arquivo que a ferramenta lê, a execução rodaria sem mover nem comentar nada
-    if (built.projectMcp) {
-      const { file } = built.projectMcp;
-      const result = ensureProjectServer(cwd, file, built.projectMcp.entry, undefined, { stdioType: built.projectMcp.stdioType });
-      if (result === 'added') deps.log(`Servidor do board registrado em ${file}, que o ${label} lê em segundo plano.`);
-      if (result === 'repaired')
-        deps.log(`O registro do servidor do board em ${file} apontava para outra pasta ou outro caminho; foi refeito para este projeto.`);
-      if (result === 'invalid')
-        deps.log(
-          `${file} não é um JSON válido e o board não conseguiu registrar o servidor dele: o ${label} pode rodar sem acesso ao board. Corrija o arquivo.`,
-        );
+    if (built.projectMcp && !projectLease) {
+      projectLease = leaseProjectServer(cwd, built.projectMcp, { coordinationDir: deps.leaseCoordinationDir, log: deps.log });
+      deps.log('Servidor do board disponível por empréstimo temporário do arquivo MCP do projeto.');
     }
     const { command, cleanup } = materialize(built);
     const format = command.format;
@@ -229,6 +238,8 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
 
     let proc: RunningProcess;
     try {
+      projectLease?.markProcessUnconfirmed();
+      processMayExist = true;
       proc = deps.spawn(command, cwd, feed);
     } catch (e) {
       cleanup();
@@ -285,6 +296,8 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
           return;
         }
         try {
+          if (projectLease && proc.terminationConfirmed?.() !== true)
+            throw new Error('A tentativa anterior ainda exige reconciliação de processos; não será repetida.');
           attempt(false);
         } catch (e) {
           finish(null, e instanceof Error ? e : new Error(String(e)));
@@ -301,7 +314,15 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
     });
   };
 
-  attempt(true);
+  const releaseUnusedLease = () => {
+    if (projectLease && !processMayExist) projectLease.release();
+  };
+  try {
+    attempt(true);
+  } catch (e) {
+    releaseUnusedLease();
+    throw e;
+  }
 
   return {
     proc: {

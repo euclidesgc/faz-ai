@@ -21,6 +21,8 @@ import type { AiActivity, BoardState, Card } from '../shared/model';
 
 /** Processo da ferramenta de IA em execução. */
 export interface RunningProcess {
+  /** Prova do transporte de que a árvore encerrou; ausência não autoriza liberar recursos emprestados. */
+  terminationConfirmed?(): boolean;
   /** chamado uma vez, com o código de saída ou o erro que impediu a execução */
   onExit(listener: (code: number | null, error?: Error) => void): void;
   kill(): void;

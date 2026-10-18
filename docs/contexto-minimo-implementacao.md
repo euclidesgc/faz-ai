@@ -43,6 +43,12 @@ Na edição de um subagente já salvo da biblioteca, **Editar contrato de contex
 
 A prévia do formulário usa `resolveContextDraft` com o contrato não salvo, essenciais e Sempre, sem complementos de atividade. Sugestões e MCPs permitidos não são ativados antecipadamente. `preview_context_draft` no MCP delega à mesma entrada de leitura do host, com parâmetros estritos e metadados seguros. Nenhuma ferramenta de escrita de contratos foi exposta à IA.
 
+### Infraestrutura de empréstimo MCP — continuação de #710/#712
+
+`projectServerLease.ts` introduz posse por caminho real e geração, compartilhada entre processos, com WAL completo publicado antes da mutação. O transporte medido mantém uma posse entre as tentativas e bloqueia configuração inválida antes do spawn. Restauração compara o estado e preserva conflitos da entrada `faz-ai`. O host recupera preparações de donos comprovadamente mortos; estado desconhecido não comprova morte.
+
+O processo publica confirmação de encerramento somente após fechar e, no POSIX, não encontrar o grupo da execução. Sem confirmação, a posse é retida e o desfecho não é sucesso. O Windows continua sem prova da árvore nesse transporte. Queda após a intenção de spawn também mantém a posse para reconciliação: ainda falta registrar e reconciliar a identidade dos processos para essa fronteira. Não marcar #710/#712 ou E3 como concluídas por esta entrega. Testes cobrem concorrência entre processos reais, falhas depois de WAL/escrita, edição concorrente, cancelamento e repetição de formato.
+
 ## Dependências identificadas no board
 
 Consulta local somente de leitura ao board deste projeto em 17/10/2026:

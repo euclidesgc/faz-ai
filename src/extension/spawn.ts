@@ -125,6 +125,7 @@ export function spawnHeadless(
   child.stdin.end(command.stdin ?? '');
 
   let exited = false;
+  let directClosed = false;
   const listeners: ((code: number | null, error?: Error) => void)[] = [];
   const finish = (code: number | null, error?: Error) => {
     if (exited) return;
@@ -132,9 +133,22 @@ export function spawnHeadless(
     listeners.forEach((fn) => fn(code, error));
   };
   child.on('error', (e: NodeJS.ErrnoException) => finish(null, e.code === 'ENOENT' ? new Error(commandNotFound(command.command)) : e));
-  child.on('close', (code) => finish(code));
+  child.on('close', (code) => {
+    directClosed = true;
+    finish(code);
+  });
 
   return {
+    terminationConfirmed: () => {
+      if (!child.pid) return true;
+      if (!directClosed || process.platform === 'win32') return false;
+      try {
+        process.kill(-child.pid, 0);
+        return false;
+      } catch (e) {
+        return (e as NodeJS.ErrnoException).code === 'ESRCH';
+      }
+    },
     onExit: (fn) => listeners.push(fn),
     kill: () => {
       // a árvore inteira: no Windows pelo taskkill (pelo cmd.exe, o filho direto é só o shell), e nos

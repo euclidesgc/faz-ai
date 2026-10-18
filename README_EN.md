@@ -590,6 +590,8 @@ When editing a saved library subagent, **Edit context contract (draft)** opens t
 
 The host–webview protocol and the `preview_context_draft` MCP tool preview saved drafts: they resolve inheritance, sources and conflicts without inference and return artifact metadata. Capability admission from #729 remains pending; previews do not authorize execution. The per-activity selection editor belongs to the next delivery.
 
+Transport that requires project MCP files (Cursor and Kimi) uses a lease coordinated by the real file path. A protected journal under `~/.faz-ai/mcp-leases` precedes mutation; format attempts reuse the same ownership. After confirmed termination, the previous configuration is restored while preserving servers added by the person. Conflicting changes to the `faz-ai` entry or invalid JSON are not overwritten. Without confirmation that the process tree has ended, the lease is retained and a new run on that file is refused. On startup, only preparations with demonstrably dead owners and no pending process are restored automatically. Windows does not yet provide process-tree confirmation in this transport; that case requires reconciliation. This does not prove CLI isolation or complete #729.
+
 ### Card Usage tab
 
 The open card has the **Consumo** (usage) tab, which brings the two numbers together:

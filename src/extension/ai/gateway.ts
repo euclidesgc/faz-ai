@@ -93,6 +93,7 @@ export interface AiExecution {
 }
 
 export interface AiGatewayDeps {
+  leaseCoordinationDir?: string;
   boardId: string;
   /** obrigatório: sem ele a execução não teria onde ser registrada */
   runLog: RunLog;
@@ -141,6 +142,7 @@ export class AiGateway {
         },
         log: call.log,
         runId,
+        leaseCoordinationDir: this.deps.leaseCoordinationDir,
       });
     } catch (e) {
       // nem chegou a existir processo (ferramenta sem suporte, plano impossível, spawn que falhou)

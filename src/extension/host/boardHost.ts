@@ -39,6 +39,7 @@ import type { WebviewToHost } from '../../shared/messages';
 import { resolveCommand } from '../cliResolve';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
 import { cleanStaleTemp } from '../aiOutput/measured';
+import { recoverProjectServers } from '../mcp/projectServerLease';
 import { loginShellPath, spawnHeadless } from '../spawn';
 
 /** Complemento do nome na mensagem de "comando não encontrado", para não piorar o que a pessoa já lê no log. */
@@ -171,7 +172,10 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     if (ownsBoard && opened.rollupDay !== dayOf(Date.now()))
       consolidate(handle.db, router.boardId, Date.now(), boardRepo.retentionMonths(router.boardId));
   });
-  if (ownsBoard) cleanStaleTemp();
+  if (ownsBoard) {
+    cleanStaleTemp();
+    maintain('reconciliar preparações de MCP interrompidas', () => recoverProjectServers({ log: o.log }));
+  }
   let pathEnv = await loginShellPath();
   // o node do PATH do terminal, com caminho absoluto: é ele que a ferramenta usa para iniciar o servidor do board.
   // Procurado de novo a cada conferência dos requisitos: a pessoa pode instalar o node com o board aberto
