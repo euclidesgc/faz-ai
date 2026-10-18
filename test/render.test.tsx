@@ -180,12 +180,12 @@ describe('telas montam sem erro', () => {
   });
 
   it('configurações', () => {
-    expect(html(<Settings />)).toContain('Harness de IA');
+    expect(html(<Settings />)).toContain('Harness');
     // menu recolhido: só ícones, com o nome da seção no aria-label
     useBoardStore.setState({ settingsNavCollapsed: true });
     const collapsed = html(<Settings />);
     expect(collapsed).toContain('settings-side collapsed');
-    expect(collapsed).toContain('aria-label="Harness de IA"');
+    expect(collapsed).toContain('aria-label="Harness"');
     useBoardStore.setState({ settingsNavCollapsed: false });
     // no editor (isWeb false em teste), a GitSettings mostra só o aviso e o link para o Settings do editor
     expect(html(<GitSettings />)).toContain('O Git agora fica no Settings do editor.');

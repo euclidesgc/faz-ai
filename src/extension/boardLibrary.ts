@@ -37,6 +37,7 @@ export class BoardLibrary {
   scanFolder(root: string): void {
     const dir = path.resolve(root.startsWith('~/') ? path.join(this.ctx.home, root.slice(2)) : root);
     const drafts = scanLibraryFolder(dir);
+    this.importResult = undefined;
     this.importDrafts = new Map(drafts.map((draft) => [randomUUID(), draft]));
     this.preview = {
       directory: dir,
@@ -44,22 +45,34 @@ export class BoardLibrary {
     };
   }
 
-  importArtifacts(keys: string[]): void {
+  importResult?: import('../shared/artifacts').LibraryImportResult;
+
+  importArtifacts(keys: string[], overwrite = false): void {
     if (!this.preview || !keys.length) throw new Error('Selecione os artefatos para importar.');
-    const items = [...new Set(keys)].map((key) => {
+    const allowed = new Set(this.importResult?.skipped.map((i) => i.key));
+    const drafts = [...new Set(keys)].map((key) => {
       const draft = this.importDrafts.get(key);
-      if (!draft) throw new Error('Releia a pasta antes de importar.');
-      const existing = this.repo.get(this.ctx.boardId, draft.kind, draft.name);
-      if (existing && existing.origin !== draft.origin)
-        throw new Error(`Já existe "${draft.name}" neste tipo. Renomeie ou edite o artefato existente.`);
-      return { draft, usage: existing?.usage ?? (draft.kind === 'rule' ? ('off' as const) : ('contextual' as const)) };
+      if (!draft || (overwrite && !allowed.has(key))) throw new Error('Releia a pasta antes de importar.');
+      return { key, draft };
     });
-    const identities = items.map(({ draft }) => `${draft.kind}:${draft.name}`);
-    if (new Set(identities).size !== identities.length)
-      throw new Error('Há nomes repetidos no mesmo tipo. Selecione apenas uma origem para cada nome.');
+    const seen = new Set<string>();
+    const skipped: NonNullable<BoardLibrary['importResult']>['skipped'] = [];
+    const items: { draft: ArtifactDraft; usage: HarnessUsage }[] = [];
+    for (const { key, draft } of drafts) {
+      const identity = `${draft.kind}:${draft.name}`;
+      const existing = this.repo.get(this.ctx.boardId, draft.kind, draft.name);
+      if (seen.has(identity) || (existing && !overwrite)) {
+        skipped.push({ key, kind: draft.kind, name: draft.name });
+        continue;
+      }
+      seen.add(identity);
+      items.push({ draft, usage: existing?.usage ?? (draft.kind === 'rule' ? 'off' : 'contextual') });
+    }
     this.repo.upsertMany(this.ctx.boardId, items);
-    this.preview = undefined;
-    this.importDrafts.clear();
+    this.importResult = { imported: items.length, skipped };
+    const pending = new Set(skipped.map((i) => i.key));
+    this.importDrafts = new Map([...this.importDrafts].filter(([key]) => pending.has(key)));
+    this.preview = skipped.length ? { ...this.preview, items: this.preview.items.filter((i) => pending.has(i.key)) } : undefined;
   }
 
   readArtifact(id: string): LibraryArtifactInput {
@@ -145,7 +158,9 @@ export class BoardLibrary {
     return (
       this.ctx.boards.getMeta(`harness.library.${this.ctx.opts.workspaceKey}`) ||
       this.ctx.opts.libraryDir ||
-      path.join(this.ctx.opts.attachmentsDir, 'artifacts', this.ctx.opts.workspaceKey)
+      (this.ctx.home
+        ? path.join(this.ctx.home, 'faz-ai-library', this.ctx.opts.workspaceKey)
+        : path.join(this.ctx.opts.attachmentsDir, 'artifacts', this.ctx.opts.workspaceKey))
     );
   }
 

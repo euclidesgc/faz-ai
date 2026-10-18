@@ -35,7 +35,9 @@ Testes em `test/` (Vitest; `test/ui/` para as telas, com Testing Library).
   MCP, as notas do `get_card` e os pedidos do runner mudam junto com o comportamento e têm teste.
 - Toda mudança visível entra em `CHANGELOG.md` e `CHANGELOG_EN.md`, na seção "Não lançado" /
   "Unreleased", e na seção certa de `README.md` e `README_EN.md` (e de `docs/mcp.md` quando muda o
-  MCP). O `npm run release` transforma "Não lançado" na versão.
+  MCP). Na `develop`, essa seção contém apenas entregas já integradas, sem itens previstos ou
+  exclusivos de outras branches. O `npm run release` transforma "Não lançado" na versão, com as
+  notas das mudanças presentes na branch da release.
 - Integração com uma ferramenta de IA (Claude Code, Cursor): leia a documentação oficial atual antes
   de mexer em caminhos, formatos de arquivo ou flags da CLI.
 
@@ -49,4 +51,6 @@ Revise com mais rigor o que mexe em `src/extension/db/**`, `src/extension/reposi
 
 As histórias deste repositório passam pelo board do próprio Faz AI, com os agentes de
 `.claude/agents/`. Um pull request por história; uma funcionalidade grande vira histórias derivadas,
-com os PRs empilhados. Os registros de decisão ficam em [`docs/decisoes/`](docs/decisoes/README.md).
+com os PRs empilhados. A base de integração das novas funcionalidades é a `develop`; entregas em
+branches intermediárias precisam chegar a ela antes de constar nas notas da próxima release.
+Os registros de decisão ficam em [`docs/decisoes/`](docs/decisoes/README.md).

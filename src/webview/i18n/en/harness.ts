@@ -68,7 +68,7 @@ export const harness: Record<string, string> = {
     'Showing the {tool} catalog. Artifacts sent to the board are available with any tool.',
 
   // --- HarnessSettings
-  'Harness de IA': 'AI harness',
+  Harness: 'Harness',
   'O que a IA lê e usa neste projeto. <b>Ferramenta e execução</b> escolhe com qual IA o board trabalha; <b>Do projeto</b> reúne o que faz parte do repositório e é editável aqui; <b>Tudo que a ferramenta carrega</b> mostra também o que vem da sua pasta de usuário e de plugins.':
     'What the AI reads and uses in this project. <b>Tool and execution</b> chooses which AI the board works with; <b>From the project</b> gathers what is part of the repository and can be edited here; <b>Everything the tool loads</b> also shows what comes from your user folder and from plugins.',
   'Ferramenta e execução': 'Tool and execution',

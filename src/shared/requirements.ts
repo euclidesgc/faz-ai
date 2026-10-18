@@ -21,7 +21,7 @@ export type RequirementId =
 
 /** O que a pessoa pode fazer, pela própria faixa de aviso, para resolver. */
 export type RequirementAction =
-  /** registrar (de novo) o servidor do board na ferramenta: a seção Servidores MCP da ferramenta, no Harness de IA */
+  /** registrar (de novo) o servidor do board na ferramenta: a seção Servidores MCP da ferramenta, no Harness */
   | { kind: 'connect' }
   /**
    * tirar o registro quebrado do arquivo do projeto, que vale sobre o global na ferramenta, e deixar o
@@ -40,7 +40,7 @@ export type RequirementAction =
   | { kind: 'allowKimiMcp' }
   /** um comando para rodar no terminal, com botão de copiar; `terminal` soma o botão "Abrir no terminal" (só o login usa) */
   | { kind: 'command'; command: string; terminal?: true }
-  /** a tela de Configurações → Harness de IA */
+  /** a tela de Configurações → Harness */
   | { kind: 'settings' };
 
 /**

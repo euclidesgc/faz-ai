@@ -76,7 +76,7 @@ export const environment: Record<string, string> = {
   'A ferramenta de IA que o board usa nos botões de IA dos cards, no chat, no heartbeat e no modo autônomo.':
     "The AI tool the board uses for the cards' AI buttons, the chat, the heartbeat and autonomous mode.",
   '{tool} (encontrado na máquina)': '{tool} (found on this machine)',
-  'Outra ferramenta de IA nesta máquina. O board passa a usá-la se você a escolher em Configurações → Harness de IA, e aí instala nela o MCP e a skill do board.':
+  'Outra ferramenta de IA nesta máquina. O board passa a usá-la se você a escolher em Configurações → Harness, e aí instala nela o MCP e a skill do board.':
     "Another AI tool on this machine. The board starts using it if you choose it in Settings → AI Harness, and then installs the board's MCP and skill in it.",
   'Linha de comando {cli}': 'Command line {cli}',
   'O board roda a linha de comando do {tool} em segundo plano, nesta pasta, para a IA trabalhar nos cards.':
@@ -88,7 +88,7 @@ export const environment: Record<string, string> = {
     "The channel through which the {tool} AI reads and updates this board's cards: it looks them up, moves them between columns, comments and attaches files. It runs on your machine.",
   'Ensina a IA do {tool} a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências.':
     "Teaches the {tool} AI to move the cards through the board's flow: phases, documents, review and pending items.",
-  'Diz o que a IA do {tool} pode fazer sozinha nas execuções pelo board. É escolhido em Configurações → Harness de IA.':
+  'Diz o que a IA do {tool} pode fazer sozinha nas execuções pelo board. É escolhido em Configurações → Harness.':
     'Sets what the {tool} AI may do on its own in runs from the board. It is chosen in Settings → AI Harness.',
   'Com o modo do Git ligado, o board cria uma branch ou uma worktree para cada história. O seu nome no Git assina os comentários.':
     'With Git mode on, the board creates a branch or a worktree for each story. Your Git name signs the comments.',
@@ -136,6 +136,6 @@ export const environment: Record<string, string> = {
     'project artifacts that enter the context without going through the board',
   'O harness do board ainda não está definido': "The board's harness is not defined yet",
   'Recomendado: defina o harness para as execuções gastarem menos contexto': 'Recommended: define the harness so runs spend less context',
-  'O board funciona assim, mas as execuções não ganham a economia e a precisão de um harness definido. Falta: {list}. Resolva em Configurações → Harness de IA.':
+  'O board funciona assim, mas as execuções não ganham a economia e a precisão de um harness definido. Falta: {list}. Resolva em Configurações → Harness.':
     'The board works like this, but runs do not get the savings and precision of a defined harness. Missing: {list}. Fix it in Settings → AI Harness.',
 };

@@ -485,3 +485,35 @@ describe('Sugerir regras e skills com IA', () => {
     expect(() => router.chatCommand({ type: 'ai.suggestSkills' })).toThrow('A IA ainda está respondendo');
   });
 });
+
+it('a assistência de subagente usa o gateway medido, sem gravar o agente nem conversar no chat', async () => {
+  const before = router.snapshot().harness.library?.artifacts;
+  const promise = router.assistAgent({
+    step: 'review',
+    name: 'revisor',
+    body: 'Revise sem editar.',
+    sections: {},
+    language: 'pt-BR',
+    agent: { skills: [], mcpServers: [], model: '', tools: { categories: ['read'], native: { tool: '', allow: [], deny: [] } } },
+  });
+  expect(router.snapshot().chat.busy).toBe(true);
+  expect(spawned[0]!.command.args).toContain('Read,Glob,Grep');
+  expect(spawned[0]!.command.stdin).toContain('Produza apenas uma proposta');
+  spawned[0]!.emit(
+    JSON.stringify({
+      explanation: 'Defina a entrega.',
+      suggestions: ['Inclua evidências.'],
+      content: 'Revise sem editar e entregue evidências.',
+      skills: [],
+      mcpServers: [],
+      categories: ['read'],
+      model: '',
+    }),
+  );
+  spawned[0]!.exit(0);
+  await expect(promise).resolves.toMatchObject({ content: 'Revise sem editar e entregue evidências.' });
+  expect(router.snapshot().harness.library?.artifacts).toEqual(before);
+  expect(messages()).toHaveLength(0);
+  expect(router.snapshot().chat.busy).toBe(false);
+  expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))).toHaveLength(1);
+});

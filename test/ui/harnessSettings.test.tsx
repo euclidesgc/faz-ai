@@ -250,7 +250,7 @@ describe('HarnessSettings: rules', () => {
     await renderScreen('rules', 'Board');
     const missing = within(screen.getByText('.claude/rules/velha.md').closest('li')!);
     expect(missing.getByText('ausente')).toBeInTheDocument();
-    await userEvent.click(missing.getByRole('button', { name: /^Remover do board/ }));
+    await userEvent.click(missing.getByRole('button', { name: /^Excluir:/ }));
     expect(lastSent('harness.selection.set')).toEqual({
       type: 'harness.selection.set',
       items: [{ kind: 'instructions', location: '.claude/rules/velha.md' }],

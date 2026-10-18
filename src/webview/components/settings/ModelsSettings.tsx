@@ -157,7 +157,7 @@ export function ModelsSettings() {
         }
       >
         {t(
-          'Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards. A ferramenta é escolhida em Harness de IA.',
+          'Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards. A ferramenta é escolhida em Harness.',
         )}
       </PageHeader>
 
@@ -186,7 +186,7 @@ export function ModelsSettings() {
                   label={t('ferramenta Cursor')}
                   satisfied={true}
                   target={{ kind: 'board', section: 'harness-tool' }}
-                  targetHint={t('em Harness de IA')}
+                  targetHint={t('em Harness')}
                 />
               </div>
             )}
@@ -196,7 +196,7 @@ export function ModelsSettings() {
               <Button
                 variant="ghost"
                 size="1"
-                aria-label={t('Trocar a ferramenta de IA, em Harness de IA')}
+                aria-label={t('Trocar a ferramenta de IA, em Harness')}
                 onClick={() => useBoardStore.getState().goToSection('harness-tool')}
               >
                 {t('trocar ferramenta')}

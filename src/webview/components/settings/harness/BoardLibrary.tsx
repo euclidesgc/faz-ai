@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Badge, Callout, Tabs, TextField } from '@radix-ui/themes';
 import { selectableOfKind } from '../../../../shared/artifacts';
 import { HARNESS_TOPICS, type HarnessTopic } from '../../../../shared/harnessTopics';
-import { harness } from '../../../commands';
+import { ai, harness, ui } from '../../../commands';
 import { useAction } from '../../../useAction';
 import { useBoardStore } from '../../../store/boardStore';
 import { ActionButton } from '../../ui';
@@ -10,9 +10,10 @@ import { SectionHeader } from '../SectionHeader';
 import { BoardList } from './BoardList';
 import { LibraryImport } from './LibraryImport';
 import { LibraryEditor } from './LibraryEditor';
-import { ai } from '../../../commands';
-import { onHostMessage } from '../../../vscode';
+import { isWeb, onHostMessage } from '../../../vscode';
 import { kindOfSelectable, type LibraryArtifactInput, type ArtifactKind } from '../../../../shared/artifacts';
+import { LibraryFolderPicker } from './LibraryFolderPicker';
+import { ArtifactHelp } from './ArtifactHelp';
 import { t } from '../../../i18n';
 
 /** A biblioteca pertence ao board: a ferramenta selecionada só decide como executar os artefatos. */
@@ -25,10 +26,17 @@ export function BoardLibrary() {
     () =>
       onHostMessage((msg) => {
         if (msg.type === 'harness.library.content') setEditor({ kind: msg.input.kind, initial: msg.input });
+        if (msg.type === 'harness.library.directorySelected') setDirectory(msg.directory);
       }),
     [],
   );
-  const [query, setQuery] = useState('');
+  const [queries, setQueries] = useState<Record<string, string>>({});
+  const [pickingDirectory, setPickingDirectory] = useState(false);
+  const chooseDirectory = useAction(() => harness.pickLibraryDirectory());
+  const create = useAction(async (kind: ArtifactKind, guided: boolean = false) => {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    setEditor({ kind, guided });
+  });
   const storedTopic = useBoardStore((s) => s.harnessTopic);
   const topic: HarnessTopic = ['rules', 'skill', 'agent', 'mcp'].includes(storedTopic) ? storedTopic : 'rules';
   const setTopic = (topic: HarnessTopic) => {
@@ -39,6 +47,12 @@ export function BoardLibrary() {
   const save = useAction(() => harness.setLibraryDirectory(directory));
   const open = useAction(() => harness.openLibrary());
   const { run: refresh, busy: refreshing } = useAction(() => harness.refresh());
+  const generate = useAction((kind: 'rule' | 'skill' | 'agent') => {
+    if (isWeb) useBoardStore.getState().setChatOpen(true);
+    else ui.showChat();
+    return ai.generateLibrary(kind);
+  });
+  const generating = generate.busy || (state.chat.busy && state.chat.activity !== 'agent-assistance');
   useEffect(() => {
     void refresh();
     const focus = () => {
@@ -68,8 +82,7 @@ export function BoardLibrary() {
           'Crie, importe e gerencie os artefatos deste board. Cada aba reúne um tipo, disponível com qualquer ferramenta de IA conectada.',
         )}
       </SectionHeader>
-      <details className="library-storage">
-        <summary>{t('Armazenamento da biblioteca')}</summary>
+      <div className="library-storage">
         <label className="form-field">
           <span>{t('Pasta da biblioteca')}</span>
           <TextField.Root
@@ -79,8 +92,16 @@ export function BoardLibrary() {
             placeholder={t('Caminho completo de uma pasta vazia')}
           />
         </label>
-        <p className="muted small">{t('Esta é a pasta de destino do board. A pasta de origem é escolhida na importação abaixo.')}</p>
+        <p className="muted small">{t('A pasta informada será o local onde os artefatos serão guardados.')}</p>
         <div className="row wrap">
+          <ActionButton
+            variant="soft"
+            loading={chooseDirectory.busy}
+            hint={t('Seleciona uma nova pasta para a biblioteca.')}
+            onClick={() => (isWeb ? setPickingDirectory(true) : void chooseDirectory.run())}
+          >
+            {t('Selecionar pasta')}
+          </ActionButton>
           <ActionButton
             variant="soft"
             loading={save.busy}
@@ -104,16 +125,9 @@ export function BoardLibrary() {
           </ActionButton>
         </div>
         <p className="muted small">
-          {t(
-            'A biblioteca é local e particular. As skills importadas não são distribuídas com a extensão. Atualizações da origem só entram quando você pede.',
-          )}
+          {t('Você pode mudar a localização dessa pasta. Ao clicar em Salvar pasta, a biblioteca será transferida para o novo local.')}
         </p>
-        <p className="muted small">
-          {t(
-            'Você pode colar pastas de skills aqui. Cada pasta deve conter SKILL.md; os arquivos de apoio vão junto. Ao voltar à tela ou clicar em Atualizar lista, elas aparecem em Skills, no modo Pelo card.',
-          )}
-        </p>
-      </details>
+      </div>
       {library?.warnings?.map((warning) => (
         <Callout.Root key={warning.path} color="amber" size="1">
           <Callout.Text>
@@ -137,59 +151,80 @@ export function BoardLibrary() {
           )}
         </p>
       )}
+      {(save.error || chooseDirectory.error || open.error) && <p role="alert">{save.error || chooseDirectory.error || open.error}</p>}
+      {pickingDirectory && (
+        <LibraryFolderPicker
+          onClose={() => setPickingDirectory(false)}
+          onSelect={(folder) => {
+            setDirectory(folder);
+            setPickingDirectory(false);
+          }}
+        />
+      )}
       <LibraryImport />
-      <TextField.Root
-        type="search"
-        aria-label={t('Buscar na biblioteca')}
-        placeholder={t('Buscar por nome ou descrição…')}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
       <Tabs.Root value={topic} onValueChange={(value) => setTopic(value as HarnessTopic)}>
         <Tabs.List>
           {topics.map((x) => (
             <Tabs.Trigger key={x.id} value={x.id}>
               {t(x.label)}
-              {!!library?.artifacts.some((a) => selectableOfKind(a.kind) === x.kind) && (
-                <Badge size="1" variant="soft">
-                  {library.artifacts.filter((a) => selectableOfKind(a.kind) === x.kind).length}
-                </Badge>
-              )}
+              <Badge size="1" variant="soft">
+                {(library?.artifacts ?? []).filter((a) => selectableOfKind(a.kind) === x.kind).length}
+              </Badge>
             </Tabs.Trigger>
           ))}
         </Tabs.List>
         {topics.map((x) => (
           <Tabs.Content key={x.id} value={x.id}>
+            <ArtifactHelp kind={kindOfSelectable(x.kind!)} />
+            <TextField.Root
+              type="search"
+              aria-label={t('Buscar na biblioteca')}
+              placeholder={t('Buscar por nome ou descrição…')}
+              value={queries[x.id] ?? ''}
+              onChange={(e) => setQueries({ ...queries, [x.id]: e.target.value })}
+            />
             <div className="actions-toolbar">
-              <ActionButton hint={t('Cria um artefato nesta aba.')} onClick={() => setEditor({ kind: kindOfSelectable(x.kind!) })}>
+              <ActionButton
+                hint={t('Cria um artefato nesta aba.')}
+                loading={create.busy}
+                onClick={() => void create.run(kindOfSelectable(x.kind!))}
+              >
                 {t('Criar')}
               </ActionButton>
               {x.kind !== 'mcp' && (
                 <>
                   <ActionButton
                     variant="soft"
-                    hint={t('Responda às perguntas e revise o conteúdo antes de salvar.')}
-                    onClick={() => setEditor({ kind: kindOfSelectable(x.kind!), guided: true })}
+                    loading={generating}
+                    disabled={state.chat.busy}
+                    aria-busy={generating}
+                    disabledReason={t('Aguarde a resposta da IA.')}
+                    hint={t('A IA analisa o projeto e cria sugestões na biblioteca. Acompanhe pela conversa do board.')}
+                    onClick={() => void generate.run(x.kind === 'instructions' ? 'rule' : x.kind === 'skill' ? 'skill' : 'agent')}
                   >
-                    {t('Assistente guiado')}
+                    {t('Gerar com base no projeto')}
                   </ActionButton>
                   <ActionButton
                     variant="soft"
-                    disabled={state.chat.busy}
-                    disabledReason={t('Aguarde a resposta da IA.')}
-                    hint={t('A IA analisa o projeto e cria sugestões na biblioteca. Acompanhe pela conversa do board.')}
-                    onClick={() => {
-                      if (x.kind === 'instructions') ai.suggestRules();
-                      else if (x.kind === 'skill') ai.suggestSkills();
-                      else ai.suggestAgents();
-                      useBoardStore.getState().setChatOpen(true);
-                    }}
+                    hint={t('Responda às perguntas e revise o conteúdo antes de salvar.')}
+                    loading={create.busy}
+                    onClick={() => void create.run(kindOfSelectable(x.kind!), true)}
                   >
-                    {t('Gerar com base no projeto')}
+                    {t('Assistente guiado')}
                   </ActionButton>
                 </>
               )}
             </div>
+            {generating && (
+              <p role="status" className="muted small">
+                {t('Aguarde a resposta da IA. Acompanhe pela conversa do board.')}
+              </p>
+            )}
+            {generate.error && (
+              <Callout.Root color="red" role="alert">
+                <Callout.Text>{t(generate.error)}</Callout.Text>
+              </Callout.Root>
+            )}
             {editor?.kind === kindOfSelectable(x.kind!) && (
               <LibraryEditor key={editor.initial?.id ?? `${editor.kind}-${editor.guided}`} {...editor} onClose={() => setEditor(null)} />
             )}
@@ -200,7 +235,12 @@ export function BoardLibrary() {
                 )}
               </p>
             )}
-            <BoardList kind={x.kind!} query={query} onOpenCatalog={() => setEditor({ kind: kindOfSelectable(x.kind!) })} />
+            <BoardList
+              kind={x.kind!}
+              query={queries[x.id] ?? ''}
+              central
+              onOpenCatalog={() => setEditor({ kind: kindOfSelectable(x.kind!) })}
+            />
           </Tabs.Content>
         ))}
       </Tabs.Root>
