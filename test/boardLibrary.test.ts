@@ -89,12 +89,10 @@ describe('biblioteca particular do board', () => {
     let s = router.snapshot();
     expect(JSON.stringify(s)).not.toContain('segredo-particular');
     const board = { command: 'node', args: ['bridge.js'] };
-    const plan = executionPlan(s, card('c'), path.join(root, 'project'), '', board, router.libraryMcpDefinitions());
+    const plan = executionPlan(s, card('c'), router.libraryMcpDefinitions(), board);
     expect(JSON.parse(plan.input.mcpConfig!).mcpServers.memoria.env.TOKEN).toBe('segredo-particular');
     expect(plan.input.agentDefinition?.prompt).toBe('Revise com rigor.');
-    expect(
-      JSON.parse(bareExec(null, board, s, { projectDir: '', homeDir: '' }, router.libraryMcpDefinitions()).mcpConfig!).mcpServers.memoria,
-    ).toBeDefined();
+    expect(JSON.parse(bareExec(null, board, s, router.libraryMcpDefinitions()).mcpConfig!).mcpServers.memoria).toBeDefined();
     router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi' } });
     s = router.snapshot();
     expect(s.board.execProfiles[0]!.instructions).toBe('Revise com rigor.');
