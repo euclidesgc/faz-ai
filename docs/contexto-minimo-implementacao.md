@@ -174,3 +174,7 @@ Acrescentados `vitest.cli-real.config.ts` e `test/cli-real/` para o comando sepa
 O teste não habilita admissão nem mede inferência/qualidade. As políticas gerenciadas e o ambiente de produção continuam sem prova; E3, #729 e o runtime E5 permanecem parciais. #728 também continua dependendo da integração de perfis CLI e caminhos legados.
 
 Após `9df6eab`, registros de avanço e pendências foram confirmados por releitura no board em #619, #717 e #729, com a marca `[contexto-minimo:9df6eab]`. #717 passou a Em andamento; #729 continua Em andamento e #619 permanece em Implementação. Validação: 3.285 testes comuns e três testes separados com CLI real, tipos, lint e formatação. Nenhum card concluído ou perfil de produção habilitado.
+
+## CLI real pelo gateway e transporte medido
+
+`test/cli-real/claudeHarness.ts` reutiliza agora `AiGateway`, materialização e `spawnHeadless`, com log real em SQLite descartável. O flush precede a liberação do launcher. O resultado é lido após reabrir os bytes do banco; todos os cenários conferem uma tentativa, identidade/encerramento do grupo e arquivos privados removidos. Os sete testes separados passaram, incluindo cancelamento, SIGKILL na requisição pendente e rejeição da barreira anterior à liberação. Perfis de produção, políticas gerenciadas, demais CLIs e a matriz completa de WAL continuam pendentes; não são gerados recibos nem usados números sintéticos no piloto.

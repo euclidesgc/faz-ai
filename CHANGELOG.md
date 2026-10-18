@@ -8,6 +8,8 @@ A seção **Não lançado** reúne apenas mudanças integradas na `develop`, agu
 
 ## Não lançado
 
+- **CLI real pelo caminho de execução do board.** A suíte separada agora usa AiGateway, transporte medido, spawnHeadless e SQLite descartável em disco. Sete testes cobrem também cancelamento, encerramento forçado e falha antes da liberação da CLI. Conferem o log reaberto do disco, uma única tentativa, consumo desconhecido após interrupção e limpeza dos arquivos MCP privados. Essa evidência não habilita admissão de produção.
+
 - **Verificação do contrato com Claude Code real.** `npm run test:cli-real`, separado da suíte comum, usa a CLI instalada com API e MCPs locais controlados, sentinelas e controles positivos. Confere fontes externas, ferramentas permitidas/proibidas, operações MCP, delegação, vazio explícito e conversa nova. O teste revelou e corrigiu o carregamento de memória de pastas adicionais por variável herdada no contrato estrito. A evidência é limitada ao ambiente de teste: não verifica políticas gerenciadas, Cursor/Kimi, consumo real nem habilita admissão de produção.
 
 - **Configurações MCP locais e importação revisada.** Schema 40 troca definições da biblioteca por referências a um cofre cifrado no host, após confirmar os valores no disco. Exportação e editor não devolvem comando, argumentos, URL, ambiente ou cabeçalhos salvos. Importações ficam pendentes até a pessoa fornecer uma definição revisada; preparação e ponte recusam configurações pendentes ou ausentes. Logs e respostas de MCPs ocultam valores conhecidos pelo cofre. Perfis de CLI e caminhos legados ainda dependem da continuação de #728.

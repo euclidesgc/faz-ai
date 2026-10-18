@@ -3,10 +3,18 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as http from 'node:http';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { once } from 'node:events';
-import { headlessCommand } from '../../src/extension/headless';
+import type { HeadlessInput } from '../../src/extension/headless';
+import { AiGateway, NO_CARD, type AiRunEnd } from '../../src/extension/ai/gateway';
+import { spawnHeadless } from '../../src/extension/spawn';
+import { openFile } from '../../src/extension/db/database';
+import { BoardRepo } from '../../src/extension/repositories/boardRepo';
+import { createRunLog } from '../../src/extension/log/runLog';
+import { all } from '../../src/extension/db/query';
+import { ExecutionAdmission } from '../../src/extension/ai/admission';
+import { CapabilityEvidenceStore } from '../../src/extension/ai/capabilityEvidence';
+import type { ProcessIdentity } from '../../src/extension/processIdentity';
 import { resolveCommand } from '../../src/extension/cliResolve';
 
 export interface ApiRequest {
@@ -26,6 +34,11 @@ export interface Observation {
   stderr: string;
   mcpCalls: string[];
   mcpConnections: string[];
+  end: AiRunEnd;
+  runId: string;
+  tempFiles: string[];
+  privateTempFiles: boolean;
+  persisted: { outcome: unknown; measure: unknown; ended_at: unknown; input_tokens: unknown };
 }
 const quote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
 const write = (file: string, text: string) => {
@@ -126,7 +139,13 @@ export async function claudeHarness() {
       hooks: { SessionStart: [{ hooks: [{ type: 'command', command: `${quote(process.execPath)} ${quote(hook)}` }] }] },
     }),
   );
-  let current: { requests: ApiRequest[]; attempts: ToolAttempt[]; sent: boolean; calls: string[]; connections: string[] } | undefined;
+  const dbPath = path.join(root, 'test.db');
+  const wasmDir = path.resolve('node_modules/sql.js/dist');
+  let handle = await openFile(dbPath, wasmDir);
+  const board = new BoardRepo(handle.db).getOrCreate(root, 'CLI real — descartável');
+  let current:
+    | { requests: ApiRequest[]; attempts: ToolAttempt[]; sent: boolean; calls: string[]; connections: string[]; interrupt?: () => void }
+    | undefined;
   const server = http.createServer(async (req, res) => {
     try {
       if (req.method !== 'POST') return respond(res, {}, 405);
@@ -165,6 +184,12 @@ export async function claudeHarness() {
         if (req.headers['x-api-key'] !== 'fazai-local-verification-only' || req.headers.authorization)
           return respond(res, { error: { type: 'authentication_error', message: 'Apenas autenticação fictícia é aceita.' } }, 401);
         current.requests.push(data);
+        if (current.interrupt) {
+          const interrupt = current.interrupt;
+          current.interrupt = undefined;
+          interrupt();
+          return; // Mantém a resposta pendente até o encerramento real do processo.
+        }
         const attempts = current.sent ? [] : current.attempts;
         current.sent = true;
         return message(res, data.model, attempts);
@@ -180,12 +205,16 @@ export async function claudeHarness() {
   const address = server.address() as { port: number };
   const url = `http://127.0.0.1:${address.port}`;
   write(path.join(project, '.mcp.json'), json({ mcpServers: { forbidden: { type: 'http', url: `${url}/mcp/forbidden` } } }));
-  const endpoint = path.join(root, 'mcp.json');
   const mcpConfig = json({ mcpServers: { allowed: { type: 'http', url: `${url}/mcp/allowed` } } });
-  write(endpoint, mcpConfig);
-  const env: NodeJS.ProcessEnv = {
-    // Não herdar chaves, provedores ou wrappers da pessoa. HOME não é alterada.
-    PATH: process.env.PATH,
+  const env: Record<string, string> = {
+    // spawnHeadless herda o ambiente do host. A fixture neutraliza provedores/chaves/wrappers,
+    // sem alterar HOME ou variáveis do processo de testes.
+    ...Object.fromEntries(
+      Object.keys(process.env)
+        .filter((key) => /^(ANTHROPIC_|CLAUDE_|AWS_|GOOGLE_|AZURE_|NODE_OPTIONS$|NODE_PATH$)/.test(key))
+        .map((key) => [key, '']),
+    ),
+    PATH: process.env.PATH ?? '',
     ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
     CLAUDE_CONFIG_DIR: config,
     ANTHROPIC_API_KEY: 'fazai-local-verification-only',
@@ -202,22 +231,36 @@ export async function claudeHarness() {
     canaries,
     executable,
     identity,
+    get requestCount() {
+      return current?.requests.length ?? 0;
+    },
+    async audit() {
+      await handle.close();
+      handle = await openFile(dbPath, wasmDir);
+      return all(handle.db, 'SELECT outcome, admission_json FROM ai_runs ORDER BY rowid DESC');
+    },
     async run({
       control = false,
       inheritAdditionalMemory = false,
       empty = false,
       attempts = [],
       prompt = 'Verificação local de contrato.',
+      interrupt,
+      failFlush = false,
+      unverified = false,
     }: {
       control?: boolean;
       inheritAdditionalMemory?: boolean;
       empty?: boolean;
       attempts?: ToolAttempt[];
       prompt?: string;
+      interrupt?: 'cancel' | 'crash';
+      failFlush?: boolean;
+      unverified?: boolean;
     } = {}): Promise<Observation> {
       fs.rmSync(marker, { force: true });
       current = { requests: [], attempts, sent: false, calls: [], connections: [] };
-      const command = headlessCommand('claude', {
+      const input: HeadlessInput = {
         prompt,
         permission: 'board',
         structured: true,
@@ -235,81 +278,149 @@ export async function claudeHarness() {
           toolSet: 'explicit',
           mcpTools: empty ? [] : ['mcp__allowed__allowed'],
         },
-      });
-      let args = command.args.map((arg) => (arg === '{tmp:mcp.json}' ? endpoint : arg));
-      if (empty) write(endpoint, '{"mcpServers":{}}');
-      else write(endpoint, mcpConfig);
-      if (control) {
-        // Controle positivo: retirar as barreiras precisa tornar a contaminação observável.
-        args = args.filter((arg) => !['--strict-mcp-config', '--disable-slash-commands'].includes(arg));
-        for (const flag of ['--setting-sources', '--tools', '--disallowedTools']) {
-          const index = args.indexOf(flag);
-          if (index >= 0) {
-            const end = args.findIndex((arg, i) => i > index && arg.startsWith('--'));
-            args.splice(index, (end < 0 ? args.length : end) - index);
-          }
-        }
-      }
-      const child = spawn(executable, args, {
-        cwd: project,
-        env: {
-          ...env,
-          ...(!control ? command.env : {}),
-          ...(inheritAdditionalMemory ? { CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1' } : {}),
-        },
-        detached: true,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      };
       let stdout = '',
-        stderr = '',
-        timedOut = false;
-      const timer = setTimeout(() => {
-        timedOut = true;
-        try {
-          process.kill(-child.pid!, 'SIGKILL');
-        } catch {
-          /* Já encerrado. */
-        }
-      }, 35_000);
-      child.stdout.on('data', (b) => {
-        stdout += String(b);
-        if (stdout.length > 8_000_000) {
-          timedOut = true;
-          try {
-            process.kill(-child.pid!, 'SIGKILL');
-          } catch {
-            /* Já encerrado. */
+        stderr = '';
+      const tempFiles: string[] = [];
+      let privateTempFiles = true;
+      const gateway = new AiGateway({
+        boardId: board.id,
+        runLog: createRunLog(handle.db),
+        admission: new ExecutionAdmission({
+          pathEnv: () => process.env.PATH,
+          homeDir: os.homedir(),
+          evidence: new CapabilityEvidenceStore(path.join(root, 'evidence')),
+          environmentEvidence: () => ({ state: 'unknown' }),
+        }),
+        leaseCoordinationDir: path.join(root, 'leases'),
+        spawn: (built, cwd, out, controlGate) => {
+          let args = [...built.args];
+          if (control) {
+            // Controle positivo: retirar as barreiras precisa tornar a contaminação observável.
+            args = args.filter((arg) => !['--strict-mcp-config', '--disable-slash-commands'].includes(arg));
+            for (const flag of ['--setting-sources', '--tools', '--disallowedTools']) {
+              const index = args.indexOf(flag);
+              if (index >= 0) {
+                const end = args.findIndex((arg, i) => i > index && arg.startsWith('--'));
+                args.splice(index, (end < 0 ? args.length : end) - index);
+              }
+            }
           }
-        }
-      });
-      child.stderr.on('data', (b) => {
-        stderr = (stderr + String(b)).slice(-10_000);
-      });
-      child.stdin.on('error', () => {});
-      child.stdin.end(command.stdin);
-      try {
-        const [code] = await once(child, 'close');
-        const events = stdout.split('\n').flatMap((line) => {
-          try {
-            return [JSON.parse(line) as Record<string, unknown>];
-          } catch {
-            return [];
+          for (const flag of ['--mcp-config']) {
+            const index = built.args.indexOf(flag);
+            if (index >= 0) {
+              const file = built.args[index + 1]!;
+              tempFiles.push(file);
+              privateTempFiles &&= (fs.statSync(file).mode & 0o777) === 0o600 && (fs.statSync(path.dirname(file)).mode & 0o777) === 0o700;
+            }
           }
-        });
-        return {
-          code,
-          timedOut,
-          requests: current.requests,
-          events,
-          stderr,
-          mcpCalls: [...current.calls],
-          mcpConnections: [...current.connections],
+          return spawnHeadless(
+            {
+              ...built,
+              command: identity.executable,
+              args,
+              env: {
+                ...env,
+                ...(!control ? built.env : {}),
+                ...(inheritAdditionalMemory ? { CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1' } : {}),
+              },
+            },
+            cwd,
+            (text, stream) => {
+              if (stream === 'stdout') stdout += text;
+              else stderr = (stderr + text).slice(-10_000);
+              out(text, stream);
+            },
+            process.env.PATH,
+            controlGate,
+          );
+        },
+      });
+      if (interrupt)
+        current.interrupt = () => {
+          if (interrupt === 'cancel') execution.stop();
+          else if (execution.identity?.groupId) process.kill(-execution.identity.groupId, 'SIGKILL');
+          else throw new Error('Grupo da execução real não identificado.');
         };
-      } finally {
-        clearTimeout(timer);
-      }
+      const execution = gateway.run({
+        origin: 'manual',
+        tool: 'claude',
+        context: NO_CARD,
+        cwd: project,
+        timeoutMinutes: 35 / 60,
+        prepare: () => ({
+          input,
+          ...(unverified
+            ? {
+                strict: {
+                  profileId: 'cli-real-fixture',
+                  request: {
+                    version: 1 as const,
+                    regime: 'exclusive' as const,
+                    agentTools: { categories: ['read' as const], native: { tool: 'claude' as const, allow: ['Read'], deny: [] } },
+                    boardTools: { mode: 'explicit' as const, value: ['read' as const] },
+                    mcpLevel: { permission: 'board' as const, tools: [] },
+                    activeMcpIds: [],
+                    allowedMcpIds: [],
+                    boardMcpIds: [],
+                    mcpServers: [],
+                    mcpTools: [],
+                    boardMcpTools: [],
+                  },
+                },
+              }
+            : {}),
+          config: {
+            model: input.exec!.model?.name ?? null,
+            effort: null,
+            profile: null,
+            agent: null,
+            autonomous: false,
+            clean: true,
+            skills: [],
+            mcp: empty ? [] : ['allowed'],
+          },
+        }),
+        beforeStart: async (_identity: ProcessIdentity) => {
+          if (failFlush) throw new Error('Falha de flush injetada antes de liberar a CLI real.');
+          await handle.flush();
+        },
+        log: () => {},
+      });
+      const end = await new Promise<AiRunEnd>((resolve) => execution.onExit(resolve));
+      // Reabrir os bytes do disco impede confundir o estado em memória com o registro durável.
+      await handle.close();
+      handle = await openFile(dbPath, wasmDir);
+      const persisted = all(handle.db, 'SELECT outcome, measure, ended_at, input_tokens FROM ai_runs WHERE id = ?', [execution.runId])[0]!;
+      const events = stdout.split('\n').flatMap((line) => {
+        try {
+          return [JSON.parse(line) as Record<string, unknown>];
+        } catch {
+          return [];
+        }
+      });
+      return {
+        code: end.code,
+        timedOut: end.timedOut,
+        requests: current.requests,
+        events,
+        stderr,
+        mcpCalls: [...current.calls],
+        mcpConnections: [...current.connections],
+        end,
+        runId: execution.runId,
+        tempFiles,
+        privateTempFiles,
+        persisted: {
+          outcome: persisted.outcome,
+          measure: persisted.measure,
+          ended_at: persisted.ended_at,
+          input_tokens: persisted.input_tokens,
+        },
+      };
     },
     async close() {
+      await handle.close();
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       fs.rmSync(root, { recursive: true, force: true });

@@ -9,6 +9,8 @@ The **Unreleased** section includes only changes integrated into `develop` and a
 
 ## Unreleased
 
+- **Real CLI through the board execution path.** The separate suite now uses AiGateway, measured transport, spawnHeadless and a disposable on-disk SQLite database. Seven tests also cover cancellation, forced termination and failure before releasing the CLI. They check the log reopened from disk, a single attempt, unknown consumption after interruption and private MCP file cleanup. This evidence does not enable production admission.
+
 - **Contract verification with real Claude Code.** `npm run test:cli-real`, separate from the normal suite, runs the installed CLI against controlled local API and MCP servers with sentinels and positive controls. It checks external sources, allowed/forbidden tools, MCP operations, delegation, explicit empty selection and fresh conversations. The test exposed and fixed inherited configuration loading memory from additional directories in the strict contract. Evidence is limited to the test environment: it does not verify managed policies, Cursor/Kimi, real consumption or enable production admission.
 
 - **Local MCP configurations and reviewed imports.** Schema 40 replaces library definitions with references to an encrypted host vault after confirming values on disk. Exports and the editor do not return saved commands, arguments, URLs, environment or headers. Imports remain pending until a person supplies a reviewed definition; preparation and the bridge reject pending or missing configurations. Logs and MCP responses redact values known to the vault. CLI profiles and legacy paths still require the remaining #728 work.
