@@ -8,7 +8,6 @@ import { migrate } from '../src/extension/db/schema';
 import { exportBoard, importBoard, parseExportFile } from '../src/extension/db/boardExport';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
-import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { NO_CARD } from '../src/extension/ai/gateway';
 import { admitExecution } from '../src/shared/executionAdmission';
 import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
@@ -62,12 +61,16 @@ afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 function run(repo = new AiRunRepo(db), boardId = router.boardId) {
   return repo.start({ ...NO_CARD, boardId, startedAt: Date.UTC(2026, 9, 15, 12), origin: 'manual', tool: 'claude' });
 }
+/** Board num banco de schema antigo: só a linha da tabela da época, sem o seed atual (que já grava perfis). */
+function legacyBoard(database: Database, id = 'board-antigo'): string {
+  database.run('INSERT INTO boards(id, workspace_key, name) VALUES (?,?,?)', [id, 'old', 'Antigo']);
+  return id;
+}
 describe('auditoria persistida da admissão', () => {
   it('migra 35 para 36 sem reclassificar a execução antiga ou alterar seus dados', () => {
     const old = newDatabase();
     migrate(old, 35);
-    const board = new BoardRepo(old).getOrCreate('old', 'Antigo');
-    const id = run(new AiRunRepo(old), board.id);
+    const id = run(new AiRunRepo(old), legacyBoard(old));
     const before = old.exec('SELECT * FROM ai_runs')[0]!;
     migrate(old);
     const after = old.exec('SELECT * FROM ai_runs')[0]!;

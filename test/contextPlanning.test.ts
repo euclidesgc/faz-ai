@@ -143,7 +143,7 @@ describe('contratos de contexto versionados', () => {
     };
     insert('boards', [{ ...current.board, workspace_key: 'old' }]);
     for (const [name, rows] of Object.entries(current.tables))
-      if (!['agent_context_contracts', 'activity_context_selections'].includes(name)) insert(name, rows);
+      if (!['agent_context_contracts', 'activity_context_selections', 'ai_profiles'].includes(name)) insert(name, rows);
     const before = executionState(db);
     const raw = all(old, 'SELECT * FROM board_artifacts');
     migrate(old);
@@ -376,6 +376,8 @@ describe('contratos de contexto versionados', () => {
     file.schemaVersion = 34;
     delete file.tables.agent_context_contracts;
     delete file.tables.activity_context_selections;
+    // perfis (schema 42) não existiam no 34: a importação os cria pela migração
+    delete file.tables.ai_profiles;
     importFile(parseExportFile(JSON.stringify(file)));
     expect(repo.read(router.boardId)).toEqual({ agents: [], activities: [] });
     expect(router.snapshot().contextPlanning?.legacy.cards[0]?.selectedSkills).toHaveLength(2);

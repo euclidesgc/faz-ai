@@ -21,11 +21,16 @@ beforeEach(async () => {
 });
 afterEach(() => db.close());
 const store = { pathOf: () => '/arquivo-ausente', backupCards: () => undefined };
+/** Board num banco de schema antigo: só a linha da tabela da época, sem o seed atual (que já grava perfis). */
+function legacyBoard(database: Database, id = 'board-antigo'): string {
+  database.run('INSERT INTO boards(id, workspace_key, name) VALUES (?,?,?)', [id, 'old', 'Antigo']);
+  return id;
+}
 describe('políticas versionadas do board', () => {
   it('migra schema 40 sem reescrever modelo/reserva legados', () => {
     const old = newDatabase();
     migrate(old, 40);
-    const id = new BoardRepo(old).getOrCreate('old', 'Antigo').id;
+    const id = legacyBoard(old);
     const rules = JSON.stringify([{ id: 'legacy', model: 'claude:opus', fallback: 'claude:haiku' }]);
     run(old, 'UPDATE boards SET model_rules_json = ? WHERE id = ?', [rules, id]);
     migrate(old);
