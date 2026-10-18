@@ -229,7 +229,7 @@ describe('telas montam sem erro', () => {
     expect(html(<FieldsSettings />)).toContain('Skills');
     const rules = html(<RulesSettings />);
     expect(rules).toContain('Avançar de fase');
-    expect(rules).toContain('Preencher o modelo sugerido');
+    expect(rules).not.toContain('mudou para a aba Modelos');
     const models = html(<ModelsSettings />);
     expect(models).not.toContain('gpt-6.1-sol'); // só a ferramenta em uso
     for (const text of [
