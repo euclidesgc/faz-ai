@@ -293,7 +293,7 @@ export class MessageRouter {
     const { current, install } = this.ctx.harness;
     return {
       ...s,
-      // os agentes do board são os arquivos marcados: derivados aqui, nunca gravados
+      // os agentes do board são as cópias guardadas no banco (escopo `board`): derivados aqui, nunca gravados
       board: {
         ...s.board,
         execProfiles: agentProfiles(
@@ -302,7 +302,7 @@ export class MessageRouter {
             : current.agents,
           s.harnessSelection,
           s.board.runner.defaultAgent,
-        ),
+        ).map((p) => (current.library && p.scope !== 'builtin' ? { ...p, scope: 'board' as const } : p)),
       },
       harness: current,
       boardServer: boardServerFootprint(),

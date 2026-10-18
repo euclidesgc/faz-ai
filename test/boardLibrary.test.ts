@@ -98,6 +98,8 @@ describe('biblioteca particular do board', () => {
     router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi' } });
     s = router.snapshot();
     expect(s.board.execProfiles[0]!.instructions).toBe('Revise com rigor.');
+    // o agente da execução é a cópia do board, não o arquivo da ferramenta (que já foi apagado)
+    expect(s.board.execProfiles[0]!.scope).toBe('board');
     expect(harnessOverview(s).agents[0]!.name).toBe('revisor');
     const cardId = router.createCard({ typeId: s.cardTypes[0]!.id, columnId: s.columns[0]!.id, parentId: null, title: 'Revisar' });
     router.handle({ type: 'card.execProfile.set', cardId, profileId: 'revisor' });

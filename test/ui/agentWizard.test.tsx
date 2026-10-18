@@ -41,6 +41,7 @@ beforeEach(async () => {
     harness: {
       ...s.harness,
       agents: [],
+      library: undefined,
       inventory: [{ tool: 'claude', installed: true, items: [skillItem, mcpItem] }],
     },
     harnessSelection: [
