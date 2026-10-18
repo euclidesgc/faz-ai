@@ -1,3 +1,5 @@
+import { ContextPlanningRepo } from '../repositories/contextPlanningRepo';
+import { validateActivityContext, validateAgentContext, validateContextTarget } from '../../shared/contextPlanning';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Database, SqlValue } from 'sql.js';
@@ -57,6 +59,8 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'harness_imports', where: 'board_id = ?', hasId: false, since: 30 },
   // os artefatos do board (#615); no export, `env`/`headers` dos MCPs saem com valor vazio (`scrubMcpSecrets`)
   { name: 'board_artifacts', where: 'board_id = ?', hasId: true, since: 34 },
+  { name: 'agent_context_contracts', where: 'board_id = ?', hasId: false, since: 35 },
+  { name: 'activity_context_selections', where: 'board_id = ?', hasId: true, since: 35 },
   { name: 'board_artifact_files', where: 'artifact_id IN (SELECT id FROM board_artifacts WHERE board_id = ?)', hasId: false, since: 34 },
 ];
 
@@ -101,6 +105,7 @@ export function exportBoard(
 ): ExportResult {
   const boardRow = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
   if (!boardRow) throw new Error('Board não encontrado');
+  new ContextPlanningRepo(db).validateBoard(boardId);
   const board: Row = {};
   for (const [k, v] of Object.entries(boardRow)) if (!OMIT_BOARD_KEYS.includes(k)) board[k] = omitSecrets(k, v);
 
@@ -254,6 +259,16 @@ export function parseExportFile(text: string): BoardExportFile {
       throw invalid('nome de skill ou agente inválido.');
   for (const f of tables.board_artifact_files as Row[])
     if (typeof f.path !== 'string' || !isSafeRelPath(f.path)) throw invalid('caminho de arquivo de apoio inválido.');
+  for (const r of tables.agent_context_contracts as Row[]) {
+    validateAgentContext(JSON.parse(str(r.contract_json)));
+    if (typeof r.artifact_id !== 'string' || !r.artifact_id || !Number.isSafeInteger(r.revision) || Number(r.revision) < 1)
+      throw invalid('contrato de agente inválido.');
+  }
+  for (const r of tables.activity_context_selections as Row[]) {
+    validateActivityContext(JSON.parse(str(r.selection_json)));
+    validateContextTarget({ cardId: r.card_id, workflowId: r.workflow_id, phaseId: r.phase_id, action: r.action });
+    if (!Number.isSafeInteger(r.revision) || Number(r.revision) < 1) throw invalid('revisão de atividade inválida.');
+  }
   if (!Array.isArray(f.files)) throw invalid('falta a lista de arquivos dos anexos.');
   for (const file of f.files) {
     if (!isRow(file) || typeof file.attachmentId !== 'string') throw invalid('item inválido na lista de arquivos dos anexos.');
@@ -358,6 +373,7 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
       insertRows(mem, t.name, t.name === 'cards' ? parentsFirst(rows) : rows);
     }
     migrate(mem);
+    new ContextPlanningRepo(mem).validateBoard(newBoardId);
 
     // 3. o outro board com o mesmo id (o mesmo arquivo importado em duas pastas do mesmo banco) não pode ser engolido
     const clash = one(db, 'SELECT id FROM boards WHERE id = ? AND id != ?', [newBoardId, target.boardId]);

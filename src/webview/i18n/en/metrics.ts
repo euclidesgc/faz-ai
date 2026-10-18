@@ -1,5 +1,41 @@
 // Painel de métricas (src/webview/components/metrics/). Os blocos do painel acrescentam aqui o texto deles.
 export const metrics: Record<string, string> = {
+  'Modo legado: os novos contratos são rascunhos e ainda não governam execuções.':
+    'Legacy mode: new contracts are drafts and do not govern executions yet.',
+  'Contexto inicial estimado: cerca de {tokens} tokens, sem os itens não medidos.':
+    'Estimated initial context: about {tokens} tokens, excluding unmeasured items.',
+  'Contexto da execução': 'Run context',
+  'Servidor obrigatório do board': 'Required board server',
+  'Sempre no board': 'Always on the board',
+  'Configuração do agente': 'Agent configuration',
+  'Escolha no card': 'Card selection',
+  'Agente da fase': 'Phase agent',
+  'Agente da história': 'Story agent',
+  'Agente da fase da história': 'Story phase agent',
+  'Agente padrão do board': 'Default board agent',
+  'Candidato à delegação nativa': 'Native delegation candidate',
+  'Prévia do rascunho com os itens Sempre do board. O card e a fase podem acrescentar contexto na execução.':
+    'Draft preview with the board’s Always items. The card and phase may add context at runtime.',
+  'Configuração efetiva atual, resolvida pelo manifesto da execução. Uma linha por identidade, com todas as origens.':
+    'Current effective configuration, resolved by the run manifest. One row per identity, with all sources.',
+  'Tamanho não medido': 'Size not measured',
+  'Cerca de {tokens} tokens iniciais': 'About {tokens} initial tokens',
+  'Itens selecionados por várias origens são contabilizados uma vez por identidade.':
+    'Items selected by multiple sources are counted once per identity.',
+  'Possível sobreposição: {agents} repetem um parágrafo de {characters} caracteres.':
+    'Possible overlap: {agents} repeat a paragraph of {characters} characters.',
+  'A comparação de sobreposição cobre parágrafos idênticos das instruções dos agentes; o conteúdo de rules e skills não é comparado.':
+    'Overlap comparison covers identical paragraphs in agent instructions; rule and skill contents are not compared.',
+  'A seleção de servidores MCP é imposta pelo executor.': 'MCP server selection is enforced by the executor.',
+  'A seleção de servidores MCP segue como orientação; este executor pode carregar outros servidores por conta própria.':
+    'MCP server selection is advisory; this executor may load other servers on its own.',
+  'As restrições de ferramentas são impostas pelo executor.': 'Tool restrictions are enforced by the executor.',
+  'As restrições de ferramentas seguem como orientação; este executor não garante isolamento por ferramenta.':
+    'Tool restrictions are advisory; this executor does not guarantee isolation per tool.',
+  'Rules e skills seguem como instruções de leitura. O tamanho inicial não prevê o consumo total; o gasto medido aparece na aba Consumo.':
+    'Rules and skills are passed as reading instructions. Initial size does not predict total usage; measured usage appears in the Usage tab.',
+  'Consumo futuro: desconhecido. Esta prévia não estima o custo total da tarefa.':
+    'Future usage: unknown. This preview does not estimate the total cost of the task.',
   // visão e estados (MetricsView)
   Métricas: 'Metrics',
   'Carregando métricas…': 'Loading metrics…',

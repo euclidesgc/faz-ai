@@ -1,3 +1,4 @@
+import { ContextPlanningRepo } from '../../repositories/contextPlanningRepo';
 import { artifactLocation } from '../../../shared/artifacts';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -418,6 +419,11 @@ function markSkill(ctx: BoardContext, name: string, scope: 'project' | 'user' = 
 
 /** Harness: regras, skills, agentes, hooks, permissões, servidores MCP e instalação de skills. */
 export const harnessHandlers = {
+  'contextPlanning.save': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('Contratos de contexto exigem revisão humana; a IA não pode alterar autorizações.');
+    new ContextPlanningRepo(ctx.dbHandle.db).save(ctx.boardId, msg.input);
+    return true;
+  },
   'harness.library.scan': (msg, ctx) => {
     ctx.library.scanFolder(msg.dir);
     ctx.harness.load();

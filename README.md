@@ -541,6 +541,30 @@ só o total. No Cursor, que não impõe o contexto vazio, o que a ferramenta car
 também fica de fora, e as definições das ferramentas MCP contam inteiras. O que a execução gastou de
 fato aparece depois, no consumo de cada execução.
 
+O bloco **Contexto da execução**, em **Consumo → Próxima execução**, mostra agente, candidatos à
+delegação nativa, rules, skills e servidores MCP com todas as origens: card, agente, fase, história,
+padrão ou modo Sempre. Um arquivo selecionado por várias origens aparece uma vez por identidade
+(a da cópia do board, quando disponível). O bloco também aparece nos editores de agentes, com o
+rascunho e os itens Sempre, sem incorporar seleções de um card.
+
+A prévia usa o manifesto atual e não inicia uma execução nem chama IA. Ela distingue restrições
+impostas pelo executor de orientações no prompt, aponta parágrafos idênticos nas instruções dos
+agentes e informa que não compara o conteúdo de rules e skills. Tamanhos desconhecidos continuam
+não medidos; a estimativa inicial não prevê o consumo total de uma tarefa. Essa entrega torna o
+comportamento atual visível; configurações por ação e novos limites de autorização ainda não estão
+ativos.
+
+A persistência já separa contratos de contexto **versão 1** dos campos legados, com revisões e
+seleções por ação e ID de fase. Herança e seleção vazia são valores distintos. Os contratos novos
+são rascunhos: ainda não há editor por ação nem aplicação no runtime. A prévia identifica esse modo
+legado. A migração para o schema 35 mantém os campos originais; sua leitura de compatibilidade
+identifica skills dos agentes como essenciais e skills dos cards como selecionadas, inclusive
+referências ausentes. MCPs legados não viram autorizações do contrato novo. Exportar e importar
+preserva os rascunhos e suas versões, sem incluir definições MCP nesses contratos; os valores de
+credenciais MCP continuam removidos da exportação.
+
+O protocolo host–webview também oferece a prévia dos rascunhos salvos: resolve herança, origens e incompatibilidades sem inferência e retorna metadados dos artefatos. Essa base da E3 ainda não inclui o editor dos contratos nem a admissão por capacidades de #729; a prévia permanece sem autorização para executar.
+
 ### Aba Consumo do card
 
 O card aberto tem a aba **Consumo**, que junta as duas contas:

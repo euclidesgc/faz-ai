@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Badge, Button, Checkbox, Dialog, Tabs, TextField } from '@radix-ui/themes';
-import type { AgentMeta, LibraryArtifactInput, ToolCategory } from '../../../../shared/artifacts';
+import { profileOfArtifact, type AgentMeta, type LibraryArtifactInput, type ToolCategory } from '../../../../shared/artifacts';
 import type { AgentAssistInput, AgentAssistResult, AgentAssistStep } from '../../../../shared/agentAssistance';
+import { agentContextOf } from '../../../../shared/executionContext';
+import { ExecutionContext } from '../../card/ExecutionContext';
 import { chat, harness, settings } from '../../../commands';
 import { requestAgentAssistance } from '../../../request';
 import { useAction } from '../../../useAction';
@@ -83,6 +85,12 @@ export function LibraryAgentEditor({
       .join('\n\n');
   const assembledBody = buildBody();
   const effectiveBody = (!body.trim() || body === lastBuilt) && assembledBody ? assembledBody : body;
+  const description =
+    initial?.description ||
+    (answers.responsibility || effectiveBody.split('\n').find((line) => line.trim() && !line.startsWith('#')) || name)
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 240);
   const draft: AgentAssistInput = {
     name,
     body: effectiveBody,
@@ -116,12 +124,7 @@ export function LibraryAgentEditor({
       id: initial?.id,
       kind: 'agent',
       name,
-      description:
-        initial?.description ||
-        (answers.responsibility || effectiveBody.split('\n').find((line) => line.trim() && !line.startsWith('#')) || name)
-          .replace(/\s+/g, ' ')
-          .trim()
-          .slice(0, 240),
+      description,
       body: effectiveBody,
       agent,
     });
@@ -200,6 +203,23 @@ export function LibraryAgentEditor({
               />
             )}
           </FormField>
+          <ExecutionContext
+            agent
+            preview={agentContextOf(
+              state,
+              profileOfArtifact(
+                {
+                  name,
+                  description,
+                  body: effectiveBody,
+                  agent,
+                  path: '',
+                  origin: '',
+                },
+                false,
+              ),
+            )}
+          />
           <Tabs.Root value={tab} onValueChange={(value) => changeTab(value as Tab)}>
             <Tabs.List aria-label={t('Definição do subagente')}>
               {Object.entries(TABS).map(([id, label]) => (

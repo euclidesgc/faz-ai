@@ -1,3 +1,4 @@
+import type { ContextPlanningState } from './contextPlanning';
 import type { OrphanReport } from './orphans';
 import type { BoardRequirement } from './requirements';
 import type { EnvironmentReport } from './environment';
@@ -243,6 +244,8 @@ export interface Autopilot {
 
 /** Snapshot completo enviado ao webview após cada mutação. */
 export interface BoardState {
+  /** Rascunhos versionados, separados do manifesto legado ainda em execução. */
+  contextPlanning?: ContextPlanningState;
   board: Board;
   workflows: Workflow[];
   columns: Column[];

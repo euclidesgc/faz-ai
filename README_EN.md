@@ -566,6 +566,28 @@ ring shows only the total. In Cursor, which does not enforce the empty context, 
 its own is also left out, and the MCP tool definitions count in full. What the run actually spent
 shows up afterwards, in the consumption of each run.
 
+The **Run context** block under **Usage → Next run** shows the agent, native delegation candidates,
+rules, skills and MCP servers with all their sources: card, agent, phase, story, default or Always.
+A file selected by multiple sources appears once per identity (the board copy ID, when available).
+The agent editors show the same block for the draft and Always items, without selections from a card.
+
+The preview uses the current manifest and neither starts a run nor calls AI. It distinguishes
+restrictions enforced by the executor from prompt advice, flags identical paragraphs in agent
+instructions and explains that rule and skill contents are not compared. Unknown sizes remain
+unmeasured; initial context size does not predict total task usage. This delivery makes current
+behavior visible; configuration per action and new authorization boundaries are not active yet.
+
+Persistence now separates **version 1** context contracts from legacy fields, with revisions and
+selections keyed by action and phase ID. Inheritance and explicit empty selections are distinct.
+New contracts are drafts: the per-action editor and runtime enforcement are not available yet.
+The preview identifies legacy mode. Migration to schema 35 preserves original fields; its
+compatibility view identifies agent skills as essential and card skills as selected, including
+missing references. Legacy MCP selections do not become permissions in the new contract.
+Export/import preserves drafts and versions without embedding MCP definitions in these contracts;
+MCP credential values continue to be removed from exports.
+
+The host–webview protocol also previews saved drafts: it resolves inheritance, sources and conflicts without inference and returns artifact metadata. This E3 foundation does not include the contract editor or capability admission from #729; preview results remain unauthorized for execution.
+
 ### Card Usage tab
 
 The open card has the **Consumo** (usage) tab, which brings the two numbers together:

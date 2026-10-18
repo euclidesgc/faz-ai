@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Badge, Button, Checkbox, TextArea, TextField } from '@radix-ui/themes';
+import { agentContextOf } from '../../../../shared/executionContext';
+import { ExecutionContext } from '../../card/ExecutionContext';
 import { AGENT_FORMAT } from '../../../../shared/agentTools';
 import { EXEC_ENFORCEMENT, TOOL_PRESETS, type ExecAspect } from '../../../../shared/execution';
 import { selectedMcpNames } from '../../../../shared/harnessSelection';
@@ -45,6 +47,26 @@ export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: A
   const dirty = body !== a.body;
   return (
     <div className="profile-editor" aria-label={t('Agente {name}', { name: a.name })}>
+      <ExecutionContext
+        agent
+        preview={agentContextOf(
+          { ...state, board: { ...state.board, aiTool: tool.id } },
+          {
+            id: a.name,
+            name: a.name,
+            purpose: a.description,
+            instructions: body,
+            skills: a.skills,
+            mcpServers: a.mcp,
+            tools: a.tools,
+            deniedTools: a.deniedTools,
+            model: a.modelValue,
+            isDefault: false,
+            scope: a.scope,
+            path: a.path,
+          },
+        )}
+      />
       <FormField label={t('O que este agente faz')} hint={t('Uma frase: é por ela que o "Refinar com IA" escolhe o agente de um card.')}>
         {(id) => (
           <TextField.Root

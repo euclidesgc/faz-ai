@@ -19,6 +19,7 @@ const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'harness.agent.assist',
   'metrics.query',
   'card.usage.query',
+  'contextPlanning.preview',
 ]);
 
 /** O que depende de onde o board está rodando: dentro do editor ou num navegador. */
@@ -396,6 +397,22 @@ export class HostBridge {
           this.post({ type: 'metrics.result', requestId: msg.requestId, result: this.router.panelMetrics(msg.query) });
         } catch (e) {
           this.post({ type: 'metrics.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'contextPlanning.preview': {
+        try {
+          this.post({
+            type: 'contextPlanning.preview.result',
+            requestId: msg.requestId,
+            preview: this.router.previewContextDraft(msg.target),
+          });
+        } catch (e) {
+          this.post({
+            type: 'contextPlanning.preview.result',
+            requestId: msg.requestId,
+            error: e instanceof Error ? e.message : String(e),
+          });
         }
         return;
       }

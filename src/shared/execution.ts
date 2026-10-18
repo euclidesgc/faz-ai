@@ -237,7 +237,7 @@ export const delegatesOf = (s: BoardState, c: Card, own: ExecProfile | undefined
           model: catalogModel(s, p.model)?.option.model ?? null,
         }));
 
-const listField = (s: BoardState, c: Card, name: string): string[] => {
+const executionFieldValues = (s: BoardState, c: Card, name: string): string[] => {
   const field = s.fieldDefs.find((f) => f.kind === 'multiselect' && f.name.toLowerCase() === name);
   const v = field ? valueOf(s, c.id, field.id) : undefined;
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
@@ -247,7 +247,17 @@ const listField = (s: BoardState, c: Card, name: string): string[] => {
 const inBoard = (names: Set<string>, name: string): boolean => names.has(name);
 
 export function manifestOf(s: BoardState, c: Card): ExecManifest {
-  const profile = profileOf(s, c);
+  return manifestWithProfile(s, c, profileOf(s, c));
+}
+
+/** Prévia isolada do agente: os padrões do board, sem campos, fase ou delegados de um card. */
+export function agentManifestOf(s: BoardState, profile: ExecProfile): ExecManifest {
+  return manifestWithProfile(s, null, profile);
+}
+
+/** Seleções do card aceitas pelo contrato legado, compartilhadas com a proveniência da prévia. */
+export function executionCardSelectionsOf(s: BoardState, c: Card | null): { skills: string[]; rules: string[]; mcps: string[] } {
+  const listField = (name: string) => (c ? executionFieldValues(s, c, name) : []);
   // uma skill do projeto desligada (movida para a pasta ao lado) some do inventário, mas o card que já a
   // indicava continua recebendo o caminho dela: desligar é guardar, não tirar do board
   const skillNames = new Set([
@@ -257,27 +267,32 @@ export function manifestOf(s: BoardState, c: Card): ExecManifest {
   ]);
   const ruleLocations = new Set([...selectedRuleLocations(s, 'contextual'), ...selectedRuleLocations(s, 'always')]);
   const mcpNames = new Set([...selectedMcpNames(s, 'contextual'), ...selectedMcpNames(s, 'always')]);
+  return {
+    skills: listField('skills').filter((n) => inBoard(skillNames, n)),
+    rules: listField('rules').filter((l) => inBoard(ruleLocations, l)),
+    mcps: listField('mcps').filter((n) => inBoard(mcpNames, n)),
+  };
+}
+
+function manifestWithProfile(s: BoardState, c: Card | null, profile: ExecProfile | undefined): ExecManifest {
+  const selected = executionCardSelectionsOf(s, c);
   const modelField = s.fieldDefs.find((f) => f.kind === 'model');
-  const chosen = parseModelValue(modelField ? valueOf(s, c.id, modelField.id) : undefined) ?? parseModelValue(profile?.model || null);
+  const chosen = parseModelValue(modelField && c ? valueOf(s, c.id, modelField.id) : undefined) ?? parseModelValue(profile?.model || null);
   const option = chosen ? s.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === s.board.aiTool) : undefined;
   return {
-    delegates: delegatesOf(s, c, profile),
+    delegates: c ? delegatesOf(s, c, profile) : [],
     profile: profile?.name ?? null,
     agent: profile && profile.scope !== 'builtin' ? profile.id : '',
     purpose: profile?.purpose ?? '',
     instructions: profile?.instructions ?? '',
     // as skills "Sempre" entram pelo contexto fixo (promptContext), não por aqui; o que o card lista e saiu do
     // board (ou passou para "Desligado") fica de fora sem quebrar o card: o board referencia, não copia
-    skills: [...new Set([...(profile?.skills ?? []), ...listField(s, c, 'skills').filter((n) => inBoard(skillNames, n))])],
-    rules: listField(s, c, 'rules').filter((l) => inBoard(ruleLocations, l)),
+    skills: [...new Set([...(profile?.skills ?? []), ...selected.skills])],
+    rules: selected.rules,
     // os servidores do agente, os do campo MCPs do card e os do board em modo "Sempre"; o do board vai sempre, sem marcação
-    mcpServers: [
-      ...new Set([
-        ...(profile?.mcpServers ?? []),
-        ...listField(s, c, 'mcps').filter((n) => inBoard(mcpNames, n)),
-        ...selectedMcpNames(s, 'always'),
-      ]),
-    ].filter((n) => n !== BOARD_MCP_NAME),
+    mcpServers: [...new Set([...(profile?.mcpServers ?? []), ...selected.mcps, ...selectedMcpNames(s, 'always')])].filter(
+      (n) => n !== BOARD_MCP_NAME,
+    ),
     tools: profile?.tools ?? [],
     deniedTools: profile?.deniedTools ?? [],
     model: option

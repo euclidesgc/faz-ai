@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 34;
+export const SCHEMA_VERSION = 35;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -448,6 +448,31 @@ const MIGRATIONS: Record<number, string> = {
       size INTEGER NOT NULL,         -- bytes do original
       PRIMARY KEY (artifact_id, path)
     );
+  `,
+  35: `
+    -- Contratos novos ficam separados: nenhum campo legado muda de significado ou vira autorização.
+    CREATE TABLE agent_context_contracts (
+      artifact_id TEXT PRIMARY KEY REFERENCES board_artifacts(id) ON DELETE CASCADE,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      contract_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE activity_context_selections (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      card_id TEXT REFERENCES cards(id) ON DELETE CASCADE,
+      workflow_id TEXT REFERENCES workflows(id) ON DELETE CASCADE,
+      phase_id TEXT NOT NULL DEFAULT '',
+      action TEXT NOT NULL,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      selection_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      CHECK (card_id IS NULL OR workflow_id IS NULL)
+    );
+    -- A fase removida permanece identificável para revisão; seu nome nunca é a identidade.
+    CREATE UNIQUE INDEX activity_context_target ON activity_context_selections
+      (board_id, COALESCE(card_id, ''), COALESCE(workflow_id, ''), phase_id, action);
   `,
 };
 

@@ -1,6 +1,6 @@
-import { manifestOf } from './execution';
+import { agentManifestOf, manifestOf, type ExecProfile } from './execution';
+import { contextFilesOf } from './contextSources';
 import type { AiTool, HarnessItem } from './harness';
-import { selectedItems, toolItemsOf } from './harnessSelection';
 import type { BoardState, Card } from './model';
 import { contextWindowOf } from './models';
 import { checklistOf, columnOf } from './selectors';
@@ -100,12 +100,6 @@ const GROUP_ORDER: ContextGroupId[] = ['mcp', 'agents', 'rules', 'skills', 'card
 
 const sized = (item: HarnessItem | undefined): number | null => (item?.size === undefined ? null : tokensOf(item.size));
 
-/** A skill de um nome na ferramenta em uso, como o get_card a resolve: a do projeto vale mais que a global ou a de plugin. */
-function skillItem(s: BoardState, name: string): HarnessItem | undefined {
-  const skills = toolItemsOf(s).filter((i) => i.kind === 'skill' && i.name === name);
-  return skills.find((i) => i.scope === 'project') ?? skills[0];
-}
-
 /** O servidor do board e os que o agente libera. No Claude Code, só os nomes e as instruções entram de início. */
 function mcpEntries(s: BoardState, tool: AiTool, allowed: string[]): ContextEntry[] {
   const f = s.boardServer;
@@ -128,11 +122,11 @@ function mcpEntries(s: BoardState, tool: AiTool, allowed: string[]): ContextEntr
 }
 
 /** O agente da sessão (instruções inteiras) e, numa história no Claude Code, os subagentes (só o nome e a descrição entram aqui). */
-function agentEntries(tool: AiTool, c: Card, m: ReturnType<typeof manifestOf>): ContextEntry[] {
+function agentEntries(tool: AiTool, m: ReturnType<typeof manifestOf>): ContextEntry[] {
   const own: ContextEntry[] = m.agent ? [{ kind: 'agent', name: m.agent, tokens: tokensOf(m.instructions.length + m.purpose.length) }] : [];
   // a ferramenta lista cada subagente pelo nome e pela descrição; as instruções dele vão para o contexto do próprio subagente
   const subs =
-    tool === 'claude' && !c.parentId
+    tool === 'claude'
       ? m.delegates.map((d): ContextEntry => ({ kind: 'subagent', name: d.name, tokens: tokensOf(d.name.length + d.purpose.length) }))
       : [];
   return [...own, ...subs];
@@ -140,25 +134,11 @@ function agentEntries(tool: AiTool, c: Card, m: ReturnType<typeof manifestOf>): 
 
 /** As rules e as skills que a sessão lê pelo caminho: as do contexto fixo e as que o card (ou o agente) exige, sem repetir. */
 function fileEntries(s: BoardState, m: ReturnType<typeof manifestOf>): { rules: ContextEntry[]; skills: ContextEntry[] } {
-  const seen = new Set<string>();
-  const once = (item: HarnessItem | undefined, key: string) => {
-    const id = item?.path ?? key;
-    return seen.has(id) ? false : (seen.add(id), true);
+  const files = contextFilesOf(s, m);
+  return {
+    rules: files.rules.map((f) => ({ kind: 'rule', name: f.name, tokens: sized(f.item) })),
+    skills: files.skills.map((f) => ({ kind: 'skill', name: f.name, tokens: sized(f.item) })),
   };
-  const rules: ContextEntry[] = [];
-  for (const i of selectedItems(s, 'instructions', 'always'))
-    if (once(i, i.location)) rules.push({ kind: 'rule', name: i.location, tokens: sized(i) });
-  for (const location of m.rules) {
-    const item = toolItemsOf(s).find((i) => i.kind === 'instructions' && i.location === location);
-    if (once(item, `rule:${location}`)) rules.push({ kind: 'rule', name: location, tokens: sized(item) });
-  }
-  const skills: ContextEntry[] = [];
-  for (const i of selectedItems(s, 'skill', 'always')) if (once(i, i.name)) skills.push({ kind: 'skill', name: i.name, tokens: sized(i) });
-  for (const name of m.skills) {
-    const item = skillItem(s, name);
-    if (once(item, `skill:${name}`)) skills.push({ kind: 'skill', name, tokens: sized(item) });
-  }
-  return { rules, skills };
 }
 
 /** O que o get_card e a fase entregam do card: texto, checklist, conversa, instruções da fase e os documentos das fases. */
@@ -187,15 +167,23 @@ const sum = (entries: ContextEntry[]): number => entries.reduce((n, e) => n + (e
  * quando a fase anexa um documento.
  */
 export function estimateContext(s: BoardState, c: Card): ContextEstimate {
+  return estimateManifestContext(s, manifestOf(s, c), c);
+}
+
+/** Custo inicial do agente com o contexto fixo, sem inventar um card ou chamar a IA. */
+export function estimateAgentContext(s: BoardState, profile: ExecProfile): ContextEstimate {
+  return estimateManifestContext(s, agentManifestOf(s, profile));
+}
+
+function estimateManifestContext(s: BoardState, m: ReturnType<typeof manifestOf>, c?: Card): ContextEstimate {
   const tool = s.board.aiTool;
-  const m = manifestOf(s, c);
   const { rules, skills } = fileEntries(s, m);
   const byGroup: Record<ContextGroupId, ContextEntry[]> = {
     mcp: mcpEntries(s, tool, m.mcpServers),
-    agents: agentEntries(tool, c, m),
+    agents: agentEntries(tool, m),
     rules,
     skills,
-    card: cardEntries(s, c),
+    card: c ? cardEntries(s, c) : [],
   };
   const groups = GROUP_ORDER.filter((id) => byGroup[id].length).map((id): ContextGroup => ({
     id,
@@ -204,7 +192,7 @@ export function estimateContext(s: BoardState, c: Card): ContextEstimate {
   }));
   const entries = groups.flatMap((g) => g.entries);
   const option = m.model ? s.board.modelCatalog.find((o) => o.tool === tool && o.model === m.model!.name) : undefined;
-  const col = columnOf(s, c);
+  const col = c ? columnOf(s, c) : undefined;
   return {
     tool,
     total: groups.reduce((n, g) => n + g.tokens, 0),

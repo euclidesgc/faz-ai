@@ -1,3 +1,5 @@
+import type { ContextDraftResolution } from './contextDraftResolution';
+import type { ContextActivityTarget, ContextPlanningWrite } from './contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from './agentAssistance';
 import type { LibraryArtifactInput } from './artifacts';
 import type { Appearance } from './appearance';
@@ -296,6 +298,8 @@ export type WebviewToHost =
   | { type: 'harness.library.pickDirectory' }
   | { type: 'harness.library.folders'; dir: string }
   | { type: 'harness.library.save'; input: LibraryArtifactInput }
+  | { type: 'contextPlanning.save'; input: ContextPlanningWrite }
+  | { type: 'contextPlanning.preview'; requestId: string; target: ContextActivityTarget }
   | { type: 'harness.library.read'; id: string }
   | { type: 'harness.library.pickArtifacts' }
   | { type: 'harness.library.directory'; dir: string }
@@ -386,6 +390,8 @@ export type HostToWebview =
   | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
+  /** prévia dos contratos salvos, sem corpos de artefatos, inferência ou admissão */
+  | { type: 'contextPlanning.preview.result'; requestId: string; preview?: ContextDraftResolution; error?: string }
   /** resposta a `card.usage.query`, correlacionada por `requestId` */
   | { type: 'card.usage.result'; requestId: string; usage?: CardUsage; error?: string }
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */

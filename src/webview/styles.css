@@ -4552,3 +4552,30 @@ div.metrics-breakdown {
   font-size: inherit;
   line-height: inherit;
 }
+
+.execution-context {
+  margin-top: var(--sp-12);
+  padding: var(--sp-12);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.execution-context > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.execution-context > summary:focus-visible {
+  outline: var(--focus-ring);
+}
+.execution-context-items > div {
+  padding: var(--sp-8) 0;
+  border-bottom: 1px solid var(--border);
+}
+.execution-context-items dd {
+  margin: var(--sp-4) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.execution-context-items code {
+  overflow-wrap: anywhere;
+}

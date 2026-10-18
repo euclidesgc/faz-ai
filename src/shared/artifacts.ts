@@ -107,7 +107,9 @@ export function itemOfArtifact(a: BoardArtifact): HarnessItem {
 }
 
 /** O agente no formato `Agent` (para o editor atual e para `profileOfArtifact`). */
-export function agentOfArtifact(a: BoardArtifact, tool?: AiTool): Agent {
+export type AgentArtifact = Pick<BoardArtifact, 'name' | 'description' | 'body' | 'agent' | 'path' | 'origin'>;
+
+export function agentOfArtifact(a: AgentArtifact, tool?: AiTool): Agent {
   const m = a.agent;
   const foreign = !!tool && m?.tools.native.tool !== tool;
   const translate = (categories: ToolCategory[]) =>
@@ -138,7 +140,7 @@ export function agentOfArtifact(a: BoardArtifact, tool?: AiTool): Agent {
 }
 
 /** O agente no formato de perfil de execução (escopo `board`, `path` = cópia de leitura). */
-export function profileOfArtifact(a: BoardArtifact, isDefault: boolean): ExecProfile {
+export function profileOfArtifact(a: AgentArtifact, isDefault: boolean): ExecProfile {
   const g = agentOfArtifact(a);
   return {
     id: g.name,

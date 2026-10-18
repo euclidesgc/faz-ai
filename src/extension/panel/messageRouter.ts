@@ -1,3 +1,5 @@
+import { resolveContextDraft, type ContextDraftResolution } from '../../shared/contextDraftResolution';
+import type { ContextActivityTarget } from '../../shared/contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
 import { scanLibraryFolder } from '../libraryImport';
 import { agentOfArtifact } from '../../shared/artifacts';
@@ -148,6 +150,7 @@ const bridgeOnly = {
   // ler o log não muda o board: a `HostBridge` responde por `panelMetrics`, sem passar por `handle`
   'metrics.query': viaBridge,
   'card.usage.query': viaBridge,
+  'contextPlanning.preview': viaBridge,
   'backup.export': viaBridge,
   'backup.import.pick': viaBridge,
   'backup.import.cancel': viaBridge,
@@ -540,6 +543,19 @@ export class MessageRouter {
   /** Consulta do painel de métricas: só lê o log (sem sonda, sem registro, sem `notify` nem gravação do banco). */
   panelMetrics(query: MetricsPanelQuery): MetricsPanelResult {
     return getPanelMetrics(this.ctx.dbHandle.db, this.ctx.boardId, query);
+  }
+
+  /** Metadados do rascunho a partir do banco do host; nenhuma inferência ou admissão é executada. */
+  previewContextDraft(target: ContextActivityTarget): ContextDraftResolution {
+    const state = this.snapshot();
+    state.harness = {
+      ...state.harness,
+      library: {
+        directory: state.harness.library?.directory ?? '',
+        artifacts: this.ctx.library.repo.list(this.ctx.boardId).map((a) => ({ ...a, path: '' })),
+      },
+    };
+    return resolveContextDraft(state, target);
   }
 
   /** O que o card gastou até agora, por fase (e, numa história, as sub-tarefas), lido do log das execuções. */
