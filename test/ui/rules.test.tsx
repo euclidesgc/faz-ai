@@ -55,15 +55,11 @@ describe('RulesSettings', () => {
   });
 });
 
-describe('RulesSettings: "Preencher o modelo sugerido" mudou para Modelos (RF07)', () => {
-  it('a opção não aparece mais aqui; o aviso explica a mudança e o botão leva até Modelos', async () => {
-    useBoardStore.setState({ settingsTab: 'columns', pendingSettingsSection: null });
+describe('RulesSettings: sem o aviso sobre a aba Modelos', () => {
+  it('não mostra o aviso nem o botão "Abrir em Modelos", e a opção não aparece aqui', () => {
     show();
+    expect(screen.queryByText(/mudou para a aba Modelos/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Abrir em Modelos' })).toBeNull();
     expect(screen.queryByRole('switch', { name: 'Preencher o modelo sugerido automaticamente' })).toBeNull();
-    expect(screen.getByText('"Preencher o modelo sugerido automaticamente" mudou para a aba Modelos.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir em Modelos' }));
-    const s = useBoardStore.getState();
-    expect(s.settingsTab).toBe('models');
-    expect(s.pendingSettingsSection).toBe('model-rules');
   });
 });
