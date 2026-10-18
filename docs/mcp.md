@@ -136,16 +136,19 @@ vira aprovação na hora nas outras, e a IA é mandada decidir e seguir. `update
 
 ### Agentes
 
-Um agente do board é um arquivo de agente da ferramenta, do projeto ou da pasta do usuário.
-`get_harness` lista os marcados como disponíveis (com `onlySelected: false`, todos, com a marcação
-em `usage`), e `get_agent`, `create_agent`, `update_agent` e `delete_agent` os gerenciam: o padrão de
-criação é a pasta global (`scope: "user"`), e o agente criado já nasce disponível. `create_agent` e
+Um agente do board é uma cópia guardada no banco do board. `get_harness` lista os marcados como
+disponíveis; com `onlySelected: false`, lista também os agentes do board junto com os arquivos de agente
+da ferramenta, com a marcação em `usage`. `get_agent` lê a cópia do board. `create_agent`,
+`update_agent` e `delete_agent` gravam só no board: `scope` é aceito e ignorado, e o agente criado já
+nasce disponível. Editar um agente copiado de um arquivo da ferramenta não altera o arquivo original;
+`delete_agent` tira o agente do board sem apagar o arquivo, e um agente que existe só na pasta da
+ferramenta (sem cópia no board) continua sendo editado ou apagado no seu arquivo. `create_agent` e
 `update_agent` aceitam, além das instruções, `description`, `model` (valor do campo Modelo, ex.:
 `claude:sonnet@medium`), `tools`, `deniedTools`, `skills` e `mcp`, e, no Cursor (que não tem lista de
 ferramentas, skills nem MCP por subagente), `readonly` e `background` (`readonly: true` e
-`is_background: true` no frontmatter); o board grava o que é só dele em chaves `faz-ai-*` do
-frontmatter. Cada ferramenta guarda os seus numa
-pasta própria (a global fica em `~/`):
+`is_background: true` no frontmatter); num agente do board, o que é só do board fica no banco; num arquivo
+de agente da ferramenta editado pelo board, em chaves `faz-ai-*` do frontmatter. Os arquivos de agente de cada ferramenta ficam numa
+pasta própria (a global fica em `~/`); o board não grava nessas pastas:
 
 | Ferramenta | Pasta | Arquivo | Modelo por agente |
 | --- | --- | --- | --- |
@@ -182,8 +185,8 @@ Não conduz OAuth e não encaminha recursos ou prompts MCP. Erros de um servidor
 dos demais. A IA descobre os schemas antes de chamar uma ferramenta.
 
 As definições MCP da biblioteca ficam cifradas no cofre local do host. Leituras, inclusive do editor, devolvem apenas referência, transporte e estado de revisão/disponibilidade. `save_board_artifact` por IA não pode gravar configurações MCP. A pessoa substitui a definição no editor; importações ficam pendentes e são recusadas antes da preparação e do encaminhamento. A leitura de arquivos de configuração MCP pela interface também é recusada. Logs e resultados encaminhados ocultam valores conhecidos pelo cofre. Perfis de CLI e APIs legadas de arquivos nativos ainda não têm a cobertura completa de #728. `get_skill`, `update_skill` e
-`write_skill_file` priorizam a cópia; `get_agent` sem escopo também. APIs de arquivos nativos seguem
-por compatibilidade. `onlySelected: false` ainda inclui fontes nativas para clientes antigos.
+`write_skill_file` priorizam a cópia; `get_agent` lê a cópia do board. APIs de arquivos nativos seguem
+por compatibilidade. `onlySelected: false` inclui também os agentes do board, junto com as fontes nativas para clientes antigos.
 
 ### Projeto, global e plugins
 

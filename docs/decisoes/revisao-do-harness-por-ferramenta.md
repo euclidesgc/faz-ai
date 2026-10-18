@@ -1,5 +1,7 @@
 # Revisão do Harness: organização por ferramenta e banco de artefatos do board
 
+> **Atualização (#615):** a decisão "o board referencia, não copia" foi substituída. O board agora guarda a própria cópia dos artefatos no banco dele, e as execuções usam só essa cópia, com um snapshot por execução. Atualizar a partir da origem é uma ação explícita da pessoa.
+
 ## Vocabulário
 
 - **Artefato**: qualquer componente do harness de uma ferramenta de IA: regra, skill, sub-agente,
