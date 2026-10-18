@@ -49,6 +49,16 @@ A prévia do formulário usa `resolveContextDraft` com o contrato não salvo, es
 
 O processo publica confirmação de encerramento somente após fechar e, no POSIX, não encontrar o grupo da execução. Sem confirmação, a posse é retida e o desfecho não é sucesso. O Windows continua sem prova da árvore nesse transporte. O launcher controlado agora espera a gravação da identidade no WAL antes de receber o comando da CLI. Uma queda antes dessa gravação não inicia inferência; depois dela, a recuperação verifica o grupo registrado antes de restaurar. Diários antigos, identidades incompletas e estados desconhecidos continuam retidos. Não marcar #710/#712 ou E3 como concluídas por esta entrega. Testes cobrem concorrência entre processos reais, falhas depois de WAL/escrita, edição concorrente, cancelamento, repetição de formato e queda real do host antes/depois da gravação da identidade e durante a execução. O comando e o prompt passam ao launcher por stdin; o protocolo de controle não polui a saída medida. Esta prova é do transporte com processos Node reais, não de isolamento ou qualidade de uma CLI de IA.
 
+### Base de admissão por capacidades — continuação de #711/#729
+
+`executionAdmission.ts` decide deterministicamente a partir de cinco capacidades independentes (conversa, artefatos, permissões, MCP e delegação), recibos e vínculo da configuração. Evidência ausente, manual, incompleta, vencida ou de outro vínculo não verifica o executor; uma falha mais nova não recorre ao sucesso antigo. Regime exclusivo exige as cinco capacidades; a variante compatível exige revisão humana e não afrouxa permissões, MCP ou delegação. A interface de escolha desse regime ainda não foi entregue.
+
+O gateway aceita preparação v1 estrita, consulta o serviço do host e bloqueia antes de `beforeSpawn` se não houver prova. Intersecta ferramentas do board/nível/agente e operações MCP exatas; listas vazias são impostas como vazias. Restrições nativas de outro executor ou sem tradução são bloqueantes. O mapeamento estrito disponível nesta base é o do Claude; os outros providers continuam sem mapeamento comprovado. A nova preparação elimina delegados e MCPs não selecionados, sem alterar a execução legada ainda ativa.
+
+A identidade da evidência inclui perfil, caminho/binário, argumentos relevantes, ambiente, diretórios e resumo das fontes externas. O host revalida comando, arquivo MCP e vínculo antes de cada tentativa e da liberação do launcher; a alternativa de formato mantém as restrições. Recibos locais têm assinatura por chave da máquina, não são exportados e não há escrita pela UI/MCP. O schema **36** acrescenta `ai_runs.admission_json`; a decisão de auditoria precisa ser gravada antes da inferência v1. Importar essa decisão não a torna evidência local.
+
+**Ainda pendente:** implementar o coletor/verificador das CLIs reais, produzir recibos de isolamento e integrar sua leitura na prévia e nos preparadores de todas as ações. O host mantém fontes externas como desconhecidas; nenhum executor real foi habilitado por estes testes. Os recibos dos testes são sintéticos. E3 e #729 continuam parciais; E5 não foi ativada.
+
 ## Dependências identificadas no board
 
 Consulta local somente de leitura ao board deste projeto em 17/10/2026:

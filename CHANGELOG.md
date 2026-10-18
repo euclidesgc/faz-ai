@@ -8,6 +8,8 @@ A seção **Não lançado** reúne apenas mudanças integradas na `develop`, agu
 
 ## Não lançado
 
+- **Base de admissão de contratos v1 no gateway.** Cinco capacidades independentes e recibos locais vinculados à configuração substituem declarações manuais como fonte de prova no novo caminho. O mapeamento estrito do Claude intersecta ferramentas e operações MCP, impõe vazio explícito e revalida as restrições antes de iniciar. O schema 36 preserva a decisão de auditoria, sem exportar recibos locais nem reutilizar autorização importada. O verificador de CLIs reais e a ativação das ações continuam pendentes; execuções atuais permanecem legadas.
+
 - **Identidade registrada antes de iniciar a IA.** O launcher aguarda o registro durável da identidade antes de receber o comando. A recuperação distingue queda antes da liberação, execução órfã ainda viva e grupo comprovadamente encerrado. Testes com processos reais cobrem essas fronteiras; identidades ambíguas e a árvore Windows permanecem sem confirmação.
 
 - **MCP do projeto emprestado durante a execução.** O transporte de Cursor e Kimi coordena o arquivo pelo caminho real, registra um diário antes de escrever e restaura a configuração anterior quando o encerramento é confirmado. As tentativas de formato compartilham o empréstimo. JSON inválido bloqueia antes de iniciar a IA; edições conflitantes são preservadas. Processos com término desconhecido mantêm o empréstimo para reconciliação.

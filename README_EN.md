@@ -592,6 +592,8 @@ The host–webview protocol and the `preview_context_draft` MCP tool preview sav
 
 Transport that requires project MCP files (Cursor and Kimi) uses a lease coordinated by the real file path. A protected journal under `~/.faz-ai/mcp-leases` precedes mutation; format attempts reuse the same ownership. After confirmed termination, the previous configuration is restored while preserving servers added by the person. Conflicting changes to the `faz-ai` entry or invalid JSON are not overwritten. Without confirmation that the process tree has ended, the lease is retained and a new run on that file is refused. The launcher receives the CLI command only after its identity is journaled. On startup, a demonstrably dead owner allows recovery of preparations whose command was never released and recorded process groups with confirmed termination. Old or ambiguous journals remain retained. Windows does not yet provide process-tree confirmation in this transport; that case requires reconciliation. This does not prove CLI isolation or complete #729.
 
+The v1 gateway admission foundation distinguishes conversation, artifacts, permissions, MCP and delegation, requiring local receipts bound to the current configuration. Decisions are recorded in history (schema 36), and export/import does not turn them into authorization. An empty list means no tools; strict Claude mapping uses exact tools and MCP operations without bypassing permissions. This foundation still awaits the real CLI verifier and activation across E5 actions: current execution remains legacy, and no executor is verified automatically.
+
 ### Card Usage tab
 
 The open card has the **Consumo** (usage) tab, which brings the two numbers together:

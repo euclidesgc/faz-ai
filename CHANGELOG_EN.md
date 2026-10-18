@@ -9,6 +9,8 @@ The **Unreleased** section includes only changes integrated into `develop` and a
 
 ## Unreleased
 
+- **V1 contract admission foundation in the gateway.** Five independent capabilities and local receipts bound to the current configuration replace manual declarations as proof in the new path. Strict Claude mapping intersects tools and MCP operations, enforces explicit empty sets, and revalidates restrictions before startup. Schema 36 preserves the audit decision without exporting local receipts or reusing imported authorization. Real CLI verification and action activation remain pending; current runs stay on the legacy path.
+
 - **Identity recorded before AI startup.** The launcher waits for durable identity recording before receiving the command. Recovery distinguishes a crash before release, a live orphaned run, and a process group with confirmed termination. Tests with real processes cover these boundaries; ambiguous identities and Windows process trees remain unconfirmed.
 
 - **Project MCP configuration borrowed during a run.** Cursor and Kimi transport coordinates the file by its real path, journals before writing, and restores the previous configuration when termination is confirmed. Format attempts share the lease. Invalid JSON blocks AI startup; conflicting edits are preserved. Unknown process termination retains the lease for reconciliation.

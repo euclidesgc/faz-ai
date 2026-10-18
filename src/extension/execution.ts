@@ -52,6 +52,9 @@ export interface ExecInput {
   /** Claude Code: arquivo de configuração só com o servidor do board e os liberados */
   mcpConfig: string | null;
   tools: string[];
+  /** No contrato v1, [] é nenhuma ferramenta. Ausente preserva a semântica legada. */
+  toolSet?: 'explicit';
+  mcpTools?: string[];
   deniedTools: string[];
   model: { name: string; effort: string | null } | null;
 }

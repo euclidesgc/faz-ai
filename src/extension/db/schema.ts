@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 35;
+export const SCHEMA_VERSION = 36;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -473,6 +473,10 @@ const MIGRATIONS: Record<number, string> = {
     -- A fase removida permanece identificável para revisão; seu nome nunca é a identidade.
     CREATE UNIQUE INDEX activity_context_target ON activity_context_selections
       (board_id, COALESCE(card_id, ''), COALESCE(workflow_id, ''), phase_id, action);
+  `,
+  36: `
+    -- Decisão auditável separada dos recibos locais; nunca é uma autorização reutilizável.
+    ALTER TABLE ai_runs ADD COLUMN admission_json TEXT;
   `,
 };
 

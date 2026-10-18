@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import type { Database, SqlValue } from 'sql.js';
 import { LARGE_EXPORT_BYTES, type ImportSummary } from '../../shared/backup';
 import { isSafeRelPath } from '../../shared/artifacts';
+import { validateAdmissionDecision } from '../../shared/executionAdmission';
 import { isSafeSegment, safeName, type AttachmentStore } from '../attachments';
 import { newDatabase } from './database';
 import { all, num, one, run, str, transaction, type Row } from './query';
@@ -106,6 +107,7 @@ export function exportBoard(
   const boardRow = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
   if (!boardRow) throw new Error('Board não encontrado');
   new ContextPlanningRepo(db).validateBoard(boardId);
+  validateAdmissionRows(all(db, 'SELECT * FROM ai_runs WHERE board_id = ?', [boardId]));
   const board: Row = {};
   for (const [k, v] of Object.entries(boardRow)) if (!OMIT_BOARD_KEYS.includes(k)) board[k] = omitSecrets(k, v);
 
@@ -247,6 +249,7 @@ export function parseExportFile(text: string): BoardExportFile {
       if (t.hasId && (typeof row.id !== 'string' || !row.id)) throw invalid(`linha sem id em "${t.name}".`);
     }
   }
+  validateAdmissionRows(tables.ai_runs as Row[]);
   // id de card e nome gravado de anexo viram caminho em disco (<anexos>/<card>/<nome>): nada que saia da pasta
   for (const c of tables.cards as Row[]) if (!isSafeSegment(str(c.id))) throw invalid('id de card inválido.');
   for (const a of tables.attachments as Row[]) {
@@ -374,6 +377,7 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
     }
     migrate(mem);
     new ContextPlanningRepo(mem).validateBoard(newBoardId);
+    validateAdmissionRows(all(mem, 'SELECT * FROM ai_runs WHERE board_id = ?', [newBoardId]));
 
     // 3. o outro board com o mesmo id (o mesmo arquivo importado em duas pastas do mesmo banco) não pode ser engolido
     const clash = one(db, 'SELECT id FROM boards WHERE id = ? AND id != ?', [newBoardId, target.boardId]);
@@ -476,4 +480,8 @@ function parentsFirst(rows: Row[]): Row[] {
     pending = next;
   }
   return out;
+}
+
+function validateAdmissionRows(rows: readonly Row[]): void {
+  for (const row of rows) if (row.admission_json != null) validateAdmissionDecision(JSON.parse(str(row.admission_json)));
 }

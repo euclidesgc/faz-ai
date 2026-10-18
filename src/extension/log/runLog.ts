@@ -3,7 +3,8 @@
 // (`finish`).
 // A regra de "o que gravar" é de `AiRunRepo`; aqui é só engolir falha.
 //
-// Falha no log não derruba a execução da pessoa: os cinco pontos escrevem no canal de log e seguem.
+// No legado, falha no log escreve no canal e não derruba a execução. No contrato v1,
+// describeRequired é bloqueante: não há inferência sem a decisão de admissão gravada.
 // `start` devolve `''` quando não conseguiu gravar, e os demais não fazem nada com um id vazio — quem
 // chama não precisa saber se o log está funcionando.
 import type { Database } from 'sql.js';
@@ -15,6 +16,8 @@ export interface RunLog {
   start(meta: AiRunStart): string;
   /** Completa modelo, esforço, perfil, subagente, permissão, skills e servidores MCP depois do plano. */
   describe(id: string, config: AiRunConfig): void;
+  /** Contrato v1: falha de auditoria é bloqueante, antes de iniciar inferência. */
+  describeRequired?(id: string, config: AiRunConfig): void;
   /** Fecha a linha com o desfecho e o código de saída, quando houver. */
   finish(id: string, outcome: AiRunOutcome, exitCode?: number | null): void;
   /** Grava o consumo e o inventário medidos, de uma vez, junto do desfecho. `measure: 'none'` grava só "não medido". */
@@ -52,6 +55,10 @@ export function createRunLog(db: Database, log?: (line: string) => void): RunLog
     describe(id, config) {
       if (!id) return;
       guard(() => runs.describe(id, config));
+    },
+    describeRequired(id, config) {
+      if (!id) throw new Error('A execução não pôde ser registrada para admissão.');
+      runs.describe(id, config);
     },
     finish(id, outcome, exitCode) {
       if (!id) return;

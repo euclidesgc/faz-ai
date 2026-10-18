@@ -18,6 +18,9 @@ import { createRunLog } from '../src/extension/log/runLog';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AiRunner } from '../src/extension/runner';
 import { providerFor } from '../src/extension/ai/providers';
+import { ExecutionAdmission, AdmissionBlockedError } from '../src/extension/ai/admission';
+import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
+import { CAPABILITY_CHECKS, EXECUTOR_CAPABILITIES, type StrictExecutionRequest } from '../src/shared/executionAdmission';
 import { ALL_AI_TOOLS, type AiTool } from '../src/shared/harness';
 import { monthOf, type AiRunOrigin } from '../src/shared/log';
 
@@ -294,5 +297,112 @@ describe('estrutura: só o gateway chama a IA e escreve o log de uso', () => {
 
   it('o log de uso não é opcional em nenhuma das dependências do executor', () => {
     expect(offenders(/\brunLog\?\s*:/, [])).toEqual([]);
+  });
+});
+
+describe('o contrato v1 não contorna a admissão no gateway', () => {
+  function fixture() {
+    const executable = path.join(dir, process.platform === 'win32' ? 'claude.exe' : 'claude');
+    fs.writeFileSync(executable, 'binário de teste; não executar', { mode: 0o755 });
+    const store = new CapabilityEvidenceStore(path.join(dir, 'evidence'));
+    const admission = new ExecutionAdmission({
+      pathEnv: () => dir,
+      homeDir: dir,
+      evidence: store,
+      environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
+    });
+    const request: StrictExecutionRequest = {
+      version: 1,
+      mcpLevel: { permission: 'board', tools: [] },
+      regime: 'exclusive',
+      boardTools: { mode: 'inherit' },
+      agentTools: { categories: ['read'], native: { tool: '', allow: [], deny: [] } },
+      activeMcpIds: [],
+      allowedMcpIds: [],
+      boardMcpIds: [],
+      mcpServers: [],
+      mcpTools: [],
+      boardMcpTools: [],
+    };
+    const base = call();
+    const strict: AiCall = { ...base, prepare: () => ({ ...base.prepare(), strict: { profileId: 'claude', request } }) };
+    function authorizeFixture() {
+      let binding = '';
+      try {
+        admission.prepare('claude', 'claude', base.prepare().input, dir, request);
+      } catch (e) {
+        if (!(e instanceof AdmissionBlockedError)) throw e;
+        binding = e.decision.binding;
+      }
+      const now = Date.now();
+      for (const capability of EXECUTOR_CAPABILITIES)
+        store.record({
+          version: 1,
+          capability,
+          binding,
+          source: 'host-probe',
+          checkedAt: now - 1,
+          expiresAt: now + 60000,
+          checks: CAPABILITY_CHECKS[capability].map((id) => ({ id, outcome: 'passed', receipt: 'a'.repeat(64) })),
+        });
+    }
+    const run = (customSpawn = spawn, runLog = createRunLog(db)) =>
+      new AiGateway({ boardId: router.boardId, runLog, spawn: customSpawn, admission });
+    return { executable, admission, strict, run, authorizeFixture };
+  }
+  it('sem serviço de admissão, bloqueia sem começar a inferência', () => {
+    const { strict } = fixture();
+    expect(() => gateway().run(strict)).toThrow('Admissão por capacidades indisponível');
+    expect(procs).toHaveLength(0);
+    expect(rows()[0]?.outcome).toBe('unsupported');
+  });
+  it('sem prova local, grava o motivo de bloqueio e não chama beforeSpawn nem spawn', () => {
+    const { strict, run } = fixture();
+    strict.beforeSpawn = vi.fn();
+    expect(() => run().run(strict)).toThrow(AdmissionBlockedError);
+    expect(strict.beforeSpawn).not.toHaveBeenCalled();
+    expect(procs).toHaveLength(0);
+    expect(rows()[0]).toMatchObject({ outcome: 'unsupported', admission: { state: 'blocked', regime: 'exclusive' } });
+  });
+  it('aplica o conjunto admitido e persiste a decisão antes de chamar o transporte', () => {
+    const { strict, run, authorizeFixture } = fixture();
+    authorizeFixture(); // Recibos sintéticos do verificador de teste, não validação de CLI real.
+    let args: string[] = [];
+    const execution = run((command, cwd, out) => {
+      expect(rows()[0]?.admission?.state).toBe('admitted');
+      args = command.args;
+      return spawn(command, cwd, out);
+    }).run(strict);
+    execution.onExit(() => {});
+    expect(args).toContain('dontAsk');
+    expect(args).not.toContain('bypassPermissions');
+    expect(args.join(' ')).not.toContain('mcp__faz-ai__*');
+    procs[0]!.exit(0);
+  });
+  it('alterar binário na fronteira do launcher bloqueia antes de liberar a ferramenta', () => {
+    const { strict, run, authorizeFixture, executable } = fixture();
+    authorizeFixture();
+    let released = false;
+    expect(() =>
+      run((_command, _cwd, _out, control) => {
+        control!.beforePreparation();
+        fs.writeFileSync(executable, 'alterado depois da admissão');
+        control!.beforeStart({ pid: process.pid, birth: null, platform: process.platform, groupId: null, generation: 'teste' });
+        released = true;
+        return { onExit: () => {}, kill: () => {} };
+      }).run(strict),
+    ).toThrow('mudou');
+    expect(released).toBe(false);
+    expect(procs).toHaveLength(0);
+  });
+  it('falha no registro obrigatório não inicia execução mesmo com recibos de teste válidos', () => {
+    const { strict, run, authorizeFixture } = fixture();
+    authorizeFixture();
+    const runLog = createRunLog(db);
+    runLog.describeRequired = () => {
+      throw new Error('disco cheio');
+    };
+    expect(() => run(spawn, runLog).run(strict)).toThrow('disco cheio');
+    expect(procs).toHaveLength(0);
   });
 });

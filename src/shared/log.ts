@@ -87,6 +87,8 @@ export interface AiRunStart {
  * execução; `''` (em `profile`/`agent`) = definido e vazio. Distinção que RF-15 pede.
  */
 export interface AiRunConfig {
+  /** Decisão sem corpos de artefatos, variáveis ou credenciais. */
+  admission?: import('./executionAdmission').ExecutionAdmissionDecision;
   model: string | null;
   effort: string | null;
   profile: string | null;

@@ -39,6 +39,8 @@ import type { WebviewToHost } from '../../shared/messages';
 import { resolveCommand } from '../cliResolve';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
 import { cleanStaleTemp } from '../aiOutput/measured';
+import { ExecutionAdmission } from '../ai/admission';
+import { CapabilityEvidenceStore } from '../ai/capabilityEvidence';
 import { recoverProjectServers } from '../mcp/projectServerLease';
 import { loginShellPath, spawnHeadless } from '../spawn';
 
@@ -184,6 +186,12 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const gateway = new AiGateway({
     boardId: router.boardId,
     runLog,
+    admission: new ExecutionAdmission({
+      pathEnv: () => pathEnv,
+      homeDir,
+      evidence: new CapabilityEvidenceStore(path.join(o.storageDir, 'capability-evidence')),
+      environmentEvidence: () => ({ state: 'unknown' }),
+    }),
     spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
   });
   const runner = new AiRunner(router, {

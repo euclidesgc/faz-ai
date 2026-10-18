@@ -24,10 +24,15 @@ export const claudeProvider: AiProvider = {
       full: ['--permission-mode', 'bypassPermissions'],
     };
     // `--verbose` é obrigatório junto do `stream-json`: sem ele a CLI recusa o argumento e nada roda
-    const args = ['-p', ...(structured ? ['--output-format', 'stream-json', '--verbose'] : []), ...modes[permission]];
+    // No contrato v1, até o nível full continua limitado pelo conjunto exato admitido.
+    const strict = exec?.toolSet === 'explicit';
+    const permissions = strict
+      ? ['--permission-mode', 'dontAsk', '--allowedTools', [...exec.tools, ...(exec.mcpTools ?? [])].join(',')]
+      : modes[permission];
+    const args = ['-p', ...(structured ? ['--output-format', 'stream-json', '--verbose'] : []), ...permissions];
     // os servidores liberados no agente também rodam sem pedir aprovação
     // o Claude Code troca por `_` o que não for letra, número, `_` ou `-` no nome do servidor
-    if (exec?.mcpAllowed.length && permission !== 'full')
+    if (!strict && exec?.mcpAllowed.length && permission !== 'full')
       args.push(...exec.mcpAllowed.map((n) => `mcp__${n.replace(/[^A-Za-z0-9_-]/g, '_')}__*`));
     args.push(...addDirs.flatMap((d) => ['--add-dir', d]));
     if (exec?.model) args.push('--model', exec.model.name, ...(exec.model.effort ? ['--effort', exec.model.effort] : []));
@@ -37,7 +42,7 @@ export const claudeProvider: AiProvider = {
       const agents = Object.fromEntries([exec.agentDefinition, ...exec.delegates].map(({ name, ...def }) => [name, def]));
       args.push('--agents', JSON.stringify(agents), '--agent', exec.agentDefinition.name);
     } else if (exec?.agent) args.push('--agent', exec.agent);
-    if (exec?.tools.length) args.push('--tools', exec.tools.join(','));
+    if (exec && (strict || exec.tools.length)) args.push('--tools', exec.tools.join(','));
     if (exec?.deniedTools.length) args.push('--disallowedTools', ...exec.deniedTools);
     // contexto vazio: só o servidor do board e os liberados pelo agente (`--strict-mcp-config` deixa de
     // fora os do usuário e do projeto; a execução não depende de "Conectar ao board" nem da aprovação do

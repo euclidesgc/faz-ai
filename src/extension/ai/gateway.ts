@@ -16,6 +16,8 @@ import { spawnMeasured, type SpawnFn } from '../aiOutput/measured';
 import type { OutputFormat } from '../aiOutput/reader';
 import { headlessUnsupported, type HeadlessCommand, type HeadlessInput } from '../headless';
 import type { RunLog } from '../log/runLog';
+import type { StrictExecutionRequest } from '../../shared/executionAdmission';
+import { AdmissionBlockedError, type ExecutionAdmission, type AdmittedExecution } from './admission';
 
 /** O contexto da execução que o log congela na hora da chamada: a IA move o card durante o trabalho. */
 export type AiRunContext = Omit<AiRunStart, 'boardId' | 'startedAt' | 'origin' | 'tool'>;
@@ -33,6 +35,8 @@ export const NO_CARD: AiRunContext = {
 
 /** O que a execução precisa depois que a linha do log já abriu. */
 export interface AiPrepared {
+  /** Contrato v1 preparado pelo host; não aceita evidência ou selo de verificação do cliente. */
+  strict?: { profileId: string; request: StrictExecutionRequest };
   input: HeadlessInput;
   /** a configuração que o log guarda; a permissão sai de `input.permission` */
   config: Omit<AiRunConfig, 'permission'>;
@@ -93,6 +97,7 @@ export interface AiExecution {
 }
 
 export interface AiGatewayDeps {
+  admission?: ExecutionAdmission;
   leaseCoordinationDir?: string;
   boardId: string;
   /** obrigatório: sem ele a execução não teria onde ser registrada */
@@ -127,18 +132,52 @@ export class AiGateway {
     let attempts = 0;
     let format: OutputFormat = 'text';
     try {
-      const { input, config } = call.prepare();
+      const prepared = call.prepare();
+      const { config } = prepared;
+      let input = prepared.input;
+      let admitted: AdmittedExecution | undefined;
+      if (prepared.strict) {
+        if (!this.deps.admission) throw new Error('Admissão por capacidades indisponível; execução v1 bloqueada.');
+        try {
+          admitted = this.deps.admission.prepare(call.tool, prepared.strict.profileId, input, call.cwd, prepared.strict.request);
+        } catch (e) {
+          if (e instanceof AdmissionBlockedError)
+            runLog.describe(runId, { ...config, permission: input.permission, admission: e.decision });
+          throw e;
+        }
+        input = admitted.input;
+      }
       // a ferramenta sem suporte para esta permissão nem começa: confere antes de gravar a configuração
-      const unsupported = headlessUnsupported(call.tool, input.permission);
+      const unsupported = admitted ? null : headlessUnsupported(call.tool, input.permission);
       if (unsupported) throw new Error(unsupported);
-      runLog.describe(runId, { ...config, permission: input.permission });
+      if (admitted) {
+        if (!runLog.describeRequired) throw new Error('Registro obrigatório da admissão indisponível.');
+        runLog.describeRequired(runId, { ...config, permission: input.permission, admission: admitted.decision });
+      } else runLog.describe(runId, { ...config, permission: input.permission });
       call.beforeSpawn?.();
       measured = spawnMeasured(call.tool, input, call.cwd, {
         spawn: (command, cwd, out, control) => {
           attempts++;
           format = command.format;
           call.onAttempt?.(command);
-          return this.deps.spawn(command, cwd, out, control);
+          const checked = admitted?.command(command) ?? command;
+          return this.deps.spawn(
+            checked,
+            cwd,
+            out,
+            control && admitted
+              ? {
+                  beforePreparation: () => {
+                    admitted.command(checked);
+                    control.beforePreparation();
+                  },
+                  beforeStart: (identity) => {
+                    admitted.command(checked);
+                    control.beforeStart(identity);
+                  },
+                }
+              : control,
+          );
         },
         log: call.log,
         runId,

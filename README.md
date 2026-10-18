@@ -569,6 +569,8 @@ O protocolo host–webview e o MCP `preview_context_draft` oferecem a prévia do
 
 O transporte que precisa de MCP por arquivo (Cursor e Kimi) usa um empréstimo coordenado pelo caminho real. O diário protegido em `~/.faz-ai/mcp-leases` precede a alteração; tentativas de formato reutilizam a mesma posse. Ao terminar com confirmação, o arquivo volta ao estado anterior, preservando servidores acrescentados pela pessoa. Alterações conflitantes da entrada `faz-ai` ou JSON inválido não são sobrescritos. Sem confirmação do fim da árvore de processos, o empréstimo fica retido e uma nova execução no mesmo arquivo é recusada. O launcher recebe o comando da CLI somente depois de sua identidade ser gravada no diário. Na abertura, um dono comprovadamente morto permite recuperar preparações sem comando liberado e grupos registrados cujo término foi confirmado. Diários antigos ou ambíguos permanecem retidos. O Windows ainda não tem confirmação de árvore nesse transporte; esse caso exige reconciliação. Isso não comprova isolamento da CLI nem conclui #729.
 
+A base de admissão v1 no gateway distingue conversa, artefatos, permissões, MCP e delegação e exige recibos locais vinculados à configuração atual. A decisão fica no histórico (schema 36), sem virar autorização ao exportar/importar. Lista vazia significa nenhuma ferramenta; o mapeamento estrito do Claude usa ferramentas e operações MCP exatas, sem pular permissões. Essa base ainda aguarda o verificador das CLIs reais e a ativação nas ações da E5: a execução atual continua legada e nenhum executor recebe verificação automaticamente.
+
 ### Aba Consumo do card
 
 O card aberto tem a aba **Consumo**, que junta as duas contas:
