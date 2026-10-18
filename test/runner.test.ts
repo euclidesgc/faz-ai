@@ -1612,6 +1612,14 @@ describe('pausa por limite de uso (história #800)', () => {
     expect(log).toContain('Limite de uso do Claude Code: execuções suspensas até 13:53 (renovação 13:50 + 3 min).');
   });
 
+  it('a pausa é da ferramenta que rodou, mesmo que a pessoa troque a do board durante a execução', () => {
+    limited.start(storyId);
+    router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
+    procs[0]!.emit(limitResult());
+    procs[0]!.exit(1);
+    expect(router.snapshot().usageLimit).toMatchObject({ tool: 'claude', resumeAt: at(13, 53) });
+  });
+
   it('sem horário na saída, a pausa usa o backoff', () => {
     limited.start(storyId);
     procs[0]!.emit(limitResult('usage limit reached'));

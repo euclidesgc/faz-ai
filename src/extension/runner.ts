@@ -90,6 +90,8 @@ interface Run {
    * (uma tentativa só).
    */
   fallbackPending: ToolModel | null;
+  /** a ferramenta que rodou: a pausa por limite é dela, mesmo que a pessoa troque a ferramenta do board durante a execução */
+  tool: AiTool;
   /** a pausa que esta execução registrou ao esbarrar no limite de uso; undefined enquanto não registrou */
   limitPause?: UsageLimitPause;
 }
@@ -515,6 +517,7 @@ export class AiRunner {
       model: activityModel ? { model: activityModel, effort: activityEffort } : null,
       fallbackPending,
       origin,
+      tool: state.board.aiTool,
     };
     this.runs.set(cardId, run);
     // a pausa por limite já venceu e ninguém está testando: esta execução é o teste, e os despachantes esperam
@@ -558,7 +561,7 @@ export class AiRunner {
         // o limite esgotou sem reserva para repetir: a pausa vale mesmo quando a IA já tinha mudado o status
         // do card (settle não chega ao caminho do limite nesse caso)
         if (!retry && limitHit(end, replied)) this.recordLimit(run, end, tool.label);
-        else if (succeeded(end) && this.router.clearUsageLimit(state.board.aiTool))
+        else if (succeeded(end) && this.router.clearUsageLimit(run.tool))
           this.deps.log(`Limite de uso do ${tool.label} renovado: execuções retomadas.`);
       } finally {
         // a limpeza precisa acontecer antes da retentativa: start() recusa começar com o card ainda em `this.runs`
@@ -769,7 +772,7 @@ export class AiRunner {
     if (run.limitPause) return run.limitPause;
     const now = this.now();
     const resetAt = resetAtOf(end.report.usageLimitReset, now);
-    const pause = this.router.recordUsageLimit(this.router.snapshot().board.aiTool, resetAt, now);
+    const pause = this.router.recordUsageLimit(run.tool, resetAt, now);
     run.limitPause = pause;
     const until = limitClock(pause.resumeAt, now);
     this.deps.log(
