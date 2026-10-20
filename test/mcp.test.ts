@@ -1290,6 +1290,46 @@ describe('status do card e checkpoint de revisão', () => {
     await call('create_card', { title: 'H2' });
     expect((await call('create_card', { title: 'Tarefa', parent: 2 })).data.work).toMatchObject({ status: 'ready' });
   });
+
+  it('ask_questions registra, substitui e expõe apenas as perguntas pendentes; recusa conteúdo inválido', async () => {
+    await call('create_card', { title: 'Decisão', column: 'Implementação' });
+    const questions = [{ question: 'Qual rota?', options: ['Simples', 'Completa'], recommended: 'Simples' }];
+    const first = await call('ask_questions', { card: 1, questions });
+    expect(first.error).toBe(false);
+    expect(first.data.card.work).toMatchObject({ status: 'waiting_answer', with: 'human' });
+    expect(first.data.next).toContain('Pare aqui');
+    const initialId = card(1).questions[0]!.id;
+    expect((await call('get_card', { card: 1 })).data.pendingQuestions).toEqual(questions);
+    expect(await call('ask_questions', { card: 1, questions: [{ ...questions[0]!, recommended: 'Outra' }] })).toMatchObject({
+      error: true,
+      text: expect.stringContaining('não está entre as opções'),
+    });
+    expect(card(1).questions[0]!.id).toBe(initialId);
+    await call('ask_questions', { card: 1, questions });
+    expect(card(1).questions[0]!.id).not.toBe(initialId);
+    router.handle({ type: 'card.questions.answer', cardId: card(1).id, answers: [] });
+    expect((await call('get_card', { card: 1 })).data.pendingQuestions).toBeUndefined();
+    expect(card(1).status).toBe('ready');
+    expect((await call('ask_question', { card: 1, question: 'Pergunta aberta?' })).data.card.work.status).toBe('waiting_answer');
+    expect(card(1).questions).toEqual([]);
+  });
+
+  it('ask_questions no modo autônomo registra a indicada na descrição sem interromper o status', async () => {
+    await call('create_card', { title: 'Decisão', column: 'Implementação' });
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true });
+    const status = card(1).status;
+    const result = await call('ask_questions', {
+      card: 1,
+      questions: [{ question: 'Qual rota?', options: ['Simples', 'Completa'], recommended: 'Simples' }],
+    });
+    expect(result.error).toBe(false);
+    expect(result.data.next).toContain('Modo autônomo');
+    expect(card(1).description).toContain('## Perguntas e respostas');
+    expect(card(1).description).toContain('Simples (decidido pela IA no modo autônomo)');
+    expect(card(1).questions).toEqual([]);
+    expect(card(1).status).toBe(status);
+    expect((await call('get_card', { card: 1 })).data.pendingQuestions).toBeUndefined();
+  });
 });
 
 describe('ferramentas de IA', () => {
