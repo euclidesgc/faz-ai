@@ -1,4 +1,9 @@
 export const settings: Record<string, string> = {
+  Perfil: 'Profile',
+  'cadastrada à mão': 'entered manually',
+  'Modelos do perfil selecionado, com os níveis de esforço de cada um. Escolher um catálogo não muda o perfil executor do board.':
+    'Models for the selected profile, with their effort levels. Choosing a catalog does not change the board executor profile.',
+  'Nenhum modelo. Use "Novo modelo" para cadastrar à mão.': 'No models. Use "New model" to add one manually.',
   'Ferramentas de IA': 'AI tools',
   'Consulta instalação, versão e login de cada perfil.': 'Checks installation, version, and sign-in for each profile.',
   'Verificar situação': 'Check status',

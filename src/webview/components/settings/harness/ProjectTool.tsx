@@ -1,5 +1,6 @@
 import { RadioGroup } from '@radix-ui/themes';
-import { AI_BASES, type AiTool } from '../../../../shared/harness';
+import { toolInfo } from '../../../../shared/aiProfiles';
+import type { AiTool } from '../../../../shared/harness';
 import type { AiToolInfo } from '../../../../shared/harnessProject';
 import { settings } from '../../../commands';
 import { useAction } from '../../../useAction';
@@ -12,6 +13,8 @@ import { t } from '../../../i18n';
 export function ProjectTool({ tool }: { tool: AiToolInfo }) {
   // trocar a ferramenta relê o harness e confere a CLI nova: a tabela mostra a espera até o host confirmar
   const inventory = useBoardStore((s) => s.state!.harness.inventory.find((x) => x.tool === tool.id)?.items ?? []);
+  const profiles = useBoardStore((s) => s.state!.board.aiProfiles.filter((p) => p.enabled));
+  const selected = profiles.find((p) => p.id === tool.id);
   const change = useAction((id: AiTool) => settings.updateBoard({ aiTool: id }));
   const chooseTool = (id: AiTool) => id !== tool.id && void change.run(id);
   return (
@@ -37,21 +40,27 @@ export function ProjectTool({ tool }: { tool: AiToolInfo }) {
             <tr>
               <th></th>
               <th>{t('Ferramenta')}</th>
+              <th>{t('Regras')}</th>
+              <th>{t('Skills')}</th>
+              <th>{t('MCP')}</th>
             </tr>
           </thead>
           <tbody>
-            {AI_BASES.map((x) => (
-              <tr key={x.id} className={x.id === tool.id ? '' : 'off'}>
+            {profiles.map((profile) => (
+              <tr key={profile.id} className={profile.id === tool.id ? '' : 'off'}>
                 <td>
-                  <RadioGroup.Item value={x.id} aria-label={x.label} />
+                  <RadioGroup.Item value={profile.id} aria-label={profile.name} />
                 </td>
-                <td>{x.label}</td>
+                <td>{profile.name}</td>
+                <td>{toolInfo(profile).rules || '—'}</td>
+                <td>{toolInfo(profile).skills || '—'}</td>
+                <td>{toolInfo(profile).mcp || '—'}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </RadioGroup.Root>
-      <BoardInstall artifact="mcp" tool={tool.id} items={inventory} />
+      {selected?.kind === 'builtin' && <BoardInstall artifact="mcp" tool={tool.id} items={inventory} />}
     </>
   );
 }
