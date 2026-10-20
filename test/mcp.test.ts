@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -14,6 +14,7 @@ import { boardServerFootprint } from '../src/extension/mcp/footprint';
 import { toolDefinitions } from '../src/extension/mcp/tools';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { forgetModels, parseCursorModels, rememberModels } from '../src/extension/models';
+import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -27,6 +28,7 @@ let dir: string;
 let router: MessageRouter;
 let client: Client;
 let changes: number;
+let profileDb: Awaited<ReturnType<typeof openInMemory>>;
 
 const libraryPath = (kind: 'skill' | 'agent', name: string) => {
   const a = router.snapshot().harness.library!.artifacts.find((a) => a.kind === kind && a.name === name)!;
@@ -49,8 +51,8 @@ const call = async (name: string, args: Record<string, unknown> = {}) => {
 
 beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-mcp-'));
-  const db = await openInMemory(WASM_DIR);
-  router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
+  profileDb = await openInMemory(WASM_DIR);
+  router = new MessageRouter({ db: profileDb, scheduleSave: () => {}, close: async () => {} } as never, {
     workspaceKey: 'ws',
     folderName: 'Projeto',
     author: 'Pessoa',
@@ -67,7 +69,10 @@ beforeEach(async () => {
   await client.connect(b);
 });
 
-afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+afterEach(() => {
+  profileDb.close();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
 
 describe('servidor MCP', () => {
   it('as definições medidas sem servidor são as que o tools/list entrega, na mesma ordem', async () => {
@@ -573,6 +578,79 @@ describe('harness e padrões pelo MCP', () => {
 });
 
 describe('modelos de IA', () => {
+  it('lista perfis sem configuração, comando ou ambiente privado', async () => {
+    const profile = new AiProfileRepo(profileDb).save(
+      router.snapshot().board.id,
+      {
+        name: 'Minha CLI',
+        kind: 'custom',
+        base: 'generic',
+        enabled: true,
+        position: 3,
+        config: { command: 'private-command', env: { TOKEN: 'private-env' } },
+      },
+      'person',
+    );
+    const result = (await call('get_models')).data;
+    expect(result.profiles.find((p: any) => p.id === profile.id)).toEqual({
+      id: profile.id,
+      name: 'Minha CLI',
+      kind: 'custom',
+      base: 'generic',
+      enabled: true,
+      default: false,
+      measures: 'none',
+    });
+    expect(JSON.stringify(result)).not.toMatch(/private-command|private-env|"config"|"env"/);
+  });
+
+  it('set_ai_tool aceita apenas perfil ligado e informa os ligados no erro', async () => {
+    const repo = new AiProfileRepo(profileDb),
+      boardId = router.snapshot().board.id;
+    const enabled = repo.save(
+      boardId,
+      { name: 'Minha CLI', kind: 'custom', base: 'generic', enabled: true, position: 3, config: { command: 'private-command' } },
+      'person',
+    );
+    const disabled = repo.save(
+      boardId,
+      { name: 'Desligada', kind: 'custom', base: 'generic', enabled: false, position: 4, config: { command: 'private-command' } },
+      'person',
+    );
+    const handle = vi.spyOn(router, 'handle');
+    expect((await call('set_ai_tool', { tool: enabled.id })).error).toBe(false);
+    expect(router.snapshot().board.aiTool).toBe(enabled.id);
+    expect(handle.mock.calls.some(([message]) => message.type.startsWith('settings.aiProfiles.'))).toBe(false);
+    for (const id of [disabled.id, 'inexistente']) {
+      const response = await call('set_ai_tool', { tool: id });
+      expect(response.error).toBe(true);
+      expect(response.text).toContain(`Perfil "${id}" não está ligado.`);
+      expect(response.text).toContain(enabled.id);
+    }
+    expect((await call('detect_models', { tool: enabled.id })).text).toContain('Perfil personalizado: catálogo cadastrado à mão.');
+  });
+
+  it('cópia usa o catálogo da origem e descrições de perfil não citam pastas de ferramenta', async () => {
+    const copy = new AiProfileRepo(profileDb).save(
+      router.snapshot().board.id,
+      { name: 'Claude copiado', kind: 'copy', base: 'claude', enabled: true, position: 3, config: {} },
+      'person',
+    );
+    const listed = (await client.listTools()).tools;
+    for (const name of ['set_ai_tool', 'get_models', 'detect_models', 'upsert_model', 'suggest_model_rules']) {
+      const description = listed.find((tool) => tool.name === name)!.description!;
+      expect(description).not.toMatch(/\.claude\/|\.cursor\/|\.kimi-code\//);
+    }
+    const result = await call('detect_models', { tool: copy.id });
+    expect(result.error).toBe(false);
+    expect(result.data.catalog.some((option: any) => option.value === 'claude:opus')).toBe(true);
+    expect(result.data.profiles.find((profile: any) => profile.id === copy.id)).toMatchObject({
+      base: 'claude',
+      kind: 'copy',
+      measures: 'cost',
+    });
+  });
+
   it('monta o catálogo por ferramenta e interpreta modelo + esforço', async () => {
     const m = (await call('get_models')).data;
     expect(m.catalog.find((o: any) => o.value === 'claude:opus')).toMatchObject({

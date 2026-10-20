@@ -104,6 +104,11 @@ Bash, sem argumentos, só do Claude Code), catálogo e regras de modelos (`get_m
 harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,
 `set_skill_enabled`, `delete_skill`…).
 
+`get_models` também lista os perfis de CLI (`profiles`) sem comando, configuração ou ambiente privado.
+`set_ai_tool` escolhe apenas um perfil ligado; uma cópia usa o catálogo da origem e um perfil
+personalizado tem modelos cadastrados à mão. Os valores de modelo usam
+`<perfil>:<modelo>@<esforço>`.
+
 Toda sessão recebe as instruções do servidor: o ciclo do card (por onde começar, status, revisão,
 modelo do card, rules e skills obrigatórias e pendências com a pessoa) em menos de 2.048 caracteres,
 o tamanho em que o Claude Code corta as instruções de cada servidor e a descrição de cada ferramenta

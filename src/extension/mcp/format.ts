@@ -217,6 +217,15 @@ export function describeModel(s: BoardState, value: FieldValue) {
 /** Catálogo de modelos e regras de sugestão do board. */
 export function modelsOverview(s: BoardState) {
   return {
+    profiles: s.board.aiProfiles.map((p) => ({
+      id: p.id,
+      name: p.name,
+      kind: p.kind,
+      base: p.base,
+      enabled: p.enabled,
+      default: s.board.aiTool === p.id,
+      measures: p.base === 'claude' ? 'cost' : p.base === 'generic' ? 'none' : 'tokens',
+    })),
     catalog: s.board.modelCatalog.map((o) => ({
       value: o.id,
       tool: o.tool,
@@ -233,7 +242,7 @@ export function modelsOverview(s: BoardState) {
       ...(r.fallback ? { fallbackSuggest: modelLabel(s.board.modelCatalog, r.fallback, true), fallbackValue: r.fallback } : {}),
       enabled: r.enabled,
     })),
-    note: 'Num card, o campo de modelo aceita `<value>@<esforço>` (ex.: "claude:opus@high") ou o nome do modelo seguido do esforço.',
+    note: 'Num card, `value` usa `<perfil>:<modelo>@<esforço>` (ex.: "claude:opus@high"). A cópia usa o catálogo do perfil pronto de origem; o perfil personalizado aceita modelo livre.',
   };
 }
 
@@ -438,7 +447,7 @@ function workspaceOf(s: BoardState, c: Card) {
 
 /** O que fazer com o `model` do card; o "Esforço da atividade" tem o mesmo nome e outro sentido. */
 const MODEL_NOTE =
-  'Execute com este modelo e esforço; se forem outros, delegue o trabalho a um subagente ou avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
+  'O valor do modelo usa `<perfil>:<modelo>@<esforço>` do perfil de CLI do board. Execute com este modelo e esforço; se forem outros, delegue o trabalho a um subagente ou avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
 
 /**
  * Os blocos do `get_card` que a IA pode pedir em separado (`only`): o resto (título, descrição, campos,
