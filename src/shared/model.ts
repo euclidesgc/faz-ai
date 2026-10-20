@@ -110,6 +110,8 @@ export interface CardType {
 
 export interface Card {
   id: Id;
+  /** Perguntas pendentes da IA (o carrossel); vazio quando não há. */
+  questions: CardQuestion[];
   /** identificador visível (#12): sequencial por board, nunca reutilizado */
   number: number;
   boardId: Id;
