@@ -13,6 +13,7 @@ import type { HarnessUsage, SelectableKind } from './harnessSelection';
 import type { HookInput, McpServerInput } from './harnessCatalog';
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { CardUsage } from './cardUsage';
+import type { QuestionInput } from './questions';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { RenameKind } from './branchRename';
@@ -79,6 +80,8 @@ export type WebviewToHost =
   | { type: 'ai.heartbeat.run' }
   | { type: 'card.create'; typeId: Id; columnId: Id; parentId: Id | null; title: string }
   | { type: 'card.update'; cardId: Id; patch: { title?: string; description?: string; typeId?: Id } }
+  | { type: 'card.questions.set'; cardId: Id; questions: QuestionInput[] }
+  | { type: 'card.questions.answer'; cardId: Id; answers: { questionId: Id; text: string; custom: boolean }[] }
   | {
       type: 'card.move';
       cardId: Id;

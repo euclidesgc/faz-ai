@@ -257,6 +257,9 @@ export const host: Record<string, string> = {
   // cartões, colunas, workflows e boards (repositórios e telas)
   'Card não encontrado': 'Card not found',
   'Card não encontrado.': 'Card not found.',
+  'Este card não tem perguntas pendentes.': 'This card has no pending questions.',
+  'As perguntas deste card mudaram: confira as novas antes de enviar.':
+    'The questions on this card have changed: review the new ones before sending.',
   'Card pai não encontrado': 'Parent card not found',
   'Coluna não encontrada': 'Column not found',
   'Coluna de destino inválida': 'Invalid destination column',

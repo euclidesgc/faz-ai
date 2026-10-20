@@ -34,6 +34,7 @@ import { BoardContext, type Actor, type Handler, type HandlerMap, type MessageTy
 import { boardBackupHandlers } from './handlers/boardBackup';
 import { boardSettingsHandlers } from './handlers/boardSettings';
 import { addAttachment, cardContentHandlers } from './handlers/cardContent';
+import { questionHandlers } from './handlers/questions';
 import { cardHandlers, createCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
 import { initModels, modelHandlers } from './handlers/models';
@@ -173,6 +174,7 @@ const HANDLERS: HandlerMap = {
   ...bridgeOnly,
   ...cardHandlers,
   ...cardContentHandlers,
+  ...questionHandlers,
   ...workspaceHandlers,
   ...branchRenameHandlers,
   ...boardSettingsHandlers,
