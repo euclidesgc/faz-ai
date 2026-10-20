@@ -144,6 +144,12 @@ export class HostBridge {
         this.postBoard();
         this.onReady?.();
         return;
+      case 'settings.aiProfiles.probe':
+        this.post(await this.router.probeAiProfiles());
+        return;
+      case 'settings.aiProfiles.test':
+        this.post(await this.router.testAiProfile(msg.id));
+        return;
       case 'view.set':
         this.viewState.update(msg.patch, this);
         return;

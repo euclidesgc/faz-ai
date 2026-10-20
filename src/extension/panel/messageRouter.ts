@@ -39,6 +39,7 @@ import { harnessHandlers } from './handlers/harness';
 import { initModels, modelHandlers } from './handlers/models';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
 import { branchRenameHandlers } from './handlers/branchRename';
+import { aiProfileHandlers, type AiProfileRuntime } from './handlers/aiProfiles';
 import { settleDelivery } from '../delivery';
 import { WorkRepo } from '../repositories/workRepo';
 import { credentialsFor } from '../credentials';
@@ -163,6 +164,8 @@ const bridgeOnly = {
   'backup.export': viaBridge,
   'backup.import.pick': viaBridge,
   'backup.import.cancel': viaBridge,
+  'settings.aiProfiles.probe': viaBridge,
+  'settings.aiProfiles.test': viaBridge,
 } satisfies Partial<HandlerMap>;
 
 /** Um handler por tipo de mensagem, agrupados por domínio em ./handlers. */
@@ -175,6 +178,7 @@ const HANDLERS: HandlerMap = {
   ...boardSettingsHandlers,
   ...boardBackupHandlers,
   ...modelHandlers,
+  ...aiProfileHandlers,
   ...harnessHandlers,
 };
 
@@ -202,6 +206,7 @@ export class MessageRouter {
   private environmentHooks: EnvironmentHooks | null = null;
   private orphans: OrphanReport = EMPTY_ORPHANS;
   private orphanHooks: OrphanHooks | null = null;
+  private aiProfileRuntime: AiProfileRuntime | null = null;
   readonly store: AttachmentStore;
   readonly harnessStore: HarnessStore | null;
 
@@ -224,6 +229,17 @@ export class MessageRouter {
 
   get boardId(): string {
     return this.ctx.boardId;
+  }
+  setAiProfileRuntime(runtime: AiProfileRuntime): void {
+    this.aiProfileRuntime = runtime;
+  }
+  probeAiProfiles() {
+    if (!this.aiProfileRuntime) throw new Error('Situação dos perfis indisponível neste host.');
+    return this.aiProfileRuntime.probe();
+  }
+  testAiProfile(id: string) {
+    if (!this.aiProfileRuntime) throw new Error('Teste de perfil indisponível neste host.');
+    return this.aiProfileRuntime.test(id);
   }
   executionPolicyLibrary(): PolicyLibrary {
     return { snapshot: this.ctx.executionPolicies.snapshot(this.boardId), ...builtinPolicyCatalog(this.snapshot()) };
@@ -335,6 +351,8 @@ export class MessageRouter {
       (ctx.source === 'ai' || ctx.externalMcp || ctx.runToken !== undefined)
     )
       throw new Error('Políticas executáveis exigem revisão humana.');
+    if (msg.type.startsWith('settings.aiProfiles.') && (ctx.source === 'ai' || ctx.externalMcp || ctx.runToken !== undefined))
+      throw new Error('Perfis executáveis exigem revisão humana.');
     const handler = HANDLERS[msg.type] as Handler<MessageType>;
     const actor = this.actorOf(ctx);
     // o log: sonda antes, registro depois — só quando o handler diz que o board mudou (o que não aconteceu não entra)

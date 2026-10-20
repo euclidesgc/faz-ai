@@ -48,6 +48,23 @@ beforeEach(async () => {
 });
 
 describe('HostBridge: preferências da pessoa', () => {
+  it('publica status e resultado do teste de perfil sem configuração privada', async () => {
+    router.setAiProfileRuntime({
+      probe: async () => ({
+        type: 'aiProfiles.status',
+        profiles: { cli: { found: true, version: '1.0.0', signedIn: null, installUrl: null } },
+      }),
+      test: async (id) => ({ type: 'aiProfiles.testResult', id, ok: true, output: 'OK' }),
+    });
+    await bridge.handle({ type: 'settings.aiProfiles.probe', requestId: 'probe' });
+    await bridge.handle({ type: 'settings.aiProfiles.test', id: 'cli', requestId: 'test' });
+    expect(sent).toContainEqual({
+      type: 'aiProfiles.status',
+      profiles: { cli: { found: true, version: '1.0.0', signedIn: null, installUrl: null } },
+    });
+    expect(sent).toContainEqual({ type: 'aiProfiles.testResult', id: 'cli', ok: true, output: 'OK' });
+    expect(sent.filter((m) => m.type === 'done').map((m) => m.requestId)).toEqual(['probe', 'test']);
+  });
   it('o ready devolve as preferências guardadas e prefs.set grava no host, para o aviso dispensado não voltar', async () => {
     const data = new Map<string, unknown>();
     const prefs = new PrefsStore({ get: <T>(k: string) => data.get(k) as T | undefined, update: (k, v) => data.set(k, v) });
@@ -212,7 +229,7 @@ describe('HostBridge: harness.file.read / harness.file.write', () => {
     expect(result()).toMatchObject({ content: '# Guia', readonly: false });
   });
 
-  it('recusa arquivo fora da varredura, JSON inválido e o ~/.claude.json', async () => {
+  it('recusa arquivo fora da varredura e configuração MCP nativa do projeto ou global', async () => {
     const outside = path.join(dir, 'segredo.txt');
     fs.writeFileSync(outside, 'x');
     await bridge.handle({ type: 'harness.file.read', requestId: 'r2', path: outside });
@@ -224,13 +241,13 @@ describe('HostBridge: harness.file.read / harness.file.write', () => {
     router.refreshHarness();
     await bridge.handle({ type: 'harness.file.write', requestId: 'w2', path: path.join(dir, '.mcp.json'), content: '{ quebrado' });
     expect(result()).toMatchObject({ ok: false });
-    expect(result().error).toMatch(/^JSON inválido, nada foi gravado/);
+    expect(result().error).toBe('Configurações MCP não são editadas pelo editor de arquivos. Use a biblioteca do board.');
     expect(fs.readFileSync(path.join(dir, '.mcp.json'), 'utf8')).toContain('"a"');
 
     const claudeJson = path.join(dir, 'h', '.claude.json');
     await bridge.handle({ type: 'harness.file.read', requestId: 'r3', path: claudeJson });
     expect(result()).toMatchObject({
-      error: 'Configurações MCP não são devolvidas ao editor. Use a biblioteca para salvar uma nova definição.',
+      error: 'Configurações MCP não são editadas pelo editor de arquivos. Use a biblioteca do board.',
     });
     await bridge.handle({ type: 'harness.file.write', requestId: 'w3', path: claudeJson, content: '{}' });
     expect(result()).toMatchObject({ ok: false, error: 'Este arquivo não pode ser alterado pelo board.' });

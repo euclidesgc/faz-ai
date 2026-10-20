@@ -1,5 +1,6 @@
 import type { AiProfile } from '../../shared/aiProfiles';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
+import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
 import { profileCanProbe, profileSignedIn } from '../cliProbe';
 import { baseValue } from '../../shared/harness';
 import { execFile } from 'node:child_process';
@@ -205,6 +206,16 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     }),
     spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
   });
+  router.setAiProfileRuntime(
+    createAiProfileRuntime({
+      repo: new AiProfileRepo(handle.db),
+      gateway,
+      boardId: () => router.boardId,
+      cwd: o.folderPath,
+      homeDir,
+      pathEnv: () => pathEnv,
+    }),
+  );
   const runner = new AiRunner(router, {
     gateway,
     cwd: o.folderPath,
