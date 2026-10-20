@@ -1,6 +1,6 @@
 # Revisão do Harness: organização por ferramenta e banco de artefatos do board
 
-> **Decisão histórica, substituída pela [#615](0615-banco-de-artefatos-proprio-do-board.md).**
+> **Decisão histórica, substituída pela [#615](0615-board-independente-de-ferramenta-1-9-ban.md).**
 > As seções abaixo descrevem o desenho anterior. Hoje o board guarda a própria cópia dos artefatos;
 > alterações na origem só entram por importação explícita, e cada execução recebe um snapshot.
 

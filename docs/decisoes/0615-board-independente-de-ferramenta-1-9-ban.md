@@ -1,4 +1,4 @@
-# 0615 — Banco de artefatos próprio do board
+# 0615 — Board independente de ferramenta (1/9): banco de artefatos próprio do board
 
 ## Contexto
 
