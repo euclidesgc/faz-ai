@@ -3,6 +3,12 @@ import { FLOW_SKILL, FLOW_SKILLS } from '../src/extension/flowSkill';
 import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 
 describe('conjunto de skills do fluxo (#588)', () => {
+  it('explica o valor por perfil, sem lista fixa de CLIs', () => {
+    const harness = FLOW_SKILLS.find((k) => k.name === 'faz-ai-harness-do-card')!;
+    expect(harness.body).toContain('<perfil>:<modelo>@<esforço>');
+    expect(harness.body).toContain('perfil de CLI do board');
+    expect(harness.body).not.toMatch(/claude, cursor (ou|e) kimi/i);
+  });
   it('a principal vem primeiro, os nomes não se repetem e cada skill tem descrição e corpo', () => {
     expect(FLOW_SKILLS[0]).toBe(FLOW_SKILL);
     const names = FLOW_SKILLS.map((k) => k.name);

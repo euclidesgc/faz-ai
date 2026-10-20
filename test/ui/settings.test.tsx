@@ -258,7 +258,7 @@ describe('TypesSettings: skills por tipo', () => {
 });
 
 describe('Settings: menu lateral', () => {
-  it('Modelos de IA vem logo depois do Harness', () => {
+  it('Ferramentas de IA vem logo depois do Harness, antes dos modelos', () => {
     useBoardStore.setState({ settingsNavCollapsed: false, settingsTab: 'columns' });
     render(
       <Theme>
@@ -270,7 +270,8 @@ describe('Settings: menu lateral', () => {
       .getAllByRole('button')
       .map((x) => x.textContent);
     const at = (label: string) => labels.indexOf(label);
-    expect(at('Modelos de IA')).toBe(at('Harness') + 1);
+    expect(at('Ferramentas de IA')).toBe(at('Harness') + 1);
+    expect(at('Modelos de IA')).toBe(at('Ferramentas de IA') + 1);
   });
 
   it('recolhe numa faixa de ícones: rótulos somem, as seções seguem acessíveis pelo nome e o estado fica lembrado', async () => {

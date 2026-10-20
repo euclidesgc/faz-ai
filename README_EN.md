@@ -269,8 +269,9 @@ navegador**; the terminal `faz-ai` warns and does not start.
 
 ## Using it with AI
 
-1. In Configurações (settings) → **Harness**, choose the project's tool (Claude Code,
-   Cursor or Kimi Code).
+1. In Settings → **AI tools**, choose the project's default CLI profile. Claude Code, Cursor and
+   Kimi Code are built in; you can also create copies and custom profiles. You can switch the active
+   profile in **Harness → Tool and execution**.
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
    **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads. This also happens on its own, silently, when the folder opens (and on every new extension version), always in the user scope; only a failure raises a notice.
 3. In the **Skills** group of the same tab, click **Instalar (padrão da ferramenta)** for the
@@ -1301,10 +1302,15 @@ commands and settings are still managed by their respective tool.
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section |
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
 | Harness | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, default agent and heartbeat (see [Harness](#harness) and [Agents](#agents)) |
-| Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
+| Ferramentas de IA | CLI profiles: enable, set a default, duplicate, create and test |
+| Modelos de IA | Models and effort levels by profile; rules that suggest each card's model |
 | Git | Only the Git tab in browser mode; in the editor, points to the Settings (Faz AI › Git) |
 | Aparência | **Language** (automatic, Português (Brasil) or English; in the editor Settings along with theme, font and size); statuses (name and color, in the Workflows tab; here only in browser mode) |
 | Backup | In the editor, export and import through the command palette (`fazai.exportBoard`, `fazai.importBoard`); in browser mode, through the Settings tab (see [Board backup](#board-backup)) |
+
+A **CLI profile** identifies a tool the board can select for a run. The builtin profiles are Claude Code, Cursor and Kimi Code. A **copy** uses its source tool's model catalog and usage measurement, but keeps its own command, credentials and verification. A **custom** profile accepts another text-output CLI; tokens and cost remain unknown. In **Settings → AI Tools**, enable a reviewed profile and choose the default. Only this screen creates, edits, duplicates and tests profiles. Imports stay disabled until local review. Saved configuration and credentials are not returned to the screen or included in a board export.
+
+To create a custom profile, enter the command and one argument per line. The markers `{prompt}`, `{model}`, `{effort}`, `{mcpConfig}` and `{addDir}` insert the request, model, effort, MCP file and an additional directory when available. Choose **Prompt input** (argument or stdin) and **Board server** (CLI, project file or none). In a card's **Model** field, **Other model…** accepts a free-form identifier for that profile without adding it to the catalog. **Test** runs a short request using your subscription; an OK response does not prove isolation, permissions or MCP restrictions. Capabilities without evidence remain unknown and may prevent a run.
 
 ### Settings in the editor Settings
 
@@ -1351,7 +1357,7 @@ at Auto. Suggestion rules combine
 conditions with AND and OR, for example `Esforço da atividade = Alto E Tags = backend`. The result
 is always a suggestion: on the card, the model and the effort can be changed at any time.
 
-The **CLI profile** foundation uses schema 42: three builtin profiles, copied and custom profiles with separate identities and initially unknown capabilities. Commands, arguments and environment variables stay in the local vault shared with MCPs; public state carries references and availability without saved values. Imports disable profiles and require review; reviewing builtins does not enable them automatically. Copies have their own reference, stay pending/disabled and inherit no isolation evidence. Domain, persistence and profile IDs are available: only enabled/reviewed profiles can become the default, and copies use the base catalog. Labels retain the profile name/identity; generic profiles receive no native directories. The host blocks imported/disabled profiles before preparing files. The three builtin providers retain their earlier behavior; copied/custom profile adapters already build commands through the shared transport, while activation requires a contract and capability admission for each action. Copies need their own evidence bound to the configuration; generic profiles without a verified mapping stay blocked. Management UI and execution preparation still await integration. Profile probes already use reviewed commands without a shell and do not run for pending imports or missing credentials. Custom profiles search only PATH/absolute paths and do not require native MCP registration; without `statusArgs`, login remains unknown without an authentication requirement. Version/login do not prove isolation or capabilities. Installation links are reviewed public metadata; URLs containing credentials, query parameters or fragments are not disclosed.
+Imported CLI profiles stay disabled until local review. Commands, arguments, environment and credentials remain in the local vault: exports, the screen and MCP expose only references and status. Copies do not inherit isolation evidence, and a custom profile without a verified mapping cannot run. Version/login probes and **Test** do not prove capabilities. See [Settings](#settings) to create and select profiles.
 
 The new **execution and fallback policy** foundation separates versioned definitions, local human review and history (schema 41). Target resolution does not replace an invalid explicit choice with a default or redirect a prefix to a default copied profile. Evaluation and simulation share one function with explained rejections, ordered targets, accumulated limits and reconciliation for partial or unknown work. Imported policies remain pending review; edits do not change earlier snapshots. Under **Settings → Harness → Tool and execution → Manage policies**, the manual editor supports conditions, ordered targets, limits, duplication, removal and paginated history. A complete comparison precedes explicit human review; saving as pending grants no execution authority. Revision conflicts preserve the draft and let the user reload the base before reviewing again. The host simulator uses the same evaluator without AI, identifying credential/admission settings as scenario assumptions. Changes to saved policies or context invalidate the displayed result. This foundation is not yet connected to the runner, chat or assistants; the description below covers the legacy fallback model, which will migrate to a disabled proposal during integration.
 

@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { spawnMeasured, cleanStaleTemp, formatArgs, refusesFormat, type SpawnFn } from '../src/extension/aiOutput/measured';
+import { spawnMeasured, cleanStaleTemp, formatArgs, refusesFormat, materialize, type SpawnFn } from '../src/extension/aiOutput/measured';
 import { MeasureEndedError, MeasureRefusedError } from '../src/extension/aiOutput/errors';
 import type { OutputStream } from '../src/extension/aiOutput/reader';
 import { headlessCommand, type HeadlessCommand, type HeadlessInput } from '../src/extension/headless';
@@ -62,6 +62,24 @@ const REFUSE_FORMAT = "error: unknown option '--output-format'\n";
 beforeEach(() => {
   started = [];
   lines = [];
+});
+
+it('não deixa arquivos temporários se a materialização falha depois de gravar um segredo', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-materialize-test-'));
+  try {
+    const command: HeadlessCommand = {
+      command: 'node',
+      args: [],
+      format: 'text',
+      tempFiles: { 'mcp.json': 'segredo', 'broken.json': null as unknown as string },
+    };
+    expect(() => materialize(command, root)).toThrow();
+    expect(fs.readdirSync(root)).toEqual([]);
+    expect(() => materialize({ ...command, tempFiles: { '../escape': 'segredo' } }, root)).toThrow('Nome de arquivo temporário inválido');
+    expect(fs.readdirSync(root)).toEqual([]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 describe('o comando do modo estruturado, por ferramenta', () => {

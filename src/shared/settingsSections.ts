@@ -23,6 +23,7 @@ export interface SettingsSectionInfo {
 export const SETTINGS_SECTIONS: Record<string, SettingsSectionInfo> = {
   'model-rules': { tab: 'models' },
   'harness-tool': { tab: 'harness', harnessTab: 'tool' },
+  'execution-policies': { tab: 'harness', harnessTab: 'tool' },
   heartbeat: { tab: 'harness', harnessTab: 'tool' },
   'harness-project': { tab: 'harness', harnessTab: 'project', harnessOrigin: 'project' },
   'harness-user': { tab: 'harness', harnessTab: 'user', harnessOrigin: 'user' },

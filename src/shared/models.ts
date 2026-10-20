@@ -1,5 +1,5 @@
 import { baseValue } from './harness';
-import type { AiBase } from './aiProfiles';
+import type { AiBase, AiProfile } from './aiProfiles';
 import { norm } from './filters';
 import { AI_BASES, type AiTool } from './harness';
 import type { BoardState, Card, FieldDef, FieldValue, Id } from './model';
@@ -158,7 +158,7 @@ export const modelDisplay = (
  * Interpreta um modelo escrito por uma pessoa ou IA: o valor exato (`claude:opus@high`), ou o
  * nome/identificador do modelo seguido opcionalmente do esforço ("Opus 5.5 high", "k3 @ max").
  */
-export function resolveModelInput(catalog: ModelOption[], text: string): string {
+export function resolveModelInput(catalog: ModelOption[], text: string, profile?: AiProfile): string {
   const raw = text.trim();
   const exact = parseModelValue(raw);
   const byId = exact && catalog.find((o) => o.id === exact.id);
@@ -169,6 +169,10 @@ export function resolveModelInput(catalog: ModelOption[], text: string): string 
     return modelValue(o.id, e);
   };
   if (byId) return pick(byId, exact.effort);
+  if (profile?.kind === 'custom' && exact?.id.startsWith(`${profile.id}:`)) {
+    const name = exact.id.slice(profile.id.length + 1);
+    if (name && !/[\s\0:@]/.test(name) && (!exact.effort || !/[\s\0:@]/.test(exact.effort))) return raw;
+  }
   const clean = norm(raw.replace(/[·@]/g, ' ')).split(/\s+/).filter(Boolean);
   for (const o of catalog) {
     for (const name of [o.label, o.model, o.id, `${toolLabel(o.tool)} ${o.label}`, `${o.tool} ${o.label}`, `${o.tool} ${o.model}`]) {

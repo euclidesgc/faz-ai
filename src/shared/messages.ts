@@ -20,6 +20,7 @@ import type { BulkCardStatus, CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { BranchKind, GitConfig } from './git';
 import type { ProjectProfile } from './projectProfile';
+import type { AiProfileDraft } from './aiProfiles';
 
 /** O que o board grava num arquivo de agente: o frontmatter (menos o nome) e o corpo. */
 export interface AgentInput {
@@ -225,6 +226,18 @@ export type WebviewToHost =
   | { type: 'settings.board.reset' }
   /** leva o board ao padrão atual sem recriá-lo: só acrescenta e completa, os cards não saem do lugar */
   | { type: 'settings.board.upgrade' }
+  /** Cria ou atualiza um perfil de CLI; os valores privados ficam somente no host. */
+  | { type: 'settings.aiProfiles.save'; profile: AiProfileDraft }
+  /** Liga ou desliga um perfil revisado. */
+  | { type: 'settings.aiProfiles.setEnabled'; id: string; enabled: boolean }
+  /** Cria uma cópia desligada e pendente de revisão. */
+  | { type: 'settings.aiProfiles.duplicate'; id: string }
+  /** Apaga um perfil que não é pronto nem padrão. */
+  | { type: 'settings.aiProfiles.remove'; id: string }
+  /** Consulta a instalação e o login dos perfis sem devolver a configuração. */
+  | { type: 'settings.aiProfiles.probe' }
+  /** Faz um teste explícito, limitado a dois minutos, sem MCP nem ferramentas de alteração. */
+  | { type: 'settings.aiProfiles.test'; id: string }
   | { type: 'settings.models.set'; catalog: ModelOption[] }
   /**
    * relê os modelos da ferramenta (configuração local ou lista embutida) e os junta ao catálogo;
@@ -377,6 +390,11 @@ export type WebviewToHost =
 
 export type HostToWebview =
   | { type: 'boardState'; state: BoardState; attachmentsBaseUri: string }
+  | {
+      type: 'aiProfiles.status';
+      profiles: Record<string, { found: boolean; version: string | null; signedIn: boolean | null; installUrl: string | null }>;
+    }
+  | { type: 'aiProfiles.testResult'; id: string; ok: boolean; output: string; error?: string }
   | { type: 'ui.openCard'; cardId: Id }
   | { type: 'viewState'; view: ViewState }
   | { type: 'prefs'; prefs: UiPrefs }

@@ -1,4 +1,5 @@
 import { baseValue } from '../../shared/harness';
+import type { AiProfile } from '../../shared/aiProfiles';
 import { agentOfArtifact, itemOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
@@ -88,7 +89,7 @@ export function needsTriage(s: BoardState, c: Card): boolean {
 }
 
 /** Valida e normaliza o valor de um campo conforme o seu tipo. */
-export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOption[]): FieldValue {
+export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOption[], profile?: AiProfile): FieldValue {
   if (value === null || value === undefined || value === '') return null;
   const option = (v: unknown): string => {
     const o = f.options.find((x) => same(x, String(v)));
@@ -108,7 +109,7 @@ export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOpti
     case 'multiselect':
       return (Array.isArray(value) ? value : [value]).map(option);
     case 'model':
-      return resolveModelInput(catalog, String(value));
+      return resolveModelInput(catalog, String(value), profile);
     case 'date':
       if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) throw new Error(`O campo "${f.name}" espera uma data no formato AAAA-MM-DD.`);
       return String(value);
@@ -217,6 +218,15 @@ export function describeModel(s: BoardState, value: FieldValue) {
 /** Catálogo de modelos e regras de sugestão do board. */
 export function modelsOverview(s: BoardState) {
   return {
+    profiles: s.board.aiProfiles.map((p) => ({
+      id: p.id,
+      name: p.name,
+      kind: p.kind,
+      base: p.base,
+      enabled: p.enabled,
+      default: s.board.aiTool === p.id,
+      measures: p.base === 'claude' ? 'cost' : p.base === 'generic' ? 'none' : 'tokens',
+    })),
     catalog: s.board.modelCatalog.map((o) => ({
       value: o.id,
       tool: o.tool,
@@ -233,7 +243,7 @@ export function modelsOverview(s: BoardState) {
       ...(r.fallback ? { fallbackSuggest: modelLabel(s.board.modelCatalog, r.fallback, true), fallbackValue: r.fallback } : {}),
       enabled: r.enabled,
     })),
-    note: 'Num card, o campo de modelo aceita `<value>@<esforço>` (ex.: "claude:opus@high") ou o nome do modelo seguido do esforço.',
+    note: 'Num card, `value` usa `<perfil>:<modelo>@<esforço>` (ex.: "claude:opus@high"). A cópia usa o catálogo do perfil pronto de origem; o perfil personalizado aceita modelo livre.',
   };
 }
 
@@ -438,7 +448,7 @@ function workspaceOf(s: BoardState, c: Card) {
 
 /** O que fazer com o `model` do card; o "Esforço da atividade" tem o mesmo nome e outro sentido. */
 const MODEL_NOTE =
-  'Execute com este modelo e esforço; se forem outros, delegue o trabalho a um subagente ou avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
+  'O valor do modelo usa `<perfil>:<modelo>@<esforço>` do perfil de CLI do board. Execute com este modelo e esforço; se forem outros, delegue o trabalho a um subagente ou avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
 
 /**
  * Os blocos do `get_card` que a IA pode pedir em separado (`only`): o resto (título, descrição, campos,

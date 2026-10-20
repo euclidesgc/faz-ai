@@ -1,5 +1,5 @@
 import { ExecutionPoliciesSettings } from './policies/ExecutionPoliciesSettings';
-import { baseInfo } from '../../../shared/harness';
+import { activeProfile, toolInfo } from '../../../shared/aiProfiles';
 import { Button, Tabs } from '@radix-ui/themes';
 import { resolveHarnessTab } from '../../../shared/harnessTopics';
 import { useBoardStore, type HarnessTab } from '../../store/boardStore';
@@ -17,10 +17,11 @@ import { rich } from '../../i18n/rich';
  * A biblioteca organiza os artefatos por tipo; a escolha do executor fica em uma seção própria.
  */
 export function HarnessSettings() {
-  const projectTool = useBoardStore((s) => s.state!.board.aiTool);
+  const board = useBoardStore((s) => s.state!.board);
+  const projectTool = board.aiTool;
   const introSeen = useBoardStore((s) => s.harnessIntroSeen);
   const setIntroSeen = useBoardStore((s) => s.setHarnessIntroSeen);
-  const tool = baseInfo(projectTool);
+  const tool = toolInfo(activeProfile(board));
   // Links antigos de ferramenta ou origem passam a abrir a biblioteca.
   const resolved = resolveHarnessTab(
     useBoardStore((s) => s.harnessTab),

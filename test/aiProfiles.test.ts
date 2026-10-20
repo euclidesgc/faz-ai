@@ -70,6 +70,7 @@ it('resolve catálogo do base da cópia, modelo livre só no personalizado e fal
     name: 'novo-modelo',
     effort: null,
   });
+  expect(resolveModelOption({ ...board, aiTool: 'local' }, 'local:novo-modelo@esforço inválido')).toBeNull();
   expect(resolveModelOption(board, 'copy:novo-modelo')).toBeNull();
   expect(activeProfile({ ...board, aiTool: 'ausente' }).id).toBe('claude');
   expect(activeProfile({ ...board, aiProfiles: [...BUILTIN_PROFILES, { ...copy, enabled: false }] }).id).toBe('claude');

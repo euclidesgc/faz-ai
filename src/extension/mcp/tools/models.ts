@@ -1,19 +1,25 @@
 import { z } from 'zod';
-import { ALL_AI_BASES, type AiTool } from '../../../shared/harness';
+import { activeProfile, catalogTool, type AiProfile } from '../../../shared/aiProfiles';
 import { TYPE_CONDITION, modelId, resolveModelInput, type ModelRule } from '../../../shared/models';
 import { newId } from '../../db/ids';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { findField, modelsOverview } from '../format';
 import type { DefineTool } from './registry';
 
-const toolArg = z.enum(ALL_AI_BASES as [string, ...string[]]).describe('Ferramenta de IA: claude, cursor ou kimi');
+const toolArg = z.string().min(1).describe('Id de um perfil de CLI do board (veja profiles em get_models)');
 const models = (router: MessageRouter) => modelsOverview(router.snapshot());
+const profileOf = (router: MessageRouter, id?: string): AiProfile => {
+  const selected = id ?? router.snapshot().board.aiTool;
+  const profile = router.snapshot().board.aiProfiles.find((p) => p.id === selected);
+  if (!profile) throw new Error(`Perfil "${selected}" não encontrado.`);
+  return profile;
+};
 
 /** Modelos de LLM: catálogo e regras de sugestão de modelo. */
 export function registerModelTools(tool: DefineTool): void {
   tool(
     'get_models',
-    'Catálogo de modelos de LLM do board (por ferramenta, com os níveis de esforço que cada um aceita) e as regras que sugerem um modelo a partir dos campos do card. O `value` de cada modelo é `<ferramenta>:<model>`; no Cursor, `model` é o id de `cursor-agent models`. O board não guarda preço: o custo de uma execução é o que a própria ferramenta informa. ' +
+    'Catálogo de modelos de LLM e perfis de CLI do board, com os níveis de esforço e as regras de sugestão. `value` usa `<perfil>:<modelo>@<esforço>`; uma cópia usa o catálogo do perfil pronto de origem e um personalizado aceita modelo livre. O board não guarda preço: o custo de uma execução é o que o executor informa. ' +
       'O campo "Esforço da atividade" do card é o tamanho da tarefa, não o esforço do modelo: as regras sugerem o modelo a partir dele.',
     {},
     (_a, router) => models(router),
@@ -22,10 +28,12 @@ export function registerModelTools(tool: DefineTool): void {
 
   tool(
     'detect_models',
-    'Relê os modelos de uma ferramenta e os junta ao catálogo. Para o Cursor, a última lista de `cursor-agent models` lida pelo board (com a CLI autenticada); para o Claude Code, usa a lista embutida na extensão.',
+    'Relê os modelos do perfil de CLI e os junta ao catálogo. Uma cópia usa o catálogo do pronto de origem; um perfil personalizado tem catálogo cadastrado à mão.',
     { tool: toolArg.optional().describe('Por padrão, a ferramenta em uso no projeto') },
     (a, router) => {
-      router.handle({ type: 'settings.models.detect', tool: (a.tool as AiTool | undefined) ?? router.snapshot().board.aiTool });
+      const profile = profileOf(router, a.tool);
+      if (profile.kind === 'custom') throw new Error('Perfil personalizado: catálogo cadastrado à mão.');
+      router.handle({ type: 'settings.models.detect', tool: catalogTool(profile) });
       return models(router);
     },
   );
@@ -45,13 +53,15 @@ export function registerModelTools(tool: DefineTool): void {
     },
     (a, router) => {
       const catalog = [...router.snapshot().board.modelCatalog];
-      const id = modelId(a.tool as AiTool, a.model);
+      const profile = profileOf(router, a.tool);
+      const catalogId = catalogTool(profile);
+      const id = modelId(catalogId, a.model);
       const efforts = a.efforts ?? [];
       if (a.default_effort && !efforts.includes(a.default_effort)) throw new Error('default_effort precisa ser um dos efforts.');
       const at = catalog.findIndex((o) => o.id === id);
       const entry = {
         id,
-        tool: a.tool as AiTool,
+        tool: catalogId,
         model: a.model,
         label: a.label ?? a.model,
         efforts,
@@ -117,8 +127,8 @@ export function registerModelTools(tool: DefineTool): void {
         groups: r.when.map((g) =>
           g.map((c) => ({ fieldId: fieldId(c.field), op: c.not ? ('isNot' as const) : ('is' as const), value: c.value })),
         ),
-        model: resolveModelInput(s.board.modelCatalog, r.model),
-        fallback: r.fallback ? resolveModelInput(s.board.modelCatalog, r.fallback) : null,
+        model: resolveModelInput(s.board.modelCatalog, r.model, activeProfile(s.board)),
+        fallback: r.fallback ? resolveModelInput(s.board.modelCatalog, r.fallback, activeProfile(s.board)) : null,
       }));
       router.handle({ type: 'settings.modelRules.set', rules });
       return models(router);
@@ -127,10 +137,12 @@ export function registerModelTools(tool: DefineTool): void {
 
   tool(
     'suggest_model_rules',
-    'Recria as regras "Esforço da tarefa → modelo" (Baixo, Médio, Alto) com um modelo leve, um intermediário e um forte da ferramenta indicada.',
+    'Recria as regras "Esforço da tarefa → modelo" (Baixo, Médio, Alto) com um modelo leve, um intermediário e um forte do perfil indicado.',
     { tool: toolArg.optional().describe('Por padrão, a ferramenta em uso no projeto') },
     (a, router) => {
-      router.handle({ type: 'settings.modelRules.suggest', tool: (a.tool as AiTool | undefined) ?? router.snapshot().board.aiTool });
+      const profile = profileOf(router, a.tool);
+      if (profile.kind === 'custom') throw new Error('Perfil personalizado: cadastre os modelos e regras à mão.');
+      router.handle({ type: 'settings.modelRules.suggest', tool: catalogTool(profile) });
       return models(router);
     },
   );

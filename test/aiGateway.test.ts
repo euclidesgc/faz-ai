@@ -9,7 +9,9 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Database } from 'sql.js';
-import { AiGateway, NO_CARD, type AiCall, type AiRunEnd } from '../src/extension/ai/gateway';
+import { AiGateway, NO_CARD, missingProfileCommand, type AiCall, type AiRunEnd } from '../src/extension/ai/gateway';
+import { commandNotFound } from '../src/extension/cliResolve';
+import { SpawnNotStartedError } from '../src/extension/processIdentity';
 import { MeasureEndedError } from '../src/extension/aiOutput/errors';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import { ChatSession } from '../src/extension/chat';
@@ -27,6 +29,27 @@ import { monthOf, type AiRunOrigin } from '../src/shared/log';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 const CLAUDE_OUTPUT = fs.readFileSync(path.join(__dirname, 'fixtures', 'claude-stream-json.jsonl'), 'utf8');
+
+it('comando ausente de perfil personalizado mostra só o link público de instalação revisado', () => {
+  const profile: import('../src/shared/aiProfiles').AiProfile = {
+    id: 'personalizado',
+    name: 'Minha CLI',
+    kind: 'custom',
+    base: 'generic',
+    enabled: true,
+    position: 3,
+    config: { command: 'missing-custom', installUrl: 'https://example.com/install' },
+    credentials: { secretRef: 'b'.repeat(64), review: 'reviewed', available: true },
+  };
+  const missing = () => new SpawnNotStartedError(commandNotFound('missing-custom'));
+  expect(missingProfileCommand(missing(), profile).message).toContain('Instalação do perfil: https://example.com/install');
+  expect(
+    missingProfileCommand(missing(), { ...profile, config: { ...profile.config, installUrl: 'https://example.com/?token=private' } })
+      .message,
+  ).not.toContain('https://');
+  expect(missingProfileCommand(missing(), { ...profile, kind: 'builtin' }).message).not.toContain('https://example.com/install');
+  expect(missingProfileCommand(new SpawnNotStartedError('Outra falha'), profile).message).toBe('Outra falha');
+});
 
 let dir: string;
 let db: Database;

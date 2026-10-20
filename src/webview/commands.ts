@@ -156,6 +156,12 @@ export const gitRename = {
 };
 
 export const settings = {
+  saveAiProfile: (profile: import('../shared/aiProfiles').AiProfileDraft) => req({ type: 'settings.aiProfiles.save', profile }),
+  setAiProfileEnabled: (id: string, enabled: boolean) => req({ type: 'settings.aiProfiles.setEnabled', id, enabled }),
+  duplicateAiProfile: (id: string) => req({ type: 'settings.aiProfiles.duplicate', id }),
+  removeAiProfile: (id: string) => req({ type: 'settings.aiProfiles.remove', id }),
+  probeAiProfiles: () => request({ type: 'settings.aiProfiles.probe' }, { timeout: 70_000 }),
+  testAiProfile: (id: string) => request({ type: 'settings.aiProfiles.test', id }, { timeout: 130_000 }),
   updateBoard: (patch: BoardPatch) => req({ type: 'settings.board.update', patch }),
   resetBoard: () => req({ type: 'settings.board.reset' }),
   upgradeBoard: () => req({ type: 'settings.board.upgrade' }),

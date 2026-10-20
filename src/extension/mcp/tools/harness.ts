@@ -95,9 +95,14 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'set_ai_tool',
-    'Define a ferramenta de IA com que o projeto trabalha (uma por vez). Isso troca a pasta de skills (.claude/skills ou .cursor/skills), o arquivo de regras, os modelos e as regras de esforço.',
-    { tool: z.enum(ALL_AI_BASES as [string, ...string[]]) },
+    'Define o perfil de CLI padrão do board, que as execuções usam. `tool` é o id de um perfil ligado (veja `profiles` em get_models). Perfis são criados e editados só pela pessoa, em Configurações → Ferramentas de IA.',
+    { tool: z.string().min(1) },
     (a, router) => {
+      const enabled = router
+        .snapshot()
+        .board.aiProfiles.filter((p) => p.enabled)
+        .map((p) => p.id);
+      if (!enabled.includes(a.tool)) throw new Error(`Perfil "${a.tool}" não está ligado. Ligados: ${enabled.join(', ')}.`);
       router.handle({ type: 'settings.board.update', patch: { aiTool: a.tool as AiTool } });
       return harness(router);
     },

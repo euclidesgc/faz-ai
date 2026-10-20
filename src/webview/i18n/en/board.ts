@@ -1,4 +1,8 @@
 export const board: Record<string, string> = {
+  'Outro modelo…': 'Other model…',
+  'Outro modelo': 'Other model',
+  'Identificador do modelo': 'Model identifier',
+  'teste de ferramenta': 'tool test',
   'Atinge {m} de {n} selecionados.': 'Affects {m} of {n} selected cards.',
   'Aprovar {n} card(s)?': 'Approve {n} card(s)?',
   'Cada card aprovado segue para a próxima coluna.': 'Each approved card moves to the next column.',

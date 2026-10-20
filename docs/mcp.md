@@ -104,6 +104,14 @@ Bash, sem argumentos, só do Claude Code), catálogo e regras de modelos (`get_m
 harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,
 `set_skill_enabled`, `delete_skill`…).
 
+`get_models.profiles` lista os perfis de CLI e seus IDs, sem comando, configuração ou ambiente
+privado. `set_ai_tool` recebe o ID de um perfil ligado; não cria, edita, revisa nem ativa perfis.
+Uma cópia usa o catálogo da origem. Para um perfil personalizado, os modelos podem ser cadastrados
+à mão; o campo Modelo também aceita “Outro modelo…” sem cadastro. O valor é
+`<perfil>:<modelo>@<esforço>` (sem `@<esforço>` quando não houver esforço). O perfil personalizado
+retorna saída em texto e consumo/custo desconhecidos, nunca zero presumido. Testar o perfil na
+interface usa a assinatura e uma resposta OK não comprova isolamento, permissões ou MCP.
+
 Toda sessão recebe as instruções do servidor: o ciclo do card (por onde começar, status, revisão,
 modelo do card, rules e skills obrigatórias e pendências com a pessoa) em menos de 2.048 caracteres,
 o tamanho em que o Claude Code corta as instruções de cada servidor e a descrição de cada ferramenta
@@ -388,10 +396,10 @@ A webview e o navegador usam `executionPolicy.read` (biblioteca ou histórico pa
 
 ### Perfis de CLI persistidos
 
-Schema 42 acrescenta `ai_profiles` à exportação e ao estado público do board. `config` é vazio nessa leitura; comandos/args/env e campos privados futuros ficam no mesmo cofre local dos MCPs, com posse por board/perfil. Importações aceitam somente referências, sem valores executáveis no JSON, e desativam os perfis até revisão humana local. A resposta da importação informa `profileReviews` com os nomes a revisar; não resolve credenciais nem executa probes. Duplicação explícita cria outra referência local e conserva revisão pendente/capacidades desconhecidas. Não há ferramenta MCP para criar/revisar/ativar perfis. Integração de perfis no gateway, catálogo/MCP e telas permanece para as etapas seguintes.
+Schema 42 acrescenta `ai_profiles` à exportação e ao estado público do board. `config` é vazio nessa leitura; comandos, argumentos, ambiente e outros valores privados ficam no cofre local dos MCPs, com posse por board/perfil. A exportação carrega referências, nunca os valores salvos. Importações desativam os perfis até revisão humana local. A resposta da importação informa `profileReviews` com os nomes a revisar; não resolve credenciais nem executa probes. Duplicação explícita cria outra referência local e conserva revisão pendente/capacidades desconhecidas. Não há ferramenta MCP para criar/revisar/ativar perfis: a gestão é feita na tela Configurações → Ferramentas de IA.
 
 
-`AiTool` agora identifica o perfil persistido; os dados nativos usam `AiBase` e `AI_BASES`/`ALL_AI_BASES`/`baseInfo`. O default do board valida perfis ligados/revisados e conserva IDs de cópias. Metadados desconhecidos são neutros, sem ampliar suporte/permissões. A gestão MCP do catálogo e a seleção por perfil ainda precisam da etapa #689; o enum público desses comandos continua restrito às três bases nesta etapa. Cópias/personalizados são recusados pelo provider atual, sem redirecionamento silencioso. O gateway do host também recusa perfis ausentes/desativados/pendentes antes de preparar snapshots ou iniciar CLI.
+O padrão do board aceita somente perfis ligados/revisados e conserva o ID de uma cópia; ela consulta o catálogo da origem, mas não herda a evidência de capacidades. Metadados desconhecidos não ampliam suporte ou permissões. O gateway recusa perfis ausentes, desativados ou pendentes antes de preparar a execução. A disponibilidade do comando e um resultado OK no teste não substituem evidência de isolamento, permissões ou MCP.
 
 
 ### Consultas de versão/login por perfil
@@ -400,7 +408,7 @@ Schema 42 acrescenta `ai_profiles` à exportação e ao estado público do board
 
 As sondas de perfil usam `execFile` sem shell, inclusive as consultas nativas; shims `.cmd`/`.bat` no Windows ficam desconhecidos nesse caminho. A versão retorna somente o trecho numérico reconhecido, com ocultação prévia dos valores privados; stdout/stderr brutos não vão ao estado. Sem `statusArgs`, personalizado não consulta/cobra login. Código zero/um/indisponível conserva verdadeiro/falso/desconhecido. As consultas configuradas exigem revisão humana e não comprovam capacidades. O cache é por perfil, executável e referência de credenciais.
 
-Requisitos de perfis configuráveis expõem nome público em `cli`, nunca comando/args/env. Link de instalação HTTPS revisado pode aparecer como metadado público; URL com usuário, senha, query ou fragmento é omitida. Cópias/personalizados não dependem do registro MCP global de outra conta. A execução e a admissão dos providers configuráveis ainda dependem de #687/#729.
+Requisitos de perfis configuráveis expõem nome público em `cli`, nunca comando/args/env. Link de instalação HTTPS revisado pode aparecer como metadado público; URL com usuário, senha, query ou fragmento é omitida. Cópias/personalizados não dependem do registro MCP global de outra conta. A execução de configuráveis exige contrato e admissão por capacidades; uma declaração manual não substitui a evidência exigida.
 
 
 ### Providers configuráveis e origem de teste
