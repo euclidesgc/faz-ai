@@ -4636,3 +4636,76 @@ div.metrics-breakdown {
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+.ai-tools-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem);
+  align-items: start;
+  gap: var(--sp-16);
+}
+.ai-tools-layout > :first-child:only-child {
+  grid-column: 1 / -1;
+}
+.ai-tools-policy-link {
+  margin-bottom: var(--sp-12);
+}
+.ai-tools-layout .settings-card {
+  margin-bottom: var(--sp-12);
+}
+.ai-profile-form {
+  position: sticky;
+  top: var(--sp-12);
+  max-height: calc(100vh - var(--sp-24));
+  overflow-y: auto;
+}
+.ai-profile-controls,
+.ai-profile-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8) var(--sp-16);
+}
+.ai-profile-evidence {
+  margin-top: var(--sp-12);
+}
+.ai-profile-capabilities {
+  margin-top: var(--sp-8);
+  font-size: var(--fs-sm);
+}
+.ai-profile-notice {
+  padding: var(--sp-8);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius);
+}
+.ai-profile-error {
+  padding: var(--sp-8);
+  color: var(--error);
+  background: var(--error-bg);
+  border-radius: var(--radius);
+}
+.ai-profile-result pre {
+  overflow-x: auto;
+  max-height: 15rem;
+  padding: var(--sp-8);
+  background: var(--code-bg);
+  border-radius: var(--radius);
+}
+.ai-profile-env-list {
+  display: grid;
+  gap: var(--sp-8);
+}
+.ai-profile-env-list .row > :first-child {
+  flex: 1 1 8rem;
+}
+.ai-profile-env-list .row > :nth-child(2) {
+  flex: 1 1 10rem;
+}
+@media (max-width: 850px) {
+  .ai-tools-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ai-profile-form {
+    position: static;
+    max-height: none;
+  }
+}

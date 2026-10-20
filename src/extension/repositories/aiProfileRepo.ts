@@ -89,8 +89,14 @@ export class AiProfileRepo {
         if (draft.kind === 'custom' || copyKeys.includes(key) || !knownConfigKeys.includes(key)) config[key] = value;
       for (const [key, value] of Object.entries(draft.config)) {
         if (draft.kind !== 'custom' && !copyKeys.includes(key)) continue;
-        config[key] =
-          key === 'env' && value && typeof value === 'object' && !Array.isArray(value) ? { ...(config.env ?? {}), ...value } : value;
+        if (key === 'env' && value && typeof value === 'object' && !Array.isArray(value)) {
+          const env = { ...(config.env ?? {}) };
+          for (const [name, secret] of Object.entries(value)) {
+            if (secret === '') delete env[name];
+            else env[name] = secret as string;
+          }
+          config.env = env;
+        } else config[key] = value;
       }
       const errors = validateProfile({ ...draft, config });
       if (errors.length) throw new Error(errors.join(' '));

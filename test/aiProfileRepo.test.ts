@@ -78,6 +78,8 @@ it('edição sem readback preserva comando e env omitidos, mas aceita troca expl
   expect(repo.resolveConfig(boardId, profile.id)).toMatchObject(draft().config);
   repo.save(boardId, { ...draft({ id: profile.id }), config: { env: { OTHER: 'outro' } } }, 'person');
   expect(repo.resolveConfig(boardId, profile.id).env).toEqual({ TOKEN: 'profile-secret-sentinel', OTHER: 'outro' });
+  repo.save(boardId, { ...draft({ id: profile.id }), config: { env: { OTHER: '' } } }, 'person');
+  expect(repo.resolveConfig(boardId, profile.id).env).toEqual({ TOKEN: 'profile-secret-sentinel' });
   repo.save(boardId, { ...draft({ id: profile.id }), config: { command: 'novo-comando', args: [] } }, 'person');
   expect(repo.resolveConfig(boardId, profile.id)).toMatchObject({ command: 'novo-comando', args: [] });
 });
