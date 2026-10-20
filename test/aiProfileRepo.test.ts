@@ -72,6 +72,15 @@ it('cofre guarda todos os campos e snapshot/banco/export não recebem valores', 
   repo.save(boardId, { ...draft(), id: profile.id, config: { command: 'replacement' } }, 'person');
   expect(repo.resolveConfig(boardId, profile.id)).toMatchObject({ command: 'replacement', future: { keep: 'unknown-sentinel' } });
 });
+it('edição sem readback preserva comando e env omitidos, mas aceita troca explícita', () => {
+  const profile = repo.save(boardId, draft(), 'person');
+  repo.save(boardId, { ...draft({ id: profile.id, name: 'Novo nome' }), config: {} }, 'person');
+  expect(repo.resolveConfig(boardId, profile.id)).toMatchObject(draft().config);
+  repo.save(boardId, { ...draft({ id: profile.id }), config: { env: { OTHER: 'outro' } } }, 'person');
+  expect(repo.resolveConfig(boardId, profile.id).env).toEqual({ TOKEN: 'profile-secret-sentinel', OTHER: 'outro' });
+  repo.save(boardId, { ...draft({ id: profile.id }), config: { command: 'novo-comando', args: [] } }, 'person');
+  expect(repo.resolveConfig(boardId, profile.id)).toMatchObject({ command: 'novo-comando', args: [] });
+});
 it('impõe revisão humana e trava os prontos e o padrão; cópia ganha referência própria sem herdar revisão ou evidência', () => {
   expect(() => repo.save(boardId, draft(), 'ai')).toThrow('revisão humana');
   expect(() => repo.save(boardId, { ...draft(), id: 'claude' }, 'person')).toThrow('prontos');

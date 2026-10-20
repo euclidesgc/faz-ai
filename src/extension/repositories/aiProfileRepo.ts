@@ -68,8 +68,6 @@ export class AiProfileRepo {
     this.human(actor);
     if (draft.kind === 'builtin' || BUILTIN_PROFILES.some((p) => p.id === draft.id))
       throw new Error('Os perfis prontos não são editados: duplique para mudar.');
-    const errors = validateProfile(draft);
-    if (errors.length) throw new Error(errors.join(' '));
     return transaction(this.db, () => {
       const rows = this.rows(boardId),
         old = rows.find((row) => row.id === draft.id);
@@ -84,10 +82,18 @@ export class AiProfileRepo {
       if (old && (old.kind !== draft.kind || old.base !== draft.base))
         throw new Error('O tipo e a base do perfil não são alterados: crie outro perfil.');
       const saved = old ? credentialsFor(this.db).get(ownerOf(boardId, id), str(old.secret_ref)) : null;
-      // Só extensões já salvas são preservadas; um campo conhecido inaplicável não passa para uma cópia.
+      // O navegador não recebe a configuração privada: campos omitidos numa edição mantêm o valor do cofre.
+      // A cópia só retém chaves do seu próprio tipo; explicitamente enviadas, listas podem ser esvaziadas.
       const config: AiProfileConfig = {};
-      for (const [key, value] of Object.entries(saved ?? {})) if (!knownConfigKeys.includes(key)) config[key] = value;
-      for (const [key, value] of Object.entries(draft.config)) if (draft.kind === 'custom' || copyKeys.includes(key)) config[key] = value;
+      for (const [key, value] of Object.entries(saved ?? {}))
+        if (draft.kind === 'custom' || copyKeys.includes(key) || !knownConfigKeys.includes(key)) config[key] = value;
+      for (const [key, value] of Object.entries(draft.config)) {
+        if (draft.kind !== 'custom' && !copyKeys.includes(key)) continue;
+        config[key] =
+          key === 'env' && value && typeof value === 'object' && !Array.isArray(value) ? { ...(config.env ?? {}), ...value } : value;
+      }
+      const errors = validateProfile({ ...draft, config });
+      if (errors.length) throw new Error(errors.join(' '));
       const ref = credentialsFor(this.db).put(ownerOf(boardId, id), config);
       run(
         this.db,
