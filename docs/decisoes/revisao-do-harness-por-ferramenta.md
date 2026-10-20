@@ -1,6 +1,8 @@
 # Revisão do Harness: organização por ferramenta e banco de artefatos do board
 
-> **Atualização (#615):** a decisão "o board referencia, não copia" foi substituída. O board agora guarda a própria cópia dos artefatos no banco dele, e as execuções usam só essa cópia, com um snapshot por execução. Atualizar a partir da origem é uma ação explícita da pessoa.
+> **Decisão histórica, substituída pela [#615](0615-banco-de-artefatos-proprio-do-board.md).**
+> As seções abaixo descrevem o desenho anterior. Hoje o board guarda a própria cópia dos artefatos;
+> alterações na origem só entram por importação explícita, e cada execução recebe um snapshot.
 
 ## Vocabulário
 
@@ -62,7 +64,7 @@ só o que está visível, economizando memória e deixando a leitura rápida.
 - **Enviar para o board**: a pessoa seleciona, das fontes Global, Projeto e Importados, quais
   artefatos o board pode usar. O artefato passa a aparecer na aba Board daquele assunto. Vale para
   skills, sub-agentes, MCPs e qualquer tipo que faça sentido levar para o board.
-- **O board referencia, não copia**: o board guarda o caminho de origem do artefato e lê o arquivo
+- **Decisão anterior, substituída pela #615 — o board referencia, não copia**: o board guarda o caminho de origem do artefato e lê o arquivo
   na hora de usar. Assim, uma atualização na fonte (Global, Projeto ou pasta importada) vale no board
   sem retrabalho. Uma origem movida ou apagada deixa o artefato marcado como ausente no board, sem
   quebrar o card que o lista.
@@ -289,7 +291,7 @@ necessário.
 
 ## Decisões tomadas
 
-1. **Enviar para o board referencia, não copia.** O board guarda o caminho de origem e lê o arquivo
+1. **Decisão anterior, substituída pela #615 — enviar para o board referencia, não copia.** O board guarda o caminho de origem e lê o arquivo
    ao usar, para acompanhar as atualizações da fonte. Origem ausente marca o artefato como ausente.
 2. **Regras entram desligadas.** A pessoa revisa e ativa cada regra, porque ela pode conflitar com o
    fluxo e as definições do board. Regra ativa vale como "Sempre".
