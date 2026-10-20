@@ -151,6 +151,7 @@ const state: BoardState = {
   environment: null,
   environmentFirstRun: false,
   harnessInstall: null,
+  artifactImport: null,
   harnessSuggestions: null,
   mainBranch: null,
   branchRenames: [],

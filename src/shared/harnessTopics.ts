@@ -6,6 +6,15 @@ import { AI_BASES, type AiTool, type HarnessItem } from './harness';
 import { HARNESS_CATALOG, HARNESS_NOTES, groupOf, type HarnessGroup } from './harnessCatalog';
 import { missingSelections, selectedItems, type SelectableKind } from './harnessSelection';
 import type { BoardState } from './model';
+import type { ArtifactKind, BoardArtifact } from './artifacts';
+import type { HarnessUsage } from './harnessSelection';
+
+/** Counts board artifacts of one kind in each usage mode. */
+export function usageCounts(artifacts: readonly BoardArtifact[], kind: ArtifactKind): Record<HarnessUsage, number> {
+  const counts: Record<HarnessUsage, number> = { always: 0, contextual: 0, off: 0 };
+  for (const artifact of artifacts) if (artifact.kind === kind) counts[artifact.usage]++;
+  return counts;
+}
 
 /** Os assuntos de uma ferramenta, na ordem das abas. */
 export type HarnessTopic = 'rules' | 'skill' | 'agent' | 'mcp' | 'command' | 'hook' | 'other';

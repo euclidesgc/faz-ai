@@ -88,7 +88,8 @@ export interface ArtifactDraft {
 export const ARTIFACT_LIMITS = { fileBytes: 512 * 1024, files: 100, totalBytes: 5 * 1024 * 1024 } as const;
 
 /** A identidade do artefato na marcação e nos campos: a origem; o criado no board, `board:<nome>`. */
-export const artifactLocation = (a: Pick<BoardArtifact, 'origin' | 'name'>): string => a.origin || `board:${a.name}`;
+export const artifactLocation = (a: Pick<BoardArtifact, 'kind' | 'origin' | 'name'>): string =>
+  a.kind === 'rule' ? a.name : a.origin || `board:${a.name}`;
 
 export const selectionOf = (a: Pick<BoardArtifact, 'kind' | 'origin' | 'name' | 'usage'>): HarnessSelection => ({
   kind: selectableOfKind(a.kind),
@@ -133,7 +134,7 @@ export function agentOfArtifact(a: AgentArtifact, tool?: AiTool): Agent {
     modelValue: foreign && !m?.model.startsWith(`${tool}:`) ? '' : (m?.model ?? ''),
     scope: 'project',
     path: a.path,
-    location: artifactLocation(a),
+    location: artifactLocation({ ...a, kind: 'agent' }),
     content: a.body,
     body:
       m?.tools.native.tool === '' && m.tools.categories.length

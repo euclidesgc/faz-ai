@@ -11,7 +11,9 @@ import {
   toolsInOrder,
   topicCount,
   topicsOf,
+  usageCounts,
 } from '../src/shared/harnessTopics';
+import type { BoardArtifact } from '../src/shared/artifacts';
 
 const item = (over: Partial<HarnessItem>): HarnessItem => ({
   kind: 'skill',
@@ -25,6 +27,17 @@ const item = (over: Partial<HarnessItem>): HarnessItem => ({
 });
 
 describe('harnessTopics: assuntos', () => {
+  it('conta somente o tipo pedido em cada modo', () => {
+    const artifacts = [
+      { kind: 'rule', usage: 'off' },
+      { kind: 'rule', usage: 'always' },
+      { kind: 'rule', usage: 'contextual' },
+      { kind: 'rule', usage: 'off' },
+      { kind: 'skill', usage: 'off' },
+    ] as BoardArtifact[];
+    expect(usageCounts(artifacts, 'rule')).toEqual({ always: 1, contextual: 1, off: 2 });
+    expect(usageCounts(artifacts, 'mcp')).toEqual({ always: 0, contextual: 0, off: 0 });
+  });
   it('a ordem é regras, skills, sub-agentes, MCPs, comandos, hooks e demais', () => {
     expect(HARNESS_TOPICS.map((t) => t.id)).toEqual(['rules', 'skill', 'agent', 'mcp', 'command', 'hook', 'other']);
   });

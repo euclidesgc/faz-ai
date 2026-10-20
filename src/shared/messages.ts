@@ -4,6 +4,8 @@ import type { ContextDraftResolution } from './contextDraftResolution';
 import type { ContextActivityTarget, ContextPlanningWrite, ActivityContextWrite } from './contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from './agentAssistance';
 import type { LibraryArtifactInput } from './artifacts';
+import type { ArtifactKind } from './artifacts';
+import type { ImportSource, OnConflict } from './artifactImport';
 import type { Appearance } from './appearance';
 import type { ImportSummary } from './backup';
 import type { ViewState } from './filters';
@@ -11,6 +13,12 @@ import type { UiPrefs } from './prefs';
 import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from './harness';
 import type { HarnessUsage, SelectableKind } from './harnessSelection';
 import type { HookInput, McpServerInput } from './harnessCatalog';
+
+/** Public MCP configuration for editing: secret values must be masked by the host. */
+export type McpServerView = Omit<McpServerInput, 'env' | 'headers'> & {
+  env: Record<string, string>;
+  headers: Record<string, string>;
+};
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { CardUsage } from './cardUsage';
 import type { ModelOption, ModelRule } from './models';
@@ -319,7 +327,33 @@ export type WebviewToHost =
   | { type: 'harness.suggest.run'; tool: AiTool; kind: SelectableKind }
   | { type: 'harness.suggest.clear' }
   /** abre o seletor de pasta do editor e importa a pasta escolhida para a ferramenta (só no editor) */
-  | { type: 'harness.import.pick'; tool: AiTool }
+  | { type: 'harness.import.pick'; tool: AiTool; what?: 'folder' | 'export' }
+  /** Opens the folder or export-file picker for importing artifacts into the board. */
+  | { type: 'harness.import.pick'; what: 'folder' | 'export'; tool?: AiTool }
+  /** Saves a rule, skill, or MCP server in the board's artifact store. */
+  | {
+      type: 'harness.artifact.save';
+      kind: 'rule' | 'skill' | 'mcp';
+      name: string;
+      previous?: string;
+      body?: string;
+      server?: McpServerInput;
+      keepSecrets?: string[];
+      files?: string[];
+      via?: 'manual' | 'wizard' | 'ai';
+    }
+  /** Reads an artifact for the editor, with MCP secrets masked. */
+  | { type: 'harness.artifact.read'; requestId: string; kind: ArtifactKind; name: string; file?: string }
+  /** Writes a supporting file inside a board skill. */
+  | { type: 'harness.skillFile.write'; skill: string; file: string; content: string; link?: boolean }
+  /** Deletes a supporting file inside a board skill. */
+  | { type: 'harness.skillFile.delete'; skill: string; file: string }
+  /** Previews candidates from a folder, installed tool, or board export. */
+  | { type: 'harness.import.scan'; source: ImportSource }
+  /** Imports selected candidates from the current preview. */
+  | { type: 'harness.import.apply'; keys: string[]; onConflict: OnConflict }
+  /** Discards the current import preview. */
+  | { type: 'harness.import.cancel' }
   /** importa uma pasta: o board a varre atrás de artefatos no formato da ferramenta e os lista em "Importados" */
   | { type: 'harness.import.add'; tool: AiTool; dir: string }
   /** tira a pasta importada da lista; os artefatos dela saem do board */
@@ -389,6 +423,8 @@ export type HostToWebview =
   | { type: 'harness.file.readResult'; requestId: string; content?: string; readonly?: boolean; error?: string }
   /** item do harness criado pela tela: ela abre o arquivo no editor do board */
   | { type: 'harness.item.created'; path: string }
+  /** Result of reading an artifact for the editor. */
+  | { type: 'harness.artifact.readResult'; requestId: string; text?: string; server?: McpServerView; error?: string }
   /** resposta a `harness.project.profile`, correlacionada por `requestId` */
   | { type: 'harness.library.content'; input: LibraryArtifactInput }
   | { type: 'harness.agent.assistResult'; requestId: string; result?: AgentAssistResult; error?: string }

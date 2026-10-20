@@ -317,9 +317,10 @@ export class HostBridge {
         return;
       }
       case 'harness.import.pick': {
+        if ('what' in msg && msg.what !== undefined) throw new Error('A prévia de importação ainda não está disponível.');
         if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
         const dir = await this.env.pickFolder('Importar artefatos de uma pasta');
-        if (dir) this.router.handle({ type: 'harness.import.add', tool: msg.tool, dir });
+        if (dir && msg.tool) this.router.handle({ type: 'harness.import.add', tool: msg.tool, dir });
         return;
       }
       case 'harness.item.create':

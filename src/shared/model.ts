@@ -1,4 +1,5 @@
 import type { AiProfile } from './aiProfiles';
+import type { ImportPreview } from './artifactImport';
 import type { ContextPlanningState } from './contextPlanning';
 import type { OrphanReport } from './orphans';
 import type { BoardRequirement } from './requirements';
@@ -301,6 +302,8 @@ export interface BoardState {
   environmentFirstRun: boolean;
   /** skills encontradas numa pasta ou repositório, antes de instalar; null fora de uma instalação */
   harnessInstall: InstallPreview | null;
+  /** Preview of artifacts to import into the board. */
+  artifactImport: ImportPreview | null;
   /** o último "Indicar artefatos": pré-seleção para a pessoa confirmar; null antes de pedir ou depois de descartar */
   harnessSuggestions: HarnessSuggestions | null;
   /** branch principal detectada no repositório do projeto; null fora de um repositório git */

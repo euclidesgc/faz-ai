@@ -387,6 +387,26 @@ function markSkill(ctx: BoardContext, name: string, scope: 'project' | 'user' = 
 
 /** Harness: regras, skills, agentes, hooks, permissões, servidores MCP e instalação de skills. */
 export const harnessHandlers = {
+  // Contracts introduced in #665; the artifact editor/importer handlers arrive in the following subtasks.
+  'harness.artifact.save': () => {
+    throw new Error('Editor de artefatos ainda não disponível.');
+  },
+  'harness.artifact.read': () => {
+    throw new Error('Editor de artefatos ainda não disponível.');
+  },
+  'harness.skillFile.write': () => {
+    throw new Error('Arquivos de apoio do board ainda não disponíveis.');
+  },
+  'harness.skillFile.delete': () => {
+    throw new Error('Arquivos de apoio do board ainda não disponíveis.');
+  },
+  'harness.import.scan': () => {
+    throw new Error('Importação de artefatos ainda não disponível.');
+  },
+  'harness.import.apply': () => {
+    throw new Error('Importação de artefatos ainda não disponível.');
+  },
+  'harness.import.cancel': () => false,
   'contextPlanning.save': (msg, ctx, actor) => {
     if (actor.byAi) throw new Error('Contratos de contexto exigem revisão humana; a IA não pode alterar autorizações.');
     new ContextPlanningRepo(ctx.dbHandle.db).save(ctx.boardId, msg.input);
