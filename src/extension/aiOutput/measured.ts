@@ -144,18 +144,25 @@ export function cleanStaleTemp(now = Date.now(), dir = os.tmpdir()): void {
   }
 }
 
-export function materialize(command: HeadlessCommand): { command: HeadlessCommand; cleanup: () => void } {
+export function materialize(command: HeadlessCommand, tempRoot = os.tmpdir()): { command: HeadlessCommand; cleanup: () => void } {
   const files = Object.entries(command.tempFiles ?? {});
   if (!files.length) return { command, cleanup: () => {} };
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-run-'));
-  let args = command.args;
-  for (const [name, content] of files) {
-    const file = path.join(dir, name);
-    // pode ter segredos (variáveis dos servidores MCP): só o dono lê
-    fs.writeFileSync(file, content, { mode: 0o600 });
-    args = args.map((a) => a.split(tmpArg(name)).join(file));
+  if (files.some(([name]) => !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name) || name === '..'))
+    throw new Error('Nome de arquivo temporário inválido.');
+  const dir = fs.mkdtempSync(path.join(tempRoot, 'fazai-run-'));
+  try {
+    let args = command.args;
+    for (const [name, content] of files) {
+      const file = path.join(dir, name);
+      // pode ter segredos (variáveis dos servidores MCP): só o dono lê
+      fs.writeFileSync(file, content, { mode: 0o600 });
+      args = args.map((a) => a.split(tmpArg(name)).join(file));
+    }
+    return { command: { ...command, args }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
+  } catch (error) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    throw error;
   }
-  return { command: { ...command, args }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
 export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: string, deps: MeasuredDeps): Measured {

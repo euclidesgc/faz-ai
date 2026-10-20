@@ -298,11 +298,16 @@ export class BoardHarness {
     return { readonly };
   }
 
+  /** A configuração nativa de MCP pode conter credenciais; nem a leitura nem a escrita legada passam pelo editor do board. */
+  private assertNotNativeMcpFile(file: string): void {
+    if (this.current.inventory.some((t) => t.items.some((i) => i.kind === 'mcp' && i.path === file)))
+      throw new Error('Configurações MCP não são editadas pelo editor de arquivos. Use a biblioteca do board.');
+  }
+
   /** Conteúdo de um arquivo do harness para o editor do board. */
   readFile(file: string): { content: string; readonly: boolean } {
     const { readonly } = this.access(file);
-    if (this.current.inventory.some((t) => t.items.some((i) => i.kind === 'mcp' && i.path === file)))
-      throw new Error('Configurações MCP não são devolvidas ao editor. Use a biblioteca para salvar uma nova definição.');
+    this.assertNotNativeMcpFile(file);
     if (fs.statSync(file).size > MAX_EDIT_BYTES) throw new Error('Arquivo maior que 512 KB: abra no editor.');
     return { content: fs.readFileSync(file, 'utf8'), readonly };
   }
@@ -315,6 +320,7 @@ export class BoardHarness {
       return;
     }
     if (this.access(file).readonly) throw new Error('Este arquivo não pode ser alterado pelo board.');
+    this.assertNotNativeMcpFile(file);
     if (/\.json$/i.test(file)) {
       try {
         // os arquivos de configuração das ferramentas aceitam comentários de linha
