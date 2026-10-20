@@ -620,6 +620,21 @@ describe('modelos de IA', () => {
     const handle = vi.spyOn(router, 'handle');
     expect((await call('set_ai_tool', { tool: enabled.id })).error).toBe(false);
     expect(router.snapshot().board.aiTool).toBe(enabled.id);
+    const created = await call('create_card', { title: 'Modelo livre', fields: { Modelo: `${enabled.id}:modelo-avulso@high` } });
+    expect(created.error).toBe(false);
+    expect((await call('get_card', { card: created.data.id })).data.fields.Modelo).toContain('modelo-avulso');
+    expect((await call('update_card', { card: created.data.id, fields: { Modelo: `${enabled.id}:outro-modelo` } })).error).toBe(false);
+    expect((await call('update_card', { card: created.data.id, fields: { Modelo: 'outra-cli:modelo-avulso' } })).error).toBe(true);
+    expect((await call('update_card_type', { type: 'História', default_fields: { Modelo: `${enabled.id}:modelo-avulso` } })).error).toBe(
+      false,
+    );
+    expect(
+      (
+        await call('set_model_rules', {
+          rules: [{ when: [[{ field: 'Tipo', value: 'História' }]], model: `${enabled.id}:modelo-avulso` }],
+        })
+      ).error,
+    ).toBe(false);
     expect(handle.mock.calls.some(([message]) => message.type.startsWith('settings.aiProfiles.'))).toBe(false);
     for (const id of [disabled.id, 'inexistente']) {
       const response = await call('set_ai_tool', { tool: id });

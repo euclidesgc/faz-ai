@@ -181,5 +181,7 @@ export function resolveModelOption(
     return parsed.effort && !option.efforts.includes(parsed.effort) ? null : { option, name: option.model, effort: parsed.effort };
   if (profile.kind !== 'custom' || !parsed.id.startsWith(`${profile.id}:`)) return null;
   const name = parsed.id.slice(profile.id.length + 1);
-  return name && !/[\s\0:@]/.test(name) ? { option: null, name, effort: parsed.effort } : null;
+  return name && !/[\s\0:@]/.test(name) && (!parsed.effort || !/[\s\0:@]/.test(parsed.effort))
+    ? { option: null, name, effort: parsed.effort }
+    : null;
 }

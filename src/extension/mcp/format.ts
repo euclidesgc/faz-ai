@@ -1,4 +1,5 @@
 import { baseValue } from '../../shared/harness';
+import type { AiProfile } from '../../shared/aiProfiles';
 import { agentOfArtifact, itemOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
@@ -88,7 +89,7 @@ export function needsTriage(s: BoardState, c: Card): boolean {
 }
 
 /** Valida e normaliza o valor de um campo conforme o seu tipo. */
-export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOption[]): FieldValue {
+export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOption[], profile?: AiProfile): FieldValue {
   if (value === null || value === undefined || value === '') return null;
   const option = (v: unknown): string => {
     const o = f.options.find((x) => same(x, String(v)));
@@ -108,7 +109,7 @@ export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOpti
     case 'multiselect':
       return (Array.isArray(value) ? value : [value]).map(option);
     case 'model':
-      return resolveModelInput(catalog, String(value));
+      return resolveModelInput(catalog, String(value), profile);
     case 'date':
       if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) throw new Error(`O campo "${f.name}" espera uma data no formato AAAA-MM-DD.`);
       return String(value);

@@ -258,8 +258,9 @@ o `faz-ai` do terminal avisa e não inicia.
 
 ## Usando com IA
 
-1. Em Configurações → **Harness**, escolha a ferramenta do projeto (Claude Code, Cursor ou
-   Kimi Code).
+1. Em Configurações → **Ferramentas de IA**, escolha o perfil de CLI padrão do projeto. Claude Code,
+   Cursor e Kimi Code vêm prontos; também é possível criar cópias e perfis personalizados. Em
+   **Harness → Ferramenta e execução**, você pode trocar o perfil em uso.
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
    global que a ferramenta lê. Isso também acontece sozinho, em silêncio, ao abrir a pasta (e a cada
    versão nova da extensão), sempre no escopo do usuário; só uma falha gera aviso.

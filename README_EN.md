@@ -269,8 +269,9 @@ navegador**; the terminal `faz-ai` warns and does not start.
 
 ## Using it with AI
 
-1. In Configurações (settings) → **Harness**, choose the project's tool (Claude Code,
-   Cursor or Kimi Code).
+1. In Settings → **AI tools**, choose the project's default CLI profile. Claude Code, Cursor and
+   Kimi Code are built in; you can also create copies and custom profiles. You can switch the active
+   profile in **Harness → Tool and execution**.
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
    **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads. This also happens on its own, silently, when the folder opens (and on every new extension version), always in the user scope; only a failure raises a notice.
 3. In the **Skills** group of the same tab, click **Instalar (padrão da ferramenta)** for the

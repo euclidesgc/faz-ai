@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { catalogTool, type AiProfile } from '../../../shared/aiProfiles';
+import { activeProfile, catalogTool, type AiProfile } from '../../../shared/aiProfiles';
 import { TYPE_CONDITION, modelId, resolveModelInput, type ModelRule } from '../../../shared/models';
 import { newId } from '../../db/ids';
 import type { MessageRouter } from '../../panel/messageRouter';
@@ -127,8 +127,8 @@ export function registerModelTools(tool: DefineTool): void {
         groups: r.when.map((g) =>
           g.map((c) => ({ fieldId: fieldId(c.field), op: c.not ? ('isNot' as const) : ('is' as const), value: c.value })),
         ),
-        model: resolveModelInput(s.board.modelCatalog, r.model),
-        fallback: r.fallback ? resolveModelInput(s.board.modelCatalog, r.fallback) : null,
+        model: resolveModelInput(s.board.modelCatalog, r.model, activeProfile(s.board)),
+        fallback: r.fallback ? resolveModelInput(s.board.modelCatalog, r.fallback, activeProfile(s.board)) : null,
       }));
       router.handle({ type: 'settings.modelRules.set', rules });
       return models(router);
