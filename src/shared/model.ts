@@ -19,6 +19,18 @@ import type { BranchRenamePending, RenameOutcome } from './branchRename';
 
 export type Id = string;
 
+/** Pergunta da IA à pessoa, com opções; fica pendente no card até a pessoa enviar as respostas. */
+export interface CardQuestion {
+  /** Gerado pelo board ao registrar; a resposta aponta para ele. */
+  id: Id;
+  /** Uma linha, sem quebras. */
+  question: string;
+  /** Pelo menos duas, sem repetidas. */
+  options: string[];
+  /** Uma das opções. */
+  recommended: string;
+}
+
 export type WorkflowKind = 'parent' | 'child';
 /** O que a coluna representa no fluxo. */
 export type ColumnCategory = 'open' | 'done' | 'cancelled';
