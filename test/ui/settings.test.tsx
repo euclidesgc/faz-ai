@@ -197,6 +197,7 @@ describe('TypesSettings: skills por tipo', () => {
         harnessSelection: [{ kind: 'skill', location: '.claude/skills/revisar-spec/SKILL.md', usage: 'contextual' }],
         harness: {
           ...s0.harness,
+          library: undefined,
           skills: [
             {
               name: 'revisar-spec',

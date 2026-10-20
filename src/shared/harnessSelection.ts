@@ -1,4 +1,4 @@
-import { itemOfArtifact, selectableOfKind, artifactLocation } from './artifacts';
+import { itemOfArtifact } from './artifacts';
 // Os artefatos selecionados são cópias do board; as fontes continuam no catálogo das ferramentas.
 import type { HarnessItem, HarnessKind } from './harness';
 import type { BoardState } from './model';
@@ -76,16 +76,16 @@ export const selectionKey = (
   item: Pick<HarnessItem, 'location'> & { name?: string; layout?: HarnessItem['layout']; boardArtifactId?: string },
 ): string => (!item.boardArtifactId && item.layout === 'entry' ? `${item.location}#${item.name ?? ''}` : item.location);
 
-/** Cópias do board primeiro; referências antigas ainda não migradas usam o catálogo da ferramenta. */
+/**
+ * Os itens que o board pode usar: só as cópias guardadas no board, que vivem no banco e não dependem da
+ * pasta da ferramenta. Antes de a biblioteca ser carregada (sem pasta de projeto, ou num estado montado
+ * à mão), vale o catálogo da ferramenta; depois dela, um item que ficou só na pasta da ferramenta não
+ * entra em execução, e a marcação antiga que não pôde ser copiada aparece como ausente.
+ */
 export function toolItemsOf(s: Pick<BoardState, 'board' | 'harness'>): HarnessItem[] {
-  const sources = s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
   const artifacts = s.harness.library?.artifacts;
-  if (!artifacts) return sources;
-  const copied = new Set(artifacts.map((a) => `${selectableOfKind(a.kind)}:${artifactLocation(a)}`));
-  return [
-    ...artifacts.filter((a) => !a.missing).map(itemOfArtifact),
-    ...sources.filter((i) => !copied.has(`${i.kind}:${selectionKey(i)}`)),
-  ];
+  if (!artifacts) return s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
+  return artifacts.filter((a) => !a.missing).map(itemOfArtifact);
 }
 
 /** A marcação de um item do inventário, ou null quando ele não está no board. */

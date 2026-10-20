@@ -153,18 +153,18 @@ describe('servidores MCP na execução do card', () => {
     expect(lines).toContain('uma skill por assunto');
   });
 
-  it('no Claude Code, um servidor Sempre entra no arquivo de configuração da execução', () => {
+  it('no Claude Code, um servidor Sempre entra no arquivo de configuração da execução, com a definição guardada no board', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-mcp-plan-'));
     try {
-      fs.writeFileSync(
-        path.join(root, '.mcp.json'),
-        JSON.stringify({ mcpServers: { memoria: { command: 'mem' }, github: { command: 'gh' }, 'faz-ai': { command: 'old' } } }),
-      );
+      // a definição na pasta da ferramenta não é lida: vale a do board, e o servidor do board é o da execução
+      fs.writeFileSync(path.join(root, '.mcp.json'), JSON.stringify({ mcpServers: { memoria: { command: 'da-ferramenta' } } }));
       const s = state();
       for (const i of s.harness.inventory[0]!.items) i.path = path.join(root, '.mcp.json');
-      const plan = executionPlan(s, card('c'), root, '', { command: 'node', args: ['b.js'] });
+      const defs = { memoria: { command: 'mem' }, github: { command: 'gh' }, 'faz-ai': { command: 'old' } };
+      const plan = executionPlan(s, card('c'), defs, { command: 'node', args: ['b.js'] });
       const config = JSON.parse(plan.input.mcpConfig!).mcpServers;
       expect(Object.keys(config).sort()).toEqual(['faz-ai', 'github', 'memoria']);
+      expect(config.memoria).toEqual({ command: 'mem' });
       expect(config['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: ['b.js'] });
       expect(plan.input.mcpBlocked).toEqual(['sql']);
     } finally {
@@ -337,10 +337,11 @@ describe('revisão: o que a pilha corrigiu', () => {
     expect(parseSuggestions('{"items":[{"key":"a","reason":"r"}]}\nObs.: {x}', ['a'])).toEqual([{ location: 'a', reason: 'r' }]);
   });
 
-  it('o chat leva os servidores do board em modo Sempre, com a definição do arquivo em que a varredura os achou', () => {
+  it('o chat leva os servidores do board em modo Sempre, com a definição guardada no board; sem definição, fica de fora', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-bare-'));
     try {
-      fs.writeFileSync(path.join(root, 'col.json'), JSON.stringify({ mcpServers: { memoria: { command: 'mem' } } }));
+      // o arquivo em que a varredura achou o servidor não é lido pela execução
+      fs.writeFileSync(path.join(root, 'col.json'), JSON.stringify({ mcpServers: { memoria: { command: 'do-arquivo' } } }));
       const s = boardState({
         harness: {
           rules: [],
@@ -369,9 +370,10 @@ describe('revisão: o que a pilha corrigiu', () => {
           { kind: 'mcp', location: '.mcp.json#fantasma', usage: 'always' },
         ],
       });
-      const plan = bareExec(null, { command: 'node', args: ['b.js'] }, s, { projectDir: root, homeDir: '' });
+      const plan = bareExec(null, { command: 'node', args: ['b.js'] }, s, { memoria: { command: 'mem' } });
       expect(plan.mcpAllowed).toEqual(['memoria']);
       expect(Object.keys(JSON.parse(plan.mcpConfig!).mcpServers).sort()).toEqual(['faz-ai', 'memoria']);
+      expect(JSON.parse(plan.mcpConfig!).mcpServers.memoria).toEqual({ command: 'mem' });
       // sem estado, só o servidor do board, como antes
       expect(JSON.parse(bareExec(null, { command: 'node', args: [] }).mcpConfig!).mcpServers).toEqual({
         'faz-ai': { type: 'stdio', command: 'node', args: [] },

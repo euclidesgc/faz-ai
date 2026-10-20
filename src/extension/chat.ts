@@ -43,12 +43,12 @@ export function chatPrompt(history: ChatMessage[], text: string, advice: string 
   ].join('\n');
 }
 
-/** O que a IA recebe no "Sugerir agentes com IA": ler o projeto e propor os agentes do board, criando e ajustando arquivos de agente pelo MCP. */
+/** O que a IA recebe no "Sugerir agentes com IA": ler o projeto e propor os agentes do board, criando e ajustando os agentes do board pelo MCP. */
 export function suggestAgentsPrompt(): string {
   return [
-    'Você vai propor os agentes de execução deste board Faz AI, pelas ferramentas do servidor MCP "faz-ai". Um agente é um arquivo de agente da ferramenta de IA (instruções, modelo, ferramentas, skills) que o board usa para executar os cards.',
+    'Você vai propor os agentes de execução deste board Faz AI, pelas ferramentas do servidor MCP "faz-ai". Um agente do board (instruções, modelo, ferramentas, skills) fica guardado no próprio board e é o que ele usa para executar os cards.',
     'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, linguagens e frameworks) e o board: get_board (agentes atuais, campos, regras de modelo), get_harness com onlySelected = false (tudo que a ferramenta carrega, com a marcação do board) e get_models (catálogo de modelos).',
-    'Proponha de 3 a 8 agentes que façam sentido para ESTE projeto. Para cada um: se já existir um parecido, ajuste-o com update_agent (patch com description, body, model, tools, skills); senão, crie com create_agent (scope "user", available true). Descrição de uma frase que diga quando usá-lo; instruções curtas e específicas do projeto (padrões, comandos de teste, pastas); skills só entre as marcadas em get_harness; modelo pelo catálogo de get_models (valor como no campo Modelo, ex.: "claude:sonnet@medium"), seguindo as regras de esforço do board.',
+    'Proponha de 3 a 8 agentes que façam sentido para ESTE projeto. Para cada um: se já existir um parecido, ajuste-o com update_agent (patch com description, body, model, tools, skills); senão, crie com create_agent. Descrição de uma frase que diga quando usá-lo; instruções curtas e específicas do projeto (padrões, comandos de teste, pastas); skills só entre as marcadas em get_harness; modelo pelo catálogo de get_models (valor como no campo Modelo, ex.: "claude:sonnet@medium"), seguindo as regras de esforço do board.',
     'Mantenha um agente condutor (que conduz os cards pelo fluxo e delega aos especialistas) como padrão do board.',
     'Não altere arquivos do projeto nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: nome → para quê, o que criou e o que ajustou.',
   ].join('\n');
@@ -309,16 +309,7 @@ export class ChatSession {
     const state = this.router.snapshot();
     const tool = toolInfo(activeProfile(state.board));
     // sem card não há agente: contexto vazio, só o servidor do board, os servidores em modo "Sempre" e o modelo escolhido
-    const plan = bareExec(
-      modelFor(state, model),
-      boardServer(this.deps),
-      state,
-      {
-        projectDir: this.deps.cwd,
-        homeDir: this.deps.homeDir ?? '',
-      },
-      this.router.libraryMcpDefinitions(),
-    );
+    const plan = bareExec(modelFor(state, model), boardServer(this.deps), state, this.router.libraryMcpDefinitions());
     if (hooks.draftOnly) {
       plan.tools = ['Read', 'Glob', 'Grep'];
       plan.deniedTools = [];

@@ -185,10 +185,8 @@ describe('credenciais locais e referências MCP', () => {
       executionPlan(
         router.snapshot(),
         router.snapshot().cards.find((c) => c.id === card)!,
-        dir,
-        '',
-        { command: 'node', args: [] },
         router.libraryMcpDefinitions(),
+        { command: 'node', args: [] },
       ),
     ).toThrow('revisão humana');
     const input = router.readLibraryArtifact(artifact.id);
@@ -198,9 +196,7 @@ describe('credenciais locais e referências MCP', () => {
     router.handle({ type: 'harness.library.save', input: { ...input, server: definition } });
     expect(router.libraryMcpDefinitions().local).toEqual(definition);
     // Mesmo com metadados disponíveis, falha ao resolver o cofre não pode retirar um MCP obrigatório.
-    expect(() => bareExec(null, { command: 'node', args: [] }, router.snapshot(), { projectDir: dir, homeDir: '' }, {})).toThrow(
-      'configuração local',
-    );
+    expect(() => bareExec(null, { command: 'node', args: [] }, router.snapshot(), {})).toThrow('configuração local');
 
     const fresh = await openInMemory(wasm);
     const elsewhere = makeRouter(fresh);

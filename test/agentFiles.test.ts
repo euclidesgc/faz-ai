@@ -170,26 +170,30 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
       seedAgents,
     });
 
-  it('na primeira abertura cria os agentes na pasta global, marcados, com o condutor como padrão; o apagado não volta, salvo por pedido', async () => {
+  it('na primeira abertura cria os agentes de fábrica no board, sem arquivo na pasta da ferramenta, com o condutor como padrão; o apagado não volta, salvo por pedido', async () => {
     const handle = await handleOf();
     const router = await open(handle, true);
-    const dir = path.join(home, '.claude', 'agents');
-    expect(fs.readdirSync(dir).sort()).toEqual(AGENT_SEEDS.map((a) => `${a.name}.md`).sort());
+    expect(fs.existsSync(path.join(home, '.claude', 'agents'))).toBe(false);
     const s = router.snapshot();
+    const agents = s.harness.library!.artifacts.filter((a) => a.kind === 'agent');
+    expect(agents.map((a) => a.name).sort()).toEqual(AGENT_SEEDS.map((a) => a.name).sort());
+    expect(agents.every((a) => a.usage === 'contextual' && a.origin === '' && a.agent?.seed)).toBe(true);
     expect(s.board.execProfiles.map((p) => p.id)).toEqual(AGENT_SEEDS.map((a) => a.name).sort());
+    expect(s.board.execProfiles.every((p) => p.scope === 'board')).toBe(true);
     expect(s.board.execProfiles.find((p) => p.isDefault)?.id).toBe(CONDUCTOR_AGENT);
     // o modelo vem das regras de esforço do board
     expect(s.board.execProfiles.find((p) => p.id === CONDUCTOR_AGENT)?.model).toMatch(/^claude:/);
-    expect(fs.readFileSync(path.join(dir, `${CONDUCTOR_AGENT}.md`), 'utf8')).toContain('faz-ai-seed: true');
-    // o condutor de fábrica leva as ferramentas do board: como subagente no chat do editor ele também fala com o board
-    expect(fs.readFileSync(path.join(dir, `${CONDUCTOR_AGENT}.md`), 'utf8')).toContain('tools: Read, Grep, Glob, Agent, mcp__faz-ai__*\n');
+    expect(s.board.execProfiles.find((p) => p.id === CONDUCTOR_AGENT)?.tools).toEqual(
+      AGENT_SEEDS.find((a) => a.name === CONDUCTOR_AGENT)!.tools,
+    );
 
-    fs.rmSync(path.join(dir, 'dados-sql.md'));
-    router.refreshHarness();
-    await open(handle, true);
-    expect(fs.existsSync(path.join(dir, 'dados-sql.md'))).toBe(false);
-    router.handle({ type: 'harness.agents.seed', force: true });
-    expect(fs.existsSync(path.join(dir, 'dados-sql.md'))).toBe(true);
+    router.handle({ type: 'harness.agent.delete', name: 'dados-sql', scope: 'user' });
+    expect(router.snapshot().harness.library!.artifacts.some((a) => a.name === 'dados-sql')).toBe(false);
+    const reopened = await open(handle, true);
+    expect(reopened.snapshot().harness.library!.artifacts.some((a) => a.name === 'dados-sql')).toBe(false);
+    reopened.handle({ type: 'harness.agents.seed', force: true });
+    expect(reopened.snapshot().harness.library!.artifacts.some((a) => a.name === 'dados-sql')).toBe(true);
+    expect(fs.existsSync(path.join(home, '.claude', 'agents'))).toBe(false);
   });
 
   it('na abertura, um agente do board gravado sem as ferramentas do servidor é regravado com elas; o escrito à mão fica', async () => {
@@ -208,20 +212,17 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
     expect(router.snapshot().board.execProfiles.find((p) => p.id === CONDUCTOR_AGENT)?.tools).toEqual(['Read', 'Grep', 'Glob', 'Agent']);
   });
 
-  it('um segundo board na mesma máquina encontra os agentes de fábrica prontos: ficam disponíveis e o condutor é o padrão', async () => {
-    await open(await handleOf(), true);
-    const dir = path.join(home, '.claude', 'agents');
-    fs.rmSync(path.join(dir, 'dados-sql.md'));
+  it('cada board tem os próprios agentes de fábrica: tirar um do board não é desfeito na próxima abertura nem afeta outro board', async () => {
+    const first = await open(await handleOf(), true);
     const second = await handleOf();
     const router = await open(second, true);
     const s = router.snapshot();
     expect(s.harnessSelection.filter((x) => x.kind === 'agent')).toHaveLength(AGENT_SEEDS.length);
     expect(s.board.execProfiles.find((p) => p.isDefault)?.id).toBe(CONDUCTOR_AGENT);
-    // o apagado foi recriado uma vez para este board; desmarcar depois não é desfeito na próxima abertura
-    expect(fs.existsSync(path.join(dir, 'dados-sql.md'))).toBe(true);
-    router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: '~/.claude/agents/dados-sql.md' }], usage: null });
+    router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: 'board:dados-sql' }], usage: null });
     const again = await open(second, true);
     expect(again.snapshot().harnessSelection.filter((x) => x.kind === 'agent')).toHaveLength(AGENT_SEEDS.length - 1);
+    expect(first.snapshot().harnessSelection.filter((x) => x.kind === 'agent')).toHaveLength(AGENT_SEEDS.length);
   });
 
   it('os perfis que o banco guardava viram arquivos globais marcados, e colunas e cards passam a apontar pelo nome', async () => {

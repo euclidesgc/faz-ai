@@ -36,6 +36,7 @@ beforeEach(async () => {
       harness: {
         ...s.harness,
         skills: [],
+        library: undefined,
         inventory: [
           {
             tool: 'claude',

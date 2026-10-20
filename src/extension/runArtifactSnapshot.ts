@@ -7,6 +7,7 @@ import { ARTIFACT_LIMITS, isSafeRelPath } from '../shared/artifacts';
 import { manifestOf } from '../shared/execution';
 import type { ArtifactRepo } from './repositories/artifactRepo';
 import type { HeadlessInput } from './headless';
+import type { AiRunConfig } from '../shared/log';
 import { alwaysRefs, cardRefs } from './promptContext';
 import { isSafeSegment } from './attachments';
 import { ArtifactMirror } from './artifactMirror';
@@ -20,6 +21,11 @@ export interface RunArtifactManifest {
   boardId: string;
   runId: string;
   createdAt: number;
+  /**
+   * A configuração resolvida da execução (modelo, agente, skills e nomes dos servidores MCP), a mesma que
+   * o log guarda: o snapshot se explica sozinho na auditoria. Sem corpos, definições MCP nem credenciais.
+   */
+  config?: RunArtifactConfig;
   artifacts: {
     id: string;
     name: string;
@@ -28,6 +34,7 @@ export interface RunArtifactManifest {
     files: { path: string; bytes: number; sha256: string }[];
   }[];
 }
+export type RunArtifactConfig = Omit<AiRunConfig, 'permission' | 'admission'>;
 export interface FrozenRunArtifacts {
   directory: string;
   manifest: RunArtifactManifest;
@@ -38,7 +45,7 @@ export interface FrozenRunArtifacts {
   readFile(file: string): { content: string; readonly: true };
 }
 
-/** Congela apenas as cópias efetivamente referenciadas; o inventário externo continua sendo legado. */
+/** Congela as cópias do board efetivamente referenciadas: só elas entram em execução (ver `toolItemsOf`). */
 export function runArtifactRequest(s: BoardState, card?: Card): RunArtifactRequest | undefined {
   const library = s.harness.library;
   if (!library) return undefined;
@@ -98,7 +105,7 @@ export class RunArtifactSnapshots {
     private boardId: string,
   ) {}
 
-  capture(runId: string, request: RunArtifactRequest = { directory: '', artifacts: [] }): FrozenRunArtifacts {
+  capture(runId: string, request: RunArtifactRequest = { directory: '', artifacts: [] }, config?: RunArtifactConfig): FrozenRunArtifacts {
     request = structuredClone(request);
     if (!isSafeSegment(runId) || !runId || !isSafeSegment(this.boardId)) throw new Error('Identidade de snapshot inválida.');
     if (new Set(request.artifacts.map((a) => a.id)).size !== request.artifacts.length) throw new Error('Artefato repetido no snapshot.');
@@ -120,7 +127,14 @@ export class RunArtifactSnapshots {
       const catalog: BoardArtifact[] = [];
       const contents = new Map<string, LibraryArtifactInput>();
       const mirror = new ArtifactMirror(request.directory, this.repo, this.boardId);
-      const manifest: RunArtifactManifest = { version: 1, boardId: this.boardId, runId, createdAt: Date.now(), artifacts: [] };
+      const manifest: RunArtifactManifest = {
+        version: 1,
+        boardId: this.boardId,
+        runId,
+        createdAt: Date.now(),
+        ...(config ? { config: structuredClone(config) } : {}),
+        artifacts: [],
+      };
       for (const ref of request.artifacts) {
         const current = known.get(ref.id);
         if (

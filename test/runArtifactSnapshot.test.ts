@@ -225,6 +225,28 @@ describe('gateway com snapshot obrigatório', () => {
     expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))[0]!.outcome).toBe('unsupported');
   });
 
+  it('o manifesto do run guarda a configuração resolvida, sem a decisão de admissão nem definições MCP', () => {
+    const gateway = new AiGateway({ boardId, runLog: createRunLog(db), spawn: vi.fn(), snapshots });
+    const input = call();
+    let manifest: Record<string, unknown> = {};
+    input.beforeSpawn = () => {
+      const runId = new AiRunRepo(db).byMonth(monthOf(Date.now()))[0]!.id;
+      manifest = JSON.parse(fs.readFileSync(path.join(dir, 'runs', boardId, runId, 'manifest.json'), 'utf8'));
+      throw new Error('parar antes do processo');
+    };
+    expect(() => gateway.run(input)).toThrow('parar antes do processo');
+    expect(manifest.config).toEqual({
+      agent: null,
+      model: null,
+      effort: null,
+      profile: null,
+      autonomous: false,
+      clean: true,
+      skills: ['testes'],
+      mcp: [],
+    });
+  });
+
   it('revalida após beforeSpawn e não inicia processo se o snapshot foi alterado', () => {
     const spawn = vi.fn();
     const gateway = new AiGateway({ boardId, runLog: createRunLog(db), spawn, snapshots });

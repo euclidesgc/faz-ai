@@ -1159,12 +1159,12 @@ execução (Configurações → Harness → tempo máximo), com a explicação n
 Os subagentes são artefatos da **Biblioteca do board**, com instruções, descrição, modelo opcional,
 categorias de ferramentas e dependências de skills e MCPs. Criar ou editar pelo Harness grava no
 board e nas cópias de leitura, sem criar arquivos nas pastas das ferramentas. Agentes existentes
-nessas pastas podem ser importados.
+nessas pastas podem ser importados. Depois de copiado, o agente não depende do arquivo original: editar ou apagar o arquivo na pasta da ferramenta não muda o board. Agentes criados por versões anteriores em `~/.claude/agents` continuam ali, mas o board não grava mais nessa pasta; editar um deles na pasta da ferramenta não atualiza a cópia do board, e para atualizá-la basta remover o agente da biblioteca e enviá-lo de novo.
 
 A execução escolhe o agente do card; na ausência dele, o agente da fase; depois, o padrão de
 **Harness → Ferramenta e execução**. Sem agentes disponíveis, usa o agente embutido, sem
 instruções adicionais. Remover um agente libera as seleções dos cards e fases que o utilizavam.
-Os agentes de fábrica existentes são mantidos na biblioteca.
+Os agentes de fábrica são criados em cada board, no banco; um que você apagou não volta, a menos que peça para recriá-los.
 
 Na aba **Sub-agentes**, use **Criar**, **Assistente guiado** ou **Gerar com base no projeto**.
 O formulário de criação e edição abre em um modal com fundo escurecido, separado da lista de agentes existentes. Clicar fora dele mantém o rascunho aberto; use Cancelar para sair.
@@ -1179,8 +1179,8 @@ modelo; nos demais executores, parte do perfil é orientação no prompt. A pont
 Sempre/Pelo card/Desligado dos servidores da biblioteca independentemente do executor.
 
 Pelo MCP, `get_board` lista os agentes disponíveis, `set_card_profile` escolhe o do card e
-`get_board_artifact`/`save_board_artifact` leem e editam a biblioteca. As APIs de arquivos nativos
-`create_agent`, `update_agent`, `get_agent` e `delete_agent` continuam por compatibilidade.
+`get_board_artifact`/`save_board_artifact` leem e editam a biblioteca. As ferramentas
+`create_agent`, `update_agent`, `get_agent` e `delete_agent` atuam nos agentes do board: não gravam em `~/.claude/agents` nem em `.cursor/agents`, `get_agent` lê a cópia do board, e `delete_agent` não apaga o arquivo original.
 
 ## Harness
 
@@ -1189,6 +1189,8 @@ O board gerencia uma **biblioteca particular**, independente da ferramenta de IA
 **Skills**, **Sub-agentes** e **MCPs**. **Ferramenta e execução** escolhe a IA, os modelos, as
 permissões, o agente padrão e o heartbeat; também conecta a ferramenta ao servidor MCP do board.
 Trocar de ferramenta preserva os artefatos e suas seleções.
+
+Execuções usam só as cópias guardadas no banco do board. Um item marcado em **Configurações → Harness** que existe só na pasta da ferramenta, sem ter sido copiado, aparece como ausente e não entra nas execuções. Apagar ou mover o arquivo original depois da cópia não muda nada no board. Os servidores MCP de uma execução vêm só das definições guardadas no board; se um agente ou card citar um servidor que não está ali, a execução não começa, e o erro pede para enviá-lo ao board em **Configurações → Harness**.
 
 Os avisos de cada tipo têm um botão com contorno, abaixo do texto e à direita, para fechar e não exibir mais. O ícone de informação permite exibir o aviso novamente.
 
@@ -1245,7 +1247,7 @@ O schema 40 migra configurações MCP da biblioteca somente após confirmar o se
 
 As ferramentas MCP `get_project_profile`, `get_board_artifact` e `save_board_artifact` permitem aos
 assistentes trabalhar na biblioteca. As APIs antigas de arquivos por ferramenta permanecem por
-compatibilidade; hooks, comandos e configurações nativas continuam sob gerenciamento da ferramenta.
+compatibilidade, mas os agentes criados ou editados pelo board ficam no banco; hooks, comandos e configurações nativas continuam sob gerenciamento da ferramenta.
 
 ## Configurações
 
@@ -1323,7 +1325,7 @@ O board e os anexos ficam no armazenamento da extensão, fora do repositório. C
 arquivo de banco (`boards/<chave da pasta>.db`), então janelas em projetos diferentes não
 interferem uma na outra. Na primeira vez, o board parte de uma cópia do banco único das versões
 anteriores (`fazai.db`), que fica intacto. Regras e skills são arquivos da pasta do projeto e
-entram no git normalmente. Evite abrir a mesma pasta em duas janelas do editor ao mesmo tempo: a
+entram no git normalmente. Agentes, skills, regras e definições MCP ficam guardados no banco do board (as credenciais das definições MCP ficam no cofre local); a pasta da biblioteca guarda uma cópia legível, e cada execução grava um snapshot próprio em `run-artifacts/`. Evite abrir a mesma pasta em duas janelas do editor ao mesmo tempo: a
 última a salvar vence (a extensão avisa quando isso acontece).
 
 **Atualizar a extensão atualiza o banco.** Ao abrir o board, a extensão aplica sozinha, em ordem,

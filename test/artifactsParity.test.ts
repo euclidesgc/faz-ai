@@ -41,6 +41,8 @@ interface Fixture {
   homeDir: string;
   /** apaga as origens (projeto e home) sem tocar no board */
   removeSources(): void;
+  /** relê o board (como a abertura e cada mudança de artefato fazem) */
+  reload(): BoardState;
   cleanup(): void;
 }
 
@@ -139,6 +141,10 @@ async function buildExecutionState(): Promise<Fixture> {
       fs.rmSync(projectDir, { recursive: true, force: true });
       fs.rmSync(homeDir, { recursive: true, force: true });
     },
+    reload: () => {
+      router.refreshHarness();
+      return router.snapshot();
+    },
     cleanup: () => fs.rmSync(root, { recursive: true, force: true }),
   };
 }
@@ -152,7 +158,7 @@ function selectionLocation(items: { kind: string; name: string; location: string
 
 /** Tudo o que a execução do card recebe, reduzido a valores comparáveis (sem caminho absoluto). */
 function snapshotOf(f: Fixture) {
-  const plan = executionPlan(f.s, f.card, f.projectDir, f.homeDir, BOARD_SERVER, f.servers);
+  const plan = executionPlan(f.s, f.card, f.servers, BOARD_SERVER);
   const lines = contextLines(f.s, f.card);
   return { plan, lines, skills: requiredSkills(f.s, f.card), rules: requiredRules(f.s, f.card) };
 }
@@ -232,5 +238,15 @@ describe('paridade da execução: o que o card recebe a partir dos artefatos', (
   it('a cópia mantém a execução completa depois de apagar as origens', () => {
     fx.removeSources();
     expectSameExecution(fx);
+  });
+
+  it('a pasta da cópia de leitura apagada volta na releitura, e a execução continua igual', () => {
+    const skill = (requiredSkills(fx.s, fx.card)[0] as { path: string }).path;
+    const directory = fx.s.harness.library!.directory;
+    fs.rmSync(directory, { recursive: true, force: true });
+    expect(fs.existsSync(skill)).toBe(false);
+    const s = fx.reload();
+    expect(fs.existsSync(skill)).toBe(true);
+    expectSameExecution({ ...fx, s, card: s.cards.find((c) => c.id === fx.card.id)! });
   });
 });

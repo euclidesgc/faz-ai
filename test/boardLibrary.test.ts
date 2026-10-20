@@ -89,20 +89,58 @@ describe('biblioteca particular do board', () => {
     let s = router.snapshot();
     expect(JSON.stringify(s)).not.toContain('segredo-particular');
     const board = { command: 'node', args: ['bridge.js'] };
-    const plan = executionPlan(s, card('c'), path.join(root, 'project'), '', board, router.libraryMcpDefinitions());
+    const plan = executionPlan(s, card('c'), router.libraryMcpDefinitions(), board);
     expect(JSON.parse(plan.input.mcpConfig!).mcpServers.memoria.env.TOKEN).toBe('segredo-particular');
     expect(plan.input.agentDefinition?.prompt).toBe('Revise com rigor.');
-    expect(
-      JSON.parse(bareExec(null, board, s, { projectDir: '', homeDir: '' }, router.libraryMcpDefinitions()).mcpConfig!).mcpServers.memoria,
-    ).toBeDefined();
+    expect(JSON.parse(bareExec(null, board, s, router.libraryMcpDefinitions()).mcpConfig!).mcpServers.memoria).toBeDefined();
     router.handle({ type: 'settings.board.update', patch: { aiTool: 'kimi' } });
     s = router.snapshot();
     expect(s.board.execProfiles[0]!.instructions).toBe('Revise com rigor.');
+    // o agente da execução é a cópia do board, não o arquivo da ferramenta (que já foi apagado)
+    expect(s.board.execProfiles[0]!.scope).toBe('board');
     expect(harnessOverview(s).agents[0]!.name).toBe('revisor');
     const cardId = router.createCard({ typeId: s.cardTypes[0]!.id, columnId: s.columns[0]!.id, parentId: null, title: 'Revisar' });
     router.handle({ type: 'card.execProfile.set', cardId, profileId: 'revisor' });
     router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: '.claude/agents/revisor.md' }], usage: null });
     expect(router.snapshot().cards.find((c) => c.id === cardId)!.execProfile).toBeNull();
+  });
+
+  it('agentes criados e editados pelo board ficam no banco: nada é gravado na pasta da ferramenta, nem na origem copiada', () => {
+    const origin = write('project/.claude/agents/copiado.md', '---\nname: copiado\ndescription: Original\n---\nCorpo original.');
+    router.refreshHarness();
+    select('agent', '.claude/agents/copiado.md');
+    router.handle({
+      type: 'harness.agent.create',
+      scope: 'user',
+      input: { name: 'novo', description: 'Novo', body: 'Faça.', model: '', tools: ['Read'], deniedTools: [], skills: [], mcp: [] },
+    });
+    expect(fs.existsSync(path.join(root, 'home/.claude/agents'))).toBe(false);
+    const agent = (name: string) => router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'agent' && a.name === name)!;
+    expect(agent('novo')).toMatchObject({ usage: 'contextual', origin: '', body: 'Faça.' });
+
+    router.handle({
+      type: 'harness.agent.update',
+      name: 'copiado',
+      scope: 'project',
+      patch: { description: 'Editado' },
+      body: 'Corpo novo.',
+    });
+    expect(agent('copiado')).toMatchObject({ description: 'Editado', body: 'Corpo novo.' });
+    expect(fs.readFileSync(origin, 'utf8')).toContain('Corpo original.');
+    expect(router.snapshot().board.execProfiles.find((p) => p.id === 'copiado')!.instructions).toBe('Corpo novo.');
+
+    router.handle({
+      type: 'harness.agent.write',
+      name: 'novo',
+      scope: 'user',
+      content: '---\nname: novo\ndescription: Pelo editor\ntools: Read, Grep\n---\nInstruções do editor.',
+    });
+    expect(agent('novo')).toMatchObject({ description: 'Pelo editor', body: 'Instruções do editor.' });
+    expect(agent('novo').agent!.tools.native.allow).toEqual(['Read', 'Grep']);
+
+    router.handle({ type: 'harness.agent.delete', name: 'copiado', scope: 'project' });
+    expect(router.snapshot().harness.library!.artifacts.some((a) => a.name === 'copiado')).toBe(false);
+    expect(fs.existsSync(origin)).toBe(true);
   });
 
   it('atualiza só sob pedido e preserva a cópia quando a origem não está disponível', () => {

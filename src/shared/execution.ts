@@ -8,8 +8,8 @@ import { columnOf, valueOf } from './selectors';
 
 /**
  * Agente do board: o que uma sessão de IA recebe para trabalhar num card, definido antes, em vez de
- * descoberto pela ferramenta. É o arquivo de agente da ferramenta (`~/.claude/agents/<nome>.md`,
- * `~/.cursor/agents/<nome>.md`), lido do disco e marcado como disponível em Configurações → Harness.
+ * descoberto pela ferramenta. Fica guardado no board (a cópia de um arquivo de agente da ferramenta, ou
+ * criado no próprio board) e marcado como disponível em Configurações → Harness.
  * Toda execução pelo board roda através de um agente: o do card, o da fase ou o padrão do board.
  * Sem nenhum arquivo marcado, vale o agente embutido (`defaultAgent`), sem instruções.
  */
@@ -286,7 +286,7 @@ function manifestWithProfile(s: BoardState, c: Card | null, profile: ExecProfile
     purpose: profile?.purpose ?? '',
     instructions: profile?.instructions ?? '',
     // as skills "Sempre" entram pelo contexto fixo (promptContext), não por aqui; o que o card lista e saiu do
-    // board (ou passou para "Desligado") fica de fora sem quebrar o card: o board referencia, não copia
+    // board (ou passou para "Desligado") fica de fora sem quebrar o card
     skills: [...new Set([...(profile?.skills ?? []), ...selected.skills])],
     rules: selected.rules,
     // os servidores do agente, os do campo MCPs do card e os do board em modo "Sempre"; o do board vai sempre, sem marcação

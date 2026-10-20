@@ -45,7 +45,11 @@ beforeEach(async () => {
   await seedBoard();
   setState((s) => ({
     board: { ...s.board, aiTool: 'claude' },
-    harness: { ...s.harness, inventory: [{ tool: 'claude', installed: true, items: [mcp('github'), mcp('postgres')] }] },
+    harness: {
+      ...s.harness,
+      library: undefined,
+      inventory: [{ tool: 'claude', installed: true, items: [mcp('github'), mcp('postgres')] }],
+    },
     harnessSelection: [
       { kind: 'mcp', location: '.mcp.json#github', usage: 'contextual' },
       { kind: 'mcp', location: '.mcp.json#postgres', usage: 'contextual' },

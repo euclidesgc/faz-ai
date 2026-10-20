@@ -208,7 +208,8 @@ export class AiGateway {
         input = this.deps.sessions.injectToken(workToken, input);
       }
       if (prepared.artifacts && !this.deps.snapshots) throw new Error('Snapshot de artefatos indisponível; execução bloqueada.');
-      const snapshot = this.deps.snapshots?.capture(runId, prepared.artifacts);
+      const { admission: _admission, ...resolved } = config;
+      const snapshot = this.deps.snapshots?.capture(runId, prepared.artifacts, resolved);
       if (snapshot) input = snapshot.rewrite(input);
       let admitted: AdmittedExecution | undefined;
       if (prepared.strict) {

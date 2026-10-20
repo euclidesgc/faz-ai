@@ -1205,11 +1205,11 @@ time limit (Settings → Harness → maximum time), with the explanation in the 
 Subagents are **Board library** artifacts with instructions, description, optional model, tool
 categories and dependencies on skills and MCPs. Creating or editing through the Harness writes to
 the board and its reading copies, without creating files in tool folders. Existing native agent
-files can be imported.
+files can be imported. Once copied, an agent does not depend on its original file: editing or deleting the file in the tool folder does not change the board. Agents created by earlier versions in `~/.claude/agents` stay there, but the board no longer writes to that folder; editing one in the tool folder does not update the board's copy, and to update it, remove the agent from the library and send it again.
 
 Runs select the card's agent, otherwise the phase's agent, then the default from **Harness →
 Tool and execution**. With no available agents, the built-in agent adds no instructions. Removing an
-agent releases card and phase selections that used it. Existing factory agents remain in the library.
+agent releases card and phase selections that used it. Factory agents are created inside each board, in its database; one you deleted does not come back unless you ask to recreate them.
 
 The **Sub-agents** tab offers **Create**, **Guided assistant** and **Generate from project**.
 Its creation and editing form opens in a modal with a dimmed background, separated from the existing agent list. Clicking outside keeps the draft open; use Cancel to leave.
@@ -1224,8 +1224,7 @@ of the profile as prompt guidance. The MCP bridge enforces Always/Per card/Off s
 independently of the executor.
 
 Through MCP, `get_board` lists available agents, `set_card_profile` selects a card's agent, and
-`get_board_artifact`/`save_board_artifact` read and edit the library. Native-file APIs `create_agent`,
-`update_agent`, `get_agent` and `delete_agent` remain for compatibility.
+`get_board_artifact`/`save_board_artifact` read and edit the library. `create_agent`, `update_agent`, `get_agent` and `delete_agent` also act on the board's agents: they do not write to `~/.claude/agents` or `.cursor/agents`, `get_agent` reads the board's copy, and `delete_agent` does not delete the original file.
 
 ## Harness
 
@@ -1233,6 +1232,8 @@ The board manages a **private library**, independent of the AI tool. Under **Set
 **Board library** provides CRUD for **Rules**, **Skills**, **Sub-agents** and **MCPs**. **Tool and
 execution** selects AI, models, permissions, default agent and heartbeat, and connects the selected
 tool to the board MCP server. Switching tools preserves artifacts and selections.
+
+Executions use only the copies stored in the board database. An item marked in **Settings → Harness** that exists only in the tool's folder and was never copied appears as missing and does not enter executions. Deleting or moving the original file after it was copied changes nothing on the board. An execution's MCP servers come only from the definitions stored on the board; if an agent or card cites a server that is not there, the execution does not start, and the error asks you to send it to the board in **Settings → Harness**.
 
 Each artifact notice has an outlined button below the text on the right to dismiss it and keep it hidden. The information icon shows the notice again.
 
@@ -1286,7 +1287,7 @@ closes a connection per operation.
 Schema 40 migrates library MCP configurations only after confirming the secret on disk. The `.credentials` vault beside the databases stores its key and encrypted files with restricted local permissions; it is excluded from exports. This does not replace operating system isolation against processes of the same user. CLI profiles and legacy native-file paths still require the complete #728 review.
 
 The `get_project_profile`, `get_board_artifact` and `save_board_artifact` MCP tools let assistants
-work in the library. Legacy tool-specific file APIs remain for compatibility; native hooks,
+work in the library. Legacy tool-specific file APIs remain for compatibility, but agents created or edited on the board are kept in the database; native hooks,
 commands and settings are still managed by their respective tool.
 
 ## Settings
@@ -1369,7 +1370,7 @@ The board and the attachments live in the extension's storage, outside the repos
 has its own database file (`boards/<folder key>.db`), so windows on different projects do not
 interfere with each other. The first time, the board starts from a copy of the single database of
 earlier versions (`fazai.db`), which is left untouched. Rules and skills are files in the project
-folder and go into git as usual. Avoid opening the same folder in two editor windows at the same
+folder and go into git as usual. Agents, skills, rules and MCP definitions are stored in the board database (the credentials of MCP definitions stay in the local vault); the library folder holds a readable copy, and each execution gets its own snapshot under `run-artifacts/`. Avoid opening the same folder in two editor windows at the same
 time: the last one to save wins (the extension warns when that happens).
 
 **Updating the extension updates the database.** When the board opens, the extension applies by
