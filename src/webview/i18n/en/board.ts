@@ -174,6 +174,7 @@ export const board: Record<string, string> = {
   'Qualquer data': 'Any date',
   'Criado em': 'Created on',
   'Atualizado em': 'Updated on',
+  'Arquivado em': 'Archived on',
   Período: 'Period',
   Hoje: 'Today',
   'Últimos 7 dias': 'Last 7 days',

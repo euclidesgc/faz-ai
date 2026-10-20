@@ -33,8 +33,18 @@ export function SortableCard({ card }: { card: Card }) {
   );
 }
 
-/** Card do board: barra na cor do tipo, título, status, campos, modelo e rodapé. */
-export function CardView({ card, overlay = false }: { card: Card; overlay?: boolean }) {
+/** Card do board; consumidores externos podem controlar a seleção com selected/onSelect. */
+export function CardView({
+  card,
+  overlay = false,
+  selected: externalSelected,
+  onSelect,
+}: {
+  card: Card;
+  overlay?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
+}) {
   const state = useBoardStore((s) => s.state)!;
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
   const selectParent = useBoardStore((s) => s.selectParent);
@@ -65,7 +75,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const archived = card.archivedAt !== null;
   const fields = fieldsForType(state, card.typeId).filter((f) => f.display !== 'hidden');
   const parent = card.parentId ? state.cards.find((c) => c.id === card.parentId) : undefined;
-  const selected = isParent && selectedParentId === card.id;
+  const selected = onSelect ? Boolean(externalSelected) : isParent && selectedParentId === card.id;
   const workingChildren = isParent ? aiWorkingChildren(state, card) : 0;
   const work: AiWork = archived
     ? null
@@ -86,7 +96,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
     overlay && 'overlay',
     archived && 'archived',
     mine && 'mine',
-    selectedIds.size > 0 && 'selecting',
+    (onSelect ? Boolean(externalSelected) : selectedIds.size > 0) && 'selecting',
     collapsed && 'card-collapsed',
   ]
     .filter(Boolean)
@@ -100,7 +110,8 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       aria-busy={busy || undefined}
       onClick={(e) => {
         e.stopPropagation();
-        if (isParent && !archived) selectParent(card.id);
+        if (onSelect) onSelect();
+        else if (isParent && !archived) selectParent(card.id);
       }}
       onDoubleClick={(e) => {
         e.stopPropagation();
@@ -124,7 +135,8 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
         onToggleCollapse={() => toggleCollapse(!collapsed)}
         leading={
           isParent &&
-          !archived && (
+          !archived &&
+          !onSelect && (
             <input
               type="checkbox"
               className="card-select"
