@@ -187,6 +187,18 @@ describe('applyFilters', () => {
     expect(run({ dateField: 'prazo', datePreset: 'custom', dateTo: '2026-10-04' })).toEqual([]);
   });
 
+  it('período de arquivamento exclui cards sem data ou fora do intervalo', () => {
+    const cards = state.cards.map((c) =>
+      c.id === 'login' ? { ...c, archivedAt: NOW - DAY } : c.id === 'bug' ? { ...c, archivedAt: NOW - 10 * DAY } : c,
+    );
+    const matched = applyFilters(
+      { ...state, cards },
+      { ...EMPTY_FILTERS, includeRelated: false, dateField: 'archivedAt', datePreset: '7d' },
+      NOW,
+    );
+    expect([...matched!]).toEqual(['login']);
+  });
+
   it('relacionamentos', () => {
     expect(run({ relation: 'withChildren' })).toEqual(['bug', 'login']);
     expect(run({ relation: 'withoutChildren' })).toEqual(['solo']);
