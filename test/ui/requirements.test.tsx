@@ -35,7 +35,7 @@ const set = (list: BoardRequirement[]) =>
     sync();
   });
 
-const setAuthExpired = (tool: string | null, expired = true) =>
+const setAuthExpired = (tool: Parameters<MessageRouter['setAuthExpired']>[0], expired = true) =>
   act(() => {
     router.setAuthExpired(tool, expired);
     sync();

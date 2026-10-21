@@ -9,6 +9,7 @@ import { PageHeader } from './settings/PageHeader';
 import { CopyCommand, RequirementFix, requirementTexts } from './RequirementsBanner';
 import type { ProfileHealth } from '../../shared/profileHealth';
 import { ProfileBlock } from './environment/ProfileBlock';
+import { NextRunSection } from './environment/NextRunSection';
 import { Button, Hint, IconExternal, IconMissing, IconOk, IconSkipped } from './ui';
 
 /** O nome do item e, no hint, como o board o usa; no idioma da interface. */
@@ -48,6 +49,13 @@ function texts(c: EnvCheck): { title: string; hint: string } {
         title: t('Artefatos presentes'),
         hint: t(
           'Um artefato do board sumiu da origem; a aba do assunto mostra quais estão ausentes, para tirar do board ou repor o arquivo.',
+        ),
+      };
+    case 'harness-isolation':
+      return {
+        title: t('Isolamento do harness'),
+        hint: t(
+          'A CLI carrega artefatos sem passar pelo board; o Diagnóstico do Harness mostra quais, para tirar da máquina ou trazer para o board.',
         ),
       };
     case 'git':
@@ -381,6 +389,7 @@ export function EnvironmentView() {
         <>
           <Section id="env-required" title={t('Necessários')} checks={report.required} />
           <ProfilesSection profiles={report.profiles} focus={focusProfile} />
+          <NextRunSection report={report} />
           <Section id="env-harness" title={t('Banco de artefatos')} checks={[report.harness]} />
           <Section id="env-recommended" title={t('Recomendados')} checks={report.recommended} />
         </>

@@ -5,6 +5,9 @@ import type { BranchRenamePending } from '../shared/branchRename';
 import { NODE_MIN_MAJOR, type EnvCheck, type EnvironmentReport, type InstallStep } from '../shared/environment';
 import { HARNESS_ISSUES, type HarnessIssue } from '../shared/harnessStatus';
 import { boardAvailability, type ProfileHealth } from '../shared/profileHealth';
+import type { AiTool } from '../shared/harness';
+import type { EffectiveLimits } from '../shared/orchestration';
+import type { PolicySimulation } from '../shared/policyManagement';
 import type { BoardRequirement } from '../shared/requirements';
 
 /** As famílias de distribuição Linux com gerenciador de pacotes conhecido. */
@@ -26,6 +29,15 @@ export interface EnvironmentProbe {
   /** a saúde de cada perfil de CLI, já montada pelo host (todos os perfis, ligados ou não) */
   health: ProfileHealth[];
   workspaceDir: string;
+  /** os perfis que o board usa por conta própria (`profilesInUse`) */
+  profilesInUse?: AiTool[];
+  /**
+   * O simulador de políticas (#620) para o alvo padrão: recebe se o padrão está disponível. Nunca chama
+   * o gateway nem a IA. Ausente: `nextRun` fica null.
+   */
+  simulateNextRun?(defaultAvailable: boolean): PolicySimulation | null;
+  /** Os limites efetivos (#621); ausente: `limits` fica null. */
+  effectiveLimits?(): EffectiveLimits | null;
   /** o que falta no banco de artefatos do board; null quando não dá para saber (sem o inventário) */
   harnessIssues: HarnessIssue[] | null;
   /** as renomeações de branch à espera de Renomear/Desfazer (#466): o item "Nome da branch" fica pendente enquanto houver */
@@ -287,10 +299,25 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
         children: [crg],
       };
 
+  const defaultHealth = profiles.find((h) => h.isDefault);
+  const simulation = p.simulateNextRun?.(!!defaultHealth && defaultHealth.problem === null) ?? null;
+  const inUse = new Set(p.profilesInUse ?? []);
+  const nextRun = simulation
+    ? {
+        simulation,
+        blockedInUse: profiles.flatMap((h) =>
+          inUse.has(h.id) && h.problem !== null ? [{ id: h.id, name: h.name, problem: h.problem }] : [],
+        ),
+      }
+    : null;
+
   return {
     required: [node],
     profiles,
     availability: boardAvailability(profiles),
+    regime: 'exclusive',
+    nextRun,
+    limits: p.effectiveLimits?.() ?? null,
     harness: harnessCheck(p.harnessIssues, req('harness')),
     recommended: [git, branchName, gh, codeGraph],
     // os instaladores do Linux e do macOS baixam pelo curl, que um Ubuntu desktop novo não traz

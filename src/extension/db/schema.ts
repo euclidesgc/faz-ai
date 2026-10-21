@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 44;
+export const SCHEMA_VERSION = 45;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -588,6 +588,11 @@ const MIGRATIONS: Record<number, string> = {
     -- #895: perguntas da IA ainda sem resposta (o carrossel do card), em JSON.
     -- Vazio quando não há; o envio das respostas grava a descrição e esvazia.
     ALTER TABLE cards ADD COLUMN questions_json TEXT NOT NULL DEFAULT '[]';
+  `,
+  45: `
+    -- #605: quantas chamadas do comando voltaram com erro (tool_result com is_error), para o sinal
+    -- "npm test com falha" do Retrabalho. Registros anteriores ficam com 0: não medido antes desta versão.
+    ALTER TABLE ai_run_bash ADD COLUMN failed INTEGER NOT NULL DEFAULT 0;
   `,
 };
 

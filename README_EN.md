@@ -410,6 +410,16 @@ Graph). Hover over an item to see how the board uses it.
   record that verification yet: the block says "Not validated: this profile has not been tested yet"
   as information, with no verified seal, and that does not stop the profile from being used. The
   link in the top warning opens the environment check on the profile's block.
+- **Capabilities, admission and Test:** each profile block has one line per capability (**Verified**,
+  **Partial** or **Unknown**; only verified gets the ready seal) and the admission ("Admissible under the
+  exclusive/compatible regime" or "Not admissible", with one reason per requirement). In the compatible
+  regime it lists what the CLI may load on its own. The **Test** button runs the tool (it uses your
+  subscription, and the warning stays on screen), one attempt of up to 2 minutes, and the top warning
+  updates itself at the end.
+- **Next run and limits:** shows the regime, the default target (with the rule and version, or the
+  block), the cards whose target is unavailable and the limits table with requested, effective and
+  reason. It comes from the policy simulator and the effective limits; without them it shows
+  "Unavailable in this version".
 - **Artifact bank** (formerly the "harness definition"): a recommendation, not a blocker. The board
   works without it, only without the context savings and precision. It points out, one child per gap,
   what is missing: no skill, agent or MCP server in Pelo card mode (use "Indicar artefatos"), no board
@@ -749,6 +759,13 @@ and also in the board opened in the browser.
   to a card in that phase was the approval) and how many came back with a **change request**, also by
   the model of the run that asked for the review, and how many stories done in the period already have
   a linked **Bug**. Only a person's answer counts: autonomous mode's automatic approval is not a review.
+  That is why the block also brings the **AI signals**, measured without a person's review: **fixes in
+  Review** (commits in runs of the Review phase), **failed `npm test`** and **commits after the pull
+  request**, in the summary and per phase, each with the part done in autonomous-mode runs; the bugs
+  line says how many of the done stories were autonomous. They are approximations (commit ≈ fix),
+  apply only to Claude Code since Bash commands started being recorded, and the Review phase is
+  recognized by its name. With no run with recorded Bash in the period, the signal is "not measured",
+  not zero.
 - **Most expensive phases and Most expensive cards** ("Fases mais caras" / "Cards mais caros"). Two
   rankings side by side, in tables you sort by tokens, runs or AI time by clicking the header
   (or with Enter/Space). The default is tokens when the period has measured tokens and AI time when
@@ -796,8 +813,9 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 - Tokens count in every measured run, from Claude Code and from Cursor. The table has no dollar cost.
 - The panel's times (permanence per phase and lead time) are not in `get_metrics`. Rework is: with
   `rework: true` (and, if you want, `start_date` and `end_date`), the answer brings the reviews, the
-  first-try approvals and the change requests per phase and per model, and the done stories with a
-  linked bug.
+  first-try approvals and the change requests per phase and per model, the done stories with a
+  linked bug and the AI signals (fixes in Review, failed `npm test`, commits after the PR), each with
+  the autonomous-mode part; "not measured" when there is no run with recorded Bash.
 - Unmeasured values appear as "-" (never 0).
 - Always tells you when the board's history started and which periods have only monthly totals
   (without per-run detail). Periods outside the retention window (6 months by default) have no detail and aggregate only

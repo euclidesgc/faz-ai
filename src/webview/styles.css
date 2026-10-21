@@ -4764,3 +4764,21 @@ div.metrics-breakdown {
     max-height: none;
   }
 }
+
+.env-limits {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+.env-limits th,
+.env-limits td {
+  text-align: left;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.env-warning {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--warn-border);
+  background: var(--warn-bg);
+}

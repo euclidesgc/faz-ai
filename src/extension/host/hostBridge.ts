@@ -151,6 +151,8 @@ export class HostBridge {
         return;
       case 'settings.aiProfiles.test':
         this.post(await this.router.testAiProfile(msg.id));
+        // o teste muda a evidência do perfil: o aviso do topo reflete o resultado sem recarregar
+        await this.router.recheckRequirements();
         return;
       case 'view.set':
         this.viewState.update(msg.patch, this);

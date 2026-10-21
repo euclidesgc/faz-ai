@@ -61,6 +61,9 @@ const report = (o: { profiles?: ProfileHealth[]; harness?: EnvCheck['status'] } 
     profile('cursor', { probe: { id: 'cursor', found: false, login: 'unchecked' }, problem: 'cli' }),
   ],
   availability: { blocked: false, reason: null, warnings: [] },
+  regime: 'exclusive',
+  nextRun: null,
+  limits: null,
   harness: harnessCheck(o.harness),
   recommended: [
     {
@@ -117,6 +120,7 @@ describe('Diagnóstico do ambiente', () => {
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
       'Necessários',
       'Perfis de CLI',
+      'Próxima execução e limites',
       'Banco de artefatos',
       'Recomendados',
     ]);
@@ -384,5 +388,133 @@ describe('Diagnóstico do ambiente', () => {
     router.markEnvironmentSeen();
     expect(seen).toHaveBeenCalledTimes(1);
     expect(router.snapshot().environmentFirstRun).toBe(false);
+  });
+
+  describe('capacidades, Testar, próxima execução e limites', () => {
+    const decisionOf = (over: object) => ({
+      action: 'fallback',
+      reason: 'rule',
+      policy: { id: 'p1', revision: 3 },
+      target: { profileId: 'cursor', model: 'composer', effort: null },
+      alternatives: [],
+      rejected: [],
+      budget: null,
+      nextAttempt: 1,
+      notBefore: null,
+      visited: [],
+      consumption: [],
+      ...over,
+    });
+    it('capacidade parcial ou desconhecida nunca aparece como verificada', () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show(
+        report({
+          profiles: [
+            profile('claude', {
+              capabilities: ['verified', 'partial', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown'],
+              evidence: { state: 'valid', version: '2.1.4', checkedAt: Date.UTC(2026, 9, 20) },
+            }),
+          ],
+        }),
+      );
+      const b = within(block('Claude Code'));
+      expect(b.getByText('Conversa nova: Verificada').closest('li')).toHaveClass('ok');
+      expect(b.getByText('Controle de artefatos: Parcial').closest('li')).not.toHaveClass('ok');
+      expect(b.getByText('Permissões: Desconhecida').closest('li')).not.toHaveClass('ok');
+      expect(b.queryByText('Permissões: Verificada')).not.toBeInTheDocument();
+    });
+    it('admissão não admissível lista os motivos, um por exigência', () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show(
+        report({
+          profiles: [
+            profile('claude', {
+              admission: {
+                version: 1,
+                regime: 'exclusive',
+                state: 'blocked',
+                capabilities: [],
+                reasons: [{ code: 'capability-not-verified', capability: 'mcp' }, { code: 'tools-missing' }],
+                tools: [],
+                deniedTools: [],
+                mcpTools: [],
+                activeMcpIds: [],
+                binding: 'x',
+              },
+            }),
+          ],
+        }),
+      );
+      const b = within(block('Claude Code'));
+      expect(b.getByText('Não admissível')).toBeInTheDocument();
+      expect(b.getByText('capability-not-verified · MCP')).toBeInTheDocument();
+      expect(b.getByText('tools-missing')).toBeInTheDocument();
+    });
+    it('o Testar avisa do uso da assinatura, mostra Testando… e não aceita o segundo clique', async () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show(report({ profiles: [profile('claude')] }));
+      const b = within(block('Claude Code'));
+      expect(b.getByText('O teste roda a ferramenta e usa a sua assinatura.')).toBeInTheDocument();
+      const button = b.getByRole('button', { name: 'Testar' });
+      await userEvent.click(button);
+      expect(await b.findByRole('status')).toHaveTextContent('Testando…');
+      expect(button).toBeDisabled();
+      expect(posted.mock.calls.filter(([m]) => m.type === 'settings.aiProfiles.test')).toHaveLength(1);
+    });
+    it('sem simulador nem limites, a seção diz "Indisponível nesta versão"', () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show(report());
+      const section = within(screen.getByRole('region', { name: 'Próxima execução e limites' }));
+      expect(section.getAllByText('Indisponível nesta versão')).toHaveLength(2);
+    });
+    it('mostra regime, alvo, regra e versão, o aviso dos cards bloqueados e a tabela de limites do relatório', () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show({
+        ...report(),
+        nextRun: {
+          simulation: { decision: decisionOf({}), hypothetical: true, problems: [], requested: { state: 'blocked' } } as never,
+          blockedInUse: [{ id: 'cursor', name: 'Cursor', problem: 'cli' }],
+        },
+        limits: {
+          branchProcesses: 2,
+          textProcesses: 4,
+          writersPerWorkspace: 1,
+          subtasks: { requested: 3, effective: 1, reason: 'Rodam uma por vez.' },
+          globalProcesses: null,
+          perProfile: { claude: 2 },
+        },
+      });
+      const s = within(screen.getByRole('region', { name: 'Próxima execução e limites' }));
+      expect(s.getByText('Regime de contexto: exclusivo')).toBeInTheDocument();
+      expect(s.getByText(/Alvo padrão: cursor · composer/)).toBeInTheDocument();
+      expect(s.getByText(/regra p1, versão 3/)).toBeInTheDocument();
+      expect(s.getByText(/Os cards com alvo Cursor não rodam/)).toBeInTheDocument();
+      const row = s.getByText('Sub-tarefas em paralelo').closest('tr')!;
+      expect(within(row).getByText('3')).toBeInTheDocument();
+      expect(within(row).getByText('Rodam uma por vez.')).toBeInTheDocument();
+      expect(s.getByText('Processos do perfil claude')).toBeInTheDocument();
+    });
+    it('decisão sem destino mostra o bloqueio', () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show({
+        ...report(),
+        nextRun: {
+          simulation: {
+            decision: decisionOf({ action: 'block', reason: 'no-policy', policy: null, target: null }),
+            hypothetical: true,
+            problems: [],
+            requested: { state: 'blocked' },
+          } as never,
+          blockedInUse: [],
+        },
+      });
+      expect(screen.getByText(/Bloqueada: Nenhuma política corresponde/)).toBeInTheDocument();
+    });
   });
 });

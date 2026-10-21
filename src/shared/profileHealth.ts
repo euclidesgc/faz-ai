@@ -1,10 +1,12 @@
 // Regras puras da saúde de cada perfil de CLI: o que o Diagnóstico e o aviso do topo mostram.
 // Não consulta banco, arquivo nem processo: recebe os probes, as capacidades e a decisão de admissão
 // já prontas e só as junta. Quem decide a admissão é `admitExecution` (executionAdmission.ts).
-import type { AiProfile } from './aiProfiles';
+import type { AiProfile, ProfileIsolation } from './aiProfiles';
 import type { CapabilityState, ExecutionAdmissionDecision } from './executionAdmission';
 import type { AiTool } from './harness';
 import type { InstallStep } from './environment';
+import type { Board } from './model';
+import { parseModelValue } from './models';
 
 /** Situação do cadastro: o importado espera revisão e não executa nada. */
 export type ProfileRegistration = 'enabled' | 'disabled' | 'pending-review';
@@ -43,6 +45,8 @@ export interface ProfileHealth {
   capabilities: CapabilityState[];
   /** a decisão de admissão no regime em vigor; null sem probe (pendente) */
   admission: ExecutionAdmissionDecision | null;
+  /** o que a CLI carrega por conta própria (regime compatível); ausente quando o host não informou */
+  isolation?: ProfileIsolation;
   evidence: { state: EvidenceState; checkedAt?: number; version?: string; ok?: boolean };
   /** prontos: os comandos oficiais; cópia/personalizado: o installUrl; null: o perfil não informou */
   install: { steps: InstallStep[]; docs: string } | { url: string } | null;
@@ -67,6 +71,7 @@ export interface ProfileHealthInput {
   credentials: ProfileHealth['credentials'];
   capabilities: CapabilityState[];
   admission: ExecutionAdmissionDecision | null;
+  isolation?: ProfileIsolation;
   evidence: ProfileHealth['evidence'];
   install: ProfileHealth['install'];
 }
@@ -102,6 +107,7 @@ export function profileHealth(i: ProfileHealthInput): ProfileHealth {
     credentials: i.credentials,
     capabilities: i.capabilities,
     admission: i.pendingReview ? null : i.admission,
+    ...(i.isolation ? { isolation: i.isolation } : {}),
     evidence: i.evidence,
     install: i.install,
     authExpired: i.authExpired,
@@ -130,4 +136,25 @@ export function boardAvailability(profiles: readonly ProfileHealth[]): BoardAvai
   if (enabled.some(profileAvailable)) return { blocked: false, reason: null, warnings };
   const onlyUntested = enabled.every((p) => p.problem === 'unvalidated' || p.problem === 'stale');
   return { blocked: true, reason: onlyUntested ? 'unvalidated' : 'unavailable', warnings };
+}
+
+/**
+ * Os perfis que o board usa por conta própria: o padrão, os prefixos dos modelos das regras de
+ * sugestão e os dos modelos dos agentes do board (RF19). Lê o prefixo `<perfil>:` do valor, sem
+ * resolver alvo (isso é da #620). O padrão vem primeiro, sem repetir; valor sem prefixo não entra,
+ * e perfil apagado continua na lista (quem bloqueia é o simulador).
+ */
+export function profilesInUse(board: Pick<Board, 'aiTool' | 'modelRules' | 'execProfiles'>): AiTool[] {
+  const out: AiTool[] = [board.aiTool];
+  const addPrefix = (value: string): void => {
+    const parsed = parseModelValue(value);
+    const colon = parsed?.id.indexOf(':') ?? -1;
+    if (parsed && colon > 0) {
+      const prefix = parsed.id.slice(0, colon);
+      if (!out.includes(prefix)) out.push(prefix);
+    }
+  };
+  for (const rule of board.modelRules) addPrefix(rule.model);
+  for (const agent of board.execProfiles) addPrefix(agent.model);
+  return out;
 }
