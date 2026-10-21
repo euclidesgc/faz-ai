@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { FLOW_SKILL_NAME } from '../shared/harnessProject';
 import { skillTemplate } from './harness';
 
-/** Skill que ensina a IA a conduzir os cards pelo fluxo do board. É instalada na pasta de skills da ferramenta em uso. */
+/** Skill que ensina a IA a conduzir os cards pelo fluxo do board. É servida pelo `get_skill`, sem arquivo instalado na pasta de skills de nenhuma ferramenta. */
 export const FLOW_SKILL = {
   name: FLOW_SKILL_NAME,
   description:
@@ -31,7 +31,7 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
    antes já está nele), os anexos e:
    - \`phase\`: a instrução da fase e, se houver, o documento que ela produz e o modelo dele;
    - \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, delegue a um subagente com essa configuração; se não for possível, avise a pessoa na conversa;
-   - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no caminho indicado, mesmo que não apareça na sua lista de skills: as execuções do board partem de contexto vazio e só conhecem o que está no board (Configurações → Harness).
+   - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no \`path\` indicado, mesmo que não apareça na sua lista de skills; a skill sem \`path\` se lê com \`get_skill <nome>\`. O que o card exige é o que está no board (Configurações → Harness).
 2. Chame \`start_work\` antes de começar. Chame \`get_board\` só quando a fase precisa dele (no Plan, para os agentes, no refinar e ao editar o board); nas demais, \`get_card\` basta, e o inventário do Harness está em \`get_harness\`.
 3. Siga a instrução de \`phase\`. Leia também os documentos das fases anteriores (anexos da história),
    quando houver. Uma história pode ser criada ou movida direto para uma fase adiante (o Plan, por
@@ -139,7 +139,7 @@ expressamente uma auditoria geral.
 ## Skills por assunto
 
 Esta skill é o essencial. O detalhe de cada assunto fica em outra skill, que você lê só quando o
-assunto aparece (o \`get_card\` aponta qual, numa nota curta):
+assunto aparece (o \`get_card\` aponta qual, numa nota curta). Leia com \`get_skill <nome>\`:
 
 - \`faz-ai-harness-do-card\`: \`model\`, \`requiredRules\`, \`requiredSkills\` e a escolha de skills, rules e servidores do card;
 - \`faz-ai-workspace-e-pr\`: \`prepare_workspace\`, a pasta de trabalho, a base do pull request, a pilha e o aviso de conflito com a base;
@@ -155,7 +155,7 @@ O \`get_card\` devolve o que o card exige para a execução; leia antes de come�
 
 - \`model\`: o modelo e o esforço que devem executar o card. O valor usa \`<perfil>:<modelo>@<esforço>\` do perfil de CLI do board. Se forem diferentes dos seus, delegue o trabalho a um subagente com essa configuração; se não for possível, avise a pessoa em vez de executar com outra. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, e as regras do board sugerem o modelo a partir dele (\`get_models\`).
 - \`requiredRules\`: leia cada arquivo em \`path\` antes de executar o card: são as instruções que o card exige, além do contexto fixo do board.
-- \`requiredSkills\`: leia o SKILL.md de cada skill em \`path\`. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em \`files\` estão os arquivos de apoio (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.
+- \`requiredSkills\`: leia o SKILL.md de cada skill em \`path\`; a que vier sem \`path\` se lê com \`get_skill <nome>\`. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em \`files\` estão os arquivos de apoio (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.
 - Skills, rules, servidores MCP e agente do card: escolha só entre o que está no board em modo "Pelo card" (\`get_harness\`). O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.
 `;
 
@@ -330,6 +330,19 @@ export const FLOW_SKILLS: readonly { name: string; description: string; body: st
     body: AUTONOMO_BODY,
   },
 ];
+
+export const FLOW_SKILL_NAMES: readonly string[] = FLOW_SKILLS.map((k) => k.name);
+
+/** Confere a lista exata: uma skill de projeto como `faz-ai-deploy` não é do fluxo só por causa do prefixo. */
+export function isFlowSkill(name: string): boolean {
+  return FLOW_SKILL_NAMES.includes(name);
+}
+
+/** SKILL.md de uma skill do fluxo, montado do texto do board; `undefined` se o nome não for do fluxo. */
+export function flowSkillMarkdown(name: string): string | undefined {
+  const k = FLOW_SKILLS.find((x) => x.name === name);
+  return k ? skillTemplate(k.name, k.description, k.body) : undefined;
+}
 
 /**
  * Grava o conjunto de skills do fluxo na pasta de skills da ferramenta (`skillsRoot`). Sem `replace`, o

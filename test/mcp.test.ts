@@ -9,6 +9,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { openInMemory } from '../src/extension/db/database';
 import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 import { FLOW_SKILLS } from '../src/extension/flowSkill';
+import { skillTemplate } from '../src/extension/harness';
 import { createMcpServer, MCP_INSTRUCTIONS, startMcpServer } from '../src/extension/mcp/server';
 import { boardServerFootprint } from '../src/extension/mcp/footprint';
 import { toolDefinitions } from '../src/extension/mcp/tools';
@@ -1239,6 +1240,32 @@ describe('status do card e checkpoint de revisão', () => {
     // só com replace a versão da pessoa é trocada
     expect((await call('install_flow_skill', { replace: true })).data).toMatchObject({ note: 'Skill substituída.' });
     expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
+  });
+
+  it('get_skill serve o fluxo e as skills por assunto do próprio board, sem arquivo instalado', async () => {
+    for (const k of FLOW_SKILLS) {
+      expect((await call('get_skill', { skill: k.name })).text).toBe(skillTemplate(k.name, k.description, k.body));
+    }
+    expect(fs.existsSync(path.join(dir, 'home-do-usuario', '.claude', 'skills'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, '.claude', 'skills'))).toBe(false);
+  });
+
+  it('get_skill devolve o texto do board mesmo com uma faz-ai-fluxo diferente na pasta de skills do projeto', async () => {
+    const dirOf = path.join(dir, '.claude', 'skills', 'faz-ai-fluxo');
+    fs.mkdirSync(dirOf, { recursive: true });
+    fs.writeFileSync(path.join(dirOf, 'SKILL.md'), '---\nname: faz-ai-fluxo\ndescription: do projeto\n---\ntexto do projeto');
+    router.refreshHarness();
+    const text = (await call('get_skill', { skill: 'faz-ai-fluxo' })).text;
+    expect(text).toContain('get_pending_work');
+    expect(text).not.toContain('texto do projeto');
+  });
+
+  it('get_skill lê do arquivo a skill comum e não trata faz-ai-deploy, do projeto, como do fluxo', async () => {
+    await call('create_skill', { name: 'faz-ai-deploy', description: 'Use ao publicar', content: 'passos do deploy' });
+    const text = (await call('get_skill', { skill: 'faz-ai-deploy' })).text;
+    expect(text).toContain('name: faz-ai-deploy');
+    expect(text).toContain('passos do deploy');
+    expect((await call('get_skill', { skill: 'nao-existe' })).error).toBe(true);
   });
 
   it('a skill do fluxo que já estava no disco, sem marcação, fica marcada em todo contexto ao "instalar" de novo', async () => {
