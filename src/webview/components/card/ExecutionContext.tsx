@@ -12,7 +12,6 @@ export const CONTEXT_ORIGINS: Record<ContextOrigin, string> = {
   story: 'Agente da história',
   'story-phase': 'Agente da fase da história',
   default: 'Agente padrão do board',
-  delegate: 'Candidato à delegação nativa',
 };
 
 const KINDS = { agent: 'Agente', subagent: 'Subagente', rule: 'Rule', skill: 'Skill', mcp: 'Servidor MCP' };

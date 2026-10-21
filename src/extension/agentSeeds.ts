@@ -2,7 +2,6 @@ import { FLOW_SKILL_NAME, toItemName } from '../shared/harnessProject';
 import { CONDUCTOR_AGENT, TOOL_PRESETS, defaultAgent } from '../shared/execution';
 import { EFFORT_FIELD } from '../shared/models';
 import type { BoardState } from '../shared/model';
-import { SUBAGENT_TOOL } from './execution';
 import type { HarnessStore } from './harness';
 import type { BoardContext } from './panel/handlers/context';
 
@@ -32,9 +31,9 @@ export const AGENT_SEEDS: Seed[] = [
   {
     name: CONDUCTOR_AGENT,
     description:
-      'Conduz os cards pelo fluxo do board (fases, documentos, revisão, pendências) e delega o trabalho técnico aos agentes especialistas.',
+      'Conduz os cards pelo fluxo do board (fases, documentos, revisão, pendências) e entrega o trabalho técnico aos agentes especialistas pelo board.',
     level: 'Médio',
-    tools: [...READ, SUBAGENT_TOOL],
+    tools: READ,
     skills: [FLOW_SKILL_NAME],
     body: [
       'Você conduz cards do board Faz AI. Siga a skill do fluxo e as instruções da fase que vêm em `phase` no get_card.',

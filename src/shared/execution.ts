@@ -201,49 +201,10 @@ export interface ExecManifest {
   target: RunTarget;
   /** modelo (nome que a CLI entende) e esforço; é o `target.model`, vazio quando o alvo não indica modelo */
   model: { name: string; effort: string | null } | null;
-  /**
-   * Os outros agentes disponíveis no board, para a sessão da história delegar as sub-tarefas a eles
-   * como subagentes (é a sessão da história que executa as sub-tarefas; nenhuma roda sozinha). Vazio
-   * numa sub-tarefa: ela já roda com o agente dela.
-   */
-  delegates: ExecDelegate[];
-}
-
-/** Um agente do board como subagente de outra sessão: o que ele sabe, pode usar e com que modelo. */
-export interface ExecDelegate {
-  name: string;
-  purpose: string;
-  instructions: string;
-  tools: string[];
-  deniedTools: string[];
-  /** nome do modelo que a ferramenta entende; null = o da sessão */
-  model: string | null;
 }
 
 /** O alvo do card, ou o padrão do board quando a escolha explícita está bloqueada (o bloqueio é tratado por quem executa). */
 const targetOfCard = (s: BoardState, c: Card): RunTarget => runTargetOf(s, c) ?? defaultTarget(s.board);
-
-/**
- * Os agentes do board que a sessão de uma história recebe como subagentes: todos os de arquivo, menos o dela.
- * O subagente roda dentro da CLI da sessão: se o modelo dele é de outro perfil, fica sem modelo (herda o da sessão).
- */
-export const delegatesOf = (s: BoardState, c: Card, own: ExecProfile | undefined): ExecDelegate[] => {
-  if (c.parentId) return [];
-  const session = targetOfCard(s, c).cli;
-  return s.board.execProfiles
-    .filter((p) => p.scope !== 'builtin' && p.id !== own?.id)
-    .map((p) => {
-      const t = targetOfValue(s.board, p.model, 'agent');
-      return {
-        name: p.id,
-        purpose: p.purpose,
-        instructions: p.instructions,
-        tools: p.tools,
-        deniedTools: p.deniedTools,
-        model: t && t.cli.id === session.id ? (t.model?.name ?? null) : null,
-      };
-    });
-};
 
 const executionFieldValues = (s: BoardState, c: Card, name: string): string[] => {
   const field = s.fieldDefs.find((f) => f.kind === 'multiselect' && f.name.toLowerCase() === name);
@@ -287,7 +248,6 @@ function manifestWithProfile(s: BoardState, c: Card | null, profile: ExecProfile
   // sem card (prévia do agente) vale o modelo do próprio agente; com card, a resolução completa (card, agente, regra, padrão)
   const target = c ? targetOfCard(s, c) : (targetOfValue(s.board, profile?.model, 'agent') ?? defaultTarget(s.board));
   return {
-    delegates: c ? delegatesOf(s, c, profile) : [],
     profile: profile?.name ?? null,
     agent: profile && profile.scope !== 'builtin' ? profile.id : '',
     purpose: profile?.purpose ?? '',

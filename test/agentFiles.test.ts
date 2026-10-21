@@ -209,7 +209,7 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
     expect(fs.readFileSync(path.join(dir, 'condutor-do-board.md'), 'utf8')).toContain('\n\nConduza.\n');
     expect(fs.readFileSync(path.join(dir, 'meu.md'), 'utf8')).toContain('tools: Read\n');
     // a interface segue mostrando só a lista da pessoa
-    expect(router.snapshot().board.execProfiles.find((p) => p.id === CONDUCTOR_AGENT)?.tools).toEqual(['Read', 'Grep', 'Glob', 'Agent']);
+    expect(router.snapshot().board.execProfiles.find((p) => p.id === CONDUCTOR_AGENT)?.tools).toEqual(['Read', 'Grep', 'Glob']);
   });
 
   it('cada board tem os próprios agentes de fábrica: tirar um do board não é desfeito na próxima abertura nem afeta outro board', async () => {

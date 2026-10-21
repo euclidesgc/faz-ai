@@ -39,7 +39,7 @@ export interface ExecutionContextPreview {
 /** Somente parágrafos idênticos de tamanho significativo; não tenta inferir conflito semântico. */
 function instructionOverlaps(m: ExecManifest): InstructionOverlap[] {
   const paragraphs = new Map<string, Set<string>>();
-  for (const agent of [{ name: m.agent || m.profile || '', instructions: m.instructions }, ...m.delegates]) {
+  for (const agent of [{ name: m.agent || m.profile || '', instructions: m.instructions }]) {
     for (const text of agent.instructions.split(/\n\s*\n/)) {
       const normalized = text.trim().replace(/\s+/g, ' ');
       if (normalized.length < 80) continue;
@@ -64,15 +64,6 @@ function preview(s: BoardState, m: ExecManifest, estimate: ContextEstimate, p: E
       tokens: m.agent ? tokensOf(m.instructions.length + m.purpose.length) : 0,
     });
   }
-  if (s.board.aiTool === 'claude')
-    for (const d of m.delegates)
-      items.push({
-        id: `delegate:${d.name}`,
-        kind: 'subagent',
-        name: d.name,
-        origins: ['delegate'],
-        tokens: tokensOf(d.name.length + d.purpose.length),
-      });
   const files = contextFilesOf(s, m, p, c);
   for (const kind of ['rule', 'skill'] as const)
     for (const file of kind === 'rule' ? files.rules : files.skills)
@@ -106,7 +97,7 @@ function preview(s: BoardState, m: ExecManifest, estimate: ContextEstimate, p: E
     estimate,
     items,
     enforcement: enforcementOf(activeProfile(s.board)),
-    overlaps: instructionOverlaps(s.board.aiTool === 'claude' ? m : { ...m, delegates: [] }),
+    overlaps: instructionOverlaps(m),
   };
 }
 

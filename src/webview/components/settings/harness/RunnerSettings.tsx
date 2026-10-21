@@ -1,5 +1,6 @@
 import { Button, Callout, Card, Text } from '@radix-ui/themes';
-import { HEARTBEAT_RANGE, PARALLEL_RANGE, RUNNER_PERMISSIONS, TIMEOUT_RANGE } from '../../../../shared/runner';
+import { HEARTBEAT_RANGE, PARALLEL_RANGE, RUNNER_PERMISSIONS, SUBTASK_PARALLEL_RANGE, TIMEOUT_RANGE } from '../../../../shared/runner';
+import { effectiveLimits } from '../../../../shared/orchestration';
 import type { AiToolInfo } from '../../../../shared/harnessProject';
 import { useBoardStore } from '../../../store/boardStore';
 import { ai, settings, ui } from '../../../commands';
@@ -16,6 +17,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
   const runner = board.runner;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === runner.permission)!;
   const worktree = board.git.mode === 'worktree';
+  const subtasks = effectiveLimits(runner, board.git.mode).subtasks;
   const hasAvailableAgent = board.execProfiles.some((p) => p.scope !== 'builtin');
   return (
     <>
@@ -170,7 +172,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
               <Text as="p" size="1" color="gray">
                 {worktree
                   ? t(
-                      'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas. As sub-tarefas independentes de cada história já rodam em paralelo, sem limite, conforme o plano.',
+                      'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas.',
                     )
                   : t(
                       'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.',
@@ -194,8 +196,29 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
                   )}
                 </FormField>
               )}
+              <FormField label={t('Sub-tarefas em paralelo por história')}>
+                {(id) => (
+                  <div className="unit-field">
+                    <NumberField
+                      id={id}
+                      min={SUBTASK_PARALLEL_RANGE.min}
+                      max={SUBTASK_PARALLEL_RANGE.max}
+                      value={runner.parallelSubtasks}
+                      onCommit={(parallelSubtasks) => settings.updateBoard({ runner: { parallelSubtasks } })}
+                    />
+                    <Text size="2" color="gray">
+                      {t('sub-tarefas')}
+                    </Text>
+                  </div>
+                )}
+              </FormField>
             </>
           )}
+          <Text as="p" size="1" color="gray">
+            {t('Efetivo: {effective}. As sub-tarefas escrevem na mesma pasta da história, então rodam uma por vez.', {
+              effective: subtasks.effective,
+            })}
+          </Text>
           {!isWeb && (
             <>
               <Text as="p" size="1" color="gray">

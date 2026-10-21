@@ -161,7 +161,7 @@ describe('contexto estimado de um card', () => {
     expect(e.unmeasured).toBe(0);
   });
 
-  it('o agente entra com as instruções; numa história no Claude Code, os outros agentes entram como subagentes, só com nome e descrição', () => {
+  it('o agente entra com as instruções; os outros agentes do board não entram (as sub-tarefas são execuções separadas)', () => {
     const story = card('h1');
     const child = sub('s1', 'h1', 'todo');
     const base = stateWith({ cards: [story, child] });
@@ -176,10 +176,7 @@ describe('contexto estimado de um card', () => {
       },
     };
     const e = estimateContext(s, story);
-    expect(group(e, 'agents')!.entries).toEqual([
-      { kind: 'agent', name: 'condutor', tokens: tokensOf(400 + 'Conduz'.length) },
-      { kind: 'subagent', name: 'backend', tokens: tokensOf('backend'.length + 'Faz o backend'.length) },
-    ]);
+    expect(group(e, 'agents')!.entries).toEqual([{ kind: 'agent', name: 'condutor', tokens: tokensOf(400 + 'Conduz'.length) }]);
     // o servidor que o agente libera aparece, sem medida
     expect(group(e, 'mcp')!.entries.at(-1)).toEqual({ kind: 'mcp-allowed', name: 'playwright', tokens: null });
     // a sub-tarefa roda com o agente dela, sem subagentes
