@@ -174,6 +174,10 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
   const inventory = new Map<string, number>();
   /** comando-base de Bash (#604) → chamadas */
   const bashCounts = new Map<string, number>();
+  /** `tool_use_id` de uma chamada de Bash → os comandos-base já contados nela; só o id e os termos, nunca a saída (#605) */
+  const bashTerms = new Map<string, string[]>();
+  /** comando-base de Bash → chamadas que voltaram com `is_error` (#605) */
+  const bashFailed = new Map<string, number>();
   /** os blocos de texto do assistente, que são a resposta quando nenhum `result` chegou */
   const saidText: string[] = [];
   /** `message.id` → consumo daquela mensagem, para o caso de o fluxo truncar antes do `result` */
@@ -217,7 +221,11 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
         // a chamada de `Agent` conta uma vez, como subagente, e não também como ferramenta
         count(item.kind, item.name);
         const bashCommand = name === 'Bash' ? asText(input?.command) : null;
-        if (bashCommand) for (const term of bashCommandTerms(bashCommand)) bashCounts.set(term, (bashCounts.get(term) ?? 0) + 1);
+        if (bashCommand) {
+          const terms = bashCommandTerms(bashCommand);
+          for (const term of terms) bashCounts.set(term, (bashCounts.get(term) ?? 0) + 1);
+          if (id) bashTerms.set(id, terms);
+        }
         lines.push(toolLine(name, input));
       }
     }
@@ -230,7 +238,10 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
     for (const raw of asList(message?.content)) {
       const block = asObject(raw);
       if (asText(block?.type) !== 'tool_result' || block?.is_error !== true) continue;
-      const name = calledTools.get(asText(block.tool_use_id) ?? '') ?? 'uma ferramenta';
+      const toolUseId = asText(block.tool_use_id) ?? '';
+      const name = calledTools.get(toolUseId) ?? 'uma ferramenta';
+      // a falha vai para cada termo da chamada (`npm test && git commit` falha nos dois), coerente com `calls`
+      for (const term of bashTerms.get(toolUseId) ?? []) bashFailed.set(term, (bashFailed.get(term) ?? 0) + 1);
       const text = resultText(block.content);
       // é esta linha que explica a falha nas últimas linhas que vão para a conversa do card
       lines.push(text ? `Erro em ${name}: ${cut(text, ERROR_MAX)}` : `Erro em ${name}.`);
@@ -340,7 +351,7 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
         const [kind, name] = key.split('\u0000');
         return { kind: kind as InventoryKind, name: name!, calls };
       });
-      const bashCommands = [...bashCounts.entries()].map(([command, calls]) => ({ command, calls, failed: 0 }));
+      const bashCommands = [...bashCounts.entries()].map(([command, calls]) => ({ command, calls, failed: bashFailed.get(command) ?? 0 }));
       // `num_turns` é do segmento: é o único campo do `result` que se soma
       const turned = results.filter((r) => r.turns !== null);
       const turns = turned.length ? turned.reduce((sum, r) => sum + r.turns!, 0) : null;
