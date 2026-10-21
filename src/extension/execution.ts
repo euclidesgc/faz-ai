@@ -1,6 +1,5 @@
-import { baseValue } from '../shared/harness';
 import { EXEC_ENFORCEMENT, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
-import type { AiTool } from '../shared/harness';
+import { activeProfile, profileBase, type AiProfile } from '../shared/aiProfiles';
 import { selectedMcpNames } from '../shared/harnessSelection';
 import type { BoardState, Card } from '../shared/model';
 import { isFlowSkill } from './flowSkill';
@@ -105,9 +104,11 @@ export function executionPlan(
   /** o servidor do board desta execução */
   board?: BoardServerSpec,
 ): ExecPlan {
-  const tool: AiTool = s.board.aiTool;
   const manifest = manifestOf(s, c);
-  const how = baseValue(EXEC_ENFORCEMENT, tool) ?? {
+  // o perfil de CLI do alvo do card (não o padrão do board): a imposição, o inventário e o arquivo de MCP seguem a CLI que executa
+  const cli = manifest.target.cli;
+  const base = profileBase(cli);
+  const how = (base ? EXEC_ENFORCEMENT[base] : undefined) ?? {
     agent: 'advised',
     skills: 'advised',
     mcp: 'advised',
@@ -115,7 +116,7 @@ export function executionPlan(
     model: 'advised',
     context: 'advised',
   };
-  const items = s.harness.inventory.find((t) => t.tool === tool)?.items ?? [];
+  const items = s.harness.inventory.find((t) => t.tool === cli.id)?.items ?? [];
   const known = [...new Set(items.filter((i) => i.kind === 'mcp').map((i) => i.name))].filter((n) => n !== BOARD_SERVER);
   const allowed = manifest.mcpServers;
   requireReviewedMcps(s, allowed);
@@ -125,7 +126,7 @@ export function executionPlan(
   // conhecido (nem desta execução nem registrado na pasta) e sem nada liberado, fica sem arquivo, e a
   // linha de comando segue sem restrição de servidores (só acontece fora da extensão)
   let mcpConfig: string | null = null;
-  if (tool === 'claude') {
+  if (base === 'claude') {
     // só as definições guardadas no board (no host, com as credenciais do cofre): a execução não lê
     // `.mcp.json` nem `~/.claude.json`, e um servidor que ficou só na pasta da ferramenta não entra
     const defs: Record<string, unknown> = { ...libraryServers };
@@ -256,8 +257,10 @@ export function bareExec(
   s?: BoardState,
   /** as definições dos servidores MCP guardadas no board; sem elas, só o servidor do board */
   libraryServers?: Record<string, unknown>,
+  /** o perfil de CLI que executa; sem ele vale o padrão do board */
+  cli?: AiProfile,
 ): ExecInput {
-  const always = s && s.board.aiTool === 'claude' && libraryServers ? selectedMcpNames(s, 'always') : [];
+  const always = s && profileBase(cli ?? activeProfile(s.board)) === 'claude' && libraryServers ? selectedMcpNames(s, 'always') : [];
   if (s) requireReviewedMcps(s, always);
   const defs: Record<string, unknown> = { ...(libraryServers ?? {}) };
   const missing = always.filter((n) => !defs[n] && s?.harness.library?.artifacts.some((a) => a.kind === 'mcp' && a.name === n));

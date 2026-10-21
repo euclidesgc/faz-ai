@@ -808,9 +808,7 @@ describe('botões de IA do card', () => {
 
   it('com a CLI sem login, os dois ficam desligados, com o motivo na dica', async () => {
     const { router, storyId } = await seedBoard();
-    router.setRequirements([
-      { id: 'signin', tool: 'cursor', cli: 'cursor-agent', action: { kind: 'command', command: 'cursor-agent login' } },
-    ]);
+    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude auth login' } }]);
     syncStore(router);
     renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
     for (const name of [/Trabalhar na fase/, /Refinar com IA/]) {

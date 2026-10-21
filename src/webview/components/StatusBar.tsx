@@ -1,4 +1,3 @@
-import { toolInfo, activeProfile } from '../../shared/aiProfiles';
 import { useState } from 'react';
 import { badgeStyle } from '../../shared/color';
 import type { Card } from '../../shared/model';
@@ -12,7 +11,7 @@ import { usePending } from '../usePending';
 import { renderMarkdown } from './MarkdownEditor';
 import { TextArea } from '@radix-ui/themes';
 import { Button, Hint, IconAi, IconHuman, IconRun, IconSuggest, SelectField } from './ui';
-import { aiBlockedReason } from './RequirementsBanner';
+import { aiBlockedReason, cardToolLabel } from './RequirementsBanner';
 import { refineHint, workHint } from './aiHints';
 
 /** O Select do Radix não aceita valor vazio: "sem status" usa este. */
@@ -50,8 +49,8 @@ export function StatusBar({ card }: { card: Card }) {
   const column = columnOf(state, card);
   const styles = state.board.appearance.statuses;
   const running = state.aiRuns.includes(card.id);
-  const toolLabel = toolInfo(activeProfile(state.board)).label;
-  const blocked = aiBlockedReason(state);
+  const toolLabel = cardToolLabel(state, card);
+  const blocked = aiBlockedReason(state, card);
   // o status novo mostra a espera no botão clicado; a nota só fecha quando o host confirma
   const change = useAction((status: CardStatus | null, text?: string) => cards.setStatus(card.id, status, text));
   // "Trabalhar na fase" e "Refinar" travam logo após o clique, até aiRuns refletir a execução (ou o tempo esgotar)

@@ -112,6 +112,26 @@ describe('ModelsSettings', () => {
     });
   });
 
+  it('Montar nova regra: modelo no Kimi e reserva no Claude, de perfis diferentes', async () => {
+    const s = state();
+    const claude = s.board.modelCatalog.find((x) => x.tool === 'claude')!;
+    const kimi = { ...claude, id: 'kimi:k3', tool: 'kimi' as const, model: 'k3', label: 'Kimi K3', efforts: [], defaultEffort: null };
+    useBoardStore.setState({ state: { ...s, board: { ...s.board, modelCatalog: [...s.board.modelCatalog, kimi] } } });
+    show();
+    await userEvent.click(screen.getByRole('button', { name: 'Montar nova regra' }));
+    const builder = within(screen.getByLabelText('Regra de sugestão'));
+    await userEvent.type(builder.getByLabelText('Nome da regra'), 'Misto');
+    const triggers = builder.getAllByRole('combobox', { name: 'Modelo' });
+    await choose(triggers[0]!, 'Kimi K3');
+    await choose(triggers[1]!, claude.label);
+    await userEvent.click(builder.getByRole('button', { name: 'Adicionar à lista' }));
+    expect(lastSent('settings.modelRules.set').rules.at(-1)).toMatchObject({
+      name: 'Misto',
+      model: 'kimi:k3',
+      fallback: `${claude.id}@${claude.defaultEffort}`,
+    });
+  });
+
   it('editar uma regra existente preserva a reserva já configurada', async () => {
     const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
     board.router.handle({

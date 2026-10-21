@@ -1,8 +1,10 @@
 import { baseValue } from '../../shared/harness';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { baseInfo } from '../../shared/harness';
-import type { BoardState } from '../../shared/model';
-import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
+import { profileLabel } from '../../shared/aiProfiles';
+import type { BoardState, Card } from '../../shared/model';
+import { defaultTarget, profilesInUse, runTargetOf } from '../../shared/runTarget';
+import { CLI_COMMAND, LOGIN_COMMAND, cliProblem, type BoardRequirement } from '../../shared/requirements';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { harness, ui } from '../commands';
@@ -14,9 +16,9 @@ import { Button, IconCheck, IconConnect, IconWarning, type ButtonVariant } from 
 /** A cor do ícone de atenção: login vencido é erro, o resto que falta é atenção, e o que só é recomendado fica discreto. */
 export type RequirementsAlertLevel = 'error' | 'warn' | 'recommended';
 
-/** Título e explicação de cada requisito, no idioma da interface. */
-export function requirementTexts(r: BoardRequirement): { title: string; detail: string } {
-  const tool = baseInfo(r.tool).label;
+/** Título e explicação de cada requisito, no idioma da interface; com o `board`, o perfil leva o nome que a pessoa deu a ele. */
+export function requirementTexts(r: BoardRequirement, board?: Pick<BoardState['board'], 'aiProfiles'>): { title: string; detail: string } {
+  const tool = board ? profileLabel(board, r.tool) : baseInfo(r.tool).label;
   switch (r.id) {
     case 'node':
       return {
@@ -199,18 +201,31 @@ export function CopyCommand({ command }: { command: string }) {
 /**
  * Por que os botões de IA do card não rodam agora, no idioma da interface; null quando rodam. Além
  * da permissão que a ferramenta não aceita, a CLI que falta ou está sem login: o clique só daria erro.
+ * Só conta o perfil que executaria o `card` (`runTargetOf`), ou o padrão sem card: o problema de outro perfil não bloqueia.
  */
-export function aiBlockedReason(state: BoardState): string | null {
+export function aiBlockedReason(state: BoardState, card?: Card): string | null {
   if (state.aiRunUnsupported) return t(state.aiRunUnsupported);
-  if (state.authExpired.length)
-    return t('O login do {tool} venceu: veja em Configurações → Verificar ambiente.', { tool: baseInfo(state.authExpired[0]!).label });
-  const cli = state.requirements.find((r) => r.id === 'cli' || r.id === 'signin');
-  if (!cli) return null;
-  return cli.id === 'cli'
-    ? t('A linha de comando do {tool} não foi encontrada: veja em Configurações → Verificar ambiente.', {
-        tool: baseInfo(cli.tool).label,
-      })
-    : t('A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.', { tool: baseInfo(cli.tool).label });
+  const target = card ? runTargetOf(state, card) : defaultTarget(state.board);
+  // escolha explícita inválida: quem executa trata o bloqueio à parte
+  if (!target) return null;
+  const tool = target.cli.name;
+  switch (cliProblem(state, target.cli.id)) {
+    case 'expired':
+      return t('O login do {tool} venceu: veja em Configurações → Verificar ambiente.', { tool });
+    case 'cli':
+      return t('A linha de comando do {tool} não foi encontrada: veja em Configurações → Verificar ambiente.', { tool });
+    case 'signin':
+      return t('A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.', { tool });
+    default:
+      return null;
+  }
+}
+
+/** O nome do perfil de CLI que trabalha no card: o da execução em curso, senão o que o executaria. */
+export function cardToolLabel(state: BoardState, card: Card): string {
+  const running = state.aiActivity.find((a) => a.cardId === card.id);
+  if (running) return profileLabel(state.board, running.tool);
+  return (runTargetOf(state, card) ?? defaultTarget(state.board)).cli.name;
 }
 
 /** Botão que resolve um requisito pelo host (CLI, disco): mostra a espera até ele confirmar, e avisa quem confere de novo. */
@@ -354,7 +369,8 @@ export function RequirementFix({
 
 /** Um item do aviso: título, explicação e a ação que o resolve. */
 function Item({ r, compact }: { r: BoardRequirement; compact: boolean }) {
-  const { title, detail } = requirementTexts(r);
+  const board = useBoardStore((s) => s.state?.board);
+  const { title, detail } = requirementTexts(r, board);
   return (
     <li>
       <strong>
@@ -395,11 +411,19 @@ function RecheckButton() {
 }
 
 const NO_EXPIRED: string[] = [];
+const NO_REQUIREMENTS: BoardRequirement[] = [];
 
-/** O que falta para o board trabalhar com a IA, com o login que venceu no meio de uma execução. */
+/**
+ * O que falta para o board trabalhar com a IA, com o login que venceu no meio de uma execução. Só entram os
+ * perfis em uso (o padrão e os dos cards com a IA): o problema de um perfil que ninguém usa não aparece.
+ */
 function useRequirementItems(): { items: BoardRequirement[]; missing: number; authError: boolean } {
-  const requirements = useBoardStore((s) => s.state?.requirements ?? []);
-  const authExpired = useBoardStore((s) => s.state?.authExpired ?? NO_EXPIRED);
+  const state = useBoardStore((s) => s.state);
+  const all = state?.requirements ?? NO_REQUIREMENTS;
+  const allExpired = state?.authExpired ?? NO_EXPIRED;
+  const inUse = useMemo(() => new Set(state ? profilesInUse(state).map((p) => p.id) : []), [state]);
+  const requirements = all.filter((r) => inUse.has(r.tool));
+  const authExpired = allExpired.filter((tool) => inUse.has(tool));
   // o sinal reativo (RF6) de um login que venceu no meio da execução pode não estar em `requirements`
   // (o probe não soube dizer): sem este item, a pessoa não veria o aviso
   const items: BoardRequirement[] = [
@@ -440,6 +464,7 @@ function requirementsSummary(items: BoardRequirement[], missing: number): string
  */
 export function useRequirementsAlert(): { level: RequirementsAlertLevel; label: string; hint: ReactNode } | null {
   const { items, missing, authError } = useRequirementItems();
+  const board = useBoardStore((s) => s.state?.board);
   if (!items.length) return null;
   const label = requirementsSummary(items, missing);
   return {
@@ -452,7 +477,7 @@ export function useRequirementsAlert(): { level: RequirementsAlertLevel; label: 
         </p>
         <ul>
           {items.map((r) => (
-            <li key={r.id}>{requirementTexts(r).title}</li>
+            <li key={`${r.id}:${r.tool}`}>{requirementTexts(r, board).title}</li>
           ))}
         </ul>
         <p className="muted">{t('Veja como resolver em Configurações → Verificar ambiente.')}</p>
@@ -480,7 +505,7 @@ export function RequirementsAlertIcon({ level, label }: { level: RequirementsAle
 export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
   const { items, missing, authError } = useRequirementItems();
   // a lista muda (algo foi resolvido): o "nada mudou" de antes não vale mais
-  const key = items.map((r) => r.id).join();
+  const key = items.map((r) => `${r.id}:${r.tool}`).join();
   if (!items.length) return null;
   return (
     <section

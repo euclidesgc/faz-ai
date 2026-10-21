@@ -1,4 +1,4 @@
-import { lastSent, posted, renderThemed, seedBoard, sentOf, syncStore, confirmLast } from './setup';
+import { lastSent, posted, renderThemed, seedBoard, sentOf, confirmLast } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -16,16 +16,29 @@ beforeEach(async () => {
   ({ router } = await seedBoard());
 });
 
+/** Copia o estado do roteador para a store, com o Cursor como perfil padrão e o Kimi ligado (o board novo nasce no Claude Code). */
+const sync = () =>
+  useBoardStore.setState({
+    state: {
+      ...router.snapshot(),
+      board: {
+        ...router.snapshot().board,
+        aiTool: 'cursor',
+        aiProfiles: router.snapshot().board.aiProfiles.map((p) => ({ ...p, enabled: p.enabled || p.id === 'cursor' || p.id === 'kimi' })),
+      },
+    },
+  });
+
 const set = (list: BoardRequirement[]) =>
   act(() => {
     router.setRequirements(list);
-    syncStore(router);
+    sync();
   });
 
 const setAuthExpired = (tool: BoardRequirement['tool'], expired = true) =>
   act(() => {
     router.setAuthExpired(tool, expired);
-    syncStore(router);
+    sync();
   });
 
 const CLI: BoardRequirement = {
@@ -38,7 +51,7 @@ const CLI: BoardRequirement = {
 const MCP: BoardRequirement = { id: 'mcp', tool: 'cursor', optional: true, action: { kind: 'connect' } };
 const PERMISSION: BoardRequirement = {
   id: 'permission',
-  tool: 'claude',
+  tool: 'cursor',
   reason: 'Escolha "Sem restrições".',
   action: { kind: 'settings' },
 };
@@ -67,7 +80,7 @@ describe('faixa de requisitos do board', () => {
     // leva ao assunto MCPs da aba da ferramenta do projeto, onde se escolhe entre global e projeto
     await userEvent.click(screen.getByRole('button', { name: /Instalar o MCP do board/ }));
     expect(sentOf('ui.connectAI')).toHaveLength(0);
-    expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'harness', harnessTab: 'claude', harnessTopic: 'mcp' });
+    expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'harness', harnessTab: 'cursor', harnessTopic: 'mcp' });
     useBoardStore.setState({ view: 'board' });
     await userEvent.click(screen.getByRole('button', { name: 'Abrir Harness' }));
     expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'harness' });
@@ -164,9 +177,9 @@ describe('botões de IA com a CLI que falta', () => {
   });
 
   it('o login vencido durante a execução (sinal reativo) também bloqueia, mesmo sem o requisito "signin"', () => {
-    setAuthExpired('claude');
-    expect(aiBlockedReason(useBoardStore.getState().state!)).toContain('login do Claude Code venceu');
-    setAuthExpired('claude', false);
+    setAuthExpired('cursor');
+    expect(aiBlockedReason(useBoardStore.getState().state!)).toContain('login do Cursor venceu');
+    setAuthExpired('cursor', false);
     expect(aiBlockedReason(useBoardStore.getState().state!)).toBeNull();
   });
 });
@@ -174,9 +187,9 @@ describe('botões de IA com a CLI que falta', () => {
 describe('login vencido: aviso de erro, item sintético e "Abrir no terminal"', () => {
   const SIGNIN: BoardRequirement = {
     id: 'signin',
-    tool: 'claude',
-    cli: 'claude',
-    action: { kind: 'command', command: 'claude auth login', terminal: true },
+    tool: 'cursor',
+    cli: 'cursor-agent',
+    action: { kind: 'command', command: 'cursor-agent login', terminal: true },
   };
 
   it('com o requisito "signin", a faixa fica com destaque de erro, não de aviso comum', () => {
@@ -198,7 +211,7 @@ describe('login vencido: aviso de erro, item sintético e "Abrir no terminal"', 
     set([SIGNIN]);
     renderThemed(<RequirementsBanner />);
     await userEvent.click(screen.getByRole('button', { name: 'Abrir no terminal' }));
-    expect(sentOf('ui.openTerminal')).toEqual([{ type: 'ui.openTerminal', command: 'claude auth login' }]);
+    expect(sentOf('ui.openTerminal')).toEqual([{ type: 'ui.openTerminal', command: 'cursor-agent login' }]);
   });
 });
 
@@ -245,5 +258,66 @@ describe('faixa de requisitos: definição do harness', () => {
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Abrir Harness' }));
     expect(useBoardStore.getState().view).toBe('settings');
+  });
+});
+
+describe('avisos por perfil de CLI', () => {
+  const KIMI_CLI: BoardRequirement = { id: 'cli', tool: 'kimi', cli: 'kimi', where: 'https://kimi.com', action: null };
+
+  /** Põe um card do Kimi (modelo `kimi:k3`) na fila da IA, ou o deixa fora dela (esperando a pessoa). */
+  const kimiCard = (queued: boolean) => {
+    const state = useBoardStore.getState().state!;
+    const field = state.fieldDefs.find((f) => f.kind === 'model')!;
+    const card = state.cards[0]!;
+    const column = state.columns.map((c) => (c.id === card.columnId ? { ...c, aiActive: true, category: 'open' as const } : c));
+    useBoardStore.setState({
+      state: {
+        ...state,
+        columns: column,
+        cards: state.cards.map((c) => (c.id === card.id ? { ...c, status: queued ? 'ready' : 'waiting_review' } : c)),
+        fieldValues: [...state.fieldValues, { cardId: card.id, fieldId: field.id, value: 'kimi:k3' }],
+        board: {
+          ...state.board,
+          modelCatalog: [
+            ...state.board.modelCatalog,
+            { id: 'kimi:k3', tool: 'kimi', model: 'k3', label: 'K3', efforts: [], defaultEffort: null } as never,
+          ],
+        },
+      },
+    });
+    return useBoardStore.getState().state!.cards.find((c) => c.id === card.id)!;
+  };
+
+  it('o aviso do Kimi só aparece com um card do Kimi na fila da IA', () => {
+    set([KIMI_CLI]);
+    kimiCard(false);
+    const { unmount } = renderThemed(<RequirementsBanner />);
+    expect(region()).toBeNull();
+    unmount();
+    kimiCard(true);
+    renderThemed(<RequirementsBanner />);
+    expect(screen.getByText('A linha de comando do Kimi Code não foi encontrada')).toBeInTheDocument();
+  });
+
+  it('o aviso do perfil padrão aparece sempre', () => {
+    set([CLI]);
+    renderThemed(<RequirementsBanner />);
+    expect(screen.getByText('A linha de comando do Cursor não foi encontrada')).toBeInTheDocument();
+  });
+
+  it('o motivo do bloqueio vale só para o card do perfil com problema', () => {
+    set([KIMI_CLI]);
+    const card = kimiCard(true);
+    const state = useBoardStore.getState().state!;
+    expect(aiBlockedReason(state, card)).toContain('linha de comando do Kimi Code não foi encontrada');
+    // o perfil padrão (Cursor) está saudável: sem card, e para um card sem escolha, nada bloqueia
+    expect(aiBlockedReason(state)).toBeNull();
+    expect(aiBlockedReason(state, { ...card, id: 'outro' })).toBeNull();
+  });
+
+  it('o login vencido de um perfil bloqueia o card dele com o nome do perfil', () => {
+    setAuthExpired('kimi');
+    const card = kimiCard(true);
+    expect(aiBlockedReason(useBoardStore.getState().state!, card)).toContain('login do Kimi Code venceu');
   });
 });

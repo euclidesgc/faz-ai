@@ -1,9 +1,10 @@
-import { resolveModelOption } from './aiProfiles';
+import { catalogTool } from './aiProfiles';
 import type { AiBase } from './aiProfiles';
 import type { Agent } from './harness';
 import { BOARD_MCP_NAME, selectedMcpNames, selectedRuleLocations, selectedSkillNames, type HarnessSelection } from './harnessSelection';
 import type { BoardState, Card } from './model';
 import { type ModelOption } from './models';
+import { defaultTarget, runTargetOf, targetOfValue, type RunTarget } from './runTarget';
 import { columnOf, valueOf } from './selectors';
 
 /**
@@ -196,7 +197,9 @@ export interface ExecManifest {
   mcpServers: string[];
   tools: string[];
   deniedTools: string[];
-  /** modelo (nome que a ferramenta entende) e esforço, quando são da ferramenta do projeto */
+  /** o alvo da execução: o perfil de CLI que executa e o modelo, resolvidos pelo valor do campo Modelo */
+  target: RunTarget;
+  /** modelo (nome que a CLI entende) e esforço; é o `target.model`, vazio quando o alvo não indica modelo */
   model: { name: string; effort: string | null } | null;
   /**
    * Os outros agentes disponíveis no board, para a sessão da história delegar as sub-tarefas a eles
@@ -217,25 +220,30 @@ export interface ExecDelegate {
   model: string | null;
 }
 
-/** O modelo do catálogo da ferramenta em uso para um valor do campo Modelo (`<id>@<esforço>`). */
-const catalogModel = (s: BoardState, value: string | null | undefined) => {
-  return resolveModelOption(s.board, value ?? undefined) ?? undefined;
-};
+/** O alvo do card, ou o padrão do board quando a escolha explícita está bloqueada (o bloqueio é tratado por quem executa). */
+const targetOfCard = (s: BoardState, c: Card): RunTarget => runTargetOf(s, c) ?? defaultTarget(s.board);
 
-/** Os agentes do board que a sessão de uma história recebe como subagentes: todos os de arquivo, menos o dela. */
-export const delegatesOf = (s: BoardState, c: Card, own: ExecProfile | undefined): ExecDelegate[] =>
-  c.parentId
-    ? []
-    : s.board.execProfiles
-        .filter((p) => p.scope !== 'builtin' && p.id !== own?.id)
-        .map((p) => ({
-          name: p.id,
-          purpose: p.purpose,
-          instructions: p.instructions,
-          tools: p.tools,
-          deniedTools: p.deniedTools,
-          model: catalogModel(s, p.model)?.name ?? null,
-        }));
+/**
+ * Os agentes do board que a sessão de uma história recebe como subagentes: todos os de arquivo, menos o dela.
+ * O subagente roda dentro da CLI da sessão: se o modelo dele é de outro perfil, fica sem modelo (herda o da sessão).
+ */
+export const delegatesOf = (s: BoardState, c: Card, own: ExecProfile | undefined): ExecDelegate[] => {
+  if (c.parentId) return [];
+  const session = targetOfCard(s, c).cli;
+  return s.board.execProfiles
+    .filter((p) => p.scope !== 'builtin' && p.id !== own?.id)
+    .map((p) => {
+      const t = targetOfValue(s.board, p.model, 'agent');
+      return {
+        name: p.id,
+        purpose: p.purpose,
+        instructions: p.instructions,
+        tools: p.tools,
+        deniedTools: p.deniedTools,
+        model: t && t.cli.id === session.id ? (t.model?.name ?? null) : null,
+      };
+    });
+};
 
 const executionFieldValues = (s: BoardState, c: Card, name: string): string[] => {
   const field = s.fieldDefs.find((f) => f.kind === 'multiselect' && f.name.toLowerCase() === name);
@@ -276,9 +284,8 @@ export function executionCardSelectionsOf(s: BoardState, c: Card | null): { skil
 
 function manifestWithProfile(s: BoardState, c: Card | null, profile: ExecProfile | undefined): ExecManifest {
   const selected = executionCardSelectionsOf(s, c);
-  const modelField = s.fieldDefs.find((f) => f.kind === 'model');
-  const rawModel = (modelField && c ? valueOf(s, c.id, modelField.id) : undefined) || profile?.model;
-  const resolved = resolveModelOption(s.board, rawModel);
+  // sem card (prévia do agente) vale o modelo do próprio agente; com card, a resolução completa (card, agente, regra, padrão)
+  const target = c ? targetOfCard(s, c) : (targetOfValue(s.board, profile?.model, 'agent') ?? defaultTarget(s.board));
   return {
     delegates: c ? delegatesOf(s, c, profile) : [],
     profile: profile?.name ?? null,
@@ -295,13 +302,15 @@ function manifestWithProfile(s: BoardState, c: Card | null, profile: ExecProfile
     ),
     tools: profile?.tools ?? [],
     deniedTools: profile?.deniedTools ?? [],
-    model: resolved
-      ? {
-          name: resolved.name,
-          effort: resolved.option ? effortToRun(resolved.option, resolved.effort) : resolved.effort,
-        }
-      : null,
+    target,
+    model: target.model ? { name: target.model.name, effort: effortOfTarget(s, target) } : null,
   };
+}
+
+/** O esforço do alvo como a CLI o recebe: o do catálogo do perfil, com o nível padrão que o Cursor exige no id. */
+function effortOfTarget(s: BoardState, target: RunTarget): string | null {
+  const option = s.board.modelCatalog.find((o) => o.tool === catalogTool(target.cli) && o.model === target.model?.name);
+  return option ? effortToRun(option, target.model!.effort) : target.model!.effort;
 }
 
 /**

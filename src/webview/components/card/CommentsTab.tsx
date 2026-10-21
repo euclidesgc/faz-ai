@@ -11,7 +11,7 @@ import { BOARD_AUTHOR } from '../../../shared/gitflow';
 import { formatDateTime, t, translateGitNotice } from '../../i18n';
 import { useAttachmentRefs } from './attachmentRefs';
 import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
-import { aiBlockedReason } from '../RequirementsBanner';
+import { aiBlockedReason, cardToolLabel } from '../RequirementsBanner';
 import { Button, DeleteButton, Hint, IconRun, IconSuggest } from '../ui';
 import { summarizeHint, workHint } from '../aiHints';
 import { activeComments } from '../../../shared/conversation';
@@ -43,9 +43,9 @@ export function CommentsTab({
   const [, starting, markStarting] = usePending(running);
   // a mensagem só sai do campo quando o host confirma: se falhar, o texto fica para tentar de novo
   const send = useAction((body: string) => comments.add(cardId, body));
-  const toolLabel = toolInfo(activeProfile(state.board)).label;
+  const toolLabel = card ? cardToolLabel(state, card) : toolInfo(activeProfile(state.board)).label;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === state.board.runner.permission)!;
-  const blocked = aiBlockedReason(state);
+  const blocked = aiBlockedReason(state, card);
   const canCall = !!card && isLive(card) && !blocked;
 
   const submit = async () => {
