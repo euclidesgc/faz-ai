@@ -1,5 +1,5 @@
 import { isFlowSkill } from '../flowSkill';
-import { activeProfile, type AiProfile } from '../../shared/aiProfiles';
+import { activeProfile, contextEnforced, isolationSummary, profileIsolation, type AiProfile } from '../../shared/aiProfiles';
 import { agentOfArtifact, itemOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
@@ -247,10 +247,26 @@ export function modelsOverview(s: BoardState) {
   };
 }
 
+/**
+ * O que a CLI do perfil ativo carrega por conta própria (declarado) e se o contexto vazio está imposto
+ * (capacidades verificadas pelo host). Lista vazia = nenhum item conhecido, nunca prova de isolamento.
+ */
+function cliLoadsOf(s: BoardState) {
+  const profile = activeProfile(s.board);
+  const iso = profileIsolation(profile);
+  return {
+    contextEnforced: contextEnforced(profile),
+    loads: iso.loads,
+    ...(iso.unrecognized ? { unrecognized: iso.unrecognized } : {}),
+    summary: isolationSummary(iso),
+    note: 'Os artefatos do board chegam pelo pedido e pelo MCP. O que está em `loads` a CLI também lê por conta própria e pode divergir do board: em conflito, vale o que o board entregou. Sem `contextEnforced`, não há prova de que a conversa começou sem artefatos externos.',
+  };
+}
+
 /** O que a sessão deve usar neste card, segundo o agente do card (o do card, o da fase ou o padrão do board). */
 function executionOf(s: BoardState, c: Card) {
   const m = manifestOf(s, c);
-  if (!m.profile) return {};
+  if (!m.profile) return { execution: { cliLoads: cliLoadsOf(s) } };
   const how = enforcementOf(activeProfile(s.board));
   const profile = s.board.execProfiles.find((p) => p.name === m.profile);
   return {
@@ -261,6 +277,7 @@ function executionOf(s: BoardState, c: Card) {
       mcpServers: ['faz-ai', ...m.mcpServers],
       ...(m.tools.length ? { tools: m.tools } : {}),
       ...(m.deniedTools.length ? { deniedTools: m.deniedTools } : {}),
+      cliLoads: cliLoadsOf(s),
       enforcedByBoardRun: EXEC_ASPECTS.filter((a) => how[a.id] === 'enforced').map((a) => a.id),
       note: 'Agente do card (`agentFile` tem as instruções). Fora da execução pelo board, siga-o como instrução: leia o arquivo e use só os servidores e ferramentas listados; `enforcedByBoardRun` são impostos só pelo board. Skill faz-ai-harness-do-card.',
     },
@@ -694,6 +711,7 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
   return {
     library: s.harness.library ? { directory: s.harness.library.directory, artifacts: s.harness.library.artifacts } : undefined,
     aiTool: s.board.aiTool,
+    cliLoads: cliLoadsOf(s),
     defaultAgent: s.board.execProfiles.find((p) => p.isDefault)?.id ?? null,
     note: onlySelected
       ? 'Só o que está no board (Configurações → Harness): é tudo o que as execuções do board usam. `usage` "always" (Sempre) entra em toda execução; "contextual" (Pelo card) só quando indicado no card (campos Rules, Skills e MCPs) ou escolhido no planejamento e no refinar; "off" (Desligado) está no board sem entrar em nada. Para ver tudo que a ferramenta carrega, chame get_harness com onlySelected = false.'
