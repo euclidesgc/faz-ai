@@ -48,6 +48,12 @@ export interface ProfileHealth {
   install: { steps: InstallStep[]; docs: string } | { url: string } | null;
   /** o login venceu numa execução (sinal reativo), mesmo com o status dizendo conectado */
   authExpired: boolean;
+  /**
+   * a validação real (teste e admissão por capacidades) conta como requisito. Falso enquanto não há
+   * quem grave evidência: o bloco mostra o estado ("não validado"), mas ele não vira problema nem
+   * bloqueia o board.
+   */
+  validationRequired: boolean;
   problem: ProfileProblem | null;
 }
 
@@ -57,6 +63,7 @@ export interface ProfileHealthInput {
   pendingReview: boolean;
   probe: ProfileProbe | null;
   authExpired: boolean;
+  validationRequired: boolean;
   credentials: ProfileHealth['credentials'];
   capabilities: CapabilityState[];
   admission: ExecutionAdmissionDecision | null;
@@ -67,12 +74,14 @@ export interface ProfileHealthInput {
 /**
  * O problema do perfil, nesta ordem: pending-review, cli, signin, unvalidated, stale, not-admissible.
  * É a ordem de resolver: sem CLI não há login, sem login não há teste, sem teste não há admissão.
- * Login `unchecked` (o perfil não tem como dizer) não impede.
+ * Login `unchecked` (o perfil não tem como dizer) não impede. Sem `validationRequired`, só os três
+ * primeiros contam.
  */
 export function profileProblem(h: Omit<ProfileHealth, 'problem'>): ProfileProblem | null {
   if (h.registration === 'pending-review') return 'pending-review';
   if (!h.probe?.found) return 'cli';
   if (h.probe.login === 'signed-out' || h.authExpired) return 'signin';
+  if (!h.validationRequired) return null;
   if (h.evidence.state === 'never') return 'unvalidated';
   if (h.evidence.state === 'stale') return 'stale';
   if (h.admission?.state !== 'admitted') return 'not-admissible';
@@ -96,6 +105,7 @@ export function profileHealth(i: ProfileHealthInput): ProfileHealth {
     evidence: i.evidence,
     install: i.install,
     authExpired: i.authExpired,
+    validationRequired: i.validationRequired,
   };
   return { ...base, problem: profileProblem(base) };
 }

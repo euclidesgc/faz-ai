@@ -28,6 +28,7 @@ function health(id: string, over: Partial<ProfileHealthInput> = {}, profile: Par
     pendingReview: false,
     probe: probe(id),
     authExpired: false,
+    validationRequired: true,
     credentials: [],
     capabilities: ['verified'],
     admission: admitted,
@@ -55,6 +56,18 @@ describe('profileProblem (ordem de resolver)', () => {
     expect(health('claude', { evidence: { state: 'stale' }, admission: blocked }).problem).toBe('stale');
     expect(health('claude', { admission: blocked }).problem).toBe('not-admissible');
     expect(health('claude', { admission: null }).problem).toBe('not-admissible');
+  });
+});
+
+describe('validação não exigida', () => {
+  it('não validado, vencido e não admissível aparecem no bloco, mas não são problema', () => {
+    for (const evidence of [{ state: 'never' }, { state: 'stale' }] as const)
+      expect(health('claude', { validationRequired: false, evidence, admission: blocked }).problem).toBeNull();
+    expect(health('claude', { validationRequired: false, evidence: { state: 'never' } }).evidence.state).toBe('never');
+  });
+  it('sem CLI e sem login continuam sendo problema', () => {
+    expect(health('claude', { validationRequired: false, probe: null }).problem).toBe('cli');
+    expect(health('claude', { validationRequired: false, authExpired: true }).problem).toBe('signin');
   });
 });
 
