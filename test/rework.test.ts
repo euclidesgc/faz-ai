@@ -112,6 +112,45 @@ describe('formatRework', () => {
     expect(text).toContain('histórias concluídas no período: 4; com bug vinculado: 1 (2 bug(s))');
     expect(formatRework(EMPTY_REWORK)).toContain('nenhuma revisão no recorte.');
   });
+
+  it('mostra os sinais da IA com a parte autônoma, por fase e no total; sem registro de Bash, "não medidos" (#605)', () => {
+    const signal = (count: number, runs: number, autonomousCount: number, autonomousRuns: number) => ({
+      count,
+      runs,
+      autonomousCount,
+      autonomousRuns,
+    });
+    const text = formatRework({
+      phases: [
+        { phase: 'PRD', reviews: 3, approved: 2, adjusted: 1, resolved: 2, firstPass: 1, ...noSignals },
+        {
+          phase: 'Revisão',
+          reviews: 0,
+          approved: 0,
+          adjusted: 0,
+          resolved: 0,
+          firstPass: 0,
+          bashRuns: 2,
+          reviewFixes: signal(3, 2, 1, 1),
+          testFailures: ZERO_SIGNAL,
+          commitsAfterPr: signal(2, 1, 0, 0),
+        },
+      ],
+      models: [],
+      escapes: { stories: 4, withBugs: 1, bugs: 2, autonomousStories: 3, autonomousWithBugs: 1, autonomousBugs: 2 },
+      aiSignals: { bashRuns: 5, reviewFixes: signal(3, 2, 1, 1), testFailures: signal(1, 1, 1, 1), commitsAfterPr: signal(2, 1, 0, 0) },
+    });
+    expect(text).toContain('correções  test c/ falha  commits pós-PR');
+    // fase sem registro de Bash: "-", não zero
+    expect(text).toContain('PRD      3         1 de 2       1        -          -              -');
+    expect(text).toContain('Revisão  0         -            0        3 (1)      0 (0)          2 (0)');
+    expect(text).toContain('com bug vinculado: 1 (2 bug(s)); autônomas: 1 de 3 (2 bug(s))');
+    expect(text).toContain('sinais da IA (execuções com registro de Bash: 5');
+    expect(text).toContain('correções na Revisão: 3 em 2 execuções (autônomas: 1 em 1)');
+    expect(text).toContain('npm test com falha: 1 em 1 execuções (autônomas: 1 em 1)');
+    expect(text).toContain('commits depois do PR: 2 em 1 histórias (autônomas: 0 em 0)');
+    expect(formatRework(EMPTY_REWORK)).toContain('sinais da IA: não medidos (nenhuma execução com registro de Bash no período)');
+  });
 });
 
 describe('aiSignalsOf: os sinais da IA (#605)', () => {

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { MetricsDim, MetricsResult, MetricsRow } from '../../log/metrics';
 import type { DefineTool } from './registry';
-import { SHOW_COST, type MetricsRework } from '../../../shared/metrics';
+import { SHOW_COST, type MetricsAiSignal, type MetricsRework } from '../../../shared/metrics';
 
 const GROUP_BY = [
   'phase',
@@ -132,8 +132,14 @@ export function formatRework(rework: MetricsRework): string {
   if (rework.phases.length)
     parts.push(
       `retrabalho por fase (só respostas de uma pessoa)\n${table(
-        ['fase', 'revisões', 'de primeira', 'ajustes'],
-        rework.phases.map((p) => [p.phase, String(p.reviews), p.resolved ? `${p.firstPass} de ${p.resolved}` : '-', String(p.adjusted)]),
+        ['fase', 'revisões', 'de primeira', 'ajustes', 'correções', 'test c/ falha', 'commits pós-PR'],
+        rework.phases.map((p) => [
+          p.phase,
+          String(p.reviews),
+          p.resolved ? `${p.firstPass} de ${p.resolved}` : '-',
+          String(p.adjusted),
+          ...[p.reviewFixes, p.testFailures, p.commitsAfterPr].map((s) => (p.bashRuns ? `${s.count} (${s.autonomousCount})` : '-')),
+        ]),
       )}`,
     );
   if (rework.models.length)
@@ -146,8 +152,22 @@ export function formatRework(rework: MetricsRework): string {
   const e = rework.escapes;
   parts.push(
     e.stories
-      ? `histórias concluídas no período: ${e.stories}; com bug vinculado: ${e.withBugs} (${e.bugs} bug(s))`
+      ? `histórias concluídas no período: ${e.stories}; com bug vinculado: ${e.withBugs} (${e.bugs} bug(s)); autônomas: ${e.autonomousWithBugs} de ${e.autonomousStories} (${e.autonomousBugs} bug(s))`
       : 'nenhuma história concluída no período',
+  );
+  // os sinais da IA (#605): a precisão medida sem revisão de pessoa; sem execução com Bash registrado, "não medido" (não é zero)
+  const a = rework.aiSignals;
+  const signal = (s: MetricsAiSignal, unit: string) =>
+    `${s.count} em ${s.runs} ${unit} (autônomas: ${s.autonomousCount} em ${s.autonomousRuns})`;
+  parts.push(
+    a.bashRuns
+      ? [
+          `sinais da IA (execuções com registro de Bash: ${a.bashRuns}; commit ≈ correção; só Claude Code)`,
+          `correções na Revisão: ${signal(a.reviewFixes, 'execuções')}`,
+          `npm test com falha: ${signal(a.testFailures, 'execuções')}`,
+          `commits depois do PR: ${signal(a.commitsAfterPr, 'histórias')}`,
+        ].join('\n')
+      : 'sinais da IA: não medidos (nenhuma execução com registro de Bash no período)',
   );
   if (!rework.phases.length) parts.unshift('nenhuma revisão no recorte.');
   return parts.join('\n\n');
@@ -182,7 +202,7 @@ export function registerMetricsTools(tool: DefineTool): void {
         .boolean()
         .optional()
         .describe(
-          'Em vez do consumo, o retrabalho do período: revisões pedidas, aprovadas de primeira e pedidos de ajuste por fase e por modelo, e as histórias concluídas com bug vinculado. Usa só start_date e end_date.',
+          'Em vez do consumo, o retrabalho do período: revisões pedidas, aprovadas de primeira e pedidos de ajuste por fase e por modelo, as histórias concluídas com bug vinculado e os sinais da IA (correções na Revisão, npm test com falha, commits depois do PR), cada um com a parte do modo autônomo. Usa só start_date e end_date.',
         ),
     },
     (a, router) => {
