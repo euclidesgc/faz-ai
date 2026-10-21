@@ -6,7 +6,7 @@ import { AGENT_SUGGESTIONS } from '../../src/shared/agentSuggestions';
 import { suggestAgentModel } from '../../src/shared/agentWizard';
 import { baseInfo, type HarnessItem } from '../../src/shared/harness';
 import { AgentWizard } from '../../src/webview/components/settings/harness/AgentWizard';
-import { AgentsTable } from '../../src/webview/components/settings/harness/AgentsTable';
+import { ArtifactsHarness } from '../../src/webview/components/settings/harness/ArtifactsHarness';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import type { BoardState } from '../../src/shared/model';
 
@@ -195,7 +195,8 @@ describe('assistente "Criar agente com ajuda"', () => {
 
 describe('Sugestões prontas e o botão do assistente na tabela de agentes', () => {
   it('"Criar agente com ajuda" abre o assistente limpo; cada sugestão pronta o abre preenchido; o botão da IA continua', async () => {
-    renderThemed(<AgentsTable tool={baseInfo('claude')} scope="user" />);
+    useBoardStore.setState({ harnessTopic: 'agent' });
+    renderThemed(<ArtifactsHarness />);
     expect(screen.getByRole('button', { name: 'Sugerir agentes com IA' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Criar agente com ajuda' }));
     expect(screen.getByRole('textbox', { name: 'Diretriz' })).toHaveValue('');

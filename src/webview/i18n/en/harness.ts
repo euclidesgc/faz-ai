@@ -3,96 +3,23 @@ export const harness: Record<string, string> = {
   'Configuração local ausente': 'Local configuration missing',
   'Este MCP exige revisão humana antes de executar.': 'This MCP requires human review before execution.',
   'A configuração local deste MCP está ausente.': 'The local configuration for this MCP is missing.',
-  'A configuração salva fica apenas no host e não é devolvida ao editor. Sem substituir, os valores atuais são preservados.':
-    'Saved configuration stays on the host and is not returned to the editor. Unless replaced, its current values are preserved.',
-  'Este MCP está pendente de revisão. Informe uma nova definição para revisar e habilitar a execução.':
-    'This MCP is pending review. Enter a new definition to review and enable execution.',
-  'A configuração local desta referência não está disponível nesta máquina.':
-    'The local configuration for this reference is unavailable on this machine.',
-  'Substituir a configuração salva': 'Replace saved configuration',
   Sugestão: 'Suggestion',
   Nenhum: 'None',
   'Recursos e resultado': 'Resources and result',
-  'Esta é a pasta de destino do board. A pasta de origem é escolhida na importação abaixo.':
-    'This is the board destination folder. Choose the source folder in the import section below.',
-  'Adicionada na pasta da biblioteca': 'Added in the library folder',
-  'Nenhuma skill na biblioteca. Use Importar de uma pasta acima ou cole uma pasta com SKILL.md na biblioteca e clique em Atualizar lista.':
-    'No skills in the library. Use Import from a folder above, or paste a folder containing SKILL.md into the library and click Refresh list.',
-  'As skills aparecem no campo Skills dos cards e no planejamento. Pelo card só entra quando escolhido; Sempre entra em toda execução.':
-    'Skills appear in the cards’ Skills field and in planning. Per card is included only when chosen; Always is included in every run.',
-  'Importar selecionadas ({n})': 'Import selected ({n})',
   'Importar {name}': 'Import {name}',
-  'Buscar skills pelo caminho': 'Find skills by path',
-  'Pasta de origem ou repositório': 'Source folder or repository',
-  '{n} skill(s) importada(s). Elas estão na aba Skills abaixo, no modo Pelo card.':
-    '{n} skill(s) imported. They are under the Skills tab below, in Per card mode.',
-  'Importar de uma pasta': 'Import from a folder',
-  'Escolhe uma pasta e lista as skills antes de copiar para o board.':
-    'Chooses a folder and lists skills before copying them to the board.',
-  '1. Escolha a pasta de origem. 2. Marque as skills encontradas. 3. Clique em Importar selecionadas. As cópias aparecem na lista abaixo e funcionam com qualquer ferramenta.':
-    '1. Choose the source folder. 2. Select the skills found. 3. Click Import selected. Copies appear in the list below and work with any tool.',
-  'Importar skills de outra pasta': 'Import skills from another folder',
   'Importar skills para o board': 'Import skills to the board',
-  'Não foi possível ler "{path}". Os arquivos foram preservados; confira o SKILL.md e os limites abaixo.':
-    'Could not read "{path}". The files were preserved; check SKILL.md and the limits below.',
-  'A pasta "{path}" precisa de um nome com letras minúsculas, números e hífens.':
-    'Folder "{path}" needs a name with lowercase letters, numbers and hyphens.',
-  'A pasta "{path}" tem o mesmo nome de uma skill já cadastrada. Seus arquivos foram preservados; renomeie a pasta para importar outra skill.':
-    'Folder "{path}" has the same name as an existing skill. Your files were preserved; rename the folder to import another skill.',
-  'Você pode colar pastas de skills aqui. Cada pasta deve conter SKILL.md; os arquivos de apoio vão junto. Ao voltar à tela ou clicar em Atualizar lista, elas aparecem em Skills, no modo Pelo card.':
-    'You can paste skill folders here. Each folder must contain SKILL.md, along with its supporting files. Return to this screen or click Refresh list to see them under Skills, in Per card mode.',
-  'Abre a pasta da biblioteca no gerenciador de arquivos do sistema.': 'Opens the library folder in the system file manager.',
-  'Atualizar lista': 'Refresh list',
-  'Reconhece skills coladas na pasta e atualiza a lista sem apagar seus arquivos.':
-    'Detects skills pasted into the folder and refreshes the list without deleting your files.',
-  'A <b>Biblioteca do board</b> reúne os artefatos disponíveis em qualquer ferramenta. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão. As abas das ferramentas mostram as fontes para importar.':
-    'The <b>Board library</b> gathers artifacts available with any tool. <b>Tool and execution</b> chooses the AI, permission and default agent. Tool tabs show sources to import from.',
-  'Tudo que o {tool} carrega. O <b>catálogo</b> (Projeto, Global e Importados) mostra as fontes. Ao enviar um artefato à <b>Biblioteca do board</b>, ele é copiado e fica disponível para as execuções com qualquer ferramenta, no modo escolhido.':
-    'Everything {tool} loads. The <b>catalog</b> (Project, Global and Imported) shows sources. Sending an artifact to the <b>Board library</b> copies it and makes it available for runs with any tool, in the chosen mode.',
 
   'Abrir pasta': 'Open folder',
-  'Origem: {path}': 'Source: {path}',
-  '{n} arquivo(s) não copiado(s); consulte os limites da biblioteca.': '{n} file(s) not copied; check the library limits.',
-  'Cada skill aceita arquivos de até 512 KB, até 100 arquivos de apoio e 5 MB no total. Itens omitidos aparecem na lista do board.':
-    'Each skill accepts files up to 512 KB, up to 100 supporting files and 5 MB in total. Omitted items are shown in the board list.',
 
-  'Copia este agente para a biblioteca do board.': 'Copies this agent to the board library.',
   'Biblioteca do board': 'Board library',
-  'Skills, agentes e regras copiados para este board ficam disponíveis com qualquer ferramenta de IA. As fontes originais são preservadas.':
-    'Skills, agents and rules copied to this board are available with any AI tool. Original sources are preserved.',
   'Pasta da biblioteca': 'Library folder',
-  'Caminho completo de uma pasta vazia': 'Full path to an empty folder',
-  'Informe uma nova pasta para a biblioteca.': 'Enter a new folder for the library.',
-  'Copia a biblioteca para a nova pasta e passa a usá-la. A pasta anterior é preservada.':
-    'Copies the library to the new folder and starts using it. The previous folder is preserved.',
-  'Salvar pasta': 'Save folder',
-  'A biblioteca ainda não está disponível.': 'The library is not available yet.',
-  'Abre a pasta da biblioteca no editor.': 'Opens the library folder in the editor.',
-  'A biblioteca é local e particular. As skills importadas não são distribuídas com a extensão. Atualizações da origem só entram quando você pede.':
-    'The library is local and private. Imported skills are not distributed with the extension. Source updates are applied only when you request them.',
-  'Buscar na biblioteca': 'Search the library',
-  'Copia as skills selecionadas e seus arquivos de apoio para a biblioteca particular deste board.':
-    'Copies the selected skills and their supporting files to this board’s private library.',
-  'Substitui a cópia do board pelo conteúdo atual da origem.': 'Replaces the board copy with the current source content.',
-  'Atualizar "{name}" da origem?': 'Update "{name}" from the source?',
-  'A cópia atual do board será substituída. A origem não será alterada.':
-    'The current board copy will be replaced. The source will not be changed.',
-  'Atualizar da origem': 'Update from source',
-  'Mostrando o catálogo do {tool}. Os artefatos enviados ao board ficam disponíveis com qualquer ferramenta.':
-    'Showing the {tool} catalog. Artifacts sent to the board are available with any tool.',
 
   // --- HarnessSettings
   Harness: 'Harness',
-  'O que a IA lê e usa neste projeto. <b>Ferramenta e execução</b> escolhe com qual IA o board trabalha; <b>Do projeto</b> reúne o que faz parte do repositório e é editável aqui; <b>Tudo que a ferramenta carrega</b> mostra também o que vem da sua pasta de usuário e de plugins.':
-    'What the AI reads and uses in this project. <b>Tool and execution</b> chooses which AI the board works with; <b>From the project</b> gathers what is part of the repository and can be edited here; <b>Everything the tool loads</b> also shows what comes from your user folder and from plugins.',
   'Ferramenta e execução': 'Tool and execution',
-  'Do projeto': 'From the project',
   'Tudo que a ferramenta carrega': 'Everything the tool loads',
-  'Tudo aqui são arquivos da pasta do projeto: vão no repositório e valem para quem trabalha nele.':
-    'Everything here is files in the project folder: they go in the repository and apply to everyone working on it.',
 
   // --- HarnessInventory
-  'Relê as pastas do projeto e do usuário': 'Re-reads the project and user folders',
   'deste projeto': 'this project',
   'não encontrada': 'not found',
 
@@ -107,109 +34,23 @@ export const harness: Record<string, string> = {
   Cancelar: 'Cancel',
 
   // --- InstallSkills
-  'Instalar no projeto': 'Install in the project',
   'Instalar no global': 'Install globally',
-  'Instalar {n} skill(s)?': 'Install {n} skill(s)?',
-  'As pastas são copiadas para {destination}. Nada é executado na instalação, mas uma skill são instruções (e às vezes scripts) que a IA vai seguir: leia o que vem de fontes que você não conhece.':
-    'The folders are copied to {destination}. Nothing is run during installation, but a skill is instructions (and sometimes scripts) that the AI will follow: read what comes from sources you do not know.',
   'a sua pasta de usuário': 'your user folder',
   'o projeto': 'the project',
   Instalar: 'Install',
-  'Instalar skills': 'Install skills',
-  'dono/repositorio, endereço git (https ou ssh) ou o caminho de uma pasta': 'owner/repository, git URL (https or ssh) or a folder path',
-  'Procurar skills': 'Find skills',
-  'Um repositório é clonado numa pasta temporária, sem rodar nada dele. Você vê as skills encontradas antes de copiar qualquer coisa.':
-    'A repository is cloned into a temporary folder, without running anything from it. You see the skills found before anything is copied.',
-  '{n} skill(s) em {source}': '{n} skill(s) in {source}',
-  'Onde instalar': 'Where to install',
-  'nome de pasta inválido para skill': 'invalid folder name for a skill',
-  'já existe no destino': 'already exists at the destination',
-  'Instalar {name}': 'Install {name}',
-  '{n} arquivo(s) de apoio': '{n} support file(s)',
-  'Nenhuma pasta com SKILL.md nessa origem.': 'No folder with SKILL.md in this source.',
-  'Selecionar todas': 'Select all',
-  'Instalar {n} selecionada(s)': 'Install {n} selected',
 
   // --- ItemRow
-  'Selecionar {name}': 'Select {name}',
-  'copiada no projeto': 'copied in the project',
-  'no projeto, com conteúdo diferente': 'in the project, with different content',
-  'Novo hook': 'New hook',
   'Novo servidor': 'New server',
   'sem arquivo': 'no file',
-  'Nada aqui ainda.': 'Nothing here yet.',
-  'Você pode criar:': 'You can create:',
-  'Desinstalar "{name}"?': 'Uninstall "{name}"?',
-  'Desinstalar {n} plugins?': 'Uninstall {n} plugins?',
-  'A pasta de cada um sai de ~/.cursor/plugins/local.': "Each one's folder is removed from ~/.cursor/plugins/local.",
-  'O Claude Code remove o plugin e apaga os dados e as opções que ele guardou.':
-    'Claude Code removes the plugin and deletes the data and options it saved.',
   Desinstalar: 'Uninstall',
-  'Ações nos plugins marcados': 'Actions on the checked plugins',
-  'Aplicando pela ferramenta…': 'Applying through the tool…',
-  Desativar: 'Disable',
-  Ativar: 'Enable',
-  'A ferramenta não carrega o plugin até ele ser ativado de novo': 'The tool does not load the plugin until it is enabled again',
   desativado: 'disabled',
-  'Vem da sua conta no claude.ai: dá para desativar, não para desinstalar':
-    'Comes from your claude.ai account: it can be disabled, not uninstalled',
-  'sincronizado do claude.ai': 'synced from claude.ai',
-  'Instalado pela sua organização: dá para desativar, não para desinstalar':
-    'Installed by your organization: it can be disabled, not uninstalled',
   'da organização': 'from the organization',
-  'Modo da skill': 'Skill mode',
-  'Ações nos itens marcados': 'Actions on the checked items',
-  'Selecionar todos: {group}': 'Select all: {group}',
-  '{n} marcados': '{n} checked',
   'Selecionar todos': 'Select all',
-  'Remover {n} entradas?': 'Remove {n} entries?',
-  'O board não respondeu. Se a extensão acabou de ser atualizada, recarregue a janela (no VS Code, Developer: Reload Window) e abra o arquivo de novo.':
-    'The board did not reply. If the extension was just updated, reload the window (in VS Code, Developer: Reload Window) and open the file again.',
-  'não lido pelo Claude Code': 'not read by Claude Code',
-  'Por padrão, o Claude Code não lê este arquivo nas suas conversas, porque o projeto tem {claude}. Para ler os dois, importe com @{path} no {claude} ou mude Project instructions no /config do Claude Code.':
-    'By default, Claude Code does not read this file in your conversations, because the project has {claude}. To read both, import it with @{path} in {claude} or change Project instructions in Claude Code /config.',
-  'O Claude Code está lendo o {path}. Criar um CLAUDE.md ou CLAUDE.local.md faz ele parar de ler, a menos que o arquivo novo importe com @{path}.':
-    'Claude Code is reading {path}. Creating a CLAUDE.md or CLAUDE.local.md makes it stop, unless the new file imports it with @{path}.',
-  'Criar {path}': 'Create {path}',
-  'ferramenta deste projeto': "this project's tool",
-  'Mostrando o que o {tool} carrega. As execuções do board usam o {board}: a marcação só vale para ele.':
-    'Showing what {tool} loads. Board runs use {board}: the marking only applies to it.',
   'não encontrada nesta máquina': 'not found on this machine',
-  'Entra no começo de toda conversa da ferramenta': 'Loaded at the start of every conversation of the tool',
-  'sempre carregado': 'always loaded',
-  'A ferramenta só lê o conteúdo quando a tarefa pede ou quando você chama':
-    'The tool only reads the content when the task calls for it or when you call it',
   'sob demanda': 'on demand',
-  'Importa com @, e entram junto:': 'Imports with @, which load along with it:',
-  'Abre o arquivo importado no board': 'Opens the imported file in the board',
-  'Abre o arquivo no board, para ler e editar': 'Opens the file in the board, to read and edit',
-  'Abre o arquivo no board, só para leitura': 'Opens the file in the board, read-only',
-  'Somente leitura: este arquivo é mantido pela ferramenta ou por um plugin.':
-    'Read-only: this file is maintained by the tool or by a plugin.',
   'Conteúdo do arquivo': 'File content',
-  'Modo da skill {name}': 'Mode of skill {name}',
-  'Skill importada: o modo nativo é de quem mantém a pasta, e no board o que vale é o modo do artefato.':
-    "Imported skill: the native mode belongs to whoever keeps the folder, and on the board what counts is the artifact's mode.",
-  'Skill de plugin: o modo não pode ser alterado aqui. Para mudar, copie a skill para o projeto.':
-    'Plugin skill: the mode cannot be changed here. To change it, copy the skill to the project.',
-  'Referências, modelos e scripts da pasta da skill': "References, templates and scripts from the skill's folder",
-  'Arquivos ({n})': 'Files ({n})',
-  'Cria uma cópia independente na pasta do projeto': 'Creates an independent copy in the project folder',
-  'Copiar para o projeto': 'Copy to the project',
-  'Cria uma cópia na sua pasta de usuário, que vale em todos os projetos':
-    'Creates a copy in your user folder, which applies to all projects',
-  'Copiar para o global': 'Copy to global',
   Apagar: 'Delete',
-  'Remover o hook deste arquivo': 'Remove the hook from this file',
-  'Remover o hook de "{name}"?': 'Remove the hook from "{name}"?',
-  '{detail}\n\nA entrada sai de {location}.': '{detail}\n\nThe entry is removed from {location}.',
   Remover: 'Remove',
-  'Remover a regra deste arquivo': 'Remove the rule from this file',
-  'Remover a regra de permissão?': 'Remove the permission rule?',
-  '{description}: {name}\n\nA regra sai de {location}.': '{description}: {name}\n\nThe rule is removed from {location}.',
-  'Remover o servidor deste arquivo': 'Remove the server from this file',
-  'Remover o servidor "{name}"?': 'Remove the server "{name}"?',
-  'A entrada sai de {location}.': 'The entry is removed from {location}.',
 
   // --- KindSection
   'Instruções e regras': 'Instructions and rules',
@@ -232,40 +73,21 @@ export const harness: Record<string, string> = {
     'Installed packages that bring skills, agents, commands, hooks and MCP servers.',
   'Configurações e permissões': 'Settings and permissions',
   'Arquivos de configuração da ferramenta.': "The tool's configuration files.",
-  'Buscar e instalar': 'Find and install',
-  'Nova regra de permissão': 'New permission rule',
   'Novo arquivo': 'New file',
   Novo: 'New',
-  'Modelos de classe e exemplos de código ficam bem numa skill própria, só quando indicada: os arquivos vão em <code>references/</code> e os cards que a indicam recebem os caminhos.':
-    'Class templates and code examples fit well in a skill of their own, used only when indicated: the files go in <code>references/</code> and the cards that indicate it receive the paths.',
-  'Criar skill de modelos': 'Create templates skill',
-  'Plugins são instalados pela própria ferramenta, {where}:': 'Plugins are installed by the tool itself, {where}:',
   'no terminal': 'in the terminal',
   'no Cursor (Customize → Plugins) ou numa sessão do agente': 'in Cursor (Customize → Plugins) or in an agent session',
   'claude plugin marketplace add <dono/repositorio>': 'claude plugin marketplace add <owner/repository>',
-  'gh skill search <termo>': 'gh skill search <term>',
   'agent plugin marketplace add <endereço git>': 'agent plugin marketplace add <git URL>',
-  '/plugins install <pasta, zip ou endereço do GitHub>': '/plugins install <folder, zip or GitHub URL>',
-  'Um hook é um comando que a ferramenta roda sozinha no seu computador. Só acrescente comandos que você conhece.':
-    'A hook is a command the tool runs on its own on your computer. Only add commands you know.',
-  'Os servidores do <code>~/.claude.json</code> aparecem aqui, mas são alterados pelo Claude Code: <code>claude mcp add --scope user …</code> e <code>claude mcp remove …</code>.':
-    'The servers in <code>~/.claude.json</code> show up here, but are changed by Claude Code: <code>claude mcp add --scope user …</code> and <code>claude mcp remove …</code>.',
 
   // --- Escopos
   Projeto: 'Project',
   Global: 'Global',
   Importados: 'Imported',
   'Indicar artefatos': 'Suggest artifacts',
-  'Indicando…': 'Suggesting…',
-  'A IA lê o projeto e o catálogo deste assunto e deixa pré-selecionados os artefatos que fazem mais sentido; você confirma.':
-    "The AI reads the project and this subject's catalog and pre-selects the artifacts that make the most sense; you confirm.",
-  '{n} indicados: confira a seleção e use "Enviar para o board".': '{n} suggested: check the selection and use "Enviar para o board".',
-  'A IA não indicou nenhum artefato deste assunto.': 'The AI suggested no artifact of this subject.',
-  'Descartar indicação': 'Discard suggestion',
   'Não há artefatos fora do board neste assunto.': 'There are no artifacts off the board in this subject.',
   'A IA não respondeu no formato esperado.': 'The AI did not answer in the expected format.',
   'Indicar artefatos só vale para a ferramenta do projeto.': 'Suggesting artifacts only works for the project tool.',
-  'Indicado pela IA': 'Suggested by the AI',
   indicado: 'suggested',
   'Encontrados nas pastas que você importou; a ferramenta não os carrega sozinha.':
     'Found in the folders you imported; the tool does not load them on its own.',
@@ -281,34 +103,20 @@ export const harness: Record<string, string> = {
   'Só quando indicada': 'Only when indicated',
 
   // --- NewHook
-  'Acrescentar este hook?': 'Add this hook?',
-  'O {tool} vai rodar este comando sozinho, no seu computador, a cada "{event}":\n\n{command}\n\nArquivo: {file}':
-    '{tool} will run this command on its own, on your computer, on every "{event}":\n\n{command}\n\nFile: {file}',
-  'Acrescentar hook': 'Add hook',
-  'Hook novo': 'New hook',
   Arquivo: 'File',
   Evento: 'Event',
-  'Filtro (opcional)': 'Filter (optional)',
-  'Ex.: Bash, ou Edit|Write; vazio = sempre': 'E.g.: Bash, or Edit|Write; empty = always',
   Comando: 'Command',
-  'Tempo limite (s)': 'Timeout (s)',
   'padrão da ferramenta': 'tool default',
 
   // --- NewItem
-  'Criar na pasta do usuário?': 'Create in the user folder?',
   Criar: 'Create',
-  'Item novo': 'New item',
   Onde: 'Where',
   Descrição: 'Description',
-  'Descrição (opcional)': 'Description (optional)',
-  'Quando a IA deve usar': 'When the AI should use it',
-  'Criar e abrir no editor': 'Create and open in the editor',
   '<nome>': '<name>',
 
   // --- NewMcpServer
   'Comando local (stdio)': 'Local command (stdio)',
   'Endereço (HTTP)': 'URL (HTTP)',
-  'Acrescentar servidor na pasta do usuário?': 'Add server to the user folder?',
   Acrescentar: 'Add',
   'Servidor MCP novo': 'New MCP server',
   Tipo: 'Type',
@@ -317,76 +125,29 @@ export const harness: Record<string, string> = {
   Endereço: 'URL',
   'Variáveis de ambiente': 'Environment variables',
   Cabeçalhos: 'Headers',
-  'Gravados no arquivo como estão. Se o arquivo vai para o repositório, não ponha segredos nele.':
-    'Written to the file as they are. If the file goes in the repository, do not put secrets in it.',
-  'CHAVE=valor, um por linha': 'KEY=value, one per line',
   'Acrescentar servidor': 'Add server',
 
   // --- NewPermission
-  'Acrescentar regra na pasta do usuário?': 'Add rule to the user folder?',
-  'Regra de permissão nova': 'New permission rule',
   Lista: 'List',
   permitir: 'allow',
   perguntar: 'ask',
   negar: 'deny',
   Regra: 'Rule',
-  'Ex.: Shell(git), Read(src/**)': 'E.g.: Shell(git), Read(src/**)',
-  'Ex.: Bash(npm run test *), Read(./.env)': 'E.g.: Bash(npm run test *), Read(./.env)',
-  'Acrescentar regra': 'Add rule',
 
   // --- ProjectAgents
   Editar: 'Edit',
-  'Apagar o subagente': 'Delete the subagent',
-  'Apagar o subagente "{name}"?': 'Delete the subagent "{name}"?',
-  'O arquivo do subagente é removido do projeto.': "The subagent's file is removed from the project.",
-  'Sem descrição no frontmatter.': 'No description in the frontmatter.',
-  'Novo subagente': 'New subagent',
-  'Subagentes do {tool}: cada arquivo em <code>{dir}</code> define um ajudante com instruções próprias, e a ferramenta delega trabalho a ele pela descrição.':
-    '{tool} subagents: each file in <code>{dir}</code> defines a helper with its own instructions, and the tool delegates work to it based on the description.',
-  'Um subagente pode fixar o modelo que usa, o que serve para executar um card com o modelo indicado nele.':
-    'A subagent can pin the model it uses, which is how a card is run with the model set on it.',
-  'Subagente novo': 'New subagent',
-  'Descrição (quando delegar)': 'Description (when to delegate)',
   'Revisa uma Spec e aponta lacunas antes do Plan': 'Reviews a Spec and points out gaps before the Plan',
-  'Instruções do subagente': 'Subagent instructions',
-  'Criar subagente': 'Create subagent',
-  'Modelo (opcional)': 'Model (optional)',
   'vazio = o modelo da sessão': 'empty = the session model',
-  'Nenhum subagente em <code>{dir}</code> ainda.': 'No subagents in <code>{dir}</code> yet.',
 
   // --- ProjectRules
   Existe: 'Exists',
   'Não existe': 'Does not exist',
-  'Lido por: {readBy}': 'Read by: {readBy}',
-  'Cria um CLAUDE.md que só importa o AGENTS.md, para as regras ficarem num arquivo só':
-    'Creates a CLAUDE.md that only imports AGENTS.md, so the rules live in a single file',
-  'Usar o AGENTS.md': 'Use AGENTS.md',
   'Apagar o arquivo': 'Delete the file',
-  'Apagar {name}?': 'Delete {name}?',
-  'O arquivo é removido da pasta do projeto.': 'The file is removed from the project folder.',
   'Regras do projeto': 'Project rules',
-  'Instruções carregadas em toda sessão de IA. Quanto mais curtas, menos contexto consomem.':
-    'Instructions loaded in every AI session. The shorter they are, the less context they use.',
 
   // --- ProjectSkills
-  'Skills do {tool} em <code>{dir}</code>. Todas viram opções do campo "Skills" dos cards, e um card que indica uma skill entrega à IA o caminho do arquivo. Por isso uma skill não precisa ficar à vista da IA para ser usada:':
-    '{tool} skills in <code>{dir}</code>. All of them become options in the "Skills" field of cards, and a card that indicates a skill hands the AI the file path. That is why a skill does not need to be in the AI\'s sight to be used:',
-  '<b>Automática</b>: a IA vê a descrição em toda sessão e decide quando usar.':
-    '<b>Automatic</b>: the AI sees the description in every session and decides when to use it.',
-  '<b>Só quando indicada</b>: a IA não a invoca sozinha; vale quando um card a indica ou quando é chamada pelo nome.':
-    '<b>Only when indicated</b>: the AI does not invoke it on its own; it applies when a card indicates it or when it is called by name.',
-  '<b>Desligada</b>: movida para <code>{dir}-disabled</code>; a ferramenta não a enxerga, mas um card ainda pode indicá-la.':
-    '<b>Off</b>: moved to <code>{dir}-disabled</code>; the tool cannot see it, but a card can still indicate it.',
-  '{n} skills automáticas no projeto.': '{n} automatic skills in the project.',
-  'A IA deixa de invocar essas skills sozinha; elas continuam valendo nos cards que as indicam':
-    'The AI stops invoking these skills on its own; they still apply on the cards that indicate them',
-  'Deixar todas só quando indicadas': 'Set all to only when indicated',
-  'Skill nova': 'New skill',
   'Descrição (quando usar)': 'Description (when to use)',
-  'Use ao revisar uma Spec antes de passar para o Plan': 'Use when reviewing a Spec before moving on to the Plan',
-  'Instruções da skill, em markdown': 'Skill instructions, in markdown',
   'Criar skill': 'Create skill',
-  'Nenhuma skill em <code>{dir}</code> ainda.': 'No skills in <code>{dir}</code> yet.',
 
   // --- ProjectTool
   'Ferramenta deste projeto': "This project's tool",
@@ -432,7 +193,6 @@ export const harness: Record<string, string> = {
   'Limpar seleção': 'Clear selection',
 
   // --- SkillFiles
-  'Criar arquivo numa skill da pasta do usuário?': 'Create a file in a user-folder skill?',
   'Sem arquivos de apoio.': 'No support files.',
   Abrir: 'Open',
   'Apagar "{file}"?': 'Delete "{file}"?',
@@ -447,36 +207,16 @@ export const harness: Record<string, string> = {
   // --- SkillRow
   Ligada: 'On',
   Desligada: 'Off',
-  'Desligar: tira a skill do contexto das ferramentas de IA': "Turn off: removes the skill from the AI tools' context",
-  'Ligar a skill': 'Turn the skill on',
-  'Apagar a skill': 'Delete the skill',
-  'Apagar a skill "{name}"?': 'Delete the skill "{name}"?',
-  'A pasta da skill é removida do projeto, com todos os arquivos dela.':
-    "The skill's folder is removed from the project, along with all its files.",
 
   // --- useItemActions e text.ts
   'O arquivo fica na sua pasta de usuário e vale para todos os seus projetos.':
     'The file stays in your user folder and applies to all your projects.',
   '{n} itens': '{n} items',
-  'Copiar {what} para a pasta do usuário?': 'Copy {what} to the user folder?',
   Copiar: 'Copy',
-  'Copiar {what} para o projeto?': 'Copy {what} to the project?',
-  'Cada item vira uma cópia independente na pasta do projeto.': 'Each item becomes an independent copy in the project folder.',
-  'Alterar skills da pasta do usuário?': 'Change user-folder skills?',
-  'A mudança é gravada no arquivo da skill. {warning}': 'The change is written to the skill file. {warning}',
-  Alterar: 'Change',
   'Apagar "{name}"?': 'Delete "{name}"?',
-  'Apagar {n} itens?': 'Delete {n} items?',
-  'A pasta da skill é removida, com todos os arquivos dela: {location}':
-    "The skill's folder is removed, along with all its files: {location}",
-  'O arquivo é removido: {location}': 'The file is removed: {location}',
   'Reler pastas': 'Reread folders',
-  'Relendo as pastas e os plugins…': 'Rereading the folders and the plugins…',
-  'Buscando a origem e procurando skills…': 'Fetching the source and looking for skills…',
   'Trocando a ferramenta e relendo o harness…': 'Switching the tool and rereading the harness…',
   'Rodar o heartbeat agora': 'Run the heartbeat now',
-  'Buscar skills para instalar': 'Find skills to install',
-  'Abrir no editor': 'Open in editor',
   'Histórias ao mesmo tempo': 'Stories at the same time',
   histórias: 'stories',
   'Tocar histórias em paralelo': 'Drive stories in parallel',
@@ -510,8 +250,6 @@ export const harness: Record<string, string> = {
   'Instalar (padrão da ferramenta)': 'Install (tool default)',
   'Reinstalar neste projeto': 'Reinstall in this project',
   'Instalar neste projeto': 'Install in this project',
-  'A skill do fluxo do board é instalada em "Tudo que a ferramenta carrega" → {tool} → Skills: no global (padrão) ou neste projeto.':
-    'The board flow skill is installed in "Everything the tool loads" → {tool} → Skills: globally (default) or in this project.',
   'No Cursor, o servidor do board fica em <code>{project}</code>, fora do git. O global do Cursor é um processo só para todas as janelas e não sabe qual board atender. O board grava este registro sozinho ao abrir no Cursor; se o "faz-ai" aparecer desligado em Cursor Settings → MCP, ligue.':
     'In Cursor, the board server lives in <code>{project}</code>, outside git. Cursor\'s global scope is a single process for all windows and cannot tell which board to serve. The board writes this registration on its own when it opens in Cursor; if "faz-ai" shows as off in Cursor Settings → MCP, turn it on.',
   // --- HarnessSettings (contexto vazio)
@@ -525,16 +263,9 @@ export const harness: Record<string, string> = {
     'Does not get in on its own: only when the card lists it, chosen by the planning, by "Refine with AI" or by you.',
   Desligado: 'Off',
   'Está no board, mas não entra em nenhuma execução até você ativar.': 'It is on the board, but gets into no run until you turn it on.',
-  'Fora do board': 'Off the board',
   'Modo no board: {name}': 'Mode on the board: {name}',
-  'Só o que está no board entra nas execuções; o resto fica invisível para elas.':
-    'Only what is on the board goes into runs; the rest is invisible to them.',
   'Modo no board': 'Mode on the board',
   // --- AgentsTable
-  'O {tool} não define agentes em arquivos; o board executa os cards com o agente embutido.':
-    '{tool} does not define agents in files; the board runs cards with the built-in agent.',
-  'Um agente é um arquivo de agente do {tool} em <code>{dir}</code>: as instruções são o papel da sessão, e o frontmatter diz o modelo, as ferramentas, as skills e os servidores MCP que ela recebe. <b>Disponível no board</b> é o que os cards e as fases podem escolher; o <b>padrão</b> executa quando nenhum deles escolhe.':
-    'An agent is a {tool} agent file in <code>{dir}</code>: the instructions are the session role, and the frontmatter sets the model, tools, skills and MCP servers it gets. <b>Available on the board</b> is what cards and phases can pick; the <b>default</b> runs when none of them picks.',
   'A IA ainda está respondendo no chat do board.': 'The AI is still answering in the board chat.',
   'A IA lê o projeto e cria ou ajusta os agentes; acompanhe no chat do board.':
     'The AI reads the project and creates or adjusts the agents; follow it in the board chat.',
@@ -544,16 +275,10 @@ export const harness: Record<string, string> = {
   'Agente novo': 'New agent',
   'Como este agente trabalha: padrões, comandos, o que nunca fazer': 'How this agent works: patterns, commands, what never to do',
   'Criar agente': 'Create agent',
-  'Os cards e as fases podem escolher este agente; o padrão precisa estar disponível':
-    'Cards and phases can pick this agent; the default must be available',
   'Disponível no board': 'Available on the board',
-  'Disponível no board: {name}': 'Available on the board: {name}',
   'Criado pelo board; pode ser editado ou apagado': 'Created by the board; it can be edited or deleted',
   'de fábrica': 'factory',
   'Tornar padrão': 'Make default',
-  'O arquivo é removido: {location}. Colunas e cards que usam este agente voltam ao padrão.':
-    'The file is removed: {location}. Columns and cards using this agent fall back to the default.',
-  'Nenhum agente do {tool} neste escopo.': 'No {tool} agent in this scope.',
   // --- AgentEditor
   'Uma frase: é por ela que o "Refinar com IA" escolhe o agente de um card.':
     'One sentence: it is how "Refine with AI" picks the agent for a card.',
@@ -573,69 +298,19 @@ export const harness: Record<string, string> = {
   'Skills e rules': 'Skills and rules',
   'Contexto vazio': 'Empty context',
   // --- Harness por ferramenta e por assunto
-  'O projeto trabalha com uma ferramenta de IA por vez. Ela define o arquivo de regras, a pasta das skills, onde o servidor MCP é registrado e os modelos oferecidos nos cards. Pastas de outras ferramentas podem existir no projeto, mas o board não mexe nelas. O servidor MCP do board e a skill do fluxo são instalados na aba de cada ferramenta, nos assuntos MCPs e Skills, em Projeto.':
-    "The project works with one AI tool at a time. It defines the rules file, the skills folder, where the MCP server is registered and the models offered on cards. Folders of other tools may exist in the project, but the board does not touch them. The board MCP server and the flow skill are installed in each tool's tab, under the MCPs and Skills topics, in Project.",
-  'O que a IA pode usar nas execuções do board. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão; cada ferramenta tem a sua aba, com um assunto por vez, e em cada um a origem: Board, Projeto, Global ou Importados.':
-    'What the AI may use in board runs. <b>Ferramenta e execução</b> (Tool and run) picks the AI, the permission and the default agent; each tool has its tab, one subject at a time, and in each one the origin: Board, Projeto, Global or Importados.',
-  'Como funciona': 'How it works',
-  'Como usar o Harness': 'How to use the Harness',
-  '<b>Para que serve.</b> Toda execução do board parte de contexto vazio. Esta tela é o catálogo do que existe na sua máquina e no projeto; o <b>Board</b> é só o que a IA pode usar.':
-    '<b>What it is for.</b> Every board run starts from an empty context. This screen is the catalog of what exists on your machine and in the project; the <b>Board</b> is only what the AI may use.',
-  '<b>Por que assim.</b> Menos contexto por execução é resposta mais rápida, mais barata e mais precisa. O planejamento de cada card escolhe o mínimo entre o que está no Board.':
-    '<b>Why this way.</b> Less context per run means faster, cheaper and more precise answers. The planning of each card picks the minimum among what is on the Board.',
-  '<b>Por onde começar.</b> 1) Abra a aba da ferramenta do projeto e, em Skills e MCPs, use <b>Indicar artefatos</b> e envie ao Board. 2) Em Sub-agentes, crie um agente com ajuda. 3) Em Regras, revise as que entraram desligadas e ative as que valem.':
-    "<b>Where to start.</b> 1) Open the project tool's tab and, in Skills and MCPs, use <b>Indicar artefatos</b> and send to the Board. 2) In Sub-agentes, create an agent with help. 3) In Regras, review the ones that entered off and turn on the ones that apply.",
   'Entendi, não mostrar de novo': 'Got it, do not show again',
-  '{n} no board, {off} desligadas': '{n} on the board, {off} off',
-  '{n} no board': '{n} on the board',
-  'Nenhum agente no board: toda execução roda com o escopo cheio. Crie um em Projeto ou Global, com "Criar agente com ajuda" ou pelas sugestões prontas.':
-    'No agent on the board: every run has the full scope. Create one in Projeto or Global, with "Criar agente com ajuda" or from the ready-made suggestions.',
-  'Nenhuma regra no board. Envie as do projeto a partir de Projeto ou Global; elas entram desligadas, para você revisar antes de ativar.':
-    'No rule on the board. Send the project ones from Projeto or Global; they enter off, for you to review before turning on.',
-  'Nada neste assunto no board: o planejamento dos cards não tem de onde escolher. Vá a Projeto ou Global, use "Indicar artefatos" e envie ao board.':
-    'Nothing of this subject on the board: the cards\' planning has nothing to pick from. Go to Projeto or Global, use "Indicar artefatos" and send to the board.',
-  'Ir para Projeto': 'Go to Projeto',
-  'Ir para Global': 'Go to Global',
-  'Harness do {tool}': '{tool} harness',
-  'Tudo que o {tool} carrega, por assunto. O <b>catálogo</b> (Projeto, Global e Importados) mostra o que existe e não ocupa o contexto da IA. Só o que você envia ao <b>Board</b> pode ser usado pelas execuções, no modo de cada artefato.':
-    'Everything {tool} loads, by topic. The <b>catalog</b> (Project, Global and Imported) shows what exists and takes no space in the AI context. Only what you send to the <b>Board</b> can be used by runs, in the mode of each artifact.',
-  'A linha de comando do {tool} não desliga artefatos: regras, servidores MCP e o mais que estiver no projeto entram no contexto conforme o {tool} decidir. Para o "tudo desligado" valer, desligue nas configurações do {tool} ou remova do projeto o que você não quer no contexto das tarefas. O board só avisa.':
-    '{tool}\'s command line does not turn artifacts off: rules, MCP servers and anything else in the project enter the context as {tool} sees fit. For "everything off" to hold, turn them off in {tool}\'s settings or remove from the project what you do not want in the context of tasks. The board only warns.',
   'Sub-agentes': 'Sub-agents',
   MCPs: 'MCPs',
   Comandos: 'Commands',
-  Demais: 'Other',
   'em Harness › Sub-agentes': 'in Harness › Sub-agents',
-  'Origem dos artefatos': 'Origin of the artifacts',
-  'O que você enviou ao board: só isso entra nas execuções, no modo de cada um (Sempre, Pelo card ou Desligado).':
-    'What you sent to the board: only this gets into runs, in the mode of each one (Always, By card or Off).',
   'Arquivos desta pasta; valem só aqui.': 'Files in this folder; they apply only here.',
   'Arquivos da sua pasta de usuário; valem em todos os projetos.': 'Files in your user folder; they apply to all projects.',
   'Buscar por nome ou descrição': 'Search by name or description',
   'Buscar por nome ou descrição…': 'Search by name or description…',
   'Nada encontrado para a busca.': 'Nothing found for the search.',
-  'As regras entram desligadas: escritas para outro contexto, elas podem conflitar com o fluxo e as definições do board (fases, aprovação, uso do MCP). Leia o texto de cada uma antes de ativar; regra ativa entra em toda execução.':
-    'Rules come in off: written for another context, they may conflict with the board flow and settings (phases, approval, MCP use). Read the text of each one before turning it on; an active rule goes into every run.',
-  'Remover do board': 'Remove from the board',
-  'Remover do board: {name}': 'Remove from the board: {name}',
   ausente: 'missing',
-  'O arquivo de origem não existe mais; os cards que o listam continuam intactos.':
-    'The source file no longer exists; the cards that list it stay intact.',
   'Os cards e as fases podem escolher este agente.': 'Cards and phases may pick this agent.',
-  'Enviar para o board': 'Send to the board',
-  'Disponibiliza para os cards deste board; o board lê o arquivo da origem na hora de usar.':
-    "Makes it available to this board's cards; the board reads the source file when using it.",
-  'Pastas importadas:': 'Imported folders:',
-  'Remover pasta': 'Remove folder',
-  'Remover pasta: {dir}': 'Remove folder: {dir}',
-  'Remover a pasta importada?': 'Remove the imported folder?',
-  '{dir}\n\nOs artefatos dela saem do board e deixam de aparecer em Importados. A pasta em si não é tocada.':
-    '{dir}\n\nIts artifacts leave the board and stop showing in Imported. The folder itself is not touched.',
   'Importar artefatos': 'Import artifacts',
-  'Escolhe uma pasta e procura nela skills, agentes, comandos, hooks e servidores MCP no formato da ferramenta.':
-    'Picks a folder and looks in it for skills, agents, commands, hooks and MCP servers in the format of the tool.',
-  'Caminho da pasta a importar': 'Path of the folder to import',
-  'Caminho da pasta, no computador onde o board roda': 'Folder path, on the computer where the board runs',
   Importar: 'Import',
 
   // --- Editor de agentes por ferramenta e assistentes de criação
@@ -728,24 +403,7 @@ export const harness: Record<string, string> = {
   'Abre o assistente com as respostas preenchidas, para você ajustar e confirmar.':
     'Opens the assistant with the answers filled in, for you to adjust and confirm.',
   'Criar regra com ajuda': 'Create rule with help',
-  'Acrescentar ao arquivo': 'Add to the file',
   'Criar regra': 'Create rule',
-  'Onde a regra vale: em todo o projeto ou só num assunto?': 'Where does the rule apply: the whole project or only one subject?',
-  'Só nos arquivos de teste': 'Only in test files',
-  'Este escopo não tem onde gravar regras para a ferramenta escolhida.': 'This scope has nowhere to write rules for the chosen tool.',
-  'Onde a regra vale': 'Where the rule applies',
-  'Principal (todo o projeto)': 'Main (whole project)',
-  'Por assunto': 'By subject',
-  'A regra principal entra no começo de toda conversa. Num arquivo que já existe, o texto é acrescentado no fim.':
-    'The main rule goes in at the start of every conversation. In a file that already exists, the text is added at the end.',
-  'acrescenta ao existente': 'adds to the existing one',
-  'Uma regra nova em {path}.': 'A new rule in {path}.',
-  'Com caminhos, o Claude Code só a lê quando mexe nesses arquivos (paths no topo do arquivo).':
-    'With paths, Claude Code only reads it when working on those files (paths at the top of the file).',
-  'Com caminhos, o Cursor só a aplica a esses arquivos (globs no topo do arquivo).':
-    'With paths, Cursor only applies it to those files (globs at the top of the file).',
-  'Caminhos (opcional)': 'Paths (optional)',
-  'Separados por vírgula. Vazio = vale sempre que a regra for lida.': 'Comma-separated. Empty = applies whenever the rule is read.',
   'O que a regra garante? Uma regra por linha, no imperativo.': 'What does the rule guarantee? One rule per line, in the imperative.',
   'Mensagens de commit em português, no imperativo, sem ponto final.':
     'Commit messages in Portuguese, in the imperative, with no final period.',
@@ -764,7 +422,6 @@ export const harness: Record<string, string> = {
   'A regra entra no board desligada: você a revisa e ativa depois, na lista de regras.':
     'The rule enters the board switched off: you review and activate it later, in the rules list.',
   'Confira o rascunho. Nada é gravado antes do botão de baixo.': 'Check the draft. Nothing is written before the button below.',
-  '(acrescenta ao fim do arquivo)': '(added to the end of the file)',
   'Desligada, até você ativar': 'Off, until you activate it',
   'Texto da regra': 'Rule text',
   'Estes trechos podem conflitar com o fluxo do board:': "These passages may conflict with the board's flow:",
@@ -776,7 +433,6 @@ export const harness: Record<string, string> = {
   'A tarefa': 'The task',
   'Uma tarefa só: skill estreita é mais precisa e pesa menos no contexto.':
     'One task only: a narrow skill is more precise and weighs less on the context.',
-  'Este escopo não tem pasta de skills para a ferramenta escolhida.': 'This scope has no skills folder for the chosen tool.',
   'Quando a IA deve usá-la? Diga os tipos de pedido ou de arquivo.': 'When should the AI use it? Name the kinds of request or file.',
   'o pedido falar de migração, schema ou banco de dados, ou mexer em arquivos de src/db/':
     'the request mentions migrations, schema or the database, or touches files in src/db/',
@@ -800,16 +456,10 @@ export const harness: Record<string, string> = {
   'Use pasta/arquivo.ext, com letras, números, hífen, ponto e sublinhado.':
     'Use folder/file.ext, with letters, numbers, hyphen, dot and underscore.',
   'Nenhum arquivo de apoio.': 'No supporting files.',
-  'Os arquivos são criados vazios na pasta da skill; escreva o conteúdo depois.':
-    'The files are created empty in the skill folder; write the content afterwards.',
   'Confira a skill. Nada é gravado antes do botão de baixo.': 'Check the skill. Nothing is written before the button below.',
   'Nome da skill': 'Skill name',
   'Pelo card: só entra quando um card a indica': 'Per card: only goes in when a card picks it',
   'SKILL.md': 'SKILL.md',
-  'Um passo a passo para escrever uma regra no formato da ferramenta; ela entra no board desligada.':
-    "A step-by-step guide to write a rule in the tool's format; it enters the board switched off.",
-  'Um passo a passo para escrever uma skill no formato da ferramenta; ela entra no board em "Pelo card".':
-    'A step-by-step guide to write a skill in the tool\'s format; it enters the board as "Per card".',
   'A IA lê o projeto e escreve de 3 a 5 regras, desligadas no board; acompanhe no chat do board.':
     'The AI reads the project and writes 3 to 5 rules, switched off on the board; follow along in the board chat.',
   'A IA lê o projeto e cria de 3 a 5 skills, em "Pelo card"; acompanhe no chat do board.':
@@ -913,91 +563,15 @@ export const harness: Record<string, string> = {
   'Pastas principais: {list}': 'Main folders: {list}',
   'Arquivos de teste': 'Test files',
   'Pasta {name}': 'Folder {name}',
-  'Relê as pastas do projeto e a global e atualiza o catálogo; espera também a lista de plugins da ferramenta.':
-    "Rereads the project and global folders and refreshes the catalog; also waits for the tool's plugin list.",
-  'Limpa a pré-seleção indicada pela IA; nada foi enviado ao board.':
-    "Clears the AI's suggested pre-selection; nothing was sent to the board.",
-  'Vai a "Ferramenta deste projeto", na aba Ferramenta e execução.':
-    'Goes to "Ferramenta deste projeto" (project tool), in the Ferramenta e execução tab.',
-  'Abre o formulário de um agente novo; o arquivo é gravado na pasta da ferramenta ao salvar.':
-    "Opens the form for a new agent; the file is written to the tool's folder on save.",
   'Fecha o editor; o que não foi salvo se perde.': 'Closes the editor; unsaved changes are lost.',
-  'Abre o editor do agente logo abaixo da linha.': 'Opens the agent editor right below the row.',
   'Grava o registro do board em .cursor/mcp.json, na pasta do projeto.':
     "Writes the board's entry to .cursor/mcp.json, in the project folder.",
   'Registra o servidor do board no global da ferramenta: vale em todos os projetos, sem arquivo no repositório.':
     "Registers the board server in the tool's global config: valid in every project, with no file in the repository.",
   'Instala a skill na sua pasta de usuário: vale em todos os projetos.': 'Installs the skill in your user folder: valid in every project.',
-  'Tira do board; o arquivo de origem não é tocado.': 'Removes it from the board; the source file is not touched.',
-  'Tira os marcados do board; os arquivos de origem ficam.': 'Removes the checked ones from the board; the source files stay.',
-  'Pede confirmação e apaga do disco os arquivos marcados.': 'Asks for confirmation and deletes the checked files from disk.',
-  'Pede confirmação e tira as entradas marcadas do arquivo de configurações.':
-    'Asks for confirmation and removes the checked entries from the settings file.',
   'Desmarca tudo; nada muda.': 'Unchecks everything; nothing changes.',
-  'Procura skills numa pasta ou num repositório git e mostra a lista antes de copiar qualquer coisa.':
-    'Looks for skills in a folder or a git repository and shows the list before copying anything.',
-  'Acrescenta uma regra de permissão ao arquivo de configurações da ferramenta.': "Adds a permission rule to the tool's settings file.",
-  'Acrescenta um hook ao arquivo de configurações da ferramenta.': "Adds a hook to the tool's settings file.",
-  'Registra um servidor MCP no arquivo da ferramenta.': "Registers an MCP server in the tool's file.",
-  'Cria um arquivo novo deste assunto na pasta da ferramenta e o abre para editar.':
-    "Creates a new file of this subject in the tool's folder and opens it for editing.",
-  'Cria a skill de referências do projeto, com a pasta references/ para modelos e exemplos.':
-    "Creates the project's references skill, with the references/ folder for templates and examples.",
-  'Cria este arquivo na pasta indicada e o abre para editar.': 'Creates this file in the folder shown and opens it for editing.',
-  'Pede confirmação e tira a pasta e os artefatos dela do board; a pasta no disco não é tocada.':
-    'Asks for confirmation and removes the folder and its artifacts from the board; the folder on disk is not touched.',
-  'Informe a origem: dono/repositório, endereço git ou o caminho de uma pasta.':
-    'Enter the source: owner/repository, a git address or a folder path.',
-  'Clona ou lê a origem numa pasta temporária, sem rodar nada, e lista as skills encontradas.':
-    'Clones or reads the source into a temporary folder, without running anything, and lists the skills found.',
-  'Marca todas as skills que podem ser instaladas.': 'Checks every skill that can be installed.',
-  'Descarta a lista e apaga a pasta temporária; nada foi instalado.':
-    'Discards the list and deletes the temporary folder; nothing was installed.',
-  'Marque pelo menos uma skill.': 'Check at least one skill.',
-  'Copia as pastas das skills marcadas para o destino escolhido.': 'Copies the folders of the checked skills to the chosen destination.',
-  'Mostra as referências, os modelos e os scripts da pasta da skill.': "Shows the references, templates and scripts in the skill's folder.",
-  'Pede confirmação e apaga o arquivo (ou a pasta da skill) do disco.':
-    "Asks for confirmation and deletes the file (or the skill's folder) from disk.",
-  'A ferramenta ainda está aplicando a ação anterior.': 'The tool is still applying the previous action.',
-  'Pede à ferramenta para desativar os plugins marcados; vale na próxima sessão dela.':
-    'Asks the tool to disable the checked plugins; takes effect in its next session.',
-  'Pede à ferramenta para ativar os plugins marcados; vale na próxima sessão dela.':
-    'Asks the tool to enable the checked plugins; takes effect in its next session.',
-  'Pede confirmação e desinstala os plugins marcados pela ferramenta.':
-    'Asks for confirmation and uninstalls the checked plugins through the tool.',
-  'O que a IA pode usar nas execuções do board. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão; cada ferramenta tem a sua aba: primeiro onde olhar (Board, Projeto, Global ou Importados), depois um assunto por vez.':
-    'What the AI can use in board runs. <b>Ferramenta e execução</b> (tool and execution) picks the AI, the permission and the default agent; each tool has its own tab: first where to look (Board, Projeto, Global or Importados), then one subject at a time.',
-  'Tudo que o {tool} carrega. Escolha onde olhar e depois o assunto: o <b>catálogo</b> (Projeto, Global e Importados) mostra o que existe e não ocupa o contexto da IA; só o que você envia ao <b>Board</b> pode ser usado pelas execuções, no modo de cada artefato.':
-    'Everything {tool} loads. Pick where to look and then the subject: the <b>catalog</b> (Projeto, Global and Importados) shows what exists and takes no space in the AI context; only what you send to the <b>Board</b> can be used by runs, in the mode of each artifact.',
-  'Este assunto não entra no board: a ferramenta carrega esses arquivos por conta própria. Veja em Projeto ou Global.':
-    'This subject does not go on the board: the tool loads these files on its own. See Projeto or Global.',
-  'Contrato de contexto: {name}': 'Context contract: {name}',
-  'Rascunho v1. Salvar não altera a execução legada. A admissão por capacidades ainda está indisponível (#729).':
-    'Version 1 draft. Saving does not change legacy execution. Capability admission is still unavailable (#729).',
-  'Papel do agente': 'Agent role',
-  'Instruções do contrato': 'Contract instructions',
-  'Skills essenciais': 'Essential skills',
-  'Entram em toda atividade deste agente.': 'Included in every activity of this agent.',
-  'Skills sugeridas': 'Suggested skills',
-  'São sugestões para a atividade; não entram antecipadamente no contexto.':
-    'Suggestions for the activity; they are not loaded into context in advance.',
   'MCPs permitidos': 'Allowed MCPs',
-  'Delimitam os MCPs que uma atividade pode selecionar; não ativam servidores por si só.':
-    'Limit which MCPs an activity can select; they do not activate servers by themselves.',
-  'Nenhum recurso deste tipo cadastrado.': 'No resources of this type registered.',
-  'Restrições de ferramentas': 'Tool restrictions',
-  'Categorias solicitadas no contrato. A tradução e a imposição dependem da admissão do executor. Lista vazia não concede todas as ferramentas.':
-    'Categories requested in the contract. Translation and enforcement depend on executor admission. An empty list does not grant all tools.',
-  'Ferramenta das restrições nativas': 'Tool for native restrictions',
-  'Permitir nativas (uma por linha)': 'Allow native tools (one per line)',
-  'Negar nativas (uma por linha)': 'Deny native tools (one per line)',
-  'Prévia do contrato com essenciais e itens Sempre. Complementos da atividade não estão selecionados.':
-    'Contract preview with essentials and Always items. Activity additions are not selected.',
-  'O contrato mudou em outra edição. Feche e abra novamente para carregar a revisão atual.':
-    'The contract changed in another editor. Close and reopen to load the current revision.',
-  'Salvar rascunho do contrato': 'Save contract draft',
   'Prévia do contrato': 'Contract preview',
-  'Editar contrato de contexto (rascunho)': 'Edit context contract (draft)',
   'Fase no card': 'Card phase',
   'Ação no card': 'Card action',
   'Fase no workflow': 'Workflow phase',
@@ -1136,7 +710,8 @@ export const harness: Record<string, string> = {
   'Não ponha segredos nos argumentos: use as variáveis de ambiente.': 'Do not put secrets in the arguments: use environment variables.',
   'Há nomes repetidos nas variáveis ou nos cabeçalhos.': 'There are repeated names in the variables or headers.',
   Categoria: 'Category',
-  'Abre o formulário de um agente novo; ele é gravado no board ao salvar.': 'Opens the form for a new agent; it is saved in the board on save.',
+  'Abre o formulário de um agente novo; ele é gravado no board ao salvar.':
+    'Opens the form for a new agent; it is saved in the board on save.',
   'Recriar os de fábrica': 'Recreate the built-in ones',
   'Tornar {name} o agente padrão': 'Make {name} the default agent',
   'Apagar o agente {name}': 'Delete the agent {name}',
@@ -1154,22 +729,25 @@ export const harness: Record<string, string> = {
   'O {tool} não aceita lista de ferramentas por agente: a execução ignora o que este agente restringe.':
     '{tool} does not accept a per-agent tool list: the run ignores what this agent restricts.',
   'Importar artefatos para o board': 'Import artifacts into the board',
-  'Nada é ativado nem executado na importação. Regras e servidores MCP importados esperam a sua revisão.': 'Nothing is activated or run on import. Imported rules and MCP servers wait for your review.',
-  'Origem': 'Source',
+  'Nada é ativado nem executado na importação. Regras e servidores MCP importados esperam a sua revisão.':
+    'Nothing is activated or run on import. Imported rules and MCP servers wait for your review.',
+  Origem: 'Source',
   'Pasta ou repositório git': 'Folder or git repository',
   'Ferramenta instalada': 'Installed tool',
   'Arquivo de exportação': 'Export file',
   'Caminho da pasta ou endereço do repositório': 'Folder path or repository address',
   'Subpasta (opcional)': 'Subfolder (optional)',
   'Informe o caminho da pasta ou o endereço do repositório.': 'Enter the folder path or the repository address.',
-  'Lê a origem sem rodar nada e lista os artefatos encontrados.': 'Reads the source without running anything and lists the artifacts found.',
-  'Examinar': 'Scan',
+  'Lê a origem sem rodar nada e lista os artefatos encontrados.':
+    'Reads the source without running anything and lists the artifacts found.',
+  Examinar: 'Scan',
   'Lê as regras, skills, agentes e MCPs que esta ferramenta já tem.': 'Reads the rules, skills, agents and MCPs this tool already has.',
   'Escolhe um arquivo de exportação do board e lista o que há nele.': 'Picks a board export file and lists what is in it.',
   'Escolher arquivo': 'Choose file',
   'Artefatos encontrados': 'Artifacts found',
   'Nenhum artefato encontrado': 'No artifacts found',
-  'A IA lê o projeto e marca o que faz mais sentido; você confirma antes de importar.': 'The AI reads the project and checks what makes the most sense; you confirm before importing.',
+  'A IA lê o projeto e marca o que faz mais sentido; você confirma antes de importar.':
+    'The AI reads the project and checks what makes the most sense; you confirm before importing.',
   'já está no board': 'already in the board',
   'Volta para escolher outra origem.': 'Goes back to choose another source.',
   'Fecha sem importar nada.': 'Closes without importing anything.',
@@ -1177,7 +755,63 @@ export const harness: Record<string, string> = {
   'Copia os artefatos marcados para o board.': 'Copies the checked artifacts into the board.',
   'Importar {n}': 'Import {n}',
   '{n} já estão no board': '{n} already in the board',
-  'Substituir troca o conteúdo atual pelo importado. Pular os repetidos importa só o que é novo.': 'Replace swaps the current content for the imported one. Skip the repeated ones imports only what is new.',
+  'Substituir troca o conteúdo atual pelo importado. Pular os repetidos importa só o que é novo.':
+    'Replace swaps the current content for the imported one. Skip the repeated ones imports only what is new.',
   'Pular os repetidos': 'Skip the repeated ones',
   'Esta ferramenta não está instalada.': 'This tool is not installed.',
+
+  // --- Artefatos do board (aba nova)
+  'Os <b>Artefatos do board</b> (regras, skills, agentes e servidores MCP) valem com qualquer ferramenta de IA; a edição vale para as próximas execuções. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão.':
+    'The <b>Board artifacts</b> (rules, skills, agents and MCP servers) work with any AI tool; an edit applies to future runs. <b>Tool and execution</b> picks the AI, the permission and the default agent.',
+  'Artefatos do board': 'Board artifacts',
+  'gerada pelo board': 'generated by the board',
+  'origem ausente na cópia': 'source missing from the copy',
+  'importado de {origin}': 'imported from {origin}',
+  'Abre o formulário; o artefato é gravado no board ao salvar.': 'Opens the form; the artifact is saved to the board on save.',
+  'Um passo a passo para escrever uma regra; ela entra no board desligada.':
+    'A step-by-step guide to write a rule; it enters the board turned off.',
+  'Um passo a passo para escrever uma skill; ela entra no board em "Pelo card".':
+    'A step-by-step guide to write a skill; it enters the board in "By card" mode.',
+  'Abre o diálogo para importar artefatos para o board.': 'Opens the dialog to import artifacts into the board.',
+  'Ações em lote': 'Bulk actions',
+  'Selecionar todos os visíveis': 'Select all visible',
+  'Selecionar: {name}': 'Select: {name}',
+  'Abre o texto no board, para ler e editar': 'Opens the text in the board, to read and edit',
+  'Versão do artefato no board': 'Artifact version on the board',
+  'v{n}': 'v{n}',
+  'Fechar edição: {name}': 'Close editing: {name}',
+  'Editar: {name}': 'Edit: {name}',
+  'Abre o editor logo abaixo da linha.': 'Opens the editor right below the row.',
+  'Apagar o artefato': 'Delete the artifact',
+  'Apagar: {name}': 'Delete: {name}',
+  'A cópia do board é apagada e a ação não pode ser desfeita; o arquivo de origem fica. Os cards e os agentes que citam este artefato deixam de recebê-lo.':
+    'The board copy is deleted and this cannot be undone; the source file stays. Cards and agents that cite this artifact stop receiving it.',
+  'um selecionado': 'one selected',
+  'Um arquivo ficou de fora pelos limites: {files}': 'One file was left out by the limits: {files}',
+  '{n} arquivos ficaram de fora pelos limites: {files}': '{n} files were left out by the limits: {files}',
+  'Importa regras, skills, agentes e servidores MCP de uma pasta, de uma ferramenta instalada ou de um arquivo.':
+    'Imports rules, skills, agents and MCP servers from a folder, an installed tool or a file.',
+  '{n} sempre': '{n} always',
+  '{n} pelo card': '{n} by card',
+  '{n} desligadas': '{n} off',
+  'Há regras desligadas: elas estão no board, mas não entram em nenhuma execução. Leia o texto de cada uma e ative ou apague; regra ativa entra em toda execução.':
+    'Some rules are off: they are on the board but enter no run. Read each one and turn it on or delete it; an active rule enters every run.',
+  'Apaga os artefatos marcados do board; os arquivos de origem ficam.':
+    'Deletes the checked artifacts from the board; the source files stay.',
+  'Apagar {n} artefatos do board?': 'Delete {n} artifacts from the board?',
+  'As cópias do board serão apagadas e a ação não pode ser desfeita; os arquivos de origem ficam. Os cards e os agentes que citam estes artefatos deixam de recebê-los.':
+    'The board copies will be deleted and this cannot be undone; the source files stay. Cards and agents that cite these artifacts stop receiving them.',
+  'Regra do board': 'Board rule',
+  'Skill do board': 'Board skill',
+  'Somente leitura: esta skill é gerada pela extensão e regravada a cada abertura.':
+    'Read only: this skill is generated by the extension and rewritten on every open.',
+  'Só o que está no board entra nas execuções, no modo de cada um.': "Only what is on the board enters runs, in each one's mode.",
+  'Nenhuma regra no board. Crie uma ou importe as que você já tem; elas entram desligadas, para você revisar antes de ativar.':
+    'No rule on the board. Create one or import the ones you already have; they enter turned off, for you to review before activating.',
+  'Nenhuma skill no board. Crie uma ou importe uma pasta com SKILL.md.':
+    'No skill on the board. Create one or import a folder with SKILL.md.',
+  'Nenhum agente no board: toda execução roda com o escopo cheio. Crie um, use as sugestões prontas ou importe.':
+    'No agent on the board: every run has the full scope. Create one, use the ready suggestions or import.',
+  'Nenhum servidor MCP no board. Cadastre um ou importe os que você já configurou.':
+    'No MCP server on the board. Register one or import the ones you already set up.',
 };

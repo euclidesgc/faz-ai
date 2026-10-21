@@ -1,21 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { request } from '../../../request';
 import { useAction } from '../../../useAction';
 import { SegmentedControl } from '@radix-ui/themes';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { onHostMessage, postToHost } from '../../../vscode';
 import { renderSafeMarkdown } from '../../attachment/AttachmentModal';
 import { Button, IconClose } from '../../ui';
+import { useArtifactText } from './useArtifactText';
 import { t } from '../../../i18n';
-
-/** Markdown das ferramentas: as rules do Cursor são `.mdc`. */
-const isMarkdownFile = (file: string): boolean => /\.(md|mdc|markdown)$/i.test(file);
-
-/** Quanto a modal espera a leitura do arquivo antes de desistir e explicar o que fazer. */
-export const READ_TIMEOUT_MS = 8000;
-const NO_REPLY =
-  'O board não respondeu. Se a extensão acabou de ser atualizada, recarregue a janela (no VS Code, Developer: Reload Window) e abra o arquivo de novo.';
 
 /** Separa o frontmatter (`---` no topo) do corpo, para o modo formatado mostrar os metadados à parte. */
 export function splitFrontmatter(src: string): { meta: string | null; body: string } {
@@ -24,34 +15,31 @@ export function splitFrontmatter(src: string): { meta: string | null; body: stri
 }
 
 /**
- * Um arquivo do harness (rule, skill, agente, comando, configuração) aberto no board, no mesmo modelo da
- * modal de anexos: Markdown formatado ou código, edição com salvar e cancelar, e proteção contra fechar
- * com texto não salvo. O que vem de plugin e o `~/.claude.json` abrem só para leitura.
+ * Um texto de artefato do board aberto na modal, no mesmo modelo da modal de anexos: Markdown formatado ou código,
+ * edição com salvar e cancelar, e proteção contra fechar com texto não salvo. Lê por `harness.artifact.read` e grava
+ * por `harness.artifact.save` (regra, SKILL.md) ou `harness.skillFile.write` (arquivo de apoio da skill). A skill do
+ * fluxo, gerada pela extensão, abre só para leitura.
  */
 export function HarnessFileModal() {
   const file = useBoardStore((s) => s.harnessFile);
   const close = useBoardStore((s) => s.closeHarnessFile);
-  // nome e caminho de exibição vêm da varredura; o arquivo apagado por fora some da lista e a modal avisa
-  const item = useBoardStore((s) => {
-    const items = s.state?.harness.inventory.flatMap((x) => x.items) ?? [];
-    // um arquivo importado com @ não é item da lista: o caminho de exibição vem da importação
-    return (
-      items.find((i) => i.path === s.harnessFile) ?? items.flatMap((i) => i.imports ?? []).find((x) => x.path === s.harnessFile) ?? null
-    );
-  });
-
-  const [content, setContent] = useState<string | null>(null);
-  const [readonly, setReadonly] = useState(true);
+  const generated = useBoardStore(
+    (s) => !!file && s.state?.harness.library?.artifacts.some((a) => a.kind === file.kind && a.name === file.name && a.generated === true),
+  );
+  const read = useArtifactText(file?.kind ?? 'rule', file?.name, file?.file);
+  // o que acabou de ser salvo vale no lugar da leitura, que só se repete ao abrir outro texto
+  const [saved, setSaved] = useState<string | null>(null);
+  const content = saved ?? read.text;
+  const readonly = !!generated;
   const [draft, setDraft] = useState('');
   const [editing, setEditing] = useState(false);
   const [viewMode, setViewMode] = useState<'formatted' | 'raw'>('formatted');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [unsavedNotice, setUnsavedNotice] = useState(false);
   const dirty = editing && draft !== (content ?? '');
   const guard = useRef({ dirty, close });
   guard.current = { dirty, close };
   const requestClose = () => (guard.current.dirty ? setUnsavedNotice(true) : guard.current.close());
+  const key = file ? `${file.kind}:${file.name}:${file.file ?? ''}` : '';
 
   useEffect(() => {
     if (!file) return;
@@ -65,66 +53,47 @@ export function HarnessFileModal() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [file, close]);
 
-  // abrir (ou trocar de arquivo) recomeça do zero e lê o conteúdo do disco
+  // abrir (ou trocar de texto) recomeça do zero
   useEffect(() => {
-    setContent(null);
+    setSaved(null);
     setDraft('');
     setEditing(false);
     setViewMode('formatted');
-    setError(null);
     setUnsavedNotice(false);
-    setReadonly(true);
-    if (!file) return;
-    setLoading(true);
-    const requestId = crypto.randomUUID();
-    const off = onHostMessage((msg) => {
-      if (msg.type !== 'harness.file.readResult' || msg.requestId !== requestId) return;
-      off();
-      window.clearTimeout(timer);
-      setLoading(false);
-      if (msg.error) return setError(msg.error);
-      setContent(msg.content ?? '');
-      setReadonly(msg.readonly === true);
-    });
-    // a leitura é imediata; sem resposta, o host é de outra versão (pacote reinstalado sem recarregar a janela)
-    const timer = window.setTimeout(() => {
-      off();
-      setLoading(false);
-      setError(t(NO_REPLY));
-    }, READ_TIMEOUT_MS);
-    postToHost({ type: 'harness.file.read', requestId, path: file });
-    return () => {
-      off();
-      window.clearTimeout(timer);
-    };
-  }, [file]);
+  }, [key]);
 
-  // o host confirma a gravação pelo `done`; se falhou (JSON inválido, sem permissão), o texto fica na tela
-  const write = useAction(() => request({ type: 'harness.file.write', path: file ?? '', content: draft }));
+  const write = useAction(() => {
+    if (!file) return;
+    return file.file
+      ? harness.writeBoardSkillFile(file.name, file.file, draft)
+      : harness.saveArtifact({ kind: file.kind, name: file.name, body: draft, via: 'manual' });
+  });
   const saving = write.busy;
+  const error = read.error;
 
   if (!file) return null;
 
   const save = async () => {
     if (saving) return;
-    setError(null);
     if (!(await write.run())) return; // o erro do host fica em `write.error`
-    setContent(draft);
+    setSaved(draft);
     setEditing(false);
     setUnsavedNotice(false);
   };
 
-  const markdown = isMarkdownFile(file);
-  const name = file.split(/[\\/]/).pop() ?? file;
+  // a regra é Markdown; o arquivo de apoio da skill, só quando a extensão diz
+  const markdown = !file.file || /\.(md|markdown)$/i.test(file.file);
+  const title = file.kind === 'rule' ? file.name : `${file.name}/${file.file ?? 'SKILL.md'}`;
   const parts = content !== null && markdown ? splitFrontmatter(content) : null;
+  const loading = read.loading && saved === null;
 
   return (
     <div className="modal-backdrop" onMouseDown={requestClose}>
-      <div className="modal attachment-modal harness-file-modal" role="dialog" aria-label={name} onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modal attachment-modal harness-file-modal" role="dialog" aria-label={title} onMouseDown={(e) => e.stopPropagation()}>
         <header className="attachment-modal-head">
-          <h2 title={file}>
-            {name}
-            <span className="muted small harness-file-path">{item?.location ?? file}</span>
+          <h2 title={title}>
+            {title}
+            <span className="muted small harness-file-path">{file.kind === 'rule' ? t('Regra do board') : t('Skill do board')}</span>
           </h2>
           {markdown && !editing && (
             <SegmentedControl.Root
@@ -157,7 +126,7 @@ export function HarnessFileModal() {
             </p>
           )}
           {readonly && content !== null && (
-            <p className="muted small">{t('Somente leitura: este arquivo é mantido pela ferramenta ou por um plugin.')}</p>
+            <p className="muted small">{t('Somente leitura: esta skill é gerada pela extensão e regravada a cada abertura.')}</p>
           )}
           {loading ? (
             <p className="muted">{t('Carregando…')}</p>
@@ -183,7 +152,6 @@ export function HarnessFileModal() {
             </>
           ) : (
             <>
-              <Button onClick={() => harness.openItem(file)}>{t('Abrir no editor')}</Button>
               <Button disabled={content === null} onClick={() => void navigator.clipboard?.writeText(content ?? '')}>
                 {t('Copiar conteúdo')}
               </Button>

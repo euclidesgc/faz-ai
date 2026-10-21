@@ -272,9 +272,9 @@ describe('telas montam sem erro', () => {
     expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);
     // cada aba do Harness (e cada assunto da ferramenta) é montada por vez: juntamos o texto de todas
     const harness = [
-      ...(['tool', 'cursor'] as const).map((harnessTab) => ({ harnessTab, harnessTopic: 'rules' as const })),
-      ...(['rules', 'skill', 'agent', 'mcp', 'command', 'hook', 'other'] as const).map((harnessTopic) => ({
-        harnessTab: 'claude' as const,
+      { harnessTab: 'tool' as const, harnessTopic: 'rules' as const },
+      ...(['rules', 'skill', 'agent', 'mcp'] as const).map((harnessTopic) => ({
+        harnessTab: 'artifacts' as const,
         harnessTopic,
       })),
     ]
@@ -286,18 +286,7 @@ describe('telas montam sem erro', () => {
     for (const text of [
       'Ferramenta deste projeto',
       'type="radio"',
-      'Claude Code',
-      'Cursor',
-      'Biblioteca do board',
-      'Criar',
-      'Assistente guiado',
-      'Importar artefatos',
-      'Sub-agentes',
-      'Gerar com base no projeto',
-      'Modo no board',
-      'revisar-spec',
-      'MCPs',
-      'deste projeto',
+      'Artefatos do board',
       'Instalar (padrão da ferramenta)',
       'Execução pela conversa e heartbeat',
       'A IA lê o projeto e usa as ferramentas do board',
@@ -305,9 +294,6 @@ describe('telas montam sem erro', () => {
       'Heartbeat ligado',
       'Rodar o heartbeat agora',
       'Agente padrão',
-      'revisor-de-spec',
-      // o agente criado pela tela vive no board: o caminho é o da cópia de leitura, não o da pasta da ferramenta
-      'agents/revisor-de-spec.md',
     ])
       expect(harness).toContain(text);
   });

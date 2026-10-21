@@ -275,8 +275,8 @@ export function RequirementFix({
 }) {
   const openSettings = useBoardStore((s) => s.openSettings);
   const openMcpInstall = () => {
-    // a instalação do servidor do board fica no assunto MCPs, em Projeto, na aba da ferramenta do projeto
-    useBoardStore.setState({ harnessTab: useBoardStore.getState().state!.board.aiTool, harnessOrigin: 'project', harnessTopic: 'mcp' });
+    // a instalação do servidor do board fica na aba Ferramenta e execução
+    useBoardStore.setState({ harnessTab: 'tool' });
     openSettings('harness');
   };
   if (!actionable(r, compact)) return null;

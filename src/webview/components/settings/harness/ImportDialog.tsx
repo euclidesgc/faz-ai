@@ -8,8 +8,10 @@ import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
 import { ActionButton, FormField } from '../../ui';
 import { isWeb } from '../../../vscode';
-import { ARTIFACT_LABELS } from './LibraryImport';
 import { t } from '../../../i18n';
+
+/** O nome de cada tipo no plural, em português (traduzido onde é usado). */
+const ARTIFACT_LABELS = { rule: 'Regras', skill: 'Skills', agent: 'Subagentes', mcp: 'MCPs' } as const;
 
 type Origin = 'folder' | 'tool' | 'export';
 
@@ -119,9 +121,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
             {origin === 'folder' && (
               <>
                 <FormField label={t('Caminho da pasta ou endereço do repositório')}>
-                  {(id) => (
-                    <TextField.Root id={id} value={path} onChange={(e) => setPath(e.target.value)} spellCheck={false} />
-                  )}
+                  {(id) => <TextField.Root id={id} value={path} onChange={(e) => setPath(e.target.value)} spellCheck={false} />}
                 </FormField>
                 <FormField label={t('Subpasta (opcional)')}>
                   {(id) => <TextField.Root id={id} value={subdir} onChange={(e) => setSubdir(e.target.value)} spellCheck={false} />}

@@ -68,8 +68,7 @@ function texts(c: EnvCheck, projectTool: AiTool): { title: string; hint: string 
       return {
         title: t('Artefatos no board'),
         hint: t(
-          'Nenhuma skill, agente ou servidor MCP em modo "Pelo card": o planejamento dos cards não tem de onde escolher. Use "Indicar artefatos" na aba do {tool} no Harness.',
-          { tool },
+          'Nenhuma skill, agente ou servidor MCP em modo "Pelo card": o planejamento dos cards não tem de onde escolher. Importe ou crie artefatos em Harness, na aba Artefatos do board.',
         ),
       };
     case 'harness-agents':

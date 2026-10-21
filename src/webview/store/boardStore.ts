@@ -40,9 +40,16 @@ export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
 
 /** `environment`: o Diagnóstico do ambiente, aberto pelas Configurações ou sozinho na primeira abertura */
 export type View = 'board' | 'archived' | 'trash' | 'settings' | 'metrics' | 'environment';
-/** Abas da tela de Harness: a ferramenta e a execução, ou uma ferramenta de IA (ver `harnessTopics.ts`). */
+/** Abas da tela de Harness: a ferramenta e a execução, ou os artefatos do board (ver `harnessTopics.ts`). */
 export type { HarnessTab };
-import { resolveHarnessTab, type HarnessOrigin, type HarnessTab, type HarnessTopic } from '../../shared/harnessTopics';
+
+/** Qual texto a modal do harness abre: o de uma regra ou skill do board, ou um arquivo de apoio da skill. */
+export interface HarnessFileRef {
+  kind: 'rule' | 'skill';
+  name: string;
+  file?: string;
+}
+import { resolveHarnessTab, type HarnessTab, type HarnessTopic } from '../../shared/harnessTopics';
 import { type SettingsTab } from '../../shared/settingsTab';
 import { SETTINGS_SECTIONS } from '../../shared/settingsSections';
 export type { SettingsTab };
@@ -88,10 +95,8 @@ interface UiState {
 
 interface BoardStore extends UiState, ViewState, UiPrefs {
   state: BoardState | null;
-  /** o assunto aberto dentro da aba da ferramenta no Harness; fica na memória, não é guardado */
+  /** o assunto aberto na aba de artefatos do Harness; fica na memória, não é guardado */
   harnessTopic: HarnessTopic;
-  /** a origem escolhida na aba da ferramenta (Board, Projeto, Global, Importados); vale para todos os assuntos, fica na memória */
-  harnessOrigin: HarnessOrigin;
   /** o chat está aberto no painel lateral do board (no navegador; no editor ele fica na barra lateral) */
   chatOpen: boolean;
   setChatOpen(open: boolean): void;
@@ -103,8 +108,8 @@ interface BoardStore extends UiState, ViewState, UiPrefs {
   dialog: DialogSpec | null;
   /** anexo aberto na modal; null quando não há modal de anexo na tela */
   attachmentModal: AttachmentModalState | null;
-  /** arquivo do harness aberto no editor do board (caminho absoluto, como a varredura o listou) */
-  harnessFile: string | null;
+  /** artefato do board aberto na modal de leitura e edição: a regra, o SKILL.md ou um arquivo de apoio da skill */
+  harnessFile: HarnessFileRef | null;
   /** backup do board em andamento: exportando, ou lendo o arquivo escolhido para importar */
   backupBusy: 'export' | 'import' | null;
   setBackupBusy(busy: 'export' | 'import' | null): void;
@@ -134,7 +139,6 @@ interface BoardStore extends UiState, ViewState, UiPrefs {
   setSettingsNavCollapsed(collapsed: boolean): void;
   /** preferências da pessoa: aplica aqui e grava no host (`prefs.set`), que as devolve ao abrir qualquer painel */
   setDontWarnYolo(value: boolean): void;
-  setHarnessIntroSeen(seen: boolean): void;
   setYoloUntilName(name: string): void;
   setPrefs(prefs: UiPrefs): void;
   selectParent(id: Id | null): void;
@@ -174,13 +178,9 @@ interface BoardStore extends UiState, ViewState, UiPrefs {
   /** abre a modal de um anexo (visualização; a edição é escolhida dentro dela) */
   openAttachmentModal(attachmentId: Id): void;
   closeAttachmentModal(): void;
-  openHarnessFile(path: string): void;
+  openHarnessFile(file: HarnessFileRef): void;
   closeHarnessFile(): void;
 }
-
-/** A aba de Harness de uma seção: `project` e `user` levam à ferramenta do projeto, que só se sabe com o board carregado. */
-const harnessTabOf = (raw: string, state: BoardState | null): HarnessTab =>
-  state ? resolveHarnessTab(raw, state.board.aiTool) : (raw as HarnessTab);
 
 const persisted = getUiState<Partial<UiState>>();
 
@@ -213,11 +213,9 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     // o Diagnóstico é de passagem: ao reabrir, volta para o board
     view: persisted?.view === 'environment' ? 'board' : (persisted?.view ?? 'board'),
     settingsTab: persisted?.settingsTab ?? 'columns',
-    // as abas Projeto e Global (`project`, `user`) viraram uma aba por ferramenta e a `all` saiu: quem deixou uma
-    // delas aberta guarda o valor antigo, que a tela resolve para a ferramenta do projeto (`resolveHarnessTab`)
-    harnessTab: persisted?.harnessTab && persisted.harnessTab !== ('all' as string) ? persisted.harnessTab : 'tool',
+    // as abas por ferramenta saíram: quem deixou uma aberta guarda o valor antigo, que cai em `tool`
+    harnessTab: resolveHarnessTab(persisted?.harnessTab),
     harnessTopic: 'rules',
-    harnessOrigin: 'project',
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
@@ -262,9 +260,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
         set({
           view: 'settings',
           settingsTab: info.tab,
-          ...(info.harnessTab && { harnessTab: harnessTabOf(info.harnessTab, get().state) }),
+          ...(info.harnessTab && { harnessTab: info.harnessTab }),
           ...(info.harnessTopic && { harnessTopic: info.harnessTopic }),
-          ...(info.harnessOrigin && { harnessOrigin: info.harnessOrigin }),
           pendingSettingsSection: section,
         });
         persist(get());
@@ -279,7 +276,6 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       persist(get());
     },
     setDontWarnYolo: (dontWarnYolo) => setPref({ dontWarnYolo }),
-    setHarnessIntroSeen: (harnessIntroSeen) => setPref({ harnessIntroSeen }),
     setYoloUntilName: (yoloUntilName) => setPref({ yoloUntilName }),
     setPrefs: (prefs) => set(prefs),
     selectParent: (id) => setShared({ selectedParentId: get().selectedParentId === id ? null : id }),
@@ -353,7 +349,6 @@ export function useHostSync(): void {
         s.setError(msg.message);
         s.setBackupBusy(null);
       } else if (msg.type === 'notice') s.setNotice(msg.message);
-      else if (msg.type === 'harness.item.created') s.openHarnessFile(msg.path);
       else if (msg.type === 'backup.done') s.setBackupBusy(null);
       else if (msg.type === 'backup.import.summary') {
         s.setBackupBusy(null);
@@ -366,9 +361,8 @@ export function useHostSync(): void {
         s.openSettings(msg.tab);
         useBoardStore.setState({
           pendingSettingsSection: msg.section ?? null,
-          ...(info?.harnessTab && { harnessTab: harnessTabOf(info.harnessTab, s.state) }),
+          ...(info?.harnessTab && { harnessTab: info.harnessTab }),
           ...(info?.harnessTopic && { harnessTopic: info.harnessTopic }),
-          ...(info?.harnessOrigin && { harnessOrigin: info.harnessOrigin }),
         });
       } else if (msg.type === 'ui.openView') s.setView(msg.view);
     });
