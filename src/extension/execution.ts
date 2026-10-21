@@ -1,4 +1,4 @@
-import { effortToRun, enforcementOf, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
+import { effortToRun, enforcementOf, manifestOf, type ExecManifest } from '../shared/execution';
 import { activeProfile, catalogTool, isolationSummary, profileBase, profileIsolation, type AiProfile } from '../shared/aiProfiles';
 import type { RunTarget } from '../shared/runTarget';
 import { selectedMcpNames } from '../shared/harnessSelection';
@@ -28,8 +28,11 @@ export interface AgentDefinition {
   model?: string;
 }
 
-/** A ferramenta do Claude Code que lança subagentes: é por ela que a sessão da história delega as sub-tarefas. */
-export const SUBAGENT_TOOL = 'Agent';
+/**
+ * As ferramentas do Claude Code que lançam subagentes (`Agent`; `Task` era o nome antes da 2.1.63 e segue
+ * como apelido). Toda execução do board as nega: as sub-tarefas são execuções separadas do board.
+ */
+export const SUBAGENT_TOOLS = ['Agent', 'Task'];
 
 /**
  * Acima disto o JSON do agente não vai na linha de comando: no Windows a CLI é um `.cmd` e a linha
@@ -43,8 +46,6 @@ export interface ExecInput {
   agent: string;
   /** o agente inteiro, para a ferramenta que o recebe inline (Claude Code); null = vai no prompt ou não há */
   agentDefinition: AgentDefinition | null;
-  /** os outros agentes do board, inline junto do agente da sessão, para ela delegar as sub-tarefas (Claude Code) */
-  delegates: AgentDefinition[];
   /** servidores MCP liberados além do do board */
   mcpAllowed: string[];
   /** servidores MCP configurados para a ferramenta que ficam de fora */
@@ -155,47 +156,14 @@ export function executionPlan(
   // o agente inline só na CLI que o aceita (perfil), e só quando cabe na linha de comando; senão vai como texto
   const inline = how.agent === 'enforced';
   let agentDefinition: AgentDefinition | null = null;
-  // a sessão de uma história leva os outros agentes do board como subagentes, para delegar as
-  // sub-tarefas (é ela que as executa; a sub-tarefa nunca roda sozinha). Com isso a sessão fica com
-  // todas as ferramentas (os subagentes precisam das deles), o agente dela ganha a de lançar
-  // subagentes, e o que ele próprio pode usar vai na definição inline
-  let delegates: AgentDefinition[] = [];
-  let sessionTools = manifest.tools;
+  // o agente da própria execução vai inline quando cabe na linha de comando; as sub-tarefas são execuções
+  // separadas do board, nunca subagentes da sessão
   if (manifest.agent && inline) {
     const def: AgentDefinition = { name: manifest.agent, description: manifest.purpose || manifest.agent, prompt: manifest.instructions };
-    const size = (list: AgentDefinition[]) => JSON.stringify(Object.fromEntries(list.map(({ name, ...d }) => [name, d]))).length;
-    if (manifest.delegates.length) {
-      const own = manifest.tools.length ? { tools: withBoardTools([...manifest.tools, SUBAGENT_TOOL]) } : {};
-      const withDelegates: AgentDefinition = {
-        ...def,
-        ...own,
-        ...(manifest.deniedTools.length ? { disallowedTools: manifest.deniedTools } : {}),
-      };
-      const subs = manifest.delegates.map<AgentDefinition>((d) => ({
-        name: d.name,
-        description: d.purpose || d.name,
-        prompt: d.instructions,
-        ...(d.tools.length ? { tools: withBoardTools(d.tools) } : {}),
-        ...(d.deniedTools.length ? { disallowedTools: d.deniedTools } : {}),
-        ...(d.model ? { model: d.model } : {}),
-      }));
-      if (size([withDelegates, ...subs]) <= MAX_AGENT_ARG) {
-        agentDefinition = withDelegates;
-        delegates = subs;
-        sessionTools = [];
-      }
-    }
-    if (!agentDefinition && size([def]) <= MAX_AGENT_ARG) agentDefinition = def;
+    if (JSON.stringify({ [def.name]: def }).length <= MAX_AGENT_ARG) agentDefinition = def;
   }
 
   const advice: string[] = [];
-  // a história cujos subagentes não couberam na linha de comando: a sessão faz as sub-tarefas ela mesma
-  if (manifest.delegates.length && !delegates.length && inline) {
-    sessionTools = [];
-    advice.push(
-      'Os agentes especialistas do board não couberam nesta execução: faça você o trabalho das sub-tarefas, com as ferramentas da sessão, seguindo as instruções de cada card.',
-    );
-  }
   if (manifest.agent && (how.agent === 'advised' || (inline && !agentDefinition))) advice.push(...agentAdvice(manifest));
   if (s.harness.library && allowed.length)
     advice.push(
@@ -226,13 +194,7 @@ export function executionPlan(
     ...(cardSkills.length ? [`Skills: ${cardSkills.join(', ')} (pelo pedido)`] : []),
     ...(manifest.rules.length ? [`Rules: ${manifest.rules.join(', ')} (pelo pedido)`] : []),
     `Servidores MCP: ${[BOARD_SERVER, ...allowed].join(', ')} (${mark('mcp')})`,
-    ...(delegates.length
-      ? [
-          `Subagentes: ${delegates.map((d) => d.name).join(', ')} (inline)`,
-          ...(agentDefinition?.tools ? [`Ferramentas do agente: ${agentDefinition.tools.join(', ')} (no agente)`] : []),
-        ]
-      : []),
-    ...(sessionTools.length ? [`Ferramentas: ${sessionTools.join(', ')} (${mark('tools')})`] : []),
+    ...(manifest.tools.length ? [`Ferramentas: ${manifest.tools.join(', ')} (${mark('tools')})`] : []),
     ...(manifest.deniedTools.length ? [`Ferramentas negadas: ${manifest.deniedTools.join(', ')} (${mark('tools')})`] : []),
     ...(manifest.model
       ? [`Modelo: ${manifest.model.name}${manifest.model.effort ? ` · ${manifest.model.effort}` : ''} (${mark('model')})`]
@@ -246,11 +208,10 @@ export function executionPlan(
       // no Claude Code o agente vai inline (`--agents`) e é escolhido por `--agent`; nas demais só o nome
       agent: inline && !agentDefinition ? '' : manifest.agent,
       agentDefinition,
-      delegates,
       mcpAllowed: allowed,
       mcpBlocked: blocked,
       mcpConfig,
-      tools: sessionTools,
+      tools: manifest.tools,
       deniedTools: manifest.deniedTools,
       model: manifest.model,
     },
@@ -285,7 +246,6 @@ export function bareExec(
   return {
     agent: '',
     agentDefinition: null,
-    delegates: [],
     mcpAllowed: allowed,
     mcpBlocked: [],
     mcpConfig: board ? JSON.stringify({ mcpServers: Object.fromEntries([BOARD_SERVER, ...allowed].map((n) => [n, defs[n]])) }) : null,

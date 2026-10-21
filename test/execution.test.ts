@@ -9,7 +9,6 @@ import {
   EXEC_ENFORCEMENT,
   agentProfiles,
   defaultAgent,
-  delegatesOf,
   effortToRun,
   manifestOf,
   parseProfiles,
@@ -25,7 +24,6 @@ import { ALL_AI_BASES } from '../src/shared/harness';
 const exec: ExecInput = {
   agent: 'planejador',
   agentDefinition: null,
-  delegates: [],
   mcpAllowed: ['github'],
   mcpBlocked: ['slack', 'com.ponto'],
   mcpConfig: '{"mcpServers":{}}',
@@ -63,32 +61,14 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
         'planejador',
       ),
     ).toBe(true);
-    // os outros agentes do board vão no mesmo JSON, como subagentes, com as ferramentas e o modelo de cada um
-    const delegated = headlessCommand('claude', {
+    // a delegação nativa fica negada em toda execução, e só o agente da própria execução vai em `--agents`
+    const denied = headlessCommand('claude', {
       prompt: 'P',
       permission: 'full',
-      exec: {
-        ...exec,
-        tools: [],
-        agentDefinition: { name: 'condutor', description: 'Conduz', prompt: 'Delegue.', tools: ['Read', 'Agent'] },
-        delegates: [
-          { name: 'backend-node', description: 'Backend', prompt: 'Codifique.', tools: ['Read', 'Edit', 'Bash'], model: 'sonnet' },
-        ],
-      },
+      exec: { ...exec, deniedTools: ['Bash'] },
     }) as HeadlessCommand;
-    expect(
-      has(
-        delegated.args,
-        '--agents',
-        JSON.stringify({
-          condutor: { description: 'Conduz', prompt: 'Delegue.', tools: ['Read', 'Agent'] },
-          'backend-node': { description: 'Backend', prompt: 'Codifique.', tools: ['Read', 'Edit', 'Bash'], model: 'sonnet' },
-        }),
-        '--agent',
-        'condutor',
-      ),
-    ).toBe(true);
-    expect(delegated.args).not.toContain('--tools');
+    const at = denied.args.indexOf('--disallowedTools');
+    expect(denied.args.slice(at + 1, at + 4)).toEqual(['Bash', 'Agent', 'Task']);
     // os servidores liberados no perfil rodam sem pedir aprovação, junto do servidor do board
     expect(has(a, '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep', 'mcp__github__*')).toBe(true);
     expect(command.tempFiles).toEqual({ 'mcp.json': '{"mcpServers":{}}' });
@@ -291,21 +271,6 @@ describe('manifesto e plano pelo alvo da execução', () => {
     expect(plan.manifest.target.cli.id).toBe('claude');
     expect(plan.input.mcpConfig).not.toBeNull();
     expect(plan.summary).toContain('Servidores MCP: faz-ai (imposto pela CLI)');
-  });
-
-  it('o subagente cujo modelo é de outro perfil fica com model null', () => {
-    const { s, c } = cenario('');
-    s.board.execProfiles = [agente('mesmo', 'claude:sonnet'), agente('outro', 'cursor:composer-2.5'), agente('sem', '')];
-    const model = (n: string) => delegatesOf(s, c, undefined).find((d) => d.name === n)!.model;
-    expect(model('mesmo')).toBe('sonnet');
-    expect(model('outro')).toBeNull();
-    expect(model('sem')).toBeNull();
-    // a sessão do Cursor inverte: só o modelo do Cursor vale
-    const cursor = cenario('cursor:composer-2.5');
-    cursor.s.board.execProfiles = s.board.execProfiles;
-    const m = (n: string) => delegatesOf(cursor.s, cursor.c, undefined).find((d) => d.name === n)!.model;
-    expect(m('outro')).toBe('composer-2.5');
-    expect(m('mesmo')).toBeNull();
   });
 
   it('a janela de contexto e a ferramenta da estimativa são as do perfil do alvo', () => {

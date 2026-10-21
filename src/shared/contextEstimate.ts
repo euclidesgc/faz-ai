@@ -122,15 +122,9 @@ function mcpEntries(s: BoardState, tool: AiTool, allowed: string[]): ContextEntr
   return [...board, ...allowed.map((name): ContextEntry => ({ kind: 'mcp-allowed', name, tokens: null }))];
 }
 
-/** O agente da sessão (instruções inteiras) e, numa história no Claude Code, os subagentes (só o nome e a descrição entram aqui). */
-function agentEntries(tool: AiTool, m: ReturnType<typeof manifestOf>): ContextEntry[] {
-  const own: ContextEntry[] = m.agent ? [{ kind: 'agent', name: m.agent, tokens: tokensOf(m.instructions.length + m.purpose.length) }] : [];
-  // a ferramenta lista cada subagente pelo nome e pela descrição; as instruções dele vão para o contexto do próprio subagente
-  const subs =
-    tool === 'claude'
-      ? m.delegates.map((d): ContextEntry => ({ kind: 'subagent', name: d.name, tokens: tokensOf(d.name.length + d.purpose.length) }))
-      : [];
-  return [...own, ...subs];
+/** O agente da sessão (instruções inteiras). */
+function agentEntries(m: ReturnType<typeof manifestOf>): ContextEntry[] {
+  return m.agent ? [{ kind: 'agent', name: m.agent, tokens: tokensOf(m.instructions.length + m.purpose.length) }] : [];
 }
 
 /** As rules e as skills que a sessão lê pelo caminho: as do contexto fixo e as que o card (ou o agente) exige, sem repetir. */
@@ -183,7 +177,7 @@ function estimateManifestContext(s: BoardState, m: ReturnType<typeof manifestOf>
   const { rules, skills } = fileEntries(s, m);
   const byGroup: Record<ContextGroupId, ContextEntry[]> = {
     mcp: mcpEntries(s, tool, m.mcpServers),
-    agents: agentEntries(tool, m),
+    agents: agentEntries(m),
     rules,
     skills,
     card: c ? cardEntries(s, c) : [],

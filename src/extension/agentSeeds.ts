@@ -2,7 +2,6 @@ import { FLOW_SKILL_NAME, toItemName } from '../shared/harnessProject';
 import { CONDUCTOR_AGENT, TOOL_PRESETS, defaultAgent } from '../shared/execution';
 import { EFFORT_FIELD } from '../shared/models';
 import type { BoardState } from '../shared/model';
-import { SUBAGENT_TOOL } from './execution';
 import type { HarnessStore } from './harness';
 import type { BoardContext } from './panel/handlers/context';
 
@@ -32,15 +31,15 @@ export const AGENT_SEEDS: Seed[] = [
   {
     name: CONDUCTOR_AGENT,
     description:
-      'Conduz os cards pelo fluxo do board (fases, documentos, revisão, pendências) e delega o trabalho técnico aos agentes especialistas.',
+      'Conduz os cards pelo fluxo do board (fases, documentos, revisão, pendências) e entrega o trabalho técnico aos agentes especialistas pelo board.',
     level: 'Médio',
-    tools: [...READ, SUBAGENT_TOOL],
+    tools: READ,
     skills: [FLOW_SKILL_NAME],
     body: [
       'Você conduz cards do board Faz AI. Siga a skill do fluxo e as instruções da fase que vêm em `phase` no get_card.',
       'Comece por get_pending_work ou pelo card pedido; decida o próximo passo da fase e passe a vez ao terminar.',
       'Não faça você o trabalho técnico que um especialista faria melhor: no Plan, indique o agente certo em cada sub-tarefa com set_card_profile, escolhendo entre os agentes disponíveis em get_board.',
-      'Na Implementação, é a sua sessão que executa as sub-tarefas: delegue cada uma, com a ferramenta Agent, ao agente indicado no card dela (os agentes do board estão disponíveis como subagentes), com o modelo e o esforço do card, e acompanhe o ciclo de cada uma no board. Nenhuma sub-tarefa roda sozinha: se você não delegar, ela não acontece.',
+      'Na Implementação, o board executa cada sub-tarefa como uma execução separada, com o agente, o modelo e o esforço do card dela: você não delega por ferramenta da sessão. Acompanhe o ciclo de cada uma no board e verifique o conjunto ao fim.',
       'Registre decisões e resultados na conversa do card. Nunca invente requisito: o que estiver em aberto vira pergunta ou nota.',
     ].join('\n'),
   },

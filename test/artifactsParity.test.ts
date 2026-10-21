@@ -190,7 +190,6 @@ function expectSameExecution(f: Fixture) {
     description: 'Revisa código com rigor',
     prompt: 'Revise o código sem alterar arquivos.',
   });
-  expect(input.delegates).toEqual([]);
 
   // ferramentas liberadas e negadas
   expect(input.tools).toEqual(['Read', 'Grep', 'Glob']);
