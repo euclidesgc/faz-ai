@@ -137,6 +137,17 @@ export type WebviewToHost =
   | { type: 'card.restoreMany'; cardIds: Id[] }
   /** apaga de vez várias lixeiras de uma vez, com os filhos; ignora quem não estiver na lixeira */
   | { type: 'card.deletePermanentMany'; cardIds: Id[] }
+  /**
+   * restaura vários cards arquivados de uma vez, com a regra de `card.restoreArchived` em cada um (a história
+   * volta com as sub-tarefas arquivadas; a sub-tarefa de história arquivada traz a história); ignora ids
+   * repetidos, inexistentes, não arquivados ou na lixeira
+   */
+  | { type: 'card.unarchiveMany'; cardIds: Id[] }
+  /**
+   * manda vários cards arquivados para a lixeira de uma vez (a história leva as sub-tarefas arquivadas);
+   * ignora ids repetidos, inexistentes, não arquivados ou já na lixeira
+   */
+  | { type: 'card.trashArchivedMany'; cardIds: Id[] }
   /** move várias histórias para a mesma coluna de uma vez; cancela as sub-tarefas em aberto do lote quando o destino é cancelamento */
   | { type: 'card.moveMany'; cardIds: Id[]; columnId: Id }
   /** a IA cria uma história a partir de outra em modo autônomo: a nova nasce em modo autônomo, empilhada depois dela */

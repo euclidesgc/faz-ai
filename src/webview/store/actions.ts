@@ -246,6 +246,61 @@ export function requestDeletePermanentMany(roots: Card[], after?: () => void): v
   });
 }
 
+/** Frase "N card(s)" dos que acompanham o lote arquivado, ou '' se ninguém vai junto. */
+function archivedAlong(selected: Card[], reach: (card: Card, all: Card[]) => Card[]): string {
+  const { state } = useBoardStore.getState();
+  const all = state!.cards.filter((c) => c.archivedAt !== null && c.deletedAt === null);
+  const ids = new Set(selected.map((c) => c.id));
+  const along = new Set<Id>();
+  for (const card of selected) for (const other of reach(card, all)) if (!ids.has(other.id)) along.add(other.id);
+  return along.size ? tn(along.size, '{n} card', '{n} cards') : '';
+}
+
+/** Restaurar traz a história inteira (com as sub-tarefas arquivadas) quando o card é uma delas ou tem uma. */
+const restoreReach = (card: Card, all: Card[]): Card[] => {
+  const story = card.parentId ? all.find((c) => c.id === card.parentId) : card;
+  return story ? [story, ...all.filter((c) => c.parentId === story.id)] : [];
+};
+
+/** Restaura o lote arquivado; sempre confirma, dizendo quantos cards voltam e o que vem junto. */
+export function requestUnarchiveMany(selected: Card[], after?: () => void): void {
+  const { ask } = useBoardStore.getState();
+  const along = archivedAlong(selected, restoreReach);
+  ask({
+    title: t('Restaurar {n} card(s)?', { n: selected.length }),
+    message:
+      (along ? t('Voltam junto: {along} (sub-tarefas arquivadas das histórias e histórias das sub-tarefas).', { along }) + ' ' : '') +
+      t('Os cards voltam para a primeira coluna do workflow e saem do modo autônomo.'),
+    cancelLabel: t('Voltar'),
+    confirmLabel: t('Restaurar'),
+    onConfirm: () =>
+      void withBulkStatus(
+        t('Restaurando {n} card(s)…', { n: selected.length }),
+        () => cards.unarchiveMany(selected.map((c) => c.id)),
+        after,
+      ),
+  });
+}
+
+/** Manda o lote arquivado para a lixeira; sempre confirma. A história leva junto as sub-tarefas arquivadas. */
+export function requestTrashArchivedMany(selected: Card[], after?: () => void): void {
+  const { ask } = useBoardStore.getState();
+  const along = archivedAlong(selected, (card, all) => all.filter((c) => c.parentId === card.id));
+  ask({
+    title: t('Excluir {n} card(s)?', { n: selected.length }),
+    message: (along ? t('Vão para a lixeira junto: {along}.', { along }) + ' ' : '') + t('Dá para restaurar pela aba Lixeira.'),
+    cancelLabel: t('Voltar'),
+    confirmLabel: t('Excluir'),
+    danger: true,
+    onConfirm: () =>
+      void withBulkStatus(
+        t('Excluindo {n} card(s)…', { n: selected.length }),
+        () => cards.trashArchivedMany(selected.map((c) => c.id)),
+        after,
+      ),
+  });
+}
+
 /** Um lote de cards vai ao host: a barra de seleção mostra o status até ele confirmar, e só então `after` roda. */
 export async function withBulkStatus(label: string, send: () => Promise<void>, after?: () => void): Promise<void> {
   const { setBulkBusy } = useBoardStore.getState();
