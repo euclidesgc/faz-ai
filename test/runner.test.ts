@@ -32,6 +32,10 @@ import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { gatewayFor } from './helpers/gateway';
 import { executionPlan } from '../src/extension/execution';
+import { FLOW_LINE } from '../src/extension/promptContext';
+
+/** O contexto de um pedido sem nada marcado no board: só a linha do fluxo. */
+const FLOW_ONLY = { always: [FLOW_LINE], card: [] as string[] };
 import { monthOf, type RunReport } from '../src/shared/log';
 import { parseRunner } from '../src/shared/runner';
 import { TYPE_CONDITION, modelValue } from '../src/shared/models';
@@ -131,7 +135,7 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   expect(plan.input.mcpBlocked).toEqual(['slack']);
   expect(plan.advice).toEqual([expect.stringContaining('list_board_mcp_tools')]); // A biblioteca ensina a ponte comum mesmo quando a CLI também aceita o servidor diretamente.
   expect(plan.input.agentDefinition).toEqual({ name: 'restrito', description: 'Restrito', prompt: 'Siga.' });
-  expect(plan.summary.join(' | ')).toContain('Servidores MCP: faz-ai, github (imposto)');
+  expect(plan.summary.join(' | ')).toContain('Servidores MCP: faz-ai, github (imposto pela CLI)');
   expect(plan.summary.join(' | ')).not.toContain('segredo');
 
   // o arquivo temporário existe enquanto o processo roda, só para o dono, e some ao terminar
@@ -466,7 +470,7 @@ describe('executor da IA', () => {
     expect(procs[0]!.cwd).toBe(dir);
     expect(procs[0]!.command).toEqual(
       headlessCommand('claude', {
-        prompt: cardPrompt('#1', undefined, [PERMISSION_ADVICE.board!], false, true),
+        prompt: cardPrompt('#1', FLOW_ONLY, [PERMISSION_ADVICE.board!], false, true),
         permission: 'board',
         addDirs: [`${dir}.worktrees`],
         structured: true,
@@ -507,7 +511,7 @@ describe('executor da IA', () => {
       runner.start(storyId);
       expect(procs[0]!.command).toEqual(
         headlessCommand('claude', {
-          prompt: cardPrompt('#1', undefined, [], true, true),
+          prompt: cardPrompt('#1', FLOW_ONLY, [], true, true),
           permission: 'full',
           addDirs: [`${dir}.worktrees`],
           structured: true,
@@ -803,7 +807,7 @@ describe('executor da IA', () => {
       const command = procs[0]!.command;
       expect(command).toEqual(
         headlessCommand('claude', {
-          prompt: conflictPrompt('#1', undefined, [PERMISSION_ADVICE.board!]),
+          prompt: conflictPrompt('#1', FLOW_ONLY, [PERMISSION_ADVICE.board!]),
           permission: 'board',
           addDirs: [`${dir}.worktrees`],
           structured: true,
@@ -1121,7 +1125,7 @@ describe('log das execuções de IA', () => {
     expect(summary).toContain(`Agente do board: ${row.profile}`);
     expect(summary).toContain(`Skills: ${row.skills.join(', ')}`);
     expect(summary).toContain(`Modelo: ${row.model} · ${row.effort}`);
-    expect(summary).toContain('Contexto vazio (imposto)');
+    expect(summary).toContain('Contexto vazio (imposto pela CLI)');
     expect(log.join('\n')).toContain(summary);
   });
 

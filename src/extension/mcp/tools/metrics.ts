@@ -106,8 +106,8 @@ function formatCoverage(result: MetricsResult): string {
   if (result.costPartial)
     lines.push(
       hasCost
-        ? 'custo parcial: só o que a ferramenta informa (o Claude Code); parte das execuções do recorte não tem custo informado'
-        : 'custo não medido: nenhuma execução do recorte tem custo informado pela ferramenta (só o Claude Code informa)',
+        ? 'custo parcial: só o que a ferramenta informa; parte das execuções do recorte não tem custo informado'
+        : 'custo não medido: nenhuma execução do recorte tem custo informado pela ferramenta (nem toda ferramenta informa o custo)',
     );
   else if (hasCost) lines.push('custo informado pela ferramenta');
   return lines.join('\n');
@@ -158,12 +158,12 @@ export function registerMetricsTools(tool: DefineTool): void {
     'get_metrics',
     SHOW_COST
       ? 'Uso, custo e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
-          'com filtros de período e card. Resposta em tabela compacta; o custo é o que a própria ferramenta informou (só o Claude Code informa; o board não calcula custo por tabela de preços) e os tokens são os medidos; ambos vêm como "-" quando não medidos (nunca 0). ' +
-          '"tool" é a ferramenta de IA que rodou (claude, cursor); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só do Claude Code). ' +
+          'com filtros de período e card. Resposta em tabela compacta; o custo é o que a própria ferramenta informou (nem toda ferramenta informa o custo; o board não calcula custo por tabela de preços) e os tokens são os medidos; ambos vêm como "-" quando não medidos (nunca 0). ' +
+          '"tool" é a ferramenta de IA que rodou (o perfil de CLI, ex.: claude); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só das ferramentas que informam). ' +
           'Nas dimensões "agent", "skill", "used_tool", "mcp_tool" e "bash_command" não há tokens/custo (não é possível repartir o custo de uma execução entre o que ela usou); "effort" e "profile" têm.'
       : 'Uso, tokens e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
           'com filtros de período e card. Resposta em tabela compacta; os tokens são os medidos (entrada, saída e cache) e vêm como "-" quando não medidos (nunca 0). O board não mostra custo em dólar. ' +
-          '"tool" é a ferramenta de IA que rodou (claude, cursor); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só do Claude Code). ' +
+          '"tool" é a ferramenta de IA que rodou (o perfil de CLI, ex.: claude); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só das ferramentas que informam). ' +
           'Nas dimensões "agent", "skill", "used_tool", "mcp_tool" e "bash_command" não há tokens (não é possível repartir o consumo de uma execução entre o que ela usou); "effort" e "profile" têm.',
     {
       group_by: z.enum(GROUP_BY).optional().describe('Dimensão de agrupamento; omitido = total do recorte'),
@@ -176,7 +176,9 @@ export function registerMetricsTools(tool: DefineTool): void {
       tool: z
         .string()
         .optional()
-        .describe('Ferramenta de IA (claude, cursor), não a ferramenta usada pela execução (essa é a dimensão used_tool/mcp_tool)'),
+        .describe(
+          'Ferramenta de IA (o perfil de CLI, ex.: claude), não a ferramenta usada pela execução (essa é a dimensão used_tool/mcp_tool)',
+        ),
       limit: z.number().int().min(1).max(100).optional().describe('Linhas antes de somar o resto em "outros"; padrão 20'),
       rework: z
         .boolean()

@@ -275,7 +275,7 @@ export class ChatSession {
     const keys = candidates.map(selectionKey);
     this.router.setSuggestions(null);
     // só leitura: a IA lê o projeto e responde; nada é gravado sem a pessoa confirmar na tela
-    this.start(suggestArtifactsPrompt(kind, candidates), 'board', null, {
+    this.start([suggestArtifactsPrompt(kind, candidates), ...contextLines(state).always].join('\n'), 'board', null, {
       done: (text) => {
         const parsed = parseSuggestions(text, keys);
         this.router.setSuggestions(

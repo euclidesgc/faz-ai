@@ -1,21 +1,36 @@
 import { selectedItems, selectedMcpNames, selectedSkillNames, selectedRuleLocations } from '../shared/harnessSelection';
 import type { BoardState, Card } from '../shared/model';
+import { isFlowSkill } from './flowSkill';
 import { requiredRules, requiredSkills } from './mcp/format';
 
-/** Um arquivo que a sessão deve ler antes de começar: uma rule ou uma skill, pelo caminho absoluto. */
+/**
+ * A primeira linha de contexto de todo pedido do board, em qualquer ferramenta: o fluxo chega pelo MCP
+ * (get_skill), então não depende de a CLI ler as instruções do servidor nem de arquivo instalado.
+ */
+export const FLOW_LINE =
+  'Fluxo do board: antes de começar, leia a skill faz-ai-fluxo com get_skill (servidor "faz-ai") e siga-a; as skills faz-ai-* indicadas também se leem por get_skill.';
+
+/**
+ * Um item que a sessão deve ler antes de começar: uma rule ou uma skill, pelo caminho absoluto. As
+ * skills do fluxo não têm caminho: leem-se por get_skill (`via`).
+ */
 export interface ContextRef {
   kind: 'rule' | 'skill';
   name: string;
-  path: string;
+  path?: string;
+  via?: 'get_skill';
 }
 
-const describe = (r: ContextRef) => `${r.kind} ${r.name} (${r.path})`;
+const describe = (r: ContextRef) => `${r.kind} ${r.name} (${r.via ?? r.path})`;
 
 /** O contexto fixo do board: rules e skills marcadas como "incluir em todo contexto", pelo caminho. */
 export function alwaysRefs(s: BoardState): ContextRef[] {
   return [
     ...selectedItems(s, 'instructions', 'always').map((i): ContextRef => ({ kind: 'rule', name: i.location, path: i.path })),
-    ...selectedItems(s, 'skill', 'always').map((i): ContextRef => ({ kind: 'skill', name: i.name, path: i.path })),
+    // a skill do fluxo vem pelo get_skill (FLOW_LINE), mesmo instalada e marcada "Sempre"
+    ...selectedItems(s, 'skill', 'always')
+      .filter((i) => !isFlowSkill(i.name))
+      .map((i): ContextRef => ({ kind: 'skill', name: i.name, path: i.path })),
   ];
 }
 
@@ -26,18 +41,23 @@ export function cardRefs(s: BoardState, c: Card): ContextRef[] {
     ...requiredRules(s, c).flatMap((r): ContextRef[] =>
       'path' in r && r.path && !always.has(r.path) ? [{ kind: 'rule', name: r.name, path: r.path }] : [],
     ),
-    ...requiredSkills(s, c).flatMap((k): ContextRef[] =>
-      'path' in k && k.path && !always.has(k.path) ? [{ kind: 'skill', name: k.name, path: k.path }] : [],
-    ),
+    ...requiredSkills(s, c).flatMap((k): ContextRef[] => {
+      // as skills do fluxo vão sem caminho, menos a faz-ai-fluxo, que a FLOW_LINE já cobre
+      if ('via' in k && k.via === 'get_skill') return k.name === 'faz-ai-fluxo' ? [] : [{ kind: 'skill', name: k.name, via: 'get_skill' }];
+      return 'path' in k && k.path && !always.has(k.path) ? [{ kind: 'skill', name: k.name, path: k.path }] : [];
+    }),
   ];
 }
 
-/** As linhas do pedido que mandam ler o contexto fixo e o do card. Vazias quando não há nada marcado. */
+/** As linhas do pedido: a do fluxo (sempre a primeira) e as que mandam ler o contexto fixo e o do card. */
 export function contextLines(s: BoardState, c?: Card): { always: string[]; card: string[] } {
   const always = alwaysRefs(s);
   const card = c ? cardRefs(s, c) : [];
   return {
-    always: always.length ? [`Contexto fixo deste board. Antes de começar, leia e siga: ${always.map(describe).join('; ')}.`] : [],
+    always: [
+      FLOW_LINE,
+      ...(always.length ? [`Contexto fixo deste board. Antes de começar, leia e siga: ${always.map(describe).join('; ')}.`] : []),
+    ],
     card: card.length ? [`Este card exige também: ${card.map(describe).join('; ')}.`] : [],
   };
 }

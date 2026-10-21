@@ -137,6 +137,13 @@ card pede; o texto completo fica em skills por assunto (`faz-ai-harness-do-card`
 `faz-ai-workspace-e-pr`, `faz-ai-implementacao-rodadas`, `faz-ai-revisao-e-homologacao` e
 `faz-ai-modo-autonomo`), que a nota aponta pelo nome.
 
+O fluxo chega por três caminhos, e nenhum deles depende de instalação: a linha que todo pedido do
+board traz (manda ler `faz-ai-fluxo` com `get_skill`), o `flowNote` de `get_card` e de `get_pending_work`
+(a mesma indicação) e as skills do fluxo em `requiredSkills`. Esse é o regime: uma orientação à IA,
+que a ferramenta segue como as demais instruções. Não há garantia de que a ferramenta leia o fluxo antes
+de agir, nem de que não carregue por conta própria uma cópia instalada da skill com o mesmo nome; o
+board só controla o que ele mesmo entrega.
+
 ### Status e revisão
 
 Cada card em que a IA atua tem um status de trabalho, devolvido em `work` por `get_card` e
@@ -189,6 +196,7 @@ a origem não remove a cópia; `set_harness_selection` altera o modo, sem atuali
 - `get_project_profile`: perfil detectado do projeto, para sugestões sem executar comandos.
 - `preview_context_draft { target: { cardId, workflowId, phaseId, action } }`: prévia dos contratos v1 salvos, somente leitura. Use IDs estáveis (não números); `cardId` e `workflowId` são nulos ou mutuamente exclusivos e `phaseId` vazio indica ação sem fase. Ações: `work`, `refine`, `summary`, `conflict`, `chat`, `harness-agent`, `harness-rule`, `harness-skill`, `harness-suggest`. Retorna metadados, origens, revisões, caminho de herança e incompatibilidades, sem corpos de artefatos ou definições MCP. Não salva, não infere, não altera o runtime legado nem autoriza execução (`canExecute: false`, admissão #729 indisponível). Não há ferramenta MCP de escrita de contratos ou permissões.
 - `get_board_artifact { id }`: conteúdo completo de regra, skill ou agente; recusa MCPs.
+- `get_skill { skill }`: `SKILL.md` completo de uma skill do projeto ou de uma skill do fluxo do board: `faz-ai-fluxo` e as `faz-ai-*` por assunto. As do fluxo vêm do próprio board, sem arquivo instalado, e têm prioridade sobre um arquivo de mesmo nome.
 - `save_board_artifact { id?, kind, name, description, body, skills?, mcpServers?, categories? }`:
   cria/atualiza apenas na biblioteca. Tipos: `rule`, `skill`, `agent`; regra nova fica desligada.
   Edição exige id e mantém nome, arquivos de apoio e configurações omitidas. Categorias de agente:
@@ -234,9 +242,11 @@ arquivo mais o nome (`.mcp.json#github`). O `name` também serve para agente, sk
 "Skills" e "MCPs" dos cards só oferecem o que está em `contextual`; o servidor do board vai sempre, sem
 marcação. O inventário traz também o escopo `imported`: artefatos de pastas que a pessoa importou, que
 a ferramenta não carrega sozinha. Em `get_card`, `requiredRules` e `requiredSkills` trazem o caminho de cada
-arquivo que o card exige; para skills fora do projeto, `path` é o caminho absoluto do `SKILL.md`.
-Quando uma skill existe no projeto e fora dele com o mesmo nome, vale a do projeto. `create_skill` e
-`install_flow_skill` já marcam o que criam (`contextual` e `always`, respectivamente).
+arquivo que o card exige; para skills fora do projeto, `path` é o caminho absoluto do `SKILL.md`. As skills
+do fluxo do board vêm sem `path`, com `{ scope: "board", via: "get_skill" }`, e se leem com `get_skill`.
+Quando uma skill existe no projeto e fora dele com o mesmo nome, vale a do projeto (exceto as do fluxo, que
+são sempre as do board). `create_skill` e `install_flow_skill` já marcam o que criam (`contextual` e `always`,
+respectivamente). `install_flow_skill` é opcional: o board já serve o fluxo pelo `get_skill`.
 
 ### Skills sob demanda
 
@@ -283,9 +293,11 @@ linha de comando da ferramenta aceita é imposto por parâmetro:
 - `ready`: cards prontos para trabalhar (sub-tarefas de uma história que está com a pessoa ficam de fora).
 
 `withPerson` lista o que espera a pessoa. Cada mensagem da conversa traz `from` (`human` ou `ai`).
-A skill `faz-ai-fluxo`, instalada por `install_flow_skill` (sem `scope`: instala no global da ferramenta, para todos os projetos) ou pelo botão em Harness de IA, descreve
-o ciclo completo para a IA. A instalação grava também as skills por assunto citadas acima, que a skill
-principal e as notas do `get_card` apontam; checar se está instalada continua olhando só a `faz-ai-fluxo`.
+A skill `faz-ai-fluxo`, que descreve o ciclo completo para a IA, é servida pelo `get_skill` e não exige instalação.
+`install_flow_skill` (opcional; sem `scope`: instala no global da ferramenta, para todos os projetos, o mesmo que
+o botão em Harness de IA) copia para a pasta de skills da ferramenta a principal e as skills por assunto, para a
+ferramenta carregá-las sozinha. Não é requisito: a faixa de requisitos não cobra essa instalação.
+`get_card` e `get_pending_work` trazem `flowNote` com a indicação de ler o fluxo com `get_skill`.
 
 ### Execução pela conversa
 
@@ -373,7 +385,7 @@ Configurações → Workflows e colunas ou por `update_column` (`ai_instruction`
 `artifact_template`).
 
 Ao ler um card (`get_card`), a IA recebe a ferramenta, o **modelo** e o **esforço** que devem executá-lo e as **Skills**
-obrigatórias com o caminho de cada `SKILL.md`. Ela é instruída a carregar essas skills antes de
+obrigatórias com o caminho de cada `SKILL.md` (as do fluxo vêm sem caminho, para ler com `get_skill`). Ela é instruída a carregar essas skills antes de
 executar e a delegar o trabalho a um subagente com o modelo escolhido, ou avisar quando o cliente
 não permite. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue.
 

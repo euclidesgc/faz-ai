@@ -130,7 +130,6 @@ describe('o harness no aviso e no Diagnóstico', () => {
     nodePath: process.execPath,
     resolve: (command) => (command === 'node' ? process.execPath : `/usr/bin/${command}`),
     signedIn: async () => true,
-    skillInstalled: true,
     ...over,
   });
 
