@@ -43,9 +43,9 @@ export const MCP_INSTRUCTIONS =
   'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +
   '`model` do get_card é o modelo que deve executar o card, e `tool` o perfil de CLI da execução (o do modelo do card, do agente ou da regra; sem modelo, o perfil padrão): se for outro, avise a pessoa. ' +
   'Antes de executar, leia as `requiredRules` do get_card (arquivo em `path`) e as `requiredSkills` (o arquivo em `path` ou, sem `path`, por get_skill), mesmo as fora da sua lista. ' +
-  'Toda conversa com a pessoa sobre um card acontece na conversa do card (add_comment, request_review, ask_question); registre ali decisões e resultados. ' +
-  'Faltou informação: ask_question. Impedimento que você não resolve: block_card. ' +
-  'Algo depende da pessoa (decisão, dado, ponto em aberto)? Entregue com request_review e `pending`. No modo autônomo nada disso segura o card: decida, registre e siga. ' +
+  'Toda conversa com a pessoa sobre um card acontece na conversa do card (add_comment, request_review, ask_questions); registre ali decisões e resultados. ' +
+  'Pergunta com alternativas: ask_questions; aberta: ask_question. Impedimento que você não resolve: block_card. ' +
+  'Dado, acesso ou ponto em aberto da pessoa: request_review e `pending`. No modo autônomo nada disso segura o card: decida, registre e siga. ' +
   'Pull request: sempre com --base em workspace.prBase do get_card. ' +
   'Uso, tokens e tempo: get_metrics. Regras, skills e agentes: get_harness. Perfil de CLI e modelos: get_models. ' +
   'O detalhe vem na descrição de cada ferramenta, nas notas do get_card e nas skills faz-ai-* (get_skill).';

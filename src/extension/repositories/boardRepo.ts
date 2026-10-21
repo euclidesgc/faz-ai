@@ -51,6 +51,11 @@ export class BoardRepo {
     return str(one(this.db, 'SELECT git_json FROM boards WHERE id = ?', [boardId])?.git_json);
   }
 
+  /** O JSON das regras de modelo como está salvo; só a conversão da reserva legada lê o formato bruto. */
+  modelRulesJson(boardId: string): string {
+    return str(one(this.db, 'SELECT model_rules_json FROM boards WHERE id = ?', [boardId])?.model_rules_json);
+  }
+
   /** Lê um valor da tabela meta (chave/valor livre), ou undefined se não existir. */
   getMeta(key: string): string | undefined {
     const row = one(this.db, 'SELECT value FROM meta WHERE key = ?', [key]);

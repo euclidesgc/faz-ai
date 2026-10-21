@@ -44,8 +44,6 @@ export interface ModelRule {
   groups: RuleCondition[][];
   /** valor de campo do tipo modelo: `<id do modelo>@<esforço>` */
   model: string;
-  /** modelo reserva, usado quando o principal esgota o limite de uso do plano; mesmo formato de `model` */
-  fallback?: string | null;
 }
 
 /** Lê as regras salvas, convertendo o formato antigo (um campo = um valor) para o atual. */
@@ -64,7 +62,6 @@ export function parseModelRules(json: string | null | undefined): ModelRule[] {
         enabled: r.enabled !== false,
         groups,
         model: r.model,
-        fallback: typeof r.fallback === 'string' ? r.fallback : null,
       },
     ];
   });

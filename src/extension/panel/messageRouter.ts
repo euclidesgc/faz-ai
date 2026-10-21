@@ -39,7 +39,7 @@ import { questionHandlers } from './handlers/questions';
 import { cardHandlers, createCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
 import { initModels, modelHandlers, proposeLegacyFallbacks } from './handlers/models';
-import { legacyFallbackNotes } from '../../shared/legacyFallback';
+import { legacyFallbackNotes, parseLegacyFallbacks } from '../../shared/legacyFallback';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
 import { branchRenameHandlers } from './handlers/branchRename';
 import { aiProfileHandlers, type AiProfileRuntime } from './handlers/aiProfiles';
@@ -253,8 +253,11 @@ export class MessageRouter {
   executionPolicyLibrary(): PolicyLibrary {
     const snapshot = this.ctx.executionPolicies.snapshot(this.boardId);
     const catalog = builtinPolicyCatalog(this.snapshot());
-    const { modelRules } = this.snapshot().board;
-    const legacy = legacyFallbackNotes(modelRules, snapshot.records, catalog.models);
+    const legacy = legacyFallbackNotes(
+      parseLegacyFallbacks(this.ctx.boards.modelRulesJson(this.boardId)),
+      snapshot.records,
+      catalog.models,
+    );
     return { snapshot, ...catalog, ...(legacy.length ? { legacy } : {}) };
   }
   executionPolicyHistory(id: string, before = Number.MAX_SAFE_INTEGER) {

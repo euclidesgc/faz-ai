@@ -3,27 +3,47 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
-import { all } from '../src/extension/db/query';
+import { all, run } from '../src/extension/db/query';
 import { exportBoard, importBoard, parseExportFile } from '../src/extension/db/boardExport';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { evaluateExecutionPolicy, validateExecutionPolicy } from '../src/shared/executionPolicies';
-import { legacyFallbackNotes, legacyFallbackProposal, legacyFallbackProposals } from '../src/shared/legacyFallback';
-import type { ModelRule } from '../src/shared/models';
+import {
+  legacyFallbackNotes,
+  legacyFallbackProposal,
+  legacyFallbackProposals,
+  parseLegacyFallbacks,
+  type LegacyFallbackRule,
+} from '../src/shared/legacyFallback';
 import { catalog, evaluation } from './fixtures/executionPolicy';
 
-const rule = (over: Partial<ModelRule> = {}): ModelRule => ({
+const rule = (over: Partial<LegacyFallbackRule> = {}): LegacyFallbackRule => ({
   id: 'r1',
   name: 'Regra',
-  enabled: true,
-  groups: [],
   model: 'claude:opus@high',
   fallback: 'claude:haiku@medium',
+  index: 0,
   ...over,
 });
 
 describe('reserva legada como proposta de política (puro)', () => {
+  it('parseLegacyFallbacks lê do JSON bruto só as regras com reserva string não vazia, preservando o índice', () => {
+    const json = JSON.stringify([
+      { id: 'r0', name: 'Sem reserva', model: 'claude:opus@high' },
+      { id: 'r1', name: 'Com reserva', model: 'claude:opus@high', fallback: 'claude:haiku@medium' },
+      { id: 'r2', model: 'claude:opus@high', fallback: '' },
+      { id: 'r3', model: 'claude:opus@high', fallback: 42 },
+      { id: 'r4', model: 'claude:opus@high', fallback: 'claude:ausente' },
+    ]);
+    expect(parseLegacyFallbacks(json)).toEqual([
+      { id: 'r1', name: 'Com reserva', model: 'claude:opus@high', fallback: 'claude:haiku@medium', index: 1 },
+      { id: 'r4', name: '', model: 'claude:opus@high', fallback: 'claude:ausente', index: 4 },
+    ]);
+    expect(parseLegacyFallbacks('')).toEqual([]);
+    expect(parseLegacyFallbacks(null)).toEqual([]);
+    expect(parseLegacyFallbacks('{nada')).toEqual([]);
+  });
   it('gera política válida, desligada, com origem no id e no nome', () => {
-    const result = legacyFallbackProposal(rule(), 0, catalog);
+    const result = legacyFallbackProposal(rule(), catalog);
     if (!('policy' in result)) throw new Error('esperava proposta');
     expect(() => validateExecutionPolicy(result.policy)).not.toThrow();
     expect(result.policy).toMatchObject({
@@ -36,16 +56,16 @@ describe('reserva legada como proposta de política (puro)', () => {
     expect(result.policy.name).toContain('Regra');
   });
   it.each([
-    [{ fallback: null }, 'fallback-missing'],
     [{ fallback: 'claude:ausente' }, 'model-missing'],
     [{ model: 'claude:ausente' }, 'model-missing'],
     [{ fallback: 'claude:haiku@ultra' }, 'effort-invalid'],
     [{ id: 'com espaço' }, 'id-invalid'],
-  ] as [Partial<ModelRule>, string][])('sem conversão %j: %s', (over, reason) => {
-    expect(legacyFallbackProposal(rule(over), 0, catalog)).toEqual({ reason });
+  ] as [Partial<LegacyFallbackRule>, string][])('sem conversão %j: %s', (over, reason) => {
+    expect(legacyFallbackProposal(rule(over), catalog)).toEqual({ reason });
   });
-  it('as propostas ignoram regras sem reserva e os avisos separam convertidas de não convertidas', () => {
-    const rules = [rule(), rule({ id: 'r2', fallback: null }), rule({ id: 'r3', fallback: 'claude:ausente' })];
+  it('a prioridade vem do índice gravado e os avisos separam convertidas de não convertidas', () => {
+    const rules = [rule(), rule({ id: 'r3', fallback: 'claude:ausente', index: 2 })];
+    expect(legacyFallbackProposals([rule({ index: 3 })], catalog)[0]!.priority).toBe(130);
     const proposals = legacyFallbackProposals(rules, catalog);
     expect(proposals.map((p) => p.id)).toEqual(['legacy-r1']);
     const records = proposals.map((policy) => ({ policy, revision: 1, review: 'pending' as const, updatedAt: 1 }));
@@ -69,7 +89,13 @@ describe('migração da reserva legada no board', () => {
       author: 'Pessoa',
       attachmentsDir: path.join(dir, 'attachments'),
     });
-  const setRules = (rules: ModelRule[]) => router.handle({ type: 'settings.modelRules.set', rules });
+  // simula um board antigo: o campo `fallback` não existe mais no tipo, então o JSON bruto é gravado direto e o board reaberto
+  const setLegacyRules = (rules: LegacyFallbackRule[], source?: 'ai') => {
+    const json = JSON.stringify(rules.map(({ id, name, model, fallback }) => ({ id, name, enabled: true, groups: [], model, fallback })));
+    run(db, 'UPDATE boards SET model_rules_json = ? WHERE id = ?', [json, router.boardId]);
+    router = open();
+    if (source) router.handle({ type: 'settings.modelRules.set', rules: router.snapshot().board.modelRules }, { source });
+  };
   const records = () => router.executionPolicyLibrary().snapshot.records;
   beforeEach(async () => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-legacy-'));
@@ -82,8 +108,8 @@ describe('migração da reserva legada no board', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it('vira proposta desligada e pendente, com histórico e aviso, e a regra guarda a origem', () => {
-    setRules([rule(), rule({ id: 'r3', fallback: 'claude:ausente' })]);
+  it('vira proposta desligada e pendente, com histórico e aviso, e a regra em memória não tem reserva', () => {
+    setLegacyRules([rule(), rule({ id: 'r3', fallback: 'claude:ausente', index: 1 })]);
     expect(records()).toHaveLength(1);
     expect(records()[0]).toMatchObject({ revision: 1, review: 'pending', policy: { id: 'legacy-r1', enabled: false } });
     expect(router.executionPolicyHistory('legacy-r1').history).toHaveLength(1);
@@ -91,10 +117,11 @@ describe('migração da reserva legada no board', () => {
       { ruleId: 'r1', status: 'proposed', review: 'pending' },
       { ruleId: 'r3', status: 'unconvertible', reason: 'model-missing' },
     ]);
-    expect(router.snapshot().board.modelRules[0]!.fallback).toBe('claude:haiku@medium');
+    expect(router.snapshot().board.modelRules.map((r) => r.id)).toEqual(['r1', 'r3']);
+    expect(router.snapshot().board.modelRules.some((r) => 'fallback' in r)).toBe(false);
   });
   it('sem ativação silenciosa nem segundo motor: nada troca de CLI até a pessoa revisar e ligar', () => {
-    setRules([rule()]);
+    setLegacyRules([rule()]);
     const pending = evaluation({ snapshot: router.executionPolicyLibrary().snapshot });
     expect(evaluateExecutionPolicy(pending)).toMatchObject({ action: 'block', reason: 'no-policy' });
     const proposal = records()[0]!.policy;
@@ -104,8 +131,8 @@ describe('migração da reserva legada no board', () => {
       policy: { id: 'legacy-r1', revision: 2 },
     });
   });
-  it('é idempotente: regravar regras ou reabrir o board não duplica nem reverte a revisão da pessoa', () => {
-    setRules([rule()]);
+  it('é idempotente: regravar regras (o que apaga a reserva do JSON) ou reabrir o board não duplica nem reverte a revisão da pessoa', () => {
+    setLegacyRules([rule()]);
     const proposal = records()[0]!.policy;
     router.handle({
       type: 'settings.executionPolicy.save',
@@ -113,25 +140,26 @@ describe('migração da reserva legada no board', () => {
       expectedRevision: 1,
       reviewed: false,
     });
-    setRules([rule(), rule({ id: 'r4', fallback: null })]);
+    router.handle({ type: 'settings.modelRules.set', rules: router.snapshot().board.modelRules });
     router = open();
     expect(records()).toHaveLength(1);
     expect(records()[0]).toMatchObject({ revision: 2, policy: { name: 'Ajustada' } });
+    // a regravação tirou o valor legado do JSON: a proposta já criada fica, e só o aviso de migração some
+    expect(router.executionPolicyLibrary().legacy).toBeUndefined();
   });
   it('proposta removida pela pessoa não volta', () => {
-    setRules([rule()]);
+    setLegacyRules([rule()]);
     router.handle({ type: 'settings.executionPolicy.remove', id: 'legacy-r1', expectedRevision: 1 });
-    setRules([rule()]);
-    router = open();
+    setLegacyRules([rule()]);
     expect(records()).toEqual([]);
     expect(router.executionPolicyLibrary().legacy).toBeUndefined();
   });
   it('a proposta nasce desligada e pendente mesmo quando as regras vêm da IA', () => {
-    router.handle({ type: 'settings.modelRules.set', rules: [rule()] }, { source: 'ai' });
+    setLegacyRules([rule()], 'ai');
     expect(records()[0]).toMatchObject({ review: 'pending', policy: { enabled: false } });
   });
   it('export/import mantém regra e proposta, lista as políticas pendentes e não leva credenciais', () => {
-    setRules([rule()]);
+    setLegacyRules([rule()]);
     const store = { pathOf: () => '/arquivo-ausente', backupCards: () => undefined };
     const file = exportBoard(db, router.boardId, store, { extensionVersion: 'test' }).file;
     expect(JSON.stringify(file)).not.toMatch(/secret_ref":"[^"]/);
@@ -139,6 +167,6 @@ describe('migração da reserva legada no board', () => {
     expect(result.policyReviews).toEqual([records()[0]!.policy.name]);
     expect(result.profileReviews?.length).toBeGreaterThan(0);
     expect(all(db, 'SELECT review_state FROM execution_policies')).toEqual([{ review_state: 'pending' }]);
-    expect(router.snapshot().board.modelRules[0]!.fallback).toBe('claude:haiku@medium');
+    expect(router.snapshot().board.modelRules.map((r) => r.id)).toEqual(['r1']);
   });
 });

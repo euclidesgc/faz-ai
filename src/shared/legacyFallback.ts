@@ -1,10 +1,20 @@
-// Reserva legada (`ModelRule.fallback`) convertida em proposta de política: desligada e pendente de revisão.
-// A regra antiga continua guardada só como origem; o fallback em execução é decidido apenas pelas políticas.
+// Reserva legada (`fallback` nas regras de modelo gravadas) convertida em proposta de política: desligada e pendente de revisão.
+// O campo não existe mais em `ModelRule`: só a conversão lê o JSON bruto do board, e o fallback em execução é decidido apenas pelas políticas.
 import type { ExecutionPolicy, ExecutionPolicyRecord, ExecutionTarget } from './executionPolicies';
-import { parseModelValue, type ModelOption, type ModelRule } from './models';
+import { parseJsonArray, parseModelValue, type ModelOption } from './models';
 
 export const LEGACY_POLICY_PREFIX = 'legacy-';
-export type LegacyUnconvertible = 'model-missing' | 'fallback-missing' | 'effort-invalid' | 'id-invalid';
+export type LegacyUnconvertible = 'model-missing' | 'effort-invalid' | 'id-invalid';
+
+/** Uma regra do JSON gravado que ainda traz a reserva do motor antigo. */
+export interface LegacyFallbackRule {
+  id: string;
+  name: string;
+  model: string;
+  fallback: string;
+  /** posição na lista gravada: dá a prioridade da proposta */
+  index: number;
+}
 
 export interface LegacyFallbackNote {
   ruleId: string;
@@ -18,6 +28,14 @@ export interface LegacyFallbackNote {
 
 const SAFE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,239}$/;
 
+/** Lê do JSON bruto de `boards.model_rules_json` só as regras que ainda têm reserva (string não vazia). */
+export function parseLegacyFallbacks(json: string | null | undefined): LegacyFallbackRule[] {
+  return parseJsonArray<{ id?: unknown; name?: unknown; model?: unknown; fallback?: unknown }>(json).flatMap((r, index) => {
+    if (!r || typeof r.id !== 'string' || typeof r.model !== 'string' || typeof r.fallback !== 'string' || !r.fallback) return [];
+    return [{ id: r.id, name: typeof r.name === 'string' ? r.name : '', model: r.model, fallback: r.fallback, index }];
+  });
+}
+
 function targetOf(value: string, catalog: readonly ModelOption[]): ExecutionTarget | LegacyUnconvertible {
   const parsed = parseModelValue(value);
   const option = parsed && catalog.find((m) => m.id === parsed.id);
@@ -28,11 +46,9 @@ function targetOf(value: string, catalog: readonly ModelOption[]): ExecutionTarg
 
 /** A política proposta para a reserva de uma regra, ou o motivo de não haver como convertê-la. */
 export function legacyFallbackProposal(
-  rule: ModelRule,
-  index: number,
+  rule: LegacyFallbackRule,
   catalog: readonly ModelOption[],
 ): { policy: ExecutionPolicy } | { reason: LegacyUnconvertible } {
-  if (!rule.fallback) return { reason: 'fallback-missing' };
   const source = targetOf(rule.model, catalog);
   const alternative = targetOf(rule.fallback, catalog);
   if (typeof source === 'string') return { reason: source };
@@ -47,7 +63,7 @@ export function legacyFallbackProposal(
       // a origem fica no nome e no id; as condições da regra (campos/tipo do card) não têm equivalente e não são copiadas
       name: `Reserva migrada da regra: ${label}`.slice(0, 240),
       enabled: false,
-      priority: Math.min(1000000, 100 + index * 10),
+      priority: Math.min(1000000, 100 + rule.index * 10),
       conditions: {
         profileIds: [source.profileId],
         models: [source.model],
@@ -66,24 +82,23 @@ export function legacyFallbackProposal(
   };
 }
 
-/** Todas as propostas possíveis das regras atuais (a ordem da lista dá a prioridade). */
-export function legacyFallbackProposals(rules: readonly ModelRule[], catalog: readonly ModelOption[]): ExecutionPolicy[] {
-  return rules.flatMap((rule, index) => {
-    const result = legacyFallbackProposal(rule, index, catalog);
+/** Todas as propostas possíveis das regras legadas (o índice de cada uma dá a prioridade). */
+export function legacyFallbackProposals(rules: readonly LegacyFallbackRule[], catalog: readonly ModelOption[]): ExecutionPolicy[] {
+  return rules.flatMap((rule) => {
+    const result = legacyFallbackProposal(rule, catalog);
     return 'policy' in result ? [result.policy] : [];
   });
 }
 
 /** Avisos de migração: o que virou proposta, em que estado está, e o que ficou sem conversão. */
 export function legacyFallbackNotes(
-  rules: readonly ModelRule[],
+  rules: readonly LegacyFallbackRule[],
   records: readonly ExecutionPolicyRecord[],
   catalog: readonly ModelOption[],
 ): LegacyFallbackNote[] {
-  return rules.flatMap((rule, index): LegacyFallbackNote[] => {
-    if (!rule.fallback) return [];
+  return rules.flatMap((rule): LegacyFallbackNote[] => {
     const base = { ruleId: rule.id, ruleName: rule.name };
-    const result = legacyFallbackProposal(rule, index, catalog);
+    const result = legacyFallbackProposal(rule, catalog);
     if ('reason' in result) return [{ ...base, policyId: null, status: 'unconvertible', review: null, reason: result.reason }];
     const record = records.find((r) => r.policy.id === result.policy.id);
     // sem registro: a pessoa descartou a proposta, e isso não se repete

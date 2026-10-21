@@ -110,16 +110,6 @@ export const runTargetOf = (state: BoardState, card: Card): RunTarget | null => 
   return r.blocked ? null : r.target;
 };
 
-/**
- * A reserva da regra que casa com o card, quando o alvo é o modelo principal dessa regra. Null sem regra,
- * sem reserva, com o modelo trocado à mão ou com a reserva num perfil desligado.
- */
-export function fallbackTargetOf(state: BoardState, card: Card, target: RunTarget): RunTarget | null {
-  const rule = suggestModelRule(state, card);
-  if (!rule?.fallback || !rule.model || target.value !== rule.model) return null;
-  return targetOfValue(state.board, rule.fallback, 'fallback');
-}
-
 /** O perfil padrão mais os perfis dos cards com a IA, sem repetição. */
 export function profilesInUse(state: BoardState): AiProfile[] {
   const out = new Map<string, AiProfile>();
