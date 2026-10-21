@@ -64,6 +64,19 @@ describe('HostBridge: preferências da pessoa', () => {
     expect(sent).toContainEqual({ type: 'aiProfiles.testResult', id: 'cli', ok: true, output: 'OK' });
     expect(sent.filter((m) => m.type === 'done').map((m) => m.requestId)).toEqual(['probe', 'test']);
   });
+  it('o Testar chama a conferência dos requisitos (checkNow) ao fim, com sucesso ou falha', async () => {
+    let checks = 0;
+    router.onRequirementsCheck(async () => void checks++);
+    let ok = true;
+    router.setAiProfileRuntime({
+      probe: async () => ({ type: 'aiProfiles.status', profiles: {} }),
+      test: async (id) => ({ type: 'aiProfiles.testResult', id, ok, output: '', ...(ok ? {} : { error: 'falhou' }) }),
+    });
+    await bridge.handle({ type: 'settings.aiProfiles.test', id: 'cli', requestId: 'a' });
+    ok = false;
+    await bridge.handle({ type: 'settings.aiProfiles.test', id: 'cli', requestId: 'b' });
+    expect(checks).toBe(2);
+  });
   it('o ready devolve as preferências guardadas e prefs.set grava no host, para o aviso dispensado não voltar', async () => {
     const data = new Map<string, unknown>();
     const prefs = new PrefsStore({ get: <T>(k: string) => data.get(k) as T | undefined, update: (k, v) => data.set(k, v) });

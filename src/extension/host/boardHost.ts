@@ -11,7 +11,7 @@ import { openFile, type DbHandle } from '../db/database';
 import { dayOf } from '../../shared/log';
 import { Autopilot } from '../autopilot';
 import { Orchestrator } from '../orchestrator';
-import { orchestratesStory, LIVE_WORK_STATES } from '../../shared/orchestration';
+import { orchestratesStory, effectiveLimits, LIVE_WORK_STATES } from '../../shared/orchestration';
 import { terminateProcessGroup } from '../processIdentity';
 import { CommentRepo } from '../repositories/commentRepo';
 import type { AiActivity } from '../../shared/model';
@@ -45,7 +45,7 @@ import { checkRequirements, profileInstallUrl } from '../requirements';
 import { CLI_COMMAND } from '../../shared/requirements';
 import { checkEnvironment, linuxFamily } from '../environment';
 import { isPendingReview, probeProfiles } from '../profileProbe';
-import { profileHealth, type ProfileHealth } from '../../shared/profileHealth';
+import { profileHealth, profilesInUse, type ProfileHealth } from '../../shared/profileHealth';
 import { editorMcpFiles, pinEditorCommands } from '../mcp/pinCommands';
 import { harnessIssues } from '../../shared/harnessStatus';
 import type { WebviewToHost } from '../../shared/messages';
@@ -530,6 +530,34 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           // o Diagnóstico confere também os perfis desligados, para a pessoa ver antes de ligar
           health: await computeHealth(true, true),
           workspaceDir: o.folderPath,
+          profilesInUse: profilesInUse(s.board),
+          // o simulador e os limites são os da base (#620, #621); nada aqui chama a IA nem recalcula regra
+          simulateNextRun: (available) => {
+            try {
+              return router.simulateExecutionPolicy({
+                draft: null,
+                sourceValue: '',
+                defaultProfileId: s.board.aiTool,
+                explicit: false,
+                context: { action: 'work', agentId: null, phaseId: null, cardTypeId: null, origin: 'manual' },
+                failure: available ? 'unknown' : 'unavailable',
+                effects: 'none',
+                eligibility: available ? 'admitted' : 'unavailable',
+                elapsedMs: 0,
+                runningGlobal: 0,
+                runningByProfile: {},
+              });
+            } catch {
+              return null;
+            }
+          },
+          effectiveLimits: () => {
+            try {
+              return effectiveLimits(s.board.runner, s.board.git.mode);
+            } catch {
+              return null;
+            }
+          },
           harnessIssues: harnessIssuesNow() ?? null,
           branchRenames: s.branchRenames,
           platform: process.platform,
