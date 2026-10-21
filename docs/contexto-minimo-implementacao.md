@@ -279,3 +279,7 @@ Ativação: variável de ambiente `FAZ_AI_CONTEXT_RUNTIME=v1` ao abrir o host (`
 ## E5 — aceite do plano em execução (#995)
 
 Mapa do aceite, com o teste de cada item: prévia = runtime = snapshot e biblioteca editada depois não muda o run (`test/contextAcceptance.test.ts`, `runArtifactSnapshot.test.ts`); recurso obrigatório ausente não inicia (`aiGateway.test.ts`, E5.1); MCP fora do plano recusado (`aiGateway.test.ts`, E5.2; `admissionBoundary.test.ts`); queda, cancelamento, resposta tardia e retomada sem execução duplicada (`orchestratorIntegration.test.ts`, `orchestrator.test.ts`); nenhuma porta executa ignorando o plano (`contextRuntimeV1.test.ts`, um teste por porta); prova com a CLI real (`test/cli-real/verifier.real.ts`). **Decisão (autônomo):** não criei um cenário novo de história atravessando várias fases com CLI falsa nem em `test:cli-real`: o `v1` é opt-in e as fases já são cobertas pelos testes do Orchestrator; fica como lacuna registrada.
+
+## E4 — fechamento (#994)
+
+O aceite da E4 agora tem teste (`test/contextAcceptance.test.ts`): Discovery resolve um agente de leitura sem MCP, a Implementação resolve o especialista com o MCP dele, e o refino e o resumo da mesma fase não herdam as seleções da Implementação. **Lacuna registrada:** "mudar requisitos, dependências, agente ou artefatos marca a proposta como desatualizada" depende da proposta de plano pela IA, que só nasce na E6.1 (#996); o teste de desatualização entra lá.

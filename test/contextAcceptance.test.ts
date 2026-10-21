@@ -100,4 +100,62 @@ describe('aceite do plano em execução (E5)', () => {
     s.contextPlanning!.activities = [];
     expect(() => cardV1(s, 'claude', target)).toThrow(/Runtime v1/);
   });
+
+  it('a atividade recebe só a configuração do seu trabalho: Discovery lê, Implementação tem especialista, refino e resumo não herdam (#994)', () => {
+    const s = state();
+
+    const [discovery, impl] = ['backlog', 'doing'];
+    s.harness.library!.artifacts.push(art('especialista', 'agent'), art('leitor', 'agent'), art('mcp-impl', 'mcp'));
+    const contract = (role: string, categories: ('read' | 'edit')[], mcps: string[]) => ({
+      version: 1 as const,
+      role,
+      instructions: '',
+      essentialSkillIds: [],
+      availableSkillIds: [],
+      allowedMcpIds: mcps,
+      tools: { categories, native: { tool: '' as const, allow: [], deny: [] } },
+    });
+    const record = (artifactId: string) => ({ artifactId, revision: 1, updatedAt: 0 });
+    s.contextPlanning!.agents = [
+      { ...record('leitor'), contract: contract('Leitor', ['read'], []) },
+      { ...record('especialista'), contract: contract('Dev', ['read', 'edit'], ['mcp-impl']) },
+    ];
+    const activity = (phaseId: string, action: 'work' | 'refine' | 'summary', agent: string | null, mcps: string[]) => ({
+      id: `${phaseId}-${action}`,
+      cardId: null,
+      workflowId: null,
+      phaseId,
+      action,
+      revision: 1,
+      updatedAt: 0,
+      selection: {
+        version: 1 as const,
+        agent: explicit(agent),
+        model: { mode: 'inherit' as const },
+        additionalSkillIds: { mode: 'inherit' as const },
+        activeMcpIds: explicit(mcps),
+        inputAttachmentIds: [],
+        expectedResult: '',
+      },
+    });
+    s.contextPlanning!.activities = [
+      activity(discovery, 'work', 'leitor', []),
+      activity(impl, 'work', 'especialista', ['mcp-impl']),
+      activity(impl, 'refine', 'leitor', []),
+    ];
+    const resolve = (phaseId: string, action: 'work' | 'refine' | 'summary') =>
+      resolveContextDraft(s, { cardId: null, workflowId: null, phaseId, action });
+    const discoveryWork = resolve(discovery, 'work');
+    const implWork = resolve(impl, 'work');
+    expect(discoveryWork.agent?.artifactId).toBe('leitor');
+    expect(discoveryWork.items.some((i) => i.artifactId === 'mcp-impl')).toBe(false);
+    expect(strictRequestFromDraft(s, discoveryWork)!.agentTools.categories).toEqual(['read']);
+    expect(implWork.agent?.artifactId).toBe('especialista');
+    expect(implWork.items.some((i) => i.artifactId === 'mcp-impl')).toBe(true);
+    const implRefine = resolve(impl, 'refine');
+    expect(implRefine.items.some((i) => i.artifactId === 'mcp-impl')).toBe(false);
+    expect(implRefine.agent?.artifactId).toBe('leitor');
+    // o resumo não tem seleção própria nesta fase: não herda o especialista da implementação
+    expect(resolve(impl, 'summary').agent?.artifactId).not.toBe('especialista');
+  });
 });
