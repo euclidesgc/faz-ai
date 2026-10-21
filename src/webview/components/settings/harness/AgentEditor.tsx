@@ -184,10 +184,13 @@ export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: A
                 </p>
                 {foreignTools && (
                   <p className="wizard-warning" role="alert">
-                    {t('Este agente veio do {origin}: as categorias foram traduzidas para os nomes do {tool}. Confira a lista antes de executar.', {
-                      origin,
-                      tool: tool.label,
-                    })}
+                    {t(
+                      'Este agente veio do {origin}: as categorias foram traduzidas para os nomes do {tool}. Confira a lista antes de executar.',
+                      {
+                        origin,
+                        tool: tool.label,
+                      },
+                    )}
                   </p>
                 )}
                 <div className="agent-presets">

@@ -35,7 +35,10 @@ export function ArtifactsHarness() {
           value={queries[active.id]}
           onChange={(e) => setQueries({ ...queries, [active.id]: e.target.value })}
         />
-        <ActionButton hint={t('Importa regras, skills, agentes e servidores MCP de uma pasta, de uma ferramenta instalada ou de um arquivo.')} onClick={() => setImporting(true)}>
+        <ActionButton
+          hint={t('Importa regras, skills, agentes e servidores MCP de uma pasta, de uma ferramenta instalada ou de um arquivo.')}
+          onClick={() => setImporting(true)}
+        >
           {t('Importar')}
         </ActionButton>
       </div>

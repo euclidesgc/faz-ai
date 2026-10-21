@@ -48,15 +48,6 @@ describe('i18n do host: mensagens preenchidas', () => {
     ['Já existe uma skill "revisar" desligada.', 'A disabled skill "revisar" already exists.'],
     ['Já existe uma skill "revisar" em .claude/skills.', 'A skill "revisar" already exists in .claude/skills.'],
     ['Já existe uma skill "revisar" no destino.', 'A skill "revisar" already exists at the destination.'],
-    ['Já existe "notas.md" nesta skill.', '"notas.md" already exists in this skill.'],
-    ['Já existe "CLAUDE.md" em ~/.claude.', '"CLAUDE.md" already exists in ~/.claude.'],
-    ['Servidor "git" não encontrado em .mcp.json.', 'Server "git" not found in .mcp.json.'],
-    ['Já existe um servidor "git" em .mcp.json.', 'A server "git" already exists in .mcp.json.'],
-    ['O Claude Code não tem uma pasta de usuário para este tipo de item.', 'Claude Code has no user folder for this kind of item.'],
-    [
-      'Arquivo de regras desconhecido: "X.md". Aceitos: CLAUDE.md, AGENTS.md.',
-      'Unknown rules file: "X.md". Accepted: CLAUDE.md, AGENTS.md.',
-    ],
     [
       'O modelo "Opus" não aceita o esforço "ultra". Aceitos: low, high.',
       'The model "Opus" does not accept the effort "ultra". Accepted: low, high.',
@@ -93,15 +84,6 @@ describe('i18n do host: mensagens preenchidas', () => {
       'Imported: a, b. Skipped: -. Problems: -. MCP servers to configure: git.',
     ],
     ['Não foi possível clonar https://github.com/a/b.git: timeout', 'Could not clone https://github.com/a/b.git: timeout'],
-    ['Skill não encontrada na origem: revisar', 'Skill not found in the source: revisar'],
-    [
-      '"Revisar Spec" não é um nome de skill válido (letras minúsculas, números e hífens).',
-      '"Revisar Spec" is not a valid skill name (lowercase letters, numbers and hyphens).',
-    ],
-    [
-      '/p/.mcp.json não é um JSON simples (pode ter comentários ou um erro de sintaxe). Abra o arquivo e edite-o à mão.',
-      '/p/.mcp.json is not plain JSON (it may have comments or a syntax error). Open the file and edit it by hand.',
-    ],
     ['A resposta passou do tempo limite (30 min) e foi encerrada.', 'The reply exceeded the time limit (30 min) and was ended.'],
     ['Não foi possível executar o Cursor: falhou', 'Could not run Cursor: falhou'],
     ['O Cursor terminou com erro (código 2).', 'Cursor finished with an error (code 2).'],

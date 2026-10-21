@@ -72,7 +72,11 @@ describe('ImportDialog', () => {
 
   it('lista com repetido e problema: o item com problema fica sem caixa', () => {
     renderThemed(<ImportDialog onClose={() => {}} />);
-    showPreview([cand({}), cand({ key: 'rule:r', kind: 'rule', name: 'r', exists: true }), cand({ key: 'mcp:m', kind: 'mcp', name: 'm', problem: 'nome inválido' })]);
+    showPreview([
+      cand({}),
+      cand({ key: 'rule:r', kind: 'rule', name: 'r', exists: true }),
+      cand({ key: 'mcp:m', kind: 'mcp', name: 'm', problem: 'nome inválido' }),
+    ]);
     expect(screen.getByText('já está no board')).toBeInTheDocument();
     expect(screen.getByText('nome inválido')).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Importar m' })).toBeNull();
@@ -131,7 +135,9 @@ describe('ImportDialog', () => {
     showPreview([cand({})], { from: 'tool', tool: 'claude' });
     await userEvent.click(screen.getByRole('button', { name: 'Indicar artefatos' }));
     expect(lastSent('harness.suggest.run')).toEqual({ type: 'harness.suggest.run', tool: 'claude', kind: 'skill' });
-    act(() => setState(() => ({ harnessSuggestions: { tool: 'claude', kind: 'skill', items: [{ location: 'skill:a', reason: 'combina' }] } })));
+    act(() =>
+      setState(() => ({ harnessSuggestions: { tool: 'claude', kind: 'skill', items: [{ location: 'skill:a', reason: 'combina' }] } })),
+    );
     expect(screen.getByRole('checkbox', { name: 'Importar a' })).toBeChecked();
     expect(screen.getByText(/combina/)).toBeInTheDocument();
   });

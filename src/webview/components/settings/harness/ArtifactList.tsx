@@ -89,7 +89,12 @@ export function ArtifactList({
 
   const toolbar = () => {
     if (kind === 'agent')
-      return <AgentsToolbar onNew={() => setOpen(creating ? null : { create: true })} onWizard={(preset) => setOpen({ wizard: preset ?? null })} />;
+      return (
+        <AgentsToolbar
+          onNew={() => setOpen(creating ? null : { create: true })}
+          onWizard={(preset) => setOpen({ wizard: preset ?? null })}
+        />
+      );
     const toggle = (next: NonNullable<typeof open>) => setOpen(open && JSON.stringify(open) === JSON.stringify(next) ? null : next);
     const label = { rule: t('Nova regra'), skill: t('Nova skill'), mcp: t('Novo servidor') }[kind];
     return (
@@ -162,11 +167,19 @@ export function ArtifactList({
       {creating && creator}
       {wizard && kind === 'rule' && <RuleWizard onClose={close} />}
       {wizard && kind === 'skill' && <SkillWizard onClose={close} />}
-      {wizard && kind === 'agent' && <AgentWizard key={wizard.wizard?.id ?? 'wizard'} tool={tool} preset={wizard.wizard ?? undefined} onClose={close} />}
+      {wizard && kind === 'agent' && (
+        <AgentWizard key={wizard.wizard?.id ?? 'wizard'} tool={tool} preset={wizard.wizard ?? undefined} onClose={close} />
+      )}
       {all.length === 0 && (
         <div className="board-empty">
           <p className="muted small">{t(EMPTY_TEXT[kind])}</p>
-          <ActionButton variant="soft" color="gray" size="1" hint={t('Abre o diálogo para importar artefatos para o board.')} onClick={onImport}>
+          <ActionButton
+            variant="soft"
+            color="gray"
+            size="1"
+            hint={t('Abre o diálogo para importar artefatos para o board.')}
+            onClick={onImport}
+          >
             {t('Importar')}
           </ActionButton>
         </div>
@@ -179,7 +192,11 @@ export function ArtifactList({
               aria-label={t('Selecionar todos os visíveis')}
               disabled={items.length === 0}
               checked={
-                items.length > 0 && items.every((a) => picked.has(a.id)) ? true : items.some((a) => picked.has(a.id)) ? 'indeterminate' : false
+                items.length > 0 && items.every((a) => picked.has(a.id))
+                  ? true
+                  : items.some((a) => picked.has(a.id))
+                    ? 'indeterminate'
+                    : false
               }
               onCheckedChange={(checked) => pick(items, checked === true)}
             />
@@ -294,9 +311,7 @@ export function ArtifactList({
                     message={t(
                       'A cópia do board é apagada e a ação não pode ser desfeita; o arquivo de origem fica. Os cards e os agentes que citam este artefato deixam de recebê-lo.',
                     )}
-                    onConfirm={() =>
-                      void harness.setSelection([{ kind: selectableOfKind(a.kind), location: artifactLocation(a) }], null)
-                    }
+                    onConfirm={() => void harness.setSelection([{ kind: selectableOfKind(a.kind), location: artifactLocation(a) }], null)}
                   />
                 )}
               </div>

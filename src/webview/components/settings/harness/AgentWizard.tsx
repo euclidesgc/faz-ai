@@ -70,15 +70,7 @@ const EMPTY: Answers = {
  * não esconde as opções. O escopo fica o menor possível: ferramentas, servidores e skills só entram se marcados.
  * Nada é gravado antes do botão do último passo; uma sugestão pronta abre o assistente com as respostas feitas.
  */
-export function AgentWizard({
-  tool,
-  preset,
-  onClose,
-}: {
-  tool: AiToolInfo;
-  preset?: AgentSuggestion;
-  onClose: () => void;
-}) {
+export function AgentWizard({ tool, preset, onClose }: { tool: AiToolInfo; preset?: AgentSuggestion; onClose: () => void }) {
   const state = useBoardStore((s) => s.state)!;
   const format = baseValue(AGENT_FORMAT, tool.id) ?? { tools: false, skills: false, mcp: false, readonly: false, background: false };
   const catalog = state.board.modelCatalog;
@@ -111,10 +103,7 @@ export function AgentWizard({
 
   const name = a.name ?? nameFromText(a.directive);
   const description = a.description ?? a.directive.replace(/\s+/g, ' ').trim();
-  const nameOk = isFreeName(name, [
-    ...state.harness.agents,
-    ...(state.harness.library?.artifacts ?? []).filter((x) => x.kind === 'agent'),
-  ]);
+  const nameOk = isFreeName(name, [...state.harness.agents, ...(state.harness.library?.artifacts ?? []).filter((x) => x.kind === 'agent')]);
   const draft = draftAgentInstructions(tool.id, {
     directive: a.directive,
     tools: a.tools,
@@ -386,9 +375,7 @@ export function AgentWizard({
           </FormField>
           <dl className="wizard-summary">
             <dt>{t('Onde')}</dt>
-            <dd>
-              {t('No board, em "Pelo card": {name}', { name })}
-            </dd>
+            <dd>{t('No board, em "Pelo card": {name}', { name })}</dd>
             {format.tools && (
               <>
                 <dt>{t('Ferramentas')}</dt>

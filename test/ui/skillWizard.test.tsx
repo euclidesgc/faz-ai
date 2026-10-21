@@ -105,7 +105,6 @@ describe('assistente "Criar skill com ajuda"', () => {
     expect(save.body).toContain('1. Procure no projeto um exemplo do mesmo tipo');
     expect(save.body).toContain('- Nunca edita migração publicada');
     expect(save.body).toContain('- [references/ultima-migracao.md](references/ultima-migracao.md)');
-    expect(sentOf('harness.item.write')).toHaveLength(0);
     expect(sentOf('harness.selection.set')).toHaveLength(0);
     expect(closed).toEqual(['x']);
   });

@@ -30,7 +30,6 @@ const { requestIds, SELF_ANSWERING } = vi.hoisted(() => ({
   requestIds: [] as string[],
   SELF_ANSWERING: new Set<string>([
     'attachment.read',
-    'harness.file.read',
     'harness.artifact.read',
     'harness.project.profile',
     'harness.agent.assist',

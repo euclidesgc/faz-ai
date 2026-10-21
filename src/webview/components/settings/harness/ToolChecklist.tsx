@@ -48,7 +48,10 @@ export function ToolChecklist({ tool, value, onChange, deny = false, servers = [
             <Checkbox
               className="tool-group-check"
               aria-label={`${prefix}${t('Categoria')} ${t(g.label)}`}
-              checked={groupState(g.tools.map((x) => x.name), value)}
+              checked={groupState(
+                g.tools.map((x) => x.name),
+                value,
+              )}
               onCheckedChange={(v) =>
                 toggleGroup(
                   g.tools.map((x) => x.name),

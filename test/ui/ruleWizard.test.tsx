@@ -103,7 +103,6 @@ describe('assistente "Criar regra com ajuda"', () => {
     expect(save).not.toHaveProperty('tool');
     expect(save).not.toHaveProperty('scope');
     expect(save).not.toHaveProperty('source');
-    expect(sentOf('harness.item.write')).toHaveLength(0);
     expect(sentOf('harness.selection.set')).toHaveLength(0);
     expect(closed).toEqual(['x']);
   });

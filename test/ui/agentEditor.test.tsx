@@ -3,7 +3,12 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { choose, lastSent, posted, renderThemed, seedBoard, sentOf } from './setup';
 import { baseInfo, type Agent, type HarnessItem } from '../../src/shared/harness';
-import { AgentsToolbar, DefaultAgentBadge, DeleteAgentButton, MakeDefaultButton } from '../../src/webview/components/settings/harness/AgentsToolbar';
+import {
+  AgentsToolbar,
+  DefaultAgentBadge,
+  DeleteAgentButton,
+  MakeDefaultButton,
+} from '../../src/webview/components/settings/harness/AgentsToolbar';
 import { AgentEditor } from '../../src/webview/components/settings/harness/AgentEditor';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import type { BoardState } from '../../src/shared/model';
@@ -217,7 +222,12 @@ describe('editor de agente do board', () => {
           directory: '',
           artifacts: [
             boardArtifact('agent', 'revisor', {
-              agent: { skills: [], mcpServers: [], model: '', tools: { categories: ['read'], native: { tool: 'cursor', allow: [], deny: [] } } },
+              agent: {
+                skills: [],
+                mcpServers: [],
+                model: '',
+                tools: { categories: ['read'], native: { tool: 'cursor', allow: [], deny: [] } },
+              },
             }),
           ],
         },

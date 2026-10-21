@@ -2,7 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ChatSession, chatPrompt, parseSuggestions, suggestAgentsPrompt, suggestRulesPrompt, suggestSkillsPrompt } from '../src/extension/chat';
+import {
+  ChatSession,
+  chatPrompt,
+  parseSuggestions,
+  suggestAgentsPrompt,
+  suggestRulesPrompt,
+  suggestSkillsPrompt,
+} from '../src/extension/chat';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import type { HeadlessCommand } from '../src/extension/headless';
 import { openInMemory } from '../src/extension/db/database';

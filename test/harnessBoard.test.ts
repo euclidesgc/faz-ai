@@ -9,7 +9,6 @@ import { openInMemory } from '../src/extension/db/database';
 import { migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
 import { scanInventory } from '../src/extension/harnessScan';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { catalogLines, refineCatalog } from '../src/extension/promptContext';
 import { bareExec, executionPlan } from '../src/extension/execution';
 import { parseSuggestions } from '../src/extension/chat';
@@ -213,37 +212,6 @@ describe('pastas importadas', () => {
     expect(imported.find((i) => i.name === 'sql')!.location).toBe(path.join(root, 'colecao/.claude/skills/sql/SKILL.md'));
     expect(items.filter((i) => i.scope === 'project')).toEqual([]);
   });
-
-  it('importar e tirar uma pasta pelo roteador preserva as cópias já adicionadas ao board', async () => {
-    write('colecao/.claude/skills/sql/SKILL.md', '---\nname: sql\ndescription: Consultas SQL\n---\n');
-    fs.mkdirSync(path.join(root, 'projeto'));
-    const db = await openInMemory(WASM_DIR);
-    const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
-      workspaceKey: 'ws',
-      folderName: 'Projeto',
-      author: 'Pessoa',
-      attachmentsDir: path.join(root, 'attachments'),
-      workspaceDir: path.join(root, 'projeto'),
-      homeDir: path.join(root, 'home'),
-    });
-    expect(() => router.handle({ type: 'harness.import.add', tool: 'claude', dir: path.join(root, 'nao-existe') })).toThrow(
-      'Pasta não encontrada',
-    );
-    router.handle({ type: 'harness.import.add', tool: 'claude', dir: path.join(root, 'colecao') });
-    let s = router.snapshot();
-    expect(s.harnessImports).toEqual([{ tool: 'claude', dir: path.join(root, 'colecao') }]);
-    const skill = s.harness.inventory.find((t) => t.tool === 'claude')!.items.find((i) => i.name === 'sql')!;
-    expect(skill.scope).toBe('imported');
-    router.handle({ type: 'harness.selection.set', items: [{ kind: 'skill', location: selectionKey(skill) }], usage: 'contextual' });
-    s = router.snapshot();
-    expect(s.fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['sql']);
-    // A pasta sai do catálogo; a cópia particular continua disponível.
-    router.handle({ type: 'harness.import.remove', tool: 'claude', dir: path.join(root, 'colecao') });
-    s = router.snapshot();
-    expect(s.harnessImports).toEqual([]);
-    expect(s.harnessSelection).toHaveLength(1);
-    expect(s.fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['sql']);
-  });
 });
 
 describe('migração 29 → 30 (banco de artefatos)', () => {
@@ -385,31 +353,6 @@ describe('revisão: o que a pilha corrigiu', () => {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
-
-  it('tirar a pasta importada apaga a marcação dos artefatos dela, em qualquer separador', async () => {
-    const db = await openInMemory(WASM_DIR);
-    const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
-      workspaceKey: 'ws',
-      folderName: 'P',
-      author: 'Pessoa',
-      attachmentsDir: path.join(os.tmpdir(), 'fazai-att-x'),
-    });
-    const boardId = router.snapshot().board.id;
-    new BoardRepo(db).setSelection(
-      boardId,
-      [
-        { kind: 'skill', location: '/col/web/SKILL.md' },
-        { kind: 'skill', location: '/colecao/x/SKILL.md' },
-        { kind: 'mcp', location: 'C:\\col\\.mcp.json#github' },
-      ],
-      'contextual',
-    );
-    new BoardRepo(db).removeImport(boardId, 'claude', '/col');
-    // a marcação sai ordenada por tipo (mcp antes de skill) e caminho
-    expect(router.snapshot().harnessSelection.map((x) => x.location)).toEqual(['C:\\col\\.mcp.json#github', '/colecao/x/SKILL.md']);
-    new BoardRepo(db).removeImport(boardId, 'claude', 'C:\\col');
-    expect(router.snapshot().harnessSelection.map((x) => x.location)).toEqual(['/colecao/x/SKILL.md']);
-  });
 });
 
 describe('handlers do host: artefatos direto no board (#668)', () => {
@@ -470,7 +413,12 @@ describe('handlers do host: artefatos direto no board (#668)', () => {
 
   it('cria, edita e lê regra, skill e MCP, e as opções dos campos acompanham (RF20)', async () => {
     router.handle({ type: 'harness.artifact.save', kind: 'rule', name: 'estilo', body: 'use tabs' });
-    router.handle({ type: 'harness.artifact.save', kind: 'skill', name: 'revisar', body: '---\nname: revisar\ndescription: Revisa\n---\nPassos' });
+    router.handle({
+      type: 'harness.artifact.save',
+      kind: 'skill',
+      name: 'revisar',
+      body: '---\nname: revisar\ndescription: Revisa\n---\nPassos',
+    });
     router.handle({ type: 'harness.artifact.save', kind: 'mcp', name: 'memoria', server: stdio() });
     expect(field('Skills')).toEqual(['revisar']);
     expect(field('MCPs')).toEqual(['memoria']);
@@ -480,20 +428,34 @@ describe('handlers do host: artefatos direto no board (#668)', () => {
     expect((await read('rule', 'estilo')).text).toBe('use espaços');
     expect((await read('skill', 'revisar')).text).toContain('Passos');
 
-    router.handle({ type: 'harness.artifact.save', kind: 'skill', name: 'revisar-2', previous: 'revisar', body: '---\nname: revisar-2\ndescription: Revisa\n---\nPassos' });
+    router.handle({
+      type: 'harness.artifact.save',
+      kind: 'skill',
+      name: 'revisar-2',
+      previous: 'revisar',
+      body: '---\nname: revisar-2\ndescription: Revisa\n---\nPassos',
+    });
     expect(field('Skills')).toEqual(['revisar-2']);
 
     const mcp = await read('mcp', 'memoria');
     expect(mcp.server).toMatchObject({ command: 'memoria', env: { TOKEN: '' } });
     expect(JSON.stringify(mcp)).not.toContain('segredo-1');
-    router.handle({ type: 'harness.artifact.save', kind: 'mcp', name: 'memoria', server: stdio({ args: ['--v'], env: { TOKEN: '' } }), keepSecrets: ['TOKEN'] });
+    router.handle({
+      type: 'harness.artifact.save',
+      kind: 'mcp',
+      name: 'memoria',
+      server: stdio({ args: ['--v'], env: { TOKEN: '' } }),
+      keepSecrets: ['TOKEN'],
+    });
     expect(JSON.stringify(router.snapshot())).not.toContain('segredo-1');
     expect(JSON.stringify(router.libraryMcpDefinitions())).toContain('segredo-1');
 
     expect((await read('rule', 'nao-existe')).error).toBe('Artefato não encontrado.');
     expect(() => router.handle({ type: 'harness.artifact.save', kind: 'rule', name: 'Nome Ruim', body: '' })).toThrow(/inválido/);
     expect(() => router.handle({ type: 'harness.artifact.save', kind: 'mcp', name: 'faz-ai', server: stdio() })).toThrow(/reservado/);
-    expect(() => router.handle({ type: 'harness.artifact.save', kind: 'mcp', name: 'y', server: stdio() }, { source: 'ai' })).toThrow(/revisão humana/);
+    expect(() => router.handle({ type: 'harness.artifact.save', kind: 'mcp', name: 'y', server: stdio() }, { source: 'ai' })).toThrow(
+      /revisão humana/,
+    );
     // nada foi para o projeto nem para as pastas das ferramentas
     expect(dump(path.join(root, 'projeto'))).toEqual([]);
     expect(dump(path.join(root, 'home'))).toEqual([]);
@@ -525,7 +487,9 @@ describe('handlers do host: artefatos direto no board (#668)', () => {
 
     sent.length = 0;
     await bridge.handle({ type: 'harness.import.apply', keys: preview.candidates.map((c) => c.key), onConflict: 'skip' });
-    expect(sent.find((m) => m.type === 'notice')).toMatchObject({ message: expect.stringContaining('Importados: CLAUDE.md. Pulados: sql.') });
+    expect(sent.find((m) => m.type === 'notice')).toMatchObject({
+      message: expect.stringContaining('Importados: CLAUDE.md. Pulados: sql.'),
+    });
     expect((await read('skill', 'sql')).text).toContain('v1');
     expect((await read('rule', 'CLAUDE.md')).text).toBe('# Regras');
     expect(router.snapshot().artifactImport).toBeNull();
@@ -539,7 +503,9 @@ describe('handlers do host: artefatos direto no board (#668)', () => {
     expect(router.snapshot().artifactImport).not.toBeNull();
     router.handle({ type: 'harness.import.cancel' });
     expect(router.snapshot().artifactImport).toBeNull();
-    await expect(bridge.handle({ type: 'harness.import.scan', source: { from: 'folder', path: path.join(root, 'vazia') } })).resolves.toBeUndefined();
+    await expect(
+      bridge.handle({ type: 'harness.import.scan', source: { from: 'folder', path: path.join(root, 'vazia') } }),
+    ).resolves.toBeUndefined();
     expect(sent.some((m) => m.type === 'error')).toBe(true);
     expect(field('Skills')).toEqual(['sql']);
     expect(dump(path.join(root, 'projeto'))).toEqual([]);

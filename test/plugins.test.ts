@@ -2,10 +2,9 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { pluginActions, type PluginInstall } from '../src/shared/harness';
-import { applyClaudePlugin, parseClaudePlugins, removeCursorPlugin } from '../src/extension/plugins';
+import type { PluginInstall } from '../src/shared/harness';
+import { parseClaudePlugins } from '../src/extension/plugins';
 import { scanInventory } from '../src/extension/harnessScan';
-import type { CliRun } from '../src/extension/cliProbe';
 
 let root: string;
 let home: string;
@@ -50,36 +49,6 @@ describe('lista de plugins do Claude Code', () => {
     ]);
     expect(parseClaudePlugins('No plugins installed.', project)).toBeNull();
   });
-
-  it('as ações de cada plugin dependem de como ele está instalado', () => {
-    expect(pluginActions('claude', install())).toEqual(['disable', 'uninstall']);
-    expect(pluginActions('claude', install({ enabled: false }))).toEqual(['enable', 'uninstall']);
-    // sincronizado do claude.ai e da organização só são desativados
-    expect(pluginActions('claude', install({ id: 'design@synced', scopes: ['synced'] }))).toEqual(['disable']);
-    expect(pluginActions('claude', install({ scopes: ['managed'] }))).toEqual(['disable']);
-    expect(pluginActions('cursor', install())).toEqual(['uninstall']);
-    expect(pluginActions('claude', undefined)).toEqual([]);
-  });
-
-  it('desinstala em cada escopo e trata o que já estava desativado como feito', async () => {
-    const calls: string[][] = [];
-    const ok = (args: string[]): Promise<CliRun> => {
-      calls.push(args);
-      return Promise.resolve({ code: 0, stdout: '{"command":"uninstall","outcome":"ok","message":"ok"}\n', stderr: '' });
-    };
-    expect(await applyClaudePlugin(ok, 'uninstall', install({ scopes: ['user', 'project', 'managed'] }))).toBeNull();
-    expect(calls).toEqual([
-      ['plugin', 'uninstall', 'fmt@loja', '--scope', 'user', '--json'],
-      ['plugin', 'uninstall', 'fmt@loja', '--scope', 'project', '--json'],
-    ]);
-    const already = () =>
-      Promise.resolve({ code: 1, stdout: '{"outcome":"failed","alreadyInGoalState":true,"message":"already disabled"}', stderr: '' });
-    expect(await applyClaudePlugin(already, 'disable', install())).toBeNull();
-    const failed = () => Promise.resolve({ code: 1, stdout: '{"outcome":"failed","message":"blocked by policy"}', stderr: '' });
-    expect(await applyClaudePlugin(failed, 'disable', install())).toBe('blocked by policy');
-    const gone = () => Promise.resolve({ code: null, stdout: '', stderr: '' });
-    expect(await applyClaudePlugin(gone, 'enable', install())).toBe('a CLI do Claude Code não respondeu');
-  });
 });
 
 describe('varredura dos plugins instalados', () => {
@@ -101,7 +70,7 @@ describe('varredura dos plugins instalados', () => {
     expect(plugins([])).toEqual([]);
   });
 
-  it('no Cursor, cada plugin local sai tirando a pasta, e um link sai sem levar o destino', () => {
+  it('no Cursor, lista cada plugin local, inclusive o que é um link', () => {
     write(home, '.cursor/plugins/local/meu/.cursor-plugin/plugin.json', '{"name":"meu"}');
     write(root, 'fonte/linkado/plugin.json', '{"name":"linkado"}');
     fs.symlinkSync(path.join(root, 'fonte/linkado'), path.join(home, '.cursor/plugins/local/linkado'));
@@ -112,9 +81,5 @@ describe('varredura dos plugins instalados', () => {
         ['linkado', 'linkado'],
       ]),
     );
-    for (const p of plugins) removeCursorPlugin(home, p.install!);
-    expect(fs.readdirSync(path.join(home, '.cursor/plugins/local'))).toEqual([]);
-    expect(fs.existsSync(path.join(root, 'fonte/linkado/plugin.json'))).toBe(true);
-    expect(() => removeCursorPlugin(home, install({ dir: path.join(home, 'outra') }))).toThrow('fora');
   });
 });

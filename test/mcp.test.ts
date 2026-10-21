@@ -320,7 +320,7 @@ describe('servidor MCP', () => {
 });
 
 describe('instalar skills pelo board', () => {
-  it('mostra o que foi encontrado, instala as escolhidas e as oferece nos cards', async () => {
+  it('mostra o que foi encontrado e descarta a origem ao cancelar', async () => {
     const src = path.join(dir, 'origem');
     for (const name of ['commit', 'deploy']) {
       fs.mkdirSync(path.join(src, name), { recursive: true });
@@ -337,24 +337,15 @@ describe('instalar skills pelo board', () => {
         { rel: 'deploy', name: 'deploy', description: 'Skill deploy', files: 0, valid: true },
       ],
     });
-    router.handle({ type: 'harness.install.apply', tool: 'claude', to: 'project', rels: ['commit'] });
-    expect(fs.existsSync(path.join(dir, '.claude/skills/commit/SKILL.md'))).toBe(true);
-    expect(fs.existsSync(path.join(dir, '.claude/skills/deploy'))).toBe(false);
+    router.clearInstall();
     expect(router.snapshot().harnessInstall).toBeNull();
     expect(cleaned).toBe(true);
-    expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toContain('commit');
-    expect(() => router.handle({ type: 'harness.install.apply', tool: 'claude', to: 'project', rels: ['deploy'] })).toThrow(
-      'Procure de novo',
-    );
   });
 });
 
 describe('modelos e referências nas skills', () => {
   it('a skill de modelos nasce só quando indicada, e o card entrega os arquivos dela', async () => {
-    router.handle({ type: 'harness.referenceSkill.create' });
-    const skill = router.snapshot().harness.skills.find((k) => k.name === 'modelos-do-projeto')!;
-    expect(skill).toMatchObject({ enabled: true, mode: 'manual' });
-    expect(fs.existsSync(path.join(dir, '.claude/skills/modelos-do-projeto/references'))).toBe(true);
+    await call('create_skill', { name: 'modelos-do-projeto', description: 'Modelos e exemplos de código', content: 'Passos' });
 
     const written = (
       await call('write_skill_file', { skill: 'modelos-do-projeto', file: 'references/repositorio.ts', content: 'export class Repo {}' })
@@ -473,16 +464,6 @@ describe('harness e padrões pelo MCP', () => {
     expect(field.options).toEqual(['commit', 'critica', 'revisar-spec']);
     const card = (await call('create_card', { title: 'História', fields: { Skills: ['commit', 'critica', 'revisar-spec'] } })).data;
     expect(card.requiredSkills).toEqual(['commit', 'critica', 'revisar-spec'].map(copiedSkill));
-    // copiar a skill global para o projeto: ela passa a existir nos dois escopos e o card usa a do projeto
-    const global = router
-      .snapshot()
-      .harness.inventory.find((t) => t.tool === 'claude')!
-      .items.find((i) => i.name === 'commit')!;
-    router.handle({ type: 'harness.item.copy', tool: 'claude', items: [{ kind: 'skill', path: global.path }], to: 'project' });
-    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual(copiedSkill('commit'));
-    expect(() => router.handle({ type: 'harness.item.delete', tool: 'claude', kind: 'skill', path: '/etc/passwd' })).toThrow(
-      'não encontrado',
-    );
     const inventory = (await call('get_harness')).data.inventory;
     expect(inventory.find((i: any) => i.name === 'commit')).toEqual({
       id: expect.any(String),
@@ -1646,7 +1627,6 @@ describe('vínculos entre cards', () => {
     await call('create_card', { title: 'B', parent: 1, depends_on: [a.id] });
     const got = (await call('get_card', { card: 1 })).data;
     const size = JSON.stringify(got).length;
-    // eslint-disable-next-line no-console
     console.log(`MEDIDA get_card #588: ${size} caracteres`);
     const notes = JSON.stringify(got, (k, v) => (k.endsWith('Note') ? v : typeof v === 'object' ? v : undefined));
     expect(notes.length).toBeLessThan(MAX_NOTES);

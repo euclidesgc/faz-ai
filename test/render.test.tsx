@@ -65,10 +65,13 @@ beforeAll(async () => {
   const firstCol = (wf: string) => s.columns.find((c) => c.workflowId === wf)!;
   storyId = router.createCard({ typeId: typeOf(parentWf.id).id, columnId: firstCol(parentWf.id).id, parentId: null, title: 'História' });
   const sub = router.createCard({ typeId: typeOf(childWf.id).id, columnId: firstCol(childWf.id).id, parentId: storyId, title: 'Tarefa' });
-  router.handle({ type: 'harness.rule.write', name: 'AGENTS.md', content: '# Regras' });
-  router.handle({ type: 'harness.skill.create', name: 'revisar-spec', description: 'Quando revisar', content: 'Passos' });
-  router.handle({ type: 'harness.skill.create', name: 'desligada', description: 'x', content: 'y' });
-  router.handle({ type: 'harness.skill.setEnabled', name: 'desligada', enabled: false });
+  router.handle({ type: 'harness.artifact.save', kind: 'rule', name: 'regras-gerais', body: '# Regras' });
+  router.handle({
+    type: 'harness.artifact.save',
+    kind: 'skill',
+    name: 'revisar-spec',
+    body: '---\nname: revisar-spec\ndescription: Quando revisar\n---\n\nPassos\n',
+  });
   router.handle({
     type: 'harness.agent.create',
     scope: 'project',

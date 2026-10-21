@@ -235,8 +235,6 @@ export class RunMcpSessions {
       'addAttachmentFiles',
       'getAttachment',
       'readHarnessFile',
-      'writeHarnessFile',
-      'writeSkillFile',
       'projectArtifacts',
       'projectProfile',
       'previewContextDraft',
@@ -269,7 +267,6 @@ export class RunMcpSessions {
           if (key === 'readLibraryArtifact' && registration) return registration.snapshot.artifact(String(values[0]));
           if (key === 'libraryMcpDefinitions' && registration) return structuredClone(registration.servers);
           if (key === 'projectArtifacts' && registration) throw new Error('Artefatos externos não pertencem ao snapshot desta execução.');
-          if (key === 'writeHarnessFile' && registration) throw new Error('O snapshot da execução é somente leitura.');
           if (key === 'handle') {
             const msg = values[0] as Parameters<MessageRouter['handle']>[0];
             const fields = msg as unknown as Record<string, unknown>;

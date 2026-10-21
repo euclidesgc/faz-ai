@@ -90,7 +90,9 @@ describe('BoardLibrary: gravar regra, skill e MCP no board', () => {
     expect(JSON.stringify(view)).not.toContain('segredo-novo-xyz');
     expect(view).toMatchObject({ transport: 'stdio', command: 'memoria', env: { TOKEN: '' } });
     expect(JSON.stringify(ctx.state())).not.toContain('segredo-novo-xyz');
-    lib().saveMcp('remoto', stdio({ transport: 'http', command: '', url: 'https://x.dev/mcp', headers: { Authorization: 'Bearer z' } }), { keepSecrets: [] });
+    lib().saveMcp('remoto', stdio({ transport: 'http', command: '', url: 'https://x.dev/mcp', headers: { Authorization: 'Bearer z' } }), {
+      keepSecrets: [],
+    });
     lib().saveMcp('remoto2', stdio({ transport: 'http', command: '', url: 'https://x.dev/mcp', headers: { Authorization: '' } }), {
       previous: 'remoto',
       keepSecrets: ['Authorization'],
@@ -136,8 +138,16 @@ describe('BoardLibrary: gravar regra, skill e MCP no board', () => {
     lib().select(sel('outro'), null, []);
     expect(get('agent', 'outro')).toBeUndefined();
     lib().repo.upsert(ctx.boardId, {
-      kind: 'skill', name: 'faz-ai-fluxo', description: '', body: 'x', meta: { generated: true }, origin: '', originTool: '',
-      missing: false, skipped: [], files: [],
+      kind: 'skill',
+      name: 'faz-ai-fluxo',
+      description: '',
+      body: 'x',
+      meta: { generated: true },
+      origin: '',
+      originTool: '',
+      missing: false,
+      skipped: [],
+      files: [],
     });
     expect(() => lib().select([{ kind: 'skill', location: 'board:faz-ai-fluxo' }], null, [])).toThrow(/do fluxo/);
     expect(() => lib().writeSkillFile('faz-ai-fluxo', 'a.md', 'x')).toThrow(/do fluxo/);
@@ -151,7 +161,9 @@ describe('BoardLibrary: gravar regra, skill e MCP no board', () => {
     lib().saveMcp('m', stdio(), { keepSecrets: [] });
     expect(fs.readdirSync(path.join(root, 'project'))).toEqual([]);
     expect(fs.readdirSync(path.join(root, 'home')).filter((n) => /^\.(claude|cursor|kimi-code)/.test(n))).toEqual([]);
-    const mirrored = lib().materialize().find((a) => a.name === 's')!;
+    const mirrored = lib()
+      .materialize()
+      .find((a) => a.name === 's')!;
     expect(fs.existsSync(path.join(path.dirname(mirrored.path), 'a.md'))).toBe(true);
     expect(mirrored.path.startsWith(path.join(root, 'project'))).toBe(false);
   });

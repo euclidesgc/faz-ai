@@ -77,8 +77,7 @@ function Rows({ label, rows, onChange }: { label: string; rows: Row[]; onChange:
   );
 }
 
-const toRecord = (rows: Row[]): Record<string, string> =>
-  Object.fromEntries(rows.filter((r) => r.key !== '').map((r) => [r.key, r.value]));
+const toRecord = (rows: Row[]): Record<string, string> => Object.fromEntries(rows.filter((r) => r.key !== '').map((r) => [r.key, r.value]));
 const savedRows = (rec: Record<string, string>): Row[] => Object.keys(rec).map((key) => ({ key, value: '', saved: true }));
 
 /**
@@ -125,7 +124,13 @@ export function McpServerEditor({ server, onClose }: { server?: BoardArtifact; o
         name: trimmed,
         transport,
         command: transport === 'stdio' ? command.trim() : '',
-        args: transport === 'stdio' ? args.split(/\r?\n/).map((a) => a.trim()).filter(Boolean) : [],
+        args:
+          transport === 'stdio'
+            ? args
+                .split(/\r?\n/)
+                .map((a) => a.trim())
+                .filter(Boolean)
+            : [],
         env: transport === 'stdio' ? toRecord(env) : {},
         url: transport === 'http' ? url.trim() : '',
         headers: transport === 'http' ? toRecord(headers) : {},

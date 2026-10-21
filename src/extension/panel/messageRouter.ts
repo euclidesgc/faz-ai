@@ -15,7 +15,7 @@ import { newId } from '../db/ids';
 import type { ImportSummary } from '../../shared/backup';
 import type { AiActivity, Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
-import type { AiTool, HarnessSuggestions, PluginAction } from '../../shared/harness';
+import type { AiTool, HarnessSuggestions } from '../../shared/harness';
 import type { ProjectProfile } from '../../shared/projectProfile';
 import { readProjectProfile } from '../projectProfile';
 import type { ClaudeCli } from '../plugins';
@@ -131,18 +131,9 @@ const bridgeOnly = {
   'ai.autopilot.pause': viaBridge,
   'ai.autopilot.resume': viaBridge,
   'card.workspace.open': viaBridge,
-  'harness.item.open': viaBridge,
-  'harness.file.read': viaBridge,
-  'harness.plugin.apply': viaBridge,
   'harness.refresh': viaBridge,
-  'harness.file.write': viaBridge,
-  'harness.item.create': viaBridge,
-  'harness.item.write': viaBridge,
   'harness.project.profile': viaBridge,
   'harness.agent.assist': viaBridge,
-  'harness.skill.file.create': viaBridge,
-  'harness.skill.file.open': viaBridge,
-  'harness.install.scan': viaBridge,
   'harness.import.pick': viaBridge,
   'harness.import.scan': viaBridge,
   'harness.artifact.read': viaBridge,
@@ -652,13 +643,6 @@ export class MessageRouter {
     this.ctx.harness.setClaudeCli(cli, () => this.changed());
   }
 
-  /** Desinstala, desativa ou ativa plugins e devolve o aviso para a pessoa. */
-  async applyPlugins(tool: AiTool, action: PluginAction, ids: string[]): Promise<string> {
-    const notice = await this.ctx.harness.applyPlugins(tool, action, ids);
-    this.changed();
-    return notice;
-  }
-
   /** Guarda a origem de skills já disponível numa pasta, para a pessoa escolher o que instalar. */
   setInstall(source: string, dir: string, cleanup: () => void): void {
     this.ctx.harness.setInstall(source, dir, cleanup);
@@ -691,48 +675,9 @@ export class MessageRouter {
     return this.ctx.library.content(kind, name, file);
   }
 
-  /** Cria um arquivo de apoio numa skill e devolve o caminho dele, para abrir no editor. */
-  createSkillFile(tool: AiTool, skillMd: string, rel: string, link: boolean): string {
-    const file = this.ctx.harness.createSkillFile(tool, skillMd, rel, link);
-    this.changed();
-    return file;
-  }
-
-  /** Grava um arquivo de apoio numa skill do projeto (usado pela IA). */
-  writeSkillFile(name: string, rel: string, content: string): string {
-    const file = this.ctx.harness.writeSkillFile(name, rel, content);
-    this.changed();
-    return file;
-  }
-
-  /** Caminho de um arquivo de apoio que a varredura listou. */
-  skillFilePath(tool: AiTool, skillMd: string, rel: string): string {
-    return this.ctx.harness.skillFilePath(tool, skillMd, rel);
-  }
-
   /** Conteúdo de um arquivo do harness para o editor do board, e se ele pode ser alterado. */
   readHarnessFile(file: string): { content: string; readonly: boolean } {
     return this.ctx.harness.readFile(file);
-  }
-
-  /** Grava um arquivo do harness editado no board e relê a varredura. */
-  writeHarnessFile(file: string, content: string): void {
-    this.ctx.harness.writeFile(file, content);
-    this.changed();
-  }
-
-  /** Cria um item do harness e devolve o caminho do arquivo, para abrir no editor. */
-  createHarnessItem(tool: AiTool, source: number, name: string, description: string): string {
-    const file = this.ctx.harness.createItem(tool, source, name, description);
-    this.changed();
-    return file;
-  }
-
-  /** Cria um item do harness com o conteúdo pronto e devolve o caminho do arquivo, para abrir no editor. */
-  writeHarnessItem(tool: AiTool, source: number, name: string, content: string, files?: string[], append?: boolean): string {
-    const file = this.ctx.harness.writeItem(tool, source, name, content, files, append);
-    this.changed();
-    return file;
   }
 
   /** O perfil do projeto aberto, para os assistentes de regras e de skills. */

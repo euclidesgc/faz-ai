@@ -24,20 +24,3 @@ export function skillMode(skillMd: string): SkillMode {
   const fm = frontmatter(read(skillMd, HEAD_BYTES))?.[1] ?? '';
   return FRONTMATTER_KEY.exec(fm)?.[2] === 'true' ? 'manual' : 'auto';
 }
-
-function setFrontmatter(skillMd: string, mode: SkillMode): void {
-  const text = read(skillMd);
-  const fm = frontmatter(text);
-  if (!fm) {
-    if (mode === 'manual') fs.writeFileSync(skillMd, `---\ndisable-model-invocation: true\n---\n\n${text}`);
-    return;
-  }
-  const lines = fm[1]!.split(/\r?\n/).filter((l) => !FRONTMATTER_KEY.test(l));
-  if (mode === 'manual') lines.push('disable-model-invocation: true');
-  fs.writeFileSync(skillMd, `---\n${lines.join('\n')}\n---${text.slice(fm[0].length)}`);
-}
-
-export function setSkillMode(skillMd: string, mode: SkillMode): void {
-  if (!fs.existsSync(skillMd)) throw new Error('SKILL.md não encontrado.');
-  setFrontmatter(skillMd, mode);
-}
