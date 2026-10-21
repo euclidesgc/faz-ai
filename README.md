@@ -253,7 +253,7 @@ história devolve em `subtasksNow` o que o **board executa** (`byBoard`, na orde
 (`waiting`). Na fase de código quem executa as sub-tarefas é o board, não a sessão da história: cada
 uma roda numa execução própria da CLI, com o agente, o modelo e as skills do card dela, **uma depois
 da outra** na pasta da história (um escritor por vez), respeitando as dependências; a sessão da
-história só as cria e para. `start_work` recusa a sub-tarefa que ainda espera outra. Sem dependências
+história só as cria e para. O ciclo de cada sub-tarefa cabe em duas chamadas: `start_work` já a leva para "Em andamento" e `move_card` com `comment` conclui e registra o resultado; no Plan, `create_card` já recebe o agente (`profile`) e o checklist e devolve o card resumido. `start_work` recusa a sub-tarefa que ainda espera outra. Sem dependências
 declaradas, todas as sub-tarefas em aberto são consideradas independentes. Quando todas terminam, o
 board chama a IA uma vez para o fechamento: verificar o conjunto, fazer o commit e mover a história. Nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica negada; no Cursor e no Kimi Code, sem bloqueio comprovado, a capacidade fica "desconhecida" e a admissão decide). Em **Configurações → Harness de IA** (e em `fazai.git.parallelSubtasks`, de 1 a 6) a pessoa define **"Sub-tarefas em paralelo por história"**; a tela mostra o pedido e o efetivo (hoje 1). O texto do fluxo é o atual do
 board, servido pelo MCP; uma cópia da skill do fluxo já instalada na pasta da ferramenta não é

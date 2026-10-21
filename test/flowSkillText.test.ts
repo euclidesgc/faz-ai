@@ -107,3 +107,28 @@ describe('skill do fluxo e as pastas das ferramentas (RF23)', () => {
     }
   });
 });
+
+describe('ciclo do card em menos chamadas (#601)', () => {
+  const rodadas = FLOW_SKILLS.find((k) => k.name === 'faz-ai-implementacao-rodadas')!.body;
+
+  it('a principal diz que start_work já leva a sub-tarefa para a coluna de andamento', () => {
+    expect(FLOW_SKILL.body).toMatch(/`start_work`[^.]*já a leva para a coluna de andamento/);
+  });
+
+  it('a principal escolhe o agente e o checklist no create_card e manda ler o detalhe pelo get_card', () => {
+    expect(FLOW_SKILL.body).toMatch(/`profile` no `create_card`/);
+    expect(FLOW_SKILL.body).toMatch(/`set_card_profile`\s+só para trocar depois/);
+    expect(FLOW_SKILL.body).toContain('o detalhe do card criado vem pelo `get_card`');
+  });
+
+  it('a conclusão da sub-tarefa de documento vai com move_card e comment', () => {
+    expect(FLOW_SKILL.body).toMatch(/coluna de conclusão \(`move_card` com `comment`/);
+  });
+
+  it('a skill das rodadas não manda mais mover para "Em andamento" depois do start_work', () => {
+    expect(rodadas).not.toContain('`start_work`, mova para');
+    expect(rodadas).not.toContain('o agente e o modelo (`set_card_profile`)');
+    expect(rodadas).toMatch(/`start_work` \(que já leva a sub-tarefa para "Em andamento"\)/);
+    expect(rodadas).toMatch(/`move_card` para a coluna de conclusão com `comment`/);
+  });
+});

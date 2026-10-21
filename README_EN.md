@@ -265,7 +265,7 @@ uses what the other produces or when both change the same files. In Implementati
 (`waiting`). In a code phase the board, not the story session, runs the sub-tasks: each one in its
 own CLI run, with the agent, model and skills of its card, **one after another** in the story's
 folder (a single writer at a time), respecting dependencies; the story session only creates them and
-stops. `start_work` refuses a sub-task that is still waiting for another. With no dependencies
+stops. Each sub-task's cycle fits in two calls: `start_work` already moves it to "Em andamento" and `move_card` with `comment` completes it and records the result; in Plan, `create_card` already takes the agent (`profile`) and the checklist and returns the summarized card. `start_work` refuses a sub-task that is still waiting for another. With no dependencies
 declared, all open sub-tasks are considered independent. When all of them finish, the board calls the
 AI once for the closing: verify the whole, commit and move the story. No execution delegates to the tool's subagents (in Claude Code, `Agent` — formerly `Task` — is denied; Cursor and Kimi Code have no proven block, so the capability stays "unknown" and admission decides). In **Settings → AI Harness** (and `fazai.git.parallelSubtasks`, 1 to 6) the person sets **"Parallel sub-tasks per story"**; the screen shows the requested and the effective value (today 1). The flow text is the board's current one, served
 through the MCP; a copy of the flow skill already installed in the tool's folder is not replaced by the

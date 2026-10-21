@@ -3,14 +3,14 @@ import { linkProblem } from '../../../shared/links';
 import { columnsOf } from '../../../shared/selectors';
 import { cardStatus, cardSummary, findCard, findColumn, findType } from '../format';
 import { cardArg, fieldsArg } from './args';
-import { END, aiOrigin, detail, live, setFields, validateFields } from './helpers';
+import { END, addChecklist, aiOrigin, detail, findProfile, live, setFields, validateFields } from './helpers';
 import type { DefineTool, ToolContext } from './registry';
 
 /** Cards: criar, alterar e mover entre colunas. */
 export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
   tool(
     'create_card',
-    'Cria um card. Com `parent`, cria uma sub-tarefa daquela história (no workflow filho); sem `parent`, cria uma história (no workflow pai).',
+    'Cria um card. Com `parent`, cria uma sub-tarefa daquela história (no workflow filho); sem `parent`, cria uma história (no workflow pai). `profile` escolhe o agente e `checklist` cria os itens na mesma chamada. Devolve o card resumido (mais `checklistItems`, com ids, quando criou itens); o detalhe (phase, notas, workspace) vem pelo get_card.',
     {
       title: z.string().min(1),
       description: z.string().optional().describe('Markdown'),
@@ -18,6 +18,8 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       type: z.string().optional().describe('Nome do tipo de card; por padrão, o primeiro tipo do workflow'),
       column: z.string().optional().describe('Nome da coluna; por padrão, a primeira do workflow'),
       fields: fieldsArg.optional(),
+      profile: z.string().optional().describe('Nome do agente do card (como em set_card_profile)'),
+      checklist: z.array(z.string().min(1)).optional().describe('Itens do checklist, na ordem'),
       depends_on: z
         .array(cardArg)
         .optional()
@@ -58,6 +60,7 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       if (!column) throw new Error(`O workflow "${wf.name}" não tem colunas.`);
       // valida os campos antes de criar, para não deixar um card pela metade
       validateFields(s, a.fields);
+      const profile = a.profile ? findProfile(s, a.profile) : null;
       // e os vínculos de dependência, contra um card provisório no lugar do que vai nascer
       if (parent && dependsOn.length) {
         const draft = { ...parent, id: '\0novo', number: 0, parentId: parent.id, workflowId: wf.id, columnId: column.id, status: null };
@@ -73,7 +76,17 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       for (const dep of dependsOn) router.handle({ type: 'link.add', fromId: dep.id, toId: id, kind: 'precedes' }, aiOrigin(ctx));
       if (origin) router.handle({ type: 'card.yolo.inherit', cardId: id, fromId: origin.id }, aiOrigin(ctx));
       if (derivedFrom) router.handle({ type: 'card.derive', cardId: id, fromId: derivedFrom.id }, aiOrigin(ctx));
-      return detail(router, id);
+      if (profile) router.handle({ type: 'card.execProfile.set', cardId: id, profileId: profile.id }, aiOrigin(ctx));
+      const checklistItems = a.checklist?.length ? addChecklist(router, id, a.checklist) : undefined;
+      // o resumo basta para seguir o Plan; o detalhe (phase, notas, workspace) vem pelo get_card
+      const after = router.snapshot();
+      return {
+        ...cardSummary(
+          after,
+          after.cards.find((c) => c.id === id)!,
+        ),
+        ...(checklistItems ? { checklistItems } : {}),
+      };
     },
   );
 
@@ -102,10 +115,11 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'move_card',
-    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto, e um card só avança de uma coluna que exige aprovação (`requiresApproval` em get_board) quando o status dele é "approved". Um card arquivado é desarquivado ao ser movido.',
+    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto, e um card só avança de uma coluna que exige aprovação (`requiresApproval` em get_board) quando o status dele é "approved". Um card arquivado é desarquivado ao ser movido. `comment` grava a mensagem de conclusão na conversa depois do movimento (equivale a move_card + add_comment); um movimento recusado não grava nada.',
     {
       card: cardArg,
       column: z.string().describe('Nome da coluna de destino'),
+      comment: z.string().min(1).optional().describe('Mensagem de conclusão (markdown), gravada na conversa do card depois do movimento'),
       position: z.number().int().min(0).optional().describe('Posição na coluna (0 = topo); por padrão, no fim'),
       cancel_subtasks: z
         .boolean()
@@ -123,6 +137,8 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
           { type: 'card.move', cardId: card.id, columnId: column.id, position: a.position ?? END, cancelChildren: a.cancel_subtasks },
           aiOrigin(ctx),
         );
+      // só depois do movimento aceito: a recusa lança antes e a conversa fica como estava
+      if (a.comment) router.handle({ type: 'comment.add', cardId: card.id, body: a.comment }, aiOrigin(ctx));
       const after = router.snapshot();
       const result: Record<string, unknown> = {
         card: cardSummary(

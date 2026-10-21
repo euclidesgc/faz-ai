@@ -32,7 +32,7 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
    - \`phase\`: a instrução da fase e, se houver, o documento que ela produz e o modelo dele;
    - \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, avise a pessoa na conversa do card; as sub-tarefas e o fechamento da fase o board executa, cada um com o modelo do card;
    - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no \`path\` indicado, mesmo que não apareça na sua lista de skills; a skill sem \`path\` se lê com \`get_skill <nome>\`. O que o card exige é o que está no board (Configurações → Harness).
-2. Chame \`start_work\` antes de começar. Chame \`get_board\` só quando a fase precisa dele (no Plan, para os agentes, no refinar e ao editar o board); nas demais, \`get_card\` basta, e o inventário do Harness está em \`get_harness\`.
+2. Chame \`start_work\` antes de começar (numa sub-tarefa, ele já a leva para a coluna de andamento). Chame \`get_board\` só quando a fase precisa dele (no Plan, para os agentes, no refinar e ao editar o board); nas demais, \`get_card\` basta, e o inventário do Harness está em \`get_harness\`.
 3. Siga a instrução de \`phase\`. Leia também os documentos das fases anteriores (anexos da história),
    quando houver. Uma história pode ser criada ou movida direto para uma fase adiante (o Plan, por
    exemplo) e começar dali: sem os documentos anteriores, trabalhe a partir da descrição, da conversa
@@ -71,7 +71,7 @@ Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela
    vai por \`ask_questions\` antes de escrever o documento; o documento não repete as perguntas e usa as
    respostas da seção "Perguntas e respostas" da descrição em modo afirmativo.
 3. Grave com \`add_attachment\` usando \`artifact: true\` e o nome em \`phase.artifact.filename\`. O arquivo fica anexado à história, mesmo enviado da sub-tarefa, e substitui a versão anterior.
-4. Mova a sub-tarefa para a coluna de conclusão e peça a revisão na história.
+4. Mova a sub-tarefa para a coluna de conclusão (\`move_card\` com \`comment\` dizendo o que fez) e peça a revisão na história.
 
 Quando a pessoa pedir ajustes, corrija o mesmo documento (mesmo nome, \`artifact: true\`), responda na
 conversa dizendo o que mudou e chame \`request_review\` de novo.
@@ -80,7 +80,9 @@ conversa dizendo o que mudou e chame \`request_review\` de novo.
 
 No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, na descrição os arquivos que ela vai tocar (tirados do mapa do código), o campo "Esforço da
 atividade" avaliado (Baixo, Médio ou Alto; o modelo é sugerido a partir dele) e os artefatos que a
-execução pede: os campos Skills, Rules e MCPs, e o agente (\`set_card_profile\`). Escolha **só entre o
+execução pede: os campos Skills, Rules e MCPs, o agente (\`profile\` no \`create_card\`; \`set_card_profile\`
+só para trocar depois) e os itens do checklist (\`checklist\`), tudo no mesmo \`create_card\`. Ele devolve o
+card resumido: o detalhe do card criado vem pelo \`get_card\`. Escolha **só entre o
 que está no board em modo "Pelo card"** (\`get_harness\`; o que está em "Sempre" já entra sozinho):
 nada do catálogo do projeto ou da máquina existe para a execução. Vale o mínimo: no máximo uma skill
 por assunto (a mais próxima do objetivo; pode haver mais de uma se forem de assuntos diferentes, como
@@ -192,7 +194,7 @@ executa, nem por subagente (ferramenta \`Agent\`).
 A sua sessão na história faz só o trabalho de planejar:
 
 1. Se a história não tem sub-tarefas na fase, crie-as a partir da descrição e da conversa, cada uma
-   com Fase = a coluna, os arquivos que vai tocar, o agente e o modelo (\`set_card_profile\`) e as
+   com Fase = a coluna, os arquivos que vai tocar, o agente e o modelo (\`profile\` do \`create_card\`) e as
    dependências (\`depends_on\`, \`link_cards\`); as que mexem nos mesmos arquivos dependem uma da outra.
    Depois **pare**: o board começa a executar.
 2. O \`get_card\` da história traz em \`subtasksNow\` o que o board executa (\`byBoard\`, na ordem),
@@ -204,10 +206,9 @@ A sua sessão na história faz só o trabalho de planejar:
    história. Se a verificação falhar, corrija ou crie uma sub-tarefa de correção com Fase = esta coluna
    e pare: o board a executa e chama você de novo.
 
-Quem executa **uma** sub-tarefa (o board chama você só nela) segue o ciclo: \`start_work\`, mova para
-"Em andamento", faça o trabalho na pasta da história (\`workspace\` no \`get_card\`), verifique só a sua
-parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build), mova para a coluna de
-conclusão e registre na conversa da sub-tarefa o que fez. Sem commit, sem trocar de branch e sem
+Quem executa **uma** sub-tarefa (o board chama você só nela) segue o ciclo: \`start_work\` (que já leva a sub-tarefa para "Em andamento"),
+faça o trabalho na pasta da história (\`workspace\` no \`get_card\`), verifique só a sua
+parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build), conclua com \`move_card\` para a coluna de conclusão com \`comment\` dizendo o que fez. Sem commit, sem trocar de branch e sem
 executar outras sub-tarefas.
 
 Testes, build e commit dependem do terminal. Se você não pode rodar comandos nesta execução (permissão
