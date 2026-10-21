@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, type SyntheticEvent } from 'react';
 import { Popover } from '@radix-ui/themes';
+import { contextEnforced, profileIsolation } from '../../../shared/aiProfiles';
+import { isolationText } from '../../isolation';
 import {
   CHARS_PER_TOKEN,
   estimateContext,
@@ -122,6 +124,7 @@ export function ContextGauge({ card }: { card: Card }) {
 
 /** O detalhe, como a janela de contexto das ferramentas de IA: total, barra por grupo e cada item. */
 export function ContextDetail({ estimate: e }: { estimate: ContextEstimate }) {
+  const profile = useBoardStore((st) => st.state?.board.aiProfiles.find((p) => p.id === e.tool));
   // sem janela conhecida, a barra divide o próprio total
   const scale = e.window ?? e.total;
   // o que vem do harness (servidores, agentes, rules e skills), para notar quando os arquivos mudaram
@@ -213,9 +216,13 @@ export function ContextDetail({ estimate: e }: { estimate: ContextEstimate }) {
         </p>
         <p>{t('Apagar mensagens da conversa diminui só as próximas execuções: o que já foi gasto não volta.')}</p>
         <p>
-          {e.tool === 'claude'
-            ? t('Fora da conta: o prompt e as ferramentas nativas do Claude Code, e as ferramentas dos servidores liberados pelo agente.')
-            : t('Fora da conta: o que o Cursor carrega por conta própria (rules, skills e servidores configurados nele).')}
+          {profile
+            ? t('Fora da conta: o que a CLI carrega por conta própria. {summary}', {
+                summary: isolationText(profileIsolation(profile), contextEnforced(profile)),
+              })
+            : e.tool === 'claude'
+              ? t('Fora da conta: o prompt e as ferramentas nativas do Claude Code, e as ferramentas dos servidores liberados pelo agente.')
+              : t('Fora da conta: o que o Cursor carrega por conta própria (rules, skills e servidores configurados nele).')}
         </p>
         {!e.window && (
           <p>

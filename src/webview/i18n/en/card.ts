@@ -274,4 +274,5 @@ export const card: Record<string, string> = {
   'Não foi possível ler o consumo do card.': "Could not read the card's usage.",
   'A consulta do consumo demorou demais. Tente de novo.': 'The usage query took too long. Try again.',
   '{name} (sempre)': '{name} (always)',
+  'Fora da conta: o que a CLI carrega por conta própria. {summary}': 'Outside the count: what the CLI loads on its own. {summary}',
 };

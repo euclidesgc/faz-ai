@@ -1,11 +1,33 @@
 import { useState } from 'react';
 import { Button, Card, TextArea, TextField } from '@radix-ui/themes';
-import type { AiProfile, AiProfileConfig, AiProfileDraft, BoardServerVia, PromptVia } from '../../../shared/aiProfiles';
+import {
+  ISOLATION_KINDS,
+  profileIsolation,
+  type AiProfile,
+  type AiProfileConfig,
+  type AiProfileDraft,
+  type BoardServerVia,
+  type IsolationKind,
+  type IsolationLeak,
+  type PromptVia,
+} from '../../../shared/aiProfiles';
 import type { RunnerPermission } from '../../../shared/runner';
 import { settings } from '../../commands';
 import { t } from '../../i18n';
 import { useAction } from '../../useAction';
 import { FormField, SelectField } from '../ui';
+
+const kindLabel: Record<IsolationKind, string> = {
+  instructions: 'Regras e instruções',
+  skill: 'Skills',
+  agent: 'Agentes',
+  hook: 'Hooks',
+  mcp: 'Servidores MCP',
+};
+const scopes = [
+  ['project', 'Projeto'],
+  ['user', 'Usuário'],
+] as const;
 
 const lines = (value: string) =>
   value
@@ -26,6 +48,12 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
   const [envTouched, setEnvTouched] = useState(false);
   const [permission, setPermission] = useState<Record<RunnerPermission, string>>({ board: '', edits: '', full: '' });
   const [permissionTouched, setPermissionTouched] = useState<Set<RunnerPermission>>(new Set());
+  const [loads, setLoads] = useState<IsolationLeak[]>(() => (profile ? profileIsolation(profile).loads : []));
+  const [loadsTouched, setLoadsTouched] = useState(false);
+  const toggleLoad = (leak: IsolationLeak, on: boolean) => {
+    setLoads((before) => [...before.filter((l) => !(l.kind === leak.kind && l.scope === leak.scope)), ...(on ? [leak] : [])]);
+    setLoadsTouched(true);
+  };
   const save = useAction((draft: AiProfileDraft) => settings.saveAiProfile(draft));
   const value = (key: TextKey) => values[key] ?? '';
   const set = (key: TextKey, text: string) => {
@@ -54,6 +82,8 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
           [...permissionTouched].map((level) => [level, lines(permission[level])]),
         ) as AiProfileConfig['permissionArgs'];
     }
+    // a declaração só é gravada quando a pessoa mexe nela; vazia continua sendo "nenhum item conhecido", não prova
+    if (loadsTouched) config.isolation = { loads };
     if (envTouched) {
       config.env = Object.fromEntries(envRows.filter((row) => row.name.trim()).map((row) => [row.name.trim(), row.value]));
     }
@@ -229,6 +259,58 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
           )}
         </FormField>
         {field('installUrl', 'Endereço de instalação')}
+        <fieldset className="ai-profile-isolation">
+          <legend>{t('O que a CLI carrega por conta própria')}</legend>
+          {profile && kind === 'copy' && profileIsolation(profile).args.length > 0 && (
+            <p className="muted">
+              {t('Argumentos de isolamento: {args}', {
+                args: profileIsolation(profile)
+                  .args.map((a) => a || '""')
+                  .join(' '),
+              })}
+            </p>
+          )}
+          {profile && kind === 'copy' && profileIsolation(profile).checked && (
+            <p className="muted">
+              {t('Conferido na documentação em {date} · versão {version}', {
+                date: profileIsolation(profile).checked!.date,
+                version: profileIsolation(profile).checked!.version,
+              })}
+            </p>
+          )}
+          <p className="muted">
+            {t(
+              'Marque o que a CLI lê sozinha mesmo com os argumentos acima. Sem nada marcado, o board não conhece itens carregados, mas isso não prova contexto vazio: só a verificação do host prova.',
+            )}
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th />
+                {scopes.map(([, label]) => (
+                  <th key={label}>{t(label)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {ISOLATION_KINDS.map((k) => (
+                <tr key={k}>
+                  <th scope="row">{t(kindLabel[k])}</th>
+                  {scopes.map(([scope, label]) => (
+                    <td key={scope}>
+                      <input
+                        type="checkbox"
+                        aria-label={`${t(kindLabel[k])} · ${t(label)}`}
+                        checked={loads.some((l) => l.kind === k && l.scope === scope)}
+                        onChange={(e) => toggleLoad({ kind: k, scope }, e.target.checked)}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </fieldset>
       </div>
       {save.error && (
         <p className="ai-profile-error" role="alert">
