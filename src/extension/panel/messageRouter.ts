@@ -109,7 +109,6 @@ const bridgeOnly = {
   'ui.openEditorMcp': viaBridge,
   'ui.openTerminal': viaBridge,
   'ui.openInBrowser': viaBridge,
-  'ui.openIdeSettings': viaBridge,
   'ai.run': viaBridge,
   'ai.stop': viaBridge,
   'ai.heartbeat.run': viaBridge,

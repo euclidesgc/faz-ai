@@ -11,7 +11,7 @@ export interface RenamePromptUi {
   copy(text: string): PromiseLike<void>;
 }
 
-/** O que o aviso precisa do router (a mesma superfície do `IdeSettings`). */
+/** O que o aviso precisa do router (a mesma superfície do router). */
 export interface RenamePromptRouter {
   snapshot(): BoardState;
   handle(msg: WebviewToHost): unknown;

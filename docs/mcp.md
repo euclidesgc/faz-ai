@@ -346,7 +346,7 @@ pasta em que o código deve ser alterado. O nome da branch e a pasta são defini
 não deve criar branches por conta própria. Nas execuções pelo board, a pasta das worktrees é
 passada à ferramenta como pasta de trabalho extra (`--add-dir`).
 
-Com o gitflow ligado (`fazai.git.gitflow`, o padrão), a branch parte da `develop` (História, Débito
+Com o gitflow ligado (Configurações → Git › Usar o gitflow, o padrão), a branch parte da `develop` (História, Débito
 técnico e Retrabalho) ou da branch principal (Bug, que gera `hotfix/`); a pilha do modo autônomo e as
 histórias derivadas partem da branch da história anterior. `workspace` ganha três campos:
 

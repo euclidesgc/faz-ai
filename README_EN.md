@@ -806,15 +806,14 @@ progress. Sub-tasks commit to the story's branch.
   the **Criar branch da história** (create the story's branch) button on the card.
 - The card shows the branch and opens the working folder in a new window.
 - The mode (worktree, branch in the same folder, or off), the branch name pattern, the worktrees
-  folder, **drive stories in parallel** and automatic PR merge when approving acceptance live in the
-  editor Settings, under **Faz AI › Git** (see [Settings in the editor
-  Settings](#settings-in-the-editor-settings)); in the browser they stay on the Git tab and the
-  parallel block in the Harness, as before.
+  folder and automatic PR merge when approving acceptance live in **Settings → Git**, and **drive
+  stories in parallel** in **Settings → AI Harness › Tool and execution**, in the editor and in the
+  browser.
 - Each worktree is a working copy: dependencies have to be installed in it.
 
 #### Gitflow
 
-Branches follow gitflow, on by default (`fazai.git.gitflow`). The card type sets the branch kind, and
+Branches follow gitflow, on by default (**Settings → Git › Usar o gitflow**). The card type sets the branch kind, and
 each kind starts from one place and goes back to another:
 
 | Branch | Produced by | Starts from | The PR goes to |
@@ -846,17 +845,17 @@ each kind starts from one place and goes back to another:
 - The branch name uses `{fluxo}` (the kind's prefix: `feature/`, `bugfix/`, `hotfix/`). The old
   pattern `{tipo}/{numero}-{titulo}` is converted to `{fluxo}{numero}-{titulo}` when the setting is read.
 
-Options under **Faz AI › Git** in the editor Settings:
+Options under **Settings → Git**, in the editor and in the browser:
 
-| Option | Default | What it does |
+| Field | Default | What it does |
 | --- | --- | --- |
-| `fazai.git.gitflow` | on | Off, every branch starts from the main branch and `{fluxo}` becomes `<type>/`. |
-| `fazai.git.mainBranch` | empty | Pinned main branch; empty detects it (`origin` HEAD, `main` or `master`). |
-| `fazai.git.developBranch` | `develop` | Integration branch. |
-| `fazai.git.featurePrefix` | `feature/` | Prefix of feature branches. |
-| `fazai.git.bugfixPrefix` | `bugfix/` | Prefix of bugfix branches. |
-| `fazai.git.hotfixPrefix` | `hotfix/` | Prefix of hotfix branches. |
-| `fazai.git.releasePrefix` | `release/` | Informational only: no card type produces a release. |
+| **Usar o gitflow** | on | Off, every branch starts from the main branch and `{fluxo}` becomes `<type>/`. |
+| **Branch principal** | empty | Pinned main branch; empty detects it (`origin` HEAD, `main` or `master`). |
+| **Branch de integração** | `develop` | Integration branch. |
+| **Prefixo de feature** | `feature/` | Prefix of feature branches. |
+| **Prefixo de bugfix** | `bugfix/` | Prefix of bugfix branches. |
+| **Prefixo de hotfix** | `hotfix/` | Prefix of hotfix branches. |
+| **Prefixo de release** | `release/` | Informational only: no card type produces a release. |
 
 An empty prefix or name, or one git doesn't accept, goes back to the default. Branches and
 worktrees left over after a story are covered in
@@ -864,7 +863,7 @@ worktrees left over after a story are covered in
 
 ##### Renaming the main branch or `develop` on `origin`
 
-Changing `fazai.git.mainBranch` or `fazai.git.developBranch` to a name that does not exist yet, with
+Changing **Branch principal** or **Branch de integração** to a name that does not exist yet, with
 the old branch existing, opens a notice in the editor (the change also applies to `origin`, and the
 board does not do it on its own). The options are **Renomear** (Rename) and **Desfazer** (Undo); closing
 the box keeps the request and the question comes back when the board is reopened.
@@ -900,7 +899,7 @@ to verify it with the expected result, and what was left out — in the story's 
 the branch, opens the pull request with the same script in its body, records its address on the
 card and asks for your review. The card shows the PR link.
 
-Automatic merge is optional and starts turned off (editor Settings, Faz AI › Git). With it on, when you
+Automatic merge is optional and starts turned off (Settings → Git › Pull request e merge). With it on, when you
 approve a story that is in the last column before completion:
 
 1. the board merges the PR through the GitHub CLI (`gh`), with the configured method (squash, merge
@@ -985,7 +984,7 @@ opening and on **Verificar de novo**.
 
 ### Decision records
 
-With **Faz AI › Git › Registros de decisão** (decision records, `fazai.git.decisionRecords`) pointing
+With **Settings → Git › Registros de decisão** (decision records) pointing
 to a folder of the repository, such as `docs/decisoes`, Homologação writes there, before opening the
 pull request, the story's decision record: the context, the decision, the discarded alternatives (with
 the reason for each one), the consequences and the program design diagrams, from the approved Spec.
@@ -1086,8 +1085,7 @@ Spec and Plan on the default board; the rule is any column with an artifact befo
 run at the same time in any workspace mode, up to **Histórias ao mesmo tempo** (two by default, up to
 six), even with **Tocar histórias em paralelo** off. Activities **with a branch** (Implementation
 and Homologation) keep the previous limit: one at a time outside the worktree. In "Worktree por
-história" mode, **Tocar histórias em paralelo** (drive stories in parallel; editor Settings, Faz AI
-› Git; off by default) makes the heartbeat drive several branch stories at once, each in its own
+história" mode, **Tocar histórias em paralelo** (drive stories in parallel; Settings → AI Harness › Tool and execution; off by default) makes the heartbeat drive several branch stories at once, each in its own
 working folder, up to the same **Histórias ao mesmo tempo**. The two caps (text and branch) are
 counted separately; each counts every run in progress, including the ones called by hand. In
 autonomous mode (whose stories are stacked), the queue order applies to stories that need a branch;
@@ -1096,12 +1094,11 @@ open. Outside the worktree, `prepare_workspace` called in a text phase while ano
 in progress is refused (folder in use): the branch is created in the code phase. With the "Sem
 restrições" permission the AI can still switch branches by hand; the guard covers only the board's
 path. The
-description of each Git key in the Settings explains why in each mode: with a branch in the project
+description of each Git field in the Settings explains why in each mode: with a branch in the project
 folder, two stories at once would switch the branch under each other and mix their changes; with
 worktrees they are isolated, at the cost of one more copy of the files on disk per story (with
 dependencies installed in each) and more memory and CPU while several AI sessions, tests and builds
-run together. In the editor the Git tab and the parallel block in the Harness become a link to
-the Settings; in the browser they stay as editable fields, as before.
+run together. These fields are the same in the editor and in the browser.
 
 - The round has a fixed order: tidying (usage limit, stalled cards); a single `git fetch`; the pull
   requests (a merged story loses its branch, so they come before the sync); the branch sync; orphans
@@ -1340,9 +1337,9 @@ commands and settings are still managed by their respective tool.
 | Harness | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, default agent and heartbeat (see [Harness](#harness) and [Agents](#agents)) |
 | Ferramentas de IA | CLI profiles: enable, set a default, duplicate, create and test |
 | Modelos de IA | Models and effort levels by profile; rules that suggest each card's model |
-| Git | Only the Git tab in browser mode; in the editor, points to the Settings (Faz AI › Git) |
-| Aparência | **Language** (automatic, Português (Brasil) or English; in the editor Settings along with theme, font and size); statuses (name and color, in the Workflows tab; here only in browser mode) |
-| Backup | In the editor, export and import through the command palette (`fazai.exportBoard`, `fazai.importBoard`); in browser mode, through the Settings tab (see [Board backup](#board-backup)) |
+| Git | Mode, gitflow, branch names and prefixes, worktrees, automatic merge and decision records; editable in the editor and in the browser. "Tocar histórias em paralelo" lives in AI Harness › Tool and execution |
+| Aparência | **Language** (automatic, Português (Brasil) or English), theme, font and size, per board, in the editor and in the browser; statuses (name and color, in the Workflows tab; here only in browser mode) |
+| Backup | Export and import the board in the Backup tab, in the editor and in the browser (in the editor, also through the command palette: `fazai.exportBoard`, `fazai.importBoard`); see [Board backup](#board-backup) |
 
 A **CLI profile** identifies a tool the board can select for a run. The builtin profiles are Claude Code, Cursor and Kimi Code. A **copy** uses its source tool's model catalog and usage measurement, but keeps its own command, credentials and verification. A **custom** profile accepts another text-output CLI; tokens and cost remain unknown. In **Settings → AI Tools**, enable a reviewed profile and choose the default. Only this screen creates, edits, duplicates and tests profiles. Imports stay disabled until local review. Saved configuration and credentials are not returned to the screen or included in a board export.
 
@@ -1351,35 +1348,6 @@ A **CLI profile** identifies a tool the board can select for a run. The builtin 
 To create a custom profile, enter the command and one argument per line. The markers `{prompt}`, `{model}`, `{effort}`, `{mcpConfig}` and `{addDir}` insert the request, model, effort, MCP file and an additional directory when available. Choose **Prompt input** (argument or stdin) and **Board server** (CLI, project file or none). In a card's **Model** field, **Other model…** accepts a free-form identifier for that profile without adding it to the catalog. **Test** runs a short request using your subscription; an OK response does not prove isolation, permissions or MCP restrictions. Capabilities without evidence remain unknown and may prevent a run.
 
 Under **Capabilities and evidence**, each profile shows the date and version of the documentation checked and a badge: **Empty context** (only with capabilities verified by the host), **Loads on its own** (known items, listed in the tooltip) or **No proof of isolation** (an empty list is not proof). In copies and custom profiles, the **What the CLI loads on its own** section of the form lets you mark, by type (rules, skills, agents, hooks, MCP) and origin (project, user), what the CLI reads by itself; this is a declaration, not a verification. Each run's summary, the card (**Next run**) and `get_card`/`get_harness` (`execution.cliLoads`) use the same decision. The real-CLI test lives outside `npm test`: `npm run test:cli-real` (Claude Code validated in a controlled local environment; Cursor and Kimi Code **unvalidated**).
-
-### Settings in the editor Settings
-
-In `Ctrl+,` (the VS Code or Cursor Settings), searching **Faz AI** shows the Faz AI category, with
-four sections, in this order:
-
-| Section | What it has today |
-| --- | --- |
-| Installation | A short text and the **Open the Environment Diagnostics** link, which opens the board on the environment check screen |
-| Appearance | **Language** (`fazai.appearance.language`), **Theme** (`fazai.appearance.theme`), **Font** (`fazai.appearance.font`) and **Size** (`fazai.appearance.fontSize`), all with User scope — apply to all this person's projects. Statuses (name and color of each status) stay on the board, now in the Workflows tab |
-| Git | The nine `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6; the "Histórias ao mesmo tempo" cap also applies, in any mode, to text-only phases), `fazai.git.parallelSubtasks` ("Sub-tarefas em paralelo por história", 1 to 6; today the effective value is 1), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase) and `fazai.git.decisionRecords` (the folder of the [decision records](#decision-records); empty = off). In the editor, the Git tab and the parallel block in the Harness become a link to these keys; in the browser they stay as editable fields |
-| Backup | Two action links: **Export the board now** and **Import a board**, which trigger the palette commands |
-
-Three new commands in the palette (`Ctrl+Shift+P`): **Faz AI: Open the Environment Diagnostics**,
-**Faz AI: Open the Faz AI settings in the editor Settings** (the Settings already filtered on Faz AI)
-and **Faz AI: Open the board settings** (the board's Configurações screen). In the board's
-Configurações, the **Abrir no Settings do editor** (open in the editor Settings) button goes the other
-way; in browser mode (`faz-ai` in the terminal) it does not appear, because there is no editor.
-
-Who wins: inside the editor, the Settings is the source and the board database (SQLite) is the copy,
-kept equal on every change so browser mode and the MCP server keep seeing the same value; outside
-the editor, SQLite is the only source, and a write made there (through MCP or the browser) is carried
-to the User Settings while the editor is open. On the four Appearance keys (language, theme, font,
-size): on a board's first opening, if the editor Settings has no explicit value yet and the board
-has a non-default value, it is copied to the Settings (and then applies to all projects); if the
-Settings already has an explicit value, it wins and the board adopts that value. With multiple
-different boards opened for the first time after an update, the value from the first board to open
-is what goes to the Settings, and subsequent boards inherit that value — until the person changes
-the Settings, at which point everyone sees the new value.
 
 About models: **Detectar modelos** (detect models) reads the tool's list (for Cursor, the models of your account, through the `cursor-agent models`
 command, read when the board opens with the CLI signed in, and the first list read replaces the built-in one
@@ -1448,7 +1416,7 @@ The commands work with the board closed (without the panel open): they open the 
 current workspace folder on demand. In a workspace with multiple folders, the commands use the first
 folder (same limitation that already exists in the extension); there is no folder selector.
 
-**In browser mode** (running `~/.faz-ai/bin/faz-ai` in the terminal): use **Configurações →
+**From the board screen** (in the editor or in browser mode, running `~/.faz-ai/bin/faz-ai` in the terminal): use **Configurações →
 Backup** (Settings → Backup):
 
 - **Exportar board** (export board) creates a `.fazai.json` file on your computer (download).

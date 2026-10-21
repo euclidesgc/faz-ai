@@ -2,8 +2,7 @@ import { useEffect } from 'react';
 import { TextField } from '@radix-ui/themes';
 import { useBoardStore, type SettingsTab, withOverlay } from '../../store/boardStore';
 import { t } from '../../i18n';
-import { settings, ui } from '../../commands';
-import { isWeb } from '../../vscode';
+import { settings } from '../../commands';
 import { WorkflowsSettings } from './workflows/WorkflowsSettings';
 import { TypesSettings } from './TypesSettings';
 import { FieldsSettings } from './FieldsSettings';
@@ -27,7 +26,6 @@ import {
   IconBranch,
   IconColumns,
   IconDoctor,
-  IconExternal,
   IconFields,
   IconHarness,
   IconModels,
@@ -50,9 +48,7 @@ const TABS: [SettingsTab, string, Icon][] = [
   ['models', 'Modelos de IA', IconModels],
   ['git', 'Git', IconBranch],
   ['appearance', 'Aparência', IconAppearance],
-  // No editor (VS Code/Cursor), o backup passa a ser feito pelos comandos da paleta
-  // (fazai.exportBoard/fazai.importBoard) e pelo Settings nativo; a aba só existe no modo navegador.
-  ...(isWeb ? ([['backup', 'Backup', IconBackup]] as [SettingsTab, string, Icon][]) : []),
+  ['backup', 'Backup', IconBackup],
 ];
 
 /** Conteúdo de um botão do menu: ícone sempre; o rótulo só com o menu aberto (recolhido, ele vira o nome acessível). */
@@ -145,14 +141,6 @@ export function Settings() {
           ))}
         </nav>
         <div className="settings-side-actions">
-          {!isWeb && (
-            <Button
-              variant="ghost"
-              onClick={() => ui.openIdeSettings()}
-              {...navProps(collapsed, t('Abrir no Settings do editor'), IconExternal)}
-              title={t('Abre as configurações do Faz AI no Settings do editor (Ctrl+,)')}
-            />
-          )}
           <CheckEnvironmentButton collapsed={collapsed} onClick={() => setView('environment')} />
           {state.pendingUpgrade.length > 0 && (
             <Button
@@ -195,7 +183,7 @@ export function Settings() {
         {tab === 'harness' && <HarnessSettings />}
         {tab === 'aiTools' && <AiToolsSettings />}
         {tab === 'git' && <GitSettings />}
-        {tab === 'backup' && isWeb && <BackupSettings />}
+        {tab === 'backup' && <BackupSettings />}
       </div>
     </div>
   );

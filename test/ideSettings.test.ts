@@ -2,207 +2,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fake, fakeConfig, workspace } from './fakes/vscode';
+import { fakeConfig, workspace } from './fakes/vscode';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import type { WebviewToHost } from '../src/shared/messages';
-import { ConfigurationTarget, GIT_SETTINGS_MIGRATED, IdeSettings, type IdeSettingsApi } from '../src/extension/settings/ideSettings';
-import { DEFAULT_GIT, LEGACY_BRANCH_PATTERN, type GitConfig } from '../src/shared/git';
-import { DEFAULT_RUNNER } from '../src/shared/runner';
+import { IDE_SETTINGS_IMPORTED, LEGACY_KEYS, SECTION, importIdeSettingsOnce } from '../src/extension/settings/ideSettings';
 
-const KEY = 'fazai.appearance.language';
-const THEME_KEY = 'fazai.appearance.theme';
-const FONT_KEY = 'fazai.appearance.font';
-const FONT_SIZE_KEY = 'fazai.appearance.fontSize';
-
-const GIT_MODE_KEY = 'fazai.git.mode';
-const GIT_BRANCH_PATTERN_KEY = 'fazai.git.branchPattern';
-const GIT_WORKTREE_DIR_KEY = 'fazai.git.worktreeDir';
-const GIT_PARALLEL_KEY = 'fazai.git.parallel';
-const GIT_PARALLEL_STORIES_KEY = 'fazai.git.parallelStories';
-const GIT_AUTO_MERGE_KEY = 'fazai.git.autoMerge';
-const GIT_MERGE_METHOD_KEY = 'fazai.git.mergeMethod';
-const GIT_DECISION_RECORDS_KEY = 'fazai.git.decisionRecords';
-
-/** As sete chaves do gitflow (#462 e #466): a chave no Settings, o campo do `GitConfig` e um valor diferente do padrão. */
-const GITFLOW_KEYS = [
-  { setting: 'fazai.git.gitflow', field: 'gitflow', custom: false },
-  { setting: 'fazai.git.mainBranch', field: 'mainBranch', custom: 'trunk' },
-  { setting: 'fazai.git.developBranch', field: 'developBranch', custom: 'integracao' },
-  { setting: 'fazai.git.featurePrefix', field: 'featurePrefix', custom: 'feat/' },
-  { setting: 'fazai.git.bugfixPrefix', field: 'bugfixPrefix', custom: 'fix/' },
-  { setting: 'fazai.git.hotfixPrefix', field: 'hotfixPrefix', custom: 'urgente/' },
-  { setting: 'fazai.git.releasePrefix', field: 'releasePrefix', custom: 'rel/' },
-] as const satisfies readonly { setting: string; field: keyof GitConfig; custom: boolean | string }[];
-
-beforeEach(() => {
-  fakeConfig.reset();
-  fakeConfig.values.default[KEY] = 'auto';
-  fakeConfig.values.default[THEME_KEY] = 'system';
-  fakeConfig.values.default[FONT_KEY] = 'sans';
-  fakeConfig.values.default[FONT_SIZE_KEY] = 14;
-  fakeConfig.values.default[GIT_MODE_KEY] = DEFAULT_GIT.mode;
-  fakeConfig.values.default[GIT_BRANCH_PATTERN_KEY] = DEFAULT_GIT.branchPattern;
-  fakeConfig.values.default[GIT_WORKTREE_DIR_KEY] = DEFAULT_GIT.worktreeDir;
-  fakeConfig.values.default[GIT_PARALLEL_KEY] = DEFAULT_RUNNER.parallel;
-  fakeConfig.values.default[GIT_PARALLEL_STORIES_KEY] = DEFAULT_RUNNER.parallelStories;
-  fakeConfig.values.default['fazai.git.parallelSubtasks'] = DEFAULT_RUNNER.parallelSubtasks;
-  fakeConfig.values.default[GIT_AUTO_MERGE_KEY] = DEFAULT_GIT.autoMerge;
-  fakeConfig.values.default[GIT_MERGE_METHOD_KEY] = DEFAULT_GIT.mergeMethod;
-  fakeConfig.values.default[GIT_DECISION_RECORDS_KEY] = DEFAULT_GIT.decisionRecords;
-  for (const k of GITFLOW_KEYS) fakeConfig.values.default[k.setting] = DEFAULT_GIT[k.field];
-});
-
-describe('IdeSettings: ler', () => {
-  it('devolve o valor do Workspace quando Usuário e Workspace divergem', () => {
-    fakeConfig.values.global[KEY] = 'en';
-    fakeConfig.values.workspace[KEY] = 'pt-BR';
-    expect(new IdeSettings(workspace).read('appearance.language')).toBe('pt-BR');
-  });
-
-  it('sem valor em nenhum escopo devolve o default', () => {
-    expect(new IdeSettings(workspace).read('appearance.language')).toBe('auto');
-  });
-
-  it('tema: devolve o valor do Workspace quando Usuário e Workspace divergem', () => {
-    fakeConfig.values.global[THEME_KEY] = 'dark';
-    fakeConfig.values.workspace[THEME_KEY] = 'light';
-    expect(new IdeSettings(workspace).read('appearance.theme')).toBe('light');
-  });
-
-  it('tema: sem valor em nenhum escopo devolve o default', () => {
-    expect(new IdeSettings(workspace).read('appearance.theme')).toBe('system');
-  });
-
-  it('fonte: devolve o valor do Workspace quando Usuário e Workspace divergem', () => {
-    fakeConfig.values.global[FONT_KEY] = 'serif';
-    fakeConfig.values.workspace[FONT_KEY] = 'mono';
-    expect(new IdeSettings(workspace).read('appearance.font')).toBe('mono');
-  });
-
-  it('fonte: sem valor em nenhum escopo devolve o default', () => {
-    expect(new IdeSettings(workspace).read('appearance.font')).toBe('sans');
-  });
-
-  it('tamanho da fonte: devolve o valor do Workspace quando Usuário e Workspace divergem', () => {
-    fakeConfig.values.global[FONT_SIZE_KEY] = 16;
-    fakeConfig.values.workspace[FONT_SIZE_KEY] = 18;
-    expect(new IdeSettings(workspace).read('appearance.fontSize')).toBe(18);
-  });
-
-  it('tamanho da fonte: sem valor em nenhum escopo devolve o default', () => {
-    expect(new IdeSettings(workspace).read('appearance.fontSize')).toBe(14);
-  });
-});
-
-describe('IdeSettings: gravar', () => {
-  it('sem alvo grava no Usuário', async () => {
-    await new IdeSettings(workspace).write('appearance.language', 'en');
-    expect(fakeConfig.updates).toEqual([{ key: KEY, value: 'en', target: ConfigurationTarget.Global }]);
-    expect(fakeConfig.values.global[KEY]).toBe('en');
-    expect(fakeConfig.values.workspace[KEY]).toBeUndefined();
-  });
-
-  it('com ConfigurationTarget.Workspace grava no Workspace e não no Usuário', async () => {
-    await new IdeSettings(workspace).write('appearance.language', 'en', ConfigurationTarget.Workspace);
-    expect(fakeConfig.updates[0]?.target).toBe(ConfigurationTarget.Workspace);
-    expect(fakeConfig.values.workspace[KEY]).toBe('en');
-    expect(fakeConfig.values.global[KEY]).toBeUndefined();
-  });
-
-  it('erro do update vai para o log, sem lançar', async () => {
-    const lines: string[] = [];
-    const api: IdeSettingsApi = {
-      getConfiguration: () => ({
-        get: () => undefined,
-        inspect: () => undefined,
-        update: () => Promise.reject(new Error('somente leitura')),
-      }),
-      onDidChangeConfiguration: () => ({ dispose() {} }),
-    };
-    await expect(new IdeSettings(api, undefined, (l) => lines.push(l)).write('appearance.language', 'en')).resolves.toBeUndefined();
-    expect(lines).toEqual(['Faz AI: não foi possível gravar fazai.appearance.language no Settings: Error: somente leitura']);
-  });
-
-  it('tema: sem alvo grava no Usuário', async () => {
-    await new IdeSettings(workspace).write('appearance.theme', 'dark');
-    expect(fakeConfig.updates).toEqual([{ key: THEME_KEY, value: 'dark', target: ConfigurationTarget.Global }]);
-    expect(fakeConfig.values.global[THEME_KEY]).toBe('dark');
-    expect(fakeConfig.values.workspace[THEME_KEY]).toBeUndefined();
-  });
-
-  it('tema: com ConfigurationTarget.Workspace grava no Workspace e não no Usuário', async () => {
-    await new IdeSettings(workspace).write('appearance.theme', 'dark', ConfigurationTarget.Workspace);
-    expect(fakeConfig.updates[0]?.target).toBe(ConfigurationTarget.Workspace);
-    expect(fakeConfig.values.workspace[THEME_KEY]).toBe('dark');
-    expect(fakeConfig.values.global[THEME_KEY]).toBeUndefined();
-  });
-
-  it('fonte: sem alvo grava no Usuário', async () => {
-    await new IdeSettings(workspace).write('appearance.font', 'mono');
-    expect(fakeConfig.updates).toEqual([{ key: FONT_KEY, value: 'mono', target: ConfigurationTarget.Global }]);
-    expect(fakeConfig.values.global[FONT_KEY]).toBe('mono');
-    expect(fakeConfig.values.workspace[FONT_KEY]).toBeUndefined();
-  });
-
-  it('fonte: com ConfigurationTarget.Workspace grava no Workspace e não no Usuário', async () => {
-    await new IdeSettings(workspace).write('appearance.font', 'mono', ConfigurationTarget.Workspace);
-    expect(fakeConfig.updates[0]?.target).toBe(ConfigurationTarget.Workspace);
-    expect(fakeConfig.values.workspace[FONT_KEY]).toBe('mono');
-    expect(fakeConfig.values.global[FONT_KEY]).toBeUndefined();
-  });
-
-  it('tamanho da fonte: sem alvo grava no Usuário', async () => {
-    await new IdeSettings(workspace).write('appearance.fontSize', 18);
-    expect(fakeConfig.updates).toEqual([{ key: FONT_SIZE_KEY, value: 18, target: ConfigurationTarget.Global }]);
-    expect(fakeConfig.values.global[FONT_SIZE_KEY]).toBe(18);
-    expect(fakeConfig.values.workspace[FONT_SIZE_KEY]).toBeUndefined();
-  });
-
-  it('tamanho da fonte: com ConfigurationTarget.Workspace grava no Workspace e não no Usuário', async () => {
-    await new IdeSettings(workspace).write('appearance.fontSize', 18, ConfigurationTarget.Workspace);
-    expect(fakeConfig.updates[0]?.target).toBe(ConfigurationTarget.Workspace);
-    expect(fakeConfig.values.workspace[FONT_SIZE_KEY]).toBe(18);
-    expect(fakeConfig.values.global[FONT_SIZE_KEY]).toBeUndefined();
-  });
-});
-
-describe('IdeSettings: observar', () => {
-  it('mudança numa chave fazai.* chama o callback com a chave curta', () => {
-    const calls: string[][] = [];
-    new IdeSettings(workspace).watch((keys) => calls.push(keys));
-    fakeConfig.set('global', KEY, 'en');
-    expect(calls).toEqual([['appearance.language']]);
-  });
-
-  it('mudança fora de fazai.* não chama o callback', () => {
-    const calls: string[][] = [];
-    new IdeSettings(workspace).watch((keys) => calls.push(keys));
-    fakeConfig.set('global', 'editor.fontSize', 12);
-    expect(calls).toEqual([]);
-  });
-
-  it('mudança em fazai.appearance.theme chama o callback só com essa chave', () => {
-    const calls: string[][] = [];
-    new IdeSettings(workspace).watch((keys) => calls.push(keys));
-    fakeConfig.set('global', THEME_KEY, 'dark');
-    expect(calls).toEqual([['appearance.theme']]);
-  });
-
-  it('mudança em fazai.appearance.font chama o callback só com essa chave', () => {
-    const calls: string[][] = [];
-    new IdeSettings(workspace).watch((keys) => calls.push(keys));
-    fakeConfig.set('global', FONT_KEY, 'mono');
-    expect(calls).toEqual([['appearance.font']]);
-  });
-
-  it('mudança em fazai.appearance.fontSize chama o callback só com essa chave', () => {
-    const calls: string[][] = [];
-    new IdeSettings(workspace).watch((keys) => calls.push(keys));
-    fakeConfig.set('global', FONT_SIZE_KEY, 18);
-    expect(calls).toEqual([['appearance.fontSize']]);
-  });
-});
+beforeEach(() => fakeConfig.reset());
 
 /** Router real ligado a um SQLite em memória, com as `settings.board.update` contadas em `updates`. */
 async function makeLink() {
@@ -221,7 +27,6 @@ async function makeLink() {
     router,
     updates,
     snapshot: () => router.snapshot(),
-    onDidChange: (fn: () => void) => router.onDidChange(fn),
     getMeta: (key: string) => router.getMeta(key),
     setMeta: (key: string, value: string) => router.setMeta(key, value),
     handle: (msg: WebviewToHost) => {
@@ -231,598 +36,129 @@ async function makeLink() {
   };
 }
 
-/** Espera a migração e a reconciliação do `bind` (gravações do `update` pousam num microtask). */
-const settled = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+const config = () => workspace.getConfiguration(SECTION);
 
-describe('IdeSettings: bind', () => {
-  it('Settings → SQLite: editar o Settings grava no board uma vez', async () => {
+describe('importIdeSettingsOnce', () => {
+  it('leva ao board um valor válido do Usuário de cada grupo', async () => {
     const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    fakeConfig.set('global', KEY, 'en');
-    expect(link.updates).toEqual([{ appearance: { language: 'en' } }]);
-    expect(link.router.snapshot().board.appearance.language).toBe('en');
+    fakeConfig.values.global['fazai.appearance.theme'] = 'dark';
+    fakeConfig.values.global['fazai.git.mode'] = 'branch';
+    fakeConfig.values.global['fazai.git.gitflow'] = false;
+    fakeConfig.values.global['fazai.git.parallelStories'] = 3;
+    fakeConfig.values.global['fazai.git.parallelSubtasks'] = 4;
+    const imported = importIdeSettingsOnce(config(), link);
+    expect(imported.sort()).toEqual(['appearance.theme', 'git.gitflow', 'git.mode', 'git.parallelStories', 'git.parallelSubtasks']);
+    const board = link.router.snapshot().board;
+    expect(board.appearance.theme).toBe('dark');
+    expect(board.git.mode).toBe('branch');
+    expect(board.git.gitflow).toBe(false);
+    expect(board.runner.parallelStories).toBe(3);
+    expect(board.runner.parallelSubtasks).toBe(4);
+    expect(link.getMeta(IDE_SETTINGS_IMPORTED)).toBe('1');
   });
 
-  it('SQLite → Settings: gravar pelo MCP escreve no Usuário uma vez', async () => {
+  it('no Git vale pasta > Workspace > Usuário', async () => {
     const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    link.router.handle({ type: 'settings.board.update', patch: { appearance: { language: 'pt-BR' } } });
-    expect(fakeConfig.updates).toEqual([{ key: KEY, value: 'pt-BR', target: ConfigurationTarget.Global }]);
+    fakeConfig.values.global['fazai.git.featurePrefix'] = 'user/';
+    fakeConfig.values.workspace['fazai.git.featurePrefix'] = 'ws/';
+    fakeConfig.values.global['fazai.git.bugfixPrefix'] = 'user/';
+    fakeConfig.values.workspace['fazai.git.bugfixPrefix'] = 'ws/';
+    fakeConfig.values.folder['fazai.git.bugfixPrefix'] = 'pasta/';
+    importIdeSettingsOnce(config(), link);
+    const git = link.router.snapshot().board.git;
+    expect(git.featurePrefix).toBe('ws/');
+    expect(git.bugfixPrefix).toBe('pasta/');
   });
 
-  it('tema: Settings → SQLite: editar o Settings grava no board uma vez', async () => {
+  it('a Aparência ignora Workspace e pasta', async () => {
     const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    fakeConfig.set('global', THEME_KEY, 'dark');
-    expect(link.updates).toEqual([{ appearance: { theme: 'dark' } }]);
+    fakeConfig.values.workspace['fazai.appearance.theme'] = 'dark';
+    fakeConfig.values.folder['fazai.appearance.font'] = 'mono';
+    fakeConfig.values.global['fazai.appearance.fontSize'] = 16;
+    const before = link.router.snapshot().board.appearance;
+    expect(importIdeSettingsOnce(config(), link)).toEqual(['appearance.fontSize']);
+    const after = link.router.snapshot().board.appearance;
+    expect(after.theme).toBe(before.theme);
+    expect(after.font).toBe(before.font);
+    expect(after.fontSize).toBe(16);
+  });
+
+  it('valores inválidos são ignorados e vão ao log', async () => {
+    const link = await makeLink();
+    const log: string[] = [];
+    fakeConfig.values.global['fazai.appearance.theme'] = 'neon';
+    fakeConfig.values.global['fazai.appearance.fontSize'] = 99;
+    fakeConfig.values.global['fazai.git.branchPattern'] = 'sem-numero';
+    expect(importIdeSettingsOnce(config(), link, (l) => log.push(l))).toEqual([]);
+    expect(link.updates).toEqual([]);
+    expect(log).toHaveLength(3);
+  });
+
+  it('a segunda chamada não importa nada, mesmo com o Settings mudado', async () => {
+    const link = await makeLink();
+    fakeConfig.values.global['fazai.appearance.theme'] = 'dark';
+    importIdeSettingsOnce(config(), link);
+    fakeConfig.values.global['fazai.appearance.theme'] = 'light';
+    fakeConfig.values.global['fazai.git.mode'] = 'branch';
+    expect(importIdeSettingsOnce(config(), link)).toEqual([]);
     expect(link.router.snapshot().board.appearance.theme).toBe('dark');
   });
 
-  it('tema: SQLite → Settings: gravar pelo MCP escreve no Usuário uma vez', async () => {
+  it('sem Settings só grava a marca e nunca escreve no Settings', async () => {
     const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    link.router.handle({ type: 'settings.board.update', patch: { appearance: { theme: 'dark' } } });
-    expect(fakeConfig.updates).toEqual([{ key: THEME_KEY, value: 'dark', target: ConfigurationTarget.Global }]);
-  });
-
-  it('fonte: Settings → SQLite: editar o Settings grava no board uma vez', async () => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    fakeConfig.set('global', FONT_KEY, 'mono');
-    expect(link.updates).toEqual([{ appearance: { font: 'mono' } }]);
-    expect(link.router.snapshot().board.appearance.font).toBe('mono');
-  });
-
-  it('fonte: SQLite → Settings: gravar pelo MCP escreve no Usuário uma vez', async () => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    link.router.handle({ type: 'settings.board.update', patch: { appearance: { font: 'mono' } } });
-    expect(fakeConfig.updates).toEqual([{ key: FONT_KEY, value: 'mono', target: ConfigurationTarget.Global }]);
-  });
-
-  it('tamanho da fonte: Settings → SQLite: editar o Settings grava no board uma vez', async () => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    fakeConfig.set('global', FONT_SIZE_KEY, 18);
-    expect(link.updates).toEqual([{ appearance: { fontSize: 18 } }]);
-    expect(link.router.snapshot().board.appearance.fontSize).toBe(18);
-  });
-
-  it('tamanho da fonte: SQLite → Settings: gravar pelo MCP escreve no Usuário uma vez', async () => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    link.router.handle({ type: 'settings.board.update', patch: { appearance: { fontSize: 18 } } });
-    expect(fakeConfig.updates).toEqual([{ key: FONT_SIZE_KEY, value: 18, target: ConfigurationTarget.Global }]);
-  });
-
-  it('mudar o tema não dispara gravação para idioma, fonte ou tamanho', async () => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    fakeConfig.set('global', THEME_KEY, 'dark');
-    expect(link.updates).toEqual([{ appearance: { theme: 'dark' } }]);
-    expect(link.router.snapshot().board.appearance.language).toBe('auto');
-    expect(link.router.snapshot().board.appearance.font).toBe('sans');
-    expect(link.router.snapshot().board.appearance.fontSize).toBe(14);
-  });
-});
-
-describe('IdeSettings: bind na abertura', () => {
-  it('Settings explícito manda: o board recebe o valor e o Settings não é tocado', async () => {
-    const link = await makeLink();
-    fakeConfig.values.global[KEY] = 'en';
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(link.router.snapshot().board.appearance.language).toBe('en');
-    expect(link.updates).toEqual([{ appearance: { language: 'en' } }]);
+    expect(importIdeSettingsOnce(config(), link)).toEqual([]);
+    expect(link.updates).toEqual([]);
+    expect(link.getMeta(IDE_SETTINGS_IMPORTED)).toBe('1');
+    fakeConfig.values.global['fazai.git.mode'] = 'branch';
+    importIdeSettingsOnce(config(), link);
     expect(fakeConfig.updates).toEqual([]);
   });
 
-  it('Settings vazio e board com valor: o Settings recebe o valor do board, uma gravação', async () => {
+  it('valor igual ao do board não gera gravação', async () => {
     const link = await makeLink();
-    link.router.handle({ type: 'settings.board.update', patch: { appearance: { language: 'pt-BR' } } });
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(fakeConfig.values.global[KEY]).toBe('pt-BR');
-    expect(fakeConfig.updates).toHaveLength(1);
+    fakeConfig.values.global['fazai.git.mode'] = link.router.snapshot().board.git.mode;
+    expect(importIdeSettingsOnce(config(), link)).toEqual([]);
     expect(link.updates).toEqual([]);
   });
 
-  it('iguais: nenhuma gravação nos dois lados', async () => {
+  it('a recusa do board numa chave não impede as outras', async () => {
     const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(fakeConfig.updates).toEqual([]);
-    expect(link.updates).toEqual([]);
-  });
-
-  it('tema: Settings explícito manda: o board recebe o valor e o Settings não é tocado', async () => {
-    const link = await makeLink();
-    fakeConfig.values.global[THEME_KEY] = 'dark';
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(link.router.snapshot().board.appearance.theme).toBe('dark');
-    expect(link.updates).toEqual([{ appearance: { theme: 'dark' } }]);
-    expect(fakeConfig.updates).toEqual([]);
-  });
-
-  it('tema: Settings vazio e board com valor: o Settings recebe o valor do board, uma gravação', async () => {
-    const link = await makeLink();
-    link.router.handle({ type: 'settings.board.update', patch: { appearance: { theme: 'dark' } } });
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(fakeConfig.values.global[THEME_KEY]).toBe('dark');
-    expect(fakeConfig.updates).toHaveLength(1);
-    expect(link.updates).toEqual([]);
-  });
-
-  it('tema: iguais: nenhuma gravação nos dois lados', async () => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(fakeConfig.updates).toEqual([]);
-    expect(link.updates).toEqual([]);
-  });
-
-  it('fonte: Settings explícito manda: o board recebe o valor e o Settings não é tocado', async () => {
-    const link = await makeLink();
-    fakeConfig.values.global[FONT_KEY] = 'mono';
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(link.router.snapshot().board.appearance.font).toBe('mono');
-    expect(link.updates).toEqual([{ appearance: { font: 'mono' } }]);
-    expect(fakeConfig.updates).toEqual([]);
-  });
-
-  it('fonte: Settings vazio e board com valor: o Settings recebe o valor do board, uma gravação', async () => {
-    const link = await makeLink();
-    link.router.handle({ type: 'settings.board.update', patch: { appearance: { font: 'mono' } } });
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(fakeConfig.values.global[FONT_KEY]).toBe('mono');
-    expect(fakeConfig.updates).toHaveLength(1);
-    expect(link.updates).toEqual([]);
-  });
-
-  it('fonte: iguais: nenhuma gravação nos dois lados', async () => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(fakeConfig.updates).toEqual([]);
-    expect(link.updates).toEqual([]);
-  });
-
-  it('tamanho da fonte: Settings explícito manda: o board recebe o valor e o Settings não é tocado', async () => {
-    const link = await makeLink();
-    fakeConfig.values.global[FONT_SIZE_KEY] = 18;
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(link.router.snapshot().board.appearance.fontSize).toBe(18);
-    expect(link.updates).toEqual([{ appearance: { fontSize: 18 } }]);
-    expect(fakeConfig.updates).toEqual([]);
-  });
-
-  it('tamanho da fonte: Settings vazio e board com valor: o Settings recebe o valor do board, uma gravação', async () => {
-    const link = await makeLink();
-    link.router.handle({ type: 'settings.board.update', patch: { appearance: { fontSize: 18 } } });
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(fakeConfig.values.global[FONT_SIZE_KEY]).toBe(18);
-    expect(fakeConfig.updates).toHaveLength(1);
-    expect(link.updates).toEqual([]);
-  });
-
-  it('tamanho da fonte: iguais: nenhuma gravação nos dois lados', async () => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(fakeConfig.updates).toEqual([]);
-    expect(link.updates).toEqual([]);
-  });
-
-  it('RF7: dois boards em sequência — o primeiro grava no Settings, o segundo adota o valor do Settings', async () => {
-    const linkA = await makeLink();
-    linkA.router.handle({ type: 'settings.board.update', patch: { appearance: { theme: 'dark' } } });
-    new IdeSettings(workspace).bind(linkA);
-    await settled();
-    expect(fakeConfig.values.global[THEME_KEY]).toBe('dark');
-    expect(linkA.updates).toEqual([]);
-
-    const linkB = await makeLink();
-    linkB.router.handle({ type: 'settings.board.update', patch: { appearance: { theme: 'light' } } });
-    new IdeSettings(workspace).bind(linkB);
-    await settled();
-    expect(linkB.router.snapshot().board.appearance.theme).toBe('dark');
-    expect(linkB.updates).toEqual([{ appearance: { theme: 'dark' } }]);
-  });
-});
-
-describe('IdeSettings: valor inválido', () => {
-  it('idioma fora do enum não muda o board e vai para o log', async () => {
-    const link = await makeLink();
-    const lines: string[] = [];
-    new IdeSettings(workspace, undefined, (l) => lines.push(l)).bind(link);
-    await settled();
-    fakeConfig.set('global', KEY, 'fr');
-    expect(link.updates).toEqual([]);
-    expect(link.router.snapshot().board.appearance.language).toBe('auto');
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain('fr');
-  });
-
-  it('tema fora do enum não muda o board e vai para o log', async () => {
-    const link = await makeLink();
-    const lines: string[] = [];
-    new IdeSettings(workspace, undefined, (l) => lines.push(l)).bind(link);
-    await settled();
-    fakeConfig.set('global', THEME_KEY, 'blue');
-    expect(link.updates).toEqual([]);
-    expect(link.router.snapshot().board.appearance.theme).toBe('system');
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain('blue');
-  });
-
-  it('fonte fora do enum não muda o board e vai para o log', async () => {
-    const link = await makeLink();
-    const lines: string[] = [];
-    new IdeSettings(workspace, undefined, (l) => lines.push(l)).bind(link);
-    await settled();
-    fakeConfig.set('global', FONT_KEY, 'comic-sans');
-    expect(link.updates).toEqual([]);
-    expect(link.router.snapshot().board.appearance.font).toBe('sans');
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain('comic-sans');
-  });
-
-  it.each([30, 5, '14'])('tamanho da fonte fora da faixa (%s) não muda o board e vai para o log', async (value) => {
-    const link = await makeLink();
-    const lines: string[] = [];
-    new IdeSettings(workspace, undefined, (l) => lines.push(l)).bind(link);
-    await settled();
-    fakeConfig.set('global', FONT_SIZE_KEY, value);
-    expect(link.updates).toEqual([]);
-    expect(link.router.snapshot().board.appearance.fontSize).toBe(14);
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain(JSON.stringify(value));
-  });
-});
-
-describe('IdeSettings: proteção contra laço', () => {
-  it('Settings → SQLite: o onDidChange do board não vira uma gravação no Settings', async () => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    fakeConfig.set('global', KEY, 'en');
-    expect(link.updates).toHaveLength(1);
-    expect(fakeConfig.updates).toHaveLength(0);
-  });
-
-  it('SQLite → Settings: o onDidChangeConfiguration do write não vira um settings.board.update', async () => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    link.router.handle({ type: 'settings.board.update', patch: { appearance: { language: 'pt-BR' } } });
-    expect(fakeConfig.updates).toHaveLength(1);
-    expect(link.updates).toHaveLength(0);
-  });
-});
-
-describe('IdeSettings: dispose', () => {
-  it('depois do dispose, nem o Settings nem o board propagam', async () => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link).dispose();
-    await settled();
-    fakeConfig.set('global', KEY, 'en');
-    link.router.handle({ type: 'settings.board.update', patch: { appearance: { language: 'pt-BR' } } });
-    expect(link.updates).toEqual([]);
-    expect(fakeConfig.updates).toEqual([]);
-  });
-});
-
-describe('IdeSettings: Git/paralelo — leitura com sobrescrita', () => {
-  it('mode: Workspace sobrepõe o Usuário; sem valores, default', () => {
-    fakeConfig.values.global[GIT_MODE_KEY] = 'branch';
-    fakeConfig.values.workspace[GIT_MODE_KEY] = 'worktree';
-    expect(new IdeSettings(workspace).read('git.mode')).toBe('worktree');
-    fakeConfig.reset();
-    fakeConfig.values.default[GIT_MODE_KEY] = DEFAULT_GIT.mode;
-    expect(new IdeSettings(workspace).read('git.mode')).toBe('worktree');
-  });
-
-  it('parallelSubtasks: Workspace sobrepõe o padrão do board', () => {
-    expect(new IdeSettings(workspace).read('git.parallelSubtasks')).toBe(DEFAULT_RUNNER.parallelSubtasks);
-    fakeConfig.values.workspace['fazai.git.parallelSubtasks'] = 1;
-    expect(new IdeSettings(workspace).read('git.parallelSubtasks')).toBe(1);
-  });
-
-  it('parallelStories: Workspace sobrepõe o Usuário; sem valores, default', () => {
-    fakeConfig.values.global[GIT_PARALLEL_STORIES_KEY] = 4;
-    fakeConfig.values.workspace[GIT_PARALLEL_STORIES_KEY] = 6;
-    expect(new IdeSettings(workspace).read('git.parallelStories')).toBe(6);
-    fakeConfig.reset();
-    fakeConfig.values.default[GIT_PARALLEL_STORIES_KEY] = DEFAULT_RUNNER.parallelStories;
-    expect(new IdeSettings(workspace).read('git.parallelStories')).toBe(DEFAULT_RUNNER.parallelStories);
-  });
-
-  it('autoMerge: Workspace sobrepõe o Usuário; sem valores, default', () => {
-    fakeConfig.values.global[GIT_AUTO_MERGE_KEY] = false;
-    fakeConfig.values.workspace[GIT_AUTO_MERGE_KEY] = true;
-    expect(new IdeSettings(workspace).read('git.autoMerge')).toBe(true);
-    fakeConfig.reset();
-    fakeConfig.values.default[GIT_AUTO_MERGE_KEY] = DEFAULT_GIT.autoMerge;
-    expect(new IdeSettings(workspace).read('git.autoMerge')).toBe(DEFAULT_GIT.autoMerge);
-  });
-});
-
-describe('IdeSettings: migração única do Git/paralelo', () => {
-  it('(a) só o board tem valor: o board vira o padrão do Usuário e a marca é gravada', async () => {
-    const link = await makeLink();
-    link.router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(fakeConfig.values.global[GIT_MODE_KEY]).toBe('branch');
-    expect(fakeConfig.values.workspace[GIT_MODE_KEY]).toBeUndefined();
-    expect(link.getMeta(GIT_SETTINGS_MIGRATED)).toBe('1');
-  });
-
-  it('(b) só o Usuário tem valor: o SQLite recebe o valor do Usuário e nenhum update é chamado', async () => {
-    const link = await makeLink();
-    fakeConfig.values.global[GIT_MODE_KEY] = 'branch';
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(link.router.snapshot().board.git.mode).toBe('branch');
-    expect(fakeConfig.updates).toEqual([]);
-  });
-
-  it('(c) os dois, diferentes: o projeto (Workspace) preserva o valor do board; Usuário e SQLite continuam como estavam', async () => {
-    const link = await makeLink();
-    link.router.handle({ type: 'settings.board.update', patch: { git: { mode: 'off' } } });
-    fakeConfig.values.global[GIT_MODE_KEY] = 'branch';
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(fakeConfig.values.workspace[GIT_MODE_KEY]).toBe('off');
-    expect(fakeConfig.values.global[GIT_MODE_KEY]).toBe('branch');
-    expect(link.router.snapshot().board.git.mode).toBe('off');
-    // a reconciliação não lê o Usuário antes de a gravação do Workspace pousar: o SQLite nunca vira `branch`
-    expect(link.updates).not.toContainEqual({ git: { mode: 'branch' } });
-    expect(link.updates).toEqual([]);
-  });
-
-  it('multi-root: a mesma migração grava no WorkspaceFolder, não no Workspace', async () => {
-    fake.folders = ['/tmp/a', '/tmp/b'];
-    const link = await makeLink();
-    link.router.handle({ type: 'settings.board.update', patch: { git: { mode: 'off' } } });
-    fakeConfig.values.global[GIT_MODE_KEY] = 'branch';
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(fakeConfig.updates).toContainEqual({ key: GIT_MODE_KEY, value: 'off', target: ConfigurationTarget.WorkspaceFolder });
-    expect(fakeConfig.values.folder[GIT_MODE_KEY]).toBe('off');
-    expect(fakeConfig.values.workspace[GIT_MODE_KEY]).toBeUndefined();
-  });
-
-  it('não repete: segundo bind com a marca presente não gera gravação além da reconciliação', async () => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(link.getMeta(GIT_SETTINGS_MIGRATED)).toBe('1');
-    expect(fakeConfig.updates).toEqual([]);
-    expect(link.updates).toEqual([]);
-
-    fakeConfig.values.global[GIT_MODE_KEY] = 'branch';
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(fakeConfig.updates).toEqual([]);
-    expect(link.updates).toEqual([{ git: { mode: 'branch' } }]);
-  });
-});
-
-describe('IdeSettings: RF13 — escopo da gravação SQLite → Settings', () => {
-  it('com Workspace explícito, a gravação vai para o Workspace', async () => {
-    const link = await makeLink();
-    fakeConfig.values.workspace[GIT_MODE_KEY] = 'worktree';
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    fakeConfig.updates.length = 0;
-    link.router.handle({ type: 'settings.board.update', patch: { git: { mode: 'off' } } });
-    expect(fakeConfig.updates).toEqual([{ key: GIT_MODE_KEY, value: 'off', target: ConfigurationTarget.Workspace }]);
-  });
-
-  it('sem valor explícito, a gravação vai para o Usuário (Global)', async () => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    fakeConfig.updates.length = 0;
-    link.router.handle({ type: 'settings.board.update', patch: { git: { mode: 'off' } } });
-    expect(fakeConfig.updates).toEqual([{ key: GIT_MODE_KEY, value: 'off', target: ConfigurationTarget.Global }]);
-  });
-
-  it('eco: a gravação no Settings não volta como um novo settings.board.update', async () => {
-    const link = await makeLink();
-    fakeConfig.values.workspace[GIT_MODE_KEY] = 'worktree';
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    link.updates.length = 0;
-    link.router.handle({ type: 'settings.board.update', patch: { git: { mode: 'off' } } });
-    expect(link.updates).toEqual([]);
-  });
-});
-
-describe('IdeSettings: Git/paralelo — validação', () => {
-  it('branchPattern sem {numero}: o SQLite mantém o padrão e o log registra o valor inválido', async () => {
-    const link = await makeLink();
-    const lines: string[] = [];
-    fakeConfig.values.global[GIT_BRANCH_PATTERN_KEY] = 'sem-numero';
-    new IdeSettings(workspace, undefined, (l) => lines.push(l)).bind(link);
-    await settled();
-    expect(link.router.snapshot().board.git.branchPattern).toBe(DEFAULT_GIT.branchPattern);
-    expect(lines.some((l) => l.includes('sem-numero'))).toBe(true);
-  });
-});
-
-describe('IdeSettings: paralelo no runner_json', () => {
-  it('parallel e parallelStories do Git chegam ao runner do board', async () => {
-    const link = await makeLink();
-    fakeConfig.values.global[GIT_PARALLEL_KEY] = true;
-    fakeConfig.values.global[GIT_PARALLEL_STORIES_KEY] = 3;
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(link.router.snapshot().board.runner.parallel).toBe(true);
-    expect(link.router.snapshot().board.runner.parallelStories).toBe(3);
-  });
-});
-
-describe('IdeSettings: gitflow (#462)', () => {
-  it.each(GITFLOW_KEYS)('$setting: Settings → SQLite grava no board uma vez', async ({ setting, field, custom }) => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    fakeConfig.set('global', setting, custom);
-    expect(link.updates).toEqual([{ git: { [field]: custom } }]);
-    expect(link.router.snapshot().board.git[field]).toBe(custom);
-  });
-
-  it.each(GITFLOW_KEYS)('$setting: SQLite → Settings escreve no Usuário uma vez', async ({ setting, field, custom }) => {
-    const link = await makeLink();
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    link.router.handle({ type: 'settings.board.update', patch: { git: { [field]: custom } } });
-    expect(fakeConfig.updates).toEqual([{ key: setting, value: custom, target: ConfigurationTarget.Global }]);
-  });
-
-  it.each(GITFLOW_KEYS)('$setting: na abertura, Settings explícito manda no board', async ({ setting, field, custom }) => {
-    const link = await makeLink();
-    fakeConfig.values.global[setting] = custom;
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(link.router.snapshot().board.git[field]).toBe(custom);
-    expect(fakeConfig.updates).toEqual([]);
-  });
-
-  it.each(GITFLOW_KEYS)(
-    '$setting: na abertura, Settings vazio e board personalizado: o Settings recebe o valor',
-    async ({ setting, field, custom }) => {
-      const link = await makeLink();
-      link.router.handle({ type: 'settings.board.update', patch: { git: { [field]: custom } } });
-      new IdeSettings(workspace).bind(link);
-      await settled();
-      expect(fakeConfig.values.global[setting]).toBe(custom);
-      expect(fakeConfig.updates).toHaveLength(1);
-    },
-  );
-
-  it('o board recusa a mudança (ex.: IA executando): o Settings volta ao valor do board e a pessoa é avisada', async () => {
-    const link = await makeLink();
-    const notices: string[] = [];
+    const log: string[] = [];
+    fakeConfig.values.global['fazai.git.mainBranch'] = 'trunk';
+    fakeConfig.values.global['fazai.appearance.theme'] = 'dark';
     const refusing = {
       ...link,
       handle: (msg: WebviewToHost) => {
-        if (msg.type === 'settings.board.update') throw new Error('Não dá para renomear a branch agora: a IA está executando #7.');
+        if (msg.type === 'settings.board.update' && (msg.patch as { git?: { mainBranch?: string } }).git?.mainBranch)
+          throw new Error('A IA está executando #7.');
         return link.handle(msg);
       },
     };
-    new IdeSettings(
-      workspace,
-      undefined,
-      () => {},
-      (m) => notices.push(m),
-    ).bind(refusing);
-    await settled();
-    fakeConfig.set('global', 'fazai.git.developBranch', 'dev');
-    expect(notices).toEqual(['Não dá para renomear a branch agora: a IA está executando #7.']);
-    expect(link.router.snapshot().board.git.developBranch).toBe('develop');
-    expect(fakeConfig.updates.at(-1)).toEqual({ key: 'fazai.git.developBranch', value: 'develop', target: ConfigurationTarget.Global });
+    expect(importIdeSettingsOnce(config(), refusing, (l) => log.push(l))).toEqual(['appearance.theme']);
+    expect(log.join('\n')).toContain('A IA está executando #7.');
+    expect(link.getMeta(IDE_SETTINGS_IMPORTED)).toBe('1');
   });
 
-  it('as seis chaves não passam pela migração única do Git', async () => {
+  it('erro no inspect de uma chave não impede as outras', async () => {
     const link = await makeLink();
-    link.router.handle({ type: 'settings.board.update', patch: { git: { featurePrefix: 'feat/' } } });
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    // a escrita vem da reconciliação (uma só, no Usuário), e a marca da migração não depende da chave
-    expect(fakeConfig.updates).toEqual([{ key: 'fazai.git.featurePrefix', value: 'feat/', target: ConfigurationTarget.Global }]);
+    fakeConfig.values.global['fazai.git.mode'] = 'branch';
+    const base = config();
+    const flaky = {
+      inspect: (key: string) => {
+        if (key === 'appearance.theme') throw new Error('falhou');
+        return base.inspect(key);
+      },
+    };
+    expect(importIdeSettingsOnce(flaky, link)).toEqual(['git.mode']);
   });
 
-  it.each(GITFLOW_KEYS.filter((k) => typeof k.custom === 'string'))(
-    '$setting: vazio no Settings volta ao padrão no board e no Settings (RF04)',
-    async ({ setting, field }) => {
-      const link = await makeLink();
-      new IdeSettings(workspace).bind(link);
-      await settled();
-      fakeConfig.set('global', setting, 'x/');
-      fakeConfig.updates.length = 0;
-      fakeConfig.set('global', setting, '');
-      await settled();
-      expect(link.router.snapshot().board.git[field]).toBe(DEFAULT_GIT[field]);
-      expect(fakeConfig.values.global[setting]).toBe(DEFAULT_GIT[field]);
-    },
-  );
-
-  it('prefixo vazio já gravado no Settings, na abertura, volta como feature/', async () => {
-    const link = await makeLink();
-    fakeConfig.values.global['fazai.git.featurePrefix'] = '';
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(link.router.snapshot().board.git.featurePrefix).toBe('feature/');
-    expect(fakeConfig.values.global['fazai.git.featurePrefix']).toBe('feature/');
-  });
-
-  it('prefixo que o git recusa volta ao padrão e a tela mostra o padrão', async () => {
-    const link = await makeLink();
-    fakeConfig.values.global['fazai.git.bugfixPrefix'] = '../fora';
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(link.router.snapshot().board.git.bugfixPrefix).toBe('bugfix/');
-    expect(fakeConfig.values.global['fazai.git.bugfixPrefix']).toBe('bugfix/');
-  });
-
-  it('padrão antigo explícito no Settings converge para o novo, no board e no Settings (RF07)', async () => {
-    const link = await makeLink();
-    fakeConfig.values.global[GIT_BRANCH_PATTERN_KEY] = LEGACY_BRANCH_PATTERN;
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(link.router.snapshot().board.git.branchPattern).toBe('{fluxo}{numero}-{titulo}');
-    expect(fakeConfig.values.global[GIT_BRANCH_PATTERN_KEY]).toBe('{fluxo}{numero}-{titulo}');
-  });
-
-  it('B5: padrão antigo ou prefixo vazio no settings.json do projeto: o board normaliza sem regravar o arquivo', async () => {
-    const link = await makeLink();
-    fakeConfig.values.workspace[GIT_BRANCH_PATTERN_KEY] = LEGACY_BRANCH_PATTERN;
-    fakeConfig.values.workspace['fazai.git.featurePrefix'] = '';
-    fakeConfig.values.folder['fazai.git.bugfixPrefix'] = '';
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    const git = () => link.router.snapshot().board.git;
-    expect(git()).toMatchObject({ branchPattern: '{fluxo}{numero}-{titulo}', featurePrefix: 'feature/', bugfixPrefix: 'bugfix/' });
-    // o arquivo versionado fica como está: regravá-lo sujaria o repositório de quem abre o board
-    expect(fakeConfig.updates).toEqual([]);
-    expect(fakeConfig.values.workspace['fazai.git.featurePrefix']).toBe('');
-
-    // editar o arquivo do projeto depois, com o board aberto, também não o regrava
-    fakeConfig.set('workspace', 'fazai.git.featurePrefix', 'feat/');
-    expect(git().featurePrefix).toBe('feat/');
-    fakeConfig.set('workspace', 'fazai.git.featurePrefix', '');
-    await settled();
-    expect(git().featurePrefix).toBe('feature/');
-    // e outra mudança no board não leva o valor normalizado ao arquivo
-    link.router.handle({ type: 'settings.board.update', patch: { git: { releasePrefix: 'rel/' } } });
-    await settled();
-    expect(fakeConfig.updates).toEqual([{ key: 'fazai.git.releasePrefix', value: 'rel/', target: ConfigurationTarget.Global }]);
-  });
-
-  it('padrão personalizado no Settings continua como está', async () => {
-    const link = await makeLink();
-    fakeConfig.values.global[GIT_BRANCH_PATTERN_KEY] = 'x/{numero}';
-    new IdeSettings(workspace).bind(link);
-    await settled();
-    expect(link.router.snapshot().board.git.branchPattern).toBe('x/{numero}');
-    expect(fakeConfig.values.global[GIT_BRANCH_PATTERN_KEY]).toBe('x/{numero}');
+  it('cobre as 20 chaves', () => {
+    expect(LEGACY_KEYS).toHaveLength(20);
+    expect(LEGACY_KEYS.filter((k) => k.userOnly).map((k) => k.key)).toEqual([
+      'appearance.language',
+      'appearance.theme',
+      'appearance.font',
+      'appearance.fontSize',
+    ]);
   });
 });
