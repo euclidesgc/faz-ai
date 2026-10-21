@@ -19,7 +19,7 @@ const profileOf = (router: MessageRouter, id?: string): AiProfile => {
 export function registerModelTools(tool: DefineTool): void {
   tool(
     'get_models',
-    'Catálogo de modelos de LLM e perfis de CLI do board, com os níveis de esforço e as regras de sugestão. `value` usa `<perfil>:<modelo>@<esforço>`; uma cópia usa o catálogo do perfil pronto de origem e um personalizado aceita modelo livre. O board não guarda preço: o custo de uma execução é o que o executor informa. ' +
+    'Catálogo de modelos de LLM e perfis de CLI do board, com os níveis de esforço e as regras de sugestão. `value` usa `<perfil>:<modelo>@<esforço>` e o prefixo escolhe o perfil de CLI que executa o card; quando nada indica um modelo (card, agente ou regra), vale o perfil padrão. Uma cópia usa o catálogo do perfil pronto de origem e um personalizado aceita modelo livre. O board não guarda preço: o custo de uma execução é o que o executor informa. ' +
       'O campo "Esforço da atividade" do card é o tamanho da tarefa, não o esforço do modelo: as regras sugerem o modelo a partir dele.',
     {},
     (_a, router) => models(router),

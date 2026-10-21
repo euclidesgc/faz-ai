@@ -1,6 +1,20 @@
+import { createHash } from 'node:crypto';
 import { authFailed } from './ai/profileAuth';
 import type { AiProfile } from '../shared/aiProfiles';
-import { toolInfo, activeProfile, catalogTool, resolveModelOption } from '../shared/aiProfiles';
+import { toolInfo, catalogTool, profileLabel } from '../shared/aiProfiles';
+import { resolveRunTarget, targetOfValue, type RunTarget, type RunTargetSource } from '../shared/runTarget';
+import { cliProblem } from '../shared/requirements';
+import {
+  evaluateExecutionPolicy,
+  type ExecutionConstraints,
+  type ExecutionTarget,
+  type PolicyAttempt,
+  type PolicyBudget,
+  type PolicyDecision,
+  type PolicyFailure,
+  type TargetSource,
+} from '../shared/executionPolicies';
+import type { ContextAction } from '../shared/contextPlanning';
 import { cardRef } from '../shared/model';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { SHOW_COST } from '../shared/metrics';
@@ -11,7 +25,7 @@ import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
 import { runArtifactRequest } from './runArtifactSnapshot';
 import { effortToRun } from '../shared/execution';
-import { modelDisplay, modelValue, suggestModelRule } from '../shared/models';
+import { modelDisplay, modelValue } from '../shared/models';
 import { effortTiers } from './models';
 import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
@@ -69,12 +83,26 @@ export interface RunOptions {
   advice?: string[];
   beforeStart?: AiCall['beforeStart'];
   onExit?(end: AiRunEnd): void;
+  /** de uso interno: a cadeia de tentativas de uma troca por política (ver `Chain`); quem chama de fora nunca informa */
+  chain?: Chain;
 }
 
-/** Par modelo/esforço no nome que a ferramenta entende (`ExecManifest.model`), não o id do catálogo. */
-interface ToolModel {
-  model: string;
-  effort: string | null;
+/**
+ * A cadeia de uma execução trocada por política: o alvo que a pessoa pediu (congelado), quando a primeira
+ * tentativa começou, as tentativas já feitas e o orçamento acumulado. Passa de uma tentativa para a
+ * seguinte para que um destino já visitado não reinicie a cadeia.
+ */
+interface Chain {
+  requested: RunTarget;
+  startedAt: number;
+  attempts: PolicyAttempt[];
+  budget: PolicyBudget | null;
+}
+
+/** O que a execução pede para continuar noutro alvo: o destino da política e a cadeia atualizada. */
+interface Retry {
+  target: RunTarget;
+  chain: Chain;
 }
 
 interface Run {
@@ -89,14 +117,17 @@ interface Run {
   origin: AiRunOrigin;
   /** projeção publicada ao router (ver `publish`) */
   info: AiActivity;
-  /** modelo/esforço que esta execução pediu à ferramenta; usado no comentário quando a reserva assume */
-  model: ToolModel | null;
-  /**
-   * reserva da regra que casaria com o card agora, pronta para a retentativa quando o modelo principal
-   * esgota o limite; `null` sem regra, sem reserva, modelo escolhido à mão, ou nesta própria retentativa
-   * (uma tentativa só).
-   */
-  fallbackPending: ToolModel | null;
+  /** o alvo desta execução (perfil de CLI e modelo); é nele que o gateway, o login e a troca por política se apoiam */
+  target: RunTarget;
+  chain: Chain;
+  /** o contexto que as políticas casam: ação, agente, fase e tipo do card */
+  policy: {
+    action: ContextAction;
+    agentId: string | null;
+    phaseId: string | null;
+    cardTypeId: string | null;
+    constraints: ExecutionConstraints | null;
+  };
 }
 
 const RUNNER_AUTHOR = 'Faz AI';
@@ -257,35 +288,68 @@ export const conflictPrompt = (ref: string, context: PromptContext = NO_CONTEXT,
   ].join('\n');
 
 /**
- * O modelo/esforço de um valor de campo do tipo modelo (`<id do catálogo>@<esforço>`), no catálogo da
- * ferramenta ativa, no formato que a chamada da ferramenta entende (nome do modelo e esforço). `null`
- * quando o valor está vazio ou o modelo não está (mais) no catálogo da ferramenta ativa.
+ * O alvo do resumo: o mesmo perfil de CLI do card, na faixa "Alto" do catálogo dele (RF12), qualquer que
+ * seja o Esforço do card. Sem faixa no catálogo, o alvo do card fica como está.
  */
-function resolvedModel(state: BoardState, value: string | null | undefined): { name: string; effort: string | null } | null {
-  const resolved = resolveModelOption(state.board, value ?? undefined);
-  return resolved
-    ? { name: resolved.name, effort: resolved.option ? effortToRun(resolved.option, resolved.effort) : resolved.effort }
-    : null;
+function highTierTarget(state: BoardState, target: RunTarget): RunTarget {
+  const tier = effortTiers(catalogTool(target.cli), state.board.modelCatalog).find(([level]) => level === 'Alto');
+  const high = tier ? targetOfValue(state.board, tier[1], target.source) : null;
+  return high && high.cli.id === target.cli.id ? high : target;
+}
+
+/** O modelo/esforço do alvo no formato que a ferramenta entende (nome do modelo e esforço). */
+function targetModel(state: BoardState, target: RunTarget): { name: string; effort: string | null } | null {
+  if (!target.model) return null;
+  const option = state.board.modelCatalog.find((o) => o.tool === catalogTool(target.cli) && o.model === target.model!.name);
+  return { name: target.model.name, effort: option ? effortToRun(option, target.model.effort) : target.model.effort };
+}
+
+/** Texto de exibição do modelo de um alvo, traduzido de volta para o catálogo; sem o modelo nele, o nome bruto. */
+function targetDisplay(state: BoardState, target: RunTarget): string {
+  if (!target.model) return profileLabel(state.board, target.cli.id);
+  const option = state.board.modelCatalog.find((o) => o.tool === catalogTool(target.cli) && o.model === target.model!.name);
+  return option ? modelDisplay(state.board.modelCatalog, modelValue(option.id, target.model.effort)) : target.model.name;
+}
+
+/** De onde o alvo veio, na frase da recusa. */
+const SOURCE_LABEL: Record<RunTargetSource, string> = {
+  card: 'o campo Modelo do card',
+  agent: 'o modelo do agente do card',
+  rule: 'a regra de modelo que casa com o card',
+  default: 'o perfil padrão',
+  chat: 'o chat',
+  fallback: 'a política de execução',
+};
+
+const POLICY_SOURCE: Record<RunTargetSource, TargetSource> = {
+  card: 'card',
+  agent: 'agent',
+  rule: 'rule',
+  default: 'board',
+  chat: 'chat',
+  fallback: 'rule',
+};
+
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,239}$/;
+const MODE_ACTION: Record<AiRunMode, ContextAction> = { phase: 'work', refine: 'refine', summarize: 'summary', conflict: 'conflict' };
+
+/** O alvo no formato das políticas (perfil, modelo e esforço como a CLI os recebe). */
+function executionTargetOf(state: BoardState, target: RunTarget): ExecutionTarget {
+  const m = targetModel(state, target);
+  return { profileId: target.cli.id, model: m?.name ?? null, effort: m ? m.effort : null };
 }
 
 /**
- * O modelo/esforço da faixa "Alto" do catálogo ativo, no formato que a chamada da ferramenta
- * entende (nome do modelo e esforço). Usado pelo modo `summarize`, que força sempre essa faixa,
- * independente do Esforço do card.
+ * O destino de uma política como alvo de execução: só vale com o perfil ligado e o modelo (e o esforço) no
+ * catálogo dele. Sem isso a troca não acontece.
  */
-function highTierModel(state: BoardState): { name: string; effort: string | null } | null {
-  const tier = effortTiers(catalogTool(activeProfile(state.board)), state.board.modelCatalog).find(([level]) => level === 'Alto');
-  return tier ? resolvedModel(state, tier[1]) : null;
-}
-
-/**
- * Texto de exibição de um `ToolModel` (nome que a ferramenta entende), traduzido de volta para o
- * catálogo para usar `modelDisplay`; sem o modelo no catálogo, cai no próprio nome bruto.
- */
-function toolModelDisplay(state: BoardState, pair: ToolModel | null): string {
-  if (!pair) return '';
-  const option = state.board.modelCatalog.find((o) => o.tool === catalogTool(activeProfile(state.board)) && o.model === pair.model);
-  return option ? modelDisplay(state.board.modelCatalog, modelValue(option.id, pair.effort)) : pair.model;
+function runTargetOfPolicy(state: BoardState, t: ExecutionTarget): RunTarget | null {
+  const cli = state.board.aiProfiles.find((p) => p.id === t.profileId && p.enabled);
+  if (!cli) return null;
+  if (t.model === null) return { cli, model: null, value: '', source: 'fallback' };
+  const option = state.board.modelCatalog.find((o) => o.tool === catalogTool(cli) && o.model === t.model);
+  if (!option || (t.effort !== null && !option.efforts.includes(t.effort))) return null;
+  return { cli, model: { name: option.model, effort: t.effort }, value: modelValue(option.id, t.effort), source: 'fallback' };
 }
 
 /** O que a IA recebe ao ser chamada para um card. O ciclo completo está na skill do fluxo e nas instruções do servidor MCP. */
@@ -340,11 +404,12 @@ export class AiRunner {
    * Inicia a execução. Lança erro se não for possível começar; o resultado aparece no status e na
    * conversa do card. `mode` escolhe entre trabalhar a fase (o padrão) e só refinar o card.
    *
-   * `forceModel` é de uso interno (a retentativa com o modelo reserva, ver `settle`): sobrescreve o
-   * modelo/esforço que o plano decidiria e nunca recebe `fallbackPending` (uma tentativa só). Quem
-   * chama de fora (painel, MCP) nunca informa este parâmetro.
+   * O alvo (perfil de CLI e modelo) sai do valor do Modelo do card (`resolveRunTarget`), não do
+   * `board.aiTool`. Escolha explícita inválida recusa a execução com a mensagem, sem cair para o nível
+   * seguinte. `forceTarget` é de uso interno (a troca por política, ver `settle`): sobrescreve o alvo, que
+   * pode ser noutra CLI. Quem chama de fora (painel, MCP) nunca informa este parâmetro.
    */
-  start(cardId: string, originOrOptions: AiRunOrigin | RunOptions = 'manual', mode: AiRunMode = 'phase', forceModel?: ToolModel): void {
+  start(cardId: string, originOrOptions: AiRunOrigin | RunOptions = 'manual', mode: AiRunMode = 'phase', forceTarget?: RunTarget): void {
     const options: RunOptions = typeof originOrOptions === 'string' ? { origin: originOrOptions, mode } : originOrOptions;
     const origin = options.origin;
     mode = options.mode ?? mode;
@@ -358,13 +423,21 @@ export class AiRunner {
     const card = state.cards.find((c) => c.id === cardId);
     if (!card || !isLive(card)) throw new Error('Card não encontrado.');
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
-    // sem login confirmado pelo probe (preventivo, RF1), nenhum gatilho gasta uma execução — diferente do sinal
-    // reativo (`authExpired`), que heartbeat.ts/autopilot.ts recusam por conta própria (RF8): aqui ele não
-    // bloqueia, para o login que o probe não soube confirmar poder se recuperar com uma execução
-    // manual que dá certo (RF9, limpa em settle()) — sem essa válvula, authExpired nunca mais sairia de `true`
-    if (state.requirements.some((r) => r.id === 'signin' && r.tool === activeProfile(state.board).id))
-      throw new Error(`O login do ${toolInfo(activeProfile(state.board)).label} venceu: veja o aviso no topo do board.`);
-    const tool = toolInfo(activeProfile(state.board));
+    const resolved = forceTarget ? { blocked: false as const, target: forceTarget } : resolveRunTarget(state, card);
+    if (resolved.blocked)
+      throw new Error(
+        `${resolved.block.message} A execução não troca de perfil nem de modelo sozinha: corrija ${SOURCE_LABEL[resolved.block.source]}.`,
+      );
+    // o resumo roda na faixa "Alto" do perfil do card, qualquer que seja o Esforço dele (RF12)
+    const target = mode === 'summarize' && !forceTarget ? highTierTarget(state, resolved.target) : resolved.target;
+    // CLI ausente ou sem login confirmado pelo probe (preventivo, RF1): só os cards deste perfil recusam, e nenhum gatilho gasta
+    // uma execução. O sinal reativo (`expired`) não recusa a manual: heartbeat.ts/autopilot.ts o recusam por conta própria
+    // (RF8), e a execução manual que dá certo o limpa (RF9, em settle()) — sem essa válvula, ele nunca mais sairia de `true`
+    const problem = cliProblem(state, target.cli.id);
+    const toolName = profileLabel(state.board, target.cli.id);
+    if (problem === 'cli') throw new Error(`A CLI do ${toolName} não foi encontrada: veja o aviso no topo do board.`);
+    if (problem === 'signin') throw new Error(`O login do ${toolName} venceu: veja o aviso no topo do board.`);
+    const tool = toolInfo(target.cli);
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
     const refine = mode === 'refine';
     const summarize = mode === 'summarize';
@@ -380,14 +453,22 @@ export class AiRunner {
     const storyPhase = story && story.id !== card.id ? (columnOf(state, story)?.name ?? phase) : phase;
     let activityModel: string | null = null;
     let activityEffort: string | null = null;
-    // a reserva da regra que casaria com o card agora, para a retentativa quando o limite esgota (ver `settle`)
-    let fallbackPending: ToolModel | null = null;
+    // o contexto que as políticas casam e as restrições da execução (a troca precisa mantê-las), preenchidas com o plano
+    const safe = (id: string | null | undefined): string | null => (id && SAFE_ID.test(id) ? id : null);
+    const policy: Run['policy'] = {
+      action: MODE_ACTION[mode],
+      agentId: null,
+      phaseId: safe(columnOf(state, story ?? card)?.id),
+      cardTypeId: safe(card.typeId),
+      constraints: null,
+    };
     let exec: AiExecution;
     try {
       exec = this.deps.gateway.run({
         origin,
-        tool: state.board.aiTool,
-        profile: activeProfile(state.board),
+        // o gateway grava `ai_runs.tool` com o perfil do alvo (RF20)
+        tool: target.cli.id,
+        profile: target.cli,
         // o contexto gravado é o do momento da chamada, congelado: a IA move o card durante o trabalho,
         // e o painel precisa saber de que coluna a execução partiu
         context: {
@@ -403,7 +484,7 @@ export class AiRunner {
         timeoutMinutes: state.board.runner.timeoutMinutes,
         beforeStart: options.beforeStart,
         prepare: () => {
-          const plan = executionPlan(state, card, this.router.libraryMcpDefinitions(), boardServer(this.deps));
+          const plan = executionPlan(state, card, this.router.libraryMcpDefinitions(), boardServer(this.deps), target);
           // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo.
           // A execução de conflito segue a permissão (e o modelo) da fase: precisa de git e das checagens, como ela
           const autonomous = !refine && !summarize && isYolo(state, card);
@@ -416,25 +497,27 @@ export class AiRunner {
           if (summarize) log('Resumir a conversa: lê as mensagens e grava um resumo, sem mover o card nem mudar o status.');
           if (conflict) log('Resolver conflito: atualiza a branch a partir da base do pull request, sem trabalhar a fase.');
           log(plan.summary.join(' | '));
-          if (forceModel) {
-            // a retentativa com a reserva: o modelo/esforço vêm impostos, sem voltar a resolver a regra
-            activityModel = forceModel.model;
-            activityEffort = forceModel.effort;
-          } else {
-            // resumir sempre usa a faixa "Alto" do catálogo ativo, independente do Esforço do card
-            const summaryModel = summarize ? highTierModel(state) : null;
-            activityModel = summarize ? (summaryModel?.name ?? null) : (plan.manifest.model?.name ?? null);
-            activityEffort = summarize ? (summaryModel?.effort ?? null) : (plan.manifest.model?.effort ?? null);
-            // a reserva só faz sentido no trabalho da fase, e só quando o Modelo do card é o que a
-            // regra sugeriria agora (senão foi trocado à mão, e a troca não é desta regra)
-            if (!refine && !summarize) {
-              const rule = suggestModelRule(state, card);
-              const ruleModel = rule?.fallback ? resolvedModel(state, rule.model) : null;
-              const matches = ruleModel && ruleModel.name === activityModel && ruleModel.effort === activityEffort;
-              const fallback = matches ? resolvedModel(state, rule!.fallback) : null;
-              fallbackPending = fallback ? { model: fallback.name, effort: fallback.effort } : null;
-            }
-          }
+          activityModel = plan.manifest.model?.name ?? null;
+          activityEffort = plan.manifest.model?.effort ?? null;
+          policy.agentId = plan.manifest.agent && SAFE_ID.test(plan.manifest.agent) ? plan.manifest.agent : null;
+          // o que a troca por política precisa preservar: permissão, regime e o escopo (agente, skills, MCPs, ferramentas)
+          policy.constraints = {
+            permission,
+            regime: 'exclusive',
+            agentId: policy.agentId,
+            scopeDigest: createHash('sha256')
+              .update(
+                JSON.stringify([
+                  plan.manifest.agent,
+                  plan.manifest.skills,
+                  plan.manifest.rules,
+                  plan.manifest.mcpServers,
+                  plan.manifest.tools,
+                  plan.manifest.deniedTools,
+                ]),
+              )
+              .digest('hex'),
+          };
           return {
             ...(options.token !== undefined ? { work: { id: options.workId!, token: options.token } } : {}),
             artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state, card) : undefined,
@@ -474,8 +557,7 @@ export class AiRunner {
                       ),
               permission,
               addDirs: this.router.aiWorkDirs(),
-              // a retentativa força o modelo/esforço da reserva no que vai para a ferramenta, sem voltar a resolver o plano
-              exec: forceModel ? { ...plan.input, model: { name: forceModel.model, effort: forceModel.effort } } : plan.input,
+              exec: plan.input,
               boardServer: boardServer(this.deps),
             },
           };
@@ -506,18 +588,19 @@ export class AiRunner {
       origin,
       phase: storyPhase,
       model: activityModel,
-      tool: activeProfile(state.board).id,
+      tool: target.cli.id,
       startedAt: exec.startedAt,
     };
     const run: Run = {
-      profile: structuredClone(activeProfile(state.board)),
+      profile: structuredClone(target.cli),
       exec,
       previous: card.status,
       mode,
       tail,
       info,
-      model: activityModel ? { model: activityModel, effort: activityEffort } : null,
-      fallbackPending,
+      target,
+      chain: options.chain ?? { requested: target, startedAt: exec.startedAt, attempts: [], budget: null },
+      policy,
       origin,
     };
     this.runs.set(cardId, run);
@@ -546,7 +629,7 @@ export class AiRunner {
               : {},
         ),
       );
-      let retry: ToolModel | undefined;
+      let retry: Retry | undefined;
       this.usageLimited = !end.stopped && !!end.report.usageLimitReached;
       try {
         // o card continua "em execução" para o log enquanto o desfecho é aplicado: o bloqueio e a
@@ -565,15 +648,15 @@ export class AiRunner {
       // continua em execução de verdade. Sem isto a sub-tarefa ficava presa e segurava a história para sempre
       if (!retry && options.workId === undefined) this.releaseSubtasks(cardId, tool.label);
       if (retry) {
-        // o modelo principal esgotou o limite e há reserva: uma nova execução assume, sem publicar nem
-        // avisar o fim desta (quem decide o desfecho final é a execução da reserva)
+        // a política autorizou a troca de alvo: uma nova execução assume, sem publicar nem avisar o fim
+        // desta (quem decide o desfecho final é a execução do destino)
         try {
-          this.start(cardId, { ...options, mode }, mode, retry);
+          this.start(cardId, { ...options, mode, chain: retry.chain }, mode, retry.target);
           return;
         } catch (e) {
           // a retentativa nem começou (card arquivado, gateway recusou): o card não pode ficar "em
           // execução" sem execução, e quem espera o fim precisa ser avisado como em qualquer outro fim
-          this.block(cardId, `Não foi possível repetir a execução com o modelo reserva: ${e instanceof Error ? e.message : String(e)}`);
+          this.block(cardId, `Não foi possível repetir a execução no destino da política: ${e instanceof Error ? e.message : String(e)}`);
         }
       }
       this.publish();
@@ -602,12 +685,11 @@ export class AiRunner {
   }
 
   /**
-   * Deixa o card num status coerente quando a IA não passou a vez por conta própria. Devolve o par
-   * modelo/esforço da reserva quando o modelo principal esgotou o limite e há reserva disponível: quem
-   * chama (`onExit`) inicia a retentativa com ele, depois de liberar `this.runs`; nenhum outro caso
-   * devolve valor.
+   * Deixa o card num status coerente quando a IA não passou a vez por conta própria. Devolve o destino da
+   * política quando o limite de uso esgotou e uma política aplicável autoriza a troca: quem chama
+   * (`onExit`) inicia a retentativa com ele, depois de liberar `this.runs`; nenhum outro caso devolve valor.
    */
-  private settle(cardId: string, run: Run, end: AiRunEnd, replied: boolean, toolLabel: string): ToolModel | undefined {
+  private settle(cardId: string, run: Run, end: AiRunEnd, replied: boolean, toolLabel: string): Retry | undefined {
     const { code, error } = end;
     const card = this.router.snapshot().cards.find((c) => c.id === cardId);
     // a IA (ou a pessoa) já mudou o status durante a execução: é ele que vale
@@ -691,31 +773,53 @@ export class AiRunner {
         { author: RUNNER_AUTHOR },
       );
     }
-    // o modelo principal esgotou o limite de uso do plano e há reserva pronta para esta regra: a
-    // retentativa assume em vez de bloquear (RF-03 exige que nenhuma outra falha caia aqui: só quando o
-    // leitor da ferramenta marcou `usageLimitReached`, nunca pelo código de saída ou por heurística do runner).
-    // E só quando a execução falhou: uma que terminou bem não é refeita com a reserva
-    // o limite esgotado vale também quando a CLI sai com código 0 sem ter respondido: o que importa é o
-    // sinal estrutural do leitor, não o código de saída
+    // o limite de uso do plano esgotou (só o sinal estrutural do leitor da CLI, nunca o código de saída ou heurística do
+    // runner), e a execução falhou ou terminou sem responder: uma execução que terminou bem não é refeita.
+    // O limite esgotado vale também quando a CLI sai com código 0 sem ter respondido
     const usageLimited = end.report.usageLimitReached && (!!failure || !replied);
-    if (usageLimited && run.fallbackPending) {
-      const state = this.router.snapshot();
-      const principal = toolModelDisplay(state, run.model);
-      const fallback = toolModelDisplay(state, run.fallbackPending);
-      this.router.handle(
-        { type: 'comment.add', cardId, body: `O \`${principal}\` esgotou o limite; a execução segue com \`${fallback}\`.` },
-        { author: RUNNER_AUTHOR, source: 'ai' },
-      );
-      return run.fallbackPending;
-    }
-    // limite de uso do plano sem reserva: o limite renova sozinho, então o card volta para a IA em vez de
-    // ficar bloqueado esperando a pessoa (o heartbeat tenta de novo na próxima rodada)
     if (usageLimited) {
+      // a troca de modelo ou de perfil só acontece por política aplicável, decidida pelo avaliador único; sem política
+      // válida não há troca (RF11), e nenhum outro caminho escolhe um modelo reserva
+      const decision = this.evaluatePolicy(run, end, replied);
+      if (decision)
+        this.deps.log(
+          `[${cardRef(card)}] Política de execução: ${decision.action} (${decision.reason}${decision.policy ? `, ${decision.policy.id} r${decision.policy.revision}` : ''}).`,
+        );
+      const next = decision?.action === 'fallback' && decision.target ? runTargetOfPolicy(this.router.snapshot(), decision.target) : null;
+      if (decision && next) {
+        const state = this.router.snapshot();
+        const principal = targetDisplay(state, run.target);
+        const fallback = targetDisplay(state, next);
+        const crossed = run.target.cli.id !== next.cli.id;
+        this.router.handle(
+          {
+            type: 'comment.add',
+            cardId,
+            body: crossed
+              ? `O \`${principal}\` do ${toolLabel} esgotou o limite; a execução segue com \`${fallback}\` no ${profileLabel(state.board, next.cli.id)}.`
+              : `O \`${principal}\` esgotou o limite; a execução segue com \`${fallback}\`.`,
+          },
+          { author: RUNNER_AUTHOR, source: 'ai' },
+        );
+        return { target: next, chain: this.chainAfter(run, end, decision) };
+      }
+      // trabalho parcial ou de efeito desconhecido: repetir às cegas, aqui ou noutro alvo, pode refazer ou desfazer o que já foi feito
+      if (decision?.action === 'reconcile')
+        return void this.block(
+          cardId,
+          `O limite de uso do plano do ${toolLabel} esgotou depois de a IA já ter agido neste card; o board não repete a execução sozinho. Confira o que ficou feito e chame a IA de novo.${output}`,
+        );
+      // sem política que autorize a troca: o limite renova sozinho, então o card volta para a IA em vez de ficar
+      // bloqueado esperando a pessoa (o heartbeat tenta de novo na próxima rodada, no mesmo alvo)
+      const offered =
+        decision?.action === 'offer' && decision.alternatives.length
+          ? ' A política oferece outro destino, que precisa da sua confirmação.'
+          : '';
       this.router.handle(
         {
           type: 'comment.add',
           cardId,
-          body: `O limite de uso do plano do ${toolLabel} esgotou. O card voltou para a IA e a execução é repetida pelo heartbeat quando o limite renovar.${output}`,
+          body: `O limite de uso do plano do ${toolLabel} esgotou. O card voltou para a IA e a execução é repetida pelo heartbeat quando o limite renovar.${offered}${output}`,
         },
         { author: RUNNER_AUTHOR, source: 'ai' },
       );
@@ -749,6 +853,85 @@ export class AiRunner {
     const currentStory = currentCard && storyOf(current, currentCard);
     if (currentStory && isYolo(current, currentCard) && isWithHuman(currentStory)) return;
     this.block(cardId, `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card.${output}`);
+  }
+
+  /**
+   * A decisão do avaliador único para o limite de uso que esgotou nesta execução. Nunca inventa política: o
+   * snapshot salvo, o alvo pedido (congelado na cadeia) e os destinos que o board realmente consegue executar.
+   * Devolve null quando as políticas não puderam ser lidas (tratado como "sem política": não troca).
+   */
+  private evaluatePolicy(run: Run, end: AiRunEnd, replied: boolean): PolicyDecision | null {
+    if (!run.policy.constraints) return null;
+    try {
+      const state = this.router.snapshot();
+      const snapshot = this.router.executionPolicyLibrary().snapshot;
+      const explicit = run.chain.requested.source === 'card' || run.chain.requested.source === 'chat';
+      const targets = new Map<string, ExecutionTarget>();
+      for (const r of snapshot.records) for (const t of r.policy.targets) targets.set(JSON.stringify([t.profileId, t.model, t.effort]), t);
+      const others = [...this.runs.values()].filter((r) => r !== run);
+      const perProfile: Record<string, number> = {};
+      for (const r of others) perProfile[r.profile.id] = (perProfile[r.profile.id] ?? 0) + 1;
+      const attempt = this.attemptOf(run, end);
+      return evaluateExecutionPolicy({
+        snapshot,
+        requested: {
+          state: 'resolved',
+          target: executionTargetOf(state, run.chain.requested),
+          from: POLICY_SOURCE[run.chain.requested.source],
+          explicit,
+        },
+        context: {
+          action: run.policy.action,
+          agentId: run.policy.agentId,
+          phaseId: run.policy.phaseId,
+          cardTypeId: run.policy.cardTypeId,
+          origin: run.origin,
+        },
+        failure: 'quota' satisfies PolicyFailure,
+        // o que a IA já fez (resposta na conversa, ferramentas ou comandos) é efeito: a execução não pode ser refeita às cegas
+        effects: replied || end.report.inventory.length || end.report.bashCommands?.length ? 'partial' : 'none',
+        constraints: run.policy.constraints,
+        candidates: [...targets.values()].map((target) => {
+          const next = runTargetOfPolicy(state, target);
+          const profile = next?.cli;
+          return {
+            target,
+            available: !!next && cliProblem(state, next.cli.id) === null,
+            credential:
+              profile?.credentials?.review === 'pending'
+                ? ('pending' as const)
+                : profile && profile.kind !== 'builtin' && !(profile.credentials?.review === 'reviewed' && profile.credentials.available)
+                  ? ('missing' as const)
+                  : ('reviewed' as const),
+            admission: 'admitted' as const,
+            constraints: run.policy.constraints!,
+          };
+        }),
+        trace: { startedAt: run.chain.startedAt, attempts: [...run.chain.attempts, attempt], budget: run.chain.budget },
+        running: { global: others.length, perProfile },
+        now: attempt.endedAt,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /** Esta tentativa na cadeia: alvo, janela de tempo e o consumo medido (null quando não houve medição, nunca zero). */
+  private attemptOf(run: Run, end: AiRunEnd): PolicyAttempt {
+    const last = run.chain.attempts.at(-1)?.endedAt ?? run.chain.startedAt;
+    const startedAt = Math.max(run.exec.startedAt, last);
+    const c = end.report.consumption;
+    return {
+      target: executionTargetOf(this.router.snapshot(), run.target),
+      startedAt,
+      endedAt: Math.max(Date.now(), startedAt),
+      consumption: c ? { inputTokens: c.inputTokens, outputTokens: c.outputTokens, costUsd: c.costUsd } : null,
+    };
+  }
+
+  /** A cadeia depois desta tentativa: o destino seguinte parte dela, então nenhum destino já visitado reinicia. */
+  private chainAfter(run: Run, end: AiRunEnd, decision: PolicyDecision): Chain {
+    return { ...run.chain, attempts: [...run.chain.attempts, this.attemptOf(run, end)], budget: decision.budget };
   }
 
   /** As sub-tarefas da história que a sessão encerrada deixou "Em execução" voltam para a IA. */

@@ -1,4 +1,5 @@
-import { toolInfo, activeProfile } from '../shared/aiProfiles';
+import { defaultTarget, runTargetOf } from '../shared/runTarget';
+import { profileLabel } from '../shared/aiProfiles';
 import { isDeliverableStory } from '../shared/story';
 import { statusInfo } from '../shared/status';
 import type { BoardContext } from './panel/handlers/context';
@@ -22,8 +23,10 @@ export function settleDelivery(ctx: BoardContext, storyId: string): boolean {
   if (!story || !isDeliverableStory(state, story)) return false;
   if (story.status !== null && statusInfo(story.status).owner === 'human') return false;
   // a entrega é sempre anunciada pela IA, seja quem for que moveu o card ou registrou o pull request:
-  // o autor é o mesmo que o runner usa ao fim de uma execução (o nome da ferramenta de IA)
-  const author = toolInfo(activeProfile(state.board)).label;
+  // o autor é o mesmo que o runner usa ao fim de uma execução: o perfil de CLI que executa a história
+  // (alvo bloqueado por escolha explícita inválida cai no padrão só para o nome; quem executa é que bloqueia)
+  const cli = (runTargetOf(state, story) ?? defaultTarget(state.board)).cli;
+  const author = profileLabel(state.board, cli.id);
   ctx.cards.setStatus(story.id, 'waiting_review', '', author);
   ctx.comments.add(story.id, author, `História entregue com o pull request ${story.prUrl}; aguardando a revisão da pessoa.`, 'ai');
   return true;

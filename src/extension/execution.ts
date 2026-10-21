@@ -1,5 +1,6 @@
-import { EXEC_ENFORCEMENT, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
-import { activeProfile, profileBase, type AiProfile } from '../shared/aiProfiles';
+import { EXEC_ENFORCEMENT, effortToRun, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
+import { activeProfile, catalogTool, profileBase, type AiProfile } from '../shared/aiProfiles';
+import type { RunTarget } from '../shared/runTarget';
 import { selectedMcpNames } from '../shared/harnessSelection';
 import type { BoardState, Card } from '../shared/model';
 import { isFlowSkill } from './flowSkill';
@@ -96,6 +97,17 @@ function requireReviewedMcps(state: BoardState, names: readonly string[]): void 
     ) ?? [];
   if (denied.length) throw new Error(`MCPs exigem revisão humana ou configuração local: ${denied.map((a) => a.name).join(', ')}.`);
 }
+/** O manifesto com outro alvo: a CLI e o modelo mudam, o resto (agente, skills, MCPs) é do card e segue igual. */
+function withTarget(s: BoardState, manifest: ExecManifest, target: RunTarget): ExecManifest {
+  const option = target.model && s.board.modelCatalog.find((o) => o.tool === catalogTool(target.cli) && o.model === target.model!.name);
+  return {
+    ...manifest,
+    target,
+    model: target.model
+      ? { name: target.model.name, effort: option ? effortToRun(option, target.model.effort) : target.model.effort }
+      : null,
+  };
+}
 export function executionPlan(
   s: BoardState,
   c: Card,
@@ -103,8 +115,10 @@ export function executionPlan(
   libraryServers: Record<string, unknown>,
   /** o servidor do board desta execução */
   board?: BoardServerSpec,
+  /** o alvo que vale nesta execução (a troca por política pode ser noutra CLI); sem ele, o do card */
+  target?: RunTarget,
 ): ExecPlan {
-  const manifest = manifestOf(s, c);
+  const manifest = target ? withTarget(s, manifestOf(s, c), target) : manifestOf(s, c);
   // o perfil de CLI do alvo do card (não o padrão do board): a imposição, o inventário e o arquivo de MCP seguem a CLI que executa
   const cli = manifest.target.cli;
   const base = profileBase(cli);

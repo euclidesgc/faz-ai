@@ -1,4 +1,5 @@
-import { toolInfo, activeProfile, resolveModelOption } from '../shared/aiProfiles';
+import { toolInfo, activeProfile, catalogTool } from '../shared/aiProfiles';
+import { defaultTarget, targetOfValue, type RunTarget } from '../shared/runTarget';
 import type { AgentAssistInput, AgentAssistResult } from '../shared/agentAssistance';
 import { agentAssistancePrompt, parseAgentAssistance } from './agentAssistance';
 import * as fs from 'node:fs';
@@ -158,12 +159,25 @@ export function parseSuggestions(text: string, candidates: readonly string[]): {
   return null;
 }
 
-/** O modelo escolhido no chat, no formato que a linha de comando da ferramenta pede; null = o padrão dela. */
-function modelFor(s: BoardState, model: string | null): ExecInput['model'] {
-  const resolved = resolveModelOption(s.board, model ?? undefined);
-  return resolved
-    ? { name: resolved.name, effort: resolved.option ? effortToRun(resolved.option, resolved.effort) : resolved.effort }
-    : null;
+/**
+ * O alvo de uma execução do chat: o valor do Modelo escolhido decide a CLI (o prefixo do perfil). Sem escolha
+ * vale o perfil padrão, que é também o das ações de apoio (sugerir regras, skills e agentes, "Indicar
+ * artefatos"). Uma escolha explícita que não vale (perfil desligado, modelo fora do catálogo) bloqueia com
+ * mensagem em vez de cair no padrão: trocar de perfil sem a pessoa saber gastaria o plano errado.
+ */
+function chatTarget(s: BoardState, model: string | null): RunTarget {
+  if (!model) return defaultTarget(s.board);
+  const target = targetOfValue(s.board, model, 'chat');
+  if (!target)
+    throw new Error(`O modelo "${model}" escolhido no chat não está disponível: o perfil está desligado ou o modelo saiu do catálogo.`);
+  return target;
+}
+
+/** O modelo do alvo no formato que a linha de comando da ferramenta pede; null = o padrão dela. */
+function modelOf(s: BoardState, target: RunTarget): ExecInput['model'] {
+  if (!target.model) return null;
+  const option = s.board.modelCatalog.find((o) => o.tool === catalogTool(target.cli) && o.model === target.model!.name);
+  return { name: target.model.name, effort: option ? effortToRun(option, target.model.effort) : target.model.effort };
 }
 
 /**
@@ -307,9 +321,10 @@ export class ChatSession {
   ): void {
     if (this.running) throw new Error('A IA ainda está respondendo. Espere ou interrompa.');
     const state = this.router.snapshot();
-    const tool = toolInfo(activeProfile(state.board));
+    const target = chatTarget(state, model);
+    const tool = toolInfo(target.cli);
     // sem card não há agente: contexto vazio, só o servidor do board, os servidores em modo "Sempre" e o modelo escolhido
-    const plan = bareExec(modelFor(state, model), boardServer(this.deps), state, this.router.libraryMcpDefinitions());
+    const plan = bareExec(modelOf(state, target), boardServer(this.deps), state, this.router.libraryMcpDefinitions(), target.cli);
     if (hooks.draftOnly) {
       plan.tools = ['Read', 'Glob', 'Grep'];
       plan.deniedTools = [];
@@ -325,8 +340,8 @@ export class ChatSession {
       // um card (ela devolve o card para "pronto" e quem executa depois é o heartbeat ou o autopiloto)
       execution = this.deps.gateway.run({
         origin: 'chat',
-        tool: state.board.aiTool,
-        profile: activeProfile(state.board),
+        tool: target.cli.id,
+        profile: target.cli,
         context: NO_CARD,
         cwd: this.deps.cwd,
         timeoutMinutes: state.board.runner.timeoutMinutes,

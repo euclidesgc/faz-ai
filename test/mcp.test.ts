@@ -722,6 +722,40 @@ describe('modelos de IA', () => {
     });
   });
 
+  it('get_card traz o alvo da execução: perfil de CLI do modelo, de onde veio e o que o board impõe nele (#703)', async () => {
+    // padrão Claude: um card com modelo do Cursor executa no Cursor
+    await call('set_ai_tool', { tool: 'cursor' }); // traz o catálogo do Cursor
+    await call('set_ai_tool', { tool: 'claude' });
+    const cursor = (await call('create_card', { title: 'No Cursor', fields: { Modelo: 'cursor:composer-2.5' } })).data;
+    const card = (await call('get_card', { card: cursor.id })).data;
+    expect(card.model).toMatchObject({ tool: 'cursor', model: 'composer-2.5', from: 'card', value: 'cursor:composer-2.5' });
+    expect(card.model.note).toContain('Se não for o da sua sessão, você não troca de CLI');
+
+    // sem modelo em nenhum nível vale o perfil padrão: não há bloco model
+    const plain = (await call('create_card', { title: 'Sem modelo' })).data;
+    expect((await call('get_card', { card: plain.id })).data.model).toBeUndefined();
+
+    // sem Modelo no card, o agente com modelo decide: from = agent, e o enforcedByBoardRun é o do perfil dele
+    await call('create_agent', { name: 'no-cursor', description: 'Roda no Cursor', content: 'Instruções', model: 'cursor:composer-2.5' });
+    await call('update_column', { column: 'Backlog', exec_profile: 'no-cursor' });
+    const viaAgent = (await call('create_card', { title: 'Pelo agente' })).data;
+    const agentCard = (await call('get_card', { card: viaAgent.id })).data;
+    expect(agentCard.model).toMatchObject({ tool: 'cursor', from: 'agent' });
+    expect(agentCard.execution.enforcedByBoardRun).toEqual(['model']);
+  });
+
+  it('as descrições de get_models e set_ai_tool e as instruções falam de perfil de CLI, não de "ferramenta do board" (#703)', async () => {
+    const listed = (await client.listTools()).tools;
+    const description = (name: string) => listed.find((x) => x.name === name)!.description!;
+    expect(description('get_models')).toContain('escolhe o perfil de CLI que executa');
+    expect(description('get_models')).toContain('vale o perfil padrão');
+    expect(description('set_ai_tool')).toContain('nem o card, nem o agente, nem as regras indicam um modelo');
+    for (const text of [description('get_models'), description('set_ai_tool'), MCP_INSTRUCTIONS])
+      expect(text).not.toMatch(/ferramenta do board/i);
+    expect(MCP_INSTRUCTIONS).toContain('o perfil de CLI da execução');
+    expect(MCP_INSTRUCTIONS.length).toBeLessThanOrEqual(CLAUDE_CODE_CUT);
+  });
+
   it('monta o catálogo por ferramenta e interpreta modelo + esforço', async () => {
     const m = (await call('get_models')).data;
     expect(m.catalog.find((o: any) => o.value === 'claude:opus')).toMatchObject({
@@ -747,7 +781,15 @@ describe('modelos de IA', () => {
     await call('set_ai_tool', { tool: 'cursor' });
     const cursor = (await call('get_models')).data;
     expect(cursor.catalog.some((o: any) => o.tool === 'cursor')).toBe(true);
-    expect(cursor.rules.map((r: any) => r.value)).toEqual(['cursor:auto', 'cursor:auto', 'cursor:auto']);
+    // as faixas de esforço de outro perfil (Claude) ficam; as do perfil sugerido (Cursor) entram
+    expect(cursor.rules.map((r: any) => r.value)).toEqual([
+      'claude:haiku',
+      'claude:sonnet@medium',
+      'claude:opus@high',
+      'cursor:auto',
+      'cursor:auto',
+      'cursor:auto',
+    ]);
     expect((await set('cursor:composer-2.5')).data.model).toMatchObject({ tool: 'cursor', model: 'composer-2.5' });
     await call('set_ai_tool', { tool: 'claude' });
     expect((await set('opus turbo')).text).toContain('não aceita o esforço');
@@ -804,7 +846,9 @@ describe('modelos de IA', () => {
       'claude:haiku',
     );
     const cursor = (await call('suggest_model_rules', { tool: 'cursor' })).data.rules;
+    // a faixa de esforço do Claude (outro perfil) é preservada, as do Cursor são substituídas
     expect(cursor.filter((r: any) => r.when.startsWith('Esforço')).map((r: any) => r.value)).toEqual([
+      'claude:opus@max',
       'cursor:auto',
       'cursor:auto',
       'cursor:auto',
@@ -933,7 +977,8 @@ describe('regras de modelo com E e OU', () => {
   it('com o preenchimento automático desligado, só sugere', async () => {
     await call('update_rules', { autoApplyModelSuggestion: false });
     const card = (await call('create_card', { title: 'x', fields: { Esforço: 'Alto' } })).data;
-    expect(card.model).toBeUndefined();
+    // a regra vale na execução mesmo sem aplicar a sugestão (alvo do runner): o bloco traz from = rule
+    expect(card.model).toMatchObject({ tool: 'claude', from: 'rule', value: 'claude:opus@high' });
     expect(card.suggestedModel.value).toBe('claude:opus@high');
   });
 
