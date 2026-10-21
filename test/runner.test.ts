@@ -37,6 +37,8 @@ import { FLOW_LINE } from '../src/extension/promptContext';
 /** O contexto de um pedido sem nada marcado no board: só a linha do fluxo. */
 const FLOW_ONLY = { always: [FLOW_LINE], card: [] as string[] };
 import { monthOf, type RunReport } from '../src/shared/log';
+import { all } from '../src/extension/db/query';
+import { effortTiers } from '../src/extension/models';
 import { parseRunner } from '../src/shared/runner';
 import { TYPE_CONDITION, modelValue } from '../src/shared/models';
 import type { Database } from 'sql.js';
@@ -666,7 +668,7 @@ describe('executor da IA', () => {
     expect(card().status).not.toBe('blocked');
     expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
     expect(lastMessage()!.body).toContain('login do Claude Code venceu');
-    expect(router.snapshot().authExpired).toBe('claude');
+    expect(router.snapshot().authExpired).toEqual(['claude']);
     expect(log.some((l) => l.includes('Login do Claude Code vencido'))).toBe(true);
 
     // uma segunda falha igual, com o sinal já ligado, não duplica o log de suspensão
@@ -680,7 +682,7 @@ describe('executor da IA', () => {
     runner.start(storyId);
     ai({ type: 'comment.add', cardId: storyId, body: 'Entendi. Qual o provedor de login?' });
     procs[2]!.exit(0);
-    expect(router.snapshot().authExpired).toBeNull();
+    expect(router.snapshot().authExpired).toEqual([]);
     expect(log.some((l) => l.includes('Login do Claude Code de volta'))).toBe(true);
   });
 
@@ -689,7 +691,7 @@ describe('executor da IA', () => {
     procs[0]!.emit('algum outro erro qualquer\n', 'stderr');
     procs[0]!.exit(1);
     expect(card().status).toBe('blocked');
-    expect(router.snapshot().authExpired).toBeNull();
+    expect(router.snapshot().authExpired).toEqual([]);
   });
 
   it('falha, saída sem resposta e tempo limite bloqueiam o card com o motivo na conversa', () => {
@@ -1451,38 +1453,69 @@ describe('log das execuções de IA', () => {
   });
 });
 
+/** Acrescenta ao catálogo do board um modelo do Cursor (o catálogo de fábrica só tem o do Claude Code). */
+const addCursorModel = () =>
+  router.handle({
+    type: 'settings.models.set',
+    catalog: [
+      ...router.snapshot().board.modelCatalog,
+      { id: 'cursor:composer-2', tool: 'cursor', model: 'composer-2', label: 'Composer 2', efforts: [], defaultEffort: null },
+    ],
+  });
+
 /**
- * Retentativa com o modelo reserva da regra de sugestão quando o modelo principal esgota o limite de
- * uso do plano (história #257). O leitor do Claude Code (`claude.ts`) só liga `usageLimitReached` com
- * um `result` de erro cujo texto bate com os termos conhecidos de limite esgotado (ver
- * `USAGE_LIMIT_TEXT`); é assim que estes testes simulam o esgotamento, sem depender de um exemplo real.
+ * Troca de modelo (ou de perfil de CLI) quando o plano esgota o limite de uso (histórias #257 e #620). A troca só
+ * acontece por política de execução aplicável, decidida pelo avaliador único: a reserva da regra de modelo
+ * legada não troca mais nada. O leitor do Claude Code (`claude.ts`) só liga `usageLimitReached` com um
+ * `result` de erro cujo texto bate com os termos conhecidos de limite esgotado (ver `USAGE_LIMIT_TEXT`); é
+ * assim que estes testes simulam o esgotamento, sem depender de um exemplo real.
  */
-describe('reserva de modelo quando o limite esgota (história #257)', () => {
-  const sonnet = () => router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === 'sonnet')!;
-  const fable = () => router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === 'fable')!;
+describe('troca por política quando o limite esgota (histórias #257 e #620)', () => {
+  const claudeModel = (model: string) => router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === model)!;
+  const sonnet = () => claudeModel('sonnet');
+  const fable = () => claudeModel('fable');
+  const cursorModel = () => router.snapshot().board.modelCatalog.find((o) => o.tool === 'cursor')!;
   const modeloField = () => router.snapshot().fieldDefs.find((f) => f.kind === 'model')!;
   const setModelo = (value: string) => router.handle({ type: 'field.setValue', cardId: storyId, fieldId: modeloField().id, value });
   const useSonnetMedium = () => setModelo(modelValue(sonnet().id, 'medium'));
-  const ruleWithFallback = (fallback: string | null) =>
+  /** a política que troca o Sonnet escolhido no card pelo destino dado, quando o limite de uso esgota */
+  const policyTo = (
+    target: { profileId: string; model: string; effort: string | null },
+    over: { id?: string; failures?: string[]; action?: 'auto' | 'offer' | 'wait' | 'block'; maxAttempts?: number } = {},
+  ) =>
     router.handle({
-      type: 'settings.modelRules.set',
-      rules: [
-        {
-          id: 'r1',
-          name: 'Regra',
-          enabled: true,
-          groups: [[{ fieldId: TYPE_CONDITION, op: 'is', value: 'História' }]],
-          model: modelValue(sonnet().id, 'medium'),
-          fallback,
+      type: 'settings.executionPolicy.save',
+      policy: {
+        version: 1,
+        id: over.id ?? 'reserva',
+        name: 'Reserva do Sonnet',
+        enabled: true,
+        priority: 10,
+        conditions: {
+          profileIds: ['claude'],
+          models: ['sonnet'],
+          actions: [],
+          agentIds: [],
+          phaseIds: [],
+          cardTypeIds: [],
+          origins: [],
+          failures: over.failures ?? ['quota'],
+          explicit: 'include',
         },
-      ],
+        action: over.action ?? 'auto',
+        targets: over.action === 'wait' || over.action === 'block' ? [] : [target],
+        limits: { maxAttempts: over.maxAttempts ?? 3, maxElapsedMs: 3_600_000, backoffMs: 0, globalProcesses: null, perProfile: {} },
+      } as never,
+      expectedRevision: 0,
+      reviewed: true,
     });
+  const policyToFable = () => policyTo({ profileId: 'claude', model: 'fable', effort: 'low' });
   // uma linha `result` que o leitor do Claude Code reconhece como limite de uso esgotado (RF-03: só este sinal estrutural liga a flag)
   const usageLimitResult = () => JSON.stringify({ type: 'result', is_error: true, result: 'usage limit reached' });
 
-  it('regra com reserva + limite esgotado: segunda chamada ao gateway com o modelo reserva, comentário na conversa, sem bloqueio', () => {
+  it('política aplicável + limite esgotado: segunda chamada ao gateway com o destino, comentário na conversa, sem bloqueio', () => {
     useSonnetMedium();
-    ruleWithFallback(modelValue(fable().id, 'low'));
+    policyToFable();
     const done = vi.fn();
     runner.start(storyId, { origin: 'manual', advice: ['ORIENTAÇÃO PRESERVADA'], onExit: done });
     expect(procs).toHaveLength(1);
@@ -1495,34 +1528,33 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     expect(args[args.indexOf('--model') + 1]).toBe('fable');
     expect(args[args.indexOf('--effort') + 1]).toBe('low');
     expect(procs[1]!.command.stdin).toContain('ORIENTAÇÃO PRESERVADA');
-    expect(card().status).toBe('running'); // não bloqueou nem esperou resposta: a reserva está em curso
+    expect(card().status).toBe('running'); // não bloqueou nem esperou resposta: a troca está em curso
     expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
     expect(lastMessage()!.body).toBe('O `Sonnet 5.5 - médio` esgotou o limite; a execução segue com `Fable 5.1 - baixo`.');
+    expect(log.some((l) => l.includes('Política de execução: fallback (fallback-permitted, reserva r1)'))).toBe(true);
 
-    // a retentativa termina bem: segue como qualquer execução normal (aqui, a IA só respondeu na conversa)
+    // o destino termina bem: segue como qualquer execução normal (aqui, a IA só respondeu na conversa)
     ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
     procs[1]!.exit(0);
     expect(done).toHaveBeenCalledOnce();
     expect(card().status).toBe('waiting_answer');
   });
 
-  it('a reserva também esgota o limite (ou falha por qualquer motivo): o card volta para a IA (#551), sem uma terceira tentativa', () => {
+  it('a regra de modelo com reserva legada não troca nada sem política: o card volta para a IA (#551), sem segunda chamada', () => {
     useSonnetMedium();
-    ruleWithFallback(modelValue(fable().id, 'low'));
-    runner.start(storyId);
-    procs[0]!.emit(usageLimitResult());
-    procs[0]!.exit(1);
-    expect(procs).toHaveLength(2);
-
-    procs[1]!.emit(usageLimitResult());
-    procs[1]!.exit(1);
-    expect(procs).toHaveLength(2); // nenhuma terceira chamada: a retentativa não recebe fallbackPending
-    expect(card().status).toBe('ready');
-  });
-
-  it('card sem reserva (regra sem fallback) + limite esgotado: o card volta para a IA (#551), sem segunda chamada', () => {
-    useSonnetMedium();
-    ruleWithFallback(null);
+    router.handle({
+      type: 'settings.modelRules.set',
+      rules: [
+        {
+          id: 'r1',
+          name: 'Regra',
+          enabled: true,
+          groups: [[{ fieldId: TYPE_CONDITION, op: 'is', value: 'História' }]],
+          model: modelValue(sonnet().id, 'medium'),
+          fallback: modelValue(fable().id, 'low'),
+        },
+      ],
+    });
     runner.start(storyId);
     procs[0]!.emit(usageLimitResult());
     procs[0]!.exit(1);
@@ -1530,9 +1562,43 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     expect(card().status).toBe('ready');
   });
 
-  it('modelo escolhido à mão sem bater com a regra + limite esgotado: o card volta para a IA (#551), sem segunda chamada', () => {
-    // a regra sugeriria sonnet@medium, mas o campo Modelo do card foi trocado à mão para fable@high
-    ruleWithFallback(modelValue(fable().id, 'low'));
+  it('o destino também esgota o limite: o card volta para a IA (#551), sem uma terceira tentativa nem reinício da cadeia', () => {
+    useSonnetMedium();
+    policyToFable();
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(2);
+
+    procs[1]!.emit(usageLimitResult());
+    procs[1]!.exit(1);
+    expect(procs).toHaveLength(2); // o destino já foi visitado e a cadeia é uma só: não há terceira chamada
+    expect(card().status).toBe('ready');
+  });
+
+  it('o limite de tentativas da política vale entre as trocas', () => {
+    useSonnetMedium();
+    // a política só admite uma tentativa: a primeira, que já esgotou o limite, a consome
+    policyTo({ profileId: 'claude', model: 'fable', effort: 'low' }, { maxAttempts: 1 });
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('ready');
+  });
+
+  it('sem política (mesmo com a regra de modelo): limite esgotado volta para a IA, sem segunda chamada', () => {
+    useSonnetMedium();
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('ready');
+    expect(log.some((l) => l.includes('Política de execução: block (no-policy)'))).toBe(true);
+  });
+
+  it('modelo escolhido à mão que a política não inclui + limite esgotado: o card volta para a IA, sem segunda chamada', () => {
+    policyToFable();
     setModelo(modelValue(fable().id, 'high'));
     runner.start(storyId);
     procs[0]!.emit(usageLimitResult());
@@ -1541,8 +1607,49 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     expect(card().status).toBe('ready');
   });
 
+  it('política de outra classe de falha não troca', () => {
+    useSonnetMedium();
+    policyTo({ profileId: 'claude', model: 'fable', effort: 'low' }, { failures: ['auth'] });
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('ready');
+  });
+
+  it('política que só oferece o destino não troca sozinha: a oferta fica registrada para a pessoa confirmar', () => {
+    useSonnetMedium();
+    policyTo({ profileId: 'claude', model: 'fable', effort: 'low' }, { action: 'offer' });
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('ready');
+    expect(lastMessage()!.body).toContain('precisa da sua confirmação');
+  });
+
+  it('trabalho parcial (a IA já respondeu na conversa) não dispara troca nem repetição: o card é bloqueado para conferência', () => {
+    useSonnetMedium();
+    policyToFable();
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    ai({ type: 'comment.add', cardId: storyId, body: 'Comecei a análise.' });
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('blocked');
+    expect(card().statusReason).toContain('já ter agido');
+  });
+
+  it('falha comum (sem limite esgotado), mesmo com política aplicável: bloqueio imediato, sem segunda chamada', () => {
+    useSonnetMedium();
+    policyToFable();
+    runner.start(storyId);
+    procs[0]!.exit(2); // erro comum, sem nenhum evento de limite esgotado: a política não mascara outros erros
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('blocked');
+  });
+
   it('a CLI atual sai com código 0 e "hit your limit" sem responder: é limite esgotado, o card volta para a IA, não bloqueia', () => {
-    ruleWithFallback(null);
     runner.start(storyId);
     procs[0]!.emit(JSON.stringify({ type: 'result', is_error: true, result: "You've hit your limit · resets 3pm (America/Sao_Paulo)" }));
     procs[0]!.exit(0);
@@ -1551,18 +1658,9 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     expect(lastMessage()!.body).toContain('limite de uso do plano');
   });
 
-  it('falha comum (sem limite esgotado), mesmo com reserva disponível: bloqueio imediato, sem segunda chamada', () => {
+  it('execução que terminou bem (código 0) com a flag ligada: não repete a fase no destino', () => {
     useSonnetMedium();
-    ruleWithFallback(modelValue(fable().id, 'low'));
-    runner.start(storyId);
-    procs[0]!.exit(2); // erro comum, sem nenhum evento de limite esgotado: a reserva não mascara outros erros
-    expect(procs).toHaveLength(1);
-    expect(card().status).toBe('blocked');
-  });
-
-  it('execução que terminou bem (código 0) com a flag ligada: não repete a fase com a reserva', () => {
-    useSonnetMedium();
-    ruleWithFallback(modelValue(fable().id, 'low'));
+    policyToFable();
     runner.start(storyId);
     procs[0]!.emit(usageLimitResult());
     ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
@@ -1571,9 +1669,9 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     expect(card().status).toBe('waiting_answer');
   });
 
-  it('a retentativa não consegue começar (card arquivado no meio): o card é bloqueado com o motivo e o fim é avisado', () => {
+  it('a retentativa não consegue começar (card arquivado no meio): o fim é avisado e o card não fica "em execução"', () => {
     useSonnetMedium();
-    ruleWithFallback(modelValue(fable().id, 'low'));
+    policyToFable();
     const finished: string[] = [];
     runner.onDidFinish((id) => finished.push(id));
     runner.start(storyId);
@@ -1586,16 +1684,135 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     expect(router.snapshot().aiActivity.some((a) => a.cardId === storyId)).toBe(false);
   });
 
-  it('modo autônomo (YOLO): a retentativa não deixa o card "waiting_answer" nem "blocked" só por causa da troca — a fila segue', () => {
+  it('modo autônomo (YOLO): a troca não deixa o card "waiting_answer" nem "blocked" só por causa dela — a fila segue', () => {
     router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
     useSonnetMedium();
-    ruleWithFallback(modelValue(fable().id, 'low'));
+    policyToFable();
     runner.start(storyId);
     procs[0]!.emit(usageLimitResult());
     procs[0]!.exit(1);
 
     expect(procs).toHaveLength(2);
     expect(card().status).toBe('running');
+  });
+
+  it('RF11: a política troca para outro perfil de CLI, que passa a ser o alvo da execução (comando, log e atividade)', () => {
+    addCursorModel();
+    useSonnetMedium();
+    const cursor = cursorModel();
+    policyTo({ profileId: 'cursor', model: cursor.model, effort: cursor.defaultEffort });
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+
+    expect(procs).toHaveLength(2);
+    expect(procs[0]!.command.command).toBe('claude');
+    expect(procs[1]!.command.command).toBe('cursor-agent');
+    expect(router.snapshot().aiActivity.find((a) => a.cardId === storyId)?.tool).toBe('cursor');
+    expect(lastMessage()!.body).toMatch(/esgotou o limite; a execução segue com .* no Cursor\.$/);
+  });
+
+  it('política editada durante a execução: vale a versão salva no fim da tentativa, e o log diz qual (r2)', () => {
+    useSonnetMedium();
+    policyToFable();
+    runner.start(storyId);
+    const saved = router.executionPolicyLibrary().snapshot.records[0]!;
+    router.handle({
+      type: 'settings.executionPolicy.save',
+      policy: { ...saved.policy, limits: { ...saved.policy.limits, maxAttempts: 5 } },
+      expectedRevision: saved.revision,
+      reviewed: true,
+    });
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(2);
+    expect(log.some((l) => l.includes('reserva r2'))).toBe(true);
+  });
+
+  it('política desligada durante a execução: o limite esgotado não troca, nem pela versão antiga', () => {
+    useSonnetMedium();
+    policyToFable();
+    runner.start(storyId);
+    const saved = router.executionPolicyLibrary().snapshot.records[0]!;
+    router.handle({
+      type: 'settings.executionPolicy.save',
+      policy: { ...saved.policy, enabled: false },
+      expectedRevision: saved.revision,
+      reviewed: true,
+    });
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('ready');
+    expect(log.some((l) => l.includes('block (no-policy)'))).toBe(true);
+  });
+
+  it('política de espera não troca de CLI nem repete na hora: o card volta para a IA e o log registra a espera', () => {
+    useSonnetMedium();
+    policyTo({ profileId: 'claude', model: 'fable', effort: 'low' }, { action: 'wait' });
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('ready');
+    expect(log.some((l) => l.includes('Política de execução: wait'))).toBe(true);
+  });
+});
+
+describe('alvo da execução por perfil de CLI (história #620)', () => {
+  const claudeModel = (model: string) => router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === model)!;
+  const cursorModel = () => router.snapshot().board.modelCatalog.find((o) => o.tool === 'cursor')!;
+  const modeloField = () => router.snapshot().fieldDefs.find((f) => f.kind === 'model')!;
+  const setModelo = (value: string) => router.handle({ type: 'field.setValue', cardId: storyId, fieldId: modeloField().id, value });
+  const runsLog = () => all(db, 'SELECT tool FROM ai_runs ORDER BY started_at, id') as { tool: string }[];
+
+  beforeEach(addCursorModel);
+
+  it('o valor do Modelo decide a CLI: um card roda no Cursor sem mudar o perfil padrão do board', () => {
+    setModelo(modelValue(cursorModel().id, cursorModel().defaultEffort));
+    runner.start(storyId);
+    expect(procs[0]!.command.command).toBe('cursor-agent');
+    expect(router.snapshot().board.aiTool).toBe('claude');
+    expect(runsLog().map((r) => r.tool)).toEqual(['cursor']);
+  });
+
+  it('escolha explícita inválida recusa a execução com a mensagem, sem cair para o perfil padrão', () => {
+    setModelo('cursor:modelo-que-nao-existe@alto');
+    expect(() => runner.start(storyId)).toThrow(/não está no catálogo.*não troca de perfil nem de modelo sozinha/);
+    expect(procs).toHaveLength(0);
+  });
+
+  it('RF16: CLI ausente de um perfil recusa só os cards daquele perfil', () => {
+    router.setRequirements([{ id: 'cli', tool: 'cursor', label: 'CLI', ok: false, action: null } as never]);
+    setModelo(modelValue(cursorModel().id, cursorModel().defaultEffort));
+    expect(() => runner.start(storyId)).toThrow('A CLI do Cursor não foi encontrada');
+    setModelo(modelValue(claudeModel('sonnet').id, 'medium'));
+    runner.start(storyId);
+    expect(procs[0]!.command.command).toBe('claude');
+  });
+
+  it('RF15/RF19: login vencido marca só o perfil que falhou, e uma execução que dá certo limpa só ele', () => {
+    router.setAuthExpired('cursor', true);
+    setModelo(modelValue(claudeModel('sonnet').id, 'medium'));
+    runner.start(storyId);
+    procs[0]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[0]!.exit(1);
+    expect(router.snapshot().authExpired.sort()).toEqual(['claude', 'cursor']);
+
+    runner.start(storyId);
+    ai({ type: 'comment.add', cardId: storyId, body: 'Entendi.' });
+    procs[1]!.exit(0);
+    expect(router.snapshot().authExpired).toEqual(['cursor']);
+  });
+
+  it('RF12: o resumo roda na faixa "Alto" do catálogo do perfil do card', () => {
+    const cursor = cursorModel();
+    setModelo(modelValue(cursor.id, cursor.defaultEffort));
+    runner.start(storyId, 'manual', 'summarize');
+    const tier = effortTiers('cursor', router.snapshot().board.modelCatalog).find(([level]) => level === 'Alto')!;
+    const high = router.snapshot().board.modelCatalog.find((o) => o.id === tier[1].split('@')[0])!;
+    expect(procs[0]!.command.command).toBe('cursor-agent');
+    expect(procs[0]!.command.args.join(' ')).toContain(high.model);
   });
 });
 

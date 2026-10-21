@@ -3,7 +3,9 @@ import type { WebviewToHost } from '../shared/messages';
 import { cardRef, type BoardState, type Card } from '../shared/model';
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
-import { blocksExecution } from '../shared/requirements';
+import { cardCliProblem, cliProblem, type CliProblem } from '../shared/requirements';
+import { profilesInUse } from '../shared/runTarget';
+import { profileLabel } from '../shared/aiProfiles';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { limitOf, type AiRunMode } from '../shared/runner';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
@@ -72,6 +74,8 @@ export function heartbeatTargets(s: BoardState): Card[] {
     const story = card.parentId ? byId.get(card.parentId) : card;
     // as histórias em modo autônomo são do autopiloto, que não espera o intervalo
     if (!story || !isLive(story) || story.yolo || out.includes(story)) continue;
+    // login vencido ou CLI ausente do perfil da história: só ela fica de fora, as dos outros perfis seguem
+    if (cardCliProblem(s, story)) continue;
     const withHuman = isWithHuman(story);
     if (withHuman && !unanswered.has(story.id)) continue;
     // já há uma execução tocando a história: outra em paralelo pisaria nas mesmas sub-tarefas
@@ -107,7 +111,8 @@ export function refineTargets(s: BoardState): Card[] {
       c.title.trim() !== '' &&
       isBacklogColumn(s, c) &&
       !isWithHuman(c) &&
-      !isAiWorking(s, c),
+      !isAiWorking(s, c) &&
+      !cardCliProblem(s, c),
   );
 }
 
@@ -125,7 +130,8 @@ export function summaryTargets(s: BoardState): Card[] {
       columnOf(s, c)?.category === 'open' &&
       !isAiWorking(s, c) &&
       !childrenOf(s, c.id).some((k) => isLive(k) && isAiWorking(s, k)) &&
-      needsSummary(s, c),
+      needsSummary(s, c) &&
+      !cardCliProblem(s, c),
   );
 }
 
@@ -162,7 +168,8 @@ export function conflictTargets(s: BoardState, pending: ReadonlySet<string>): Ca
       c.status !== 'blocked' &&
       c.status !== 'waiting_answer' &&
       !isAiWorking(s, c) &&
-      !childrenOf(s, c.id).some((k) => isLive(k) && isAiWorking(s, k)),
+      !childrenOf(s, c.id).some((k) => isLive(k) && isAiWorking(s, k)) &&
+      !cardCliProblem(s, c),
   );
 }
 
@@ -187,12 +194,23 @@ export function heartbeatQueue(s: BoardState, conflicts: ReadonlySet<string> = n
   return items;
 }
 
+/** O motivo de um perfil de CLI não poder executar, na frase da rodada. */
+const PROBLEM_REASON: Record<CliProblem, (profile: string) => string> = {
+  cli: (p) => `a CLI do ${p} não foi encontrada`,
+  signin: (p) => `o login do ${p} venceu`,
+  expired: (p) => `o login do ${p} venceu`,
+};
+
 /**
  * Por que uma rodada não tem o que executar: o motivo que vai para o log e para a pessoa. Cada causa
  * é uma das condições em que `heartbeatTargets` ou `pump` deixam um card de fora.
  */
 export function heartbeatIdleReason(s: BoardState): string {
-  if (blocksExecution(s)) return 'o login da ferramenta de IA venceu (veja o aviso no topo do board).';
+  // um perfil por vez, na ordem de `profilesInUse` (o padrão primeiro)
+  for (const profile of profilesInUse(s)) {
+    const problem = cliProblem(s, profile.id);
+    if (problem) return `${PROBLEM_REASON[problem](profileLabel(s.board, profile.id))} (veja o aviso no topo do board).`;
+  }
   const p = pendingWork(s);
   const queue = aiQueue(s, p);
   if (!queue.length) return 'nada pendente com a IA.';
@@ -420,12 +438,6 @@ export class Heartbeat {
     // em vez de cruzar com a sincronização das branches
     if (this.holding) return void this.changed();
     const s = this.deps.snapshot();
-    // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
-    if (blocksExecution(s)) {
-      if (this.queue.length) this.deps.log(`Heartbeat: ${heartbeatIdleReason(s)}`);
-      this.queue = [];
-      return void this.changed();
-    }
     const counts = runningByKind(s, this.runner.running);
     const wants = autopilotStep(s);
     const reservedKind: ActivityKind | null = this.yieldToAutopilot && s.autopilot.active && wants.kind === 'run' ? wants.activity : null;

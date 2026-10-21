@@ -11,7 +11,6 @@ export const settings: Record<string, string> = {
   'Novo perfil': 'New profile',
   'Os perfis de CLI são dados do board. Configuração não comprova isolamento, permissões ou acesso ao MCP.':
     'CLI profiles are board data. Configuration does not prove isolation, permissions, or MCP access.',
-  'Abre as políticas de execução e fallback no Harness.': 'Opens execution and fallback policies in Harness.',
   'Perfil padrão': 'Default profile',
   'Perfil pronto': 'Builtin profile',
   Personalizado: 'Custom',
@@ -378,10 +377,6 @@ export const settings: Record<string, string> = {
   Editar: 'Edit',
   'Remover da lista': 'Remove from the list',
   'Nenhuma regra na lista: o board não sugere modelo.': 'No rules in the list: the board does not suggest a model.',
-  'Reserva (opcional)': 'Fallback (optional)',
-  'Sem reserva: se o modelo principal esgotar o limite, a execução não é repetida.':
-    'No fallback: if the main model hits the usage limit, the run is not retried.',
-  'reserva: {model}': 'fallback: {model}',
   'Campos personalizados': 'Custom fields',
   'Novo campo': 'New field',
   'Campos guardam informações extras do card, como prazo, pontos ou cliente. Todos aparecem no card aberto; em "No board" você escolhe se e como cada um aparece também no card do board.':

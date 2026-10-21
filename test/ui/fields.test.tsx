@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
+import { ModelEditor } from '../../src/webview/components/FieldRenderer';
 import { FieldsSettings } from '../../src/webview/components/settings/FieldsSettings';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
@@ -159,5 +160,62 @@ describe('FieldsSettings', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Novo campo' }));
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(sentOf('settings.field.create')).toHaveLength(0);
+  });
+});
+
+describe('ModelEditor: catálogo de todos os perfis ligados', () => {
+  const option = (tool: 'claude' | 'kimi', model: string, label: string) => ({
+    id: `${tool}:${model}`,
+    tool,
+    model,
+    label,
+    efforts: [],
+    defaultEffort: null,
+  });
+  const setProfiles = (enabled: (id: string) => boolean) => {
+    const s = useBoardStore.getState().state!;
+    useBoardStore.setState({
+      state: {
+        ...s,
+        board: {
+          ...s.board,
+          modelCatalog: [option('claude', 'opus', 'Opus X'), option('kimi', 'k3', 'Kimi K3')],
+          aiProfiles: s.board.aiProfiles.map((p) => ({ ...p, enabled: enabled(p.id) })),
+        },
+      },
+    });
+  };
+  const open = async (value: string | null) => {
+    render(
+      <Theme>
+        <ModelEditor part="model" value={value} onChange={() => {}} />
+      </Theme>,
+    );
+    await userEvent.click(screen.getByRole('combobox', { name: 'Modelo' }));
+  };
+  const groupLabels = () =>
+    screen
+      .getAllByRole('group')
+      .map((g) => g.getAttribute('aria-labelledby'))
+      .map((id) => document.getElementById(id!)?.textContent);
+
+  it('um grupo por perfil ligado', async () => {
+    setProfiles((id) => id === 'claude' || id === 'kimi');
+    await open(null);
+    expect(groupLabels()).toEqual(['Claude Code', 'Kimi Code']);
+    expect(screen.getByRole('option', { name: 'Kimi K3' })).toBeInTheDocument();
+  });
+
+  it('o perfil desligado some', async () => {
+    setProfiles((id) => id === 'claude');
+    await open(null);
+    expect(groupLabels()).toEqual(['Claude Code']);
+    expect(screen.queryByRole('option', { name: 'Kimi K3' })).toBeNull();
+  });
+
+  it('o valor fora do catálogo continua visível', async () => {
+    setProfiles(() => true);
+    await open('claude:apagado');
+    expect(screen.getAllByText('claude:apagado (fora do catálogo)').length).toBeGreaterThan(0);
   });
 });

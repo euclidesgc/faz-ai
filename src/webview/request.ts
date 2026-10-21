@@ -108,7 +108,9 @@ export function requestAgentAssistance(
 export function requestExecutionPolicy(
   input:
     | { type: 'executionPolicy.read'; id?: string; beforeRevision?: number }
-    | { type: 'executionPolicy.simulate'; scenario: import('../shared/policyManagement').PolicyScenario },
+    | { type: 'executionPolicy.simulate'; scenario: import('../shared/policyManagement').PolicyScenario }
+    | { type: 'executionPolicy.assist'; input: import('../shared/policyAssistant').PolicyAssistInput },
+  timeout: number = REQUEST_TIMEOUT_MS,
 ): Promise<import('../shared/policyManagement').PolicyReply> {
   const requestId = newRequestId();
   const end = beginRequest();
@@ -137,7 +139,7 @@ export function requestExecutionPolicy(
     const timer = setTimeout(() => {
       cleanup();
       reject(new Error(REQUEST_TIMEOUT_MESSAGE));
-    }, REQUEST_TIMEOUT_MS);
+    }, timeout);
     pending.add(cancel);
     try {
       postToHost({ ...input, requestId });

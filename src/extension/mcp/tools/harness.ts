@@ -95,7 +95,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'set_ai_tool',
-    'Define o perfil de CLI padrão do board, que as execuções usam. `tool` é o id de um perfil ligado (veja `profiles` em get_models). Perfis são criados e editados só pela pessoa, em Configurações → Ferramentas de IA.',
+    'Define o perfil de CLI padrão: o que executa quando nem o card, nem o agente, nem as regras indicam um modelo. `tool` é o id de um perfil ligado (veja `profiles` em get_models). Perfis são criados e editados só pela pessoa, em Configurações → Ferramentas de IA.',
     { tool: z.string().min(1) },
     (a, router) => {
       const enabled = router

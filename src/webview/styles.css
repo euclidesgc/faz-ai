@@ -4701,9 +4701,6 @@ div.metrics-breakdown {
 .ai-tools-layout > :first-child:only-child {
   grid-column: 1 / -1;
 }
-.ai-tools-policy-link {
-  margin-bottom: var(--sp-12);
-}
 .ai-tools-layout .settings-card {
   margin-bottom: var(--sp-12);
 }

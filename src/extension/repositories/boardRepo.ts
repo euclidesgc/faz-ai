@@ -512,7 +512,7 @@ export class BoardRepo {
       aiRunUnsupported: null,
       requirements: [],
       requirementsCheckedAt: 0,
-      authExpired: null,
+      authExpired: [],
       orphans: EMPTY_ORPHANS,
       environment: null,
       environmentFirstRun: false,

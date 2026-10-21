@@ -808,9 +808,7 @@ describe('botões de IA do card', () => {
 
   it('com a CLI sem login, os dois ficam desligados, com o motivo na dica', async () => {
     const { router, storyId } = await seedBoard();
-    router.setRequirements([
-      { id: 'signin', tool: 'cursor', cli: 'cursor-agent', action: { kind: 'command', command: 'cursor-agent login' } },
-    ]);
+    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude auth login' } }]);
     syncStore(router);
     renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
     for (const name of [/Trabalhar na fase/, /Refinar com IA/]) {
@@ -826,7 +824,7 @@ describe('botões de IA do card', () => {
   it('com o login vencido durante a execução (sinal reativo, sem o requisito "signin"), os dois também ficam desligados', async () => {
     const { router, storyId } = await seedBoard();
     act(() => {
-      router.setAuthExpired('claude');
+      router.setAuthExpired('claude', true);
       syncStore(router);
     });
     renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
@@ -840,7 +838,7 @@ describe('botões de IA do card', () => {
     }
 
     act(() => {
-      router.setAuthExpired(null);
+      router.setAuthExpired('claude', false);
       syncStore(router);
     });
     for (const name of [/Trabalhar na fase/, /Refinar com IA/]) expect(screen.getByRole('button', { name })).toBeEnabled();
