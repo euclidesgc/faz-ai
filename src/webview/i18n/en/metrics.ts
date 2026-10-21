@@ -172,7 +172,16 @@ export const metrics: Record<string, string> = {
   'nenhuma resposta da pessoa no período': 'no answer from a person in the period',
   'Pedidos de ajuste': 'Change requests',
   'Histórias concluídas com bug vinculado': 'Done stories with a linked bug',
-  '{n} de {total} ({bugs} bug(s))': '{n} of {total} ({bugs} bug(s))',
+  '{n} de {total} ({bugs} bug(s); autônomas: {an} de {atotal})': '{n} of {total} ({bugs} bug(s); autonomous: {an} of {atotal})',
+  // os sinais da IA (#605)
+  'Correções na Revisão': 'Fixes in Review',
+  'npm test com falha': 'npm test failed',
+  'Commits depois do pull request': 'Commits after the pull request',
+  '{n} em {runs} execuções (autônomas: {a})': '{n} in {runs} runs (autonomous: {a})',
+  '{n} em {runs} histórias (autônomas: {a})': '{n} in {runs} stories (autonomous: {a})',
+  '{n} ({a})': '{n} ({a})',
+  'Os sinais da IA são aproximações (commit ≈ correção) e valem só para o Claude Code, desde o registro de comandos de Bash; "autônomas" é a parte feita em execuções do modo autônomo. Sem execução com registro de Bash no período, o sinal fica "não medido".':
+    'The AI signals are approximations (commit ≈ fix) and apply only to Claude Code, since Bash commands started being recorded; "autonomous" is the part done in autonomous-mode runs. With no run with recorded Bash in the period, the signal is "not measured".',
   'nenhuma história concluída no período': 'no story done in the period',
   'Retrabalho por fase': 'Rework by phase',
   'Retrabalho por modelo': 'Rework by model',

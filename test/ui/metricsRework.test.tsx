@@ -60,18 +60,65 @@ describe('bloco Retrabalho', () => {
       aiSignals: EMPTY_REWORK.aiSignals,
     });
     expect(screen.getByText('50% (1 de 2 respostas)')).toBeInTheDocument();
-    expect(screen.getByText('1 de 4 (2 bug(s))')).toBeInTheDocument();
+    expect(screen.getByText('1 de 4 (2 bug(s); autônomas: 0 de 0)')).toBeInTheDocument();
+    // sem execução com registro de Bash, os sinais da IA não são zero: não foram medidos
+    expect(screen.getAllByText('não medido')).toHaveLength(3);
     const byPhase = screen.getByRole('table', { name: 'Retrabalho por fase' });
     const prd = within(byPhase).getByRole('row', { name: /PRD/ });
     expect(
       within(prd)
         .getAllByRole('cell')
         .map((c) => c.textContent),
-    ).toEqual(['3', '1 de 2', '1']);
+    ).toEqual(['3', '1 de 2', '1', '—', '—', '—']);
     // sem resposta da pessoa, "de primeira" não é zero
     expect(within(within(byPhase).getByRole('row', { name: /Spec/ })).getAllByRole('cell')[1]).toHaveTextContent('—');
     const byModel = screen.getByRole('table', { name: 'Retrabalho por modelo' });
     expect(within(byModel).getByRole('rowheader', { name: 'não definido' })).toBeInTheDocument();
+  });
+
+  it('mostra os sinais da IA com a parte autônoma no resumo e por fase (#605)', () => {
+    const signal = (count: number, runs: number, autonomousCount: number, autonomousRuns: number) => ({
+      count,
+      runs,
+      autonomousCount,
+      autonomousRuns,
+    });
+    show({
+      phases: [
+        {
+          phase: 'Revisão',
+          reviews: 0,
+          approved: 0,
+          adjusted: 0,
+          resolved: 0,
+          firstPass: 0,
+          bashRuns: 2,
+          reviewFixes: signal(3, 2, 1, 1),
+          testFailures: signal(0, 0, 0, 0),
+          commitsAfterPr: signal(2, 1, 0, 0),
+        },
+      ],
+      models: [],
+      escapes: { stories: 4, withBugs: 1, bugs: 2, autonomousStories: 3, autonomousWithBugs: 1, autonomousBugs: 2 },
+      aiSignals: { bashRuns: 5, reviewFixes: signal(3, 2, 1, 1), testFailures: signal(1, 1, 1, 1), commitsAfterPr: signal(2, 1, 0, 0) },
+    });
+    expect(screen.getByText('1 de 4 (2 bug(s); autônomas: 1 de 3)')).toBeInTheDocument();
+    expect(screen.getByText('3 em 2 execuções (autônomas: 1)')).toBeInTheDocument();
+    expect(screen.getByText('1 em 1 execuções (autônomas: 1)')).toBeInTheDocument();
+    expect(screen.getByText('2 em 1 histórias (autônomas: 0)')).toBeInTheDocument();
+    const byPhase = screen.getByRole('table', { name: 'Retrabalho por fase' });
+    expect(
+      within(within(byPhase).getByRole('row', { name: /^Revisão/ }))
+        .getAllByRole('cell')
+        .map((c) => c.textContent),
+    ).toEqual(['0', '—', '0', '3 (1)', '0 (0)', '2 (0)']);
+    expect(screen.getByText(/Os sinais da IA são aproximações/)).toBeInTheDocument();
+  });
+
+  it('só com sinais da IA, sem revisão nem história concluída, o bloco aparece', () => {
+    show({ ...EMPTY_REWORK, aiSignals: { ...EMPTY_REWORK.aiSignals, bashRuns: 1 } });
+    expect(screen.queryByText('Nenhuma revisão nem história concluída neste período.')).toBeNull();
+    expect(screen.getAllByText('0 em 0 execuções (autônomas: 0)')).toHaveLength(2);
   });
 
   it('em inglês', () => {
@@ -84,5 +131,6 @@ describe('bloco Retrabalho', () => {
     });
     expect(screen.getByText('100% (1 of 1 answers)')).toBeInTheDocument();
     expect(screen.getByText('no story done in the period')).toBeInTheDocument();
+    expect(screen.getAllByText('not measured')).toHaveLength(3);
   });
 });
