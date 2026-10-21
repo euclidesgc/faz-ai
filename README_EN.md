@@ -319,6 +319,14 @@ description; answering the same question again replaces the previous answer. In 
 board answers each question with the recommended option, records it in the same section and the AI
 carries on. An open question, without options, is still `ask_question`.
 
+Questions with options appear on the open card, below the description, in a carousel: one question at a
+time, with the **{n} de {total}** counter (step n of total) and the recommended option marked with the
+**Indicada** (Recommended) badge. Clicking an option records the answer and moves on; to write your own
+answer, use the field of that question. **Anterior** (Previous) and **Próxima** (Next) go back and
+forward. The last screen is the summary, with the unanswered questions; **Enviar respostas** (Send
+answers) records everything in the **Perguntas e respostas** (Questions and answers) section and hands
+the turn back to the AI.
+
 While something is missing for the board to work with the tool, the **Configurações** (Settings) tab
 and the **Verificar ambiente** (Check environment) button get a warning icon. Its hint sums up what is
 missing, with each item's name, and each item's explanation and action are in the environment check.

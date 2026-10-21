@@ -95,6 +95,9 @@ export const cards = {
   update: (cardId: Id, patch: PatchOf<'card.update'>) => reqCard(cardId, { type: 'card.update', cardId, patch }),
   move: (cardId: Id, columnId: Id, position: number, cancelChildren?: boolean) =>
     reqCard(cardId, { type: 'card.move', cardId, columnId, position, ...(cancelChildren ? { cancelChildren } : {}) }),
+  /** envia as respostas das perguntas da IA (só as respondidas); o host grava na descrição e devolve a vez */
+  answerQuestions: (cardId: Id, answers: { questionId: Id; text: string; custom: boolean }[]) =>
+    reqCard(cardId, { type: 'card.questions.answer', cardId, answers }),
   trash: (cardId: Id) => reqCard(cardId, { type: 'card.trash', cardId }),
   restore: (cardId: Id) => reqCard(cardId, { type: 'card.restore', cardId }),
   archive: (cardId: Id) => reqCard(cardId, { type: 'card.archive', cardId }),
