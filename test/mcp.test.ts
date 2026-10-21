@@ -976,7 +976,9 @@ describe('regras de modelo com E e OU', () => {
 
   it('get_models nunca devolve reserva, mesmo com o JSON antigo gravado no board', async () => {
     const { run } = await import('../src/extension/db/query');
-    const json = JSON.stringify([{ id: 'r1', name: 'Antiga', enabled: true, groups: [], model: 'claude:haiku', fallback: 'claude:opus@high' }]);
+    const json = JSON.stringify([
+      { id: 'r1', name: 'Antiga', enabled: true, groups: [], model: 'claude:haiku', fallback: 'claude:opus@high' },
+    ]);
     run(profileDb, 'UPDATE boards SET model_rules_json = ? WHERE id = ?', [json, router.boardId]);
     const res = await call('get_models', {});
     expect(res.data.rules).toHaveLength(1);

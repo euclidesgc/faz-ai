@@ -162,11 +162,7 @@ describe('suggestModelRule e suggestModel', () => {
   });
 
   it('suggestModelRule devolve a primeira regra habilitada cujas condições casam', () => {
-    const state = stateWith([
-      { ...rule({ id: 'r0', enabled: false }) },
-      rule({ id: 'r1' }),
-      rule({ id: 'r2', model: 'claude:fable@max' }),
-    ]);
+    const state = stateWith([{ ...rule({ id: 'r0', enabled: false }) }, rule({ id: 'r1' }), rule({ id: 'r2', model: 'claude:fable@max' })]);
     expect(suggestModelRule(state, card())).toMatchObject({ id: 'r1', model: 'claude:sonnet@high' });
   });
 

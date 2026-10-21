@@ -254,7 +254,11 @@ export class MessageRouter {
   executionPolicyLibrary(): PolicyLibrary {
     const snapshot = this.ctx.executionPolicies.snapshot(this.boardId);
     const catalog = builtinPolicyCatalog(this.snapshot());
-    const legacy = legacyFallbackNotes(parseLegacyFallbacks(this.ctx.boards.modelRulesJson(this.boardId)), snapshot.records, catalog.models);
+    const legacy = legacyFallbackNotes(
+      parseLegacyFallbacks(this.ctx.boards.modelRulesJson(this.boardId)),
+      snapshot.records,
+      catalog.models,
+    );
     return { snapshot, ...catalog, ...(legacy.length ? { legacy } : {}) };
   }
   executionPolicyHistory(id: string, before = Number.MAX_SAFE_INTEGER) {
