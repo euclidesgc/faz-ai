@@ -46,6 +46,7 @@ beforeEach(() => {
   fakeConfig.values.default[GIT_WORKTREE_DIR_KEY] = DEFAULT_GIT.worktreeDir;
   fakeConfig.values.default[GIT_PARALLEL_KEY] = DEFAULT_RUNNER.parallel;
   fakeConfig.values.default[GIT_PARALLEL_STORIES_KEY] = DEFAULT_RUNNER.parallelStories;
+  fakeConfig.values.default['fazai.git.parallelSubtasks'] = DEFAULT_RUNNER.parallelSubtasks;
   fakeConfig.values.default[GIT_AUTO_MERGE_KEY] = DEFAULT_GIT.autoMerge;
   fakeConfig.values.default[GIT_MERGE_METHOD_KEY] = DEFAULT_GIT.mergeMethod;
   fakeConfig.values.default[GIT_DECISION_RECORDS_KEY] = DEFAULT_GIT.decisionRecords;
@@ -534,6 +535,12 @@ describe('IdeSettings: Git/paralelo — leitura com sobrescrita', () => {
     fakeConfig.reset();
     fakeConfig.values.default[GIT_MODE_KEY] = DEFAULT_GIT.mode;
     expect(new IdeSettings(workspace).read('git.mode')).toBe('worktree');
+  });
+
+  it('parallelSubtasks: Workspace sobrepõe o padrão do board', () => {
+    expect(new IdeSettings(workspace).read('git.parallelSubtasks')).toBe(DEFAULT_RUNNER.parallelSubtasks);
+    fakeConfig.values.workspace['fazai.git.parallelSubtasks'] = 1;
+    expect(new IdeSettings(workspace).read('git.parallelSubtasks')).toBe(1);
   });
 
   it('parallelStories: Workspace sobrepõe o Usuário; sem valores, default', () => {

@@ -31,24 +31,24 @@ const CLIENT_NAMES: Record<string, string> = {
  * O que o servidor MCP ensina a toda sessão, antes de qualquer ferramenta. O Claude Code corta as instruções
  * de cada servidor em 2.048 caracteres (documentação de 2026-10-13), então elas trazem só o ciclo, com o mais
  * crítico no começo; o detalhe de cada passo vai onde a IA o lê quando precisa: a descrição da ferramenta,
- * as notas do get_card e a skill do fluxo.
+ * as notas do get_card e a skill do fluxo (get_skill). Nem toda ferramenta lê estas instruções: o fluxo também
+ * chega pelo `flowNote` e por `requiredSkills`. O texto é neutro: sem nome de ferramenta nem pasta dela.
  */
 export const MCP_INSTRUCTIONS =
-  'Board kanban do projeto (Faz AI). As histórias (workflow pai) passam pelas fases do fluxo, que são as colunas, uma por vez até a conclusão; ' +
+  'Board kanban do projeto (Faz AI). Antes de trabalhar nele, leia o fluxo com get_skill faz-ai-fluxo e siga-o. As histórias (workflow pai) passam pelas fases do fluxo, que são as colunas, uma por vez até a conclusão; ' +
   'as sub-tarefas (workflow filho) ficam ligadas a uma história. Cards são identificados pelo número (#12). Sinalize o progresso movendo os cards (move_card). ' +
   'Sem um pedido específico, comece por get_pending_work: ele lista o que está com você. get_board (colunas, tipos, campos, agentes): Plan, refinar, editar board. ' +
   'Cada card tem um status de trabalho em `work`: "ready" e "approved" estão com você; "waiting_review", "waiting_answer" e "blocked" estão com a pessoa. ' +
   'Ao começar um card chame start_work e siga `phase` do get_card. Nas colunas com `requiresApproval`, ao terminar o trabalho da fase chame request_review e PARE: ' +
   'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +
-  'get_card devolve em `model` o modelo e o esforço que devem executar o card: se forem diferentes dos seus, delegue o trabalho a um subagente com essa configuração; ' +
-  'se não for possível, avise a pessoa em vez de executar com outra. ' +
-  'Antes de executar, leia os arquivos de `requiredRules` e `requiredSkills` do get_card, mesmo os que não estão na sua lista de skills. ' +
+  '`model` do get_card é o modelo que deve executar o card, e `tool` o perfil de CLI da execução (o do modelo do card, do agente ou da regra; sem modelo, o perfil padrão): se for outro, avise a pessoa. ' +
+  'Antes de executar, leia as `requiredRules` do get_card (arquivo em `path`) e as `requiredSkills` (o arquivo em `path` ou, sem `path`, por get_skill), mesmo as fora da sua lista. ' +
   'Toda conversa com a pessoa sobre um card acontece na conversa do card (add_comment, request_review, ask_question); registre ali decisões e resultados. ' +
   'Faltou informação: ask_question. Impedimento que você não resolve: block_card. ' +
-  'Ficou algo dependendo da pessoa (decisão, dado, ponto em aberto que ela precisa avaliar)? Não registre só num comentário: entregue com request_review e `pending`, e o card fica com ela. No modo autônomo nada disso segura o card: decida você, registre e siga. ' +
+  'Algo depende da pessoa (decisão, dado, ponto em aberto)? Entregue com request_review e `pending`. No modo autônomo nada disso segura o card: decida, registre e siga. ' +
   'Pull request: sempre com --base em workspace.prBase do get_card. ' +
   'Uso, tokens e tempo: get_metrics. Regras, skills e agentes: get_harness. Perfil de CLI e modelos: get_models. ' +
-  'O detalhe vem onde você precisa: na descrição de cada ferramenta, nas notas do get_card e na skill faz-ai-fluxo.';
+  'O detalhe vem na descrição de cada ferramenta, nas notas do get_card e nas skills faz-ai-* (get_skill).';
 
 /** Cria um servidor MCP (uma sessão) com as ferramentas do board. */
 export function createMcpServer(opts: McpOptions, sessionToken: () => string | undefined = () => undefined): McpServer {

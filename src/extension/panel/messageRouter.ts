@@ -1,6 +1,7 @@
 import { builtinPolicyCatalog, simulatePolicyScenario, type PolicyLibrary, type PolicyScenario } from '../../shared/policyManagement';
 import { resolveContextDraft, type ContextDraftResolution } from '../../shared/contextDraftResolution';
 import type { ContextActivityTarget } from '../../shared/contextPlanning';
+import type { PolicyAssistInput, PolicyAssistResult } from '../../shared/policyAssistant';
 import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
 import { scanLibraryFolder } from '../libraryImport';
 import { agentOfArtifact } from '../../shared/artifacts';
@@ -37,7 +38,8 @@ import { addAttachment, cardContentHandlers } from './handlers/cardContent';
 import { questionHandlers } from './handlers/questions';
 import { cardHandlers, createCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
-import { initModels, modelHandlers } from './handlers/models';
+import { initModels, modelHandlers, proposeLegacyFallbacks } from './handlers/models';
+import { legacyFallbackNotes } from '../../shared/legacyFallback';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
 import { branchRenameHandlers } from './handlers/branchRename';
 import { aiProfileHandlers, type AiProfileRuntime } from './handlers/aiProfiles';
@@ -162,6 +164,7 @@ const bridgeOnly = {
   'contextPlanning.preview': viaBridge,
   'executionPolicy.read': viaBridge,
   'executionPolicy.simulate': viaBridge,
+  'executionPolicy.assist': viaBridge,
   'backup.export': viaBridge,
   'backup.import.pick': viaBridge,
   'backup.import.cancel': viaBridge,
@@ -191,6 +194,10 @@ export class MessageRouter {
   private listeners = new Set<() => void>();
   private errorListeners = new Set<(message: string) => void>();
   private approveListeners: ((cardId: string) => void)[] = [];
+  private cancelListeners: ((cardIds: string[]) => void)[] = [];
+  /** o que o executor informou (`setAiRuns`) e o que o orquestrador conduz entre as rodadas (`setOrchestrations`) */
+  private runnerRuns: AiActivity[] = [];
+  private orchestrations: AiActivity[] = [];
   private aiRuns: string[] = [];
   private aiActivity: AiActivity[] = [];
   private heartbeatNextAt: number | null = null;
@@ -201,7 +208,7 @@ export class MessageRouter {
   private requirements: BoardRequirement[] = [];
   private requirementsCheckedAt = 0;
   private requirementsCheck: (() => Promise<void>) | null = null;
-  private authExpired: AiTool | null = null;
+  private authExpired: AiTool[] = [];
   private openTerminalHook: ((command: string) => void) | null = null;
   private environment: EnvironmentReport | null = null;
   private environmentFirstRun = false;
@@ -226,6 +233,7 @@ export class MessageRouter {
     initModels(this.ctx);
     // os agentes de fábrica usam as regras de modelo, que initModels acabou de criar
     this.ctx.harness.bootstrap();
+    proposeLegacyFallbacks(this.ctx);
     dbHandle.scheduleSave();
   }
 
@@ -244,7 +252,11 @@ export class MessageRouter {
     return this.aiProfileRuntime.test(id);
   }
   executionPolicyLibrary(): PolicyLibrary {
-    return { snapshot: this.ctx.executionPolicies.snapshot(this.boardId), ...builtinPolicyCatalog(this.snapshot()) };
+    const snapshot = this.ctx.executionPolicies.snapshot(this.boardId);
+    const catalog = builtinPolicyCatalog(this.snapshot());
+    const { modelRules } = this.snapshot().board;
+    const legacy = legacyFallbackNotes(modelRules, snapshot.records, catalog.models);
+    return { snapshot, ...catalog, ...(legacy.length ? { legacy } : {}) };
   }
   executionPolicyHistory(id: string, before = Number.MAX_SAFE_INTEGER) {
     if (!Number.isSafeInteger(before) || before < 1 || typeof id !== 'string' || !id || id.length > 240)
@@ -361,7 +373,12 @@ export class MessageRouter {
     const probe = this.ctx.log.probe(msg);
     const changed = handler(msg, this.ctx, actor);
     if (changed) this.ctx.log.record(msg, actor, probe);
-    return changed ? this.changed() : this.snapshot();
+    const result = changed ? this.changed() : this.snapshot();
+    if (changed && msg.type === 'card.move') {
+      const column = result.columns.find((c) => c.id === msg.columnId);
+      if (column?.category === 'cancelled') this.cancelListeners.forEach((fn) => fn([msg.cardId]));
+    }
+    return result;
   }
 
   /** Como `card.create`, mas devolve o id do card criado. */
@@ -426,13 +443,13 @@ export class MessageRouter {
   }
 
   /**
-   * A ferramenta de IA falhou por login vencido nesta execução (RF6), ou o probe confirmou que voltou;
-   * null quando não há aviso reativo ativo. Devolve se mudou, para quem chama decidir se loga a transição
+   * O perfil de CLI `cli` falhou por login vencido nesta execução (RF6) (`expired`), ou o probe confirmou que voltou;
+   * só o sinal daquele perfil muda. Devolve se mudou, para quem chama decidir se loga a transição
    * (o log não é responsabilidade do `MessageRouter`, como nas outras operações).
    */
-  setAuthExpired(tool: AiTool | null): boolean {
-    if (this.authExpired === tool) return false;
-    this.authExpired = tool;
+  setAuthExpired(cli: AiTool, expired: boolean): boolean {
+    if (this.authExpired.includes(cli) === expired) return false;
+    this.authExpired = expired ? [...this.authExpired, cli] : this.authExpired.filter((c) => c !== cli);
     this.notify();
     return true;
   }
@@ -479,10 +496,31 @@ export class MessageRouter {
 
   /** Execuções de IA em curso, uma por card (informado pelo executor); `aiRuns` é derivado delas. */
   setAiRuns(runs: AiActivity[]): void {
-    this.aiActivity = runs;
-    this.aiRuns = runs.map((r) => r.cardId);
+    this.runnerRuns = runs;
+    this.publishAiRuns();
+  }
+
+  /**
+   * As histórias que o orquestrador conduz agora (informado pelo host): entre uma rodada e outra a
+   * história continua "Em execução", e o `staleRunning` não a libera. A execução de uma unidade já
+   * aparece em `setAiRuns` e prevalece.
+   */
+  setOrchestrations(runs: AiActivity[]): void {
+    this.orchestrations = runs;
+    this.publishAiRuns();
+  }
+
+  private publishAiRuns(): void {
+    const own = new Set(this.runnerRuns.map((r) => r.cardId));
+    this.aiActivity = [...this.runnerRuns, ...this.orchestrations.filter((r) => !own.has(r.cardId))];
+    this.aiRuns = this.aiActivity.map((r) => r.cardId);
     this.ctx.aiRuns = this.aiRuns;
     this.notify();
+  }
+
+  /** Avisa quando cards vão para uma coluna de cancelamento (o orquestrador interrompe as execuções deles). */
+  onCardsCancelled(fn: (cardIds: string[]) => void): void {
+    this.cancelListeners.push(fn);
   }
 
   /** Próxima rodada agendada do heartbeat (informado pelo host); só notifica quando o valor muda. */
@@ -563,6 +601,15 @@ export class MessageRouter {
     this.notify();
   }
 
+  private policyAssistHandler?: (input: PolicyAssistInput) => Promise<PolicyAssistResult>;
+  setPolicyAssistHandler(handler: (input: PolicyAssistInput) => Promise<PolicyAssistResult>): void {
+    this.policyAssistHandler = handler;
+  }
+  /** Devolve só uma proposta: nada aqui salva, liga ou remove política. */
+  assistExecutionPolicy(input: PolicyAssistInput): Promise<PolicyAssistResult> {
+    if (!this.policyAssistHandler) return Promise.reject(new Error('A assistência de IA não está disponível neste board.'));
+    return this.policyAssistHandler(input);
+  }
   private agentAssistHandler?: (input: AgentAssistInput) => Promise<AgentAssistResult>;
   setAgentAssistHandler(handler: (input: AgentAssistInput) => Promise<AgentAssistResult>): void {
     this.agentAssistHandler = handler;

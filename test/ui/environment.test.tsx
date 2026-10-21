@@ -305,7 +305,7 @@ describe('Diagnóstico do ambiente', () => {
 
     useBoardStore.setState({ view: 'board' });
     act(() => {
-      router.setRequirements([{ id: 'node', tool: 'cursor', action: null }]);
+      router.setRequirements([{ id: 'node', tool: 'claude', action: null }]);
       syncStore(router);
     });
     renderThemed(<RequirementsBanner />);
@@ -334,21 +334,27 @@ describe('Diagnóstico do ambiente: definição do harness', () => {
       id: 'harness',
       tool: 'cursor',
       status: 'missing',
-      requirement: { id: 'harness', tool: 'cursor', optional: true, harnessIssues: ['artifacts', 'cursor'], action: { kind: 'settings' } },
+      requirement: {
+        id: 'harness',
+        tool: 'cursor',
+        optional: true,
+        harnessIssues: ['artifacts', 'isolation'],
+        action: { kind: 'settings' },
+      },
       children: [
         { id: 'harness-artifacts', tool: 'cursor', status: 'missing' },
         { id: 'harness-agents', tool: 'cursor', status: 'ok' },
         { id: 'harness-rules', tool: 'cursor', status: 'ok' },
         { id: 'harness-missing', tool: 'cursor', status: 'ok' },
-        { id: 'harness-cursor', tool: 'cursor', status: 'missing' },
+        { id: 'harness-isolation', tool: 'cursor', status: 'missing' },
       ],
     });
     show(r);
     const harness = item('Definição do harness');
     expect(within(harness).getByText('Artefatos no board')).toBeInTheDocument();
-    expect(within(harness).getByText('Artefatos do projeto fora do board')).toBeInTheDocument();
+    expect(within(harness).getByText('Artefatos fora do board que a CLI carrega')).toBeInTheDocument();
     expect(within(harness).getByRole('button', { name: 'Abrir Harness' })).toBeInTheDocument();
-    fireEvent.focus(screen.getByText('Artefatos do projeto fora do board'));
-    expect((await screen.findByRole('tooltip')).textContent).toMatch(/não desliga nada/);
+    fireEvent.focus(screen.getByText('Artefatos fora do board que a CLI carrega'));
+    expect((await screen.findByRole('tooltip')).textContent).toMatch(/não desliga tudo/);
   });
 });

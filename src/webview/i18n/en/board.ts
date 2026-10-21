@@ -114,6 +114,12 @@ export const board: Record<string, string> = {
   'Nome da coluna': 'Column name',
   Arquivados: 'Archived',
   // Aba Arquivados
+  'Buscar nos arquivados': 'Search archived',
+  'Mostrar mais': 'Show more',
+  'Mostrando {shown} de {total}': 'Showing {shown} of {total}',
+  'Nenhum card arquivado atende aos filtros.': 'No archived card matches the filters.',
+  'Nenhuma sub-tarefa arquivada desta história.': 'No archived sub-tasks for this story.',
+  'Sub-tarefas de {card}': 'Sub-tasks of {card}',
   'Nenhum card arquivado neste workflow.': 'No archived cards in this workflow.',
   'Cards arquivados ficam aqui, por workflow, do mais recente ao mais antigo. Restaurar leva o card para a primeira coluna do workflow dele.':
     'Archived cards stay here, by workflow, newest first. Restore sends the card to the first column of its workflow.',
@@ -122,6 +128,17 @@ export const board: Record<string, string> = {
     'Sub-task {sub} belongs to story {story}, which is archived. Restoring brings the story and all its archived sub-tasks back to the Backlog.',
   'Restaurar história': 'Restore story',
   'Restaurar {title}': 'Restore {title}',
+  'Ações em massa': 'Bulk actions',
+  'Selecionar todos os visíveis': 'Select all visible',
+  'Enviar para a lixeira': 'Move to trash',
+  'Restaurar {n} card(s)?': 'Restore {n} card(s)?',
+  'Voltam junto: {along} (sub-tarefas arquivadas das histórias e histórias das sub-tarefas).':
+    'Coming back too: {along} (archived sub-tasks of the stories and stories of the sub-tasks).',
+  'Os cards voltam para a primeira coluna do workflow e saem do modo autônomo.':
+    'The cards return to the first column of their workflow and leave autonomous mode.',
+  'Restaurando {n} card(s)…': 'Restoring {n} card(s)…',
+  'Excluir {n} card(s)?': 'Delete {n} card(s)?',
+  'Excluindo {n} card(s)…': 'Deleting {n} card(s)…',
 
   // Lixeira
   'Esvaziar a lixeira?': 'Empty the trash?',
@@ -178,6 +195,7 @@ export const board: Record<string, string> = {
   'Qualquer data': 'Any date',
   'Criado em': 'Created on',
   'Atualizado em': 'Updated on',
+  'Arquivado em': 'Archived on',
   Período: 'Period',
   Hoje: 'Today',
   'Últimos 7 dias': 'Last 7 days',
@@ -249,8 +267,8 @@ export const board: Record<string, string> = {
   'Parar a IA': 'Stop the AI',
   'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está.':
     'Runs {tool} in the background to do the work the phase asks for.',
-  'Parte de <b>contexto vazio</b>: só entram as rules e skills marcadas no Harness e o agente do card (ou o padrão do board).':
-    "Starts from <b>empty context</b>: only the rules and skills marked in the Harness, and the card's agent (or the board's default), come in.",
+  'Parte <b>só do que está no board</b>: as rules e skills marcadas no Harness e o agente do card (ou o padrão do board). No Claude Code o contexto vazio é imposto; nas outras CLIs, veja o que elas carregam sozinhas em Ferramentas de IA.':
+    "Starts from <b>only what is on the board</b>: the rules and skills marked in the Harness and the card's agent (or the board's default). In Claude Code the empty context is enforced; for other CLIs, see what they load on their own in Ferramentas de IA.",
   'Ao terminar, passa a vez — pede revisão, pergunta ou move o card — sem acompanhamento ao vivo; a resposta chega na conversa.':
     "When it's done, it hands off — asks for review, asks a question, or moves the card — with no live follow-along; the reply shows up in the conversation.",
   'O consumo fica registrado em Métricas.': 'Usage is logged in Metrics.',
@@ -376,6 +394,12 @@ export const board: Record<string, string> = {
     'Position {n} in the autonomous-mode queue: the AI takes this story after the ones before it, respecting dependencies.',
   'Selecionar todos de {name}': 'Select all in {name}',
   'Desmarcar todos de {name}': 'Deselect all in {name}',
+  'Selecionar todas as linhas': 'Select all rows',
+  'Desmarcar todas as linhas': 'Deselect all rows',
+  'Apagar {n} card(s) definitivamente?': 'Delete {n} card(s) for good?',
+  'Comentários, anexos e sub-tarefas destes cards também serão apagados. Não dá para desfazer.':
+    'Comments, attachments and sub-tasks of these cards will also be deleted. This cannot be undone.',
+  'Apagando {n} card(s)…': 'Deleting {n} card(s)…',
   'Ver todos os cards': 'See all cards',
   'Ver {n} com você': 'See {n} with you',
   'Abrir chat': 'Open chat',

@@ -629,6 +629,7 @@ describe('branch e worktree por história', () => {
         origin: 'manual' as const,
         phase: 'Implementação',
         model: null,
+        tool: 'claude',
         startedAt: 0,
       },
     ];

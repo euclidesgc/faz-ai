@@ -7,8 +7,10 @@ import { spawn } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { openInMemory } from '../src/extension/db/database';
-import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
+import { FLOW_NOTE, SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 import { FLOW_SKILLS } from '../src/extension/flowSkill';
+import { FLOW_TEXT } from './flowSkillText';
+import { skillTemplate } from '../src/extension/harness';
 import { createMcpServer, MCP_INSTRUCTIONS, startMcpServer } from '../src/extension/mcp/server';
 import { boardServerFootprint } from '../src/extension/mcp/footprint';
 import { toolDefinitions } from '../src/extension/mcp/tools';
@@ -22,7 +24,8 @@ const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 // (https://code.claude.com/docs/en/mcp, "Tool search for MCP server authors", lida em 2026-10-13): o resto a IA não lê.
 const CLAUDE_CODE_CUT = 2048;
 // teto das notas fixas do get_card de uma história autônoma com rodadas (#588): eram 2.515 caracteres numa história de teste, de 4.573 no total
-const MAX_NOTES = 1500;
+// (1.700 desde o flowNote do #645, ~90 caracteres, e a frase de `via: "get_skill"` no requiredSkillsNote)
+const MAX_NOTES = 1700;
 
 let dir: string;
 let router: MessageRouter;
@@ -129,7 +132,6 @@ describe('servidor MCP', () => {
       'request_review e PARE',
       '"approved"',
       '`model`',
-      'subagente',
       '`requiredRules`',
       '`requiredSkills`',
       'request_review e `pending`',
@@ -139,6 +141,59 @@ describe('servidor MCP', () => {
       .filter((t) => (t.description ?? '').length > CLAUDE_CODE_CUT)
       .map((t) => `${t.name} (${t.description!.length})`);
     expect(tooLong).toEqual([]);
+  });
+
+  it('as instruções abrem pelo fluxo servido pelo get_skill e dizem como ler as requiredSkills sem path', () => {
+    expect(MCP_INSTRUCTIONS.length).toBeLessThanOrEqual(CLAUDE_CODE_CUT);
+    expect(MCP_INSTRUCTIONS).toContain('Antes de trabalhar nele, leia o fluxo com get_skill faz-ai-fluxo e siga-o.');
+    expect(MCP_INSTRUCTIONS).toContain('sem `path`, por get_skill');
+  });
+
+  it('get_pending_work e get_card trazem o flowNote numa linha, e o requiredSkills do fluxo vem sem path', async () => {
+    for (const data of [(await call('get_pending_work')).data, (await call('create_card', { title: 'História' })).data]) {
+      expect(data.flowNote).toBe(FLOW_NOTE);
+      expect(data.flowNote).toContain('get_skill');
+      expect(data.flowNote).toContain('faz-ai-fluxo');
+      expect(data.flowNote).not.toContain('\n');
+    }
+    // uma cópia instalada na pasta da ferramenta é ignorada: a skill do fluxo vem sempre pelo get_skill
+    const installed = path.join(dir, '.claude', 'skills', 'faz-ai-fluxo');
+    fs.mkdirSync(installed, { recursive: true });
+    fs.writeFileSync(path.join(installed, 'SKILL.md'), '---\nname: faz-ai-fluxo\ndescription: cópia\n---\ntexto');
+    router.refreshHarness();
+    await call('create_skill', { name: 'testar', description: 'Use ao testar', content: 'passos' });
+    await call('create_agent', { name: 'condutor', description: 'Conduz', content: 'Instruções', skills: ['faz-ai-fluxo', 'testar'] });
+    router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'condutor' } } });
+    const card = (await call('get_card', { card: 1 })).data;
+    expect(card.requiredSkills[0]).toEqual({ name: 'faz-ai-fluxo', scope: 'board', via: 'get_skill' });
+    expect(card.requiredSkillsNote).toContain('sem `path` (`via: "get_skill"`), leia com get_skill');
+    // a skill comum mantém o caminho
+    expect(card.requiredSkills[1]).toMatchObject({ name: 'testar' });
+    expect(card.requiredSkills[1].path).toBeDefined();
+    expect(card.requiredSkills[1].via).toBeUndefined();
+  });
+
+  it('nenhum texto que a IA lê cita ferramenta de IA nem a pasta dela', async () => {
+    const tools = (await client.listTools()).tools;
+    const texts: string[] = [MCP_INSTRUCTIONS, FLOW_TEXT];
+    for (const t of tools) {
+      texts.push(t.description ?? '');
+      for (const prop of Object.values((t.inputSchema.properties ?? {}) as Record<string, { description?: string }>))
+        texts.push(prop.description ?? '');
+    }
+    const notes = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value.flatMap(notes)
+        : value && typeof value === 'object'
+          ? Object.entries(value).flatMap(([k, v]) => (/note$/i.test(k) && typeof v === 'string' ? [v] : notes(v)))
+          : [];
+    await call('create_agent', { name: 'condutor', description: 'Conduz', content: 'Instruções', skills: ['faz-ai-fluxo'] });
+    router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'condutor' } } });
+    const card = (await call('create_card', { title: 'História' })).data;
+    texts.push(...notes(card), ...notes((await call('get_card', { card: 1 })).data), ...notes((await call('get_pending_work')).data));
+    expect(texts.length).toBeGreaterThan(20);
+    const found = texts.filter((x) => /Claude Code|Cursor|Kimi|\.claude\/|\.cursor\/|\.kimi-code\/|Agent tool/.test(x));
+    expect(found).toEqual([]);
   });
 
   it('o que não cabe nas instruções está na descrição da ferramenta em que a IA precisa dele', async () => {
@@ -429,7 +484,10 @@ describe('perfis de execução', () => {
       mcpServers: ['faz-ai', 'github'],
       deniedTools: ['WebFetch'],
     });
-    expect(card.execution.enforcedByBoardRun).toEqual(['agent', 'mcp', 'tools', 'model', 'context']);
+    expect(card.execution.enforcedByBoardRun).toEqual(['agent', 'mcp', 'tools', 'model']);
+    // lista vazia de itens conhecidos não é prova de contexto vazio
+    expect(card.execution.cliLoads).toMatchObject({ contextEnforced: false, loads: [] });
+    expect(card.execution.cliLoads.summary).toContain('sem prova de isolamento');
     expect(card.requiredSkills.map((k: any) => k.name)).toEqual(['planejar', 'testar']);
     await call('create_card', { title: 'Sub', type: 'Sub-tarefa', parent: 1 });
     expect((await call('get_card', { card: 2 })).data.execution.profile).toBe('planejador');
@@ -645,6 +703,16 @@ describe('modelos de IA', () => {
     expect((await call('detect_models', { tool: enabled.id })).text).toContain('Perfil personalizado: catálogo cadastrado à mão.');
   });
 
+  it('get_execution_policies só consulta: lista as políticas salvas, sem escrita nem segredos', async () => {
+    const listed = (await client.listTools()).tools.find((t) => t.name === 'get_execution_policies')!;
+    expect(listed.annotations?.readOnlyHint).toBe(true);
+    const result = await call('get_execution_policies');
+    console.log(result.text);
+    expect(result.error).toBe(false);
+    expect(result.data.policies).toEqual([]);
+    expect((await client.listTools()).tools.some((t) => /^(save|set|activate|delete)_.*polic/.test(t.name))).toBe(false);
+  });
+
   it('cópia usa o catálogo da origem e descrições de perfil não citam pastas de ferramenta', async () => {
     const copy = new AiProfileRepo(profileDb).save(
       router.snapshot().board.id,
@@ -664,6 +732,40 @@ describe('modelos de IA', () => {
       kind: 'copy',
       measures: 'cost',
     });
+  });
+
+  it('get_card traz o alvo da execução: perfil de CLI do modelo, de onde veio e o que o board impõe nele (#703)', async () => {
+    // padrão Claude: um card com modelo do Cursor executa no Cursor
+    await call('set_ai_tool', { tool: 'cursor' }); // traz o catálogo do Cursor
+    await call('set_ai_tool', { tool: 'claude' });
+    const cursor = (await call('create_card', { title: 'No Cursor', fields: { Modelo: 'cursor:composer-2.5' } })).data;
+    const card = (await call('get_card', { card: cursor.id })).data;
+    expect(card.model).toMatchObject({ tool: 'cursor', model: 'composer-2.5', from: 'card', value: 'cursor:composer-2.5' });
+    expect(card.model.note).toContain('Você não troca de CLI');
+
+    // sem modelo em nenhum nível vale o perfil padrão: não há bloco model
+    const plain = (await call('create_card', { title: 'Sem modelo' })).data;
+    expect((await call('get_card', { card: plain.id })).data.model).toBeUndefined();
+
+    // sem Modelo no card, o agente com modelo decide: from = agent, e o enforcedByBoardRun é o do perfil dele
+    await call('create_agent', { name: 'no-cursor', description: 'Roda no Cursor', content: 'Instruções', model: 'cursor:composer-2.5' });
+    await call('update_column', { column: 'Backlog', exec_profile: 'no-cursor' });
+    const viaAgent = (await call('create_card', { title: 'Pelo agente' })).data;
+    const agentCard = (await call('get_card', { card: viaAgent.id })).data;
+    expect(agentCard.model).toMatchObject({ tool: 'cursor', from: 'agent' });
+    expect(agentCard.execution.enforcedByBoardRun).toEqual(['model']);
+  });
+
+  it('as descrições de get_models e set_ai_tool e as instruções falam de perfil de CLI, não de "ferramenta do board" (#703)', async () => {
+    const listed = (await client.listTools()).tools;
+    const description = (name: string) => listed.find((x) => x.name === name)!.description!;
+    expect(description('get_models')).toContain('escolhe o perfil de CLI que executa');
+    expect(description('get_models')).toContain('vale o perfil padrão');
+    expect(description('set_ai_tool')).toContain('nem o card, nem o agente, nem as regras indicam um modelo');
+    for (const text of [description('get_models'), description('set_ai_tool'), MCP_INSTRUCTIONS])
+      expect(text).not.toMatch(/ferramenta do board/i);
+    expect(MCP_INSTRUCTIONS).toContain('o perfil de CLI da execução');
+    expect(MCP_INSTRUCTIONS.length).toBeLessThanOrEqual(CLAUDE_CODE_CUT);
   });
 
   it('monta o catálogo por ferramenta e interpreta modelo + esforço', async () => {
@@ -691,7 +793,15 @@ describe('modelos de IA', () => {
     await call('set_ai_tool', { tool: 'cursor' });
     const cursor = (await call('get_models')).data;
     expect(cursor.catalog.some((o: any) => o.tool === 'cursor')).toBe(true);
-    expect(cursor.rules.map((r: any) => r.value)).toEqual(['cursor:auto', 'cursor:auto', 'cursor:auto']);
+    // as faixas de esforço de outro perfil (Claude) ficam; as do perfil sugerido (Cursor) entram
+    expect(cursor.rules.map((r: any) => r.value)).toEqual([
+      'claude:haiku',
+      'claude:sonnet@medium',
+      'claude:opus@high',
+      'cursor:auto',
+      'cursor:auto',
+      'cursor:auto',
+    ]);
     expect((await set('cursor:composer-2.5')).data.model).toMatchObject({ tool: 'cursor', model: 'composer-2.5' });
     await call('set_ai_tool', { tool: 'claude' });
     expect((await set('opus turbo')).text).toContain('não aceita o esforço');
@@ -727,7 +837,7 @@ describe('modelos de IA', () => {
     const card = (await call('create_card', { title: 'H', fields: { Esforço: 'Baixo' } })).data;
     expect(card.model.value).toBe('claude:haiku');
     // a nota diz o que fazer com o modelo e separa o esforço do modelo do "Esforço da atividade"
-    expect(card.model.note).toMatch(/delegue o trabalho a um subagente[\s\S]*avise a pessoa/);
+    expect(card.model.note).toMatch(/Execute com este modelo e esforço[\s\S]*avise a pessoa/);
     expect(card.model.note).toContain('"Esforço da atividade" é o tamanho da tarefa');
     // o modelo veio da sugestão, então acompanha a mudança de esforço
     expect((await call('update_card', { card: 1, fields: { Esforço: 'Alto' } })).data.model.value).toBe('claude:opus@high');
@@ -748,7 +858,9 @@ describe('modelos de IA', () => {
       'claude:haiku',
     );
     const cursor = (await call('suggest_model_rules', { tool: 'cursor' })).data.rules;
+    // a faixa de esforço do Claude (outro perfil) é preservada, as do Cursor são substituídas
     expect(cursor.filter((r: any) => r.when.startsWith('Esforço')).map((r: any) => r.value)).toEqual([
+      'claude:opus@max',
       'cursor:auto',
       'cursor:auto',
       'cursor:auto',
@@ -849,35 +961,27 @@ describe('regras de modelo com E e OU', () => {
     );
   });
 
-  it('aceita um modelo reserva por regra; sem reserva fica igual a antes da história', async () => {
+  it('recusa a reserva por regra (agora é política de execução) e não altera as regras salvas', async () => {
+    await call('set_model_rules', { rules: [{ name: 'Antes', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku' }] });
     const res = await call('set_model_rules', {
-      rules: [
-        { name: 'Com reserva', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku', fallback: 'opus high' },
-        { name: 'Sem reserva', when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'opus low' },
-      ],
+      rules: [{ name: 'Com reserva', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku', fallback: 'opus high' }],
     });
-    expect(res.data.rules[0]).toMatchObject({
-      name: 'Com reserva',
-      value: 'claude:haiku',
-      fallbackSuggest: expect.stringContaining('Opus'),
-      fallbackValue: 'claude:opus@high',
+    expect(res.error).toBe(true);
+    expect(res.text).toContain('políticas de execução');
+    expect(router.snapshot().board.modelRules.map((r) => r.name)).toEqual(['Antes']);
+    expect(router.executionPolicyLibrary().snapshot.records).toEqual([]);
+    const ok = await call('set_model_rules', {
+      rules: [{ name: 'Sem reserva', when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'opus low' }],
     });
-    expect(res.data.rules[1]).not.toHaveProperty('fallbackValue');
-    expect(res.data.rules[1]).not.toHaveProperty('fallbackSuggest');
-
-    const rules = router.snapshot().board.modelRules;
-    expect(rules[0]?.fallback).toBe('claude:opus@high');
-    expect(rules[1]?.fallback).toBe(null);
-
-    const fromGet = (await call('get_models')).data.rules;
-    expect(fromGet[0]).toMatchObject({ fallbackValue: 'claude:opus@high' });
-    expect(fromGet[1]).not.toHaveProperty('fallbackValue');
+    expect(ok.data.rules[0]).not.toHaveProperty('fallbackValue');
+    expect(router.snapshot().board.modelRules[0]?.fallback).toBe(null);
   });
 
   it('com o preenchimento automático desligado, só sugere', async () => {
     await call('update_rules', { autoApplyModelSuggestion: false });
     const card = (await call('create_card', { title: 'x', fields: { Esforço: 'Alto' } })).data;
-    expect(card.model).toBeUndefined();
+    // a regra vale na execução mesmo sem aplicar a sugestão (alvo do runner): o bloco traz from = rule
+    expect(card.model).toMatchObject({ tool: 'claude', from: 'rule', value: 'claude:opus@high' });
     expect(card.suggestedModel.value).toBe('claude:opus@high');
   });
 
@@ -1239,6 +1343,32 @@ describe('status do card e checkpoint de revisão', () => {
     // só com replace a versão da pessoa é trocada
     expect((await call('install_flow_skill', { replace: true })).data).toMatchObject({ note: 'Skill substituída.' });
     expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
+  });
+
+  it('get_skill serve o fluxo e as skills por assunto do próprio board, sem arquivo instalado', async () => {
+    for (const k of FLOW_SKILLS) {
+      expect((await call('get_skill', { skill: k.name })).text).toBe(skillTemplate(k.name, k.description, k.body));
+    }
+    expect(fs.existsSync(path.join(dir, 'home-do-usuario', '.claude', 'skills'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, '.claude', 'skills'))).toBe(false);
+  });
+
+  it('get_skill devolve o texto do board mesmo com uma faz-ai-fluxo diferente na pasta de skills do projeto', async () => {
+    const dirOf = path.join(dir, '.claude', 'skills', 'faz-ai-fluxo');
+    fs.mkdirSync(dirOf, { recursive: true });
+    fs.writeFileSync(path.join(dirOf, 'SKILL.md'), '---\nname: faz-ai-fluxo\ndescription: do projeto\n---\ntexto do projeto');
+    router.refreshHarness();
+    const text = (await call('get_skill', { skill: 'faz-ai-fluxo' })).text;
+    expect(text).toContain('get_pending_work');
+    expect(text).not.toContain('texto do projeto');
+  });
+
+  it('get_skill lê do arquivo a skill comum e não trata faz-ai-deploy, do projeto, como do fluxo', async () => {
+    await call('create_skill', { name: 'faz-ai-deploy', description: 'Use ao publicar', content: 'passos do deploy' });
+    const text = (await call('get_skill', { skill: 'faz-ai-deploy' })).text;
+    expect(text).toContain('name: faz-ai-deploy');
+    expect(text).toContain('passos do deploy');
+    expect((await call('get_skill', { skill: 'nao-existe' })).error).toBe(true);
   });
 
   it('a skill do fluxo que já estava no disco, sem marcação, fica marcada em todo contexto ao "instalar" de novo', async () => {
@@ -1613,6 +1743,19 @@ describe('vínculos entre cards', () => {
     expect((await call('unlink_cards', { card: filho.id, other: pai.id })).error).toBe(false);
     expect(router.snapshot().links).toHaveLength(1);
     expect((await call('unlink_cards', { card: filho.id, other: pai.id })).error).toBe(true);
+  });
+
+  it('numa fase de código o get_card mostra o que o board executa (byBoard) e a nota manda criar as sub-tarefas e parar', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const base = (await call('create_card', { title: 'Base', parent: story.id })).data;
+    const tela = (await call('create_card', { title: 'Tela', parent: story.id })).data;
+    const api = (await call('create_card', { title: 'API', parent: story.id, depends_on: [base.id] })).data;
+    await call('move_card', { card: story.id, column: 'Implementação' });
+    for (const k of [base, tela, api]) await call('update_card', { card: k.id, fields: { Fase: 'Implementação' } });
+    const got = (await call('get_card', { card: story.id })).data;
+    expect(got.subtasksNow).toEqual({ byBoard: [base.id, tela.id], waiting: [api.id] });
+    expect(got.subtasksNowNote).toMatch(/nem por subagente/);
+    expect(got.subtasksNowNote).toMatch(/crie-as e pare/);
   });
 
   it('dependência entre sub-tarefas: depends_on, rodadas em subtasksNow e start_work recusando a que espera', async () => {

@@ -11,7 +11,6 @@ export const settings: Record<string, string> = {
   'Novo perfil': 'New profile',
   'Os perfis de CLI são dados do board. Configuração não comprova isolamento, permissões ou acesso ao MCP.':
     'CLI profiles are board data. Configuration does not prove isolation, permissions, or MCP access.',
-  'Abre as políticas de execução e fallback no Harness.': 'Opens execution and fallback policies in Harness.',
   'Perfil padrão': 'Default profile',
   'Perfil pronto': 'Builtin profile',
   Personalizado: 'Custom',
@@ -378,10 +377,6 @@ export const settings: Record<string, string> = {
   Editar: 'Edit',
   'Remover da lista': 'Remove from the list',
   'Nenhuma regra na lista: o board não sugere modelo.': 'No rules in the list: the board does not suggest a model.',
-  'Reserva (opcional)': 'Fallback (optional)',
-  'Sem reserva: se o modelo principal esgotar o limite, a execução não é repetida.':
-    'No fallback: if the main model hits the usage limit, the run is not retried.',
-  'reserva: {model}': 'fallback: {model}',
   'Campos personalizados': 'Custom fields',
   'Novo campo': 'New field',
   'Campos guardam informações extras do card, como prazo, pontos ou cliente. Todos aparecem no card aberto; em "No board" você escolhe se e como cada um aparece também no card do board.':
@@ -613,4 +608,9 @@ export const settings: Record<string, string> = {
   'Desfazer volta o nome para {from} sem tocar o repositório.': 'Undo puts the name back to {from} without touching the repository.',
   Desfazer: 'Undo',
   'Renomear de novo': 'Rename again',
+  'O que a CLI carrega por conta própria': 'What the CLI loads on its own',
+  'Argumentos de isolamento: {args}': 'Isolation arguments: {args}',
+  'Conferido na documentação em {date} · versão {version}': 'Checked against the documentation on {date} · version {version}',
+  'Marque o que a CLI lê sozinha mesmo com os argumentos acima. Sem nada marcado, o board não conhece itens carregados, mas isso não prova contexto vazio: só a verificação do host prova.':
+    "Mark what the CLI reads on its own even with the arguments above. With nothing marked, the board knows of no loaded items, but that does not prove an empty context: only the host's verification does.",
 };

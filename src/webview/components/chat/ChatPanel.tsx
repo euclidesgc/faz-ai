@@ -1,4 +1,5 @@
 import { toolInfo, activeProfile } from '../../../shared/aiProfiles';
+import { cliOfValue } from '../../../shared/runTarget';
 import { useEffect, useRef, useState } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import { t } from '../../i18n';
@@ -26,7 +27,8 @@ export function ChatPanel() {
   const [text, setText] = useState('');
   const log = useRef<HTMLDivElement>(null);
   const { messages, busy } = state.chat;
-  const tool = toolInfo(activeProfile(state.board));
+  // o rótulo é o do perfil do modelo escolhido, ou o do perfil padrão sem escolha
+  const tool = toolInfo(cliOfValue(state.board, model) ?? activeProfile(state.board));
 
   // acompanha a conversa: a mensagem nova fica à vista
   useEffect(() => {

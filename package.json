@@ -288,11 +288,20 @@
             "order": 12,
             "markdownDescription": "%config.git.parallelStories%"
           },
+          "fazai.git.parallelSubtasks": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6,
+            "default": 2,
+            "scope": "resource",
+            "order": 13,
+            "markdownDescription": "%config.git.parallelSubtasks%"
+          },
           "fazai.git.autoMerge": {
             "type": "boolean",
             "default": false,
             "scope": "resource",
-            "order": 13,
+            "order": 14,
             "markdownDescription": "%config.git.autoMerge%"
           },
           "fazai.git.mergeMethod": {
@@ -309,14 +318,14 @@
             ],
             "default": "squash",
             "scope": "resource",
-            "order": 14,
+            "order": 15,
             "markdownDescription": "%config.git.mergeMethod%"
           },
           "fazai.git.decisionRecords": {
             "type": "string",
             "default": "",
             "scope": "resource",
-            "order": 15,
+            "order": 16,
             "markdownDescription": "%config.git.decisionRecords%"
           }
         }

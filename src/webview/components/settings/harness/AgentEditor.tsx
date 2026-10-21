@@ -4,7 +4,8 @@ import { Badge, Button, Checkbox, TextArea, TextField } from '@radix-ui/themes';
 import { agentContextOf } from '../../../../shared/executionContext';
 import { ExecutionContext } from '../../card/ExecutionContext';
 import { AGENT_FORMAT } from '../../../../shared/agentTools';
-import { EXEC_ENFORCEMENT, TOOL_PRESETS, type ExecAspect } from '../../../../shared/execution';
+import { activeProfile } from '../../../../shared/aiProfiles';
+import { enforcementOf, TOOL_PRESETS, type ExecAspect } from '../../../../shared/execution';
 import { selectedMcpNames } from '../../../../shared/harnessSelection';
 import type { Agent } from '../../../../shared/harness';
 import type { AiToolInfo } from '../../../../shared/harnessProject';
@@ -21,14 +22,7 @@ import { t } from '../../../i18n';
 export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: AiToolInfo; onClose: () => void }) {
   const state = useBoardStore((s) => s.state)!;
   const [body, setBody] = useState(a.body);
-  const how = baseValue(EXEC_ENFORCEMENT, tool.id) ?? {
-    agent: 'advised',
-    skills: 'advised',
-    mcp: 'advised',
-    tools: 'advised',
-    model: 'advised',
-    context: 'advised',
-  };
+  const how = enforcementOf(activeProfile({ aiTool: tool.id, aiProfiles: state.board.aiProfiles }));
   const servers = [
     ...new Set(
       (state.harness.inventory.find((x) => x.tool === tool.id)?.items ?? [])

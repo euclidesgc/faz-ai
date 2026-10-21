@@ -1,9 +1,11 @@
 import { catalogTool } from '../../../shared/aiProfiles';
 import { isAiBase } from '../../../shared/harness';
+import { legacyFallbackProposals } from '../../../shared/legacyFallback';
 import { builtinPolicyCatalog } from '../../../shared/policyManagement';
 import type { AiTool } from '../../../shared/harness';
 import type { FieldDef } from '../../../shared/model';
 import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelOption, type ModelRule } from '../../../shared/models';
+import { cliOfValue } from '../../../shared/runTarget';
 import { valueOf } from '../../../shared/selectors';
 import { newId } from '../../db/ids';
 import { detectTools, effortTiers, fastBaseId, isFastVariant, modelsFor } from '../../models';
@@ -117,10 +119,16 @@ function suggestRules(ctx: BoardContext, tool: AiTool): void {
     groups: [[{ fieldId: field.id, op: 'is', value }]],
     model,
   }));
-  // sai o que era só "Esforço = X"; regras montadas pela pessoa ficam, e na frente (a primeira que casa vence)
+  // sai só o que era "Esforço = X" e aponta para o catálogo desta ferramenta (ou para perfil que não resolve);
+  // regras montadas pela pessoa e faixas de outro perfil ficam, e na frente (a primeira que casa vence)
   const onlyEffort = (r: ModelRule) =>
     r.groups.length === 1 && r.groups[0]!.length === 1 && r.groups[0]![0]!.fieldId === field.id && r.groups[0]![0]!.op === 'is';
-  ctx.boards.setModelRules(ctx.boardId, [...s.board.modelRules.filter((r) => !onlyEffort(r)), ...tiers]);
+  const ofOtherProfile = (r: ModelRule) => {
+    const cli = cliOfValue(s.board, r.model);
+    return !!cli && catalogTool(cli) !== tool;
+  };
+  const keep = (r: ModelRule) => !onlyEffort(r) || ofOtherProfile(r);
+  ctx.boards.setModelRules(ctx.boardId, [...s.board.modelRules.filter(keep), ...tiers]);
 }
 
 /** Campo de modelo do card e o que as regras sugerem para ele agora. */
@@ -142,6 +150,16 @@ export function applySuggestion(ctx: BoardContext, cardId: string, previous: str
   const current = valueOf(s, cardId, field.id);
   const next = suggestModel(s, card);
   if ((current === null || current === previous) && next !== current) ctx.cards.setFieldValue(cardId, field.id, next);
+}
+
+/**
+ * A reserva (`fallback`) das regras de modelo não decide mais nada na execução: vira proposta de política
+ * desligada e pendente de revisão. Roda ao abrir o board, ao salvar regras e após importar; não repete.
+ */
+export function proposeLegacyFallbacks(ctx: BoardContext): void {
+  const { board } = ctx.state();
+  const proposals = legacyFallbackProposals(board.modelRules, board.modelCatalog);
+  if (proposals.length) ctx.executionPolicies.proposeMigrated(ctx.boardId, proposals);
 }
 
 /** Catálogo de modelos e regras de sugestão. */
@@ -168,6 +186,7 @@ export const modelHandlers = {
   },
   'settings.modelRules.set': (msg, ctx) => {
     ctx.boards.setModelRules(ctx.boardId, msg.rules);
+    proposeLegacyFallbacks(ctx);
     return true;
   },
   'settings.modelRules.suggest': (msg, ctx) => {

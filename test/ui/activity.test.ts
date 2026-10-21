@@ -18,6 +18,7 @@ const activity = (over: Partial<AiActivity> = {}): AiActivity => ({
   origin: 'manual',
   phase: 'Discovery',
   model: null,
+  tool: 'claude',
   startedAt: NOW,
   ...over,
 });

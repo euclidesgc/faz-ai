@@ -149,6 +149,17 @@ function requestRemoval(kind: keyof typeof REMOVALS, cardId: Id, after?: () => v
   });
 }
 
+/**
+ * Duplica o card pelo menu do drawer. O título da cópia sai daqui porque o host não conhece o idioma da pessoa.
+ * Sem confirmação: a cópia nasce na primeira coluna e o drawer continua no original (desfazer é mandar a cópia para a lixeira).
+ */
+export function requestDuplicate(cardId: Id, after?: () => void): void {
+  const card = useBoardStore.getState().state!.cards.find((c) => c.id === cardId);
+  if (!card) return;
+  void cards.duplicate(cardId, t('Cópia de {title}', { title: card.title }));
+  after?.();
+}
+
 /** Manda para a lixeira; avisa antes quando o card leva sub-tarefas ou anexos junto. */
 export const requestTrash = (cardId: Id, after?: () => void): void => requestRemoval('trash', cardId, after);
 
@@ -212,6 +223,79 @@ export function requestTrashMany(histories: Card[], after?: () => void): void {
       void withBulkStatus(
         t('Excluindo {n} história(s)…', { n: histories.length }),
         () => cards.trashMany(histories.map((c) => c.id)),
+        after,
+      ),
+  });
+}
+
+/** Restaura o lote da lixeira, sem confirmação (nada se perde). */
+export function requestRestoreMany(roots: Card[], after?: () => void): void {
+  void withBulkStatus(t('Restaurando {n} card(s)…', { n: roots.length }), () => cards.restoreMany(roots.map((c) => c.id)), after);
+}
+
+/** Apaga o lote da lixeira de vez; a confirmação é daqui (o host não pergunta). */
+export function requestDeletePermanentMany(roots: Card[], after?: () => void): void {
+  const { ask } = useBoardStore.getState();
+  ask({
+    title: t('Apagar {n} card(s) definitivamente?', { n: roots.length }),
+    message: t('Comentários, anexos e sub-tarefas destes cards também serão apagados. Não dá para desfazer.'),
+    confirmLabel: t('Apagar de vez'),
+    danger: true,
+    onConfirm: () =>
+      void withBulkStatus(t('Apagando {n} card(s)…', { n: roots.length }), () => cards.deletePermanentMany(roots.map((c) => c.id)), after),
+  });
+}
+
+/** Frase "N card(s)" dos que acompanham o lote arquivado, ou '' se ninguém vai junto. */
+function archivedAlong(selected: Card[], reach: (card: Card, all: Card[]) => Card[]): string {
+  const { state } = useBoardStore.getState();
+  const all = state!.cards.filter((c) => c.archivedAt !== null && c.deletedAt === null);
+  const ids = new Set(selected.map((c) => c.id));
+  const along = new Set<Id>();
+  for (const card of selected) for (const other of reach(card, all)) if (!ids.has(other.id)) along.add(other.id);
+  return along.size ? tn(along.size, '{n} card', '{n} cards') : '';
+}
+
+/** Restaurar traz a história inteira (com as sub-tarefas arquivadas) quando o card é uma delas ou tem uma. */
+const restoreReach = (card: Card, all: Card[]): Card[] => {
+  const story = card.parentId ? all.find((c) => c.id === card.parentId) : card;
+  return story ? [story, ...all.filter((c) => c.parentId === story.id)] : [];
+};
+
+/** Restaura o lote arquivado; sempre confirma, dizendo quantos cards voltam e o que vem junto. */
+export function requestUnarchiveMany(selected: Card[], after?: () => void): void {
+  const { ask } = useBoardStore.getState();
+  const along = archivedAlong(selected, restoreReach);
+  ask({
+    title: t('Restaurar {n} card(s)?', { n: selected.length }),
+    message:
+      (along ? t('Voltam junto: {along} (sub-tarefas arquivadas das histórias e histórias das sub-tarefas).', { along }) + ' ' : '') +
+      t('Os cards voltam para a primeira coluna do workflow e saem do modo autônomo.'),
+    cancelLabel: t('Voltar'),
+    confirmLabel: t('Restaurar'),
+    onConfirm: () =>
+      void withBulkStatus(
+        t('Restaurando {n} card(s)…', { n: selected.length }),
+        () => cards.unarchiveMany(selected.map((c) => c.id)),
+        after,
+      ),
+  });
+}
+
+/** Manda o lote arquivado para a lixeira; sempre confirma. A história leva junto as sub-tarefas arquivadas. */
+export function requestTrashArchivedMany(selected: Card[], after?: () => void): void {
+  const { ask } = useBoardStore.getState();
+  const along = archivedAlong(selected, (card, all) => all.filter((c) => c.parentId === card.id));
+  ask({
+    title: t('Excluir {n} card(s)?', { n: selected.length }),
+    message: (along ? t('Vão para a lixeira junto: {along}.', { along }) + ' ' : '') + t('Dá para restaurar pela aba Lixeira.'),
+    cancelLabel: t('Voltar'),
+    confirmLabel: t('Excluir'),
+    danger: true,
+    onConfirm: () =>
+      void withBulkStatus(
+        t('Excluindo {n} card(s)…', { n: selected.length }),
+        () => cards.trashArchivedMany(selected.map((c) => c.id)),
         after,
       ),
   });

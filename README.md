@@ -62,8 +62,7 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
    Cada pasta tem o seu board, já com as fases do fluxo.
 2. **Conecte a IA ao board.** Em **Configurações → Harness**, escolha a ferramenta do projeto
    (Claude Code, Cursor ou Kimi Code). Na aba **Projeto**, clique em **Instalar (padrão da ferramenta)** no
-   grupo **Servidores MCP** e de novo no grupo **Skills**, para a skill do fluxo, que ensina a IA a
-   conduzir as fases.
+   grupo **Servidores MCP**. O fluxo do board chega à IA pelo próprio MCP, sem instalar skill.
 3. **Crie a tarefa.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título (por
    exemplo, "Login com Google") e dê Enter. Duplo clique abre o card: descreva o que você quer, em
    Markdown, e, se quiser, escolha o modelo da IA e as skills que ela deve ler.
@@ -77,7 +76,9 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
 5. **Revise e siga.** Leia o documento da fase, responda ou clique em **Aprovar** (ou **Pedir
    ajustes**). Com a aprovação, a história avança na hora para **PRD**, **Spec**, **Plan** e
    **Implementação**, sempre com a IA produzindo e você aprovando. As sub-tarefas da implementação
-   nascem no workflow de baixo e a IA as conclui uma a uma.
+   nascem no workflow de baixo e o **board** as executa, uma a uma, cada uma numa execução própria
+   da CLI (com o agente, o modelo e as skills do card dela); a sessão da história só as cria e,
+   no fim, o board a chama uma vez para verificar o conjunto, fazer o commit e mover a história.
 
 Para o dia a dia: o contador **N com você** no topo mostra o que espera por você, o **Chat** deixa
 você pedir à IA, em linguagem natural, para criar e mover cards, e o **heartbeat** pode chamar a IA
@@ -91,9 +92,9 @@ necessário, na hora certa:
 - **Cada card é uma sessão nova e curta.** Em vez de uma conversa longa que acumula tudo, a IA abre o
   card pelo board (`get_card`), faz aquele trabalho e para. O histórico fica no card, e não na janela
   de contexto.
-- **Contexto vazio por padrão.** Toda execução pelo board começa sem nenhuma regra, skill, agente,
-  hook ou plugin da sua máquina ou do projeto: só entra o que você marcou em **Harness**. No
-  Claude Code isso é imposto por parâmetro (`--setting-sources ""`, `--disable-slash-commands` e um
+- **Contexto controlado por padrão.** Toda execução pelo board começa sem regras, skills, agentes,
+  hooks ou plugins da sua máquina ou do projeto que você não tenha marcado em **Harness**, na medida
+  em que a ferramenta deixa o board controlar isso. No Claude Code isso é imposto por parâmetro (`--setting-sources ""`, `--disable-slash-commands` e um
   arquivo de servidores MCP só com o do board); nas outras ferramentas, o que a linha de comando
   aceita (ver a tabela de [Agentes](#agentes)).
 - **Artefatos enviados ao board, não descobertos.** Rules, skills e servidores MCP entram no board
@@ -165,7 +166,27 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
    coluna do workflow dele (Backlog / A fazer no board padrão), inativo. Restaurar uma história traz
    também todas as sub-tarefas arquivadas dela e desliga o modo autônomo; restaurar uma sub-tarefa
    cuja história está arquivada pede confirmação e restaura a história inteira (uma sub-tarefa de
-   história ativa volta sozinha, sem confirmação).
+   história ativa volta sozinha, sem confirmação). A aba tem uma barra de filtros própria, que não
+   muda o filtro do board: busca por texto (título, descrição, conversa, campos e `#número`), tipo,
+   campos de opção (como Tags) e período de arquivamento. O contador mostra os filtros ativos, e
+   **Limpar filtros** os desfaz; ao sair e voltar, a aba abre limpa. Cada linha mostra 50 cards por
+   vez, e **Mostrar mais** traz os seguintes. Clicar numa história arquivada a seleciona: a linha de
+   Sub-tarefas passa a mostrar só as sub-tarefas arquivadas dela, mesmo as que não batem no filtro.
+   Clicar de novo, ou em **Limpar seleção**, desfaz a seleção. Abrir o card continua listando todas
+   as sub-tarefas. Para agir sobre vários de uma vez, marque os cards arquivados que quiser:
+   **Selecionar todos os visíveis** marca só os que os filtros mostram. **Restaurar** em massa segue
+   a mesma regra do individual (uma história volta com as sub-tarefas arquivadas dela, e uma
+   sub-tarefa cuja história está arquivada traz a história inteira), e **Enviar para a lixeira** em
+   massa leva junto as sub-tarefas arquivadas de cada história. Toda ação em massa pede confirmação,
+   dizendo quantos cards serão afetados e o que vai junto. Excluir definitivamente continua só pela
+   Lixeira.
+6. **Duplicar card** (menu de ações do card aberto) cria outro card a partir dele, um por vez. O título
+   ganha o prefixo "Cópia de"; a descrição, o tipo, os campos e o checklist (desmarcado) são copiados, e
+   o card novo vai para o fim da primeira coluna do workflow, sem confirmação. Sub-tarefas, anexos,
+   comentários e vínculos não são copiados. Não há duplicação em massa: na seleção de vários cards, a
+   opção não aparece.
+
+**Seleção múltipla na lixeira.** Na lixeira, marque cards um a um ou use **Selecionar todos** no cabeçalho da tabela; a caixa fica em estado parcial quando só alguns estão marcados. Com ao menos um card marcado, aparece a barra com a contagem e as ações **Restaurar** e **Apagar de vez**, que valem para a seleção inteira. Restaurar segue direto; apagar de vez pede uma única confirmação para o lote. **Limpar** desmarca tudo. Restaurar ou apagar um card leva junto as sub-tarefas dele que estão na lixeira. **Esvaziar lixeira** continua como estava e não depende da seleção.
 
 Nada acontece em silêncio: toda ação que vai ao board espera a confirmação e mostra que está
 trabalhando. Uma barra fina no topo acende enquanto qualquer pedido está em andamento; o card que
@@ -226,15 +247,15 @@ dependência.
 A IA usa isso para acelerar a Implementação. No Plan ela declara a ordem entre as sub-tarefas
 (`create_card` com `depends_on`, ou `link_cards` com `depends_on`): uma depende da outra quando usa o
 que ela produz ou quando as duas alteram os mesmos arquivos. Na Implementação, o `get_card` da
-história devolve em `subtasksNow` o que pode rodar agora (e em `subtasksNowNote`, como conduzir a
-rodada), e a IA delega **as sub-tarefas sem
-dependência pendente a subagentes simultâneos**, cada um com o modelo do seu card; ao fim da rodada
-ela verifica o conjunto, faz o commit e parte para a rodada seguinte. `start_work` recusa a
-sub-tarefa que ainda espera outra. Sem dependências declaradas, todas as sub-tarefas em aberto são
-consideradas independentes. Depende de a ferramenta de IA ter subagentes (o Claude Code tem); sem
-eles, a execução segue uma por vez, na ordem das dependências. Projetos que já tinham a skill do
-fluxo instalada continuam com o texto antigo dela (o board não sobrescreve uma skill que você pode
-ter ajustado): apague-a e instale de novo em Configurações para receber a instrução nova.
+história devolve em `subtasksNow` o que o **board executa** (`byBoard`, na ordem) e o que espera
+(`waiting`). Na fase de código quem executa as sub-tarefas é o board, não a sessão da história: cada
+uma roda numa execução própria da CLI, com o agente, o modelo e as skills do card dela, **uma depois
+da outra** na pasta da história (um escritor por vez), respeitando as dependências; a sessão da
+história só as cria e para. `start_work` recusa a sub-tarefa que ainda espera outra. Sem dependências
+declaradas, todas as sub-tarefas em aberto são consideradas independentes. Quando todas terminam, o
+board chama a IA uma vez para o fechamento: verificar o conjunto, fazer o commit e mover a história. Nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica negada; no Cursor e no Kimi Code, sem bloqueio comprovado, a capacidade fica "desconhecida" e a admissão decide). Em **Configurações → Harness de IA** (e em `fazai.git.parallelSubtasks`, de 1 a 6) a pessoa define **"Sub-tarefas em paralelo por história"**; a tela mostra o pedido e o efetivo (hoje 1). O texto do fluxo é o atual do
+board, servido pelo MCP; uma cópia da skill do fluxo já instalada na pasta da ferramenta não é
+substituída pelo board. Para a ferramenta não carregar o texto antigo por conta própria, apague essa cópia.
 
 ### Board no navegador, fora do editor
 
@@ -259,17 +280,18 @@ o `faz-ai` do terminal avisa e não inicia.
 ## Usando com IA
 
 1. Em Configurações → **Ferramentas de IA**, escolha o perfil de CLI padrão do projeto. Claude Code,
-   Cursor e Kimi Code vêm prontos; também é possível criar cópias e perfis personalizados. Em
-   **Harness → Ferramenta e execução**, você pode trocar o perfil em uso.
+   Cursor e Kimi Code vêm prontos; também é possível criar cópias e perfis personalizados. O padrão
+   só vale quando nada indica outro: a CLI de cada execução sai do modelo escolhido (veja
+   [Configurações](#configurações)). Em **Harness → Ferramenta e execução**, você pode trocar o perfil em uso.
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
    global que a ferramenta lê. Isso também acontece sozinho, em silêncio, ao abrir a pasta (e a cada
    versão nova da extensão), sempre no escopo do usuário; só uma falha gera aviso.
-3. No grupo **Skills** da mesma aba, clique em **Instalar (padrão da ferramenta)** para a
-   skill do fluxo (`faz-ai-fluxo`): ela ensina a IA a conduzir os cards pelas fases, gerar os
-   documentos, pedir revisão e retomar pendências. O botão instala também as skills por assunto
-   (harness do card, pasta de trabalho e PR, rodadas, revisão e homologação, modo autônomo). Podem ser editadas.
+3. Opcional: no grupo **Skills** da mesma aba, **Instalar (padrão da ferramenta)** copia a skill do
+   fluxo (`faz-ai-fluxo`) e as skills por assunto (harness do card, pasta de trabalho e PR, rodadas,
+   revisão e homologação, modo autônomo) para a ferramenta. Não é preciso: o board já serve essas
+   skills pelo MCP (`get_skill`). Instalá-las só serve se você quer que a ferramenta as carregue sozinha.
 
-**Só no global.** O servidor e a skill do fluxo ficam na configuração global da ferramenta, e nada
+**Só no global.** O servidor e a cópia instalada da skill do fluxo, se houver, ficam na configuração global da ferramenta, e nada
 disso entra na pasta do projeto (que pode ser compartilhada com quem não tem a extensão):
 
 | Item | Onde grava |
@@ -329,10 +351,9 @@ a janela), e diz quando nada mudou. Ao lado, no editor, **Recarregar a janela** 
 é o que faz valer uma extensão recém-atualizada. Com a IA trabalhando em algum card, pergunta antes,
 porque a execução para.
 
-O MCP do board e a skill do fluxo (`faz-ai-fluxo`) contam como requisito em todas as ferramentas:
-mesmo onde as execuções pelo board levam o MCP sozinhas (Claude, Cursor), a conversa no chat do
-editor ou no terminal depende dele, e a skill é o que faz a IA seguir o fluxo. A falta da skill tem o
-botão **Instalar a skill** no Diagnóstico e na faixa do chat. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
+O MCP do board conta como requisito em todas as ferramentas: mesmo onde as execuções pelo board levam
+o MCP sozinhas (Claude, Cursor), a conversa no chat do editor ou no terminal depende dele, e é por ele
+que o fluxo chega à IA (`get_skill`). A skill do fluxo instalada na ferramenta não é requisito. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
 desligados, com o motivo na dica.
 
 **Login vencido: aviso de erro e retomada sozinha.** Quando o motivo do aviso é login (faltando ou
@@ -356,7 +377,7 @@ linha de comando, o grafo dentro do Code Review Graph). Passe o mouse sobre um i
 board o usa.
 
 - **Necessários:** o Node.js 22 ou mais novo e a ferramenta de IA do projeto, com a linha de comando,
-  o login (`claude auth login` ou `cursor-agent login`), o MCP do board, a skill do fluxo, a
+  o login (`claude auth login` ou `cursor-agent login`), o MCP do board, a
   **definição do harness** e o nível de permissão. A definição do harness é recomendação, não bloqueio:
   o board trabalha sem ela, só sem o ganho de economia e precisão. Ela aponta, um filho por falta, o que
   falta no banco de artefatos: nenhuma skill, agente ou servidor MCP em modo Pelo card (use "Indicar
@@ -383,7 +404,7 @@ do sistema: `xcode-select --install` e `brew install gh` no macOS, `apt`, `dnf` 
 distribuição desconhecida, fica só o site. Os logins e as ações na pasta do projeto (`git init`, `gh auth login`, `code-review-graph build`,
 `code-review-graph install --platform …`, `code-review-graph embed --provider local`) também trazem o
 comando com botão de copiar. Só o que é do board tem botão: instalar o MCP
-do board e a skill do fluxo, e abrir a escolha do nível de permissão.
+do board (e, se quiser, a skill do fluxo), e abrir a escolha do nível de permissão.
 
 O chat do editor inicia o MCP do board com o PATH de quando o editor abriu: um Node instalado depois
 (pelo `nvm`, por exemplo) não está nele até o editor fechar e abrir de novo. Por isso, quando o Node
@@ -440,8 +461,8 @@ os documentos das fases anteriores, trabalha a partir da descrição, da convers
 Implementação, uma história sem sub-tarefas ganha uma a partir da descrição.
 
 Boards criados antes recebem os textos novos pelo **Atualizar board** (Configurações), só nas colunas
-que ainda têm o texto padrão anterior: o que você personalizou fica como está. A skill do fluxo
-instalada não muda sozinha; reinstale-a (substituindo) para ela ensinar o mesmo.
+que ainda têm o texto padrão anterior: o que você personalizou fica como está. O fluxo que a IA lê é o texto atual do
+board, pelo MCP: não depende de reinstalar nada.
 
 ### Chat com a IA
 
@@ -1282,7 +1303,11 @@ compatibilidade, mas os agentes criados ou editados pelo board ficam no banco; h
 
 Um **perfil de CLI** é uma ferramenta que o board pode escolher para executar. Os perfis prontos são Claude Code, Cursor e Kimi Code. Uma **cópia** usa o catálogo de modelos e a medição de consumo da ferramenta de origem, mas mantém comando, credenciais e verificação próprios. Um **personalizado** aceita outra CLI com saída em texto; tokens e custo ficam desconhecidos. Em **Configurações → Ferramentas de IA**, ligue um perfil revisado e escolha o padrão; só essa tela cria, edita, duplica e testa perfis. Importações ficam desligadas até revisão local. Configuração e credenciais salvas não voltam à tela nem entram no export do board.
 
+**Qual CLI executa.** O valor do campo **Modelo** (`<perfil>:<modelo>@<esforço>`) já diz o perfil de CLI. Para cada execução o board usa o primeiro nível preenchido: o **Modelo do card**, o **modelo do agente**, a **regra de modelo** (mesmo com "Preencher o modelo sugerido automaticamente" desligado) e, sem nenhum, o **perfil de CLI padrão** de Configurações → Ferramentas de IA. Assim, sub-tarefas da mesma história podem rodar em CLIs diferentes, e as regras por esforço podem apontar para perfis diferentes. O primeiro nível preenchido é definitivo: se a escolha for inválida (perfil desligado, modelo fora do catálogo ou esforço inexistente), o card fica **bloqueado** com o motivo, sem cair para o próximo nível nem para o padrão. O campo Modelo, o chat e o editor de regras listam os modelos de **todos os perfis ligados**, agrupados por perfil. Login vencido e CLI ausente valem por perfil: param só os cards daquele perfil, e o aviso aparece só para os perfis em uso. **Sugerir regras** age só no perfil sugerido e preserva as faixas de outros perfis. Pelo MCP, o `get_card` mostra o alvo em `model` (`tool`, `from` e, se inválido, `blocked`).
+
 Para criar um personalizado, informe o comando e um argumento por linha. Os marcadores `{prompt}`, `{model}`, `{effort}`, `{mcpConfig}` e `{addDir}` inserem, respectivamente, o pedido, o modelo, o esforço, o arquivo MCP e uma pasta adicional quando estiverem disponíveis. Escolha **Entrada do pedido** (argumento ou stdin) e **Servidor do board** (CLI, arquivo no projeto ou nenhum). No campo **Modelo** de um card, **Outro modelo…** aceita um identificador livre desse perfil sem cadastrá-lo no catálogo. **Testar** executa um pedido curto e usa a sua assinatura; uma resposta OK não comprova isolamento, permissões nem restrições MCP. Capacidades sem evidência permanecem desconhecidas e podem impedir a execução.
+
+Cada perfil mostra, em **Capacidades e evidências**, a data e a versão da documentação conferida e um selo: **Contexto vazio** (só com capacidades verificadas pelo host), **Carrega por conta própria** (há itens conhecidos, listados no balão) ou **Sem prova de isolamento** (lista vazia não é prova). Em cópias e perfis personalizados, a seção **O que a CLI carrega por conta própria** do formulário permite marcar, por tipo (regras, skills, agentes, hooks, MCP) e origem (projeto, usuário), o que a CLI lê sozinha; é uma declaração, não uma verificação. O resumo de cada execução, o card (**Próxima execução**) e `get_card`/`get_harness` (`execution.cliLoads`) usam essa mesma decisão. O teste com CLIs reais fica fora do `npm test`: `npm run test:cli-real` (Claude Code validado em ambiente local controlado; Cursor e Kimi Code **não validados**).
 
 ### Configurações no Settings do editor
 
@@ -1293,7 +1318,7 @@ quatro seções, nesta ordem:
 | --- | --- |
 | Instalação | Um texto curto e o link **Abrir o Diagnóstico do ambiente**, que abre o board na tela do Diagnóstico |
 | Aparência | **Idioma** (`fazai.appearance.language`), **Tema** (`fazai.appearance.theme`), **Fonte** (`fazai.appearance.font`) e **Tamanho** (`fazai.appearance.fontSize`), todos com escopo Usuário — valem em todos os projetos desta pessoa. Status (rótulo e cor de cada status) continuam no board, agora na aba Fluxos |
-| Git | As oito chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.decisionRecords` (a pasta dos [registros de decisão](#registros-de-decisão); vazio = desligado). No editor, a aba Git e o bloco de paralelo do Harness viram link para estas chaves; no navegador seguem como campos editáveis |
+| Git | As nove chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.parallelSubtasks` ("Sub-tarefas em paralelo por história", de 1 a 6; hoje o efetivo é 1), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.decisionRecords` (a pasta dos [registros de decisão](#registros-de-decisão); vazio = desligado). No editor, a aba Git e o bloco de paralelo do Harness viram link para estas chaves; no navegador seguem como campos editáveis |
 | Backup | Dois links de ação: **Exportar o board agora** e **Importar um board**, que disparam os comandos da paleta |
 
 Três comandos novos na paleta (`Ctrl+Shift+P`): **Faz AI: Abrir o Diagnóstico do ambiente**,
@@ -1328,9 +1353,9 @@ sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualqu
 
 Perfis de CLI importados ficam desligados até revisão local. Comandos, argumentos, ambiente e credenciais permanecem no cofre local: exportação, tela e MCP mostram apenas referências e estado. Cópias não herdam provas de isolamento, e um personalizado sem tradução verificada não executa. Sondas de versão/login e o botão **Testar** não comprovam capacidades. Consulte [Configurações](#configurações) para criar e escolher perfis.
 
-A base das novas **políticas de execução e fallback** já separa definição versionada, revisão humana local e histórico (schema 41). O resolvedor não troca uma escolha explícita inválida por um padrão nem redireciona um prefixo para o perfil-cópia padrão. O avaliador e a simulação usam a mesma função, com recusas explicadas, destinos ordenados, limites acumulados e exigência de reconciliação quando há trabalho parcial ou desconhecido. Políticas importadas permanecem pendentes de revisão; snapshots anteriores não mudam com a edição. Em **Configurações → Harness → Ferramenta e execução → Gerenciar políticas**, o editor manual permite condições, destinos ordenados, limites, duplicação, remoção e histórico paginado. A comparação integral precede a confirmação de revisão humana; salvar como pendente não autoriza execução. Conflitos de versão preservam o rascunho e permitem recarregar a base antes de revisar novamente. O simulador do host usa o mesmo avaliador, sem IA, e identifica credenciais/admissão como hipóteses do cenário. Mudanças nas políticas salvas ou no contexto invalidam o resultado exibido. Esta base ainda não está ligada ao runner, chat ou assistentes: a descrição abaixo é do modelo reserva legado, que será migrado para proposta desativada na etapa de integração.
+A base das novas **políticas de execução e fallback** já separa definição versionada, revisão humana local e histórico (schema 41). O resolvedor não troca uma escolha explícita inválida por um padrão nem redireciona um prefixo para o perfil-cópia padrão. O avaliador e a simulação usam a mesma função, com recusas explicadas, destinos ordenados, limites acumulados e exigência de reconciliação quando há trabalho parcial ou desconhecido. Políticas importadas permanecem pendentes de revisão; snapshots anteriores não mudam com a edição. Em **Configurações → Ferramentas de IA → Políticas de execução e fallback → Gerenciar políticas**, o editor manual permite condições, destinos ordenados, limites, duplicação, remoção e histórico paginado. A comparação integral precede a confirmação de revisão humana; salvar como pendente não autoriza execução. Conflitos de versão preservam o rascunho e permitem recarregar a base antes de revisar novamente. O simulador do host usa o mesmo avaliador, sem IA, e identifica credenciais/admissão como hipóteses do cenário. Mudanças nas políticas salvas ou no contexto invalidam o resultado exibido. Runner, chat e assistentes ("Sugerir agentes, regras ou skills", "Indicar artefatos") decidem a troca de alvo por esse mesmo avaliador: com política ligada e aplicável a execução segue no destino dela; sem política, a falha bloqueia e nada roda noutro alvo. Em **Próxima execução**, a simulação avalia só as políticas salvas e ligadas, sem gastar tokens nem abrir a CLI. **Criar com ajuda de IA**, **Sugerir fallbacks** e **Revisar conflitos** pedem à IA só uma proposta (rascunho com explicação, diferenças e exemplos simulados, sem segredos): ela passa pelo validador do editor e nada é salvo ou ligado até você revisar e confirmar. A IA também consulta as políticas pelo MCP (`get_execution_policies`, só leitura); criar, revisar e ativar é sempre ação da pessoa.
 
-Cada regra pode ter um **modelo reserva** (opcional). Quando a execução de um card falha porque o modelo principal esgotou o limite de uso do plano, e esse modelo veio de uma regra com reserva configurada, o sistema repete automaticamente a execução com o modelo reserva, uma única vez. Se o reserva também falhar ou não estiver configurado, o card é bloqueado como hoje. A troca automática aparece como um comentário na conversa do card ("O `<modelo principal>` esgotou o limite; a execução segue com `<modelo reserva>`"), e o campo Modelo do card continua mostrando o modelo principal — a próxima execução tenta o principal de novo.
+O antigo **modelo reserva** das regras de sugestão não troca mais nada na execução: o fallback é decidido só pelas **políticas de execução e fallback**. Ao abrir o board, ao salvar regras ou depois de importar um backup, cada reserva legada vira uma **proposta de política desligada e pendente de revisão** (id `legacy-<regra>`, ação *oferecer*, falha *quota*, destino = o modelo reserva), com histórico na versão 1. A proposta não copia as condições da regra (campos e tipo do card): ajuste-as no editor. A conversão acontece uma vez; se você remover a proposta, ela não volta. Em **Políticas → Gerenciar políticas** um aviso lista as propostas e as reservas sem conversão (modelo ou esforço fora do catálogo); nada troca de CLI até você comparar, simular, revisar e ligar a política. O editor de regras mostra a reserva antiga como desativada e aponta para essa área, sem criar reserva paralela; o MCP `set_model_rules` recusa o parâmetro `fallback`. Ao exportar, credenciais e variáveis dos perfis de CLI não vão no arquivo; ao importar, os perfis voltam desligados e as políticas pendentes, e o aviso lista ambos.
 
 **Avisos de dependência entre configurações e links cruzados.** Várias opções de Configurações só fazem efeito por causa de outra. O board mostra uma linha discreta sob as opções dependentes (por exemplo, "Depende de **uma regra de sugestão de modelo** (agora: nenhuma)" abaixo de "Preencher o modelo sugerido automaticamente", ou "Depende de **agentes marcados como disponíveis**" abaixo de "Agente padrão"); a opção fica desabilitada quando a dependência não está satisfeita. Os links permitem navegar: clique em um para ir até a seção correspondente do board, que rola e destaca por 2 segundos, ou clique em um link do Settings para abrir o board na seção certa. No modo navegador, os links para o Settings aparecem só como texto. **"Preencher o modelo sugerido automaticamente"** saiu de Regras e foi para Modelos, onde faz mais sentido — um aviso simples em Regras indica a mudança de lugar. O campo Intervalo do heartbeat fica desabilitado quando o heartbeat está desligado, sem um componente de dependência adicional. Cabeçalhos novos em Modelos, Agentes, Rules e Skills mostram "Mostrando os X do [ferramenta] · trocar ferramenta", permitindo mudar a ferramenta de qualquer uma dessas telas do board.
 

@@ -1,4 +1,3 @@
-import { ExecutionPoliciesSettings } from './policies/ExecutionPoliciesSettings';
 import { activeProfile, toolInfo } from '../../../shared/aiProfiles';
 import { Button, Tabs } from '@radix-ui/themes';
 import { resolveHarnessTab } from '../../../shared/harnessTopics';
@@ -13,7 +12,8 @@ import { t } from '../../i18n';
 import { rich } from '../../i18n/rich';
 
 /**
- * Tela do harness. Toda execução do board parte de contexto vazio: só o que estiver no board entra.
+ * Tela do harness. Toda execução do board parte só do que está no board (no Claude Code, contexto vazio imposto; nas outras
+ * CLIs, o que elas carregam sozinhas aparece em Ferramentas de IA).
  * A biblioteca organiza os artefatos por tipo; a escolha do executor fica em uma seção própria.
  */
 export function HarnessSettings() {
@@ -54,7 +54,6 @@ export function HarnessSettings() {
         </Tabs.Content>
         <Tabs.Content value="tool">
           <ProjectTool tool={tool} />
-          <ExecutionPoliciesSettings />
           <RunnerSettings tool={tool} />
           <ContextPlanDefaults />
         </Tabs.Content>

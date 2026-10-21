@@ -1484,6 +1484,15 @@ button.ghost.on {
   color: var(--muted);
 }
 
+.archived-parent,
+.archived-more {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: var(--fs-sm);
+  color: var(--fg);
+}
+
 /* lixeira */
 .trash {
   padding: var(--sp-12) var(--sp-20);
@@ -4691,9 +4700,6 @@ div.metrics-breakdown {
 }
 .ai-tools-layout > :first-child:only-child {
   grid-column: 1 / -1;
-}
-.ai-tools-policy-link {
-  margin-bottom: var(--sp-12);
 }
 .ai-tools-layout .settings-card {
   margin-bottom: var(--sp-12);

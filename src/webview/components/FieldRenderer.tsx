@@ -1,6 +1,7 @@
 import { Checkbox, Select, TextField as RxTextField } from '@radix-ui/themes';
 import { useState } from 'react';
-import { activeProfile, catalogTool, profileLabel } from '../../shared/aiProfiles';
+import { activeProfile } from '../../shared/aiProfiles';
+import { modelGroups } from '../../shared/runTarget';
 import { modelDisplay } from '../modelText';
 import type { FieldDef, FieldValue } from '../../shared/model';
 import { effortLabel, modelValue, parseModelValue } from '../../shared/models';
@@ -122,15 +123,13 @@ export function ModelEditor({
   part?: 'both' | 'model' | 'effort';
 }) {
   const board = useBoardStore((s) => s.state?.board);
-  const all = board?.modelCatalog ?? [];
   const active = board ? activeProfile(board) : null;
   const [otherOpen, setOtherOpen] = useState(false);
   const [otherName, setOtherName] = useState('');
   const current = parseModelValue(value);
-  // Catálogos são associados a perfis existentes; um valor antigo continua visível até ser trocado.
-  const profiles = board?.aiProfiles.filter((p) => p.enabled) ?? [];
-  const catalog = all.filter((o) => profiles.some((p) => catalogTool(p) === o.tool) || o.id === current?.id);
-  const option = current ? catalog.find((o) => o.id === current.id) : undefined;
+  // um grupo por perfil ligado; o valor fora deles (perfil desligado, modelo apagado) continua visível
+  const groups = board ? modelGroups(board).filter((g) => g.options.length > 0) : [];
+  const option = current ? groups.flatMap((g) => g.options).find((o) => o.id === current.id) : undefined;
   const submitOther = () => {
     const name = otherName.trim();
     if (!active || active.kind !== 'custom' || !name || /[\s\0:@]/.test(name)) return;
@@ -162,7 +161,7 @@ export function ModelEditor({
           setOtherOpen(true);
           return;
         }
-        const o = catalog.find((x) => x.id === id);
+        const o = groups.flatMap((g) => g.options).find((x) => x.id === id);
         onChange(o ? modelValue(o.id, o.defaultEffort) : null);
       }}
     >
@@ -170,20 +169,16 @@ export function ModelEditor({
       <Select.Content position="popper">
         <Select.Item value={NO_MODEL}>—</Select.Item>
         {current && !option && <Select.Item value={current.id}>{t('{id} (fora do catálogo)', { id: current.id })}</Select.Item>}
-        {profiles
-          .filter((profile) => catalog.some((o) => o.tool === catalogTool(profile)))
-          .map((profile) => (
-            <Select.Group key={profile.id}>
-              <Select.Label>{board ? profileLabel(board, profile.id) : profile.name}</Select.Label>
-              {catalog
-                .filter((o) => o.tool === catalogTool(profile))
-                .map((o) => (
-                  <Select.Item key={o.id} value={o.id}>
-                    {o.label}
-                  </Select.Item>
-                ))}
-            </Select.Group>
-          ))}
+        {groups.map((g) => (
+          <Select.Group key={g.cli}>
+            <Select.Label>{g.label}</Select.Label>
+            {g.options.map((o) => (
+              <Select.Item key={o.id} value={o.id}>
+                {o.label}
+              </Select.Item>
+            ))}
+          </Select.Group>
+        ))}
         {active?.kind === 'custom' && <Select.Item value={OTHER_MODEL}>{t('Outro modelo…')}</Select.Item>}
       </Select.Content>
     </Select.Root>

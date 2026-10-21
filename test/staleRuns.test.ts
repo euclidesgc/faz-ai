@@ -64,7 +64,16 @@ describe('staleRunning', () => {
     // a história roda pelo executor: ela e a sub-tarefa que a sessão marcou estão em execução de verdade
     expect(stale([card(1).id], later)).toEqual([3]);
     router.setAiRuns([
-      { cardId: card(1).id, runId: 'r', mode: 'phase', origin: 'manual', phase: 'Implementação', model: null, startedAt: 1 },
+      {
+        cardId: card(1).id,
+        runId: 'r',
+        mode: 'phase',
+        origin: 'manual',
+        phase: 'Implementação',
+        model: null,
+        tool: 'claude',
+        startedAt: 1,
+      },
     ]);
     expect(stale([], later)).toEqual([3]);
   });

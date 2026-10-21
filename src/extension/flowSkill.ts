@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { FLOW_SKILL_NAME } from '../shared/harnessProject';
 import { skillTemplate } from './harness';
 
-/** Skill que ensina a IA a conduzir os cards pelo fluxo do board. É instalada na pasta de skills da ferramenta em uso. */
+/** Skill que ensina a IA a conduzir os cards pelo fluxo do board. É servida pelo `get_skill`, sem arquivo instalado na pasta de skills de nenhuma ferramenta. */
 export const FLOW_SKILL = {
   name: FLOW_SKILL_NAME,
   description:
@@ -30,8 +30,8 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
 1. \`get_card\` traz a descrição, a conversa (a partir do último resumo, \`kind: "summary"\`: o que veio
    antes já está nele), os anexos e:
    - \`phase\`: a instrução da fase e, se houver, o documento que ela produz e o modelo dele;
-   - \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, delegue a um subagente com essa configuração; se não for possível, avise a pessoa na conversa;
-   - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no caminho indicado, mesmo que não apareça na sua lista de skills: as execuções do board partem de contexto vazio e só conhecem o que está no board (Configurações → Harness).
+   - \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, avise a pessoa na conversa do card; as sub-tarefas e o fechamento da fase o board executa, cada um com o modelo do card;
+   - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no \`path\` indicado, mesmo que não apareça na sua lista de skills; a skill sem \`path\` se lê com \`get_skill <nome>\`. O que o card exige é o que está no board (Configurações → Harness).
 2. Chame \`start_work\` antes de começar. Chame \`get_board\` só quando a fase precisa dele (no Plan, para os agentes, no refinar e ao editar o board); nas demais, \`get_card\` basta, e o inventário do Harness está em \`get_harness\`.
 3. Siga a instrução de \`phase\`. Leia também os documentos das fases anteriores (anexos da história),
    quando houver. Uma história pode ser criada ou movida direto para uma fase adiante (o Plan, por
@@ -139,7 +139,7 @@ expressamente uma auditoria geral.
 ## Skills por assunto
 
 Esta skill é o essencial. O detalhe de cada assunto fica em outra skill, que você lê só quando o
-assunto aparece (o \`get_card\` aponta qual, numa nota curta):
+assunto aparece (o \`get_card\` aponta qual, numa nota curta). Leia com \`get_skill <nome>\`:
 
 - \`faz-ai-harness-do-card\`: \`model\`, \`requiredRules\`, \`requiredSkills\` e a escolha de skills, rules e servidores do card;
 - \`faz-ai-workspace-e-pr\`: \`prepare_workspace\`, a pasta de trabalho, a base do pull request, a pilha e o aviso de conflito com a base;
@@ -153,9 +153,10 @@ const HARNESS_BODY = `# Harness do card
 
 O \`get_card\` devolve o que o card exige para a execução; leia antes de começar.
 
-- \`model\`: o modelo e o esforço que devem executar o card. O valor usa \`<perfil>:<modelo>@<esforço>\` do perfil de CLI do board. Se forem diferentes dos seus, delegue o trabalho a um subagente com essa configuração; se não for possível, avise a pessoa em vez de executar com outra. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, e as regras do board sugerem o modelo a partir dele (\`get_models\`).
+- \`model\`: o modelo e o esforço que devem executar o card. O valor usa \`<perfil>:<modelo>@<esforço>\` do perfil de CLI do board. \`tool\` é o perfil de CLI da execução (o do modelo do card, do agente ou da regra) e \`from\` diz de onde veio; sem modelo indicado vale o perfil padrão (\`set_ai_tool\`), e o bloco não aparece. Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Se o modelo da sua sessão for outro, avise a pessoa em vez de executar com outro. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, e as regras do board sugerem o modelo a partir dele (\`get_models\`).
 - \`requiredRules\`: leia cada arquivo em \`path\` antes de executar o card: são as instruções que o card exige, além do contexto fixo do board.
-- \`requiredSkills\`: leia o SKILL.md de cada skill em \`path\`. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em \`files\` estão os arquivos de apoio (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.
+- \`requiredSkills\`: leia o SKILL.md de cada skill em \`path\`; a que vier sem \`path\` se lê com \`get_skill <nome>\`. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em \`files\` estão os arquivos de apoio (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.
+- \`execution.cliLoads\`: o que a CLI da ferramenta carrega por conta própria (regras, skills, agentes, hooks e MCPs do projeto ou do usuário) e se o isolamento está imposto (\`contextEnforced\`). Lista vazia não prova isolamento. O que o board entregou pelo pedido e pelo MCP vale sobre o que a CLI leu sozinha; não afirme que a conversa começou sem artefatos externos sem \`contextEnforced\`.
 - Skills, rules, servidores MCP e agente do card: escolha só entre o que está no board em modo "Pelo card" (\`get_harness\`). O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.
 `;
 
@@ -182,31 +183,39 @@ numa execução própria para resolvê-lo.
 
 const RODADAS_BODY = `# Rodadas da Implementação
 
-Na Implementação, trabalhe em rodadas. \`get_card\` na história traz em \`subtasksNow\` o que pode
-rodar agora (\`canRunTogether\`), o que espera outra sub-tarefa (\`waiting\`) e, quando houver, o que
-não é seu agora: \`withPerson\` (pergunta, revisão ou bloqueio com a pessoa) e \`running\` (outra
-execução já está nela). Não mexa nessas duas últimas:
+Na Implementação, o **board** executa as sub-tarefas: cada uma numa execução própria da CLI, com o
+agente, o modelo, as skills e os MCPs do card dela, uma depois da outra na pasta da história (um
+escritor por vez), na ordem das dependências. Nenhuma sub-tarefa roda sozinha por você, e você não as
+executa, nem por subagente (ferramenta \`Agent\`).
 
-1. Se a sua ferramenta tem subagentes, delegue **cada** sub-tarefa de \`canRunTogether\` a um subagente,
-   todos lançados na mesma mensagem para rodarem ao mesmo tempo, cada um com o modelo e o esforço do
-   card dele (\`model\` no \`get_card\`). Diga a cada subagente: o número da sub-tarefa, a pasta de
-   trabalho da história, que ele altere só os arquivos da tarefa dele, que não faça commit nem troque
-   de branch, e o ciclo abaixo.
-2. O ciclo de cada sub-tarefa: \`start_work\`, mova para "Em andamento", faça o trabalho, verifique e
-   mova para a coluna de conclusão, registrando na conversa do card o que foi feito.
-3. Quando a rodada terminar, confira o resultado junto (testes e build do projeto), faça o commit
-   (os dois só com terminal; veja abaixo) e leia a história de novo: as sub-tarefas liberadas formam a próxima rodada. Repita até não sobrar
-   nenhuma que você possa tocar agora; se as restantes estiverem com a pessoa (\`withPerson\`), pare.
+A sua sessão na história faz só o trabalho de planejar:
+
+1. Se a história não tem sub-tarefas na fase, crie-as a partir da descrição e da conversa, cada uma
+   com Fase = a coluna, os arquivos que vai tocar, o agente e o modelo (\`set_card_profile\`) e as
+   dependências (\`depends_on\`, \`link_cards\`); as que mexem nos mesmos arquivos dependem uma da outra.
+   Depois **pare**: o board começa a executar.
+2. O \`get_card\` da história traz em \`subtasksNow\` o que o board executa (\`byBoard\`, na ordem),
+   o que espera outra sub-tarefa (\`waiting\`) e o que não é do board agora: \`withPerson\` (pergunta,
+   revisão ou bloqueio com a pessoa) e \`running\` (execução em curso).
+3. Quando todas as sub-tarefas terminam, o board chama você de novo, **uma vez**, para o fechamento:
+   verifique o conjunto como o projeto define (typecheck e testes, com terminal), faça o commit na
+   branch da história e mova a história. Os resultados de cada sub-tarefa estão na conversa da
+   história. Se a verificação falhar, corrija ou crie uma sub-tarefa de correção com Fase = esta coluna
+   e pare: o board a executa e chama você de novo.
+
+Quem executa **uma** sub-tarefa (o board chama você só nela) segue o ciclo: \`start_work\`, mova para
+"Em andamento", faça o trabalho na pasta da história (\`workspace\` no \`get_card\`), verifique só a sua
+parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build), mova para a coluna de
+conclusão e registre na conversa da sub-tarefa o que fez. Sem commit, sem trocar de branch e sem
+executar outras sub-tarefas.
 
 Testes, build e commit dependem do terminal. Se você não pode rodar comandos nesta execução (permissão
 sem terminal, como "Board e arquivos do projeto"), não tente: implemente, verifique lendo o código e
-registre na conversa da história o que falta rodar (testes, build, commit).
-Essa parte fica para quem tem permissão.
+registre na conversa o que falta rodar. Essa parte fica para quem tem permissão.
 
-\`start_work\` recusa a sub-tarefa que ainda depende de outra em aberto. Sem subagentes, ou com uma
-sub-tarefa só na rodada, execute uma por vez, na ordem das dependências. Se duas sub-tarefas da
-mesma rodada precisarem do mesmo arquivo, não as rode juntas: registre a dependência com
-\`link_cards\` e deixe uma para a rodada seguinte.
+\`start_work\` recusa a sub-tarefa que ainda depende de outra em aberto. Se duas sub-tarefas precisarem
+do mesmo arquivo, registre a dependência com \`link_cards\`: o board executa uma de cada vez de qualquer
+forma, mas a ordem certa evita retrabalho.
 `;
 
 const REVISAO_BODY = `# Revisão e Homologação
@@ -216,13 +225,14 @@ const REVISAO_BODY = `# Revisão e Homologação
 Depois da Implementação e antes do pull request, a história passa pela Revisão:
 
 1. Rode as checagens do projeto (typecheck, lint, testes e build, como o projeto os define).
-2. Revise o diff da história contra a base com um olhar independente: delegue ao agente
-   \`revisor-de-codigo\`, se ele estiver nos agentes do board, numa sessão nova. Além dos defeitos,
+2. Revise o diff da história contra a base com um olhar independente: crie uma
+   sub-tarefa de revisão (Fase = Revisão) com o agente \`revisor-de-codigo\`, se ele estiver nos agentes
+   do board, e pare: o board a executa e chama você de novo; sem o agente, revise você mesmo. Além dos defeitos,
    procure o código que só passa no teste: teste novo que já passa no commit base, teste existente
    alterado junto com o código que ele cobre, try/catch que engole erro, cast forçado e acoplamento
    novo entre módulos.
 3. Trate cada achado. O que tem diretriz clara (regra do projeto, padrão já usado no código, teste
-   que falha) você corrige agora, delegando ao especialista, e registra na conversa. O que é ambíguo
+   que falha) você corrige agora (ou cria uma sub-tarefa de correção com o especialista e para, para o board executá-la) e registra na conversa. O que é ambíguo
    ou muda o comportamento combinado é decisão da pessoa: \`ask_question\` e pare (no modo autônomo,
    decida pelo padrão do projeto e pelo caminho menos complexo, registre e siga).
 4. Rode as checagens de novo, faça o commit, registre o resultado na conversa (ele alimenta o "Como
@@ -316,7 +326,7 @@ export const FLOW_SKILLS: readonly { name: string; description: string; body: st
   {
     name: 'faz-ai-implementacao-rodadas',
     description:
-      'Use na fase de Implementação de uma história com sub-tarefas: as rodadas (subtasksNow), subagentes, ciclo de cada sub-tarefa e o que fazer sem terminal.',
+      'Use na fase de Implementação de uma história com sub-tarefas: a Implementação executada pelo board (subtasksNow), o ciclo de cada sub-tarefa, o fechamento e o que fazer sem terminal.',
     body: RODADAS_BODY,
   },
   {
@@ -330,6 +340,19 @@ export const FLOW_SKILLS: readonly { name: string; description: string; body: st
     body: AUTONOMO_BODY,
   },
 ];
+
+export const FLOW_SKILL_NAMES: readonly string[] = FLOW_SKILLS.map((k) => k.name);
+
+/** Confere a lista exata: uma skill de projeto como `faz-ai-deploy` não é do fluxo só por causa do prefixo. */
+export function isFlowSkill(name: string): boolean {
+  return FLOW_SKILL_NAMES.includes(name);
+}
+
+/** SKILL.md de uma skill do fluxo, montado do texto do board; `undefined` se o nome não for do fluxo. */
+export function flowSkillMarkdown(name: string): string | undefined {
+  const k = FLOW_SKILLS.find((x) => x.name === name);
+  return k ? skillTemplate(k.name, k.description, k.body) : undefined;
+}
 
 /**
  * Grava o conjunto de skills do fluxo na pasta de skills da ferramenta (`skillsRoot`). Sem `replace`, o

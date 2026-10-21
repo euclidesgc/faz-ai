@@ -11,7 +11,7 @@ import { t } from '../../../i18n';
 import { useBoardStore } from '../../../store/boardStore';
 import { Choice, NumberField, ORIGIN_LABELS, FAILURE_LABELS, REASON_LABELS, profileLabel, targetLabel } from './parts';
 
-export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy; library: PolicyLibrary }) {
+export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy | null; library: PolicyLibrary }) {
   const state = useBoardStore((s) => s.state)!;
   const first = library.models[0];
   const [scenario, setScenario] = useState<Omit<PolicyScenario, 'draft'>>({
@@ -52,8 +52,9 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy;
     })),
   ];
   return (
-    <section aria-label={t('Simular política')}>
-      <h4>{t('Simular política')}</h4>
+    <section aria-label={policy ? t('Simular política') : t('Próxima execução')}>
+      <h4>{policy ? t('Simular política') : t('Próxima execução')}</h4>
+      {!policy && <p className="muted">{t('Usa só as políticas salvas e ligadas, pelo mesmo avaliador da execução.')}</p>}
       <p className="muted">{t('Este cenário é hipotético. Não inicia IA, não grava o board e não comprova admissão ou credenciais.')}</p>
       <div className="context-contract-fields">
         <Choice
@@ -171,7 +172,7 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy;
             <p>
               {t('Regra: {name} · versão {version}', {
                 name:
-                  result.value.decision.policy.id === policy.id
+                  result.value.decision.policy.id === policy?.id
                     ? policy.name
                     : (library.snapshot.records.find((r) => r.policy.id === result.value.decision.policy!.id)?.policy.name ??
                       result.value.decision.policy.id),
@@ -198,7 +199,7 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy;
                 {t(p.code === 'cycle' ? 'Cadeia cíclica' : p.code === 'ambiguous-priority' ? 'Prioridade ambígua' : 'Destino inválido')}:{' '}
                 {p.policyIds
                   .map((id) =>
-                    id === policy.id ? policy.name : (library.snapshot.records.find((r) => r.policy.id === id)?.policy.name ?? id),
+                    id === policy?.id ? policy.name : (library.snapshot.records.find((r) => r.policy.id === id)?.policy.name ?? id),
                   )
                   .join(' → ')}
               </li>

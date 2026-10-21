@@ -15,7 +15,7 @@ import type { WebviewToHost } from '../../shared/messages';
 import { DEFAULT_APPEARANCE, FONT_SIZE_RANGE, FONTS, THEMES, type TextFont, type ThemeMode } from '../../shared/appearance';
 import { LANGUAGES, type Language } from '../../shared/language';
 import { DEFAULT_GIT, MERGE_METHODS, WORKSPACE_MODES, cleanDecisionDir, type MergeMethod, type WorkspaceMode } from '../../shared/git';
-import { DEFAULT_RUNNER, PARALLEL_RANGE } from '../../shared/runner';
+import { DEFAULT_RUNNER, PARALLEL_RANGE, SUBTASK_PARALLEL_RANGE } from '../../shared/runner';
 
 export const SECTION = 'fazai';
 
@@ -119,6 +119,15 @@ const gitParallelStoriesKey: SyncedKey<number> = {
   migrate: true,
 };
 
+const gitParallelSubtasksKey: SyncedKey<number> = {
+  key: 'git.parallelSubtasks',
+  fromBoard: (board) => board.runner.parallelSubtasks,
+  toBoardPatch: (value) => ({ runner: { parallelSubtasks: value } }),
+  isValid: (value): value is number => isInteger(value, SUBTASK_PARALLEL_RANGE),
+  defaultValue: DEFAULT_RUNNER.parallelSubtasks,
+  migrate: true,
+};
+
 const gitAutoMergeKey: SyncedKey<boolean> = {
   key: 'git.autoMerge',
   fromBoard: (board) => board.git.autoMerge,
@@ -216,6 +225,7 @@ export const GIT_KEYS: SyncedKey<unknown>[] = [
   gitWorktreeDirKey,
   gitParallelKey,
   gitParallelStoriesKey,
+  gitParallelSubtasksKey,
   gitAutoMergeKey,
   gitMergeMethodKey,
 ] as SyncedKey<unknown>[];

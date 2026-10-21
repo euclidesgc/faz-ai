@@ -36,14 +36,14 @@ const agent: Agent = {
   background: false,
 };
 
-const state = (over: Parameters<typeof boardState>[0] = {}, tool: 'claude' | 'cursor' = 'claude') =>
+const state = (over: Parameters<typeof boardState>[0] = {}, tool: 'claude' | 'cursor' | 'kimi' = 'claude') =>
   boardState({
     ...over,
     board: { ...boardState().board, aiTool: tool, ...(over.board ?? {}) },
   });
 
 describe('harnessIssues', () => {
-  it('board vazio: faltam artefatos e agente; nada de regras, ausentes ou Cursor', () => {
+  it('board vazio: faltam artefatos e agente; nada de regras, ausentes ou isolamento', () => {
     expect(harnessIssues(state())).toEqual(['artifacts', 'agents']);
   });
 
@@ -82,7 +82,7 @@ describe('harnessIssues', () => {
     expect(harnessIssues(ready)).toEqual([]);
   });
 
-  it('regra desligada, artefato ausente e, no Cursor, artefatos do projeto fora do board', () => {
+  it('regra desligada, artefato ausente e, no Cursor, artefato que a CLI carrega sozinha', () => {
     const s = state(
       {
         harness: {
@@ -110,13 +110,38 @@ describe('harnessIssues', () => {
       },
       'cursor',
     );
-    expect(harnessIssues(s)).toEqual(['rules', 'missing', 'cursor']);
+    expect(harnessIssues(s)).toEqual(['rules', 'missing', 'isolation']);
     // só o servidor do board no projeto não conta como artefato fora do board
     const clean = {
       ...s,
-      harness: { ...s.harness, inventory: [{ ...s.harness.inventory[0]!, items: s.harness.inventory[0]!.items.slice(1) }] },
+      harness: { ...s.harness, inventory: [{ ...s.harness.inventory[0]!, items: s.harness.inventory[0]!.items.slice(1, 2) }] },
     };
     expect(harnessIssues(clean)).toEqual(['missing']);
+  });
+});
+
+describe('harnessIssues: problema isolation pela lista do perfil ativo', () => {
+  const inv = (tool: 'claude' | 'cursor' | 'kimi', items: HarnessItem[]) => ({
+    harness: { rules: [], skills: [], agents: [agent], inventory: [{ tool, installed: true, items }] },
+    board: { ...boardState().board, aiTool: tool, execProfiles: [profileOfAgent(agent, true)] },
+  });
+  const rule = item({ kind: 'instructions', name: 'AGENTS.md', location: 'AGENTS.md' });
+  const userSkill = item({ kind: 'skill', name: 'sql', location: '~/.kimi/skills/sql/SKILL.md', scope: 'user', layout: 'skills' });
+
+  it('Cursor com regra do projeto acusa', () => {
+    expect(harnessIssues(state(inv('cursor', [rule]), 'cursor'))).toContain('isolation');
+  });
+  it('Kimi com skill do usuário acusa', () => {
+    expect(harnessIssues(state(inv('kimi', [userSkill]), 'kimi'))).toContain('isolation');
+  });
+  it('Claude (lista vazia) nunca acusa, com tudo isso no disco', () => {
+    const s = state(inv('claude', [rule, userSkill]), 'claude');
+    expect(harnessIssues(s)).not.toContain('isolation');
+  });
+  it('Cursor sem nada da lista (origem que o perfil não lista) não acusa', () => {
+    const plugin = item({ kind: 'skill', name: 'p', location: 'p', scope: 'plugin' });
+    const userRule = item({ kind: 'instructions', name: 'r', location: '~/r', scope: 'user' });
+    expect(harnessIssues(state(inv('cursor', [plugin, userRule]), 'cursor'))).not.toContain('isolation');
   });
 });
 
@@ -130,7 +155,6 @@ describe('o harness no aviso e no Diagnóstico', () => {
     nodePath: process.execPath,
     resolve: (command) => (command === 'node' ? process.execPath : `/usr/bin/${command}`),
     signedIn: async () => true,
-    skillInstalled: true,
     ...over,
   });
 
@@ -190,7 +214,7 @@ describe('o harness no aviso e no Diagnóstico', () => {
       ['harness-agents', 'ok'],
       ['harness-rules', 'missing'],
       ['harness-missing', 'missing'],
-      ['harness-cursor', 'ok'],
+      ['harness-isolation', 'ok'],
     ]);
     // recomendação: o bloco da ferramenta continua pronto, e só as faltas contam
     expect(own.status).toBe('ok');

@@ -2,9 +2,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { allowKimiMcp, checkRequirements, kimiMcpAllowed, registeredServer, type RequirementProbe } from '../src/extension/requirements';
+import {
+  allowKimiMcp,
+  checkProfileCli,
+  checkRequirements,
+  kimiMcpAllowed,
+  registeredServer,
+  type RequirementProbe,
+} from '../src/extension/requirements';
+import { BUILTIN_PROFILES } from '../src/shared/aiProfiles';
 import { registerClients } from '../src/extension/mcp/clientConfig';
-import { blocksExecution } from '../src/shared/requirements';
+import { blocksExecution, cliProblem } from '../src/shared/requirements';
 import type { BoardRequirement } from '../src/shared/requirements';
 
 let project: string;
@@ -109,13 +117,11 @@ describe('requisitos do board', () => {
     expect(await ids('cursor')).toEqual([['mcp', false]]);
   });
 
-  it('sem a skill do fluxo, pede para instalar; sem o inventário lido, não diz nada', async () => {
+  it('a skill do fluxo não é requisito: nenhuma ferramenta pede para instalá-la', async () => {
     connect('cursor');
-    expect(await checkRequirements(probe({ skillInstalled: false }))).toEqual([
-      { id: 'skill', tool: 'cursor', action: { kind: 'installSkill' } },
-    ]);
-    expect(await checkRequirements(probe({ skillInstalled: true }))).toEqual([]);
-    expect(await checkRequirements(probe())).toEqual([]);
+    const list = await checkRequirements(probe({ tool: 'cursor' }));
+    expect(list.some((r) => r.id === 'skill')).toBe(false);
+    expect(await checkRequirements(probe({ tool: 'claude' }))).not.toContainEqual(expect.objectContaining({ id: 'skill' }));
   });
 
   it('o registro do Claude para o usuário inteiro ou só para esta pasta (~/.claude.json) também vale', async () => {
@@ -266,19 +272,49 @@ describe('blocksExecution', () => {
   const req = (id: BoardRequirement['id']): BoardRequirement => ({ id, tool: 'claude', action: null });
 
   it('bloqueia quando falta login', () => {
-    expect(blocksExecution({ requirements: [req('signin')], authExpired: null })).toBe(true);
+    expect(blocksExecution({ requirements: [req('signin')], authExpired: [] }, 'claude')).toBe(true);
   });
 
-  it('não bloqueia por outro requisito que falte (CLI, MCP…)', () => {
-    expect(blocksExecution({ requirements: [req('cli'), req('mcp')], authExpired: null })).toBe(false);
+  it('não bloqueia por outro requisito que falte (MCP…); a CLI ausente bloqueia o perfil dela', () => {
+    expect(blocksExecution({ requirements: [req('mcp')], authExpired: [] }, 'claude')).toBe(false);
+    expect(blocksExecution({ requirements: [req('cli')], authExpired: [] }, 'claude')).toBe(true);
   });
 
   it('sem nenhum requisito pendente nem sinal reativo, não bloqueia', () => {
-    expect(blocksExecution({ requirements: [], authExpired: null })).toBe(false);
+    expect(blocksExecution({ requirements: [], authExpired: [] }, 'claude')).toBe(false);
   });
 
   it('bloqueia pelo sinal reativo mesmo sem "signin" nos requisitos (o probe não soube dizer)', () => {
-    expect(blocksExecution({ requirements: [], authExpired: 'cursor' })).toBe(true);
+    expect(blocksExecution({ requirements: [], authExpired: ['cursor'] }, 'cursor')).toBe(true);
+  });
+});
+
+describe('problemas por perfil de CLI', () => {
+  const req = (id: BoardRequirement['id'], tool: string): BoardRequirement => ({ id, tool, action: null });
+
+  it('cliProblem olha só o perfil pedido', () => {
+    const state = { requirements: [req('cli', 'cursor'), req('signin', 'kimi')], authExpired: ['claude'] };
+    expect(cliProblem(state, 'cursor')).toBe('cli');
+    expect(cliProblem(state, 'kimi')).toBe('signin');
+    expect(cliProblem(state, 'claude')).toBe('expired');
+    expect(cliProblem(state, 'outro')).toBeNull();
+  });
+
+  it('blocksExecution trava só o perfil com problema', () => {
+    const state = { requirements: [req('signin', 'cursor')], authExpired: [] };
+    expect(blocksExecution(state, 'cursor')).toBe(true);
+    expect(blocksExecution(state, 'claude')).toBe(false);
+  });
+
+  it('checkProfileCli devolve só cli e signin, com tool = id do perfil', async () => {
+    const cursor = { ...BUILTIN_PROFILES.find((p) => p.id === 'cursor')!, enabled: true };
+    // sem MCP registrado, sem skill: nada disso entra
+    const ok = await checkProfileCli(cursor, probe({ tool: 'claude' }));
+    expect(ok).toEqual([]);
+    const missing = await checkProfileCli(cursor, probe({ tool: 'claude', resolve: () => null }));
+    expect(missing.map((r) => [r.id, r.tool])).toEqual([['cli', 'cursor']]);
+    const signedOut = await checkProfileCli(cursor, probe({ tool: 'claude', profileSignedIn: async () => false }));
+    expect(signedOut.map((r) => [r.id, r.tool])).toEqual([['signin', 'cursor']]);
   });
 });
 
