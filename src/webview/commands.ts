@@ -3,6 +3,7 @@ import type { BranchRenamePending } from '../shared/branchRename';
 import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from '../shared/harness';
 import type { HarnessUsage, SelectableKind } from '../shared/harnessSelection';
 import type { AgentInput } from '../shared/messages';
+import type { ImportSource, OnConflict } from '../shared/artifactImport';
 import type { HookInput, McpServerInput } from '../shared/harnessCatalog';
 import type { BulkCardStatus, CardStatus } from '../shared/status';
 import type { ModelOption, ModelRule } from '../shared/models';
@@ -253,6 +254,12 @@ export const harness = {
   importLibrarySkills: (rels: string[]) => req({ type: 'harness.library.import', rels }),
   pickLibrarySource: () => req({ type: 'harness.library.pick' }),
   openLibrary: () => req({ type: 'harness.library.open' }),
+  /** Abre o seletor de pasta ou de arquivo de exportação para importar artefatos ao board. */
+  importPick: (what: 'folder' | 'export') => req({ type: 'harness.import.pick', what }),
+  /** Examina a origem e devolve a prévia em `state.artifactImport`. */
+  importScan: (source: ImportSource) => req({ type: 'harness.import.scan', source }),
+  importApply: (keys: string[], onConflict: OnConflict) => req({ type: 'harness.import.apply', keys, onConflict }),
+  importCancel: () => post({ type: 'harness.import.cancel' }),
   pickImport: (tool: AiTool) => req({ type: 'harness.import.pick', tool }),
   addImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.add', tool, dir }),
   removeImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.remove', tool, dir }),
