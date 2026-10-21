@@ -165,7 +165,14 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
    coluna do workflow dele (Backlog / A fazer no board padrão), inativo. Restaurar uma história traz
    também todas as sub-tarefas arquivadas dela e desliga o modo autônomo; restaurar uma sub-tarefa
    cuja história está arquivada pede confirmação e restaura a história inteira (uma sub-tarefa de
-   história ativa volta sozinha, sem confirmação).
+   história ativa volta sozinha, sem confirmação). A aba tem uma barra de filtros própria, que não
+   muda o filtro do board: busca por texto (título, descrição, conversa, campos e `#número`), tipo,
+   campos de opção (como Tags) e período de arquivamento. O contador mostra os filtros ativos, e
+   **Limpar filtros** os desfaz; ao sair e voltar, a aba abre limpa. Cada linha mostra 50 cards por
+   vez, e **Mostrar mais** traz os seguintes. Clicar numa história arquivada a seleciona: a linha de
+   Sub-tarefas passa a mostrar só as sub-tarefas arquivadas dela, mesmo as que não batem no filtro.
+   Clicar de novo, ou em **Limpar seleção**, desfaz a seleção. Abrir o card continua listando todas
+   as sub-tarefas.
 
 Nada acontece em silêncio: toda ação que vai ao board espera a confirmação e mostra que está
 trabalhando. Uma barra fina no topo acende enquanto qualquer pedido está em andamento; o card que

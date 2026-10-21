@@ -174,7 +174,14 @@ promise a percentage: it shows, in the inventory, what is being loaded.
    column of its workflow (Backlog / A fazer on the default board), inactive. Restoring a story also
    brings back all its archived sub-tasks and turns autonomous mode off; restoring a sub-task whose
    story is archived asks for confirmation and restores the whole story (a sub-task of an active
-   story comes back on its own, with no confirmation).
+   story comes back on its own, with no confirmation). The tab has its own filter bar, which does not
+   change the board's filter: text search (title, description, conversation, fields and `#number`),
+   type, option fields (such as Tags) and archive date range. The counter shows the active filters,
+   and **Limpar filtros** (clear filters) resets them; when you leave and come back, the tab opens
+   clear. Each row shows 50 cards at a time, and **Mostrar mais** (show more) brings the next ones.
+   Clicking an archived story selects it: the Sub-tarefas (sub-tasks) row then shows only its archived
+   sub-tasks, even those that do not match the filter. Clicking again, or **Limpar seleção** (clear
+   selection), clears the selection. Opening the card still lists all sub-tasks.
 
 Nothing happens silently: every action that goes to the board waits for confirmation and shows it
 is working. A thin bar at the top lights up while any request is in progress; the card being moved,

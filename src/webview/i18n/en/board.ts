@@ -114,6 +114,12 @@ export const board: Record<string, string> = {
   'Nome da coluna': 'Column name',
   Arquivados: 'Archived',
   // Aba Arquivados
+  'Buscar nos arquivados': 'Search archived',
+  'Mostrar mais': 'Show more',
+  'Mostrando {shown} de {total}': 'Showing {shown} of {total}',
+  'Nenhum card arquivado atende aos filtros.': 'No archived card matches the filters.',
+  'Nenhuma sub-tarefa arquivada desta história.': 'No archived sub-tasks for this story.',
+  'Sub-tarefas de {card}': 'Sub-tasks of {card}',
   'Nenhum card arquivado neste workflow.': 'No archived cards in this workflow.',
   'Cards arquivados ficam aqui, por workflow, do mais recente ao mais antigo. Restaurar leva o card para a primeira coluna do workflow dele.':
     'Archived cards stay here, by workflow, newest first. Restore sends the card to the first column of its workflow.',
