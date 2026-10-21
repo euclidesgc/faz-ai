@@ -55,7 +55,13 @@ describe('biblioteca particular do board', () => {
     const item = selectedItems(router.snapshot(), 'skill')[0]!;
     expect(item.path).toContain('/faz-ai-library/library-test/skills/react/SKILL.md');
     expect(fs.readFileSync(path.join(path.dirname(item.path), 'references/forms.md'), 'utf8')).toBe('Referência');
-    router.writeHarnessFile(item.path, '---\nname: react\ndescription: Particular\n---\nCópia editada');
+    router.handle({
+      type: 'harness.artifact.save',
+      kind: 'skill',
+      name: 'react',
+      previous: 'react',
+      body: '---\nname: react\ndescription: Particular\n---\nCópia editada',
+    });
     expect(fs.readFileSync(path.join(root, 'project/.claude/skills/react/SKILL.md'), 'utf8')).toContain('Original');
     fs.rmSync(path.join(root, 'project/.claude'), { recursive: true });
     for (const aiTool of ['cursor', 'kimi', 'claude'] as const) {

@@ -3,7 +3,7 @@ import { cardRef, type BoardState, type Card, type Column } from '../shared/mode
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
-import { cardCliProblem } from '../shared/requirements';
+import { cardCliProblem, noProfileAvailable } from '../shared/requirements';
 import { limitOf, type AiRunMode } from '../shared/runner';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
@@ -403,6 +403,8 @@ export class Autopilot {
           continue;
         }
         if (step.kind !== 'run') return;
+        // nenhum perfil disponível: não insiste sozinho, a pessoa resolve
+        if (noProfileAvailable(this.router.snapshot())) return;
         // o teto é por tipo de atividade e conta toda execução em andamento (heartbeat, chamadas à mão):
         // o autopiloto usa as vagas livres de cada tipo, na ordem da fila
         const s = this.router.snapshot();

@@ -20,6 +20,7 @@ import { detectMainBranch } from '../../git';
 import { ghProcess, type GhRunner } from '../../branchRename';
 import { parseGit, type MainBranch } from '../../../shared/git';
 import { BoardLibrary } from '../../boardLibrary';
+import { ArtifactImporter } from '../../artifactImport';
 import { BoardHarness } from './harness';
 
 export interface RouterOptions {
@@ -56,6 +57,8 @@ export class BoardContext {
   readonly store: AttachmentStore;
   readonly harness: BoardHarness;
   readonly library: BoardLibrary;
+  /** a prévia e a cópia de artefatos de pasta, git, ferramenta instalada ou export; descartada ao fechar o board */
+  readonly importer: ArtifactImporter;
   /** o log de utilização: sonda antes do handler e registro depois, feitos pelo router */
   readonly log: EventLog;
   /** muda quando o board é recriado (settings.board.reset) */
@@ -94,6 +97,7 @@ export class BoardContext {
     // nada a mudar para chegar ao padrão atual: só registra a versão, sem perguntar
     if (!pendingUpgrade(db, board.id).length) upgradeBoard(db, board.id);
     this.library = new BoardLibrary(this);
+    this.importer = new ArtifactImporter(this);
     this.harness = new BoardHarness(
       this,
       opts.workspaceDir ? new HarnessStore(opts.workspaceDir, catalogTool(activeProfile(board)), opts.homeDir ?? '') : null,

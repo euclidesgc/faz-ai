@@ -1,5 +1,4 @@
 import { isAiBase, EMPTY_HARNESS } from '../shared/harness';
-import type { AiBase } from '../shared/aiProfiles';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -15,7 +14,6 @@ import {
   type PluginInstall,
   type RuleFile,
   type Skill,
-  type SkillMode,
   type ToolInventory,
 } from '../shared/harness';
 import type { AgentInput } from '../shared/messages';
@@ -24,7 +22,7 @@ import { agentInputOf, lacksBoardTools, parseAgentFile, renderAgentFile } from '
 import { frontmatterOf, frontmatterValue } from './frontmatter';
 import { scanInventory } from './harnessScan';
 import { detectTools } from './models';
-import { setSkillMode, skillMode } from './skillMode';
+import { skillMode } from './skillMode';
 
 const MAX_BYTES = 512 * 1024;
 
@@ -61,9 +59,6 @@ export class HarnessStore {
    */
   claudePlugins: PluginInstall[] | null = null;
 
-  /** As pastas importadas de cada ferramenta (caminhos absolutos), varridas junto com o resto. */
-  imports: Partial<Record<AiBase, string[]>> = {};
-
   setTool(tool: AiTool): void {
     this.tool = tool;
   }
@@ -94,14 +89,7 @@ export class HarnessStore {
     return ALL_AI_BASES.map((tool) => ({
       tool,
       installed: installed.includes(tool),
-      items: scanInventory(
-        tool,
-        this.workspaceDir,
-        this.homeDir,
-        undefined,
-        tool === 'claude' ? this.claudePlugins : null,
-        this.imports[tool] ?? [],
-      ),
+      items: scanInventory(tool, this.workspaceDir, this.homeDir, undefined, tool === 'claude' ? this.claudePlugins : null),
     }));
   }
 
@@ -215,72 +203,6 @@ export class HarnessStore {
 
   deleteAgent(name: string, scope: InstallScope): void {
     fs.rmSync(this.existingAgent(name, scope), { force: true });
-  }
-
-  writeRule(name: string, content: string): void {
-    fs.writeFileSync(this.rulePath(name), content);
-  }
-
-  deleteRule(name: string): void {
-    fs.rmSync(this.rulePath(name), { force: true });
-  }
-
-  createSkill(name: string, description: string, body: string): void {
-    this.checkName(name);
-    if (this.find(name)) throw new Error(`Já existe uma skill "${name}".`);
-    if (!description.trim()) throw new Error('A skill precisa de uma descrição: é por ela que a IA decide quando usar a skill.');
-    const dir = path.join(this.workspaceDir, this.dirs.enabled, name);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'SKILL.md'), skillTemplate(name, description, body));
-  }
-
-  /** Substitui o SKILL.md inteiro (com o frontmatter). */
-  writeSkill(name: string, content: string): void {
-    fs.writeFileSync(path.join(this.dirOf(name).dir, 'SKILL.md'), content);
-  }
-
-  setSkillEnabled(name: string, enabled: boolean): void {
-    const found = this.dirOf(name);
-    if (found.enabled === enabled) return;
-    const to = path.join(this.workspaceDir, enabled ? this.dirs.enabled : this.dirs.disabled, name);
-    if (fs.existsSync(to)) throw new Error(`Já existe uma skill "${name}" ${enabled ? 'ligada' : 'desligada'}.`);
-    fs.mkdirSync(path.dirname(to), { recursive: true });
-    fs.renameSync(found.dir, to);
-  }
-
-  /** Invocação automática ou só quando indicada, gravado no formato da ferramenta em uso. */
-  setSkillMode(name: string, mode: SkillMode): void {
-    setSkillMode(path.join(this.dirOf(name).dir, 'SKILL.md'), mode);
-  }
-
-  deleteSkill(name: string): void {
-    fs.rmSync(this.dirOf(name).dir, { recursive: true, force: true });
-  }
-
-  private find(name: string): { dir: string; enabled: boolean } | undefined {
-    for (const enabled of [true, false]) {
-      const dir = path.join(this.workspaceDir, enabled ? this.dirs.enabled : this.dirs.disabled, name);
-      if (fs.existsSync(path.join(dir, 'SKILL.md'))) return { dir, enabled };
-    }
-    return undefined;
-  }
-
-  private dirOf(name: string) {
-    this.checkName(name);
-    const found = this.find(name);
-    if (!found) throw new Error(`Skill "${name}" não encontrada.`);
-    return found;
-  }
-
-  private checkName(name: string): void {
-    if (!SKILL_NAME_PATTERN.test(name))
-      throw new Error('Nome de skill inválido: use letras minúsculas, números e hífens (ex.: "revisar-spec").');
-  }
-
-  private rulePath(name: string): string {
-    if (!RULE_FILES.some((r) => r.name === name))
-      throw new Error(`Arquivo de regras desconhecido: "${name}". Aceitos: ${RULE_FILES.map((r) => r.name).join(', ')}.`);
-    return path.join(this.workspaceDir, name);
   }
 
   private read(file: string): string {

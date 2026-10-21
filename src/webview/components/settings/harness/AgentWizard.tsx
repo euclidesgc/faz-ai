@@ -12,7 +12,6 @@ import {
 } from '../../../../shared/agentWizard';
 import type { AgentSuggestion } from '../../../../shared/agentSuggestions';
 import { TOOL_PRESETS } from '../../../../shared/execution';
-import type { InstallScope } from '../../../../shared/harness';
 import { isFreeName, toItemName, type AiToolInfo } from '../../../../shared/harnessProject';
 import { selectedMcpNames } from '../../../../shared/harnessSelection';
 import type { AgentInput } from '../../../../shared/messages';
@@ -71,17 +70,7 @@ const EMPTY: Answers = {
  * não esconde as opções. O escopo fica o menor possível: ferramentas, servidores e skills só entram se marcados.
  * Nada é gravado antes do botão do último passo; uma sugestão pronta abre o assistente com as respostas feitas.
  */
-export function AgentWizard({
-  tool,
-  scope,
-  preset,
-  onClose,
-}: {
-  tool: AiToolInfo;
-  scope: InstallScope;
-  preset?: AgentSuggestion;
-  onClose: () => void;
-}) {
+export function AgentWizard({ tool, preset, onClose }: { tool: AiToolInfo; preset?: AgentSuggestion; onClose: () => void }) {
   const state = useBoardStore((s) => s.state)!;
   const format = baseValue(AGENT_FORMAT, tool.id) ?? { tools: false, skills: false, mcp: false, readonly: false, background: false };
   const catalog = state.board.modelCatalog;
@@ -114,7 +103,7 @@ export function AgentWizard({
 
   const name = a.name ?? nameFromText(a.directive);
   const description = a.description ?? a.directive.replace(/\s+/g, ' ').trim();
-  const nameOk = isFreeName(name, state.harness.agents);
+  const nameOk = isFreeName(name, [...state.harness.agents, ...(state.harness.library?.artifacts ?? []).filter((x) => x.kind === 'agent')]);
   const draft = draftAgentInstructions(tool.id, {
     directive: a.directive,
     tools: a.tools,
@@ -143,7 +132,7 @@ export function AgentWizard({
         ...(format.readonly && a.readonly ? { readonly: true } : {}),
         ...(format.background && a.background ? { background: true } : {}),
       };
-      harness.createAgent(scope, input);
+      harness.createAgent(input);
       onClose();
       return;
     }
@@ -153,7 +142,7 @@ export function AgentWizard({
   const disabled = step === 0 ? !a.directive.trim() : step === STEPS.length - 1 ? !nameOk || !description : false;
   const unsupported = (what: string, canSkip = true) => (
     <p className="muted small">
-      {t('O {tool} não aceita {what} no arquivo do agente: ele herda tudo da conversa principal.', { tool: tool.label, what })}
+      {t('O {tool} não aceita {what} por agente: ele herda tudo da conversa principal.', { tool: tool.label, what })}
       {canSkip && ` ${t('Pode continuar.')}`}
     </p>
   );
@@ -386,12 +375,7 @@ export function AgentWizard({
           </FormField>
           <dl className="wizard-summary">
             <dt>{t('Onde')}</dt>
-            <dd>
-              <code>
-                {scope === 'project' ? tool.agents.dir : `~/${tool.agents.dir}`}/{name}
-                {tool.agents.ext}
-              </code>
-            </dd>
+            <dd>{t('No board, em "Pelo card": {name}', { name })}</dd>
             {format.tools && (
               <>
                 <dt>{t('Ferramentas')}</dt>

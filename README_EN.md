@@ -70,6 +70,9 @@ In five minutes you have a task moving on the board, with the AI working on it.
    pick the project's tool (Claude Code, Cursor or Kimi Code). In the **Projeto** (project) tab, click
    **Instalar (padrão da ferramenta)** (install, tool default) in the **Servidores MCP** (MCP servers)
    group. The board's flow reaches the AI through the MCP itself, with no skill to install.
+   The board's artifacts (rules, skills, agents and MCP servers) live in the Harness **Artefatos do
+   board** (board artifacts) tab: created there or imported from a folder, an installed tool or an
+   exported file, copied and with confirmation before replacing.
 3. **Create the task.** In the **Backlog** column, click **+ Novo card** (new card), type the title
    (for example, "Login with Google") and press Enter. Double-click opens the card: describe what
    you want, in Markdown, and optionally pick the AI model and the skills it must read.
@@ -325,8 +328,8 @@ the window opens) and then to **turn on `faz-ai`** in Cursor Settings → MCP (C
 project server off). Replacing a flow skill that already exists at the destination asks for
 confirmation (changes made to it are lost). The **Faz AI: Install the board MCP (global)** palette
 command does the install on the project's tool. An old project registration (`.mcp.json`,
-`.kimi-code/mcp.json`) takes precedence over the global one and is not migrated: the requirements
-banner offers **Corrigir o registro** (fix the registration), which removes it and redoes the global.
+`.kimi-code/mcp.json`) takes precedence over the global one and is not migrated: remove the `faz-ai`
+entry from that file by hand, or run the install command again.
 4. Open a new session of the tool in the project folder and ask, for example, "list the cards on
    the board", "take story #1 and write the PRD" or "check what is pending on the board and move it
    forward".
@@ -347,45 +350,48 @@ forward. The last screen is the summary, with the unanswered questions; **Enviar
 answers) records everything in the **Perguntas e respostas** (Questions and answers) section and hands
 the turn back to the AI.
 
-While something is missing for the board to work with the tool, the **Configurações** (Settings) tab
-and the **Verificar ambiente** (Check environment) button get a warning icon. Its hint sums up what is
+While something is missing for the board to work, the **Configurações** (Settings) tab and the
+**Verificar ambiente** (Check environment) button get a warning icon. Its hint sums up what is
 missing, with each item's name, and each item's explanation and action are in the environment check.
-The chat panel, which has no Settings, keeps a bar with the same items. The check looks at Node.js (the board's server runs on
-it), the tool's command line, its sign-in (for Cursor, through `cursor-agent status`; for Claude
-Code, through `claude auth status`; for Kimi Code, through its credentials folder), the board's
-server registration in the file the tool reads (for Claude, the registration for your user from
-`claude mcp add -s user` also counts), a registration pointing to a node or path that no longer
-exists, to another folder or to the bridge of an earlier version, and the permission level. Each
-item says what it affects and brings the action: the command to copy, **Instalar o MCP do board**
-(install the board MCP, which opens the tool's MCP servers section), **Corrigir o registro** (fix the
-registration: a broken one in the project file takes precedence over the global one; fixing removes
-it from there and leaves the global one in effect), **Recarregar a janela** (reload the window) or
-the shortcut to the Harness. The icon goes away on its own when the last item is solved. The
-check runs when the board opens, when the tool or permission changes, after connecting, every 5
-minutes and on **Verificar de novo** (check again), which also rereads the terminal PATH (a node
-installed with the board open is found without reloading the window), and says when nothing
-changed. Next to it, in the editor, **Recarregar a janela** (reload the window) restarts the
+The chat panel, which has no Settings, keeps a bar with the same items. The board checks Node.js (the
+board's server runs on it) and **each CLI profile that is turned on**: whether the command line
+exists, whether it is signed in (for Cursor, through `cursor-agent status`; for Claude Code, through
+`claude auth status`; for Kimi Code, through its credentials folder; for custom profiles, through the
+status command the profile declares) and whether the profile is waiting for review. An imported
+profile that has not been reviewed runs no command at all.
+
+The warning only **blocks** the board (red icon, AI buttons disabled, heartbeat and autonomous mode
+stopped) when **no** enabled profile is available. A profile with a problem, while another one is
+ready, becomes just its own warning, with a link to its block in the environment check: with Claude
+Code installed and signed in and Cursor absent, the board works and Cursor shows as not found.
+Disabled profiles and profiles pending review never raise a warning. The icon goes away on its own
+when the last item is solved. The check runs when the board opens, when the tool or permission
+changes, every 5 minutes and on **Verificar de novo** (check again), which also rereads the terminal
+PATH (a node installed with the board open is found without reloading the window) and says when
+nothing changed. Next to it, in the editor, **Recarregar a janela** (reload the window) restarts the
 extension: that is what makes a freshly updated extension take effect. With the AI working on a
 card, it asks first, because the run stops.
 
-The board MCP counts as a requirement for every tool: even where runs from the board carry the MCP on
-their own (Claude, Cursor), conversations in the editor chat or the terminal depend on it, and it is how
-the flow reaches the AI (`get_skill`). An installed flow skill in the tool is not a requirement. While the command line is missing or not signed in, the card's AI buttons are
-disabled, with the reason in the tooltip.
+**Behavior change.** The environment check and the top warning no longer ask for the board MCP
+registered in the tool, the flow skill installed in it, the permission level in its file or the Code
+Review Graph MCP: the board delivers the context to runs, and that no longer depends on the tool
+being configured. The buttons that fixed those items are gone too (**Instalar o MCP do board**,
+**Corrigir o registro**, **Corrigir o caminho**, **Instalar a skill**, **Liberar as ferramentas do
+board**, **Abrir MCPs do Cursor**). While the default profile's command line is missing or not
+signed in, the card's AI buttons are disabled, with the reason in the tooltip.
 
-**Expired login: error warning and automatic resume.** When the warning's reason is sign-in (missing,
-or expired mid-run), the warning icon turns red instead of the usual yellow, and the item gains an
-**Abrir no terminal** (open in terminal) button next to the command to copy: the board opens an editor
-terminal and runs the command there, but you always do the actual sign-in. Before every AI call (the
-card's button, the heartbeat and autonomous mode), the board checks the sign-in again; if it expired,
-the run does not even start. When the login expires mid-run, the first failure that matches a known pattern ("OAuth session expired", "not
-logged in", "401", etc.) does not block the card: it goes back to the status it had, with a short
-comment, and the same error warning turns on — the heartbeat and autonomous
-mode do not retry on their own while it is on. The warning goes away and the queue resumes on its
-own once the sign-in is confirmed again (by the periodic check, within 10 seconds of signing in, or
-via **Já entrei: verificar de novo** — I signed in, check again) or, when the check cannot tell, on
-the first manual run that succeeds. The environment check shows the same warning in the
-**Login na linha de comando** (command line sign-in) item.
+**Expired login: warning and automatic resume.** When the warning's reason is sign-in (missing, or
+expired mid-run), the profile gets a "not signed in" warning and, for ready profiles, an **Abrir no
+terminal** (open in terminal) button next to the command to copy: the board opens an editor terminal
+and runs the command there, but you always do the actual sign-in. Before every AI call (the card's
+button, the heartbeat and autonomous mode), the board checks the sign-in again; if it expired, the
+run does not even start. When the login expires mid-run, the first failure that matches a known
+pattern ("OAuth session expired", "not logged in", "401", etc.) does not block the card: it goes back
+to the status it had, with a short comment, and the heartbeat and autonomous mode do not retry on
+their own while the default profile's sign-in is expired. The queue resumes on its own once the
+sign-in is confirmed again (by the periodic check, within 10 seconds) or, when the check cannot tell,
+on the first manual run that succeeds. The environment check shows the same warning on the profile's
+**Login** line.
 
 **Environment check.** The first time the board opens on a machine, a list opens on its own with
 everything the board needs and what it makes use of. After that, it opens from the **Verificar
@@ -393,18 +399,23 @@ ambiente** (Check environment) button in Settings (with the warning icon when so
 on another item shows inside it (the sign-in inside the command line, the graph inside Code Review
 Graph). Hover over an item to see how the board uses it.
 
-- **Required:** Node.js 22 or newer and the project's AI tool, with its command line, the sign-in
-  (`claude auth login` or `cursor-agent login`), the board's MCP, the **harness
-  definition** and the permission level. The harness definition is a recommendation, not a blocker:
-  the board works without it, only without the context savings and precision. It points out, one
-  child per gap, what the artifact bank lacks: no skill, agent or MCP server in Pelo card mode (use
-  "Indicar artefatos"), no board agent, rules sent and still off, an artifact that vanished from its
-  source and, in Cursor, project rules, servers or hooks that enter the context without going
-  through the board. The same shows in the banner at the top of the board as a discreet
-  recommendation line, with the shortcut to the Harness.
-- **Optional:** the other AI tool, when it is on the machine (its command line on the PATH or, in
-  Cursor, the editor itself). A project on Claude Code shows Cursor here, and vice versa. The list only
-  shows the state: the board installs its MCP and skill there when it becomes the project's tool.
+- **Required:** Node.js 22 or newer.
+- **CLI profiles:** one block per enabled profile, the default first, and a closed **Desligados**
+  (off) group with the disabled ones and those pending review. Each block shows the **status** (on,
+  off or pending review), the **command line** (the path and version found, or "not found" with the
+  installation: the official installer for ready profiles, the link the profile declares, or "This
+  profile did not say how to install it"), the **sign-in** (signed in, signed out, or "not checked"
+  when the profile has no status command), the **credentials** (only the reference name and whether it
+  is filled in or missing, never the value) and the **last real verification**. The board does not
+  record that verification yet: the block says "Not validated: this profile has not been tested yet"
+  as information, with no verified seal, and that does not stop the profile from being used. The
+  link in the top warning opens the environment check on the profile's block.
+- **Artifact bank** (formerly the "harness definition"): a recommendation, not a blocker. The board
+  works without it, only without the context savings and precision. It points out, one child per gap,
+  what is missing: no skill, agent or MCP server in Pelo card mode (use "Indicar artefatos"), no board
+  agent, rules sent and still off, and an artifact that vanished from its source. It does not depend
+  on any tool. The same shows in the top warning as a discreet recommendation line, with the shortcut
+  to the Harness.
 - **Recommended:** Git and a repository in the folder, the GitHub CLI and its sign-in (for automatic
   merge and PR tracking) and [Code Review Graph](https://github.com/tirth8205/code-review-graph), a
   graph of the code the AI queries instead of reading whole files, with the project graph, its MCP and
@@ -419,18 +430,15 @@ the neutral ones that work on any distribution: `curl` on Linux and macOS, Power
 show the system's command: `xcode-select --install` and `brew install gh` on macOS, `apt`, `dnf` or
 `pacman` on Linux (with the `sudo apt update` a new machine needs first) and `winget` on Windows; on an
 unknown distribution, only the site. Sign-ins and actions in the project folder (`git init`, `gh auth login`,
-`code-review-graph build`, `code-review-graph install --platform …`, `code-review-graph embed
---provider local`) also show the command with a copy button. Only what belongs to
-the board has a button: installing the board's MCP (and, if you want, the flow skill), and opening the permission
-level choice.
+`code-review-graph build`, `code-review-graph embed --provider local`) also show the command with a
+copy button. The environment check only checks and guides: the only buttons lead to the Harness and
+to the sign-in terminal.
 
 The editor chat starts the board's MCP with the PATH the editor opened with: Node installed later
 (through `nvm`, for example) is not in it until the editor is closed and reopened. So, when Node shows
-up, or through the **Corrigir o caminho** (Fix the path) button on the MCP item in the environment check, the board writes
-the command's full path into the `faz-ai` and `code-review-graph` registrations the editor cannot
+up, the board writes the command's full path into the `faz-ai` and `code-review-graph` registrations the editor cannot
 find. The path is found at that moment, on the machine where the extension runs, and the file stays
-out of git (`.git/info/exclude`). If the project MCP file is versioned, the board does not write to it
-and explains the options.
+out of git (`.git/info/exclude`). If the project MCP file is versioned, the board does not write to it.
 
 Suggested flow: the AI reads the story and the phase instruction, creates a sub-task to build the
 phase document, attaches the document to the story and asks for review in the card's conversation.
@@ -1275,7 +1283,7 @@ Each artifact notice has an outlined button below the text on the right to dismi
 path on the computer running the board. The preview groups all four types with counts and
 checkboxes; **Import selected** copies each item into its tab. It recognizes native tool formats
 and neutral collections: `AGENTS.md`, `rules/`, `agents/`, and skills containing `SKILL.md`, including
-nested folders. `mcp.json` and `.mcp.json` use `mcpServers`. The preview has four tabs, including
+nested folders; for Kimi Code, the project's `.kimi-code/AGENTS.md` is read too. `mcp.json` and `.mcp.json` use `mcpServers`. The preview has four tabs, including
 empty ones, with independent filters. Selections persist across tabs and filters. Duplicate names
 within a type are skipped while other items are imported; the summary groups conflicts and offers
 an explicit confirmation before overwriting them.
@@ -1524,7 +1532,7 @@ machine, for example), they must be set up again:
 | Item | What it is for | How to get it |
 |---|---|---|
 | Node.js 22+ and git | build, tests and the `faz-ai` command | regular install |
-| `.mcp.json` and `.claude/settings.local.json` | connect the AI to the board; hold machine paths | the board no longer creates them (only Cursor's `.cursor/mcp.json`); an old one goes away with **Corrigir o registro** (fix the registration) in the requirements banner |
+| `.mcp.json` and `.claude/settings.local.json` | connect the AI to the board; hold machine paths | the board no longer creates them (only Cursor's `.cursor/mcp.json`); an old one only goes away if you remove it by hand |
 | Board and attachments | live in the extension's storage, not in the repository | the folder's board starts empty on the other machine |
 | `.env.release` with `OVSX_PAT` | publishing to Open VSX | token at https://open-vsx.org/user-settings/tokens |
 | Azure CLI login | publishing to the VS Code Marketplace | `az login --allow-no-subscriptions`, with the account that owns the publisher |

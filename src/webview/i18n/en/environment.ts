@@ -15,23 +15,35 @@ export const environment: Record<string, string> = {
   'O board está pronto para trabalhar com a IA. Há {n} recomendações para aproveitar melhor.':
     'The board is ready to work with the AI. There are {n} recommendations to get more out of it.',
   'Tudo pronto: o board tem tudo o que usa.': 'All set: the board has everything it uses.',
+  'Banco de artefatos do board': 'Board artifact bank',
+  'Perfis de CLI': 'CLI profiles',
+  'Nenhum perfil de CLI está ligado.': 'No CLI profile is turned on.',
+  'Desligados ({n})': 'Off ({n})',
+  'O que o board precisa para trabalhar com a IA: o Node.js, cada perfil de CLI (linha de comando, login e credenciais), o banco de artefatos e o que ele aproveita quando está instalado. Passe o mouse sobre um item para ver como o board o usa. O board não instala nada de terceiros: instale pelo comando ou pelo site indicado.':
+    'What the board needs to work with the AI: Node.js, each CLI profile (command line, login and credentials), the artifact bank and what it uses when installed. Hover an item to see how the board uses it. The board installs nothing from third parties: install with the command or the site shown.',
+  'Banco de artefatos': 'Artifact bank',
+  Ligado: 'On',
+  Padrão: 'Default',
+  'Perfil importado: revise antes de usar. O board não roda nenhum comando dele enquanto isso.':
+    'Imported profile: review it before use. The board runs none of its commands meanwhile.',
+  'Linha de comando encontrada': 'Command line found',
+  'Linha de comando não encontrada': 'Command line not found',
+  'Como instalar': 'How to install',
+  'Este perfil não informou como instalar.': 'This profile did not say how to install it.',
+  'Login: desconectado': 'Login: signed out',
+  'Login: venceu numa execução': 'Login: expired during a run',
+  'Login: conectado': 'Login: signed in',
+  'Login: não conferido (o perfil não tem comando de status)': 'Login: not checked (the profile has no status command)',
+  'Login: não conferido (falta a linha de comando)': 'Login: not checked (the command line is missing)',
+  'Credencial {name}: preenchida': 'Credential {name}: filled in',
+  'Credencial {name}: ausente': 'Credential {name}: missing',
+  'Verificado em {version}': 'Verified on {version}',
+  'Precisa verificar de novo: a linha de comando mudou desde o último teste':
+    'Needs checking again: the command line changed since the last test',
+  'Não validado: este perfil ainda não foi testado': 'Not validated: this profile has not been tested yet',
   'Depende do item anterior': 'Depends on the item above',
   Falta: 'Missing',
-  'Instalar a skill': 'Install the skill',
-  'A skill do fluxo ({name}) não está pronta para o {tool}': 'The flow skill ({name}) is not ready for {tool}',
-  'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem só do que está no board (no Claude Code, contexto vazio imposto; nas outras CLIs, veja o que elas carregam sozinhas em Ferramentas de IA): a skill precisa existir e estar no board em modo "Sempre" em Configurações → Harness. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.':
-    'It teaches the AI to drive cards through the board flow: phases, documents, review and pending items. Board runs start from only what is on the board (in Claude Code, empty context is enforced; for other CLIs, see what they load on their own in Ferramentas de IA): the skill must exist and be on the board in "Always" mode in Settings → Harness. Installing from here writes to the tool\'s global skills folder and checks it.',
-  'O {tool} não acha o comando do MCP do board': '{tool} cannot find the board MCP command',
-  '{file} inicia o MCP com "{missing}", que não está no PATH com que o editor abriu (o programa foi instalado depois, ou fica numa pasta que o editor não lê). O arquivo está no git, então o board não grava nele o caminho desta máquina: feche e abra o editor de novo, ou tire o arquivo do git.':
-    '{file} starts the MCP with "{missing}", which is not in the PATH the editor opened with (the program was installed later, or lives in a folder the editor does not read). The file is in git, so the board does not write this machine’s path into it: close and reopen the editor, or take the file out of git.',
-  '{file} inicia o MCP com "{missing}", que não está no PATH com que o editor abriu (o programa foi instalado depois, ou fica numa pasta que o editor não lê). Corrigir grava o caminho completo dele nesta máquina, e o arquivo fica fora do git; depois, recarregue a janela.':
-    '{file} starts the MCP with "{missing}", which is not in the PATH the editor opened with (the program was installed later, or lives in a folder the editor does not read). Fixing writes its full path on this machine, and the file stays out of git; then reload the window.',
-  'Corrigir o caminho': 'Fix the path',
   uv: 'uv',
-  'Aplicando e conferindo de novo…': 'Applying and checking again…',
-  'MCP do board (faz-ai)': 'Board MCP (faz-ai)',
-  'Nível de permissão das execuções': 'Permission level for runs',
-  'Skill do fluxo ({name})': 'Flow skill ({name})',
   'Repositório Git nesta pasta': 'Git repository in this folder',
   'Nome da branch principal/develop': 'Main/develop branch name',
   'O nome novo já está nas configurações, mas o repositório ainda usa o antigo. Renomear ou Desfazer na tela Git acerta o clone, o upstream e o origin; o comando abaixo é só o do clone local.':
@@ -47,7 +59,6 @@ export const environment: Record<string, string> = {
   'O que o board precisa para trabalhar com o {tool}, as outras ferramentas de IA desta máquina e o que ele aproveita quando está instalado. Passe o mouse sobre um item para ver como o board o usa. O board instala só o próprio MCP e a skill do fluxo; o resto você instala pelo site indicado.':
     'What the board needs to work with {tool}, the other AI tools on this machine and what it makes use of when installed. Hover over an item to see how the board uses it. The board installs only its own MCP and the flow skill; you install the rest from the site shown.',
   Necessários: 'Required',
-  Opcionais: 'Optional',
   Recomendados: 'Recommended',
   '{version} encontrado': '{version} found',
   'Para instalar:': 'To install:',
@@ -72,24 +83,6 @@ export const environment: Record<string, string> = {
   'Node.js {min} ou mais novo': 'Node.js {min} or newer',
   'Roda o MCP do board: a ferramenta de IA o inicia com o Node.js do PATH a cada conversa e a cada execução pelo board.':
     "Runs the board's MCP: the AI tool starts it with the Node.js on the PATH in every conversation and every run from the board.",
-  '{tool} (ferramenta do projeto)': '{tool} (project tool)',
-  'A ferramenta de IA que o board usa nos botões de IA dos cards, no chat, no heartbeat e no modo autônomo.':
-    "The AI tool the board uses for the cards' AI buttons, the chat, the heartbeat and autonomous mode.",
-  '{tool} (encontrado na máquina)': '{tool} (found on this machine)',
-  'Outra ferramenta de IA nesta máquina. O board passa a usá-la se você a escolher em Configurações → Harness, e aí instala nela o MCP e a skill do board.':
-    "Another AI tool on this machine. The board starts using it if you choose it in Settings → AI Harness, and then installs the board's MCP and skill in it.",
-  'Linha de comando {cli}': 'Command line {cli}',
-  'O board roda a linha de comando do {tool} em segundo plano, nesta pasta, para a IA trabalhar nos cards.':
-    'The board runs the {tool} command line in the background, in this folder, for the AI to work on the cards.',
-  'Login na linha de comando': 'Command line sign-in',
-  'As execuções pelo board usam a sua conta e o seu plano no {tool}. Sem login, elas falham antes de começar.':
-    'Runs from the board use your {tool} account and plan. Without signing in, they fail before starting.',
-  'O canal pelo qual a IA do {tool} lê e atualiza os cards deste board: consulta, move entre as colunas, comenta e anexa. Roda na sua máquina.':
-    "The channel through which the {tool} AI reads and updates this board's cards: it looks them up, moves them between columns, comments and attaches files. It runs on your machine.",
-  'Ensina a IA do {tool} a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências.':
-    "Teaches the {tool} AI to move the cards through the board's flow: phases, documents, review and pending items.",
-  'Diz o que a IA do {tool} pode fazer sozinha nas execuções pelo board. É escolhido em Configurações → Harness.':
-    'Sets what the {tool} AI may do on its own in runs from the board. It is chosen in Settings → AI Harness.',
   'Com o modo do Git ligado, o board cria uma branch ou uma worktree para cada história. O seu nome no Git assina os comentários.':
     'With Git mode on, the board creates a branch or a worktree for each story. Your Git name signs the comments.',
   'Os modos de branch e de worktree precisam de um repositório. Sem ele, as histórias são trabalhadas direto na pasta.':
@@ -102,20 +95,16 @@ export const environment: Record<string, string> = {
     'Code Review Graph analyzes the project once; after that, the graph updates with every change.',
   'Instala o Code Review Graph e o mantém atualizado, isolado na própria pasta. Se faltar um Python 3.10 ou mais novo, o uv baixa um só para ele: não é preciso instalar o Python antes.':
     'Installs Code Review Graph and keeps it up to date, isolated in its own folder. If Python 3.10 or newer is missing, uv downloads one just for it: there is no need to install Python first.',
-  'MCP do Code Review Graph': 'Code Review Graph MCP',
-  'É por ele que a IA do {tool} consulta o grafo nas conversas e nas execuções.':
-    'It is how the {tool} AI queries the graph in conversations and runs.',
   'Busca semântica': 'Semantic search',
   'Deixa a IA buscar o código pelo significado ("onde validamos o login?"), e não só pelo nome. Com o provedor local, o código não sai da sua máquina.':
     'Lets the AI search the code by meaning ("where do we validate the login?"), not just by name. With the local provider, the code does not leave your machine.',
 
   // --- Definição do harness
-  'Definição do harness': 'Harness definition',
   'O banco de artefatos do board: as skills, agentes, servidores MCP e regras que as execuções podem usar, no modo de cada um. Sem ele o board funciona, mas sem o ganho de economia e precisão.':
     "The board's artifact bank: the skills, agents, MCP servers and rules runs may use, each in its mode. The board works without it, but without the context savings and precision.",
   'Artefatos no board': 'Artifacts on the board',
-  'Nenhuma skill, agente ou servidor MCP em modo "Pelo card": o planejamento dos cards não tem de onde escolher. Use "Indicar artefatos" na aba do {tool} no Harness.':
-    'No skill, agent or MCP server in "Pelo card" mode: the cards\' planning has nothing to pick from. Use "Indicar artefatos" in the {tool} tab of the Harness.',
+  'Nenhuma skill, agente ou servidor MCP em modo "Pelo card": o planejamento dos cards não tem de onde escolher. Importe ou crie artefatos em Harness, na aba Artefatos do board.':
+    'No skill, agent or MCP server in "By card" mode: the cards\' planning has nothing to pick from. Import or create artifacts in Harness, in the Board artifacts tab.',
   'Agente do board': 'Board agent',
   'Sem agente, toda execução roda com o escopo cheio. Crie um com "Criar agente com ajuda" ou "Sugerir agentes com IA".':
     'Without an agent, every run has the full scope. Create one with "Criar agente com ajuda" or "Sugerir agentes com IA".',
@@ -125,9 +114,6 @@ export const environment: Record<string, string> = {
   'Artefatos presentes': 'Artifacts present',
   'Um artefato do board sumiu da origem; a aba do assunto mostra quais estão ausentes, para tirar do board ou repor o arquivo.':
     "A board artifact vanished from its source; the subject's tab shows which are missing, to remove from the board or restore the file.",
-  'Artefatos fora do board que a CLI carrega': 'Artifacts outside the board that the CLI loads',
-  'A linha de comando do {tool} não desliga tudo: {list} entram no contexto sem passar pelo board. Desligue na configuração da ferramenta ou remova; o board só confere.':
-    "The {tool} command line does not turn everything off: {list} enter the context without going through the board. Turn them off in the tool's settings or remove them; the board only checks.",
   'regras do projeto': 'project rules',
   'regras do usuário': 'user rules',
   'skills do projeto': 'project skills',

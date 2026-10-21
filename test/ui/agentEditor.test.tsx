@@ -3,9 +3,16 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { choose, lastSent, posted, renderThemed, seedBoard, sentOf } from './setup';
 import { baseInfo, type Agent, type HarnessItem } from '../../src/shared/harness';
+import {
+  AgentsToolbar,
+  DefaultAgentBadge,
+  DeleteAgentButton,
+  MakeDefaultButton,
+} from '../../src/webview/components/settings/harness/AgentsToolbar';
 import { AgentEditor } from '../../src/webview/components/settings/harness/AgentEditor';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import type { BoardState } from '../../src/shared/model';
+import type { BoardArtifact } from '../../src/shared/artifacts';
 
 const agent: Agent = {
   name: 'revisor',
@@ -70,7 +77,6 @@ describe('editor de agente: Claude Code', () => {
     expect(lastSent('harness.agent.update')).toEqual({
       type: 'harness.agent.update',
       name: 'revisor',
-      scope: 'project',
       patch: { tools: ['Read', 'mcp__github__*', 'Grep'] },
     });
     await userEvent.click(screen.getByRole('checkbox', { name: 'Read' }));
@@ -142,5 +148,138 @@ describe('editor de agente: Cursor', () => {
     renderEditor(agent);
     expect(screen.queryByRole('checkbox', { name: 'Somente leitura' })).toBeNull();
     expect(screen.queryByRole('checkbox', { name: 'Em segundo plano' })).toBeNull();
+  });
+});
+
+const boardArtifact = (kind: 'mcp' | 'skill' | 'agent', name: string, patch: Partial<BoardArtifact> = {}): BoardArtifact => ({
+  id: `${kind}:${name}`,
+  kind,
+  name,
+  description: kind === 'agent' ? 'Revisa' : '',
+  usage: 'contextual',
+  origin: '',
+  originTool: '',
+  missing: false,
+  skipped: [],
+  files: [],
+  body: '',
+  path: '',
+  createdAt: 0,
+  updatedAt: 0,
+  ...patch,
+});
+
+describe('editor de agente do board', () => {
+  it('a categoria marca todas as ferramentas dela e desmarca todas, e a lista detalhada acompanha', async () => {
+    renderEditor({ ...agent, tools: [] });
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Categoria Edição de arquivos' }));
+    expect(lastSent('harness.agent.update').patch).toEqual({ tools: ['Edit', 'Write', 'NotebookEdit'] });
+    expect(screen.queryByRole('checkbox', { name: 'Categoria Leitura' })).toBeInTheDocument();
+  });
+
+  it('com a categoria marcada pela lista, desmarcar a categoria tira só as ferramentas dela', async () => {
+    renderEditor({ ...agent, tools: ['Read', 'Edit', 'Write', 'NotebookEdit', 'mcp__github__*'] });
+    const box = screen.getByRole('checkbox', { name: 'Categoria Edição de arquivos' });
+    expect(box).toBeChecked();
+    // Read sozinha deixa a categoria de leitura no estado intermediário
+    expect(screen.getByRole('checkbox', { name: 'Categoria Leitura' })).toHaveAttribute('aria-checked', 'mixed');
+    await userEvent.click(box);
+    expect(lastSent('harness.agent.update').patch).toEqual({ tools: ['Read', 'mcp__github__*'] });
+  });
+
+  it('um agente migrado abre com as mesmas ferramentas e salvar sem mudar a lista não a altera', async () => {
+    renderEditor(agent);
+    for (const name of ['Read']) expect(screen.getByRole('checkbox', { name })).toBeChecked();
+    expect(screen.getByText(/Lista explícita: 2 ferramentas/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Salvar' })).toBeDisabled();
+    await userEvent.type(screen.getByRole('textbox', { name: /^Instruções/ }), ' mais');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(lastSent('harness.agent.update')).toEqual({ type: 'harness.agent.update', name: 'revisor', patch: {}, body: 'instruções mais' });
+  });
+
+  it('sem lista a tela diz que o agente herda o nível de permissão', () => {
+    renderEditor({ ...agent, tools: [] });
+    expect(screen.getByText(/Sem lista: o agente herda/)).toBeInTheDocument();
+  });
+
+  it('os servidores MCP oferecidos são os do board, não os da pasta da ferramenta', async () => {
+    setState((s) => ({
+      harness: {
+        ...s.harness,
+        library: { directory: '', artifacts: [boardArtifact('mcp', 'board-only'), boardArtifact('mcp', 'faz-ai')] },
+      },
+    }));
+    renderEditor(agent);
+    expect(screen.getByRole('button', { name: /board-only/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /postgres/ })).toBeNull();
+  });
+
+  it('avisa quando o agente veio de outra ferramenta', () => {
+    setState((s) => ({
+      harness: {
+        ...s.harness,
+        library: {
+          directory: '',
+          artifacts: [
+            boardArtifact('agent', 'revisor', {
+              agent: {
+                skills: [],
+                mcpServers: [],
+                model: '',
+                tools: { categories: ['read'], native: { tool: 'cursor', allow: [], deny: [] } },
+              },
+            }),
+          ],
+        },
+      },
+    }));
+    renderEditor(agent);
+    expect(screen.getByRole('alert')).toHaveTextContent(/veio do cursor/);
+  });
+});
+
+describe('barra e ações de linha dos agentes', () => {
+  const setDefault = (name: string) => setState((s) => ({ board: { ...s.board, runner: { ...s.board.runner, defaultAgent: name } } }));
+
+  it('o padrão tem o selo e o apagar desabilitado, sem "Tornar padrão"', () => {
+    setDefault('revisor');
+    renderThemed(
+      <>
+        <DefaultAgentBadge name="revisor" />
+        <MakeDefaultButton name="revisor" />
+        <DeleteAgentButton name="revisor" />
+      </>,
+    );
+    expect(screen.getByText('padrão')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Tornar revisor/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Apagar o agente revisor' })).toBeDisabled();
+  });
+
+  it('"Tornar padrão" grava runner.defaultAgent, o valor do Executor, e o outro agente pode ser apagado', async () => {
+    setDefault('outro');
+    renderThemed(
+      <>
+        <DefaultAgentBadge name="revisor" />
+        <MakeDefaultButton name="revisor" />
+        <DeleteAgentButton name="revisor" />
+      </>,
+    );
+    expect(screen.queryByText('padrão')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Apagar o agente revisor' })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Tornar revisor o agente padrão' }));
+    expect(lastSent('settings.board.update')).toEqual({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'revisor' } } });
+  });
+
+  it('a barra tem novo agente, assistente, sugestões, IA e recriar os de fábrica (harness.agents.seed)', async () => {
+    const calls: (string | undefined)[] = [];
+    renderThemed(<AgentsToolbar onNew={() => calls.push('new')} onWizard={(p) => calls.push(p?.id ?? 'wizard')} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Novo agente' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Criar agente com ajuda' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Escritor de testes' }));
+    expect(calls).toEqual(['new', 'wizard', expect.any(String)]);
+    await userEvent.click(screen.getByRole('button', { name: 'Recriar os de fábrica' }));
+    expect(lastSent('harness.agents.seed')).toEqual({ type: 'harness.agents.seed', force: true });
+    await userEvent.click(screen.getByRole('button', { name: 'Sugerir agentes com IA' }));
+    expect(sentOf('ai.suggestAgents')).toHaveLength(1);
   });
 });

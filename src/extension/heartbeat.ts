@@ -3,7 +3,7 @@ import type { WebviewToHost } from '../shared/messages';
 import { cardRef, type BoardState, type Card } from '../shared/model';
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
-import { cardCliProblem, cliProblem, type CliProblem } from '../shared/requirements';
+import { cardCliProblem, cliProblem, noProfileAvailable, type CliProblem } from '../shared/requirements';
 import { profilesInUse } from '../shared/runTarget';
 import { profileLabel } from '../shared/aiProfiles';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
@@ -214,6 +214,7 @@ export function heartbeatIdleReason(s: BoardState): string {
     const problem = cliProblem(s, profile.id);
     if (problem) return `${PROBLEM_REASON[problem](profileLabel(s.board, profile.id))} (veja o aviso no topo do board).`;
   }
+  if (noProfileAvailable(s)) return 'nenhum perfil de CLI ligado está disponível (veja o aviso no topo do board).';
   const p = pendingWork(s);
   const queue = aiQueue(s, p);
   if (!queue.length) return 'nada pendente com a IA.';
@@ -441,6 +442,12 @@ export class Heartbeat {
     // em vez de cruzar com a sincronização das branches
     if (this.holding) return void this.changed();
     const s = this.deps.snapshot();
+    // nenhum perfil disponível: não insiste sozinho, a pessoa resolve
+    if (noProfileAvailable(s)) {
+      if (this.queue.length) this.deps.log(`Heartbeat: ${heartbeatIdleReason(s)}`);
+      this.queue = [];
+      return void this.changed();
+    }
     const counts = runningByKind(s, this.runner.running);
     const wants = autopilotStep(s);
     const reservedKind: ActivityKind | null = this.yieldToAutopilot && s.autopilot.active && wants.kind === 'run' ? wants.activity : null;

@@ -1049,6 +1049,8 @@ button.ghost.on {
   position: fixed;
   inset: 0;
   z-index: 60;
+  /* aberto sobre um diálogo do Radix (body com pointer-events: none) precisa continuar clicável */
+  pointer-events: auto;
   background: var(--overlay);
   display: flex;
   align-items: center;

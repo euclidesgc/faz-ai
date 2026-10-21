@@ -1,7 +1,7 @@
-import { profileLabel, type AiProfile } from '../../shared/aiProfiles';
+import { PROFILE_CAPABILITIES, profileLabel, type AiProfile } from '../../shared/aiProfiles';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
-import { profileCanProbe, profileSignedIn } from '../cliProbe';
+import { profileCanProbe, profileSignedIn, profileVersion } from '../cliProbe';
 import { baseValue } from '../../shared/harness';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -26,7 +26,7 @@ import { consolidate } from '../log/rollup';
 import { BoardRepo } from '../repositories/boardRepo';
 import { registerClients, removeProjectServer } from '../mcp/clientConfig';
 import { runRegistrationSteps } from '../mcp/reinstall';
-import { readBridgeVersion, workspaceKey } from '../mcp/socketPath';
+import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
 import { ReleaseWatcher } from '../release';
 import { CommandError, deleteBranch, detectMainBranch, removeWorktree } from '../git';
@@ -39,18 +39,17 @@ import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
-import { claudeSignedIn, cursorModels, cursorSignedIn, kimiModels, kimiSignedIn, runCli } from '../cliProbe';
-import { baseInfo, ALL_AI_BASES, type AiTool } from '../../shared/harness';
-import { allowKimiMcp, checkProfileCli, checkRequirements, registeredServer, type RequirementProbe } from '../requirements';
-import { headlessCommand, headlessUnsupported } from '../headless';
-import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
-import { checkEnvironment, linuxFamily, type OtherToolProbe } from '../environment';
-import { editorMcpFiles, pinEditorCommands, registeredIn } from '../mcp/pinCommands';
-import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
-import { selectedItems } from '../../shared/harnessSelection';
+import { cursorModels, kimiModels, runCli } from '../cliProbe';
+import { baseInfo, type AiTool } from '../../shared/harness';
+import { checkRequirements, profileInstallUrl } from '../requirements';
+import { CLI_COMMAND } from '../../shared/requirements';
+import { checkEnvironment, linuxFamily } from '../environment';
+import { isPendingReview, probeProfiles } from '../profileProbe';
+import { profileHealth, type ProfileHealth } from '../../shared/profileHealth';
+import { editorMcpFiles, pinEditorCommands } from '../mcp/pinCommands';
 import { harnessIssues } from '../../shared/harnessStatus';
 import type { WebviewToHost } from '../../shared/messages';
-import { resolveCommand } from '../cliResolve';
+import { resolveCommand, resolveProfileCommand } from '../cliResolve';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
 import { cleanStaleTemp } from '../aiOutput/measured';
 import { ExecutionAdmission } from '../ai/admission';
@@ -348,23 +347,67 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let disposed = false;
   const SIGNIN_CACHE_MS = 3 * 60_000;
   const signinCache = new Map<AiTool, { at: number; value: boolean | null; binding: string }>();
-  // dispatch por ferramenta: cada uma tem o seu probe (o do Kimi Code não usa o executável: lê a
-  // pasta de credenciais); quando o probe não sabe dizer (`null`), vale só o sinal reativo de falha
-  // na execução
-  const probeSignedIn = async (tool: AiTool, exe: string, force: boolean, profile?: AiProfile): Promise<boolean | null> => {
-    const binding = JSON.stringify([exe, profile?.credentials?.secretRef || 'builtin']);
-    const cached = !force && signinCache.get(tool);
+  // o probe de login é o do perfil (o do Kimi Code não usa o executável: lê a pasta de credenciais);
+  // quando ele não sabe dizer (`null`), vale só o sinal reativo de falha na execução
+  const probeSignedIn = async (exe: string, force: boolean, profile: AiProfile): Promise<boolean | null> => {
+    const binding = JSON.stringify([exe, profile.credentials?.secretRef || 'builtin']);
+    const cached = !force && signinCache.get(profile.id);
     if (cached && cached.binding === binding && Date.now() - cached.at < SIGNIN_CACHE_MS) return cached.value;
-    const value = profile
-      ? await profileSignedIn(profile, exe, homeDir, { pathEnv })
-      : await (tool === 'cursor' ? cursorSignedIn(exe, pathEnv) : tool === 'kimi' ? kimiSignedIn(homeDir) : claudeSignedIn(exe, pathEnv));
-    signinCache.set(tool, { at: Date.now(), value, binding });
+    const value = await profileSignedIn(profile, exe, homeDir, { pathEnv });
+    signinCache.set(profile.id, { at: Date.now(), value, binding });
     return value;
   };
   /** O que falta no banco de artefatos; undefined sem o inventário lido (a pasta do projeto não existe). */
   const harnessIssuesNow = (): ReturnType<typeof harnessIssues> | undefined => {
     const s = router.snapshot();
     return s.harness.inventory.some((t) => t.tool === s.board.aiTool) ? harnessIssues(s) : undefined;
+  };
+  /** O perfil com a configuração privada, para resolver o comando e os probes; a pública traz `config` vazio. */
+  const resolvedProfile = (meta: AiProfile): AiProfile => {
+    if (meta.kind === 'builtin' || !profileCanProbe(meta)) return meta;
+    try {
+      return new AiProfileRepo(handle.db).resolveProfile(router.boardId, meta.id);
+    } catch {
+      return { ...meta, credentials: { ...meta.credentials!, available: false } };
+    }
+  };
+  /**
+   * A saúde de cada perfil de CLI, com o padrão primeiro, depois os ligados e por fim os desligados e
+   * pendentes. Sem `all`, só os ligados rodam os probes (o aviso do topo roda a cada 5 minutos); o
+   * Diagnóstico roda todos. O perfil pendente de revisão nunca roda nada. Nada aqui chama a IA.
+   */
+  const computeHealth = async (all: boolean, force: boolean): Promise<ProfileHealth[]> => {
+    const s = router.snapshot();
+    const { board } = s;
+    const resolved = new Map(board.aiProfiles.map((p) => [p.id, resolvedProfile(p)]));
+    const probes = await probeProfiles(
+      board.aiProfiles.filter((p) => all || p.enabled).map((p) => resolved.get(p.id)!),
+      {
+        resolve: (p) => resolveProfileCommand(p, pathEnv, homeDir),
+        version: (p, exe) => profileVersion(p, exe, { pathEnv }),
+        signedIn: (p, exe) => probeSignedIn(exe, force, p),
+      },
+    );
+    const rank = (h: ProfileHealth) => (h.isDefault ? 0 : h.registration === 'enabled' ? 1 : 2);
+    return board.aiProfiles
+      .map((meta) => {
+        const url = profileInstallUrl(resolved.get(meta.id)!);
+        return profileHealth({
+          profile: meta,
+          isDefault: meta.id === board.aiTool,
+          pendingReview: isPendingReview(meta),
+          probe: probes.get(meta.id) ?? null,
+          authExpired: s.authExpired.includes(meta.id),
+          // sem verificador de capacidades na base, a validação ainda não é requisito (ver profileHealth)
+          validationRequired: false,
+          credentials: meta.credentials ? [{ name: meta.credentials.secretRef, filled: meta.credentials.available }] : [],
+          capabilities: PROFILE_CAPABILITIES.map((c) => meta.capabilities?.[c] ?? 'unknown'),
+          admission: null,
+          evidence: { state: 'never' },
+          install: url ? { url } : null,
+        });
+      })
+      .sort((a, b) => rank(a) - rank(b));
   };
   const checkNow = (): Promise<void> => {
     if (disposed) return Promise.resolve();
@@ -373,70 +416,35 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return checking;
     }
     const { board } = router.snapshot();
-    // o perfil com a configuração local resolvida (a credencial do configurável vem do banco)
-    const resolveProfile = (meta: AiProfile): AiProfile => {
-      if (!profileCanProbe(meta) || meta.kind === 'builtin') return meta;
-      try {
-        return new AiProfileRepo(handle.db).resolveProfile(router.boardId, meta.id);
-      } catch {
-        return { ...meta, credentials: { ...meta.credentials!, available: false } };
-      }
-    };
-    const meta = board.aiProfiles.find((p) => p.id === board.aiTool);
-    const profile = meta && resolveProfile(meta);
-    // os outros perfis ligados só têm a CLI e o login conferidos; os desligados não são conferidos (P2 da Spec)
-    const others = board.aiProfiles.filter((p) => p.enabled && p.id !== board.aiTool).map(resolveProfile);
     // a pessoa pode ter instalado o node com o board aberto: o registro do MCP no editor, gravado sem
     // ele, passa a ter o caminho completo (o editor não o acha no PATH de quando abriu)
     const hadNode = !!nodePath;
     nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
-    if (!hadNode && nodePath && (!profile || (profile.kind === 'builtin' && profileCanProbe(profile)))) pinMcp();
+    const meta = board.aiProfiles.find((p) => p.id === board.aiTool);
+    if (!hadNode && nodePath && (!meta || (meta.kind === 'builtin' && profileCanProbe(meta)))) pinMcp();
     lastCheckError = null;
-    const probe: RequirementProbe = {
-      profile,
-      profileSignedIn: (selected, exe) => probeSignedIn(selected.id, exe, forceSigninCheck, selected),
-      tool: board.aiTool,
-      permission: board.runner.permission,
-      workspaceDir: o.folderPath,
-      homeDir,
-      bridgePath: o.bridgePath,
-      installedVersion: readBridgeVersion(homeDir),
-      currentVersion: o.version,
-      nodePath,
-      resolve: (command, options) => resolveCommand(command, options?.pathEnv ?? pathEnv, homeDir, options),
-      signedIn: (tool, exe) => probeSignedIn(tool, exe, forceSigninCheck),
-      editor: o.editor?.name,
-      windowStartedAt: o.editor?.startedAt,
-      editorPath: o.editor ? (process.env.PATH ?? '') : undefined,
-      harnessIssues: harnessIssuesNow(),
-    };
-    checking = (async () => {
-      const own = await checkRequirements(probe);
-      const rest = await Promise.all(others.map((p) => checkProfileCli(p, { ...probe, profile: p, tool: p.id })));
-      return [...own, ...rest.flat()];
-    })()
-      .then((list) => {
+    checking = computeHealth(false, forceSigninCheck)
+      .then((health) => ({ health, list: checkRequirements({ nodePath, health, harnessIssues: harnessIssuesNow() }) }))
+      .then(({ health, list }) => {
         // a conferência (com o probe de login, que chama a CLI) pode terminar depois do encerramento
         if (disposed) return;
         // a CLI da ferramenta que lista modelos (Cursor, Kimi Code) acabou de ficar pronta (instalada,
         // com login): só agora dá para ler os modelos da conta
         const modelReader = board.aiTool === 'cursor' || board.aiTool === 'kimi' ? board.aiTool : null;
-        const blocked = !!modelReader && list.some((r) => r.tool === board.aiTool && (r.id === 'cli' || r.id === 'signin'));
+        const own = health.find((h) => h.id === board.aiTool);
+        const blocked = !!modelReader && (own?.problem === 'cli' || own?.problem === 'signin');
         if (modelsBlocked && !blocked && modelReader && router.snapshot().board.aiTool === modelReader) refreshToolModels(modelReader);
         modelsBlocked = blocked;
         router.setRequirements(list);
-        // o sinal reativo (RF6) limpa quando o probe da própria ferramenta volta a confirmar o login —
-        // a essa altura `signinCache` já tem o valor fresco desta conferência (lido pelo `signedIn` acima);
-        // cobre Claude e Cursor, que têm probe (quando o probe não sabe dizer, só se recupera por uma execução
-        // manual que dá certo, em `runner.ts`). Ao trocar de ferramenta o sinal já foi limpo incondicionalmente
+        // o sinal reativo (RF6) limpa, por perfil, quando o probe do próprio perfil volta a confirmar o login —
+        // a essa altura `signinCache` já tem o valor fresco desta conferência; quando o probe não sabe
+        // dizer, só se recupera por uma execução manual que dá certo (em `runner.ts`)
         for (const expired of router.snapshot().authExpired)
           if (signinCache.get(expired)?.value === true && router.setAuthExpired(expired, false))
             o.log(`Login do ${profileLabel(router.snapshot().board, expired)} de volta: execuções retomadas.`);
-        // ligar o MCP no Cursor é com a pessoa, fora do board: enquanto falta, confere a cada 10 s, para
-        // o aviso sumir logo depois que ela liga (a conferência lê só uma pasta). O login (`signin`) entra
-        // no mesmo timer: a ferramenta com probe (Claude, Cursor) retoma em até 10 s, sem esperar
-        // os 5 minutos do ciclo normal
-        if (list.some((r) => r.id === 'mcp-enable' || r.id === 'signin')) {
+        // o login (`profile` com `signin`) entra num timer: o perfil com probe retoma em até 10 s depois
+        // de a pessoa entrar na conta, sem esperar os 5 minutos do ciclo normal
+        if (list.some((r) => r.id === 'profile' && r.problem === 'signin')) {
           enableTimer ??= setInterval(() => void checkNow(), 10_000);
           enableTimer.unref?.();
         } else if (enableTimer) {
@@ -498,11 +506,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const editorFiles = o.editor?.name === 'cursor' ? editorMcpFiles(o.folderPath, homeDir) : null;
   const editorPath = () => process.env.PATH ?? '';
   const resolveHere = (command: string) => resolveCommand(command, pathEnv, homeDir);
-  // o MCP do Code Review Graph na ferramenta: no Cursor, no arquivo do projeto ou no global
-  const crgRegistered = (tool: AiTool) =>
-    tool === 'cursor'
-      ? registeredIn(editorMcpFiles(o.folderPath, homeDir), 'code-review-graph')
-      : !!registeredServer(tool, o.folderPath, homeDir, 'code-review-graph');
   const pinMcp = () => {
     if (!editorFiles) return;
     try {
@@ -511,29 +514,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     } catch (e) {
       o.log(`Não foi possível gravar o caminho completo dos MCPs: ${e instanceof Error ? e.message : String(e)}`);
     }
-  };
-  /**
-   * As ferramentas de IA que não são a do projeto, quando estão na máquina: a CLI no PATH ou, no
-   * Cursor, o próprio editor em que o board está aberto.
-   */
-  const otherTools = async (tool: AiTool): Promise<OtherToolProbe[]> => {
-    const s = router.snapshot();
-    const out: OtherToolProbe[] = [];
-    for (const other of ALL_AI_BASES) {
-      if (other === tool) continue;
-      const cli = resolveHere(baseValue(CLI_COMMAND, other) ?? '');
-      if (!cli && !(other === 'cursor' && o.editor?.name === 'cursor')) continue;
-      const inventory = s.harness.inventory.find((t) => t.tool === other);
-      out.push({
-        tool: other,
-        cli,
-        signedIn: cli ? await probeSignedIn(other, cli, false) : null,
-        mcp: !!registeredServer(other, o.folderPath, homeDir),
-        skill: !!inventory?.items.some((i) => i.kind === 'skill' && i.name === FLOW_SKILL_NAME),
-        permission: headlessUnsupported(other, s.board.runner.permission),
-      });
-    }
-    return out;
   };
   let diagnosing: Promise<void> | null = null;
   /** o último Diagnóstico falhou com este erro (null quando deu certo) */
@@ -544,26 +524,14 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       pathEnv = (await loginShellPath(true)) ?? pathEnv;
       await checkNow();
       const s = router.snapshot();
-      const tool = s.board.aiTool;
-      const skillInstalled = selectedItems(s, 'skill', 'always').some((i) => i.name === FLOW_SKILL_NAME);
-      // o sinal reativo (RF6) também vira o item "signin" do Diagnóstico quando o probe não soube dizer
-      // (`null`): sem isso, `s.requirements` não teria `signin` para um login que venceu no meio da execução
-      const built = headlessCommand(tool, { prompt: '', permission: 'full' });
-      const cliName = 'unsupported' in built ? null : built.command;
-      const syntheticSignin: BoardRequirement | null =
-        s.authExpired.includes(tool) && cliName && !s.requirements.some((r) => r.id === 'signin')
-          ? { id: 'signin', tool, cli: cliName, action: { kind: 'command', command: baseValue(LOGIN_COMMAND, tool) ?? '', terminal: true } }
-          : null;
       router.setEnvironment(
         await checkEnvironment({
-          tool,
-          requirements: syntheticSignin ? [...s.requirements, syntheticSignin] : s.requirements,
+          requirements: s.requirements,
+          // o Diagnóstico confere também os perfis desligados, para a pessoa ver antes de ligar
+          health: await computeHealth(true, true),
           workspaceDir: o.folderPath,
-          skillInstalled,
           harnessIssues: harnessIssuesNow() ?? null,
           branchRenames: s.branchRenames,
-          others: await otherTools(tool),
-          crgMcp: crgRegistered(tool),
           platform: process.platform,
           homeDir,
           pathDirs: (pathEnv ?? process.env.PATH ?? '').split(path.delimiter),
@@ -597,15 +565,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   router.onEnvironment(
     {
       check: diagnoseForScreen,
-      pinMcp: () => {
-        pinMcp();
-        return diagnoseForScreen();
-      },
-      allowKimiMcp: () => {
-        if (allowKimiMcp(homeDir))
-          o.log('Ferramentas do board liberadas nas conversas do Kimi Code (a regra "mcp__faz-ai__*" entrou no config.toml dele).');
-        void diagnose();
-      },
       seen: () => {
         try {
           fs.mkdirSync(o.storageDir, { recursive: true });
@@ -624,7 +583,15 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let toolInUse = router.snapshot().board.aiTool;
   let permissionInUse = router.snapshot().board.runner.permission;
   if (toolInUse === 'cursor' || toolInUse === 'kimi') refreshToolModels(toolInUse);
+  // o login que venceu (ou voltou) numa execução muda o aviso do perfil: confere já, sem esperar o ciclo
+  let authExpiredInUse = router.snapshot().authExpired;
   router.onDidChange(() => {
+    const expired = router.snapshot().authExpired;
+    // por conteúdo: a lista é nova a cada mudança
+    if (expired.length !== authExpiredInUse.length || expired.some((id) => !authExpiredInUse.includes(id))) {
+      authExpiredInUse = expired;
+      void checkNow();
+    }
     const { board } = router.snapshot();
     if (board.aiTool === toolInUse && board.runner.permission === permissionInUse) return;
     const toolChanged = board.aiTool !== toolInUse;

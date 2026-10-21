@@ -806,9 +806,9 @@ describe('botões de IA do card', () => {
     expect(lastSent('ai.run')).toEqual({ type: 'ai.run', cardId: storyId, mode: 'refine' });
   });
 
-  it('com a CLI sem login, os dois ficam desligados, com o motivo na dica', async () => {
+  it('sem nenhum perfil de CLI disponível, os dois ficam desligados, com o motivo na dica', async () => {
     const { router, storyId } = await seedBoard();
-    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude auth login' } }]);
+    router.setRequirements([{ id: 'no-profile', reason: 'unavailable', action: { kind: 'diagnostic' } }]);
     syncStore(router);
     renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
     for (const name of [/Trabalhar na fase/, /Refinar com IA/]) {
@@ -816,12 +816,12 @@ describe('botões de IA do card', () => {
       expect(button).toBeDisabled();
       // o `title` nativo saiu; o motivo do bloqueio agora vem no hint, aberto pelo foco
       fireEvent.focus(button);
-      expect(await screen.findByText(/sem login/)).toBeInTheDocument();
+      expect(await screen.findByText(/Nenhum perfil de CLI está disponível/)).toBeInTheDocument();
       fireEvent.blur(button);
     }
   });
 
-  it('com o login vencido durante a execução (sinal reativo, sem o requisito "signin"), os dois também ficam desligados', async () => {
+  it('com o login vencido durante a execução (sinal reativo do perfil padrão), os dois também ficam desligados', async () => {
     const { router, storyId } = await seedBoard();
     act(() => {
       router.setAuthExpired('claude', true);

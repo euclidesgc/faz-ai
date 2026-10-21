@@ -171,10 +171,7 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
 
   // noutra ferramenta, o que não vai por parâmetro vira instrução no prompt
   router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
-  const cursorPlan = executionPlan(router.snapshot(), card(), router.libraryMcpDefinitions(), bridge);
-  expect(cursorPlan.summary.at(-1)).toContain('A CLI pode carregar por conta própria: regras do projeto');
-  expect(cursorPlan.clean).toBe(false);
-  expect(cursorPlan.advice).toEqual([
+  expect(executionPlan(router.snapshot(), card(), router.libraryMcpDefinitions(), bridge).advice).toEqual([
     'Você atua como o agente "restrito": Restrito.',
     'Instruções do agente:\nSiga.',
     expect.stringContaining('list_board_mcp_tools'),
@@ -491,11 +488,28 @@ describe('executor da IA', () => {
     expect(runner.isRunning(storyId)).toBe(false);
   });
 
-  it('com o login da ferramenta vencido (requisito "signin"), não inicia e não gasta uma execução', () => {
-    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } }]);
+  it('com o login do perfil do board sem confirmar pelo probe (requisito "profile" com signin), não inicia e não gasta uma execução', () => {
+    router.setRequirements([
+      {
+        id: 'profile',
+        profile: 'claude',
+        name: 'Claude Code',
+        problem: 'signin',
+        optional: true,
+        action: { kind: 'diagnostic', profile: 'claude' },
+      },
+    ]);
     expect(() => runner.start(storyId)).toThrow(/login/i);
     expect(procs).toHaveLength(0);
     expect(card().status).not.toBe('running');
+  });
+
+  it('o problema de login de outro perfil, ou o login vencido só numa execução, não impede a execução do perfil do board', () => {
+    router.setRequirements([
+      { id: 'profile', profile: 'cursor', name: 'Cursor', problem: 'signin', optional: true, action: null },
+      { id: 'profile', profile: 'claude', name: 'Claude Code', problem: 'signin', expired: true, optional: true, action: null },
+    ]);
+    expect(() => runner.start(storyId)).not.toThrow();
   });
 
   it('se a IA só respondeu na conversa, a vez passa para a pessoa', () => {
@@ -1780,7 +1794,7 @@ describe('alvo da execução por perfil de CLI (história #620)', () => {
   });
 
   it('RF16: CLI ausente de um perfil recusa só os cards daquele perfil', () => {
-    router.setRequirements([{ id: 'cli', tool: 'cursor', label: 'CLI', ok: false, action: null } as never]);
+    router.setRequirements([{ id: 'profile', profile: 'cursor', name: 'Cursor', problem: 'cli', optional: true, action: null }]);
     setModelo(modelValue(cursorModel().id, cursorModel().defaultEffort));
     expect(() => runner.start(storyId)).toThrow('A CLI do Cursor não foi encontrada');
     setModelo(modelValue(claudeModel('sonnet').id, 'medium'));

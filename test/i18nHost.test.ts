@@ -53,15 +53,6 @@ describe('i18n do host: mensagens preenchidas', () => {
     ['Já existe uma skill "revisar" desligada.', 'A disabled skill "revisar" already exists.'],
     ['Já existe uma skill "revisar" em .claude/skills.', 'A skill "revisar" already exists in .claude/skills.'],
     ['Já existe uma skill "revisar" no destino.', 'A skill "revisar" already exists at the destination.'],
-    ['Já existe "notas.md" nesta skill.', '"notas.md" already exists in this skill.'],
-    ['Já existe "CLAUDE.md" em ~/.claude.', '"CLAUDE.md" already exists in ~/.claude.'],
-    ['Servidor "git" não encontrado em .mcp.json.', 'Server "git" not found in .mcp.json.'],
-    ['Já existe um servidor "git" em .mcp.json.', 'A server "git" already exists in .mcp.json.'],
-    ['O Claude Code não tem uma pasta de usuário para este tipo de item.', 'Claude Code has no user folder for this kind of item.'],
-    [
-      'Arquivo de regras desconhecido: "X.md". Aceitos: CLAUDE.md, AGENTS.md.',
-      'Unknown rules file: "X.md". Accepted: CLAUDE.md, AGENTS.md.',
-    ],
     [
       'O modelo "Opus" não aceita o esforço "ultra". Aceitos: low, high.',
       'The model "Opus" does not accept the effort "ultra". Accepted: low, high.',
@@ -89,16 +80,15 @@ describe('i18n do host: mensagens preenchidas', () => {
       'The "Fase" field has no default value per type: the board fills it in on each card.',
     ],
     ['Pasta não encontrada: /home/ana/skills', 'Folder not found: /home/ana/skills'],
+    ['Subpasta não encontrada: docs', 'Subfolder not found: docs'],
+    ['Arquivo não encontrado: /tmp/x.json', 'File not found: /tmp/x.json'],
+    ['Item não encontrado na prévia: rule:a', 'Item not found in the preview: rule:a'],
+    ['Skill "revisar" não está no board.', 'Skill "revisar" is not in the board.'],
+    [
+      'Importados: a, b. Pulados: -. Problemas: -. Servidores MCP a configurar: git.',
+      'Imported: a, b. Skipped: -. Problems: -. MCP servers to configure: git.',
+    ],
     ['Não foi possível clonar https://github.com/a/b.git: timeout', 'Could not clone https://github.com/a/b.git: timeout'],
-    ['Skill não encontrada na origem: revisar', 'Skill not found in the source: revisar'],
-    [
-      '"Revisar Spec" não é um nome de skill válido (letras minúsculas, números e hífens).',
-      '"Revisar Spec" is not a valid skill name (lowercase letters, numbers and hyphens).',
-    ],
-    [
-      '/p/.mcp.json não é um JSON simples (pode ter comentários ou um erro de sintaxe). Abra o arquivo e edite-o à mão.',
-      '/p/.mcp.json is not plain JSON (it may have comments or a syntax error). Open the file and edit it by hand.',
-    ],
     ['A resposta passou do tempo limite (30 min) e foi encerrada.', 'The reply exceeded the time limit (30 min) and was ended.'],
     ['Não foi possível executar o Cursor: falhou', 'Could not run Cursor: falhou'],
     ['O Cursor terminou com erro (código 2).', 'Cursor finished with an error (code 2).'],
@@ -161,6 +151,24 @@ describe('i18n do host: mensagens preenchidas', () => {
       ],
     ];
     for (const [notice, en] of cases) expect(t(gitNoticeText(notice))).toBe(en);
+  });
+
+  it('erros e avisos fixos de artefatos do board (limites, agente padrão, skill do fluxo, nome repetido, origem)', () => {
+    setLocale('en');
+    const cases: [string, string][] = [
+      ['Arquivo maior que 512 KB.', 'File larger than 512 KB.'],
+      ['A skill já tem 100 arquivos de apoio.', 'The skill already has 100 supporting files.'],
+      ['Escolha outro agente padrão antes de apagar este.', 'Choose another default agent before deleting this one.'],
+      ['A skill do fluxo é da extensão: só o modo dela pode mudar.', 'The flow skill belongs to the extension: only its mode can change.'],
+      [
+        'Já existe um artefato com este nome. Edite o existente ou escolha outro nome.',
+        'An artifact with this name already exists. Edit the existing one or choose another name.',
+      ],
+      ['Subpasta inválida.', 'Invalid subfolder.'],
+      ['Nenhum artefato encontrado.', 'No artifact found.'],
+      ['O nome faz-ai é reservado ao MCP do board.', 'The name faz-ai is reserved for the board MCP.'],
+    ];
+    for (const [pt, en] of cases) expect(t(pt)).toBe(en);
   });
 
   it('em português a mensagem fica como chegou', () => {

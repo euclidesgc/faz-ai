@@ -310,7 +310,6 @@ export const host: Record<string, string> = {
   'Esta história ainda não tem pasta de trabalho.': 'This story does not have a working folder yet.',
   'Arquivo fora do harness.': 'File outside the harness.',
   'Arquivo maior que 512 KB: abra no editor.': 'File larger than 512 KB: open it in the editor.',
-  'Este arquivo não pode ser alterado pelo board.': 'This file cannot be changed by the board.',
 
   // backup do board (exportar e importar)
   'Board exportado em {path}. O arquivo contém conversas e anexos: guarde-o com cuidado.':
@@ -421,83 +420,24 @@ export const host: Record<string, string> = {
   '"{name}" tem mais de 20 MB e não foi anexado.': '"{name}" is larger than 20 MB and was not attached.',
 
   // harness: arquivos de regras, skills, agentes, hooks, permissões e servidores MCP
-  'SKILL.md não encontrado.': 'SKILL.md not found.',
   'Nenhuma pasta de projeto aberta.': 'No project folder is open.',
-  'Pasta do usuário não encontrada.': 'User folder not found.',
-  'Item não encontrado no harness. Atualize a lista e tente de novo.': 'Item not found in the harness. Refresh the list and try again.',
-  'Servidor não encontrado no harness. Atualize a lista e tente de novo.':
-    'Server not found in the harness. Refresh the list and try again.',
-  'Skill "{name}" não encontrada no projeto.': 'Skill "{name}" not found in the project.',
   'Nenhuma origem de skills carregada. Procure de novo.': 'No skills source loaded. Search again.',
-  'Esta ferramenta não tem uma pasta de skills nesse escopo.': 'This tool has no skills folder in that scope.',
-  'Nome inválido: use letras minúsculas, números e hífens (ex.: "revisar-spec").':
-    'Invalid name: use lowercase letters, numbers and hyphens (e.g. "review-spec").',
   'Nome de skill inválido: use letras minúsculas, números e hífens (ex.: "revisar-spec").':
     'Invalid skill name: use lowercase letters, numbers and hyphens (e.g. "review-spec").',
   'Nome de agente inválido: use letras minúsculas, números e hífens (ex.: "revisor-de-spec").':
     'Invalid agent name: use lowercase letters, numbers and hyphens (e.g. "spec-reviewer").',
-  'Nome de arquivo inválido: use pasta/arquivo.ext, com letras, números, hífen, ponto e sublinhado.':
-    'Invalid file name: use folder/file.ext, with letters, numbers, hyphen, dot and underscore.',
   'Nome inválido: use letras, números, hífen, ponto ou sublinhado.': 'Invalid name: use letters, numbers, hyphen, dot or underscore.',
-  'Não é possível criar um item neste lugar.': 'An item cannot be created here.',
-  'Informe a descrição: é por ela que a IA decide quando usar o item.':
-    'Enter the description: it is how the AI decides when to use the item.',
-  'A skill precisa de uma descrição: é por ela que a IA decide quando usar a skill.':
-    'The skill needs a description: it is how the AI decides when to use the skill.',
   'O agente precisa de uma descrição: é por ela que a IA decide quando delegar a ele.':
     'The agent needs a description: it is how the AI decides when to delegate to it.',
-  'Já existe: {file}': 'Already exists: {file}',
-  'Já existe "{rel}" nesta skill.': '"{rel}" already exists in this skill.',
-  'Já existe "{name}" em {path}.': '"{name}" already exists in {path}.',
   'Já existe uma skill "{name}".': 'A skill "{name}" already exists.',
   'Já existe uma skill "{name}" ligada.': 'An enabled skill "{name}" already exists.',
   'Já existe uma skill "{name}" desligada.': 'A disabled skill "{name}" already exists.',
   'Já existe uma skill "{name}" em {path}.': 'A skill "{name}" already exists in {path}.',
   'Já existe uma skill "{name}" no destino.': 'A skill "{name}" already exists at the destination.',
   'Já existe um agente "{name}".': 'An agent "{name}" already exists.',
-  'Já existe um servidor "{name}" em {path}.': 'A server "{name}" already exists in {path}.',
-  'Arquivo "{rel}" não encontrado nesta skill.': 'File "{rel}" not found in this skill.',
   'Skill "{name}" não encontrada.': 'Skill "{name}" not found.',
   'Agente "{name}" não encontrado.': 'Agent "{name}" not found.',
-  'Servidor "{name}" não encontrado em {path}.': 'Server "{name}" not found in {path}.',
-  'Plugins desinstalados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.':
-    'Plugins uninstalled: {names}. Takes effect from the next Claude Code session, or after /reload-plugins in an open session.',
-  'Plugins desativados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.':
-    'Plugins disabled: {names}. Takes effect from the next Claude Code session, or after /reload-plugins in an open session.',
-  'Plugins ativados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.':
-    'Plugins enabled: {names}. Takes effect from the next Claude Code session, or after /reload-plugins in an open session.',
-  'Plugins removidos de ~/.cursor/plugins/local: {names}. Recarregue a janela do Cursor para valer.':
-    'Plugins removed from ~/.cursor/plugins/local: {names}. Reload the Cursor window for it to take effect.',
-  'Feito em {done} de {total}. Falhou: {failures}': 'Done for {done} of {total}. Failed: {failures}',
-  'Nada mudou. Falhou: {failures}': 'Nothing changed. Failed: {failures}',
-  'Nenhum dos plugins escolhidos aceita essa ação.': 'None of the chosen plugins accepts that action.',
-  'Arquivo de regras desconhecido: "{name}". Aceitos: {accepted}.': 'Unknown rules file: "{name}". Accepted: {accepted}.',
-  'Itens de plugin não podem ser alterados pelo board.': 'Plugin items cannot be changed by the board.',
-  'Servidores de plugin não podem ser removidos pelo board.': 'Plugin servers cannot be removed by the board.',
-  'Este item não pode ser alterado pelo board.': 'This item cannot be changed by the board.',
-  'Este item não pode ser copiado.': 'This item cannot be copied.',
-  'Arquivos de configuração não são apagados pelo board.': 'Settings files are not deleted by the board.',
-  'Só skills têm modo de invocação.': 'Only skills have an invocation mode.',
-  'Só skills têm arquivos de apoio.': 'Only skills have supporting files.',
-  'O {tool} não tem uma pasta de projeto para este tipo de item.': '{tool} has no project folder for this kind of item.',
-  'O {tool} não tem uma pasta de usuário para este tipo de item.': '{tool} has no user folder for this kind of item.',
-  '{file} não é um JSON simples (pode ter comentários ou um erro de sintaxe). Abra o arquivo e edite-o à mão.':
-    '{file} is not plain JSON (it may have comments or a syntax error). Open the file and edit it by hand.',
-  'Este item fica num arquivo que o board não edita. Abra o arquivo e edite-o à mão.':
-    'This item lives in a file the board does not edit. Open the file and edit it by hand.',
-  'Este servidor fica num arquivo que o board não edita. Abra o arquivo, ou use a linha de comando da ferramenta.':
-    "This server lives in a file the board does not edit. Open the file, or use the tool's command line.",
-  'Este arquivo de servidores MCP não é editado pelo board.': 'The board does not edit this MCP servers file.',
-  'Este arquivo de hooks não é editado pelo board.': 'The board does not edit this hooks file.',
-  'Este arquivo de permissões não é editado pelo board.': 'The board does not edit this permissions file.',
-  'Informe o comando do servidor.': 'Enter the server command.',
-  'Informe o endereço (URL) do servidor.': 'Enter the server address (URL).',
-  'Informe o evento do hook.': 'Enter the hook event.',
   'Informe o comando do hook.': 'Enter the hook command.',
-  'Informe a regra.': 'Enter the rule.',
-  'Esta regra já está na lista.': 'This rule is already in the list.',
-  'Regra de permissão desconhecida.': 'Unknown permission rule.',
-  'Regra não encontrada no arquivo. Atualize a lista e tente de novo.': 'Rule not found in the file. Refresh the list and try again.',
   'Hook não encontrado no arquivo. Atualize a lista e tente de novo.': 'Hook not found in the file. Refresh the list and try again.',
 
   // instalação de skills
@@ -506,9 +446,46 @@ export const host: Record<string, string> = {
   'Origem não reconhecida. Use o caminho completo de uma pasta, "dono/repositorio" do GitHub ou um endereço https ou ssh de um repositório git.':
     'Source not recognized. Use the full path of a folder, "owner/repository" from GitHub or an https or ssh address of a git repository.',
   'Não foi possível clonar {url}: {reason}': 'Could not clone {url}: {reason}',
-  'Skill não encontrada na origem: {rel}': 'Skill not found in the source: {rel}',
-  '"{name}" não é um nome de skill válido (letras minúsculas, números e hífens).':
-    '"{name}" is not a valid skill name (lowercase letters, numbers and hyphens).',
+
+  'Nome de regra inválido: use letras minúsculas, números e hífens, com .md opcional.':
+    'Invalid rule name: use lowercase letters, numbers and hyphens, with an optional .md.',
+  'Nome de regra inválido: use letras, números, ponto, hífen e sublinhado.':
+    'Invalid rule name: use letters, numbers, dot, hyphen and underscore.',
+  'Nome de skill inválido: use letras minúsculas, números e hífens.': 'Invalid skill name: use lowercase letters, numbers and hyphens.',
+  'Nome de agente inválido.': 'Invalid agent name.',
+  'Nome inválido.': 'Invalid name.',
+  'Nome de artefato inválido.': 'Invalid artifact name.',
+  'Nome inválido. Use letras minúsculas, números e hífens.': 'Invalid name. Use lowercase letters, numbers and hyphens.',
+  'O nome faz-ai é reservado ao MCP do board.': 'The name faz-ai is reserved for the board MCP.',
+  'O nome faz-ai é reservado ao servidor MCP do board.': 'The name faz-ai is reserved for the board MCP server.',
+  'Arquivo maior que 512 KB.': 'File larger than 512 KB.',
+  'Arquivos de apoio demais (limite de 100).': 'Too many supporting files (limit of 100).',
+  'Arquivo de apoio inválido ou acima de 512 KB.': 'Supporting file invalid or larger than 512 KB.',
+  'Skill acima de 5 MB.': 'Skill larger than 5 MB.',
+  'A skill já tem 100 arquivos de apoio.': 'The skill already has 100 supporting files.',
+  'A skill passaria de 5 MB no total.': 'The skill would exceed 5 MB in total.',
+  'Arquivo de apoio não encontrado.': 'Supporting file not found.',
+  'Arquivo binário: não dá para editar como texto.': 'Binary file: it cannot be edited as text.',
+  'Não foi possível ler o conteúdo.': 'Could not read the content.',
+  'Escolha outro agente padrão antes de apagar este.': 'Choose another default agent before deleting this one.',
+  'A skill do fluxo é da extensão: só o modo dela pode mudar.': 'The flow skill belongs to the extension: only its mode can change.',
+  'Já existe um artefato com este nome. Edite o existente ou escolha outro nome.':
+    'An artifact with this name already exists. Edit the existing one or choose another name.',
+  'Artefato não encontrado.': 'Artifact not found.',
+  'Nenhum artefato encontrado.': 'No artifact found.',
+  'Informe uma URL HTTP do servidor MCP.': 'Enter an HTTP URL for the MCP server.',
+  'Informe o comando do servidor MCP.': 'Enter the MCP server command.',
+  'Informe a configuração do servidor MCP.': 'Enter the MCP server configuration.',
+  'Importar artefatos exige revisão humana.': 'Importing artifacts requires human review.',
+  'Leia a origem antes de importar.': 'Read the source before importing.',
+  'Subpasta inválida.': 'Invalid subfolder.',
+  'Subpasta não encontrada: {rel}': 'Subfolder not found: {rel}',
+  'Ferramenta não reconhecida.': 'Tool not recognized.',
+  'Arquivo não encontrado: {file}': 'File not found: {file}',
+  'Item não encontrado na prévia: {key}': 'Item not found in the preview: {key}',
+  'Skill "{skill}" não está no board.': 'Skill "{skill}" is not in the board.',
+  'Importados: {imported}. Pulados: {skipped}. Problemas: {problems}. Servidores MCP a configurar: {secrets}.':
+    'Imported: {imported}. Skipped: {skipped}. Problems: {problems}. MCP servers to configure: {secrets}.',
 
   '{ref} está bloqueado: {reason}': '{ref} is blocked: {reason}',
   '{ref} está esperando uma pessoa.': '{ref} is waiting for a person.',
