@@ -232,7 +232,10 @@ que ela produz ou quando as duas alteram os mesmos arquivos. Na Implementação,
 história devolve em `subtasksNow` o que pode rodar agora (e em `subtasksNowNote`, como conduzir a
 rodada), e a IA delega **as sub-tarefas sem
 dependência pendente a subagentes simultâneos**, cada um com o modelo do seu card; ao fim da rodada
-ela verifica o conjunto, faz o commit e parte para a rodada seguinte. `start_work` recusa a
+ela verifica o conjunto, faz o commit e parte para a rodada seguinte. O ciclo de cada sub-tarefa
+cabe em duas chamadas: `start_work` já a leva para "Em andamento", e `move_card` com `comment`
+conclui e registra o resultado na conversa; no Plan, `create_card` já recebe o agente (`profile`) e
+os itens do checklist e devolve o card resumido. `start_work` recusa a
 sub-tarefa que ainda espera outra. Sem dependências declaradas, todas as sub-tarefas em aberto são
 consideradas independentes. Depende de a ferramenta de IA ter subagentes (o Claude Code tem); sem
 eles, a execução segue uma por vez, na ordem das dependências. Projetos que já tinham a skill do

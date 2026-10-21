@@ -243,7 +243,10 @@ uses what the other produces or when both change the same files. In Implementati
 `get_card` returns in `subtasksNow` what can run now (and in `subtasksNowNote`, how to run the
 round), and the AI delegates **the sub-tasks with no
 pending dependency to simultaneous subagents**, each with its card's model; at the end of the round
-it verifies the whole, commits and moves on to the next round. `start_work` refuses a sub-task that
+it verifies the whole, commits and moves on to the next round. Each sub-task's cycle fits in two
+calls: `start_work` already moves it to "Em andamento", and `move_card` with `comment` completes it
+and records the result in the conversation; in Plan, `create_card` already takes the agent
+(`profile`) and the checklist items and returns the summarized card. `start_work` refuses a sub-task that
 is still waiting for another. With no dependencies declared, all open sub-tasks are considered
 independent. It depends on the AI tool having subagents (Claude Code does); without them, execution
 goes one at a time, in dependency order. Projects that already had the flow skill installed keep its

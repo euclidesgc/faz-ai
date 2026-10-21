@@ -191,7 +191,10 @@ describe('servidor MCP', () => {
 
   it('cria história e sub-tarefas, com campos por nome, e avisa o board', async () => {
     const story = (await call('create_card', { title: 'Login', description: '# PRD' })).data;
-    expect(story).toMatchObject({ id: '#1', type: 'História', column: 'Backlog', description: '# PRD' });
+    // a resposta é o resumo: a descrição e o detalhe vêm pelo get_card
+    expect(story).toMatchObject({ id: '#1', type: 'História', column: 'Backlog' });
+    expect(story).not.toHaveProperty('description');
+    expect((await call('get_card', { card: 1 })).data.description).toBe('# PRD');
     const sub = (await call('create_card', { title: 'Escrever spec', parent: '#1', fields: { fase: 'spec' } })).data;
     expect(sub).toMatchObject({ id: '#2', type: 'Sub-tarefa', column: 'A fazer', parent: '#1 Login', fields: { Fase: 'Spec' } });
     expect(changes).toBeGreaterThan(0);
@@ -355,7 +358,8 @@ describe('modelos e referências nas skills', () => {
     expect((await call('write_skill_file', { skill: 'modelos-do-projeto', file: '../fora.ts', content: 'x' })).error).toBe(true);
     expect((await call('write_skill_file', { skill: 'nao-existe', file: 'references/a.ts', content: 'x' })).error).toBe(true);
 
-    const card = (await call('create_card', { title: 'História', fields: { Skills: ['modelos-do-projeto'] } })).data;
+    const created = (await call('create_card', { title: 'História', fields: { Skills: ['modelos-do-projeto'] } })).data;
+    const card = (await call('get_card', { card: created.id })).data;
     expect(card.requiredSkills).toEqual([
       {
         name: 'modelos-do-projeto',
@@ -422,8 +426,10 @@ describe('perfis de execução', () => {
     expect((await call('get_card', { card: 2 })).data.execution.profile).toBe('planejador');
 
     // o card pode trocar de agente, e voltar ao da coluna
-    expect((await call('set_card_profile', { card: 1, profile: 'geral' })).data.execution.profile).toBe('geral');
-    expect((await call('set_card_profile', { card: 1 })).data.execution.profile).toBe('planejador');
+    expect((await call('set_card_profile', { card: 1, profile: 'geral' })).data).toMatchObject({ id: '#1', column: expect.any(String) });
+    expect((await call('get_card', { card: 1 })).data.execution.profile).toBe('geral');
+    await call('set_card_profile', { card: 1 });
+    expect((await call('get_card', { card: 1 })).data.execution.profile).toBe('planejador');
 
     // desmarcar um agente solta as colunas e os cards que o usavam
     await call('set_card_profile', { card: 1, profile: 'planejador' });
@@ -463,7 +469,8 @@ describe('harness e padrões pelo MCP', () => {
     });
     const field = router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
     expect(field.options).toEqual(['commit', 'critica', 'revisar-spec']);
-    const card = (await call('create_card', { title: 'História', fields: { Skills: ['commit', 'critica', 'revisar-spec'] } })).data;
+    const created = (await call('create_card', { title: 'História', fields: { Skills: ['commit', 'critica', 'revisar-spec'] } })).data;
+    const card = (await call('get_card', { card: created.id })).data;
     expect(card.requiredSkills).toEqual(['commit', 'critica', 'revisar-spec'].map(copiedSkill));
     const inventory = (await call('get_harness')).data.inventory;
     expect(inventory.find((i: any) => i.name === 'commit')).toEqual({
@@ -513,7 +520,9 @@ describe('harness e padrões pelo MCP', () => {
     expect(fs.existsSync(path.join(dir, '.claude', 'skills'))).toBe(false);
 
     // skill marcada no card aparece como obrigatória, com o caminho do SKILL.md
-    const card = (await call('create_card', { title: 'História', fields: { Skills: ['revisar-spec'], Modelo: 'Claude Haiku 4.5' } })).data;
+    const created = (await call('create_card', { title: 'História', fields: { Skills: ['revisar-spec'], Modelo: 'Claude Haiku 4.5' } }))
+      .data;
+    const card = (await call('get_card', { card: created.id })).data;
     expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', scope: 'board', path: libraryPath('skill', 'revisar-spec') }]);
     expect(card.model).toMatchObject({ tool: 'claude', model: 'haiku', effort: null, value: 'claude:haiku' });
 
@@ -716,7 +725,8 @@ describe('modelos de IA', () => {
       ['Esforço da atividade = Alto', 'claude:opus@high'],
     ]);
 
-    const card = (await call('create_card', { title: 'H', fields: { Esforço: 'Baixo' } })).data;
+    const created = (await call('create_card', { title: 'H', fields: { Esforço: 'Baixo' } })).data;
+    const card = (await call('get_card', { card: created.id })).data;
     expect(card.model.value).toBe('claude:haiku');
     // a nota diz o que fazer com o modelo e separa o esforço do modelo do "Esforço da atividade"
     expect(card.model.note).toMatch(/delegue o trabalho a um subagente[\s\S]*avise a pessoa/);
@@ -736,9 +746,9 @@ describe('modelos de IA', () => {
         { when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'Opus 5.5 max' },
       ],
     });
-    expect((await call('create_card', { title: 'Doc', fields: { Tags: ['docs'], Esforço: 'Alto' } })).data.model.value).toBe(
-      'claude:haiku',
-    );
+    // o resumo do create_card traz o campo Modelo gravado; o valor normalizado vem pelo get_card
+    const doc = (await call('create_card', { title: 'Doc', fields: { Tags: ['docs'], Esforço: 'Alto' } })).data;
+    expect((await call('get_card', { card: doc.id })).data.model.value).toBe('claude:haiku');
     const cursor = (await call('suggest_model_rules', { tool: 'cursor' })).data.rules;
     expect(cursor.filter((r: any) => r.when.startsWith('Esforço')).map((r: any) => r.value)).toEqual([
       'cursor:auto',
@@ -800,8 +810,10 @@ describe('modos rápidos do Cursor', () => {
 });
 
 describe('regras de modelo com E e OU', () => {
-  const modelOf = async (fields: Record<string, unknown>, type?: string) =>
-    (await call('create_card', { title: 'x', type, fields })).data.model?.value;
+  const modelOf = async (fields: Record<string, unknown>, type?: string) => {
+    const created = (await call('create_card', { title: 'x', type, fields })).data;
+    return (await call('get_card', { card: created.id })).data.model?.value;
+  };
 
   it('avalia grupos E/OU, negação, tipo do card, ordem e regras desligadas', async () => {
     const res = await call('set_model_rules', {
@@ -868,7 +880,8 @@ describe('regras de modelo com E e OU', () => {
 
   it('com o preenchimento automático desligado, só sugere', async () => {
     await call('update_rules', { autoApplyModelSuggestion: false });
-    const card = (await call('create_card', { title: 'x', fields: { Esforço: 'Alto' } })).data;
+    const created = (await call('create_card', { title: 'x', fields: { Esforço: 'Alto' } })).data;
+    const card = (await call('get_card', { card: created.id })).data;
     expect(card.model).toBeUndefined();
     expect(card.suggestedModel.value).toBe('claude:opus@high');
   });
@@ -1048,7 +1061,8 @@ describe('status do card e checkpoint de revisão', () => {
     expect(story.phase.reviewNote).toContain('#1');
 
     // a sub-tarefa da fase enxerga a fase da história e grava o artefato nela
-    const sub = (await call('create_card', { title: 'Escrever PRD', parent: 1, fields: { Fase: 'PRD' } })).data;
+    await call('create_card', { title: 'Escrever PRD', parent: 1, fields: { Fase: 'PRD' } });
+    const sub = (await call('get_card', { card: 2 })).data;
     expect(sub.phase.name).toBe('PRD');
     expect(sub.storyArtifacts).toEqual([]);
     const first = (await call('add_attachment', { card: 2, filename: 'PRD.md', content: 'v1', artifact: true })).data;
@@ -1573,7 +1587,8 @@ describe('vínculos entre cards', () => {
     const base = (await call('create_card', { title: 'Modelo de dados', parent: story.id })).data;
     const tela = (await call('create_card', { title: 'Tela', parent: story.id })).data;
     const api = (await call('create_card', { title: 'API', parent: story.id, depends_on: [base.id] })).data;
-    expect(api.links.dependsOn).toMatchObject([{ id: base.id }]);
+    expect(api.waitingFor).toEqual([base.id]);
+    expect((await call('get_card', { card: api.id })).data.links.dependsOn).toMatchObject([{ id: base.id }]);
     expect(router.snapshot().links).toMatchObject([{ kind: 'precedes' }]);
 
     // a história mostra o que roda junto agora e o que espera
@@ -1585,6 +1600,7 @@ describe('vínculos entre cards', () => {
     const refused = await call('start_work', { card: api.id });
     expect(refused.error).toBe(true);
     expect(refused.text).toContain(`depende de ${base.id}`);
+    expect((await call('get_card', { card: api.id })).data.column).toBe('A fazer'); // a recusa não move a sub-tarefa
     expect((await call('start_work', { card: base.id })).error).toBe(false);
     expect((await call('start_work', { card: tela.id })).error).toBe(false);
 
@@ -2456,5 +2472,100 @@ describe('ponte HTTP da biblioteca', () => {
       remote.closeAllConnections();
       await new Promise<void>((resolve) => remote.close(() => resolve()));
     }
+  });
+});
+
+describe('ciclo do card em menos chamadas (#601)', () => {
+  const conversation = async (card: string) => (await call('get_card', { card, only: ['conversation'] })).data.comments;
+
+  it('start_work numa sub-tarefa em "A fazer" já a leva para "Em andamento"; numa história, ou fora da primeira coluna, só marca running', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: story.id })).data;
+    const started = (await call('start_work', { card: sub.id })).data;
+    expect(started.card).toMatchObject({ id: sub.id, column: 'Em andamento', work: { status: 'running' } });
+    // chamar de novo, já em "Em andamento", não muda a coluna
+    expect((await call('start_work', { card: sub.id })).data.card.column).toBe('Em andamento');
+    // a história fica onde está
+    const onStory = (await call('start_work', { card: story.id })).data;
+    expect(onStory.card).toMatchObject({ id: story.id, column: 'Backlog', work: { status: 'running' } });
+  });
+
+  it('start_work não move a sub-tarefa quando a coluna seguinte do workflow filho não é aberta ou exige aprovação', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const a = (await call('create_card', { title: 'A', parent: story.id })).data;
+    expect((await call('update_column', { column: 'Em andamento', workflow: 'child', requires_approval: true })).error).toBe(false);
+    expect((await call('start_work', { card: a.id })).data.card).toMatchObject({ column: 'A fazer', work: { status: 'running' } });
+    await call('update_column', { column: 'Em andamento', workflow: 'child', requires_approval: false, category: 'done' });
+    const b = (await call('create_card', { title: 'B', parent: story.id })).data;
+    expect((await call('start_work', { card: b.id })).data.card).toMatchObject({ column: 'A fazer', work: { status: 'running' } });
+  });
+
+  it('move_card com comment grava a mensagem na conversa, assinada pela IA, só depois do movimento aceito', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: story.id })).data;
+    const moved = await call('move_card', { card: sub.id, column: 'Concluído', comment: 'Feito: arquivo X alterado.' });
+    expect(moved.error).toBe(false);
+    expect(moved.data.card.column).toBe('Concluído');
+    expect(moved.data.hint).toContain('saíram de aberto');
+    const after = await conversation(sub.id);
+    expect(after).toHaveLength(1);
+    expect(after[0]).toMatchObject({ body: 'Feito: arquivo X alterado.', from: 'ai' });
+    // sem comment, nada entra na conversa
+    await call('move_card', { card: sub.id, column: 'A fazer' });
+    expect(await conversation(sub.id)).toHaveLength(1);
+    // movimento recusado (história com sub-tarefa em aberto rumo à conclusão) não grava o comentário
+    const refused = await call('move_card', { card: story.id, column: 'Concluído', comment: 'não deveria entrar' });
+    expect(refused.error).toBe(true);
+    expect(await conversation(story.id)).toHaveLength(0);
+    expect((await call('get_card', { card: story.id })).data.column).toBe('Backlog');
+  });
+
+  it('create_card com profile e checklist devolve o card resumido, com os itens criados na ordem', async () => {
+    await call('create_agent', { name: 'planejador', description: 'Planeja', content: '# Planejador' });
+    const story = (await call('create_card', { title: 'História' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: story.id, profile: 'planejador', checklist: ['um', 'dois', 'três'] }))
+      .data;
+    expect(sub).toMatchObject({ id: '#2', title: 'Sub', column: 'A fazer', parent: '#1 História', checklist: '0/3' });
+    expect(sub.checklistItems.map((i: any) => i.text)).toEqual(['um', 'dois', 'três']);
+    for (const i of sub.checklistItems) expect(i).toMatchObject({ itemId: expect.any(String), done: false });
+    // só o resumo: o detalhe vem pelo get_card
+    for (const key of ['phase', 'description', 'comments', 'execution', 'model', 'workspace', 'links']) expect(sub).not.toHaveProperty(key);
+    expect((await call('get_card', { card: sub.id })).data.execution.profile).toBe('planejador');
+    // sem checklist, a resposta não traz checklistItems e cabe em menos de mil caracteres (antes, ~4,7 mil)
+    const plain = await call('create_card', { title: 'Outra', parent: story.id, checklist: [] });
+    expect(plain.data).not.toHaveProperty('checklistItems');
+    expect(JSON.stringify(plain.data).length).toBeLessThan(1000);
+  });
+
+  it('create_card com profile desconhecido é recusado antes de criar o card', async () => {
+    const bad = await call('create_card', { title: 'x', profile: 'inexistente' });
+    expect(bad.error).toBe(true);
+    expect(bad.text).toContain('Agente "inexistente" não encontrado');
+    expect((await call('list_cards')).data.cards).toEqual([]);
+  });
+
+  it('add_checklist_item aceita text, items ou os dois, e recusa a chamada sem nenhum', async () => {
+    const card = (await call('create_card', { title: 'H' })).data;
+    const many = (await call('add_checklist_item', { card: card.id, items: ['a', 'b', 'c'] })).data;
+    expect(many.map((i: any) => i.text)).toEqual(['a', 'b', 'c']);
+    const one = (await call('add_checklist_item', { card: card.id, text: 'd' })).data;
+    expect(one.map((i: any) => i.text)).toEqual(['a', 'b', 'c', 'd']);
+    const both = (await call('add_checklist_item', { card: card.id, text: 'e', items: ['f'] })).data;
+    expect(both.map((i: any) => i.text)).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
+    const none = await call('add_checklist_item', { card: card.id });
+    expect(none.error).toBe(true);
+    expect(none.text).toContain('Informe `text` ou `items`');
+  });
+
+  it('as instruções e as descrições ensinam o ciclo novo', async () => {
+    expect(MCP_INSTRUCTIONS).toContain('start_work (numa sub-tarefa, já a move para a coluna de andamento)');
+    expect(MCP_INSTRUCTIONS).toContain('conclua com move_card e `comment`');
+    const tools = (await client.listTools()).tools;
+    const desc = (name: string) => tools.find((t) => t.name === name)!.description ?? '';
+    expect(desc('start_work')).toContain('já a leva para a coluna seguinte');
+    expect(desc('move_card')).toContain('`comment`');
+    expect(desc('create_card')).toContain('Devolve o card resumido');
+    expect(desc('add_checklist_item')).toContain('`items`');
+    expect(desc('set_card_profile')).toContain('Devolve o card resumido');
   });
 });

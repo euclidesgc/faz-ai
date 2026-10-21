@@ -7,7 +7,7 @@ import { isAtYoloStop, isDelivered, isYolo, storyOf } from '../../../shared/stor
 import type { MessageRouter } from '../../panel/messageRouter';
 import { cardSummary, findCard } from '../format';
 import { cardArg } from './args';
-import { aiOrigin, detail, findProfile, live } from './helpers';
+import { END, aiOrigin, detail, findProfile, live, nextOpenColumnOf } from './helpers';
 import type { DefineTool, ToolContext } from './registry';
 
 /** Execução pela IA: status de trabalho, workspace (branch/pasta), agente de execução e pull request. */
@@ -33,7 +33,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'start_work',
-    'Marca que você começou a trabalhar no card (status "running"). Chame antes de executar o trabalho de um card. Recusa enquanto o card depender de outro que ainda não terminou (`waitingFor`).',
+    'Marca que você começou a trabalhar no card (status "running"). Chame antes de executar o trabalho de um card. Numa sub-tarefa que está na primeira coluna do workflow filho, já a leva para a coluna seguinte ("Em andamento" no board padrão): não precisa de move_card. Recusa enquanto o card depender de outro que ainda não terminou (`waitingFor`).',
     { card: cardArg },
     (a, router) => {
       const s = router.snapshot();
@@ -43,6 +43,9 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
         throw new Error(
           `${cardRef(card)} depende de ${pending.map(cardRef).join(', ')}, que ainda não terminou. Conclua a dependência antes, ou remova o vínculo com unlink_cards se ele não fizer mais sentido.`,
         );
+      // o movimento vem antes do status: a resposta já mostra a coluna nova e, se ele for recusado, nada fica "running"
+      const next = nextOpenColumnOf(s, card);
+      if (next) router.handle({ type: 'card.move', cardId: card.id, columnId: next.id, position: END }, aiOrigin(ctx));
       return setStatus(
         router,
         a.card,
@@ -145,7 +148,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'set_card_profile',
-    'Escolhe o agente do card: o arquivo de agente (instruções, skills, servidores MCP, ferramentas e modelo) que a sessão do board usa para executá-lo; os disponíveis estão em `agents`, em get_board. Sem `profile`, o card volta a usar o agente da coluna (ou o padrão do board).',
+    'Escolhe o agente do card: o arquivo de agente (instruções, skills, servidores MCP, ferramentas e modelo) que a sessão do board usa para executá-lo; os disponíveis estão em `agents`, em get_board. Sem `profile`, o card volta a usar o agente da coluna (ou o padrão do board). Devolve o card resumido; no create_card, `profile` já escolhe o agente.',
     { card: cardArg, profile: z.string().optional().describe('Nome do agente; omita para voltar ao da coluna') },
     (a, router) => {
       const card = live(findCard(router.snapshot(), a.card));
@@ -153,7 +156,11 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
         { type: 'card.execProfile.set', cardId: card.id, profileId: a.profile ? findProfile(router.snapshot(), a.profile).id : null },
         aiOrigin(ctx),
       );
-      return detail(router, card.id);
+      const after = router.snapshot();
+      return cardSummary(
+        after,
+        after.cards.find((c) => c.id === card.id)!,
+      );
     },
   );
 

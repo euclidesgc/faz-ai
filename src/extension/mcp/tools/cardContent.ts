@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { linkBetween } from '../../../shared/links';
 import { findCard } from '../format';
 import { cardArg } from './args';
-import { aiOrigin, detail } from './helpers';
+import { addChecklist, aiOrigin, detail } from './helpers';
 import type { DefineTool, ToolContext } from './registry';
 
 /** Conteúdo do card: checklist, comentários (conversa), anexos e vínculos com outros cards. */
@@ -33,11 +33,17 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
     return detail(router, card.id).links ?? {};
   });
 
-  tool('add_checklist_item', 'Adiciona um item ao checklist (TODO) do card.', { card: cardArg, text: z.string().min(1) }, (a, router) => {
-    const card = findCard(router.snapshot(), a.card);
-    router.handle({ type: 'checklist.add', cardId: card.id, text: a.text });
-    return detail(router, card.id).checklistItems;
-  });
+  tool(
+    'add_checklist_item',
+    'Adiciona itens ao checklist (TODO) do card. Informe `text` (um item) ou `items` (vários, na ordem), numa chamada só.',
+    { card: cardArg, text: z.string().min(1).optional(), items: z.array(z.string().min(1)).optional().describe('Vários itens, na ordem') },
+    (a, router) => {
+      const card = findCard(router.snapshot(), a.card);
+      const texts = [...(a.text ? [a.text] : []), ...(a.items ?? [])];
+      if (!texts.length) throw new Error('Informe `text` ou `items`.');
+      return addChecklist(router, card.id, texts);
+    },
+  );
 
   tool(
     'update_checklist_item',

@@ -125,11 +125,18 @@ Cada card em que a IA atua tem um status de trabalho, devolvido em `work` por `g
 | Status | Com quem | Como chega nele |
 | --- | --- | --- |
 | `ready` | IA | O card entrou numa coluna em que a IA atua, a pessoa pediu ajustes ou respondeu a uma pergunta |
-| `running` | IA | `start_work` |
+| `running` | IA | `start_work` (numa sub-tarefa na primeira coluna do workflow filho, também a move para a coluna seguinte, quando é aberta e não exige aprovação) |
 | `waiting_answer` | Pessoa | `ask_question` |
 | `waiting_review` | Pessoa | `request_review` |
 | `approved` | IA | A pessoa aprovou e o board não pôde mover o card (não há ferramenta para a IA aprovar; a aprovação normal já leva o card à próxima coluna) |
 | `blocked` | Pessoa | `block_card`, ou a pessoa bloqueou |
+
+`move_card` aceita `comment`: a mensagem de conclusão (markdown) entra na conversa do card, assinada
+pela IA, depois do movimento aceito; um movimento recusado não grava nada. `create_card` aceita
+`profile` (o agente, pelo nome, validado antes de criar) e `checklist` (os itens, na ordem) e devolve o
+card resumido, como `move_card` e `start_work`, mais `checklistItems` (com ids) quando criou itens; o
+detalhe (`phase`, `execution`, notas) vem pelo `get_card`. `set_card_profile` também devolve o resumo.
+`add_checklist_item` aceita `text` (um item) ou `items` (vários, na ordem).
 
 Nas colunas com `requiresApproval` (em `get_board`), `move_card` só leva o card para a frente quando
 o status é `approved`. Voltar de coluna ou cancelar é livre. No modo autônomo, `phase.requiresApproval`
@@ -238,7 +245,7 @@ caminhos dos arquivos de apoio dela.
 
 O agente do card define antes o que a sessão usa: instruções, skills, servidores MCP, ferramentas e
 modelo. `get_board` lista os disponíveis em `agents` (com `default`; a resposta não traz `harness` nem `appearance`: o inventário está em `get_harness`, e só o Plan, o refinar e a edição do board pedem o `get_board`). O agente de um card é o do
-próprio card (`set_card_profile`, pelo nome), senão o da coluna (`update_column` com
+próprio card (`profile` no `create_card` ou `set_card_profile`, pelo nome), senão o da coluna (`update_column` com
 `exec_profile`), senão o da coluna da história (numa sub-tarefa), senão o padrão do board
 (Configurações → Harness de IA → Ferramenta e execução).
 
