@@ -689,6 +689,10 @@ pelo navegador.
   execuções simultâneas somam, então o total pode passar do tempo decorrido no relógio. O que não
   foi medido aparece como "não medido", nunca como 0, e quando só parte das execuções foi medida o
   aviso diz quantas ficaram de fora.
+- **Execuções acima do limite de consumo.** Uma execução que lê mais de 10 milhões de tokens de
+  cache passa do limite: o total **Execuções de IA** mostra "{n} acima do limite de consumo" e, ao
+  fim da execução, a conversa do card recebe um aviso com o consumo e a duração. O limite é fixo e o
+  alerta não interrompe nada. Sem tokens medidos (Cursor) não há alerta, e meses arquivados não contam.
 - **Tokens por mês.** Gráfico de barras com os tokens de cada mês.
   O mês em andamento aparece com hachura, porque ainda não terminou; um mês sem nenhum dado é um
   espaço marcado "sem dado", não uma barra de altura zero. Abaixo do gráfico fica uma tabela com os
