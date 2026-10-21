@@ -61,10 +61,6 @@ export interface EnvironmentHooks {
   /** roda o Diagnóstico; resolve quando o relatório já está no board e rejeita se a conferência falhou */
   check(): Promise<void>;
   seen(): void;
-  /** grava o caminho completo dos MCPs que o editor não acha, e confere de novo */
-  pinMcp?(): Promise<void>;
-  /** libera as ferramentas do board sem aprovação nas conversas do Kimi Code (a regra no config.toml), e confere de novo */
-  allowKimiMcp?(): void;
 }
 
 /** O que o host faz pela limpeza de branches e worktrees órfãs (#465). O relatório sai por `setOrphans`. */
@@ -126,8 +122,6 @@ const bridgeOnly = {
   'git.orphans.cleanSafe': viaBridge,
   'environment.check': viaBridge,
   'environment.seen': viaBridge,
-  'environment.pinMcp': viaBridge,
-  'environment.allowKimiMcp': viaBridge,
   'ai.autopilot.pause': viaBridge,
   'ai.autopilot.resume': viaBridge,
   'card.workspace.open': viaBridge,
@@ -429,14 +423,6 @@ export class MessageRouter {
 
   checkEnvironment(): Promise<void> {
     return this.environmentHooks?.check() ?? Promise.resolve();
-  }
-
-  pinEnvironmentMcp(): Promise<void> {
-    return this.environmentHooks?.pinMcp?.() ?? Promise.resolve();
-  }
-
-  allowKimiMcp(): void {
-    this.environmentHooks?.allowKimiMcp?.();
   }
 
   /** A tela abriu sozinha uma vez: nas próximas aberturas, só pelo botão. */

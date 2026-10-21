@@ -192,7 +192,7 @@ export function heartbeatQueue(s: BoardState, conflicts: ReadonlySet<string> = n
  * é uma das condições em que `heartbeatTargets` ou `pump` deixam um card de fora.
  */
 export function heartbeatIdleReason(s: BoardState): string {
-  if (blocksExecution(s)) return 'o login da ferramenta de IA venceu (veja o aviso no topo do board).';
+  if (blocksExecution(s)) return 'nenhum perfil de CLI disponível, ou o login do perfil padrão venceu (veja o aviso no topo do board).';
   const p = pendingWork(s);
   const queue = aiQueue(s, p);
   if (!queue.length) return 'nada pendente com a IA.';
@@ -420,7 +420,7 @@ export class Heartbeat {
     // em vez de cruzar com a sincronização das branches
     if (this.holding) return void this.changed();
     const s = this.deps.snapshot();
-    // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
+    // nenhum perfil disponível: não insiste sozinho, a pessoa resolve
     if (blocksExecution(s)) {
       if (this.queue.length) this.deps.log(`Heartbeat: ${heartbeatIdleReason(s)}`);
       this.queue = [];

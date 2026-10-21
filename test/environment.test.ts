@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { checkEnvironment, linuxFamily, type EnvironmentProbe, type LinuxFamily, type OtherToolProbe } from '../src/extension/environment';
+import { checkEnvironment, linuxFamily, type EnvironmentProbe, type LinuxFamily } from '../src/extension/environment';
+import { BUILTIN_PROFILES } from '../src/shared/aiProfiles';
+import { profileHealth, type ProfileHealth } from '../src/shared/profileHealth';
 import { missingCount, type EnvCheck, type EnvCheckId, type EnvironmentReport } from '../src/shared/environment';
 import type { BoardRequirement } from '../src/shared/requirements';
 
@@ -9,11 +11,8 @@ function probe(o: {
   outputs?: Record<string, string | null>;
   files?: Record<string, string>;
   requirements?: BoardRequirement[];
-  skillInstalled?: boolean;
+  health?: ProfileHealth[];
   harnessIssues?: EnvironmentProbe['harnessIssues'];
-  tool?: EnvironmentProbe['tool'];
-  others?: OtherToolProbe[];
-  crgMcp?: boolean;
   platform?: NodeJS.Platform;
   pathDirs?: string[];
   linux?: LinuxFamily | null;
@@ -22,13 +21,10 @@ function probe(o: {
   const ran: string[] = [];
   return {
     ran,
-    tool: o.tool ?? 'cursor',
     requirements: o.requirements ?? [],
+    health: o.health ?? [],
     workspaceDir: '/proj',
-    skillInstalled: o.skillInstalled ?? false,
     harnessIssues: o.harnessIssues === undefined ? [] : o.harnessIssues,
-    others: o.others ?? [],
-    crgMcp: o.crgMcp ?? false,
     branchRenames: o.branchRenames,
     platform: o.platform ?? 'linux',
     homeDir: '/home/u',
@@ -47,7 +43,27 @@ function probe(o: {
 
 /** Todos os itens da árvore, na ordem da tela. */
 const flat = (checks: EnvCheck[]): EnvCheck[] => checks.flatMap((c) => [c, ...flat(c.children ?? [])]);
-const all = (r: EnvironmentReport) => flat([...r.required, ...r.optional, ...r.recommended]);
+const all = (r: EnvironmentReport) => flat([...r.required, r.harness, ...r.recommended]);
+/** A saúde de um perfil pronto: com a CLI achada ou não. */
+const health = (id: string, found = true, version?: string): ProfileHealth =>
+  profileHealth({
+    profile: BUILTIN_PROFILES.find((p) => p.id === id)!,
+    isDefault: id === 'claude',
+    pendingReview: false,
+    probe: {
+      id,
+      found,
+      login: found ? 'signed-in' : 'unchecked',
+      ...(found ? { path: `/bin/${id}`, ...(version ? { version } : {}) } : {}),
+    },
+    authExpired: false,
+    validationRequired: false,
+    credentials: [],
+    capabilities: [],
+    admission: null,
+    evidence: { state: 'never' },
+    install: null,
+  });
 const find = (checks: EnvCheck[], id: EnvCheckId) => flat(checks).find((c) => c.id === id)!;
 /** A árvore só com id e estado, para comparar a forma inteira. */
 /** Só os comandos da instalação de um item. */
@@ -61,35 +77,22 @@ const FIND_SPEC = `${UV_PY} -c import importlib.util,sys;sys.exit(0 if importlib
 
 describe('Diagnóstico do ambiente', () => {
   it('máquina vazia: o que depende de outro item fica dentro dele, esperando', async () => {
-    const node: BoardRequirement = { id: 'node', tool: 'cursor', action: null };
-    const cli: BoardRequirement = { id: 'cli', tool: 'cursor', cli: 'cursor-agent', action: null };
-    const r = await checkEnvironment(probe({ requirements: [node, cli] }));
-    expect(shape(r.required)).toEqual([
-      ['node', 'missing'],
+    const node: BoardRequirement = { id: 'node', action: null };
+    const r = await checkEnvironment(probe({ requirements: [node] }));
+    expect(shape(r.required)).toEqual([['node', 'missing']]);
+    // o banco de artefatos não depende de ferramenta nenhuma
+    expect(shape([r.harness])).toEqual([
       [
-        'tool',
-        'missing',
+        'harness',
+        'ok',
         [
-          ['cli', 'missing', [['signin', 'skipped']]],
-          ['mcp', 'ok'],
-          ['skill', 'missing'],
-          // o harness depende da CLI: sem ela, nem ele nem o que falta nele dá para conferir
-          [
-            'harness',
-            'skipped',
-            [
-              ['harness-artifacts', 'skipped'],
-              ['harness-agents', 'skipped'],
-              ['harness-rules', 'skipped'],
-              ['harness-missing', 'skipped'],
-              ['harness-cursor', 'skipped'],
-            ],
-          ],
-          ['permission', 'ok'],
+          ['harness-artifacts', 'ok'],
+          ['harness-agents', 'ok'],
+          ['harness-rules', 'ok'],
+          ['harness-missing', 'ok'],
         ],
       ],
     ]);
-    expect(r.optional).toEqual([]);
     expect(shape(r.recommended)).toEqual([
       ['git', 'missing', [['repo', 'skipped']]],
       ['branch-name', 'ok'],
@@ -104,24 +107,30 @@ describe('Diagnóstico do ambiente', () => {
             'skipped',
             [
               ['crg-graph', 'skipped'],
-              ['crg-mcp', 'skipped'],
               ['crg-embeddings', 'skipped'],
             ],
           ],
         ],
       ],
     ]);
-    // o bloco da ferramenta só resume: contam o Node, a CLI e a skill
-    expect(missingCount(r.required)).toBe(3);
+    expect(missingCount(r.required)).toBe(1);
+  });
+
+  it('um bloco por perfil, na ordem que o host mandou; sem o crg-mcp nem itens de MCP, skill ou permissão (RF02, RF23)', async () => {
+    const r = await checkEnvironment(probe({ health: [health('claude'), health('cursor', false)] }));
+    expect(r.profiles.map((h) => h.id)).toEqual(['claude', 'cursor']);
+    expect(r.availability).toEqual({ blocked: false, reason: null, warnings: [{ id: 'cursor', name: 'Cursor', problem: 'cli' }] });
+    const ids = all(r).map((c) => c.id as string);
+    for (const gone of ['tool', 'cli', 'signin', 'mcp', 'skill', 'permission', 'crg-mcp', 'harness-cursor'])
+      expect(ids).not.toContain(gone);
   });
 
   it('o nome da branch fica pendente, em recomendados, enquanto houver renomeação à espera', async () => {
-    const none = await checkEnvironment(probe({ tool: 'claude' }));
+    const none = await checkEnvironment(probe({}));
     expect(find(none.recommended, 'branch-name').status).toBe('ok');
     expect(find(none.recommended, 'branch-name').command).toBeUndefined();
     const pending = await checkEnvironment(
       probe({
-        tool: 'claude',
         branchRenames: [
           { kind: 'main', from: 'master', to: 'main', previous: '' },
           { kind: 'develop', from: 'dev', to: 'develop', previous: 'dev' },
@@ -139,31 +148,27 @@ describe('Diagnóstico do ambiente', () => {
   });
 
   it('o board não instala nada de terceiros: cada item traz o site ou o comando para copiar', async () => {
-    const r = await checkEnvironment(probe({ tool: 'claude' }));
-    const items = all(r);
-    expect(items.filter((c) => c.requirement?.action && c.requirement.action.kind !== 'installSkill')).toEqual([]);
+    const r = await checkEnvironment(probe({}));
     expect(find(r.required, 'node').docs).toBe('https://nodejs.org/en/download');
-    expect(find(r.required, 'cli').docs).toBe('https://code.claude.com/docs/en/setup');
-    expect(find(r.required, 'signin').command).toBe('claude auth login');
     expect(find(r.recommended, 'repo').command).toBe('git init');
     expect(find(r.recommended, 'gh-auth').command).toBe('gh auth login');
     expect(find(r.recommended, 'crg-graph').command).toBe('code-review-graph build');
-    expect(find(r.recommended, 'crg-mcp').command).toBe('code-review-graph install --platform claude-code');
     expect(find(r.recommended, 'crg-embeddings').command).toBe('code-review-graph embed --provider local');
   });
 
-  it('o MCP, a skill e a permissão da ferramenta do projeto levam o requisito do aviso, com o botão dele', async () => {
-    const mcp: BoardRequirement = { id: 'mcp-enable', tool: 'cursor', action: { kind: 'openEditorMcp' } };
-    const signin: BoardRequirement = {
-      id: 'signin',
-      tool: 'cursor',
-      cli: 'cursor-agent',
-      action: { kind: 'command', command: 'cursor-agent login' },
-    };
-    const r = await checkEnvironment(probe({ requirements: [mcp, signin], commands: { 'cursor-agent': '/bin/cursor-agent' } }));
-    expect(find(r.required, 'mcp')).toMatchObject({ status: 'missing', requirement: mcp });
-    expect(find(r.required, 'skill')).toMatchObject({ status: 'missing', requirement: { action: { kind: 'installSkill' } } });
-    expect(find(r.required, 'signin')).toMatchObject({ status: 'missing', command: 'cursor-agent login', requirement: signin });
+  it('o banco de artefatos leva o requisito do aviso, com o atalho para o Harness, e o que falta vira filho', async () => {
+    const harness: BoardRequirement = { id: 'harness', optional: true, harnessIssues: ['rules'], action: { kind: 'settings' } };
+    const r = await checkEnvironment(probe({ requirements: [harness], harnessIssues: ['rules', 'missing'] }));
+    expect(r.harness).toMatchObject({ status: 'missing', requirement: harness });
+    expect(r.harness.children!.map((c) => [c.id, c.status])).toEqual([
+      ['harness-artifacts', 'ok'],
+      ['harness-agents', 'ok'],
+      ['harness-rules', 'missing'],
+      ['harness-missing', 'missing'],
+    ]);
+    // recomendação: só as faltas dentro dele contam, e sem o inventário fica pulado
+    expect(missingCount([r.harness])).toBe(2);
+    expect((await checkEnvironment(probe({ harnessIssues: null }))).harness.status).toBe('skipped');
   });
 
   it('Node.js abaixo da versão mínima falta, com a versão encontrada', async () => {
@@ -175,47 +180,17 @@ describe('Diagnóstico do ambiente', () => {
     expect(find(ok.required, 'node')).toMatchObject({ status: 'ok', version: '22.3.0' });
   });
 
-  it('a outra ferramenta encontrada na máquina entra nos opcionais, só com o estado de cada item', async () => {
-    const claude: OtherToolProbe = { tool: 'claude', cli: '/bin/claude', signedIn: false, mcp: true, skill: false, permission: null };
-    const r = await checkEnvironment(probe({ others: [claude], outputs: { '/bin/claude --version': '2.1.4 (Claude Code)' } }));
-    expect(shape(r.optional)).toEqual([
-      [
-        'tool',
-        'missing',
-        [
-          ['cli', 'ok', [['signin', 'missing']]],
-          ['mcp', 'ok'],
-          ['skill', 'missing'],
-          ['permission', 'ok'],
-        ],
-      ],
-    ]);
-    expect(r.optional[0]!.tool).toBe('claude');
-    expect(find(r.optional, 'cli').version).toBe('2.1.4');
-    expect(find(r.optional, 'signin').command).toBe('claude auth login');
-    expect(flat(r.optional).some((c) => c.requirement)).toBe(false);
-    // a ferramenta achada pelo editor, sem a CLI: o login espera a CLI
-    const editor = await checkEnvironment(
-      probe({ tool: 'claude', others: [{ tool: 'cursor', cli: null, signedIn: null, mcp: false, skill: false, permission: null }] }),
-    );
-    expect(find(editor.optional, 'cli').status).toBe('missing');
-    expect(find(editor.optional, 'signin').status).toBe('skipped');
-  });
-
   it('tudo instalado: mostra as versões e não falta nada', async () => {
     const p = probe({
-      skillInstalled: true,
-      crgMcp: true,
+      health: [health('cursor', true, '2026.09.30')],
       commands: {
         node: '/usr/bin/node',
-        'cursor-agent': '/bin/cursor-agent',
         git: '/usr/bin/git',
         gh: '/usr/bin/gh',
         'code-review-graph': CRG,
       },
       outputs: {
         '/usr/bin/node --version': 'v22.3.0\n',
-        '/bin/cursor-agent --version': '2026.09.30-abc\n',
         '/usr/bin/git --version': 'git version 2.43.0\n',
         '/usr/bin/git rev-parse --is-inside-work-tree': 'true\n',
         '/usr/bin/gh --version': 'gh version 2.92.0 (2026-04-28)\n',
@@ -237,13 +212,12 @@ describe('Diagnóstico do ambiente', () => {
         .map((c) => [c.id, c.version]),
     ).toEqual([
       ['node', '22.3.0'],
-      ['cli', '2026.09.30'],
       ['git', '2.43.0'],
       ['gh', '2.92.0'],
       ['crg', '2.3.6'],
     ]);
     // com o Code Review Graph instalado, o uv e o Python ficam de fora
-    expect(find(r.recommended, 'crg').children!.map((c) => c.id)).toEqual(['crg-graph', 'crg-mcp', 'crg-embeddings']);
+    expect(find(r.recommended, 'crg').children!.map((c) => c.id)).toEqual(['crg-graph', 'crg-embeddings']);
   });
 
   it('sem o #! (Windows), a busca semântica é lida da lista do uv', async () => {
@@ -299,41 +273,56 @@ describe('Diagnóstico do ambiente', () => {
   });
 
   it('o que falta traz o comando de instalação oficial, neutro: curl no Linux e no macOS, PowerShell no Windows', async () => {
-    const cli: BoardRequirement = { id: 'cli', tool: 'claude', cli: 'claude', action: null };
-    const node: BoardRequirement = { id: 'node', tool: 'claude', action: null };
-    const unix = await checkEnvironment(probe({ tool: 'claude', requirements: [node, cli] }));
+    const node: BoardRequirement = { id: 'node', action: null };
+    const missing = [health('claude', false), health('cursor', false), health('kimi', false)];
+    const unix = await checkEnvironment(probe({ requirements: [node], health: missing }));
     expect(commands(find(unix.required, 'node'))).toEqual([
       'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash',
       '. "$HOME/.nvm/nvm.sh"',
       'nvm install 22',
     ]);
-    expect(commands(find(unix.required, 'cli'))).toEqual(['curl -fsSL https://claude.ai/install.sh | bash']);
+    const steps = (r: EnvironmentReport) =>
+      r.profiles.map((h) => (h.install && 'steps' in h.install ? h.install.steps.map((s) => s.command)[0] : null));
+    expect(steps(unix)).toEqual([
+      'curl -fsSL https://claude.ai/install.sh | bash',
+      'curl https://cursor.com/install -fsS | bash',
+      'npm install -g @moonshot-ai/kimi-code',
+    ]);
+    expect(unix.profiles[0]!.install).toMatchObject({ docs: 'https://code.claude.com/docs/en/setup' });
     expect(commands(find(unix.recommended, 'uv'))).toEqual(['curl -LsSf https://astral.sh/uv/install.sh | sh']);
-    const windows = await checkEnvironment(probe({ tool: 'claude', requirements: [node, cli], platform: 'win32' }));
-    expect(commands(find(windows.required, 'cli'))).toEqual(['irm https://claude.ai/install.ps1 | iex']);
+    const windows = await checkEnvironment(probe({ requirements: [node], health: missing, platform: 'win32' }));
+    expect(steps(windows)[0]).toBe('irm https://claude.ai/install.ps1 | iex');
     expect(commands(find(windows.required, 'node'))).toEqual(['winget install OpenJS.NodeJS.LTS']);
     // no Windows, o programa só aparece num terminal novo
     expect(find(windows.required, 'node').reopenTerminal).toBe(true);
     expect(windows.curlMissing).toBeUndefined();
-    // a outra ferramenta, achada pelo editor sem a CLI: o comando da CLI dela
-    const cursor = await checkEnvironment(
-      probe({ tool: 'claude', others: [{ tool: 'cursor', cli: null, signedIn: null, mcp: false, skill: false, permission: null }] }),
-    );
-    expect(commands(find(cursor.optional, 'cli'))).toEqual(['curl https://cursor.com/install -fsS | bash']);
+  });
+
+  it('perfil com a CLI achada não sugere instalar; o que já traz um link (cópia ou personalizado) fica como veio', async () => {
+    const ok = health('claude');
+    const custom: ProfileHealth = {
+      ...health('cursor', false),
+      kind: 'custom',
+      base: 'generic',
+      install: { url: 'https://example.org/i' },
+    };
+    const r = await checkEnvironment(probe({ health: [ok, custom] }));
+    expect(r.profiles[0]!.install).toBeNull();
+    expect(r.profiles[1]!.install).toEqual({ url: 'https://example.org/i' });
   });
 
   it('o Node.js pelo nvm diz cada passo; com o nvm já instalado, falta só o Node', async () => {
-    const node: BoardRequirement = { id: 'node', tool: 'claude', action: null };
-    const sem = await checkEnvironment(probe({ tool: 'claude', requirements: [node] }));
+    const node: BoardRequirement = { id: 'node', action: null };
+    const sem = await checkEnvironment(probe({ requirements: [node] }));
     expect(find(sem.required, 'node').install!.map((s) => s.step)).toEqual(['nvm', 'nvm-load', 'node']);
-    const com = await checkEnvironment(probe({ tool: 'claude', requirements: [node], files: { '/home/u/.nvm/nvm.sh': '' } }));
+    const com = await checkEnvironment(probe({ requirements: [node], files: { '/home/u/.nvm/nvm.sh': '' } }));
     expect(commands(find(com.required, 'node'))).toEqual(['. "$HOME/.nvm/nvm.sh"', 'nvm install 22']);
   });
 
   it('sem ~/.local/bin no PATH, a CLI e o uv trazem o passo do PATH; sem curl, o aviso', async () => {
-    const cli: BoardRequirement = { id: 'cli', tool: 'cursor', cli: 'cursor-agent', action: null };
-    const r = await checkEnvironment(probe({ requirements: [cli], pathDirs: ['/usr/bin'] }));
-    expect(commands(find(r.required, 'cli'))).toEqual([
+    const r = await checkEnvironment(probe({ health: [health('cursor', false)], pathDirs: ['/usr/bin'] }));
+    const cursor = r.profiles[0]!.install as { steps: { command: string }[] };
+    expect(cursor.steps.map((s) => s.command)).toEqual([
       'curl https://cursor.com/install -fsS | bash',
       `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc`,
       'export PATH="$HOME/.local/bin:$PATH"',
@@ -345,9 +334,11 @@ describe('Diagnóstico do ambiente', () => {
     ]);
     expect(r.curlMissing).toBe(true);
     const mac = await checkEnvironment(
-      probe({ requirements: [cli], pathDirs: ['/usr/bin'], platform: 'darwin', commands: { curl: '/usr/bin/curl' } }),
+      probe({ health: [health('cursor', false)], pathDirs: ['/usr/bin'], platform: 'darwin', commands: { curl: '/usr/bin/curl' } }),
     );
-    expect(commands(find(mac.required, 'cli'))![1]).toBe(`echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc`);
+    expect((mac.profiles[0]!.install as { steps: { command: string }[] }).steps[1]!.command).toBe(
+      `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc`,
+    );
     expect(mac.curlMissing).toBeUndefined();
   });
 
@@ -390,6 +381,5 @@ describe('Diagnóstico do ambiente', () => {
   it('pronto não sugere instalar', async () => {
     const r = await checkEnvironment(probe({ commands: { node: '/usr/bin/node' }, outputs: { '/usr/bin/node --version': 'v22.3.0' } }));
     expect(find(r.required, 'node').install).toBeUndefined();
-    expect(find(r.required, 'cli').install).toBeUndefined();
   });
 });

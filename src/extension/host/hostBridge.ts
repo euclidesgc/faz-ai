@@ -192,12 +192,6 @@ export class HostBridge {
       case 'environment.seen':
         this.router.markEnvironmentSeen();
         return;
-      case 'environment.pinMcp':
-        await this.router.pinEnvironmentMcp();
-        return;
-      case 'environment.allowKimiMcp':
-        this.router.allowKimiMcp();
-        return;
       case 'chat.send':
       case 'chat.stop':
       case 'chat.clear':

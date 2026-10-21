@@ -432,7 +432,7 @@ describe('heartbeat', () => {
   it('com o login vencido (preventivo ou reativo), não inicia nenhuma história e esvazia a rodada', () => {
     create('A', 'PRD');
     create('B', 'Spec');
-    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } }]);
+    router.setRequirements([{ id: 'no-profile', reason: 'unavailable', action: { kind: 'diagnostic' } }]);
     heartbeat.runNow();
     expect(runner.started).toEqual([]);
 

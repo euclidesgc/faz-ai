@@ -395,7 +395,7 @@ export class Autopilot {
           continue;
         }
         if (step.kind !== 'run') return;
-        // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
+        // nenhum perfil disponível: não insiste sozinho, a pessoa resolve
         if (blocksExecution(this.router.snapshot())) return;
         // o teto é por tipo de atividade e conta toda execução em andamento (heartbeat, chamadas à mão):
         // o autopiloto usa as vagas livres de cada tipo, na ordem da fila

@@ -14,7 +14,7 @@ export type HarnessIssue = 'artifacts' | 'agents' | 'rules' | 'missing';
 
 export const HARNESS_ISSUES: HarnessIssue[] = ['artifacts', 'agents', 'rules', 'missing'];
 
-type View = Pick<BoardState, 'board' | 'harnessSelection'>;
+type View = Pick<BoardState, 'board' | 'harness' | 'harnessSelection'>;
 
 /** Os problemas do harness deste board, na ordem em que o Diagnóstico os mostra; vazio quando está tudo em ordem. */
 export function harnessIssues(s: View): HarnessIssue[] {

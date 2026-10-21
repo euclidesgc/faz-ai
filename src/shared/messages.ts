@@ -334,10 +334,6 @@ export type WebviewToHost =
   | { type: 'environment.check' }
   /** o Diagnóstico já abriu sozinho nesta máquina: não abre mais na abertura do board */
   | { type: 'environment.seen' }
-  /** grava o caminho completo dos MCPs (do board e do Code Review Graph) que o editor não acha */
-  | { type: 'environment.pinMcp' }
-  /** libera as ferramentas do board sem aprovação nas conversas do Kimi Code (a regra no config.toml dele) */
-  | { type: 'environment.allowKimiMcp' }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
   /**
    * instala a skill do fluxo no global de uma ferramenta (padrão: a do projeto), nunca no projeto;
