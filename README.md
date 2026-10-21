@@ -246,12 +246,16 @@ A IA usa isso para acelerar a Implementação. No Plan ela declara a ordem entre
 (`create_card` com `depends_on`, ou `link_cards` com `depends_on`): uma depende da outra quando usa o
 que ela produz ou quando as duas alteram os mesmos arquivos. Na Implementação, o `get_card` da
 história devolve em `subtasksNow` o que pode rodar agora (e em `subtasksNowNote`, como conduzir a
-rodada), e a IA delega **as sub-tarefas sem
-dependência pendente a subagentes simultâneos**, cada um com o modelo do seu card; ao fim da rodada
-ela verifica o conjunto, faz o commit e parte para a rodada seguinte. `start_work` recusa a
-sub-tarefa que ainda espera outra. Sem dependências declaradas, todas as sub-tarefas em aberto são
-consideradas independentes. Depende de a ferramenta de IA ter subagentes (o Claude Code tem); sem
-eles, a execução segue uma por vez, na ordem das dependências. O texto do fluxo é o atual do
+rodada). **As sub-tarefas são execuções separadas do board**, cada uma com o agente, o modelo e as
+skills do seu card; a sessão da história **não delega a subagentes da ferramenta** (no Claude Code, a
+ferramenta de subagente, `Agent` — antes `Task` —, fica negada em toda execução do board). O board roda
+**uma sub-tarefa por vez**, porque todas escrevem na mesma pasta da história. Em **Configurações →
+Harness de IA** (e na chave `fazai.git.parallelSubtasks`, de 1 a 6, do Settings do editor) a pessoa
+define **"Sub-tarefas em paralelo por história"**, e a tela mostra o pedido e o efetivo
+(hoje 1). No Cursor e no Kimi Code não há bloqueio da delegação nativa comprovado: a capacidade fica
+"desconhecida" e a admissão decide. Ao fim da rodada a IA verifica o conjunto, faz o commit e parte
+para a seguinte. `start_work` recusa a sub-tarefa que ainda espera outra. Sem dependências declaradas,
+todas as sub-tarefas em aberto são consideradas independentes. O texto do fluxo é o atual do
 board, servido pelo MCP; uma cópia da skill do fluxo já instalada na pasta da ferramenta não é
 substituída pelo board. Para a ferramenta não carregar o texto antigo por conta própria, apague essa cópia.
 
@@ -1316,7 +1320,7 @@ quatro seções, nesta ordem:
 | --- | --- |
 | Instalação | Um texto curto e o link **Abrir o Diagnóstico do ambiente**, que abre o board na tela do Diagnóstico |
 | Aparência | **Idioma** (`fazai.appearance.language`), **Tema** (`fazai.appearance.theme`), **Fonte** (`fazai.appearance.font`) e **Tamanho** (`fazai.appearance.fontSize`), todos com escopo Usuário — valem em todos os projetos desta pessoa. Status (rótulo e cor de cada status) continuam no board, agora na aba Fluxos |
-| Git | As oito chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.decisionRecords` (a pasta dos [registros de decisão](#registros-de-decisão); vazio = desligado). No editor, a aba Git e o bloco de paralelo do Harness viram link para estas chaves; no navegador seguem como campos editáveis |
+| Git | As nove chaves `fazai.git.*`, todas com escopo **Recurso** (o valor do Usuário é o padrão de todos os projetos; Workspace ou Folder sobrescreve só no projeto ou na pasta): `fazai.git.mode` (onde a IA mexe no código: `worktree`, `branch` ou `off`), `fazai.git.branchPattern` (padrão do nome da branch), `fazai.git.worktreeDir` (pasta das worktrees), `fazai.git.parallel` e `fazai.git.parallelStories` ("Tocar histórias em paralelo", de 2 a 6; o teto de "Histórias ao mesmo tempo" vale também, em qualquer modo, para as fases só de texto), `fazai.git.parallelSubtasks` ("Sub-tarefas em paralelo por história", de 1 a 6; hoje o efetivo é 1), `fazai.git.autoMerge` e `fazai.git.mergeMethod` (merge automático do PR e o tipo: squash, merge ou rebase) e `fazai.git.decisionRecords` (a pasta dos [registros de decisão](#registros-de-decisão); vazio = desligado). No editor, a aba Git e o bloco de paralelo do Harness viram link para estas chaves; no navegador seguem como campos editáveis |
 | Backup | Dois links de ação: **Exportar o board agora** e **Importar um board**, que disparam os comandos da paleta |
 
 Três comandos novos na paleta (`Ctrl+Shift+P`): **Faz AI: Abrir o Diagnóstico do ambiente**,

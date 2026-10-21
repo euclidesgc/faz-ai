@@ -260,12 +260,16 @@ The AI uses this to speed up Implementation. In Plan it declares the order betwe
 (`create_card` with `depends_on`, or `link_cards` with `depends_on`): one depends on another when it
 uses what the other produces or when both change the same files. In Implementation, the story's
 `get_card` returns in `subtasksNow` what can run now (and in `subtasksNowNote`, how to run the
-round), and the AI delegates **the sub-tasks with no
-pending dependency to simultaneous subagents**, each with its card's model; at the end of the round
-it verifies the whole, commits and moves on to the next round. `start_work` refuses a sub-task that
-is still waiting for another. With no dependencies declared, all open sub-tasks are considered
-independent. It depends on the AI tool having subagents (Claude Code does); without them, execution
-goes one at a time, in dependency order. The flow text is the board's current one, served
+round). **Sub-tasks are separate board runs**, each with the agent, model and skills of its card; the
+story's session **does not delegate to the tool's subagents** (in Claude Code, the subagent tool,
+`Agent` — formerly `Task` — is denied in every board run). The board runs **one sub-task at a time**,
+because they all write to the story's folder. In **Settings → AI Harness** (and the editor setting
+`fazai.git.parallelSubtasks`, 1 to 6) you set **"Sub-tarefas em paralelo por história"** (sub-tasks in
+parallel per story), and the screen shows the requested and the effective value (today 1). Cursor and
+Kimi Code have no proven way to block native delegation: the capability stays "unknown" and admission
+decides. At the end of the round the AI verifies the whole, commits and moves on to the next round.
+`start_work` refuses a sub-task that is still waiting for another. With no dependencies declared, all
+open sub-tasks are considered independent. The flow text is the board's current one, served
 through the MCP; a copy of the flow skill already installed in the tool's folder is not replaced by the
 board. To keep the tool from loading the old text on its own, delete that copy.
 
@@ -1363,7 +1367,7 @@ four sections, in this order:
 | --- | --- |
 | Installation | A short text and the **Open the Environment Diagnostics** link, which opens the board on the environment check screen |
 | Appearance | **Language** (`fazai.appearance.language`), **Theme** (`fazai.appearance.theme`), **Font** (`fazai.appearance.font`) and **Size** (`fazai.appearance.fontSize`), all with User scope — apply to all this person's projects. Statuses (name and color of each status) stay on the board, now in the Workflows tab |
-| Git | The eight `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6; the "Histórias ao mesmo tempo" cap also applies, in any mode, to text-only phases), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase) and `fazai.git.decisionRecords` (the folder of the [decision records](#decision-records); empty = off). In the editor, the Git tab and the parallel block in the Harness become a link to these keys; in the browser they stay as editable fields |
+| Git | The nine `fazai.git.*` keys, all with **Resource** scope (the User value is the default for every project; Workspace or Folder overrides it only for that project or folder): `fazai.git.mode` (where the AI works on the code: `worktree`, `branch` or `off`), `fazai.git.branchPattern` (branch name pattern), `fazai.git.worktreeDir` (worktrees folder), `fazai.git.parallel` and `fazai.git.parallelStories` ("Tocar histórias em paralelo", 2 to 6; the "Histórias ao mesmo tempo" cap also applies, in any mode, to text-only phases), `fazai.git.parallelSubtasks` ("Sub-tarefas em paralelo por história", 1 to 6; today the effective value is 1), `fazai.git.autoMerge` and `fazai.git.mergeMethod` (automatic PR merge and its type: squash, merge or rebase) and `fazai.git.decisionRecords` (the folder of the [decision records](#decision-records); empty = off). In the editor, the Git tab and the parallel block in the Harness become a link to these keys; in the browser they stay as editable fields |
 | Backup | Two action links: **Export the board now** and **Import a board**, which trigger the palette commands |
 
 Three new commands in the palette (`Ctrl+Shift+P`): **Faz AI: Open the Environment Diagnostics**,
