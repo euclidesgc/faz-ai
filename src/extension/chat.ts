@@ -229,10 +229,7 @@ export class ChatSession {
   suggestRules(): void {
     if (!this.deps.cwd || !fs.existsSync(this.deps.cwd)) throw new Error('Abra um projeto existente para gerar artefatos.');
     const state = this.router.snapshot();
-    const prompt = [
-      suggestRulesPrompt(),
-      ...contextLines(state).always,
-    ].join('\n');
+    const prompt = [suggestRulesPrompt(), ...contextLines(state).always].join('\n');
     this.run(
       { role: 'user', text: 'Sugerir regras com IA: leia o projeto e proponha regras para ele.' },
       prompt,
@@ -246,9 +243,7 @@ export class ChatSession {
   suggestSkills(): void {
     if (!this.deps.cwd || !fs.existsSync(this.deps.cwd)) throw new Error('Abra um projeto existente para gerar artefatos.');
     const state = this.router.snapshot();
-    const prompt = [suggestSkillsPrompt(), ...contextLines(state).always].join(
-      '\n',
-    );
+    const prompt = [suggestSkillsPrompt(), ...contextLines(state).always].join('\n');
     this.run(
       { role: 'user', text: 'Sugerir skills com IA: leia o projeto e proponha skills para ele.' },
       prompt,

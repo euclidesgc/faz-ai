@@ -759,6 +759,13 @@ and also in the board opened in the browser.
   to a card in that phase was the approval) and how many came back with a **change request**, also by
   the model of the run that asked for the review, and how many stories done in the period already have
   a linked **Bug**. Only a person's answer counts: autonomous mode's automatic approval is not a review.
+  That is why the block also brings the **AI signals**, measured without a person's review: **fixes in
+  Review** (commits in runs of the Review phase), **failed `npm test`** and **commits after the pull
+  request**, in the summary and per phase, each with the part done in autonomous-mode runs; the bugs
+  line says how many of the done stories were autonomous. They are approximations (commit ≈ fix),
+  apply only to Claude Code since Bash commands started being recorded, and the Review phase is
+  recognized by its name. With no run with recorded Bash in the period, the signal is "not measured",
+  not zero.
 - **Most expensive phases and Most expensive cards** ("Fases mais caras" / "Cards mais caros"). Two
   rankings side by side, in tables you sort by tokens, runs or AI time by clicking the header
   (or with Enter/Space). The default is tokens when the period has measured tokens and AI time when
@@ -806,8 +813,9 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 - Tokens count in every measured run, from Claude Code and from Cursor. The table has no dollar cost.
 - The panel's times (permanence per phase and lead time) are not in `get_metrics`. Rework is: with
   `rework: true` (and, if you want, `start_date` and `end_date`), the answer brings the reviews, the
-  first-try approvals and the change requests per phase and per model, and the done stories with a
-  linked bug.
+  first-try approvals and the change requests per phase and per model, the done stories with a
+  linked bug and the AI signals (fixes in Review, failed `npm test`, commits after the PR), each with
+  the autonomous-mode part; "not measured" when there is no run with recorded Bash.
 - Unmeasured values appear as "-" (never 0).
 - Always tells you when the board's history started and which periods have only monthly totals
   (without per-run detail). Periods outside the retention window (6 months by default) have no detail and aggregate only
@@ -1297,6 +1305,8 @@ nested folders; for Kimi Code, the project's `.kimi-code/AGENTS.md` is read too.
 empty ones, with independent filters. Selections persist across tabs and filters. Duplicate names
 within a type are skipped while other items are imported; the summary groups conflicts and offers
 an explicit confirmation before overwriting them.
+
+**Export to the tool** (next to **Import**) is the reverse path: it copies board rules, skills and agents into the folder of **Claude Code**, **Cursor** or **Kimi Code**, in each one's format, to the **Project folder** (disabled without an open project) or the **User folder**. The preview groups Rules, Skills and Agents, with search, checkboxes (items that are "Always" or "By card" come checked; the flow skill comes unchecked, with a warning), each item's status ("new", "already exists · will be skipped", "refused" with the reason), what the tool's format loses or maps, and the destination's extra files, which stay. **Replace the ones that already exist** rewrites what is already there; without it the whole item is skipped. The summary counts written, replaced, skipped, refused and failed. The result is a **disconnected copy**: the board does not update or follow it, nor delete what was exported, and MCP servers are not exported (**Connect to the board** registers the board's own). Export exists only on the Harness screen: there is no MCP tool or CLI command for it (#623).
 
 In **Skills**, select items individually or all visible items and apply **Always**, **Per card** or **Off** in bulk. Selections persist across searches; **Clear selection** clears them. **Delete selected** requires confirmation and preserves source files. Subagents also support bulk selection and deletion or making them available on the board; MCPs support bulk usage changes and deletion. Skills, subagents and MCPs do not offer Update from source. The rules form only has Name and Content.
 
