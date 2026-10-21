@@ -2,7 +2,16 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readMcpByName, readSource, resolveLocation, type SourceDirs } from '../src/extension/artifactSource';
+import {
+  listSkillFiles,
+  mcpServerNames,
+  mcpSummary,
+  parseAgentFile,
+  readMcpByName,
+  readSource,
+  resolveLocation,
+  type SourceDirs,
+} from '../src/extension/artifactSource';
 import { FLOW_SKILL } from '../src/extension/flowSkill';
 import { scanInventory } from '../src/extension/harnessScan';
 import { ARTIFACT_LIMITS, type AgentMeta } from '../src/shared/artifacts';
@@ -260,5 +269,44 @@ describe('readMcpByName', () => {
     expect(readMcpByName('b', inventory, dirs)).toMatchObject({ meta: { server: { command: 'projeto-b' } }, origin: '.mcp.json#b' });
     expect(readMcpByName('c', inventory, dirs)).toMatchObject({ meta: { server: { command: 'global-c' } }, originTool: 'claude' });
     expect(readMcpByName('nada', inventory, dirs)).toBeNull();
+  });
+});
+
+describe('leitor único: funções vindas de harnessScan e agentFiles', () => {
+  it('listSkillFiles ignora SKILL.md, ocultos, node_modules e links', () => {
+    const dir = path.join(root, 'skill');
+    write(dir, 'SKILL.md', 'x');
+    write(dir, 'ref/a.md', 'a');
+    write(dir, '.oculto', 'o');
+    write(dir, 'node_modules/p.js', 'p');
+    write(root, 'fora.txt', 'fora');
+    fs.symlinkSync(path.join(root, 'fora.txt'), path.join(dir, 'link.txt'));
+    expect(listSkillFiles(dir)).toEqual(['ref/a.md']);
+  });
+  it('mcpSummary não expõe argumentos nem cabeçalhos', () => {
+    expect(mcpSummary({ command: 'npx', args: ['segredo'] })).toBe('MCP stdio');
+    expect(mcpSummary({ url: 'https://x', headers: { a: 'b' } })).toBe('MCP HTTP');
+    expect(mcpSummary(null)).toBe('');
+  });
+  it('parseAgentFile lê descrição, ferramentas e skills', () => {
+    const a = parseAgentFile(
+      { dir: '.claude/agents' } as never,
+      { name: 'rev', scope: 'project', path: '/x', location: '.claude/agents/rev.md' },
+      '---\ndescription: Revisa\ntools: Read, Grep\nskills: a, b\n---\nCorpo\n',
+    );
+    expect([a.description, a.tools, a.skills, a.body]).toEqual(['Revisa', ['Read', 'Grep'], ['a', 'b'], 'Corpo']);
+  });
+  it('mcpServerNames lê .mcp.json, as do projeto no ~/.claude.json e ignora JSON inválido', () => {
+    write(dirs.projectDir, '.mcp.json', JSON.stringify({ mcpServers: { a: {}, b: {} } }));
+    write(
+      dirs.homeDir,
+      '.claude.json',
+      JSON.stringify({ mcpServers: { u: {} }, projects: { [dirs.projectDir]: { mcpServers: { l: {} } } } }),
+    );
+    write(dirs.projectDir, 'ruim.json', '{');
+    expect(mcpServerNames('.mcp.json', dirs)).toEqual(['a', 'b']);
+    expect(mcpServerNames('~/.claude.json', dirs).sort()).toEqual(['l', 'u']);
+    expect(mcpServerNames('ruim.json', dirs)).toEqual([]);
+    expect(mcpServerNames('ausente.json', dirs)).toEqual([]);
   });
 });

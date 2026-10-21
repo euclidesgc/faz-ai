@@ -1,7 +1,10 @@
 import type { Agent, AgentSpec } from '../shared/harness';
 import type { AgentInput } from '../shared/messages';
 import { BOARD_TOOLS, withBoardTools } from '../shared/execution';
-import { frontmatterOf, frontmatterValue } from './frontmatter';
+import { frontmatterOf } from './frontmatter';
+import { frontmatterList, isCursor, parseAgentFile } from './artifactSource';
+
+export { parseAgentFile };
 
 /**
  * Arquivo de agente da ferramenta, lido e escrito pelo board: markdown com frontmatter YAML (Claude
@@ -13,29 +16,6 @@ import { frontmatterOf, frontmatterValue } from './frontmatter';
  * subagente, e essas chaves só são lidas e gravadas na pasta dele.
  */
 
-const list = (raw: string | undefined): string[] =>
-  (raw ?? '')
-    .replace(/^\[|\]$/g, '')
-    .split(',')
-    .map((x) => x.trim().replace(/^["']|["']$/g, ''))
-    .filter(Boolean);
-
-/** Valor de uma chave do frontmatter que pode ser uma lista em linha (`a, b`, `[a, b]`) ou em bloco (`- a`). */
-function frontmatterList(fm: string, key: string): string[] {
-  const inline = frontmatterValue(fm, key);
-  if (inline) return list(inline);
-  const lines = fm.split(/\r?\n/);
-  const at = lines.findIndex((l) => new RegExp(`^${key}:\\s*$`).test(l));
-  if (at < 0) return [];
-  const out: string[] = [];
-  for (const l of lines.slice(at + 1)) {
-    const m = /^\s+-\s*(.+?)\s*$/.exec(l);
-    if (!m) break;
-    out.push(m[1]!.replace(/^["']|["']$/g, ''));
-  }
-  return out;
-}
-
 /**
  * A pasta de agentes é de uma ferramenta que lê `mcp__<servidor>__*` na lista de ferramentas (o
  * Claude Code; o Kimi Code, que aceita os mesmos globs no frontmatter — documentação da CLI 2.1.1).
@@ -46,8 +26,6 @@ function frontmatterList(fm: string, key: string): string[] {
 const readsBoardTools = (spec: AgentSpec): boolean => spec.dir.startsWith('.claude/') || spec.dir.startsWith('.kimi-code/');
 
 /** O `model` nativo que vai no frontmatter: o id do modelo, sem a ferramenta nem o esforço (`claude:sonnet@medium` → `sonnet`). */
-const isCursor = (spec: AgentSpec): boolean => spec.dir.startsWith('.cursor/');
-
 /** O Kimi Code ignora `model:` e `skills:` no arquivo de agente e lê `subagents` (documentação da CLI 2.1.1). */
 const isKimi = (spec: AgentSpec): boolean => spec.dir.startsWith('.kimi-code/');
 
@@ -56,31 +34,6 @@ export const nativeModelOf = (modelValue: string): string => modelValue.replace(
 /** O arquivo de agente tem lista de ferramentas sem as do servidor do board: foi gravado antes desta regra. */
 export const lacksBoardTools = (spec: AgentSpec, a: Agent): boolean =>
   readsBoardTools(spec) && a.tools.length > 0 && !frontmatterList(frontmatterOf(a.content), 'tools').includes(BOARD_TOOLS);
-
-/** Lê um arquivo de agente. `scope`, `path` e `location` vêm de quem o encontrou. */
-export function parseAgentFile(
-  spec: AgentSpec,
-  found: { name: string; scope: 'project' | 'user'; path: string; location: string },
-  content: string,
-): Agent {
-  const fm = frontmatterOf(content);
-  const body = fm ? content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '') : content;
-  return {
-    ...found,
-    content,
-    description: frontmatterValue(fm, 'description') ?? '',
-    model: frontmatterValue(fm, 'model') ?? '',
-    modelValue: frontmatterValue(fm, 'faz-ai-model') ?? '',
-    body: body.trim(),
-    tools: frontmatterList(fm, 'tools').filter((t) => t !== BOARD_TOOLS),
-    deniedTools: frontmatterList(fm, 'disallowedTools'),
-    skills: frontmatterList(fm, 'skills'),
-    mcp: frontmatterList(fm, 'faz-ai-mcp'),
-    seed: frontmatterValue(fm, 'faz-ai-seed') === 'true',
-    readonly: isCursor(spec) && frontmatterValue(fm, 'readonly') === 'true',
-    background: isCursor(spec) && frontmatterValue(fm, 'is_background') === 'true',
-  };
-}
 
 /**
  * Escreve o arquivo de um agente com tudo o que o board sabe dele. Os textos livres vão entre aspas

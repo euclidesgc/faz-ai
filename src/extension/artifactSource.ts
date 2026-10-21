@@ -1,13 +1,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ARTIFACT_LIMITS, isSafeRelPath, kindOfSelectable, toolCategories, type AgentMeta, type ArtifactDraft } from '../shared/artifacts';
-import { baseInfo, type AiTool, type HarnessItem } from '../shared/harness';
+import { baseInfo, type Agent, type AgentSpec, type AiTool, type HarnessItem } from '../shared/harness';
+import { BOARD_TOOLS } from '../shared/execution';
 import { selectionKey, type SelectableKind } from '../shared/harnessSelection';
-import { parseAgentFile } from './agentFiles';
 import { FLOW_SKILLS } from './flowSkill';
 import { frontmatterOf, frontmatterValue } from './frontmatter';
 import { skillTemplate } from './harness';
-import { listSkillFiles, mcpSummary } from './harnessScan';
 import { byPath } from './samePath';
 
 /**
@@ -25,6 +24,99 @@ import { byPath } from './samePath';
 export interface SourceDirs {
   projectDir: string;
   homeDir: string;
+}
+
+/** Entradas de uma pasta em ordem; pasta ausente ou ilegível dá lista vazia. */
+const entries = (dir: string): string[] => {
+  try {
+    return fs.readdirSync(dir).sort();
+  } catch {
+    return [];
+  }
+};
+const isDir = (p: string): boolean => {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Arquivos de apoio da pasta de uma skill (tudo menos o SKILL.md e arquivos ocultos), relativos a ela e
+ * sem limite de quantidade: a cópia para o board precisa saber o que ficou de fora pelos limites.
+ */
+export function listSkillFiles(dir: string, rel = '', depth = 0): string[] {
+  if (depth > 3) return [];
+  return entries(rel ? path.join(dir, rel) : dir).flatMap((n) => {
+    if (n.startsWith('.') || n === 'node_modules' || (!rel && n === 'SKILL.md')) return [];
+    const child = rel ? `${rel}/${n}` : n;
+    // Uma referência não deve copiar arquivos que o link aponta fora da skill.
+    try {
+      if (fs.lstatSync(path.join(dir, child)).isSymbolicLink()) return [];
+    } catch {
+      return [];
+    }
+    return isDir(path.join(dir, child)) ? listSkillFiles(dir, child, depth + 1) : [child];
+  });
+}
+
+/** O que o servidor MCP roda ou onde ele está, sem argumentos, variáveis ou cabeçalhos (podem ter segredos). */
+export function mcpSummary(server: unknown): string {
+  const s = obj(server);
+  if (typeof s.command === 'string') return 'MCP stdio';
+  if (typeof s.url === 'string') return 'MCP HTTP';
+  return '';
+}
+
+const list = (raw: string | undefined): string[] =>
+  (raw ?? '')
+    .replace(/^\[|\]$/g, '')
+    .split(',')
+    .map((x) => x.trim().replace(/^["']|["']$/g, ''))
+    .filter(Boolean);
+
+/** Valor de uma chave do frontmatter que pode ser uma lista em linha (`a, b`, `[a, b]`) ou em bloco (`- a`). */
+export function frontmatterList(fm: string, key: string): string[] {
+  const inline = frontmatterValue(fm, key);
+  if (inline) return list(inline);
+  const lines = fm.split(/\r?\n/);
+  const at = lines.findIndex((l) => new RegExp(`^${key}:\\s*$`).test(l));
+  if (at < 0) return [];
+  const out: string[] = [];
+  for (const l of lines.slice(at + 1)) {
+    const m = /^\s+-\s*(.+?)\s*$/.exec(l);
+    if (!m) break;
+    out.push(m[1]!.replace(/^["']|["']$/g, ''));
+  }
+  return out;
+}
+
+export const isCursor = (spec: AgentSpec): boolean => spec.dir.startsWith('.cursor/');
+
+/** Lê um arquivo de agente. `scope`, `path` e `location` vêm de quem o encontrou. */
+export function parseAgentFile(
+  spec: AgentSpec,
+  found: { name: string; scope: 'project' | 'user'; path: string; location: string },
+  content: string,
+): Agent {
+  const fm = frontmatterOf(content);
+  const body = fm ? content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '') : content;
+  return {
+    ...found,
+    content,
+    description: frontmatterValue(fm, 'description') ?? '',
+    model: frontmatterValue(fm, 'model') ?? '',
+    modelValue: frontmatterValue(fm, 'faz-ai-model') ?? '',
+    body: body.trim(),
+    tools: frontmatterList(fm, 'tools').filter((t) => t !== BOARD_TOOLS),
+    deniedTools: frontmatterList(fm, 'disallowedTools'),
+    skills: frontmatterList(fm, 'skills'),
+    mcp: frontmatterList(fm, 'faz-ai-mcp'),
+    seed: frontmatterValue(fm, 'faz-ai-seed') === 'true',
+    readonly: isCursor(spec) && frontmatterValue(fm, 'readonly') === 'true',
+    background: isCursor(spec) && frontmatterValue(fm, 'is_background') === 'true',
+  };
 }
 
 /** location → caminho absoluto: relativo ao projeto, `~/…` (home) ou absoluto (pasta importada). */
@@ -268,4 +360,15 @@ export function readMcpByName(name: string, inventory: HarnessItem[], dirs: Sour
     .filter((x) => !x.d.missing)
     .sort((a, b) => a.rank - b.rank);
   return drafts[0]?.d ?? null;
+}
+
+/**
+ * Os nomes dos servidores MCP de um arquivo de configuração (`mcpServers`; no `~/.claude.json` entram
+ * também os desta pasta de projeto). Arquivo ausente ou JSON inválido dá lista vazia; nunca lança.
+ */
+export function mcpServerNames(file: string, dirs: SourceDirs): string[] {
+  const json = readJson(resolveLocation(file, dirs));
+  if (!json) return [];
+  const local = isClaudeJson(file) ? obj(obj(byPath(obj(json.projects), dirs.projectDir)).mcpServers) : {};
+  return [...new Set([...Object.keys(local), ...Object.keys(obj(json.mcpServers))])];
 }

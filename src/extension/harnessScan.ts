@@ -14,6 +14,9 @@ import {
 } from '../shared/harnessCatalog';
 import { frontmatterOf, frontmatterValue } from './frontmatter';
 import { skillMode } from './skillMode';
+import { listSkillFiles, mcpSummary } from './artifactSource';
+
+export { listSkillFiles, mcpSummary };
 import { parseKimiHooks } from '../shared/kimiHooks';
 
 const HEAD_BYTES = 4096;
@@ -137,25 +140,6 @@ export function importsOf(file: string, homeDir: string, depth = 1, seen = new S
 
 const MAX_SKILL_FILES = 100;
 
-/**
- * Arquivos de apoio da pasta de uma skill (tudo menos o SKILL.md e arquivos ocultos), relativos a ela e
- * sem limite de quantidade: a cópia para o board precisa saber o que ficou de fora pelos limites.
- */
-export function listSkillFiles(dir: string, rel = '', depth = 0): string[] {
-  if (depth > 3) return [];
-  return entries(rel ? path.join(dir, rel) : dir).flatMap((n) => {
-    if (n.startsWith('.') || n === 'node_modules' || (!rel && n === 'SKILL.md')) return [];
-    const child = rel ? `${rel}/${n}` : n;
-    // Uma referência não deve copiar arquivos que o link aponta fora da skill.
-    try {
-      if (fs.lstatSync(path.join(dir, child)).isSymbolicLink()) return [];
-    } catch {
-      return [];
-    }
-    return isDir(path.join(dir, child)) ? listSkillFiles(dir, child, depth + 1) : [child];
-  });
-}
-
 /** Os arquivos de apoio que o inventário mostra: os primeiros 100. */
 const skillFiles = (dir: string): string[] => listSkillFiles(dir).slice(0, MAX_SKILL_FILES);
 
@@ -172,14 +156,6 @@ function hookEntries(value: unknown): { matcher: string; command: string; type: 
     const handlers = Array.isArray(e.hooks) ? e.hooks.map(obj) : [e];
     return handlers.map((h) => ({ matcher, command: hookCommand(h), type: typeof h.type === 'string' ? h.type : 'command' }));
   });
-}
-
-/** O que o servidor MCP roda ou onde ele está, sem argumentos, variáveis ou cabeçalhos (podem ter segredos). */
-export function mcpSummary(server: unknown): string {
-  const s = obj(server);
-  if (typeof s.command === 'string') return 'MCP stdio';
-  if (typeof s.url === 'string') return 'MCP HTTP';
-  return '';
 }
 
 interface Ctx {
