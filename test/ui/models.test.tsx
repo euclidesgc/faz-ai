@@ -86,40 +86,18 @@ describe('ModelsSettings', () => {
     expect(lastSent('settings.modelRules.set').rules.at(-1)).toMatchObject({ name: 'Backend pesado', enabled: true });
   });
 
-  it('Montar nova regra: não há campo de reserva; o editor aponta para as políticas e a regra vai sem reserva', async () => {
+  it('Montar nova regra: não há campo "Fallback" nem botão para as políticas, e a regra vai sem reserva', async () => {
     show();
     await userEvent.click(screen.getByRole('button', { name: 'Montar nova regra' }));
     const builder = within(screen.getByLabelText('Regra de sugestão'));
     await userEvent.type(builder.getByLabelText('Nome da regra'), 'Sem reserva');
     expect(builder.getAllByRole('combobox', { name: 'Modelo' })).toHaveLength(1);
-    expect(builder.getByText(/o fallback é uma política de execução/)).toBeInTheDocument();
-    expect(builder.getByRole('button', { name: 'Ir para as políticas de execução' })).toBeEnabled();
+    expect(builder.queryByText('Fallback')).not.toBeInTheDocument();
+    expect(builder.queryByRole('button', { name: 'Ir para as políticas de execução' })).not.toBeInTheDocument();
     await userEvent.click(builder.getByRole('button', { name: 'Adicionar à lista' }));
-    expect(lastSent('settings.modelRules.set').rules.at(-1)).toMatchObject({ name: 'Sem reserva', fallback: null });
-  });
-
-  it('editar uma regra com reserva legada a mostra como desativada, sem reativá-la nem alterá-la', async () => {
-    const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
-    board.router.handle({
-      type: 'settings.modelRules.set',
-      rules: [
-        {
-          id: 'r2',
-          name: 'Teste reserva',
-          enabled: true,
-          groups: [[{ fieldId: '@type', op: 'is', value: 'História' }]],
-          model: m.id,
-          fallback: `${m.id}@${m.defaultEffort}`,
-        },
-      ],
-    });
-    syncStore(board.router);
-    show();
-    expect(screen.getByText(new RegExp(`reserva legada \\(desativada\\): .*${m.label}`))).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
-    const builder = within(screen.getByLabelText('Regra de sugestão'));
-    await userEvent.click(builder.getByRole('button', { name: 'Salvar regra' }));
-    expect(lastSent('settings.modelRules.set').rules[0]).toMatchObject({ fallback: `${m.id}@${m.defaultEffort}` });
+    const sent = lastSent('settings.modelRules.set').rules.at(-1);
+    expect(sent).toMatchObject({ name: 'Sem reserva' });
+    expect(sent).not.toHaveProperty('fallback');
   });
 
   it('o interruptor liga e desliga uma regra', async () => {

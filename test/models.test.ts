@@ -40,22 +40,18 @@ describe('rótulo do modelo', () => {
 });
 
 describe('parseModelRules', () => {
-  it('lê o campo fallback quando é string', () => {
-    const rules = parseModelRules(
-      JSON.stringify([{ id: 'a', name: 'r', enabled: true, groups: [], model: 'claude:sonnet@low', fallback: 'claude:haiku' }]),
-    );
-    expect(rules).toEqual([{ id: 'a', name: 'r', enabled: true, groups: [], model: 'claude:sonnet@low', fallback: 'claude:haiku' }]);
-  });
-
-  it('sem fallback (ausente ou não-string) vira null', () => {
+  it('ignora o campo fallback do JSON antigo: a regra volta sem a propriedade', () => {
     const rules = parseModelRules(
       JSON.stringify([
-        { id: 'a', name: 'r1', enabled: true, groups: [], model: 'claude:sonnet@low' },
-        { id: 'b', name: 'r2', enabled: true, groups: [], model: 'claude:sonnet@low', fallback: 42 },
-        { id: 'c', name: 'r3', enabled: true, groups: [], model: 'claude:sonnet@low', fallback: null },
+        { id: 'a', name: 'r1', enabled: true, groups: [], model: 'claude:sonnet@low', fallback: 'claude:haiku' },
+        { id: 'b', name: 'r2', enabled: true, groups: [], model: 'claude:sonnet@low' },
       ]),
     );
-    expect(rules.map((r) => r.fallback)).toEqual([null, null, null]);
+    expect(rules).toEqual([
+      { id: 'a', name: 'r1', enabled: true, groups: [], model: 'claude:sonnet@low' },
+      { id: 'b', name: 'r2', enabled: true, groups: [], model: 'claude:sonnet@low' },
+    ]);
+    expect(rules.some((r) => 'fallback' in r)).toBe(false);
   });
 });
 
@@ -162,17 +158,12 @@ describe('suggestModelRule e suggestModel', () => {
     enabled: true,
     groups: [[{ fieldId: 'esforco', op: 'is', value: 'Alto' }]],
     model: 'claude:sonnet@high',
-    fallback: null,
     ...over,
   });
 
   it('suggestModelRule devolve a primeira regra habilitada cujas condições casam', () => {
-    const state = stateWith([
-      { ...rule({ id: 'r0', enabled: false }) },
-      rule({ id: 'r1', fallback: 'claude:haiku' }),
-      rule({ id: 'r2', model: 'claude:fable@max' }),
-    ]);
-    expect(suggestModelRule(state, card())).toMatchObject({ id: 'r1', model: 'claude:sonnet@high', fallback: 'claude:haiku' });
+    const state = stateWith([{ ...rule({ id: 'r0', enabled: false }) }, rule({ id: 'r1' }), rule({ id: 'r2', model: 'claude:fable@max' })]);
+    expect(suggestModelRule(state, card())).toMatchObject({ id: 'r1', model: 'claude:sonnet@high' });
   });
 
   it('sem regra casando, devolve null', () => {
@@ -180,7 +171,7 @@ describe('suggestModelRule e suggestModel', () => {
     expect(suggestModelRule(state, card())).toBeNull();
   });
 
-  it('suggestModel continua devolvendo só o modelo, igual a antes, para regras sem fallback', () => {
+  it('suggestModel continua devolvendo só o modelo, igual a antes', () => {
     const state = stateWith([rule()]);
     expect(suggestModel(state, card())).toBe('claude:sonnet@high');
   });
