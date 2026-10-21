@@ -660,7 +660,7 @@ describe('executor da IA', () => {
     expect(card().status).not.toBe('blocked');
     expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
     expect(lastMessage()!.body).toContain('login do Claude Code venceu');
-    expect(router.snapshot().authExpired).toBe('claude');
+    expect(router.snapshot().authExpired).toEqual(['claude']);
     expect(log.some((l) => l.includes('Login do Claude Code vencido'))).toBe(true);
 
     // uma segunda falha igual, com o sinal já ligado, não duplica o log de suspensão
@@ -674,7 +674,7 @@ describe('executor da IA', () => {
     runner.start(storyId);
     ai({ type: 'comment.add', cardId: storyId, body: 'Entendi. Qual o provedor de login?' });
     procs[2]!.exit(0);
-    expect(router.snapshot().authExpired).toBeNull();
+    expect(router.snapshot().authExpired).toEqual([]);
     expect(log.some((l) => l.includes('Login do Claude Code de volta'))).toBe(true);
   });
 
@@ -683,7 +683,7 @@ describe('executor da IA', () => {
     procs[0]!.emit('algum outro erro qualquer\n', 'stderr');
     procs[0]!.exit(1);
     expect(card().status).toBe('blocked');
-    expect(router.snapshot().authExpired).toBeNull();
+    expect(router.snapshot().authExpired).toEqual([]);
   });
 
   it('falha, saída sem resposta e tempo limite bloqueiam o card com o motivo na conversa', () => {

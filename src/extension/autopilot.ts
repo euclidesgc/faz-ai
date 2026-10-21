@@ -3,7 +3,7 @@ import { cardRef, type BoardState, type Card, type Column } from '../shared/mode
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
-import { blocksExecution } from '../shared/requirements';
+import { cardCliProblem } from '../shared/requirements';
 import { limitOf, type AiRunMode } from '../shared/runner';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
@@ -395,13 +395,14 @@ export class Autopilot {
           continue;
         }
         if (step.kind !== 'run') return;
-        // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
-        if (blocksExecution(this.router.snapshot())) return;
         // o teto é por tipo de atividade e conta toda execução em andamento (heartbeat, chamadas à mão):
         // o autopiloto usa as vagas livres de cada tipo, na ordem da fila
         const s = this.router.snapshot();
         const counts = runningByKind(s, this.runner.running);
         for (const r of autopilotRuns(s)) {
+          // login vencido (preventivo ou pela falha reativa) ou CLI ausente do perfil da história: não insiste
+          // sozinho, a pessoa resolve; só essa história espera, as dos outros perfis seguem
+          if (cardCliProblem(s, r.story)) continue;
           // a história passou de fase desde a última execução e a conversa está cheia: primeiro o resumo (uma
           // execução de texto), depois a fase. Uma história que ainda não rodou nesta sessão segue direto
           const from = this.lastRunColumn.get(r.story.id);

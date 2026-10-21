@@ -200,29 +200,9 @@ const modifiedAt = (file: string): number => {
   }
 };
 
-/**
- * O que falta, agora, para o board trabalhar com a ferramenta do projeto. Lista vazia é tudo pronto.
- * A ordem é a de resolver: sem node não há servidor, sem CLI não há login, e assim por diante.
- */
-export async function checkRequirements(p: RequirementProbe): Promise<BoardRequirement[]> {
+/** CLI ausente e login faltando de um perfil (ou da ferramenta, sem perfil): os dois requisitos que o bloqueio por perfil olha. */
+async function cliAndSignin(p: RequirementProbe, profile: AiProfile | undefined, tool: AiTool): Promise<BoardRequirement[]> {
   const out: BoardRequirement[] = [];
-  const profile = p.profile;
-  const tool = profile?.id ?? p.tool;
-  if (profile && !profileCanProbe(profile))
-    return [
-      {
-        id: 'permission',
-        tool,
-        reason:
-          profile.enabled && profile.credentials?.review === 'reviewed' && !profile.credentials.available
-            ? 'Configuração local do perfil indisponível.'
-            : 'Perfil desativado ou pendente de revisão.',
-        action: { kind: 'settings' },
-      },
-    ];
-
-  if (!p.nodePath) out.push({ id: 'node', tool, action: null });
-
   const command = profile ? profileCommand(profile) : headlessCommand(tool, { prompt: '', permission: 'full' }).command;
   // Command pode conter valores privados; o requisito usa o nome público do perfil configurável.
   const cli = profile && profile.kind !== 'builtin' ? profile.name : command;
@@ -261,6 +241,43 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
           ? { kind: 'settings' }
           : { kind: 'command', command: baseValue(LOGIN_COMMAND, tool) ?? '', terminal: true },
     });
+  return out;
+}
+
+/**
+ * Só o que impede a execução num perfil de CLI: CLI ausente (`cli`) e login faltando (`signin`), com `tool` = id
+ * do perfil. Serve aos perfis ligados que não são o padrão (MCP, skill e permissão são só do padrão). Perfil
+ * desligado, pendente de revisão ou sem configuração local não é conferido: devolve vazio.
+ */
+export async function checkProfileCli(profile: AiProfile, probe: RequirementProbe): Promise<BoardRequirement[]> {
+  if (!profileCanProbe(profile)) return [];
+  return cliAndSignin(probe, profile, profile.id);
+}
+
+/**
+ * O que falta, agora, para o board trabalhar com a ferramenta do projeto. Lista vazia é tudo pronto.
+ * A ordem é a de resolver: sem node não há servidor, sem CLI não há login, e assim por diante.
+ */
+export async function checkRequirements(p: RequirementProbe): Promise<BoardRequirement[]> {
+  const out: BoardRequirement[] = [];
+  const profile = p.profile;
+  const tool = profile?.id ?? p.tool;
+  if (profile && !profileCanProbe(profile))
+    return [
+      {
+        id: 'permission',
+        tool,
+        reason:
+          profile.enabled && profile.credentials?.review === 'reviewed' && !profile.credentials.available
+            ? 'Configuração local do perfil indisponível.'
+            : 'Perfil desativado ou pendente de revisão.',
+        action: { kind: 'settings' },
+      },
+    ];
+
+  if (!p.nodePath) out.push({ id: 'node', tool, action: null });
+
+  out.push(...(await cliAndSignin(p, profile, tool)));
   // O perfil configurável recebe MCP na execução; registro global de outra conta não é requisito dele.
   if (profile && profile.kind !== 'builtin') {
     const unsupported = headlessUnsupported(tool, p.permission);

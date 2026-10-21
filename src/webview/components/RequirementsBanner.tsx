@@ -202,8 +202,8 @@ export function CopyCommand({ command }: { command: string }) {
  */
 export function aiBlockedReason(state: BoardState): string | null {
   if (state.aiRunUnsupported) return t(state.aiRunUnsupported);
-  if (state.authExpired)
-    return t('O login do {tool} venceu: veja em Configurações → Verificar ambiente.', { tool: baseInfo(state.authExpired).label });
+  if (state.authExpired.length)
+    return t('O login do {tool} venceu: veja em Configurações → Verificar ambiente.', { tool: baseInfo(state.authExpired[0]!).label });
   const cli = state.requirements.find((r) => r.id === 'cli' || r.id === 'signin');
   if (!cli) return null;
   return cli.id === 'cli'
@@ -394,29 +394,30 @@ function RecheckButton() {
   );
 }
 
+const NO_EXPIRED: string[] = [];
+
 /** O que falta para o board trabalhar com a IA, com o login que venceu no meio de uma execução. */
 function useRequirementItems(): { items: BoardRequirement[]; missing: number; authError: boolean } {
   const requirements = useBoardStore((s) => s.state?.requirements ?? []);
-  const authExpired = useBoardStore((s) => s.state?.authExpired ?? null);
+  const authExpired = useBoardStore((s) => s.state?.authExpired ?? NO_EXPIRED);
   // o sinal reativo (RF6) de um login que venceu no meio da execução pode não estar em `requirements`
   // (o probe não soube dizer): sem este item, a pessoa não veria o aviso
-  const items: BoardRequirement[] =
-    authExpired && !requirements.some((r) => r.id === 'signin')
-      ? [
-          ...requirements,
-          {
-            id: 'signin',
-            tool: authExpired,
-            cli: baseValue(CLI_COMMAND, authExpired) ?? '',
-            action: { kind: 'command', command: baseValue(LOGIN_COMMAND, authExpired) ?? '', terminal: true },
-          },
-        ]
-      : requirements;
+  const items: BoardRequirement[] = [
+    ...requirements,
+    ...authExpired
+      .filter((tool) => !requirements.some((r) => r.id === 'signin' && r.tool === tool))
+      .map((tool): BoardRequirement => ({
+        id: 'signin',
+        tool,
+        cli: baseValue(CLI_COMMAND, tool) ?? '',
+        action: { kind: 'command', command: baseValue(LOGIN_COMMAND, tool) ?? '', terminal: true },
+      })),
+  ];
   return {
     items,
     missing: items.filter((r) => !r.optional).length,
     // login vencido é mais urgente que os outros requisitos (para o board inteiro, não só um card): destaque de erro
-    authError: requirements.some((r) => r.id === 'signin' && !r.optional) || authExpired !== null,
+    authError: requirements.some((r) => r.id === 'signin' && !r.optional) || authExpired.length > 0,
   };
 }
 

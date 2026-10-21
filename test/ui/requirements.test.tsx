@@ -22,9 +22,9 @@ const set = (list: BoardRequirement[]) =>
     syncStore(router);
   });
 
-const setAuthExpired = (tool: BoardRequirement['tool'] | null) =>
+const setAuthExpired = (tool: BoardRequirement['tool'], expired = true) =>
   act(() => {
-    router.setAuthExpired(tool);
+    router.setAuthExpired(tool, expired);
     syncStore(router);
   });
 
@@ -166,7 +166,7 @@ describe('botões de IA com a CLI que falta', () => {
   it('o login vencido durante a execução (sinal reativo) também bloqueia, mesmo sem o requisito "signin"', () => {
     setAuthExpired('claude');
     expect(aiBlockedReason(useBoardStore.getState().state!)).toContain('login do Claude Code venceu');
-    setAuthExpired(null);
+    setAuthExpired('claude', false);
     expect(aiBlockedReason(useBoardStore.getState().state!)).toBeNull();
   });
 });
@@ -226,7 +226,7 @@ describe('aviso compacto do que falta (no lugar da faixa no topo do board)', () 
     setAuthExpired('cursor');
     renderThemed(<App />);
     expect(document.querySelector('.requirements-alert.error')).not.toBeNull();
-    setAuthExpired(null);
+    setAuthExpired('cursor', false);
     expect(document.querySelector('.requirements-alert')).toBeNull();
   });
 });

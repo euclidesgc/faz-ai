@@ -542,7 +542,16 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     const { token } = router.parkImport(parseExportFile(router.exportBoardFile().text), 10);
     createCard('Card 2');
     router.setAiRuns([
-      { cardId: router.snapshot().cards[0]!.id, runId: '', mode: 'phase', origin: 'manual', phase: '', model: null, startedAt: Date.now() },
+      {
+        cardId: router.snapshot().cards[0]!.id,
+        runId: '',
+        mode: 'phase',
+        origin: 'manual',
+        phase: '',
+        model: null,
+        tool: 'claude',
+        startedAt: Date.now(),
+      },
     ]);
     await bridge.handle({ type: 'backup.import.apply', token });
     expect(sent.at(-1)).toEqual({ type: 'error', message: 'Espere a execução da IA terminar para importar o board.' });

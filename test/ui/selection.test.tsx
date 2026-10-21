@@ -338,7 +338,9 @@ describe('ações contextuais da seleção', () => {
       useBoardStore.getState().selectMany([firstId, secondId, thirdId]);
       patchState(() => ({
         aiRuns: [firstId],
-        aiActivity: [{ cardId: firstId, runId: 'run', mode: 'refine', origin: 'manual', phase: 'Backlog', model: null, startedAt: 1 }],
+        aiActivity: [
+          { cardId: firstId, runId: 'run', mode: 'refine', origin: 'manual', phase: 'Backlog', model: null, tool: 'claude', startedAt: 1 },
+        ],
       }));
       const s = useBoardStore.getState().state!;
       patchState(() => ({ board: { ...s.board, runner: { ...s.board.runner, parallelStories: 2 } } }));

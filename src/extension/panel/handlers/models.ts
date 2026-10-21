@@ -4,6 +4,7 @@ import { builtinPolicyCatalog } from '../../../shared/policyManagement';
 import type { AiTool } from '../../../shared/harness';
 import type { FieldDef } from '../../../shared/model';
 import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelOption, type ModelRule } from '../../../shared/models';
+import { cliOfValue } from '../../../shared/runTarget';
 import { valueOf } from '../../../shared/selectors';
 import { newId } from '../../db/ids';
 import { detectTools, effortTiers, fastBaseId, isFastVariant, modelsFor } from '../../models';
@@ -117,10 +118,16 @@ function suggestRules(ctx: BoardContext, tool: AiTool): void {
     groups: [[{ fieldId: field.id, op: 'is', value }]],
     model,
   }));
-  // sai o que era só "Esforço = X"; regras montadas pela pessoa ficam, e na frente (a primeira que casa vence)
+  // sai só o que era "Esforço = X" e aponta para o catálogo desta ferramenta (ou para perfil que não resolve);
+  // regras montadas pela pessoa e faixas de outro perfil ficam, e na frente (a primeira que casa vence)
   const onlyEffort = (r: ModelRule) =>
     r.groups.length === 1 && r.groups[0]!.length === 1 && r.groups[0]![0]!.fieldId === field.id && r.groups[0]![0]!.op === 'is';
-  ctx.boards.setModelRules(ctx.boardId, [...s.board.modelRules.filter((r) => !onlyEffort(r)), ...tiers]);
+  const ofOtherProfile = (r: ModelRule) => {
+    const cli = cliOfValue(s.board, r.model);
+    return !!cli && catalogTool(cli) !== tool;
+  };
+  const keep = (r: ModelRule) => !onlyEffort(r) || ofOtherProfile(r);
+  ctx.boards.setModelRules(ctx.boardId, [...s.board.modelRules.filter(keep), ...tiers]);
 }
 
 /** Campo de modelo do card e o que as regras sugerem para ele agora. */

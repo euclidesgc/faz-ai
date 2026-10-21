@@ -362,7 +362,7 @@ export class AiRunner {
     // reativo (`authExpired`), que heartbeat.ts/autopilot.ts recusam por conta própria (RF8): aqui ele não
     // bloqueia, para o login que o probe não soube confirmar poder se recuperar com uma execução
     // manual que dá certo (RF9, limpa em settle()) — sem essa válvula, authExpired nunca mais sairia de `true`
-    if (state.requirements.some((r) => r.id === 'signin'))
+    if (state.requirements.some((r) => r.id === 'signin' && r.tool === activeProfile(state.board).id))
       throw new Error(`O login do ${toolInfo(activeProfile(state.board)).label} venceu: veja o aviso no topo do board.`);
     const tool = toolInfo(activeProfile(state.board));
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
@@ -506,6 +506,7 @@ export class AiRunner {
       origin,
       phase: storyPhase,
       model: activityModel,
+      tool: activeProfile(state.board).id,
       startedAt: exec.startedAt,
     };
     const run: Run = {
@@ -553,9 +554,8 @@ export class AiRunner {
         if (options.workId === undefined) retry = this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
         else {
           const expired = end.authExpired || authFailed(run.profile, run.tail);
-          if (expired) this.router.setAuthExpired(state.board.aiTool);
-          else if (!end.stopped && !end.error && end.code === 0 && this.router.snapshot().authExpired === state.board.aiTool)
-            this.router.setAuthExpired(null);
+          if (expired) this.router.setAuthExpired(run.profile.id, true);
+          else if (!end.stopped && !end.error && end.code === 0) this.router.setAuthExpired(run.profile.id, false);
         }
       } finally {
         // a limpeza precisa acontecer antes da retentativa: start() recusa começar com o card ainda em `this.runs`
@@ -624,7 +624,7 @@ export class AiRunner {
     // global (RF3) é quem explica à pessoa o que fazer. Entra antes do caminho de "refinar" porque RF6
     // vale para os dois modos, e antes do `failure` genérico, que continua tratando qualquer outra falha
     if (expired) {
-      if (this.router.setAuthExpired(toolId)) this.deps.log(`Login do ${toolLabel} vencido: execuções suspensas.`);
+      if (this.router.setAuthExpired(toolId, true)) this.deps.log(`Login do ${toolLabel} vencido: execuções suspensas.`);
       this.router.handle(
         {
           type: 'comment.add',
@@ -640,8 +640,7 @@ export class AiRunner {
     }
     // a execução não falhou por autenticação: se o sinal estava ligado para esta ferramenta, ela voltou
     // a funcionar (RF9) — cobre o login que o probe não soube confirmar, que só tem este caminho
-    if (this.router.snapshot().authExpired === toolId && this.router.setAuthExpired(null))
-      this.deps.log(`Login do ${toolLabel} de volta: execuções retomadas.`);
+    if (this.router.setAuthExpired(toolId, false)) this.deps.log(`Login do ${toolLabel} de volta: execuções retomadas.`);
     // o fim do que a ferramenta escreveu vai junto: a pessoa entende a falha sem sair do card
     // o plano gratuito do Cursor só roda o Auto: a recusa diz pouco, e a saída é o modelo do card
     const freePlan = run.tail.some((l) => /free plans can only use auto/i.test(l))

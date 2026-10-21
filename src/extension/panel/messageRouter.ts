@@ -201,7 +201,7 @@ export class MessageRouter {
   private requirements: BoardRequirement[] = [];
   private requirementsCheckedAt = 0;
   private requirementsCheck: (() => Promise<void>) | null = null;
-  private authExpired: AiTool | null = null;
+  private authExpired: AiTool[] = [];
   private openTerminalHook: ((command: string) => void) | null = null;
   private environment: EnvironmentReport | null = null;
   private environmentFirstRun = false;
@@ -426,13 +426,13 @@ export class MessageRouter {
   }
 
   /**
-   * A ferramenta de IA falhou por login vencido nesta execução (RF6), ou o probe confirmou que voltou;
-   * null quando não há aviso reativo ativo. Devolve se mudou, para quem chama decidir se loga a transição
+   * O perfil de CLI `cli` falhou por login vencido nesta execução (RF6) (`expired`), ou o probe confirmou que voltou;
+   * só o sinal daquele perfil muda. Devolve se mudou, para quem chama decidir se loga a transição
    * (o log não é responsabilidade do `MessageRouter`, como nas outras operações).
    */
-  setAuthExpired(tool: AiTool | null): boolean {
-    if (this.authExpired === tool) return false;
-    this.authExpired = tool;
+  setAuthExpired(cli: AiTool, expired: boolean): boolean {
+    if (this.authExpired.includes(cli) === expired) return false;
+    this.authExpired = expired ? [...this.authExpired, cli] : this.authExpired.filter((c) => c !== cli);
     this.notify();
     return true;
   }
