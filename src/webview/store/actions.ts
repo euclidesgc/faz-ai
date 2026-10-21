@@ -149,6 +149,17 @@ function requestRemoval(kind: keyof typeof REMOVALS, cardId: Id, after?: () => v
   });
 }
 
+/**
+ * Duplica o card pelo menu do drawer. O título da cópia sai daqui porque o host não conhece o idioma da pessoa.
+ * Sem confirmação: a cópia nasce na primeira coluna e o drawer continua no original (desfazer é mandar a cópia para a lixeira).
+ */
+export function requestDuplicate(cardId: Id, after?: () => void): void {
+  const card = useBoardStore.getState().state!.cards.find((c) => c.id === cardId);
+  if (!card) return;
+  void cards.duplicate(cardId, t('Cópia de {title}', { title: card.title }));
+  after?.();
+}
+
 /** Manda para a lixeira; avisa antes quando o card leva sub-tarefas ou anexos junto. */
 export const requestTrash = (cardId: Id, after?: () => void): void => requestRemoval('trash', cardId, after);
 
