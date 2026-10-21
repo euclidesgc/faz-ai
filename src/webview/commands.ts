@@ -214,7 +214,6 @@ export const harness = {
   setSelection: (items: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null) =>
     req({ type: 'harness.selection.set', items, usage }),
   /** a IA pré-seleciona os artefatos do assunto que fazem mais sentido para o projeto */
-  suggest: (tool: AiTool, kind: SelectableKind) => post({ type: 'harness.suggest.run', tool, kind }),
   /** abre o seletor de pasta do editor para importar artefatos */
   scanLibraryFolder: (dir: string) => req({ type: 'harness.library.scan', dir }),
   applyLibraryImport: (keys: string[], overwrite?: boolean) =>

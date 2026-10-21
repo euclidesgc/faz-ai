@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { FLOW_SKILL_NAME } from '../shared/harnessProject';
-import { skillTemplate } from './harness';
+import { skillTemplate } from './frontmatter';
 
 /** Skill que ensina a IA a conduzir os cards pelo fluxo do board. É servida pelo `get_skill`, sem arquivo instalado na pasta de skills de nenhuma ferramenta. */
 export const FLOW_SKILL = {

@@ -517,7 +517,6 @@ export class BoardRepo {
       environment: null,
       environmentFirstRun: false,
       harnessInstall: null,
-      harnessSuggestions: null,
       // detectada pelo router, que tem a pasta do projeto; o banco não sabe
       mainBranch: null,
       branchRenames: parsePending(this.getMeta(RENAME_PENDING_KEY)),

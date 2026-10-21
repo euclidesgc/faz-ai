@@ -8,7 +8,6 @@ import { ArtifactRepo } from '../src/extension/repositories/artifactRepo';
 import { selectedItems } from '../src/shared/harnessSelection';
 import { harnessOverview, requiredSkills } from '../src/extension/mcp/format';
 import { executionPlan, bareExec } from '../src/extension/execution';
-import { findSkills } from '../src/extension/skillInstall';
 import { skillCatalog } from '../src/shared/skillCatalog';
 import { card } from './fakes/board';
 
@@ -156,22 +155,6 @@ describe('biblioteca particular do board', () => {
     fs.rmSync(source);
     expect(() => router.handle({ type: 'harness.library.update', id: a.id })).toThrow('cópia do board foi preservada');
     expect(fs.readFileSync(a.path, 'utf8')).toBe('Segunda versão');
-  });
-
-  it('importa coleções em lote e impede colisões sem gravar parte do lote', () => {
-    write('collection/react/SKILL.md', 'Skill React');
-    write('collection/sql/SKILL.md', 'Skill SQL');
-    const dir = path.join(root, 'collection');
-    router.setInstall(dir, dir, () => {});
-    expect(findSkills(dir)).toHaveLength(2);
-    router.handle({ type: 'harness.library.import', rels: ['react', 'sql'] });
-    expect(selectedItems(router.snapshot(), 'skill').map((i) => i.name)).toEqual(['react', 'sql']);
-    write('other/react/SKILL.md', 'Outra React');
-    write('other/new/SKILL.md', 'Nova');
-    const other = path.join(root, 'other');
-    router.setInstall(other, other, () => {});
-    expect(() => router.handle({ type: 'harness.library.import', rels: ['new', 'react'] })).toThrow('Já existe um artefato');
-    expect(selectedItems(router.snapshot(), 'skill')).toHaveLength(2);
   });
 
   it('troca a pasta sem apagar arquivos da pessoa e remove somente a cópia ao desmarcar', () => {

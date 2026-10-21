@@ -53,7 +53,7 @@ function withoutPrices(o: ModelOption): ModelOption {
 
 /** Passa a trabalhar com a ferramenta: pasta de skills, modelos e regras de esforço dela. */
 export function useTool(ctx: BoardContext, tool: AiTool): void {
-  ctx.harness.setTool(tool);
+  ctx.harness.load();
   const profile = ctx.state().board.aiProfiles.find((p) => p.id === tool);
   const base = profile ? catalogTool(profile) : tool;
   detectModels(ctx, base);

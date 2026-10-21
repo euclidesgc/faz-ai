@@ -1,13 +1,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ARTIFACT_LIMITS, isSafeRelPath, kindOfSelectable, toolCategories, type AgentMeta, type ArtifactDraft } from '../shared/artifacts';
-import { baseInfo, type AiTool, type HarnessItem } from '../shared/harness';
-import { selectionKey, type SelectableKind } from '../shared/harnessSelection';
-import { parseAgentFile } from './agentFiles';
+import { baseInfo, type Agent, type AgentSpec, type AiTool } from '../shared/harness';
+import type { AgentInput } from '../shared/messages';
+import { BOARD_TOOLS } from '../shared/execution';
+import type { SelectableKind } from '../shared/harnessSelection';
 import { FLOW_SKILLS } from './flowSkill';
-import { frontmatterOf, frontmatterValue } from './frontmatter';
-import { skillTemplate } from './harness';
-import { listSkillFiles, mcpSummary } from './harnessScan';
+import { frontmatterOf, frontmatterValue, skillTemplate } from './frontmatter';
+import { listSkillFiles, mcpSummary } from './importScan';
 import { byPath } from './samePath';
 
 /**
@@ -153,6 +153,74 @@ function agentTool(location: string, tool: AiTool | ''): AiTool | '' {
   return tool;
 }
 
+const list = (raw: string | undefined): string[] =>
+  (raw ?? '')
+    .replace(/^\[|\]$/g, '')
+    .split(',')
+    .map((x) => x.trim().replace(/^["']|["']$/g, ''))
+    .filter(Boolean);
+
+/** Valor de uma chave do frontmatter que pode ser uma lista em linha (`a, b`, `[a, b]`) ou em bloco (`- a`). */
+function frontmatterList(fm: string, key: string): string[] {
+  const inline = frontmatterValue(fm, key);
+  if (inline) return list(inline);
+  const lines = fm.split(/\r?\n/);
+  const at = lines.findIndex((l) => new RegExp(`^${key}:\\s*$`).test(l));
+  if (at < 0) return [];
+  const out: string[] = [];
+  for (const l of lines.slice(at + 1)) {
+    const m = /^\s+-\s*(.+?)\s*$/.exec(l);
+    if (!m) break;
+    out.push(m[1]!.replace(/^["']|["']$/g, ''));
+  }
+  return out;
+}
+
+/**
+ * Lê um arquivo de agente (markdown com frontmatter YAML). As chaves `description`, `tools`,
+ * `disallowedTools`, `model` e `skills` são as da própria ferramenta; o que é só do board fica em chaves
+ * `faz-ai-*`. `scope`, `path` e `location` vêm de quem o encontrou. Só leitura: o board não grava
+ * arquivos de agente nas pastas das ferramentas.
+ */
+export function parseAgentFile(
+  spec: AgentSpec,
+  found: { name: string; scope: 'project' | 'user'; path: string; location: string },
+  content: string,
+): Agent {
+  const fm = frontmatterOf(content);
+  const body = fm ? content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '') : content;
+  const cursor = spec.dir.startsWith('.cursor/');
+  return {
+    ...found,
+    content,
+    description: frontmatterValue(fm, 'description') ?? '',
+    model: frontmatterValue(fm, 'model') ?? '',
+    modelValue: frontmatterValue(fm, 'faz-ai-model') ?? '',
+    body: body.trim(),
+    tools: frontmatterList(fm, 'tools').filter((t) => t !== BOARD_TOOLS),
+    deniedTools: frontmatterList(fm, 'disallowedTools'),
+    skills: frontmatterList(fm, 'skills'),
+    mcp: frontmatterList(fm, 'faz-ai-mcp'),
+    seed: frontmatterValue(fm, 'faz-ai-seed') === 'true',
+    readonly: cursor && frontmatterValue(fm, 'readonly') === 'true',
+    background: cursor && frontmatterValue(fm, 'is_background') === 'true',
+  };
+}
+
+/** O que o board sabe de um agente lido, no formato de entrada (para editar e regravar). */
+export const agentInputOf = (a: Agent): AgentInput => ({
+  name: a.name,
+  description: a.description,
+  body: a.body,
+  model: a.modelValue,
+  tools: a.tools,
+  deniedTools: a.deniedTools,
+  skills: a.skills,
+  mcp: a.mcp,
+  ...(a.readonly ? { readonly: true } : {}),
+  ...(a.background ? { background: true } : {}),
+});
+
 function readAgent(location: string, dirs: SourceDirs, tool: AiTool | ''): Draft {
   const file = resolveLocation(location, dirs);
   const name = path.basename(file).replace(/\.md$/, '');
@@ -234,38 +302,4 @@ export function readSource(
     // erro inesperado (permissão, caminho estranho): a marcação fica, como ausente
   }
   return missing(base(kind, sel.location, sel.location, tool));
-}
-
-/** A ferramenta dona do arquivo de servidores MCP, pelo caminho. */
-function mcpTool(file: string): AiTool | '' {
-  const p = `/${file.replace(/\\/g, '/')}`;
-  if (p.includes('/.cursor/')) return 'cursor';
-  if (p.includes('/.kimi-code/')) return 'kimi';
-  if (p.endsWith('/.mcp.json') || p.endsWith('/.claude.json')) return 'claude';
-  return '';
-}
-
-/**
- * Definição de um servidor por nome no inventário da ferramenta, para os servidores citados por um
- * agente copiado (P4). Com o mesmo nome em mais de um lugar, vale a precedência do Claude Code: o da
- * pasta no `~/.claude.json`, o do projeto, o do usuário e, por fim, plugins e pastas importadas. Null
- * quando nenhum lugar tem uma definição legível: aí não há o que copiar.
- */
-export function readMcpByName(name: string, inventory: HarnessItem[], dirs: SourceDirs): ArtifactDraft | null {
-  const rank = (i: HarnessItem): number => {
-    if (i.scope === 'project') return 1;
-    if (i.scope === 'user') return 2;
-    return 3;
-  };
-  const drafts = inventory
-    .filter((i) => i.kind === 'mcp' && i.name === name && i.layout === 'entry')
-    .map((i) => {
-      const location = selectionKey(i);
-      const d = readSource({ kind: 'mcp', location }, dirs, mcpTool(i.path));
-      const local = isClaudeJson(i.path) && !!obj(obj(byPath(obj(readJson(i.path)?.projects), dirs.projectDir)).mcpServers)[name];
-      return { d, rank: local ? 0 : rank(i) };
-    })
-    .filter((x) => !x.d.missing)
-    .sort((a, b) => a.rank - b.rank);
-  return drafts[0]?.d ?? null;
 }

@@ -11,41 +11,23 @@ const skillArg = z.string().describe('Nome da skill (nome da pasta), ex.: "revis
 const agentArg = z.string().describe('Nome do agente (nome do arquivo, sem a extensão), ex.: "revisor-de-spec"');
 
 const harness = (router: MessageRouter) => harnessOverview(router.snapshot());
-const agentScopeArg = z
-  .enum(['user', 'project'])
-  .optional()
-  .describe('Só para um agente que existe apenas na pasta da ferramenta: "user" (pasta do usuário) ou "project"; o agente do board ignora');
 const listArg = (what: string) => z.array(z.string()).optional().describe(what);
-
-/** Skill do projeto pelo nome; lança se não existir. */
-const skill = (router: MessageRouter, name: string) => {
-  const k = router.snapshot().harness.skills.find((x) => x.name === name);
-  if (!k) throw new Error(`Skill "${name}" não encontrada.`);
-  return k;
-};
 
 /** O agente guardado no board com esse nome, se houver: é nele que as ferramentas de agente agem. */
 const boardAgent = (router: MessageRouter, name: string) =>
   router.snapshot().harness.library?.artifacts.find((x) => x.kind === 'agent' && x.name === name && !x.missing);
 
-/** Agente só da pasta da ferramenta, pelo nome (e escopo, quando informado); lança com a lista dos existentes. */
-const agent = (router: MessageRouter, name: string, scope?: InstallScope) => {
-  const all = router.snapshot().harness.agents.filter((x) => x.name === name && (!scope || x.scope === scope));
-  // com o mesmo nome nos dois escopos, vale o do projeto (como na execução)
-  const found = all.find((x) => x.scope === 'project') ?? all[0];
-  if (!found)
-    throw new Error(
-      `Agente "${name}" não encontrado. Existentes: ${
-        router
-          .snapshot()
-          .harness.agents.map((x) => `"${x.name}"`)
-          .join(', ') || 'nenhum'
-      }.`,
-    );
+/** Agente do board pelo nome; lança com a lista dos existentes. */
+const agent = (router: MessageRouter, name: string) => {
+  const found = boardAgent(router, name);
+  if (!found) {
+    const all = (router.snapshot().harness.library?.artifacts ?? []).filter((x) => x.kind === 'agent' && !x.missing);
+    throw new Error(`Agente "${name}" não encontrado no board. Existentes: ${all.map((x) => `"${x.name}"`).join(', ') || 'nenhum'}.`);
+  }
   return found;
 };
 
-/** Harness do projeto: ferramenta de IA, arquivos de regras, skills e agentes. */
+/** Harness do board: ferramenta de IA, regras, skills e agentes guardados no banco. */
 export function registerHarnessTools(tool: DefineTool): void {
   // ---------- regras e skills ----------
 
@@ -76,7 +58,7 @@ export function registerHarnessTools(tool: DefineTool): void {
     },
     (a, router) => {
       const s = router.snapshot();
-      const items = [...toolItemsOf(s), ...s.harness.inventory.flatMap((t) => t.items)];
+      const items = toolItemsOf(s);
       const resolved = a.items.map((i) => {
         const found = items.find((x) => x.kind === i.kind && x.name === i.name);
         if (!found) throw new Error(`Item ${i.kind} "${i.name}" não encontrado no harness.`);
@@ -104,24 +86,19 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'read_rule_file',
-    'Lê um arquivo de regras do projeto.',
+    'Lê um arquivo de regras guardado no board.',
     { file: ruleArg },
     (a, router) => {
-      if (router.mcpAccess()) {
-        const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'instructions' && i.boardArtifactId && i.name === a.file);
-        if (!copy) throw new Error('Arquivo fora do snapshot desta execução.');
-        return router.readHarnessFile(copy.path).content;
-      }
-      const r = router.snapshot().harness.rules.find((x) => x.name === a.file);
-      if (!r?.exists) throw new Error(`${a.file} não existe neste projeto.`);
-      return r.content;
+      const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'instructions' && i.boardArtifactId && i.name === a.file);
+      if (!copy) throw new Error(`${a.file} não está no board.`);
+      return router.readHarnessFile(copy.path).content;
     },
     true,
   );
 
   tool(
     'write_rule_file',
-    'Cria ou substitui por inteiro um arquivo de regras do projeto.',
+    'Cria ou substitui por inteiro um arquivo de regras guardado no board (nasce desligado; ligue com set_harness_selection).',
     { file: ruleArg, content: z.string() },
     (a, router) => {
       router.handle({ type: 'harness.rule.write', name: a.file, content: a.content });
@@ -129,7 +106,7 @@ export function registerHarnessTools(tool: DefineTool): void {
     },
   );
 
-  tool('delete_rule_file', 'Apaga um arquivo de regras do projeto. Não pode ser desfeito pelo board.', { file: ruleArg }, (a, router) => {
+  tool('delete_rule_file', 'Tira um arquivo de regras do board. Não pode ser desfeito pelo board.', { file: ruleArg }, (a, router) => {
     router.handle({ type: 'harness.rule.delete', name: a.file });
     return harness(router);
   });
@@ -143,14 +120,15 @@ export function registerHarnessTools(tool: DefineTool): void {
       const flow = flowSkillMarkdown(a.skill);
       if (flow !== undefined) return flow;
       const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'skill' && i.boardArtifactId && i.name === a.skill);
-      return copy ? router.readHarnessFile(copy.path).content : skill(router, a.skill).content;
+      if (!copy) throw new Error(`Skill "${a.skill}" não encontrada no board.`);
+      return router.readHarnessFile(copy.path).content;
     },
     true,
   );
 
   tool(
     'create_skill',
-    'Cria uma skill no projeto, no harness do projeto. Ela passa a ser uma opção do campo "Skills" dos cards.',
+    'Cria uma skill no board. Ela passa a ser uma opção do campo "Skills" dos cards.',
     {
       name: z.string().describe('Letras minúsculas, números e hífens'),
       description: z.string().min(1).describe('Quando a skill deve ser usada; é por ela que a IA decide invocá-la'),
@@ -164,37 +142,21 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'update_skill',
-    'Substitui o SKILL.md inteiro da cópia do board, incluindo o frontmatter (name, description). Sem cópia no board, altera a skill do projeto.',
+    'Substitui o SKILL.md inteiro da cópia da skill no board, incluindo o frontmatter (name, description).',
     { skill: skillArg, content: z.string().min(1) },
     (a, router) => {
       const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'skill' && i.boardArtifactId && i.name === a.skill);
-      if (copy) {
-        router.writeHarnessFile(copy.path, a.content);
-        return harness(router);
-      }
-      skill(router, a.skill);
-      router.handle({ type: 'harness.skill.write', name: a.skill, content: a.content });
-      return harness(router);
-    },
-  );
-
-  tool(
-    'set_skill_enabled',
-    'Liga ou desliga uma skill. Desligada, ela sai da pasta que as ferramentas de IA leem (economiza contexto) mas o conteúdo é preservado.',
-    { skill: skillArg, enabled: z.boolean() },
-    (a, router) => {
-      skill(router, a.skill);
-      router.handle({ type: 'harness.skill.setEnabled', name: a.skill, enabled: a.enabled });
+      if (!copy) throw new Error(`Skill "${a.skill}" não encontrada no board.`);
+      router.writeHarnessFile(copy.path, a.content);
       return harness(router);
     },
   );
 
   tool(
     'delete_skill',
-    'Apaga uma skill do projeto, com todos os arquivos da pasta. Não pode ser desfeito pelo board.',
+    'Tira uma skill do board, com todos os arquivos dela. Não pode ser desfeito pelo board.',
     { skill: skillArg },
     (a, router) => {
-      skill(router, a.skill);
       router.handle({ type: 'harness.skill.delete', name: a.skill });
       return harness(router);
     },
@@ -202,15 +164,15 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'write_skill_file',
-    'Grava um arquivo de apoio na cópia da skill do board (ou no projeto se ainda não foi adicionada): um modelo de classe ou exemplo de código em `references/`, um modelo de arquivo em `assets/` ou um script em `scripts/`. Substitui o arquivo se ele já existir. Para a IA ler o arquivo quando usar a skill, o SKILL.md precisa apontar para ele (use update_skill).',
+    'Grava um arquivo de apoio na cópia da skill do board: um modelo de classe ou exemplo de código em `references/`, um modelo de arquivo em `assets/` ou um script em `scripts/`. Substitui o arquivo se ele já existir. Para a IA ler o arquivo quando usar a skill, o SKILL.md precisa apontar para ele (use update_skill).',
     {
-      skill: z.string().describe('Nome da skill do projeto'),
+      skill: skillArg,
       file: z.string().describe('Caminho dentro da pasta da skill, ex.: "references/modelo-de-repositorio.ts"'),
       content: z.string(),
     },
     (a, router) => {
       router.writeSkillFile(a.skill, a.file, a.content);
-      return harnessOverview(router.snapshot()).inventory.find((i) => i.kind === 'skill' && i.name === a.skill);
+      return harnessOverview(router.snapshot()).skills.find((i) => i.name === a.skill);
     },
   );
 
@@ -218,11 +180,12 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'get_agent',
-    'Lê um agente do board (listado em get_harness): o arquivo da cópia guardada no board, com o frontmatter. Um agente que só existe na pasta da ferramenta (fora do board) é lido de lá; `scope` escolhe entre o do projeto e o da pasta do usuário.',
-    { agent: agentArg, scope: agentScopeArg },
+    'Lê um agente do board (listado em get_harness): o arquivo da cópia guardada no board, com o frontmatter.',
+    { agent: agentArg },
     (a, router) => {
       const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'agent' && i.boardArtifactId && i.name === a.agent);
-      return copy ? router.readHarnessFile(copy.path).content : agent(router, a.agent, a.scope as InstallScope | undefined).content;
+      if (!copy) agent(router, a.agent);
+      return router.readHarnessFile(copy!.path).content;
     },
     true,
   );
@@ -272,7 +235,6 @@ export function registerHarnessTools(tool: DefineTool): void {
     'Altera um agente do board: com `content`, substitui o agente inteiro (frontmatter e instruções, no formato da ferramenta em uso); com os demais campos, reescreve só o que vier, preservando o resto. A mudança fica no board e vale para as próximas execuções; as já iniciadas seguem com a versão delas. O arquivo de origem de um agente copiado não é alterado.',
     {
       agent: agentArg,
-      scope: agentScopeArg,
       content: z.string().min(1).optional().describe('Arquivo inteiro, com o frontmatter'),
       description: z.string().optional(),
       body: z.string().optional().describe('Instruções (sem o frontmatter)'),
@@ -285,9 +247,7 @@ export function registerHarnessTools(tool: DefineTool): void {
       background: z.boolean().optional().describe('Nas ferramentas que aceitam: roda em segundo plano'),
     },
     (a, router) => {
-      const found = boardAgent(router, a.agent)
-        ? { name: a.agent, scope: 'user' as const }
-        : agent(router, a.agent, a.scope as InstallScope | undefined);
+      const found = { name: agent(router, a.agent).name, scope: 'user' as const };
       if (a.content) router.handle({ type: 'harness.agent.write', name: found.name, scope: found.scope, content: a.content });
       else
         router.handle({
@@ -312,13 +272,10 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'delete_agent',
-    'Tira um agente do board; o arquivo de origem de um agente copiado não é apagado. Um agente que só existe na pasta da ferramenta (fora do board) tem o arquivo apagado. Não pode ser desfeito pelo board.',
-    { agent: agentArg, scope: agentScopeArg },
+    'Tira um agente do board; o arquivo de origem de um agente copiado não é apagado. Não pode ser desfeito pelo board.',
+    { agent: agentArg },
     (a, router) => {
-      const found = boardAgent(router, a.agent)
-        ? { name: a.agent, scope: 'user' as const }
-        : agent(router, a.agent, a.scope as InstallScope | undefined);
-      router.handle({ type: 'harness.agent.delete', name: found.name, scope: found.scope });
+      router.handle({ type: 'harness.agent.delete', name: agent(router, a.agent).name, scope: 'user' });
       return harness(router);
     },
   );

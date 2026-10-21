@@ -32,7 +32,7 @@ import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
-import { claudeSignedIn, cursorModels, cursorSignedIn, kimiModels, kimiSignedIn, runCli } from '../cliProbe';
+import { claudeSignedIn, cursorModels, cursorSignedIn, kimiModels, kimiSignedIn } from '../cliProbe';
 import { baseInfo, ALL_AI_BASES, type AiTool } from '../../shared/harness';
 import { allowKimiMcp, checkRequirements, registeredServer } from '../requirements';
 import { headlessCommand, headlessUnsupported } from '../headless';
@@ -228,11 +228,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
   // o log do board liga cada evento à execução em curso no card (`run_id`); sem execução, fica nulo
   router.setRunResolver((cardId) => runner.runIdOf(cardId));
-  // os plugins do Claude Code: a lista de instalados e as ações sobre eles passam pela CLI, na pasta do projeto
-  router.setClaudeCli((args) => {
-    const exe = resolveCommand('claude', pathEnv, homeDir);
-    return exe ? runCli(exe, args, pathEnv, 60_000, o.folderPath) : Promise.resolve({ code: null, stdout: '', stderr: '' });
-  });
   // os comandos externos das rotinas periódicas: resolvem com a saída padrão, rejeitam com `CommandError`,
   // que traz a mensagem do comando (é ela que vai para o log), o código de saída e a saída padrão (o
   // `merge-tree` da conferência com a base sai com 1 no conflito, #747). `git` aqui é assíncrono de propósito — o `src/extension/git.ts`
@@ -725,7 +720,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     },
     async dispose() {
       disposed = true;
-      router.setClaudeCli(null);
       clearInterval(requirementsTimer);
       if (enableTimer) clearInterval(enableTimer);
       // espera a conferência em andamento: sem isso ela pode gravar o board depois de o banco fechar

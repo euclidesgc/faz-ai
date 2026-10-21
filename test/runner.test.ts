@@ -132,7 +132,7 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   expect(JSON.parse(plan.input.mcpConfig!)).toEqual({
     mcpServers: { 'faz-ai': { type: 'stdio', ...bridge }, github: { command: 'gh-mcp', env: { TOKEN: 'segredo' } } },
   });
-  expect(plan.input.mcpBlocked).toEqual(['slack']);
+  expect(plan.input.mcpBlocked).toEqual([]); // o que só existe no disco não é do board
   expect(plan.advice).toEqual([expect.stringContaining('list_board_mcp_tools')]); // A biblioteca ensina a ponte comum mesmo quando a CLI também aceita o servidor diretamente.
   expect(plan.input.agentDefinition).toEqual({ name: 'restrito', description: 'Restrito', prompt: 'Siga.' });
   expect(plan.summary.join(' | ')).toContain('Servidores MCP: faz-ai, github (imposto pela CLI)');

@@ -148,7 +148,6 @@ describe('suggestModelRule e suggestModel', () => {
     environment: null,
     environmentFirstRun: false,
     harnessInstall: null,
-    harnessSuggestions: null,
     authExpired: null,
     orphans: { items: [], failed: {}, scannedAt: null },
     mainBranch: null,

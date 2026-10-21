@@ -7,12 +7,11 @@ import initSqlJs from 'sql.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openInMemory } from '../src/extension/db/database';
 import { migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
-import { scanInventory } from '../src/extension/harnessScan';
+import { scanImportedFolder } from '../src/extension/importScan';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { catalogLines, refineCatalog } from '../src/extension/promptContext';
 import { bareExec, executionPlan } from '../src/extension/execution';
-import { parseSuggestions } from '../src/extension/chat';
 import { manifestOf } from '../src/shared/execution';
 import type { HarnessItem } from '../src/shared/harness';
 import {
@@ -166,7 +165,7 @@ describe('servidores MCP na execução do card', () => {
       expect(Object.keys(config).sort()).toEqual(['faz-ai', 'github', 'memoria']);
       expect(config.memoria).toEqual({ command: 'mem' });
       expect(config['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: ['b.js'] });
-      expect(plan.input.mcpBlocked).toEqual(['sql']);
+      expect(plan.input.mcpBlocked).toEqual([]); // bloqueado é só o que a biblioteca do board tem e o agente não libera
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -186,32 +185,29 @@ describe('pastas importadas', () => {
     fs.writeFileSync(file, content);
   };
 
-  it('a varredura encontra na pasta o que a ferramenta reconhece num projeto, e a própria pasta como pasta de skills', () => {
+  it('a leitura encontra na pasta o que a ferramenta reconhece num projeto, e a própria pasta como pasta de skills', () => {
     write('colecao/.claude/skills/sql/SKILL.md', '---\nname: sql\ndescription: Consultas SQL\n---\n');
     write('colecao/.claude/agents/revisor.md', '---\nname: revisor\ndescription: Revisa\n---\n');
     write('colecao/.mcp.json', JSON.stringify({ mcpServers: { postgres: { command: 'pg-mcp' } } }));
     write('colecao/CLAUDE.md', '# Regras da coleção');
     write('so-skills/navegar/SKILL.md', '---\nname: navegar\ndescription: Navega\n---\n');
-    fs.mkdirSync(path.join(root, 'projeto'));
-    const items = scanInventory('claude', path.join(root, 'projeto'), '', undefined, null, [
-      path.join(root, 'colecao'),
-      path.join(root, 'so-skills'),
-      path.join(root, 'nao-existe'),
-    ]);
-    const imported = items.filter((i) => i.scope === 'imported');
-    expect(imported.map((i) => [i.kind, i.name]).sort()).toEqual([
+    const items = [
+      ...scanImportedFolder('claude', path.join(root, 'colecao')),
+      ...scanImportedFolder('claude', path.join(root, 'so-skills')),
+      ...scanImportedFolder('claude', path.join(root, 'nao-existe')),
+    ];
+    expect(items.map((i) => [i.kind, i.name]).sort()).toEqual([
       ['agent', 'revisor'],
       ['instructions', 'CLAUDE.md'],
       ['mcp', 'postgres'],
       ['skill', 'navegar'],
       ['skill', 'sql'],
     ]);
-    // a identidade é o caminho absoluto: fora do projeto e da home, é o que o inventário mostra
-    expect(imported.find((i) => i.name === 'sql')!.location).toBe(path.join(root, 'colecao/.claude/skills/sql/SKILL.md'));
-    expect(items.filter((i) => i.scope === 'project')).toEqual([]);
+    // a identidade é o caminho absoluto
+    expect(items.find((i) => i.name === 'sql')!.path).toBe(path.join(root, 'colecao/.claude/skills/sql/SKILL.md'));
   });
 
-  it('importar e tirar uma pasta pelo roteador preserva as cópias já adicionadas ao board', async () => {
+  it('importar uma pasta pelo roteador copia os artefatos para o board', async () => {
     write('colecao/.claude/skills/sql/SKILL.md', '---\nname: sql\ndescription: Consultas SQL\n---\n');
     fs.mkdirSync(path.join(root, 'projeto'));
     const db = await openInMemory(WASM_DIR);
@@ -223,22 +219,12 @@ describe('pastas importadas', () => {
       workspaceDir: path.join(root, 'projeto'),
       homeDir: path.join(root, 'home'),
     });
-    expect(() => router.handle({ type: 'harness.import.add', tool: 'claude', dir: path.join(root, 'nao-existe') })).toThrow(
-      'Pasta não encontrada',
-    );
-    router.handle({ type: 'harness.import.add', tool: 'claude', dir: path.join(root, 'colecao') });
-    let s = router.snapshot();
-    expect(s.harnessImports).toEqual([{ tool: 'claude', dir: path.join(root, 'colecao') }]);
-    const skill = s.harness.inventory.find((t) => t.tool === 'claude')!.items.find((i) => i.name === 'sql')!;
-    expect(skill.scope).toBe('imported');
-    router.handle({ type: 'harness.selection.set', items: [{ kind: 'skill', location: selectionKey(skill) }], usage: 'contextual' });
-    s = router.snapshot();
-    expect(s.fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['sql']);
-    // A pasta sai do catálogo; a cópia particular continua disponível.
-    router.handle({ type: 'harness.import.remove', tool: 'claude', dir: path.join(root, 'colecao') });
-    s = router.snapshot();
-    expect(s.harnessImports).toEqual([]);
-    expect(s.harnessSelection).toHaveLength(1);
+    router.handle({ type: 'harness.library.scan', dir: path.join(root, 'colecao') });
+    const keys = router.snapshot().harness.library!.preview!.items.map((i) => i.key);
+    expect(keys).toHaveLength(1);
+    router.handle({ type: 'harness.library.apply', keys });
+    const s = router.snapshot();
+    expect(s.harness.library!.artifacts.map((a) => [a.kind, a.name])).toEqual([['skill', 'sql']]);
     expect(s.fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['sql']);
   });
 });
@@ -331,10 +317,6 @@ describe('revisão: o que a pilha corrigiu', () => {
     expect(m.skills).toEqual(['sql']);
     expect(m.rules).toEqual([]);
     expect(m.mcpServers).toEqual([]);
-  });
-
-  it('parseSuggestions aceita texto com chaves depois do JSON', () => {
-    expect(parseSuggestions('{"items":[{"key":"a","reason":"r"}]}\nObs.: {x}', ['a'])).toEqual([{ location: 'a', reason: 'r' }]);
   });
 
   it('o chat leva os servidores do board em modo Sempre, com a definição guardada no board; sem definição, fica de fora', () => {

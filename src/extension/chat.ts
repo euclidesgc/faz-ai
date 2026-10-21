@@ -4,8 +4,6 @@ import { agentAssistancePrompt, parseAgentAssistance } from './agentAssistance';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { MAX_CHAT_MESSAGES, type ChatMessage } from '../shared/chat';
-import { type AiTool, type HarnessItem } from '../shared/harness';
-import { selectionKey, usageOf, type SelectableKind } from '../shared/harnessSelection';
 import type { RunnerPermission } from '../shared/runner';
 import { effortToRun } from '../shared/execution';
 import type { BoardState } from '../shared/model';
@@ -99,65 +97,6 @@ export function suggestLibraryPrompt(kind: 'rule' | 'skill' | 'agent'): string {
   ].join('\n');
 }
 
-/** O que cada tipo de artefato é, para o pedido de "Indicar artefatos". */
-const KIND_LABEL: Record<SelectableKind, string> = {
-  instructions: 'arquivos de regras e instruções',
-  skill: 'skills',
-  agent: 'agentes (subagentes)',
-  mcp: 'servidores MCP',
-};
-
-/**
- * O que a IA recebe no "Indicar artefatos": ler o projeto e escolher, só entre os candidatos listados
- * (o catálogo daquele assunto que ainda não está no board), os que fazem mais sentido para ele. A
- * resposta é um JSON e nada mais: é a pessoa quem confirma na tela; a IA só sugere.
- */
-export function suggestArtifactsPrompt(kind: SelectableKind, candidates: HarnessItem[]): string {
-  const list = candidates.map(
-    (i) => `- key: ${selectionKey(i)} | nome: ${i.name} | origem: ${i.scope}${i.description ? ` | ${i.description}` : ''}`,
-  );
-  return [
-    `Você vai indicar quais ${KIND_LABEL[kind]} deste projeto valem a pena entrar no board Faz AI, para as execuções dos cards poderem usá-los. Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, CLAUDE.md, linguagens e frameworks). Não altere nada: só leia.`,
-    `Candidatos (só estes existem; não invente outros):`,
-    ...list,
-    `Escolha os que fazem sentido para ESTE projeto e as tarefas que ele costuma ter, poucos e precisos: excesso de artefatos piora o resultado. ${
-      kind === 'skill' ? 'No máximo uma skill por assunto: entre duas do mesmo assunto, a mais próxima do projeto. ' : ''
-    }Deixe de fora o que é genérico demais, de outra stack, ou redundante com algo já escolhido.`,
-    'Responda SOMENTE com um JSON neste formato, sem texto antes nem depois: {"items":[{"key":"<key do candidato>","reason":"<por que, numa frase curta, em português do Brasil>"}]}. Sem nenhum candidato útil, responda {"items":[]}.',
-  ].join('\n');
-}
-
-/**
- * Lê a resposta de "Indicar artefatos": o primeiro JSON com `items` no texto (a IA às vezes escreve
- * algo em volta). Só valem as chaves dos candidatos; o resto é descartado.
- */
-export function parseSuggestions(text: string, candidates: readonly string[]): { location: string; reason: string }[] | null {
-  const allowed = new Set(candidates);
-  const parsed = (from: number, end: number): unknown[] | null => {
-    try {
-      const v: unknown = JSON.parse(text.slice(from, end + 1));
-      return v && typeof v === 'object' && Array.isArray((v as { items?: unknown }).items) ? (v as { items: unknown[] }).items : null;
-    } catch {
-      return null;
-    }
-  };
-  for (let from = text.indexOf('{'); from >= 0; from = text.indexOf('{', from + 1)) {
-    // a IA às vezes escreve algo com chaves depois do JSON: vale o primeiro trecho que é o JSON esperado
-    let items: unknown[] | null = null;
-    for (let end = text.lastIndexOf('}'); end > from && !items; end = text.lastIndexOf('}', end - 1)) items = parsed(from, end);
-    if (!items) continue;
-    const seen = new Set<string>();
-    return items.flatMap((raw) => {
-      const r = raw as { key?: unknown; reason?: unknown };
-      const key = typeof r?.key === 'string' ? r.key : '';
-      if (!allowed.has(key) || seen.has(key)) return [];
-      seen.add(key);
-      return [{ location: key, reason: typeof r.reason === 'string' ? r.reason.trim() : '' }];
-    });
-  }
-  return null;
-}
-
 /** O modelo escolhido no chat, no formato que a linha de comando da ferramenta pede; null = o padrão dela. */
 function modelFor(s: BoardState, model: string | null): ExecInput['model'] {
   const resolved = resolveModelOption(s.board, model ?? undefined);
@@ -187,7 +126,6 @@ export class ChatSession {
       else if (msg.type === 'ai.suggestAgents') this.suggestAgents();
       else if (msg.type === 'ai.suggestRules') this.suggestRules();
       else if (msg.type === 'ai.suggestSkills') this.suggestSkills();
-      else if (msg.type === 'harness.suggest.run') this.suggestArtifacts(msg.tool, msg.kind);
       else if (msg.type === 'chat.stop') this.stop();
       else this.clear();
     });
@@ -239,12 +177,7 @@ export class ChatSession {
     this.run({ role: 'user', text: 'Sugerir skills com IA: leia o projeto e proponha skills para ele.' }, prompt, 'board', null);
   }
 
-  /**
-   * "Indicar artefatos": a IA lê o projeto e o catálogo do assunto (o que ainda não está no board, da
-   * ferramenta do projeto) e devolve os que fazem mais sentido; a tela os pré-seleciona e a pessoa
-   * confirma. Fica fora da conversa do chat: o resultado vai em `harnessSuggestions`. Só a ferramenta
-   * do projeto, porque só a marcação dela vale.
-   */
+  /** A IA monta um rascunho de agente a partir do pedido da pessoa; nada é gravado sem ela confirmar. */
   assistAgent(input: AgentAssistInput): Promise<AgentAssistResult> {
     return new Promise((resolve, reject) => {
       const state = this.router.snapshot();
@@ -260,29 +193,6 @@ export class ChatSession {
         },
         failed: (error) => reject(new Error(error)),
       });
-    });
-  }
-
-  suggestArtifacts(tool: AiTool, kind: SelectableKind): void {
-    const state = this.router.snapshot();
-    if (tool !== state.board.aiTool) throw new Error('Indicar artefatos só vale para a ferramenta do projeto.');
-    const items = state.harness.inventory.find((t) => t.tool === tool)?.items ?? [];
-    const candidates = items.filter((i) => i.kind === kind && !usageOf(state.harnessSelection, i));
-    if (!candidates.length) {
-      this.router.setSuggestions({ tool, kind, items: [], error: 'Não há artefatos fora do board neste assunto.' });
-      return;
-    }
-    const keys = candidates.map(selectionKey);
-    this.router.setSuggestions(null);
-    // só leitura: a IA lê o projeto e responde; nada é gravado sem a pessoa confirmar na tela
-    this.start([suggestArtifactsPrompt(kind, candidates), ...contextLines(state).always].join('\n'), 'board', null, {
-      done: (text) => {
-        const parsed = parseSuggestions(text, keys);
-        this.router.setSuggestions(
-          parsed ? { tool, kind, items: parsed } : { tool, kind, items: [], error: 'A IA não respondeu no formato esperado.' },
-        );
-      },
-      failed: (error) => this.router.setSuggestions({ tool, kind, items: [], error }),
     });
   }
 

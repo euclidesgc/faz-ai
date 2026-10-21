@@ -111,8 +111,10 @@ export function executionPlan(
   const manifest = manifestOf(s, c);
   const profile = activeProfile(s.board);
   const how = enforcementOf(profile);
-  const items = s.harness.inventory.find((t) => t.tool === tool)?.items ?? [];
-  const known = [...new Set(items.filter((i) => i.kind === 'mcp').map((i) => i.name))].filter((n) => n !== BOARD_SERVER);
+  // os servidores que o board conhece são os da biblioteca dele (o inventário das pastas das ferramentas saiu)
+  const known = [...new Set((s.harness.library?.artifacts ?? []).filter((a) => a.kind === 'mcp').map((a) => a.name))].filter(
+    (n) => n !== BOARD_SERVER,
+  );
   const allowed = manifest.mcpServers;
   requireReviewedMcps(s, allowed);
   const blocked = known.filter((n) => !allowed.includes(n));
