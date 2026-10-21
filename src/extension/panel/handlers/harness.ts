@@ -163,6 +163,12 @@ export class BoardHarness {
     return { readonly };
   }
 
+  /** A configuração nativa de MCP pode conter credenciais; nem a leitura nem a escrita legada passam pelo editor do board. */
+  private assertNotNativeMcpFile(file: string): void {
+    if (this.current.inventory.some((t) => t.items.some((i) => i.kind === 'mcp' && i.path === file)))
+      throw new Error('Configurações MCP não são editadas pelo editor de arquivos. Use a biblioteca do board.');
+  }
+
   /** Conteúdo de um arquivo do harness para o editor do board. */
   readFile(file: string): { content: string; readonly: boolean } {
     const { readonly } = this.access(file);

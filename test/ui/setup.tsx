@@ -37,6 +37,7 @@ const { requestIds, SELF_ANSWERING } = vi.hoisted(() => ({
     'card.usage.query',
     'executionPolicy.read',
     'executionPolicy.simulate',
+    'executionPolicy.assist',
   ]),
 }));
 export { requestIds };

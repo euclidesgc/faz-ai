@@ -1,4 +1,4 @@
-import { lastSent, posted, renderThemed, seedBoard, sentOf, syncStore, confirmLast } from './setup';
+import { lastSent, posted, renderThemed, seedBoard, sentOf, confirmLast } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -16,16 +16,29 @@ beforeEach(async () => {
   ({ router } = await seedBoard());
 });
 
+/** Copia o estado do roteador para a store, com o Cursor como perfil padrão e o Kimi ligado (o board novo nasce no Claude Code). */
+const sync = () =>
+  useBoardStore.setState({
+    state: {
+      ...router.snapshot(),
+      board: {
+        ...router.snapshot().board,
+        aiTool: 'cursor',
+        aiProfiles: router.snapshot().board.aiProfiles.map((p) => ({ ...p, enabled: p.enabled || p.id === 'cursor' || p.id === 'kimi' })),
+      },
+    },
+  });
+
 const set = (list: BoardRequirement[]) =>
   act(() => {
     router.setRequirements(list);
-    syncStore(router);
+    sync();
   });
 
-const setAuthExpired = (tool: string | null) =>
+const setAuthExpired = (tool: Parameters<MessageRouter['setAuthExpired']>[0], expired = true) =>
   act(() => {
-    router.setAuthExpired(tool);
-    syncStore(router);
+    router.setAuthExpired(tool, expired);
+    sync();
   });
 
 const NONE = (reason: 'no-enabled' | 'unvalidated' | 'unavailable'): BoardRequirement => ({
@@ -170,14 +183,17 @@ describe('botões de IA sem perfil disponível', () => {
     expect(aiBlockedReason(router.snapshot())).toBeNull();
     set([NONE('unavailable')]);
     expect(aiBlockedReason(useBoardStore.getState().state!)).toContain('Nenhum perfil de CLI está disponível');
-    set([CURSOR_CLI, HARNESS]);
+    set([HARNESS]);
     expect(aiBlockedReason(useBoardStore.getState().state!)).toBeNull();
+    // o problema do perfil padrão (Cursor) bloqueia o que o usaria
+    set([CURSOR_CLI]);
+    expect(aiBlockedReason(useBoardStore.getState().state!)).toContain('linha de comando do Cursor não foi encontrada');
   });
 
   it('o login vencido do perfil padrão durante a execução (sinal reativo) também bloqueia', () => {
-    setAuthExpired('claude');
-    expect(aiBlockedReason(useBoardStore.getState().state!)).toContain('login do Claude Code venceu');
-    setAuthExpired(null);
+    setAuthExpired('cursor');
+    expect(aiBlockedReason(useBoardStore.getState().state!)).toContain('login do Cursor venceu');
+    setAuthExpired('cursor', false);
     expect(aiBlockedReason(useBoardStore.getState().state!)).toBeNull();
   });
 });

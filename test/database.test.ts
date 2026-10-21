@@ -508,6 +508,30 @@ describe('migração 33 → 34 (artefatos do board)', () => {
   });
 });
 
+describe('migração 43 → 44 (perguntas pendentes do card)', () => {
+  it('preserva um card antigo e inicia suas perguntas vazias', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 43);
+    old.run(`
+      INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto');
+      INSERT INTO workflows (id, board_id, name, position, kind) VALUES ('w', 'b', 'Histórias', 0, 'parent');
+      INSERT INTO columns (id, workflow_id, name, position) VALUES ('c', 'w', 'Backlog', 0);
+      INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t', 'b', 'História', 'blue', 'w');
+      INSERT INTO cards (id, board_id, workflow_id, column_id, type_id, title, description, position, created_at, updated_at)
+        VALUES ('card', 'b', 'w', 'c', 't', 'Pergunta antiga', 'Texto preservado', 0, 1, 2);
+    `);
+    expect(old.exec('PRAGMA table_info(cards)')[0]!.values.map((r) => r[1])).not.toContain('questions_json');
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(old.exec("SELECT title, description, updated_at, questions_json FROM cards WHERE id = 'card'")[0]!.values).toEqual([
+      ['Pergunta antiga', 'Texto preservado', 2, '[]'],
+    ]);
+  });
+});
+
 describe('banco novo', () => {
   it('chega na versão atual do esquema e já tem a coluna merge_commit', async () => {
     const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
@@ -641,11 +665,11 @@ describe('migração 32 → 33 (ai_run_bash)', () => {
   });
 });
 
-describe('migração 43 → 44 (ai_run_bash.failed)', () => {
+describe('migração 44 → 45 (ai_run_bash.failed)', () => {
   it('acrescenta a coluna com 0 nos registros antigos (não medido) e o banco novo aceita o valor', async () => {
     const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
     const old = new SQL.Database();
-    migrate(old, 43);
+    migrate(old, 44);
     old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
     old.run(
       "INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x')",
@@ -656,7 +680,7 @@ describe('migração 43 → 44 (ai_run_bash.failed)', () => {
     migrate(old);
 
     expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
-    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(44);
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(45);
     expect(old.exec("SELECT command, calls, failed FROM ai_run_bash WHERE run_id = 'r1'")[0]!.values).toEqual([['npm test', 2, 0]]);
 
     const fresh = new SQL.Database();

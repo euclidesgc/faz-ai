@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PROFILES, type AiProfile } from '../src/shared/aiProfiles';
 import type { ExecutionAdmissionDecision } from '../src/shared/executionAdmission';
+import type { ExecProfile } from '../src/shared/execution';
+import type { Board } from '../src/shared/model';
+import type { ModelRule } from '../src/shared/models';
 import {
   boardAvailability,
   profileAvailable,
   profileHealth,
+  profilesInUse,
   type ProfileHealth,
   type ProfileHealthInput,
   type ProfileProbe,
@@ -107,5 +111,31 @@ describe('boardAvailability', () => {
       health('kimi', { pendingReview: true }),
     ]);
     expect(a).toEqual({ blocked: false, reason: null, warnings: [] });
+  });
+});
+
+type InUseBoard = Pick<Board, 'aiTool' | 'modelRules' | 'execProfiles'>;
+const rule = (model: string): ModelRule => ({ id: model, name: model, enabled: true, groups: [], model });
+const agent = (model: string): ExecProfile => ({ id: model, model }) as ExecProfile;
+const inUseBoard = (over: Partial<InUseBoard> = {}): InUseBoard => ({ aiTool: 'claude', modelRules: [], execProfiles: [], ...over });
+
+describe('profilesInUse', () => {
+  it('sem regras nem agentes, devolve só o padrão', () => {
+    expect(profilesInUse(inUseBoard())).toEqual(['claude']);
+  });
+  it('junta os prefixos das regras e dos agentes, na ordem, sem repetir', () => {
+    const board = inUseBoard({
+      modelRules: [rule('cursor:composer-1'), rule('claude:opus@high'), rule('kimi:k3')],
+      execProfiles: [agent('kimi:k3@max'), agent('cursor:gpt-5')],
+    });
+    expect(profilesInUse(board)).toEqual(['claude', 'cursor', 'kimi']);
+  });
+  it('valor sem prefixo `<perfil>:` não entra; o esforço não atrapalha o prefixo', () => {
+    const board = inUseBoard({ modelRules: [rule('opus'), rule('cursor:composer-1@high')], execProfiles: [agent('')] });
+    expect(profilesInUse(board)).toEqual(['claude', 'cursor']);
+  });
+  it('perfil apagado que ainda aparece numa regra ou agente continua na lista', () => {
+    const board = inUseBoard({ modelRules: [rule('apagado:modelo')], execProfiles: [agent('apagado:outro')] });
+    expect(profilesInUse(board)).toEqual(['claude', 'apagado']);
   });
 });

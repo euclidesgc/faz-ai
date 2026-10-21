@@ -1,7 +1,9 @@
 import { useState, type ReactNode } from 'react';
-import type { BoardState } from '../../shared/model';
+import { profileLabel } from '../../shared/aiProfiles';
+import type { BoardState, Card } from '../../shared/model';
 import type { ProfileProblem } from '../../shared/profileHealth';
-import type { BoardRequirement } from '../../shared/requirements';
+import { defaultTarget, runTargetOf } from '../../shared/runTarget';
+import { cliProblem, type BoardRequirement } from '../../shared/requirements';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { ui } from '../commands';
@@ -86,6 +88,7 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
         agents: t('nenhum agente do board'),
         rules: t('regras no board ainda desligadas, sem revisão'),
         missing: t('artefato do board que sumiu da origem'),
+        isolation: t('artefatos que a CLI carrega sem passar pelo board'),
       };
       return {
         title: t('O harness do board ainda não está definido'),
@@ -132,18 +135,36 @@ export function CopyCommand({ command }: { command: string }) {
 
 /**
  * Por que os botões de IA do card não rodam agora, no idioma da interface; null quando rodam. Além
- * da permissão que a ferramenta não aceita, o board sem nenhum perfil de CLI disponível ou o login
- * vencido do perfil padrão: o clique só daria erro.
+ * da permissão que a ferramenta não aceita, o board sem nenhum perfil de CLI disponível, a CLI que falta ou está sem
+ * login, ou o login que venceu. Só conta o perfil que executaria o `card` (`runTargetOf`), ou o padrão sem card: o
+ * problema de outro perfil não bloqueia.
  */
-export function aiBlockedReason(state: BoardState): string | null {
+export function aiBlockedReason(state: BoardState, card?: Card): string | null {
   if (state.aiRunUnsupported) return t(state.aiRunUnsupported);
+  // nenhum perfil disponível bloqueia qualquer execução
   const none = state.requirements.find((r) => r.id === 'no-profile');
   if (none) return t('{title}: veja em Configurações → Verificar ambiente.', { title: requirementTexts(none).title });
-  if (state.authExpired === state.board.aiTool) {
-    const name = state.board.aiProfiles.find((p) => p.id === state.authExpired)?.name ?? state.authExpired;
-    return t('O login do {tool} venceu: veja em Configurações → Verificar ambiente.', { tool: name });
+  const target = card ? runTargetOf(state, card) : defaultTarget(state.board);
+  // escolha explícita inválida: quem executa trata o bloqueio à parte
+  if (!target) return null;
+  const tool = target.cli.name;
+  switch (cliProblem(state, target.cli.id)) {
+    case 'expired':
+      return t('O login do {tool} venceu: veja em Configurações → Verificar ambiente.', { tool });
+    case 'cli':
+      return t('A linha de comando do {tool} não foi encontrada: veja em Configurações → Verificar ambiente.', { tool });
+    case 'signin':
+      return t('A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.', { tool });
+    default:
+      return null;
   }
-  return null;
+}
+
+/** O nome do perfil de CLI que trabalha no card: o da execução em curso, senão o que o executaria. */
+export function cardToolLabel(state: BoardState, card: Card): string {
+  const running = state.aiActivity.find((a) => a.cardId === card.id);
+  if (running) return profileLabel(state.board, running.tool);
+  return (runTargetOf(state, card) ?? defaultTarget(state.board)).cli.name;
 }
 
 /** Se o requisito tem um botão ou comando que o resolve por aqui (na versão compacta, sem o atalho para as Configurações). */

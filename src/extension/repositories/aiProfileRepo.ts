@@ -1,5 +1,6 @@
 import type { Database } from 'sql.js';
 import {
+  BUILTIN_ISOLATION,
   BUILTIN_PROFILES,
   newProfileId,
   unknownProfileCapabilities,
@@ -26,7 +27,7 @@ const knownConfigKeys = [
   'statusArgs',
   'authPatterns',
 ];
-const copyKeys = ['command', 'env', 'extraArgs', 'installUrl', 'authPatterns'];
+const copyKeys = ['command', 'env', 'extraArgs', 'installUrl', 'authPatterns', 'isolation'];
 /** Configuração livre nunca passa pelo SQLite nem retorna ao editor. */
 export class AiProfileRepo {
   constructor(private readonly db: Database) {}
@@ -39,6 +40,15 @@ export class AiProfileRepo {
       if (!result.some((row) => row.id === p.id)) result.push({ ...structuredClone(p), capabilities: unknownProfileCapabilities() });
     return result.sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
   }
+  /** O isolamento declarado não é segredo: é a única parte da configuração que volta para a leitura pública. */
+  private isolationOf(row: Row): AiProfileConfig {
+    try {
+      const saved = credentialsFor(this.db).get(ownerOf(str(row.board_id), str(row.id)), str(row.secret_ref));
+      return saved?.isolation === undefined ? {} : { isolation: saved.isolation as AiProfileConfig['isolation'] };
+    } catch {
+      return {};
+    }
+  }
   private publicProfile(row: Row): AiProfile {
     const builtin = BUILTIN_PROFILES.find((p) => p.id === row.id);
     return {
@@ -49,7 +59,7 @@ export class AiProfileRepo {
             name: str(row.name),
             kind: str(row.kind) as AiProfile['kind'],
             base: str(row.base) as AiProfile['base'],
-            config: {},
+            config: this.isolationOf(row),
           }),
       enabled: bool(row.enabled),
       position: num(row.position),
@@ -68,8 +78,6 @@ export class AiProfileRepo {
     this.human(actor);
     if (draft.kind === 'builtin' || BUILTIN_PROFILES.some((p) => p.id === draft.id))
       throw new Error('Os perfis prontos não são editados: duplique para mudar.');
-    const errors = validateProfile(draft);
-    if (errors.length) throw new Error(errors.join(' '));
     return transaction(this.db, () => {
       const rows = this.rows(boardId),
         old = rows.find((row) => row.id === draft.id);
@@ -84,10 +92,24 @@ export class AiProfileRepo {
       if (old && (old.kind !== draft.kind || old.base !== draft.base))
         throw new Error('O tipo e a base do perfil não são alterados: crie outro perfil.');
       const saved = old ? credentialsFor(this.db).get(ownerOf(boardId, id), str(old.secret_ref)) : null;
-      // Só extensões já salvas são preservadas; um campo conhecido inaplicável não passa para uma cópia.
+      // O navegador não recebe a configuração privada: campos omitidos numa edição mantêm o valor do cofre.
+      // A cópia só retém chaves do seu próprio tipo; explicitamente enviadas, listas podem ser esvaziadas.
       const config: AiProfileConfig = {};
-      for (const [key, value] of Object.entries(saved ?? {})) if (!knownConfigKeys.includes(key)) config[key] = value;
-      for (const [key, value] of Object.entries(draft.config)) if (draft.kind === 'custom' || copyKeys.includes(key)) config[key] = value;
+      for (const [key, value] of Object.entries(saved ?? {}))
+        if (draft.kind === 'custom' || copyKeys.includes(key) || !knownConfigKeys.includes(key)) config[key] = value;
+      for (const [key, value] of Object.entries(draft.config)) {
+        if (draft.kind !== 'custom' && !copyKeys.includes(key)) continue;
+        if (key === 'env' && value && typeof value === 'object' && !Array.isArray(value)) {
+          const env = { ...(config.env ?? {}) };
+          for (const [name, secret] of Object.entries(value)) {
+            if (secret === '') delete env[name];
+            else env[name] = secret as string;
+          }
+          config.env = env;
+        } else config[key] = value;
+      }
+      const errors = validateProfile({ ...draft, config });
+      if (errors.length) throw new Error(errors.join(' '));
       const ref = credentialsFor(this.db).put(ownerOf(boardId, id), config);
       run(
         this.db,
@@ -141,7 +163,13 @@ export class AiProfileRepo {
       profiles.map((p) => p.id),
     );
     const sourceRow = one(this.db, 'SELECT secret_ref FROM ai_profiles WHERE board_id = ? AND id = ?', [boardId, id]);
-    const config = source.kind === 'builtin' ? null : credentialsFor(this.db).get(ownerOf(boardId, id), str(sourceRow?.secret_ref));
+    // a cópia de um pronto leva a lista de itens que a CLI carrega (declaração herdada, sem a garantia do base)
+    const config =
+      source.kind === 'builtin'
+        ? source.base === 'generic'
+          ? null
+          : { isolation: { loads: structuredClone(BUILTIN_ISOLATION[source.base].loads) } }
+        : credentialsFor(this.db).get(ownerOf(boardId, id), str(sourceRow?.secret_ref));
     const ref = config ? credentialsFor(this.db).put(ownerOf(boardId, targetId), config) : null;
     run(
       this.db,

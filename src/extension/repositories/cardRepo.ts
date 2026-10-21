@@ -1,5 +1,5 @@
 import type { Database } from 'sql.js';
-import type { FieldValue } from '../../shared/model';
+import type { CardQuestion, FieldValue } from '../../shared/model';
 import { norm } from '../../shared/filters';
 import { parseRules } from '../../shared/rules';
 import type { CardStatus } from '../../shared/status';
@@ -12,7 +12,17 @@ const entryStatus = (col: Row): CardStatus | null => (num(col.ai_active) === 1 &
 export class CardRepo {
   constructor(private db: Database) {}
 
+  /** Perguntas pendentes não são uma edição do conteúdo do card. */
+  setQuestions(cardId: string, questions: CardQuestion[]): void {
+    run(this.db, 'UPDATE cards SET questions_json = ? WHERE id = ?', [JSON.stringify(questions), cardId]);
+  }
+
   create(boardId: string, input: { typeId: string; columnId: string; parentId: string | null; title: string }): string {
+    return transaction(this.db, () => this.createInner(boardId, input));
+  }
+
+  /** Corpo do `create` sem abrir transação: o sql.js não aninha `BEGIN`, então quem já está numa usa este. */
+  private createInner(boardId: string, input: { typeId: string; columnId: string; parentId: string | null; title: string }): string {
     const db = this.db;
     const col = one(
       db,
@@ -30,38 +40,74 @@ export class CardRepo {
     const pos = num(one(db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM cards WHERE column_id = ?', [input.columnId])?.p);
     const id = newId();
     const t = now();
+    // o contador fica no board para que o número de um card apagado nunca volte a ser usado
+    const number = num(one(db, 'SELECT next_card_number AS n FROM boards WHERE id = ?', [boardId])?.n);
+    run(db, 'UPDATE boards SET next_card_number = ? WHERE id = ?', [number + 1, boardId]);
+    run(
+      db,
+      `INSERT INTO cards(id, number, board_id, workflow_id, column_id, type_id, parent_id, title, description, position, created_at, updated_at, status, status_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        id,
+        number,
+        boardId,
+        str(col.workflow_id),
+        input.columnId,
+        input.typeId,
+        input.parentId,
+        input.title.trim() || 'Sem título',
+        '',
+        pos,
+        t,
+        t,
+        entryStatus(col),
+        t,
+      ],
+    );
+    // padrões do tipo (ex.: modelo e skills), só para campos que ainda existem
+    const defaults = JSON.parse(
+      str(one(db, 'SELECT defaults_json FROM card_types WHERE id = ?', [input.typeId])?.defaults_json) || '{}',
+    ) as Record<string, FieldValue>;
+    for (const [fieldId, value] of Object.entries(defaults)) {
+      if (one(db, 'SELECT id FROM field_defs WHERE id = ? AND board_id = ?', [fieldId, boardId]))
+        run(db, 'INSERT INTO field_values(card_id, field_id, value_json) VALUES (?,?,?)', [id, fieldId, JSON.stringify(value)]);
+    }
+    return id;
+  }
+
+  /**
+   * Copia um card para a primeira coluna do mesmo workflow (mesmo pai, se for sub-tarefa): título dado,
+   * descrição, tipo, valores de campos e checklist desmarcado. Não leva sub-tarefas, anexos, comentários,
+   * vínculos nem o que é da execução (branch, PR, status, modo autônomo, perfil): a cópia nasce limpa.
+   */
+  duplicate(boardId: string, cardId: string, title: string): string {
+    const db = this.db;
+    const src = one(db, 'SELECT workflow_id, type_id, parent_id, description FROM cards WHERE id = ? AND board_id = ?', [cardId, boardId]);
+    if (!src) throw new Error('Card não encontrado');
+    const first = one(db, 'SELECT id FROM columns WHERE workflow_id = ? ORDER BY position LIMIT 1', [str(src.workflow_id)]);
+    if (!first) throw new Error('Workflow sem colunas');
     return transaction(db, () => {
-      // o contador fica no board para que o número de um card apagado nunca volte a ser usado
-      const number = num(one(db, 'SELECT next_card_number AS n FROM boards WHERE id = ?', [boardId])?.n);
-      run(db, 'UPDATE boards SET next_card_number = ? WHERE id = ?', [number + 1, boardId]);
+      const id = this.createInner(boardId, {
+        typeId: str(src.type_id),
+        columnId: str(first.id),
+        parentId: src.parent_id == null ? null : str(src.parent_id),
+        title,
+      });
+      run(db, 'UPDATE cards SET description = ? WHERE id = ?', [str(src.description), id]);
+      // os padrões do tipo já entraram no create; os valores do original têm precedência
+      run(db, 'DELETE FROM field_values WHERE card_id = ?', [id]);
       run(
         db,
-        `INSERT INTO cards(id, number, board_id, workflow_id, column_id, type_id, parent_id, title, description, position, created_at, updated_at, status, status_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [
-          id,
-          number,
-          boardId,
-          str(col.workflow_id),
-          input.columnId,
-          input.typeId,
-          input.parentId,
-          input.title.trim() || 'Sem título',
-          '',
-          pos,
-          t,
-          t,
-          entryStatus(col),
-          t,
-        ],
+        'INSERT INTO field_values(card_id, field_id, value_json) SELECT ?, field_id, value_json FROM field_values WHERE card_id = ?',
+        [id, cardId],
       );
-      // padrões do tipo (ex.: modelo e skills), só para campos que ainda existem
-      const defaults = JSON.parse(
-        str(one(db, 'SELECT defaults_json FROM card_types WHERE id = ?', [input.typeId])?.defaults_json) || '{}',
-      ) as Record<string, FieldValue>;
-      for (const [fieldId, value] of Object.entries(defaults)) {
-        if (one(db, 'SELECT id FROM field_defs WHERE id = ? AND board_id = ?', [fieldId, boardId]))
-          run(db, 'INSERT INTO field_values(card_id, field_id, value_json) VALUES (?,?,?)', [id, fieldId, JSON.stringify(value)]);
+      for (const item of all(db, 'SELECT text, position FROM checklist_items WHERE card_id = ? ORDER BY position', [cardId])) {
+        run(db, 'INSERT INTO checklist_items(id, card_id, text, done, position) VALUES (?,?,?,0,?)', [
+          newId(),
+          id,
+          str(item.text),
+          num(item.position),
+        ]);
       }
       return id;
     });

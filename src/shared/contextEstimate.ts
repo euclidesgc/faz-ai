@@ -1,4 +1,4 @@
-import { activeProfile, catalogTool } from './aiProfiles';
+import { catalogTool } from './aiProfiles';
 import { agentManifestOf, manifestOf, type ExecProfile } from './execution';
 import { contextFilesOf } from './contextSources';
 import type { AiTool, HarnessItem } from './harness';
@@ -122,15 +122,9 @@ function mcpEntries(s: BoardState, tool: AiTool, allowed: string[]): ContextEntr
   return [...board, ...allowed.map((name): ContextEntry => ({ kind: 'mcp-allowed', name, tokens: null }))];
 }
 
-/** O agente da sessão (instruções inteiras) e, numa história no Claude Code, os subagentes (só o nome e a descrição entram aqui). */
-function agentEntries(tool: AiTool, m: ReturnType<typeof manifestOf>): ContextEntry[] {
-  const own: ContextEntry[] = m.agent ? [{ kind: 'agent', name: m.agent, tokens: tokensOf(m.instructions.length + m.purpose.length) }] : [];
-  // a ferramenta lista cada subagente pelo nome e pela descrição; as instruções dele vão para o contexto do próprio subagente
-  const subs =
-    tool === 'claude'
-      ? m.delegates.map((d): ContextEntry => ({ kind: 'subagent', name: d.name, tokens: tokensOf(d.name.length + d.purpose.length) }))
-      : [];
-  return [...own, ...subs];
+/** O agente da sessão (instruções inteiras). */
+function agentEntries(m: ReturnType<typeof manifestOf>): ContextEntry[] {
+  return m.agent ? [{ kind: 'agent', name: m.agent, tokens: tokensOf(m.instructions.length + m.purpose.length) }] : [];
 }
 
 /** As rules e as skills que a sessão lê pelo caminho: as do contexto fixo e as que o card (ou o agente) exige, sem repetir. */
@@ -177,11 +171,13 @@ export function estimateAgentContext(s: BoardState, profile: ExecProfile): Conte
 }
 
 function estimateManifestContext(s: BoardState, m: ReturnType<typeof manifestOf>, c?: Card): ContextEstimate {
-  const tool = s.board.aiTool;
+  // a CLI do alvo do card (ou do agente), não o perfil padrão do board
+  const cli = m.target.cli;
+  const tool = cli.id;
   const { rules, skills } = fileEntries(s, m);
   const byGroup: Record<ContextGroupId, ContextEntry[]> = {
     mcp: mcpEntries(s, tool, m.mcpServers),
-    agents: agentEntries(tool, m),
+    agents: agentEntries(m),
     rules,
     skills,
     card: c ? cardEntries(s, c) : [],
@@ -192,14 +188,12 @@ function estimateManifestContext(s: BoardState, m: ReturnType<typeof manifestOf>
     entries: byGroup[id],
   }));
   const entries = groups.flatMap((g) => g.entries);
-  const option = m.model
-    ? s.board.modelCatalog.find((o) => o.tool === catalogTool(activeProfile(s.board)) && o.model === m.model!.name)
-    : undefined;
+  const option = m.model ? s.board.modelCatalog.find((o) => o.tool === catalogTool(cli) && o.model === m.model!.name) : undefined;
   const col = c ? columnOf(s, c) : undefined;
   return {
     tool,
     total: groups.reduce((n, g) => n + g.tokens, 0),
-    window: m.model ? contextWindowOf(catalogTool(activeProfile(s.board)), m.model.name) : null,
+    window: m.model ? contextWindowOf(catalogTool(cli), m.model.name) : null,
     model: option?.label ?? m.model?.name ?? null,
     phase: col?.aiActive ? col.name : null,
     groups,

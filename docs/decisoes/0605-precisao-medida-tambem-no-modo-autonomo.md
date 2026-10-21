@@ -17,7 +17,7 @@ total e parte autônoma (`MetricsAiSignal`: `count`, `runs`, `autonomousCount`, 
 
 - **correções na Revisão**: commits (`git commit`) em execuções cuja fase normalizada é `revisao`;
 - **`npm test` com falha**: chamadas de `npm test` que voltaram com `tool_result` `is_error`, gravadas
-  na coluna nova `ai_run_bash.failed` (migração 44), preenchida pelo leitor do Claude Code;
+  na coluna nova `ai_run_bash.failed` (migração 45), preenchida pelo leitor do Claude Code;
 - **commits depois do pull request**: commits de execuções iniciadas depois do primeiro
   `pull_request_set` da história (no total conta histórias; por fase, execuções);
 - **bugs depois da conclusão**: o `escapes` existente ganha a parte autônoma (história autônoma = teve
@@ -44,15 +44,16 @@ texto.
   `autonomousCount` ao lado mantém uma linha por fase.
 - **Calcular os sinais no `getPanelMetrics` via `runsWhere`**: o período do retrabalho é inclusivo em
   ms, diferente do `started_at <` do consumo; os números não bateriam com `escapes`.
-- **Migração 45 (como na Spec)**: a `develop` estava na 43 quando a branch partiu; a coluna entrou
-  como migração 44.
+- **Migração 45 (como na Spec)**: a branch partiu da `develop` na 43 e a coluna nasceu como 44; ao
+  trazer a `develop` de novo, a #895 já ocupava a 44 (`cards.questions_json`), então a coluna passou
+  para a 45.
 
 ## Consequências
 
 - Sinais são aproximações: commit ≈ correção (commit de formatação conta), `is_error` cobre qualquer
   erro do Bash (timeout, permissão), e valem só para o Claude Code, desde o registro de comandos de
   Bash. A nota do painel, o README e o CHANGELOG avisam.
-- `failed` só existe a partir da versão 44 do banco: registros anteriores ficam com 0, e o painel não
+- `failed` só existe a partir da versão 45 do banco: registros anteriores ficam com 0, e o painel não
   distingue "não falhou" de "não medido" nessas execuções (a base `bashRuns` as conta).
 - Uma consulta a mais em `panelRework` (só no detalhe; meses consolidados em `log_months` não têm
   sinais, como o inventário).

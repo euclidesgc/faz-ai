@@ -268,7 +268,6 @@ export async function claudeHarness() {
         exec: {
           agent: '',
           agentDefinition: null,
-          delegates: [],
           model: { name: 'claude-sonnet-4-6', effort: null },
           mcpBlocked: [],
           mcpAllowed: empty ? [] : ['allowed'],

@@ -338,7 +338,9 @@ describe('ações contextuais da seleção', () => {
       useBoardStore.getState().selectMany([firstId, secondId, thirdId]);
       patchState(() => ({
         aiRuns: [firstId],
-        aiActivity: [{ cardId: firstId, runId: 'run', mode: 'refine', origin: 'manual', phase: 'Backlog', model: null, startedAt: 1 }],
+        aiActivity: [
+          { cardId: firstId, runId: 'run', mode: 'refine', origin: 'manual', phase: 'Backlog', model: null, tool: 'claude', startedAt: 1 },
+        ],
       }));
       const s = useBoardStore.getState().state!;
       patchState(() => ({ board: { ...s.board, runner: { ...s.board.runner, parallelStories: 2 } } }));
@@ -367,5 +369,11 @@ describe('ações contextuais da seleção', () => {
     await userEvent.click(bar().getByRole('button', { name: 'Arquivar selecionados' }));
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Arquivar' }));
     expect(lastSent('card.archiveMany').cardIds.sort()).toEqual([firstId, secondId].sort());
+  });
+
+  it('com vários cards selecionados a barra não tem ação de duplicar', async () => {
+    await selectTwoStories();
+    expect(bar().getByText('2 selecionados')).toBeInTheDocument();
+    expect(bar().queryByRole('button', { name: /Duplicar/ })).toBeNull();
   });
 });

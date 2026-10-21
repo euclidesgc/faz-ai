@@ -1,6 +1,7 @@
 import { executorProfile } from './providers';
 import { redactCredentialValues } from '../credentials';
 import { authFailed } from './profileAuth';
+import { profileInstallUrl } from '../requirements';
 import type { AiProfile } from '../../shared/aiProfiles';
 // A única porta por onde o board chama uma ferramenta de IA. Toda execução — de um card (a pessoa, o
 // heartbeat ou o autopiloto) ou do chat — passa por `AiGateway.run`, e é aqui que o log de uso é
@@ -24,7 +25,15 @@ import type { StrictExecutionRequest } from '../../shared/executionAdmission';
 import { AdmissionBlockedError, type ExecutionAdmission, type AdmittedExecution } from './admission';
 import type { RunArtifactRequest, RunArtifactSnapshots } from '../runArtifactSnapshot';
 import type { RunMcpSessions } from '../mcp/runSessions';
-import type { ProcessIdentity } from '../processIdentity';
+import { SpawnNotStartedError, type ProcessIdentity } from '../processIdentity';
+
+/** Só acrescenta um link público revisado ao erro de executável ausente do perfil personalizado. */
+export function missingProfileCommand(error: Error, profile: AiProfile | undefined): Error {
+  if (!(error instanceof SpawnNotStartedError) || !error.message.startsWith('comando "') || profile?.kind !== 'custom') return error;
+  const installUrl = profileInstallUrl(profile);
+  if (installUrl) error.message += ` Instalação do perfil: ${installUrl}`;
+  return error;
+}
 
 /** O contexto da execução que o log congela na hora da chamada: a IA move o card durante o trabalho. */
 export type AiRunContext = Omit<AiRunStart, 'boardId' | 'startedAt' | 'origin' | 'tool'>;
@@ -280,6 +289,7 @@ export class AiGateway {
     } catch (e) {
       revoke();
       if (e instanceof Error) {
+        missingProfileCommand(e, profile);
         e.message = redact(e.message);
         if (e.stack) e.stack = redact(e.stack);
       }

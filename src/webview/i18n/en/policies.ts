@@ -3,8 +3,11 @@ export const policies: Record<string, string> = {
   'A política foi removida. Seu rascunho foi preservado.': 'The policy was removed. Your draft has been preserved.',
   'O host não devolveu as políticas.': 'The host did not return the policies.',
   'Políticas de execução e fallback': 'Execution and fallback policies',
-  'Prepare políticas versionadas e compare cenários sem iniciar IA. A execução atual ainda usa o modelo reserva das regras; estas políticas preparam o novo plano.':
-    'Prepare versioned policies and compare scenarios without starting AI. Current execution still uses the rules’ fallback model; these policies prepare the new plan.',
+  'Políticas versionadas decidem o fallback entre perfis de CLI e modelos. Sem uma política ligada, a falha bloqueia, sem fallback. Funciona sem IA e sem executor.':
+    'Versioned policies decide the fallback between CLI profiles and models. Without an enabled policy, a failure blocks, with no fallback. Works without AI or an executor.',
+  'Próxima execução': 'Next run',
+  'Usa só as políticas salvas e ligadas, pelo mesmo avaliador da execução.':
+    'Uses only saved, enabled policies, through the same evaluator as execution.',
   'Lendo políticas…': 'Reading policies…',
   'Gerenciar políticas': 'Manage policies',
   'Salvar exige comparação e revisão explícita. Simulações não concedem acesso nem iniciam execuções.':
@@ -169,4 +172,55 @@ export const policies: Record<string, string> = {
   'Destino inválido': 'Invalid target',
   'Cenário de política inválido.': 'Invalid policy scenario.',
   'Página de histórico inválida.': 'Invalid history page.',
+  'Criar com ajuda de IA': 'Create with AI help',
+  'Sugerir fallbacks': 'Suggest fallbacks',
+  'Revisar conflitos': 'Review conflicts',
+  'Destinos admitidos': 'Admitted targets',
+  'Destinos indisponíveis': 'Unavailable targets',
+  'A IA não devolveu uma proposta.': 'The AI did not return a proposal.',
+  'A IA recebe só o catálogo, os perfis e as políticas, sem segredos, e devolve uma proposta. Nada é salvo nem ligado até você revisar e confirmar. Sem IA disponível, o editor manual continua igual.':
+    'The AI receives only the catalog, profiles and policies, without secrets, and returns a proposal. Nothing is saved or enabled until you review and confirm. Without an available AI, the manual editor stays the same.',
+  'Objetivo da política': 'Policy goal',
+  'Consultando a IA…': 'Asking the AI…',
+  'Pedir proposta': 'Ask for a proposal',
+  'Fechar assistente': 'Close assistant',
+  'Explicação da IA': 'AI explanation',
+  'Conflitos nas políticas salvas': 'Conflicts in saved policies',
+  'Rascunho proposto': 'Proposed draft',
+  Diferenças: 'Differences',
+  'Exemplos na simulação local': 'Examples in the local simulation',
+  'Cenários hipotéticos com o rascunho ligado só na simulação. Não comprovam admissão nem credenciais.':
+    'Hypothetical scenarios with the draft enabled only in the simulation. They do not prove admission or credentials.',
+  'A IA não propôs alterações no rascunho.': 'The AI proposed no changes to the draft.',
+  'Usar proposta no rascunho': 'Use proposal in the draft',
+  'Abrir proposta no editor': 'Open proposal in the editor',
+  'Pedido de assistência de política inválido.': 'Invalid policy assistance request.',
+  'O objetivo é grande demais para analisar.': 'The goal is too large to analyze.',
+  'Descreva o objetivo da política.': 'Describe the policy goal.',
+  'Abra uma política no editor para sugerir fallbacks.': 'Open a policy in the editor to suggest fallbacks.',
+  'O texto parece conter um segredo. Remova-o antes de pedir ajuda à IA.':
+    'The text seems to contain a secret. Remove it before asking the AI for help.',
+  'Há políticas demais para o assistente analisar de uma vez.': 'There are too many policies for the assistant to analyze at once.',
+  'A IA não respondeu no formato esperado. Tente novamente.': 'The AI did not answer in the expected format. Try again.',
+  'Sem rascunho aberto, a revisão de conflitos só explica.': 'With no open draft, the conflict review only explains.',
+  'A política proposta pela IA foi recusada: formato inválido.': 'The AI-proposed policy was refused: invalid format.',
+  'A política proposta pela IA foi recusada: o validador a considera inválida.':
+    'The AI-proposed policy was refused: the validator considers it invalid.',
+  'A política proposta pela IA foi recusada: usa perfil ou modelo que não está no catálogo.':
+    'The AI-proposed policy was refused: it uses a profile or model that is not in the catalog.',
+  'A política proposta pela IA foi recusada: reduziria o isolamento do que a pessoa definiu.':
+    'The AI-proposed policy was refused: it would reduce the isolation of what you defined.',
+  'A política proposta pela IA foi recusada: cria prioridade ambígua, ciclo ou destino inválido.':
+    'The AI-proposed policy was refused: it creates an ambiguous priority, a cycle or an invalid target.',
+  'A resposta da IA foi descartada por parecer conter um segredo.': 'The AI answer was discarded because it seems to contain a secret.',
+  'Reservas de regras antigas': 'Fallbacks from old rules',
+  'Cada reserva de regra antiga virou uma proposta desligada e pendente de revisão. Nada troca de CLI até você revisar e ligar a política; as condições da regra (campos e tipo do card) não foram copiadas.':
+    'Each old rule fallback became a disabled proposal pending review. Nothing switches CLI until you review and enable the policy; the rule conditions (card fields and type) were not copied.',
+  'Regra "{name}": proposta {state}': 'Rule "{name}": proposal {state}',
+  'Regra "{name}": sem conversão ({reason})': 'Rule "{name}": not converted ({reason})',
+  'pendente de revisão': 'pending review',
+  'já revisada': 'already reviewed',
+  'o modelo não está no catálogo': 'the model is not in the catalog',
+  'o esforço não existe no modelo': 'the effort does not exist on the model',
+  'o identificador da regra é inválido': 'the rule id is invalid',
 };

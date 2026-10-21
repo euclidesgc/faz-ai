@@ -218,7 +218,7 @@ it('backup pelo navegador: GET /backup/export baixa o arquivo e POST /backup/imp
   expect(file.fazai).toBe('board-export');
   expect(file.tables.cards.map((c: { title: string }) => c.title)).toEqual(['Antes do backup']);
   expect(((await notice) as Extract<HostToWebview, { type: 'notice' }>).message).toMatch(
-    /^Board exportado em Projeto-.*guarde-o com cuidado\.$/,
+    /^Board exportado em Projeto-.*guarde-o com cuidado\./,
   );
 
   // muda o board depois do export: a importação deve voltar ao estado exportado
@@ -269,7 +269,8 @@ it('backup pelo navegador: GET /backup/export baixa o arquivo e POST /backup/imp
   expect(((await imported) as Extract<HostToWebview, { type: 'boardState' }>).state.cards.map((c) => c.title)).toEqual(['Antes do backup']);
   expect(await done).toEqual({
     type: 'notice',
-    message: 'Board "Projeto" importado: 1 card(s) e 0 anexo(s). Perfis desativados para revisão local: Claude Code, Cursor, Kimi Code.',
+    message:
+      'Board "Projeto" importado: 1 card(s) e 0 anexo(s). Perfis desativados para revisão local: Claude Code, Cursor, Kimi Code. Credenciais dos perfis não vêm no arquivo: configure-as de novo neste computador.',
   });
   page.close();
 });

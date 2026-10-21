@@ -39,6 +39,17 @@ function makeRouter(db: Awaited<ReturnType<typeof openInMemory>>) {
   });
 }
 describe('credenciais locais e referências MCP', () => {
+  it('o editor legado não lê nem sobrescreve o arquivo MCP nativo com segredos', async () => {
+    const db = await openInMemory(wasm);
+    const router = makeRouter(db);
+    const file = path.join(dir, '.mcp.json');
+    const content = JSON.stringify({ mcpServers: { private: definition } });
+    fs.writeFileSync(file, content);
+    router.refreshHarness();
+    expect(() => router.readHarnessFile(file)).toThrow('Configurações MCP');
+    expect(fs.readFileSync(file, 'utf8')).toBe(content);
+    db.close();
+  });
   it('logs e resposta final não devolvem credenciais conhecidas do host', async () => {
     const db = await openInMemory(wasm);
     const router = makeRouter(db);

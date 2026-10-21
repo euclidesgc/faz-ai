@@ -17,6 +17,7 @@ function probe(o: {
   pathDirs?: string[];
   linux?: LinuxFamily | null;
   branchRenames?: EnvironmentProbe['branchRenames'];
+  extra?: Partial<EnvironmentProbe>;
 }): EnvironmentProbe & { ran: string[] } {
   const ran: string[] = [];
   return {
@@ -38,6 +39,7 @@ function probe(o: {
     },
     firstLine: (f) => o.files?.[f]?.split('\n')[0] ?? null,
     exists: (f) => f in (o.files ?? {}),
+    ...o.extra,
   };
 }
 
@@ -90,6 +92,7 @@ describe('Diagnóstico do ambiente', () => {
           ['harness-agents', 'ok'],
           ['harness-rules', 'ok'],
           ['harness-missing', 'ok'],
+          ['harness-isolation', 'ok'],
         ],
       ],
     ]);
@@ -165,6 +168,7 @@ describe('Diagnóstico do ambiente', () => {
       ['harness-agents', 'ok'],
       ['harness-rules', 'missing'],
       ['harness-missing', 'missing'],
+      ['harness-isolation', 'ok'],
     ]);
     // recomendação: só as faltas dentro dele contam, e sem o inventário fica pulado
     expect(missingCount([r.harness])).toBe(2);
@@ -381,5 +385,46 @@ describe('Diagnóstico do ambiente', () => {
   it('pronto não sugere instalar', async () => {
     const r = await checkEnvironment(probe({ commands: { node: '/usr/bin/node' }, outputs: { '/usr/bin/node --version': 'v22.3.0' } }));
     expect(find(r.required, 'node').install).toBeUndefined();
+  });
+});
+
+describe('Diagnóstico: próxima execução e limites (#880)', () => {
+  const simulation = { decision: { action: 'auto', reason: 'rule' }, hypothetical: true, problems: [], requested: { state: 'blocked' } };
+  it('sem simulador nem limites na base, nextRun e limits ficam null e o regime é exclusivo', async () => {
+    const r = await checkEnvironment(probe({ health: [health('claude')] }));
+    expect(r.nextRun).toBeNull();
+    expect(r.limits).toBeNull();
+    expect(r.regime).toBe('exclusive');
+  });
+  it('usa o simulador e os limites da base e lista os perfis em uso não disponíveis', async () => {
+    const asked: boolean[] = [];
+    const limits = { branchProcesses: 2 };
+    const r = await checkEnvironment(
+      probe({
+        health: [health('claude'), health('cursor', false), health('kimi', false)],
+        extra: {
+          profilesInUse: ['claude', 'cursor'],
+          simulateNextRun: (available) => {
+            asked.push(available);
+            return simulation as never;
+          },
+          effectiveLimits: () => limits as never,
+        },
+      }),
+    );
+    expect(asked).toEqual([true]);
+    expect(r.nextRun?.simulation).toBe(simulation);
+    expect(r.nextRun?.blockedInUse).toEqual([{ id: 'cursor', name: expect.any(String), problem: 'cli' }]);
+    expect(r.limits).toBe(limits);
+  });
+  it('padrão indisponível chega ao simulador como indisponível', async () => {
+    const asked: boolean[] = [];
+    await checkEnvironment(
+      probe({
+        health: [health('claude', false)],
+        extra: { simulateNextRun: (a) => (asked.push(a), null) },
+      }),
+    );
+    expect(asked).toEqual([false]);
   });
 });

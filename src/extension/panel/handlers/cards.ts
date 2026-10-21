@@ -243,6 +243,64 @@ function trashMany(ctx: BoardContext, msg: MessageOf<'card.trashMany'>): void {
   for (const story of liveStoriesOf(ctx, msg.cardIds)) ctx.cards.trash(story.id);
 }
 
+/** Os cards do lote que estão na lixeira, na ordem em que a mensagem listou os ids. */
+function trashedOf(ctx: BoardContext, cardIds: string[]): string[] {
+  const trashed = new Set(
+    ctx
+      .state()
+      .cards.filter((c) => c.deletedAt !== null)
+      .map((c) => c.id),
+  );
+  return cardIds.filter((id) => trashed.has(id));
+}
+
+/**
+ * Restaura várias lixeiras de uma vez. Um item que falha (ex.: sub-tarefa cuja história ainda está na lixeira,
+ * listada antes dela) não interrompe o lote: o erro vira só a ausência do efeito naquele card.
+ */
+function restoreMany(ctx: BoardContext, msg: MessageOf<'card.restoreMany'>): void {
+  for (const id of trashedOf(ctx, msg.cardIds)) {
+    try {
+      ctx.cards.restore(id);
+    } catch {
+      // pai ainda na lixeira: a sub-tarefa volta junto com a história, quando ela for restaurada
+    }
+  }
+}
+
+/**
+ * Apaga de vez várias lixeiras de uma vez, com os filhos. Um id já removido por um item anterior do lote
+ * (ex.: a sub-tarefa listada depois da história que a levou junto) não tem efeito: `deletePermanent` devolve
+ * vazio para ele.
+ */
+function deletePermanentMany(ctx: BoardContext, msg: MessageOf<'card.deletePermanentMany'>): void {
+  for (const id of trashedOf(ctx, msg.cardIds)) ctx.cards.deletePermanent(id).forEach((removed) => ctx.store.removeCard(removed));
+}
+
+/**
+ * Aplica `act` a cada card arquivado do lote, na ordem da mensagem. Repetidos, inexistentes, não arquivados
+ * e na lixeira ficam de fora. O estado é lido uma vez (um snapshot por id custaria caro com centenas de
+ * cards) e não precisa ser relido: `restoreArchived` e `trash` são idempotentes, então a sub-tarefa listada
+ * depois da história (que já a levou junto) vira no-op.
+ */
+function eachArchived(ctx: BoardContext, cardIds: string[], act: (id: string) => void): void {
+  const byId = new Map(ctx.state().cards.map((c) => [c.id, c]));
+  for (const id of new Set(cardIds)) {
+    const card = byId.get(id);
+    if (card && card.archivedAt != null && card.deletedAt == null) act(id);
+  }
+}
+
+/** Restaura vários cards arquivados, com a regra do Restaurar individual (`restoreArchived`) em cada um. */
+function unarchiveMany(ctx: BoardContext, msg: MessageOf<'card.unarchiveMany'>): void {
+  eachArchived(ctx, msg.cardIds, (id) => ctx.cards.restoreArchived(id));
+}
+
+/** Manda vários cards arquivados para a lixeira; `trash` na história leva as sub-tarefas arquivadas. */
+function trashArchivedMany(ctx: BoardContext, msg: MessageOf<'card.trashArchivedMany'>): void {
+  eachArchived(ctx, msg.cardIds, (id) => ctx.cards.trash(id));
+}
+
 /**
  * Move várias histórias de uma vez para a mesma coluna. `cancelChildren: true` sempre: cobre RF13
  * (cancelar as sub-tarefas em aberto do lote ao mover para uma coluna de cancelamento, sem perguntar
@@ -272,6 +330,11 @@ export function createCard(ctx: BoardContext, input: { typeId: string; columnId:
 export const cardHandlers = {
   'card.create': (msg, ctx) => {
     createCard(ctx, msg);
+    return true;
+  },
+  'card.duplicate': (msg, ctx) => {
+    const id = ctx.cards.duplicate(ctx.boardId, msg.cardId, msg.title);
+    applySuggestion(ctx, id, null);
     return true;
   },
   'card.update': (msg, ctx) => {
@@ -353,6 +416,22 @@ export const cardHandlers = {
   },
   'card.trashMany': (msg, ctx) => {
     trashMany(ctx, msg);
+    return true;
+  },
+  'card.restoreMany': (msg, ctx) => {
+    restoreMany(ctx, msg);
+    return true;
+  },
+  'card.deletePermanentMany': (msg, ctx) => {
+    deletePermanentMany(ctx, msg);
+    return true;
+  },
+  'card.unarchiveMany': (msg, ctx) => {
+    unarchiveMany(ctx, msg);
+    return true;
+  },
+  'card.trashArchivedMany': (msg, ctx) => {
+    trashArchivedMany(ctx, msg);
     return true;
   },
   'card.moveMany': (msg, ctx, { byAi }) => {
