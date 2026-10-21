@@ -37,7 +37,7 @@ describe('GitSettings dentro do editor', () => {
 
   it('mudar o modo de Git grava o patch do board', async () => {
     show();
-    await choose(screen.getByRole('combobox', { name: 'Onde a IA mexe no código' }), 'Branch por história');
+    await choose(screen.getByRole('combobox', { name: 'Onde a IA mexe no código' }), 'Branch na própria pasta');
     expect(lastSent('settings.board.update').patch).toEqual({ git: { mode: 'branch' } });
   });
 

@@ -180,38 +180,36 @@ it.skipIf(process.platform === 'win32')(
   },
 );
 
-it.skipIf(process.platform === 'win32')('comandos de ida e volta entre o board e o Settings do editor', async () => {
-  const { deactivate } = await activateExtension();
-  const opened: unknown[][] = [];
-  fake.commands.set('workbench.action.openSettings', (...args) => void opened.push(args));
+it.skipIf(process.platform === 'win32')(
+  'o comando das configurações do board abre a tela, e o do Settings do editor não existe mais',
+  async () => {
+    const { deactivate } = await activateExtension();
+    expect(fake.commands.has('fazai.openIdeSettings')).toBe(false);
 
-  await fake.commands.get('fazai.openIdeSettings')!();
-  await fake.commands.get('fazai.openIdeSettings')!('fazai.appearance.language');
-  expect(opened).toEqual([['@ext:euclidesgc.faz-ai'], ['@id:fazai.appearance.language']]);
+    // sem painel: o comando abre o board e a mensagem espera o ready
+    await fake.commands.get('fazai.openBoardSettings')!({ tab: 'harness' });
+    const { webview } = fake.panels[0]!;
+    expect(webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings')).toBe(false);
+    webview.receive({ type: 'ready' });
+    await wait(() => webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings'), 'aba enviada ao painel');
+    expect(webview.posted.find((m) => (m as { type: string }).type === 'ui.openSettings')).toEqual({
+      type: 'ui.openSettings',
+      tab: 'harness',
+      section: undefined,
+    });
 
-  // sem painel: o comando abre o board e a mensagem espera o ready
-  await fake.commands.get('fazai.openBoardSettings')!({ tab: 'harness' });
-  const { webview } = fake.panels[0]!;
-  expect(webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings')).toBe(false);
-  webview.receive({ type: 'ready' });
-  await wait(() => webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings'), 'aba enviada ao painel');
-  expect(webview.posted.find((m) => (m as { type: string }).type === 'ui.openSettings')).toEqual({
-    type: 'ui.openSettings',
-    tab: 'harness',
-    section: undefined,
-  });
+    // painel aberto: posta na hora; aba inválida cai na padrão
+    await fake.commands.get('fazai.openBoardSettings')!({ tab: 'nada' });
+    expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
+    await fake.commands.get('fazai.openBoardSettings')!();
+    expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
 
-  // painel aberto: posta na hora; aba inválida cai na padrão
-  await fake.commands.get('fazai.openBoardSettings')!({ tab: 'nada' });
-  expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
-  await fake.commands.get('fazai.openBoardSettings')!();
-  expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
+    await fake.commands.get('fazai.openEnvironment')!();
+    expect(webview.posted.at(-1)).toEqual({ type: 'ui.openView', view: 'environment' });
 
-  await fake.commands.get('fazai.openEnvironment')!();
-  expect(webview.posted.at(-1)).toEqual({ type: 'ui.openView', view: 'environment' });
-
-  await deactivate();
-});
+    await deactivate();
+  },
+);
 
 it.skipIf(process.platform === 'win32')('abrir o board importa uma vez o valor que a pessoa tinha gravado no Settings', async () => {
   fakeConfig.values.global['fazai.appearance.theme'] = 'dark';

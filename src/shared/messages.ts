@@ -63,7 +63,6 @@ export type WebviewToHost =
   /** abre este board no navegador, fora do editor */
   | { type: 'ui.openInBrowser' }
   /** pede ao editor para abrir o Settings nativo filtrado no Faz AI, ou numa chave (só faz sentido dentro do editor) */
-  | { type: 'ui.openIdeSettings'; key?: string }
   /** a tela Git pede para detectar de novo a branch principal */
   | { type: 'git.main.refresh' }
   /** a resposta ao aviso de renomeação da principal ou da develop (`from` e `to` são os do pedido que a pessoa viu): renomear, desfazer ou dispensar o resultado */

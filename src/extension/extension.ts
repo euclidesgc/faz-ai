@@ -334,9 +334,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
     vscode.commands.registerCommand('fazai.openBoard', () => openBoard()),
     vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard({ type: 'ui.openCard', cardId })),
-    vscode.commands.registerCommand('fazai.openIdeSettings', (key?: string) =>
-      vscode.commands.executeCommand('workbench.action.openSettings', key ? `@id:${key}` : '@ext:euclidesgc.faz-ai'),
-    ),
     vscode.commands.registerCommand('fazai.openBoardSettings', (args?: { tab?: unknown; section?: string }) =>
       openBoard({ type: 'ui.openSettings', tab: toSettingsTab(args?.tab), section: args?.section }),
     ),
