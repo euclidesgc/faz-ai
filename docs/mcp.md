@@ -120,12 +120,25 @@ harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_ski
 `set_skill_enabled`, `delete_skill`…).
 
 `get_models.profiles` lista os perfis de CLI e seus IDs, sem comando, configuração ou ambiente
-privado. `set_ai_tool` recebe o ID de um perfil ligado; não cria, edita, revisa nem ativa perfis.
+privado. O prefixo do `value` escolhe o perfil de CLI que executa o card; sem modelo no card, no agente
+nem na regra, vale o perfil padrão. `set_ai_tool` define esse **perfil padrão**: recebe o ID de um perfil
+ligado e não cria, edita, revisa nem ativa perfis.
 Uma cópia usa o catálogo da origem. Para um perfil personalizado, os modelos podem ser cadastrados
 à mão; o campo Modelo também aceita “Outro modelo…” sem cadastro. O valor é
 `<perfil>:<modelo>@<esforço>` (sem `@<esforço>` quando não houver esforço). O perfil personalizado
 retorna saída em texto e consumo/custo desconhecidos, nunca zero presumido. Testar o perfil na
 interface usa a assinatura e uma resposta OK não comprova isolamento, permissões ou MCP.
+
+O bloco `model` do `get_card` é o alvo que de fato executa o card, resolvido na ordem Modelo do card,
+modelo do agente, regra de modelo (mesmo com o preenchimento automático desligado) e perfil padrão:
+`{ tool, model, effort, label, value, from, note }`. `tool` é o **perfil de CLI** que executa (não o
+agente) e `from` é `'card' | 'agent' | 'rule'`; no perfil padrão sem modelo o bloco não vem. Numa escolha
+explícita inválida (perfil desligado, modelo fora do catálogo, esforço inexistente) o bloco traz o valor
+escolhido, o `from` e `blocked: { reason, message }` (`profile-unavailable`, `model-unknown` ou
+`effort-invalid`), sem cair para o nível seguinte. `execution` (o que o board impõe) segue o perfil que
+executa. `get_execution_policies` lê as políticas de execução e troca de alvo (regra vencedora, destinos,
+limites e revisão), só leitura e sem segredos; criar, revisar e ativar política é ação da pessoa nas
+Configurações → Ferramentas de IA.
 
 Toda sessão recebe as instruções do servidor: o ciclo do card (por onde começar, status, revisão,
 modelo do card, rules e skills obrigatórias e pendências com a pessoa) em menos de 2.048 caracteres,
@@ -418,7 +431,7 @@ O schema 41 acrescenta definições e histórico de políticas. A importação f
 
 A webview e o navegador usam `executionPolicy.read` (biblioteca ou histórico paginado) e `executionPolicy.simulate` com respostas correlacionadas por `requestId`. A simulação usa uma cópia do rascunho e não grava, resolve segredos, gera recibos nem inicia CLI. Instalação, credenciais e admissão no cenário são hipóteses declaradas, não estado comprovado do host. O catálogo contém apenas metadados dos providers integrados.
 
-A reserva legada de `ModelRule.fallback` não decide execução: ao abrir o board, salvar regras ou importar, vira proposta `legacy-<regra>` (desligada, pendente, versão 1; idempotente, sem migração de schema), e `set_model_rules` recusa `fallback`. `settings.executionPolicy.save` e `settings.executionPolicy.remove` exigem ação da pessoa e revisão otimista; IA, MCP externo e tokens de execução são recusados. A UI permite salvar pendente ou confirmar revisão após comparar todas as condições/destinos/limites, preserva o rascunho em conflitos e permite recarregar a versão atual para nova comparação. Remoção cria revisão desativada e mantém o histórico. Rascunhos inválidos para o catálogo podem ser desativados ou removidos. Não foram adicionadas ferramentas MCP de escrita/ativação. A integração do avaliador com as inferências e a prévia Próxima execução continua pendente.
+A reserva legada de `ModelRule.fallback` não decide execução: ao abrir o board, salvar regras ou importar, vira proposta `legacy-<regra>` (desligada, pendente, versão 1; idempotente, sem migração de schema), e `set_model_rules` recusa `fallback`. `settings.executionPolicy.save` e `settings.executionPolicy.remove` exigem ação da pessoa e revisão otimista; IA, MCP externo e tokens de execução são recusados. A UI permite salvar pendente ou confirmar revisão após comparar todas as condições/destinos/limites, preserva o rascunho em conflitos e permite recarregar a versão atual para nova comparação. Remoção cria revisão desativada e mantém o histórico. Rascunhos inválidos para o catálogo podem ser desativados ou removidos. Não há ferramentas MCP de escrita/ativação: só `get_execution_policies`, de leitura. Runner, chat e assistentes decidem a troca de alvo pelo mesmo avaliador da prévia **Próxima execução**. O assistente de IA do editor (criar, sugerir fallbacks, revisar conflitos) só devolve uma proposta validada, sem segredos; não salva nem liga política.
 
 
 ### Perfis de CLI persistidos

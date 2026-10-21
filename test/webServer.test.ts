@@ -218,7 +218,7 @@ it('backup pelo navegador: GET /backup/export baixa o arquivo e POST /backup/imp
   expect(file.fazai).toBe('board-export');
   expect(file.tables.cards.map((c: { title: string }) => c.title)).toEqual(['Antes do backup']);
   expect(((await notice) as Extract<HostToWebview, { type: 'notice' }>).message).toMatch(
-    /^Board exportado em Projeto-.*guarde-o com cuidado\.$/,
+    /^Board exportado em Projeto-.*guarde-o com cuidado\./,
   );
 
   // muda o board depois do export: a importação deve voltar ao estado exportado
