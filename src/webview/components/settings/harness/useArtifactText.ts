@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ArtifactKind } from '../../../../shared/artifacts';
+import type { McpServerView } from '../../../../shared/messages';
 import { onHostMessage, postToHost } from '../../../vscode';
 import { t } from '../../../i18n';
 
@@ -8,6 +9,8 @@ export const ARTIFACT_READ_TIMEOUT_MS = 8000;
 
 export interface ArtifactText {
   text: string | null;
+  /** só no MCP: a definição com os valores secretos mascarados pelo host */
+  server?: McpServerView | null;
   error: string | null;
   loading: boolean;
 }
@@ -29,7 +32,11 @@ export function useArtifactText(kind: ArtifactKind, name: string | undefined, fi
       if (msg.type !== 'harness.artifact.readResult' || msg.requestId !== requestId) return;
       off();
       window.clearTimeout(timer);
-      setState(msg.error ? { text: null, error: msg.error, loading: false } : { text: msg.text ?? '', error: null, loading: false });
+      setState(
+        msg.error
+          ? { text: null, error: msg.error, loading: false }
+          : { text: msg.text ?? '', server: msg.server ?? null, error: null, loading: false },
+      );
     });
     const timer = window.setTimeout(() => {
       off();

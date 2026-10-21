@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { confirmLast, lastSent, posted, renderThemed, seedBoard, sentOf } from './setup';
+import { choose, confirmLast, lastSent, posted, renderThemed, seedBoard, sentOf } from './setup';
 import type { ArtifactKind, BoardArtifact } from '../../src/shared/artifacts';
 import type { HostToWebview } from '../../src/shared/messages';
 import type { BoardState } from '../../src/shared/model';
+import { McpServerEditor } from '../../src/webview/components/settings/harness/McpServerEditor';
 import { RuleEditor } from '../../src/webview/components/settings/harness/RuleEditor';
 import { SkillEditor } from '../../src/webview/components/settings/harness/SkillEditor';
 import { useBoardStore } from '../../src/webview/store/boardStore';
@@ -223,5 +224,109 @@ describe('editor de skill', () => {
       via: 'manual',
       body: '---\nname: nova-skill\ndescription: "Faz algo."\n---\n\n# corpo\n',
     });
+  });
+});
+
+describe('editor de servidor MCP', () => {
+  it('cria um servidor por comando', async () => {
+    renderThemed(<McpServerEditor onClose={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Salvar' })).toBeDisabled();
+    await userEvent.type(screen.getByRole('textbox', { name: 'Nome' }), 'github');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Comando' }), 'npx');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Argumentos' }), '-y\npkg');
+    await userEvent.click(screen.getByRole('button', { name: 'Acrescentar linha' }));
+    await userEvent.type(screen.getByLabelText('Nome em Variáveis de ambiente'), 'TOKEN');
+    await userEvent.type(screen.getByLabelText('Valor de TOKEN'), 'abc');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(lastSent('harness.artifact.save')).toEqual({
+      type: 'harness.artifact.save',
+      kind: 'mcp',
+      name: 'github',
+      server: { name: 'github', transport: 'stdio', command: 'npx', args: ['-y', 'pkg'], env: { TOKEN: 'abc' }, url: '', headers: {} },
+      keepSecrets: [],
+      via: 'manual',
+    });
+  });
+
+  it('cria um servidor por endereço', async () => {
+    renderThemed(<McpServerEditor onClose={() => {}} />);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Nome' }), 'docs');
+    await choose(screen.getByRole('combobox', { name: 'Tipo' }), 'Endereço (HTTP)');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Endereço' }), 'https://exemplo.dev/mcp');
+    await userEvent.click(screen.getByRole('button', { name: 'Acrescentar linha' }));
+    await userEvent.type(screen.getByLabelText('Nome em Cabeçalhos'), 'Authorization');
+    await userEvent.type(screen.getByLabelText('Valor de Authorization'), 'Bearer x');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(lastSent('harness.artifact.save')).toMatchObject({
+      kind: 'mcp',
+      name: 'docs',
+      keepSecrets: [],
+      server: { transport: 'http', url: 'https://exemplo.dev/mcp', command: '', env: {}, headers: { Authorization: 'Bearer x' } },
+    });
+  });
+
+  it('editar: o valor guardado não aparece e salvar sem digitar manda o nome em keepSecrets', async () => {
+    setArtifacts([artifact('mcp', 'api')]);
+    renderThemed(<McpServerEditor server={artifact('mcp', 'api')} onClose={() => {}} />);
+    const read = lastSent('harness.artifact.read');
+    expect(read).toMatchObject({ kind: 'mcp', name: 'api' });
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: {
+            type: 'harness.artifact.readResult',
+            requestId: read.requestId,
+            server: { name: 'api', transport: 'stdio', command: 'node', args: ['s.js'], env: { TOKEN: '' }, url: '', headers: {} },
+          } satisfies HostToWebview,
+        }),
+      );
+    });
+    expect(await screen.findByDisplayValue('node')).toBeInTheDocument();
+    expect(screen.getByLabelText('Valor de TOKEN')).toHaveValue('');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(lastSent('harness.artifact.save')).toMatchObject({
+      kind: 'mcp',
+      name: 'api',
+      keepSecrets: ['TOKEN'],
+      server: { command: 'node', args: ['s.js'], env: { TOKEN: '' } },
+    });
+    expect(lastSent('harness.artifact.save')).not.toHaveProperty('previous');
+  });
+
+  it('digitar um valor substitui o guardado e tira o nome de keepSecrets', async () => {
+    setArtifacts([artifact('mcp', 'api')]);
+    renderThemed(<McpServerEditor server={artifact('mcp', 'api')} onClose={() => {}} />);
+    const read = lastSent('harness.artifact.read');
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: {
+            type: 'harness.artifact.readResult',
+            requestId: read.requestId,
+            server: { name: 'api', transport: 'stdio', command: 'node', args: [], env: { TOKEN: '' }, url: '', headers: {} },
+          } satisfies HostToWebview,
+        }),
+      );
+    });
+    await screen.findByDisplayValue('node');
+    await userEvent.type(screen.getByLabelText('Valor de TOKEN'), 'novo');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(lastSent('harness.artifact.save')).toMatchObject({ keepSecrets: [], server: { env: { TOKEN: 'novo' } } });
+  });
+
+  it('nome inválido ou repetido desabilita Salvar', async () => {
+    setArtifacts([artifact('mcp', 'api')]);
+    renderThemed(<McpServerEditor onClose={() => {}} />);
+    const name = screen.getByRole('textbox', { name: 'Nome' });
+    await userEvent.type(screen.getByRole('textbox', { name: 'Comando' }), 'npx');
+    await userEvent.type(name, 'nome inválido');
+    expect(screen.getByRole('button', { name: 'Salvar' })).toBeDisabled();
+    await userEvent.clear(name);
+    await userEvent.type(name, 'api');
+    expect(screen.getByRole('button', { name: 'Salvar' })).toBeDisabled();
+    expect(screen.getByText('Já existe um servidor com este nome.')).toBeInTheDocument();
+    await userEvent.clear(name);
+    await userEvent.type(name, 'outro');
+    expect(screen.getByRole('button', { name: 'Salvar' })).toBeEnabled();
   });
 });

@@ -1120,4 +1120,20 @@ export const harness: Record<string, string> = {
   'Os arquivos são criados vazios na skill; escreva o conteúdo depois, no editor.':
     'The files are created empty in the skill; write their contents later, in the editor.',
   'O host não respondeu à leitura. Feche e abra o editor de novo.': 'The host did not answer the read. Close and reopen the editor.',
+  'Dê um nome ao servidor.': 'Give the server a name.',
+  'Use letras, números, hífen, ponto ou sublinhado (até 64).': 'Use letters, numbers, hyphens, dots or underscores (up to 64).',
+  'O nome faz-ai é reservado ao MCP do board.': 'The name faz-ai is reserved for the board MCP.',
+  'Já existe um servidor com este nome.': 'A server with this name already exists.',
+  'Os valores guardados não aparecem. Deixe vazio para mantê-lo; digite para substituí-lo.':
+    'Saved values are never shown. Leave empty to keep it; type to replace it.',
+  'Nome em {label}': 'Name in {label}',
+  'Valor de {key}': 'Value of {key}',
+  'Guardado: vazio mantém': 'Saved: empty keeps it',
+  valor: 'value',
+  'Remover {key}': 'Remove {key}',
+  'Acrescentar linha': 'Add row',
+  'Editar servidor MCP': 'Edit MCP server',
+  'Lendo o servidor…': 'Reading the server…',
+  'Não ponha segredos nos argumentos: use as variáveis de ambiente.': 'Do not put secrets in the arguments: use environment variables.',
+  'Há nomes repetidos nas variáveis ou nos cabeçalhos.': 'There are repeated names in the variables or headers.',
 };
