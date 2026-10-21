@@ -684,7 +684,13 @@ pelo navegador.
   em cada fase, quantas a pessoa aprovou **de primeira** (a primeira resposta a um card naquela fase
   foi a aprovação) e quantas voltaram com **pedido de ajuste**, também pelo modelo da execução que pediu
   a revisão, e quantas histórias concluídas no período já têm um **Bug vinculado**. Só conta a resposta
-  de uma pessoa: a aprovação automática do modo autônomo não é revisão.
+  de uma pessoa: a aprovação automática do modo autônomo não é revisão. Por isso o bloco traz também
+  os **sinais da IA**, medidos sem revisão de pessoa: **correções na Revisão** (commits em execuções
+  da fase Revisão), **`npm test` com falha** e **commits depois do pull request**, no resumo e por
+  fase, cada um com a parte feita em execuções do modo autônomo; a linha de bugs diz quantas das
+  histórias concluídas foram autônomas. São aproximações (commit ≈ correção), valem só para o Claude
+  Code desde o registro de comandos de Bash, e a fase Revisão é reconhecida pelo nome. Sem execução
+  com registro de Bash no período, o sinal fica "não medido", não zero.
 - **Fases mais caras e Cards mais caros.** Dois rankings lado a lado, em tabelas que você ordena por
   tokens, execuções ou tempo de IA clicando no cabeçalho (ou com Enter/Espaço). O padrão são os
   tokens quando o período tem tokens medidos e o tempo de IA quando não tem, e a tela escreve o
@@ -732,8 +738,9 @@ economizar tokens.
 - Tokens contam em toda execução medida, do Claude Code e do Cursor. A tabela não traz custo em dólar.
 - Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`. O retrabalho está:
   com `rework: true` (e, se quiser, `start_date` e `end_date`), a resposta traz as revisões, as
-  aprovações de primeira e os pedidos de ajuste por fase e por modelo, e as histórias concluídas com bug
-  vinculado.
+  aprovações de primeira e os pedidos de ajuste por fase e por modelo, as histórias concluídas com bug
+  vinculado e os sinais da IA (correções na Revisão, `npm test` com falha, commits depois do PR), cada
+  um com a parte do modo autônomo; "não medidos" quando não há execução com registro de Bash.
 - Valores não medidos aparecem como "-" (nunca 0).
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
   (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm detalhe e só agregam os

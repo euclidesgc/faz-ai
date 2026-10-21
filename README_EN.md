@@ -710,6 +710,13 @@ and also in the board opened in the browser.
   to a card in that phase was the approval) and how many came back with a **change request**, also by
   the model of the run that asked for the review, and how many stories done in the period already have
   a linked **Bug**. Only a person's answer counts: autonomous mode's automatic approval is not a review.
+  That is why the block also brings the **AI signals**, measured without a person's review: **fixes in
+  Review** (commits in runs of the Review phase), **failed `npm test`** and **commits after the pull
+  request**, in the summary and per phase, each with the part done in autonomous-mode runs; the bugs
+  line says how many of the done stories were autonomous. They are approximations (commit ≈ fix),
+  apply only to Claude Code since Bash commands started being recorded, and the Review phase is
+  recognized by its name. With no run with recorded Bash in the period, the signal is "not measured",
+  not zero.
 - **Most expensive phases and Most expensive cards** ("Fases mais caras" / "Cards mais caros"). Two
   rankings side by side, in tables you sort by tokens, runs or AI time by clicking the header
   (or with Enter/Space). The default is tokens when the period has measured tokens and AI time when
@@ -757,8 +764,9 @@ used most?". The tool replies with a compact table, optimized to save tokens.
 - Tokens count in every measured run, from Claude Code and from Cursor. The table has no dollar cost.
 - The panel's times (permanence per phase and lead time) are not in `get_metrics`. Rework is: with
   `rework: true` (and, if you want, `start_date` and `end_date`), the answer brings the reviews, the
-  first-try approvals and the change requests per phase and per model, and the done stories with a
-  linked bug.
+  first-try approvals and the change requests per phase and per model, the done stories with a
+  linked bug and the AI signals (fixes in Review, failed `npm test`, commits after the PR), each with
+  the autonomous-mode part; "not measured" when there is no run with recorded Bash.
 - Unmeasured values appear as "-" (never 0).
 - Always tells you when the board's history started and which periods have only monthly totals
   (without per-run detail). Periods outside the retention window (6 months by default) have no detail and aggregate only

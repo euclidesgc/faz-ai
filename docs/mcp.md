@@ -99,7 +99,10 @@ O valor da Fase de uma sub-tarefa é gravado pela IA (`create_card` ou `update_c
 
 Também pelo MCP: uso, tokens e tempo do log (`get_metrics`, com `group_by` por fase, modelo, ferramenta,
 agente, skill, ferramenta usada, ferramenta MCP ou `bash_command`: o comando-base de cada chamada de
-Bash, sem argumentos, só do Claude Code), catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
+Bash, sem argumentos, só do Claude Code; com `rework: true`, o retrabalho do período: revisões, aprovações
+de primeira, pedidos de ajuste, histórias concluídas com bug e os sinais da IA — correções na Revisão,
+`npm test` com falha e commits depois do PR — cada um com a parte do modo autônomo, "não medidos" sem
+registro de Bash), catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
 `set_model_rules`), padrões por tipo de card (`update_card_type`), recriar o board (`reset_board`) e o
 harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,
 `set_skill_enabled`, `delete_skill`…).
