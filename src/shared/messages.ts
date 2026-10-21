@@ -335,6 +335,7 @@ export type WebviewToHost =
   | { type: 'harness.library.save'; input: LibraryArtifactInput }
   | { type: 'executionPolicy.read'; requestId: string; id?: string; beforeRevision?: number }
   | { type: 'executionPolicy.simulate'; requestId: string; scenario: PolicyScenario }
+  | { type: 'executionPolicy.assist'; requestId: string; input: import('./policyAssistant').PolicyAssistInput }
   | { type: 'settings.executionPolicy.save'; policy: ExecutionPolicy; expectedRevision: number; reviewed: boolean }
   | { type: 'settings.executionPolicy.remove'; id: string; expectedRevision: number }
   | { type: 'contextPlanning.save'; input: ContextPlanningWrite }

@@ -172,4 +172,45 @@ export const policies: Record<string, string> = {
   'Destino inválido': 'Invalid target',
   'Cenário de política inválido.': 'Invalid policy scenario.',
   'Página de histórico inválida.': 'Invalid history page.',
+  'Criar com ajuda de IA': 'Create with AI help',
+  'Sugerir fallbacks': 'Suggest fallbacks',
+  'Revisar conflitos': 'Review conflicts',
+  'Destinos admitidos': 'Admitted targets',
+  'Destinos indisponíveis': 'Unavailable targets',
+  'A IA não devolveu uma proposta.': 'The AI did not return a proposal.',
+  'A IA recebe só o catálogo, os perfis e as políticas, sem segredos, e devolve uma proposta. Nada é salvo nem ligado até você revisar e confirmar. Sem IA disponível, o editor manual continua igual.':
+    'The AI receives only the catalog, profiles and policies, without secrets, and returns a proposal. Nothing is saved or enabled until you review and confirm. Without an available AI, the manual editor stays the same.',
+  'Objetivo da política': 'Policy goal',
+  'Consultando a IA…': 'Asking the AI…',
+  'Pedir proposta': 'Ask for a proposal',
+  'Fechar assistente': 'Close assistant',
+  'Explicação da IA': 'AI explanation',
+  'Conflitos nas políticas salvas': 'Conflicts in saved policies',
+  'Rascunho proposto': 'Proposed draft',
+  Diferenças: 'Differences',
+  'Exemplos na simulação local': 'Examples in the local simulation',
+  'Cenários hipotéticos com o rascunho ligado só na simulação. Não comprovam admissão nem credenciais.':
+    'Hypothetical scenarios with the draft enabled only in the simulation. They do not prove admission or credentials.',
+  'A IA não propôs alterações no rascunho.': 'The AI proposed no changes to the draft.',
+  'Usar proposta no rascunho': 'Use proposal in the draft',
+  'Abrir proposta no editor': 'Open proposal in the editor',
+  'Pedido de assistência de política inválido.': 'Invalid policy assistance request.',
+  'O objetivo é grande demais para analisar.': 'The goal is too large to analyze.',
+  'Descreva o objetivo da política.': 'Describe the policy goal.',
+  'Abra uma política no editor para sugerir fallbacks.': 'Open a policy in the editor to suggest fallbacks.',
+  'O texto parece conter um segredo. Remova-o antes de pedir ajuda à IA.':
+    'The text seems to contain a secret. Remove it before asking the AI for help.',
+  'Há políticas demais para o assistente analisar de uma vez.': 'There are too many policies for the assistant to analyze at once.',
+  'A IA não respondeu no formato esperado. Tente novamente.': 'The AI did not answer in the expected format. Try again.',
+  'Sem rascunho aberto, a revisão de conflitos só explica.': 'With no open draft, the conflict review only explains.',
+  'A política proposta pela IA foi recusada: formato inválido.': 'The AI-proposed policy was refused: invalid format.',
+  'A política proposta pela IA foi recusada: o validador a considera inválida.':
+    'The AI-proposed policy was refused: the validator considers it invalid.',
+  'A política proposta pela IA foi recusada: usa perfil ou modelo que não está no catálogo.':
+    'The AI-proposed policy was refused: it uses a profile or model that is not in the catalog.',
+  'A política proposta pela IA foi recusada: reduziria o isolamento do que a pessoa definiu.':
+    'The AI-proposed policy was refused: it would reduce the isolation of what you defined.',
+  'A política proposta pela IA foi recusada: cria prioridade ambígua, ciclo ou destino inválido.':
+    'The AI-proposed policy was refused: it creates an ambiguous priority, a cycle or an invalid target.',
+  'A resposta da IA foi descartada por parecer conter um segredo.': 'The AI answer was discarded because it seems to contain a secret.',
 };

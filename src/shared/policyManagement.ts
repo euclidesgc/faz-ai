@@ -47,6 +47,7 @@ export interface PolicyReply {
   history?: ExecutionPolicyRecord[];
   nextBefore?: number | null;
   simulation?: PolicySimulation;
+  assistance?: import('./policyAssistant').PolicyAssistResult;
   error?: string;
 }
 /** Catálogo dos providers integrados. Não representa instalação, login ou admissão da CLI. */

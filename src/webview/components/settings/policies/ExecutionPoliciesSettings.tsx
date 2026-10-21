@@ -12,6 +12,7 @@ import { SettingsCard } from '../SettingsCard';
 import { PolicyEditor } from './PolicyEditor';
 import { PolicySummary } from './parts';
 import { PolicySimulation } from './PolicySimulation';
+import { PolicyAssistant } from './PolicyAssistant';
 
 const newId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
 
@@ -166,6 +167,13 @@ export function ExecutionPoliciesSettings() {
             ) : (
               <>
                 <Button onClick={newPolicy}>{t('Nova política')}</Button>
+                <PolicyAssistant
+                  modes={['create', 'conflicts']}
+                  draft={null}
+                  library={library}
+                  applyLabel={t('Abrir proposta no editor')}
+                  onApply={(initial) => setEditor({ base: null, initial })}
+                />
                 {!library.snapshot.records.length && <p>{t('Nenhuma política cadastrada.')}</p>}
                 {[...library.snapshot.records]
                   .sort((a, b) => a.policy.priority - b.policy.priority)

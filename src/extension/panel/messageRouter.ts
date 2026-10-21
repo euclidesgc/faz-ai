@@ -1,6 +1,7 @@
 import { builtinPolicyCatalog, simulatePolicyScenario, type PolicyLibrary, type PolicyScenario } from '../../shared/policyManagement';
 import { resolveContextDraft, type ContextDraftResolution } from '../../shared/contextDraftResolution';
 import type { ContextActivityTarget } from '../../shared/contextPlanning';
+import type { PolicyAssistInput, PolicyAssistResult } from '../../shared/policyAssistant';
 import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
 import { scanLibraryFolder } from '../libraryImport';
 import { agentOfArtifact } from '../../shared/artifacts';
@@ -162,6 +163,7 @@ const bridgeOnly = {
   'contextPlanning.preview': viaBridge,
   'executionPolicy.read': viaBridge,
   'executionPolicy.simulate': viaBridge,
+  'executionPolicy.assist': viaBridge,
   'backup.export': viaBridge,
   'backup.import.pick': viaBridge,
   'backup.import.cancel': viaBridge,
@@ -563,6 +565,15 @@ export class MessageRouter {
     this.notify();
   }
 
+  private policyAssistHandler?: (input: PolicyAssistInput) => Promise<PolicyAssistResult>;
+  setPolicyAssistHandler(handler: (input: PolicyAssistInput) => Promise<PolicyAssistResult>): void {
+    this.policyAssistHandler = handler;
+  }
+  /** Devolve só uma proposta: nada aqui salva, liga ou remove política. */
+  assistExecutionPolicy(input: PolicyAssistInput): Promise<PolicyAssistResult> {
+    if (!this.policyAssistHandler) return Promise.reject(new Error('A assistência de IA não está disponível neste board.'));
+    return this.policyAssistHandler(input);
+  }
   private agentAssistHandler?: (input: AgentAssistInput) => Promise<AgentAssistResult>;
   setAgentAssistHandler(handler: (input: AgentAssistInput) => Promise<AgentAssistResult>): void {
     this.agentAssistHandler = handler;

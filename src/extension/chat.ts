@@ -3,6 +3,8 @@ import { cliProblem } from '../shared/requirements';
 import type { ContextAction } from '../shared/contextPlanning';
 import { defaultTarget, targetOfValue, type RunTarget } from '../shared/runTarget';
 import type { AgentAssistInput, AgentAssistResult } from '../shared/agentAssistance';
+import type { PolicyAssistInput, PolicyAssistResult } from '../shared/policyAssistant';
+import { policyAssistancePrompt, parsePolicyAssistance } from './policyAssistant';
 import { agentAssistancePrompt, parseAgentAssistance } from './agentAssistance';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -199,6 +201,7 @@ export class ChatSession {
   ) {
     this.messages = this.load();
     router.setAgentAssistHandler((input) => this.assistAgent(input));
+    router.setPolicyAssistHandler((input) => this.assistPolicy(input));
     router.setChatHandler((msg) => {
       if (msg.type === 'chat.send') this.send(msg.text, msg.model);
       else if (msg.type === 'ai.suggestAgents') this.suggestAgents();
@@ -295,6 +298,34 @@ export class ChatSession {
         },
         failed: (error) => reject(new Error(error)),
       });
+    });
+  }
+
+  /**
+   * Assistente de políticas: a IA só lê o pedido e devolve uma proposta, que passa pelo validador antes de chegar à
+   * tela. O mesmo `start` das demais ações de apoio avalia a política JÁ SALVA (quota, fallback e admissão do
+   * executor); o rascunho nunca entra no snapshot. Sem executor admissível o erro volta e o editor manual segue livre.
+   */
+  assistPolicy(input: PolicyAssistInput): Promise<PolicyAssistResult> {
+    return new Promise((resolve, reject) => {
+      try {
+        const state = this.router.snapshot();
+        const snapshot = this.router.executionPolicyLibrary().snapshot;
+        const prompt = policyAssistancePrompt(input, state, snapshot);
+        this.start(prompt, 'board', null, 'harness-suggest', {
+          draftOnly: true,
+          done: (text) => {
+            try {
+              resolve(parsePolicyAssistance(text, input, this.router.snapshot(), this.router.executionPolicyLibrary().snapshot));
+            } catch (error) {
+              reject(error);
+            }
+          },
+          failed: (error) => reject(new Error(error)),
+        });
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 

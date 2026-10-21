@@ -22,6 +22,7 @@ const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'contextPlanning.preview',
   'executionPolicy.read',
   'executionPolicy.simulate',
+  'executionPolicy.assist',
 ]);
 
 /** O que depende de onde o board está rodando: dentro do editor ou num navegador. */
@@ -429,6 +430,18 @@ export class HostBridge {
             type: 'executionPolicy.result',
             requestId: msg.requestId,
             simulation: this.router.simulateExecutionPolicy(msg.scenario),
+          });
+        } catch (e) {
+          this.post({ type: 'executionPolicy.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'executionPolicy.assist': {
+        try {
+          this.post({
+            type: 'executionPolicy.result',
+            requestId: msg.requestId,
+            assistance: await this.router.assistExecutionPolicy(msg.input),
           });
         } catch (e) {
           this.post({ type: 'executionPolicy.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
