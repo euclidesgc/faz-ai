@@ -5,6 +5,8 @@ import type { AiProfile } from './aiProfiles';
 import type { CapabilityState, ExecutionAdmissionDecision } from './executionAdmission';
 import type { AiTool } from './harness';
 import type { InstallStep } from './environment';
+import type { Board } from './model';
+import { parseModelValue } from './models';
 
 /** Situação do cadastro: o importado espera revisão e não executa nada. */
 export type ProfileRegistration = 'enabled' | 'disabled' | 'pending-review';
@@ -130,4 +132,25 @@ export function boardAvailability(profiles: readonly ProfileHealth[]): BoardAvai
   if (enabled.some(profileAvailable)) return { blocked: false, reason: null, warnings };
   const onlyUntested = enabled.every((p) => p.problem === 'unvalidated' || p.problem === 'stale');
   return { blocked: true, reason: onlyUntested ? 'unvalidated' : 'unavailable', warnings };
+}
+
+/**
+ * Os perfis que o board usa por conta própria: o padrão, os prefixos dos modelos das regras de
+ * sugestão e os dos modelos dos agentes do board (RF19). Lê o prefixo `<perfil>:` do valor, sem
+ * resolver alvo (isso é da #620). O padrão vem primeiro, sem repetir; valor sem prefixo não entra,
+ * e perfil apagado continua na lista (quem bloqueia é o simulador).
+ */
+export function profilesInUse(board: Pick<Board, 'aiTool' | 'modelRules' | 'execProfiles'>): AiTool[] {
+  const out: AiTool[] = [board.aiTool];
+  const addPrefix = (value: string): void => {
+    const parsed = parseModelValue(value);
+    const colon = parsed?.id.indexOf(':') ?? -1;
+    if (parsed && colon > 0) {
+      const prefix = parsed.id.slice(0, colon);
+      if (!out.includes(prefix)) out.push(prefix);
+    }
+  };
+  for (const rule of board.modelRules) addPrefix(rule.model);
+  for (const agent of board.execProfiles) addPrefix(agent.model);
+  return out;
 }
