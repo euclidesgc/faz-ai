@@ -226,8 +226,6 @@ describe('toItemName', () => {
 describe('manifesto e plano pelo alvo da execução', () => {
   const opt = (tool: string, model: string): ModelOption =>
     ({ id: `${tool}:${model}`, tool, model, label: model, efforts: [], defaultEffort: null }) as ModelOption;
-  const agente = (id: string, model: string) =>
-    ({ ...defaultAgent(), id, name: id, model, isDefault: false, scope: 'project', path: `/${id}.md` }) as never;
   const cenario = (cardModel: string, ligados = ['claude', 'cursor']) => {
     const s = boardState();
     s.board.aiTool = 'claude';
