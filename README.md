@@ -429,6 +429,15 @@ responde no próprio card:
 As instruções e os modelos de documento do board padrão pedem, em cada fase, o que deixa a revisão
 do código rápida depois:
 
+- **Trilha curta para histórias pequenas.** Com a regra ligada (Configurações → Regras; desligada
+  por padrão), uma história de esforço **Baixo** ou do tipo **Bug** aprovada no Discovery, ou levada
+  adiante pelo autopiloto, vai direto ao Plan, sem PRD nem Spec, e o Plan parte do DISCOVERY. A regra
+  lê o esforço e o tipo atuais a cada avanço: se o Discovery descobre que a história é maior do que
+  parecia, a IA sobe o esforço e a história segue a trilha completa. Para forçar a trilha completa
+  numa história pequena, arraste-a (ou peça à IA que a mova com `move_card`) para o PRD ou a Spec: o
+  movimento explícito nunca é redirecionado. As colunas puladas são reconhecidas pelo documento que
+  produzem (PRD.md e SPEC.md), então renomeá-las não desliga a regra.
+
 - **Spec com o desenho do programa.** Além da arquitetura, a Spec traz os tipos e as assinaturas
   novos ou alterados, o arquivo de cada um e quem chama quem no caminho principal, com o fluxo da
   funcionalidade em diagramas Mermaid. As alternativas descartadas vêm com o motivo de cada uma.
@@ -1295,7 +1304,7 @@ compatibilidade, mas os agentes criados ou editados pelo board ficam no banco; h
 | Workflows e colunas | Quantos workflows quiser (cards independentes ou sub-tarefas), com nome editável e posição que você muda arrastando; **Nova coluna** em cada um; nomes, ordem (arrastando) e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento). Abrir e fechar workflows e colunas é feito no próprio board e fica lembrado |
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
 | Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria |
-| Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
+| Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido, trilha curta para histórias pequenas (esforço Baixo ou tipo Bug pula o PRD e a Spec) |
 | Harness | Biblioteca única de regras, skills, subagentes e MCPs, com importação por tipo, CRUD e assistentes; ferramenta, permissão, agente padrão e heartbeat (ver [Harness](#harness) e [Agentes](#agentes)) |
 | Ferramentas de IA | Perfis de CLI: ligar, escolher o padrão, duplicar, criar e testar |
 | Modelos de IA | Modelos e níveis de esforço por perfil; regras que sugerem o modelo de cada card |
