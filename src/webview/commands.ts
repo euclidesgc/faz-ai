@@ -92,9 +92,13 @@ export const ai = {
 
 export const cards = {
   create: (input: Payload<'card.create'>) => req({ type: 'card.create', ...input }),
+  duplicate: (cardId: Id, title: string) => reqCard(cardId, { type: 'card.duplicate', cardId, title }),
   update: (cardId: Id, patch: PatchOf<'card.update'>) => reqCard(cardId, { type: 'card.update', cardId, patch }),
   move: (cardId: Id, columnId: Id, position: number, cancelChildren?: boolean) =>
     reqCard(cardId, { type: 'card.move', cardId, columnId, position, ...(cancelChildren ? { cancelChildren } : {}) }),
+  /** envia as respostas das perguntas da IA (só as respondidas); o host grava na descrição e devolve a vez */
+  answerQuestions: (cardId: Id, answers: { questionId: Id; text: string; custom: boolean }[]) =>
+    reqCard(cardId, { type: 'card.questions.answer', cardId, answers }),
   trash: (cardId: Id) => reqCard(cardId, { type: 'card.trash', cardId }),
   restore: (cardId: Id) => reqCard(cardId, { type: 'card.restore', cardId }),
   archive: (cardId: Id) => reqCard(cardId, { type: 'card.archive', cardId }),
@@ -109,6 +113,10 @@ export const cards = {
   setYoloMany: (cardIds: Id[], enabled: boolean, until?: Id | null) => req({ type: 'card.yolo.setMany', cardIds, enabled, until }),
   archiveMany: (cardIds: Id[]) => req({ type: 'card.archiveMany', cardIds }),
   trashMany: (cardIds: Id[]) => req({ type: 'card.trashMany', cardIds }),
+  restoreMany: (cardIds: Id[]) => req({ type: 'card.restoreMany', cardIds }),
+  deletePermanentMany: (cardIds: Id[]) => req({ type: 'card.deletePermanentMany', cardIds }),
+  unarchiveMany: (cardIds: Id[]) => req({ type: 'card.unarchiveMany', cardIds }),
+  trashArchivedMany: (cardIds: Id[]) => req({ type: 'card.trashArchivedMany', cardIds }),
   moveMany: (cardIds: Id[], columnId: Id) => req({ type: 'card.moveMany', cardIds, columnId }),
   setExecProfile: (cardId: Id, profileId: Id | null) => reqCard(cardId, { type: 'card.execProfile.set', cardId, profileId }),
   setField: (cardId: Id, fieldId: Id, value: FieldValue) => reqCard(cardId, { type: 'field.setValue', cardId, fieldId, value }),
