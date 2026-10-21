@@ -3,7 +3,7 @@ import { cardsIn, columnsOf, typesOf, isAiWorking, aiWorkingChildren } from '../
 import { useBoardStore } from '../../store/boardStore';
 import { useCardBusy } from '../../store/busyCards';
 import { cards } from '../../commands';
-import { requestArchive, requestMove, requestRestoreArchived, requestTrash } from '../../store/actions';
+import { requestArchive, requestDuplicate, requestMove, requestRestoreArchived, requestTrash } from '../../store/actions';
 import { Menu } from '../Menu';
 import { Button, IconChevronDown, IconClose, SelectField } from '../ui';
 import { t, dt } from '../../i18n';
@@ -57,6 +57,7 @@ export function DrawerHeader({ card }: { card: Card }) {
             archived
               ? { label: t('Restaurar'), onClick: () => requestRestoreArchived(card.id, close) }
               : { label: t('Arquivar'), onClick: () => requestArchive(card.id, close) },
+            ...(archived ? [] : [{ label: t('Duplicar card'), onClick: () => requestDuplicate(card.id) }]),
             'sep',
             { label: t('Mover para a lixeira'), danger: true, onClick: () => requestTrash(card.id, close) },
           ]}

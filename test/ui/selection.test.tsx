@@ -368,4 +368,10 @@ describe('ações contextuais da seleção', () => {
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Arquivar' }));
     expect(lastSent('card.archiveMany').cardIds.sort()).toEqual([firstId, secondId].sort());
   });
+
+  it('com vários cards selecionados a barra não tem ação de duplicar', async () => {
+    await selectTwoStories();
+    expect(bar().getByText('2 selecionados')).toBeInTheDocument();
+    expect(bar().queryByRole('button', { name: /Duplicar/ })).toBeNull();
+  });
 });

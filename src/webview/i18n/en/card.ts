@@ -14,6 +14,8 @@ export const card: Record<string, string> = {
   'Ações do card': 'Card actions',
   Ações: 'Actions',
   Arquivar: 'Archive',
+  'Duplicar card': 'Duplicate card',
+  'Cópia de {title}': 'Copy of {title}',
   'Mover para a lixeira': 'Move to trash',
   'Fechar (Esc)': 'Close (Esc)',
   Fechar: 'Close',

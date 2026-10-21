@@ -597,6 +597,23 @@ describe('CardDrawer', () => {
     expect(sentOf('card.trash')).toHaveLength(0);
   });
 
+  it('Ações: "Duplicar card" manda o título traduzido, sem confirmar, e o drawer continua no original', async () => {
+    openStory();
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Duplicar card' }));
+    const title = useBoardStore.getState().state!.cards.find((c) => c.id === board.storyId)!.title;
+    expect(lastSent('card.duplicate')).toEqual({ type: 'card.duplicate', cardId: board.storyId, title: `Cópia de ${title}` });
+    expect(useBoardStore.getState().dialog).toBeNull();
+    expect(useBoardStore.getState().openCardId).toBe(board.storyId);
+  });
+
+  it('card arquivado: sem "Duplicar card" no menu', async () => {
+    patchCard(board.subId, { archivedAt: 1 });
+    openCardDrawer(board.subId);
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
+    expect(screen.queryByRole('button', { name: 'Duplicar card' })).toBeNull();
+  });
+
   it('card arquivado: aviso, coluna travada, sem status e "Restaurar" no menu (história ativa: restaura só ele)', async () => {
     patchCard(board.subId, { archivedAt: 1 });
     openCardDrawer(board.subId);

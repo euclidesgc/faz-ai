@@ -79,6 +79,8 @@ export type WebviewToHost =
   /** começa agora uma rodada do heartbeat: a IA trata tudo o que está pendente com ela */
   | { type: 'ai.heartbeat.run' }
   | { type: 'card.create'; typeId: Id; columnId: Id; parentId: Id | null; title: string }
+  /** copia o card para a primeira coluna do workflow (descrição, tipo, campos e checklist desmarcado); `title` já vem no idioma da pessoa */
+  | { type: 'card.duplicate'; cardId: Id; title: string }
   | { type: 'card.update'; cardId: Id; patch: { title?: string; description?: string; typeId?: Id } }
   | { type: 'card.questions.set'; cardId: Id; questions: QuestionInput[] }
   | { type: 'card.questions.answer'; cardId: Id; answers: { questionId: Id; text: string; custom: boolean }[] }

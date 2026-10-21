@@ -332,6 +332,11 @@ export const cardHandlers = {
     createCard(ctx, msg);
     return true;
   },
+  'card.duplicate': (msg, ctx) => {
+    const id = ctx.cards.duplicate(ctx.boardId, msg.cardId, msg.title);
+    applySuggestion(ctx, id, null);
+    return true;
+  },
   'card.update': (msg, ctx) => {
     ctx.cards.update(msg.cardId, msg.patch);
     return true;

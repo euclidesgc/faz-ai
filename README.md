@@ -178,6 +178,11 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
    massa leva junto as sub-tarefas arquivadas de cada história. Toda ação em massa pede confirmação,
    dizendo quantos cards serão afetados e o que vai junto. Excluir definitivamente continua só pela
    Lixeira.
+6. **Duplicar card** (menu de ações do card aberto) cria outro card a partir dele, um por vez. O título
+   ganha o prefixo "Cópia de"; a descrição, o tipo, os campos e o checklist (desmarcado) são copiados, e
+   o card novo vai para o fim da primeira coluna do workflow, sem confirmação. Sub-tarefas, anexos,
+   comentários e vínculos não são copiados. Não há duplicação em massa: na seleção de vários cards, a
+   opção não aparece.
 
 **Seleção múltipla na lixeira.** Na lixeira, marque cards um a um ou use **Selecionar todos** no cabeçalho da tabela; a caixa fica em estado parcial quando só alguns estão marcados. Com ao menos um card marcado, aparece a barra com a contagem e as ações **Restaurar** e **Apagar de vez**, que valem para a seleção inteira. Restaurar segue direto; apagar de vez pede uma única confirmação para o lote. **Limpar** desmarca tudo. Restaurar ou apagar um card leva junto as sub-tarefas dele que estão na lixeira. **Esvaziar lixeira** continua como estava e não depende da seleção.
 

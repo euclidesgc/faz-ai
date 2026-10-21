@@ -189,6 +189,12 @@ promise a percentage: it shows, in the inventory, what is being loaded.
    each story's archived sub-tasks along. Every bulk action asks for confirmation, saying how many
    cards will be affected and what goes along with them. Permanent deletion stays only in the Lixeira
    (trash).
+6. **Duplicar card** (duplicate card; card actions menu of the open card) creates another card from
+   it, one at a time. The title gets the prefix "Cópia de" (Copy of in the English interface); the
+   description, type, fields and checklist (unchecked) are copied, and the new card goes to the end of
+   the first column of its workflow, with no confirmation. Sub-tasks, attachments, comments and links
+   are not copied. There is no bulk duplication: with several cards selected, the option does not
+   appear.
 
 **Multi-select in the trash.** In the **Lixeira** (trash), tick cards one by one or use **Selecionar todos** in the table header; the checkbox shows a partial state when only some are ticked. With at least one card ticked, a bar appears with the count and the actions **Restaurar** (restore) and **Apagar de vez** (delete permanently), which apply to the whole selection. Restore runs straight away; delete permanently asks for one confirmation for the batch. **Limpar** (clear) unticks everything. Restoring or deleting a card also takes its sub-tasks that are in the trash. **Esvaziar lixeira** (empty trash) stays as it was and does not depend on the selection.
 
