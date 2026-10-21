@@ -359,10 +359,10 @@ export class AiRunner {
     if (!card || !isLive(card)) throw new Error('Card não encontrado.');
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
     // sem login confirmado pelo probe (preventivo, RF1), nenhum gatilho gasta uma execução — diferente do sinal
-    // reativo (`authExpired`), que heartbeat.ts/autopilot.ts recusam por conta própria (RF8): aqui ele não
-    // bloqueia, para o login que o probe não soube confirmar poder se recuperar com uma execução
-    // manual que dá certo (RF9, limpa em settle()) — sem essa válvula, authExpired nunca mais sairia de `true`
-    if (state.requirements.some((r) => r.id === 'signin'))
+    // reativo (`authExpired`, `expired` no requisito): aqui ele não bloqueia, para o login que o probe não
+    // soube confirmar poder se recuperar com uma execução manual que dá certo (RF9, limpa em settle()) —
+    // sem essa válvula, authExpired nunca mais sairia de `true`. O bloqueio vale para o perfil do alvo
+    if (state.requirements.some((r) => r.id === 'profile' && r.problem === 'signin' && !r.expired && r.profile === state.board.aiTool))
       throw new Error(`O login do ${toolInfo(activeProfile(state.board)).label} venceu: veja o aviso no topo do board.`);
     const tool = toolInfo(activeProfile(state.board));
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);

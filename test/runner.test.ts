@@ -485,11 +485,28 @@ describe('executor da IA', () => {
     expect(runner.isRunning(storyId)).toBe(false);
   });
 
-  it('com o login da ferramenta vencido (requisito "signin"), não inicia e não gasta uma execução', () => {
-    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } }]);
+  it('com o login do perfil do board sem confirmar pelo probe (requisito "profile" com signin), não inicia e não gasta uma execução', () => {
+    router.setRequirements([
+      {
+        id: 'profile',
+        profile: 'claude',
+        name: 'Claude Code',
+        problem: 'signin',
+        optional: true,
+        action: { kind: 'diagnostic', profile: 'claude' },
+      },
+    ]);
     expect(() => runner.start(storyId)).toThrow(/login/i);
     expect(procs).toHaveLength(0);
     expect(card().status).not.toBe('running');
+  });
+
+  it('o problema de login de outro perfil, ou o login vencido só numa execução, não impede a execução do perfil do board', () => {
+    router.setRequirements([
+      { id: 'profile', profile: 'cursor', name: 'Cursor', problem: 'signin', optional: true, action: null },
+      { id: 'profile', profile: 'claude', name: 'Claude Code', problem: 'signin', expired: true, optional: true, action: null },
+    ]);
+    expect(() => runner.start(storyId)).not.toThrow();
   });
 
   it('se a IA só respondeu na conversa, a vez passa para a pessoa', () => {

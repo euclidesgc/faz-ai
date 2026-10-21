@@ -5,7 +5,10 @@ import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssi
 import { scanLibraryFolder } from '../libraryImport';
 import { agentOfArtifact, type ArtifactKind } from '../../shared/artifacts';
 import type { ImportSource } from '../../shared/artifactImport';
+import * as os from 'node:os';
 import * as path from 'node:path';
+import { ToolExporter } from '../toolExport';
+import type { ExportPlan, ExportResult, ExportTarget } from '../../shared/toolExport';
 import type { BoardRequirement } from '../../shared/requirements';
 import type { EnvironmentReport } from '../../shared/environment';
 import { EMPTY_ORPHANS, type OrphanReport } from '../../shared/orphans';
@@ -61,10 +64,6 @@ export interface EnvironmentHooks {
   /** roda o Diagnóstico; resolve quando o relatório já está no board e rejeita se a conferência falhou */
   check(): Promise<void>;
   seen(): void;
-  /** grava o caminho completo dos MCPs que o editor não acha, e confere de novo */
-  pinMcp?(): Promise<void>;
-  /** libera as ferramentas do board sem aprovação nas conversas do Kimi Code (a regra no config.toml), e confere de novo */
-  allowKimiMcp?(): void;
 }
 
 /** O que o host faz pela limpeza de branches e worktrees órfãs (#465). O relatório sai por `setOrphans`. */
@@ -126,13 +125,13 @@ const bridgeOnly = {
   'git.orphans.cleanSafe': viaBridge,
   'environment.check': viaBridge,
   'environment.seen': viaBridge,
-  'environment.pinMcp': viaBridge,
-  'environment.allowKimiMcp': viaBridge,
   'ai.autopilot.pause': viaBridge,
   'ai.autopilot.resume': viaBridge,
   'card.workspace.open': viaBridge,
   'harness.refresh': viaBridge,
   'harness.project.profile': viaBridge,
+  'harness.export.plan': viaBridge,
+  'harness.export.apply': viaBridge,
   'harness.agent.assist': viaBridge,
   'harness.import.pick': viaBridge,
   'harness.import.scan': viaBridge,
@@ -431,14 +430,6 @@ export class MessageRouter {
     return this.environmentHooks?.check() ?? Promise.resolve();
   }
 
-  pinEnvironmentMcp(): Promise<void> {
-    return this.environmentHooks?.pinMcp?.() ?? Promise.resolve();
-  }
-
-  allowKimiMcp(): void {
-    this.environmentHooks?.allowKimiMcp?.();
-  }
-
   /** A tela abriu sozinha uma vez: nas próximas aberturas, só pelo botão. */
   markEnvironmentSeen(): void {
     if (!this.environmentFirstRun) return;
@@ -692,6 +683,26 @@ export class MessageRouter {
 
   projectProfile(): ProjectProfile {
     return readProjectProfile(this.ctx.opts.workspaceDir ?? '');
+  }
+
+  /** Prévia do "Exportar para a ferramenta": só lê o board e o disco. */
+  exportPlan(tool: AiTool, target: ExportTarget): ExportPlan {
+    return this.exporter().plan(tool, target);
+  }
+
+  /** Grava os artefatos escolhidos na pasta da ferramenta; o board não muda. */
+  exportApply(tool: AiTool, target: ExportTarget, ids: string[], replace: boolean): ExportResult {
+    return this.exporter().apply(tool, target, ids, replace);
+  }
+
+  private exporter(): ToolExporter {
+    const defaultAgent = this.ctx.boards.snapshot(this.ctx.boardId, this.ctx.opts.author).board.runner.defaultAgent;
+    return new ToolExporter(
+      this.ctx.library.repo,
+      this.ctx.boardId,
+      { projectDir: this.ctx.opts.workspaceDir || undefined, homeDir: os.homedir() },
+      defaultAgent,
+    );
   }
 
   private notify(): void {

@@ -1,147 +1,91 @@
-import { baseValue } from '../../shared/harness';
 import { useState, type ReactNode } from 'react';
-import { baseInfo } from '../../shared/harness';
 import type { BoardState } from '../../shared/model';
-import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
+import type { ProfileProblem } from '../../shared/profileHealth';
+import type { BoardRequirement } from '../../shared/requirements';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
-import { harness, ui } from '../commands';
+import { ui } from '../commands';
 import { useAction } from '../useAction';
-import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { isWeb } from '../vscode';
-import { Button, IconCheck, IconConnect, IconWarning, type ButtonVariant } from './ui';
+import { Button, IconCheck, IconWarning, type ButtonVariant } from './ui';
 
-/** A cor do ícone de atenção: login vencido é erro, o resto que falta é atenção, e o que só é recomendado fica discreto. */
+/** A cor do ícone de atenção: nenhum perfil disponível é erro, o resto que falta é atenção, e o que só é recomendado fica discreto. */
 export type RequirementsAlertLevel = 'error' | 'warn' | 'recommended';
+
+/** O problema de um perfil, em poucas palavras, para o título do aviso. */
+function profileProblemTitle(problem: ProfileProblem | undefined, name: string): string {
+  switch (problem) {
+    case 'cli':
+      return t('{name}: linha de comando não encontrada', { name });
+    case 'signin':
+      return t('{name}: sem login', { name });
+    case 'unvalidated':
+      return t('{name}: não validado', { name });
+    case 'stale':
+      return t('{name}: precisa verificar de novo', { name });
+    case 'not-admissible':
+      return t('{name}: não admissível', { name });
+    case 'pending-review':
+    default:
+      return t('{name}: pendente de revisão', { name });
+  }
+}
 
 /** Título e explicação de cada requisito, no idioma da interface. */
 export function requirementTexts(r: BoardRequirement): { title: string; detail: string } {
-  const tool = baseInfo(r.tool).label;
   switch (r.id) {
     case 'node':
       return {
         title: t('Node.js não encontrado'),
         detail: t(
-          'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 22 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.',
-          { tool },
+          'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 22 ou mais novo, e ele não está no PATH do terminal. Sem ele, a IA não alcança o board. Instale o Node.js e clique em Verificar de novo.',
         ),
       };
-    case 'cli':
+    case 'no-profile':
       return {
-        title: t('A linha de comando do {tool} não foi encontrada', { tool }),
-        detail: r.action
-          ? t(
-              'Sem ela não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale com o comando abaixo e clique em Verificar de novo.',
-              { cli: r.cli ?? '' },
-            )
-          : t(
-              'Sem ela não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale pelo site {where} e clique em Verificar de novo.',
-              { cli: r.cli ?? '', where: r.where ?? '' },
-            ),
-      };
-    case 'signin':
-      return {
-        title: t('A linha de comando do {tool} está sem login', { tool }),
-        detail: t(
-          'Ela está instalada, mas não entrou na conta: as execuções pelo board falham antes de começar. Rode o comando abaixo no terminal, conclua o login no navegador e clique em Verificar de novo.',
-        ),
-      };
-    case 'mcp':
-      return {
-        title: t('O MCP do board (faz-ai) não está instalado no {tool}', { tool }),
+        title:
+          r.reason === 'no-enabled'
+            ? t('Nenhum perfil de CLI está ligado')
+            : r.reason === 'unvalidated'
+              ? t('Nenhum perfil de CLI foi validado: teste um perfil para o board trabalhar com a IA')
+              : t('Nenhum perfil de CLI está disponível para o board trabalhar com a IA'),
         detail:
-          r.tool === 'claude'
+          r.reason === 'no-enabled'
             ? t(
-                'Nas conversas com o {tool} fora do board, a IA não enxerga os cards. As execuções pelo board não dependem disso. Conecte e aprove o servidor "faz-ai" quando a ferramenta pedir.',
-                { tool },
+                'Sem um perfil ligado não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. Ligue um perfil de CLI para o board trabalhar com a IA.',
               )
-            : r.tool === 'cursor'
+            : t(
+                'Sem um perfil disponível não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. Veja o que falta em cada perfil no Diagnóstico do ambiente.',
+              ),
+      };
+    case 'profile': {
+      const name = r.name ?? r.profile ?? '';
+      return {
+        title: profileProblemTitle(r.problem, name),
+        detail:
+          r.problem === 'cli'
+            ? t(
+                'O board não encontrou a linha de comando deste perfil. Os cards que dependem dele não rodam; os dos outros perfis seguem. Veja como instalar no Diagnóstico do ambiente.',
+              )
+            : r.problem === 'signin'
               ? t(
-                  'Nas conversas com o Cursor no editor, a IA não enxerga os cards. As execuções pelo board registram o servidor sozinhas, mas a conversa no editor não. Conecte e ative o servidor "faz-ai" em Cursor Settings → MCP.',
+                  'A linha de comando está instalada, mas sem login: as execuções deste perfil falham antes de começar. Entre na conta e clique em Verificar de novo.',
                 )
-              : t(
-                  'Nas conversas com o {tool} fora do board, a IA não enxerga os cards, e as execuções pelo board também dependem disso. Conecte e aprove o servidor "faz-ai" quando a ferramenta pedir.',
-                  { tool },
-                ),
+              : r.problem === 'unvalidated' || r.problem === 'stale'
+                ? t(
+                    'Este perfil ainda não foi testado, ou a linha de comando mudou desde o último teste. Veja o estado dele no Diagnóstico do ambiente.',
+                  )
+                : r.problem === 'not-admissible'
+                  ? t('O regime em vigor não admite este perfil. Veja o motivo no Diagnóstico do ambiente.')
+                  : t('Este perfil foi importado e espera revisão. O board não roda nenhum comando dele enquanto isso.'),
       };
-    case 'mcp-stale':
-      return {
-        title: t('O MCP do board no {tool} está desatualizado', { tool }),
-        detail:
-          r.action?.kind === 'fixProject'
-            ? t(
-                '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). O registro do projeto vale no lugar do global, então a ferramenta não consegue iniciar o servidor. Corrigir tira o registro deste arquivo e deixa valendo o global, com os caminhos atuais.',
-                { file: r.file ?? '', missing: r.missing ?? '' },
-              )
-            : t(
-                '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). A ferramenta não consegue iniciar o servidor. Conecte de novo para gravar o caminho atual.',
-                { file: r.file ?? '', missing: r.missing ?? '' },
-              ),
-      };
-    case 'mcp-elsewhere':
-      return {
-        title: t('O MCP do board no {tool} está registrado para outra pasta', { tool }),
-        detail:
-          r.action?.kind === 'fixProject'
-            ? t(
-                '{file} liga o servidor do board à pasta "{missing}", e não a este projeto (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar). O registro do projeto vale no lugar do global, então a IA falaria com outro board, ou com nenhum. Corrigir tira o registro deste arquivo e deixa valendo o global.',
-                { file: r.file ?? '', missing: r.missing ?? '' },
-              )
-            : t(
-                '{file} liga o servidor do board à pasta "{missing}", e não a este projeto (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar). A IA falaria com outro board, ou com nenhum. Conecte de novo para gravar a pasta atual.',
-                { file: r.file ?? '', missing: r.missing ?? '' },
-              ),
-      };
-    case 'mcp-outdated':
-      return {
-        title: t('O MCP do board no {tool} é de uma versão anterior', { tool }),
-        detail: t(
-          '{file} usa a ponte em "{missing}", de uma versão anterior da extensão, que não é mais atualizada e pode não achar o projeto aberto. Instale de novo para gravar o registro atual.',
-          { file: r.file ?? '', missing: r.missing ?? '' },
-        ),
-      };
-    case 'mcp-reload':
-      return {
-        title: t('MCP do board instalado no {tool}: recarregue a janela', { tool }),
-        detail: t(
-          'O MCP "faz-ai" é o canal pelo qual a IA do chat do Cursor lê e atualiza os cards deste board. Ele foi instalado em {file} depois que esta janela abriu, e o Cursor só lê os MCPs do projeto ao abrir a janela: recarregue para ele aparecer.',
-          { file: r.file ?? '' },
-        ),
-      };
-    case 'mcp-path':
-      return {
-        title: t('O {tool} não acha o comando do MCP do board', { tool }),
-        detail: r.tracked
-          ? t(
-              '{file} inicia o MCP com "{missing}", que não está no PATH com que o editor abriu (o programa foi instalado depois, ou fica numa pasta que o editor não lê). O arquivo está no git, então o board não grava nele o caminho desta máquina: feche e abra o editor de novo, ou tire o arquivo do git.',
-              { file: r.file ?? '', missing: r.missing ?? '' },
-            )
-          : t(
-              '{file} inicia o MCP com "{missing}", que não está no PATH com que o editor abriu (o programa foi instalado depois, ou fica numa pasta que o editor não lê). Corrigir grava o caminho completo dele nesta máquina, e o arquivo fica fora do git; depois, recarregue a janela.',
-              { file: r.file ?? '', missing: r.missing ?? '' },
-            ),
-      };
-    case 'skill':
-      return {
-        title: t('A skill do fluxo ({name}) não está pronta para o {tool}', { name: FLOW_SKILL_NAME, tool }),
-        detail: t(
-          'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem de contexto vazio: a skill precisa existir e estar no board em modo "Sempre" em Configurações → Harness. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.',
-        ),
-      };
-    case 'mcp-enable':
-      return {
-        title: t('Ative o MCP do board no {tool}', { tool }),
-        detail: t(
-          'O MCP "faz-ai" é o canal pelo qual a IA do chat do Cursor lê e atualiza os cards deste board. O Cursor deixa desativado todo MCP novo de um projeto, e só você pode ativá-lo: em Abrir MCPs do Cursor, clique em "faz-ai" e ligue a chave deste projeto.',
-        ),
-      };
+    }
     case 'harness': {
       const issue: Record<string, string> = {
         artifacts: t('nenhuma skill, agente ou servidor MCP em modo "Pelo card"'),
         agents: t('nenhum agente do board'),
         rules: t('regras no board ainda desligadas, sem revisão'),
         missing: t('artefato do board que sumiu da origem'),
-        cursor: t('artefatos do projeto que entram no contexto sem passar pelo board'),
       };
       return {
         title: t('O harness do board ainda não está definido'),
@@ -153,16 +97,6 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
         ),
       };
     }
-    case 'permission':
-      return { title: t('O {tool} não roda com o nível de permissão escolhido', { tool }), detail: t(r.reason ?? '') };
-    case 'permission-mcp':
-      return {
-        title: t('O {tool} pede aprovação para cada ferramenta do board', { tool }),
-        detail: t(
-          'Nas conversas com o {tool} fora do board, cada ferramenta do MCP "faz-ai" pede uma aprovação. Uma regra no {file} libera todas de uma vez; sem ela tudo funciona, mas com uma pergunta a cada chamada. As execuções pelo board não pedem nada.',
-          { tool, file: r.file ?? '' },
-        ),
-      };
   }
 }
 
@@ -198,87 +132,41 @@ export function CopyCommand({ command }: { command: string }) {
 
 /**
  * Por que os botões de IA do card não rodam agora, no idioma da interface; null quando rodam. Além
- * da permissão que a ferramenta não aceita, a CLI que falta ou está sem login: o clique só daria erro.
+ * da permissão que a ferramenta não aceita, o board sem nenhum perfil de CLI disponível ou o login
+ * vencido do perfil padrão: o clique só daria erro.
  */
 export function aiBlockedReason(state: BoardState): string | null {
   if (state.aiRunUnsupported) return t(state.aiRunUnsupported);
-  if (state.authExpired)
-    return t('O login do {tool} venceu: veja em Configurações → Verificar ambiente.', { tool: baseInfo(state.authExpired).label });
-  const cli = state.requirements.find((r) => r.id === 'cli' || r.id === 'signin');
-  if (!cli) return null;
-  return cli.id === 'cli'
-    ? t('A linha de comando do {tool} não foi encontrada: veja em Configurações → Verificar ambiente.', {
-        tool: baseInfo(cli.tool).label,
-      })
-    : t('A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.', { tool: baseInfo(cli.tool).label });
-}
-
-/** Botão que resolve um requisito pelo host (CLI, disco): mostra a espera até ele confirmar, e avisa quem confere de novo. */
-function FixButton({
-  variant,
-  run,
-  onFixed,
-  children,
-}: {
-  variant?: ButtonVariant;
-  run: () => Promise<void>;
-  onFixed?: () => void;
-  children: ReactNode;
-}) {
-  const fix = useAction(run);
-  return (
-    <Button
-      size="small"
-      variant={variant}
-      loading={fix.busy}
-      onClick={() => {
-        void fix.run();
-        onFixed?.();
-      }}
-    >
-      {children}
-    </Button>
-  );
+  const none = state.requirements.find((r) => r.id === 'no-profile');
+  if (none) return t('{title}: veja em Configurações → Verificar ambiente.', { title: requirementTexts(none).title });
+  if (state.authExpired === state.board.aiTool) {
+    const name = state.board.aiProfiles.find((p) => p.id === state.authExpired)?.name ?? state.authExpired;
+    return t('O login do {tool} venceu: veja em Configurações → Verificar ambiente.', { tool: name });
+  }
+  return null;
 }
 
 /** Se o requisito tem um botão ou comando que o resolve por aqui (na versão compacta, sem o atalho para as Configurações). */
 function actionable(r: BoardRequirement, compact: boolean): boolean {
   const kind = r.action?.kind;
-  // recarregar a janela e abrir os MCPs do editor só existem dentro do editor; no navegador, fica a explicação
-  if (kind === 'reload' || kind === 'openEditorMcp') return !isWeb;
-  if (kind === 'settings') return !compact;
-  return (
-    kind === 'command' ||
-    kind === 'connect' ||
-    kind === 'fixProject' ||
-    kind === 'pinMcp' ||
-    kind === 'installSkill' ||
-    kind === 'allowKimiMcp'
-  );
+  // o Diagnóstico e as Configurações não existem no chat compacto
+  if (kind === 'settings' || kind === 'diagnostic') return !compact;
+  return kind === 'command';
 }
 
-/**
- * A ação que resolve o requisito: o comando com copiar, ou o botão que faz. `onFixed` roda depois de
- * um botão que muda algo na máquina (o Diagnóstico confere de novo para o item mudar de estado).
- */
+/** A ação que resolve o requisito: o comando com copiar, ou o botão que leva ao Diagnóstico ou ao Harness. */
 export function RequirementFix({
   r,
   compact = false,
-  onFixed,
   variant,
 }: {
   r: BoardRequirement;
   compact?: boolean;
-  onFixed?: () => void;
   /** no diagnóstico do ambiente, a ação que resolve o item é `primary`; no aviso fica a padrão */
   variant?: ButtonVariant;
 }) {
   const openSettings = useBoardStore((s) => s.openSettings);
-  const openMcpInstall = () => {
-    // a instalação do servidor do board fica na aba Ferramenta e execução
-    useBoardStore.setState({ harnessTab: 'tool' });
-    openSettings('harness');
-  };
+  const openEnvironment = useBoardStore((s) => s.openEnvironment);
   if (!actionable(r, compact)) return null;
   const action = r.action!;
   switch (action.kind) {
@@ -293,54 +181,10 @@ export function RequirementFix({
           )}
         </>
       );
-    case 'connect':
-      // a instalação mora na seção Servidores MCP da ferramenta, onde se escolhe global ou projeto
+    case 'diagnostic':
       return (
-        <Button size="small" variant={variant} onClick={() => openMcpInstall()}>
-          <IconConnect /> {t('Instalar o MCP do board')}
-        </Button>
-      );
-    case 'fixProject':
-      return (
-        <FixButton variant={variant} run={() => ui.fixProjectMcp(action.file)} onFixed={onFixed}>
-          <IconConnect /> {t('Corrigir o registro')}
-        </FixButton>
-      );
-    case 'installSkill':
-      return (
-        <FixButton variant={variant} run={() => harness.installFlowSkill(r.tool)} onFixed={onFixed}>
-          {t('Instalar a skill')}
-        </FixButton>
-      );
-    case 'pinMcp':
-      return (
-        <FixButton variant={variant} run={() => ui.pinMcp()} onFixed={onFixed}>
-          <IconConnect /> {t('Corrigir o caminho')}
-        </FixButton>
-      );
-    case 'allowKimiMcp':
-      return (
-        <Button
-          size="small"
-          variant={variant}
-          onClick={() => {
-            ui.allowKimiMcp();
-            onFixed?.();
-          }}
-        >
-          <IconConnect /> {t('Liberar as ferramentas do board')}
-        </Button>
-      );
-    case 'openEditorMcp':
-      return (
-        <Button size="small" variant={variant} onClick={() => ui.openEditorMcp()}>
-          <IconConnect /> {t('Abrir MCPs do Cursor')}
-        </Button>
-      );
-    case 'reload':
-      return (
-        <Button size="small" variant={variant} onClick={() => ui.reloadWindow()}>
-          {t('Recarregar a janela')}
+        <Button size="small" variant={variant} onClick={() => openEnvironment(action.profile)}>
+          {t('Ver no diagnóstico')}
         </Button>
       );
     case 'settings':
@@ -394,55 +238,44 @@ function RecheckButton() {
   );
 }
 
-/** O que falta para o board trabalhar com a IA, com o login que venceu no meio de uma execução. */
-function useRequirementItems(): { items: BoardRequirement[]; missing: number; authError: boolean } {
-  const requirements = useBoardStore((s) => s.state?.requirements ?? []);
-  const authExpired = useBoardStore((s) => s.state?.authExpired ?? null);
-  // o sinal reativo (RF6) de um login que venceu no meio da execução pode não estar em `requirements`
-  // (o probe não soube dizer): sem este item, a pessoa não veria o aviso
-  const items: BoardRequirement[] =
-    authExpired && !requirements.some((r) => r.id === 'signin')
-      ? [
-          ...requirements,
-          {
-            id: 'signin',
-            tool: authExpired,
-            cli: baseValue(CLI_COMMAND, authExpired) ?? '',
-            action: { kind: 'command', command: baseValue(LOGIN_COMMAND, authExpired) ?? '', terminal: true },
-          },
-        ]
-      : requirements;
+/** O que falta para o board trabalhar com a IA. */
+function useRequirementItems(): { items: BoardRequirement[]; missing: number; blocked: boolean } {
+  const items = useBoardStore((s) => s.state?.requirements ?? []);
   return {
     items,
     missing: items.filter((r) => !r.optional).length,
-    // login vencido é mais urgente que os outros requisitos (para o board inteiro, não só um card): destaque de erro
-    authError: requirements.some((r) => r.id === 'signin' && !r.optional) || authExpired !== null,
+    // nenhum perfil disponível é mais urgente que os outros requisitos (vale para o board inteiro, não só um card): destaque de erro
+    blocked: items.some((r) => r.id === 'no-profile'),
   };
 }
 
-/** O resumo do aviso: quantos requisitos faltam, ou o passo que falta no Cursor, ou só o recomendado. */
+/** O resumo do aviso: o que bloqueia, quantos requisitos faltam, quantos perfis precisam de atenção, ou só o recomendado. */
 function requirementsSummary(items: BoardRequirement[], missing: number): string {
-  return missing === 0
-    ? items.every((r) => r.id === 'harness')
-      ? t('Recomendado: defina o harness para as execuções gastarem menos contexto')
-      : t('Recomendado para a IA enxergar o board nas suas conversas')
-    : items.every((r) => r.id === 'mcp-reload' || r.id === 'mcp-enable')
-      ? t('Falta um passo para o chat do Cursor usar o board')
-      : missing === 1
-        ? t('Falta 1 requisito para o board trabalhar com a IA')
-        : t('Faltam {n} requisitos para o board trabalhar com a IA', { n: missing });
+  const none = items.find((r) => r.id === 'no-profile');
+  if (none) return requirementTexts(none).title;
+  if (missing > 0)
+    return missing === 1
+      ? t('Falta 1 requisito para o board trabalhar com a IA')
+      : t('Faltam {n} requisitos para o board trabalhar com a IA', { n: missing });
+  const profiles = items.filter((r) => r.id === 'profile').length;
+  if (profiles > 0)
+    return profiles === 1 ? t('1 perfil de CLI precisa de atenção') : t('{n} perfis de CLI precisam de atenção', { n: profiles });
+  return t('Recomendado: defina o harness para as execuções gastarem menos contexto');
 }
+
+const itemKey = (r: BoardRequirement) => `${r.id}:${r.profile ?? ''}`;
 
 /**
  * O aviso compacto do que falta, no lugar da faixa no topo do board: o ícone de atenção (na aba Configurações
  * e no Verificar ambiente) e o hint dele, com o resumo e o nome de cada item. null quando não falta nada.
  */
 export function useRequirementsAlert(): { level: RequirementsAlertLevel; label: string; hint: ReactNode } | null {
-  const { items, missing, authError } = useRequirementItems();
+  const { items, missing, blocked } = useRequirementItems();
   if (!items.length) return null;
   const label = requirementsSummary(items, missing);
+  const warn = missing > 0 || items.some((r) => r.id === 'profile');
   return {
-    level: missing ? (authError ? 'error' : 'warn') : 'recommended',
+    level: blocked ? 'error' : warn ? 'warn' : 'recommended',
     label,
     hint: (
       <>
@@ -451,7 +284,7 @@ export function useRequirementsAlert(): { level: RequirementsAlertLevel; label: 
         </p>
         <ul>
           {items.map((r) => (
-            <li key={r.id}>{requirementTexts(r).title}</li>
+            <li key={itemKey(r)}>{requirementTexts(r).title}</li>
           ))}
         </ul>
         <p className="muted">{t('Veja como resolver em Configurações → Verificar ambiente.')}</p>
@@ -477,19 +310,19 @@ export function RequirementsAlertIcon({ level, label }: { level: RequirementsAle
  * impede as execuções pelo board) não conta como pendência: sozinho, vira uma caixa discreta.
  */
 export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
-  const { items, missing, authError } = useRequirementItems();
+  const { items, missing, blocked } = useRequirementItems();
   // a lista muda (algo foi resolvido): o "nada mudou" de antes não vale mais
-  const key = items.map((r) => r.id).join();
+  const key = items.map(itemKey).join();
   if (!items.length) return null;
   return (
     <section
       key={key}
-      className={`banner requirements ${missing ? (authError ? 'error' : 'warn') : 'recommended'} ${compact ? 'compact' : ''}`}
+      className={`banner requirements ${blocked ? 'error' : missing || items.some((r) => r.id === 'profile') ? 'warn' : 'recommended'} ${compact ? 'compact' : ''}`}
       role="region"
       aria-label={t('Requisitos do board')}
     >
       <div className="requirements-head">
-        {missing > 0 && <IconWarning />}
+        {(missing > 0 || items.some((r) => r.id === 'profile')) && <IconWarning />}
         <strong role="status">{requirementsSummary(items, missing)}</strong>
         <span className="spacer" />
         {/* a lista completa, com o que é só recomendado (git, GitHub CLI, Code Review Graph); o chat não tem a tela */}
@@ -502,7 +335,7 @@ export function RequirementsBanner({ compact = false }: { compact?: boolean }) {
       </div>
       <ul>
         {items.map((r) => (
-          <Item key={r.id} r={r} compact={compact} />
+          <Item key={itemKey(r)} r={r} compact={compact} />
         ))}
       </ul>
     </section>

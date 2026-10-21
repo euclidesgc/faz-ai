@@ -28,6 +28,7 @@ import type { BulkCardStatus, CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { BranchKind, GitConfig } from './git';
 import type { ProjectProfile } from './projectProfile';
+import type { ExportPlan, ExportResult, ExportTarget } from './toolExport';
 
 /** O que o board grava num arquivo de agente: o frontmatter (menos o nome) e o corpo. */
 export interface AgentInput {
@@ -247,6 +248,10 @@ export type WebviewToHost =
   | { type: 'harness.refresh' }
   /** o perfil do projeto (linguagens, comandos, ferramentas, pastas) para os assistentes; a resposta é `harness.project.profileResult` */
   | { type: 'harness.project.profile'; requestId: string }
+  /** prévia do "Exportar para a ferramenta"; a resposta é `harness.export.planResult` */
+  | { type: 'harness.export.plan'; requestId: string; tool: AiTool; target: ExportTarget }
+  /** grava os artefatos escolhidos; a resposta é `harness.export.applyResult` */
+  | { type: 'harness.export.apply'; requestId: string; tool: AiTool; target: ExportTarget; ids: string[]; replace: boolean }
   | { type: 'harness.agent.assist'; requestId: string; input: AgentAssistInput }
   /**
    * envia artefatos ao board com um modo, muda o modo dos que já estão nele, ou os tira do board (com
@@ -334,10 +339,6 @@ export type WebviewToHost =
   | { type: 'environment.check' }
   /** o Diagnóstico já abriu sozinho nesta máquina: não abre mais na abertura do board */
   | { type: 'environment.seen' }
-  /** grava o caminho completo dos MCPs (do board e do Code Review Graph) que o editor não acha */
-  | { type: 'environment.pinMcp' }
-  /** libera as ferramentas do board sem aprovação nas conversas do Kimi Code (a regra no config.toml dele) */
-  | { type: 'environment.allowKimiMcp' }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
   /**
    * instala a skill do fluxo no global de uma ferramenta (padrão: a do projeto), nunca no projeto;
@@ -371,6 +372,8 @@ export type HostToWebview =
   | { type: 'harness.library.directorySelected'; directory: string }
   | { type: 'harness.library.foldersResult'; directory: string; parent: string; folders: { name: string; path: string }[] }
   | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }
+  | { type: 'harness.export.planResult'; requestId: string; plan?: ExportPlan; error?: string }
+  | { type: 'harness.export.applyResult'; requestId: string; result?: ExportResult; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
   /** prévia dos contratos salvos, sem corpos de artefatos, inferência ou admissão */

@@ -717,9 +717,9 @@ describe('autopiloto', () => {
     expect(runner.started).toEqual([card(1).id]);
   });
 
-  it('com o login vencido (preventivo ou reativo), não inicia a história e fica à espera, sem desligar (#189)', () => {
+  it('sem perfil disponível ou com o login do perfil padrão vencido (reativo), não inicia a história e fica à espera, sem desligar (#189)', () => {
     create('A', 'Backlog');
-    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } }]);
+    router.setRequirements([{ id: 'no-profile', reason: 'unavailable', action: { kind: 'diagnostic' } }]);
     yolo(1);
     expect(runner.started).toEqual([]);
     expect(autopilot.isActive).toBe(true); // diferente de uma falha real: não desliga, só espera

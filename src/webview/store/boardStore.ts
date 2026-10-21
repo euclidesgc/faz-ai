@@ -97,6 +97,10 @@ interface BoardStore extends UiState, ViewState, UiPrefs {
   state: BoardState | null;
   /** o assunto aberto na aba de artefatos do Harness; fica na memória, não é guardado */
   harnessTopic: HarnessTopic;
+  /** o perfil de CLI a mostrar à vista no Diagnóstico (vindo do aviso do topo); fica na memória, não é guardado */
+  environmentProfile: string | null;
+  /** abre o Diagnóstico do ambiente, no bloco de um perfil quando há um */
+  openEnvironment(profile?: string): void;
   /** o chat está aberto no painel lateral do board (no navegador; no editor ele fica na barra lateral) */
   chatOpen: boolean;
   setChatOpen(open: boolean): void;
@@ -216,6 +220,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     // as abas por ferramenta saíram: quem deixou uma aberta guarda o valor antigo, que cai em `tool`
     harnessTab: resolveHarnessTab(persisted?.harnessTab),
     harnessTopic: 'rules',
+    environmentProfile: null,
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
@@ -248,6 +253,10 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     setNotice: (notice) => set({ notice }),
     setView(view) {
       set({ view });
+      persist(get());
+    },
+    openEnvironment(profile) {
+      set({ view: 'environment', environmentProfile: profile ?? null, openCardId: null, attachmentModal: null });
       persist(get());
     },
     openSettings(settingsTab) {

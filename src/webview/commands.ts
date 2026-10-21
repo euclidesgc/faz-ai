@@ -58,8 +58,6 @@ export const ui = {
   openTerminal: (command: string) => post({ type: 'ui.openTerminal', command }),
   checkEnvironment: () => req({ type: 'environment.check' }),
   environmentSeen: () => post({ type: 'environment.seen' }),
-  pinMcp: () => req({ type: 'environment.pinMcp' }),
-  allowKimiMcp: () => post({ type: 'environment.allowKimiMcp' }),
 };
 
 export const chat = {
