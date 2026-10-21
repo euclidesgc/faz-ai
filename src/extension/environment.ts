@@ -28,6 +28,8 @@ export interface EnvironmentProbe {
   workspaceDir: string;
   /** o que falta no banco de artefatos do board; null quando não dá para saber (sem o inventário) */
   harnessIssues: HarnessIssue[] | null;
+  /** cópias antigas da skill do fluxo nas pastas das ferramentas (só avisa; null quando não dá para saber) */
+  flowSkillCopies?: string[];
   /** as renomeações de branch à espera de Renomear/Desfazer (#466): o item "Nome da branch" fica pendente enquanto houver */
   branchRenames?: BranchRenamePending[];
   /** o sistema: no Windows, os comandos de instalação são os do PowerShell */
@@ -169,6 +171,9 @@ function harnessCheck(issues: HarnessIssue[] | null, requirement?: BoardRequirem
   };
 }
 
+/** Aviso da cópia antiga da skill do fluxo: o item só existe quando há cópia, e o arquivo nunca é apagado. */
+const flowSkillCopy = (paths: string[]): EnvCheck => ({ id: 'flow-skill-copy', status: 'missing', paths });
+
 /**
  * O Diagnóstico do ambiente: o Node.js, um bloco por perfil de CLI (CLI, login, credenciais), o banco
  * de artefatos do board e o que ele aproveita quando existe. O board não instala nada de terceiros:
@@ -292,7 +297,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     profiles,
     availability: boardAvailability(profiles),
     harness: harnessCheck(p.harnessIssues, req('harness')),
-    recommended: [git, branchName, gh, codeGraph],
+    recommended: [git, branchName, gh, codeGraph, ...(p.flowSkillCopies?.length ? [flowSkillCopy(p.flowSkillCopies)] : [])],
     // os instaladores do Linux e do macOS baixam pelo curl, que um Ubuntu desktop novo não traz
     ...(!windows && !p.resolve('curl') ? { curlMissing: true as const } : {}),
     checkedAt: Date.now(),

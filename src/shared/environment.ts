@@ -18,7 +18,8 @@ export type EnvCheckId =
   | 'crg'
   | 'uv'
   | 'crg-graph'
-  | 'crg-embeddings';
+  | 'crg-embeddings'
+  | 'flow-skill-copy';
 
 /**
  * `ok`: pronto. `missing`: falta. `skipped`: não dá para conferir enquanto falta o item de que ele
@@ -47,6 +48,8 @@ export interface EnvCheck {
   docs?: string;
   /** o requisito do aviso no topo do board, com o texto e o botão que o resolvem */
   requirement?: BoardRequirement;
+  /** os arquivos que o item aponta (a cópia antiga da skill do fluxo), para a pessoa apagar */
+  paths?: string[];
   /** o que depende deste item, mostrado dentro dele */
   children?: EnvCheck[];
 }

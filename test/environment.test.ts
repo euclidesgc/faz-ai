@@ -17,6 +17,7 @@ function probe(o: {
   pathDirs?: string[];
   linux?: LinuxFamily | null;
   branchRenames?: EnvironmentProbe['branchRenames'];
+  flowSkillCopies?: string[];
 }): EnvironmentProbe & { ran: string[] } {
   const ran: string[] = [];
   return {
@@ -26,6 +27,7 @@ function probe(o: {
     workspaceDir: '/proj',
     harnessIssues: o.harnessIssues === undefined ? [] : o.harnessIssues,
     branchRenames: o.branchRenames,
+    flowSkillCopies: o.flowSkillCopies,
     platform: o.platform ?? 'linux',
     homeDir: '/home/u',
     pathDirs: o.pathDirs ?? ['/usr/bin', '/home/u/.local/bin'],
@@ -145,6 +147,16 @@ describe('Diagnóstico do ambiente', () => {
     // recomendação: não entra na contagem do que falta para a IA trabalhar
     expect(missingCount(pending.required)).toBe(missingCount(none.required));
     expect(pending.required.some((c) => c.id === 'branch-name')).toBe(false);
+  });
+
+  it('a cópia antiga da skill do fluxo só aparece em recomendados quando existe, e o item aponta o arquivo', async () => {
+    const none = await checkEnvironment(probe({}));
+    expect(none.recommended.some((c) => c.id === 'flow-skill-copy')).toBe(false);
+    const file = '/home/u/.claude/skills/faz-ai-fluxo/SKILL.md';
+    const r = await checkEnvironment(probe({ flowSkillCopies: [file] }));
+    expect(find(r.recommended, 'flow-skill-copy')).toMatchObject({ status: 'missing', paths: [file] });
+    // recomendação: não entra no que falta para a IA trabalhar
+    expect(missingCount(r.required)).toBe(missingCount(none.required));
   });
 
   it('o board não instala nada de terceiros: cada item traz o site ou o comando para copiar', async () => {
