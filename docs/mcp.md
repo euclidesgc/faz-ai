@@ -401,8 +401,7 @@ Ao ler um card (`get_card`), a IA recebe a ferramenta, o **modelo** e o **esfor�
 obrigatórias com o caminho de cada `SKILL.md` (as do fluxo vêm sem caminho, para ler com `get_skill`). Ela é instruída a carregar essas skills antes de
 executar e a avisar a pessoa quando o modelo for outro. Na fase de código, as sub-tarefas são executadas
 pelo board (uma execução da CLI por sub-tarefa, com o modelo do card dela): a sessão da história cria e
-descreve as sub-tarefas e para, e `subtasksNow.byBoard` lista as que o board executa, na ordem. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue.
- Nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica negada; no Cursor e no Kimi Code, sem bloqueio comprovado, a capacidade fica "desconhecida" e a admissão decide). Em **Configurações → Harness de IA** (e em `fazai.git.parallelSubtasks`, de 1 a 6) a pessoa define **"Sub-tarefas em paralelo por história"**; a tela mostra o pedido e o efetivo (hoje 1).
+descreve as sub-tarefas e para, e `subtasksNow.byBoard` lista as que o board executa, na ordem. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue. Nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica negada; no Cursor e no Kimi Code, sem bloqueio comprovado, a capacidade fica "desconhecida" e a admissão decide). Em **Configurações → Harness de IA** (e em `fazai.git.parallelSubtasks`, de 1 a 6) a pessoa define **"Sub-tarefas em paralelo por história"**; a tela mostra o pedido e o efetivo (hoje 1).
 Fluxo SDD sugerido: a IA lê a história e a fase (`phase`), cria uma sub-tarefa com o campo Fase,
 constrói nela o documento da fase e o anexa à história (`artifact: true`), pede a revisão na
 história e para. Com a aprovação, move a história para a próxima coluna.
