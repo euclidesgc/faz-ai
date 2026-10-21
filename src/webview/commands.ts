@@ -256,11 +256,11 @@ export const harness = {
   pickImport: (tool: AiTool) => req({ type: 'harness.import.pick', tool }),
   addImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.add', tool, dir }),
   removeImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.remove', tool, dir }),
-  createAgent: (scope: InstallScope, input: AgentInput) => req({ type: 'harness.agent.create', scope, input }),
-  updateAgent: (name: string, scope: InstallScope, patch: Partial<AgentInput>, body?: string) =>
-    req({ type: 'harness.agent.update', name, scope, patch, ...(body !== undefined ? { body } : {}) }),
-  writeAgent: (name: string, scope: InstallScope, content: string) => req({ type: 'harness.agent.write', name, scope, content }),
-  deleteAgent: (name: string, scope: InstallScope) => req({ type: 'harness.agent.delete', name, scope }),
+  createAgent: (input: AgentInput) => req({ type: 'harness.agent.create', input }),
+  updateAgent: (name: string, patch: Partial<AgentInput>, body?: string) =>
+    req({ type: 'harness.agent.update', name, patch, ...(body !== undefined ? { body } : {}) }),
+  writeAgent: (name: string, content: string) => req({ type: 'harness.agent.write', name, content }),
+  deleteAgent: (name: string) => req({ type: 'harness.agent.delete', name }),
   seedAgents: (force = false) => req({ type: 'harness.agents.seed', force }),
   addMcp: (tool: AiTool, source: number, server: McpServerInput) => req({ type: 'harness.mcp.add', tool, source, server }),
   removeMcp: (tool: AiTool, path: string, name: string) => req({ type: 'harness.mcp.remove', tool, path, name }),

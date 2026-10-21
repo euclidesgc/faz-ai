@@ -5,6 +5,12 @@ import type { AiTool } from '../../../../shared/harness';
 import { Chip, IconClose, SelectField } from '../../ui';
 import { t } from '../../../i18n';
 
+/** Estado da caixa da categoria: todas, algumas (intermediário) ou nenhuma das ferramentas marcadas. */
+function groupState(names: string[], value: string[]): boolean | 'indeterminate' {
+  const n = names.filter((x) => value.includes(x)).length;
+  return n === 0 ? false : n === names.length ? true : 'indeterminate';
+}
+
 /** Item sentinela do seletor de servidores: o Select do Radix não aceita valor vazio. */
 const NONE = '__none';
 
@@ -21,13 +27,17 @@ interface Props {
 }
 
 /**
- * As ferramentas embutidas de uma ferramenta de IA como caixas marcáveis, por grupo de escopo, com o aviso nos
+ * As ferramentas por categoria (Leitura, Edição de arquivos, Comandos, Rede, Outros agentes), cada uma com a caixa da
+ * categoria e a lista detalhada dentro, com o aviso nos
  * grupos que ampliam o que o agente alcança. O que o arquivo já tem e a lista não conhece (servidores MCP,
  * `Bash(git diff *)`) aparece como chip marcado, que dá para tirar; `servers` oferece acrescentar um servidor.
  */
 export function ToolChecklist({ tool, value, onChange, deny = false, servers = [], prefix = '' }: Props) {
   const groups = baseValue(AGENT_TOOLS, tool) ?? [];
   const toggle = (name: string, on: boolean) => onChange(on ? [...value, name] : value.filter((v) => v !== name));
+  // marcar a categoria marca todas as ferramentas dela; desmarcar tira todas (o resto da lista fica)
+  const toggleGroup = (names: string[], on: boolean) =>
+    onChange(on ? [...value, ...names.filter((n) => !value.includes(n))] : value.filter((v) => !names.includes(v)));
   const extras = extraToolNames(tool, value);
   const addable = servers.filter((s) => !value.includes(mcpToolPattern(s)));
   return (
@@ -35,6 +45,17 @@ export function ToolChecklist({ tool, value, onChange, deny = false, servers = [
       {groups.map((g) => (
         <fieldset key={g.id} className="tool-group">
           <legend>
+            <Checkbox
+              className="tool-group-check"
+              aria-label={`${prefix}${t('Categoria')} ${t(g.label)}`}
+              checked={groupState(g.tools.map((x) => x.name), value)}
+              onCheckedChange={(v) =>
+                toggleGroup(
+                  g.tools.map((x) => x.name),
+                  v === true,
+                )
+              }
+            />
             <span className="tool-group-name">{t(g.label)}</span>
             {g.widens && !deny && (
               <Badge color="amber" variant="soft" title={t('Marcar uma ferramenta deste grupo amplia o que o agente pode fazer.')}>

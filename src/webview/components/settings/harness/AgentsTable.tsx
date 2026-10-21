@@ -12,6 +12,7 @@ import { ModelEditor } from '../../FieldRenderer';
 import { ActionButton, DeleteButton, FormField, IconAgents, IconPlus } from '../../ui';
 import { AgentEditor } from './AgentEditor';
 import { AgentWizard } from './AgentWizard';
+import { AgentsToolbar, DefaultAgentBadge, DeleteAgentButton, MakeDefaultButton } from './AgentsToolbar';
 import { FormActions } from './FormActions';
 import { withGlobalWarning } from './text';
 import { t } from '../../../i18n';
@@ -31,13 +32,10 @@ export function AgentsTable({ tool, scope, query = '' }: { tool: AiToolInfo; sco
   const [wizard, setWizard] = useState<{ preset?: AgentSuggestion; at: number } | null>(null);
   const [draft, setDraft] = useState(EMPTY);
   const agents = state.harness.agents.filter((a) => a.scope === scope && matchesQuery(query, a.name, a.description));
-  const defaultName = state.board.execProfiles.find((p) => p.isDefault && p.scope !== 'builtin')?.id ?? '';
   const available = (a: Agent) => usageOf(state.harnessSelection, { kind: 'agent', location: a.location }) !== null;
-  const busy = state.chat.busy;
-  const seed = useAction(() => harness.seedAgents(true));
   const nameOk = isFreeName(draft.name, state.harness.agents);
   const create = () => {
-    harness.createAgent(scope, {
+    harness.createAgent({
       name: draft.name,
       description: draft.description.trim(),
       body: draft.body,
@@ -82,71 +80,17 @@ export function AgentsTable({ tool, scope, query = '' }: { tool: AiToolInfo; sco
           {t('trocar ferramenta')}
         </ActionButton>
       </Text>
-      <div className="actions-toolbar">
-        <span className="toolbar-group">
-          <ActionButton
-            hint={t('Abre o formulário de um agente novo; o arquivo é gravado na pasta da ferramenta ao salvar.')}
-            onClick={() => {
-              setCreating(!creating);
-              setWizard(null);
-            }}
-          >
-            <IconPlus /> {t('Novo agente')}
-          </ActionButton>
-          <ActionButton
-            variant="soft"
-            color="gray"
-            hint={t('Um passo a passo com exemplos e sugestões para criar um agente de escopo reduzido.')}
-            onClick={() => {
-              setWizard({ at: Date.now() });
-              setCreating(false);
-            }}
-          >
-            <IconAgents /> {t('Criar agente com ajuda')}
-          </ActionButton>
-        </span>
-        <span className="toolbar-group">
-          <ActionButton
-            variant="soft"
-            color="gray"
-            disabled={busy}
-            disabledReason={t('A IA ainda está respondendo no chat do board.')}
-            hint={t('A IA lê o projeto e cria ou ajusta os agentes; acompanhe no chat do board.')}
-            onClick={() => ai.suggestAgents()}
-          >
-            {t('Sugerir agentes com IA')}
-          </ActionButton>
-          {scope === 'user' && (
-            <ActionButton
-              variant="ghost"
-              loading={seed.busy}
-              hint={t('Cria de novo os agentes de fábrica que não existem mais; não mexe nos que existem.')}
-              onClick={() => void seed.run()}
-            >
-              {t('Recriar os agentes padrão')}
-            </ActionButton>
-          )}
-        </span>
-      </div>
-      <div className="actions-toolbar agent-ready" role="group" aria-label={t('Sugestões prontas')}>
-        <span className="muted small">{t('Sugestões prontas:')}</span>
-        {AGENT_SUGGESTIONS.map((s) => (
-          <ActionButton
-            key={s.id}
-            variant="soft"
-            color="gray"
-            size="1"
-            hint={t('Abre o assistente com as respostas preenchidas, para você ajustar e confirmar.')}
-            onClick={() => {
-              setWizard({ preset: s, at: Date.now() });
-              setCreating(false);
-            }}
-          >
-            {t(s.label)}
-          </ActionButton>
-        ))}
-      </div>
-      {wizard && <AgentWizard key={wizard.at} tool={tool} scope={scope} preset={wizard.preset} onClose={() => setWizard(null)} />}
+      <AgentsToolbar
+        onNew={() => {
+          setCreating(!creating);
+          setWizard(null);
+        }}
+        onWizard={(preset) => {
+          setWizard({ preset, at: Date.now() });
+          setCreating(false);
+        }}
+      />
+      {wizard && <AgentWizard key={wizard.at} tool={tool} preset={wizard.preset} onClose={() => setWizard(null)} />}
       {creating && (
         <Card className="draft-card" aria-label={t('Agente novo')}>
           <FormField label={t('Nome')} hint={draft.name && !nameOk ? t('Nome inválido ou já usado.') : undefined}>
@@ -227,11 +171,7 @@ export function AgentsTable({ tool, scope, query = '' }: { tool: AiToolInfo; sco
                 </td>
                 <td>
                   <span className="item-name">{a.name}</span>{' '}
-                  {on && a.name === defaultName && (
-                    <Badge color="indigo" variant="soft">
-                      {t('padrão')}
-                    </Badge>
-                  )}{' '}
+                  <DefaultAgentBadge name={a.name} />{' '}
                   {a.seed && (
                     <Badge color="gray" variant="outline" title={t('Criado pelo board; pode ser editado ou apagado')}>
                       {t('de fábrica')}
@@ -254,16 +194,7 @@ export function AgentsTable({ tool, scope, query = '' }: { tool: AiToolInfo; sco
                 </td>
                 <td className="narrow">
                   <div className="row-actions">
-                    {on && a.name !== defaultName && (
-                      <ActionButton
-                        variant="ghost"
-                        size="1"
-                        hint={t('Usado quando nem o card nem a coluna indicam um agente')}
-                        onClick={() => settings.updateBoard({ runner: { defaultAgent: a.name } })}
-                      >
-                        {t('Tornar padrão')}
-                      </ActionButton>
-                    )}
+                    {on && <MakeDefaultButton name={a.name} />}
                     <ActionButton
                       variant="ghost"
                       size="1"
@@ -272,17 +203,7 @@ export function AgentsTable({ tool, scope, query = '' }: { tool: AiToolInfo; sco
                     >
                       {open ? t('Fechar edição') : t('Editar')}
                     </ActionButton>
-                    <DeleteButton
-                      title={t('Apagar o agente')}
-                      question={t('Apagar o agente "{name}"?', { name: a.name })}
-                      message={withGlobalWarning(
-                        t('O arquivo é removido: {location}. Colunas e cards que usam este agente voltam ao padrão.', {
-                          location: a.location,
-                        }),
-                        a.scope,
-                      )}
-                      onConfirm={() => void harness.deleteAgent(a.name, a.scope)}
-                    />
+                    <DeleteAgentButton name={a.name} location={a.location} />
                   </div>
                 </td>
               </tr>,

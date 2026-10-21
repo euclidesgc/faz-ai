@@ -541,7 +541,6 @@ export const harness: Record<string, string> = {
   'Sugerir agentes com IA': 'Suggest agents with AI',
   'Cria de novo os agentes de fábrica que não existem mais; não mexe nos que existem.':
     'Recreates the factory agents that no longer exist; leaves the existing ones alone.',
-  'Recriar os agentes padrão': 'Recreate the default agents',
   'Agente novo': 'New agent',
   'Como este agente trabalha: padrões, comandos, o que nunca fazer': 'How this agent works: patterns, commands, what never to do',
   'Criar agente': 'Create agent',
@@ -665,8 +664,8 @@ export const harness: Record<string, string> = {
   'Tirar {item}': 'Remove {item}',
   Tirar: 'Remove',
   'Nova linha: {label}': 'New line: {label}',
-  'O {tool} não aceita {what} no arquivo do agente: ele herda tudo da conversa principal.':
-    '{tool} does not accept {what} in the agent file: it inherits everything from the main conversation.',
+  'O {tool} não aceita {what} por agente: ele herda tudo da conversa principal.':
+    '{tool} does not accept {what} per agent: it inherits everything from the main conversation.',
   'Pode continuar.': 'You can continue.',
   'Criar agente com ajuda': 'Create agent with help',
   'Para que este agente existe? Diga o papel e o objetivo dele.': 'What is this agent for? Describe its role and goal.',
@@ -1136,4 +1135,22 @@ export const harness: Record<string, string> = {
   'Lendo o servidor…': 'Reading the server…',
   'Não ponha segredos nos argumentos: use as variáveis de ambiente.': 'Do not put secrets in the arguments: use environment variables.',
   'Há nomes repetidos nas variáveis ou nos cabeçalhos.': 'There are repeated names in the variables or headers.',
+  Categoria: 'Category',
+  'Abre o formulário de um agente novo; ele é gravado no board ao salvar.': 'Opens the form for a new agent; it is saved in the board on save.',
+  'Recriar os de fábrica': 'Recreate the built-in ones',
+  'Tornar {name} o agente padrão': 'Make {name} the default agent',
+  'Apagar o agente {name}': 'Delete the agent {name}',
+  'Este é o agente padrão. Torne outro agente o padrão antes de apagar este.':
+    'This is the default agent. Make another agent the default before deleting this one.',
+  'O agente é removido do board{location}. Colunas e cards que o usam voltam ao padrão.':
+    'The agent is removed from the board{location}. Columns and cards that use it go back to the default.',
+  'No board, em "Pelo card": {name}': 'In the board, under "By the card": {name}',
+  'Sem lista: o agente herda o que o nível de permissão da execução libera.':
+    'No list: the agent inherits what the execution permission level allows.',
+  'Lista explícita: {n} ferramentas; só elas, dentro do nível de permissão da execução.':
+    'Explicit list: {n} tools; only those, within the execution permission level.',
+  'Este agente veio do {origin}: as categorias foram traduzidas para os nomes do {tool}. Confira a lista antes de executar.':
+    'This agent came from {origin}: the categories were translated to the names used by {tool}. Check the list before running.',
+  'O {tool} não aceita lista de ferramentas por agente: a execução ignora o que este agente restringe.':
+    '{tool} does not accept a per-agent tool list: the run ignores what this agent restricts.',
 };

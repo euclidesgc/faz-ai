@@ -313,10 +313,12 @@ describe('HarnessSettings: agentes', () => {
   };
 
   it('o global lista os agentes da pasta do usuário, com o padrão e a marcação; o projeto lista os dele', async () => {
+    setState((st) => ({ board: { ...st.board, runner: { ...st.board.runner, defaultAgent: 'revisor' } } }));
     await openAgents();
     const a = row(/revisor/);
     expect(a.getByRole('checkbox', { name: 'Disponível no board: revisor' })).toBeChecked();
     expect(a.getByText('padrão')).toBeInTheDocument();
+    expect(a.getByRole('button', { name: 'Apagar o agente revisor' })).toBeDisabled();
     expect(a.getByText('claude:opus@high')).toBeInTheDocument();
     expect(screen.queryByRole('row', { name: /local/ })).toBeNull();
     await userEvent.click(a.getByRole('checkbox', { name: 'Disponível no board: revisor' }));
@@ -354,7 +356,6 @@ describe('HarnessSettings: agentes', () => {
     await userEvent.click(create);
     expect(lastSent('harness.agent.create')).toEqual({
       type: 'harness.agent.create',
-      scope: 'user',
       input: { name: 'revisor-novo', description: 'Revisa', body: 'Passos', model: '', tools: [], deniedTools: [], skills: [], mcp: [] },
     });
     expect(screen.queryByRole('button', { name: 'Criar agente' })).toBeNull();
@@ -368,7 +369,6 @@ describe('HarnessSettings: agentes', () => {
     expect(lastSent('harness.agent.update')).toEqual({
       type: 'harness.agent.update',
       name: 'revisor',
-      scope: 'user',
       patch: { description: 'Revisa tudo' },
     });
     await userEvent.type(screen.getByDisplayValue('instruções'), '.');
@@ -376,28 +376,27 @@ describe('HarnessSettings: agentes', () => {
     expect(lastSent('harness.agent.update')).toEqual({
       type: 'harness.agent.update',
       name: 'revisor',
-      scope: 'user',
       patch: {},
       body: 'instruções.',
     });
     await userEvent.click(screen.getByRole('button', { name: 'Só leitura' }));
     expect(lastSent('harness.agent.update').patch).toEqual({ tools: ['Read', 'Grep', 'Glob'] });
     await userEvent.click(row(/revisor/).getByTitle('Apagar o agente'));
-    expect(dialog().getByText(/vale para todos os seus projetos/)).toBeInTheDocument();
+    expect(dialog().getByText(/O agente é removido do board/)).toBeInTheDocument();
     await userEvent.click(dialog().getByRole('button', { name: 'Apagar' }));
-    expect(lastSent('harness.agent.delete')).toEqual({ type: 'harness.agent.delete', name: 'revisor', scope: 'user' });
+    expect(lastSent('harness.agent.delete')).toEqual({ type: 'harness.agent.delete', name: 'revisor' });
   });
 
-  it('sugerir agentes com IA pede ao host, e fica desabilitado enquanto o chat responde; recriar os padrão só no global', async () => {
+  it('sugerir agentes com IA pede ao host, e fica desabilitado enquanto o chat responde; recriar os de fábrica em qualquer origem', async () => {
     await openAgents();
     await userEvent.click(screen.getByRole('button', { name: 'Sugerir agentes com IA' }));
     expect(lastSent('ai.suggestAgents')).toEqual({ type: 'ai.suggestAgents' });
-    await userEvent.click(screen.getByRole('button', { name: 'Recriar os agentes padrão' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Recriar os de fábrica' }));
     expect(lastSent('harness.agents.seed')).toEqual({ type: 'harness.agents.seed', force: true });
     act(() => setState((s) => ({ chat: { ...s.chat, busy: true } })));
     expect(screen.getByRole('button', { name: 'Sugerir agentes com IA' })).toBeDisabled();
     await userEvent.click(screen.getByRole('radio', { name: 'Projeto' }));
-    expect(screen.queryByRole('button', { name: 'Recriar os agentes padrão' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Recriar os de fábrica' })).toBeInTheDocument();
   });
 
   it('o agente padrão é escolhido em Ferramenta e execução entre os disponíveis', async () => {

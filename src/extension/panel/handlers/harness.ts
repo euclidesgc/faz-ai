@@ -581,11 +581,11 @@ export const harnessHandlers = {
   'harness.agent.update': (msg, ctx) =>
     ctx.library.hasAgent(msg.name)
       ? ctx.harness.change(() => ctx.library.updateAgent(msg.name, msg.patch, msg.body))
-      : ctx.harness.op((h) => h.updateAgent(msg.name, msg.scope, msg.patch, msg.body)),
+      : ctx.harness.op((h) => h.updateAgent(msg.name, msg.scope ?? 'project', msg.patch, msg.body)),
   'harness.agent.write': (msg, ctx) =>
     ctx.library.hasAgent(msg.name)
       ? ctx.harness.change(() => ctx.library.writeAgent(msg.name, msg.content))
-      : ctx.harness.op((h) => h.writeAgent(msg.name, msg.scope, msg.content)),
+      : ctx.harness.op((h) => h.writeAgent(msg.name, msg.scope ?? 'project', msg.content)),
   'harness.agent.delete': (msg, ctx) => {
     if (ctx.library.hasAgent(msg.name)) {
       ctx.library.deleteAgent(msg.name);
@@ -594,8 +594,8 @@ export const harnessHandlers = {
       return true;
     }
     return ctx.harness.op((h) => {
-      const location = h.agents().find((a) => a.name === msg.name && a.scope === msg.scope)?.location;
-      h.deleteAgent(msg.name, msg.scope);
+      const location = h.agents().find((a) => a.name === msg.name && a.scope === (msg.scope ?? 'project'))?.location;
+      h.deleteAgent(msg.name, msg.scope ?? 'project');
       if (location) ctx.boards.setSelection(ctx.boardId, [{ kind: 'agent', location }], null);
       if (!h.agents().some((a) => a.name === msg.name)) ctx.boards.releaseAgent(ctx.boardId, msg.name);
     });

@@ -361,9 +361,9 @@ export type WebviewToHost =
   /** cria um agente no board (guardado no banco, não na pasta da ferramenta), disponível para os cards; `scope` é ignorado */
   | { type: 'harness.agent.create'; scope?: InstallScope; input: AgentInput }
   /** reescreve o frontmatter (o que vier em `patch`) e, se vier, o corpo de um agente, preservando o resto */
-  | { type: 'harness.agent.update'; name: string; scope: InstallScope; patch: Partial<AgentInput>; body?: string }
-  | { type: 'harness.agent.write'; name: string; scope: InstallScope; content: string }
-  | { type: 'harness.agent.delete'; name: string; scope: InstallScope }
+  | { type: 'harness.agent.update'; name: string; scope?: InstallScope; patch: Partial<AgentInput>; body?: string }
+  | { type: 'harness.agent.write'; name: string; scope?: InstallScope; content: string }
+  | { type: 'harness.agent.delete'; name: string; scope?: InstallScope }
   /** cria os agentes padrão de fábrica que ainda não existem (`force` recria também os que a pessoa apagou) */
   | { type: 'harness.agents.seed'; force?: boolean }
   /** a IA lê o projeto e propõe os agentes do board (cria, ajusta e marca); o resultado vai para o chat do board */
