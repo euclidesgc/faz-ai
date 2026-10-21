@@ -5,7 +5,8 @@
 import type { RunnerPermission } from '../../../shared/runner';
 import { claudeReader } from '../../aiOutput/claude';
 import { textReader } from '../../aiOutput/text';
-import { BOARD_SERVER, boardOnlyMcpConfig } from '../../execution';
+import { BUILTIN_ISOLATION } from '../../../shared/aiProfiles';
+import { BOARD_SERVER, SUBAGENT_TOOLS, boardOnlyMcpConfig } from '../../execution';
 import { tmpArg, type AiProvider } from '../provider';
 
 const SERVER = BOARD_SERVER;
@@ -37,21 +38,23 @@ export const claudeProvider: AiProvider = {
     args.push(...addDirs.flatMap((d) => ['--add-dir', d]));
     if (exec?.model) args.push('--model', exec.model.name, ...(exec.model.effort ? ['--effort', exec.model.effort] : []));
     // o agente vai inline e é o da sessão: não depende de nenhuma pasta de agentes (verificado na CLI 2.1.278)
-    // os outros agentes do board vão junto, como subagentes da sessão da história
+    // só o agente da própria execução: as sub-tarefas são execuções separadas do board, não subagentes
     if (exec?.agentDefinition) {
-      const agents = Object.fromEntries([exec.agentDefinition, ...exec.delegates].map(({ name, ...def }) => [name, def]));
-      args.push('--agents', JSON.stringify(agents), '--agent', exec.agentDefinition.name);
+      const { name, ...def } = exec.agentDefinition;
+      args.push('--agents', JSON.stringify({ [name]: def }), '--agent', name);
     } else if (exec?.agent) args.push('--agent', exec.agent);
     if (exec && (strict || exec.tools.length)) args.push('--tools', exec.tools.join(','));
-    if (exec?.deniedTools.length) args.push('--disallowedTools', ...exec.deniedTools);
-    // contexto vazio: só o servidor do board e os liberados pelo agente (`--strict-mcp-config` deixa de
+    // a delegação nativa fica negada em toda execução do board (docs do Claude Code: `Agent`, antes `Task`)
+    if (exec) args.push('--disallowedTools', ...new Set([...exec.deniedTools, ...SUBAGENT_TOOLS]));
+    // isolamento (BUILTIN_ISOLATION.claude, lido na doc 2026-10-16/2.1.296): só o servidor do board e os liberados pelo agente (`--strict-mcp-config` deixa de
     // fora os do usuário e do projeto; a execução não depende de "Conectar ao board" nem da aprovação do
     // .mcp.json, que o modo -p não tem como pedir), nenhuma fonte de configuração (`--setting-sources ""`:
     // sem CLAUDE.md, skills, agentes, hooks e plugins do usuário nem do projeto, verificado na CLI 2.1.278)
     // e nenhuma skill invocável; o que o board marcou vai no pedido, pelo caminho do arquivo
     const mcpConfig = exec?.mcpConfig ?? (boardServer ? boardOnlyMcpConfig(boardServer) : null);
     if (mcpConfig) args.push('--strict-mcp-config', '--mcp-config', tmpArg(MCP_CONFIG));
-    args.push('--setting-sources', '', '--disable-slash-commands');
+    // `--strict-mcp-config` só vale junto de `--mcp-config` (acima); o resto vem do isolamento do perfil pronto
+    args.push(...BUILTIN_ISOLATION.claude.args.filter((a) => a !== '--strict-mcp-config'));
     return {
       command: 'claude',
       args,

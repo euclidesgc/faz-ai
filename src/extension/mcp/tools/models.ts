@@ -19,10 +19,24 @@ const profileOf = (router: MessageRouter, id?: string): AiProfile => {
 export function registerModelTools(tool: DefineTool): void {
   tool(
     'get_models',
-    'Catálogo de modelos de LLM e perfis de CLI do board, com os níveis de esforço e as regras de sugestão. `value` usa `<perfil>:<modelo>@<esforço>`; uma cópia usa o catálogo do perfil pronto de origem e um personalizado aceita modelo livre. O board não guarda preço: o custo de uma execução é o que o executor informa. ' +
+    'Catálogo de modelos de LLM e perfis de CLI do board, com os níveis de esforço e as regras de sugestão. `value` usa `<perfil>:<modelo>@<esforço>` e o prefixo escolhe o perfil de CLI que executa o card; quando nada indica um modelo (card, agente ou regra), vale o perfil padrão. Uma cópia usa o catálogo do perfil pronto de origem e um personalizado aceita modelo livre. O board não guarda preço: o custo de uma execução é o que o executor informa. ' +
       'O campo "Esforço da atividade" do card é o tamanho da tarefa, não o esforço do modelo: as regras sugerem o modelo a partir dele.',
     {},
     (_a, router) => models(router),
+    true,
+  );
+
+  tool(
+    'get_execution_policies',
+    'Consulta as políticas de execução e troca de alvo do board (regra vencedora, destinos, limites e revisão). Só leitura: criar, alterar, revisar ou ativar política é ação da pessoa nas Configurações do board, e a IA não aprova a própria política. Não traz comandos, credenciais nem segredos.',
+    {},
+    (_a, router) => {
+      const { snapshot } = router.executionPolicyLibrary();
+      return {
+        policies: snapshot.records.map((r) => ({ ...r.policy, revision: r.revision, review: r.review })),
+        note: 'Alterações só pela interface do board.',
+      };
+    },
     true,
   );
 
@@ -111,7 +125,9 @@ export function registerModelTools(tool: DefineTool): void {
           fallback: z
             .string()
             .optional()
-            .describe('Modelo e esforço de reserva, usado quando o principal esgota o limite; omitido = sem reserva'),
+            .describe(
+              'Descontinuado: a reserva agora é uma política de execução, revisada pela pessoa em Ferramentas de IA. Informar isto é recusado.',
+            ),
           enabled: z.boolean().optional(),
         }),
       ),
@@ -120,6 +136,11 @@ export function registerModelTools(tool: DefineTool): void {
       const s = router.snapshot();
       const fieldId = (name: string) =>
         ['tipo', 'type', TYPE_CONDITION].includes(name.trim().toLowerCase()) ? TYPE_CONDITION : findField(s, name).id;
+      // a reserva paralela não existe mais: o fallback é decidido só pelas políticas de execução
+      if (a.rules.some((r) => r.fallback))
+        throw new Error(
+          'A reserva por regra foi substituída pelas políticas de execução, que só a pessoa grava: configure em Ferramentas de IA.',
+        );
       const rules: ModelRule[] = a.rules.map((r) => ({
         id: newId(),
         name: r.name ?? '',
@@ -128,7 +149,7 @@ export function registerModelTools(tool: DefineTool): void {
           g.map((c) => ({ fieldId: fieldId(c.field), op: c.not ? ('isNot' as const) : ('is' as const), value: c.value })),
         ),
         model: resolveModelInput(s.board.modelCatalog, r.model, activeProfile(s.board)),
-        fallback: r.fallback ? resolveModelInput(s.board.modelCatalog, r.fallback, activeProfile(s.board)) : null,
+        fallback: null,
       }));
       router.handle({ type: 'settings.modelRules.set', rules });
       return models(router);

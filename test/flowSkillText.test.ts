@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FLOW_SKILL, FLOW_SKILLS, FLOW_SKILL_NAMES, flowSkillMarkdown, isFlowSkill } from '../src/extension/flowSkill';
+import { FLOW_TEXT } from './flowSkillText';
 import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 
 describe('conjunto de skills do fluxo (#588)', () => {
@@ -8,6 +9,19 @@ describe('conjunto de skills do fluxo (#588)', () => {
     expect(harness.body).toContain('<perfil>:<modelo>@<esforço>');
     expect(harness.body).toContain('perfil de CLI do board');
     expect(harness.body).not.toMatch(/claude, cursor (ou|e) kimi/i);
+  });
+  it('fala do perfil de CLI da execução e do perfil padrão, sem mandar trocar de CLI', () => {
+    const harness = FLOW_SKILLS.find((k) => k.name === 'faz-ai-harness-do-card')!;
+    expect(harness.body).toContain('perfil de CLI da execução');
+    expect(harness.body).toContain('perfil padrão');
+    expect(harness.body).toContain('Você não troca de CLI');
+    expect(FLOW_TEXT).not.toMatch(/ferramenta do board/i);
+  });
+  it('a skill do harness explica cliLoads sem prometer contexto vazio sem prova', () => {
+    const harness = FLOW_SKILLS.find((k) => k.name === 'faz-ai-harness-do-card')!;
+    expect(harness.body).toContain('execution.cliLoads');
+    expect(harness.body).toContain('contextEnforced');
+    expect(harness.body).toContain('Lista vazia não prova isolamento');
   });
   it('a principal vem primeiro, os nomes não se repetem e cada skill tem descrição e corpo', () => {
     expect(FLOW_SKILLS[0]).toBe(FLOW_SKILL);

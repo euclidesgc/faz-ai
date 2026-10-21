@@ -3,10 +3,11 @@ import { cardRef, type BoardState, type Card, type Column } from '../shared/mode
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
-import { blocksExecution } from '../shared/requirements';
+import { cardCliProblem } from '../shared/requirements';
 import { limitOf, type AiRunMode } from '../shared/runner';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
+import { orchestratesStory } from '../shared/orchestration';
 import { autopilotQueue } from '../shared/autopilotQueue';
 import { commentsSinceSummary } from '../shared/conversation';
 import type { MessageRouter } from './panel/messageRouter';
@@ -34,7 +35,14 @@ export interface AutopilotRunner {
   onDidFinish(listener: (cardId: string, mode?: AiRunMode) => void): void;
 }
 
+/** Quem conduz uma história rodada após rodada (o `Orchestrator`): o autopiloto e o heartbeat só pedem que ela siga. */
+export interface StoryDriver {
+  drive(storyId: string, origin: AiRunOrigin): Promise<{ kind: string; reason?: string }>;
+}
+
 export interface AutopilotDeps {
+  /** conduz as histórias de fase de código que já têm sub-tarefas; sem ele, tudo passa por `runner.start` */
+  driver?: StoryDriver;
   log(line: string): void;
   /** só a janela dona do board toca as histórias, para duas não chamarem a IA em dobro; padrão: sempre */
   canRun?(): boolean;
@@ -395,13 +403,14 @@ export class Autopilot {
           continue;
         }
         if (step.kind !== 'run') return;
-        // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
-        if (blocksExecution(this.router.snapshot())) return;
         // o teto é por tipo de atividade e conta toda execução em andamento (heartbeat, chamadas à mão):
         // o autopiloto usa as vagas livres de cada tipo, na ordem da fila
         const s = this.router.snapshot();
         const counts = runningByKind(s, this.runner.running);
         for (const r of autopilotRuns(s)) {
+          // login vencido (preventivo ou pela falha reativa) ou CLI ausente do perfil da história: não insiste
+          // sozinho, a pessoa resolve; só essa história espera, as dos outros perfis seguem
+          if (cardCliProblem(s, r.story)) continue;
           // a história passou de fase desde a última execução e a conversa está cheia: primeiro o resumo (uma
           // execução de texto), depois a fase. Uma história que ainda não rodou nesta sessão segue direto
           const from = this.lastRunColumn.get(r.story.id);
@@ -429,6 +438,7 @@ export class Autopilot {
       const s = this.router.snapshot();
       this.progress.set(story.id, { sig: progressOf(s, story), stalls: this.progress.get(story.id)?.stalls ?? 0 });
       this.lastRunColumn.set(story.id, story.columnId);
+      if (this.deps.driver && orchestratesStory(s, story)) return this.drive(this.deps.driver, story);
       this.runner.start(story.id, 'autopilot');
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
@@ -438,6 +448,20 @@ export class Autopilot {
       this.active = false;
       this.publish(reason);
     }
+  }
+
+  /** O orquestrador conduz a história; uma recusa dele (outra janela, reconciliação) vai para o log e a nota, sem desligar a fila. */
+  private drive(driver: StoryDriver, story: Card): void {
+    driver
+      .drive(story.id, 'autopilot')
+      .then((result) => {
+        if (result.kind === 'paused' && result.reason) this.publish(result.reason);
+      })
+      .catch((e: unknown) => {
+        const reason = e instanceof Error ? e.message : String(e);
+        this.deps.log(`Autopiloto: ${cardRef(story)}: ${reason}`);
+        this.publish(reason);
+      });
   }
 
   private startSummary(s: BoardState, story: Card): void {

@@ -597,6 +597,23 @@ describe('CardDrawer', () => {
     expect(sentOf('card.trash')).toHaveLength(0);
   });
 
+  it('Ações: "Duplicar card" manda o título traduzido, sem confirmar, e o drawer continua no original', async () => {
+    openStory();
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Duplicar card' }));
+    const title = useBoardStore.getState().state!.cards.find((c) => c.id === board.storyId)!.title;
+    expect(lastSent('card.duplicate')).toEqual({ type: 'card.duplicate', cardId: board.storyId, title: `Cópia de ${title}` });
+    expect(useBoardStore.getState().dialog).toBeNull();
+    expect(useBoardStore.getState().openCardId).toBe(board.storyId);
+  });
+
+  it('card arquivado: sem "Duplicar card" no menu', async () => {
+    patchCard(board.subId, { archivedAt: 1 });
+    openCardDrawer(board.subId);
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
+    expect(screen.queryByRole('button', { name: 'Duplicar card' })).toBeNull();
+  });
+
   it('card arquivado: aviso, coluna travada, sem status e "Restaurar" no menu (história ativa: restaura só ele)', async () => {
     patchCard(board.subId, { archivedAt: 1 });
     openCardDrawer(board.subId);
@@ -791,9 +808,7 @@ describe('botões de IA do card', () => {
 
   it('com a CLI sem login, os dois ficam desligados, com o motivo na dica', async () => {
     const { router, storyId } = await seedBoard();
-    router.setRequirements([
-      { id: 'signin', tool: 'cursor', cli: 'cursor-agent', action: { kind: 'command', command: 'cursor-agent login' } },
-    ]);
+    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude auth login' } }]);
     syncStore(router);
     renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
     for (const name of [/Trabalhar na fase/, /Refinar com IA/]) {
@@ -809,7 +824,7 @@ describe('botões de IA do card', () => {
   it('com o login vencido durante a execução (sinal reativo, sem o requisito "signin"), os dois também ficam desligados', async () => {
     const { router, storyId } = await seedBoard();
     act(() => {
-      router.setAuthExpired('claude');
+      router.setAuthExpired('claude', true);
       syncStore(router);
     });
     renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
@@ -823,7 +838,7 @@ describe('botões de IA do card', () => {
     }
 
     act(() => {
-      router.setAuthExpired(null);
+      router.setAuthExpired('claude', false);
       syncStore(router);
     });
     for (const name of [/Trabalhar na fase/, /Refinar com IA/]) expect(screen.getByRole('button', { name })).toBeEnabled();

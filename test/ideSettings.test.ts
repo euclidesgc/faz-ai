@@ -45,13 +45,15 @@ describe('importIdeSettingsOnce', () => {
     fakeConfig.values.global['fazai.git.mode'] = 'branch';
     fakeConfig.values.global['fazai.git.gitflow'] = false;
     fakeConfig.values.global['fazai.git.parallelStories'] = 3;
+    fakeConfig.values.global['fazai.git.parallelSubtasks'] = 4;
     const imported = importIdeSettingsOnce(config(), link);
-    expect(imported.sort()).toEqual(['appearance.theme', 'git.gitflow', 'git.mode', 'git.parallelStories']);
+    expect(imported.sort()).toEqual(['appearance.theme', 'git.gitflow', 'git.mode', 'git.parallelStories', 'git.parallelSubtasks']);
     const board = link.router.snapshot().board;
     expect(board.appearance.theme).toBe('dark');
     expect(board.git.mode).toBe('branch');
     expect(board.git.gitflow).toBe(false);
     expect(board.runner.parallelStories).toBe(3);
+    expect(board.runner.parallelSubtasks).toBe(4);
     expect(link.getMeta(IDE_SETTINGS_IMPORTED)).toBe('1');
   });
 
@@ -150,8 +152,8 @@ describe('importIdeSettingsOnce', () => {
     expect(importIdeSettingsOnce(flaky, link)).toEqual(['git.mode']);
   });
 
-  it('cobre as 19 chaves', () => {
-    expect(LEGACY_KEYS).toHaveLength(19);
+  it('cobre as 20 chaves', () => {
+    expect(LEGACY_KEYS).toHaveLength(20);
     expect(LEGACY_KEYS.filter((k) => k.userOnly).map((k) => k.key)).toEqual([
       'appearance.language',
       'appearance.theme',

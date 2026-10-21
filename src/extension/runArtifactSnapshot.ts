@@ -60,7 +60,7 @@ export function runArtifactRequest(s: BoardState, card?: Card): RunArtifactReque
       manifest.rules.some((name) => !refs.some((r) => r.kind === 'rule' && r.name === name)))
   )
     throw new Error('Artefato obrigatório do card está indisponível.');
-  const agents = new Set([manifest?.agent, ...(manifest?.delegates.map((a) => a.name) ?? [])]);
+  const agents = new Set([manifest?.agent]);
   return {
     directory: library.directory,
     artifacts: library.artifacts
@@ -269,7 +269,6 @@ export class RunArtifactSnapshots {
           const result = structuredClone(input);
           result.prompt = replace(result.prompt);
           if (result.exec?.agentDefinition) result.exec.agentDefinition.prompt = replace(result.exec.agentDefinition.prompt);
-          if (result.exec) result.exec.delegates = result.exec.delegates.map((a) => ({ ...a, prompt: replace(a.prompt) }));
           if (request.artifacts.length)
             result.addDirs = [
               ...new Set([...(result.addDirs ?? []).map((dir) => (dir === request.directory ? destination : dir)), destination]),

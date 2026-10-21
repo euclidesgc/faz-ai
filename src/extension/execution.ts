@@ -1,6 +1,6 @@
-import { baseValue } from '../shared/harness';
-import { EXEC_ENFORCEMENT, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
-import type { AiTool } from '../shared/harness';
+import { effortToRun, enforcementOf, manifestOf, type ExecManifest } from '../shared/execution';
+import { activeProfile, catalogTool, isolationSummary, profileBase, profileIsolation, type AiProfile } from '../shared/aiProfiles';
+import type { RunTarget } from '../shared/runTarget';
 import { selectedMcpNames } from '../shared/harnessSelection';
 import type { BoardState, Card } from '../shared/model';
 import { isFlowSkill } from './flowSkill';
@@ -28,8 +28,11 @@ export interface AgentDefinition {
   model?: string;
 }
 
-/** A ferramenta do Claude Code que lança subagentes: é por ela que a sessão da história delega as sub-tarefas. */
-export const SUBAGENT_TOOL = 'Agent';
+/**
+ * As ferramentas do Claude Code que lançam subagentes (`Agent`; `Task` era o nome antes da 2.1.63 e segue
+ * como apelido). Toda execução do board as nega: as sub-tarefas são execuções separadas do board.
+ */
+export const SUBAGENT_TOOLS = ['Agent', 'Task'];
 
 /**
  * Acima disto o JSON do agente não vai na linha de comando: no Windows a CLI é um `.cmd` e a linha
@@ -43,8 +46,6 @@ export interface ExecInput {
   agent: string;
   /** o agente inteiro, para a ferramenta que o recebe inline (Claude Code); null = vai no prompt ou não há */
   agentDefinition: AgentDefinition | null;
-  /** os outros agentes do board, inline junto do agente da sessão, para ela delegar as sub-tarefas (Claude Code) */
-  delegates: AgentDefinition[];
   /** servidores MCP liberados além do do board */
   mcpAllowed: string[];
   /** servidores MCP configurados para a ferramenta que ficam de fora */
@@ -66,6 +67,8 @@ export interface ExecPlan {
   advice: string[];
   /** resumo para o log da execução */
   summary: string[];
+  /** contexto vazio imposto por capacidades verificadas (nunca por lista vazia); vai para `ai_runs.clean` */
+  clean: boolean;
 }
 
 /** Configuração do Claude Code só com o servidor do board: o que toda execução recebe quando o agente não libera mais nada. */
@@ -97,6 +100,17 @@ function requireReviewedMcps(state: BoardState, names: readonly string[]): void 
     ) ?? [];
   if (denied.length) throw new Error(`MCPs exigem revisão humana ou configuração local: ${denied.map((a) => a.name).join(', ')}.`);
 }
+/** O manifesto com outro alvo: a CLI e o modelo mudam, o resto (agente, skills, MCPs) é do card e segue igual. */
+function withTarget(s: BoardState, manifest: ExecManifest, target: RunTarget): ExecManifest {
+  const option = target.model && s.board.modelCatalog.find((o) => o.tool === catalogTool(target.cli) && o.model === target.model!.name);
+  return {
+    ...manifest,
+    target,
+    model: target.model
+      ? { name: target.model.name, effort: option ? effortToRun(option, target.model.effort) : target.model.effort }
+      : null,
+  };
+}
 export function executionPlan(
   s: BoardState,
   c: Card,
@@ -104,18 +118,16 @@ export function executionPlan(
   libraryServers: Record<string, unknown>,
   /** o servidor do board desta execução */
   board?: BoardServerSpec,
+  /** o alvo que vale nesta execução (a troca por política pode ser noutra CLI); sem ele, o do card */
+  target?: RunTarget,
 ): ExecPlan {
-  const tool: AiTool = s.board.aiTool;
-  const manifest = manifestOf(s, c);
-  const how = baseValue(EXEC_ENFORCEMENT, tool) ?? {
-    agent: 'advised',
-    skills: 'advised',
-    mcp: 'advised',
-    tools: 'advised',
-    model: 'advised',
-    context: 'advised',
-  };
-  const items = s.harness.inventory.find((t) => t.tool === tool)?.items ?? [];
+  const manifest = target ? withTarget(s, manifestOf(s, c), target) : manifestOf(s, c);
+  // o perfil de CLI do alvo do card (não o padrão do board): a imposição, o inventário e o arquivo de MCP seguem a CLI que executa
+  const cli = manifest.target.cli;
+  const base = profileBase(cli);
+  const profile = cli;
+  const how = enforcementOf(cli);
+  const items = s.harness.inventory.find((t) => t.tool === cli.id)?.items ?? [];
   const known = [...new Set(items.filter((i) => i.kind === 'mcp').map((i) => i.name))].filter((n) => n !== BOARD_SERVER);
   const allowed = manifest.mcpServers;
   requireReviewedMcps(s, allowed);
@@ -125,7 +137,7 @@ export function executionPlan(
   // conhecido (nem desta execução nem registrado na pasta) e sem nada liberado, fica sem arquivo, e a
   // linha de comando segue sem restrição de servidores (só acontece fora da extensão)
   let mcpConfig: string | null = null;
-  if (tool === 'claude') {
+  if (base === 'claude') {
     // só as definições guardadas no board (no host, com as credenciais do cofre): a execução não lê
     // `.mcp.json` nem `~/.claude.json`, e um servidor que ficou só na pasta da ferramenta não entra
     const defs: Record<string, unknown> = { ...libraryServers };
@@ -144,47 +156,14 @@ export function executionPlan(
   // o agente inline só na CLI que o aceita (perfil), e só quando cabe na linha de comando; senão vai como texto
   const inline = how.agent === 'enforced';
   let agentDefinition: AgentDefinition | null = null;
-  // a sessão de uma história leva os outros agentes do board como subagentes, para delegar as
-  // sub-tarefas (é ela que as executa; a sub-tarefa nunca roda sozinha). Com isso a sessão fica com
-  // todas as ferramentas (os subagentes precisam das deles), o agente dela ganha a de lançar
-  // subagentes, e o que ele próprio pode usar vai na definição inline
-  let delegates: AgentDefinition[] = [];
-  let sessionTools = manifest.tools;
+  // o agente da própria execução vai inline quando cabe na linha de comando; as sub-tarefas são execuções
+  // separadas do board, nunca subagentes da sessão
   if (manifest.agent && inline) {
     const def: AgentDefinition = { name: manifest.agent, description: manifest.purpose || manifest.agent, prompt: manifest.instructions };
-    const size = (list: AgentDefinition[]) => JSON.stringify(Object.fromEntries(list.map(({ name, ...d }) => [name, d]))).length;
-    if (manifest.delegates.length) {
-      const own = manifest.tools.length ? { tools: withBoardTools([...manifest.tools, SUBAGENT_TOOL]) } : {};
-      const withDelegates: AgentDefinition = {
-        ...def,
-        ...own,
-        ...(manifest.deniedTools.length ? { disallowedTools: manifest.deniedTools } : {}),
-      };
-      const subs = manifest.delegates.map<AgentDefinition>((d) => ({
-        name: d.name,
-        description: d.purpose || d.name,
-        prompt: d.instructions,
-        ...(d.tools.length ? { tools: withBoardTools(d.tools) } : {}),
-        ...(d.deniedTools.length ? { disallowedTools: d.deniedTools } : {}),
-        ...(d.model ? { model: d.model } : {}),
-      }));
-      if (size([withDelegates, ...subs]) <= MAX_AGENT_ARG) {
-        agentDefinition = withDelegates;
-        delegates = subs;
-        sessionTools = [];
-      }
-    }
-    if (!agentDefinition && size([def]) <= MAX_AGENT_ARG) agentDefinition = def;
+    if (JSON.stringify({ [def.name]: def }).length <= MAX_AGENT_ARG) agentDefinition = def;
   }
 
   const advice: string[] = [];
-  // a história cujos subagentes não couberam na linha de comando: a sessão faz as sub-tarefas ela mesma
-  if (manifest.delegates.length && !delegates.length && inline) {
-    sessionTools = [];
-    advice.push(
-      'Os agentes especialistas do board não couberam nesta execução: faça você o trabalho das sub-tarefas, com as ferramentas da sessão, seguindo as instruções de cada card.',
-    );
-  }
   if (manifest.agent && (how.agent === 'advised' || (inline && !agentDefinition))) advice.push(...agentAdvice(manifest));
   if (s.harness.library && allowed.length)
     advice.push(
@@ -195,7 +174,10 @@ export function executionPlan(
     if (manifest.tools.length) advice.push(`Use só estas ferramentas: ${manifest.tools.join(', ')}.`);
     if (manifest.deniedTools.length) advice.push(`Não use estas ferramentas: ${manifest.deniedTools.join(', ')}.`);
   }
-  if (how.context === 'advised')
+  // a orientação só vale onde a CLI é conhecida por carregar itens por conta própria; sem prova de isolamento
+  // e sem item conhecido (ex.: o Claude Code com os argumentos de isolamento), o resumo é que diz isso
+  const iso = profileIsolation(profile);
+  if (how.context === 'advised' && (iso.loads.length || iso.unrecognized))
     advice.push(
       'Use só as rules, as skills e as instruções indicadas neste pedido; ignore instruções, skills e agentes carregados por conta própria.',
     );
@@ -212,18 +194,13 @@ export function executionPlan(
     ...(cardSkills.length ? [`Skills: ${cardSkills.join(', ')} (pelo pedido)`] : []),
     ...(manifest.rules.length ? [`Rules: ${manifest.rules.join(', ')} (pelo pedido)`] : []),
     `Servidores MCP: ${[BOARD_SERVER, ...allowed].join(', ')} (${mark('mcp')})`,
-    ...(delegates.length
-      ? [
-          `Subagentes: ${delegates.map((d) => d.name).join(', ')} (inline)`,
-          ...(agentDefinition?.tools ? [`Ferramentas do agente: ${agentDefinition.tools.join(', ')} (no agente)`] : []),
-        ]
-      : []),
-    ...(sessionTools.length ? [`Ferramentas: ${sessionTools.join(', ')} (${mark('tools')})`] : []),
+    ...(manifest.tools.length ? [`Ferramentas: ${manifest.tools.join(', ')} (${mark('tools')})`] : []),
     ...(manifest.deniedTools.length ? [`Ferramentas negadas: ${manifest.deniedTools.join(', ')} (${mark('tools')})`] : []),
     ...(manifest.model
       ? [`Modelo: ${manifest.model.name}${manifest.model.effort ? ` · ${manifest.model.effort}` : ''} (${mark('model')})`]
       : []),
-    `Contexto vazio (${mark('context')})`,
+    // a decisão real do perfil: lista vazia não é prova, e o que a CLI carrega por conta própria aparece
+    how.context === 'enforced' ? 'Contexto vazio (imposto pela CLI)' : `${isolationSummary(iso)} (pelo pedido)`,
   ];
   return {
     manifest,
@@ -231,16 +208,16 @@ export function executionPlan(
       // no Claude Code o agente vai inline (`--agents`) e é escolhido por `--agent`; nas demais só o nome
       agent: inline && !agentDefinition ? '' : manifest.agent,
       agentDefinition,
-      delegates,
       mcpAllowed: allowed,
       mcpBlocked: blocked,
       mcpConfig,
-      tools: sessionTools,
+      tools: manifest.tools,
       deniedTools: manifest.deniedTools,
       model: manifest.model,
     },
     advice,
     summary,
+    clean: how.context === 'enforced',
   };
 }
 
@@ -256,8 +233,10 @@ export function bareExec(
   s?: BoardState,
   /** as definições dos servidores MCP guardadas no board; sem elas, só o servidor do board */
   libraryServers?: Record<string, unknown>,
+  /** o perfil de CLI que executa; sem ele vale o padrão do board */
+  cli?: AiProfile,
 ): ExecInput {
-  const always = s && s.board.aiTool === 'claude' && libraryServers ? selectedMcpNames(s, 'always') : [];
+  const always = s && profileBase(cli ?? activeProfile(s.board)) === 'claude' && libraryServers ? selectedMcpNames(s, 'always') : [];
   if (s) requireReviewedMcps(s, always);
   const defs: Record<string, unknown> = { ...(libraryServers ?? {}) };
   const missing = always.filter((n) => !defs[n] && s?.harness.library?.artifacts.some((a) => a.kind === 'mcp' && a.name === n));
@@ -267,7 +246,6 @@ export function bareExec(
   return {
     agent: '',
     agentDefinition: null,
-    delegates: [],
     mcpAllowed: allowed,
     mcpBlocked: [],
     mcpConfig: board ? JSON.stringify({ mcpServers: Object.fromEntries([BOARD_SERVER, ...allowed].map((n) => [n, defs[n]])) }) : null,

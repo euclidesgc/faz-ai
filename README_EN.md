@@ -84,7 +84,7 @@ In five minutes you have a task moving on the board, with the AI working on it.
 5. **Review and move on.** Read the phase document, answer, or click **Aprovar** (approve) or
    **Pedir ajustes** (ask for changes). On approval the story moves on right away to **PRD**, **Spec**,
    **Plan** and **Implementação** (implementation), always with the AI producing and you approving.
-   The implementation sub-tasks are born in the lower workflow and the AI completes them one by one.
+   The implementation sub-tasks are born in the lower workflow and the board runs them one by one, each in its own CLI run.
 
 For day to day: the **N com você** (N with you) counter at the top shows what is waiting for you,
 the **Chat** lets you ask the AI, in natural language, to create and move cards, and the
@@ -174,7 +174,27 @@ promise a percentage: it shows, in the inventory, what is being loaded.
    column of its workflow (Backlog / A fazer on the default board), inactive. Restoring a story also
    brings back all its archived sub-tasks and turns autonomous mode off; restoring a sub-task whose
    story is archived asks for confirmation and restores the whole story (a sub-task of an active
-   story comes back on its own, with no confirmation).
+   story comes back on its own, with no confirmation). The tab has its own filter bar, which does not
+   change the board's filter: text search (title, description, conversation, fields and `#number`),
+   type, option fields (such as Tags) and archive date range. The counter shows the active filters,
+   and **Limpar filtros** (clear filters) resets them; when you leave and come back, the tab opens
+   clear. Each row shows 50 cards at a time, and **Mostrar mais** (show more) brings the next ones.
+   Clicking an archived story selects it: the Sub-tarefas (sub-tasks) row then shows only its archived
+   sub-tasks, even those that do not match the filter. Clicking again, or **Limpar seleção** (clear
+   selection), clears the selection. Opening the card still lists all sub-tasks. To act on several at
+   once, select the archived cards you want: **Selecionar todos os visíveis** (select all visible)
+   selects only the cards the filters show. **Restaurar** (restore) in bulk follows the same rule as
+   the single action (a story comes back with its archived sub-tasks, and a sub-task whose story is
+   archived brings back the whole story), and **Enviar para a lixeira** (send to trash) in bulk takes
+   each story's archived sub-tasks along. Every bulk action asks for confirmation, saying how many
+   cards will be affected and what goes along with them. Permanent deletion stays only in the Lixeira
+   (trash).
+6. **Duplicar card** (duplicate card; card actions menu of the open card) creates another card from
+   it, one at a time. The title gets the prefix "Cópia de" (Copy of in the English interface); the
+   description, type, fields and checklist (unchecked) are copied, and the new card goes to the end of
+   the first column of its workflow, with no confirmation. Sub-tasks, attachments, comments and links
+   are not copied. There is no bulk duplication: with several cards selected, the option does not
+   appear.
 
 **Multi-select in the trash.** In the **Lixeira** (trash), tick cards one by one or use **Selecionar todos** in the table header; the checkbox shows a partial state when only some are ticked. With at least one card ticked, a bar appears with the count and the actions **Restaurar** (restore) and **Apagar de vez** (delete permanently), which apply to the whole selection. Restore runs straight away; delete permanently asks for one confirmation for the batch. **Limpar** (clear) unticks everything. Restoring or deleting a card also takes its sub-tasks that are in the trash. **Esvaziar lixeira** (empty trash) stays as it was and does not depend on the selection.
 
@@ -236,16 +256,16 @@ other one is a prerequisite) or "só começa depois deste card". The open card s
 **Depende de** (depends on, with how many dependencies are still open) and **Libera** (unblocks).
 The board refuses a dependency cycle.
 
-The AI uses this to speed up Implementation. In Plan it declares the order between sub-tasks
+The AI uses this to order the Implementation. In Plan it declares the order between sub-tasks
 (`create_card` with `depends_on`, or `link_cards` with `depends_on`): one depends on another when it
 uses what the other produces or when both change the same files. In Implementation, the story's
-`get_card` returns in `subtasksNow` what can run now (and in `subtasksNowNote`, how to run the
-round), and the AI delegates **the sub-tasks with no
-pending dependency to simultaneous subagents**, each with its card's model; at the end of the round
-it verifies the whole, commits and moves on to the next round. `start_work` refuses a sub-task that
-is still waiting for another. With no dependencies declared, all open sub-tasks are considered
-independent. It depends on the AI tool having subagents (Claude Code does); without them, execution
-goes one at a time, in dependency order. The flow text is the board's current one, served
+`get_card` returns in `subtasksNow` what the **board runs** (`byBoard`, in order) and what waits
+(`waiting`). In a code phase the board, not the story session, runs the sub-tasks: each one in its
+own CLI run, with the agent, model and skills of its card, **one after another** in the story's
+folder (a single writer at a time), respecting dependencies; the story session only creates them and
+stops. `start_work` refuses a sub-task that is still waiting for another. With no dependencies
+declared, all open sub-tasks are considered independent. When all of them finish, the board calls the
+AI once for the closing: verify the whole, commit and move the story. No execution delegates to the tool's subagents (in Claude Code, `Agent` — formerly `Task` — is denied; Cursor and Kimi Code have no proven block, so the capability stays "unknown" and admission decides). In **Settings → AI Harness** (and `fazai.git.parallelSubtasks`, 1 to 6) the person sets **"Parallel sub-tasks per story"**; the screen shows the requested and the effective value (today 1). The flow text is the board's current one, served
 through the MCP; a copy of the flow skill already installed in the tool's folder is not replaced by the
 board. To keep the tool from loading the old text on its own, delete that copy.
 
@@ -272,8 +292,9 @@ navegador**; the terminal `faz-ai` warns and does not start.
 ## Using it with AI
 
 1. In Settings → **AI tools**, choose the project's default CLI profile. Claude Code, Cursor and
-   Kimi Code are built in; you can also create copies and custom profiles. You can switch the active
-   profile in **Harness → Tool and execution**.
+   Kimi Code are built in; you can also create copies and custom profiles. The default only applies
+   when nothing indicates another: the CLI of each run comes from the chosen model (see
+   [Settings](#settings)). You can switch the active profile in **Harness → Tool and execution**.
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
    **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads. This also happens on its own, silently, when the folder opens (and on every new extension version), always in the user scope; only a failure raises a notice.
 3. Optional: in the **Skills** group of the same tab, **Instalar (padrão da ferramenta)** (install, tool default)
@@ -1324,7 +1345,11 @@ commands and settings are still managed by their respective tool.
 
 A **CLI profile** identifies a tool the board can select for a run. The builtin profiles are Claude Code, Cursor and Kimi Code. A **copy** uses its source tool's model catalog and usage measurement, but keeps its own command, credentials and verification. A **custom** profile accepts another text-output CLI; tokens and cost remain unknown. In **Settings → AI Tools**, enable a reviewed profile and choose the default. Only this screen creates, edits, duplicates and tests profiles. Imports stay disabled until local review. Saved configuration and credentials are not returned to the screen or included in a board export.
 
+**Which CLI runs.** The value of the **Model** field (`<profile>:<model>@<effort>`) already names the CLI profile. For each run the board uses the first level that is filled in: the **card's Model**, the **agent's model**, the **model rule** (even with "Fill in the suggested model automatically" off) and, with none, the **default CLI profile** in Settings → AI tools. So sub-tasks of the same story can run on different CLIs, and effort-based rules can point to different profiles. The first level that is filled in is final: if the choice is invalid (profile off, model outside the catalog or unknown effort), the card is **blocked** with the reason, without falling to the next level or to the default. The Model field, the chat and the rule editor list the models of **all enabled profiles**, grouped by profile. Expired login and missing CLI apply per profile: they stop only the cards of that profile, and the warning appears only for the profiles in use. **Suggest rules** acts only on the suggested profile and preserves other profiles' bands. Over MCP, `get_card` shows the target in `model` (`tool`, `from` and, if invalid, `blocked`).
+
 To create a custom profile, enter the command and one argument per line. The markers `{prompt}`, `{model}`, `{effort}`, `{mcpConfig}` and `{addDir}` insert the request, model, effort, MCP file and an additional directory when available. Choose **Prompt input** (argument or stdin) and **Board server** (CLI, project file or none). In a card's **Model** field, **Other model…** accepts a free-form identifier for that profile without adding it to the catalog. **Test** runs a short request using your subscription; an OK response does not prove isolation, permissions or MCP restrictions. Capabilities without evidence remain unknown and may prevent a run.
+
+Under **Capabilities and evidence**, each profile shows the date and version of the documentation checked and a badge: **Empty context** (only with capabilities verified by the host), **Loads on its own** (known items, listed in the tooltip) or **No proof of isolation** (an empty list is not proof). In copies and custom profiles, the **What the CLI loads on its own** section of the form lets you mark, by type (rules, skills, agents, hooks, MCP) and origin (project, user), what the CLI reads by itself; this is a declaration, not a verification. Each run's summary, the card (**Next run**) and `get_card`/`get_harness` (`execution.cliLoads`) use the same decision. The real-CLI test lives outside `npm test`: `npm run test:cli-real` (Claude Code validated in a controlled local environment; Cursor and Kimi Code **unvalidated**).
 
 About models: **Detectar modelos** (detect models) reads the tool's list (for Cursor, the models of your account, through the `cursor-agent models`
 command, read when the board opens with the CLI signed in, and the first list read replaces the built-in one
@@ -1344,9 +1369,9 @@ is always a suggestion: on the card, the model and the effort can be changed at 
 
 Imported CLI profiles stay disabled until local review. Commands, arguments, environment and credentials remain in the local vault: exports, the screen and MCP expose only references and status. Copies do not inherit isolation evidence, and a custom profile without a verified mapping cannot run. Version/login probes and **Test** do not prove capabilities. See [Settings](#settings) to create and select profiles.
 
-The new **execution and fallback policy** foundation separates versioned definitions, local human review and history (schema 41). Target resolution does not replace an invalid explicit choice with a default or redirect a prefix to a default copied profile. Evaluation and simulation share one function with explained rejections, ordered targets, accumulated limits and reconciliation for partial or unknown work. Imported policies remain pending review; edits do not change earlier snapshots. Under **Settings → Harness → Tool and execution → Manage policies**, the manual editor supports conditions, ordered targets, limits, duplication, removal and paginated history. A complete comparison precedes explicit human review; saving as pending grants no execution authority. Revision conflicts preserve the draft and let the user reload the base before reviewing again. The host simulator uses the same evaluator without AI, identifying credential/admission settings as scenario assumptions. Changes to saved policies or context invalidate the displayed result. This foundation is not yet connected to the runner, chat or assistants; the description below covers the legacy fallback model, which will migrate to a disabled proposal during integration.
+The new **execution and fallback policy** foundation separates versioned definitions, local human review and history (schema 41). Target resolution does not replace an invalid explicit choice with a default or redirect a prefix to a default copied profile. Evaluation and simulation share one function with explained rejections, ordered targets, accumulated limits and reconciliation for partial or unknown work. Imported policies remain pending review; edits do not change earlier snapshots. Under **Settings → AI tools → Execution and fallback policies → Manage policies**, the manual editor supports conditions, ordered targets, limits, duplication, removal and paginated history. A complete comparison precedes explicit human review; saving as pending grants no execution authority. Revision conflicts preserve the draft and let the user reload the base before reviewing again. The host simulator uses the same evaluator without AI, identifying credential/admission settings as scenario assumptions. Changes to saved policies or context invalidate the displayed result. The runner, chat and assistants ("Suggest agents, rules or skills", "Suggest artifacts") decide the target switch through this same evaluator: with an enabled, applicable policy the run continues on its target; without one, the failure blocks and nothing runs on another target. In **Next run**, the simulation evaluates only saved, enabled policies, without spending tokens or opening the CLI. **Create with AI help**, **Suggest fallbacks** and **Review conflicts** ask the AI only for a proposal (a draft with explanation, differences and simulated examples, without secrets): it goes through the editor's validator and nothing is saved or enabled until you review and confirm. The AI also reads the policies over MCP (`get_execution_policies`, read-only); creating, reviewing and enabling is always the person's action.
 
-Each rule can have a **fallback model** (optional). When a card's execution fails because the primary model hit the plan's usage limit, and that model came from a rule with a fallback configured, the system automatically retries the execution with the fallback model, once only. If the fallback also fails or is not configured, the card is blocked as usual. The automatic switch appears as a comment in the card's conversation ("The `<primary model>` hit the usage limit; execution continues with `<fallback model>`"), and the card's Model field keeps showing the primary model — the next execution will try the primary again.
+The old **fallback model** on suggestion rules no longer switches anything at run time: fallback is decided only by **execution and fallback policies**. When the board opens, when rules are saved or after a backup is imported, each legacy fallback becomes a **disabled proposal pending review** (id `legacy-<rule>`, action *offer*, failure *quota*, target = the fallback model), with history at version 1. The proposal does not copy the rule conditions (card fields and type): adjust them in the editor. The conversion happens once; if you remove the proposal it does not come back. Under **Policies → Manage policies** a notice lists the proposals and the fallbacks that could not be converted (model or effort outside the catalog); nothing switches CLI until you compare, simulate, review and enable the policy. The rule editor shows the old fallback as disabled and points to that area, creating no parallel fallback; the MCP `set_model_rules` refuses the `fallback` parameter. On export, CLI profile credentials and variables are not in the file; on import, profiles come back disabled and policies pending, and the notice lists both.
 
 **Dependency warnings between settings and cross-linked navigation.** Some configuration options only work because of another. The board shows a discreet line under dependent options (for example, "Depends on **a model suggestion rule** (now: none)" below "Fill in the suggested model automatically", or "Depends on **agents marked as available**" below "Default agent"); the option stays disabled when the dependency is not met. Links let you navigate: click one to go to the matching board section, which scrolls and highlights for 2 seconds, or click a link in the Settings to open the board at the right section. In browser mode, links to the Settings appear as text only. **"Fill in the suggested model automatically"** moved from Rules to Models, where it makes more sense — a simple notice in Rules indicates the move. The Heartbeat interval field stays disabled when the heartbeat is off, with no additional dependency component. New headers in Models, Agents, Rules and Skills show "Showing the X of [tool] · switch tool", letting you change the tool from any of these board screens.
 

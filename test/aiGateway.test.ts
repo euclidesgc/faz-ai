@@ -150,6 +150,41 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     expect(rows().map((r) => r.outcome)).toEqual(['failed', 'stopped', 'timeout']);
   });
 
+  it('o empréstimo do arquivo MCP do projeto usa a raiz do gateway e volta no tempo limite (relógio falso)', () => {
+    vi.useFakeTimers();
+    const coordination = path.join(dir, 'coordenacao');
+    const file = path.join(dir, '.cursor/mcp.json');
+    // o processo falso confirma o fim da árvore: só então o arquivo pode voltar
+    const confirmingSpawn: SpawnFn = (command, cwd, out) => {
+      const proc = spawn(command, cwd, out);
+      let ended = false;
+      const kill = proc.kill;
+      return { ...proc, onExit: proc.onExit, kill: () => ((ended = true), kill()), terminationConfirmed: () => ended };
+    };
+    const g = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn: confirmingSpawn,
+      leaseCoordinationDir: coordination,
+    });
+    g.run(
+      call({
+        tool: 'cursor',
+        timeoutMinutes: 1,
+        prepare: () => ({
+          input: { prompt: 'oi', permission: 'board', boardServer: { command: '/usr/bin/node', args: ['/dados/bridge.js', dir] } },
+          config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: false, skills: [], mcp: null },
+        }),
+      }),
+    );
+    expect(fs.existsSync(file)).toBe(true);
+    expect(fs.readdirSync(coordination)).toHaveLength(1);
+    vi.advanceTimersByTime(61_000);
+    expect(rows()[0]!.outcome).toBe('timeout');
+    expect(fs.existsSync(file)).toBe(false);
+    expect(fs.readdirSync(coordination)).toEqual([]);
+  });
+
   it('a falha antes do primeiro evento não é repetida e fica com o consumo desconhecido, não zero (#739)', () => {
     const logged: string[] = [];
     const run = gateway().run(call({ log: (l) => logged.push(l) }));

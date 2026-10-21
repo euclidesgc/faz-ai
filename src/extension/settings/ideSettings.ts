@@ -12,7 +12,7 @@ import type { WebviewToHost } from '../../shared/messages';
 import { FONT_SIZE_RANGE, FONTS, THEMES, type TextFont, type ThemeMode } from '../../shared/appearance';
 import { LANGUAGES, type Language } from '../../shared/language';
 import { MERGE_METHODS, WORKSPACE_MODES, cleanDecisionDir, type MergeMethod, type WorkspaceMode } from '../../shared/git';
-import { PARALLEL_RANGE } from '../../shared/runner';
+import { PARALLEL_RANGE, SUBTASK_PARALLEL_RANGE } from '../../shared/runner';
 
 export const SECTION = 'fazai';
 
@@ -106,6 +106,12 @@ export const LEGACY_KEYS: LegacyKey[] = [
     fromBoard: (board) => board.runner.parallelStories,
     toBoardPatch: (value) => ({ runner: { parallelStories: value } }),
     isValid: (value): value is number => isInteger(value, PARALLEL_RANGE),
+  }),
+  legacy<number>({
+    key: 'git.parallelSubtasks',
+    fromBoard: (board) => board.runner.parallelSubtasks,
+    toBoardPatch: (value) => ({ runner: { parallelSubtasks: value } }),
+    isValid: (value): value is number => isInteger(value, SUBTASK_PARALLEL_RANGE),
   }),
   legacy<boolean>({
     key: 'git.autoMerge',

@@ -120,12 +120,25 @@ harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_ski
 `set_skill_enabled`, `delete_skill`…).
 
 `get_models.profiles` lista os perfis de CLI e seus IDs, sem comando, configuração ou ambiente
-privado. `set_ai_tool` recebe o ID de um perfil ligado; não cria, edita, revisa nem ativa perfis.
+privado. O prefixo do `value` escolhe o perfil de CLI que executa o card; sem modelo no card, no agente
+nem na regra, vale o perfil padrão. `set_ai_tool` define esse **perfil padrão**: recebe o ID de um perfil
+ligado e não cria, edita, revisa nem ativa perfis.
 Uma cópia usa o catálogo da origem. Para um perfil personalizado, os modelos podem ser cadastrados
 à mão; o campo Modelo também aceita “Outro modelo…” sem cadastro. O valor é
 `<perfil>:<modelo>@<esforço>` (sem `@<esforço>` quando não houver esforço). O perfil personalizado
 retorna saída em texto e consumo/custo desconhecidos, nunca zero presumido. Testar o perfil na
 interface usa a assinatura e uma resposta OK não comprova isolamento, permissões ou MCP.
+
+O bloco `model` do `get_card` é o alvo que de fato executa o card, resolvido na ordem Modelo do card,
+modelo do agente, regra de modelo (mesmo com o preenchimento automático desligado) e perfil padrão:
+`{ tool, model, effort, label, value, from, note }`. `tool` é o **perfil de CLI** que executa (não o
+agente) e `from` é `'card' | 'agent' | 'rule'`; no perfil padrão sem modelo o bloco não vem. Numa escolha
+explícita inválida (perfil desligado, modelo fora do catálogo, esforço inexistente) o bloco traz o valor
+escolhido, o `from` e `blocked: { reason, message }` (`profile-unavailable`, `model-unknown` ou
+`effort-invalid`), sem cair para o nível seguinte. `execution` (o que o board impõe) segue o perfil que
+executa. `get_execution_policies` lê as políticas de execução e troca de alvo (regra vencedora, destinos,
+limites e revisão), só leitura e sem segredos; criar, revisar e ativar política é ação da pessoa nas
+Configurações → Ferramentas de IA.
 
 Toda sessão recebe as instruções do servidor: o ciclo do card (por onde começar, status, revisão,
 modelo do card, rules e skills obrigatórias e pendências com a pessoa) em menos de 2.048 caracteres,
@@ -386,9 +399,9 @@ Configurações → Workflows e colunas ou por `update_column` (`ai_instruction`
 
 Ao ler um card (`get_card`), a IA recebe a ferramenta, o **modelo** e o **esforço** que devem executá-lo e as **Skills**
 obrigatórias com o caminho de cada `SKILL.md` (as do fluxo vêm sem caminho, para ler com `get_skill`). Ela é instruída a carregar essas skills antes de
-executar e a delegar o trabalho a um subagente com o modelo escolhido, ou avisar quando o cliente
-não permite. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue.
-
+executar e a avisar a pessoa quando o modelo for outro. Na fase de código, as sub-tarefas são executadas
+pelo board (uma execução da CLI por sub-tarefa, com o modelo do card dela): a sessão da história cria e
+descreve as sub-tarefas e para, e `subtasksNow.byBoard` lista as que o board executa, na ordem. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue. Nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica negada; no Cursor e no Kimi Code, sem bloqueio comprovado, a capacidade fica "desconhecida" e a admissão decide). Em **Configurações → Harness de IA** (e em `fazai.git.parallelSubtasks`, de 1 a 6) a pessoa define **"Sub-tarefas em paralelo por história"**; a tela mostra o pedido e o efetivo (hoje 1).
 Fluxo SDD sugerido: a IA lê a história e a fase (`phase`), cria uma sub-tarefa com o campo Fase,
 constrói nela o documento da fase e o anexa à história (`artifact: true`), pede a revisão na
 história e para. Com a aprovação, move a história para a próxima coluna.
@@ -418,7 +431,7 @@ O schema 41 acrescenta definições e histórico de políticas. A importação f
 
 A webview e o navegador usam `executionPolicy.read` (biblioteca ou histórico paginado) e `executionPolicy.simulate` com respostas correlacionadas por `requestId`. A simulação usa uma cópia do rascunho e não grava, resolve segredos, gera recibos nem inicia CLI. Instalação, credenciais e admissão no cenário são hipóteses declaradas, não estado comprovado do host. O catálogo contém apenas metadados dos providers integrados.
 
-`settings.executionPolicy.save` e `settings.executionPolicy.remove` exigem ação da pessoa e revisão otimista; IA, MCP externo e tokens de execução são recusados. A UI permite salvar pendente ou confirmar revisão após comparar todas as condições/destinos/limites, preserva o rascunho em conflitos e permite recarregar a versão atual para nova comparação. Remoção cria revisão desativada e mantém o histórico. Rascunhos inválidos para o catálogo podem ser desativados ou removidos. Não foram adicionadas ferramentas MCP de escrita/ativação. A integração do avaliador com as inferências e a prévia Próxima execução continua pendente.
+A reserva legada de `ModelRule.fallback` não decide execução: ao abrir o board, salvar regras ou importar, vira proposta `legacy-<regra>` (desligada, pendente, versão 1; idempotente, sem migração de schema), e `set_model_rules` recusa `fallback`. `settings.executionPolicy.save` e `settings.executionPolicy.remove` exigem ação da pessoa e revisão otimista; IA, MCP externo e tokens de execução são recusados. A UI permite salvar pendente ou confirmar revisão após comparar todas as condições/destinos/limites, preserva o rascunho em conflitos e permite recarregar a versão atual para nova comparação. Remoção cria revisão desativada e mantém o histórico. Rascunhos inválidos para o catálogo podem ser desativados ou removidos. Não há ferramentas MCP de escrita/ativação: só `get_execution_policies`, de leitura. Runner, chat e assistentes decidem a troca de alvo pelo mesmo avaliador da prévia **Próxima execução**. O assistente de IA do editor (criar, sugerir fallbacks, revisar conflitos) só devolve uma proposta validada, sem segredos; não salva nem liga política.
 
 
 ### Perfis de CLI persistidos
@@ -445,3 +458,7 @@ O gateway recebe a identidade/perfil escolhido, resolve a configuração privada
 O adaptador genérico monta stdin/argv, destinos MCP CLI/projeto/nenhum, modelo/esforço/pastas e argumentos por permissão. Caminho MCP precisa ficar no projeto; ausência de argumentos restritos recusa montagem. Lookup é exato por PATH/absoluto e não usa shell. Seu leitor de texto retorna `measure: none`, consumo/custo desconhecidos e não transforma isso em medição quebrada ou zero. O gateway oculta valores privados e classifica frases literais de autenticação antes da ocultação; não interpreta essas frases como regex.
 
 Schema 43 amplia o CHECK de `ai_runs.origin` para `test`. A reconstrução transacional preserva IDs, consumo, auditoria, inventário e Bash; as FKs dos filhos são conferidas e restauradas. Import/export continua versionado. A migração foi exercitada apenas em bancos descartáveis nesta implementação; o banco vivo do board não foi alterado diretamente.
+
+## O que a CLI carrega por conta própria (`cliLoads`)
+
+`get_card` (em `execution.cliLoads`) e `get_harness` (`cliLoads`) devolvem `{ contextEnforced, loads, unrecognized?, summary, note }` do perfil ativo. `loads` lista os tipos (`instructions`, `skill`, `agent`, `hook`, `mcp`) e a origem (`project`, `user`) que a CLI lê sozinha; `contextEnforced` só é verdadeiro com as capacidades de conversa nova e de controle de artefatos verificadas pelo host. Lista vazia significa nenhum item conhecido e não prova isolamento. Em conflito entre o que a CLI leu e o que o board entregou, vale o board. `ai_runs.clean` das execuções novas segue `contextEnforced`; as antigas mantêm o valor gravado.

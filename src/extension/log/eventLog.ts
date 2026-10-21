@@ -128,6 +128,8 @@ export class EventLog {
       case 'card.yolo.setMany':
       case 'card.archiveMany':
       case 'card.trashMany':
+      case 'card.unarchiveMany':
+      case 'card.trashArchivedMany':
       case 'card.moveMany': {
         const ids = msg.cardIds;
         return { before: cardFacts(db, ids), after: () => cardFacts(db, ids), cardId: null, extra: {} };

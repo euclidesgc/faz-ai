@@ -1,8 +1,17 @@
 import { isFlowSkill } from '../flowSkill';
-import { baseValue } from '../../shared/harness';
-import type { AiProfile } from '../../shared/aiProfiles';
+import {
+  catalogTool,
+  profileLabel,
+  activeProfile,
+  contextEnforced,
+  isolationSummary,
+  profileIsolation,
+  type AiProfile,
+} from '../../shared/aiProfiles';
+import { orchestratesStory } from '../../shared/orchestration';
+import { resolveRunTarget } from '../../shared/runTarget';
 import { agentOfArtifact, itemOfArtifact } from '../../shared/artifacts';
-import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../shared/execution';
+import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
 import { isSelectableKind, selectionKey, usageOf, toolItemsOf } from '../../shared/harnessSelection';
 import { groupOf } from '../../shared/harnessCatalog';
@@ -216,6 +225,26 @@ export function describeModel(s: BoardState, value: FieldValue) {
   return { tool: o.tool, model: o.model, effort: effortToRun(o, v.effort), label: modelLabel(s.board.modelCatalog, value, true), value };
 }
 
+/**
+ * O alvo da execução do card como a IA o lê: o perfil de CLI (`tool`), o modelo e de onde veio (`from`).
+ * Sai da mesma resolução do runner (`resolveRunTarget`); no perfil padrão sem modelo não há bloco. Uma escolha
+ * explícita inválida não cai para o próximo nível: vem o valor escolhido com o `blocked` e o motivo.
+ */
+function targetModelOf(s: BoardState, c: Card) {
+  const r = resolveRunTarget(s, c);
+  if (r.blocked) {
+    const { source, value, reason, message } = r.block;
+    return { ...describeModel(s, value), from: source, blocked: { reason, message } };
+  }
+  const { cli, model, value, source } = r.target;
+  if (!model || (source !== 'card' && source !== 'agent' && source !== 'rule')) return null;
+  const parsed = parseModelValue(value);
+  const option = parsed && s.board.modelCatalog.find((o) => o.id === parsed.id && o.tool === catalogTool(cli));
+  const effort = option ? effortToRun(option, model.effort) : model.effort;
+  const base = option ? modelLabel(s.board.modelCatalog, value) : model.name;
+  return { tool: cli.id, model: model.name, effort, label: `${profileLabel(s.board, cli.id)} · ${base}`, value, from: source };
+}
+
 /** Catálogo de modelos e regras de sugestão do board. */
 export function modelsOverview(s: BoardState) {
   return {
@@ -248,18 +277,28 @@ export function modelsOverview(s: BoardState) {
   };
 }
 
+/**
+ * O que a CLI do perfil ativo carrega por conta própria (declarado) e se o contexto vazio está imposto
+ * (capacidades verificadas pelo host). Lista vazia = nenhum item conhecido, nunca prova de isolamento.
+ */
+function cliLoadsOf(s: BoardState) {
+  const profile = activeProfile(s.board);
+  const iso = profileIsolation(profile);
+  return {
+    contextEnforced: contextEnforced(profile),
+    loads: iso.loads,
+    ...(iso.unrecognized ? { unrecognized: iso.unrecognized } : {}),
+    summary: isolationSummary(iso),
+    note: 'Os artefatos do board chegam pelo pedido e pelo MCP. O que está em `loads` a CLI também lê por conta própria e pode divergir do board: em conflito, vale o que o board entregou. Sem `contextEnforced`, não há prova de que a conversa começou sem artefatos externos.',
+  };
+}
+
 /** O que a sessão deve usar neste card, segundo o agente do card (o do card, o da fase ou o padrão do board). */
 function executionOf(s: BoardState, c: Card) {
   const m = manifestOf(s, c);
-  if (!m.profile) return {};
-  const how = baseValue(EXEC_ENFORCEMENT, s.board.aiTool) ?? {
-    agent: 'advised',
-    skills: 'advised',
-    mcp: 'advised',
-    tools: 'advised',
-    model: 'advised',
-    context: 'advised',
-  };
+  if (!m.profile) return { execution: { cliLoads: cliLoadsOf(s) } };
+  // o que o board impõe vem do perfil de CLI que executa o card, não do padrão do board
+  const how = enforcementOf(m.target.cli);
   const profile = s.board.execProfiles.find((p) => p.name === m.profile);
   return {
     execution: {
@@ -269,6 +308,7 @@ function executionOf(s: BoardState, c: Card) {
       mcpServers: ['faz-ai', ...m.mcpServers],
       ...(m.tools.length ? { tools: m.tools } : {}),
       ...(m.deniedTools.length ? { deniedTools: m.deniedTools } : {}),
+      cliLoads: cliLoadsOf(s),
       enforcedByBoardRun: EXEC_ASPECTS.filter((a) => how[a.id] === 'enforced').map((a) => a.id),
       note: 'Agente do card (`agentFile` tem as instruções). Fora da execução pelo board, siga-o como instrução: leia o arquivo e use só os servidores e ferramentas listados; `enforcedByBoardRun` são impostos só pelo board. Skill faz-ai-harness-do-card.',
     },
@@ -454,7 +494,7 @@ function workspaceOf(s: BoardState, c: Card) {
 
 /** O que fazer com o `model` do card; o "Esforço da atividade" tem o mesmo nome e outro sentido. */
 const MODEL_NOTE =
-  'O valor do modelo usa `<perfil>:<modelo>@<esforço>` do perfil de CLI do board. Execute com este modelo e esforço; se forem outros, delegue o trabalho a um subagente ou avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
+  'O valor do modelo usa `<perfil>:<modelo>@<esforço>` do perfil de CLI do board. `tool` é o perfil de CLI que executa o card pelo board e `from` diz de onde veio a escolha (card, agente ou regra). Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Execute com este modelo e esforço; se forem outros, avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
 
 /**
  * Os blocos do `get_card` que a IA pode pedir em separado (`only`): o resto (título, descrição, campos,
@@ -484,10 +524,11 @@ export function cardDetail(
   const field = modelFieldOf(s, c);
   const chosen = field ? valueOf(s, c.id, field.id) : undefined;
   const suggested = suggestModel(s, c);
+  const target = targetModelOf(s, c);
   return {
     ...cardSummary(s, c),
     flowNote: FLOW_NOTE,
-    ...(chosen ? { model: { ...describeModel(s, chosen), note: MODEL_NOTE } } : {}),
+    ...(target ? { model: { ...target, note: MODEL_NOTE } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
     harnessNote:
       'Escolha skills, rules, MCPs e agente só entre o que está em "Pelo card" (get_harness), o mínimo necessário. Skill faz-ai-harness-do-card.',
@@ -569,9 +610,9 @@ export function cardDetail(
  * do servidor: o Claude Code as corta em 2.048 caracteres, e a IA só precisa disto quando há rodada.
  */
 export const SUBTASKS_NOW_NOTE =
-  'Rodadas: `canRunTogether` são as sub-tarefas liberadas (subagentes, se tiver, todos de uma vez; senão uma por vez); `waiting` esperam outra; ' +
-  '`withPerson` e `running` não são suas. Ao fim da rodada, verifique, faça o commit e releia a história. Sem terminal, implemente e registre o que falta rodar. ' +
-  'Vale mesmo que a skill do fluxo instalada diga uma por vez. Detalhes: skill faz-ai-implementacao-rodadas.';
+  'O board executa as sub-tarefas da fase de código, cada uma numa execução própria: `byBoard` são as que ele executa, na ordem; `waiting` esperam outra; ' +
+  '`withPerson` e `running` não são suas. Não execute sub-tarefas, nem por subagente: crie-as e pare. O board chama você de novo, uma vez, para o fechamento. ' +
+  'Detalhes: skill faz-ai-implementacao-rodadas.';
 
 /**
  * As rodadas da Implementação: `canRunTogether` só traz as sub-tarefas que a IA pode tocar agora; as que
@@ -579,10 +620,13 @@ export const SUBTASKS_NOW_NOTE =
  */
 function subtasksNow(s: BoardState, storyId: string) {
   const w = subtaskWaves(s, storyId);
+  const story = s.cards.find((c) => c.id === storyId);
+  const byBoard = !!story && orchestratesStory(s, story);
   if (!w.waiting.length && !w.withPerson.length && !w.running.length && w.ready.length < 2) return {};
   return {
     subtasksNow: {
-      canRunTogether: w.ready.map(cardRef),
+      // numa fase de código o board executa as sub-tarefas (uma por vez, na ordem); nas demais a sessão as toca
+      ...(byBoard ? { byBoard: w.ready.map(cardRef) } : { canRunTogether: w.ready.map(cardRef) }),
       waiting: w.waiting.map(cardRef),
       ...(w.withPerson.length ? { withPerson: w.withPerson.map(cardRef) } : {}),
       ...(w.running.length ? { running: w.running.map(cardRef) } : {}),
@@ -702,6 +746,7 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
   return {
     library: s.harness.library ? { directory: s.harness.library.directory, artifacts: s.harness.library.artifacts } : undefined,
     aiTool: s.board.aiTool,
+    cliLoads: cliLoadsOf(s),
     defaultAgent: s.board.execProfiles.find((p) => p.isDefault)?.id ?? null,
     note: onlySelected
       ? 'Só o que está no board (Configurações → Harness): é tudo o que as execuções do board usam. `usage` "always" (Sempre) entra em toda execução; "contextual" (Pelo card) só quando indicado no card (campos Rules, Skills e MCPs) ou escolhido no planejamento e no refinar; "off" (Desligado) está no board sem entrar em nada. Para ver tudo que a ferramenta carrega, chame get_harness com onlySelected = false.'

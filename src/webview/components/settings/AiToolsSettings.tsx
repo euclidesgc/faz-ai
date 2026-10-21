@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Badge, RadioGroup } from '@radix-ui/themes';
-import { PROFILE_CAPABILITIES, type AiProfile } from '../../../shared/aiProfiles';
+import { PROFILE_CAPABILITIES, contextEnforced, profileIsolation, type AiProfile } from '../../../shared/aiProfiles';
 import type { HostToWebview } from '../../../shared/messages';
 import { settings } from '../../commands';
 import { t } from '../../i18n';
 import { useBoardStore } from '../../store/boardStore';
+import { isolationText, leaksList } from '../../isolation';
 import { useAction } from '../../useAction';
 import { onHostMessage } from '../../vscode';
 import { ActionButton, DeleteButton, IconPlus, SwitchField } from '../ui';
 import { AiProfileForm } from './AiProfileForm';
+import { ExecutionPoliciesSettings } from './policies/ExecutionPoliciesSettings';
 import { PageHeader } from './PageHeader';
 import { SettingsCard } from './SettingsCard';
 
@@ -27,7 +29,6 @@ const capabilityName: Record<(typeof PROFILE_CAPABILITIES)[number], string> = {
 /** A configuração fica no host; esta aba só recebe metadados, situação e o resultado redigido do Testar. */
 export function AiToolsSettings() {
   const state = useBoardStore((s) => s.state)!;
-  const goToSection = useBoardStore((s) => s.goToSection);
   const ask = useBoardStore((s) => s.ask);
   const [statuses, setStatuses] = useState<Record<string, Status>>({});
   const [results, setResults] = useState<Record<string, TestResult>>({});
@@ -105,16 +106,6 @@ export function AiToolsSettings() {
       </PageHeader>
       <div className="ai-tools-layout">
         <div>
-          <div className="row ai-tools-policy-link">
-            <ActionButton
-              variant="soft"
-              color="gray"
-              hint={t('Abre as políticas de execução e fallback no Harness.')}
-              onClick={() => goToSection('execution-policies')}
-            >
-              {t('Políticas de execução e fallback')}
-            </ActionButton>
-          </div>
           <RadioGroup.Root value={state.board.aiTool} onValueChange={(id) => void selectDefault.run(id)} aria-label={t('Perfil padrão')}>
             {profiles.map((profile) => {
               const standard = state.board.aiTool === profile.id;
@@ -200,6 +191,20 @@ export function AiToolsSettings() {
                       </a>
                     )}
                     {profile.kind === 'custom' && <span className="muted">{t('Não mede tokens nem custo')}</span>}
+                    {(() => {
+                      const iso = profileIsolation(profile);
+                      const enforced = contextEnforced(profile);
+                      const leaks = iso.loads.length > 0 || !!iso.unrecognized;
+                      return (
+                        <Badge
+                          variant="soft"
+                          color={enforced ? 'green' : leaks ? 'amber' : 'gray'}
+                          title={leaks ? leaksList(iso) : isolationText(iso, enforced)}
+                        >
+                          {t(enforced ? 'Contexto vazio' : leaks ? 'Carrega por conta própria' : 'Sem prova de isolamento')}
+                        </Badge>
+                      );
+                    })()}
                   </div>
                   <details className="ai-profile-evidence">
                     <summary>{t('Capacidades e evidências')}</summary>
@@ -222,6 +227,14 @@ export function AiToolsSettings() {
                     <p className="muted">
                       {t('Fonte e versão da evidência: não informadas. Uma declaração da pessoa não recebe selo de verificação.')}
                     </p>
+                    {profileIsolation(profile).checked && (
+                      <p className="muted">
+                        {t('Conferido na documentação em {date} · versão {version}', {
+                          date: profileIsolation(profile).checked!.date,
+                          version: profileIsolation(profile).checked!.version,
+                        })}
+                      </p>
+                    )}
                     {status && (
                       <p className="muted">
                         {t('Fonte da situação: sonda local do host. Versão da CLI: {version}.', {
@@ -248,6 +261,7 @@ export function AiToolsSettings() {
             })}
           </RadioGroup.Root>
           {profiles.length === 0 && <p className="muted">{t('Nenhum perfil cadastrado.')}</p>}
+          <ExecutionPoliciesSettings />
         </div>
         {editor && (
           <AiProfileForm

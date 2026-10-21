@@ -19,8 +19,8 @@ export const environment: Record<string, string> = {
   Falta: 'Missing',
   'Instalar a skill': 'Install the skill',
   'A skill do fluxo ({name}) não está pronta para o {tool}': 'The flow skill ({name}) is not ready for {tool}',
-  'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem de contexto vazio: a skill precisa existir e estar no board em modo "Sempre" em Configurações → Harness. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.':
-    'It teaches the AI to drive cards through the board flow: phases, documents, review and pending items. Board runs start from an empty context: the skill must exist and be on the board in "Always" mode in Settings → Harness. Installing from here writes to the tool\'s global skills folder and checks it.',
+  'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem só do que está no board (no Claude Code, contexto vazio imposto; nas outras CLIs, veja o que elas carregam sozinhas em Ferramentas de IA): a skill precisa existir e estar no board em modo "Sempre" em Configurações → Harness. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.':
+    'It teaches the AI to drive cards through the board flow: phases, documents, review and pending items. Board runs start from only what is on the board (in Claude Code, empty context is enforced; for other CLIs, see what they load on their own in Ferramentas de IA): the skill must exist and be on the board in "Always" mode in Settings → Harness. Installing from here writes to the tool\'s global skills folder and checks it.',
   'O {tool} não acha o comando do MCP do board': '{tool} cannot find the board MCP command',
   '{file} inicia o MCP com "{missing}", que não está no PATH com que o editor abriu (o programa foi instalado depois, ou fica numa pasta que o editor não lê). O arquivo está no git, então o board não grava nele o caminho desta máquina: feche e abra o editor de novo, ou tire o arquivo do git.':
     '{file} starts the MCP with "{missing}", which is not in the PATH the editor opened with (the program was installed later, or lives in a folder the editor does not read). The file is in git, so the board does not write this machine’s path into it: close and reopen the editor, or take the file out of git.',
@@ -125,15 +125,28 @@ export const environment: Record<string, string> = {
   'Artefatos presentes': 'Artifacts present',
   'Um artefato do board sumiu da origem; a aba do assunto mostra quais estão ausentes, para tirar do board ou repor o arquivo.':
     "A board artifact vanished from its source; the subject's tab shows which are missing, to remove from the board or restore the file.",
-  'Artefatos do projeto fora do board': 'Project artifacts outside the board',
-  'A linha de comando do Cursor não desliga nada: regras, servidores MCP e hooks do projeto entram no contexto sem passar pelo board. Desligue nas configurações do Cursor ou remova do projeto; o board só confere.':
-    "Cursor's command line turns nothing off: the project's rules, MCP servers and hooks enter the context without going through the board. Turn them off in Cursor's settings or remove them from the project; the board only checks.",
+  'Artefatos fora do board que a CLI carrega': 'Artifacts outside the board that the CLI loads',
+  'A linha de comando do {tool} não desliga tudo: {list} entram no contexto sem passar pelo board. Desligue na configuração da ferramenta ou remova; o board só confere.':
+    "The {tool} command line does not turn everything off: {list} enter the context without going through the board. Turn them off in the tool's settings or remove them; the board only checks.",
+  'regras do projeto': 'project rules',
+  'regras do usuário': 'user rules',
+  'skills do projeto': 'project skills',
+  'skills do usuário': 'user skills',
+  'agentes do projeto': 'project agents',
+  'agentes do usuário': 'user agents',
+  'hooks do projeto': 'project hooks',
+  'hooks do usuário': 'user hooks',
+  'servidores MCP do projeto': 'project MCP servers',
+  'servidores MCP do usuário': 'user MCP servers',
+  'itens não reconhecidos': 'unrecognized items',
+  'A CLI pode carregar por conta própria: {list}.': 'The CLI may load on its own: {list}.',
+  'Contexto vazio (imposto)': 'Empty context (enforced)',
+  'Nenhum item conhecido carregado (sem prova de isolamento)': 'No known item loaded (no proof of isolation)',
   'nenhuma skill, agente ou servidor MCP em modo "Pelo card"': 'no skill, agent or MCP server in "Pelo card" mode',
   'nenhum agente do board': 'no board agent',
   'regras no board ainda desligadas, sem revisão': 'rules on the board still off, not reviewed',
   'artefato do board que sumiu da origem': 'a board artifact that vanished from its source',
-  'artefatos do projeto que entram no contexto sem passar pelo board':
-    'project artifacts that enter the context without going through the board',
+  'artefatos que a CLI carrega sem passar pelo board': 'artifacts the CLI loads without going through the board',
   'O harness do board ainda não está definido': "The board's harness is not defined yet",
   'Recomendado: defina o harness para as execuções gastarem menos contexto': 'Recommended: define the harness so runs spend less context',
   'O board funciona assim, mas as execuções não ganham a economia e a precisão de um harness definido. Falta: {list}. Resolva em Configurações → Harness.':

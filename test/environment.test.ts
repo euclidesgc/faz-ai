@@ -82,7 +82,7 @@ describe('Diagnóstico do ambiente', () => {
               ['harness-agents', 'skipped'],
               ['harness-rules', 'skipped'],
               ['harness-missing', 'skipped'],
-              ['harness-cursor', 'skipped'],
+              ['harness-isolation', 'skipped'],
             ],
           ],
           ['permission', 'ok'],

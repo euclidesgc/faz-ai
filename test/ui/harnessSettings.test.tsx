@@ -501,6 +501,15 @@ describe('HarnessSettings: ferramenta e execução', () => {
     await userEvent.clear(parallel);
     await userEvent.type(parallel, '3{Enter}');
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { parallelStories: 3 } });
+    // sub-tarefas em paralelo: o pedido (1 a 6) e o efetivo, que hoje é sempre 1
+    const subtasks = within(runner).getByLabelText('Sub-tarefas em paralelo por história');
+    expect(subtasks).toHaveValue(2);
+    expect(
+      within(runner).getByText('Efetivo: 1. As sub-tarefas escrevem na mesma pasta da história, então rodam uma por vez.'),
+    ).toBeInTheDocument();
+    await userEvent.clear(subtasks);
+    await userEvent.type(subtasks, '4{Enter}');
+    expect(lastSent('settings.board.update').patch).toEqual({ runner: { parallelSubtasks: 4 } });
     await userEvent.click(screen.getByRole('button', { name: 'Rodar o heartbeat agora' }));
     expect(lastSent('ai.heartbeat.run')).toEqual({ type: 'ai.heartbeat.run' });
   });

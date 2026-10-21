@@ -1,4 +1,5 @@
 import { importBoard } from '../../db/boardExport';
+import { proposeLegacyFallbacks } from './models';
 import type { HandlerMap } from './context';
 
 /** Backup do board: a importação, que substitui o board da pasta pelo arquivo estacionado em `pendingImports`. */
@@ -23,6 +24,7 @@ export const boardBackupHandlers = {
     ctx.boardId = result.boardId;
     ctx.lastImport = result;
     ctx.harness.load();
+    proposeLegacyFallbacks(ctx);
     return true;
   },
 } satisfies Partial<HandlerMap>;

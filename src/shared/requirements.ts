@@ -1,6 +1,8 @@
 import type { AiBase } from './aiProfiles';
 import type { AiTool } from './harness';
 import type { HarnessIssue } from './harnessStatus';
+import type { BoardState, Card } from './model';
+import { runTargetOf } from './runTarget';
 
 /** O que falta para o board trabalhar com a ferramenta de IA do projeto. */
 export type RequirementId =
@@ -78,7 +80,27 @@ export const CLI_COMMAND: Record<AiBase, string> = { claude: 'claude', cursor: '
 /** O comando que faz o login na CLI de cada ferramenta (conferido nas CLIs em 2026-10-13). */
 export const LOGIN_COMMAND: Record<AiBase, string> = { claude: 'claude auth login', cursor: 'cursor-agent login', kimi: 'kimi login' };
 
-/** Sem login a execução pelo board nem começa: usado pelos 4 gatilhos (manual, Refinar com IA, heartbeat, autopiloto). */
-export function blocksExecution(state: { requirements: BoardRequirement[]; authExpired: AiTool | null }): boolean {
-  return state.requirements.some((r) => r.id === 'signin') || state.authExpired !== null;
+/** O problema de um perfil de CLI que impede a execução: CLI ausente, sem login (probe) ou login vencido (falha numa execução). */
+export type CliProblem = 'cli' | 'signin' | 'expired';
+
+type ProblemState = { requirements: BoardRequirement[]; authExpired: AiTool[] };
+
+/** O problema do perfil `cli` (id do perfil), ou null. Só olha os sinais daquele perfil; a CLI ausente vem antes do login. */
+export function cliProblem(state: ProblemState, cli: AiTool): CliProblem | null {
+  const own = state.requirements.filter((r) => r.tool === cli && !r.optional);
+  if (own.some((r) => r.id === 'cli')) return 'cli';
+  if (own.some((r) => r.id === 'signin')) return 'signin';
+  return state.authExpired.includes(cli) ? 'expired' : null;
+}
+
+/** A execução no perfil `cli` nem começa: usado pelos gatilhos (manual, Refinar com IA, heartbeat, autopiloto). Os outros perfis seguem. */
+export const blocksExecution = (state: ProblemState, cli: AiTool): boolean => cliProblem(state, cli) !== null;
+
+/**
+ * O problema do perfil de CLI que executaria o card (`runTargetOf`), ou null. Um alvo bloqueado (escolha
+ * explícita inválida) não é problema de CLI: quem executa trata isso à parte.
+ */
+export function cardCliProblem(state: BoardState, card: Card): CliProblem | null {
+  const target = runTargetOf(state, card);
+  return target ? cliProblem(state, target.cli.id) : null;
 }
