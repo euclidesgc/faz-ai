@@ -5,7 +5,6 @@ import type { ModelOption, ModelRule } from '../src/shared/models';
 import {
   cliOfValue,
   defaultTarget,
-  fallbackTargetOf,
   modelGroups,
   profilesInUse,
   resolveRunTarget,
@@ -60,13 +59,12 @@ function state(o: Opts = {}): BoardState {
   } as unknown as BoardState;
 }
 const first = (s: BoardState) => s.cards[0]!;
-const rule = (model: string, fallback?: string): ModelRule => ({
+const rule = (model: string): ModelRule => ({
   id: 'r',
   name: 'r',
   enabled: true,
   groups: [[{ fieldId: '@type', op: 'is', value: 'Tarefa' }]],
   model,
-  fallback,
 });
 
 describe('runTargetOf', () => {
@@ -147,25 +145,6 @@ describe('cliOfValue e targetOfValue', () => {
 
   it('defaultTarget usa o perfil padrão', () => {
     expect(defaultTarget({ ...state().board, aiTool: 'cursor' }).cli.id).toBe('cursor');
-  });
-});
-
-describe('fallbackTargetOf', () => {
-  const r = rule('claude:opus@high', 'cursor:composer-2.5');
-  it('a reserva pode estar noutro perfil', () => {
-    const s = state({ rules: [r], cards: [{ id: 'c1', model: 'claude:opus@high' }] });
-    const t = runTargetOf(s, first(s))!;
-    expect(fallbackTargetOf(s, first(s), t)).toMatchObject({ cli: { id: 'cursor' }, source: 'fallback' });
-  });
-  it('null com a reserva num perfil desligado', () => {
-    const s = state({ rules: [r], aiProfiles: profiles('claude') });
-    expect(fallbackTargetOf(s, first(s), runTargetOf(s, first(s))!)).toBeNull();
-  });
-  it('null com o modelo trocado à mão e sem regra', () => {
-    const s = state({ rules: [r], cards: [{ id: 'c1', model: 'claude:haiku' }] });
-    expect(fallbackTargetOf(s, first(s), runTargetOf(s, first(s))!)).toBeNull();
-    const n = state();
-    expect(fallbackTargetOf(n, first(n), defaultTarget(n.board))).toBeNull();
   });
 });
 

@@ -8,11 +8,20 @@ import { MCP_INSTRUCTIONS } from '../src/extension/mcp/server';
 const implementacao = FLOW_TEXT.slice(FLOW_TEXT.indexOf('## Sub-tarefas de implementação'), FLOW_TEXT.indexOf('## Homologação'));
 
 describe('rodadas da Implementação', () => {
-  it('a skill para quando as sub-tarefas restantes estão com a pessoa, em vez de repetir até não sobrar nenhuma em aberto', () => {
-    expect(implementacao).not.toContain('até não sobrar\nnenhuma em aberto');
-    expect(implementacao).toMatch(/possa tocar agora/);
+  it('a skill diz que o board executa as sub-tarefas e que a sessão cria, descreve e para; withPerson não é do board', () => {
+    expect(implementacao).toMatch(/o \*\*board\*\* executa as sub-tarefas/);
+    expect(implementacao).toMatch(/Depois\s+\*\*pare\*\*/);
+    expect(implementacao).toContain('byBoard');
     expect(implementacao).toContain('withPerson');
-    expect(implementacao).toMatch(/com a pessoa[^.]*pare/);
+    expect(implementacao).toMatch(/uma vez\*\*, para o fechamento/);
+  });
+
+  it('nenhum texto que a IA lê manda executar sub-tarefa pela ferramenta Agent ou por subagente', () => {
+    expect(implementacao).toMatch(/nem por subagente/);
+    expect(implementacao).not.toMatch(/delegue[^.]*subagente/i);
+    expect(SUBTASKS_NOW_NOTE).toMatch(/nem por subagente/);
+    expect(SUBTASKS_NOW_NOTE).not.toMatch(/delegue/i);
+    expect(MCP_INSTRUCTIONS).not.toMatch(/delegue/i);
   });
 
   it('a skill só manda testar e fazer commit quando a permissão inclui o terminal', () => {
@@ -20,10 +29,11 @@ describe('rodadas da Implementação', () => {
     expect(implementacao).toMatch(/quem tem permissão/);
   });
 
-  it('a nota das rodadas no get_card resume a regra de parada e a condição da permissão, e aponta a skill', () => {
+  it('a nota das rodadas no get_card diz o que o board executa, que a sessão cria e para, e aponta a skill', () => {
     expect(SUBTASKS_NOW_NOTE).toContain('withPerson');
     expect(SUBTASKS_NOW_NOTE).toMatch(/não são suas/);
-    expect(SUBTASKS_NOW_NOTE).toMatch(/Sem terminal/);
+    expect(SUBTASKS_NOW_NOTE).toContain('byBoard');
+    expect(SUBTASKS_NOW_NOTE).toMatch(/crie-as e pare/);
     expect(SUBTASKS_NOW_NOTE).toContain('faz-ai-implementacao-rodadas');
   });
 });
@@ -37,9 +47,12 @@ describe('pendências com a pessoa', () => {
     expect(FLOW_TEXT).toMatch(/"Travado em mim" tiver qualquer item[\s\S]*`request_review`[\s\S]*`pending`/);
     const yolo = FLOW_TEXT.slice(FLOW_TEXT.indexOf('## Modo autônomo'), FLOW_TEXT.length);
     expect(yolo).toMatch(/`request_review` com\s+`pending` não segura o card no modo autônomo/);
-    expect(yolo).toContain('Perguntas para você');
-    expect(yolo).toContain('decidido pela IA no modo autônomo');
+    expect(yolo).toContain('`ask_questions` é aceita');
+    expect(yolo).toContain('Perguntas e respostas');
+    expect(yolo).not.toContain('Perguntas para você');
     expect(MCP_INSTRUCTIONS).toContain('request_review e `pending`');
+    expect(MCP_INSTRUCTIONS).toContain('ask_questions');
+    expect(FLOW_TEXT).not.toContain('R.** >');
     expect(MCP_INSTRUCTIONS).toContain('No modo autônomo nada disso segura o card');
   });
 });
@@ -80,7 +93,7 @@ describe('base do pull request (#462)', () => {
     expect(homologacao).toContain('gh pr create --base <prBase>');
     const prepare = body.slice(
       body.indexOf('chame `prepare_workspace` na história'),
-      body.indexOf('Na Implementação, trabalhe em rodadas'),
+      body.indexOf('Na Implementação, o **board** executa'),
     );
     expect(prepare).toMatch(/base do fluxo[\s\S]*`workspace.prBase`/);
     const yolo = body.slice(body.indexOf('## Modo autônomo'), body.length);
@@ -96,6 +109,6 @@ describe('Revisão antes do pull request', () => {
     expect(revisao).toContain('revisor-de-codigo');
     expect(revisao).toMatch(/só passa no teste/);
     expect(revisao).toMatch(/diretriz clara[\s\S]*corrige agora/);
-    expect(revisao).toMatch(/ambíguo[\s\S]*`ask_question`[\s\S]*modo autônomo[\s\S]*menos complexo/);
+    expect(revisao).toMatch(/ambíguo[\s\S]*`ask_questions`[\s\S]*modo autônomo[\s\S]*menos complexo/);
   });
 });

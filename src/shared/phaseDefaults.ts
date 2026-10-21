@@ -257,7 +257,8 @@ const PLAN_INSTRUCTION_V11 = [
   'A descrição de cada sub-tarefa deve bastar para executá-la: o que fazer, onde e como verificar.',
 ].join('\n');
 
-export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
+// Os textos padrão da versão 12 do board (até a 0.44.0): a versão 13 troca a seção "Perguntas para você" por ask_questions.
+const PHASE_DEFAULTS_V12: Record<string, PhaseDefault> = {
   Discovery: {
     instruction: [
       'Entenda o problema de forma macro, antes de qualquer documento de requisitos.',
@@ -466,6 +467,25 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   },
 };
 
+const QUESTIONS_SECTION_START = '\n\n## ❓ Perguntas para você';
+const withoutQuestions = (template: string): string => template.split(QUESTIONS_SECTION_START)[0]!;
+const askQuestions = (text: string): string =>
+  text
+    .replace('use ask_question e pare', 'use ask_questions (ou ask_question, para pergunta aberta) e pare')
+    .replace('`ask_question` e pare', '`ask_questions` e pare')
+    .replace(
+      'ask_question (no modo autônomo, request_review com pending) e pare',
+      'ask_questions (no modo autônomo, o board responde com a indicada) e pare',
+    );
+
+/** Os textos padrão atuais: os da versão 12, sem a seção "Perguntas para você" e com ask_questions. */
+export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+  Object.entries(PHASE_DEFAULTS_V12).map(([name, d]) => [
+    name,
+    { ...d, instruction: askQuestions(d.instruction), artifactTemplate: withoutQuestions(d.artifactTemplate) },
+  ]),
+);
+
 /** Textos padrão anteriores de uma fase e o que a versão atual traz de novo, para a atualização do board. */
 export interface PhaseHistory {
   instructions: string[];
@@ -481,27 +501,29 @@ export interface PhaseHistory {
  */
 export const PHASE_HISTORY: Record<string, PhaseHistory> = {
   Discovery: {
-    instructions: [DISCOVERY_INSTRUCTION_V11],
-    templates: [DISCOVERY_TEMPLATE_V8, DISCOVERY_TEMPLATE_V11],
-    change:
-      'o documento ganha as seções "Perguntas para você" (alternativas, recomendação e espaço para a resposta) e "Mapa do código", de onde as fases seguintes partem',
+    instructions: [DISCOVERY_INSTRUCTION_V11, PHASE_DEFAULTS_V12.Discovery!.instruction],
+    templates: [DISCOVERY_TEMPLATE_V8, DISCOVERY_TEMPLATE_V11, PHASE_DEFAULTS_V12.Discovery!.artifactTemplate],
+    change: 'as dúvidas com alternativas vão por ask_questions (carrossel no card) e o documento perde a seção "Perguntas para você"',
   },
   PRD: {
     instructions: [PRD_INSTRUCTION_V5, PRD_INSTRUCTION_V11],
-    templates: [PRD_TEMPLATE_V8],
-    change:
-      'a fase parte do mapa do código do Discovery e lê só o que faltar; pode começar sem o Discovery e o documento ganha a seção "Perguntas para você", com alternativas, recomendação e espaço para a resposta',
+    templates: [PRD_TEMPLATE_V8, PHASE_DEFAULTS_V12.PRD!.artifactTemplate],
+    change: 'o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
   },
   Spec: {
     instructions: [SPEC_INSTRUCTION_V5, SPEC_INSTRUCTION_V11],
-    templates: [SPEC_TEMPLATE_V5, SPEC_TEMPLATE_V8, SPEC_TEMPLATE_V11],
-    change:
-      'a Spec parte do mapa do código do Discovery e o completa, sem citar ferramentas do projeto; traz o desenho do programa (tipos, assinaturas e fluxo em diagramas Mermaid), o motivo de cada alternativa descartada e a seção "Perguntas para você"',
+    templates: [SPEC_TEMPLATE_V5, SPEC_TEMPLATE_V8, SPEC_TEMPLATE_V11, PHASE_DEFAULTS_V12.Spec!.artifactTemplate],
+    change: 'o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
   },
   Plan: {
     instructions: [PLAN_INSTRUCTION_V5, PLAN_INSTRUCTION_V11],
-    templates: [PLAN_TEMPLATE_V5, PLAN_TEMPLATE_V8],
-    change: `o plano parte do mapa do código da Spec e cada sub-tarefa traz os arquivos que vai tocar; cada passo fica fácil de revisar sozinho, o plano estima o tamanho da entrega, dividindo em histórias derivadas o que passar de umas ${PR_LINES_BUDGET} linhas, e ganha a seção "Perguntas para você"`,
+    templates: [PLAN_TEMPLATE_V5, PLAN_TEMPLATE_V8, PHASE_DEFAULTS_V12.Plan!.artifactTemplate],
+    change: 'o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
+  },
+  Revisão: {
+    instructions: [PHASE_DEFAULTS_V12.Revisão!.instruction],
+    templates: [],
+    change: 'o achado que muda o comportamento combinado vira pergunta por ask_questions',
   },
   Implementação: { instructions: [IMPLEMENTATION_INSTRUCTION_V5], templates: [], change: 'a fase pode começar sem sub-tarefas do Plan' },
   Homologação: {

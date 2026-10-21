@@ -304,15 +304,16 @@ function SettingsWithHostSync() {
   return <Settings />;
 }
 
-describe('Settings: ida e volta com o Settings do editor', () => {
-  it('o botão "Abrir no Settings do editor" manda ui.openIdeSettings', async () => {
+describe('Settings: abas e navegação do host', () => {
+  it('a aba Backup aparece no editor e não há o botão "Abrir no Settings do editor"', async () => {
     render(
       <Theme>
         <Settings />
       </Theme>,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir no Settings do editor' }));
-    expect(lastSent('ui.openIdeSettings')).toEqual({ type: 'ui.openIdeSettings', key: undefined });
+    expect(screen.queryByRole('button', { name: 'Abrir no Settings do editor' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Backup' }));
+    expect(screen.getByRole('button', { name: /Exportar board/ })).toBeInTheDocument();
   });
 
   it('ui.openSettings troca a aba e rola até a seção', () => {

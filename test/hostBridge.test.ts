@@ -677,23 +677,7 @@ describe('HostBridge: card.usage.query', () => {
   });
 });
 
-describe('HostBridge: Settings do editor', () => {
-  it('ui.openIdeSettings pede ao editor para abrir o Settings na chave', async () => {
-    const keys: (string | undefined)[] = [];
-    env.openIdeSettings = (key) => void keys.push(key);
-    await bridge.handle({ type: 'ui.openIdeSettings', key: 'fazai.appearance.language' });
-    await bridge.handle({ type: 'ui.openIdeSettings' });
-    expect(keys).toEqual(['fazai.appearance.language', undefined]);
-  });
-
-  it('sem openIdeSettings no ambiente (modo navegador), a mensagem é ignorada sem erro', async () => {
-    delete env.openIdeSettings;
-    await expect(bridge.handle({ type: 'ui.openIdeSettings' })).resolves.toBeUndefined();
-    expect(sent.filter((m) => m.type === 'error')).toEqual([]);
-  });
-});
-
-describe('biblioteca: importar e abrir uma pasta', () => {
+describe('HostBridge: biblioteca do Harness', () => {
   it('o seletor lista as skills para revisão antes de copiar', async () => {
     const source = path.join(dir, 'colecao');
     fs.mkdirSync(path.join(source, 'react'), { recursive: true });

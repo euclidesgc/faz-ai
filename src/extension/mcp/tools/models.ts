@@ -122,12 +122,6 @@ export function registerModelTools(tool: DefineTool): void {
             .min(1)
             .describe('Ex.: [[{Esforço=Alto},{Tags=backend}], [{Tipo=Bug}]] significa (Esforço=Alto E Tags=backend) OU Tipo=Bug'),
           model: z.string().describe('Modelo e esforço, ex.: "claude:opus@high" ou "Opus 5.5 high"'),
-          fallback: z
-            .string()
-            .optional()
-            .describe(
-              'Descontinuado: a reserva agora é uma política de execução, revisada pela pessoa em Ferramentas de IA. Informar isto é recusado.',
-            ),
           enabled: z.boolean().optional(),
         }),
       ),
@@ -136,11 +130,6 @@ export function registerModelTools(tool: DefineTool): void {
       const s = router.snapshot();
       const fieldId = (name: string) =>
         ['tipo', 'type', TYPE_CONDITION].includes(name.trim().toLowerCase()) ? TYPE_CONDITION : findField(s, name).id;
-      // a reserva paralela não existe mais: o fallback é decidido só pelas políticas de execução
-      if (a.rules.some((r) => r.fallback))
-        throw new Error(
-          'A reserva por regra foi substituída pelas políticas de execução, que só a pessoa grava: configure em Ferramentas de IA.',
-        );
       const rules: ModelRule[] = a.rules.map((r) => ({
         id: newId(),
         name: r.name ?? '',
@@ -149,7 +138,6 @@ export function registerModelTools(tool: DefineTool): void {
           g.map((c) => ({ fieldId: fieldId(c.field), op: c.not ? ('isNot' as const) : ('is' as const), value: c.value })),
         ),
         model: resolveModelInput(s.board.modelCatalog, r.model, activeProfile(s.board)),
-        fallback: null,
       }));
       router.handle({ type: 'settings.modelRules.set', rules });
       return models(router);

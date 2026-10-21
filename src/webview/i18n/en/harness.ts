@@ -479,13 +479,15 @@ export const harness: Record<string, string> = {
   'Abrir no editor': 'Open in editor',
   'Histórias ao mesmo tempo': 'Stories at the same time',
   histórias: 'stories',
+  'Sub-tarefas em paralelo por história': 'Sub-tasks in parallel per story',
+  'sub-tarefas': 'sub-tasks',
+  'Efetivo: {effective}. As sub-tarefas escrevem na mesma pasta da história, então rodam uma por vez.':
+    'Effective: {effective}. The sub-tasks write to the same story folder, so they run one at a time.',
   'Tocar histórias em paralelo': 'Drive stories in parallel',
-  'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas. As sub-tarefas independentes de cada história já rodam em paralelo, sem limite, conforme o plano.':
-    'When on, the heartbeat drives several stories at once, each in its own folder (worktree). More stories in parallel use more memory and CPU and more of your account usage limit. Autonomous mode stays one at a time, because its stories are stacked. The independent sub-tasks of each story already run in parallel, with no limit, according to the plan.',
+  'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas.':
+    'When on, the heartbeat drives several stories at once, each in its own folder (worktree). More stories in parallel use more memory and CPU and more of your account usage limit. Autonomous mode stays one at a time, because its stories are stacked.',
   'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.':
     'Only available in "Worktree por história" mode (Settings > Git). Outside it the stories share the same folder and would cause conflicts, so the heartbeat drives one at a time.',
-  'Tocar histórias em paralelo agora fica no Settings do editor, em Faz AI › Git.':
-    'Driving stories in parallel now lives in the editor Settings, under Faz AI › Git.',
 
   // --- BoardInstall
   'O registro será gravado em {where}.': 'The registration will be written to {where}.',

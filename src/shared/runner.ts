@@ -59,6 +59,8 @@ export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint:
 export const TIMEOUT_RANGE = { min: 1, max: 240 };
 export const HEARTBEAT_RANGE = { min: 5, max: 1440 };
 export const PARALLEL_RANGE = { min: 2, max: 6 };
+/** Sub-tarefas em paralelo por história: 1 a 6 (hoje o efetivo é sempre 1, veja `effectiveLimits`). */
+export const SUBTASK_PARALLEL_RANGE = { min: 1, max: 6 };
 export const DEFAULT_RUNNER: RunnerConfig = {
   permission: 'board',
   timeoutMinutes: 45,
@@ -110,7 +112,10 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
         ? Math.min(HEARTBEAT_RANGE.max, Math.max(HEARTBEAT_RANGE.min, interval))
         : DEFAULT_RUNNER.heartbeatMinutes,
     parallel: raw.parallel === true,
-    parallelSubtasks: Number.isFinite(subtasks) && subtasks > 0 ? Math.min(6, Math.max(1, subtasks)) : DEFAULT_RUNNER.parallelSubtasks,
+    parallelSubtasks:
+      Number.isFinite(subtasks) && subtasks > 0
+        ? Math.min(SUBTASK_PARALLEL_RANGE.max, Math.max(SUBTASK_PARALLEL_RANGE.min, subtasks))
+        : DEFAULT_RUNNER.parallelSubtasks,
     parallelStories:
       Number.isFinite(parallel) && parallel > 0
         ? Math.min(PARALLEL_RANGE.max, Math.max(PARALLEL_RANGE.min, parallel))
