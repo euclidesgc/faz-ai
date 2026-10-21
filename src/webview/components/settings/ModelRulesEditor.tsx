@@ -153,26 +153,6 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
         {() => <ModelEditor value={rule.model} onChange={(v) => setRule({ ...rule, model: typeof v === 'string' ? v : '' })} />}
       </FormField>
 
-      <FormField
-        label={t('Fallback')}
-        hint={
-          rule.fallback
-            ? t('reserva legada: {model}. Ela não troca de CLI sozinha; revise a proposta em Políticas de execução e fallback.', {
-                model: modelDisplay(state.board.modelCatalog, rule.fallback, true),
-              })
-            : t('A reserva por regra não existe mais: o fallback é uma política de execução, revisada por você.')
-        }
-      >
-        {() => (
-          <Button
-            variant="soft"
-            onClick={() => document.getElementById('execution-policies')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })}
-          >
-            {t('Ir para as políticas de execução')}
-          </Button>
-        )}
-      </FormField>
-
       <div className="form-actions">
         <Button variant="soft" color="gray" onClick={onCancel}>
           {t('Cancelar')}
@@ -218,7 +198,6 @@ export function ModelRulesEditor() {
       enabled: true,
       groups: [[{ fieldId: first.id, op: 'is', value: first.values[0] ?? '' }]],
       model: o ? modelValue(o.id, o.defaultEffort) : '',
-      fallback: null,
     });
   };
   const tool = baseInfo(aiTool);
@@ -284,14 +263,7 @@ export function ModelRulesEditor() {
               </td>
               <td>{r.name ? dt(r.name) : <span className="muted">{t('(sem nome)')}</span>}</td>
               <td>{describeRule(state, r, { word: t, name: dt })}</td>
-              <td>
-                {modelDisplay(state.board.modelCatalog, r.model, true)}
-                {r.fallback && (
-                  <div className="muted small">
-                    {t('reserva legada (desativada): {model}', { model: modelDisplay(state.board.modelCatalog, r.fallback, true) })}
-                  </div>
-                )}
-              </td>
+              <td>{modelDisplay(state.board.modelCatalog, r.model, true)}</td>
               <td className="narrow">
                 <IconButton
                   variant="ghost"
