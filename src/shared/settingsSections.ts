@@ -21,7 +21,6 @@ export const SETTINGS_SECTIONS: Record<string, SettingsSectionInfo> = {
   // as âncoras da tela por ferramenta caem na aba de artefatos do board
   'harness-project': { tab: 'harness', harnessTab: 'artifacts' },
   'harness-user': { tab: 'harness', harnessTab: 'artifacts' },
-  'harness-cursor': { tab: 'harness', harnessTab: 'artifacts' },
   'harness-missing': { tab: 'harness', harnessTab: 'artifacts' },
   // a pendência "nenhum agente do board" leva à aba Agentes
   'harness-agents': { tab: 'harness', harnessTab: 'artifacts', harnessTopic: 'agent' },

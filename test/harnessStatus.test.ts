@@ -82,7 +82,7 @@ describe('harnessIssues', () => {
     expect(harnessIssues(ready)).toEqual([]);
   });
 
-  it('regra desligada, artefato ausente e, no Cursor, artefatos do projeto fora do board', () => {
+  it('regra desligada e artefato ausente; no Cursor, artefatos do projeto fora do board não geram problema', () => {
     const s = state(
       {
         harness: {
@@ -95,7 +95,7 @@ describe('harnessIssues', () => {
               installed: true,
               items: [
                 item({ kind: 'instructions', name: 'AGENTS.md', location: 'AGENTS.md' }),
-                item({ kind: 'mcp', name: 'faz-ai', location: '.cursor/mcp.json', layout: 'entry' }),
+                item({ kind: 'mcp', name: 'outro', location: '.cursor/mcp.json', layout: 'entry' }),
                 item({ kind: 'skill', name: 'sql', location: '.cursor/skills/sql/SKILL.md', layout: 'skills' }),
               ],
             },
@@ -110,13 +110,7 @@ describe('harnessIssues', () => {
       },
       'cursor',
     );
-    expect(harnessIssues(s)).toEqual(['rules', 'missing', 'cursor']);
-    // só o servidor do board no projeto não conta como artefato fora do board
-    const clean = {
-      ...s,
-      harness: { ...s.harness, inventory: [{ ...s.harness.inventory[0]!, items: s.harness.inventory[0]!.items.slice(1) }] },
-    };
-    expect(harnessIssues(clean)).toEqual(['missing']);
+    expect(harnessIssues(s)).toEqual(['rules', 'missing']);
   });
 });
 
