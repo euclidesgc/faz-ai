@@ -961,20 +961,27 @@ describe('regras de modelo com E e OU', () => {
     );
   });
 
-  it('recusa a reserva por regra (agora é política de execução) e não altera as regras salvas', async () => {
-    await call('set_model_rules', { rules: [{ name: 'Antes', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku' }] });
+  it('o parâmetro fallback não existe: a chave é ignorada, a regra é salva sem reserva e nenhuma política nasce', async () => {
     const res = await call('set_model_rules', {
       rules: [{ name: 'Com reserva', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku', fallback: 'opus high' }],
     });
-    expect(res.error).toBe(true);
-    expect(res.text).toContain('políticas de execução');
-    expect(router.snapshot().board.modelRules.map((r) => r.name)).toEqual(['Antes']);
+    expect(res.error).toBe(false);
+    expect(res.data.rules[0]).not.toHaveProperty('fallbackValue');
+    expect(router.snapshot().board.modelRules.map((r) => r.name)).toEqual(['Com reserva']);
+    expect(router.snapshot().board.modelRules.some((r) => 'fallback' in r)).toBe(false);
     expect(router.executionPolicyLibrary().snapshot.records).toEqual([]);
-    const ok = await call('set_model_rules', {
-      rules: [{ name: 'Sem reserva', when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'opus low' }],
-    });
-    expect(ok.data.rules[0]).not.toHaveProperty('fallbackValue');
-    expect(router.snapshot().board.modelRules[0]?.fallback).toBe(null);
+    const tool = (await client.listTools()).tools.find((t) => t.name === 'set_model_rules');
+    expect(JSON.stringify(tool)).not.toContain('fallback');
+  });
+
+  it('get_models nunca devolve reserva, mesmo com o JSON antigo gravado no board', async () => {
+    const { run } = await import('../src/extension/db/query');
+    const json = JSON.stringify([{ id: 'r1', name: 'Antiga', enabled: true, groups: [], model: 'claude:haiku', fallback: 'claude:opus@high' }]);
+    run(profileDb, 'UPDATE boards SET model_rules_json = ? WHERE id = ?', [json, router.boardId]);
+    const res = await call('get_models', {});
+    expect(res.data.rules).toHaveLength(1);
+    expect(res.data.rules[0]).not.toHaveProperty('fallbackValue');
+    expect(res.data.rules[0]).not.toHaveProperty('fallbackSuggest');
   });
 
   it('com o preenchimento automático desligado, só sugere', async () => {
@@ -995,7 +1002,6 @@ describe('regras de modelo com E e OU', () => {
           enabled: true,
           groups: [[{ fieldId: 'f1', op: 'is', value: 'Alto' }]],
           model: 'claude:opus@high',
-          fallback: null,
         },
       ],
     );
