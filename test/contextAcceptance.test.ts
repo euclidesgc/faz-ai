@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveContextDraft } from '../src/shared/contextDraftResolution';
-import { applyAdmissionDecision, strictRequestFromDraft } from '../src/shared/contextAdmissionPreview';
+import { strictRequestFromDraft } from '../src/shared/contextAdmissionPreview';
 import type { BoardArtifact } from '../src/shared/artifacts';
 import type { ContextActivityTarget } from '../src/shared/contextPlanning';
 import * as fs from 'node:fs';
