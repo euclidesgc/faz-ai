@@ -187,11 +187,14 @@ describe('telas montam sem erro', () => {
     expect(collapsed).toContain('settings-side collapsed');
     expect(collapsed).toContain('aria-label="Harness"');
     useBoardStore.setState({ settingsNavCollapsed: false });
-    // no editor (isWeb false em teste), a GitSettings mostra só o aviso e o link para o Settings do editor
-    expect(html(<GitSettings />)).toContain('O Git agora fica no Settings do editor.');
+    // no editor (isWeb false em teste), a GitSettings mostra os campos de Git, sem o aviso do Settings
+    const gitHtml = html(<GitSettings />);
+    expect(gitHtml).toContain('Onde a IA mexe no código');
+    expect(gitHtml).not.toContain('Settings do editor');
     const settingsHtml = html(<Settings />);
-    // no editor (isWeb false em teste), a aba Backup não aparece no Settings do board: os comandos da paleta cuidam disso
-    expect(settingsHtml).not.toContain('Backup');
+    // a aba Backup existe também no editor
+    expect(settingsHtml).toContain('Backup');
+    expect(settingsHtml).not.toContain('Abrir no Settings do editor');
     const backup = html(<BackupSettings />);
     for (const text of ['Exportar board', 'Importar de um arquivo…', 'guarde-o com cuidado']) expect(backup).toContain(text);
     expect(backup).not.toContain('Espere a execução da IA terminar');
@@ -265,8 +268,8 @@ describe('telas montam sem erro', () => {
     for (const text of ['OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs']) expect(builder).toContain(text);
 
     const look = html(<AppearanceSettings />);
-    for (const text of ['Abrir no Settings do editor', 'Prévia']) expect(look).toContain(text);
-    for (const text of ['Tamanho da fonte: 14px', 'Status dos cards']) expect(look).not.toContain(text);
+    for (const text of ['Tamanho da fonte: 14px', 'Prévia']) expect(look).toContain(text);
+    for (const text of ['Abrir no Settings do editor', 'Status dos cards']) expect(look).not.toContain(text);
     const toggle = html(<ThemeToggle />);
     for (const text of ['Tema: Sistema. Clique para mudar para Claro.', '<svg']) expect(toggle).toContain(text);
     expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);

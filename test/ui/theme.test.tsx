@@ -1,4 +1,4 @@
-import { lastSent, posted, seedBoard, syncStore, type SeededBoard } from './setup';
+import { choose, lastSent, posted, seedBoard, syncStore, type SeededBoard } from './setup';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -34,21 +34,40 @@ describe('ThemeToggle', () => {
 });
 
 describe('AppearanceSettings dentro do editor', () => {
-  it('não mostra os 4 campos nem a tabela de status; mostra o aviso e o botão para o Settings do editor', async () => {
+  const open = () => {
     withTheme('system');
     render(
       <Theme>
         <AppearanceSettings />
       </Theme>,
     );
-    expect(screen.queryByRole('combobox', { name: 'Tema' })).toBeNull();
-    expect(screen.queryByRole('combobox', { name: 'Fonte dos textos' })).toBeNull();
-    expect(screen.queryByRole('combobox', { name: 'Idioma' })).toBeNull();
-    expect(screen.queryByRole('slider')).toBeNull();
-    expect(screen.queryByLabelText('Nome do status running')).toBeNull();
-    expect(screen.getByText('A aparência do board (idioma, tema, fonte e tamanho) agora fica no Settings do editor.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir no Settings do editor' }));
-    expect(lastSent('ui.openIdeSettings')).toEqual({ type: 'ui.openIdeSettings', key: 'fazai.appearance.theme' });
+  };
+
+  it('mostra os 4 campos, sem o aviso nem o botão do Settings do editor', () => {
+    open();
+    expect(screen.getByRole('combobox', { name: 'Tema' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Fonte dos textos' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Idioma' })).toBeInTheDocument();
+    expect(screen.getByRole('slider')).toBeInTheDocument();
+    expect(screen.queryByText(/agora fica no Settings do editor/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Abrir no Settings do editor' })).toBeNull();
+  });
+
+  it('trocar tema, idioma e fonte grava só o campo alterado', async () => {
+    open();
+    await choose(screen.getByRole('combobox', { name: 'Tema' }), 'Escuro');
+    expect(lastSent('settings.board.update').patch).toEqual({ appearance: { theme: 'dark' } });
+    await choose(screen.getByRole('combobox', { name: 'Idioma' }), 'English');
+    expect(lastSent('settings.board.update').patch).toEqual({ appearance: { language: 'en' } });
+    await choose(screen.getByRole('combobox', { name: 'Fonte dos textos' }), 'Serifada');
+    expect(lastSent('settings.board.update').patch).toEqual({ appearance: { font: 'serif' } });
+  });
+
+  it('o controle deslizante grava o tamanho da fonte', async () => {
+    open();
+    screen.getByRole('slider').focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(lastSent('settings.board.update').patch.appearance!.fontSize).toBeGreaterThan(0);
   });
 });
 

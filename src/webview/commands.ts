@@ -50,7 +50,6 @@ export const ui = {
   /** instala o servidor MCP do board: padrão é a ferramenta do projeto, no escopo global */
   connectAI: (tool?: AiTool) => req({ type: 'ui.connectAI', tool }),
   openInBrowser: () => post({ type: 'ui.openInBrowser' }),
-  openIdeSettings: (key?: string) => post({ type: 'ui.openIdeSettings', key }),
   /** a tela Git pede para detectar de novo a branch principal (sem rede) */
   refreshMainBranch: () => post({ type: 'git.main.refresh' }),
   showChat: () => post({ type: 'ui.showChat' }),

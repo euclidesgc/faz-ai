@@ -210,11 +210,19 @@ it.skipIf(process.platform === 'win32')('comandos de ida e volta entre o board e
   await fake.commands.get('fazai.openEnvironment')!();
   expect(webview.posted.at(-1)).toEqual({ type: 'ui.openView', view: 'environment' });
 
-  // Settings → board: mudar o idioma no Settings chega ao SQLite e à webview
-  fakeConfig.set('global', 'fazai.appearance.language', 'en');
-  await wait(() => {
-    const last = webview.posted.filter((m) => (m as { type: string }).type === 'boardState').at(-1) as { state: BoardState } | undefined;
-    return last?.state.board.appearance.language === 'en';
-  }, 'idioma do Settings refletido no board');
+  await deactivate();
+});
+
+it.skipIf(process.platform === 'win32')('abrir o board importa uma vez o valor que a pessoa tinha gravado no Settings', async () => {
+  fakeConfig.values.global['fazai.appearance.theme'] = 'dark';
+  const { deactivate } = await activateExtension();
+  await fake.commands.get('fazai.openBoard')!();
+  const { webview } = fake.panels[0]!;
+  webview.receive({ type: 'ready' });
+  await wait(() => webview.posted.some((m) => (m as { type: string }).type === 'boardState'), 'board enviado ao painel');
+  const state = (webview.posted.find((m) => (m as { type: string }).type === 'boardState') as { state: BoardState }).state;
+  expect(state.board.appearance.theme).toBe('dark');
+  // a importação nunca escreve no Settings
+  expect(fakeConfig.updates).toEqual([]);
   await deactivate();
 });

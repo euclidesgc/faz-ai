@@ -4,8 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 
 // liga o modo navegador antes de o setup montar o mock de `src/webview/vscode` (padrão de appearanceSettingsWeb.test.tsx):
-// no editor (!isWeb, padrão dos testes), "Tocar histórias em paralelo" vira link para o Settings do editor
-// (ver runnerSettingsEditor.test.tsx), igual ao GitSettings.
+// "Tocar histórias em paralelo" também aparece no editor (ver runnerSettingsEditor.test.tsx).
 vi.hoisted(() => {
   (globalThis as { __fazaiTestWeb?: boolean }).__fazaiTestWeb = true;
 });

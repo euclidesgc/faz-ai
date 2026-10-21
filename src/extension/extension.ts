@@ -16,7 +16,7 @@ import { resolveCommand } from './cliResolve';
 import { loginShellPath } from './spawn';
 import { BoardPanel } from './panel/BoardPanel';
 import type { MessageRouter } from './panel/messageRouter';
-import { IdeSettings } from './settings/ideSettings';
+import { SECTION, importIdeSettingsOnce } from './settings/ideSettings';
 import type { HostToWebview } from '../shared/messages';
 import { toSettingsTab } from '../shared/settingsTab';
 import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
@@ -150,10 +150,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           copy: (text) => vscode.env.clipboard.writeText(text),
         }),
       );
-      // Settings do editor (fazai.*) ↔ SQLite do board
-      context.subscriptions.push(
-        new IdeSettings(vscode.workspace, f.uri, log, (m) => void vscode.window.showWarningMessage(m)).bind(router),
-      );
+      // traz uma vez os valores fazai.* que a pessoa gravou no Settings do editor para o board
+      importIdeSettingsOnce(vscode.workspace.getConfiguration(SECTION, f.uri), router, log);
       runner = host.runner;
       heartbeat = host.heartbeat;
       autopilot = host.autopilot;

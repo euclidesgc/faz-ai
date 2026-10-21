@@ -23,16 +23,32 @@ const show = () => {
 };
 
 describe('GitSettings dentro do editor', () => {
-  it('mostra o aviso do Settings, sem os campos de Git do navegador', () => {
+  it('mostra os campos de Git e do gitflow editáveis, sem o aviso do Settings', () => {
     show();
-    expect(screen.getByText('O Git agora fica no Settings do editor.')).toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'Onde a IA mexe no código' })).toBeNull();
-    expect(screen.queryByRole('textbox', { name: 'Nome da branch' })).toBeNull();
-    expect(screen.queryByRole('switch', { name: 'Usar o gitflow' })).toBeNull();
-    expect(screen.queryByLabelText('Prefixo de feature')).toBeNull();
-    // a principal e a explicação da renomeação são do navegador: no editor, o Settings é a fonte
-    expect(screen.queryByLabelText('Branch principal')).toBeNull();
-    expect(screen.queryByRole('note', { name: 'Renomear a principal ou a develop' })).toBeNull();
+    expect(screen.queryByText('O Git agora fica no Settings do editor.')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Settings do editor/ })).toBeNull();
+    expect(screen.getByRole('combobox', { name: 'Onde a IA mexe no código' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Nome da branch' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Usar o gitflow' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Prefixo de feature')).toBeInTheDocument();
+    expect(screen.getByLabelText('Branch principal')).toBeInTheDocument();
+    expect(screen.getByRole('note', { name: 'Renomear a principal ou a develop' })).toBeInTheDocument();
+  });
+
+  it('mudar o modo de Git grava o patch do board', async () => {
+    show();
+    await choose(screen.getByRole('combobox', { name: 'Onde a IA mexe no código' }), 'Branch por história');
+    expect(lastSent('settings.board.update').patch).toEqual({ git: { mode: 'branch' } });
+  });
+
+  it('desligar o gitflow e editar o nome da branch gravam o patch do board', async () => {
+    show();
+    await userEvent.click(screen.getByRole('switch', { name: 'Usar o gitflow' }));
+    expect(lastSent('settings.board.update').patch).toEqual({ git: { gitflow: false } });
+    const field = screen.getByRole('textbox', { name: 'Nome da branch' });
+    await userEvent.clear(field);
+    await userEvent.type(field, 'x/{{numero}{Enter}');
+    expect(lastSent('settings.board.update').patch).toEqual({ git: { branchPattern: 'x/{numero}' } });
   });
 
   it('o diálogo de renomeação não abre no editor, onde quem pergunta é o modal da extensão', () => {
@@ -55,22 +71,6 @@ describe('GitSettings dentro do editor', () => {
     expect(within(table).getAllByRole('row')).toHaveLength(7);
     expect(within(table).getByText('feature/')).toBeInTheDocument();
     expect(within(table).getByText('processo de release do projeto')).toBeInTheDocument();
-    // os valores aparecem só para leitura
-    const values = screen.getByRole('list', { name: 'Valores no Settings do editor' });
-    expect(values).toHaveTextContent('Usar o gitflow: sim');
-    expect(values).toHaveTextContent('Branch de integração: develop');
-  });
-
-  it('o botão do modo de Git abre o Settings do editor na chave do modo', async () => {
-    show();
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir no Settings do editor' }));
-    expect(lastSent('ui.openIdeSettings')).toEqual({ type: 'ui.openIdeSettings', key: 'fazai.git.mode' });
-  });
-
-  it('o botão do gitflow abre o Settings do editor em fazai.git.gitflow', async () => {
-    show();
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir o gitflow no Settings do editor' }));
-    expect(lastSent('ui.openIdeSettings')).toEqual({ type: 'ui.openIdeSettings', key: 'fazai.git.gitflow' });
   });
 
   it('o tipo de branch de um tipo de card funciona no editor', async () => {
