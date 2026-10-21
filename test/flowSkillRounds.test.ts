@@ -47,9 +47,12 @@ describe('pendências com a pessoa', () => {
     expect(FLOW_TEXT).toMatch(/"Travado em mim" tiver qualquer item[\s\S]*`request_review`[\s\S]*`pending`/);
     const yolo = FLOW_TEXT.slice(FLOW_TEXT.indexOf('## Modo autônomo'), FLOW_TEXT.length);
     expect(yolo).toMatch(/`request_review` com\s+`pending` não segura o card no modo autônomo/);
-    expect(yolo).toContain('Perguntas para você');
-    expect(yolo).toContain('decidido pela IA no modo autônomo');
+    expect(yolo).toContain('`ask_questions` é aceita');
+    expect(yolo).toContain('Perguntas e respostas');
+    expect(yolo).not.toContain('Perguntas para você');
     expect(MCP_INSTRUCTIONS).toContain('request_review e `pending`');
+    expect(MCP_INSTRUCTIONS).toContain('ask_questions');
+    expect(FLOW_TEXT).not.toContain('R.** >');
     expect(MCP_INSTRUCTIONS).toContain('No modo autônomo nada disso segura o card');
   });
 });
@@ -106,6 +109,6 @@ describe('Revisão antes do pull request', () => {
     expect(revisao).toContain('revisor-de-codigo');
     expect(revisao).toMatch(/só passa no teste/);
     expect(revisao).toMatch(/diretriz clara[\s\S]*corrige agora/);
-    expect(revisao).toMatch(/ambíguo[\s\S]*`ask_question`[\s\S]*modo autônomo[\s\S]*menos complexo/);
+    expect(revisao).toMatch(/ambíguo[\s\S]*`ask_questions`[\s\S]*modo autônomo[\s\S]*menos complexo/);
   });
 });

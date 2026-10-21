@@ -70,9 +70,8 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
    lê o card pelo board, analisa o problema e conversa com você na aba **Conversa**. Quando termina,
    o status muda para **Aguardando revisão**: é a sua vez. O mesmo acontece quando a IA deixa
    algo dependendo de você (uma decisão, um ponto em aberto): a pendência aparece na conversa como
-   **Travado em mim** e o card fica com você. O que depende de uma resposta sua vai também na seção
-   **Perguntas para você** do documento da fase, com as alternativas, a recomendação da IA e o espaço
-   `R. >` para você responder.
+   **Travado em mim** e o card fica com você. A pergunta com alternativas chega como um carrossel no
+   card (`ask_questions`), com a opção indicada pela IA; os documentos da fase não repetem as perguntas.
 5. **Revise e siga.** Leia o documento da fase, responda ou clique em **Aprovar** (ou **Pedir
    ajustes**). Com a aprovação, a história avança na hora para **PRD**, **Spec**, **Plan** e
    **Implementação**, sempre com a IA produzindo e você aprovando. As sub-tarefas da implementação
@@ -1117,9 +1116,8 @@ história sozinha, **sem pedir autorização nem confirmação para nada**:
   antes da coluna escolhida: nem uma pendência (`request_review` com `pending`, que fica registrada
   na conversa e a IA é mandada decidir).
 - **Sem perguntas**: a IA não usa `ask_question`; diante de uma dúvida ela decide e registra a
-  decisão e o motivo na conversa. As perguntas do documento da fase continuam sendo escritas na
-  seção **Perguntas para você**, com alternativas e recomendação, e a própria IA as responde no
-  espaço `R. >`, marcando que foi decidido por ela no modo autônomo. Só um impedimento real (acesso,
+  decisão e o motivo na conversa. `ask_questions` é aceita: o board responde cada pergunta com a
+  indicada e a registra na seção **Perguntas e respostas** da descrição. Só um impedimento real (acesso,
   ambiente, falha que ela não resolve) bloqueia o card.
 - **Conversa resumida entre as fases**: ao passar para outra coluna com três ou mais mensagens desde
   o último resumo (ou duas que somem muito texto; ao menos uma da IA), o autopiloto roda **Resumir a conversa** antes da fase nova:
