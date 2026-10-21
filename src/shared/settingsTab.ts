@@ -1,4 +1,15 @@
-export const SETTINGS_TABS = ['columns', 'types', 'fields', 'rules', 'models', 'harness', 'git', 'appearance', 'backup'] as const;
+export const SETTINGS_TABS = [
+  'columns',
+  'types',
+  'fields',
+  'rules',
+  'models',
+  'harness',
+  'aiTools',
+  'git',
+  'appearance',
+  'backup',
+] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 export const DEFAULT_SETTINGS_TAB: SettingsTab = 'columns';
 

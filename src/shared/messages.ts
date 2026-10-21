@@ -21,6 +21,7 @@ export type McpServerView = Omit<McpServerInput, 'env' | 'headers'> & {
 };
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { CardUsage } from './cardUsage';
+import type { QuestionInput } from './questions';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { RenameKind } from './branchRename';
@@ -28,6 +29,7 @@ import type { BulkCardStatus, CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { BranchKind, GitConfig } from './git';
 import type { ProjectProfile } from './projectProfile';
+import type { AiProfileDraft } from './aiProfiles';
 import type { ExportPlan, ExportResult, ExportTarget } from './toolExport';
 
 /** O que o board grava num arquivo de agente: o frontmatter (menos o nome) e o corpo. */
@@ -70,7 +72,6 @@ export type WebviewToHost =
   /** abre este board no navegador, fora do editor */
   | { type: 'ui.openInBrowser' }
   /** pede ao editor para abrir o Settings nativo filtrado no Faz AI, ou numa chave (só faz sentido dentro do editor) */
-  | { type: 'ui.openIdeSettings'; key?: string }
   /** a tela Git pede para detectar de novo a branch principal */
   | { type: 'git.main.refresh' }
   /** a resposta ao aviso de renomeação da principal ou da develop (`from` e `to` são os do pedido que a pessoa viu): renomear, desfazer ou dispensar o resultado */
@@ -86,7 +87,11 @@ export type WebviewToHost =
   /** começa agora uma rodada do heartbeat: a IA trata tudo o que está pendente com ela */
   | { type: 'ai.heartbeat.run' }
   | { type: 'card.create'; typeId: Id; columnId: Id; parentId: Id | null; title: string }
+  /** copia o card para a primeira coluna do workflow (descrição, tipo, campos e checklist desmarcado); `title` já vem no idioma da pessoa */
+  | { type: 'card.duplicate'; cardId: Id; title: string }
   | { type: 'card.update'; cardId: Id; patch: { title?: string; description?: string; typeId?: Id } }
+  | { type: 'card.questions.set'; cardId: Id; questions: QuestionInput[] }
+  | { type: 'card.questions.answer'; cardId: Id; answers: { questionId: Id; text: string; custom: boolean }[] }
   | {
       type: 'card.move';
       cardId: Id;
@@ -136,6 +141,21 @@ export type WebviewToHost =
   | { type: 'card.archiveMany'; cardIds: Id[] }
   /** manda várias histórias para a lixeira de uma vez; ignora quem não for história viva */
   | { type: 'card.trashMany'; cardIds: Id[] }
+  /** restaura várias lixeiras de uma vez (cada uma com os filhos); ignora quem não estiver na lixeira */
+  | { type: 'card.restoreMany'; cardIds: Id[] }
+  /** apaga de vez várias lixeiras de uma vez, com os filhos; ignora quem não estiver na lixeira */
+  | { type: 'card.deletePermanentMany'; cardIds: Id[] }
+  /**
+   * restaura vários cards arquivados de uma vez, com a regra de `card.restoreArchived` em cada um (a história
+   * volta com as sub-tarefas arquivadas; a sub-tarefa de história arquivada traz a história); ignora ids
+   * repetidos, inexistentes, não arquivados ou na lixeira
+   */
+  | { type: 'card.unarchiveMany'; cardIds: Id[] }
+  /**
+   * manda vários cards arquivados para a lixeira de uma vez (a história leva as sub-tarefas arquivadas);
+   * ignora ids repetidos, inexistentes, não arquivados ou já na lixeira
+   */
+  | { type: 'card.trashArchivedMany'; cardIds: Id[] }
   /** move várias histórias para a mesma coluna de uma vez; cancela as sub-tarefas em aberto do lote quando o destino é cancelamento */
   | { type: 'card.moveMany'; cardIds: Id[]; columnId: Id }
   /** a IA cria uma história a partir de outra em modo autônomo: a nova nasce em modo autônomo, empilhada depois dela */
@@ -234,6 +254,18 @@ export type WebviewToHost =
   | { type: 'settings.board.reset' }
   /** leva o board ao padrão atual sem recriá-lo: só acrescenta e completa, os cards não saem do lugar */
   | { type: 'settings.board.upgrade' }
+  /** Cria ou atualiza um perfil de CLI; os valores privados ficam somente no host. */
+  | { type: 'settings.aiProfiles.save'; profile: AiProfileDraft }
+  /** Liga ou desliga um perfil revisado. */
+  | { type: 'settings.aiProfiles.setEnabled'; id: string; enabled: boolean }
+  /** Cria uma cópia desligada e pendente de revisão. */
+  | { type: 'settings.aiProfiles.duplicate'; id: string }
+  /** Apaga um perfil que não é pronto nem padrão. */
+  | { type: 'settings.aiProfiles.remove'; id: string }
+  /** Consulta a instalação e o login dos perfis sem devolver a configuração. */
+  | { type: 'settings.aiProfiles.probe' }
+  /** Faz um teste explícito, limitado a dois minutos, sem MCP nem ferramentas de alteração. */
+  | { type: 'settings.aiProfiles.test'; id: string }
   | { type: 'settings.models.set'; catalog: ModelOption[] }
   /**
    * relê os modelos da ferramenta (configuração local ou lista embutida) e os junta ao catálogo;
@@ -265,6 +297,7 @@ export type WebviewToHost =
   | { type: 'harness.library.save'; input: LibraryArtifactInput }
   | { type: 'executionPolicy.read'; requestId: string; id?: string; beforeRevision?: number }
   | { type: 'executionPolicy.simulate'; requestId: string; scenario: PolicyScenario }
+  | { type: 'executionPolicy.assist'; requestId: string; input: import('./policyAssistant').PolicyAssistInput }
   | { type: 'settings.executionPolicy.save'; policy: ExecutionPolicy; expectedRevision: number; reviewed: boolean }
   | { type: 'settings.executionPolicy.remove'; id: string; expectedRevision: number }
   | { type: 'contextPlanning.save'; input: ContextPlanningWrite }
@@ -356,6 +389,11 @@ export type WebviewToHost =
 
 export type HostToWebview =
   | { type: 'boardState'; state: BoardState; attachmentsBaseUri: string }
+  | {
+      type: 'aiProfiles.status';
+      profiles: Record<string, { found: boolean; version: string | null; signedIn: boolean | null; installUrl: string | null }>;
+    }
+  | { type: 'aiProfiles.testResult'; id: string; ok: boolean; output: string; error?: string }
   | { type: 'ui.openCard'; cardId: Id }
   | { type: 'viewState'; view: ViewState }
   | { type: 'prefs'; prefs: UiPrefs }

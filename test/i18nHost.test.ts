@@ -24,6 +24,11 @@ afterEach(() => setLocale('pt-BR'));
 
 describe('i18n do host: mensagens preenchidas', () => {
   const cases: [pt: string, en: string][] = [
+    ['Este card não tem perguntas pendentes.', 'This card has no pending questions.'],
+    [
+      'As perguntas deste card mudaram: confira as novas antes de enviar.',
+      'The questions on this card have changed: review the new ones before sending.',
+    ],
     [
       'Não é possível concluir "Pagar fatura": 2 sub-tarefa(s) ainda em aberto.',
       'Cannot complete "Pagar fatura": 2 sub-task(s) still open.',

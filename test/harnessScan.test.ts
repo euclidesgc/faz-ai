@@ -267,3 +267,13 @@ describe('Kimi Code: instruções na pasta do projeto', () => {
     expect(items.filter((i) => i.scope === 'project').map((i) => i.location)).toContain('.kimi-code/AGENTS.md');
   });
 });
+
+it('perfil genérico não presume pastas ou inventário de outra ferramenta', () => {
+  write(project, 'CLAUDE.md', 'Sentinela nativa');
+  write(project, '.claude/skills/x/SKILL.md', skill('Sentinela skill'));
+  expect(scanInventory('claude', project, home).length).toBeGreaterThan(0);
+  expect(scanInventory('personalizado', project, home, undefined, null, [project])).toEqual([]);
+  expect(new HarnessStore(project, 'personalizado', home).scan()).toEqual({ rules: [], skills: [], agents: [], inventory: [] });
+  expect(createTargets('personalizado')).toEqual([]);
+  expect(permissionTargets('personalizado')).toEqual([]);
+});

@@ -6,10 +6,11 @@ import { refineHint, workHint } from '../src/webview/components/aiHints';
 // se alguém editar o arquivo. Renderiza a árvore em markup estático só para inspecionar o texto.
 
 describe('aiHints', () => {
-  it('workHint descreve o contexto vazio e o retorno pela conversa', () => {
+  it('workHint parte só do que está no board, sem prometer contexto vazio para toda CLI, pela conversa', () => {
     const html = renderToStaticMarkup(<>{workHint('Claude')}</>);
     expect(html).toContain('Claude');
-    expect(html).toContain('contexto vazio');
+    expect(html).toContain('só do que está no board');
+    expect(html).toContain('Ferramentas de IA');
     expect(html).toContain('Métricas');
     expect(html).not.toContain('sessão limpa');
   });

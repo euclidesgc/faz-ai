@@ -109,6 +109,14 @@ describe('getMetrics', () => {
     expect(row(result, 'haiku')).toMatchObject({ runs: 1, durationMs: 3000 });
   });
 
+  it('RF20: duas execuções em perfis de CLI diferentes aparecem separadas na dimensão tool', () => {
+    run(at(2026, 6), 1000, { tool: 'claude', model: 'sonnet' });
+    run(at(2026, 6), 3000, { tool: 'cursor', model: 'composer-2' });
+    const result = getMetrics(db, boardId, { groupBy: 'tool' });
+    expect(row(result, 'claude')).toMatchObject({ runs: 1, durationMs: 1000 });
+    expect(row(result, 'cursor')).toMatchObject({ runs: 1, durationMs: 3000 });
+  });
+
   it('agrupa por card, com rótulo "#número título"', () => {
     run(at(2026, 6), 1000, { cardNumber: 72, cardTitle: 'Consulta das métricas' });
     run(at(2026, 6), 500, { cardNumber: 72, cardTitle: 'Consulta das métricas' });

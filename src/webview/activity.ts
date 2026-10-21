@@ -39,7 +39,7 @@ const originLabel = (origin: AiRunOrigin): string =>
         : origin === 'autopilot'
           ? 'modo autônomo'
           : origin === 'test'
-            ? 'Teste'
+            ? 'teste de ferramenta'
             : 'chat',
   );
 

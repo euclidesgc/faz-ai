@@ -19,8 +19,8 @@ beforeAll(async () => {
 
 const withTheme = () => syncStore(board.router);
 
-describe('AppearanceSettings no navegador', () => {
-  it('mostra os 4 campos, sem o aviso nem o botão do Settings do editor', () => {
+describe('AppearanceSettings (modo navegador)', () => {
+  it('mostra os 4 campos, sem o aviso nem o botão do Settings do editor (igual ao editor)', () => {
     withTheme();
     render(
       <Theme>

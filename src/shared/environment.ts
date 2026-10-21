@@ -1,4 +1,7 @@
 import type { HarnessIssue } from './harnessStatus';
+import type { AiTool } from './harness';
+import type { EffectiveLimits } from './orchestration';
+import type { PolicySimulation } from './policyManagement';
 import type { BoardAvailability, ProfileHealth } from './profileHealth';
 import type { BoardRequirement } from './requirements';
 
@@ -63,6 +66,16 @@ export interface InstallStep {
   step?: InstallStepKind;
 }
 
+/**
+ * A próxima execução, como o simulador de políticas responde (sem regra recalculada aqui): o alvo do
+ * padrão e os perfis em uso que não estão disponíveis (os cards com esse alvo não rodam).
+ */
+export interface NextRunReport {
+  simulation: PolicySimulation;
+  /** os perfis que o board usa por conta própria e não estão disponíveis, com o motivo */
+  blockedInUse: { id: AiTool; name: string; problem: NonNullable<ProfileHealth['problem']> }[];
+}
+
 export interface EnvironmentReport {
   /** sem eles o board não trabalha com a IA: o Node.js */
   required: EnvCheck[];
@@ -70,6 +83,12 @@ export interface EnvironmentReport {
   profiles: ProfileHealth[];
   /** o que o aviso do topo mostra: bloqueia só quando nenhum perfil ligado está disponível */
   availability: BoardAvailability;
+  /** o regime de contexto em vigor nas execuções do board */
+  regime: 'exclusive' | 'compatible';
+  /** a próxima execução (simulador); null quando a base não tem o simulador */
+  nextRun: NextRunReport | null;
+  /** os limites efetivos (`effectiveLimits`); null quando a base não os expõe */
+  limits: EffectiveLimits | null;
   /** o banco de artefatos do board: o que falta nele, um filho por falta (recomendação) */
   harness: EnvCheck;
   /** o que o board aproveita quando existe: git, GitHub CLI, Code Review Graph */

@@ -12,6 +12,7 @@ import { DEFAULT_RUNNER } from '../../src/shared/runner';
 
 export const card = (id: string, over: Partial<Card> = {}): Card => ({
   id,
+  questions: [],
   number: 0,
   boardId: 'b',
   workflowId: 'wp',
@@ -114,7 +115,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     aiRunUnsupported: null,
     requirements: [],
     requirementsCheckedAt: 0,
-    authExpired: null,
+    authExpired: [],
     orphans: EMPTY_ORPHANS,
     environment: null,
     environmentFirstRun: false,

@@ -9,6 +9,7 @@ import { PageHeader } from './settings/PageHeader';
 import { CopyCommand, RequirementFix, requirementTexts } from './RequirementsBanner';
 import type { ProfileHealth } from '../../shared/profileHealth';
 import { ProfileBlock } from './environment/ProfileBlock';
+import { NextRunSection } from './environment/NextRunSection';
 import { Button, Hint, IconExternal, IconMissing, IconOk, IconSkipped } from './ui';
 
 /** O nome do item e, no hint, como o board o usa; no idioma da interface. */
@@ -381,6 +382,7 @@ export function EnvironmentView() {
         <>
           <Section id="env-required" title={t('Necessários')} checks={report.required} />
           <ProfilesSection profiles={report.profiles} focus={focusProfile} />
+          <NextRunSection report={report} />
           <Section id="env-harness" title={t('Banco de artefatos')} checks={[report.harness]} />
           <Section id="env-recommended" title={t('Recomendados')} checks={report.recommended} />
         </>

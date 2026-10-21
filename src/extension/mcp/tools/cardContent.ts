@@ -60,7 +60,7 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
 
   tool(
     'add_comment',
-    'Escreve na conversa do card (markdown). Use para registrar decisões e o resultado do trabalho e para responder à pessoa. A mensagem é assinada com o nome do cliente de IA. Para pedir revisão use request_review; para perguntar, ask_question.',
+    'Escreve na conversa do card (markdown). Use para registrar decisões e o resultado do trabalho e para responder à pessoa. A mensagem é assinada com o nome do cliente de IA. Para pedir revisão use request_review; para perguntar, ask_questions (com opções) ou ask_question (aberta).',
     { card: cardArg, body: z.string().min(1), kind: z.literal('summary').optional() },
     (a, router) => {
       const card = findCard(router.snapshot(), a.card);

@@ -335,6 +335,8 @@ export interface ImportResult {
   mcpSecrets: string[];
   /** Perfis importados entram desativados e exigem revisão local. */
   profileReviews?: string[];
+  /** Nomes das políticas importadas que voltaram a pendente de revisão (nenhuma liga sozinha). */
+  policyReviews?: string[];
 }
 
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -450,6 +452,10 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
         str(r.name),
       ),
     };
+    const policyReviews = all(mem, 'SELECT policy_json FROM execution_policies WHERE board_id = ? AND deleted_at IS NULL ORDER BY id', [
+      newBoardId,
+    ]).map((r) => (JSON.parse(str(r.policy_json)) as { name: string }).name);
+    if (policyReviews.length) result.policyReviews = policyReviews;
     if (attachmentsBackup) result.attachmentsBackup = attachmentsBackup;
     return result;
   } finally {

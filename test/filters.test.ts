@@ -13,6 +13,7 @@ const DAY = 86400000;
 
 const card = (id: string, over: Partial<Card> = {}): Card => ({
   id,
+  questions: [],
   number: 0,
   boardId: 'b',
   workflowId: 'wp',
@@ -145,7 +146,7 @@ const state: BoardState = {
   aiRunUnsupported: null,
   requirements: [],
   requirementsCheckedAt: 0,
-  authExpired: null,
+  authExpired: [],
   orphans: { items: [], failed: {}, scannedAt: null },
   environment: null,
   environmentFirstRun: false,
@@ -186,6 +187,18 @@ describe('applyFilters', () => {
     expect(run({ dateField: 'createdAt', datePreset: '30d' })).not.toContain('solo');
     expect(run({ dateField: 'prazo', datePreset: 'custom', dateFrom: '2026-10-01', dateTo: '2026-10-05' })).toEqual(['solo']);
     expect(run({ dateField: 'prazo', datePreset: 'custom', dateTo: '2026-10-04' })).toEqual([]);
+  });
+
+  it('período de arquivamento exclui cards sem data ou fora do intervalo', () => {
+    const cards = state.cards.map((c) =>
+      c.id === 'login' ? { ...c, archivedAt: NOW - DAY } : c.id === 'bug' ? { ...c, archivedAt: NOW - 10 * DAY } : c,
+    );
+    const matched = applyFilters(
+      { ...state, cards },
+      { ...EMPTY_FILTERS, includeRelated: false, dateField: 'archivedAt', datePreset: '7d' },
+      NOW,
+    );
+    expect([...matched!]).toEqual(['login']);
   });
 
   it('relacionamentos', () => {

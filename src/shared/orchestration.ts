@@ -52,6 +52,22 @@ export function orchestrableSubtasks(s: BoardState, story: Card): Card[] {
     return [];
   return phaseSubtasks(s, story).filter((c) => columnOf(s, c)?.category === 'open' && !isWithHuman(c));
 }
+/**
+ * O board conduz esta história pelo orquestrador: fase de código com IA, aberta, e já com sub-tarefas na
+ * fase (abertas ou fechadas: o fechamento também é do orquestrador). Sem sub-tarefas, a sessão da história
+ * roda como sempre (`runner.start`), para criá-las.
+ */
+export function orchestratesStory(s: BoardState, story: Card): boolean {
+  const phase = columnOf(s, story);
+  return (
+    isLive(story) &&
+    !story.parentId &&
+    phase?.category === 'open' &&
+    !!phase.aiActive &&
+    activityKindOf(s, story) === 'branch' &&
+    phaseSubtasks(s, story).length > 0
+  );
+}
 /** A serialização completa evita colisões; IDs e revisões, nunca nomes de fases, definem a rodada. */
 export function workKey(kind: WorkKind, s: BoardState, story: Card, card: Card): string {
   const closed =

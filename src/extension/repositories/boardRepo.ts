@@ -34,6 +34,7 @@ import type { HarnessSelection, HarnessUsage, SelectableKind } from '../../share
 import { BRANCH_KINDS, parseGit, type BranchKind, type GitConfig } from '../../shared/git';
 import { parseAppearance, type Appearance } from '../../shared/appearance';
 import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
+import { parseQuestions } from '../../shared/questions';
 import { EMPTY_HARNESS, parseAiTool, type AiTool } from '../../shared/harness';
 import { RENAME_PENDING_KEY, RENAME_RESULT_KEY, parsePending, parseResult } from '../../shared/branchRename';
 
@@ -48,6 +49,11 @@ export class BoardRepo {
   /** O JSON da configuração de git do board, como está salvo (vazio quando o board não existe). */
   gitJson(boardId: string): string {
     return str(one(this.db, 'SELECT git_json FROM boards WHERE id = ?', [boardId])?.git_json);
+  }
+
+  /** O JSON das regras de modelo como está salvo; só a conversão da reserva legada lê o formato bruto. */
+  modelRulesJson(boardId: string): string {
+    return str(one(this.db, 'SELECT model_rules_json FROM boards WHERE id = ?', [boardId])?.model_rules_json);
   }
 
   /** Lê um valor da tabela meta (chave/valor livre), ou undefined se não existir. */
@@ -353,6 +359,7 @@ export class BoardRepo {
 
     const cards: Card[] = all(db, 'SELECT * FROM cards WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
       id: str(r.id),
+      questions: parseQuestions(str(r.questions_json)),
       number: num(r.number),
       boardId,
       workflowId: str(r.workflow_id),
@@ -478,7 +485,7 @@ export class BoardRepo {
       aiRunUnsupported: null,
       requirements: [],
       requirementsCheckedAt: 0,
-      authExpired: null,
+      authExpired: [],
       orphans: EMPTY_ORPHANS,
       environment: null,
       environmentFirstRun: false,

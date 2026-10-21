@@ -2,7 +2,12 @@ import { baseInfo, parseAiTool } from '../src/shared/harness';
 import { expect, it } from 'vitest';
 import {
   activeProfile,
+  BUILTIN_ISOLATION,
   BUILTIN_PROFILES,
+  contextEnforced,
+  isolationSummary,
+  leakLabel,
+  profileIsolation,
   catalogTool,
   expandArgLines,
   newProfileId,
@@ -11,6 +16,7 @@ import {
   validateProfile,
   type AiProfile,
 } from '../src/shared/aiProfiles';
+import { enforcementOf } from '../src/shared/execution';
 import { catalog } from './fixtures/executionPolicy';
 const custom: AiProfile = {
   id: 'local',
@@ -70,6 +76,7 @@ it('resolve catálogo do base da cópia, modelo livre só no personalizado e fal
     name: 'novo-modelo',
     effort: null,
   });
+  expect(resolveModelOption({ ...board, aiTool: 'local' }, 'local:novo-modelo@esforço inválido')).toBeNull();
   expect(resolveModelOption(board, 'copy:novo-modelo')).toBeNull();
   expect(activeProfile({ ...board, aiTool: 'ausente' }).id).toBe('claude');
   expect(activeProfile({ ...board, aiProfiles: [...BUILTIN_PROFILES, { ...copy, enabled: false }] }).id).toBe('claude');
@@ -84,4 +91,77 @@ it('identidade do perfil é aberta e metadados de cópia preservam nome e identi
     label: 'Minha cópia',
     skills: '.claude/skills',
   });
+});
+
+const builtin = (id: 'claude' | 'cursor' | 'kimi') => BUILTIN_PROFILES.find((p) => p.id === id)!;
+const verified = { conversation: 'verified', artifacts: 'verified' } as const;
+it('isolamento dos prontos vem do código, com data e versão conferidas', () => {
+  expect(profileIsolation(builtin('claude'))).toMatchObject({
+    args: ['--setting-sources', '', '--disable-slash-commands', '--strict-mcp-config'],
+    loads: [],
+    checked: { date: '2026-10-16', version: 'Claude Code 2.1.296' },
+  });
+  expect(profileIsolation(builtin('cursor')).loads).toHaveLength(9);
+  expect(profileIsolation(builtin('kimi')).loads).toContainEqual({ kind: 'hook', scope: 'user' });
+  expect(profileIsolation(builtin('kimi')).loads).not.toContainEqual({ kind: 'hook', scope: 'project' });
+  for (const base of ['claude', 'cursor', 'kimi'] as const) expect(BUILTIN_ISOLATION[base].checked?.sources.length).toBeGreaterThan(0);
+});
+it('cópia herda a lista do base e usa a própria quando gravada; personalizado novo é vazio', () => {
+  const copy: AiProfile = { id: 'c', name: 'C', kind: 'copy', base: 'cursor', enabled: true, position: 4, config: {} };
+  expect(profileIsolation(copy).loads).toEqual(BUILTIN_ISOLATION.cursor.loads);
+  const own = { ...copy, config: { isolation: { loads: [{ kind: 'mcp', scope: 'user' }] } } } as AiProfile;
+  expect(profileIsolation(own).loads).toEqual([{ kind: 'mcp', scope: 'user' }]);
+  expect(profileIsolation(custom)).toEqual({ args: [], loads: [] });
+});
+it('item desconhecido é contado e nunca vira contexto imposto por descarte', () => {
+  const p = {
+    ...custom,
+    capabilities: verified,
+    config: {
+      isolation: {
+        loads: [
+          { kind: 'plugin', scope: 'user' },
+          { kind: 'mcp', scope: 'user' },
+        ],
+      },
+    },
+  } as AiProfile;
+  const iso = profileIsolation(p);
+  expect(iso.loads).toEqual([{ kind: 'mcp', scope: 'user' }]);
+  expect(iso.unrecognized).toBe(1);
+  expect(isolationSummary(iso)).toContain('itens não reconhecidos');
+  expect(validateProfile({ ...p, config: p.config })).toContain('Isolamento do perfil inválido.');
+  expect(contextEnforced({ ...custom, capabilities: verified, config: { isolation: { loads: 'x' } } as never })).toBe(false);
+});
+it('lista vazia e configuração manual não provam contexto vazio: só capacidades verificadas', () => {
+  expect(contextEnforced(builtin('claude'))).toBe(false);
+  expect(enforcementOf(builtin('claude')).context).toBe('advised');
+  expect(enforcementOf(builtin('claude'))).toMatchObject({ agent: 'enforced', mcp: 'enforced', model: 'enforced' });
+  expect(contextEnforced({ ...custom, config: { isolation: { loads: [] } } })).toBe(false);
+  expect(contextEnforced({ ...custom, capabilities: { conversation: 'verified', artifacts: 'partial' } })).toBe(false);
+  expect(contextEnforced({ ...builtin('claude'), capabilities: verified })).toBe(true);
+  expect(enforcementOf({ ...builtin('claude'), capabilities: verified }).context).toBe('enforced');
+  expect(contextEnforced({ ...builtin('cursor'), capabilities: verified })).toBe(false);
+  expect(enforcementOf(custom)).toEqual({
+    agent: 'advised',
+    skills: 'advised',
+    mcp: 'advised',
+    tools: 'advised',
+    model: 'advised',
+    context: 'advised',
+  });
+});
+it('rótulos e resumo do que a CLI pode carregar', () => {
+  expect(leakLabel({ kind: 'instructions', scope: 'project' })).toBe('regras do projeto');
+  expect(leakLabel({ kind: 'mcp', scope: 'user' })).toBe('servidores MCP do usuário');
+  expect(
+    isolationSummary({
+      args: [],
+      loads: [
+        { kind: 'instructions', scope: 'project' },
+        { kind: 'mcp', scope: 'user' },
+      ],
+    }),
+  ).toBe('A CLI pode carregar por conta própria: regras do projeto, servidores MCP do usuário.');
+  expect(isolationSummary({ args: [], loads: [] })).toContain('sem prova de isolamento');
 });

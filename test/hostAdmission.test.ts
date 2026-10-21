@@ -99,7 +99,6 @@ describe('admissão no host', () => {
     expect(built.args).toContain('dontAsk');
     expect(built.args).not.toContain('bypassPermissions');
     expect(built.args.join(' ')).not.toContain('mcp__faz-ai__*');
-    expect(admitted.input.exec?.delegates).toEqual([]);
     expect(admitted.input.exec?.deniedTools).toContain('Agent');
   });
   it('pruna servidores não selecionados, sem expor seus segredos na decisão', () => {
@@ -173,7 +172,6 @@ it('não transporta permissões ou modelos ocultos na definição nativa do agen
       { name: 'revisor', description: 'Revisor', prompt: 'Revise.', model: 'modelo-externo', tools: ['Agent'] },
       { permissionMode: 'bypassPermissions', skills: ['externa'], mcpServers: ['externo'] },
     ),
-    delegates: [],
     mcpAllowed: [],
     mcpBlocked: [],
     mcpConfig: null,

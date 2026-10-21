@@ -32,7 +32,7 @@ function resolveFolder(): string {
 
 const folder = resolveFolder();
 const target = socketPath(folder);
-const runToken = process.env.FAZAI_RUN_TOKEN;
+const runToken = given(process.env.FAZAI_RUN_TOKEN);
 if (runToken !== undefined && !/^[a-f0-9]{64}$/.test(runToken)) {
   process.stderr.write('faz-ai: token de execução inválido.\n');
   process.exit(1);

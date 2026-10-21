@@ -258,7 +258,7 @@ describe('TypesSettings: skills por tipo', () => {
 });
 
 describe('Settings: menu lateral', () => {
-  it('Modelos de IA vem logo depois do Harness', () => {
+  it('Ferramentas de IA vem logo depois do Harness, antes dos modelos', () => {
     useBoardStore.setState({ settingsNavCollapsed: false, settingsTab: 'columns' });
     render(
       <Theme>
@@ -270,7 +270,8 @@ describe('Settings: menu lateral', () => {
       .getAllByRole('button')
       .map((x) => x.textContent);
     const at = (label: string) => labels.indexOf(label);
-    expect(at('Modelos de IA')).toBe(at('Harness') + 1);
+    expect(at('Ferramentas de IA')).toBe(at('Harness') + 1);
+    expect(at('Modelos de IA')).toBe(at('Ferramentas de IA') + 1);
   });
 
   it('recolhe numa faixa de ícones: rótulos somem, as seções seguem acessíveis pelo nome e o estado fica lembrado', async () => {
@@ -303,15 +304,16 @@ function SettingsWithHostSync() {
   return <Settings />;
 }
 
-describe('Settings: ida e volta com o Settings do editor', () => {
-  it('o botão "Abrir no Settings do editor" manda ui.openIdeSettings', async () => {
+describe('Settings: abas e navegação do host', () => {
+  it('a aba Backup aparece no editor e não há o botão "Abrir no Settings do editor"', async () => {
     render(
       <Theme>
         <Settings />
       </Theme>,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir no Settings do editor' }));
-    expect(lastSent('ui.openIdeSettings')).toEqual({ type: 'ui.openIdeSettings', key: undefined });
+    expect(screen.queryByRole('button', { name: 'Abrir no Settings do editor' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Backup' }));
+    expect(screen.getByRole('button', { name: /Exportar board/ })).toBeInTheDocument();
   });
 
   it('ui.openSettings troca a aba e rola até a seção', () => {
