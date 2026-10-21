@@ -103,7 +103,7 @@ describe('leitor dos adaptadores: list', () => {
     write(home, '.claude/skills/manual/SKILL.md', '---\nname: manual\ndescription: Feita à mão\n---\nCorpo\n');
     const listed = adapterFor('claude')!.list('user', home);
     expect(listed).toEqual([{ kind: 'skill', location: '~/.claude/skills/manual/SKILL.md', scope: 'user' }]);
-    expect(readSource(listed[0], { projectDir: home, homeDir: home }, 'claude').description).toBe('Feita à mão');
+    expect(readSource(listed[0]!, { projectDir: home, homeDir: home }, 'claude').description).toBe('Feita à mão');
   });
 
   it('pasta ausente dá lista vazia e link para fora é ignorado', () => {

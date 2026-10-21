@@ -215,14 +215,15 @@ export function listToolFolder(
   for (const extra of opts.extraRules ?? []) {
     const file = path.join(base, extra);
     try {
-      if (fs.statSync(file).isFile()) add('rule', extra);
+      if (fs.statSync(file).isFile()) add('instructions', extra);
     } catch {
       /* ausente */
     }
   }
   if (opts.ruleDir && opts.ruleExt) {
     for (const e of children(path.join(base, opts.ruleDir))) {
-      if (e.name.endsWith(opts.ruleExt) && inside(rootDir, path.join(base, opts.ruleDir, e.name))) add('rule', `${opts.ruleDir}/${e.name}`);
+      if (e.name.endsWith(opts.ruleExt) && inside(rootDir, path.join(base, opts.ruleDir, e.name)))
+        add('instructions', `${opts.ruleDir}/${e.name}`);
     }
   }
   for (const e of children(path.join(rootDir, 'skills'))) {

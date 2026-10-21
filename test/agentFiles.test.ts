@@ -225,7 +225,7 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
     expect(first.snapshot().harnessSelection.filter((x) => x.kind === 'agent')).toHaveLength(AGENT_SEEDS.length);
   });
 
-  it('os perfis que o banco guardava viram arquivos globais marcados, e colunas e cards passam a apontar pelo nome', async () => {
+  it('os perfis que o banco guardava viram agentes do board, sem arquivo na pasta da ferramenta, e colunas e cards passam a apontar pelo nome', async () => {
     const handle = await handleOf();
     const first = await open(handle, false);
     const s0 = first.snapshot();
@@ -252,8 +252,12 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
 
     const router = await open(handle, false);
     const s = router.snapshot();
-    const file = path.join(home, '.claude', 'agents', 'revisor-de-spec.md');
-    expect(fs.readFileSync(file, 'utf8')).toContain('faz-ai-mcp: github');
+    // nada é gravado na pasta da ferramenta: o agente está no board, com o servidor MCP citado
+    expect(fs.existsSync(path.join(home, '.claude', 'agents'))).toBe(false);
+    expect(s.board.execProfiles.find((p) => p.id === 'revisor-de-spec')).toMatchObject({
+      mcpServers: ['github'],
+      skills: ['tdd'],
+    });
     expect(s.board.execProfiles.map((p) => [p.id, p.isDefault])).toEqual([
       ['geral', false],
       ['revisor-de-spec', true],

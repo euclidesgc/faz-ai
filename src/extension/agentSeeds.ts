@@ -3,7 +3,6 @@ import { CONDUCTOR_AGENT, TOOL_PRESETS, defaultAgent } from '../shared/execution
 import { EFFORT_FIELD } from '../shared/models';
 import type { BoardState } from '../shared/model';
 import { SUBAGENT_TOOL } from './execution';
-import type { HarnessStore } from './harness';
 import type { BoardContext } from './panel/handlers/context';
 
 type Level = 'Baixo' | 'Médio' | 'Alto';
@@ -197,58 +196,46 @@ export function seedAgents(ctx: BoardContext, force = false): string[] {
 }
 
 /**
- * Converte os agentes que versões anteriores guardavam no banco em arquivos na pasta global da
- * ferramenta, marcados como disponíveis. Um arquivo de mesmo nome que já exista é reaproveitado, nunca
- * sobrescrito. Colunas e cards passam a apontar pelo nome. Idempotente: só roda enquanto houver perfis no banco.
+ * Converte os agentes que versões anteriores guardavam no banco em agentes do próprio board, disponíveis
+ * ("Pelo card"). Nada é gravado na pasta da ferramenta nem lido dela: o corpo de um perfil que apontava
+ * para um agente de arquivo vem do agente de mesmo nome que já está no board. Um agente de mesmo nome que
+ * já exista é reaproveitado, nunca sobrescrito. Colunas e cards passam a apontar pelo nome. Idempotente:
+ * só roda enquanto houver perfis no banco.
  */
-export function migrateExecProfiles(ctx: BoardContext, store: HarnessStore): Record<string, string> {
+export function migrateExecProfiles(ctx: BoardContext): Record<string, string> {
   const legacy = ctx.boards.legacyExecProfiles(ctx.boardId);
   if (!legacy.length) return {};
-  const agents = store.agents();
   const names: Record<string, string> = {};
   let defaultName = '';
   for (const p of legacy) {
     // o "Agente padrão" embutido das versões anteriores não era um perfil da pessoa: sem instruções nem
-    // restrições, não vira arquivo; quem apontava para ele passa a seguir o padrão do board
+    // restrições, não vira agente; quem apontava para ele passa a seguir o padrão do board
     if (p.id === defaultAgent().id) {
       names[p.id] = '';
       continue;
     }
     const name = toItemName(p.name) || p.id;
     names[p.id] = name;
-    const found = agents.find((a) => a.name === name);
-    if (!found) {
-      const subagent = p.agent ? agents.find((a) => a.name === p.agent) : undefined;
+    if (!ctx.library.hasAgent(name)) {
+      const subagent = p.agent && ctx.library.hasAgent(p.agent) ? ctx.library.agentInput(p.agent) : undefined;
       try {
-        store.createAgent(
-          {
-            name,
-            description: p.purpose || p.name,
-            body: subagent?.body || `Agente "${p.name}" do board.`,
-            model: p.model,
-            tools: p.tools,
-            deniedTools: p.deniedTools,
-            skills: p.skills,
-            mcp: p.mcpServers ?? [],
-          },
-          'user',
-        );
+        ctx.library.createAgent({
+          name,
+          description: p.purpose || p.name,
+          body: subagent?.body || `Agente "${p.name}" do board.`,
+          model: p.model,
+          tools: p.tools,
+          deniedTools: p.deniedTools,
+          skills: p.skills,
+          mcp: p.mcpServers ?? [],
+        });
       } catch {
-        // sem pasta de usuário ou ferramenta sem agentes: os perfis ficam no banco até a próxima abertura
+        // nome inválido para agente: os perfis ficam no banco até a próxima abertura
         return {};
       }
     }
     if (p.isDefault) defaultName = name;
   }
-  const location = (name: string) => store.agents().find((a) => a.name === name)?.location;
-  ctx.boards.setSelection(
-    ctx.boardId,
-    Object.values(names)
-      .map((n) => location(n))
-      .filter((l): l is string => !!l)
-      .map((l) => ({ kind: 'agent' as const, location: l })),
-    'contextual',
-  );
   if (defaultName) ctx.boards.updateBoard(ctx.boardId, { runner: { defaultAgent: defaultName } });
   ctx.boards.finishExecProfilesMigration(ctx.boardId, names);
   return names;

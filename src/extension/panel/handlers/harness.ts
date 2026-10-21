@@ -49,7 +49,7 @@ export class BoardHarness {
     if (!this.store) return;
     let state = this.ctx.state();
     this.current = this.store.scan();
-    this.ctx.library.migrate(this.current.inventory);
+    this.ctx.library.migrate();
     this.current.library = {
       directory: this.ctx.library.directory,
       preview: this.ctx.library.preview,
@@ -75,7 +75,7 @@ export class BoardHarness {
    */
   bootstrap(): void {
     if (!this.store) return;
-    migrateExecProfiles(this.ctx, this.store);
+    migrateExecProfiles(this.ctx);
     // agentes gravados antes de a lista de ferramentas levar o servidor do board: regravados uma vez
     this.store.repairAgentTools();
     this.load();

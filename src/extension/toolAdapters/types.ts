@@ -1,5 +1,6 @@
 // Contrato dos adaptadores do "Exportar para a ferramenta" (#623): cada ferramenta diz onde grava,
 // como renderiza cada artefato no formato oficial e o que se perde nele.
+import type { SelectableKind } from '../../shared/harnessSelection';
 import type { AiTool } from '../../shared/harness';
 import type { ArtifactDraft } from '../../shared/artifacts';
 import type { ArtifactRow } from '../repositories/artifactRepo';
@@ -23,9 +24,9 @@ export interface RenderedFile {
   from: string[];
 }
 
-/** Um artefato encontrado na pasta da ferramenta; `location` é a que `readSource` entende. */
+/** Um artefato encontrado na pasta da ferramenta; `kind` e `location` são os que `readSource` entende (regra = `instructions`). */
 export interface ListedSource {
-  kind: 'rule' | 'skill' | 'agent' | 'mcp';
+  kind: SelectableKind;
   location: string;
   scope: 'project' | 'user';
 }
