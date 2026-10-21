@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { ALL_AI_BASES, RULE_FILES, type AiTool, type InstallScope } from '../../../shared/harness';
+import { RULE_FILES, type AiTool, type InstallScope } from '../../../shared/harness';
 import { SELECTABLE_KINDS, toolItemsOf, selectionKey, type HarnessUsage, type SelectableKind } from '../../../shared/harnessSelection';
-import { FLOW_SKILL, flowSkillMarkdown } from '../../flowSkill';
+import { flowSkillMarkdown } from '../../flowSkill';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { harnessOverview } from '../format';
 import type { DefineTool } from './registry';
@@ -51,28 +51,25 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'get_harness',
-    'O banco de artefatos do board: a ferramenta em uso, o agente padrão e, com o modo (`usage`), as rules, skills, agentes e servidores MCP enviados ao board em Configurações → Harness. `cliLoads` diz o que a CLI da ferramenta carrega por conta própria e se o contexto vazio está imposto: lista vazia não prova isolamento. Com onlySelected = false, lista tudo que a ferramenta carrega nesta máquina (projeto, pasta do usuário, plugins e pastas importadas), esteja no board ou não.',
-    {
-      onlySelected: z
-        .boolean()
-        .optional()
-        .describe('Padrão true: só o marcado. false: tudo que a ferramenta carrega, com a marcação de cada item'),
-    },
-    (a, router) => harnessOverview(router.snapshot(), a.onlySelected ?? true),
+    'O banco de artefatos do board: a ferramenta em uso, o agente padrão e, com o modo (`usage`), as rules, skills, agentes e servidores MCP enviados ao board em Configurações → Harness. `cliLoads` diz o que a CLI da ferramenta carrega por conta própria e se o contexto vazio está imposto: lista vazia não prova isolamento.',
+    {},
+    (_a, router) => harnessOverview(router.snapshot()),
     true,
   );
 
   tool(
     'set_harness_selection',
-    'Envia rules, skills, agentes e servidores MCP ao board, muda o modo deles ou os tira do board. "always" (Sempre): entra em toda execução; "contextual" (Pelo card): disponível para indicar no card (campos Rules, Skills e MCPs) ou escolher como agente; "off" (Desligado): fica no board sem entrar em nada (é como as regras entram, para revisão); null: tira do board. Identifique o item por `location`, como get_harness o mostra; um agente, uma skill ou um servidor MCP também pelo nome.',
+    'Envia rules, skills, agentes e servidores MCP ao board, muda o modo deles ou os tira do board. "always" (Sempre): entra em toda execução; "contextual" (Pelo card): disponível para indicar no card (campos Rules, Skills e MCPs) ou escolher como agente; "off" (Desligado): fica no board sem entrar em nada (é como as regras entram, para revisão); null: tira do board. Identifique cada item por `kind` e `name`, como get_harness o mostra.',
     {
       items: z
         .array(
-          z.object({
-            kind: z.enum(SELECTABLE_KINDS as [SelectableKind, ...SelectableKind[]]),
-            location: z.string().optional().describe('A `key` como em get_harness (o caminho; num servidor MCP, `arquivo#nome`)'),
-            name: z.string().optional().describe('Nome do agente, da skill ou do servidor MCP, quando não souber a chave'),
-          }),
+          // estrito: um `location` (a identidade antiga, por caminho) dá erro em vez de ser ignorado
+          z
+            .object({
+              kind: z.enum(SELECTABLE_KINDS as [SelectableKind, ...SelectableKind[]]),
+              name: z.string().min(1).describe('Nome da rule, da skill, do agente ou do servidor MCP, como em get_harness'),
+            })
+            .strict(),
         )
         .min(1),
       usage: z.enum(['always', 'contextual', 'off']).nullable(),
@@ -81,11 +78,8 @@ export function registerHarnessTools(tool: DefineTool): void {
       const s = router.snapshot();
       const items = [...toolItemsOf(s), ...s.harness.inventory.flatMap((t) => t.items)];
       const resolved = a.items.map((i) => {
-        // `location` é a `key` do get_harness (num servidor MCP, arquivo mais `#nome`); o caminho sem o nome também vale
-        const found = items.find(
-          (x) => x.kind === i.kind && (i.location ? selectionKey(x) === i.location || x.location === i.location : x.name === i.name),
-        );
-        if (!found) throw new Error(`Item ${i.kind} "${i.location ?? i.name ?? ''}" não encontrado no harness da ferramenta em uso.`);
+        const found = items.find((x) => x.kind === i.kind && x.name === i.name);
+        if (!found) throw new Error(`Item ${i.kind} "${i.name}" não encontrado no harness.`);
         return { kind: i.kind, location: selectionKey(found) };
       });
       router.handle({ type: 'harness.selection.set', items: resolved, usage: a.usage as HarnessUsage | null });
@@ -156,7 +150,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'create_skill',
-    'Cria uma skill no projeto, na pasta de skills da ferramenta de IA em uso. Ela passa a ser uma opção do campo "Skills" dos cards.',
+    'Cria uma skill no projeto, no harness do projeto. Ela passa a ser uma opção do campo "Skills" dos cards.',
     {
       name: z.string().describe('Letras minúsculas, números e hífens'),
       description: z.string().min(1).describe('Quando a skill deve ser usada; é por ela que a IA decide invocá-la'),
@@ -165,35 +159,6 @@ export function registerHarnessTools(tool: DefineTool): void {
     (a, router) => {
       router.handle({ type: 'harness.skill.create', name: a.name, description: a.description, content: a.content });
       return harness(router);
-    },
-  );
-
-  tool(
-    'install_flow_skill',
-    'Opcional: o board já serve o fluxo pelo get_skill. Copia as skills do fluxo para a pasta de skills da ferramenta. A principal, "faz-ai-fluxo", ensina a conduzir os cards pelo fluxo do board (fases, documentos, pendências), junto com as skills por assunto (faz-ai-harness-do-card, faz-ai-workspace-e-pr, faz-ai-implementacao-rodadas, faz-ai-revisao-e-homologacao, faz-ai-modo-autonomo), e marca a principal como "incluir em todo contexto" neste board. Sempre no global da ferramenta, para todos os projetos: nada entra na pasta do projeto. Não sobrescreve uma skill de mesmo nome no destino, a menos que replace seja true.',
-    {
-      tool: z.enum(ALL_AI_BASES).optional().describe('Ferramenta de IA; padrão: a do projeto'),
-      replace: z.boolean().optional().describe('Troca a skill de mesmo nome que já esteja no destino'),
-    },
-    (a, router) => {
-      const tool = a.tool ?? router.snapshot().board.aiTool;
-      const found = () =>
-        router
-          .snapshot()
-          .harness.inventory.find((t) => t.tool === tool)
-          ?.items.find((i) => i.kind === 'skill' && i.scope === 'user' && i.name === FLOW_SKILL.name);
-      const had = !!found();
-      router.handle({ type: 'harness.flowSkill.install', tool, replace: a.replace });
-      return {
-        installed: !had || !!a.replace,
-        note:
-          had && !a.replace
-            ? 'A skill já existia no destino e foi mantida como está; marcada em todo contexto.'
-            : had
-              ? 'Skill substituída.'
-              : 'Skill criada.',
-        skill: found()?.path,
-      };
     },
   );
 

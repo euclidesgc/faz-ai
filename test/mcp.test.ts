@@ -505,9 +505,7 @@ describe('perfis de execução', () => {
     expect(s.cards.every((c) => c.execProfile === null)).toBe(true);
     expect((await call('get_card', { card: 1 })).data.execution.profile).toBe('geral');
     // tirar do board um agente criado no board o apaga: ele não tinha arquivo na pasta da ferramenta
-    expect((await call('get_harness', { onlySelected: false })).data.agents.map((a: any) => [a.name, a.usage])).toEqual([
-      ['geral', 'contextual'],
-    ]);
+    expect((await call('get_harness')).data.agents.map((a: any) => [a.name, a.usage])).toEqual([['geral', 'contextual']]);
   });
 });
 
@@ -1252,15 +1250,12 @@ describe('status do card e checkpoint de revisão', () => {
     expect(stored('revisor-de-spec')).toMatchObject({ description: 'Outra', body: 'Novo corpo' });
     expect(fs.existsSync(path.join(dir, '.claude/agents'))).toBe(false);
 
-    // agente criado por fora aparece no inventário completo, mas só entra no board depois de enviado
+    // agente criado por fora da pasta do board não aparece no get_harness: ele só mostra o que está no board
     fs.mkdirSync(path.join(dir, '.claude/agents'), { recursive: true });
     fs.writeFileSync(path.join(dir, '.claude/agents/planejador.md'), '---\nname: planejador\ndescription: Quebra a spec em passos\n---\nx');
     router.refreshHarness();
     expect((await call('get_harness')).data.agents.map((a: any) => a.name)).toEqual(['revisor-de-spec']);
-    expect((await call('get_harness', { onlySelected: false })).data.agents.map((a: any) => a.name)).toEqual([
-      'planejador',
-      'revisor-de-spec',
-    ]);
+    expect((await call('get_harness')).data.agents.map((a: any) => a.name)).toEqual(['revisor-de-spec']);
 
     // no Cursor o agente guarda somente leitura e segundo plano; update_agent liga e desliga
     await call('set_ai_tool', { tool: 'cursor' });
@@ -1280,24 +1275,14 @@ describe('status do card e checkpoint de revisão', () => {
     expect(stored('revisor-de-spec')).toBeUndefined();
   });
 
-  it('instala a skill do fluxo sempre no global da ferramenta, sem sobrescrever', async () => {
-    const file = path.join(dir, 'home-do-usuario', '.claude', 'skills', 'faz-ai-fluxo', 'SKILL.md');
-    expect((await call('install_flow_skill')).data).toMatchObject({
-      installed: true,
-      skill: expect.stringContaining('.claude/skills/faz-ai-fluxo'),
-    });
-    expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
-    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'faz-ai-fluxo'))).toBe(false);
-    // os artefatos padrão do board não entram no projeto: o escopo deixou de ser um parâmetro
-    expect((await call('install_flow_skill', { scope: 'project' })).error).toBe(true);
-    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'faz-ai-fluxo'))).toBe(false);
+  it('não há mais install_flow_skill', async () => {
+    expect((await call('install_flow_skill')).error).toBe(true);
+    expect(fs.existsSync(path.join(dir, 'home-do-usuario', '.claude', 'skills'))).toBe(false);
+  });
 
-    fs.writeFileSync(file, '---\nname: faz-ai-fluxo\ndescription: minha versão\n---\nmeu texto');
-    expect((await call('install_flow_skill')).data.installed).toBe(false);
-    expect(fs.readFileSync(file, 'utf8')).toContain('meu texto');
-    // só com replace a versão da pessoa é trocada
-    expect((await call('install_flow_skill', { replace: true })).data).toMatchObject({ note: 'Skill substituída.' });
-    expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
+  it('set_harness_selection aceita só kind e name: um location dá erro', async () => {
+    const r = await call('set_harness_selection', { items: [{ kind: 'skill', location: '/x/SKILL.md' }], usage: 'always' });
+    expect(r.error).toBe(true);
   });
 
   it('get_skill serve o fluxo e as skills por assunto do próprio board, sem arquivo instalado', async () => {
@@ -1324,25 +1309,6 @@ describe('status do card e checkpoint de revisão', () => {
     expect(text).toContain('name: faz-ai-deploy');
     expect(text).toContain('passos do deploy');
     expect((await call('get_skill', { skill: 'nao-existe' })).error).toBe(true);
-  });
-
-  it('a skill do fluxo que já estava no disco, sem marcação, fica marcada em todo contexto ao "instalar" de novo', async () => {
-    // a skill foi instalada antes de a marcação existir (ou a pessoa a desmarcou): o Diagnóstico avisa, e o
-    // botão de instalar precisa resolver o aviso sem sobrescrever o arquivo
-    const dirOf = path.join(dir, 'home-do-usuario', '.claude', 'skills', 'faz-ai-fluxo');
-    fs.mkdirSync(dirOf, { recursive: true });
-    fs.writeFileSync(path.join(dirOf, 'SKILL.md'), '---\nname: faz-ai-fluxo\ndescription: minha versão\n---\nmeu texto');
-    router.refreshHarness();
-    const usage = async () =>
-      (await call('get_harness', { onlySelected: false })).data.inventory.find((i: any) => i.kind === 'skill' && i.name === 'faz-ai-fluxo')
-        ?.usage;
-    expect(await usage()).toBeNull();
-    expect((await call('install_flow_skill')).data).toMatchObject({
-      installed: false,
-      note: expect.stringContaining('marcada em todo contexto'),
-    });
-    expect(await usage()).toBe('always');
-    expect(fs.readFileSync(path.join(dirOf, 'SKILL.md'), 'utf8')).toContain('meu texto');
   });
 
   it('pergunta, bloqueio e colunas configuráveis', async () => {

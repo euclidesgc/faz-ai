@@ -81,59 +81,42 @@ export const workflows: Record<string, string> = {
 
   // Agentes
   Agentes: 'Agents',
-  'Novo agente': 'New agent',
   'Um agente diz como a IA trabalha num card: que skills ela lê, a que servidores MCP e ferramentas ela tem acesso e que modelo usa. Toda execução pelo board ("Trabalhar na fase", "Refinar com IA" e heartbeat) roda através de um agente: o escolhido no card; senão, o da fase (Workflows e colunas → Fase); senão, o padrão. Assim isso é decidido antes, em vez de a ferramenta descobrir sozinha durante a conversa.':
     'An agent defines how the AI works on a card: which skills it reads, which MCP servers and tools it can access and which model it uses. Every run from the board ("Work on the phase", "Refine with AI" and heartbeat) goes through an agent: the one chosen on the card; otherwise the phase\'s (Workflows and columns → Phase); otherwise the default. This way it is decided up front, instead of the tool figuring it out on its own during the conversation.',
   'O que o {tool} aceita por parâmetro': 'What {tool} accepts as a parameter',
   'Cada execução pelo board é uma sessão nova, só com o que está no card. <b>Imposto</b> é o que o {tool} recebe por parâmetro; <b>orientado</b> segue como instrução no prompt. Numa conversa aberta por você, tudo é orientação: a IA lê o agente em <code>get_card</code>. As skills vão sempre pelo caminho do arquivo, no prompt: valem mesmo desligadas ou fora da invocação automática.':
     'Each run from the board is a new session, with only what is on the card. <b>Enforced</b> is what {tool} receives as a parameter; <b>advised</b> goes as an instruction in the prompt. In a conversation you open yourself, everything is guidance: the AI reads the agent in <code>get_card</code>. Skills always go by file path, in the prompt: they apply even when turned off or outside automatic invocation.',
   'Agente {n}': 'Agent {n}',
-  'Na execução pelo board, o {tool} recebe isto por parâmetro: a sessão não tem como usar outra coisa.':
-    'When run from the board, {tool} receives this as a parameter: the session has no way to use anything else.',
-  'O {tool} não aceita isto por parâmetro: segue no prompt, como instrução.':
-    '{tool} does not accept this as a parameter: it goes in the prompt, as an instruction.',
   imposto: 'enforced',
   orientado: 'advised',
   'subagente {name}': 'subagent {name}',
-  '{n} skill(s)': '{n} skill(s)',
   'MCP: board': 'MCP: board',
   'MCP: board + {list}': 'MCP: board + {list}',
   'ferramentas: {list}': 'tools: {list}',
   'sessão limpa': 'clean session',
   'Sem restrições: a sessão usa o que a ferramenta carregar.': 'No restrictions: the session uses whatever the tool loads.',
-  'Agente {name}': 'Agent {name}',
   'Nome do agente': 'Agent name',
   padrão: 'default',
-  'Usado quando nem o card nem a coluna indicam um agente': 'Used when neither the card nor the column specifies an agent',
   Fechar: 'Close',
   Editar: 'Edit',
   'Precisa haver ao menos um agente': 'There must be at least one agent',
-  'Apagar o agente': 'Delete the agent',
-  'Apagar o agente "{name}"?': 'Delete the agent "{name}"?',
-  'Colunas e cards que usam este agente voltam ao padrão.': 'Columns and cards that use this agent go back to the default.',
-  'O que este agente faz': 'What this agent does',
   'Uma frase, como na descrição de um agente. É a base para sugerir skills e servidores MCP.':
     "One sentence, like an agent's description. It is the basis for suggesting skills and MCP servers.",
   'Ex.: revisa a Spec e aponta lacunas antes do Plan': 'E.g. reviews the Spec and points out gaps before the Plan',
   Skills: 'Skills',
   'Lidas em toda execução com este agente, além das indicadas no card. Com a intenção preenchida, o botão Sugerir pela intenção marca as que combinam.':
     'Read on every run with this agent, in addition to those chosen on the card. With the intent filled in, the Suggest from intent button selects the ones that match.',
-  'Skills de {name}': 'Skills for {name}',
   'Servidores MCP': 'MCP servers',
   'Restringir: a sessão usa só o servidor do board e os marcados abaixo':
     'Restrict: the session uses only the board server and the ones checked below',
-  'Nenhum outro servidor configurado para o {tool}.': 'No other server configured for {tool}.',
   'Servidores cujo nome ou descrição combinam com a intenção': 'Servers whose name or description match the intent',
   'Sugerir pela intenção ({n})': 'Suggest from intent ({n})',
-  'Ferramentas disponíveis': 'Available tools',
   'Nomes separados por vírgula, como a ferramenta os chama; vazio = as que o nível de permissão da execução libera.':
     "Names separated by commas, as the tool calls them; empty = the ones the run's permission level allows.",
-  'Sem lista: vale o que o nível de permissão libera': 'No list: whatever the permission level allows applies',
   'Ex.: Read, Grep, Glob, Edit': 'E.g. Read, Grep, Glob, Edit',
   'Ferramentas negadas': 'Denied tools',
   'Ex.: WebFetch, Bash(git push *)': 'E.g. WebFetch, Bash(git push *)',
   'Modelo e esforço': 'Model and effort',
-  'O modelo indicado no card tem preferência.': 'The model chosen on the card takes precedence.',
   'Subagente do {tool}': '{tool} subagent',
   'Opcional: um arquivo de agente do {tool} (em Harness → Agentes) que conduz a sessão; vazio = o agente padrão da ferramenta.':
     "Optional: a {tool} agent file (in Harness → Agents) that drives the session; empty = the tool's default agent.",
@@ -149,9 +132,7 @@ export const workflows: Record<string, string> = {
   'Lê e busca arquivos; não edita nem roda comandos.': 'Reads and searches files; does not edit or run commands.',
   'Lê, edita arquivos e roda comandos no terminal.': 'Reads, edits files and runs commands in the terminal.',
   'Criar coluna': 'Create column',
-  'Fechar edição': 'Close editing',
   'Tornar agente padrão': 'Make agent the default',
-  'Usar as ferramentas do nível de permissão': "Use the permission level's tools",
   'Editar instrução': 'Edit instruction',
   'Definir instrução': 'Set instruction',
 };

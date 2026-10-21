@@ -12,7 +12,6 @@ import { t } from '../../../i18n';
 /** Escolha da ferramenta de IA do projeto (uma por vez). */
 export function ProjectTool({ tool }: { tool: AiToolInfo }) {
   // trocar a ferramenta relê o harness e confere a CLI nova: a tabela mostra a espera até o host confirmar
-  const inventory = useBoardStore((s) => s.state!.harness.inventory.find((x) => x.tool === tool.id)?.items ?? []);
   const profiles = useBoardStore((s) => s.state!.board.aiProfiles.filter((p) => p.enabled));
   const selected = profiles.find((p) => p.id === tool.id);
   const change = useAction((id: AiTool) => settings.updateBoard({ aiTool: id }));
@@ -60,7 +59,7 @@ export function ProjectTool({ tool }: { tool: AiToolInfo }) {
           </tbody>
         </table>
       </RadioGroup.Root>
-      {selected?.kind === 'builtin' && <BoardInstall artifact="mcp" tool={tool.id} items={inventory} />}
+      {selected?.kind === 'builtin' && <BoardInstall tool={tool.id} />}
     </>
   );
 }
