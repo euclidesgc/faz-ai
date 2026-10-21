@@ -78,6 +78,11 @@ export class ArtifactImporter {
     this.refresh = deps.refresh ?? (() => void this.ctx.library.materialize());
   }
 
+  /** A prévia atual, para o estado do board; null sem origem lida. */
+  get current(): ImportPreview | null {
+    return this.preview;
+  }
+
   private get dirs() {
     return { projectDir: this.ctx.opts.workspaceDir ?? '', homeDir: this.ctx.home };
   }

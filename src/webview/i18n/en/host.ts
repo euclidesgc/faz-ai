@@ -486,6 +486,77 @@ export const host: Record<string, string> = {
   '"{name}" não é um nome de skill válido (letras minúsculas, números e hífens).':
     '"{name}" is not a valid skill name (lowercase letters, numbers and hyphens).',
 
+  'Nome de regra inválido: use letras minúsculas, números e hífens, com .md opcional.':
+    'Invalid rule name: use lowercase letters, numbers and hyphens, with an optional .md.',
+  'Nome de regra inválido: use letras, números, ponto, hífen e sublinhado.':
+    'Invalid rule name: use letters, numbers, dot, hyphen and underscore.',
+  'Nome de skill inválido: use letras minúsculas, números e hífens.':
+    'Invalid skill name: use lowercase letters, numbers and hyphens.',
+  'Nome de agente inválido.':
+    'Invalid agent name.',
+  'Nome inválido.':
+    'Invalid name.',
+  'Nome de artefato inválido.':
+    'Invalid artifact name.',
+  'Nome inválido. Use letras minúsculas, números e hífens.':
+    'Invalid name. Use lowercase letters, numbers and hyphens.',
+  'O nome faz-ai é reservado ao MCP do board.':
+    'The name faz-ai is reserved for the board MCP.',
+  'O nome faz-ai é reservado ao servidor MCP do board.':
+    'The name faz-ai is reserved for the board MCP server.',
+  'Arquivo maior que 512 KB.':
+    'File larger than 512 KB.',
+  'Arquivos de apoio demais (limite de 100).':
+    'Too many supporting files (limit of 100).',
+  'Arquivo de apoio inválido ou acima de 512 KB.':
+    'Supporting file invalid or larger than 512 KB.',
+  'Skill acima de 5 MB.':
+    'Skill larger than 5 MB.',
+  'A skill já tem 100 arquivos de apoio.':
+    'The skill already has 100 supporting files.',
+  'A skill passaria de 5 MB no total.':
+    'The skill would exceed 5 MB in total.',
+  'Arquivo de apoio não encontrado.':
+    'Supporting file not found.',
+  'Arquivo binário: não dá para editar como texto.':
+    'Binary file: it cannot be edited as text.',
+  'Não foi possível ler o conteúdo.':
+    'Could not read the content.',
+  'Escolha outro agente padrão antes de apagar este.':
+    'Choose another default agent before deleting this one.',
+  'A skill do fluxo é da extensão: só o modo dela pode mudar.':
+    'The flow skill belongs to the extension: only its mode can change.',
+  'Já existe um artefato com este nome. Edite o existente ou escolha outro nome.':
+    'An artifact with this name already exists. Edit the existing one or choose another name.',
+  'Artefato não encontrado.':
+    'Artifact not found.',
+  'Nenhum artefato encontrado.':
+    'No artifact found.',
+  'Informe uma URL HTTP do servidor MCP.':
+    'Enter an HTTP URL for the MCP server.',
+  'Informe o comando do servidor MCP.':
+    'Enter the MCP server command.',
+  'Informe a configuração do servidor MCP.':
+    'Enter the MCP server configuration.',
+  'Importar artefatos exige revisão humana.':
+    'Importing artifacts requires human review.',
+  'Leia a origem antes de importar.':
+    'Read the source before importing.',
+  'Subpasta inválida.':
+    'Invalid subfolder.',
+  'Subpasta não encontrada: {rel}':
+    'Subfolder not found: {rel}',
+  'Ferramenta não reconhecida.':
+    'Tool not recognized.',
+  'Arquivo não encontrado: {file}':
+    'File not found: {file}',
+  'Item não encontrado na prévia: {key}':
+    'Item not found in the preview: {key}',
+  'Skill "{skill}" não está no board.':
+    'Skill "{skill}" is not in the board.',
+  'Importados: {imported}. Pulados: {skipped}. Problemas: {problems}. Servidores MCP a configurar: {secrets}.':
+    'Imported: {imported}. Skipped: {skipped}. Problems: {problems}. MCP servers to configure: {secrets}.',
+
   '{ref} está bloqueado: {reason}': '{ref} is blocked: {reason}',
   '{ref} está esperando uma pessoa.': '{ref} is waiting for a person.',
   '{ref} não tem nada pendente com a IA, mas ainda não foi concluído.': '{ref} has nothing pending with the AI, but is not finished yet.',

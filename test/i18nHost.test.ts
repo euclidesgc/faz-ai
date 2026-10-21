@@ -84,6 +84,14 @@ describe('i18n do host: mensagens preenchidas', () => {
       'The "Fase" field has no default value per type: the board fills it in on each card.',
     ],
     ['Pasta não encontrada: /home/ana/skills', 'Folder not found: /home/ana/skills'],
+    ['Subpasta não encontrada: docs', 'Subfolder not found: docs'],
+    ['Arquivo não encontrado: /tmp/x.json', 'File not found: /tmp/x.json'],
+    ['Item não encontrado na prévia: rule:a', 'Item not found in the preview: rule:a'],
+    ['Skill "revisar" não está no board.', 'Skill "revisar" is not in the board.'],
+    [
+      'Importados: a, b. Pulados: -. Problemas: -. Servidores MCP a configurar: git.',
+      'Imported: a, b. Skipped: -. Problems: -. MCP servers to configure: git.',
+    ],
     ['Não foi possível clonar https://github.com/a/b.git: timeout', 'Could not clone https://github.com/a/b.git: timeout'],
     ['Skill não encontrada na origem: revisar', 'Skill not found in the source: revisar'],
     [
@@ -156,6 +164,24 @@ describe('i18n do host: mensagens preenchidas', () => {
       ],
     ];
     for (const [notice, en] of cases) expect(t(gitNoticeText(notice))).toBe(en);
+  });
+
+  it('erros e avisos fixos de artefatos do board (limites, agente padrão, skill do fluxo, nome repetido, origem)', () => {
+    setLocale('en');
+    const cases: [string, string][] = [
+      ['Arquivo maior que 512 KB.', 'File larger than 512 KB.'],
+      ['A skill já tem 100 arquivos de apoio.', 'The skill already has 100 supporting files.'],
+      ['Escolha outro agente padrão antes de apagar este.', 'Choose another default agent before deleting this one.'],
+      ['A skill do fluxo é da extensão: só o modo dela pode mudar.', 'The flow skill belongs to the extension: only its mode can change.'],
+      [
+        'Já existe um artefato com este nome. Edite o existente ou escolha outro nome.',
+        'An artifact with this name already exists. Edit the existing one or choose another name.',
+      ],
+      ['Subpasta inválida.', 'Invalid subfolder.'],
+      ['Nenhum artefato encontrado.', 'No artifact found.'],
+      ['O nome faz-ai é reservado ao MCP do board.', 'The name faz-ai is reserved for the board MCP.'],
+    ];
+    for (const [pt, en] of cases) expect(t(pt)).toBe(en);
   });
 
   it('em português a mensagem fica como chegou', () => {

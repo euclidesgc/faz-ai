@@ -45,6 +45,8 @@ const PLUGIN_DONE: Record<PluginAction, string> = {
   disable: 'Plugins desativados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
   enable: 'Plugins ativados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
 };
+/** O aviso do resultado da importação de artefatos: o que entrou, o que foi pulado, os problemas e os servidores MCP a configurar. */
+const IMPORT_DONE = 'Importados: {imported}. Pulados: {skipped}. Problemas: {problems}. Servidores MCP a configurar: {secrets}.';
 const fill = (text: string, params: Record<string, string | number>) =>
   text.replace(/\{(\w+)\}/g, (m, n: string) => String(params[n] ?? m));
 
@@ -52,6 +54,8 @@ const fill = (text: string, params: Record<string, string | number>) =>
 export class BoardHarness {
   current: Harness = EMPTY_HARNESS;
   /** origem de skills já baixada, à espera da escolha do que instalar */
+  /** o aviso do último `harness.import.apply`, à espera da ponte */
+  importNotice: string | null = null;
   install: { source: string; dir: string; skills: InstallableSkill[]; cleanup: () => void } | null = null;
   /** a CLI do Claude Code, para a lista de plugins instalados e as ações sobre eles; quem abre o board a fornece */
   private claudeCli: ClaudeCli | null = null;
@@ -387,26 +391,48 @@ function markSkill(ctx: BoardContext, name: string, scope: 'project' | 'user' = 
 
 /** Harness: regras, skills, agentes, hooks, permissões, servidores MCP e instalação de skills. */
 export const harnessHandlers = {
-  // Contracts introduced in #665; the artifact editor/importer handlers arrive in the following subtasks.
-  'harness.artifact.save': () => {
-    throw new Error('Editor de artefatos ainda não disponível.');
+  'harness.artifact.save': (msg, ctx, actor) => {
+    const { library } = ctx;
+    const via = msg.via ?? 'manual';
+    if (msg.kind === 'rule') library.saveRule(msg.name, msg.body ?? '', { previous: msg.previous, via });
+    else if (msg.kind === 'skill')
+      library.saveSkill(msg.name, msg.body ?? '', { previous: msg.previous, via, ...(msg.files ? { files: msg.files } : {}) });
+    else {
+      if (actor.byAi) throw new Error('Configurações e credenciais MCP exigem revisão humana.');
+      if (!msg.server) throw new Error('Informe a configuração do servidor MCP.');
+      library.saveMcp(msg.name, msg.server, { previous: msg.previous, keepSecrets: msg.keepSecrets ?? [] });
+    }
+    ctx.harness.load();
+    return true;
   },
-  'harness.artifact.read': () => {
-    throw new Error('Editor de artefatos ainda não disponível.');
+  'harness.skillFile.write': (msg, ctx) => {
+    ctx.library.writeSkillFile(msg.skill, msg.file, msg.content);
+    ctx.harness.load();
+    return true;
   },
-  'harness.skillFile.write': () => {
-    throw new Error('Arquivos de apoio do board ainda não disponíveis.');
+  'harness.skillFile.delete': (msg, ctx) => {
+    ctx.library.deleteSkillFile(msg.skill, msg.file);
+    ctx.harness.load();
+    return true;
   },
-  'harness.skillFile.delete': () => {
-    throw new Error('Arquivos de apoio do board ainda não disponíveis.');
+  'harness.import.apply': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('Importar artefatos exige revisão humana.');
+    const names = new Map((ctx.importer.current?.candidates ?? []).map((c) => [c.key, c.name]));
+    const nameOf = (key: string) => names.get(key) ?? key;
+    const result = ctx.importer.apply(msg.keys, msg.onConflict);
+    ctx.harness.importNotice = fill(IMPORT_DONE, {
+      imported: result.imported.map(nameOf).join(', ') || '-',
+      skipped: result.skipped.map(nameOf).join(', ') || '-',
+      problems: result.problems.join('; ') || '-',
+      secrets: result.mcpSecrets.map((s) => s.split(':')[0]).join(', ') || '-',
+    });
+    ctx.harness.load();
+    return true;
   },
-  'harness.import.scan': () => {
-    throw new Error('Importação de artefatos ainda não disponível.');
+  'harness.import.cancel': (_msg, ctx) => {
+    ctx.importer.cancel();
+    return true;
   },
-  'harness.import.apply': () => {
-    throw new Error('Importação de artefatos ainda não disponível.');
-  },
-  'harness.import.cancel': () => false,
   'contextPlanning.save': (msg, ctx, actor) => {
     if (actor.byAi) throw new Error('Contratos de contexto exigem revisão humana; a IA não pode alterar autorizações.');
     new ContextPlanningRepo(ctx.dbHandle.db).save(ctx.boardId, msg.input);

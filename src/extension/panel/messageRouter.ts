@@ -3,7 +3,8 @@ import { resolveContextDraft, type ContextDraftResolution } from '../../shared/c
 import type { ContextActivityTarget } from '../../shared/contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
 import { scanLibraryFolder } from '../libraryImport';
-import { agentOfArtifact } from '../../shared/artifacts';
+import { agentOfArtifact, type ArtifactKind } from '../../shared/artifacts';
+import type { ImportSource } from '../../shared/artifactImport';
 import * as path from 'node:path';
 import type { BoardRequirement } from '../../shared/requirements';
 import type { EnvironmentReport } from '../../shared/environment';
@@ -143,6 +144,8 @@ const bridgeOnly = {
   'harness.skill.file.open': viaBridge,
   'harness.install.scan': viaBridge,
   'harness.import.pick': viaBridge,
+  'harness.import.scan': viaBridge,
+  'harness.artifact.read': viaBridge,
   'harness.library.open': viaBridge,
   'harness.library.pick': viaBridge,
   'harness.library.pickArtifacts': viaBridge,
@@ -318,7 +321,7 @@ export class MessageRouter {
       environment: this.environment,
       environmentFirstRun: this.environmentFirstRun,
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
-      artifactImport: null,
+      artifactImport: this.ctx.importer.current,
       harnessSuggestions: this.suggestions,
       mainBranch: this.ctx.mainBranch(),
       orphans: this.orphans,
@@ -664,6 +667,28 @@ export class MessageRouter {
 
   clearInstall(): void {
     this.ctx.harness.clearInstall();
+    this.ctx.importer.cancel();
+  }
+
+  /** Lê a origem de artefatos e deixa a prévia no estado do board. */
+  async scanImport(source: ImportSource): Promise<void> {
+    try {
+      await this.ctx.importer.scan(source);
+    } finally {
+      this.notify();
+    }
+  }
+
+  /** O aviso do último `harness.import.apply`, entregue uma vez. */
+  takeImportNotice(): string | null {
+    const notice = this.ctx.harness.importNotice;
+    this.ctx.harness.importNotice = null;
+    return notice;
+  }
+
+  /** O conteúdo de um artefato do board para o editor (segredos do MCP mascarados). */
+  readArtifact(kind: ArtifactKind, name: string, file?: string) {
+    return this.ctx.library.content(kind, name, file);
   }
 
   /** Cria um arquivo de apoio numa skill e devolve o caminho dele, para abrir no editor. */

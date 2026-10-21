@@ -15,6 +15,7 @@ import type { MessageRouter } from '../panel/messageRouter';
 const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'attachment.read',
   'harness.file.read',
+  'harness.artifact.read',
   'harness.project.profile',
   'harness.agent.assist',
   'metrics.query',
@@ -253,6 +254,23 @@ export class HostBridge {
         }
         return;
       }
+      case 'harness.artifact.read': {
+        try {
+          this.post({ type: 'harness.artifact.readResult', requestId: msg.requestId, ...this.router.readArtifact(msg.kind, msg.name, msg.file) });
+        } catch (e) {
+          this.post({ type: 'harness.artifact.readResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'harness.import.scan':
+        await this.router.scanImport(msg.source);
+        return;
+      case 'harness.import.apply': {
+        this.router.handle(msg);
+        const notice = this.router.takeImportNotice();
+        if (notice) this.post({ type: 'notice', message: notice });
+        return;
+      }
       case 'harness.refresh':
         await this.router.refreshHarnessAndPlugins();
         return;
@@ -317,7 +335,15 @@ export class HostBridge {
         return;
       }
       case 'harness.import.pick': {
-        if ('what' in msg && msg.what !== undefined) throw new Error('A prévia de importação ainda não está disponível.');
+        if (msg.what) {
+          let picked: string | undefined;
+          if (msg.what === 'folder') {
+            if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
+            picked = await this.env.pickFolder('Importar artefatos de uma pasta');
+          } else picked = this.env.pickBackupFile ? await this.env.pickBackupFile() : (await this.env.pickFiles())?.[0];
+          if (picked) await this.router.scanImport({ from: msg.what === 'folder' ? 'folder' : 'export', path: picked });
+          return;
+        }
         if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
         const dir = await this.env.pickFolder('Importar artefatos de uma pasta');
         if (dir && msg.tool) this.router.handle({ type: 'harness.import.add', tool: msg.tool, dir });
