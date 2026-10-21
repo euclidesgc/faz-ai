@@ -141,6 +141,11 @@ export interface AiGatewayDeps {
   sessions?: RunMcpSessions;
   snapshots?: Pick<RunArtifactSnapshots, 'capture'>;
   admission?: ExecutionAdmission;
+  /**
+   * Runtime do contexto (E5.3). `legacy` (padrão) mantém o comportamento anterior; `v1` recusa toda execução que
+   * não traga a configuração resolvida e o pedido de admissão: nenhum caminho de IA roda ignorando o plano.
+   */
+  runtime?: ContextRuntime;
   leaseCoordinationDir?: string;
   boardId: string;
   /** obrigatório: sem ele a execução não teria onde ser registrada */
@@ -157,8 +162,14 @@ export function outcomeOf(end: { stopped: boolean; timedOut: boolean; code: numb
   return 'done';
 }
 
+export type ContextRuntime = 'legacy' | 'v1';
+
 export class AiGateway {
   constructor(private deps: AiGatewayDeps) {}
+
+  get runtime(): ContextRuntime {
+    return this.deps.runtime ?? 'legacy';
+  }
 
   get supportsSnapshots(): boolean {
     return !!this.deps.snapshots;
@@ -213,6 +224,8 @@ export class AiGateway {
       )
         throw new Error('Perfil desativado ou pendente de revisão.');
       const prepared = call.prepare();
+      if (this.runtime === 'v1' && !(prepared.context && prepared.strict))
+        throw new Error('Runtime v1: a execução precisa da configuração resolvida e da admissão; nenhum caminho de IA ignora o plano.');
       if (profile.kind !== 'builtin' && !prepared.strict)
         throw new Error('Perfis configuráveis exigem contrato e admissão por capacidades.');
       if (profile.kind !== 'builtin' && prepared.strict?.profileId !== profile.id)

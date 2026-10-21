@@ -627,6 +627,8 @@ O `Orchestrator` já oferece `drive`, continuação de rodadas, reconciliação 
 
 A base de admissão v1 no gateway distingue conversa, artefatos, permissões, MCP e delegação e exige recibos locais vinculados à configuração atual. A decisão fica no histórico (schema 36), sem virar autorização ao exportar/importar. Lista vazia significa nenhuma ferramenta; o mapeamento estrito do Claude usa ferramentas e operações MCP exatas, sem pular permissões. Essa base ainda aguarda o verificador das CLIs reais e a ativação nas ações da E5: a execução atual continua legada e nenhum executor recebe verificação automaticamente.
 
+**Runtime v1 (opcional).** Com `FAZ_AI_CONTEXT_RUNTIME=v1` no ambiente que abre o editor, o gateway só executa com a configuração resolvida e a admissão por capacidades: runner (fase, refinar, resumo, conflito), chat, assistentes do Harness e teste do perfil. Sem agente com contrato válido ou sem recibos (comando **Faz AI: Verificar o isolamento da CLI de IA**, validade de 14 dias), o processo não abre. O legado continua o padrão.
+
 ### Aba Consumo do card
 
 O card aberto tem a aba **Consumo**, que junta as duas contas:

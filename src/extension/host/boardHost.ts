@@ -19,6 +19,7 @@ import type { AiActivity } from '../../shared/model';
 import type { AiRunMode } from '../../shared/runner';
 import { columnOf } from '../../shared/selectors';
 import { Heartbeat } from '../heartbeat';
+import { contextRuntimeFromEnv } from '../ai/v1Prepare';
 import { AiGateway } from '../ai/gateway';
 import { RunArtifactSnapshots } from '../runArtifactSnapshot';
 import { ArtifactRepo } from '../repositories/artifactRepo';
@@ -230,6 +231,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     redact: (text) => router.redactCredentials(text),
     snapshots: new RunArtifactSnapshots(path.join(o.storageDir, 'run-artifacts'), new ArtifactRepo(handle.db), router.boardId),
     admission,
+    runtime: contextRuntimeFromEnv(),
     spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
   });
   router.setAdmissionReader((request) => {

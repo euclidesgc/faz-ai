@@ -31,6 +31,7 @@ import { modelDisplay, modelValue } from '../shared/models';
 import { effortTiers } from './models';
 import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
+import { cardV1 } from './ai/v1Prepare';
 import { AiGateway, type AiCall, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
@@ -485,6 +486,15 @@ export class AiRunner {
             ]),
           };
           return {
+            // runtime v1: o contrato do agente e a seleção da atividade decidem; sem eles a execução não parte
+            ...(this.deps.gateway.runtime === 'v1'
+              ? cardV1(state, target.cli.id, {
+                  cardId,
+                  workflowId: card.workflowId,
+                  phaseId: columnOf(state, card)?.id ?? '',
+                  action: MODE_ACTION[mode],
+                })
+              : {}),
             ...(options.token !== undefined ? { work: { id: options.workId!, token: options.token } } : {}),
             artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state, card) : undefined,
             // a configuração completa só existe depois do plano; é a mesma que o resumo manda para o canal de log
