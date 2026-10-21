@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { TextField } from '@radix-ui/themes';
-import { ARCHIVED_EMPTY_FILTERS, ARCHIVED_PAGE, archivedRowCards } from '../../shared/archived';
+import { ARCHIVED_EMPTY_FILTERS, ARCHIVED_PAGE, archivedRowCards, type ArchivedRowCards } from '../../shared/archived';
 import { activeFilterCount, applyFilters, type Filters } from '../../shared/filters';
 import type { Card, Id, Workflow } from '../../shared/model';
 import { cardRef } from '../../shared/model';
@@ -8,7 +8,7 @@ import { isArchived } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { useCardBusy } from '../store/busyCards';
 import { formatDateTime, t, tn, dt } from '../i18n';
-import { requestRestoreArchived } from '../store/actions';
+import { requestRestoreArchived, requestTrashArchivedMany, requestUnarchiveMany } from '../store/actions';
 import { CardView } from './Card';
 import { FilterPanel } from './FilterPanel';
 import { Button } from './ui';
@@ -16,7 +16,8 @@ import { Button } from './ui';
 /**
  * Aba Arquivados: uma linha por workflow, na ordem do board, só com os cards arquivados dele (do mais recente ao
  * mais antigo). Preserva o histórico sem ocupar as linhas do board; restaurar devolve o card à primeira coluna.
- * Filtros, páginas e a história selecionada são estado local: sair da aba e voltar a abre limpa.
+ * Filtros, páginas, a história selecionada (clique no card: filtra as sub-tarefas) e a seleção múltipla (caixa de marcação,
+ * para as ações em massa) são estado local, independentes entre si, como no board: sair da aba e voltar a abre limpa.
  */
 export function ArchivedView() {
   const state = useBoardStore((s) => s.state)!;
@@ -25,6 +26,7 @@ export function ArchivedView() {
   const [limits, setLimits] = useState<Record<Id, number>>({});
   const [storyId, setStoryId] = useState<Id | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [marked, setMarked] = useState<Set<Id>>(new Set());
 
   // Mudar o filtro volta cada linha à primeira página.
   const setFilters = (patch: Partial<Filters>) => {
@@ -34,6 +36,27 @@ export function ArchivedView() {
   const matched = useMemo(() => applyFilters(state, filters), [state, filters]);
   // Derivada do estado: história restaurada ou na lixeira deixa de valer sem efeito colateral.
   const story = storyId ? (state.cards.find((c) => c.id === storyId && isArchived(c)) ?? null) : null;
+  // Único ponto que diz o que a tela lista: as linhas, a paginação e a seleção em massa partem daqui.
+  const rows = workflows.map((wf) => {
+    const row = archivedRowCards(state, wf, matched, story?.id ?? null);
+    return { workflow: wf, ...row, shown: row.cards.slice(0, limits[wf.id] ?? ARCHIVED_PAGE) };
+  });
+  const visibleIds = new Set(rows.flatMap((r) => r.shown.map((c) => c.id)));
+  // Só vale o que está na lista; o efeito grava a poda para o id não ressurgir marcado quando voltar à lista.
+  const selected = new Set([...marked].filter((id) => visibleIds.has(id)));
+  const prunedSize = selected.size;
+  useEffect(() => {
+    if (prunedSize !== marked.size) setMarked(new Set([...marked].filter((id) => visibleIds.has(id))));
+    // visibleIds muda a cada render; prunedSize já reflete a diferença entre o marcado e o visível.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prunedSize, marked]);
+  const toggleMarked = (id: Id) =>
+    setMarked((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  const clearMarked = () => setMarked(new Set());
   const clearAll = () => {
     setFiltersState(ARCHIVED_EMPTY_FILTERS);
     setLimits({});
@@ -58,14 +81,23 @@ export function ArchivedView() {
         canClear={activeFilterCount(filters) > 0 || story !== null}
         clearAll={clearAll}
       />
-      {workflows.map((wf) => (
+      <ArchivedSelectionBar
+        selected={state.cards.filter((c) => selected.has(c.id))}
+        selectAll={() => setMarked(new Set(visibleIds))}
+        clear={clearMarked}
+      />
+      {rows.map((row) => (
         <ArchivedRow
-          key={wf.id}
-          workflow={wf}
-          matched={matched}
+          key={row.workflow.id}
+          workflow={row.workflow}
+          rowCards={row}
+          shown={row.shown}
           story={story}
-          limit={limits[wf.id] ?? ARCHIVED_PAGE}
-          showMore={() => setLimits((current) => ({ ...current, [wf.id]: (current[wf.id] ?? ARCHIVED_PAGE) + ARCHIVED_PAGE }))}
+          marked={selected}
+          toggleMarked={toggleMarked}
+          showMore={() =>
+            setLimits((current) => ({ ...current, [row.workflow.id]: (current[row.workflow.id] ?? ARCHIVED_PAGE) + ARCHIVED_PAGE }))
+          }
           toggleStory={(id) => setStoryId((current) => (current === id ? null : id))}
           clearStory={() => setStoryId(null)}
         />
@@ -121,25 +153,56 @@ function ArchivedFilterBar({
   );
 }
 
+/** Barra de ações em massa, no estilo da `SelectionBar` do board; aparece com ao menos um card marcado. */
+function ArchivedSelectionBar({ selected, selectAll, clear }: { selected: Card[]; selectAll: () => void; clear: () => void }) {
+  const bulkBusy = useBoardStore((s) => s.bulkBusy);
+  if (selected.length === 0) return null;
+  return (
+    <div className="selectionbar" role="toolbar" aria-label={t('Ações em massa')}>
+      <span>{t('{n} selecionados', { n: selected.length })}</span>
+      {bulkBusy && (
+        <span role="status" className="muted small">
+          <span className="spinner" aria-hidden /> {bulkBusy}
+        </span>
+      )}
+      <Button variant="ghost" size="small" disabled={!!bulkBusy} onClick={selectAll}>
+        {t('Selecionar todos os visíveis')}
+      </Button>
+      <Button variant="ghost" size="small" onClick={clear}>
+        {t('Limpar')}
+      </Button>
+      <Button size="small" disabled={!!bulkBusy} onClick={() => requestUnarchiveMany(selected, clear)}>
+        {t('Restaurar')}
+      </Button>
+      <Button size="small" danger disabled={!!bulkBusy} onClick={() => requestTrashArchivedMany(selected, clear)}>
+        {t('Enviar para a lixeira')}
+      </Button>
+    </div>
+  );
+}
+
 function ArchivedRow({
   workflow,
-  matched,
+  rowCards,
+  shown,
   story,
-  limit,
+  marked,
+  toggleMarked,
   showMore,
   toggleStory,
   clearStory,
 }: {
   workflow: Workflow;
-  matched: Set<Id> | null;
+  rowCards: ArchivedRowCards;
+  shown: Card[];
   story: Card | null;
-  limit: number;
+  marked: Set<Id>;
+  toggleMarked: (id: Id) => void;
   showMore: () => void;
   toggleStory: (id: Id) => void;
   clearStory: () => void;
 }) {
-  const state = useBoardStore((s) => s.state)!;
-  const { total, cards } = archivedRowCards(state, workflow, matched, story?.id ?? null);
+  const { total, cards } = rowCards;
   const byStory = workflow.kind === 'child' && story !== null;
   return (
     <section className="archived-row" aria-label={dt(workflow.name)}>
@@ -165,7 +228,7 @@ function ArchivedRow({
         </p>
       ) : (
         <div className="archived-cards">
-          {cards.slice(0, limit).map((card) => (
+          {shown.map((card) => (
             <div key={card.id} className="archived-item">
               {workflow.kind === 'parent' ? (
                 <CardView card={card} selected={story?.id === card.id} onSelect={() => toggleStory(card.id)} />
@@ -173,6 +236,13 @@ function ArchivedRow({
                 <CardView card={card} />
               )}
               <div className="archived-meta">
+                <input
+                  type="checkbox"
+                  className="card-select"
+                  checked={marked.has(card.id)}
+                  aria-label={t('Selecionar {title}', { title: `${cardRef(card)} ${card.title}` })}
+                  onChange={() => toggleMarked(card.id)}
+                />
                 <span>{formatDateTime(card.archivedAt!)}</span>
                 <span className="spacer" />
                 <RestoreButton cardId={card.id} label={t('Restaurar {title}', { title: `${cardRef(card)} ${card.title}` })} />
@@ -181,9 +251,9 @@ function ArchivedRow({
           ))}
         </div>
       )}
-      {cards.length > limit && (
+      {cards.length > shown.length && (
         <div className="archived-more">
-          <span className="muted small">{t('Mostrando {shown} de {total}', { shown: limit, total: cards.length })}</span>
+          <span className="muted small">{t('Mostrando {shown} de {total}', { shown: shown.length, total: cards.length })}</span>
           <button onClick={showMore}>{t('Mostrar mais')}</button>
         </div>
       )}

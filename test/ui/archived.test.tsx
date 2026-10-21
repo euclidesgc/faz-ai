@@ -1,6 +1,6 @@
-import { lastSent, renderThemed, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { confirmLast, lastSent, renderThemed, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../../src/webview/App';
 import { ArchivedView } from '../../src/webview/components/ArchivedView';
@@ -308,5 +308,96 @@ describe('aba Arquivados: filtros, paginação e filhos da história', () => {
     expect(screen.queryByRole('option', { name: 'Criado em' })).toBeNull();
     expect(screen.queryByText('Pendência')).toBeNull();
     expect(screen.queryByText('Relacionamentos')).toBeNull();
+  });
+  describe('seleção em massa', () => {
+    const mark = (name: RegExp) => screen.getByRole('checkbox', { name });
+    const bar = () => screen.queryByRole('toolbar', { name: 'Ações em massa' });
+
+    it('a barra aparece com um card marcado, conta, e Limpar desmarca', async () => {
+      archivedStory('Alfa checkout', []);
+      archivedStory('Beta relatório', []);
+      sync();
+      renderThemed(<ArchivedView />);
+      expect(bar()).toBeNull();
+      await userEvent.click(mark(/Alfa checkout/));
+      expect(within(bar()!).getByText('1 selecionados')).toBeInTheDocument();
+      await userEvent.click(mark(/Beta relatório/));
+      expect(within(bar()!).getByText('2 selecionados')).toBeInTheDocument();
+      await userEvent.click(within(bar()!).getByRole('button', { name: 'Limpar' }));
+      expect(bar()).toBeNull();
+    });
+
+    it('marcar não filtra as sub-tarefas e filtrar pela história não marca', async () => {
+      archivedStory('Alfa checkout', ['Sub alfa um']);
+      sync();
+      renderThemed(<ArchivedView />);
+      await userEvent.click(mark(/Alfa checkout/));
+      expect(within(row(childWf().name)).queryByText(/^Sub-tarefas de/)).toBeNull();
+      await userEvent.click(mark(/Alfa checkout/));
+      await userEvent.click(within(row(parentWf().name)).getByText('Alfa checkout'));
+      expect(within(row(childWf().name)).getByText(/^Sub-tarefas de/)).toBeInTheDocument();
+      expect(bar()).toBeNull();
+    });
+
+    it('"Selecionar todos os visíveis" respeita o filtro e a poda tira o que sai da lista', async () => {
+      archivedStory('Alfa checkout', []);
+      archivedStory('Beta relatório', []);
+      sync();
+      renderThemed(<ArchivedView />);
+      await userEvent.click(mark(/Alfa checkout/));
+      await userEvent.type(search(), 'Beta');
+      // o Alfa saiu da lista: a seleção é podada junto
+      expect(bar()).toBeNull();
+      await userEvent.click(mark(/Beta relatório/));
+      await userEvent.click(within(bar()!).getByRole('button', { name: 'Selecionar todos os visíveis' }));
+      expect(within(bar()!).getByText('1 selecionados')).toBeInTheDocument();
+      await userEvent.clear(search());
+      // voltar o filtro não ressuscita o Alfa
+      expect(within(bar()!).getByText('1 selecionados')).toBeInTheDocument();
+      expect(mark(/Alfa checkout/)).not.toBeChecked();
+    });
+
+    it('Restaurar pede confirmação com a contagem e o que vai junto, e só envia ao confirmar', async () => {
+      const a = archivedStory('Alfa checkout', ['Sub alfa um', 'Sub alfa dois']);
+      sync();
+      renderThemed(
+        <>
+          <ArchivedView />
+          <Dialog />
+        </>,
+      );
+      await userEvent.click(mark(/Alfa checkout/));
+      await userEvent.click(within(bar()!).getByRole('button', { name: 'Restaurar' }));
+      expect(screen.getByText('Restaurar 1 card(s)?')).toBeInTheDocument();
+      expect(screen.getByText(/Voltam junto: 2 cards/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Voltar' }));
+      expect(sentOf('card.unarchiveMany')).toHaveLength(0);
+      expect(bar()).not.toBeNull();
+
+      await userEvent.click(within(bar()!).getByRole('button', { name: 'Restaurar' }));
+      await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Restaurar' }));
+      expect(lastSent('card.unarchiveMany')).toEqual({ type: 'card.unarchiveMany', cardIds: [a.id] });
+      expect(within(bar()!).getByRole('status')).toHaveTextContent('Restaurando 1 card(s)…');
+      confirmLast();
+      await waitFor(() => expect(bar()).toBeNull());
+    });
+
+    it('Enviar para a lixeira pede confirmação e envia card.trashArchivedMany ao confirmar', async () => {
+      const a = archivedStory('Alfa checkout', ['Sub alfa um']);
+      sync();
+      renderThemed(
+        <>
+          <ArchivedView />
+          <Dialog />
+        </>,
+      );
+      await userEvent.click(mark(/Alfa checkout/));
+      await userEvent.click(within(bar()!).getByRole('button', { name: 'Enviar para a lixeira' }));
+      expect(screen.getByText('Excluir 1 card(s)?')).toBeInTheDocument();
+      expect(screen.getByText(/Vão para a lixeira junto: 1 card/)).toBeInTheDocument();
+      expect(sentOf('card.trashArchivedMany')).toHaveLength(0);
+      await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Excluir' }));
+      expect(lastSent('card.trashArchivedMany')).toEqual({ type: 'card.trashArchivedMany', cardIds: [a.id] });
+    });
   });
 });
