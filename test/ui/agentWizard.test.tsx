@@ -4,9 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { lastSent, posted, renderThemed, seedBoard, sentOf } from './setup';
 import { AGENT_SUGGESTIONS } from '../../src/shared/agentSuggestions';
 import { suggestAgentModel } from '../../src/shared/agentWizard';
-import { aiToolInfo, type HarnessItem } from '../../src/shared/harness';
+import { baseInfo, type HarnessItem } from '../../src/shared/harness';
 import { AgentWizard } from '../../src/webview/components/settings/harness/AgentWizard';
-import { AgentsTable } from '../../src/webview/components/settings/harness/AgentsTable';
+import { ArtifactsHarness } from '../../src/webview/components/settings/harness/ArtifactsHarness';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import type { BoardState } from '../../src/shared/model';
 
@@ -41,6 +41,7 @@ beforeEach(async () => {
     harness: {
       ...s.harness,
       agents: [],
+      library: undefined,
       inventory: [{ tool: 'claude', installed: true, items: [skillItem, mcpItem] }],
     },
     harnessSelection: [
@@ -57,7 +58,7 @@ const catalog = () => useBoardStore.getState().state!.board.modelCatalog;
 describe('assistente "Criar agente com ajuda"', () => {
   it('percorre os 7 passos, com exemplo e sugestão em cada um, e só grava no último', async () => {
     const closed: string[] = [];
-    renderThemed(<AgentWizard tool={aiToolInfo('claude')} scope="user" onClose={() => closed.push('x')} />);
+    renderThemed(<AgentWizard tool={baseInfo('claude')} onClose={() => closed.push('x')} />);
 
     // 1. diretriz: sem resposta não segue; o exemplo de resposta aparece
     expect(screen.getByText('Passo 1 de 7')).toBeInTheDocument();
@@ -111,7 +112,8 @@ describe('assistente "Criar agente com ajuda"', () => {
     expect(screen.getByText('faz-ai')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Criar agente' }));
     const sent = lastSent('harness.agent.create');
-    expect(sent.scope).toBe('user');
+    expect(sent).not.toHaveProperty('scope');
+    expect(sent.input).not.toHaveProperty('tool');
     expect(sent.input).toMatchObject({
       name: 'revisa-diff-branch-antes',
       description: 'Revisa o diff de uma branch antes do pull request e aponta bugs, sem alterar nada.',
@@ -131,7 +133,7 @@ describe('assistente "Criar agente com ajuda"', () => {
       harness: { ...s.harness, agents: [{ name: 'revisor', scope: 'user', location: '~/.claude/agents/revisor.md' } as never] },
     }));
     const closed: string[] = [];
-    renderThemed(<AgentWizard tool={aiToolInfo('claude')} scope="project" onClose={() => closed.push('x')} />);
+    renderThemed(<AgentWizard tool={baseInfo('claude')} onClose={() => closed.push('x')} />);
     await userEvent.type(screen.getByRole('textbox', { name: 'Diretriz' }), 'Revisa tudo');
     for (let i = 0; i < 6; i++) await next();
     const name = screen.getByRole('textbox', { name: 'Nome' });
@@ -150,7 +152,7 @@ describe('assistente "Criar agente com ajuda"', () => {
 
   it('uma sugestão pronta abre o assistente com as respostas feitas, para ajustar e confirmar', async () => {
     const reviewer = AGENT_SUGGESTIONS[0]!;
-    renderThemed(<AgentWizard tool={aiToolInfo('claude')} scope="user" preset={reviewer} onClose={() => {}} />);
+    renderThemed(<AgentWizard tool={baseInfo('claude')} preset={reviewer} onClose={() => {}} />);
     expect(screen.getByRole('textbox', { name: 'Diretriz' })).toHaveValue(reviewer.directive);
     await next();
     for (const name of reviewer.tools) expect(screen.getByRole('checkbox', { name })).toBeChecked();
@@ -168,7 +170,7 @@ describe('assistente "Criar agente com ajuda"', () => {
 
   it('no Cursor o passo das ferramentas vira somente leitura, e skills e MCP avisam que o arquivo não os aceita', async () => {
     setState((s) => ({ board: { ...s.board, aiTool: 'cursor' } }));
-    renderThemed(<AgentWizard tool={aiToolInfo('cursor')} scope="project" onClose={() => {}} />);
+    renderThemed(<AgentWizard tool={baseInfo('cursor')} onClose={() => {}} />);
     await userEvent.type(screen.getByRole('textbox', { name: 'Diretriz' }), 'Revisa o código e aponta problemas');
     await next();
     expect(screen.queryByRole('checkbox', { name: 'Read' })).toBeNull();
@@ -176,9 +178,9 @@ describe('assistente "Criar agente com ajuda"', () => {
     expect(screen.getByRole('checkbox', { name: 'Somente leitura' })).toBeChecked();
     await userEvent.click(screen.getByRole('checkbox', { name: 'Em segundo plano' }));
     await next();
-    expect(screen.getByText(/Cursor não aceita servidores MCP no arquivo do agente/)).toBeInTheDocument();
+    expect(screen.getByText(/Cursor não aceita servidores MCP por agente/)).toBeInTheDocument();
     await next();
-    expect(screen.getByText(/Cursor não aceita skills no arquivo do agente/)).toBeInTheDocument();
+    expect(screen.getByText(/Cursor não aceita skills por agente/)).toBeInTheDocument();
     for (let i = 0; i < 3; i++) await next();
     await userEvent.click(screen.getByRole('button', { name: 'Criar agente' }));
     expect(lastSent('harness.agent.create').input).toMatchObject({
@@ -193,7 +195,8 @@ describe('assistente "Criar agente com ajuda"', () => {
 
 describe('Sugestões prontas e o botão do assistente na tabela de agentes', () => {
   it('"Criar agente com ajuda" abre o assistente limpo; cada sugestão pronta o abre preenchido; o botão da IA continua', async () => {
-    renderThemed(<AgentsTable tool={aiToolInfo('claude')} scope="user" />);
+    useBoardStore.setState({ harnessTopic: 'agent' });
+    renderThemed(<ArtifactsHarness />);
     expect(screen.getByRole('button', { name: 'Sugerir agentes com IA' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Criar agente com ajuda' }));
     expect(screen.getByRole('textbox', { name: 'Diretriz' })).toHaveValue('');

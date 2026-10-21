@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs/promises';
-import { fetchSource, parseSource } from '../skillInstall';
 import { MAX_ATTACHMENT_BYTES } from '../attachments';
 import { parseExportFile, type ImportResult } from '../db/boardExport';
 import type { HostToWebview, Tracked, WebviewToHost } from '../../shared/messages';
@@ -14,11 +13,14 @@ import type { MessageRouter } from '../panel/messageRouter';
 /** Mensagens que já respondem com o próprio `requestId` (payload de leitura ou resultado de gravação): não ganham `done`. */
 const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'attachment.read',
-  'harness.file.read',
+  'harness.artifact.read',
   'harness.project.profile',
   'harness.agent.assist',
   'metrics.query',
   'card.usage.query',
+  'contextPlanning.preview',
+  'executionPolicy.read',
+  'executionPolicy.simulate',
 ]);
 
 /** O que depende de onde o board está rodando: dentro do editor ou num navegador. */
@@ -76,8 +78,9 @@ export function exportNotice(savedPath: string, warnings: string[]): string {
 /** Mensagem de resultado da importação: o board, os totais, os cards cujo anexo ficou sem arquivo e os segredos de MCP a preencher. */
 export function importNotice(r: ImportResult): string {
   const missing = r.warnings.length ? ` Anexos sem arquivo: ${r.warnings.join(', ')}.` : '';
-  const secrets = r.mcpSecrets.length ? ` Preencha os valores vazios dos servidores MCP: ${r.mcpSecrets.join(', ')}.` : '';
-  return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}${secrets}`;
+  const secrets = r.mcpSecrets.length ? ` Revise as configurações locais dos servidores MCP: ${r.mcpSecrets.join(', ')}.` : '';
+  const profiles = r.profileReviews?.length ? ` Perfis desativados para revisão local: ${r.profileReviews.join(', ')}.` : '';
+  return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}${secrets}${profiles}`;
 }
 
 /**
@@ -233,43 +236,30 @@ export class HostBridge {
         await this.env.openFolder(story.worktreePath);
         return;
       }
-      case 'harness.item.open': {
-        // só abre arquivos que a varredura do harness listou
-        const known = this.router.snapshot().harness.inventory.some((t) => t.items.some((i) => i.path === msg.path));
-        if (!known) throw new Error('Arquivo fora do harness.');
-        await this.env.openFile(msg.path);
+      case 'harness.artifact.read': {
+        try {
+          this.post({
+            type: 'harness.artifact.readResult',
+            requestId: msg.requestId,
+            ...this.router.readArtifact(msg.kind, msg.name, msg.file),
+          });
+        } catch (e) {
+          this.post({ type: 'harness.artifact.readResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
         return;
       }
-      case 'harness.file.read': {
-        try {
-          const { content, readonly } = this.router.readHarnessFile(msg.path);
-          this.post({ type: 'harness.file.readResult', requestId: msg.requestId, content, readonly });
-        } catch (e) {
-          this.post({ type: 'harness.file.readResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
-        }
+      case 'harness.import.scan':
+        await this.router.scanImport(msg.source);
+        return;
+      case 'harness.import.apply': {
+        this.router.handle(msg);
+        const notice = this.router.takeImportNotice();
+        if (notice) this.post({ type: 'notice', message: notice });
         return;
       }
       case 'harness.refresh':
         await this.router.refreshHarnessAndPlugins();
         return;
-      case 'harness.plugin.apply':
-        this.post({ type: 'notice', message: await this.router.applyPlugins(msg.tool, msg.action, msg.ids) });
-        return;
-      case 'harness.file.write':
-        // a falha (JSON inválido, sem permissão) vira o erro do `done`, e a tela mantém o texto
-        this.router.writeHarnessFile(msg.path, msg.content);
-        return;
-      case 'harness.skill.file.create':
-        await this.env.openFile(this.router.createSkillFile(msg.tool, msg.path, msg.file, msg.link));
-        return;
-      case 'harness.skill.file.open':
-        await this.env.openFile(this.router.skillFilePath(msg.tool, msg.path, msg.file));
-        return;
-      case 'harness.install.scan': {
-        const fetched = await fetchSource(parseSource(msg.source, os.homedir()));
-        this.router.setInstall(msg.source.trim(), fetched.dir, fetched.cleanup);
-        return;
-      }
       case 'harness.library.read':
         this.post({ type: 'harness.library.content', input: this.router.readLibraryArtifact(msg.id) });
         return;
@@ -313,22 +303,14 @@ export class HostBridge {
         return;
       }
       case 'harness.import.pick': {
-        if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
-        const dir = await this.env.pickFolder('Importar artefatos de uma pasta');
-        if (dir) this.router.handle({ type: 'harness.import.add', tool: msg.tool, dir });
+        let picked: string | undefined;
+        if (msg.what === 'folder') {
+          if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
+          picked = await this.env.pickFolder('Importar artefatos de uma pasta');
+        } else picked = this.env.pickBackupFile ? await this.env.pickBackupFile() : (await this.env.pickFiles())?.[0];
+        if (picked) await this.router.scanImport({ from: msg.what === 'folder' ? 'folder' : 'export', path: picked });
         return;
       }
-      case 'harness.item.create':
-        // o arquivo novo abre no editor do board, onde a pessoa já escreve o conteúdo
-        this.post({ type: 'harness.item.created', path: this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description) });
-        return;
-      case 'harness.item.write':
-        // o arquivo criado abre no editor do board, para a pessoa ler o que o assistente gravou
-        this.post({
-          type: 'harness.item.created',
-          path: this.router.writeHarnessItem(msg.tool, msg.source, msg.name, msg.content, msg.files, msg.append),
-        });
-        return;
       case 'harness.agent.assist':
         try {
           this.post({ type: 'harness.agent.assistResult', requestId: msg.requestId, result: await this.router.assistAgent(msg.input) });
@@ -396,6 +378,48 @@ export class HostBridge {
           this.post({ type: 'metrics.result', requestId: msg.requestId, result: this.router.panelMetrics(msg.query) });
         } catch (e) {
           this.post({ type: 'metrics.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'executionPolicy.read': {
+        try {
+          this.post({
+            type: 'executionPolicy.result',
+            requestId: msg.requestId,
+            ...(msg.id
+              ? this.router.executionPolicyHistory(msg.id, msg.beforeRevision)
+              : { library: this.router.executionPolicyLibrary() }),
+          });
+        } catch (e) {
+          this.post({ type: 'executionPolicy.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'executionPolicy.simulate': {
+        try {
+          this.post({
+            type: 'executionPolicy.result',
+            requestId: msg.requestId,
+            simulation: this.router.simulateExecutionPolicy(msg.scenario),
+          });
+        } catch (e) {
+          this.post({ type: 'executionPolicy.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'contextPlanning.preview': {
+        try {
+          this.post({
+            type: 'contextPlanning.preview.result',
+            requestId: msg.requestId,
+            preview: this.router.previewContextDraft(msg.target),
+          });
+        } catch (e) {
+          this.post({
+            type: 'contextPlanning.preview.result',
+            requestId: msg.requestId,
+            error: e instanceof Error ? e.message : String(e),
+          });
         }
         return;
       }

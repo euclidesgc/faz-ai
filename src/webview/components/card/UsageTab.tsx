@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { CardUsageRow } from '../../../shared/cardUsage';
-import { estimateContext } from '../../../shared/contextEstimate';
+import { executionContextOf } from '../../../shared/executionContext';
+import { ExecutionContext } from './ExecutionContext';
 import type { Card } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { dt, t, tn } from '../../i18n';
@@ -41,7 +42,7 @@ function UsageLine({ label, row, total = false }: { label: string; row: CardUsag
  */
 export function UsageTab({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
-  const estimate = useMemo(() => estimateContext(state, card), [state, card]);
+  const preview = useMemo(() => executionContextOf(state, card), [state, card]);
   // uma execução do card (ou de uma sub-tarefa) que começa ou termina muda o que já foi gasto
   const childIds = state.cards.filter((c) => c.parentId === card.id).map((c) => c.id);
   const version = state.aiRuns.filter((id) => id === card.id || childIds.includes(id)).join(',');
@@ -131,7 +132,8 @@ export function UsageTab({ card }: { card: Card }) {
       <section className="drawer-section">
         <h3>{t('Próxima execução')}</h3>
         <div className="usage-estimate">
-          <ContextDetail estimate={estimate} />
+          <ContextDetail estimate={preview.estimate} />
+          <ExecutionContext preview={preview} />
         </div>
       </section>
     </div>

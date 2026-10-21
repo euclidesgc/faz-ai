@@ -1,5 +1,7 @@
+import { baseValue } from './harness';
+import type { AiBase } from './aiProfiles';
 import { norm } from './filters';
-import { AI_TOOLS, type AiTool } from './harness';
+import { AI_BASES, type AiTool } from './harness';
 import type { BoardState, Card, FieldDef, FieldValue, Id } from './model';
 import { valueOf } from './selectors';
 
@@ -84,7 +86,7 @@ export function parseModelValue(value: FieldValue | undefined): { id: string; ef
 
 export const modelValue = (id: string, effort: string | null): string => (effort ? `${id}@${effort}` : id);
 
-const toolLabel = (tool: AiTool): string => AI_TOOLS.find((t) => t.id === tool)?.label ?? tool;
+const toolLabel = (tool: AiTool): string => AI_BASES.find((t) => t.id === tool)?.label ?? tool;
 
 function formatModel(catalog: ModelOption[], value: FieldValue | undefined, withTool: boolean, effort: (e: string) => string): string {
   const v = parseModelValue(value);
@@ -104,7 +106,7 @@ export const modelLabel = (catalog: ModelOption[], value: FieldValue | undefined
  * Haiku 5.5 com 1M; Haiku 4.5 com 200 mil (o `haiku` do catálogo embutido é o Haiku 4.5). Um modelo fora
  * daqui, como os do Cursor, fica sem janela: a tela não inventa o tamanho.
  */
-const CONTEXT_WINDOWS: Partial<Record<AiTool, Record<string, number>>> = {
+const CONTEXT_WINDOWS: Partial<Record<AiBase, Record<string, number>>> = {
   claude: {
     fable: 1_000_000,
     opus: 1_000_000,
@@ -126,7 +128,8 @@ const CONTEXT_WINDOWS: Partial<Record<AiTool, Record<string, number>>> = {
 };
 
 /** A janela de contexto do modelo, ou null quando o board não a conhece. */
-export const contextWindowOf = (tool: AiTool, model: string): number | null => CONTEXT_WINDOWS[tool]?.[model] ?? null;
+export const contextWindowOf = (tool: AiTool, model: string): number | null =>
+  (baseValue(CONTEXT_WINDOWS, tool) ?? undefined)?.[model] ?? null;
 
 /** Nível de esforço como as ferramentas escrevem, em português para a interface. */
 export const EFFORT_LABELS: Record<string, string> = {

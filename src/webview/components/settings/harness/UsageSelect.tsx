@@ -1,41 +1,26 @@
-import type { HarnessItem } from '../../../../shared/harness';
-import {
-  HARNESS_USAGES,
-  isSelectableKind,
-  selectionKey,
-  usageOf,
-  usageOptions,
-  type HarnessUsage,
-} from '../../../../shared/harnessSelection';
+import { artifactLocation, selectableOfKind, type BoardArtifact } from '../../../../shared/artifacts';
+import { HARNESS_USAGES, usageOptions, type HarnessUsage } from '../../../../shared/harnessSelection';
 import { harness } from '../../../commands';
-import { useBoardStore } from '../../../store/boardStore';
 import { SelectField } from '../../ui';
 import { t } from '../../../i18n';
 
 /**
- * O modo de uma rule, skill ou servidor MCP no board: Sempre, Pelo card ou Desligado (regras). No catálogo
- * há também "Fora do board"; na lista do Board o item já está lá, e o seletor só troca o modo.
+ * O modo de um artefato do board: Sempre, Pelo card ou Desligado (só regras). O agente não tem modo: ele fica
+ * disponível ao card, à fase e ao padrão, e a linha mostra isso em vez do seletor.
  */
-export function UsageSelect({ item, allowNone = true }: { item: HarnessItem; allowNone?: boolean }) {
-  const selection = useBoardStore((s) => s.state!.harnessSelection);
-  if (!isSelectableKind(item.kind) || item.kind === 'agent') return null;
-  const kind = item.kind;
-  const usage = usageOf(selection, item);
-  const modes = usageOptions(kind);
-  const available = item.boardArtifactId && !modes.includes('off') ? ['off' as const, ...modes] : modes;
-  const options = available.map((id) => HARNESS_USAGES.find((u) => u.id === id)!);
+export function UsageSelect({ artifact }: { artifact: BoardArtifact }) {
+  if (artifact.kind === 'agent') return null;
+  const kind = selectableOfKind(artifact.kind);
+  const options = usageOptions(kind).map((id) => HARNESS_USAGES.find((u) => u.id === id)!);
   return (
-    <SelectField<HarnessUsage | 'none'>
+    <SelectField<HarnessUsage>
       size="1"
       steady
-      aria-label={t('Modo no board: {name}', { name: item.name })}
-      title={t('Só o que está no board entra nas execuções; o resto fica invisível para elas.')}
-      options={[
-        ...(allowNone ? [{ value: 'none' as const, label: t('Fora do board') }] : []),
-        ...options.map((u) => ({ value: u.id, label: t(u.label) })),
-      ]}
-      value={usage ?? (allowNone ? 'none' : options[0]!.id)}
-      onChange={(v) => harness.setSelection([{ kind, location: selectionKey(item) }], v === 'none' ? null : v)}
+      aria-label={t('Modo no board: {name}', { name: artifact.name })}
+      title={t('Só o que está no board entra nas execuções, no modo de cada um.')}
+      options={options.map((u) => ({ value: u.id, label: t(u.label) }))}
+      value={artifact.usage}
+      onChange={(usage) => harness.setSelection([{ kind, location: artifactLocation(artifact) }], usage)}
     />
   );
 }

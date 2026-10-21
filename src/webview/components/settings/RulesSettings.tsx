@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Badge, Button, Card, Heading, Text } from '@radix-ui/themes';
+import { Badge, Button, Card, Heading } from '@radix-ui/themes';
 import { DEFAULT_RULES, type BoardRules, type CancelChildrenMode, type CompleteParentMode, type ConfirmMode } from '../../../shared/rules';
 import { columnsOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
@@ -196,15 +196,6 @@ export function RulesSettings() {
           />
         }
       />
-
-      <Card className="form-card" aria-label={t('Preencher o modelo sugerido')}>
-        <Text as="p" size="2">
-          {t('"Preencher o modelo sugerido automaticamente" mudou para a aba Modelos.')}
-        </Text>
-        <Button variant="soft" onClick={() => useBoardStore.getState().goToSection('model-rules')}>
-          {t('Abrir em Modelos')}
-        </Button>
-      </Card>
 
       <Rule
         title={t('Excluir card')}

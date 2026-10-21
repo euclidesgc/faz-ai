@@ -1,3 +1,5 @@
+import type { AiProfile } from '../shared/aiProfiles';
+import { redactCredentialValues } from './credentials';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -25,10 +27,13 @@ export function runCli(
   timeoutMs = 20_000,
   /** pasta em que o comando roda; os de plugin do Claude Code acham o escopo de projeto por ela */
   cwd?: string,
+  options: { env?: Record<string, string>; noShell?: boolean } = {},
 ): Promise<CliRun> {
   return new Promise((resolve) => {
     // no Windows, uma CLI instalada como .cmd só roda pelo shell, como nas execuções
-    const launch = launchSpec(file, args);
+    if (options.noShell && process.platform === 'win32' && /\.(cmd|bat)$/i.test(file))
+      return resolve({ code: null, stdout: '', stderr: '' });
+    const launch = options.noShell ? { file, args, shell: false } : launchSpec(file, args);
     execFile(
       launch.file,
       launch.args,
@@ -39,7 +44,7 @@ export function runCli(
         windowsVerbatimArguments: launch.shell,
         // no Windows, o shell abriria uma janela do cmd.exe a cada consulta
         windowsHide: true,
-        env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}), NO_COLOR: '1', NO_OPEN_BROWSER: '1' },
+        env: { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}), ...options.env, NO_COLOR: '1', NO_OPEN_BROWSER: '1' },
       },
       (err, stdout, stderr) => {
         const code = err ? (typeof (err as NodeJS.ErrnoException).code === 'number' ? Number(err.code) : null) : 0;
@@ -83,8 +88,8 @@ export async function cursorModels(executable: string, pathEnv: string | undefin
  * A sonda só roda com a CLI presente, então a pasta ausente é "nunca entrou na conta" (false), e só
  * um erro de leitura deixa a dúvida (null).
  */
-export function kimiSignedIn(homeDir: string): boolean | null {
-  const dir = path.join(kimiHome(homeDir), 'credentials');
+export function kimiSignedIn(homeDir: string, dataDir?: string): boolean | null {
+  const dir = path.join(dataDir || kimiHome(homeDir), 'credentials');
   try {
     return fs.readdirSync(dir).some((n) => n.endsWith('.json'));
   } catch (e) {
@@ -96,4 +101,62 @@ export function kimiSignedIn(homeDir: string): boolean | null {
 export async function kimiModels(executable: string, pathEnv: string | undefined): Promise<ModelOption[]> {
   const run = await runCli(executable, ['provider', 'list', '--json'], pathEnv);
   return run.code === 0 ? parseKimiModels(run.stdout) : [];
+}
+
+export interface ProfileProbeOptions {
+  pathEnv?: string;
+  cwd?: string;
+}
+/** Referências importadas ou cópias sem revisão nunca iniciam consultas. */
+export function profileCanProbe(profile: AiProfile): boolean {
+  return (
+    profile.enabled &&
+    profile.credentials?.review !== 'pending' &&
+    (profile.kind === 'builtin' || (profile.credentials?.review === 'reviewed' && profile.credentials.available))
+  );
+}
+async function runProfileQuery(profile: AiProfile, executable: string, args: string[], options: ProfileProbeOptions): Promise<CliRun> {
+  if (!profileCanProbe(profile)) return { code: null, stdout: '', stderr: '' };
+  return runCli(executable, args, options.pathEnv, 20000, options.cwd, {
+    noShell: true,
+    env: profile.kind === 'builtin' ? undefined : profile.config.env,
+  });
+}
+/** Retorna somente a versão, nunca saída bruta que possa revelar credenciais. Não é prova de isolamento. */
+export async function profileVersion(profile: AiProfile, executable: string, options: ProfileProbeOptions = {}): Promise<string | null> {
+  const args = profile.kind === 'custom' ? (profile.config.versionArgs ?? '--version').trim().split(/\s+/).filter(Boolean) : ['--version'];
+  if (!args.length) return null;
+  const result = await runProfileQuery(profile, executable, args, options);
+  if (result.code !== 0) return null;
+  const safe = redactCredentialValues(result.stdout, profile.config);
+  return /\bv?(\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?)\b/.exec(safe)?.[1] ?? null;
+}
+export async function profileSignedIn(
+  profile: AiProfile,
+  executable: string,
+  homeDir: string,
+  options: ProfileProbeOptions = {},
+): Promise<boolean | null> {
+  if (!profileCanProbe(profile)) return null;
+  if (profile.kind === 'custom') {
+    const args = profile.config.statusArgs?.trim().split(/\s+/).filter(Boolean);
+    if (!args?.length) return null;
+    const result = await runProfileQuery(profile, executable, args, options);
+    return result.code === null ? null : result.code === 0;
+  }
+  if (profile.base === 'kimi') return kimiSignedIn(homeDir, profile.kind === 'copy' ? profile.config.env?.KIMI_CODE_HOME : undefined);
+  const result = await runProfileQuery(
+    profile,
+    executable,
+    profile.base === 'claude' ? ['auth', 'status'] : ['status', '--format', 'json'],
+    options,
+  );
+  if (result.code === null) return null;
+  try {
+    const data = JSON.parse(result.stdout) as Record<string, unknown>;
+    const field = profile.base === 'claude' ? data.loggedIn : data.isAuthenticated;
+    return typeof field === 'boolean' ? field : null;
+  } catch {
+    return null;
+  }
 }

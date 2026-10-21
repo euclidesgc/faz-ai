@@ -11,7 +11,7 @@ import { EXEC_ASPECTS, TOOL_PRESETS, defaultAgent } from '../src/shared/executio
 import { RULE_CONFLICT_REASONS } from '../src/shared/ruleConflicts';
 import { RULE_IDEAS, RULE_WIZARD_STEPS, conventionItems, pathSuggestions } from '../src/shared/ruleWizard';
 import { SKILL_WIZARD_STEPS } from '../src/shared/skillWizard';
-import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, RULE_FILES, SKILL_FOLDERS, SKILL_MODES } from '../src/shared/harness';
+import { AI_BASES, HARNESS_KINDS, HARNESS_SCOPES, RULE_FILES, SKILL_FOLDERS, SKILL_MODES } from '../src/shared/harness';
 import { HARNESS_CATALOG, HARNESS_GROUPS, HARNESS_NOTES, PERMISSION_LIST_LABEL, PLUGIN_COMMANDS } from '../src/shared/harnessCatalog';
 import { BRANCH_KINDS, MERGE_METHODS, WORKSPACE_MODES } from '../src/shared/git';
 import { gitNoticeText, type GitNotice } from '../src/shared/gitflow';
@@ -48,15 +48,6 @@ describe('i18n do host: mensagens preenchidas', () => {
     ['Já existe uma skill "revisar" desligada.', 'A disabled skill "revisar" already exists.'],
     ['Já existe uma skill "revisar" em .claude/skills.', 'A skill "revisar" already exists in .claude/skills.'],
     ['Já existe uma skill "revisar" no destino.', 'A skill "revisar" already exists at the destination.'],
-    ['Já existe "notas.md" nesta skill.', '"notas.md" already exists in this skill.'],
-    ['Já existe "CLAUDE.md" em ~/.claude.', '"CLAUDE.md" already exists in ~/.claude.'],
-    ['Servidor "git" não encontrado em .mcp.json.', 'Server "git" not found in .mcp.json.'],
-    ['Já existe um servidor "git" em .mcp.json.', 'A server "git" already exists in .mcp.json.'],
-    ['O Claude Code não tem uma pasta de usuário para este tipo de item.', 'Claude Code has no user folder for this kind of item.'],
-    [
-      'Arquivo de regras desconhecido: "X.md". Aceitos: CLAUDE.md, AGENTS.md.',
-      'Unknown rules file: "X.md". Accepted: CLAUDE.md, AGENTS.md.',
-    ],
     [
       'O modelo "Opus" não aceita o esforço "ultra". Aceitos: low, high.',
       'The model "Opus" does not accept the effort "ultra". Accepted: low, high.',
@@ -84,16 +75,15 @@ describe('i18n do host: mensagens preenchidas', () => {
       'The "Fase" field has no default value per type: the board fills it in on each card.',
     ],
     ['Pasta não encontrada: /home/ana/skills', 'Folder not found: /home/ana/skills'],
+    ['Subpasta não encontrada: docs', 'Subfolder not found: docs'],
+    ['Arquivo não encontrado: /tmp/x.json', 'File not found: /tmp/x.json'],
+    ['Item não encontrado na prévia: rule:a', 'Item not found in the preview: rule:a'],
+    ['Skill "revisar" não está no board.', 'Skill "revisar" is not in the board.'],
+    [
+      'Importados: a, b. Pulados: -. Problemas: -. Servidores MCP a configurar: git.',
+      'Imported: a, b. Skipped: -. Problems: -. MCP servers to configure: git.',
+    ],
     ['Não foi possível clonar https://github.com/a/b.git: timeout', 'Could not clone https://github.com/a/b.git: timeout'],
-    ['Skill não encontrada na origem: revisar', 'Skill not found in the source: revisar'],
-    [
-      '"Revisar Spec" não é um nome de skill válido (letras minúsculas, números e hífens).',
-      '"Revisar Spec" is not a valid skill name (lowercase letters, numbers and hyphens).',
-    ],
-    [
-      '/p/.mcp.json não é um JSON simples (pode ter comentários ou um erro de sintaxe). Abra o arquivo e edite-o à mão.',
-      '/p/.mcp.json is not plain JSON (it may have comments or a syntax error). Open the file and edit it by hand.',
-    ],
     ['A resposta passou do tempo limite (30 min) e foi encerrada.', 'The reply exceeded the time limit (30 min) and was ended.'],
     ['Não foi possível executar o Cursor: falhou', 'Could not run Cursor: falhou'],
     ['O Cursor terminou com erro (código 2).', 'Cursor finished with an error (code 2).'],
@@ -110,6 +100,14 @@ describe('i18n do host: mensagens preenchidas', () => {
     [
       'Board "B" importado: 2 card(s) e 1 anexo(s). Anexos sem arquivo: #3. Preencha os valores vazios dos servidores MCP: github: TOKEN.',
       'Board "B" imported: 2 card(s) and 1 attachment(s). Attachments without a file: #3. Fill in the empty values of the MCP servers: github: TOKEN.',
+    ],
+    [
+      'Board "B" importado: 2 card(s) e 1 anexo(s). Revise as configurações locais dos servidores MCP: github: revisão da configuração local.',
+      'Board "B" imported: 2 card(s) and 1 attachment(s). Review the local MCP server configurations: github: revisão da configuração local.',
+    ],
+    [
+      'Board "B" importado: 2 card(s) e 1 anexo(s). Anexos sem arquivo: #3. Revise as configurações locais dos servidores MCP: github.',
+      'Board "B" imported: 2 card(s) and 1 attachment(s). Attachments without a file: #3. Review the local MCP server configurations: github.',
     ],
     ['Migration 7 não encontrada', 'Migration 7 not found'],
   ];
@@ -148,6 +146,24 @@ describe('i18n do host: mensagens preenchidas', () => {
       ],
     ];
     for (const [notice, en] of cases) expect(t(gitNoticeText(notice))).toBe(en);
+  });
+
+  it('erros e avisos fixos de artefatos do board (limites, agente padrão, skill do fluxo, nome repetido, origem)', () => {
+    setLocale('en');
+    const cases: [string, string][] = [
+      ['Arquivo maior que 512 KB.', 'File larger than 512 KB.'],
+      ['A skill já tem 100 arquivos de apoio.', 'The skill already has 100 supporting files.'],
+      ['Escolha outro agente padrão antes de apagar este.', 'Choose another default agent before deleting this one.'],
+      ['A skill do fluxo é da extensão: só o modo dela pode mudar.', 'The flow skill belongs to the extension: only its mode can change.'],
+      [
+        'Já existe um artefato com este nome. Edite o existente ou escolha outro nome.',
+        'An artifact with this name already exists. Edit the existing one or choose another name.',
+      ],
+      ['Subpasta inválida.', 'Invalid subfolder.'],
+      ['Nenhum artefato encontrado.', 'No artifact found.'],
+      ['O nome faz-ai é reservado ao MCP do board.', 'The name faz-ai is reserved for the board MCP.'],
+    ];
+    for (const [pt, en] of cases) expect(t(pt)).toBe(en);
   });
 
   it('em português a mensagem fica como chegou', () => {
@@ -203,6 +219,7 @@ describe('i18n do host: mensagens preenchidas', () => {
         heartbeatRefine: true,
         parallel: false,
         parallelStories: 2,
+        parallelSubtasks: 2,
         autopilotPaused: false,
         defaultAgent: '',
       },
@@ -252,7 +269,7 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
     ['HARNESS_KINDS', HARNESS_KINDS.flatMap((x) => [x.label, x.hint])],
     ['HARNESS_SCOPES', HARNESS_SCOPES.flatMap((x) => [x.label, x.hint, x.summary])],
     ['SKILL_FOLDERS', SKILL_FOLDERS.map((x) => x.hint)],
-    ['AI_TOOLS', AI_TOOLS.map((x) => x.mcp)],
+    ['AI_BASES', AI_BASES.map((x) => x.mcp)],
     ['RULE_FILES', RULE_FILES.map((x) => x.readBy).filter((x) => x.includes(' e '))],
     ['PERMISSION_LIST_LABEL', Object.values(PERMISSION_LIST_LABEL)],
     [

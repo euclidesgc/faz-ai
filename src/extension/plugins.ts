@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { uninstallScopes, type PluginAction, type PluginInstall } from '../shared/harness';
+import type { PluginInstall } from '../shared/harness';
 import type { CliRun } from './cliProbe';
 
 /** Roda `claude <args>` na pasta do projeto; quem liga o board sabe achar a CLI no PATH do terminal. */
@@ -63,47 +63,4 @@ export function pluginSignature(homeDir: string, projectDir: string): string {
       }
     })
     .join('|');
-}
-
-/** O resultado de um comando de plugin: o Claude Code imprime um objeto JSON na última linha com `--json`. */
-function outcome(run: CliRun): { ok: boolean; message: string } {
-  const last = run.stdout.trim().split('\n').pop() ?? '';
-  try {
-    const json = JSON.parse(last) as { outcome?: string; message?: string; alreadyInGoalState?: boolean };
-    // desativar o que já está desativado não é falha
-    return { ok: json.outcome === 'ok' || json.alreadyInGoalState === true, message: json.message ?? '' };
-  } catch {
-    const text = (run.stderr.trim() || run.stdout.trim()).split('\n')[0] ?? '';
-    return { ok: run.code === 0, message: run.code === null ? 'a CLI do Claude Code não respondeu' : text };
-  }
-}
-
-/**
- * Desinstala, desativa ou ativa um plugin do Claude Code. Desinstalar roda um comando por escopo em
- * que ele está instalado; desativar e ativar deixam a CLI achar o escopo. Devolve o erro, ou null.
- */
-export async function applyClaudePlugin(run: ClaudeCli, action: PluginAction, install: PluginInstall): Promise<string | null> {
-  const calls =
-    action === 'uninstall'
-      ? uninstallScopes(install).map((scope) => ['plugin', 'uninstall', install.id, '--scope', scope, '--json'])
-      : [['plugin', action, install.id, '--json']];
-  for (const args of calls) {
-    const result = outcome(await run(args));
-    if (!result.ok) return result.message || `claude ${args.slice(0, 3).join(' ')} falhou`;
-  }
-  return null;
-}
-
-/**
- * Desinstala um plugin local do Cursor: tira a pasta dele de `~/.cursor/plugins/local`. O caminho vem
- * da varredura. Um plugin logo abaixo dessa pasta sai inteiro, e se for um link sai só o link; um mais
- * fundo só sai se a pasta real também estiver lá dentro, para nunca apagar arquivos de outro lugar.
- */
-export function removeCursorPlugin(homeDir: string, install: PluginInstall): void {
-  const root = path.join(homeDir, '.cursor/plugins/local');
-  const rel = path.relative(root, install.dir);
-  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('Plugin fora de ~/.cursor/plugins/local.');
-  if (rel.split(path.sep).length > 1 && !fs.realpathSync(install.dir).startsWith(fs.realpathSync(root) + path.sep))
-    throw new Error('A pasta do plugin fica fora de ~/.cursor/plugins/local: remova pelo Cursor.');
-  fs.rmSync(install.dir, { recursive: true, force: true });
 }

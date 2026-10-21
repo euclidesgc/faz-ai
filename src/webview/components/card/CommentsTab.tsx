@@ -1,6 +1,6 @@
+import { toolInfo, activeProfile } from '../../../shared/aiProfiles';
 import { useState } from 'react';
 import type { Comment } from '../../../shared/model';
-import { aiToolInfo } from '../../../shared/harness';
 import { RUNNER_PERMISSIONS } from '../../../shared/runner';
 import { isLive } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
@@ -43,7 +43,7 @@ export function CommentsTab({
   const [, starting, markStarting] = usePending(running);
   // a mensagem só sai do campo quando o host confirma: se falhar, o texto fica para tentar de novo
   const send = useAction((body: string) => comments.add(cardId, body));
-  const toolLabel = aiToolInfo(state.board.aiTool).label;
+  const toolLabel = toolInfo(activeProfile(state.board)).label;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === state.board.runner.permission)!;
   const blocked = aiBlockedReason(state);
   const canCall = !!card && isLive(card) && !blocked;

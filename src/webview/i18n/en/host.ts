@@ -142,6 +142,86 @@ export const gitNotices: Record<string, string> = {
 };
 
 export const host: Record<string, string> = {
+  'O perfil resolvido não corresponde ao alvo solicitado.': 'The resolved profile does not match the requested target.',
+  'A admissão não corresponde ao perfil solicitado.': 'Admission does not match the requested profile.',
+  'O perfil precisa de executável direto, sem shell.': 'The profile requires a direct executable without a shell.',
+  'Perfil pronto inválido.': 'Invalid builtin profile.',
+
+  'Este perfil fornece apenas texto; consumo desconhecido.': 'This profile returns text only; usage is unknown.',
+  'Perfis configuráveis exigem contrato e admissão por capacidades.': 'Configurable profiles require a contract and capability admission.',
+  'Perfil genérico sem tradução do contrato neutro.': 'Generic profile has no neutral contract mapping.',
+  'O perfil não declara argumentos para esta permissão restrita.': 'The profile declares no arguments for this restricted permission.',
+  'Arquivo MCP do perfil precisa ser relativo ao projeto.': 'The profile MCP file must be relative to the project.',
+
+  'Perfil desativado ou pendente de revisão.': 'Profile disabled or pending review.',
+  'Configuração local do perfil indisponível.': 'Local profile configuration is unavailable.',
+  'Perfil de CLI ainda não disponível para execução.': 'CLI profile is not available for execution yet.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Perfis desativados para revisão local: {profiles}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Profiles disabled for local review: {profiles}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Revise as configurações locais dos servidores MCP: {secrets}. Perfis desativados para revisão local: {profiles}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Review the local MCP server configurations: {secrets}. Profiles disabled for local review: {profiles}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}. Perfis desativados para revisão local: {profiles}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}. Profiles disabled for local review: {profiles}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}. Revise as configurações locais dos servidores MCP: {secrets}. Perfis desativados para revisão local: {profiles}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}. Review the local MCP server configurations: {secrets}. Profiles disabled for local review: {profiles}.',
+  'Política de execução inválida ou versão não suportada.': 'Invalid execution policy or unsupported version.',
+  'Snapshot de políticas inválido.': 'Invalid policy snapshot.',
+  'Versão de política inválida.': 'Invalid policy version.',
+  'Identidade de política repetida.': 'Duplicate policy identity.',
+  'Políticas executáveis exigem revisão humana.': 'Executable policies require human review.',
+  'Revisão de política inválida.': 'Invalid policy revision.',
+  'Política indisponível neste board.': 'Policy unavailable on this board.',
+  'A política mudou. Releia antes de salvar.': 'The policy changed. Read it again before saving.',
+  'Destino da política inválido ou indisponível no catálogo.': 'Policy target is invalid or unavailable in the catalog.',
+  'Políticas conflitantes: {problems}.': 'Conflicting policies: {problems}.',
+  'Histórico de política incompleto ou fora do board.': 'Policy history is incomplete or outside the board.',
+  'Versão atual diverge do histórico da política.': 'The current version differs from policy history.',
+  'Histórico de política fora do board.': 'Policy history is outside the board.',
+
+  'Revise as configurações locais dos servidores MCP: {secrets}.': 'Review the local MCP server configurations: {secrets}.',
+
+  'Configurações MCP não são devolvidas ao editor. Use a biblioteca para salvar uma nova definição.':
+    'MCP configurations are not returned to the editor. Use the library to save a new definition.',
+  'Configurações e credenciais MCP exigem revisão humana.': 'MCP configurations and credentials require human review.',
+  'Este MCP exige revisão humana ou configuração local antes de executar.':
+    'This MCP requires human review or local configuration before execution.',
+  'MCPs exigem revisão humana ou configuração local: {names}.': 'MCPs require human review or local configuration: {names}.',
+  'Referências salvas não podem ser substituídas pelo editor.': 'Saved references cannot be replaced by the editor.',
+  'Referência de credencial fora deste artefato.': 'The credential reference does not belong to this artifact.',
+  'Definição MCP importada inválida.': 'Invalid imported MCP definition.',
+  'Definição MCP legada inválida; valores originais preservados.': 'Invalid legacy MCP definition; original values have been preserved.',
+  'Arquivo de credenciais sem proteção local adequada.': 'The credentials file lacks adequate local protection.',
+  'Pasta de credenciais sem proteção local adequada.': 'The credentials folder lacks adequate local protection.',
+  'Chave local de credenciais inválida.': 'Invalid local credentials key.',
+
+  'A reconciliação da abertura precisa terminar antes de executar.': 'Startup reconciliation must finish before running.',
+  'A unidade foi cancelada antes de liberar a execução.': 'The work unit was cancelled before releasing the run.',
+  'A história mudou de fase ou foi encerrada antes de liberar a execução.': 'The story changed phase or ended before releasing the run.',
+  'A unidade ou a pasta já está reservada.': 'The work unit or workspace is already reserved.',
+  'A pasta já tem outro escritor ou aguarda reconciliação.': 'The workspace already has another writer or is awaiting reconciliation.',
+  'A tentativa precisa estar vinculada ao log antes de iniciar.': 'The attempt must be linked to the log before starting.',
+  'Não foi possível preparar ou iniciar a execução; confira o ambiente antes de tentar de novo.':
+    'The run could not be prepared or started; check the environment before trying again.',
+  'Não foi possível reservar a pasta antes de executar.': 'The workspace could not be reserved before running.',
+  'A unidade não iniciou: {reason}': 'The work unit did not start: {reason}',
+  'A unidade viva ainda reserva a pasta.': 'The live work unit still reserves the workspace.',
+  'Esta execução foi encerrada pelo board; nada foi alterado.': 'This run was ended by the board; nothing was changed.',
+  'A unidade exige token e identidade de trabalho juntos.': 'The work unit requires both a token and a work identity.',
+  'A unidade não pertence ao card desta execução.': 'The work unit does not belong to this run’s card.',
+  'A execução controlada exige a ponte MCP do board.': 'A managed run requires the board MCP bridge.',
+  'O token não pertence à unidade desta execução.': 'The token does not belong to this run’s work unit.',
+  'Snapshot incompatível com a sessão MCP.': 'The snapshot is incompatible with the MCP session.',
+  'Snapshot obrigatório da execução indisponível.': 'The required run snapshot is unavailable.',
+  'Operação MCP fora do contrato desta execução.': 'The MCP operation is outside this run’s contract.',
+  'Card fora do escopo desta execução.': 'The card is outside this run’s scope.',
+  'Servidor MCP fora do snapshot desta execução.': 'The MCP server is outside this run’s snapshot.',
+  'Método fora da sessão MCP.': 'The method is outside the MCP session.',
+  'Artefatos externos não pertencem ao snapshot desta execução.': 'External artifacts do not belong to this run’s snapshot.',
+  'Configuração global fora do escopo desta execução.': 'Global configuration is outside this run’s scope.',
+  'O board está executando #{number}; acompanhe pelo get_card.': 'The board is executing #{number}; follow its progress through get_card.',
+  'O board executa as sub-tarefas desta fase; a sessão da história apenas as planeja.':
+    'The board executes this phase’s subtasks; the story session only plans them.',
+
   'O índice da biblioteca está inválido. Os arquivos foram preservados.': 'The library index is invalid. The files were preserved.',
   'Caminho inválido dentro da skill.': 'Invalid path inside the skill.',
   'O arquivo ultrapassa os limites da biblioteca.': 'The file exceeds the library limits.',
@@ -205,7 +285,6 @@ export const host: Record<string, string> = {
   'Esta história ainda não tem pasta de trabalho.': 'This story does not have a working folder yet.',
   'Arquivo fora do harness.': 'File outside the harness.',
   'Arquivo maior que 512 KB: abra no editor.': 'File larger than 512 KB: open it in the editor.',
-  'Este arquivo não pode ser alterado pelo board.': 'This file cannot be changed by the board.',
 
   // backup do board (exportar e importar)
   'Board exportado em {path}. O arquivo contém conversas e anexos: guarde-o com cuidado.':
@@ -216,6 +295,10 @@ export const host: Record<string, string> = {
     'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s).',
   'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}.':
     'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Revise as configurações locais dos servidores MCP: {secrets}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Review the local MCP server configurations: {secrets}.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}. Revise as configurações locais dos servidores MCP: {secrets}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Attachments without a file: {missing}. Review the local MCP server configurations: {secrets}.',
   'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Preencha os valores vazios dos servidores MCP: {secrets}.':
     'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Fill in the empty values of the MCP servers: {secrets}.',
   'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Anexos sem arquivo: {missing}. Preencha os valores vazios dos servidores MCP: {secrets}.':
@@ -312,83 +395,24 @@ export const host: Record<string, string> = {
   '"{name}" tem mais de 20 MB e não foi anexado.': '"{name}" is larger than 20 MB and was not attached.',
 
   // harness: arquivos de regras, skills, agentes, hooks, permissões e servidores MCP
-  'SKILL.md não encontrado.': 'SKILL.md not found.',
   'Nenhuma pasta de projeto aberta.': 'No project folder is open.',
-  'Pasta do usuário não encontrada.': 'User folder not found.',
-  'Item não encontrado no harness. Atualize a lista e tente de novo.': 'Item not found in the harness. Refresh the list and try again.',
-  'Servidor não encontrado no harness. Atualize a lista e tente de novo.':
-    'Server not found in the harness. Refresh the list and try again.',
-  'Skill "{name}" não encontrada no projeto.': 'Skill "{name}" not found in the project.',
   'Nenhuma origem de skills carregada. Procure de novo.': 'No skills source loaded. Search again.',
-  'Esta ferramenta não tem uma pasta de skills nesse escopo.': 'This tool has no skills folder in that scope.',
-  'Nome inválido: use letras minúsculas, números e hífens (ex.: "revisar-spec").':
-    'Invalid name: use lowercase letters, numbers and hyphens (e.g. "review-spec").',
   'Nome de skill inválido: use letras minúsculas, números e hífens (ex.: "revisar-spec").':
     'Invalid skill name: use lowercase letters, numbers and hyphens (e.g. "review-spec").',
   'Nome de agente inválido: use letras minúsculas, números e hífens (ex.: "revisor-de-spec").':
     'Invalid agent name: use lowercase letters, numbers and hyphens (e.g. "spec-reviewer").',
-  'Nome de arquivo inválido: use pasta/arquivo.ext, com letras, números, hífen, ponto e sublinhado.':
-    'Invalid file name: use folder/file.ext, with letters, numbers, hyphen, dot and underscore.',
   'Nome inválido: use letras, números, hífen, ponto ou sublinhado.': 'Invalid name: use letters, numbers, hyphen, dot or underscore.',
-  'Não é possível criar um item neste lugar.': 'An item cannot be created here.',
-  'Informe a descrição: é por ela que a IA decide quando usar o item.':
-    'Enter the description: it is how the AI decides when to use the item.',
-  'A skill precisa de uma descrição: é por ela que a IA decide quando usar a skill.':
-    'The skill needs a description: it is how the AI decides when to use the skill.',
   'O agente precisa de uma descrição: é por ela que a IA decide quando delegar a ele.':
     'The agent needs a description: it is how the AI decides when to delegate to it.',
-  'Já existe: {file}': 'Already exists: {file}',
-  'Já existe "{rel}" nesta skill.': '"{rel}" already exists in this skill.',
-  'Já existe "{name}" em {path}.': '"{name}" already exists in {path}.',
   'Já existe uma skill "{name}".': 'A skill "{name}" already exists.',
   'Já existe uma skill "{name}" ligada.': 'An enabled skill "{name}" already exists.',
   'Já existe uma skill "{name}" desligada.': 'A disabled skill "{name}" already exists.',
   'Já existe uma skill "{name}" em {path}.': 'A skill "{name}" already exists in {path}.',
   'Já existe uma skill "{name}" no destino.': 'A skill "{name}" already exists at the destination.',
   'Já existe um agente "{name}".': 'An agent "{name}" already exists.',
-  'Já existe um servidor "{name}" em {path}.': 'A server "{name}" already exists in {path}.',
-  'Arquivo "{rel}" não encontrado nesta skill.': 'File "{rel}" not found in this skill.',
   'Skill "{name}" não encontrada.': 'Skill "{name}" not found.',
   'Agente "{name}" não encontrado.': 'Agent "{name}" not found.',
-  'Servidor "{name}" não encontrado em {path}.': 'Server "{name}" not found in {path}.',
-  'Plugins desinstalados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.':
-    'Plugins uninstalled: {names}. Takes effect from the next Claude Code session, or after /reload-plugins in an open session.',
-  'Plugins desativados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.':
-    'Plugins disabled: {names}. Takes effect from the next Claude Code session, or after /reload-plugins in an open session.',
-  'Plugins ativados: {names}. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.':
-    'Plugins enabled: {names}. Takes effect from the next Claude Code session, or after /reload-plugins in an open session.',
-  'Plugins removidos de ~/.cursor/plugins/local: {names}. Recarregue a janela do Cursor para valer.':
-    'Plugins removed from ~/.cursor/plugins/local: {names}. Reload the Cursor window for it to take effect.',
-  'Feito em {done} de {total}. Falhou: {failures}': 'Done for {done} of {total}. Failed: {failures}',
-  'Nada mudou. Falhou: {failures}': 'Nothing changed. Failed: {failures}',
-  'Nenhum dos plugins escolhidos aceita essa ação.': 'None of the chosen plugins accepts that action.',
-  'Arquivo de regras desconhecido: "{name}". Aceitos: {accepted}.': 'Unknown rules file: "{name}". Accepted: {accepted}.',
-  'Itens de plugin não podem ser alterados pelo board.': 'Plugin items cannot be changed by the board.',
-  'Servidores de plugin não podem ser removidos pelo board.': 'Plugin servers cannot be removed by the board.',
-  'Este item não pode ser alterado pelo board.': 'This item cannot be changed by the board.',
-  'Este item não pode ser copiado.': 'This item cannot be copied.',
-  'Arquivos de configuração não são apagados pelo board.': 'Settings files are not deleted by the board.',
-  'Só skills têm modo de invocação.': 'Only skills have an invocation mode.',
-  'Só skills têm arquivos de apoio.': 'Only skills have supporting files.',
-  'O {tool} não tem uma pasta de projeto para este tipo de item.': '{tool} has no project folder for this kind of item.',
-  'O {tool} não tem uma pasta de usuário para este tipo de item.': '{tool} has no user folder for this kind of item.',
-  '{file} não é um JSON simples (pode ter comentários ou um erro de sintaxe). Abra o arquivo e edite-o à mão.':
-    '{file} is not plain JSON (it may have comments or a syntax error). Open the file and edit it by hand.',
-  'Este item fica num arquivo que o board não edita. Abra o arquivo e edite-o à mão.':
-    'This item lives in a file the board does not edit. Open the file and edit it by hand.',
-  'Este servidor fica num arquivo que o board não edita. Abra o arquivo, ou use a linha de comando da ferramenta.':
-    "This server lives in a file the board does not edit. Open the file, or use the tool's command line.",
-  'Este arquivo de servidores MCP não é editado pelo board.': 'The board does not edit this MCP servers file.',
-  'Este arquivo de hooks não é editado pelo board.': 'The board does not edit this hooks file.',
-  'Este arquivo de permissões não é editado pelo board.': 'The board does not edit this permissions file.',
-  'Informe o comando do servidor.': 'Enter the server command.',
-  'Informe o endereço (URL) do servidor.': 'Enter the server address (URL).',
-  'Informe o evento do hook.': 'Enter the hook event.',
   'Informe o comando do hook.': 'Enter the hook command.',
-  'Informe a regra.': 'Enter the rule.',
-  'Esta regra já está na lista.': 'This rule is already in the list.',
-  'Regra de permissão desconhecida.': 'Unknown permission rule.',
-  'Regra não encontrada no arquivo. Atualize a lista e tente de novo.': 'Rule not found in the file. Refresh the list and try again.',
   'Hook não encontrado no arquivo. Atualize a lista e tente de novo.': 'Hook not found in the file. Refresh the list and try again.',
 
   // instalação de skills
@@ -397,13 +421,52 @@ export const host: Record<string, string> = {
   'Origem não reconhecida. Use o caminho completo de uma pasta, "dono/repositorio" do GitHub ou um endereço https ou ssh de um repositório git.':
     'Source not recognized. Use the full path of a folder, "owner/repository" from GitHub or an https or ssh address of a git repository.',
   'Não foi possível clonar {url}: {reason}': 'Could not clone {url}: {reason}',
-  'Skill não encontrada na origem: {rel}': 'Skill not found in the source: {rel}',
-  '"{name}" não é um nome de skill válido (letras minúsculas, números e hífens).':
-    '"{name}" is not a valid skill name (lowercase letters, numbers and hyphens).',
+
+  'Nome de regra inválido: use letras minúsculas, números e hífens, com .md opcional.':
+    'Invalid rule name: use lowercase letters, numbers and hyphens, with an optional .md.',
+  'Nome de regra inválido: use letras, números, ponto, hífen e sublinhado.':
+    'Invalid rule name: use letters, numbers, dot, hyphen and underscore.',
+  'Nome de skill inválido: use letras minúsculas, números e hífens.': 'Invalid skill name: use lowercase letters, numbers and hyphens.',
+  'Nome de agente inválido.': 'Invalid agent name.',
+  'Nome inválido.': 'Invalid name.',
+  'Nome de artefato inválido.': 'Invalid artifact name.',
+  'Nome inválido. Use letras minúsculas, números e hífens.': 'Invalid name. Use lowercase letters, numbers and hyphens.',
+  'O nome faz-ai é reservado ao MCP do board.': 'The name faz-ai is reserved for the board MCP.',
+  'O nome faz-ai é reservado ao servidor MCP do board.': 'The name faz-ai is reserved for the board MCP server.',
+  'Arquivo maior que 512 KB.': 'File larger than 512 KB.',
+  'Arquivos de apoio demais (limite de 100).': 'Too many supporting files (limit of 100).',
+  'Arquivo de apoio inválido ou acima de 512 KB.': 'Supporting file invalid or larger than 512 KB.',
+  'Skill acima de 5 MB.': 'Skill larger than 5 MB.',
+  'A skill já tem 100 arquivos de apoio.': 'The skill already has 100 supporting files.',
+  'A skill passaria de 5 MB no total.': 'The skill would exceed 5 MB in total.',
+  'Arquivo de apoio não encontrado.': 'Supporting file not found.',
+  'Arquivo binário: não dá para editar como texto.': 'Binary file: it cannot be edited as text.',
+  'Não foi possível ler o conteúdo.': 'Could not read the content.',
+  'Escolha outro agente padrão antes de apagar este.': 'Choose another default agent before deleting this one.',
+  'A skill do fluxo é da extensão: só o modo dela pode mudar.': 'The flow skill belongs to the extension: only its mode can change.',
+  'Já existe um artefato com este nome. Edite o existente ou escolha outro nome.':
+    'An artifact with this name already exists. Edit the existing one or choose another name.',
+  'Artefato não encontrado.': 'Artifact not found.',
+  'Nenhum artefato encontrado.': 'No artifact found.',
+  'Informe uma URL HTTP do servidor MCP.': 'Enter an HTTP URL for the MCP server.',
+  'Informe o comando do servidor MCP.': 'Enter the MCP server command.',
+  'Informe a configuração do servidor MCP.': 'Enter the MCP server configuration.',
+  'Importar artefatos exige revisão humana.': 'Importing artifacts requires human review.',
+  'Leia a origem antes de importar.': 'Read the source before importing.',
+  'Subpasta inválida.': 'Invalid subfolder.',
+  'Subpasta não encontrada: {rel}': 'Subfolder not found: {rel}',
+  'Ferramenta não reconhecida.': 'Tool not recognized.',
+  'Arquivo não encontrado: {file}': 'File not found: {file}',
+  'Item não encontrado na prévia: {key}': 'Item not found in the preview: {key}',
+  'Skill "{skill}" não está no board.': 'Skill "{skill}" is not in the board.',
+  'Importados: {imported}. Pulados: {skipped}. Problemas: {problems}. Servidores MCP a configurar: {secrets}.':
+    'Imported: {imported}. Skipped: {skipped}. Problems: {problems}. MCP servers to configure: {secrets}.',
 
   '{ref} está bloqueado: {reason}': '{ref} is blocked: {reason}',
   '{ref} está esperando uma pessoa.': '{ref} is waiting for a person.',
   '{ref} não tem nada pendente com a IA, mas ainda não foi concluído.': '{ref} has nothing pending with the AI, but is not finished yet.',
 
   ...gitNotices,
+  'Há trabalho em execução ou reconciliação. Resolva a posse antes de importar o board.':
+    'Work is running or being reconciled. Resolve ownership before importing the board.',
 };

@@ -48,6 +48,7 @@ describe('identidade e conversões', () => {
   it('a location é a origem; criado no board, board:<nome>', () => {
     expect(artifactLocation(base())).toBe('.claude/skills/minha-skill/SKILL.md');
     expect(artifactLocation(base({ origin: '' }))).toBe('board:minha-skill');
+    expect(artifactLocation(base({ kind: 'rule', name: 'review.md', origin: '.claude/rules/review.md' }))).toBe('review.md');
   });
 
   it('selectionOf devolve a marcação equivalente', () => {

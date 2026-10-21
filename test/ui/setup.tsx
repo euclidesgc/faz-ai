@@ -30,11 +30,13 @@ const { requestIds, SELF_ANSWERING } = vi.hoisted(() => ({
   requestIds: [] as string[],
   SELF_ANSWERING: new Set<string>([
     'attachment.read',
-    'harness.file.read',
+    'harness.artifact.read',
     'harness.project.profile',
     'harness.agent.assist',
     'metrics.query',
     'card.usage.query',
+    'executionPolicy.read',
+    'executionPolicy.simulate',
   ]),
 }));
 export { requestIds };
@@ -166,7 +168,9 @@ afterEach(() => {
     selectedParentId: null,
     collapsed: {},
     view: 'board',
-    // a origem do Harness fica no store: volta ao padrão para um teste não enxergar a escolha do anterior
-    harnessOrigin: 'project',
+    // a aba e o assunto do Harness ficam no store: voltam ao padrão para um teste não enxergar a escolha do anterior
+    harnessTab: 'tool',
+    harnessTopic: 'rules',
+    harnessFile: null,
   });
 });

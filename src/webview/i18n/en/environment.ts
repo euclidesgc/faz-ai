@@ -114,8 +114,8 @@ export const environment: Record<string, string> = {
   'O banco de artefatos do board: as skills, agentes, servidores MCP e regras que as execuções podem usar, no modo de cada um. Sem ele o board funciona, mas sem o ganho de economia e precisão.':
     "The board's artifact bank: the skills, agents, MCP servers and rules runs may use, each in its mode. The board works without it, but without the context savings and precision.",
   'Artefatos no board': 'Artifacts on the board',
-  'Nenhuma skill, agente ou servidor MCP em modo "Pelo card": o planejamento dos cards não tem de onde escolher. Use "Indicar artefatos" na aba do {tool} no Harness.':
-    'No skill, agent or MCP server in "Pelo card" mode: the cards\' planning has nothing to pick from. Use "Indicar artefatos" in the {tool} tab of the Harness.',
+  'Nenhuma skill, agente ou servidor MCP em modo "Pelo card": o planejamento dos cards não tem de onde escolher. Importe ou crie artefatos em Harness, na aba Artefatos do board.':
+    'No skill, agent or MCP server in "By card" mode: the cards\' planning has nothing to pick from. Import or create artifacts in Harness, in the Board artifacts tab.',
   'Agente do board': 'Board agent',
   'Sem agente, toda execução roda com o escopo cheio. Crie um com "Criar agente com ajuda" ou "Sugerir agentes com IA".':
     'Without an agent, every run has the full scope. Create one with "Criar agente com ajuda" or "Sugerir agentes com IA".',

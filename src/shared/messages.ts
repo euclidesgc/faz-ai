@@ -1,12 +1,24 @@
+import type { PolicyReply, PolicyScenario } from './policyManagement';
+import type { ExecutionPolicy } from './executionPolicies';
+import type { ContextDraftResolution } from './contextDraftResolution';
+import type { ContextActivityTarget, ContextPlanningWrite, ActivityContextWrite } from './contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from './agentAssistance';
 import type { LibraryArtifactInput } from './artifacts';
+import type { ArtifactKind } from './artifacts';
+import type { ImportSource, OnConflict } from './artifactImport';
 import type { Appearance } from './appearance';
 import type { ImportSummary } from './backup';
 import type { ViewState } from './filters';
 import type { UiPrefs } from './prefs';
-import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from './harness';
+import type { AiTool, InstallScope } from './harness';
 import type { HarnessUsage, SelectableKind } from './harnessSelection';
-import type { HookInput, McpServerInput } from './harnessCatalog';
+import type { McpServerInput } from './harnessCatalog';
+
+/** Public MCP configuration for editing: secret values must be masked by the host. */
+export type McpServerView = Omit<McpServerInput, 'env' | 'headers'> & {
+  env: Record<string, string>;
+  headers: Record<string, string>;
+};
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { CardUsage } from './cardUsage';
 import type { ModelOption, ModelRule } from './models';
@@ -233,59 +245,9 @@ export type WebviewToHost =
   | { type: 'settings.rules.update'; patch: Partial<BoardRules> }
   /** relê o harness do disco (a pasta do usuário não é vigiada) */
   | { type: 'harness.refresh' }
-  /** abre no editor o arquivo de um item do harness */
-  | { type: 'harness.item.open'; path: string }
-  /** lê, para o editor do board, um arquivo que a varredura do harness listou */
-  | { type: 'harness.file.read'; requestId: string; path: string }
-  /** grava o texto editado no board num arquivo do harness; recusa os que são só leitura */
-  /** grava o texto editado num arquivo do harness; a confirmação vem pelo `done` do `requestId` */
-  | { type: 'harness.file.write'; path: string; content: string }
-  /** cria um item num lugar do catálogo da ferramenta (`source` é o índice em HARNESS_CATALOG) e abre o arquivo no editor */
-  | { type: 'harness.item.create'; tool: AiTool; source: number; name: string; description: string }
-  /**
-   * cria um item já com o conteúdo (os assistentes de regras e de skills) e abre o arquivo no editor do board. Numa
-   * skill, `files` são arquivos de apoio criados vazios na pasta dela. Com `append`, um arquivo fixo que já existe
-   * (CLAUDE.md, AGENTS.md) ganha o conteúdo no fim em vez de dar erro
-   */
-  | { type: 'harness.item.write'; tool: AiTool; source: number; name: string; content: string; files?: string[]; append?: boolean }
   /** o perfil do projeto (linguagens, comandos, ferramentas, pastas) para os assistentes; a resposta é `harness.project.profileResult` */
   | { type: 'harness.project.profile'; requestId: string }
   | { type: 'harness.agent.assist'; requestId: string; input: AgentAssistInput }
-  /** apaga um arquivo ou uma pasta de skill do projeto ou da pasta do usuário */
-  | { type: 'harness.item.delete'; tool: AiTool; kind: HarnessKind; path: string }
-  /** desinstala, desativa ou ativa plugins pela ferramenta; `ids` são os de `HarnessItem.install` */
-  | { type: 'harness.plugin.apply'; tool: AiTool; action: PluginAction; ids: string[] }
-  /** copia skills, agentes, comandos ou regras para o projeto ou para a pasta do usuário */
-  | { type: 'harness.item.copy'; tool: AiTool; items: { kind: HarnessKind; path: string }[]; to: 'project' | 'user' }
-  | { type: 'harness.rule.write'; name: string; content: string }
-  | { type: 'harness.rule.delete'; name: string }
-  | { type: 'harness.skill.create'; name: string; description: string; content: string }
-  | { type: 'harness.skill.write'; name: string; content: string }
-  | { type: 'harness.skill.setEnabled'; name: string; enabled: boolean }
-  | { type: 'harness.skill.delete'; name: string }
-  /** acrescenta um servidor MCP a um arquivo de configuração da ferramenta (`source` é o índice em HARNESS_CATALOG) */
-  | { type: 'harness.mcp.add'; tool: AiTool; source: number; server: McpServerInput }
-  | { type: 'harness.mcp.remove'; tool: AiTool; path: string; name: string }
-  /** acrescenta um hook a um arquivo de hooks da ferramenta (`source` é o índice em HARNESS_CATALOG) */
-  | { type: 'harness.hook.add'; tool: AiTool; source: number; hook: HookInput }
-  /** remove o hook listado: `event` é o nome do item e `command` o detalhe dele */
-  | { type: 'harness.hook.remove'; tool: AiTool; path: string; event: string; command: string }
-  /** regra de permissão numa das listas (allow, ask, deny) do arquivo de configuração */
-  | { type: 'harness.permission.add'; tool: AiTool; source: number; list: string; rule: string }
-  | { type: 'harness.permission.remove'; tool: AiTool; path: string; list: string; rule: string }
-  /** arquivo de apoio de uma skill (`path` é o SKILL.md, `file` o caminho dentro da pasta dela); criar abre o arquivo no editor */
-  | { type: 'harness.skill.file.create'; tool: AiTool; path: string; file: string; link: boolean }
-  | { type: 'harness.skill.file.open'; tool: AiTool; path: string; file: string }
-  | { type: 'harness.skill.file.delete'; tool: AiTool; path: string; file: string }
-  /** cria no projeto a skill de modelos e exemplos de código, só quando indicada */
-  | { type: 'harness.referenceSkill.create' }
-  /** procura skills numa pasta ou num repositório git (clonado numa pasta temporária); o resultado vem em `harnessInstall` */
-  | { type: 'harness.install.scan'; source: string }
-  /** copia as skills escolhidas para a pasta de skills da ferramenta, no projeto ou na pasta do usuário */
-  | { type: 'harness.install.apply'; tool: AiTool; to: 'project' | 'user'; rels: string[] }
-  | { type: 'harness.install.cancel' }
-  /** invocação automática ou só quando indicada, numa skill do projeto ou da pasta do usuário (`path` é o SKILL.md) */
-  | { type: 'harness.skill.setMode'; tool: AiTool; paths: string[]; mode: SkillMode }
   /**
    * envia artefatos ao board com um modo, muda o modo dos que já estão nele, ou os tira do board (com
    * `usage` null): `location` é a identidade do item na marcação (`selectionKey`: o caminho como o
@@ -296,6 +258,13 @@ export type WebviewToHost =
   | { type: 'harness.library.pickDirectory' }
   | { type: 'harness.library.folders'; dir: string }
   | { type: 'harness.library.save'; input: LibraryArtifactInput }
+  | { type: 'executionPolicy.read'; requestId: string; id?: string; beforeRevision?: number }
+  | { type: 'executionPolicy.simulate'; requestId: string; scenario: PolicyScenario }
+  | { type: 'settings.executionPolicy.save'; policy: ExecutionPolicy; expectedRevision: number; reviewed: boolean }
+  | { type: 'settings.executionPolicy.remove'; id: string; expectedRevision: number }
+  | { type: 'contextPlanning.save'; input: ContextPlanningWrite }
+  | { type: 'contextPlanning.saveBatch'; inputs: ActivityContextWrite[] }
+  | { type: 'contextPlanning.preview'; requestId: string; target: ContextActivityTarget }
   | { type: 'harness.library.read'; id: string }
   | { type: 'harness.library.pickArtifacts' }
   | { type: 'harness.library.directory'; dir: string }
@@ -307,18 +276,38 @@ export type WebviewToHost =
   /** a IA analisa o projeto e o catálogo do assunto e pré-seleciona os artefatos que fazem mais sentido (resultado em `harnessSuggestions`) */
   | { type: 'harness.suggest.run'; tool: AiTool; kind: SelectableKind }
   | { type: 'harness.suggest.clear' }
-  /** abre o seletor de pasta do editor e importa a pasta escolhida para a ferramenta (só no editor) */
-  | { type: 'harness.import.pick'; tool: AiTool }
-  /** importa uma pasta: o board a varre atrás de artefatos no formato da ferramenta e os lista em "Importados" */
-  | { type: 'harness.import.add'; tool: AiTool; dir: string }
-  /** tira a pasta importada da lista; os artefatos dela saem do board */
-  | { type: 'harness.import.remove'; tool: AiTool; dir: string }
-  /** cria um agente na pasta de agentes da ferramenta (global por padrão) e o marca como disponível no board */
+  /** Opens the folder or export-file picker for importing artifacts into the board. */
+  | { type: 'harness.import.pick'; what: 'folder' | 'export'; tool?: AiTool }
+  /** Saves a rule, skill, or MCP server in the board's artifact store. */
+  | {
+      type: 'harness.artifact.save';
+      kind: 'rule' | 'skill' | 'mcp';
+      name: string;
+      previous?: string;
+      body?: string;
+      server?: McpServerInput;
+      keepSecrets?: string[];
+      files?: string[];
+      via?: 'manual' | 'wizard' | 'ai';
+    }
+  /** Reads an artifact for the editor, with MCP secrets masked. */
+  | { type: 'harness.artifact.read'; requestId: string; kind: ArtifactKind; name: string; file?: string }
+  /** Writes a supporting file inside a board skill. */
+  | { type: 'harness.skillFile.write'; skill: string; file: string; content: string; link?: boolean }
+  /** Deletes a supporting file inside a board skill. */
+  | { type: 'harness.skillFile.delete'; skill: string; file: string }
+  /** Previews candidates from a folder, installed tool, or board export. */
+  | { type: 'harness.import.scan'; source: ImportSource }
+  /** Imports selected candidates from the current preview. */
+  | { type: 'harness.import.apply'; keys: string[]; onConflict: OnConflict }
+  /** Discards the current import preview. */
+  | { type: 'harness.import.cancel' }
+  /** cria um agente no board (guardado no banco, não na pasta da ferramenta), disponível para os cards; `scope` é ignorado */
   | { type: 'harness.agent.create'; scope?: InstallScope; input: AgentInput }
   /** reescreve o frontmatter (o que vier em `patch`) e, se vier, o corpo de um agente, preservando o resto */
-  | { type: 'harness.agent.update'; name: string; scope: InstallScope; patch: Partial<AgentInput>; body?: string }
-  | { type: 'harness.agent.write'; name: string; scope: InstallScope; content: string }
-  | { type: 'harness.agent.delete'; name: string; scope: InstallScope }
+  | { type: 'harness.agent.update'; name: string; scope?: InstallScope; patch: Partial<AgentInput>; body?: string }
+  | { type: 'harness.agent.write'; name: string; scope?: InstallScope; content: string }
+  | { type: 'harness.agent.delete'; name: string; scope?: InstallScope }
   /** cria os agentes padrão de fábrica que ainda não existem (`force` recria também os que a pessoa apagou) */
   | { type: 'harness.agents.seed'; force?: boolean }
   /** a IA lê o projeto e propõe os agentes do board (cria, ajusta e marca); o resultado vai para o chat do board */
@@ -374,10 +363,8 @@ export type HostToWebview =
   | { type: 'notice'; message: string }
   /** resposta a `attachment.read`, correlacionada por `requestId` */
   | { type: 'attachment.readResult'; requestId: string; content?: string; error?: string }
-  /** resposta a `harness.file.read`: o conteúdo e se o arquivo pode ser alterado pelo board */
-  | { type: 'harness.file.readResult'; requestId: string; content?: string; readonly?: boolean; error?: string }
-  /** item do harness criado pela tela: ela abre o arquivo no editor do board */
-  | { type: 'harness.item.created'; path: string }
+  /** Result of reading an artifact for the editor. */
+  | { type: 'harness.artifact.readResult'; requestId: string; text?: string; server?: McpServerView; error?: string }
   /** resposta a `harness.project.profile`, correlacionada por `requestId` */
   | { type: 'harness.library.content'; input: LibraryArtifactInput }
   | { type: 'harness.agent.assistResult'; requestId: string; result?: AgentAssistResult; error?: string }
@@ -386,6 +373,9 @@ export type HostToWebview =
   | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
+  /** prévia dos contratos salvos, sem corpos de artefatos, inferência ou admissão */
+  | ({ type: 'executionPolicy.result'; requestId: string } & PolicyReply)
+  | { type: 'contextPlanning.preview.result'; requestId: string; preview?: ContextDraftResolution; error?: string }
   /** resposta a `card.usage.query`, correlacionada por `requestId` */
   | { type: 'card.usage.result'; requestId: string; usage?: CardUsage; error?: string }
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */

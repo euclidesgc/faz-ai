@@ -1,9 +1,9 @@
 import type { WebviewToHost } from '../shared/messages';
 import type { BranchRenamePending } from '../shared/branchRename';
-import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from '../shared/harness';
+import type { AiTool } from '../shared/harness';
 import type { HarnessUsage, SelectableKind } from '../shared/harnessSelection';
 import type { AgentInput } from '../shared/messages';
-import type { HookInput, McpServerInput } from '../shared/harnessCatalog';
+import type { ImportSource, OnConflict } from '../shared/artifactImport';
 import type { BulkCardStatus, CardStatus } from '../shared/status';
 import type { ModelOption, ModelRule } from '../shared/models';
 import type { BoardRules } from '../shared/rules';
@@ -19,9 +19,6 @@ type Payload<T extends WebviewToHost['type']> = Omit<Extract<WebviewToHost, { ty
 export type BoardPatch = PatchOf<'settings.board.update'>;
 export type ColumnPatch = PatchOf<'settings.column.update'>;
 export type FieldInput = Payload<'settings.field.create'>;
-/** Para onde copiar ou instalar itens do harness. */
-export type HarnessScope = 'project' | 'user';
-
 /** Sem confirmação: só para o que não grava nada no board (abrir, mostrar, revelar) ou já tem um estado próprio para esperar (chat, IA rodando). */
 const post = (msg: WebviewToHost): void => postToHost(msg);
 /**
@@ -29,6 +26,15 @@ const post = (msg: WebviewToHost): void => postToHost(msg);
  * conta própria, e o botão ou a seção de onde a ação saiu usa a promessa com `useAction` para mostrar no lugar.
  */
 const req = (msg: WebviewToHost): Promise<void> => request(msg);
+export const executionPolicies = {
+  save: (policy: import('../shared/executionPolicies').ExecutionPolicy, expectedRevision: number, reviewed: boolean) =>
+    req({ type: 'settings.executionPolicy.save', policy, expectedRevision, reviewed }),
+  remove: (id: string, expectedRevision: number) => req({ type: 'settings.executionPolicy.remove', id, expectedRevision }),
+};
+export const contextPlanning = {
+  saveBatch: (inputs: import('../shared/contextPlanning').ActivityContextWrite[]) => req({ type: 'contextPlanning.saveBatch', inputs }),
+  save: (input: import('../shared/contextPlanning').ContextPlanningWrite) => req({ type: 'contextPlanning.save', input }),
+};
 /** Como `req`, e o card fica marcado como ocupado (spinner no board e no card aberto) até a resposta. */
 const reqCard = (cardId: Id, msg: WebviewToHost): Promise<void> => trackCard(cardId, request(msg));
 
@@ -63,9 +69,6 @@ export const chat = {
 };
 
 export const ai = {
-  /** Confirma o início da geração; a execução continua em `chat.busy`. */
-  generateLibrary: (kind: 'rule' | 'skill' | 'agent') =>
-    req({ type: kind === 'rule' ? 'ai.suggestRules' : kind === 'skill' ? 'ai.suggestSkills' : 'ai.suggestAgents' }),
   run: (cardId: Id) => reqCard(cardId, { type: 'ai.run', cardId }),
   refine: (cardId: Id) => reqCard(cardId, { type: 'ai.run', cardId, mode: 'refine' }),
   summarize: (cardId: Id) => reqCard(cardId, { type: 'ai.run', cardId, mode: 'summarize' }),
@@ -188,76 +191,28 @@ export const backup = {
 
 export const harness = {
   refresh: () => req({ type: 'harness.refresh' }),
-  openItem: (path: string) => post({ type: 'harness.item.open', path }),
-  createItem: (tool: AiTool, source: number, name: string, description: string) =>
-    req({ type: 'harness.item.create', tool, source, name, description }),
-  /** cria o item já com o conteúdo (assistentes de regras e skills); `append` acrescenta a um arquivo fixo que já existe */
-  writeItem: (tool: AiTool, source: number, name: string, content: string, files?: string[], append?: boolean) =>
-    req({
-      type: 'harness.item.write',
-      tool,
-      source,
-      name,
-      content,
-      ...(files?.length ? { files } : {}),
-      ...(append ? { append } : {}),
-    }),
-  deleteItem: (tool: AiTool, kind: HarnessKind, path: string) => req({ type: 'harness.item.delete', tool, kind, path }),
-  applyPlugins: (tool: AiTool, action: PluginAction, ids: string[]) => req({ type: 'harness.plugin.apply', tool, action, ids }),
-  copyItems: (tool: AiTool, items: { kind: HarnessKind; path: string }[], to: HarnessScope) =>
-    req({ type: 'harness.item.copy', tool, items, to }),
-  writeRule: (name: string, content: string) => req({ type: 'harness.rule.write', name, content }),
-  deleteRule: (name: string) => req({ type: 'harness.rule.delete', name }),
-  createSkill: (name: string, description: string, content: string) => req({ type: 'harness.skill.create', name, description, content }),
-  writeSkill: (name: string, content: string) => req({ type: 'harness.skill.write', name, content }),
-  setSkillEnabled: (name: string, enabled: boolean) => req({ type: 'harness.skill.setEnabled', name, enabled }),
-  setSkillMode: (tool: AiTool, paths: string[], mode: SkillMode) => req({ type: 'harness.skill.setMode', tool, paths, mode }),
-  deleteSkill: (name: string) => req({ type: 'harness.skill.delete', name }),
-  createSkillFile: (tool: AiTool, path: string, file: string, link: boolean) =>
-    req({ type: 'harness.skill.file.create', tool, path, file, link }),
-  openSkillFile: (tool: AiTool, path: string, file: string) => post({ type: 'harness.skill.file.open', tool, path, file }),
-  deleteSkillFile: (tool: AiTool, path: string, file: string) => req({ type: 'harness.skill.file.delete', tool, path, file }),
+  /** Salva regra, skill ou MCP no banco do board (editores e assistentes). */
+  saveArtifact: (input: Payload<'harness.artifact.save'>) => req({ type: 'harness.artifact.save', ...input }),
+  /** Grava (cria ou edita) um arquivo de apoio de uma skill do board. */
+  writeBoardSkillFile: (skill: string, file: string, content: string, link?: boolean) =>
+    req({ type: 'harness.skillFile.write', skill, file, content, ...(link ? { link } : {}) }),
+  /** Apaga um arquivo de apoio de uma skill do board. */
+  deleteBoardSkillFile: (skill: string, file: string) => req({ type: 'harness.skillFile.delete', skill, file }),
   /** envia artefatos ao board com um modo, muda o modo, ou os tira do board (usage null); `location` é a `selectionKey` */
   setSelection: (items: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null) =>
     req({ type: 'harness.selection.set', items, usage }),
   /** a IA pré-seleciona os artefatos do assunto que fazem mais sentido para o projeto */
   suggest: (tool: AiTool, kind: SelectableKind) => post({ type: 'harness.suggest.run', tool, kind }),
-  clearSuggestions: () => req({ type: 'harness.suggest.clear' }),
-  /** abre o seletor de pasta do editor para importar artefatos */
-  scanLibraryFolder: (dir: string) => req({ type: 'harness.library.scan', dir }),
-  applyLibraryImport: (keys: string[], overwrite?: boolean) =>
-    req({ type: 'harness.library.apply', keys, ...(overwrite ? { overwrite } : {}) }),
-  pickLibraryDirectory: () => req({ type: 'harness.library.pickDirectory' }),
-  listLibraryFolders: (dir: string) => req({ type: 'harness.library.folders', dir }),
-  saveLibraryArtifact: (input: import('../shared/artifacts').LibraryArtifactInput) => req({ type: 'harness.library.save', input }),
-  readLibraryArtifact: (id: string) => req({ type: 'harness.library.read', id }),
-  pickLibraryArtifacts: () => req({ type: 'harness.library.pickArtifacts' }),
-  setLibraryDirectory: (dir: string) => req({ type: 'harness.library.directory', dir }),
-  updateLibraryArtifact: (id: string) => req({ type: 'harness.library.update', id }),
-  importLibrarySkills: (rels: string[]) => req({ type: 'harness.library.import', rels }),
-  pickLibrarySource: () => req({ type: 'harness.library.pick' }),
-  openLibrary: () => req({ type: 'harness.library.open' }),
-  pickImport: (tool: AiTool) => req({ type: 'harness.import.pick', tool }),
-  addImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.add', tool, dir }),
-  removeImport: (tool: AiTool, dir: string) => req({ type: 'harness.import.remove', tool, dir }),
-  createAgent: (scope: InstallScope, input: AgentInput) => req({ type: 'harness.agent.create', scope, input }),
-  updateAgent: (name: string, scope: InstallScope, patch: Partial<AgentInput>, body?: string) =>
-    req({ type: 'harness.agent.update', name, scope, patch, ...(body !== undefined ? { body } : {}) }),
-  writeAgent: (name: string, scope: InstallScope, content: string) => req({ type: 'harness.agent.write', name, scope, content }),
-  deleteAgent: (name: string, scope: InstallScope) => req({ type: 'harness.agent.delete', name, scope }),
+  /** Abre o seletor de pasta ou de arquivo de exportação para importar artefatos ao board. */
+  importPick: (what: 'folder' | 'export') => req({ type: 'harness.import.pick', what }),
+  /** Examina a origem e devolve a prévia em `state.artifactImport`. */
+  importScan: (source: ImportSource) => req({ type: 'harness.import.scan', source }),
+  importApply: (keys: string[], onConflict: OnConflict) => req({ type: 'harness.import.apply', keys, onConflict }),
+  importCancel: () => post({ type: 'harness.import.cancel' }),
+  createAgent: (input: AgentInput) => req({ type: 'harness.agent.create', input }),
+  updateAgent: (name: string, patch: Partial<AgentInput>, body?: string) =>
+    req({ type: 'harness.agent.update', name, patch, ...(body !== undefined ? { body } : {}) }),
+  deleteAgent: (name: string) => req({ type: 'harness.agent.delete', name }),
   seedAgents: (force = false) => req({ type: 'harness.agents.seed', force }),
-  addMcp: (tool: AiTool, source: number, server: McpServerInput) => req({ type: 'harness.mcp.add', tool, source, server }),
-  removeMcp: (tool: AiTool, path: string, name: string) => req({ type: 'harness.mcp.remove', tool, path, name }),
-  addHook: (tool: AiTool, source: number, hook: HookInput) => req({ type: 'harness.hook.add', tool, source, hook }),
-  removeHook: (tool: AiTool, path: string, event: string, command: string) =>
-    req({ type: 'harness.hook.remove', tool, path, event, command }),
-  addPermission: (tool: AiTool, source: number, list: string, rule: string) =>
-    req({ type: 'harness.permission.add', tool, source, list, rule }),
-  removePermission: (tool: AiTool, path: string, list: string, rule: string) =>
-    req({ type: 'harness.permission.remove', tool, path, list, rule }),
-  createReferenceSkill: () => req({ type: 'harness.referenceSkill.create' }),
   installFlowSkill: (tool: AiTool, replace = false) => req({ type: 'harness.flowSkill.install', tool, replace }),
-  scanInstall: (source: string) => req({ type: 'harness.install.scan', source }),
-  applyInstall: (tool: AiTool, to: HarnessScope, rels: string[]) => req({ type: 'harness.install.apply', tool, to, rels }),
-  cancelInstall: () => req({ type: 'harness.install.cancel' }),
 };

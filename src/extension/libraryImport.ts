@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ALL_AI_TOOLS, type AiTool } from '../shared/harness';
+import { ALL_AI_BASES, type AiTool } from '../shared/harness';
 import type { ArtifactDraft } from '../shared/artifacts';
 import { readSource } from './artifactSource';
 import { scanInventory } from './harnessScan';
@@ -25,7 +25,7 @@ export function scanLibraryFolder(root: string): ArtifactDraft[] {
     if (draft.kind === 'rule') draft.name = path.basename(file);
     if (!draft.missing && draft.name !== 'faz-ai') found.set(key, draft);
   };
-  for (const tool of ALL_AI_TOOLS)
+  for (const tool of ALL_AI_BASES)
     for (const item of scanInventory(tool, '', '', '', [], [root]))
       if (['instructions', 'skill', 'agent', 'mcp'].includes(item.kind))
         add(item.kind as 'instructions' | 'skill' | 'agent' | 'mcp', selectionKey(item), tool);

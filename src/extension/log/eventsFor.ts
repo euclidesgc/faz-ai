@@ -19,6 +19,8 @@ export type NewCardEvent = Omit<CardEvent, 'id' | 'month'>;
 export interface EventActor {
   author: string;
   byAi: boolean;
+  /** Identidade autenticada do MCP; null identifica uma sessão externa. */
+  runId?: string | null;
 }
 
 /** O que nem a mensagem nem os fatos do card carregam; a sonda do log preenche o que a mensagem pede. */

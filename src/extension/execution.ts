@@ -1,9 +1,7 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import { baseValue } from '../shared/harness';
 import { EXEC_ENFORCEMENT, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
 import type { AiTool } from '../shared/harness';
 import { selectedMcpNames } from '../shared/harnessSelection';
-import { byPath } from './samePath';
 import type { BoardState, Card } from '../shared/model';
 
 /** Nome do servidor MCP do board, como registrado em cada ferramenta. */
@@ -52,6 +50,9 @@ export interface ExecInput {
   /** Claude Code: arquivo de configuração só com o servidor do board e os liberados */
   mcpConfig: string | null;
   tools: string[];
+  /** No contrato v1, [] é nenhuma ferramenta. Ausente preserva a semântica legada. */
+  toolSet?: 'explicit';
+  mcpTools?: string[];
   deniedTools: string[];
   model: { name: string; effort: string | null } | null;
 }
@@ -63,30 +64,6 @@ export interface ExecPlan {
   advice: string[];
   /** resumo para o log da execução */
   summary: string[];
-}
-
-const obj = (v: unknown): Record<string, unknown> =>
-  v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
-
-function readJson(file: string): Record<string, unknown> {
-  try {
-    return obj(JSON.parse(fs.readFileSync(file, 'utf8')));
-  } catch {
-    return {};
-  }
-}
-
-/**
- * Definições dos servidores MCP que o Claude Code carregaria nesta pasta: do projeto (.mcp.json) e do
- * usuário (~/.claude.json, globais e desta pasta). Fica na extensão: tem variáveis e cabeçalhos com segredos.
- */
-function claudeServers(projectDir: string, homeDir: string): Record<string, unknown> {
-  const user = homeDir ? readJson(path.join(homeDir, '.claude.json')) : {};
-  return {
-    ...obj(user.mcpServers),
-    ...obj(readJson(path.join(projectDir, '.mcp.json')).mcpServers),
-    ...obj(obj(byPath(obj(user.projects), projectDir)).mcpServers),
-  };
 }
 
 /** Configuração do Claude Code só com o servidor do board: o que toda execução recebe quando o agente não libera mais nada. */
@@ -107,21 +84,39 @@ export const agentAdvice = (m: ExecManifest): string[] =>
  * de contexto vazio: só o servidor do board e os servidores que o agente libera; o agente vai por
  * parâmetro onde a ferramenta aceita, e como texto nas demais.
  */
+function requireReviewedMcps(state: BoardState, names: readonly string[]): void {
+  const denied =
+    state.harness.library?.artifacts.filter(
+      (a) =>
+        a.kind === 'mcp' &&
+        names.includes(a.name) &&
+        a.mcpCredential &&
+        (a.mcpCredential.review !== 'reviewed' || !a.mcpCredential.available),
+    ) ?? [];
+  if (denied.length) throw new Error(`MCPs exigem revisão humana ou configuração local: ${denied.map((a) => a.name).join(', ')}.`);
+}
 export function executionPlan(
   s: BoardState,
   c: Card,
-  projectDir: string,
-  homeDir: string,
-  /** o servidor do board desta execução: vale mais que um registro de arquivo, que pode ser de outra pasta */
+  /** as definições dos servidores MCP guardadas no board (só no host: têm as credenciais do cofre) */
+  libraryServers: Record<string, unknown>,
+  /** o servidor do board desta execução */
   board?: BoardServerSpec,
-  libraryServers?: Record<string, unknown>,
 ): ExecPlan {
   const tool: AiTool = s.board.aiTool;
   const manifest = manifestOf(s, c);
-  const how = EXEC_ENFORCEMENT[tool];
+  const how = baseValue(EXEC_ENFORCEMENT, tool) ?? {
+    agent: 'advised',
+    skills: 'advised',
+    mcp: 'advised',
+    tools: 'advised',
+    model: 'advised',
+    context: 'advised',
+  };
   const items = s.harness.inventory.find((t) => t.tool === tool)?.items ?? [];
   const known = [...new Set(items.filter((i) => i.kind === 'mcp').map((i) => i.name))].filter((n) => n !== BOARD_SERVER);
   const allowed = manifest.mcpServers;
+  requireReviewedMcps(s, allowed);
   const blocked = known.filter((n) => !allowed.includes(n));
 
   // o Claude Code recebe um arquivo só com o servidor do board e os liberados; sem servidor do board
@@ -129,23 +124,17 @@ export function executionPlan(
   // linha de comando segue sem restrição de servidores (só acontece fora da extensão)
   let mcpConfig: string | null = null;
   if (tool === 'claude') {
-    const defs = libraryServers ?? (allowed.length || !board ? claudeServers(projectDir, homeDir) : {});
-    if (!board && libraryServers) defs[BOARD_SERVER] = claudeServers(projectDir, homeDir)[BOARD_SERVER];
-    // um servidor do board que vem de uma pasta importada não está na configuração do Claude Code: a
-    // definição é lida do arquivo em que a varredura o encontrou
-    for (const name of allowed)
-      if (!defs[name]) {
-        const item = items.find((i) => i.kind === 'mcp' && i.name === name && i.path.endsWith('.json'));
-        const def = item && obj(readJson(item.path).mcpServers)[name];
-        if (def) defs[name] = def;
-      }
+    // só as definições guardadas no board (no host, com as credenciais do cofre): a execução não lê
+    // `.mcp.json` nem `~/.claude.json`, e um servidor que ficou só na pasta da ferramenta não entra
+    const defs: Record<string, unknown> = { ...libraryServers };
     if (board) defs[BOARD_SERVER] = { type: 'stdio', ...board };
     if (!defs[BOARD_SERVER] && allowed.length)
-      throw new Error(
-        'O agente libera servidores MCP, mas o servidor do board não está registrado para o Claude Code nesta pasta. Instale o servidor em Configurações → Harness → Claude Code → MCPs.',
-      );
+      throw new Error('O agente libera servidores MCP, mas o servidor do board não está disponível nesta execução.');
     const missing = allowed.filter((n) => !defs[n]);
-    if (missing.length) throw new Error(`Servidores MCP do agente não encontrados na configuração do Claude Code: ${missing.join(', ')}.`);
+    if (missing.length)
+      throw new Error(
+        `Servidores MCP do agente que não estão no board: ${missing.join(', ')}. Envie o servidor ao board em Configurações → Harness.`,
+      );
     if (defs[BOARD_SERVER])
       mcpConfig = JSON.stringify({ mcpServers: Object.fromEntries([BOARD_SERVER, ...allowed].map((n) => [n, defs[n]])) });
   }
@@ -249,24 +238,21 @@ export function executionPlan(
 /**
  * Execução sem agente e sem card (chat do board, sugestões, "Indicar artefatos"): contexto vazio, só o
  * servidor do board e, com `s`, os servidores do board em modo "Sempre" (eles entram em toda
- * interação). Um servidor Sempre sem definição conhecida fica de fora, sem erro: o chat não pode parar
- * por causa dele.
+ * interação). Uma configuração local da biblioteca precisa ser resolvida; falha impede execução.
+ * Fontes legadas sem definição conhecida mantêm o tratamento anterior.
  */
 export function bareExec(
   model: ExecInput['model'],
   board?: BoardServerSpec,
   s?: BoardState,
-  dirs?: { projectDir: string; homeDir: string },
+  /** as definições dos servidores MCP guardadas no board; sem elas, só o servidor do board */
   libraryServers?: Record<string, unknown>,
 ): ExecInput {
-  const always = s && s.board.aiTool === 'claude' && dirs ? selectedMcpNames(s, 'always') : [];
-  const defs = libraryServers ?? (always.length ? claudeServers(dirs!.projectDir, dirs!.homeDir) : {});
-  for (const name of always)
-    if (!defs[name]) {
-      const item = s!.harness.inventory.find((t) => t.tool === 'claude')?.items.find((i) => i.kind === 'mcp' && i.name === name);
-      const def = item?.path.endsWith('.json') ? obj(readJson(item.path).mcpServers)[name] : undefined;
-      if (def) defs[name] = def;
-    }
+  const always = s && s.board.aiTool === 'claude' && libraryServers ? selectedMcpNames(s, 'always') : [];
+  if (s) requireReviewedMcps(s, always);
+  const defs: Record<string, unknown> = { ...(libraryServers ?? {}) };
+  const missing = always.filter((n) => !defs[n] && s?.harness.library?.artifacts.some((a) => a.kind === 'mcp' && a.name === n));
+  if (missing.length) throw new Error(`MCPs exigem revisão humana ou configuração local: ${missing.join(', ')}.`);
   const allowed = always.filter((n) => defs[n]);
   if (board) defs[BOARD_SERVER] = { type: 'stdio', ...board };
   return {

@@ -1,5 +1,8 @@
+import { baseValue } from '../../../../shared/harness';
 import { useState } from 'react';
 import { Badge, Button, Checkbox, TextArea, TextField } from '@radix-ui/themes';
+import { agentContextOf } from '../../../../shared/executionContext';
+import { ExecutionContext } from '../../card/ExecutionContext';
 import { AGENT_FORMAT } from '../../../../shared/agentTools';
 import { EXEC_ENFORCEMENT, TOOL_PRESETS, type ExecAspect } from '../../../../shared/execution';
 import { selectedMcpNames } from '../../../../shared/harnessSelection';
@@ -18,17 +21,31 @@ import { t } from '../../../i18n';
 export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: AiToolInfo; onClose: () => void }) {
   const state = useBoardStore((s) => s.state)!;
   const [body, setBody] = useState(a.body);
-  const how = EXEC_ENFORCEMENT[tool.id];
+  const how = baseValue(EXEC_ENFORCEMENT, tool.id) ?? {
+    agent: 'advised',
+    skills: 'advised',
+    mcp: 'advised',
+    tools: 'advised',
+    model: 'advised',
+    context: 'advised',
+  };
+  // os servidores MCP oferecidos são os do board (a aba MCPs), nunca os da pasta da ferramenta
+  const library = state.harness.library;
   const servers = [
     ...new Set(
-      (state.harness.inventory.find((x) => x.tool === tool.id)?.items ?? [])
-        .filter((i) => i.kind === 'mcp' && i.name !== 'faz-ai')
-        .map((i) => i.name),
+      library
+        ? library.artifacts.filter((x) => x.kind === 'mcp' && !x.missing && x.name !== 'faz-ai').map((x) => x.name)
+        : (state.harness.inventory.find((x) => x.tool === tool.id)?.items ?? [])
+            .filter((i) => i.kind === 'mcp' && i.name !== 'faz-ai')
+            .map((i) => i.name),
     ),
   ].sort();
-  const format = AGENT_FORMAT[tool.id];
+  // um agente importado de outra ferramenta guarda os nomes nativos dela: aqui as ferramentas aparecem traduzidas por categoria
+  const origin = library?.artifacts.find((x) => x.kind === 'agent' && x.name === a.name)?.agent?.tools.native.tool;
+  const foreignTools = !!origin && origin !== tool.id;
+  const format = baseValue(AGENT_FORMAT, tool.id) ?? { tools: false, skills: false, mcp: false, readonly: false, background: false };
   const boardServers = selectedMcpNames(state);
-  const patch = (p: Partial<AgentInput>) => harness.updateAgent(a.name, a.scope, p);
+  const patch = (p: Partial<AgentInput>) => harness.updateAgent(a.name, p);
   const badge = (aspect: ExecAspect) => (
     <Badge
       color={how[aspect] === 'enforced' ? 'indigo' : 'gray'}
@@ -45,6 +62,26 @@ export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: A
   const dirty = body !== a.body;
   return (
     <div className="profile-editor" aria-label={t('Agente {name}', { name: a.name })}>
+      <ExecutionContext
+        agent
+        preview={agentContextOf(
+          { ...state, board: { ...state.board, aiTool: tool.id } },
+          {
+            id: a.name,
+            name: a.name,
+            purpose: a.description,
+            instructions: body,
+            skills: a.skills,
+            mcpServers: a.mcp,
+            tools: a.tools,
+            deniedTools: a.deniedTools,
+            model: a.modelValue,
+            isDefault: false,
+            scope: a.scope,
+            path: a.path,
+          },
+        )}
+      />
       <FormField label={t('O que este agente faz')} hint={t('Uma frase: é por ela que o "Refinar com IA" escolhe o agente de um card.')}>
         {(id) => (
           <TextField.Root
@@ -74,7 +111,7 @@ export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: A
               <Button variant="soft" color="gray" onClick={onClose}>
                 {dirty ? t('Descartar') : t('Fechar')}
               </Button>
-              <Button disabled={!dirty} onClick={() => harness.updateAgent(a.name, a.scope, {}, body)}>
+              <Button disabled={!dirty} onClick={() => harness.updateAgent(a.name, {}, body)}>
                 {t('Salvar')}
               </Button>
             </div>
@@ -140,6 +177,22 @@ export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: A
           >
             {() => (
               <>
+                <p className="muted small" role="status">
+                  {a.tools.length === 0
+                    ? t('Sem lista: o agente herda o que o nível de permissão da execução libera.')
+                    : t('Lista explícita: {n} ferramentas; só elas, dentro do nível de permissão da execução.', { n: a.tools.length })}
+                </p>
+                {foreignTools && (
+                  <p className="wizard-warning" role="alert">
+                    {t(
+                      'Este agente veio do {origin}: as categorias foram traduzidas para os nomes do {tool}. Confira a lista antes de executar.',
+                      {
+                        origin,
+                        tool: tool.label,
+                      },
+                    )}
+                  </p>
+                )}
                 <div className="agent-presets">
                   {TOOL_PRESETS.map((preset) => (
                     <Button
@@ -188,6 +241,11 @@ export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: A
             )}
           </FormField>
         </>
+      )}
+      {!format.tools && (
+        <p className="wizard-warning" role="status">
+          {t('O {tool} não aceita lista de ferramentas por agente: a execução ignora o que este agente restringe.', { tool: tool.label })}
+        </p>
       )}
       {(format.readonly || format.background) && (
         <FormField

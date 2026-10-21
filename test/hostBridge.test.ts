@@ -8,7 +8,6 @@ import { EMPTY_PREFS } from '../src/shared/prefs';
 import { HostBridge, exportNotice, importNotice, type HostEnv } from '../src/extension/host/hostBridge';
 import { parseExportFile } from '../src/extension/db/boardExport';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { HARNESS_CATALOG } from '../src/shared/harnessCatalog';
 import type { HostToWebview } from '../src/shared/messages';
 
 let router: MessageRouter;
@@ -178,122 +177,7 @@ describe('HostBridge: chat', () => {
   });
 });
 
-describe('HostBridge: harness.file.read / harness.file.write', () => {
-  const result = () => sent.at(-1) as { content?: string; readonly?: boolean; error?: string; ok?: boolean };
-
-  it('lê e grava um arquivo que a varredura listou, e relê o harness', async () => {
-    fs.mkdirSync(path.join(dir, '.claude', 'rules'), { recursive: true });
-    const rule = path.join(dir, '.claude', 'rules', 'estilo.md');
-    fs.writeFileSync(rule, '# Estilo\n');
-    router.refreshHarness();
-    await bridge.handle({ type: 'harness.file.read', requestId: 'r1', path: rule });
-    expect(sent.at(-1)).toEqual({ type: 'harness.file.readResult', requestId: 'r1', content: '# Estilo\n', readonly: false });
-    await bridge.handle({
-      type: 'harness.file.write',
-      requestId: 'w1',
-      path: rule,
-      content: '---\ndescription: Estilo do código\n---\n# Estilo\n',
-    });
-    expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'w1', ok: true });
-    expect(fs.readFileSync(rule, 'utf8')).toContain('Estilo do código');
-    const item = router
-      .snapshot()
-      .harness.inventory.flatMap((t) => t.items)
-      .find((i) => i.path === rule);
-    expect(item?.description).toBe('Estilo do código');
-  });
-
-  it('abre também o arquivo que o CLAUDE.md importa com @', async () => {
-    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'Veja @docs/guia.md');
-    fs.mkdirSync(path.join(dir, 'docs'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'docs', 'guia.md'), '# Guia');
-    router.refreshHarness();
-    await bridge.handle({ type: 'harness.file.read', requestId: 'r4', path: path.join(dir, 'docs', 'guia.md') });
-    expect(result()).toMatchObject({ content: '# Guia', readonly: false });
-  });
-
-  it('recusa arquivo fora da varredura, JSON inválido e o ~/.claude.json', async () => {
-    const outside = path.join(dir, 'segredo.txt');
-    fs.writeFileSync(outside, 'x');
-    await bridge.handle({ type: 'harness.file.read', requestId: 'r2', path: outside });
-    expect(result().error).toBe('Arquivo fora do harness.');
-
-    fs.writeFileSync(path.join(dir, '.mcp.json'), '{ "mcpServers": { "a": { "command": "x" } } }');
-    fs.mkdirSync(path.join(dir, 'h'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'h', '.claude.json'), '{ "mcpServers": { "b": { "command": "y" } } }');
-    router.refreshHarness();
-    await bridge.handle({ type: 'harness.file.write', requestId: 'w2', path: path.join(dir, '.mcp.json'), content: '{ quebrado' });
-    expect(result()).toMatchObject({ ok: false });
-    expect(result().error).toMatch(/^JSON inválido, nada foi gravado/);
-    expect(fs.readFileSync(path.join(dir, '.mcp.json'), 'utf8')).toContain('"a"');
-
-    const claudeJson = path.join(dir, 'h', '.claude.json');
-    await bridge.handle({ type: 'harness.file.read', requestId: 'r3', path: claudeJson });
-    expect(result()).toMatchObject({ readonly: true });
-    await bridge.handle({ type: 'harness.file.write', requestId: 'w3', path: claudeJson, content: '{}' });
-    expect(result()).toMatchObject({ ok: false, error: 'Este arquivo não pode ser alterado pelo board.' });
-  });
-});
-
-describe('HostBridge: harness.item.write e harness.project.profile (assistentes de regras e skills)', () => {
-  const sourceOf = (tool: 'claude' | 'cursor', scope: 'project' | 'user', test: (s: { path: string; layout: string }) => boolean) =>
-    HARNESS_CATALOG[tool].findIndex((s) => s.scope === scope && !s.builtin && !s.noCreate && test(s));
-
-  it('uma regra por assunto nasce com o texto pronto, abre no editor e entra na varredura', async () => {
-    const source = sourceOf('claude', 'project', (s) => s.path === '.claude/rules' && s.layout === 'files');
-    await bridge.handle({
-      type: 'harness.item.write',
-      tool: 'claude',
-      source,
-      name: 'testes',
-      content: '---\ndescription: "Testes"\n---\n\n- Pequenos.\n',
-    });
-    const file = path.join(dir, '.claude', 'rules', 'testes.md');
-    expect(fs.readFileSync(file, 'utf8')).toBe('---\ndescription: "Testes"\n---\n\n- Pequenos.\n');
-    expect(sent.at(-1)).toEqual({ type: 'harness.item.created', path: file });
-    expect(
-      router
-        .snapshot()
-        .harness.inventory.flatMap((t) => t.items)
-        .find((i) => i.path === file)?.description,
-    ).toBe('Testes');
-  });
-
-  it('o arquivo principal que já existe recebe o texto no fim, só com append; sem ele dá erro e nada muda', async () => {
-    const source = sourceOf('claude', 'project', (s) => s.path === 'CLAUDE.md');
-    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), '# Projeto\n');
-    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: '', content: '## Regras\n- A\n' });
-    expect((sent.at(-1) as { type: string }).type).toBe('error');
-    expect(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8')).toBe('# Projeto\n');
-    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: '', content: '## Regras\n- A\n', append: true });
-    expect(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8')).toBe('# Projeto\n\n## Regras\n- A\n');
-    // sem o arquivo, o append cria
-    fs.rmSync(path.join(dir, 'CLAUDE.md'));
-    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: '', content: '## Regras\n', append: true });
-    expect(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8')).toBe('## Regras\n');
-  });
-
-  it('uma skill é criada com o SKILL.md pronto e os arquivos de apoio vazios; nome de arquivo inválido não cria nada', async () => {
-    const source = sourceOf('claude', 'project', (s) => s.layout === 'skills');
-    const content = '---\nname: migracao\ndescription: "Escrever uma migração."\n---\n\n# migracao\n';
-    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: 'migracao', content, files: ['../fora.md'] });
-    expect((sent.at(-1) as { type: string }).type).toBe('error');
-    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'migracao'))).toBe(false);
-    await bridge.handle({
-      type: 'harness.item.write',
-      tool: 'claude',
-      source,
-      name: 'migracao',
-      content,
-      files: ['references/exemplo.md', 'scripts/rodar.sh'],
-    });
-    const folder = path.join(dir, '.claude', 'skills', 'migracao');
-    expect(fs.readFileSync(path.join(folder, 'SKILL.md'), 'utf8')).toBe(content);
-    expect(fs.readFileSync(path.join(folder, 'references', 'exemplo.md'), 'utf8')).toBe('');
-    expect(fs.existsSync(path.join(folder, 'scripts', 'rodar.sh'))).toBe(true);
-    expect(router.snapshot().harness.skills.map((k) => k.name)).toContain('migracao');
-  });
-
+describe('HostBridge: harness.project.profile (assistentes de regras e skills)', () => {
   it('o perfil do projeto responde com o requestId, ou com o erro na própria resposta', async () => {
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ scripts: { test: 'vitest' } }));
     await bridge.handle({ type: 'harness.project.profile', requestId: 'p1' });
@@ -314,13 +198,11 @@ describe('HostBridge: plugins pela CLI do Claude Code', () => {
   };
   const flush = () => new Promise((r) => setTimeout(r, 0));
 
-  it('lista os instalados pela CLI, desativa os marcados e avisa quando terminou', async () => {
+  it('lista os instalados pela CLI', async () => {
     const synced = plugin('.claude/plugins/synced/org/design~g2', 'design');
     const cached = plugin('.claude/plugins/cache/loja/fmt/1.0', 'fmt');
     plugin('.claude/plugins/marketplaces/loja/plugins/catalogo', 'catalogo');
-    const calls: string[][] = [];
     router.setClaudeCli((args) => {
-      calls.push(args);
       const stdout =
         args[1] === 'list'
           ? JSON.stringify([
@@ -340,33 +222,6 @@ describe('HostBridge: plugins pela CLI do Claude Code', () => {
       ['design', 'design@synced'],
       ['fmt', 'fmt@loja'],
     ]);
-
-    await bridge.handle({ type: 'harness.plugin.apply', tool: 'claude', action: 'disable', ids: ['design@synced', 'fmt@loja'] });
-    expect(calls.filter((c) => c[1] === 'disable')).toEqual([
-      ['plugin', 'disable', 'design@synced', '--json'],
-      ['plugin', 'disable', 'fmt@loja', '--json'],
-    ]);
-    expect(sent.at(-1)).toEqual({
-      type: 'notice',
-      message:
-        'Plugins desativados: design, fmt. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
-    });
-    // a lista é consultada de novo depois da ação
-    expect(calls.filter((c) => c[1] === 'list').length).toBe(2);
-  });
-
-  it('um plugin sincronizado do claude.ai não é desinstalado, e a tela recebe o erro e o fim', async () => {
-    const synced = plugin('.claude/plugins/synced/org/design', 'design');
-    router.setClaudeCli((args) =>
-      Promise.resolve({
-        code: 0,
-        stdout: args[1] === 'list' ? JSON.stringify([{ id: 'design@synced', scope: 'synced', enabled: true, installPath: synced }]) : '',
-        stderr: '',
-      }),
-    );
-    await flush();
-    await bridge.handle({ type: 'harness.plugin.apply', tool: 'claude', action: 'uninstall', ids: ['design@synced'] });
-    expect(sent.at(-1)).toEqual({ type: 'error', message: 'Nenhum dos plugins escolhidos aceita essa ação.' });
   });
 });
 
@@ -499,7 +354,11 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     let changes = 0;
     router.onDidChange(() => changes++);
     await bridge.handle({ type: 'backup.import.apply', token: summary.token });
-    expect(sent.at(-1)).toEqual({ type: 'notice', message: 'Board "Meu Board" importado: 1 card(s) e 0 anexo(s).' });
+    expect(sent.at(-1)).toEqual({
+      type: 'notice',
+      message:
+        'Board "Meu Board" importado: 1 card(s) e 0 anexo(s). Perfis desativados para revisão local: Claude Code, Cursor, Kimi Code.',
+    });
     expect(changes).toBe(1);
     expect(router.boardId).toBe(oldBoardId); // o arquivo veio deste mesmo board: os ids se preservam
     expect(router.snapshot().cards.map((c) => c.title)).toEqual(['Card 1']);
@@ -546,7 +405,7 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     );
     expect(
       importNotice({ boardId: 'b', boardName: 'B', cards: 2, attachments: 1, warnings: [], mcpSecrets: ['github: GITHUB_TOKEN', 'x: K'] }),
-    ).toBe('Board "B" importado: 2 card(s) e 1 anexo(s). Preencha os valores vazios dos servidores MCP: github: GITHUB_TOKEN, x: K.');
+    ).toBe('Board "B" importado: 2 card(s) e 1 anexo(s). Revise as configurações locais dos servidores MCP: github: GITHUB_TOKEN, x: K.');
   });
 });
 
@@ -578,6 +437,33 @@ describe('HostBridge: metrics.query', () => {
     expect(sent.filter((m) => m.type === 'metrics.result')).toHaveLength(10);
     expect(count('card_events')).toBe(events);
     expect(count('ai_runs')).toBe(runs);
+    expect(changes).toBe(0);
+    expect(saves).toBe(0);
+  });
+});
+
+describe('HostBridge: prévia dos rascunhos de contexto', () => {
+  it('responde com correlação e admissão indisponível, sem gravar ou iniciar IA', async () => {
+    let changes = 0;
+    router.onDidChange(() => void changes++);
+    saves = 0;
+    const runs = rawDb.exec('SELECT COUNT(*) FROM ai_runs')[0]!.values[0]![0];
+    await bridge.handle({
+      type: 'contextPlanning.preview',
+      requestId: 'context-1',
+      target: { cardId: null, workflowId: null, phaseId: '', action: 'chat' },
+    });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      type: 'contextPlanning.preview.result',
+      requestId: 'context-1',
+      preview: {
+        canExecute: false,
+        admission: { state: 'unavailable', dependency: 729 },
+        diagnostics: [{ code: 'admission-unavailable' }, { code: 'agent-required' }],
+      },
+    });
+    expect(rawDb.exec('SELECT COUNT(*) FROM ai_runs')[0]!.values[0]![0]).toBe(runs);
     expect(changes).toBe(0);
     expect(saves).toBe(0);
   });

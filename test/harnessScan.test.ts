@@ -1,22 +1,18 @@
+import { HarnessStore } from '../src/extension/harness';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { HarnessOps } from '../src/extension/harnessOps';
 import { importsOf, scanInventory } from '../src/extension/harnessScan';
-import { HooksAndPermissions } from '../src/extension/hooksAndPermissions';
-import { McpServers } from '../src/extension/mcpServers';
-import { setSkillMode, skillMode } from '../src/extension/skillMode';
+import { skillMode } from '../src/extension/skillMode';
 import {
   HARNESS_CATALOG,
   HARNESS_GROUPS,
   claudeProjectKey,
   createTargets,
   groupOf,
-  hookTargets,
   importPath,
   instructionRoles,
-  mcpTargets,
   permissionTargets,
 } from '../src/shared/harnessCatalog';
 
@@ -70,14 +66,6 @@ describe('varredura do harness por ferramenta e escopo', () => {
     expect(policy.map((i) => i.location)).toEqual([path.join(managed, 'CLAUDE.md'), path.join(managed, 'managed-settings.json')]);
     // nem a memória nem a política aparecem como lugar de criar ou destino de cópia
     expect(createTargets('claude').some((t) => t.label.includes('memory') || (t.label === 'CLAUDE.md' && t.scope === 'user'))).toBe(false);
-    expect(() =>
-      new HarnessOps(project, home).create(
-        'claude',
-        HARNESS_CATALOG.claude.findIndex((s) => s.base === 'managed'),
-        '',
-        '',
-      ),
-    ).toThrow('Não é possível criar um item neste lugar.');
   });
 
   it('Claude Code: os @caminho das instruções, fora de código, até quatro níveis e sem repetir', () => {
@@ -201,7 +189,7 @@ describe('varredura do harness por ferramenta e escopo', () => {
     });
     // nada que possa ser segredo vai para a lista
     expect(JSON.stringify(items)).not.toContain('segredo');
-    expect(items.find((i) => i.name === 'remoto')?.description).toBe('https://exemplo.dev/mcp');
+    expect(items.find((i) => i.name === 'remoto')?.description).toBe('MCP HTTP');
   });
 
   it('Cursor: caminhos da ferramenta', () => {
@@ -235,48 +223,7 @@ describe('varredura do harness por ferramenta e escopo', () => {
   });
 });
 
-describe('criar, copiar e apagar itens do harness', () => {
-  const find = (tool: 'claude' | 'cursor', kind: string, name: string, scope: string) =>
-    scanInventory(tool, project, home).find((i) => i.kind === kind && i.name === name && i.scope === scope)!;
-  const target = (tool: 'claude' | 'cursor', label: string) => createTargets(tool).find((t) => t.label === label)!.source;
-
-  it('cria no projeto e na pasta do usuário, no formato de cada ferramenta', () => {
-    const ops = new HarnessOps(project, home);
-    const skillFile = ops.create('claude', target('claude', '~/.claude/skills/<nome>/SKILL.md'), 'commit', 'Escreve o commit');
-    expect(skillFile).toBe(path.join(home, '.claude/skills/commit/SKILL.md'));
-    expect(fs.readFileSync(skillFile, 'utf8')).toContain('description: "Escreve o commit"');
-    expect(ops.create('claude', target('claude', '.claude/agents/<nome>.md'), 'revisor', 'Revisa')).toBe(
-      path.join(project, '.claude/agents/revisor.md'),
-    );
-    expect(fs.readFileSync(ops.create('cursor', target('cursor', '.cursor/rules/<nome>.mdc'), 'estilo', 'Estilo'), 'utf8')).toBe(
-      '---\ndescription: "Estilo"\nalwaysApply: false\n---\n\n',
-    );
-    expect(ops.create('claude', target('claude', '~/.claude/CLAUDE.md'), '', '')).toBe(path.join(home, '.claude/CLAUDE.md'));
-    // não sobrescreve, não aceita nome fora do padrão e exige descrição em skill e agente
-    expect(() => ops.create('claude', target('claude', '~/.claude/skills/<nome>/SKILL.md'), 'commit', 'x')).toThrow('Já existe');
-    expect(() => ops.create('claude', target('claude', '.claude/skills/<nome>/SKILL.md'), '../fora', 'x')).toThrow('Nome inválido');
-    expect(() => ops.create('claude', target('claude', '.claude/agents/<nome>.md'), 'sem-descricao', ' ')).toThrow('descrição');
-    // entradas de arquivo de configuração não são lugares de criação
-    expect(() =>
-      ops.create(
-        'claude',
-        HARNESS_CATALOG.claude.findIndex((s) => s.layout === 'json-keys'),
-        'x',
-        'x',
-      ),
-    ).toThrow();
-  });
-
-  it('não cria nos lugares alternativos do CLAUDE.md e do AGENTS.md', () => {
-    const ops = new HarnessOps(project, home);
-    const labels = createTargets('claude').map((t) => t.label);
-    expect(labels).toEqual(expect.arrayContaining(['CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md']));
-    expect(labels).not.toContain('.claude/CLAUDE.md');
-    expect(labels).not.toContain('.claude/AGENTS.md');
-    const alt = HARNESS_CATALOG.claude.findIndex((s) => s.scope === 'project' && s.path === '.claude/CLAUDE.md');
-    expect(() => ops.create('claude', alt, '', '')).toThrow();
-  });
-
+describe('instruções do Claude Code', () => {
   it('separa os arquivos que decidem se o Claude Code lê o AGENTS.md e monta o caminho do @import', () => {
     write(project, 'CLAUDE.local.md', '# Local');
     write(project, '.claude/AGENTS.md', '# Agentes');
@@ -290,293 +237,25 @@ describe('criar, copiar e apagar itens do harness', () => {
     expect(importPath('.claude/CLAUDE.md', 'AGENTS.md')).toBe('../AGENTS.md');
     expect(importPath('.claude/CLAUDE.md', '.claude/AGENTS.md')).toBe('AGENTS.md');
   });
-
-  it('copia do global e de plugin para o projeto, com a pasta inteira da skill', () => {
-    write(home, '.claude/skills/commit/SKILL.md', skill('Global'));
-    write(home, '.claude/skills/commit/references/modelo.md', 'Modelo');
-    write(home, '.claude/plugins/loja/design/.claude-plugin/plugin.json', '{"name":"design"}');
-    write(home, '.claude/plugins/loja/design/agents/critico.md', '---\ndescription: Critica\n---\n');
-    const ops = new HarnessOps(project, home);
-    ops.copy('claude', find('claude', 'skill', 'commit', 'user'), 'project');
-    ops.copy('claude', find('claude', 'agent', 'critico', 'plugin'), 'project');
-    expect(fs.readFileSync(path.join(project, '.claude/skills/commit/references/modelo.md'), 'utf8')).toBe('Modelo');
-    expect(fs.existsSync(path.join(project, '.claude/agents/critico.md'))).toBe(true);
-    // a cópia aparece nos dois escopos, com o mesmo resumo de conteúdo até alguém editar uma delas
-    expect(find('claude', 'skill', 'commit', 'project').digest).toBe(find('claude', 'skill', 'commit', 'user').digest);
-    fs.appendFileSync(path.join(project, '.claude/skills/commit/SKILL.md'), 'ajuste');
-    expect(find('claude', 'skill', 'commit', 'project').digest).not.toBe(find('claude', 'skill', 'commit', 'user').digest);
-    expect(() => ops.copy('claude', find('claude', 'skill', 'commit', 'user'), 'project')).toThrow('Já existe');
-  });
-
-  it('apaga do projeto e do global, mas nunca de um plugin nem um arquivo de configuração', () => {
-    write(project, '.claude/skills/velha/SKILL.md', skill('x'));
-    write(project, '.claude/skills/velha/assets/a.txt', 'a');
-    write(home, '.claude/agents/global.md', '---\ndescription: x\n---\n');
-    write(home, '.claude/settings.json', '{}');
-    write(home, '.claude/plugins/loja/design/.claude-plugin/plugin.json', '{"name":"design"}');
-    write(home, '.claude/plugins/loja/design/skills/critica/SKILL.md', skill('x'));
-    write(project, '.mcp.json', JSON.stringify({ mcpServers: { board: { command: 'node' } } }));
-    const ops = new HarnessOps(project, home);
-    ops.remove(find('claude', 'skill', 'velha', 'project'));
-    ops.remove(find('claude', 'agent', 'global', 'user'));
-    expect(fs.existsSync(path.join(project, '.claude/skills/velha'))).toBe(false);
-    expect(fs.existsSync(path.join(home, '.claude/agents/global.md'))).toBe(false);
-    expect(() => ops.remove(find('claude', 'skill', 'critica', 'plugin'))).toThrow('plugin');
-    expect(() => ops.remove(find('claude', 'settings', 'settings.json', 'user'))).toThrow('configuração');
-    expect(() => ops.remove(find('claude', 'mcp', 'board', 'project'))).toThrow('não pode ser alterado');
-    expect(fs.existsSync(path.join(project, '.mcp.json'))).toBe(true);
-  });
 });
 
 describe('modo de invocação das skills', () => {
-  it('grava e lê o modo na chave do frontmatter, preservando o resto do arquivo', () => {
+  it('lê o modo na chave do frontmatter, nas duas grafias', () => {
     write(project, '.claude/skills/deploy/SKILL.md', '---\nname: deploy\ndescription: Faz o deploy\n---\n\nPassos\n');
-    const md = path.join(project, '.claude/skills/deploy/SKILL.md');
-    expect(skillMode(md)).toBe('auto');
-    setSkillMode(md, 'manual');
-    expect(fs.readFileSync(md, 'utf8')).toBe(
-      '---\nname: deploy\ndescription: Faz o deploy\ndisable-model-invocation: true\n---\n\nPassos\n',
-    );
-    expect(skillMode(md)).toBe('manual');
-    setSkillMode(md, 'manual'); // repetir não duplica a chave
-    expect(fs.readFileSync(md, 'utf8').match(/disable-model-invocation/g)).toHaveLength(1);
-    setSkillMode(md, 'auto');
-    expect(fs.readFileSync(md, 'utf8')).toBe('---\nname: deploy\ndescription: Faz o deploy\n---\n\nPassos\n');
-
-    // a grafia em camelCase da chave também é lida, e voltar para automática a remove
+    expect(skillMode(path.join(project, '.claude/skills/deploy/SKILL.md'))).toBe('auto');
+    write(project, '.claude/skills/manual/SKILL.md', '---\nname: manual\ndescription: x\ndisable-model-invocation: true\n---\n');
+    expect(skillMode(path.join(project, '.claude/skills/manual/SKILL.md'))).toBe('manual');
     write(project, '.claude/skills/estilo/SKILL.md', '---\nname: estilo\ndescription: x\ndisableModelInvocation: true\n---\n');
-    const camel = path.join(project, '.claude/skills/estilo/SKILL.md');
-    expect(skillMode(camel)).toBe('manual');
-    setSkillMode(camel, 'auto');
-    expect(fs.readFileSync(camel, 'utf8')).toBe('---\nname: estilo\ndescription: x\n---\n');
-
-    // SKILL.md sem frontmatter ganha um
-    write(project, '.claude/skills/solta/SKILL.md', 'Só o corpo');
-    setSkillMode(path.join(project, '.claude/skills/solta/SKILL.md'), 'manual');
-    expect(fs.readFileSync(path.join(project, '.claude/skills/solta/SKILL.md'), 'utf8')).toBe(
-      '---\ndisable-model-invocation: true\n---\n\nSó o corpo',
-    );
+    expect(skillMode(path.join(project, '.claude/skills/estilo/SKILL.md'))).toBe('manual');
   });
 });
 
-describe('servidores MCP nos arquivos de cada ferramenta', () => {
-  const stdio = {
-    name: 'github',
-    transport: 'stdio' as const,
-    command: 'npx',
-    args: ['-y', 'gh-mcp'],
-    env: { TOKEN: 'abc' },
-    url: '',
-    headers: {},
-  };
-  const http = {
-    name: 'docs',
-    transport: 'http' as const,
-    command: '',
-    args: [],
-    env: {},
-    url: 'https://exemplo.dev/mcp',
-    headers: { Authorization: 'Bearer x' },
-  };
-  const at = (tool: 'claude' | 'cursor', label: string) => mcpTargets(tool).find((t) => t.label === label)!.source;
-  const json = (base: string, rel: string) => JSON.parse(fs.readFileSync(path.join(base, rel), 'utf8'));
-
-  it('grava no formato de cada arquivo, preservando o que já estava lá', () => {
-    const mcp = new McpServers(project, home);
-    write(project, '.mcp.json', JSON.stringify({ outraChave: 1, mcpServers: { 'faz-ai': { command: 'node' } } }));
-    mcp.add('claude', at('claude', '.mcp.json'), stdio);
-    mcp.add('claude', at('claude', '.mcp.json'), http);
-    expect(json(project, '.mcp.json')).toEqual({
-      outraChave: 1,
-      mcpServers: {
-        'faz-ai': { command: 'node' },
-        github: { type: 'stdio', command: 'npx', args: ['-y', 'gh-mcp'], env: { TOKEN: 'abc' } },
-        docs: { type: 'http', url: 'https://exemplo.dev/mcp', headers: { Authorization: 'Bearer x' } },
-      },
-    });
-    mcp.add('cursor', at('cursor', '~/.cursor/mcp.json'), stdio);
-    // o Cursor pede `type: "stdio"` nos servidores locais; o remoto vai só com `url`
-    expect(json(home, '.cursor/mcp.json')).toEqual({
-      mcpServers: { github: { type: 'stdio', command: 'npx', args: ['-y', 'gh-mcp'], env: { TOKEN: 'abc' } } },
-    });
-    // o ~/.claude.json não é um alvo de escrita
-    expect(mcpTargets('claude').map((t) => t.label)).toEqual(['.mcp.json']);
-  });
-
-  it('recusa nome repetido, dados incompletos e arquivo com comentários', () => {
-    const mcp = new McpServers(project, home);
-    mcp.add('claude', at('claude', '.mcp.json'), stdio);
-    expect(() => mcp.add('claude', at('claude', '.mcp.json'), stdio)).toThrow('Já existe');
-    expect(() => mcp.add('claude', at('claude', '.mcp.json'), { ...stdio, name: 'com espaço' })).toThrow('Nome inválido');
-    expect(() => mcp.add('claude', at('claude', '.mcp.json'), { ...stdio, name: 'x', command: ' ' })).toThrow('comando');
-    expect(() => mcp.add('claude', at('claude', '.mcp.json'), { ...http, url: 'exemplo' })).toThrow('endereço');
-    write(project, '.cursor/mcp.json', '{\n  // comentário\n  "mcpServers": {}\n}');
-    expect(() => mcp.add('cursor', at('cursor', '.cursor/mcp.json'), stdio)).toThrow('edite-o à mão');
-    expect(fs.readFileSync(path.join(project, '.cursor/mcp.json'), 'utf8')).toContain('// comentário');
-  });
-
-  it('remove do arquivo certo e nunca de plugin nem do ~/.claude.json', () => {
-    const mcp = new McpServers(project, home);
-    mcp.add('claude', at('claude', '.mcp.json'), stdio);
-    write(home, '.claude.json', JSON.stringify({ mcpServers: { global: { command: 'x' } } }));
-    write(home, '.claude/plugins/loja/p/.claude-plugin/plugin.json', '{"name":"p"}');
-    write(home, '.claude/plugins/loja/p/.mcp.json', JSON.stringify({ mcpServers: { deplugin: { command: 'y' } } }));
-    const item = (name: string) => scanInventory('claude', project, home).find((i) => i.kind === 'mcp' && i.name === name)!;
-    expect(() => mcp.remove('claude', item('global'))).toThrow('não edita');
-    expect(() => mcp.remove('claude', item('deplugin'))).toThrow('plugin');
-    mcp.remove('claude', item('github'));
-    expect(json(project, '.mcp.json')).toEqual({ mcpServers: {} });
-  });
-});
-
-describe('hooks e permissões nos arquivos de cada ferramenta', () => {
-  const json = (base: string, rel: string) => JSON.parse(fs.readFileSync(path.join(base, rel), 'utf8'));
-  const hookAt = (tool: 'claude' | 'cursor', label: string) => hookTargets(tool).find((t) => t.label === label)!.source;
-  const hooksOf = (tool: 'claude' | 'cursor') => scanInventory(tool, project, home).filter((i) => i.kind === 'hook');
-
-  it('Claude Code: agrupa por filtro e preserva o resto do arquivo', () => {
-    const ops = new HooksAndPermissions(project, home);
-    write(
-      project,
-      '.claude/settings.json',
-      JSON.stringify({ model: 'opus', hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: './a.sh' }] }] } }),
-    );
-    const src = hookAt('claude', '.claude/settings.json');
-    ops.addHook('claude', src, { event: 'PreToolUse', matcher: 'Bash', command: './b.sh', timeout: 10 });
-    ops.addHook('claude', src, { event: 'PreToolUse', matcher: 'Edit|Write', command: './c.sh', timeout: 0 });
-    ops.addHook('claude', src, { event: 'Stop', matcher: '', command: './fim.sh', timeout: 0 });
-    expect(json(project, '.claude/settings.json')).toEqual({
-      model: 'opus',
-      hooks: {
-        PreToolUse: [
-          {
-            matcher: 'Bash',
-            hooks: [
-              { type: 'command', command: './a.sh' },
-              { type: 'command', command: './b.sh', timeout: 10 },
-            ],
-          },
-          { matcher: 'Edit|Write', hooks: [{ type: 'command', command: './c.sh' }] },
-        ],
-        Stop: [{ hooks: [{ type: 'command', command: './fim.sh' }] }],
-      },
-    });
-    expect(hooksOf('claude').map((i) => [i.name, i.description])).toEqual([
-      ['PreToolUse', 'Bash → ./a.sh'],
-      ['PreToolUse', 'Bash → ./b.sh'],
-      ['PreToolUse', 'Edit|Write → ./c.sh'],
-      ['Stop', './fim.sh'],
-    ]);
-    // remover tira só o comando pedido; grupo e evento vazios somem
-    ops.removeHook(
-      'claude',
-      hooksOf('claude').find((i) => i.detail === './a.sh')!,
-    );
-    ops.removeHook(
-      'claude',
-      hooksOf('claude').find((i) => i.detail === './fim.sh')!,
-    );
-    expect(json(project, '.claude/settings.json').hooks).toEqual({
-      PreToolUse: [
-        { matcher: 'Bash', hooks: [{ type: 'command', command: './b.sh', timeout: 10 }] },
-        { matcher: 'Edit|Write', hooks: [{ type: 'command', command: './c.sh' }] },
-      ],
-    });
-    expect(json(project, '.claude/settings.json').model).toBe('opus');
-  });
-
-  it('Cursor: entradas diretas, com a versão do arquivo', () => {
-    const ops = new HooksAndPermissions(project, home);
-    ops.addHook('cursor', hookAt('cursor', '.cursor/hooks.json'), { event: 'afterFileEdit', matcher: '', command: './fmt.sh', timeout: 5 });
-    expect(json(project, '.cursor/hooks.json')).toEqual({ version: 1, hooks: { afterFileEdit: [{ command: './fmt.sh', timeout: 5 }] } });
-    ops.removeHook('cursor', hooksOf('cursor')[0]!);
-    expect(json(project, '.cursor/hooks.json')).toEqual({ version: 1, hooks: {} });
-  });
-
-  it('recusa hook de plugin, arquivo com comentários e dados incompletos', () => {
-    const ops = new HooksAndPermissions(project, home);
-    write(home, '.claude/plugins/loja/p/.claude-plugin/plugin.json', '{"name":"p"}');
-    write(
-      home,
-      '.claude/plugins/loja/p/hooks/hooks.json',
-      JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: './x.sh' }] }] } }),
-    );
-    expect(() => ops.removeHook('claude', hooksOf('claude')[0]!)).toThrow('plugin');
-    write(project, '.claude/settings.json', '{\n  // comentário\n  "hooks": {}\n}');
-    expect(() =>
-      ops.addHook('claude', hookAt('claude', '.claude/settings.json'), { event: 'Stop', matcher: '', command: './x.sh', timeout: 0 }),
-    ).toThrow('edite-o à mão');
-    expect(() =>
-      ops.addHook('claude', hookAt('claude', '~/.claude/settings.json'), { event: 'Stop', matcher: '', command: ' ', timeout: 0 }),
-    ).toThrow('comando');
-    expect(() =>
-      ops.addHook('claude', hookAt('claude', '~/.claude/settings.json'), { event: 'com espaço', matcher: '', command: 'x', timeout: 0 }),
-    ).toThrow('evento');
-  });
-
-  it('regras de permissão: lista, acrescenta e remove por lista', () => {
-    const ops = new HooksAndPermissions(project, home);
-    write(
-      project,
-      '.claude/settings.json',
-      JSON.stringify({ permissions: { allow: ['Bash(npm test)'], defaultMode: 'acceptEdits' }, hooks: {} }),
-    );
-    const src = permissionTargets('claude').find((t) => t.label === '.claude/settings.json')!.source;
-    ops.addPermission('claude', src, 'deny', 'Read(./.env)');
-    ops.addPermission('claude', src, 'allow', 'Bash(git status)');
-    expect(() => ops.addPermission('claude', src, 'allow', 'Bash(git status)')).toThrow('já está');
-    expect(() => ops.addPermission('claude', src, 'inventada', 'x')).toThrow();
-    const rules = () => scanInventory('claude', project, home).filter((i) => i.kind === 'settings' && i.layout === 'entry');
-    expect(rules().map((i) => [i.name, i.description, i.detail])).toEqual([
-      ['Bash(npm test)', 'permitir', 'allow'],
-      ['Bash(git status)', 'permitir', 'allow'],
-      ['Read(./.env)', 'negar', 'deny'],
-    ]);
-    ops.removePermission(
-      'claude',
-      rules().find((i) => i.name === 'Bash(npm test)')!,
-    );
-    expect(json(project, '.claude/settings.json')).toEqual({
-      permissions: { allow: ['Bash(git status)'], defaultMode: 'acceptEdits', deny: ['Read(./.env)'] },
-      hooks: {},
-    });
-    ops.addPermission('cursor', permissionTargets('cursor').find((t) => t.scope === 'user')!.source, 'deny', 'Shell(rm)');
-    expect(json(home, '.cursor/cli-config.json')).toEqual({ permissions: { deny: ['Shell(rm)'] } });
-  });
-});
-
-describe('arquivos de apoio das skills', () => {
-  it('lista, cria com o link no SKILL.md e apaga, sem sair da pasta da skill', () => {
-    write(project, '.claude/skills/api/SKILL.md', skill('API'));
-    write(project, '.claude/skills/api/references/modelo.ts', 'export class Modelo {}');
-    write(project, '.claude/skills/api/.oculto', 'x');
-    const item = () => scanInventory('claude', project, home).find((i) => i.kind === 'skill' && i.name === 'api')!;
-    expect(item().files).toEqual(['references/modelo.ts']);
-    const ops = new HarnessOps(project, home);
-    ops.addSkillFile(item(), 'assets/arquivo.tpl', 'conteúdo', true);
-    ops.addSkillFile(item(), 'scripts/checar.sh', '', false);
-    expect(item().files).toEqual(['assets/arquivo.tpl', 'references/modelo.ts', 'scripts/checar.sh']);
-    const md = fs.readFileSync(path.join(project, '.claude/skills/api/SKILL.md'), 'utf8');
-    expect(md.endsWith('- [assets/arquivo.tpl](assets/arquivo.tpl)\n')).toBe(true);
-    expect(md).not.toContain('checar.sh');
-    expect(() => ops.addSkillFile(item(), 'assets/arquivo.tpl', '', false)).toThrow('Já existe');
-    for (const bad of ['../fora.md', '/etc/passwd', 'SKILL.md', 'a/../../b', 'com espaço.md', 'a/b/c/d/e.md'])
-      expect(() => ops.addSkillFile(item(), bad, '', false)).toThrow('inválido');
-    ops.writeSkillFile(item(), 'references/modelo.ts', 'novo');
-    expect(fs.readFileSync(path.join(project, '.claude/skills/api/references/modelo.ts'), 'utf8')).toBe('novo');
-    ops.removeSkillFile(item(), 'scripts/checar.sh');
-    expect(item().files).toEqual(['assets/arquivo.tpl', 'references/modelo.ts']);
-    expect(() => ops.removeSkillFile(item(), 'nao-existe.md')).toThrow('não encontrado');
-    // skill de plugin: só leitura
-    write(home, '.claude/plugins/loja/p/.claude-plugin/plugin.json', '{"name":"p"}');
-    write(home, '.claude/plugins/loja/p/skills/de-plugin/SKILL.md', skill('x'));
-    expect(() =>
-      ops.addSkillFile(
-        scanInventory('claude', project, home).find((i) => i.name === 'de-plugin')!,
-        'references/a.md',
-        '',
-        false,
-      ),
-    ).toThrow('plugin');
-  });
+it('perfil genérico não presume pastas ou inventário de outra ferramenta', () => {
+  write(project, 'CLAUDE.md', 'Sentinela nativa');
+  write(project, '.claude/skills/x/SKILL.md', skill('Sentinela skill'));
+  expect(scanInventory('claude', project, home).length).toBeGreaterThan(0);
+  expect(scanInventory('personalizado', project, home, undefined, null, [project])).toEqual([]);
+  expect(new HarnessStore(project, 'personalizado', home).scan()).toEqual({ rules: [], skills: [], agents: [], inventory: [] });
+  expect(createTargets('personalizado')).toEqual([]);
+  expect(permissionTargets('personalizado')).toEqual([]);
 });

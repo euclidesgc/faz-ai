@@ -267,7 +267,10 @@ it('backup pelo navegador: GET /backup/export baixa o arquivo e POST /backup/imp
   const done = page.next('notice');
   await post('cliente-bk-1234', { type: 'backup.import.apply', token });
   expect(((await imported) as Extract<HostToWebview, { type: 'boardState' }>).state.cards.map((c) => c.title)).toEqual(['Antes do backup']);
-  expect(await done).toEqual({ type: 'notice', message: 'Board "Projeto" importado: 1 card(s) e 0 anexo(s).' });
+  expect(await done).toEqual({
+    type: 'notice',
+    message: 'Board "Projeto" importado: 1 card(s) e 0 anexo(s). Perfis desativados para revisão local: Claude Code, Cursor, Kimi Code.',
+  });
   page.close();
 });
 

@@ -1,4 +1,4 @@
-import { aiToolInfo, type AiTool, type HarnessItem, type InstallScope } from '../../../../shared/harness';
+import { baseInfo, type AiTool, type HarnessItem, type InstallScope } from '../../../../shared/harness';
 import { FLOW_SKILL_NAME } from '../../../../shared/harnessProject';
 import { copyTarget } from '../../../../shared/harnessCatalog';
 import { useAction } from '../../../useAction';
@@ -17,7 +17,7 @@ const NAMES: Record<BoardArtifact, string> = { mcp: 'faz-ai', skill: FLOW_SKILL_
 
 /** Onde o global grava, como a pessoa reconhece o arquivo ou a pasta. */
 function place(artifact: BoardArtifact, tool: AiTool): string {
-  if (artifact === 'mcp') return t(aiToolInfo(tool).mcpUser);
+  if (artifact === 'mcp') return t(baseInfo(tool).mcpUser);
   return `~/${copyTarget(tool, 'skill', 'skills', 'user')?.path ?? ''}/${FLOW_SKILL_NAME}`;
 }
 
@@ -31,7 +31,7 @@ export function BoardInstall({ artifact, tool, items }: { artifact: BoardArtifac
   const name = NAMES[artifact];
   const installedIn = (scope: InstallScope) => items.some((i) => i.kind === artifact && i.scope === scope && i.name === name);
   const where = place(artifact, tool);
-  const label = aiToolInfo(tool).label;
+  const label = baseInfo(tool).label;
 
   // registrar o servidor chama a CLI da ferramenta; o botão clicado mostra a espera até o host confirmar
   const installing = useAction((replace: boolean) => (artifact === 'mcp' ? ui.connectAI(tool) : harness.installFlowSkill(tool, replace)));

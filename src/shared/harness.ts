@@ -1,3 +1,4 @@
+import type { AiBase } from './aiProfiles';
 import type { BoardArtifact } from './artifacts';
 /** Harness do projeto: arquivos de regras e skills, gerenciados pelo board. */
 
@@ -95,13 +96,6 @@ export interface HarnessSuggestions {
   items: { location: string; reason: string }[];
   /** a IA não respondeu no formato esperado, ou a execução falhou */
   error?: string;
-}
-
-/** Uma pasta importada: o board a varre atrás de artefatos no formato da ferramenta e os oferece ao board. */
-export interface HarnessImport {
-  tool: AiTool;
-  /** caminho absoluto da pasta */
-  dir: string;
 }
 
 /** Onde o board instala o servidor MCP e a skill do fluxo: global (`user`, o padrão) ou só neste projeto. */
@@ -202,26 +196,6 @@ export interface PluginInstall {
   dir: string;
 }
 
-/** O que o board faz com um plugin instalado, pela própria ferramenta. */
-export type PluginAction = 'uninstall' | 'disable' | 'enable';
-
-/** Escopos de onde o Claude Code desinstala um plugin; os sincronizados do claude.ai e os da organização só são desativados. */
-const UNINSTALL_SCOPES = ['user', 'project', 'local'];
-
-/** As ações que valem para o plugin, conforme a ferramenta e como ele está instalado. */
-export function pluginActions(tool: AiTool, install: PluginInstall | undefined): PluginAction[] {
-  if (!install) return [];
-  // o Cursor não tem comando para desativar: um plugin local sai tirando a pasta
-  if (tool === 'cursor') return ['uninstall'];
-  const out: PluginAction[] = [install.enabled ? 'disable' : 'enable'];
-  if (/@(inline|synced|skills-dir)$/.test(install.id)) return out;
-  if (install.scopes.some((s) => UNINSTALL_SCOPES.includes(s))) out.push('uninstall');
-  return out;
-}
-
-/** Os escopos de que o Claude Code desinstala o plugin, um comando por escopo. */
-export const uninstallScopes = (install: PluginInstall): string[] => install.scopes.filter((s) => UNINSTALL_SCOPES.includes(s));
-
 /** Uma skill encontrada numa pasta ou num repositório, antes de ser instalada. */
 export interface InstallableSkill {
   /** pasta da skill, relativa à origem */
@@ -264,7 +238,7 @@ export interface Harness {
 }
 
 /** Ferramentas de IA que o board sabe configurar. O projeto trabalha com uma por vez. */
-export type AiTool = 'claude' | 'cursor' | 'kimi';
+export type AiTool = string;
 
 /** Onde e como uma ferramenta guarda os agentes do projeto (conforme a documentação de cada uma em 2026-10-02). */
 export interface AgentSpec {
@@ -273,8 +247,8 @@ export interface AgentSpec {
 }
 
 /** O que cada ferramenta lê no projeto (conforme a documentação de cada uma). */
-export const AI_TOOLS: {
-  id: AiTool;
+export const AI_BASES: {
+  id: AiBase;
   label: string;
   rules: string;
   skills: string;
@@ -313,15 +287,27 @@ export const AI_TOOLS: {
   },
 ];
 
-export const ALL_AI_TOOLS: AiTool[] = AI_TOOLS.map((t) => t.id);
-export const aiToolInfo = (tool: AiTool) => AI_TOOLS.find((t) => t.id === tool)!;
+export const ALL_AI_BASES: AiBase[] = AI_BASES.map((t) => t.id);
+/** Dados nativos desconhecidos ficam neutros, sem pastas ou permissões presumidas. */
+export const isAiBase = (value: unknown): value is AiBase => value === 'claude' || value === 'cursor' || value === 'kimi';
+export const baseValue = <T>(table: Partial<Record<AiBase, T>>, id: string | null): T | undefined => (isAiBase(id) ? table[id] : undefined);
+export const baseInfo = (tool: string) =>
+  AI_BASES.find((t) => t.id === tool) ?? {
+    id: tool,
+    label: tool,
+    rules: '',
+    skills: '',
+    mcp: '',
+    mcpUser: '',
+    agents: { dir: '', ext: '.md' },
+  };
 
 /** Lê a ferramenta salva. Versões antigas guardavam uma lista; vale a primeira. */
-export function parseAiTool(json: string | null | undefined): AiTool {
+export function parseAiTool(json: string | null | undefined, ids: readonly string[] = ALL_AI_BASES): AiTool {
   try {
     const v: unknown = JSON.parse(json ?? '');
     const first = Array.isArray(v) ? v[0] : v;
-    if (ALL_AI_TOOLS.includes(first as AiTool)) return first as AiTool;
+    if (typeof first === 'string' && ids.includes(first)) return first;
   } catch {
     /* inválido: usa o padrão */
   }
@@ -350,10 +336,3 @@ export const SKILL_FOLDERS: { id: string; label: string; hint: string }[] = [
 
 /** Caminho de um arquivo de apoio dentro da pasta da skill: `pasta/arquivo.ext`, sem subir de pasta. */
 export const SKILL_FILE_PATTERN = /^(?:[A-Za-z0-9_][A-Za-z0-9_.-]*\/){0,3}[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
-
-/** Skill sugerida para guardar modelos de classe e exemplos de código do projeto. */
-export const REFERENCE_SKILL = {
-  name: 'modelos-do-projeto',
-  description: 'Modelos de classe e exemplos de código deste projeto. Use como referência ao criar código novo do mesmo tipo.',
-  body: 'Os arquivos em `references/` são exemplos reais ou modelos de como o código deste projeto deve ser escrito.\n\nAo criar algo novo, procure aqui o modelo do mesmo tipo e siga a estrutura, os nomes e o estilo dele.\n\n## Modelos\n\nListe aqui cada arquivo de `references/` com uma linha dizendo quando usar.',
-};

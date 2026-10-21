@@ -4,7 +4,7 @@ import { headlessCommand, tmpArg, type HeadlessCommand } from '../src/extension/
 import { CONDUCTOR_AGENT, EXEC_ENFORCEMENT, agentProfiles, defaultAgent, effortToRun, parseProfiles } from '../src/shared/execution';
 import type { Agent } from '../src/shared/harness';
 import { toItemName } from '../src/shared/harnessProject';
-import { ALL_AI_TOOLS } from '../src/shared/harness';
+import { ALL_AI_BASES } from '../src/shared/harness';
 
 const exec: ExecInput = {
   agent: 'planejador',
@@ -17,7 +17,7 @@ const exec: ExecInput = {
   deniedTools: ['WebFetch'],
   model: { name: 'opus', effort: 'high' },
 };
-const args = (tool: (typeof ALL_AI_TOOLS)[number], permission: 'board' | 'full' = 'full') =>
+const args = (tool: (typeof ALL_AI_BASES)[number], permission: 'board' | 'full' = 'full') =>
   (headlessCommand(tool, { prompt: 'P', permission, exec }) as HeadlessCommand).args;
 const has = (list: string[], ...seq: string[]) => list.some((_, i) => seq.every((s, j) => list[i + j] === s));
 
@@ -86,7 +86,7 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
   });
 
   it('sem perfil, o contexto continua vazio: o Claude Code sem fontes de configuração', () => {
-    for (const tool of ALL_AI_TOOLS)
+    for (const tool of ALL_AI_BASES)
       expect(headlessCommand(tool, { prompt: 'P', permission: 'full' })).toEqual(
         headlessCommand(tool, { prompt: 'P', permission: 'full', exec: undefined }),
       );
@@ -111,7 +111,7 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
   });
 
   it('a tabela do que é imposto cobre todas as ferramentas, e as skills vão sempre como orientação', () => {
-    for (const tool of ALL_AI_TOOLS) expect(EXEC_ENFORCEMENT[tool].skills).toBe('advised');
+    for (const tool of ALL_AI_BASES) expect(EXEC_ENFORCEMENT[tool].skills).toBe('advised');
     expect(EXEC_ENFORCEMENT.claude).toMatchObject({
       agent: 'enforced',
       mcp: 'enforced',

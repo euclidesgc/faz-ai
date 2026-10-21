@@ -50,3 +50,13 @@ describe('aviso de conflito com a base (#747)', () => {
     expect(FLOW_SKILL.body).toContain('a pilha e o aviso de conflito com a base');
   });
 });
+
+describe('skill do fluxo e as pastas das ferramentas (RF23)', () => {
+  it('nenhum texto manda criar skill, regra ou agente na pasta da ferramenta', () => {
+    for (const k of FLOW_SKILLS) {
+      const text = `${k.description}\n${k.body}`;
+      expect(text).not.toMatch(/\.claude\/|\.cursor\/|\.kimi-code\//);
+      expect(text).not.toMatch(/arquivo (de|da) (skill|regra|agente)[^.\n]*pasta d[ae] ferramenta/i);
+    }
+  });
+});

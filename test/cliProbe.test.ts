@@ -143,3 +143,55 @@ describe('kimiModels', () => {
     expect(await kimiModels('kimi', undefined)).toEqual([]);
   });
 });
+describe('sondas dos perfis revisados', () => {
+  const profile = {
+    id: 'pessoal',
+    name: 'Pessoal',
+    kind: 'custom' as const,
+    base: 'generic' as const,
+    enabled: true,
+    position: 3,
+    config: { command: 'custom', versionArgs: '--about version', env: { TOKEN: 'sentinela-segredo' } },
+    credentials: { secretRef: 'a'.repeat(64), review: 'reviewed' as const, available: true },
+  };
+  beforeEach(() => execFileMock.mockReset());
+  it('versão usa argumentos separados, ambiente privado e nenhum shell; não devolve saída bruta', async () => {
+    const { profileVersion } = await import('../src/extension/cliProbe');
+    mockOutput(0, 'custom 1.2.3 sentinela-segredo');
+    expect(await profileVersion(profile, '/usr/bin/custom')).toBe('1.2.3');
+    expect(execFileMock).toHaveBeenCalledWith(
+      '/usr/bin/custom',
+      ['--about', 'version'],
+      expect.objectContaining({ shell: false, env: expect.objectContaining({ TOKEN: 'sentinela-segredo' }) }),
+      expect.any(Function),
+    );
+    mockOutput(0, 'sentinela-segredo');
+    expect(await profileVersion(profile, '/usr/bin/custom')).toBeNull();
+  });
+  it('sem statusArgs não consulta; status retorna verdadeiro, falso ou desconhecido', async () => {
+    const { profileSignedIn } = await import('../src/extension/cliProbe');
+    expect(await profileSignedIn(profile, 'custom', '/home')).toBeNull();
+    expect(execFileMock).not.toHaveBeenCalled();
+    const selected = { ...profile, config: { ...profile.config, statusArgs: 'auth status' } };
+    mockOutput(0, '');
+    expect(await profileSignedIn(selected, 'custom', '/home')).toBe(true);
+    mockOutput(1, '');
+    expect(await profileSignedIn(selected, 'custom', '/home')).toBe(false);
+    execFileMock.mockImplementationOnce((_file, _args, _opts, cb) =>
+      cb(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }), '', ''),
+    );
+    expect(await profileSignedIn(selected, 'custom', '/home')).toBeNull();
+  });
+  it('perfil pendente, desligado ou sem credencial local não inicia consulta', async () => {
+    const { profileVersion, profileSignedIn } = await import('../src/extension/cliProbe');
+    for (const selected of [
+      { ...profile, enabled: false },
+      { ...profile, credentials: { ...profile.credentials, review: 'pending' as const } },
+      { ...profile, credentials: { ...profile.credentials, available: false } },
+    ]) {
+      expect(await profileVersion(selected, 'custom')).toBeNull();
+      expect(await profileSignedIn(selected, 'custom', '/home')).toBeNull();
+    }
+    expect(execFileMock).not.toHaveBeenCalled();
+  });
+});

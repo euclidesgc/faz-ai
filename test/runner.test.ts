@@ -110,13 +110,23 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     },
   });
   router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'restrito' } } });
+  // o agente nasce no board; o servidor que ele libera também precisa estar no board
+  router.handle({ type: 'harness.selection.set', items: [{ kind: 'mcp', location: '.mcp.json#github' }], usage: 'contextual' });
+  const pendingMcp = router.snapshot().harness.library?.artifacts.find((a) => a.kind === 'mcp' && a.name === 'github');
+  if (pendingMcp)
+    router.handle({
+      type: 'harness.library.save',
+      input: { ...router.readLibraryArtifact(pendingMcp.id), server: { command: 'gh-mcp', env: { TOKEN: 'segredo' } } },
+    });
   const s0 = router.snapshot();
   const cardId = router.createCard({ typeId: s0.cardTypes[0]!.id, columnId: s0.columns[0]!.id, parentId: null, title: 'x' });
   const card = () => router.snapshot().cards.find((c) => c.id === cardId)!;
 
-  const plan = executionPlan(router.snapshot(), card(), project, home);
+  // o servidor do board vem da execução, e os demais só das definições guardadas no board
+  const bridge = { command: 'node', args: [path.join(root, 'bridge.js'), project] };
+  const plan = executionPlan(router.snapshot(), card(), router.libraryMcpDefinitions(), bridge);
   expect(JSON.parse(plan.input.mcpConfig!)).toEqual({
-    mcpServers: { 'faz-ai': { command: 'node' }, github: { command: 'gh-mcp', env: { TOKEN: 'segredo' } } },
+    mcpServers: { 'faz-ai': { type: 'stdio', ...bridge }, github: { command: 'gh-mcp', env: { TOKEN: 'segredo' } } },
   });
   expect(plan.input.mcpBlocked).toEqual(['slack']);
   expect(plan.advice).toEqual([expect.stringContaining('list_board_mcp_tools')]); // A biblioteca ensina a ponte comum mesmo quando a CLI também aceita o servidor diretamente.
@@ -130,6 +140,8 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   const runner = new AiRunner(router, {
     cwd: project,
     homeDir: home,
+    bridgePath: bridge.args[0],
+    nodePath: 'node',
     log: () => {},
     gateway: gatewayFor(router, db, (command) => {
       const file = command.args[command.args.indexOf('--mcp-config') + 1]!;
@@ -150,7 +162,7 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
 
   // noutra ferramenta, o que não vai por parâmetro vira instrução no prompt
   router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
-  expect(executionPlan(router.snapshot(), card(), project, home).advice).toEqual([
+  expect(executionPlan(router.snapshot(), card(), router.libraryMcpDefinitions(), bridge).advice).toEqual([
     'Você atua como o agente "restrito": Restrito.',
     'Instruções do agente:\nSiga.',
     expect.stringContaining('list_board_mcp_tools'),
@@ -158,26 +170,34 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     'Use só as rules, as skills e as instruções indicadas neste pedido; ignore instruções, skills e agentes carregados por conta própria.',
   ]);
 
-  // sem o servidor do board registrado, a execução restrita não começa
+  // sem o servidor do board da execução, a execução restrita não começa (o registro em arquivo não vale)
   router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude' } });
-  fs.writeFileSync(path.join(project, '.mcp.json'), JSON.stringify({ mcpServers: { github: { command: 'gh-mcp' } } }));
+  fs.writeFileSync(
+    path.join(project, '.mcp.json'),
+    JSON.stringify({ mcpServers: { 'faz-ai': { command: 'node' }, github: { command: 'outro' } } }),
+  );
   router.refreshHarness();
-  expect(() => executionPlan(router.snapshot(), card(), project, home)).toThrow('servidor do board não está registrado');
-  // com o servidor da execução, o registro em arquivo não é preciso, e o de arquivo (de outra pasta) não vale
+  expect(() => executionPlan(router.snapshot(), card(), router.libraryMcpDefinitions())).toThrow('servidor do board não está disponível');
   const server = { command: '/usr/bin/node', args: ['/dados/bridge.js', project] };
-  expect(JSON.parse(executionPlan(router.snapshot(), card(), project, home, server).input.mcpConfig!).mcpServers['faz-ai']).toEqual({
-    type: 'stdio',
-    ...server,
-  });
-  // os servidores da pasta no ~/.claude.json valem com o caminho escrito de outro jeito (o Claude Code grava com /)
-  fs.writeFileSync(path.join(project, '.mcp.json'), JSON.stringify({ mcpServers: {} }));
+  expect(
+    JSON.parse(executionPlan(router.snapshot(), card(), router.libraryMcpDefinitions(), server).input.mcpConfig!).mcpServers['faz-ai'],
+  ).toEqual({ type: 'stdio', ...server });
+  // a execução não lê .mcp.json nem ~/.claude.json: mudar a definição na ferramenta não muda a do board
   fs.writeFileSync(
     path.join(home, '.claude.json'),
-    JSON.stringify({ projects: { [`${project}/`]: { mcpServers: { github: { command: 'gh-mcp' } } } } }),
+    JSON.stringify({
+      mcpServers: { github: { command: 'global' } },
+      projects: { [`${project}/`]: { mcpServers: { github: { command: 'da-pasta' } } } },
+    }),
   );
-  expect(JSON.parse(executionPlan(router.snapshot(), card(), project, home, server).input.mcpConfig!).mcpServers.github).toEqual({
-    command: 'gh-mcp',
-  });
+  expect(
+    JSON.parse(executionPlan(router.snapshot(), card(), router.libraryMcpDefinitions(), server).input.mcpConfig!).mcpServers.github,
+  ).toEqual({ command: 'gh-mcp', env: { TOKEN: 'segredo' } });
+  // um servidor do agente que saiu do board não é buscado na pasta da ferramenta
+  router.handle({ type: 'harness.selection.set', items: [{ kind: 'mcp', location: '.mcp.json#github' }], usage: null });
+  expect(() => executionPlan(router.snapshot(), card(), router.libraryMcpDefinitions(), server)).toThrow(
+    'Envie o servidor ao board em Configurações → Harness',
+  );
   fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -233,8 +253,7 @@ it('a história leva os outros agentes do board como subagentes, e o agente dela
     executionPlan(
       router.snapshot(),
       router.snapshot().cards.find((c) => c.id === id)!,
-      project,
-      home,
+      {},
       server,
     );
 
@@ -953,6 +972,7 @@ describe('executor da IA', () => {
     expect([...CURSOR_TOOLS.board, ...CURSOR_TOOLS.edits]).not.toContain('shell_tool_call');
     expect(headlessUnsupported('claude', 'board')).toBeNull();
     expect(headlessUnsupported('cursor', 'board')).toBeNull();
+    expect(headlessUnsupported('perfil-personalizado', 'board')).toContain('ainda não disponível');
     // o Claude Code recusa pular as permissões como root
     expect(headlessUnsupported('claude', 'full', 0)).toContain('root');
     expect(headlessUnsupported('claude', 'full', 1000)).toBeNull();
@@ -993,6 +1013,7 @@ describe('executor da IA', () => {
 
   it('guarda permissão e tempo limite, recusando valores inválidos', () => {
     expect(router.snapshot().board.runner).toEqual({
+      parallelSubtasks: 2,
       defaultAgent: '',
       permission: 'board',
       timeoutMinutes: 45,
@@ -1081,7 +1102,7 @@ describe('log das execuções de IA', () => {
       },
     });
     router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'restrito' } } });
-    const summary = executionPlan(router.snapshot(), card(), dir, '').summary.join(' | ');
+    const summary = executionPlan(router.snapshot(), card(), {}).summary.join(' | ');
     logged.start(storyId);
 
     const row = only();
@@ -1131,7 +1152,7 @@ describe('log das execuções de IA', () => {
     router.handle({ type: 'field.setValue', cardId: storyId, fieldId: modeloField.id, value: modelValue(sonnet.id, 'medium') });
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
     router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
-    expect(executionPlan(router.snapshot(), card(), dir, '').manifest.model).toMatchObject({ name: 'sonnet', effort: 'medium' });
+    expect(executionPlan(router.snapshot(), card(), {}).manifest.model).toMatchObject({ name: 'sonnet', effort: 'medium' });
 
     logged.start(storyId, 'manual', 'summarize');
     // a faixa "Alto" do catálogo embutido do Claude Code é opus/high, independente do Modelo do card
@@ -1451,15 +1472,18 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
   it('regra com reserva + limite esgotado: segunda chamada ao gateway com o modelo reserva, comentário na conversa, sem bloqueio', () => {
     useSonnetMedium();
     ruleWithFallback(modelValue(fable().id, 'low'));
-    runner.start(storyId);
+    const done = vi.fn();
+    runner.start(storyId, { origin: 'manual', advice: ['ORIENTAÇÃO PRESERVADA'], onExit: done });
     expect(procs).toHaveLength(1);
     procs[0]!.emit(usageLimitResult());
     procs[0]!.exit(1);
+    expect(done).not.toHaveBeenCalled();
 
     expect(procs).toHaveLength(2);
     const args = procs[1]!.command.args;
     expect(args[args.indexOf('--model') + 1]).toBe('fable');
     expect(args[args.indexOf('--effort') + 1]).toBe('low');
+    expect(procs[1]!.command.stdin).toContain('ORIENTAÇÃO PRESERVADA');
     expect(card().status).toBe('running'); // não bloqueou nem esperou resposta: a reserva está em curso
     expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
     expect(lastMessage()!.body).toBe('O `Sonnet 5.5 - médio` esgotou o limite; a execução segue com `Fable 5.1 - baixo`.');
@@ -1467,6 +1491,7 @@ describe('reserva de modelo quando o limite esgota (história #257)', () => {
     // a retentativa termina bem: segue como qualquer execução normal (aqui, a IA só respondeu na conversa)
     ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
     procs[1]!.exit(0);
+    expect(done).toHaveBeenCalledOnce();
     expect(card().status).toBe('waiting_answer');
   });
 

@@ -65,10 +65,13 @@ beforeAll(async () => {
   const firstCol = (wf: string) => s.columns.find((c) => c.workflowId === wf)!;
   storyId = router.createCard({ typeId: typeOf(parentWf.id).id, columnId: firstCol(parentWf.id).id, parentId: null, title: 'História' });
   const sub = router.createCard({ typeId: typeOf(childWf.id).id, columnId: firstCol(childWf.id).id, parentId: storyId, title: 'Tarefa' });
-  router.handle({ type: 'harness.rule.write', name: 'AGENTS.md', content: '# Regras' });
-  router.handle({ type: 'harness.skill.create', name: 'revisar-spec', description: 'Quando revisar', content: 'Passos' });
-  router.handle({ type: 'harness.skill.create', name: 'desligada', description: 'x', content: 'y' });
-  router.handle({ type: 'harness.skill.setEnabled', name: 'desligada', enabled: false });
+  router.handle({ type: 'harness.artifact.save', kind: 'rule', name: 'regras-gerais', body: '# Regras' });
+  router.handle({
+    type: 'harness.artifact.save',
+    kind: 'skill',
+    name: 'revisar-spec',
+    body: '---\nname: revisar-spec\ndescription: Quando revisar\n---\n\nPassos\n',
+  });
   router.handle({
     type: 'harness.agent.create',
     scope: 'project',
@@ -229,7 +232,7 @@ describe('telas montam sem erro', () => {
     expect(html(<FieldsSettings />)).toContain('Skills');
     const rules = html(<RulesSettings />);
     expect(rules).toContain('Avançar de fase');
-    expect(rules).toContain('Preencher o modelo sugerido');
+    expect(rules).not.toContain('mudou para a aba Modelos');
     const models = html(<ModelsSettings />);
     expect(models).not.toContain('gpt-6.1-sol'); // só a ferramenta em uso
     for (const text of [
@@ -272,9 +275,9 @@ describe('telas montam sem erro', () => {
     expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);
     // cada aba do Harness (e cada assunto da ferramenta) é montada por vez: juntamos o texto de todas
     const harness = [
-      ...(['tool', 'cursor'] as const).map((harnessTab) => ({ harnessTab, harnessTopic: 'rules' as const })),
-      ...(['rules', 'skill', 'agent', 'mcp', 'command', 'hook', 'other'] as const).map((harnessTopic) => ({
-        harnessTab: 'claude' as const,
+      { harnessTab: 'tool' as const, harnessTopic: 'rules' as const },
+      ...(['rules', 'skill', 'agent', 'mcp'] as const).map((harnessTopic) => ({
+        harnessTab: 'artifacts' as const,
         harnessTopic,
       })),
     ]
@@ -286,18 +289,7 @@ describe('telas montam sem erro', () => {
     for (const text of [
       'Ferramenta deste projeto',
       'type="radio"',
-      'Claude Code',
-      'Cursor',
-      'Biblioteca do board',
-      'Criar',
-      'Assistente guiado',
-      'Importar artefatos',
-      'Sub-agentes',
-      'Gerar com base no projeto',
-      'Modo no board',
-      'revisar-spec',
-      'MCPs',
-      'deste projeto',
+      'Artefatos do board',
       'Instalar (padrão da ferramenta)',
       'Execução pela conversa e heartbeat',
       'A IA lê o projeto e usa as ferramentas do board',
@@ -305,8 +297,6 @@ describe('telas montam sem erro', () => {
       'Heartbeat ligado',
       'Rodar o heartbeat agora',
       'Agente padrão',
-      'revisor-de-spec',
-      '.claude/agents/revisor-de-spec.md',
     ])
       expect(harness).toContain(text);
   });

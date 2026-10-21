@@ -1,6 +1,10 @@
+import { builtinPolicyCatalog, simulatePolicyScenario, type PolicyLibrary, type PolicyScenario } from '../../shared/policyManagement';
+import { resolveContextDraft, type ContextDraftResolution } from '../../shared/contextDraftResolution';
+import type { ContextActivityTarget } from '../../shared/contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
 import { scanLibraryFolder } from '../libraryImport';
-import { agentOfArtifact } from '../../shared/artifacts';
+import { agentOfArtifact, type ArtifactKind } from '../../shared/artifacts';
+import type { ImportSource } from '../../shared/artifactImport';
 import * as path from 'node:path';
 import type { BoardRequirement } from '../../shared/requirements';
 import type { EnvironmentReport } from '../../shared/environment';
@@ -11,7 +15,7 @@ import { newId } from '../db/ids';
 import type { ImportSummary } from '../../shared/backup';
 import type { AiActivity, Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
-import type { AiTool, HarnessSuggestions, PluginAction } from '../../shared/harness';
+import type { AiTool, HarnessSuggestions } from '../../shared/harness';
 import type { ProjectProfile } from '../../shared/projectProfile';
 import { readProjectProfile } from '../projectProfile';
 import type { ClaudeCli } from '../plugins';
@@ -37,6 +41,9 @@ import { initModels, modelHandlers } from './handlers/models';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
 import { branchRenameHandlers } from './handlers/branchRename';
 import { settleDelivery } from '../delivery';
+import { WorkRepo } from '../repositories/workRepo';
+import { credentialsFor } from '../credentials';
+import { RunMcpSessions, type RunMcpAccess } from '../mcp/runSessions';
 
 export type { RouterOptions };
 
@@ -44,6 +51,9 @@ export type { RouterOptions };
 export interface Origin {
   author?: string;
   source?: 'human' | 'ai';
+  /** Somente o host liga a origem à apresentação da conexão MCP. */
+  runToken?: string;
+  externalMcp?: true;
 }
 
 /** O que o host faz pelo Diagnóstico do ambiente. */
@@ -121,19 +131,12 @@ const bridgeOnly = {
   'ai.autopilot.pause': viaBridge,
   'ai.autopilot.resume': viaBridge,
   'card.workspace.open': viaBridge,
-  'harness.item.open': viaBridge,
-  'harness.file.read': viaBridge,
-  'harness.plugin.apply': viaBridge,
   'harness.refresh': viaBridge,
-  'harness.file.write': viaBridge,
-  'harness.item.create': viaBridge,
-  'harness.item.write': viaBridge,
   'harness.project.profile': viaBridge,
   'harness.agent.assist': viaBridge,
-  'harness.skill.file.create': viaBridge,
-  'harness.skill.file.open': viaBridge,
-  'harness.install.scan': viaBridge,
   'harness.import.pick': viaBridge,
+  'harness.import.scan': viaBridge,
+  'harness.artifact.read': viaBridge,
   'harness.library.open': viaBridge,
   'harness.library.pick': viaBridge,
   'harness.library.pickArtifacts': viaBridge,
@@ -148,6 +151,9 @@ const bridgeOnly = {
   // ler o log não muda o board: a `HostBridge` responde por `panelMetrics`, sem passar por `handle`
   'metrics.query': viaBridge,
   'card.usage.query': viaBridge,
+  'contextPlanning.preview': viaBridge,
+  'executionPolicy.read': viaBridge,
+  'executionPolicy.simulate': viaBridge,
   'backup.export': viaBridge,
   'backup.import.pick': viaBridge,
   'backup.import.cancel': viaBridge,
@@ -168,6 +174,7 @@ const HANDLERS: HandlerMap = {
 
 /** Aplica mensagens do webview no banco. Não depende da API do VSCode. */
 export class MessageRouter {
+  readonly executions: RunMcpSessions;
   private ctx: BoardContext;
   private listeners = new Set<() => void>();
   private errorListeners = new Set<(message: string) => void>();
@@ -194,6 +201,12 @@ export class MessageRouter {
 
   constructor(dbHandle: DbHandle, opts: RouterOptions) {
     this.ctx = new BoardContext(dbHandle, opts);
+    this.executions = new RunMcpSessions({
+      repo: () => this.work,
+      state: () => this.snapshot(),
+      definitions: () => this.libraryMcpDefinitions(),
+      save: () => dbHandle.scheduleSave(),
+    });
     this.store = this.ctx.store;
     this.harnessStore = this.ctx.harness.store;
     this.ctx.harness.load();
@@ -205,6 +218,25 @@ export class MessageRouter {
 
   get boardId(): string {
     return this.ctx.boardId;
+  }
+  executionPolicyLibrary(): PolicyLibrary {
+    return { snapshot: this.ctx.executionPolicies.snapshot(this.boardId), ...builtinPolicyCatalog(this.snapshot()) };
+  }
+  executionPolicyHistory(id: string, before = Number.MAX_SAFE_INTEGER) {
+    if (!Number.isSafeInteger(before) || before < 1 || typeof id !== 'string' || !id || id.length > 240)
+      throw new Error('Página de histórico inválida.');
+    const records = this.ctx.executionPolicies.history(this.boardId, id, { before, limit: 51 });
+    return { history: records.slice(0, 50), nextBefore: records.length > 50 ? records[49]!.revision : null };
+  }
+  simulateExecutionPolicy(scenario: PolicyScenario) {
+    return simulatePolicyScenario(this.snapshot(), this.ctx.executionPolicies.snapshot(this.boardId), scenario);
+  }
+  get work(): WorkRepo {
+    return new WorkRepo(this.ctx.dbHandle.db, this.ctx.boardId);
+  }
+  /** A sessão MCP devolve uma capacidade restrita pelo proxy; a interface humana não a recebe. */
+  mcpAccess(): RunMcpAccess | null {
+    return null;
   }
 
   /** Lê um valor da tabela meta do board (ex.: config do Git da IDE); undefined se não existir. */
@@ -246,13 +278,16 @@ export class MessageRouter {
   libraryMcpDefinitions(): Record<string, unknown> {
     return this.ctx.library.mcpDefinitions();
   }
+  redactCredentials(text: string): string {
+    return credentialsFor(this.ctx.dbHandle.db).redact(text);
+  }
 
   snapshot(): BoardState {
     const s = this.ctx.boards.snapshot(this.ctx.boardId, this.ctx.opts.author);
     const { current, install } = this.ctx.harness;
     return {
       ...s,
-      // os agentes do board são os arquivos marcados: derivados aqui, nunca gravados
+      // os agentes do board são as cópias guardadas no banco (escopo `board`): derivados aqui, nunca gravados
       board: {
         ...s.board,
         execProfiles: agentProfiles(
@@ -261,7 +296,7 @@ export class MessageRouter {
             : current.agents,
           s.harnessSelection,
           s.board.runner.defaultAgent,
-        ),
+        ).map((p) => (current.library && p.scope !== 'builtin' ? { ...p, scope: 'board' as const } : p)),
       },
       harness: current,
       boardServer: boardServerFootprint(),
@@ -277,6 +312,7 @@ export class MessageRouter {
       environment: this.environment,
       environmentFirstRun: this.environmentFirstRun,
       harnessInstall: install ? { source: install.source, skills: install.skills } : null,
+      artifactImport: this.ctx.importer.current,
       harnessSuggestions: this.suggestions,
       mainBranch: this.ctx.mainBranch(),
       orphans: this.orphans,
@@ -289,6 +325,11 @@ export class MessageRouter {
    */
   handle(msg: WebviewToHost, ctx: Origin = {}): BoardState {
     // o mapa garante o handler do tipo certo; o cast só junta a união de handlers numa assinatura
+    if (
+      (msg.type === 'settings.executionPolicy.save' || msg.type === 'settings.executionPolicy.remove') &&
+      (ctx.source === 'ai' || ctx.externalMcp || ctx.runToken !== undefined)
+    )
+      throw new Error('Políticas executáveis exigem revisão humana.');
     const handler = HANDLERS[msg.type] as Handler<MessageType>;
     const actor = this.actorOf(ctx);
     // o log: sonda antes, registro depois — só quando o handler diz que o board mudou (o que não aconteceu não entra)
@@ -326,7 +367,11 @@ export class MessageRouter {
   }
 
   private actorOf(ctx: Origin): Actor {
-    return { author: ctx.author ?? this.ctx.opts.author, byAi: ctx.source === 'ai' };
+    if (ctx.runToken !== undefined) {
+      const binding = this.executions.assert(ctx.runToken);
+      return { author: ctx.author ?? 'IA', byAi: true, runId: binding.attempt.runId };
+    }
+    return { author: ctx.author ?? this.ctx.opts.author, byAi: ctx.source === 'ai', ...(ctx.externalMcp ? { runId: null } : {}) };
   }
 
   /** O que falta para o board trabalhar com a ferramenta de IA (informado pelo host, que confere). */
@@ -542,6 +587,19 @@ export class MessageRouter {
     return getPanelMetrics(this.ctx.dbHandle.db, this.ctx.boardId, query);
   }
 
+  /** Metadados do rascunho a partir do banco do host; nenhuma inferência ou admissão é executada. */
+  previewContextDraft(target: ContextActivityTarget): ContextDraftResolution {
+    const state = this.snapshot();
+    state.harness = {
+      ...state.harness,
+      library: {
+        directory: state.harness.library?.directory ?? '',
+        artifacts: this.ctx.library.repo.list(this.ctx.boardId).map((a) => ({ ...a, path: '' })),
+      },
+    };
+    return resolveContextDraft(state, target);
+  }
+
   /** O que o card gastou até agora, por fase (e, numa história, as sub-tarefas), lido do log das execuções. */
   cardUsage(cardId: string): CardUsage {
     const s = this.ctx.boards.snapshot(this.ctx.boardId, this.ctx.opts.author);
@@ -585,13 +643,6 @@ export class MessageRouter {
     this.ctx.harness.setClaudeCli(cli, () => this.changed());
   }
 
-  /** Desinstala, desativa ou ativa plugins e devolve o aviso para a pessoa. */
-  async applyPlugins(tool: AiTool, action: PluginAction, ids: string[]): Promise<string> {
-    const notice = await this.ctx.harness.applyPlugins(tool, action, ids);
-    this.changed();
-    return notice;
-  }
-
   /** Guarda a origem de skills já disponível numa pasta, para a pessoa escolher o que instalar. */
   setInstall(source: string, dir: string, cleanup: () => void): void {
     this.ctx.harness.setInstall(source, dir, cleanup);
@@ -600,50 +651,33 @@ export class MessageRouter {
 
   clearInstall(): void {
     this.ctx.harness.clearInstall();
+    this.ctx.importer.cancel();
   }
 
-  /** Cria um arquivo de apoio numa skill e devolve o caminho dele, para abrir no editor. */
-  createSkillFile(tool: AiTool, skillMd: string, rel: string, link: boolean): string {
-    const file = this.ctx.harness.createSkillFile(tool, skillMd, rel, link);
-    this.changed();
-    return file;
+  /** Lê a origem de artefatos e deixa a prévia no estado do board. */
+  async scanImport(source: ImportSource): Promise<void> {
+    try {
+      await this.ctx.importer.scan(source);
+    } finally {
+      this.notify();
+    }
   }
 
-  /** Grava um arquivo de apoio numa skill do projeto (usado pela IA). */
-  writeSkillFile(name: string, rel: string, content: string): string {
-    const file = this.ctx.harness.writeSkillFile(name, rel, content);
-    this.changed();
-    return file;
+  /** O aviso do último `harness.import.apply`, entregue uma vez. */
+  takeImportNotice(): string | null {
+    const notice = this.ctx.harness.importNotice;
+    this.ctx.harness.importNotice = null;
+    return notice;
   }
 
-  /** Caminho de um arquivo de apoio que a varredura listou. */
-  skillFilePath(tool: AiTool, skillMd: string, rel: string): string {
-    return this.ctx.harness.skillFilePath(tool, skillMd, rel);
+  /** O conteúdo de um artefato do board para o editor (segredos do MCP mascarados). */
+  readArtifact(kind: ArtifactKind, name: string, file?: string) {
+    return this.ctx.library.content(kind, name, file);
   }
 
   /** Conteúdo de um arquivo do harness para o editor do board, e se ele pode ser alterado. */
   readHarnessFile(file: string): { content: string; readonly: boolean } {
     return this.ctx.harness.readFile(file);
-  }
-
-  /** Grava um arquivo do harness editado no board e relê a varredura. */
-  writeHarnessFile(file: string, content: string): void {
-    this.ctx.harness.writeFile(file, content);
-    this.changed();
-  }
-
-  /** Cria um item do harness e devolve o caminho do arquivo, para abrir no editor. */
-  createHarnessItem(tool: AiTool, source: number, name: string, description: string): string {
-    const file = this.ctx.harness.createItem(tool, source, name, description);
-    this.changed();
-    return file;
-  }
-
-  /** Cria um item do harness com o conteúdo pronto e devolve o caminho do arquivo, para abrir no editor. */
-  writeHarnessItem(tool: AiTool, source: number, name: string, content: string, files?: string[], append?: boolean): string {
-    const file = this.ctx.harness.writeItem(tool, source, name, content, files, append);
-    this.changed();
-    return file;
   }
 
   /** O perfil do projeto aberto, para os assistentes de regras e de skills. */
