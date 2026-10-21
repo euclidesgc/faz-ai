@@ -1,5 +1,6 @@
 import type { Database } from 'sql.js';
 import {
+  BUILTIN_ISOLATION,
   BUILTIN_PROFILES,
   newProfileId,
   unknownProfileCapabilities,
@@ -26,7 +27,7 @@ const knownConfigKeys = [
   'statusArgs',
   'authPatterns',
 ];
-const copyKeys = ['command', 'env', 'extraArgs', 'installUrl', 'authPatterns'];
+const copyKeys = ['command', 'env', 'extraArgs', 'installUrl', 'authPatterns', 'isolation'];
 /** Configuração livre nunca passa pelo SQLite nem retorna ao editor. */
 export class AiProfileRepo {
   constructor(private readonly db: Database) {}
@@ -39,6 +40,15 @@ export class AiProfileRepo {
       if (!result.some((row) => row.id === p.id)) result.push({ ...structuredClone(p), capabilities: unknownProfileCapabilities() });
     return result.sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
   }
+  /** O isolamento declarado não é segredo: é a única parte da configuração que volta para a leitura pública. */
+  private isolationOf(row: Row): AiProfileConfig {
+    try {
+      const saved = credentialsFor(this.db).get(ownerOf(str(row.board_id), str(row.id)), str(row.secret_ref));
+      return saved?.isolation === undefined ? {} : { isolation: saved.isolation as AiProfileConfig['isolation'] };
+    } catch {
+      return {};
+    }
+  }
   private publicProfile(row: Row): AiProfile {
     const builtin = BUILTIN_PROFILES.find((p) => p.id === row.id);
     return {
@@ -49,7 +59,7 @@ export class AiProfileRepo {
             name: str(row.name),
             kind: str(row.kind) as AiProfile['kind'],
             base: str(row.base) as AiProfile['base'],
-            config: {},
+            config: this.isolationOf(row),
           }),
       enabled: bool(row.enabled),
       position: num(row.position),
@@ -153,7 +163,13 @@ export class AiProfileRepo {
       profiles.map((p) => p.id),
     );
     const sourceRow = one(this.db, 'SELECT secret_ref FROM ai_profiles WHERE board_id = ? AND id = ?', [boardId, id]);
-    const config = source.kind === 'builtin' ? null : credentialsFor(this.db).get(ownerOf(boardId, id), str(sourceRow?.secret_ref));
+    // a cópia de um pronto leva a lista de itens que a CLI carrega (declaração herdada, sem a garantia do base)
+    const config =
+      source.kind === 'builtin'
+        ? source.base === 'generic'
+          ? null
+          : { isolation: { loads: structuredClone(BUILTIN_ISOLATION[source.base].loads) } }
+        : credentialsFor(this.db).get(ownerOf(boardId, id), str(sourceRow?.secret_ref));
     const ref = config ? credentialsFor(this.db).put(ownerOf(boardId, targetId), config) : null;
     run(
       this.db,

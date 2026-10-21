@@ -51,7 +51,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'get_harness',
-    'O banco de artefatos do board: a ferramenta em uso, o agente padrão e, com o modo (`usage`), as rules, skills, agentes e servidores MCP enviados ao board em Configurações → Harness. Toda execução parte de contexto vazio: o que não está no board não existe para ela. Com onlySelected = false, lista tudo que a ferramenta carrega nesta máquina (projeto, pasta do usuário, plugins e pastas importadas), esteja no board ou não.',
+    'O banco de artefatos do board: a ferramenta em uso, o agente padrão e, com o modo (`usage`), as rules, skills, agentes e servidores MCP enviados ao board em Configurações → Harness. `cliLoads` diz o que a CLI da ferramenta carrega por conta própria e se o contexto vazio está imposto: lista vazia não prova isolamento. Com onlySelected = false, lista tudo que a ferramenta carrega nesta máquina (projeto, pasta do usuário, plugins e pastas importadas), esteja no board ou não.',
     {
       onlySelected: z
         .boolean()

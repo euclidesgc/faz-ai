@@ -158,4 +158,21 @@ describe('Ferramentas de IA', () => {
     expect(lastSent('settings.aiProfiles.remove')).toMatchObject({ id: custom.id });
     confirmLast();
   });
+
+  it('mostra o selo de isolamento sem tratar lista vazia como prova e grava o que a pessoa marcar', async () => {
+    show();
+    const claude = within(profileCard('Claude Code'));
+    expect(claude.getByText('Sem prova de isolamento')).toBeInTheDocument();
+    expect(within(profileCard('Cursor')).getByText('Carrega por conta própria')).toBeInTheDocument();
+    await userEvent.click(claude.getByText('Capacidades e evidências'));
+    expect(claude.getByText(/Conferido na documentação em 2026-10-16 · versão Claude Code/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Novo perfil' }));
+    const form = within(screen.getByLabelText('Novo perfil de CLI'));
+    await userEvent.type(form.getByRole('textbox', { name: 'Nome' }), 'Outra CLI');
+    await userEvent.type(form.getByRole('textbox', { name: 'Comando' }), 'outra-cli');
+    await userEvent.click(form.getByRole('checkbox', { name: 'Hooks · Usuário' }));
+    await userEvent.click(form.getByRole('button', { name: 'Salvar perfil' }));
+    expect(lastSent('settings.aiProfiles.save').profile.config.isolation).toEqual({ loads: [{ kind: 'hook', scope: 'user' }] });
+    confirmLast();
+  });
 });

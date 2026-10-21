@@ -125,7 +125,7 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
       return {
         title: t('A skill do fluxo ({name}) não está pronta para o {tool}', { name: FLOW_SKILL_NAME, tool }),
         detail: t(
-          'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem de contexto vazio: a skill precisa existir e estar no board em modo "Sempre" em Configurações → Harness. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.',
+          'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem só do que está no board (no Claude Code, contexto vazio imposto; nas outras CLIs, veja o que elas carregam sozinhas em Ferramentas de IA): a skill precisa existir e estar no board em modo "Sempre" em Configurações → Harness. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.',
         ),
       };
     case 'mcp-enable':
@@ -141,7 +141,7 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
         agents: t('nenhum agente do board'),
         rules: t('regras no board ainda desligadas, sem revisão'),
         missing: t('artefato do board que sumiu da origem'),
-        cursor: t('artefatos do projeto que entram no contexto sem passar pelo board'),
+        isolation: t('artefatos que a CLI carrega sem passar pelo board'),
       };
       return {
         title: t('O harness do board ainda não está definido'),

@@ -1,4 +1,4 @@
-import { toolInfo, activeProfile, resolveModelOption } from '../shared/aiProfiles';
+import { toolInfo, activeProfile, contextEnforced, resolveModelOption } from '../shared/aiProfiles';
 import type { AgentAssistInput, AgentAssistResult } from '../shared/agentAssistance';
 import { agentAssistancePrompt, parseAgentAssistance } from './agentAssistance';
 import * as fs from 'node:fs';
@@ -339,8 +339,7 @@ export class ChatSession {
             profile: null,
             agent: null,
             autonomous: false,
-            // toda execução pelo board parte de contexto vazio
-            clean: true,
+            clean: contextEnforced(activeProfile(state.board)),
             skills: [],
             mcp: [],
           },

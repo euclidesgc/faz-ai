@@ -485,7 +485,10 @@ describe('perfis de execução', () => {
       mcpServers: ['faz-ai', 'github'],
       deniedTools: ['WebFetch'],
     });
-    expect(card.execution.enforcedByBoardRun).toEqual(['agent', 'mcp', 'tools', 'model', 'context']);
+    expect(card.execution.enforcedByBoardRun).toEqual(['agent', 'mcp', 'tools', 'model']);
+    // lista vazia de itens conhecidos não é prova de contexto vazio
+    expect(card.execution.cliLoads).toMatchObject({ contextEnforced: false, loads: [] });
+    expect(card.execution.cliLoads.summary).toContain('sem prova de isolamento');
     expect(card.requiredSkills.map((k: any) => k.name)).toEqual(['planejar', 'testar']);
     await call('create_card', { title: 'Sub', type: 'Sub-tarefa', parent: 1 });
     expect((await call('get_card', { card: 2 })).data.execution.profile).toBe('planejador');

@@ -1,9 +1,11 @@
-import { baseValue } from './harness';
+import { activeProfile } from './aiProfiles';
 import { estimateAgentContext, estimateContext, tokensOf, type ContextEstimate } from './contextEstimate';
 import { contextAgentOrigin, contextFilesOf, type ContextOrigin } from './contextSources';
 import {
   agentManifestOf,
-  EXEC_ENFORCEMENT,
+  enforcementOf,
+  type Enforcement,
+  type ExecAspect,
   executionCardSelectionsOf,
   manifestOf,
   profileOf,
@@ -30,7 +32,7 @@ export interface InstructionOverlap {
 export interface ExecutionContextPreview {
   estimate: ContextEstimate;
   items: ExecutionContextItem[];
-  enforcement: (typeof EXEC_ENFORCEMENT)[keyof typeof EXEC_ENFORCEMENT];
+  enforcement: Record<ExecAspect, Enforcement>;
   overlaps: InstructionOverlap[];
 }
 
@@ -103,14 +105,7 @@ function preview(s: BoardState, m: ExecManifest, estimate: ContextEstimate, p: E
   return {
     estimate,
     items,
-    enforcement: baseValue(EXEC_ENFORCEMENT, s.board.aiTool) ?? {
-      agent: 'advised',
-      skills: 'advised',
-      mcp: 'advised',
-      tools: 'advised',
-      model: 'advised',
-      context: 'advised',
-    },
+    enforcement: enforcementOf(activeProfile(s.board)),
     overlaps: instructionOverlaps(s.board.aiTool === 'claude' ? m : { ...m, delegates: [] }),
   };
 }

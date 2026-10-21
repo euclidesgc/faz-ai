@@ -4,6 +4,8 @@ import { baseInfo, type AiTool } from '../../shared/harness';
 import { NODE_MIN_MAJOR, missingCount, type EnvCheck, type InstallStepKind } from '../../shared/environment';
 import { CLI_COMMAND } from '../../shared/requirements';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
+import { activeProfile, profileIsolation } from '../../shared/aiProfiles';
+import { leaksList } from '../isolation';
 import { useBoardStore } from '../store/boardStore';
 import { t, tn } from '../i18n';
 import { ui } from '../commands';
@@ -14,7 +16,7 @@ import { CopyCommand, RequirementFix, requirementTexts } from './RequirementsBan
 import { Button, Hint, IconExternal, IconMissing, IconOk, IconSkipped } from './ui';
 
 /** O nome do item e, no hint, como o board o usa; no idioma da interface. */
-function texts(c: EnvCheck, projectTool: AiTool): { title: string; hint: string } {
+function texts(c: EnvCheck, projectTool: AiTool, leaks: string): { title: string; hint: string } {
   const tool = baseInfo(c.tool ?? projectTool).label;
   switch (c.id) {
     case 'node':
@@ -89,11 +91,12 @@ function texts(c: EnvCheck, projectTool: AiTool): { title: string; hint: string 
           'Um artefato do board sumiu da origem; a aba do assunto mostra quais estão ausentes, para tirar do board ou repor o arquivo.',
         ),
       };
-    case 'harness-cursor':
+    case 'harness-isolation':
       return {
-        title: t('Artefatos do projeto fora do board'),
+        title: t('Artefatos fora do board que a CLI carrega'),
         hint: t(
-          'A linha de comando do Cursor não desliga nada: regras, servidores MCP e hooks do projeto entram no contexto sem passar pelo board. Desligue nas configurações do Cursor ou remova do projeto; o board só confere.',
+          'A linha de comando do {tool} não desliga tudo: {list} entram no contexto sem passar pelo board. Desligue na configuração da ferramenta ou remova; o board só confere.',
+          { tool, list: leaks },
         ),
       };
     case 'permission':
@@ -223,7 +226,8 @@ interface RowProps {
 
 /** Uma linha da lista: estado, nome (com o hint), versão, site e o comando; o que depende dela vem dentro. */
 function Row({ check, projectTool, busy, onFixed }: RowProps) {
-  const x = texts(check, projectTool);
+  const profile = useBoardStore((s) => activeProfile(s.state!.board));
+  const x = texts(check, projectTool, leaksList(profileIsolation(profile)));
   const r = check.requirement;
   const openSettings = useBoardStore((s) => s.openSettings);
   const nodeTooOld = check.id === 'node' && check.status === 'missing' && check.version;
