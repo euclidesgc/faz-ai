@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { EMPTY_REWORK } from '../src/shared/metrics';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -1704,8 +1705,10 @@ describe('retrabalho pelo get_metrics e no painel', () => {
     router.handle({ type: 'card.move', cardId: card(5).id, columnId: done.id, position: 0 });
 
     const rework = router.panelMetrics({}).sections.rework;
-    expect(rework.phases).toEqual([{ phase: 'PRD', reviews: 4, approved: 2, adjusted: 1, resolved: 2, firstPass: 1 }]);
-    expect(rework.escapes).toEqual({ stories: 2, withBugs: 1, bugs: 1 });
+    expect(rework.phases).toEqual([
+      { phase: 'PRD', reviews: 4, approved: 2, adjusted: 1, resolved: 2, firstPass: 1, ...EMPTY_REWORK.aiSignals },
+    ]);
+    expect(rework.escapes).toEqual({ stories: 2, withBugs: 1, bugs: 1, autonomousStories: 0, autonomousWithBugs: 0, autonomousBugs: 0 });
 
     const text = (await call('get_metrics', { rework: true })).text;
     expect(text).toContain('retrabalho por fase');

@@ -1,10 +1,18 @@
 // O retrabalho do painel e do get_metrics: o que a IA entregou para revisão, o que a pessoa aprovou de
 // primeira e o que voltou com pedido de ajuste, por fase e por modelo, e os bugs que apareceram depois
 // de uma história concluída. É o sinal de qualidade que os benchmarks não medem e o board consegue ver.
-// `reworkOf` é puro (as contas); `panelRework` só faz as consultas.
+// `reworkOf` e `aiSignalsOf` são puros (as contas); `panelRework` só faz as consultas. Os sinais da IA
+// (#605) medem a precisão onde não há revisão de pessoa, como no modo autônomo: commits na Revisão,
+// `npm test` com falha e commits depois do pull request, lidos dos comandos de Bash de cada execução.
 import type { Database } from 'sql.js';
 import { norm } from '../../shared/filters';
-import { ZERO_SIGNAL, type MetricsRework, type MetricsReworkModel, type MetricsReworkPhase } from '../../shared/metrics';
+import {
+  ZERO_SIGNAL,
+  type MetricsAiSignal,
+  type MetricsRework,
+  type MetricsReworkModel,
+  type MetricsReworkPhase,
+} from '../../shared/metrics';
 import { all, num, str } from '../db/query';
 
 /** Uma mudança de status do log, com o modelo da execução que a produziu ('' = sem execução do board). */
@@ -23,6 +31,88 @@ export interface ReworkEventRow {
 export interface ReworkPeriod {
   start: number;
   end: number;
+}
+
+/** Uma chamada registrada de Bash de uma execução (`ai_run_bash` ⨝ `ai_runs`), com o que os sinais precisam. */
+export interface BashSignalRow {
+  runId: string;
+  /** a história: o card da execução ou o pai dele; null = execução sem card */
+  storyId: string | null;
+  phase: string;
+  autonomous: boolean;
+  startedAt: number;
+  /** o comando-base, ex.: 'git commit', 'npm test' */
+  command: string;
+  calls: number;
+  failed: number;
+  /** quando a história registrou o pull request (primeiro `pull_request_set`); undefined = sem PR */
+  prAt?: number;
+}
+
+/** Os sinais da IA de uma fase: o que `MetricsReworkPhase` tem além das revisões. */
+export type PhaseSignals = Pick<MetricsReworkPhase, 'bashRuns' | 'reviewFixes' | 'testFailures' | 'commitsAfterPr'>;
+
+/** Soma `count` ocorrências de um sinal e marca a chave (execução ou história) como atingida, com a parte autônoma. */
+class SignalSum {
+  private seen = new Map<string, boolean>();
+  private count = 0;
+  private autonomousCount = 0;
+  add(key: string, count: number, autonomous: boolean): void {
+    this.count += count;
+    if (autonomous) this.autonomousCount += count;
+    // a chave é autônoma se qualquer ocorrência dela foi
+    this.seen.set(key, (this.seen.get(key) ?? false) || autonomous);
+  }
+  value(): MetricsAiSignal {
+    return {
+      count: this.count,
+      runs: this.seen.size,
+      autonomousCount: this.autonomousCount,
+      autonomousRuns: [...this.seen.values()].filter(Boolean).length,
+    };
+  }
+}
+
+/**
+ * As contas dos sinais da IA, uma linha por (execução, comando): só as execuções iniciadas no período.
+ * `bashRuns` é a base medida (execuções com algum comando registrado); "correções na Revisão" são os
+ * commits de execuções da fase cujo nome normalizado (sem acento) é "revisao" (mesmo critério do tipo "Bug" em
+ * `escapes`); "npm test com falha" são as chamadas de `npm test` que voltaram com erro; "commits depois
+ * do PR" são os commits de execuções iniciadas depois de a história registrar o pull request. No total,
+ * `commitsAfterPr.runs` conta histórias distintas (a história é autônoma se alguma dessas execuções foi);
+ * por fase, conta execuções.
+ */
+export function aiSignalsOf(
+  rows: BashSignalRow[],
+  period: ReworkPeriod,
+): { total: MetricsRework['aiSignals']; byPhase: Map<string, PhaseSignals> } {
+  const inPeriod = rows.filter((r) => r.startedAt >= period.start && r.startedAt <= period.end);
+  const sums = () => ({
+    runs: new Set<string>(),
+    reviewFixes: new SignalSum(),
+    testFailures: new SignalSum(),
+    commitsAfterPr: new SignalSum(),
+  });
+  const total = sums();
+  const phases = new Map<string, ReturnType<typeof sums>>();
+  for (const r of inPeriod) {
+    const phase = phases.get(r.phase) ?? phases.set(r.phase, sums()).get(r.phase)!;
+    for (const acc of [total, phase]) acc.runs.add(r.runId);
+    if (r.command === 'git commit' && norm(r.phase) === 'revisao')
+      for (const acc of [total, phase]) acc.reviewFixes.add(r.runId, r.calls, r.autonomous);
+    if (r.command === 'npm test' && r.failed > 0) for (const acc of [total, phase]) acc.testFailures.add(r.runId, r.failed, r.autonomous);
+    if (r.command === 'git commit' && r.storyId !== null && r.prAt !== undefined && r.startedAt > r.prAt) {
+      total.commitsAfterPr.add(r.storyId, r.calls, r.autonomous);
+      phase.commitsAfterPr.add(r.runId, r.calls, r.autonomous);
+    }
+  }
+  const pack = (acc: ReturnType<typeof sums>): PhaseSignals => ({
+    bashRuns: acc.runs.size,
+    reviewFixes: acc.reviewFixes.value(),
+    testFailures: acc.testFailures.value(),
+    commitsAfterPr: acc.commitsAfterPr.value(),
+  });
+  return { total: pack(total), byPhase: new Map([...phases].map(([phase, acc]) => [phase, pack(acc)])) };
 }
 
 const emptyPhase = (phase: string): MetricsReworkPhase => ({
@@ -125,14 +215,23 @@ function escapes(db: Database, boardId: string, period: ReworkPeriod, workflow: 
       (bugsOf.get(story) ?? bugsOf.set(story, new Set()).get(story)!).add(other);
     }
   }
+  // a história é autônoma se alguma execução dela (ou de uma sub-tarefa) rodou em modo autônomo (#605)
+  const autonomous = new Set(
+    all(
+      db,
+      `SELECT DISTINCT COALESCE(c.parent_id, r.card_id) AS story_id FROM ai_runs r LEFT JOIN cards c ON c.id = r.card_id
+       WHERE r.board_id = ? AND r.autonomous = 1 AND COALESCE(c.parent_id, r.card_id) IN (${marks})`,
+      [boardId, ...ids],
+    ).map((r) => str(r.story_id)),
+  );
+  const autonomousWithBugs = [...bugsOf.keys()].filter((id) => autonomous.has(id));
   return {
     stories: doneAt.size,
     withBugs: bugsOf.size,
     bugs: new Set([...bugsOf.values()].flatMap((s) => [...s])).size,
-    // a parte autônoma é conta da #1030; aqui só o contrato
-    autonomousStories: 0,
-    autonomousWithBugs: 0,
-    autonomousBugs: 0,
+    autonomousStories: autonomous.size,
+    autonomousWithBugs: autonomousWithBugs.length,
+    autonomousBugs: new Set(autonomousWithBugs.flatMap((id) => [...bugsOf.get(id)!])).size,
   };
 }
 
@@ -165,10 +264,44 @@ export function panelRework(db: Database, boardId: string, period: ReworkPeriod,
       source: str(r.source) === 'ai' ? 'ai' : 'human',
       model: str(r.model),
     }));
-  return {
-    ...reworkOf(rows, period),
-    escapes: escapes(db, boardId, period, workflow),
-    // os sinais da IA são consulta da #1030; até lá, "não medido"
-    aiSignals: { bashRuns: 0, reviewFixes: ZERO_SIGNAL, testFailures: ZERO_SIGNAL, commitsAfterPr: ZERO_SIGNAL },
-  };
+  const { phases, models } = reworkOf(rows, period);
+  const { total, byPhase } = aiSignalsOf(bashSignalRows(db, boardId, period, workflow), period);
+  // funde os sinais nas fases das revisões; uma fase só com sinal de Bash entra também
+  const merged = new Map(phases.map((p) => [p.phase, p]));
+  for (const [phase, signals] of byPhase) {
+    if (signals.bashRuns === 0) continue;
+    merged.set(phase, { ...(merged.get(phase) ?? emptyPhase(phase)), ...signals });
+  }
+  return { phases: [...merged.values()], models, escapes: escapes(db, boardId, period, workflow), aiSignals: total };
+}
+
+/**
+ * Os comandos de Bash das execuções iniciadas no período, com a história (o card ou o pai dele) e o
+ * instante em que ela registrou o pull request. A execução de uma sub-tarefa já apagada cai no próprio
+ * card, sem PR: o commit depois do PR não conta, o resto conta. `started_at` segue o período do
+ * retrabalho (ms, inclusive nas duas pontas), não o `runsWhere` do consumo.
+ */
+function bashSignalRows(db: Database, boardId: string, period: ReworkPeriod, workflow: string): BashSignalRow[] {
+  const wf = workflow ? ' AND r.workflow = ?' : '';
+  return all(
+    db,
+    `SELECT r.id AS run_id, COALESCE(c.parent_id, r.card_id) AS story_id, r.phase, r.autonomous, r.started_at,
+            b.command, b.calls, b.failed, pr.pr_at
+     FROM ai_run_bash b JOIN ai_runs r ON r.id = b.run_id
+     LEFT JOIN cards c ON c.id = r.card_id
+     LEFT JOIN (SELECT card_id, MIN(at) AS pr_at FROM card_events WHERE board_id = ? AND kind = 'pull_request_set' GROUP BY card_id) pr
+       ON pr.card_id = COALESCE(c.parent_id, r.card_id)
+     WHERE r.board_id = ? AND r.started_at >= ? AND r.started_at <= ?${wf}`,
+    [boardId, boardId, period.start, period.end, ...(workflow ? [workflow] : [])],
+  ).map((r) => ({
+    runId: str(r.run_id),
+    storyId: r.story_id == null ? null : str(r.story_id),
+    phase: str(r.phase),
+    autonomous: num(r.autonomous) === 1,
+    startedAt: num(r.started_at),
+    command: str(r.command),
+    calls: num(r.calls),
+    failed: num(r.failed),
+    ...(r.pr_at == null ? {} : { prAt: num(r.pr_at) }),
+  }));
 }
