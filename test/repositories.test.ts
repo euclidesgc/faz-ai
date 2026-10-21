@@ -59,6 +59,17 @@ describe('seed', () => {
 });
 
 describe('cards', () => {
+  it('perguntas pendentes entram no snapshot e podem ser apagadas sem alterar updated_at', () => {
+    const backlog = colsOf(parentWf().id)[0]!;
+    const id = cards.create(boardId, { typeId: typeNamed('História').id, columnId: backlog.id, parentId: null, title: 'Decisão' });
+    const original = snap().cards.find((c) => c.id === id)!;
+    const questions = [{ id: 'q1', question: 'Usar fila?', options: ['Sim', 'Não'], recommended: 'Sim' }];
+    cards.setQuestions(id, questions);
+    expect(snap().cards.find((c) => c.id === id)).toMatchObject({ questions, updatedAt: original.updatedAt });
+    cards.setQuestions(id, []);
+    expect(snap().cards.find((c) => c.id === id)).toMatchObject({ questions: [], updatedAt: original.updatedAt });
+  });
+
   it('cria história e sub-tarefa ligada ao pai', () => {
     const backlog = colsOf(parentWf().id)[0]!;
     const story = cards.create(boardId, { typeId: typeNamed('História').id, columnId: backlog.id, parentId: null, title: 'Login' });

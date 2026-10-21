@@ -1,5 +1,5 @@
 import type { Database } from 'sql.js';
-import type { FieldValue } from '../../shared/model';
+import type { CardQuestion, FieldValue } from '../../shared/model';
 import { norm } from '../../shared/filters';
 import { parseRules } from '../../shared/rules';
 import type { CardStatus } from '../../shared/status';
@@ -11,6 +11,11 @@ const entryStatus = (col: Row): CardStatus | null => (num(col.ai_active) === 1 &
 
 export class CardRepo {
   constructor(private db: Database) {}
+
+  /** Perguntas pendentes não são uma edição do conteúdo do card. */
+  setQuestions(cardId: string, questions: CardQuestion[]): void {
+    run(this.db, 'UPDATE cards SET questions_json = ? WHERE id = ?', [JSON.stringify(questions), cardId]);
+  }
 
   create(boardId: string, input: { typeId: string; columnId: string; parentId: string | null; title: string }): string {
     const db = this.db;

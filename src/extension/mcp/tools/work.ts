@@ -96,6 +96,38 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
   );
 
   tool(
+    'ask_questions',
+    'Faz à pessoa perguntas com opções, respondidas num carrossel no card aberto (status "waiting_answer"). Use para toda pergunta com alternativas, inclusive o que ficaria no `pending` do request_review; pergunta aberta, sem opções, é ask_question. Antes, escreva na descrição do card (update_card) o detalhe de cada pergunta: o motivo da indicada, as consequências de seguir ou não e o detalhe das outras opções. No carrossel vão só a pergunta, as opções curtas e a indicada. As respostas ficam na seção "Perguntas e respostas" da descrição; a pergunta com o mesmo texto de uma já respondida substitui a resposta dela. No modo autônomo o board responde cada uma com a indicada, registra e o card segue com você.',
+    {
+      card: cardArg,
+      questions: z
+        .array(
+          z.object({
+            question: z.string().describe('A pergunta, curta, em uma linha'),
+            options: z.array(z.string()).describe('As opções curtas; pelo menos duas'),
+            recommended: z.string().describe('A opção indicada: o texto exato de uma das opções'),
+          }),
+        )
+        .describe('As perguntas da rodada; substituem as que ainda estão pendentes no card'),
+    },
+    (a, router) => {
+      const s = router.snapshot();
+      const card = live(findCard(s, a.card));
+      const yolo = isYolo(s, card);
+      const after = router.handle({ type: 'card.questions.set', cardId: card.id, questions: a.questions }, aiOrigin(ctx));
+      return {
+        card: cardSummary(
+          after,
+          after.cards.find((c) => c.id === card.id)!,
+        ),
+        next: yolo
+          ? 'Modo autônomo: cada pergunta foi respondida com a indicada e registrada na seção "Perguntas e respostas" da descrição. Leia a descrição de novo (get_card) antes de reescrevê-la e siga o trabalho.'
+          : 'Pare aqui. Quando a pessoa enviar as respostas, elas ficam na seção "Perguntas e respostas" da descrição e o card volta para "ready". Pergunta sem resposta: decida pelo padrão do projeto e registre a decisão.',
+      };
+    },
+  );
+
+  tool(
     'ask_question',
     'Faz uma pergunta à pessoa na conversa do card e passa a vez para ela (status "waiting_answer"). Use quando faltar uma informação ou decisão. Depois de chamar, pare de trabalhar neste card até a resposta chegar.',
     { card: cardArg, question: z.string().min(1).describe('A pergunta (markdown)') },

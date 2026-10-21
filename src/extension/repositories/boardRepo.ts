@@ -34,6 +34,7 @@ import type { HarnessSelection, HarnessUsage, SelectableKind } from '../../share
 import { BRANCH_KINDS, parseGit, type BranchKind, type GitConfig } from '../../shared/git';
 import { parseAppearance, type Appearance } from '../../shared/appearance';
 import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
+import { parseQuestions } from '../../shared/questions';
 import { EMPTY_HARNESS, parseAiTool, type AiTool, type HarnessImport } from '../../shared/harness';
 import { RENAME_PENDING_KEY, RENAME_RESULT_KEY, parsePending, parseResult } from '../../shared/branchRename';
 
@@ -384,6 +385,7 @@ export class BoardRepo {
 
     const cards: Card[] = all(db, 'SELECT * FROM cards WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
       id: str(r.id),
+      questions: parseQuestions(str(r.questions_json)),
       number: num(r.number),
       boardId,
       workflowId: str(r.workflow_id),
