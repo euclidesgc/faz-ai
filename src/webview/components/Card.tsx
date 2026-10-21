@@ -117,8 +117,17 @@ export function CardView({
         e.stopPropagation();
         openCard(card.id);
       }}
+      aria-current={onSelect && externalSelected ? true : undefined}
       onKeyDown={(e) => {
-        if (e.key !== 'Enter' || e.target !== e.currentTarget) return;
+        if (e.target !== e.currentTarget) return;
+        // Sem o checkbox, a seleção controlada precisa de um jeito de teclado: Espaço.
+        if (e.key === ' ' && onSelect) {
+          e.preventDefault();
+          e.stopPropagation();
+          onSelect();
+          return;
+        }
+        if (e.key !== 'Enter') return;
         e.stopPropagation();
         openCard(card.id);
       }}

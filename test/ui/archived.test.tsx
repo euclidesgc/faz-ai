@@ -264,6 +264,20 @@ describe('aba Arquivados: filtros, paginação e filhos da história', () => {
     expect(useBoardStore.getState().selectedParentId).toBeNull();
   });
 
+  it('a história arquivada também se seleciona pelo teclado (Espaço) e marca aria-current', async () => {
+    archivedStory('Alfa checkout', ['Sub alfa um']);
+    sync();
+    renderThemed(<ArchivedView />);
+    const article = within(row(parentWf().name)).getByText('Alfa checkout').closest('article')!;
+    expect(article).not.toHaveAttribute('aria-current');
+    article.focus();
+    await userEvent.keyboard(' ');
+    expect(article).toHaveAttribute('aria-current', 'true');
+    expect(within(row(childWf().name)).getByText(/^Sub-tarefas de/)).toBeInTheDocument();
+    await userEvent.keyboard(' ');
+    expect(article).not.toHaveAttribute('aria-current');
+  });
+
   it('história selecionada que foi restaurada: o aviso "Sub-tarefas de" some', async () => {
     const a = archivedStory('Alfa checkout', ['Sub alfa um']);
     sync();
