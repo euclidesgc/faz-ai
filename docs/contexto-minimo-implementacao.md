@@ -255,3 +255,7 @@ Schema 43 reconstrói ai_runs para incluir origem test, sem mudar migrações an
 ## E5.2 — só os MCPs selecionados (#999)
 
 Quando a execução traz `context` e `strict`, o gateway recusa antes do spawn qualquer MCP do pedido de admissão que não esteja nos itens `mcp` da configuração resolvida. Os limites do agente e do board, a lista exata de ferramentas e a montagem do arquivo MCP só com os servidores admitidos continuam em `admitExecution` e `ExecutionAdmission.prepare` (#729): MCP fora do contrato é `mcp-outside-boundary`, itens Sempre passam pelo mesmo teste e as definições vêm do cofre sem credencial em prompt, log ou export. Onde o executor só escolhe por servidor, a prévia lista o servidor e não a operação (`mcpTools` fica vazio até a execução preparar o MCP).
+
+## #1045 — environmentEvidence real (parte 1 do coletor)
+
+`src/extension/ai/environmentEvidence.ts` calcula o digest das políticas gerenciadas do Claude Code (`managed-settings.json`, `managed-settings.d/`, `managed-mcp.json`) e o host passa a usá-lo em vez de `unknown` fixo. Pasta ausente é fonte conferida; erro de leitura mantém `unknown`. **Pendente:** o verificador que roda a CLI real e grava os recibos assinados. O vínculo inclui `cwd`, ambiente e MCP reais, então a prova precisa rodar na invocação admitida (sem plantar sentinelas no projeto do usuário); isso exige decisão de desenho do vínculo/sentinelas e não foi feito.

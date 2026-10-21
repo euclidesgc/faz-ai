@@ -1,3 +1,4 @@
+import { collectClaudeEnvironment } from '../ai/environmentEvidence';
 import { activeProfile, profileLabel, type AiProfile } from '../../shared/aiProfiles';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
@@ -211,7 +212,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     pathEnv: () => pathEnv,
     homeDir,
     evidence: new CapabilityEvidenceStore(path.join(o.storageDir, 'capability-evidence')),
-    environmentEvidence: () => ({ state: 'unknown' }),
+    environmentEvidence: () => collectClaudeEnvironment(),
   });
   const gateway = new AiGateway({
     resolveProfile: (id) => new AiProfileRepo(handle.db).resolveProfile(router.boardId, id),
