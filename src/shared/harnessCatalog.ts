@@ -333,6 +333,11 @@ export const HARNESS_CATALOG: Record<AiBase, HarnessSource[]> = {
       loads: 'always',
       hint: 'Instruções do projeto no padrão aberto AGENTS.md, lidas pelo Kimi Code em toda sessão.',
     }),
+    file('instructions', 'project', '.kimi-code/AGENTS.md', {
+      group: 'main',
+      loads: 'always',
+      hint: 'Instruções do projeto na pasta do Kimi Code, lidas em toda sessão.',
+    }),
     file('instructions', 'user', '.kimi-code/AGENTS.md', {
       group: 'main',
       loads: 'always',
