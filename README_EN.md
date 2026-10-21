@@ -1352,6 +1352,8 @@ A **CLI profile** identifies a tool the board can select for a run. The builtin 
 
 To create a custom profile, enter the command and one argument per line. The markers `{prompt}`, `{model}`, `{effort}`, `{mcpConfig}` and `{addDir}` insert the request, model, effort, MCP file and an additional directory when available. Choose **Prompt input** (argument or stdin) and **Board server** (CLI, project file or none). In a card's **Model** field, **Other model…** accepts a free-form identifier for that profile without adding it to the catalog. **Test** runs a short request using your subscription; an OK response does not prove isolation, permissions or MCP restrictions. Capabilities without evidence remain unknown and may prevent a run.
 
+Under **Capabilities and evidence**, each profile shows the date and version of the documentation checked and a badge: **Empty context** (only with capabilities verified by the host), **Loads on its own** (known items, listed in the tooltip) or **No proof of isolation** (an empty list is not proof). In copies and custom profiles, the **What the CLI loads on its own** section of the form lets you mark, by type (rules, skills, agents, hooks, MCP) and origin (project, user), what the CLI reads by itself; this is a declaration, not a verification. Each run's summary, the card (**Next run**) and `get_card`/`get_harness` (`execution.cliLoads`) use the same decision. The real-CLI test lives outside `npm test`: `npm run test:cli-real` (Claude Code validated in a controlled local environment; Cursor and Kimi Code **unvalidated**).
+
 ### Settings in the editor Settings
 
 In `Ctrl+,` (the VS Code or Cursor Settings), searching **Faz AI** shows the Faz AI category, with

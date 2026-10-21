@@ -1,5 +1,5 @@
-import { EXEC_ENFORCEMENT, effortToRun, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
-import { activeProfile, catalogTool, profileBase, type AiProfile } from '../shared/aiProfiles';
+import { effortToRun, enforcementOf, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
+import { activeProfile, catalogTool, isolationSummary, profileBase, profileIsolation, type AiProfile } from '../shared/aiProfiles';
 import type { RunTarget } from '../shared/runTarget';
 import { selectedMcpNames } from '../shared/harnessSelection';
 import type { BoardState, Card } from '../shared/model';
@@ -66,6 +66,8 @@ export interface ExecPlan {
   advice: string[];
   /** resumo para o log da execução */
   summary: string[];
+  /** contexto vazio imposto por capacidades verificadas (nunca por lista vazia); vai para `ai_runs.clean` */
+  clean: boolean;
 }
 
 /** Configuração do Claude Code só com o servidor do board: o que toda execução recebe quando o agente não libera mais nada. */
@@ -122,14 +124,8 @@ export function executionPlan(
   // o perfil de CLI do alvo do card (não o padrão do board): a imposição, o inventário e o arquivo de MCP seguem a CLI que executa
   const cli = manifest.target.cli;
   const base = profileBase(cli);
-  const how = (base ? EXEC_ENFORCEMENT[base] : undefined) ?? {
-    agent: 'advised',
-    skills: 'advised',
-    mcp: 'advised',
-    tools: 'advised',
-    model: 'advised',
-    context: 'advised',
-  };
+  const profile = cli;
+  const how = enforcementOf(cli);
   const items = s.harness.inventory.find((t) => t.tool === cli.id)?.items ?? [];
   const known = [...new Set(items.filter((i) => i.kind === 'mcp').map((i) => i.name))].filter((n) => n !== BOARD_SERVER);
   const allowed = manifest.mcpServers;
@@ -210,7 +206,10 @@ export function executionPlan(
     if (manifest.tools.length) advice.push(`Use só estas ferramentas: ${manifest.tools.join(', ')}.`);
     if (manifest.deniedTools.length) advice.push(`Não use estas ferramentas: ${manifest.deniedTools.join(', ')}.`);
   }
-  if (how.context === 'advised')
+  // a orientação só vale onde a CLI é conhecida por carregar itens por conta própria; sem prova de isolamento
+  // e sem item conhecido (ex.: o Claude Code com os argumentos de isolamento), o resumo é que diz isso
+  const iso = profileIsolation(profile);
+  if (how.context === 'advised' && (iso.loads.length || iso.unrecognized))
     advice.push(
       'Use só as rules, as skills e as instruções indicadas neste pedido; ignore instruções, skills e agentes carregados por conta própria.',
     );
@@ -238,7 +237,8 @@ export function executionPlan(
     ...(manifest.model
       ? [`Modelo: ${manifest.model.name}${manifest.model.effort ? ` · ${manifest.model.effort}` : ''} (${mark('model')})`]
       : []),
-    `Contexto vazio (${mark('context')})`,
+    // a decisão real do perfil: lista vazia não é prova, e o que a CLI carrega por conta própria aparece
+    how.context === 'enforced' ? 'Contexto vazio (imposto pela CLI)' : `${isolationSummary(iso)} (pelo pedido)`,
   ];
   return {
     manifest,
@@ -256,6 +256,7 @@ export function executionPlan(
     },
     advice,
     summary,
+    clean: how.context === 'enforced',
   };
 }
 

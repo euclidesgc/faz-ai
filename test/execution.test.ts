@@ -133,8 +133,9 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
       mcp: 'enforced',
       tools: 'enforced',
       model: 'enforced',
-      context: 'enforced',
     });
+    // o contexto vazio depende das capacidades verificadas do perfil (enforcementOf), não desta tabela
+    expect(EXEC_ENFORCEMENT.claude).not.toHaveProperty('context');
   });
 
   it('lê os perfis que o banco guardava (só para a migração), descartando o que for inválido', () => {

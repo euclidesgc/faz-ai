@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Badge, RadioGroup } from '@radix-ui/themes';
-import { PROFILE_CAPABILITIES, type AiProfile } from '../../../shared/aiProfiles';
+import { PROFILE_CAPABILITIES, contextEnforced, profileIsolation, type AiProfile } from '../../../shared/aiProfiles';
 import type { HostToWebview } from '../../../shared/messages';
 import { settings } from '../../commands';
 import { t } from '../../i18n';
 import { useBoardStore } from '../../store/boardStore';
+import { isolationText, leaksList } from '../../isolation';
 import { useAction } from '../../useAction';
 import { onHostMessage } from '../../vscode';
 import { ActionButton, DeleteButton, IconPlus, SwitchField } from '../ui';
@@ -190,6 +191,20 @@ export function AiToolsSettings() {
                       </a>
                     )}
                     {profile.kind === 'custom' && <span className="muted">{t('Não mede tokens nem custo')}</span>}
+                    {(() => {
+                      const iso = profileIsolation(profile);
+                      const enforced = contextEnforced(profile);
+                      const leaks = iso.loads.length > 0 || !!iso.unrecognized;
+                      return (
+                        <Badge
+                          variant="soft"
+                          color={enforced ? 'green' : leaks ? 'amber' : 'gray'}
+                          title={leaks ? leaksList(iso) : isolationText(iso, enforced)}
+                        >
+                          {t(enforced ? 'Contexto vazio' : leaks ? 'Carrega por conta própria' : 'Sem prova de isolamento')}
+                        </Badge>
+                      );
+                    })()}
                   </div>
                   <details className="ai-profile-evidence">
                     <summary>{t('Capacidades e evidências')}</summary>
@@ -212,6 +227,14 @@ export function AiToolsSettings() {
                     <p className="muted">
                       {t('Fonte e versão da evidência: não informadas. Uma declaração da pessoa não recebe selo de verificação.')}
                     </p>
+                    {profileIsolation(profile).checked && (
+                      <p className="muted">
+                        {t('Conferido na documentação em {date} · versão {version}', {
+                          date: profileIsolation(profile).checked!.date,
+                          version: profileIsolation(profile).checked!.version,
+                        })}
+                      </p>
+                    )}
                     {status && (
                       <p className="muted">
                         {t('Fonte da situação: sonda local do host. Versão da CLI: {version}.', {

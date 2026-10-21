@@ -608,4 +608,9 @@ export const settings: Record<string, string> = {
   'Desfazer volta o nome para {from} sem tocar o repositório.': 'Undo puts the name back to {from} without touching the repository.',
   Desfazer: 'Undo',
   'Renomear de novo': 'Rename again',
+  'O que a CLI carrega por conta própria': 'What the CLI loads on its own',
+  'Argumentos de isolamento: {args}': 'Isolation arguments: {args}',
+  'Conferido na documentação em {date} · versão {version}': 'Checked against the documentation on {date} · version {version}',
+  'Marque o que a CLI lê sozinha mesmo com os argumentos acima. Sem nada marcado, o board não conhece itens carregados, mas isso não prova contexto vazio: só a verificação do host prova.':
+    "Mark what the CLI reads on its own even with the arguments above. With nothing marked, the board knows of no loaded items, but that does not prove an empty context: only the host's verification does.",
 };

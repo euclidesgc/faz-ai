@@ -23,7 +23,7 @@ export function HarnessIntro() {
         <ul>
           <li>
             {rich(
-              '<b>Para que serve.</b> Toda execução do board parte de contexto vazio. A <b>Biblioteca do board</b> guarda regras, skills, subagentes e MCPs para qualquer ferramenta conectada.',
+              '<b>Para que serve.</b> Toda execução do board parte só do que está no board (no Claude Code, contexto vazio imposto; nas outras CLIs, veja o que elas carregam sozinhas em Ferramentas de IA). A <b>Biblioteca do board</b> guarda regras, skills, subagentes e MCPs para qualquer ferramenta conectada.',
             )}
           </li>
           <li>

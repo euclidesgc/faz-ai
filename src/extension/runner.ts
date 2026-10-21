@@ -475,8 +475,8 @@ export class AiRunner {
               profile: plan.manifest.profile,
               agent: plan.manifest.agent,
               autonomous,
-              // toda execução pelo board parte de contexto vazio
-              clean: true,
+              // só com o isolamento verificado; execuções antigas seguem como foram gravadas
+              clean: plan.clean,
               skills: plan.manifest.skills,
               mcp: plan.manifest.mcpServers,
             },

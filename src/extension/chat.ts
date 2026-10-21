@@ -1,4 +1,4 @@
-import { toolInfo, activeProfile, catalogTool, profileLabel } from '../shared/aiProfiles';
+import { toolInfo, activeProfile, catalogTool, contextEnforced, profileLabel } from '../shared/aiProfiles';
 import { cliProblem } from '../shared/requirements';
 import type { ContextAction } from '../shared/contextPlanning';
 import { defaultTarget, targetOfValue, type RunTarget } from '../shared/runTarget';
@@ -426,8 +426,7 @@ export class ChatSession {
             profile: null,
             agent: null,
             autonomous: false,
-            // toda execução pelo board parte de contexto vazio
-            clean: true,
+            clean: contextEnforced(activeProfile(state.board)),
             skills: [],
             mcp: [],
           },

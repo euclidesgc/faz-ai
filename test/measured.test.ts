@@ -13,6 +13,7 @@ import { MeasureEndedError, MeasureRefusedError } from '../src/extension/aiOutpu
 import type { OutputStream } from '../src/extension/aiOutput/reader';
 import { headlessCommand, type HeadlessCommand, type HeadlessInput } from '../src/extension/headless';
 import type { RunningProcess } from '../src/extension/runner';
+import { SpawnNotStartedError } from '../src/extension/processIdentity';
 
 const FIXTURE = fs.readFileSync(path.join(__dirname, 'fixtures', 'claude-stream-json.jsonl'), 'utf8');
 
@@ -599,6 +600,32 @@ describe('empréstimo MCP no transporte medido', () => {
       run.proc.kill();
       expect(started[0]!.killed).toBe(true);
       expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('falha depois de eventos (código 1) devolve o arquivo', () => {
+    const { dir, deps } = setup();
+    try {
+      const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, deps);
+      run.proc.onExit(() => {});
+      started[0]!.emit(`${JSON.stringify({ type: 'system', subtype: 'init' })}\n`, 'stdout');
+      started[0]!.exit(1);
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('spawn que lança sem iniciar processo devolve o empréstimo antes de o erro subir', () => {
+    const { dir, deps } = setup();
+    try {
+      const failing: SpawnFn = () => {
+        throw new SpawnNotStartedError('não iniciou');
+      };
+      expect(() => spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { ...deps, spawn: failing })).toThrow('não iniciou');
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

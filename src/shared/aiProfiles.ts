@@ -5,6 +5,27 @@ import type { FieldValue } from './model';
 import type { RunnerPermission } from './runner';
 import type { CapabilityEvidence, CapabilityState, ExecutorCapability } from './executionAdmission';
 
+export const ISOLATION_KINDS = ['instructions', 'skill', 'agent', 'hook', 'mcp'] as const;
+export type IsolationKind = (typeof ISOLATION_KINDS)[number];
+const ISOLATION_SCOPES = ['project', 'user'] as const;
+/** Um tipo de artefato que a CLI carrega sozinha, e de onde (a pasta do projeto ou a conta da pessoa). */
+export interface IsolationLeak {
+  kind: IsolationKind;
+  scope: (typeof ISOLATION_SCOPES)[number];
+}
+/**
+ * `args` são os parâmetros que o board passa para a CLI não carregar artefatos; `loads`, o que ela ainda
+ * carrega mesmo assim (lista de itens CONHECIDOS: vazia não prova ausência de artefatos externos, nem de
+ * regras ancestrais/globais, memória, plugins, políticas gerenciadas e add-dir). `checked` é a leitura da
+ * documentação oficial; evidência de isolamento só vem das capacidades verificadas pelo host.
+ * `unrecognized` conta itens que não se entendeu: eles nunca viram "seguro" por descarte.
+ */
+export interface ProfileIsolation {
+  args: string[];
+  loads: IsolationLeak[];
+  checked?: { date: string; version: string; sources: string[] };
+  unrecognized?: number;
+}
 export type AiBase = 'claude' | 'cursor' | 'kimi';
 export type ProviderBase = AiBase | 'generic';
 export type AiProfileKind = 'builtin' | 'copy' | 'custom';
@@ -46,6 +67,8 @@ export interface AiProfileConfig {
   statusArgs?: string;
   authPatterns?: string[];
   installUrl?: string;
+  /** O que a CLI pode carregar por conta própria, declarado por quem configura. Não é evidência. */
+  isolation?: { loads: IsolationLeak[] };
   [key: string]: unknown;
 }
 export interface AiProfile {
@@ -132,6 +155,11 @@ export function validateProfile(p: AiProfileDraft): string[] {
   )
     errors.push('Configuração do perfil inválida.');
   if (
+    c.isolation !== undefined &&
+    (!c.isolation || typeof c.isolation !== 'object' || Array.isArray(c.isolation) || parseLoads(c.isolation.loads).unrecognized)
+  )
+    errors.push('Isolamento do perfil inválido.');
+  if (
     c.permissionArgs !== undefined &&
     (!c.permissionArgs ||
       typeof c.permissionArgs !== 'object' ||
@@ -184,4 +212,103 @@ export function resolveModelOption(
   return name && !/[\s\0:@]/.test(name) && (!parsed.effort || !/[\s\0:@]/.test(parsed.effort))
     ? { option: null, name, effort: parsed.effort }
     : null;
+}
+
+const leak = (kind: IsolationKind, scope: IsolationLeak['scope']): IsolationLeak => ({ kind, scope });
+const both = (kind: IsolationKind): IsolationLeak[] => [leak(kind, 'project'), leak(kind, 'user')];
+/**
+ * Isolamento dos perfis prontos. Documentação oficial lida em 2026-10-16 (Claude Code 2.1.296, Cursor CLI
+ * 2026.10.01, Kimi Code CLI 2.1.1); relida em 2026-10-20 para Claude Code (cli-reference: `--setting-sources`
+ * user|project|local, `--disable-slash-commands`, `--strict-mcp-config`; `--bare` e `--safe-mode` são
+ * outros mecanismos e não substituem estes; política gerenciada continua valendo) e Cursor (a CLI lê
+ * `.cursor/rules`, AGENTS.md, CLAUDE.md e o mcp.json). Nenhuma flag de Cursor ou Kimi desliga o que
+ * carregam; o que a lista não cobre (ancestrais, memória, plugins, política gerenciada, add-dir) segue
+ * desconhecido até o host verificar.
+ */
+export const BUILTIN_ISOLATION: Record<AiBase, ProfileIsolation> = {
+  claude: {
+    args: ['--setting-sources', '', '--disable-slash-commands', '--strict-mcp-config'],
+    loads: [],
+    checked: {
+      date: '2026-10-16',
+      version: 'Claude Code 2.1.296',
+      sources: ['https://code.claude.com/docs/en/cli-reference', 'https://code.claude.com/docs/en/settings'],
+    },
+  },
+  cursor: {
+    args: [],
+    loads: [leak('instructions', 'project'), ...both('skill'), ...both('agent'), ...both('hook'), ...both('mcp')],
+    checked: { date: '2026-10-16', version: 'Cursor CLI 2026.10.01', sources: ['https://cursor.com/docs/cli/using'] },
+  },
+  kimi: {
+    args: [],
+    loads: [...both('instructions'), ...both('skill'), ...both('agent'), ...both('mcp'), leak('hook', 'user')],
+    checked: {
+      date: '2026-10-16',
+      version: 'Kimi Code CLI 2.1.1',
+      sources: ['https://moonshotai.github.io/kimi-cli/en/customization/skills.html'],
+    },
+  },
+};
+
+const isLeak = (v: unknown): v is IsolationLeak => {
+  const l = v as Partial<IsolationLeak> | null;
+  return (
+    !!l &&
+    typeof l === 'object' &&
+    ISOLATION_KINDS.includes(l.kind as IsolationKind) &&
+    ISOLATION_SCOPES.includes(l.scope as IsolationLeak['scope'])
+  );
+};
+/** Lê a lista gravada; o que não for reconhecido é contado (não vira "seguro" por descarte) e sem repetição. */
+export function parseLoads(raw: unknown): { loads: IsolationLeak[]; unrecognized: number } {
+  const items = Array.isArray(raw) ? raw : [];
+  const loads: IsolationLeak[] = [];
+  let unrecognized = Array.isArray(raw) ? 0 : 1;
+  for (const item of items) {
+    if (!isLeak(item)) unrecognized++;
+    else if (!loads.some((l) => l.kind === item.kind && l.scope === item.scope)) loads.push({ kind: item.kind, scope: item.scope });
+  }
+  return { loads, unrecognized };
+}
+/**
+ * O isolamento declarado do perfil. Pronto: o do código. Cópia: o gravado ou, na falta, o da base (só como
+ * declaração herdada: a cópia não herda a garantia, ver `contextEnforced`). Personalizado: o gravado ou
+ * lista vazia (= nenhum item conhecido, nunca prova).
+ */
+export function profileIsolation(p: AiProfile): ProfileIsolation {
+  const base = p.base === 'generic' ? null : BUILTIN_ISOLATION[p.base];
+  if (p.kind === 'builtin' && base) return structuredClone(base);
+  const own = p.config.isolation;
+  const { loads, unrecognized } =
+    own === undefined ? { loads: structuredClone(base?.loads ?? []), unrecognized: 0 } : parseLoads(own?.loads);
+  const out: ProfileIsolation = { args: p.kind === 'copy' && base ? [...base.args] : [], loads };
+  if (unrecognized) out.unrecognized = unrecognized;
+  if (own === undefined && p.kind === 'copy' && base?.checked) out.checked = base.checked;
+  return out;
+}
+/**
+ * Contexto vazio imposto: só com as capacidades de conversa nova e de artefatos VERIFICADAS pelo host para
+ * este perfil e sem item conhecido ou não reconhecido carregado. `loads` vazio sozinho não basta, e a
+ * declaração manual (perfil personalizado, cópia alterada) nunca é lida como prova.
+ */
+export function contextEnforced(p: AiProfile): boolean {
+  const iso = profileIsolation(p);
+  return p.capabilities?.conversation === 'verified' && p.capabilities.artifacts === 'verified' && !iso.loads.length && !iso.unrecognized;
+}
+const KIND_LABEL: Record<IsolationKind, [string, string]> = {
+  instructions: ['regras do projeto', 'regras do usuário'],
+  skill: ['skills do projeto', 'skills do usuário'],
+  agent: ['agentes do projeto', 'agentes do usuário'],
+  hook: ['hooks do projeto', 'hooks do usuário'],
+  mcp: ['servidores MCP do projeto', 'servidores MCP do usuário'],
+};
+export const leakLabel = (l: IsolationLeak): string => KIND_LABEL[l.kind][l.scope === 'project' ? 0 : 1];
+export function isolationSummary(iso: ProfileIsolation): string {
+  const parts = iso.loads.map(leakLabel);
+  if (iso.unrecognized) parts.push('itens não reconhecidos');
+  // lista vazia é "nenhum item conhecido", não prova de contexto vazio (a prova são as capacidades verificadas)
+  return parts.length
+    ? `A CLI pode carregar por conta própria: ${parts.join(', ')}.`
+    : 'Nenhum item conhecido carregado (sem prova de isolamento)';
 }

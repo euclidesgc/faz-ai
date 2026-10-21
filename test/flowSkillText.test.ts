@@ -17,6 +17,12 @@ describe('conjunto de skills do fluxo (#588)', () => {
     expect(harness.body).toContain('Você não troca de CLI');
     expect(FLOW_TEXT).not.toMatch(/ferramenta do board/i);
   });
+  it('a skill do harness explica cliLoads sem prometer contexto vazio sem prova', () => {
+    const harness = FLOW_SKILLS.find((k) => k.name === 'faz-ai-harness-do-card')!;
+    expect(harness.body).toContain('execution.cliLoads');
+    expect(harness.body).toContain('contextEnforced');
+    expect(harness.body).toContain('Lista vazia não prova isolamento');
+  });
   it('a principal vem primeiro, os nomes não se repetem e cada skill tem descrição e corpo', () => {
     expect(FLOW_SKILLS[0]).toBe(FLOW_SKILL);
     const names = FLOW_SKILLS.map((k) => k.name);
