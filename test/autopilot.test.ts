@@ -725,13 +725,34 @@ describe('autopiloto', () => {
     expect(autopilot.isActive).toBe(true); // diferente de uma falha real: não desliga, só espera
 
     router.setRequirements([]);
-    router.setAuthExpired('claude');
+    router.setAuthExpired('claude', true);
     flush();
     expect(runner.started).toEqual([]);
 
-    router.setAuthExpired(null);
+    router.setAuthExpired('claude', false);
     flush();
     expect(runner.started).toEqual([card(1).id]);
+  });
+
+  it('com o login de um perfil vencido, o autopiloto pula só a história dele e segue com a do outro perfil', () => {
+    const catalog = router.snapshot().board.modelCatalog;
+    router.handle({
+      type: 'settings.models.set',
+      catalog: [
+        ...catalog,
+        { id: 'cursor:composer', tool: 'cursor', model: 'composer', label: 'Composer', efforts: [], defaultEffort: null },
+      ],
+    });
+    create('A', 'PRD'); // #1, Cursor pelo campo Modelo
+    create('B', 'PRD'); // #2, Claude (perfil padrão)
+    const field = router.snapshot().fieldDefs.find((f) => f.name === 'Modelo')!;
+    router.handle({ type: 'field.setValue', cardId: card(1).id, fieldId: field.id, value: 'cursor:composer' });
+    router.setAuthExpired('cursor', true);
+    yolo(1);
+    yolo(2);
+    flush();
+    expect(runner.started).toEqual([card(2).id]);
+    expect(autopilot.isActive).toBe(true);
   });
 
   it('um "Em execução" sem execução de verdade volta para a IA', () => {

@@ -20,6 +20,7 @@ const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'contextPlanning.preview',
   'executionPolicy.read',
   'executionPolicy.simulate',
+  'executionPolicy.assist',
 ]);
 
 /** O que depende de onde o board está rodando: dentro do editor ou num navegador. */
@@ -71,7 +72,7 @@ export interface HostEnv {
 /** Mensagem de resultado da exportação: onde ficou, os cards com anexo sem arquivo e o aviso sobre o conteúdo. */
 export function exportNotice(savedPath: string, warnings: string[]): string {
   const missing = warnings.length ? ` Anexos sem arquivo: ${warnings.join(', ')}.` : '';
-  return `Board exportado em ${savedPath}.${missing} O arquivo contém conversas e anexos: guarde-o com cuidado.`;
+  return `Board exportado em ${savedPath}.${missing} O arquivo contém conversas e anexos: guarde-o com cuidado. Credenciais e variáveis dos perfis de CLI não vão no arquivo.`;
 }
 
 /** Mensagem de resultado da importação: o board, os totais, os cards cujo anexo ficou sem arquivo e os segredos de MCP a preencher. */
@@ -79,7 +80,9 @@ export function importNotice(r: ImportResult): string {
   const missing = r.warnings.length ? ` Anexos sem arquivo: ${r.warnings.join(', ')}.` : '';
   const secrets = r.mcpSecrets.length ? ` Revise as configurações locais dos servidores MCP: ${r.mcpSecrets.join(', ')}.` : '';
   const profiles = r.profileReviews?.length ? ` Perfis desativados para revisão local: ${r.profileReviews.join(', ')}.` : '';
-  return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}${secrets}${profiles}`;
+  const credentials = r.profileReviews?.length ? ' Credenciais dos perfis não vêm no arquivo: configure-as de novo neste computador.' : '';
+  const policies = r.policyReviews?.length ? ` Políticas pendentes de revisão: ${r.policyReviews.join(', ')}.` : '';
+  return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}${secrets}${profiles}${credentials}${policies}`;
 }
 
 /**
@@ -372,6 +375,18 @@ export class HostBridge {
             type: 'executionPolicy.result',
             requestId: msg.requestId,
             simulation: this.router.simulateExecutionPolicy(msg.scenario),
+          });
+        } catch (e) {
+          this.post({ type: 'executionPolicy.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'executionPolicy.assist': {
+        try {
+          this.post({
+            type: 'executionPolicy.result',
+            requestId: msg.requestId,
+            assistance: await this.router.assistExecutionPolicy(msg.input),
           });
         } catch (e) {
           this.post({ type: 'executionPolicy.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });

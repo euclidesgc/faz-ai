@@ -12,9 +12,11 @@ import { gatewayFor } from './helpers/gateway';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import type { ChatMessage } from '../src/shared/chat';
 import { monthOf } from '../src/shared/log';
+import { modelValue } from '../src/shared/models';
 import type { Database } from 'sql.js';
 
 let dir: string;
+const logs: string[] = [];
 let db: Database;
 let router: MessageRouter;
 let spawned: {
@@ -73,7 +75,12 @@ const build = () => {
       },
     };
   };
-  return new ChatSession(router, { cwd: dir, log: () => {}, file: path.join(dir, 'chat.json'), gateway: gatewayFor(router, db, spawn) });
+  return new ChatSession(router, {
+    cwd: dir,
+    log: (l) => logs.push(l),
+    file: path.join(dir, 'chat.json'),
+    gateway: gatewayFor(router, db, spawn),
+  });
 };
 
 beforeEach(async () => {
@@ -437,4 +444,65 @@ it('a assistência de subagente usa o gateway medido, sem gravar o agente nem co
   expect(messages()).toHaveLength(0);
   expect(router.snapshot().chat.busy).toBe(false);
   expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))).toHaveLength(1);
+});
+
+describe('ChatSession: política de execução no limite de uso', () => {
+  const option = (model: string) => router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === model)!;
+  const usageLimit = JSON.stringify({ type: 'result', is_error: true, result: 'usage limit reached' });
+  const policyTo = (model: string, effort: string) =>
+    router.handle({
+      type: 'settings.executionPolicy.save',
+      policy: {
+        version: 1,
+        id: 'reserva-chat',
+        name: 'Reserva do chat',
+        enabled: true,
+        priority: 10,
+        conditions: {
+          profileIds: ['claude'],
+          models: ['sonnet'],
+          actions: ['chat'],
+          agentIds: [],
+          phaseIds: [],
+          cardTypeIds: [],
+          origins: [],
+          failures: ['quota'],
+          explicit: 'include',
+        },
+        action: 'auto',
+        targets: [{ profileId: 'claude', model, effort }],
+        limits: { maxAttempts: 3, maxElapsedMs: 3_600_000, backoffMs: 0, globalProcesses: null, perProfile: {} },
+      } as never,
+      expectedRevision: 0,
+      reviewed: true,
+    });
+  const sendSonnet = () => {
+    const sonnet = option('sonnet');
+    router.chatCommand({ type: 'chat.send', text: 'oi', model: modelValue(sonnet.id, sonnet.efforts[0] ?? null) });
+  };
+
+  it('com política aplicável, o limite esgotado segue no destino sem repetir a pergunta na conversa', () => {
+    const fable = option('fable');
+    policyTo('fable', fable.efforts[0]!);
+    sendSonnet();
+    spawned[0]!.raw(`${usageLimit}\n`);
+    spawned[0]!.exit(1);
+    expect(logs.some((l) => l.includes('Política de execução: fallback'))).toBe(true);
+    expect(spawned).toHaveLength(2);
+    expect(spawned[1]!.command.args[spawned[1]!.command.args.indexOf('--model') + 1]).toBe('fable');
+    expect(messages().filter((m) => m.role === 'user')).toHaveLength(1);
+    spawned[1]!.emit('Pronto.');
+    spawned[1]!.exit(0);
+    expect(messages().at(-1)).toMatchObject({ role: 'assistant', text: 'Pronto.' });
+  });
+
+  it('sem política o limite esgotado vira aviso e nada é executado noutro alvo', () => {
+    sendSonnet();
+    spawned[0]!.raw(`${usageLimit}\n`);
+    spawned[0]!.exit(1);
+    expect(spawned).toHaveLength(1);
+    expect(messages().at(-1)).toMatchObject({ role: 'error' });
+    expect(messages().at(-1)!.text).toContain('limite de uso do plano');
+    expect(router.snapshot().chat.busy).toBe(false);
+  });
 });

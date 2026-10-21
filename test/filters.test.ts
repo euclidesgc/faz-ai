@@ -146,7 +146,7 @@ const state: BoardState = {
   aiRunUnsupported: null,
   requirements: [],
   requirementsCheckedAt: 0,
-  authExpired: null,
+  authExpired: [],
   orphans: { items: [], failed: {}, scannedAt: null },
   environment: null,
   environmentFirstRun: false,

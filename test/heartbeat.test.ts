@@ -6,6 +6,7 @@ import {
   Heartbeat,
   STALE_DAYS,
   conflictTargets,
+  heartbeatIdleReason,
   heartbeatQueue,
   heartbeatTargets,
   refineTargets,
@@ -429,6 +430,31 @@ describe('heartbeat', () => {
     expect(heartbeat.busy).toBe(false);
   });
 
+  it('com o login de um perfil vencido, só o card dele fica de fora: o do outro perfil roda e o motivo cita o perfil', () => {
+    const catalog = router.snapshot().board.modelCatalog;
+    router.handle({
+      type: 'settings.models.set',
+      catalog: [
+        ...catalog,
+        { id: 'cursor:composer', tool: 'cursor', model: 'composer', label: 'Composer', efforts: [], defaultEffort: null },
+      ],
+    });
+    create('A', 'PRD'); // #1, Claude (perfil padrão)
+    create('B', 'PRD'); // #2, Cursor pelo campo Modelo
+    const field = router.snapshot().fieldDefs.find((f) => f.name === 'Modelo')!;
+    router.handle({ type: 'field.setValue', cardId: card(2).id, fieldId: field.id, value: 'cursor:composer' });
+    router.setAuthExpired('cursor', true);
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1]);
+    heartbeat.runNow();
+    expect(runner.started).toEqual([card(1).id]);
+
+    // sem nada do Claude para rodar, o motivo cita o perfil do Cursor
+    router.setAuthExpired('cursor', true);
+    router.setAuthExpired('claude', false);
+    setStatus(1, 'approved');
+    expect(heartbeatIdleReason(router.snapshot())).toBe('o login do Cursor venceu (veja o aviso no topo do board).');
+  });
+
   it('com o login vencido (preventivo ou reativo), não inicia nenhuma história e esvazia a rodada', () => {
     create('A', 'PRD');
     create('B', 'Spec');
@@ -437,11 +463,11 @@ describe('heartbeat', () => {
     expect(runner.started).toEqual([]);
 
     router.setRequirements([]);
-    router.setAuthExpired('claude');
+    router.setAuthExpired('claude', true);
     heartbeat.runNow();
     expect(runner.started).toEqual([]);
 
-    router.setAuthExpired(null);
+    router.setAuthExpired('claude', false);
     heartbeat.runNow();
     // as duas estão em fase de texto e cabem no teto de texto (2): o login de volta libera as duas
     expect(runner.started).toHaveLength(2);

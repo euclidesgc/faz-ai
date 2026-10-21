@@ -284,7 +284,7 @@ describe('Diagnóstico do ambiente', () => {
 
     useBoardStore.setState({ view: 'board' });
     act(() => {
-      router.setRequirements([{ id: 'node', tool: 'cursor', action: null }]);
+      router.setRequirements([{ id: 'node', tool: 'claude', action: null }]);
       syncStore(router);
     });
     renderThemed(<RequirementsBanner />);

@@ -1,6 +1,6 @@
-import { activeProfile, isolationSummary, profileIsolation } from '../shared/aiProfiles';
-import { enforcementOf, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
-import type { AiTool } from '../shared/harness';
+import { effortToRun, enforcementOf, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
+import { activeProfile, catalogTool, isolationSummary, profileBase, profileIsolation, type AiProfile } from '../shared/aiProfiles';
+import type { RunTarget } from '../shared/runTarget';
 import { selectedMcpNames } from '../shared/harnessSelection';
 import type { BoardState, Card } from '../shared/model';
 import { isFlowSkill } from './flowSkill';
@@ -99,6 +99,17 @@ function requireReviewedMcps(state: BoardState, names: readonly string[]): void 
     ) ?? [];
   if (denied.length) throw new Error(`MCPs exigem revisão humana ou configuração local: ${denied.map((a) => a.name).join(', ')}.`);
 }
+/** O manifesto com outro alvo: a CLI e o modelo mudam, o resto (agente, skills, MCPs) é do card e segue igual. */
+function withTarget(s: BoardState, manifest: ExecManifest, target: RunTarget): ExecManifest {
+  const option = target.model && s.board.modelCatalog.find((o) => o.tool === catalogTool(target.cli) && o.model === target.model!.name);
+  return {
+    ...manifest,
+    target,
+    model: target.model
+      ? { name: target.model.name, effort: option ? effortToRun(option, target.model.effort) : target.model.effort }
+      : null,
+  };
+}
 export function executionPlan(
   s: BoardState,
   c: Card,
@@ -106,11 +117,15 @@ export function executionPlan(
   libraryServers: Record<string, unknown>,
   /** o servidor do board desta execução */
   board?: BoardServerSpec,
+  /** o alvo que vale nesta execução (a troca por política pode ser noutra CLI); sem ele, o do card */
+  target?: RunTarget,
 ): ExecPlan {
-  const tool: AiTool = s.board.aiTool;
-  const manifest = manifestOf(s, c);
-  const profile = activeProfile(s.board);
-  const how = enforcementOf(profile);
+  const manifest = target ? withTarget(s, manifestOf(s, c), target) : manifestOf(s, c);
+  // o perfil de CLI do alvo do card (não o padrão do board): a imposição, o inventário e o arquivo de MCP seguem a CLI que executa
+  const cli = manifest.target.cli;
+  const base = profileBase(cli);
+  const profile = cli;
+  const how = enforcementOf(cli);
   // os servidores que o board conhece são os da biblioteca dele (o inventário das pastas das ferramentas saiu)
   const known = [...new Set((s.harness.library?.artifacts ?? []).filter((a) => a.kind === 'mcp').map((a) => a.name))].filter(
     (n) => n !== BOARD_SERVER,
@@ -123,7 +138,7 @@ export function executionPlan(
   // conhecido (nem desta execução nem registrado na pasta) e sem nada liberado, fica sem arquivo, e a
   // linha de comando segue sem restrição de servidores (só acontece fora da extensão)
   let mcpConfig: string | null = null;
-  if (tool === 'claude') {
+  if (base === 'claude') {
     // só as definições guardadas no board (no host, com as credenciais do cofre): a execução não lê
     // `.mcp.json` nem `~/.claude.json`, e um servidor que ficou só na pasta da ferramenta não entra
     const defs: Record<string, unknown> = { ...libraryServers };
@@ -259,8 +274,10 @@ export function bareExec(
   s?: BoardState,
   /** as definições dos servidores MCP guardadas no board; sem elas, só o servidor do board */
   libraryServers?: Record<string, unknown>,
+  /** o perfil de CLI que executa; sem ele vale o padrão do board */
+  cli?: AiProfile,
 ): ExecInput {
-  const always = s && s.board.aiTool === 'claude' && libraryServers ? selectedMcpNames(s, 'always') : [];
+  const always = s && profileBase(cli ?? activeProfile(s.board)) === 'claude' && libraryServers ? selectedMcpNames(s, 'always') : [];
   if (s) requireReviewedMcps(s, always);
   const defs: Record<string, unknown> = { ...(libraryServers ?? {}) };
   const missing = always.filter((n) => !defs[n] && s?.harness.library?.artifacts.some((a) => a.kind === 'mcp' && a.name === n));

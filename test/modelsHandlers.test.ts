@@ -85,3 +85,41 @@ describe('detectar e gravar o catálogo', () => {
     expect(router.snapshot().board.modelCatalog).toEqual(sent);
   });
 });
+
+describe('"Sugerir regras" e as faixas de esforço de outros perfis', () => {
+  const faixa = (fieldId: string, nivel: string, model: string) => ({
+    id: `r-${nivel}`,
+    name: `Esforço ${nivel.toLowerCase()}`,
+    enabled: true,
+    groups: [[{ fieldId, op: 'is' as const, value: nivel }]],
+    model,
+  });
+  const esforco = (router: MessageRouter) => router.snapshot().fieldDefs.find((f) => f.name === 'Esforço da atividade')!.id;
+
+  it('troca só a faixa do perfil sugerido e mantém, na frente, a de outro perfil', () => {
+    const router = new MessageRouter(dbHandle as never, opts());
+    router.handle({ type: 'settings.models.detect', tool: 'claude' });
+    router.handle({ type: 'settings.models.detect', tool: 'kimi' });
+    const f = esforco(router);
+    router.handle({
+      type: 'settings.modelRules.set',
+      rules: [faixa(f, 'Baixo', 'kimi:kimi-k2'), faixa(f, 'Alto', 'claude:opus')],
+    });
+    router.handle({ type: 'settings.modelRules.suggest', tool: 'claude' });
+    const rules = router.snapshot().board.modelRules;
+    expect(rules[0]).toMatchObject({ id: 'r-Baixo', model: 'kimi:kimi-k2' });
+    expect(rules.some((r) => r.id === 'r-Alto')).toBe(false);
+    expect(rules.slice(1).map((r) => r.model.split(':')[0])).toEqual(['claude', 'claude', 'claude']);
+  });
+
+  it('sem faixas de outro perfil, o resultado é o de sempre', () => {
+    const router = new MessageRouter(dbHandle as never, opts());
+    router.handle({ type: 'settings.models.detect', tool: 'claude' });
+    const f = esforco(router);
+    router.handle({ type: 'settings.modelRules.set', rules: [faixa(f, 'Alto', 'claude:opus')] });
+    router.handle({ type: 'settings.modelRules.suggest', tool: 'claude' });
+    const rules = router.snapshot().board.modelRules;
+    expect(rules).toHaveLength(3);
+    expect(rules.some((r) => r.id === 'r-Alto')).toBe(false);
+  });
+});

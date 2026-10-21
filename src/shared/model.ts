@@ -248,6 +248,8 @@ export interface AiActivity {
   phase: string;
   /** nome do modelo, ou null quando a ferramenta decide */
   model: string | null;
+  /** o perfil de CLI (id) da execução */
+  tool: AiTool;
   /** ms, o mesmo startedAt da linha do log */
   startedAt: number;
 }
@@ -303,8 +305,8 @@ export interface BoardState {
   requirements: BoardRequirement[];
   /** quando o host terminou a última conferência dos requisitos (ms), mesmo sem mudança; 0 antes da primeira */
   requirementsCheckedAt: number;
-  /** a ferramenta ativa falhou por login vencido numa execução; null quando não há aviso reativo ativo */
-  authExpired: AiTool | null;
+  /** os perfis de CLI (ids) que falharam por login vencido numa execução; vazio quando não há aviso reativo ativo */
+  authExpired: AiTool[];
   /** branches e worktrees órfãs, varridas pelo host; vazio antes da primeira varredura (runtime, não vai para o banco) */
   orphans: OrphanReport;
   /** o último Diagnóstico do ambiente; null antes de rodar a primeira vez */

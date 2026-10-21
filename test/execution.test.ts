@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import type { ExecInput } from '../src/extension/execution';
 import { headlessCommand, tmpArg, type HeadlessCommand } from '../src/extension/headless';
-import { CONDUCTOR_AGENT, EXEC_ENFORCEMENT, agentProfiles, defaultAgent, effortToRun, parseProfiles } from '../src/shared/execution';
+import { executionPlan } from '../src/extension/execution';
+import { BUILTIN_PROFILES } from '../src/shared/aiProfiles';
+import { estimateContext } from '../src/shared/contextEstimate';
+import {
+  CONDUCTOR_AGENT,
+  EXEC_ENFORCEMENT,
+  agentProfiles,
+  defaultAgent,
+  delegatesOf,
+  effortToRun,
+  manifestOf,
+  parseProfiles,
+} from '../src/shared/execution';
+import { runTargetOf } from '../src/shared/runTarget';
+import type { BoardState } from '../src/shared/model';
+import type { ModelOption } from '../src/shared/models';
+import { boardState, card } from './fakes/board';
 import type { Agent } from '../src/shared/harness';
 import { toItemName } from '../src/shared/harnessProject';
 import { ALL_AI_BASES } from '../src/shared/harness';
@@ -224,5 +240,78 @@ describe('toItemName', () => {
   it('tira acentos antes de trocar o resto por hífen: "Agente padrão" vira agente-padrao, não agente-padr-o', () => {
     expect(toItemName('Agente padrão')).toBe('agente-padrao');
     expect(toItemName('Revisão de Código')).toBe('revisao-de-codigo');
+  });
+});
+
+describe('manifesto e plano pelo alvo da execução', () => {
+  const opt = (tool: string, model: string): ModelOption =>
+    ({ id: `${tool}:${model}`, tool, model, label: model, efforts: [], defaultEffort: null }) as ModelOption;
+  const agente = (id: string, model: string) =>
+    ({ ...defaultAgent(), id, name: id, model, isDefault: false, scope: 'project', path: `/${id}.md` }) as never;
+  const cenario = (cardModel: string, ligados = ['claude', 'cursor']) => {
+    const s = boardState();
+    s.board.aiTool = 'claude';
+    s.board.aiProfiles = BUILTIN_PROFILES.map((p) => ({ ...structuredClone(p), enabled: ligados.includes(p.id) }));
+    s.board.modelCatalog = [opt('claude', 'sonnet'), opt('cursor', 'composer-2.5')];
+    s.fieldDefs = [{ id: 'modelo', kind: 'model', appliesToTypes: null } as never];
+    const c = card('c1', { columnId: 'backlog' });
+    s.cards = [c];
+    s.fieldValues = cardModel ? [{ cardId: 'c1', fieldId: 'modelo', value: cardModel } as never] : [];
+    return { s, c };
+  };
+
+  it('manifestOf().target é o runTargetOf e o model sai dele', () => {
+    const { s, c } = cenario('cursor:composer-2.5');
+    const m = manifestOf(s, c);
+    expect(m.target).toEqual(runTargetOf(s, c));
+    expect(m.target.cli.id).toBe('cursor');
+    expect(m.model).toEqual({ name: 'composer-2.5', effort: null });
+  });
+
+  it('executionPlan de um card do Cursor num board com padrão Claude usa a imposição do Cursor e os servidores da biblioteca do board', () => {
+    const { s, c } = cenario('cursor:composer-2.5');
+    s.harness = {
+      ...s.harness,
+      library: {
+        directory: '',
+        artifacts: [{ id: 'a', kind: 'mcp', name: 'da-biblioteca', description: '', origin: '', usage: 'off', missing: false }],
+      },
+    } as never;
+    const plan = executionPlan(s, c, {}, { command: 'node', args: [] });
+    expect(plan.input.mcpBlocked).toEqual(['da-biblioteca']);
+    // o Cursor não recebe o arquivo de MCP nem o agente por parâmetro: a orientação vai no pedido
+    expect(plan.input.mcpConfig).toBeNull();
+    expect(plan.summary).toContain('Servidores MCP: faz-ai (pelo pedido)');
+    expect(plan.summary.some((l) => l.startsWith('Modelo: composer-2.5') && l.endsWith('(imposto pela CLI)'))).toBe(true);
+  });
+
+  it('um board com um perfil só sai como hoje: padrão Claude, MCP imposto e arquivo de configuração', () => {
+    const { s, c } = cenario('claude:sonnet', ['claude']);
+    const plan = executionPlan(s, c, {}, { command: 'node', args: [] });
+    expect(plan.manifest.target.cli.id).toBe('claude');
+    expect(plan.input.mcpConfig).not.toBeNull();
+    expect(plan.summary).toContain('Servidores MCP: faz-ai (imposto pela CLI)');
+  });
+
+  it('o subagente cujo modelo é de outro perfil fica com model null', () => {
+    const { s, c } = cenario('');
+    s.board.execProfiles = [agente('mesmo', 'claude:sonnet'), agente('outro', 'cursor:composer-2.5'), agente('sem', '')];
+    const model = (n: string) => delegatesOf(s, c, undefined).find((d) => d.name === n)!.model;
+    expect(model('mesmo')).toBe('sonnet');
+    expect(model('outro')).toBeNull();
+    expect(model('sem')).toBeNull();
+    // a sessão do Cursor inverte: só o modelo do Cursor vale
+    const cursor = cenario('cursor:composer-2.5');
+    cursor.s.board.execProfiles = s.board.execProfiles;
+    const m = (n: string) => delegatesOf(cursor.s, cursor.c, undefined).find((d) => d.name === n)!.model;
+    expect(m('outro')).toBe('composer-2.5');
+    expect(m('mesmo')).toBeNull();
+  });
+
+  it('a janela de contexto e a ferramenta da estimativa são as do perfil do alvo', () => {
+    const { s, c } = cenario('cursor:composer-2.5');
+    const e = estimateContext(s as BoardState, c);
+    expect(e.tool).toBe('cursor');
+    expect(e.model).toBe('composer-2.5');
   });
 });
