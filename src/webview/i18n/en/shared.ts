@@ -174,6 +174,8 @@ export const shared: Record<string, string> = {
   'Seu prompt pronto, chamado com /nome em qualquer projeto.': 'Your ready-made prompt, called with /name in any project.',
   'Instruções do projeto no padrão aberto AGENTS.md, lidas pelo Kimi Code em toda sessão.':
     'Project instructions in the open AGENTS.md standard, read by Kimi Code in every session.',
+  'Instruções do projeto na pasta do Kimi Code, lidas em toda sessão.':
+    'Project instructions in the Kimi Code folder, read in every session.',
   'Suas instruções no padrão AGENTS.md, lidas pelo Kimi Code em qualquer projeto.':
     'Your instructions in the AGENTS.md standard, read by Kimi Code in any project.',
   'Instruções e arquivos de apoio que o Kimi Code carrega quando a tarefa pede; só a descrição fica sempre à vista.':

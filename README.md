@@ -1206,7 +1206,7 @@ Os avisos de cada tipo têm um botão com contorno, abaixo do texto e à direita
 ou informe seu caminho no computador onde o board roda. A prévia mostra os quatro tipos, suas
 quantidades e caixas de seleção; **Importar selecionados** copia cada item para sua aba. O board
 reconhece formatos das ferramentas e coleções neutras: `AGENTS.md`, pastas `rules/`, `agents/` e
-skills com `SKILL.md`, inclusive em subpastas. Arquivos `mcp.json` e `.mcp.json` usam `mcpServers`.
+skills com `SKILL.md`, inclusive em subpastas; no Kimi Code, o `.kimi-code/AGENTS.md` do projeto também é lido. Arquivos `mcp.json` e `.mcp.json` usam `mcpServers`.
 A prévia tem quatro abas, inclusive vazias, com filtro por nome ou descrição. Seleções são mantidas
 ao trocar de aba e filtrar. Nomes repetidos do mesmo tipo são ignorados: os demais itens entram,
 e o resumo agrupa os conflitos e oferece uma confirmação explícita para sobrescrevê-los.

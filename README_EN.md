@@ -1248,7 +1248,7 @@ Each artifact notice has an outlined button below the text on the right to dismi
 path on the computer running the board. The preview groups all four types with counts and
 checkboxes; **Import selected** copies each item into its tab. It recognizes native tool formats
 and neutral collections: `AGENTS.md`, `rules/`, `agents/`, and skills containing `SKILL.md`, including
-nested folders. `mcp.json` and `.mcp.json` use `mcpServers`. The preview has four tabs, including
+nested folders; for Kimi Code, the project's `.kimi-code/AGENTS.md` is read too. `mcp.json` and `.mcp.json` use `mcpServers`. The preview has four tabs, including
 empty ones, with independent filters. Selections persist across tabs and filters. Duplicate names
 within a type are skipped while other items are imported; the summary groups conflicts and offers
 an explicit confirmation before overwriting them.

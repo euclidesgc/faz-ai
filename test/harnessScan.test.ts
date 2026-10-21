@@ -259,3 +259,11 @@ it('perfil genérico não presume pastas ou inventário de outra ferramenta', ()
   expect(createTargets('personalizado')).toEqual([]);
   expect(permissionTargets('personalizado')).toEqual([]);
 });
+
+describe('Kimi Code: instruções na pasta do projeto', () => {
+  it('lê .kimi-code/AGENTS.md no escopo do projeto', () => {
+    write(project, '.kimi-code/AGENTS.md', '# Regras');
+    const items = scanInventory('kimi', project, home);
+    expect(items.filter((i) => i.scope === 'project').map((i) => i.location)).toContain('.kimi-code/AGENTS.md');
+  });
+});
