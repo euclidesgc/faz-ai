@@ -144,12 +144,10 @@ export const settings: Record<string, string> = {
     "All {count} card(s), conversations, attachments and settings of this board will be deleted, and the board goes back to the default. This can't be undone. Project rules and skills are not affected.",
   'Apagar tudo e recriar': 'Delete everything and recreate',
   'Recriar board padrão': 'Recreate default board',
-  'Abrir no Settings do editor': 'Open in the editor Settings',
   'Depende de <b>{label}</b> (agora: {state})': 'Depends on <b>{label}</b> (now: {state})',
   'Depende de <b>{label}</b>': 'Depends on <b>{label}</b>',
   'Abrir {label}, {hint}': 'Open {label}, {hint}',
   abrir: 'open',
-  'Abre as configurações do Faz AI no Settings do editor (Ctrl+,)': 'Opens the Faz AI settings in the editor Settings (Ctrl+,)',
   'Apaga todos os cards e configurações e recria o board com o padrão atual':
     'Deletes all cards and settings and recreates the board with the current default',
   'Prévia do card do tipo {typeName}': 'Preview of the {typeName} card type',
@@ -247,9 +245,6 @@ export const settings: Record<string, string> = {
   'Tema do board e tipografia dos textos longos: a descrição dos cards e a conversa, tanto ao escrever quanto ao ler.':
     'Board theme and typography of long texts: the card description and the conversation, both when writing and when reading.',
   'Tema e fonte': 'Theme and font',
-  'A aparência do board (idioma, tema, fonte e tamanho) agora fica no Settings do editor.':
-    'The board appearance (language, theme, font and size) now lives in the editor Settings.',
-  'O Git agora fica no Settings do editor.': 'Git now lives in the editor Settings.',
   Idioma: 'Language',
   'O idioma da interface do board.': 'The language of the board interface.',
   Tema: 'Theme',
@@ -512,10 +507,6 @@ export const settings: Record<string, string> = {
   'Prefixo de hotfix': 'Hotfix prefix',
   'Prefixo de release': 'Release prefix',
   'Vazio volta ao padrão (<code>{padrao}</code>).': 'Empty goes back to the default (<code>{padrao}</code>).',
-  'Valores no Settings do editor': 'Values in the editor Settings',
-  sim: 'yes',
-  não: 'no',
-  'Abrir o gitflow no Settings do editor': 'Open gitflow in the editor Settings',
   'Tipo de branch por tipo de card': 'Branch kind per card type',
   'Cada tipo de card das histórias gera um tipo de branch. A escolha fica no tipo: renomear o tipo não muda a branch. A release não sai de um tipo de card; é o processo de release do projeto.':
     "Each story card type creates a branch kind. The choice stays on the type: renaming the type does not change the branch. The release does not come from a card type; it is the project's release process.",

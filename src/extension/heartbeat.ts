@@ -11,7 +11,8 @@ import { limitOf, type AiRunMode } from '../shared/runner';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
 import { USAGE_LIMIT_TEXT } from '../shared/conversation';
 import { isWithHuman } from '../shared/story';
-import { autopilotStep, needsSummary } from './autopilot';
+import { autopilotStep, needsSummary, type StoryDriver } from './autopilot';
+import { orchestratesStory } from '../shared/orchestration';
 
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
 export interface HeartbeatRunner {
@@ -24,6 +25,8 @@ export interface HeartbeatRunner {
 }
 
 export interface HeartbeatDeps {
+  /** conduz as histórias de fase de código que já têm sub-tarefas (o `Orchestrator`); sem ele, passam por `runner.start` */
+  driver?: StoryDriver;
   snapshot(): BoardState;
   now(): number;
   log(line: string): void;
@@ -456,7 +459,8 @@ export class Heartbeat {
         continue;
       }
       try {
-        this.runner.start(item.id, 'heartbeat', item.mode);
+        if (item.mode === 'phase' && this.deps.driver && orchestratesStory(current, card)) this.drive(this.deps.driver, card);
+        else this.runner.start(item.id, 'heartbeat', item.mode);
         counts[kind]++;
         // o limite de uso esgotou na última execução: só uma de teste, as outras esperam o resultado dela
         if (this.runner.usageLimited) {
@@ -475,6 +479,13 @@ export class Heartbeat {
     if (waiting.branch) this.deps.log(`Heartbeat: ${waiting.branch} história(s) com branch esperando vaga.`);
     if (waiting.text) this.deps.log(`Heartbeat: ${waiting.text} história(s) em fase de texto esperando vaga.`);
     this.changed();
+  }
+
+  /** A história é do orquestrador: a posse única decide se esta chamada inicia algo; a recusa vai para o log. */
+  private drive(driver: StoryDriver, story: Card): void {
+    driver
+      .drive(story.id, 'heartbeat')
+      .catch((e: unknown) => this.deps.log(`Heartbeat: ${cardRef(story)}: ${e instanceof Error ? e.message : String(e)}`));
   }
 
   /** A execução é do autopiloto: o card é (ou pertence a) uma história em modo autônomo. */

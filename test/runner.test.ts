@@ -270,25 +270,12 @@ it('a história leva os outros agentes do board como subagentes, e o agente dela
       server,
     );
 
-  // a história: a sessão fica com todas as ferramentas (sem `--tools`), o condutor leva as dele mais a de
-  // lançar subagentes, e o especialista vai inline com as ferramentas e o modelo do arquivo dele
+  // a história: o condutor vai inline com as ferramentas dele, sem subagentes nem a ferramenta de lançá-los
   const story = of(storyId);
-  expect(story.input.tools).toEqual([]);
-  // toda lista de ferramentas num agente é fechada e deixaria o servidor do board de fora: ele vai junto
-  expect(story.input.agentDefinition).toMatchObject({ name: 'condutor', tools: ['Read', 'Grep', 'Glob', 'Agent', 'mcp__faz-ai__*'] });
-  expect(story.input.delegates).toEqual([
-    {
-      name: 'backend-node',
-      description: 'Agente backend-node',
-      prompt: 'Instruções de backend-node.',
-      tools: ['Read', 'Edit', 'Bash', 'mcp__faz-ai__*'],
-      model: option.model,
-    },
-  ]);
+  expect(story.input.agentDefinition).toMatchObject({ name: 'condutor' });
+  expect(story.input.agentDefinition?.tools ?? []).not.toContain('Agent');
   expect(story.advice).toEqual([]);
-  expect(story.summary.join(' | ')).toContain('Subagentes: backend-node (inline)');
-  expect(story.summary.join(' | ')).toContain('Ferramentas do agente: Read, Grep, Glob, Agent, mcp__faz-ai__* (no agente)');
-  expect(story.summary.join(' | ')).not.toContain('Ferramentas: ');
+  expect(story.summary.join(' | ')).not.toContain('Subagentes');
 
   // a sub-tarefa roda com o agente dela, com as ferramentas impostas, e sem subagentes
   const task = of(taskId);
@@ -297,7 +284,6 @@ it('a história leva os outros agentes do board como subagentes, e o agente dela
     description: 'Agente backend-node',
     prompt: 'Instruções de backend-node.',
   });
-  expect(task.input.delegates).toEqual([]);
   expect(task.input.tools).toEqual(['Read', 'Edit', 'Bash']);
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -472,18 +458,26 @@ afterEach(() => {
   fs.rmSync(`${dir}.worktrees`, { recursive: true, force: true });
 });
 
+/** Toda execução do Claude Code nega a delegação nativa (`Agent`, antes `Task`). */
+const withoutNativeDelegation = <T extends { args: string[] }>(command: T): T => {
+  const at = command.args.indexOf('--setting-sources');
+  return { ...command, args: [...command.args.slice(0, at), '--disallowedTools', 'Agent', 'Task', ...command.args.slice(at)] };
+};
+
 describe('executor da IA', () => {
   it('roda a ferramenta do projeto para o card e marca "Em execução"', () => {
     runner.start(storyId);
     expect(procs).toHaveLength(1);
     expect(procs[0]!.cwd).toBe(dir);
     expect(procs[0]!.command).toEqual(
-      headlessCommand('claude', {
-        prompt: cardPrompt('#1', FLOW_ONLY, [PERMISSION_ADVICE.board!], false, true),
-        permission: 'board',
-        addDirs: [`${dir}.worktrees`],
-        structured: true,
-      }),
+      withoutNativeDelegation(
+        headlessCommand('claude', {
+          prompt: cardPrompt('#1', FLOW_ONLY, [PERMISSION_ADVICE.board!], false, true),
+          permission: 'board',
+          addDirs: [`${dir}.worktrees`],
+          structured: true,
+        }),
+      ),
     );
     expect(card()).toMatchObject({ status: 'running', statusBy: 'Claude Code' });
     expect(router.snapshot().aiRuns).toEqual([storyId]);
@@ -519,12 +513,14 @@ describe('executor da IA', () => {
       yolo();
       runner.start(storyId);
       expect(procs[0]!.command).toEqual(
-        headlessCommand('claude', {
-          prompt: cardPrompt('#1', FLOW_ONLY, [], true, true),
-          permission: 'full',
-          addDirs: [`${dir}.worktrees`],
-          structured: true,
-        }),
+        withoutNativeDelegation(
+          headlessCommand('claude', {
+            prompt: cardPrompt('#1', FLOW_ONLY, [], true, true),
+            permission: 'full',
+            addDirs: [`${dir}.worktrees`],
+            structured: true,
+          }),
+        ),
       );
       expect(procs[0]!.command.args).toContain('bypassPermissions');
       expect(procs[0]!.command.stdin).toContain('MODO AUTÔNOMO');
@@ -815,12 +811,14 @@ describe('executor da IA', () => {
       runner.start(storyId, 'heartbeat', 'conflict');
       const command = procs[0]!.command;
       expect(command).toEqual(
-        headlessCommand('claude', {
-          prompt: conflictPrompt('#1', FLOW_ONLY, [PERMISSION_ADVICE.board!]),
-          permission: 'board',
-          addDirs: [`${dir}.worktrees`],
-          structured: true,
-        }),
+        withoutNativeDelegation(
+          headlessCommand('claude', {
+            prompt: conflictPrompt('#1', FLOW_ONLY, [PERMISSION_ADVICE.board!]),
+            permission: 'board',
+            addDirs: [`${dir}.worktrees`],
+            structured: true,
+          }),
+        ),
       );
       expect(command.stdin).not.toContain('Faça o trabalho da fase');
       expect(log.join('\n')).toContain('[#1] Resolver conflito: atualiza a branch a partir da base do pull request');
@@ -1541,7 +1539,7 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(card().status).toBe('waiting_answer');
   });
 
-  it('a regra de modelo com reserva legada não troca nada sem política: o card volta para a IA (#551), sem segunda chamada', () => {
+  it('a regra de modelo não troca nada sem política: o card volta para a IA (#551), sem segunda chamada', () => {
     useSonnetMedium();
     router.handle({
       type: 'settings.modelRules.set',
@@ -1552,7 +1550,6 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
           enabled: true,
           groups: [[{ fieldId: TYPE_CONDITION, op: 'is', value: 'História' }]],
           model: modelValue(sonnet().id, 'medium'),
-          fallback: modelValue(fable().id, 'low'),
         },
       ],
     });

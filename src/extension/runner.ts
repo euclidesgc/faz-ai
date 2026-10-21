@@ -16,6 +16,8 @@ import {
 } from './policyGate';
 import type { ContextAction } from '../shared/contextPlanning';
 import { cardRef } from '../shared/model';
+import { activityKindOf } from '../shared/activity';
+import { STORY_SESSION_ADVICE } from './unitAdvice';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { SHOW_COST } from '../shared/metrics';
 import { exceedsRunLimit, RUN_CACHE_READ_LIMIT } from '../shared/runLimit';
@@ -182,9 +184,9 @@ export function longRunNotice(report: RunReport, durationMs: number): string | n
 /** O que a IA recebe a mais quando a história está em modo autônomo (YOLO): sem aprovação, sem perguntas, até o pull request. */
 export const AUTONOMOUS_ADVICE = [
   'MODO AUTÔNOMO (YOLO): esta história foi liberada para rodar sozinha. Ninguém aprova, responde nem acompanha esta sessão.',
-  'Não chame request_review nem ask_question (a pergunta é recusada), nem request_review com pending: no modo autônomo nenhuma pendência segura o card. Ao terminar a fase, registre na conversa o que foi feito e as decisões que tomou (add_comment) e mova o card para a próxima coluna.',
+  'Não chame request_review nem ask_question (a pergunta aberta é recusada), nem request_review com pending: no modo autônomo nenhuma pendência segura o card. Ao terminar a fase, registre na conversa o que foi feito e as decisões que tomou (add_comment) e mova o card para a próxima coluna.',
   'Ninguém revisa as decisões do meio do caminho: siga sempre os padrões do projeto e as regras de arquitetura dele (CLAUDE.md, AGENTS.md, DESIGN.md e o código parecido que já existe) e, entre os caminhos que seguem esses padrões, escolha o menos complexo. Diante de uma dúvida, decida por esse critério e registre a decisão e o motivo na conversa.',
-  'As perguntas do documento da fase continuam: escreva cada uma na seção "Perguntas para você" do documento, com as alternativas, o impacto de cada uma e a sua recomendação justificada, e responda você mesmo no espaço "R. >" com a alternativa escolhida, marcando "(decidido pela IA no modo autônomo)". A pessoa lê as decisões depois.',
+  'ask_questions é aceita: o board responde cada pergunta com a indicada e a registra na seção "Perguntas e respostas" da descrição; use-a para as decisões com alternativas. A pessoa lê as decisões depois.',
   'Use block_card só se for impossível seguir (acesso, ambiente, falha que você não resolve), explicando o que é preciso para destravar.',
   'Na Implementação, execute todas as sub-tarefas até o fim. Na última coluna em que a IA atua (Homologação, no board padrão) não há aprovação nem próxima fase: envie a branch, abra o pull request com --base em workspace.prBase (do get_card), registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa), resuma na conversa o que foi feito e como testar, e pare: não avance o card. Não faça o merge.',
   'Se o pedido for grande demais para uma entrega só (partes independentes), divida-o no Discovery: mantenha nesta história a primeira entrega e crie as seguintes com create_card (autonomous_from = esta história), em ordem de dependência. Elas entram na fila e cada uma parte da branch da anterior, com o pull request empilhado (--base na branch anterior).',
@@ -329,7 +331,7 @@ export const cardPrompt = (
     ...context.card,
     `Leia o card com get_card (descrição, conversa, anexos e a fase em \`phase\`). Se a última mensagem da conversa for da pessoa, responda a ela pela conversa do card.`,
     ...(triage ? [TRIAGE_ADVICE] : []),
-    'Faça o trabalho da fase em que o card está e termine passando a vez: request_review quando houver algo para revisar, ask_question quando precisar de uma resposta, block_card se houver um impedimento, ou mova o card se a fase não exigir aprovação.',
+    'Faça o trabalho da fase em que o card está e termine passando a vez: request_review quando houver algo para revisar, ask_questions (com opções) ou ask_question (pergunta aberta) quando precisar de uma resposta, block_card se houver um impedimento, ou mova o card se a fase não exigir aprovação.',
     ...(autonomous ? [AUTONOMOUS_ADVICE] : []),
     ...advice,
     'Trabalhe só neste card e nas sub-tarefas dele. Não pergunte nada fora da conversa do card: ninguém está acompanhando esta sessão.',
@@ -455,6 +457,11 @@ export class AiRunner {
           const permission = autonomous ? 'full' : refine || summarize ? 'board' : state.board.runner.permission;
           const permissionAdvice = refine || summarize ? null : PERMISSION_ADVICE[permission];
           const stopAdvice = autonomous && !conflict ? yoloStopAdvice(state, card) : null;
+          // a sessão da história numa fase de código só cria as sub-tarefas: quem as executa é o board
+          const storySessionAdvice =
+            options.workId === undefined && !card.parentId && mode === 'phase' && activityKindOf(state, card, 'phase') === 'branch'
+              ? STORY_SESSION_ADVICE
+              : null;
           if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
           if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
           if (summarize) log('Resumir a conversa: lê as mensagens e grava um resumo, sem mover o card nem mudar o status.');
@@ -507,6 +514,7 @@ export class AiRunner {
                         contextLines(state, card),
                         [
                           ...(stopAdvice ? [stopAdvice] : []),
+                          ...(storySessionAdvice ? [storySessionAdvice] : []),
                           ...plan.advice,
                           ...(permissionAdvice ? [permissionAdvice] : []),
                           ...(options.advice ?? []),
@@ -605,7 +613,7 @@ export class AiRunner {
       }
       // a sessão da história é quem marca as sub-tarefas "Em execução" (start_work); com ela encerrada, nenhuma
       // continua em execução de verdade. Sem isto a sub-tarefa ficava presa e segurava a história para sempre
-      if (!retry && options.workId === undefined) this.releaseSubtasks(cardId, tool.label);
+      if (!retry && options.workId === undefined && !this.orchestrated(cardId)) this.releaseSubtasks(cardId, tool.label);
       if (retry) {
         // a política autorizou a troca de alvo: uma nova execução assume, sem publicar nem avisar o fim
         // desta (quem decide o desfecho final é a execução do destino)
@@ -840,6 +848,13 @@ export class AiRunner {
       acted: replied || !!end.report.inventory.length || !!end.report.bashCommands?.length,
       runningProfiles: [...this.runs.values()].filter((r) => r !== run).map((r) => r.profile.id),
     });
+  }
+
+  /** O board executa as sub-tarefas desta história (fase de código): quem as libera é a reconciliação, não a sessão. */
+  private orchestrated(storyId: string): boolean {
+    const s = this.router.snapshot();
+    const story = s.cards.find((c) => c.id === storyId);
+    return !!story && !story.parentId && activityKindOf(s, story, 'phase') === 'branch';
   }
 
   /** As sub-tarefas da história que a sessão encerrada deixou "Em execução" voltam para a IA. */

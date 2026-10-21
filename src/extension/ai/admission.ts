@@ -159,7 +159,6 @@ export class ExecutionAdmission {
         mcpBlocked: [],
         model: null,
         ...input.exec,
-        delegates: [],
         tools: preliminary.tools,
         deniedTools: preliminary.deniedTools,
         toolSet: 'explicit',

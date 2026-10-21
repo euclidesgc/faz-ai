@@ -16,7 +16,7 @@ import { resolveCommand } from './cliResolve';
 import { loginShellPath } from './spawn';
 import { BoardPanel } from './panel/BoardPanel';
 import type { MessageRouter } from './panel/messageRouter';
-import { IdeSettings } from './settings/ideSettings';
+import { SECTION, importIdeSettingsOnce } from './settings/ideSettings';
 import type { HostToWebview } from '../shared/messages';
 import { toSettingsTab } from '../shared/settingsTab';
 import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
@@ -150,10 +150,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           copy: (text) => vscode.env.clipboard.writeText(text),
         }),
       );
-      // Settings do editor (fazai.*) ↔ SQLite do board
-      context.subscriptions.push(
-        new IdeSettings(vscode.workspace, f.uri, log, (m) => void vscode.window.showWarningMessage(m)).bind(router),
-      );
+      // traz uma vez os valores fazai.* que a pessoa gravou no Settings do editor para o board
+      importIdeSettingsOnce(vscode.workspace.getConfiguration(SECTION, f.uri), router, log);
       runner = host.runner;
       heartbeat = host.heartbeat;
       autopilot = host.autopilot;
@@ -190,7 +188,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const aiCommand = (action: 'start' | 'stop') => async (cardId: string, opts?: { fromBoard?: boolean; mode?: AiRunMode }) => {
     if (!(await getRouter()) || !runner) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
     try {
-      if (action === 'start') runner.start(cardId, 'manual', opts?.mode);
+      if (action === 'start') await host?.runAi(cardId, opts?.mode);
       else runner.stop(cardId);
     } catch (e) {
       if (opts?.fromBoard) throw e;
@@ -257,7 +255,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         env: {
           connectAI: async (target) => (await h.connectAI(target)).message,
           fixProjectMcp: (file) => h.fixProjectServer(file),
-          runAi: (cardId, mode) => h.runner.start(cardId, 'manual', mode),
+          runAi: (cardId, mode) => h.runAi(cardId, mode),
           stopAi: (cardId) => h.runner.stop(cardId),
           pauseAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.pause'),
           resumeAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.resume'),
@@ -336,9 +334,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
     vscode.commands.registerCommand('fazai.openBoard', () => openBoard()),
     vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard({ type: 'ui.openCard', cardId })),
-    vscode.commands.registerCommand('fazai.openIdeSettings', (key?: string) =>
-      vscode.commands.executeCommand('workbench.action.openSettings', key ? `@id:${key}` : '@ext:euclidesgc.faz-ai'),
-    ),
     vscode.commands.registerCommand('fazai.openBoardSettings', (args?: { tab?: unknown; section?: string }) =>
       openBoard({ type: 'ui.openSettings', tab: toSettingsTab(args?.tab), section: args?.section }),
     ),

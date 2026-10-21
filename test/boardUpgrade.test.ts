@@ -272,7 +272,7 @@ describe('atualização do board para o padrão atual', () => {
     expect(pendingUpgrade(db, boardId)).toEqual([]);
   });
 
-  it('versão 9: os documentos das fases com o modelo padrão da 0.38 ganham a seção "Perguntas para você"; o personalizado fica', () => {
+  it('versão 9: os documentos das fases com o modelo padrão da 0.38 saem da seção "Perguntas para você" (ask_questions); o personalizado fica', () => {
     upgradeBoard(db, boardId);
     const settings = new SettingsRepo(db);
     for (const name of ['Discovery', 'PRD', 'Spec'])
@@ -288,9 +288,8 @@ describe('atualização do board para o padrão atual', () => {
     upgradeBoard(db, boardId);
     for (const name of ['Discovery', 'PRD', 'Spec']) {
       expect(col(name).artifactTemplate).toBe(PHASE_DEFAULTS[name]!.artifactTemplate);
-      expect(col(name).artifactTemplate).toContain('## ❓ Perguntas para você');
-      expect(col(name).artifactTemplate).toContain('**Recomendação:**');
-      expect(col(name).artifactTemplate).toContain('**R.** >');
+      expect(col(name).artifactTemplate).not.toContain('Perguntas para você');
+      expect(PHASE_HISTORY[name]!.templates.at(-1)).toContain('## ❓ Perguntas para você');
     }
     expect(col('PRD').artifactTemplate).not.toContain('## Questões em aberto');
     expect(col('Plan').artifactTemplate).toBe('# Meu plano');
@@ -299,7 +298,7 @@ describe('atualização do board para o padrão atual', () => {
 
   it('versão 10: a Homologação com o texto da 0.39 passa a abrir o pull request com --base em workspace.prBase; a personalizada fica', () => {
     upgradeBoard(db, boardId);
-    expect(BOARD_TEMPLATE_VERSION).toBe(13);
+    expect(BOARD_TEMPLATE_VERSION).toBe(14);
     const settings = new SettingsRepo(db);
     const v9 = PHASE_HISTORY['Homologação']!.instructions.at(-1)!;
     // o texto de fábrica anterior é o atual sem a base do PR
@@ -321,12 +320,31 @@ describe('atualização do board para o padrão atual', () => {
     expect(col('Homologação').aiInstruction).toBe('minha homologação');
   });
 
+  it('versão 13: o Discovery e a Revisão passam a citar ask_questions; os modelos perdem a seção; o personalizado fica', () => {
+    upgradeBoard(db, boardId);
+    const settings = new SettingsRepo(db);
+    // o Discovery ganhou a versão 14 depois (trilha curta): o texto da versão 12 é o penúltimo
+    for (const n of ['Discovery', 'Revisão'])
+      settings.updateColumn(col(n).id, { aiInstruction: PHASE_HISTORY[n]!.instructions.at(n === 'Discovery' ? -2 : -1)! });
+    settings.updateColumn(col('Spec').id, { artifactTemplate: PHASE_HISTORY['Spec']!.templates.at(-1)! });
+    settings.updateColumn(col('Plan').id, { artifactTemplate: '# Meu plano' });
+    run(db, 'UPDATE boards SET template_version = 12 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId).length).toBe(3);
+    upgradeBoard(db, boardId);
+    expect(col('Discovery').aiInstruction).toContain('ask_questions');
+    expect(col('Revisão').aiInstruction).toContain('ask_questions');
+    expect(col('Spec').artifactTemplate).not.toContain('Perguntas para você');
+    expect(col('Plan').artifactTemplate).toBe('# Meu plano');
+    for (const d of Object.values(PHASE_DEFAULTS)) expect(d.artifactTemplate).not.toContain('Perguntas para você');
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+  });
+
   it('versão 12: as fases de documento com o texto da versão 11 recebem o "Mapa do código"; o personalizado fica', () => {
     upgradeBoard(db, boardId);
     const settings = new SettingsRepo(db);
-    // Discovery e Plan ganharam a versão 12 depois (trilha curta): o texto da versão 11 é o penúltimo
+    // Discovery e Plan ganharam as versões 13 (ask_questions) e 14 (trilha curta) depois: o texto da versão 11 é o antepenúltimo
     const old = (n: string) => ({
-      aiInstruction: PHASE_HISTORY[n]!.instructions.at(n === 'Discovery' || n === 'Plan' ? -2 : -1)!,
+      aiInstruction: PHASE_HISTORY[n]!.instructions.at(n === 'Discovery' || n === 'Plan' ? -3 : -1)!,
       ...(n === 'Discovery' || n === 'Spec' ? { artifactTemplate: PHASE_HISTORY[n]!.templates.at(-1)! } : {}),
     });
     for (const n of ['Discovery', 'PRD', 'Spec', 'Plan']) settings.updateColumn(col(n).id, old(n));
@@ -346,12 +364,12 @@ describe('atualização do board para o padrão atual', () => {
     expect(pendingUpgrade(db, boardId)).toEqual([]);
   });
 
-  it('versão 13: Discovery e Plan com o texto da versão 12 passam a explicar a trilha curta; o personalizado fica', () => {
+  it('versão 14: Discovery e Plan com o texto da versão 13 passam a explicar a trilha curta; o personalizado fica', () => {
     upgradeBoard(db, boardId);
     const settings = new SettingsRepo(db);
     settings.updateColumn(col('Discovery').id, { aiInstruction: PHASE_HISTORY['Discovery']!.instructions.at(-1)! });
     settings.updateColumn(col('Plan').id, { aiInstruction: 'meu Plan' });
-    run(db, 'UPDATE boards SET template_version = 12 WHERE id = ?', [boardId]);
+    run(db, 'UPDATE boards SET template_version = 13 WHERE id = ?', [boardId]);
     const pending = pendingUpgrade(db, boardId);
     expect(pending).toHaveLength(1);
     expect(pending[0]).toContain('trilha curta');
@@ -359,6 +377,7 @@ describe('atualização do board para o padrão atual', () => {
     expect(col('Discovery').aiInstruction).toBe(PHASE_DEFAULTS['Discovery']!.instruction);
     expect(col('Discovery').aiInstruction).toContain('Trilha curta');
     expect(col('Discovery').aiInstruction).toContain('update_card');
+    expect(col('Discovery').aiInstruction).toContain('ask_questions');
     expect(PHASE_DEFAULTS['Plan']!.instruction).toContain('trilha curta');
     expect(PHASE_DEFAULTS['Plan']!.instruction).toContain('DISCOVERY.md');
     expect(col('Plan').aiInstruction).toBe('meu Plan');

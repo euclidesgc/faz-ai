@@ -8,7 +8,6 @@ import { RUNNER_PERMISSIONS } from '../src/shared/runner';
 const exec: NonNullable<HeadlessInput['exec']> = {
   agent: 'especialista',
   agentDefinition: { name: 'especialista', description: 'Especialista', prompt: 'Instrução fixa' },
-  delegates: [],
   mcpAllowed: [],
   mcpBlocked: [],
   mcpConfig: '{"mcpServers":{}}',

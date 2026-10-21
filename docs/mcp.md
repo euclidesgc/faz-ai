@@ -96,6 +96,8 @@ para `waiting_answer`; as respostas entram na seção "Perguntas e respostas" da
 autônomo, o board registra a opção indicada para cada pergunta e a IA continua. `get_card` inclui
 `pendingQuestions` (pergunta, opções e indicada, sem IDs) somente enquanto houver perguntas pendentes.
 
+`ask_question` continua para a pergunta aberta, sem opções. `request_review` com `pending` fica para o que não é pergunta com opções (dado, acesso, ponto em aberto). Os modelos de documento das fases não têm mais a seção "Perguntas para você".
+
 Parâmetros de `ask_questions`: `card` e `questions`, uma lista de `{ question, options, recommended }`.
 `options` tem pelo menos duas opções, sem repetição, e `recommended` é o texto exato de uma delas. A
 chamada é recusada, sem gravar nada, com pergunta vazia, menos de duas opções, opções repetidas,
@@ -344,7 +346,7 @@ pasta em que o código deve ser alterado. O nome da branch e a pasta são defini
 não deve criar branches por conta própria. Nas execuções pelo board, a pasta das worktrees é
 passada à ferramenta como pasta de trabalho extra (`--add-dir`).
 
-Com o gitflow ligado (`fazai.git.gitflow`, o padrão), a branch parte da `develop` (História, Débito
+Com o gitflow ligado (Configurações → Git › Usar o gitflow, o padrão), a branch parte da `develop` (História, Débito
 técnico e Retrabalho) ou da branch principal (Bug, que gera `hotfix/`); a pilha do modo autônomo e as
 histórias derivadas partem da branch da história anterior. `workspace` ganha três campos:
 
@@ -403,9 +405,9 @@ Configurações → Workflows e colunas ou por `update_column` (`ai_instruction`
 
 Ao ler um card (`get_card`), a IA recebe a ferramenta, o **modelo** e o **esforço** que devem executá-lo e as **Skills**
 obrigatórias com o caminho de cada `SKILL.md` (as do fluxo vêm sem caminho, para ler com `get_skill`). Ela é instruída a carregar essas skills antes de
-executar e a delegar o trabalho a um subagente com o modelo escolhido, ou avisar quando o cliente
-não permite. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue.
-
+executar e a avisar a pessoa quando o modelo for outro. Na fase de código, as sub-tarefas são executadas
+pelo board (uma execução da CLI por sub-tarefa, com o modelo do card dela): a sessão da história cria e
+descreve as sub-tarefas e para, e `subtasksNow.byBoard` lista as que o board executa, na ordem. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue. Nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica negada; no Cursor e no Kimi Code, sem bloqueio comprovado, a capacidade fica "desconhecida" e a admissão decide). Em **Configurações → Harness de IA** (e em `fazai.git.parallelSubtasks`, de 1 a 6) a pessoa define **"Sub-tarefas em paralelo por história"**; a tela mostra o pedido e o efetivo (hoje 1).
 Fluxo SDD sugerido: a IA lê a história e a fase (`phase`), cria uma sub-tarefa com o campo Fase,
 constrói nela o documento da fase e o anexa à história (`artifact: true`), pede a revisão na
 história e para. Com a aprovação, move a história para a próxima coluna.
@@ -435,7 +437,7 @@ O schema 41 acrescenta definições e histórico de políticas. A importação f
 
 A webview e o navegador usam `executionPolicy.read` (biblioteca ou histórico paginado) e `executionPolicy.simulate` com respostas correlacionadas por `requestId`. A simulação usa uma cópia do rascunho e não grava, resolve segredos, gera recibos nem inicia CLI. Instalação, credenciais e admissão no cenário são hipóteses declaradas, não estado comprovado do host. O catálogo contém apenas metadados dos providers integrados.
 
-A reserva legada de `ModelRule.fallback` não decide execução: ao abrir o board, salvar regras ou importar, vira proposta `legacy-<regra>` (desligada, pendente, versão 1; idempotente, sem migração de schema), e `set_model_rules` recusa `fallback`. `settings.executionPolicy.save` e `settings.executionPolicy.remove` exigem ação da pessoa e revisão otimista; IA, MCP externo e tokens de execução são recusados. A UI permite salvar pendente ou confirmar revisão após comparar todas as condições/destinos/limites, preserva o rascunho em conflitos e permite recarregar a versão atual para nova comparação. Remoção cria revisão desativada e mantém o histórico. Rascunhos inválidos para o catálogo podem ser desativados ou removidos. Não há ferramentas MCP de escrita/ativação: só `get_execution_policies`, de leitura. Runner, chat e assistentes decidem a troca de alvo pelo mesmo avaliador da prévia **Próxima execução**. O assistente de IA do editor (criar, sugerir fallbacks, revisar conflitos) só devolve uma proposta validada, sem segredos; não salva nem liga política.
+A reserva legada das regras de modelo não existe mais em `ModelRule`: o valor `fallback` ainda gravado no JSON de boards antigos é lido só pela conversão, que ao abrir o board, salvar regras ou importar o transforma em proposta `legacy-<regra>` (desligada, pendente, versão 1; idempotente, sem migração de schema). `set_model_rules` não tem o parâmetro `fallback` (a chave é ignorada, como qualquer outra fora do schema) e `get_models` não devolve `fallbackSuggest` nem `fallbackValue`. `settings.executionPolicy.save` e `settings.executionPolicy.remove` exigem ação da pessoa e revisão otimista; IA, MCP externo e tokens de execução são recusados. A UI permite salvar pendente ou confirmar revisão após comparar todas as condições/destinos/limites, preserva o rascunho em conflitos e permite recarregar a versão atual para nova comparação. Remoção cria revisão desativada e mantém o histórico. Rascunhos inválidos para o catálogo podem ser desativados ou removidos. Não há ferramentas MCP de escrita/ativação: só `get_execution_policies`, de leitura. Runner, chat e assistentes decidem a troca de alvo pelo mesmo avaliador da prévia **Próxima execução**. O assistente de IA do editor (criar, sugerir fallbacks, revisar conflitos) só devolve uma proposta validada, sem segredos; não salva nem liga política.
 
 
 ### Perfis de CLI persistidos

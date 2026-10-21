@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 
 // liga o modo navegador antes de o setup montar o mock de `src/webview/vscode` (padrão de appearanceSettingsWeb.test.tsx):
-// no editor (!isWeb, padrão dos testes), o GitSettings mostra só o link para o Settings (ver gitSettingsEditor.test.tsx)
+// o modo navegador cobre também as diferenças de ambiente (ver gitSettingsEditor.test.tsx para o editor)
 vi.hoisted(() => {
   (globalThis as { __fazaiTestWeb?: boolean }).__fazaiTestWeb = true;
 });

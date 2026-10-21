@@ -132,7 +132,6 @@ describe('servidor MCP', () => {
       'request_review e PARE',
       '"approved"',
       '`model`',
-      'subagente',
       '`requiredRules`',
       '`requiredSkills`',
       'request_review e `pending`',
@@ -742,7 +741,7 @@ describe('modelos de IA', () => {
     const cursor = (await call('create_card', { title: 'No Cursor', fields: { Modelo: 'cursor:composer-2.5' } })).data;
     const card = (await call('get_card', { card: cursor.id })).data;
     expect(card.model).toMatchObject({ tool: 'cursor', model: 'composer-2.5', from: 'card', value: 'cursor:composer-2.5' });
-    expect(card.model.note).toContain('Se não for o da sua sessão, você não troca de CLI');
+    expect(card.model.note).toContain('Você não troca de CLI');
 
     // sem modelo em nenhum nível vale o perfil padrão: não há bloco model
     const plain = (await call('create_card', { title: 'Sem modelo' })).data;
@@ -838,7 +837,7 @@ describe('modelos de IA', () => {
     const card = (await call('create_card', { title: 'H', fields: { Esforço: 'Baixo' } })).data;
     expect(card.model.value).toBe('claude:haiku');
     // a nota diz o que fazer com o modelo e separa o esforço do modelo do "Esforço da atividade"
-    expect(card.model.note).toMatch(/delegue o trabalho a um subagente[\s\S]*avise a pessoa/);
+    expect(card.model.note).toMatch(/Execute com este modelo e esforço[\s\S]*avise a pessoa/);
     expect(card.model.note).toContain('"Esforço da atividade" é o tamanho da tarefa');
     // o modelo veio da sugestão, então acompanha a mudança de esforço
     expect((await call('update_card', { card: 1, fields: { Esforço: 'Alto' } })).data.model.value).toBe('claude:opus@high');
@@ -962,20 +961,29 @@ describe('regras de modelo com E e OU', () => {
     );
   });
 
-  it('recusa a reserva por regra (agora é política de execução) e não altera as regras salvas', async () => {
-    await call('set_model_rules', { rules: [{ name: 'Antes', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku' }] });
+  it('o parâmetro fallback não existe: a chave é ignorada, a regra é salva sem reserva e nenhuma política nasce', async () => {
     const res = await call('set_model_rules', {
       rules: [{ name: 'Com reserva', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku', fallback: 'opus high' }],
     });
-    expect(res.error).toBe(true);
-    expect(res.text).toContain('políticas de execução');
-    expect(router.snapshot().board.modelRules.map((r) => r.name)).toEqual(['Antes']);
+    expect(res.error).toBe(false);
+    expect(res.data.rules[0]).not.toHaveProperty('fallbackValue');
+    expect(router.snapshot().board.modelRules.map((r) => r.name)).toEqual(['Com reserva']);
+    expect(router.snapshot().board.modelRules.some((r) => 'fallback' in r)).toBe(false);
     expect(router.executionPolicyLibrary().snapshot.records).toEqual([]);
-    const ok = await call('set_model_rules', {
-      rules: [{ name: 'Sem reserva', when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'opus low' }],
-    });
-    expect(ok.data.rules[0]).not.toHaveProperty('fallbackValue');
-    expect(router.snapshot().board.modelRules[0]?.fallback).toBe(null);
+    const tool = (await client.listTools()).tools.find((t) => t.name === 'set_model_rules');
+    expect(JSON.stringify(tool)).not.toContain('fallback');
+  });
+
+  it('get_models nunca devolve reserva, mesmo com o JSON antigo gravado no board', async () => {
+    const { run } = await import('../src/extension/db/query');
+    const json = JSON.stringify([
+      { id: 'r1', name: 'Antiga', enabled: true, groups: [], model: 'claude:haiku', fallback: 'claude:opus@high' },
+    ]);
+    run(profileDb, 'UPDATE boards SET model_rules_json = ? WHERE id = ?', [json, router.boardId]);
+    const res = await call('get_models', {});
+    expect(res.data.rules).toHaveLength(1);
+    expect(res.data.rules[0]).not.toHaveProperty('fallbackValue');
+    expect(res.data.rules[0]).not.toHaveProperty('fallbackSuggest');
   });
 
   it('com o preenchimento automático desligado, só sugere', async () => {
@@ -996,7 +1004,6 @@ describe('regras de modelo com E e OU', () => {
           enabled: true,
           groups: [[{ fieldId: 'f1', op: 'is', value: 'Alto' }]],
           model: 'claude:opus@high',
-          fallback: null,
         },
       ],
     );
@@ -1744,6 +1751,19 @@ describe('vínculos entre cards', () => {
     expect((await call('unlink_cards', { card: filho.id, other: pai.id })).error).toBe(false);
     expect(router.snapshot().links).toHaveLength(1);
     expect((await call('unlink_cards', { card: filho.id, other: pai.id })).error).toBe(true);
+  });
+
+  it('numa fase de código o get_card mostra o que o board executa (byBoard) e a nota manda criar as sub-tarefas e parar', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const base = (await call('create_card', { title: 'Base', parent: story.id })).data;
+    const tela = (await call('create_card', { title: 'Tela', parent: story.id })).data;
+    const api = (await call('create_card', { title: 'API', parent: story.id, depends_on: [base.id] })).data;
+    await call('move_card', { card: story.id, column: 'Implementação' });
+    for (const k of [base, tela, api]) await call('update_card', { card: k.id, fields: { Fase: 'Implementação' } });
+    const got = (await call('get_card', { card: story.id })).data;
+    expect(got.subtasksNow).toEqual({ byBoard: [base.id, tela.id], waiting: [api.id] });
+    expect(got.subtasksNowNote).toMatch(/nem por subagente/);
+    expect(got.subtasksNowNote).toMatch(/crie-as e pare/);
   });
 
   it('dependência entre sub-tarefas: depends_on, rodadas em subtasksNow e start_work recusando a que espera', async () => {

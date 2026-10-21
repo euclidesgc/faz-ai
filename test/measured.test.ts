@@ -326,7 +326,6 @@ describe('a falha antes do primeiro evento não é repetida (#739)', () => {
         exec: {
           agent: '',
           agentDefinition: null,
-          delegates: [],
           mcpAllowed: [],
           mcpBlocked: [],
           mcpConfig: null,

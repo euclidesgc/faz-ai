@@ -257,31 +257,14 @@ const PLAN_INSTRUCTION_V11 = [
   'A descrição de cada sub-tarefa deve bastar para executá-la: o que fazer, onde e como verificar.',
 ].join('\n');
 
-const DISCOVERY_INSTRUCTION_V12 = [
-  'Entenda o problema de forma macro, antes de qualquer documento de requisitos.',
-  'Leia a descrição e a conversa do card (inclusive as imagens anexadas) e investigue o código e a documentação do projeto.',
-  'Esclareça o que precisa ser feito, qual é o objetivo, quem é afetado, os pré-requisitos e dependências, os riscos e o que fica de fora.',
-  'Use as ferramentas de índice de código que o Harness liberou, se houver, antes de Read e Grep; o arquivo lido continua sendo a fonte de verdade. Registre na seção "Mapa do código" os arquivos, funções, padrões e testes envolvidos: as fases seguintes partem dele e leem só o que faltar.',
-  'Discuta com a pessoa pela conversa do card: para cada dúvida ou decisão em aberto use ask_question e pare até a resposta. Pesquise o que for preciso para responder ao que ela escreveu.',
-  'Quando o entendimento estiver alinhado, registre-o no artefato e peça a revisão. Ele é o insumo do PRD.',
-].join('\n');
-
-const PLAN_INSTRUCTION_V12 = [
-  'Quebre a Spec aprovada em passos pequenos, que possam ser implementados e verificados um a um. Se a história começou nesta fase, sem Spec, parta da descrição e da conversa do card. Parta da seção "Mapa do código" da Spec e leia só o que faltar. Use as ferramentas de índice de código que o Harness liberou, se houver, antes de Read e Grep; o arquivo lido continua sendo a fonte de verdade.',
-  'Cada passo é uma parte inteligível da entrega, fácil de revisar sozinha, e diz como verificá-la (teste, typecheck, comando ou tela). Recortar por camada (dados, regras de negócio, tela) vale, desde que cada parte seja verificável e fácil de revisar.',
-  `Estime o tamanho da entrega em linhas de código. A história é uma funcionalidade e vira um pull request; se a estimativa passar de umas ${PR_LINES_BUDGET} linhas, divida a funcionalidade: deixe nesta história a primeira parte e crie as seguintes como histórias derivadas, em ordem, cada uma com derived_from = a parte anterior (a primeira derivada, desta história; a segunda, da primeira derivada, e assim por diante), para cada pull request ficar empilhado sobre o da parte anterior. Registre no plano o que fica em cada uma.`,
-  'Registre o plano no artefato e crie uma sub-tarefa para cada passo, com Fase = Implementação, o campo "Esforço da atividade" avaliado (o modelo é sugerido a partir dele) e as Skills necessárias.',
-  'A descrição de cada sub-tarefa deve bastar para executá-la: o que fazer, os arquivos que ela vai tocar (tirados do mapa) e como verificar.',
-].join('\n');
-
-export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
+// Os textos padrão da versão 12 do board (até a 0.44.0): a versão 13 troca a seção "Perguntas para você" por ask_questions.
+const PHASE_DEFAULTS_V12: Record<string, PhaseDefault> = {
   Discovery: {
     instruction: [
       'Entenda o problema de forma macro, antes de qualquer documento de requisitos.',
       'Leia a descrição e a conversa do card (inclusive as imagens anexadas) e investigue o código e a documentação do projeto.',
       'Esclareça o que precisa ser feito, qual é o objetivo, quem é afetado, os pré-requisitos e dependências, os riscos e o que fica de fora.',
       'Use as ferramentas de índice de código que o Harness liberou, se houver, antes de Read e Grep; o arquivo lido continua sendo a fonte de verdade. Registre na seção "Mapa do código" os arquivos, funções, padrões e testes envolvidos: as fases seguintes partem dele e leem só o que faltar.',
-      'Com a regra Trilha curta ligada, uma história de esforço Baixo ou do tipo Bug vai deste Discovery direto ao Plan, sem PRD nem Spec: deixe o Mapa do código completo, porque o Plan parte dele. Se descobrir que a história é maior do que parecia, suba o campo "Esforço da atividade" com update_card (ou corrija o tipo) e registre na conversa: o avanço seguinte segue a trilha completa.',
       'Discuta com a pessoa pela conversa do card: para cada dúvida ou decisão em aberto use ask_question e pare até a resposta. Pesquise o que for preciso para responder ao que ela escreveu.',
       'Quando o entendimento estiver alinhado, registre-o no artefato e peça a revisão. Ele é o insumo do PRD.',
     ].join('\n'),
@@ -419,7 +402,7 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   },
   Plan: {
     instruction: [
-      'Quebre a Spec aprovada em passos pequenos, que possam ser implementados e verificados um a um. Se a história começou nesta fase, sem Spec, ou veio pela trilha curta (só com o Discovery), parta do DISCOVERY.md, da descrição e da conversa do card, sem criar os documentos que faltam. Parta da seção "Mapa do código" da Spec ou do Discovery e leia só o que faltar. Use as ferramentas de índice de código que o Harness liberou, se houver, antes de Read e Grep; o arquivo lido continua sendo a fonte de verdade.',
+      'Quebre a Spec aprovada em passos pequenos, que possam ser implementados e verificados um a um. Se a história começou nesta fase, sem Spec, parta da descrição e da conversa do card. Parta da seção "Mapa do código" da Spec e leia só o que faltar. Use as ferramentas de índice de código que o Harness liberou, se houver, antes de Read e Grep; o arquivo lido continua sendo a fonte de verdade.',
       'Cada passo é uma parte inteligível da entrega, fácil de revisar sozinha, e diz como verificá-la (teste, typecheck, comando ou tela). Recortar por camada (dados, regras de negócio, tela) vale, desde que cada parte seja verificável e fácil de revisar.',
       `Estime o tamanho da entrega em linhas de código. A história é uma funcionalidade e vira um pull request; se a estimativa passar de umas ${PR_LINES_BUDGET} linhas, divida a funcionalidade: deixe nesta história a primeira parte e crie as seguintes como histórias derivadas, em ordem, cada uma com derived_from = a parte anterior (a primeira derivada, desta história; a segunda, da primeira derivada, e assim por diante), para cada pull request ficar empilhado sobre o da parte anterior. Registre no plano o que fica em cada uma.`,
       'Registre o plano no artefato e crie uma sub-tarefa para cada passo, com Fase = Implementação, o campo "Esforço da atividade" avaliado (o modelo é sugerido a partir dele) e as Skills necessárias.',
@@ -484,6 +467,44 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   },
 };
 
+const QUESTIONS_SECTION_START = '\n\n## ❓ Perguntas para você';
+const withoutQuestions = (template: string): string => template.split(QUESTIONS_SECTION_START)[0]!;
+const askQuestions = (text: string): string =>
+  text
+    .replace('use ask_question e pare', 'use ask_questions (ou ask_question, para pergunta aberta) e pare')
+    .replace('`ask_question` e pare', '`ask_questions` e pare')
+    .replace(
+      'ask_question (no modo autônomo, request_review com pending) e pare',
+      'ask_questions (no modo autônomo, o board responde com a indicada) e pare',
+    );
+
+/** Os textos padrão da versão 13: os da versão 12, sem a seção "Perguntas para você" e com ask_questions. */
+const PHASE_DEFAULTS_V13: Record<string, PhaseDefault> = Object.fromEntries(
+  Object.entries(PHASE_DEFAULTS_V12).map(([name, d]) => [
+    name,
+    { ...d, instruction: askQuestions(d.instruction), artifactTemplate: withoutQuestions(d.artifactTemplate) },
+  ]),
+);
+
+// A versão 14 explica a trilha curta (regra shortTrack): o Discovery avisa que a história pequena vai direto ao
+// Plan e como devolvê-la à trilha completa; o Plan parte do DISCOVERY quando não há PRD nem Spec.
+const SHORT_TRACK_DISCOVERY =
+  'Com a regra Trilha curta ligada, uma história de esforço Baixo ou do tipo Bug vai deste Discovery direto ao Plan, sem PRD nem Spec: deixe o Mapa do código completo, porque o Plan parte dele. Se descobrir que a história é maior do que parecia, suba o campo "Esforço da atividade" com update_card (ou corrija o tipo) e registre na conversa: o avanço seguinte segue a trilha completa.';
+const shortTrack = (name: string, text: string): string => {
+  if (name === 'Discovery') return text.replace('\nDiscuta com a pessoa', `\n${SHORT_TRACK_DISCOVERY}\nDiscuta com a pessoa`);
+  if (name === 'Plan')
+    return text.replace(
+      'Se a história começou nesta fase, sem Spec, parta da descrição e da conversa do card. Parta da seção "Mapa do código" da Spec e leia só o que faltar.',
+      'Se a história começou nesta fase, sem Spec, ou veio pela trilha curta (só com o Discovery), parta do DISCOVERY.md, da descrição e da conversa do card, sem criar os documentos que faltam. Parta da seção "Mapa do código" da Spec ou do Discovery e leia só o que faltar.',
+    );
+  return text;
+};
+
+/** Os textos padrão atuais (versão 14): os da versão 13 com a trilha curta no Discovery e no Plan. */
+export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+  Object.entries(PHASE_DEFAULTS_V13).map(([name, d]) => [name, { ...d, instruction: shortTrack(name, d.instruction) }]),
+);
+
 /** Textos padrão anteriores de uma fase e o que a versão atual traz de novo, para a atualização do board. */
 export interface PhaseHistory {
   instructions: string[];
@@ -499,27 +520,31 @@ export interface PhaseHistory {
  */
 export const PHASE_HISTORY: Record<string, PhaseHistory> = {
   Discovery: {
-    instructions: [DISCOVERY_INSTRUCTION_V11, DISCOVERY_INSTRUCTION_V12],
-    templates: [DISCOVERY_TEMPLATE_V8, DISCOVERY_TEMPLATE_V11],
+    instructions: [DISCOVERY_INSTRUCTION_V11, PHASE_DEFAULTS_V12.Discovery!.instruction, PHASE_DEFAULTS_V13.Discovery!.instruction],
+    templates: [DISCOVERY_TEMPLATE_V8, DISCOVERY_TEMPLATE_V11, PHASE_DEFAULTS_V12.Discovery!.artifactTemplate],
     change:
-      'a fase explica a trilha curta (história de esforço Baixo ou do tipo Bug vai direto ao Plan quando a regra está ligada) e como devolver a história à trilha completa; o documento ganha as seções "Perguntas para você" e "Mapa do código", de onde as fases seguintes partem',
+      'a fase explica a trilha curta (história de esforço Baixo ou do tipo Bug vai direto ao Plan quando a regra está ligada) e como devolver a história à trilha completa; as dúvidas com alternativas vão por ask_questions (carrossel no card) e o documento perde a seção "Perguntas para você"',
   },
   PRD: {
     instructions: [PRD_INSTRUCTION_V5, PRD_INSTRUCTION_V11],
-    templates: [PRD_TEMPLATE_V8],
-    change:
-      'a fase parte do mapa do código do Discovery e lê só o que faltar; pode começar sem o Discovery e o documento ganha a seção "Perguntas para você", com alternativas, recomendação e espaço para a resposta',
+    templates: [PRD_TEMPLATE_V8, PHASE_DEFAULTS_V12.PRD!.artifactTemplate],
+    change: 'o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
   },
   Spec: {
     instructions: [SPEC_INSTRUCTION_V5, SPEC_INSTRUCTION_V11],
-    templates: [SPEC_TEMPLATE_V5, SPEC_TEMPLATE_V8, SPEC_TEMPLATE_V11],
-    change:
-      'a Spec parte do mapa do código do Discovery e o completa, sem citar ferramentas do projeto; traz o desenho do programa (tipos, assinaturas e fluxo em diagramas Mermaid), o motivo de cada alternativa descartada e a seção "Perguntas para você"',
+    templates: [SPEC_TEMPLATE_V5, SPEC_TEMPLATE_V8, SPEC_TEMPLATE_V11, PHASE_DEFAULTS_V12.Spec!.artifactTemplate],
+    change: 'o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
   },
   Plan: {
-    instructions: [PLAN_INSTRUCTION_V5, PLAN_INSTRUCTION_V11, PLAN_INSTRUCTION_V12],
-    templates: [PLAN_TEMPLATE_V5, PLAN_TEMPLATE_V8],
-    change: `o plano parte do DISCOVERY quando a história veio pela trilha curta, sem PRD nem Spec; parte do mapa do código da Spec ou do Discovery e cada sub-tarefa traz os arquivos que vai tocar; cada passo fica fácil de revisar sozinho, o plano estima o tamanho da entrega, dividindo em histórias derivadas o que passar de umas ${PR_LINES_BUDGET} linhas, e ganha a seção "Perguntas para você"`,
+    instructions: [PLAN_INSTRUCTION_V5, PLAN_INSTRUCTION_V11, PHASE_DEFAULTS_V12.Plan!.instruction, PHASE_DEFAULTS_V13.Plan!.instruction],
+    templates: [PLAN_TEMPLATE_V5, PLAN_TEMPLATE_V8, PHASE_DEFAULTS_V12.Plan!.artifactTemplate],
+    change:
+      'o plano parte do DISCOVERY quando a história veio pela trilha curta, sem PRD nem Spec; o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
+  },
+  Revisão: {
+    instructions: [PHASE_DEFAULTS_V12.Revisão!.instruction],
+    templates: [],
+    change: 'o achado que muda o comportamento combinado vira pergunta por ask_questions',
   },
   Implementação: { instructions: [IMPLEMENTATION_INSTRUCTION_V5], templates: [], change: 'a fase pode começar sem sub-tarefas do Plan' },
   Homologação: {

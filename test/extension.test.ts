@@ -180,41 +180,47 @@ it.skipIf(process.platform === 'win32')(
   },
 );
 
-it.skipIf(process.platform === 'win32')('comandos de ida e volta entre o board e o Settings do editor', async () => {
+it.skipIf(process.platform === 'win32')(
+  'o comando das configurações do board abre a tela, e o do Settings do editor não existe mais',
+  async () => {
+    const { deactivate } = await activateExtension();
+    expect(fake.commands.has('fazai.openIdeSettings')).toBe(false);
+
+    // sem painel: o comando abre o board e a mensagem espera o ready
+    await fake.commands.get('fazai.openBoardSettings')!({ tab: 'harness' });
+    const { webview } = fake.panels[0]!;
+    expect(webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings')).toBe(false);
+    webview.receive({ type: 'ready' });
+    await wait(() => webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings'), 'aba enviada ao painel');
+    expect(webview.posted.find((m) => (m as { type: string }).type === 'ui.openSettings')).toEqual({
+      type: 'ui.openSettings',
+      tab: 'harness',
+      section: undefined,
+    });
+
+    // painel aberto: posta na hora; aba inválida cai na padrão
+    await fake.commands.get('fazai.openBoardSettings')!({ tab: 'nada' });
+    expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
+    await fake.commands.get('fazai.openBoardSettings')!();
+    expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
+
+    await fake.commands.get('fazai.openEnvironment')!();
+    expect(webview.posted.at(-1)).toEqual({ type: 'ui.openView', view: 'environment' });
+
+    await deactivate();
+  },
+);
+
+it.skipIf(process.platform === 'win32')('abrir o board importa uma vez o valor que a pessoa tinha gravado no Settings', async () => {
+  fakeConfig.values.global['fazai.appearance.theme'] = 'dark';
   const { deactivate } = await activateExtension();
-  const opened: unknown[][] = [];
-  fake.commands.set('workbench.action.openSettings', (...args) => void opened.push(args));
-
-  await fake.commands.get('fazai.openIdeSettings')!();
-  await fake.commands.get('fazai.openIdeSettings')!('fazai.appearance.language');
-  expect(opened).toEqual([['@ext:euclidesgc.faz-ai'], ['@id:fazai.appearance.language']]);
-
-  // sem painel: o comando abre o board e a mensagem espera o ready
-  await fake.commands.get('fazai.openBoardSettings')!({ tab: 'harness' });
+  await fake.commands.get('fazai.openBoard')!();
   const { webview } = fake.panels[0]!;
-  expect(webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings')).toBe(false);
   webview.receive({ type: 'ready' });
-  await wait(() => webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings'), 'aba enviada ao painel');
-  expect(webview.posted.find((m) => (m as { type: string }).type === 'ui.openSettings')).toEqual({
-    type: 'ui.openSettings',
-    tab: 'harness',
-    section: undefined,
-  });
-
-  // painel aberto: posta na hora; aba inválida cai na padrão
-  await fake.commands.get('fazai.openBoardSettings')!({ tab: 'nada' });
-  expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
-  await fake.commands.get('fazai.openBoardSettings')!();
-  expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
-
-  await fake.commands.get('fazai.openEnvironment')!();
-  expect(webview.posted.at(-1)).toEqual({ type: 'ui.openView', view: 'environment' });
-
-  // Settings → board: mudar o idioma no Settings chega ao SQLite e à webview
-  fakeConfig.set('global', 'fazai.appearance.language', 'en');
-  await wait(() => {
-    const last = webview.posted.filter((m) => (m as { type: string }).type === 'boardState').at(-1) as { state: BoardState } | undefined;
-    return last?.state.board.appearance.language === 'en';
-  }, 'idioma do Settings refletido no board');
+  await wait(() => webview.posted.some((m) => (m as { type: string }).type === 'boardState'), 'board enviado ao painel');
+  const state = (webview.posted.find((m) => (m as { type: string }).type === 'boardState') as { state: BoardState }).state;
+  expect(state.board.appearance.theme).toBe('dark');
+  // a importação nunca escreve no Settings
+  expect(fakeConfig.updates).toEqual([]);
   await deactivate();
 });

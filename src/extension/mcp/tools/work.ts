@@ -48,7 +48,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
         a.card,
         'running',
         undefined,
-        'Ao terminar, peça a revisão com request_review, pergunte com ask_question ou mova o card.',
+        'Ao terminar, peça a revisão com request_review, pergunte com ask_questions (com opções) ou ask_question (aberta) ou mova o card.',
       );
     },
   );
@@ -56,7 +56,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
   tool(
     'request_review',
     'Entrega o trabalho da fase para revisão de uma pessoa (status "waiting_review") e registra o resumo na conversa do card. Depois de chamar, PARE: só uma pessoa aprova. Se ela pedir ajustes, o card volta para "ready" com o pedido na conversa; quando aprovar, o status vira "approved" e você move o card. ' +
-      'Use `pending` sempre que algo ficou dependendo da pessoa (decisão, dado, acesso, ponto em aberto que ela precisa avaliar): a pendência vai para a conversa e o card fica com ela. No modo autônomo nada segura o card (nem `pending`): decida você, registre e siga. Nunca registre uma pendência só num comentário e siga adiante.',
+      'Use `pending` para o que ficou dependendo da pessoa e não é pergunta com opções (dado, acesso, ponto em aberto que ela precisa avaliar); decisão com alternativas vai por ask_questions: a pendência vai para a conversa e o card fica com ela. No modo autônomo nada segura o card (nem `pending`): decida você, registre e siga. Nunca registre uma pendência só num comentário e siga adiante.',
     {
       card: cardArg,
       summary: z.string().min(1).describe('O que foi feito e o que a pessoa deve revisar (markdown)'),
@@ -129,7 +129,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'ask_question',
-    'Faz uma pergunta à pessoa na conversa do card e passa a vez para ela (status "waiting_answer"). Use quando faltar uma informação ou decisão. Depois de chamar, pare de trabalhar neste card até a resposta chegar.',
+    'Faz uma pergunta à pessoa na conversa do card e passa a vez para ela (status "waiting_answer"). Use quando faltar uma informação ou decisão. Pergunta com alternativas: ask_questions. Depois de chamar, pare de trabalhar neste card até a resposta chegar.',
     { card: cardArg, question: z.string().min(1).describe('A pergunta (markdown)') },
     (a, router) => {
       if (isYolo(router.snapshot(), live(findCard(router.snapshot(), a.card))))

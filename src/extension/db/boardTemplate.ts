@@ -15,7 +15,7 @@ import { all, bool, num, one, run, str, transaction } from './query';
  * Board padrão. Cada mudança no padrão sobe a versão; boards criados antes são atualizados no
  * lugar (com confirmação), sem recriar nada: os cards continuam na coluna em que estavam.
  */
-export const BOARD_TEMPLATE_VERSION = 13;
+export const BOARD_TEMPLATE_VERSION = 14;
 
 export interface TemplateColumn {
   name: string;
@@ -298,8 +298,8 @@ function phaseTextSteps(db: Database, boardId: string): Step[] {
     const phase = name ? PHASE_DEFAULTS[name] : undefined;
     if (!name || !phase) continue;
     const history = PHASE_HISTORY[name]!;
-    const instruction = history.instructions.includes(str(col.ai_instruction));
-    const template = history.templates.includes(str(col.artifact_template));
+    const instruction = history.instructions.includes(str(col.ai_instruction)) && str(col.ai_instruction) !== phase.instruction;
+    const template = history.templates.includes(str(col.artifact_template)) && str(col.artifact_template) !== phase.artifactTemplate;
     if (!instruction && !template) continue;
     out.push({
       description: `Coluna "${str(col.name)}": ${history.change}.`,
