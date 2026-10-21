@@ -3,18 +3,17 @@ import * as path from 'node:path';
 import { ARTIFACT_LIMITS, isSafeRelPath, type ArtifactDraft, type ArtifactKind } from '../shared/artifacts';
 import { importUsage, type ImportCandidate, type ImportPreview, type ImportSource, type OnConflict } from '../shared/artifactImport';
 import { isAiBase, SKILL_NAME_PATTERN, type AiTool } from '../shared/harness';
-import { isSelectableKind, selectionKey, type HarnessUsage } from '../shared/harnessSelection';
+import type { HarnessUsage } from '../shared/harnessSelection';
 import { isSafeSegment } from './attachments';
 import { readSource } from './artifactSource';
 import { parseExportFile } from './db/boardExport';
 import { FLOW_SKILLS } from './flowSkill';
-import { scanInventory } from './harnessScan';
 import { scanLibraryFolder } from './libraryImport';
+import { adaptersOf, listToolSources } from './toolSources';
 import type { BoardContext } from './panel/handlers/context';
 import { fetchSource, findSkills, parseSource, runGit, type GitRunner } from './skillInstall';
 
 const KINDS: readonly string[] = ['rule', 'skill', 'agent', 'mcp'];
-const TOOL_KINDS = ['instructions', 'skill', 'agent', 'mcp'] as const;
 const RESERVED_MCP = 'faz-ai';
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -230,14 +229,23 @@ export class ArtifactImporter {
     if (!isAiBase(tool)) throw new Error('Ferramenta não reconhecida.');
     const flow = new Set(FLOW_SKILLS.map((k) => k.name));
     const out: Entry[] = [];
-    for (const item of scanInventory(tool, this.dirs.projectDir, this.dirs.homeDir)) {
-      if (!isSelectableKind(item.kind) || !(TOOL_KINDS as readonly string[]).includes(item.kind)) continue;
-      const draft = readSource({ kind: item.kind, location: selectionKey(item) }, this.dirs, tool, false);
-      if (draft.kind === 'rule') draft.name = path.basename(item.path);
-      // o servidor e a skill do fluxo são da própria extensão
-      if ((draft.kind === 'skill' && flow.has(draft.name)) || (draft.kind === 'mcp' && draft.name === RESERVED_MCP)) continue;
-      out.push({ draft });
-    }
+    const seen = new Set<string>();
+    // o adaptador de formato diz onde a ferramenta guarda cada coisa; projeto antes do usuário
+    for (const adapter of adaptersOf(tool))
+      for (const [target, base] of [
+        ['project', this.dirs.projectDir],
+        ['user', this.dirs.homeDir],
+      ] as const)
+        for (const item of listToolSources(adapter, target, base, this.dirs)) {
+          const draft = readSource({ kind: item.kind, location: item.location }, this.dirs, tool, false);
+          if (draft.kind === 'rule') draft.name = path.basename(item.location);
+          // o servidor e a skill do fluxo são da própria extensão
+          if ((draft.kind === 'skill' && flow.has(draft.name)) || (draft.kind === 'mcp' && draft.name === RESERVED_MCP)) continue;
+          const key = `${draft.kind}:${draft.origin}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push({ draft });
+        }
     return out;
   }
 

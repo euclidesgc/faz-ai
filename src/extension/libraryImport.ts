@@ -1,10 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ALL_AI_BASES, type AiTool } from '../shared/harness';
+import type { AiTool } from '../shared/harness';
 import type { ArtifactDraft } from '../shared/artifacts';
 import { readSource } from './artifactSource';
-import { scanInventory } from './harnessScan';
-import { selectionKey } from '../shared/harnessSelection';
+import { adaptersOf, listToolSources } from './toolSources';
 
 /** Reconhece coleções neutras e formatos de origem sem vincular a biblioteca a uma ferramenta. */
 export function scanLibraryFolder(root: string): ArtifactDraft[] {
@@ -25,10 +24,10 @@ export function scanLibraryFolder(root: string): ArtifactDraft[] {
     if (draft.kind === 'rule') draft.name = path.basename(file);
     if (!draft.missing && draft.name !== 'faz-ai') found.set(key, draft);
   };
-  for (const tool of ALL_AI_BASES)
-    for (const item of scanInventory(tool, '', '', '', [], [root]))
-      if (['instructions', 'skill', 'agent', 'mcp'].includes(item.kind))
-        add(item.kind as 'instructions' | 'skill' | 'agent' | 'mcp', selectionKey(item), tool);
+  // as pastas das ferramentas dentro da pasta lida, pelo adaptador de formato
+  for (const adapter of adaptersOf())
+    for (const item of listToolSources(adapter, 'project', root, { projectDir: root, homeDir: '' }))
+      add(item.kind, item.location, item.tool);
   let visited = 0;
   const walk = (dir: string, depth: number) => {
     if (depth > 8 || ++visited > 4000) return;
