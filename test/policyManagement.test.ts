@@ -104,6 +104,13 @@ describe('host de políticas e simulação', () => {
     expect(JSON.stringify(all(db, 'SELECT * FROM execution_policies'))).toBe(before);
     expect(all(db, 'SELECT * FROM ai_runs')).toEqual([]);
   });
+  it('Próxima execução sem rascunho usa só as políticas salvas e não altera nada', () => {
+    const before = JSON.stringify(all(db, 'SELECT * FROM execution_policies'));
+    const result = router.simulateExecutionPolicy({ ...scenario(), draft: null });
+    expect(result.hypothetical).toBe(true);
+    expect(result.decision.policy).toBeNull();
+    expect(JSON.stringify(all(db, 'SELECT * FROM execution_policies'))).toBe(before);
+  });
   it('simulação é determinística, conserva consumo desconhecido e recusa efeitos, destinos e recursos inválidos', () => {
     const input = scenario();
     const a = router.simulateExecutionPolicy(input);
@@ -111,7 +118,7 @@ describe('host de políticas e simulação', () => {
     expect(a.decision.consumption).toEqual([null]);
     expect(router.simulateExecutionPolicy({ ...input, effects: 'unknown' }).decision.action).toBe('reconcile');
     expect(router.simulateExecutionPolicy({ ...input, eligibility: 'blocked-admission' }).decision.action).toBe('block');
-    input.draft.targets[0]!.profileId = 'unknown';
+    input.draft!.targets[0]!.profileId = 'unknown';
     expect(router.simulateExecutionPolicy(input)).toMatchObject({ decision: { action: 'block' }, problems: [{ code: 'target-invalid' }] });
     expect(() => router.simulateExecutionPolicy({ ...scenario(), context: { ...scenario().context, phaseId: 'other-board' } })).toThrow(
       'Cenário',
@@ -125,7 +132,7 @@ describe('host de políticas e simulação', () => {
       reviewed: true,
     });
     const input = scenario();
-    input.draft.targets = [{ profileId: 'claude', model: 'haiku', effort: 'medium' }];
+    input.draft!.targets = [{ profileId: 'claude', model: 'haiku', effort: 'medium' }];
     expect(router.simulateExecutionPolicy(input)).toMatchObject({
       decision: { action: 'fallback', policy: { id: 'winner' }, target: { profileId: 'cursor', model: 'composer' } },
     });

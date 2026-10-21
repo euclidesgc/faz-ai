@@ -11,7 +11,6 @@ export const settings: Record<string, string> = {
   'Novo perfil': 'New profile',
   'Os perfis de CLI são dados do board. Configuração não comprova isolamento, permissões ou acesso ao MCP.':
     'CLI profiles are board data. Configuration does not prove isolation, permissions, or MCP access.',
-  'Abre as políticas de execução e fallback no Harness.': 'Opens execution and fallback policies in Harness.',
   'Perfil padrão': 'Default profile',
   'Perfil pronto': 'Builtin profile',
   Personalizado: 'Custom',

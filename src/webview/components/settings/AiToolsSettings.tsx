@@ -9,6 +9,7 @@ import { useAction } from '../../useAction';
 import { onHostMessage } from '../../vscode';
 import { ActionButton, DeleteButton, IconPlus, SwitchField } from '../ui';
 import { AiProfileForm } from './AiProfileForm';
+import { ExecutionPoliciesSettings } from './policies/ExecutionPoliciesSettings';
 import { PageHeader } from './PageHeader';
 import { SettingsCard } from './SettingsCard';
 
@@ -27,7 +28,6 @@ const capabilityName: Record<(typeof PROFILE_CAPABILITIES)[number], string> = {
 /** A configuração fica no host; esta aba só recebe metadados, situação e o resultado redigido do Testar. */
 export function AiToolsSettings() {
   const state = useBoardStore((s) => s.state)!;
-  const goToSection = useBoardStore((s) => s.goToSection);
   const ask = useBoardStore((s) => s.ask);
   const [statuses, setStatuses] = useState<Record<string, Status>>({});
   const [results, setResults] = useState<Record<string, TestResult>>({});
@@ -105,16 +105,6 @@ export function AiToolsSettings() {
       </PageHeader>
       <div className="ai-tools-layout">
         <div>
-          <div className="row ai-tools-policy-link">
-            <ActionButton
-              variant="soft"
-              color="gray"
-              hint={t('Abre as políticas de execução e fallback no Harness.')}
-              onClick={() => goToSection('execution-policies')}
-            >
-              {t('Políticas de execução e fallback')}
-            </ActionButton>
-          </div>
           <RadioGroup.Root value={state.board.aiTool} onValueChange={(id) => void selectDefault.run(id)} aria-label={t('Perfil padrão')}>
             {profiles.map((profile) => {
               const standard = state.board.aiTool === profile.id;
@@ -248,6 +238,7 @@ export function AiToolsSettings() {
             })}
           </RadioGroup.Root>
           {profiles.length === 0 && <p className="muted">{t('Nenhum perfil cadastrado.')}</p>}
+          <ExecutionPoliciesSettings />
         </div>
         {editor && (
           <AiProfileForm

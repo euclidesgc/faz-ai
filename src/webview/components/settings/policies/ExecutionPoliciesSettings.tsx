@@ -11,6 +11,7 @@ import { SectionHeader } from '../SectionHeader';
 import { SettingsCard } from '../SettingsCard';
 import { PolicyEditor } from './PolicyEditor';
 import { PolicySummary } from './parts';
+import { PolicySimulation } from './PolicySimulation';
 
 const newId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
 
@@ -74,7 +75,7 @@ export function ExecutionPoliciesSettings() {
       <SectionHeader id="execution-policies" title={t('Políticas de execução e fallback')}>
         <p>
           {t(
-            'Prepare políticas versionadas e compare cenários sem iniciar IA. A execução atual ainda usa o modelo reserva das regras; estas políticas preparam o novo plano.',
+            'Políticas versionadas decidem o fallback entre perfis de CLI e modelos. Sem uma política ligada, a falha bloqueia, sem fallback. Funciona sem IA e sem executor.',
           )}
         </p>
       </SectionHeader>
@@ -227,6 +228,7 @@ export function ExecutionPoliciesSettings() {
                       }
                     />
                   ))}
+                <PolicySimulation policy={null} library={library} />
               </>
             ))}
           {(remove.error || readHistory.error) && <p role="alert">{t(remove.error ?? readHistory.error!)}</p>}

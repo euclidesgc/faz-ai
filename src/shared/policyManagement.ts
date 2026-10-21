@@ -23,7 +23,8 @@ export interface PolicyLibrary {
   models: ModelOption[];
 }
 export interface PolicyScenario {
-  draft: ExecutionPolicy;
+  /** Rascunho a avaliar no lugar da salva; nulo avalia só as políticas salvas (Próxima execução). */
+  draft: ExecutionPolicy | null;
   sourceValue: string;
   defaultProfileId: string;
   explicit: boolean;
@@ -70,7 +71,7 @@ export function builtinPolicyCatalog(state: BoardState): { profiles: PolicyProfi
 }
 /** Cenário hipotético: nunca recebe recibos nem é usado para autorizar uma execução. */
 export function simulatePolicyScenario(state: BoardState, snapshot: ExecutionPolicySnapshot, scenario: PolicyScenario): PolicySimulation {
-  validateExecutionPolicy(scenario.draft);
+  if (scenario.draft !== null) validateExecutionPolicy(scenario.draft);
   const catalog = builtinPolicyCatalog(state);
   const fail = (): never => {
     throw new Error('Cenário de política inválido.');
@@ -109,10 +110,13 @@ export function simulatePolicyScenario(state: BoardState, snapshot: ExecutionPol
     profiles: catalog.profiles,
     catalog: catalog.models,
   });
-  const records = snapshot.records.filter((r) => r.policy.id !== scenario.draft.id);
-  const revision = (snapshot.records.find((r) => r.policy.id === scenario.draft.id)?.revision ?? 0) + 1;
-  // Revisão admitida somente na cópia da simulação, sem alterar o registro pendente importado.
-  records.push({ policy: structuredClone(scenario.draft), revision, review: 'reviewed', updatedAt: 0 });
+  const draft = scenario.draft;
+  const records = snapshot.records.filter((r) => r.policy.id !== draft?.id);
+  if (draft) {
+    const revision = (snapshot.records.find((r) => r.policy.id === draft.id)?.revision ?? 0) + 1;
+    // Revisão admitida somente na cópia da simulação, sem alterar o registro pendente importado.
+    records.push({ policy: structuredClone(draft), revision, review: 'reviewed', updatedAt: 0 });
+  }
   // A regra vencedora pode ser outra política salva; o cenário cobre todos os destinos distintos.
   const targets = [
     ...new Map(

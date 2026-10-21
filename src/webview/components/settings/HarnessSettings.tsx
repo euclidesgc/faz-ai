@@ -1,4 +1,3 @@
-import { ExecutionPoliciesSettings } from './policies/ExecutionPoliciesSettings';
 import { activeProfile, toolInfo } from '../../../shared/aiProfiles';
 import { Button, Tabs } from '@radix-ui/themes';
 import { resolveHarnessTab } from '../../../shared/harnessTopics';
@@ -54,7 +53,6 @@ export function HarnessSettings() {
         </Tabs.Content>
         <Tabs.Content value="tool">
           <ProjectTool tool={tool} />
-          <ExecutionPoliciesSettings />
           <RunnerSettings tool={tool} />
           <ContextPlanDefaults />
         </Tabs.Content>

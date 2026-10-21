@@ -3,8 +3,11 @@ export const policies: Record<string, string> = {
   'A política foi removida. Seu rascunho foi preservado.': 'The policy was removed. Your draft has been preserved.',
   'O host não devolveu as políticas.': 'The host did not return the policies.',
   'Políticas de execução e fallback': 'Execution and fallback policies',
-  'Prepare políticas versionadas e compare cenários sem iniciar IA. A execução atual ainda usa o modelo reserva das regras; estas políticas preparam o novo plano.':
-    'Prepare versioned policies and compare scenarios without starting AI. Current execution still uses the rules’ fallback model; these policies prepare the new plan.',
+  'Políticas versionadas decidem o fallback entre perfis de CLI e modelos. Sem uma política ligada, a falha bloqueia, sem fallback. Funciona sem IA e sem executor.':
+    'Versioned policies decide the fallback between CLI profiles and models. Without an enabled policy, a failure blocks, with no fallback. Works without AI or an executor.',
+  'Próxima execução': 'Next run',
+  'Usa só as políticas salvas e ligadas, pelo mesmo avaliador da execução.':
+    'Uses only saved, enabled policies, through the same evaluator as execution.',
   'Lendo políticas…': 'Reading policies…',
   'Gerenciar políticas': 'Manage policies',
   'Salvar exige comparação e revisão explícita. Simulações não concedem acesso nem iniciam execuções.':

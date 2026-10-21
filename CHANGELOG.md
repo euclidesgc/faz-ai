@@ -8,6 +8,8 @@ A seção **Não lançado** reúne apenas mudanças integradas na `develop`, agu
 
 ## Não lançado
 
+- **Políticas de execução e fallback em Configurações → Ferramentas de IA (#733).** O editor de políticas (condições, destinos, limites, histórico, comparação e revisão antes de salvar) saiu do Harness e fica abaixo dos perfis de CLI, no editor e no navegador, sem IA nem executor. Nova simulação **Próxima execução**: avalia só as políticas salvas e ligadas, pelo mesmo avaliador do runner, sem gastar tokens nem abrir a CLI.
+
 - **Chat, assistentes e sugestões usam a mesma política de execução dos cards (#732).** Quando o limite de uso do plano esgota no chat, em "Sugerir agentes, regras ou skills" ou em "Indicar artefatos", a decisão vem do avaliador único de políticas, o mesmo do runner: com política aplicável a execução segue no destino dela, sem repetir a pergunta na conversa; sem política, a conversa mostra o aviso e nada roda noutro alvo. O log explica a regra vencedora, o destino, as alternativas e as recusas. A CLI ausente ou sem login recusa antes de abrir o processo. A IA consulta as políticas pelo MCP (`get_execution_policies`, só leitura); criar, revisar e ativar continua sendo ação da pessoa nas Configurações.
 
 - **Duplicar card pelo menu de 3 pontinhos (#723).** No menu de ações do card aberto, **Duplicar card** cria um card novo a partir dele. O título ganha o prefixo "Cópia de"; a descrição, o tipo, os campos e o checklist (desmarcado) são copiados, e o card novo vai para o fim da primeira coluna do workflow, sem confirmação. Sub-tarefas, anexos, comentários e vínculos não são copiados. A opção vale para um card por vez: na seleção de vários cards não há duplicação em massa.

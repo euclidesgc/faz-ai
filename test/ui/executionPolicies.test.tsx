@@ -153,3 +153,9 @@ it('recarrega a versão concorrente sem perder o rascunho e exige nova comparaç
   await userEvent.click(screen.getByRole('button', { name: 'Confirmar revisão e salvar' }));
   expect(lastSent('settings.executionPolicy.save')).toMatchObject({ expectedRevision: 2, policy: { name: 'Minha proposta' } });
 });
+it('Próxima execução simula sem rascunho, pelo host', async () => {
+  await open();
+  await userEvent.click(screen.getByRole('button', { name: 'Simular sem executar' }));
+  expect(lastSent('executionPolicy.simulate').scenario.draft).toBeNull();
+  expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
+});
