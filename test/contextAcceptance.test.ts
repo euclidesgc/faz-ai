@@ -87,7 +87,7 @@ describe('aceite do plano em execução (E5)', () => {
       const snapshots = new RunArtifactSnapshots(dir, { list: () => [] } as never, 'b');
       const run = snapshots.capture('run-1', { artifacts: [], inputAttachments: [] } as never, undefined, v1.context);
       expect(run.manifest.context).toEqual(preview);
-      s.harness.library.artifacts.push(art('novo', 'skill'));
+      s.harness.library!.artifacts.push(art('novo', 'skill'));
       expect(run.manifest.context).toEqual(preview);
       expect(resolveContextDraft(s, target)).not.toBe(preview);
     } finally {

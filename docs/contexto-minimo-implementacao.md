@@ -283,3 +283,7 @@ Mapa do aceite, com o teste de cada item: prévia = runtime = snapshot e bibliot
 ## E4 — fechamento (#994)
 
 O aceite da E4 agora tem teste (`test/contextAcceptance.test.ts`): Discovery resolve um agente de leitura sem MCP, a Implementação resolve o especialista com o MCP dele, e o refino e o resumo da mesma fase não herdam as seleções da Implementação. **Lacuna registrada:** "mudar requisitos, dependências, agente ou artefatos marca a proposta como desatualizada" depende da proposta de plano pela IA, que só nasce na E6.1 (#996); o teste de desatualização entra lá.
+
+## E6.1 — proposta de plano pela IA (#996)
+
+`contextPlanning.propose` (host; `ChatSession.proposeContext`, mesmo caminho `draftOnly` dos assistentes, sem ferramentas) pede à IA a configuração mínima de uma atividade. `src/extension/contextProposal.ts` monta o prompt só com o que o agente permite (skills fora das essenciais; MCPs do contrato do agente) e valida a resposta: ids fora dos candidatos, repetidos, sem justificativa ou em formato inesperado lançam erro e não viram rascunho. A IA não troca agente, contrato nem prioridades, e o host não grava nada; a pessoa aplica pela tela (#1002). `proposalInputsHash`/`isProposalStale` (`src/shared/contextProposal.ts`) marcam a proposta como desatualizada quando mudam o texto e as ligações do card, o agente e seu contrato, ou a revisão e a disponibilidade das skills e MCPs do catálogo. Falha ou cancelamento da execução rejeitam a promessa sem tocar no rascunho da tela.

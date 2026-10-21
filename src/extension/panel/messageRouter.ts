@@ -5,6 +5,7 @@ import type { ExecutionAdmissionDecision, StrictExecutionRequest } from '../../s
 import type { ContextActivityTarget } from '../../shared/contextPlanning';
 import type { PolicyAssistInput, PolicyAssistResult } from '../../shared/policyAssistant';
 import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
+import type { ContextProposal } from '../../shared/contextProposal';
 import { scanLibraryFolder } from '../libraryImport';
 import { agentOfArtifact } from '../../shared/artifacts';
 import * as path from 'node:path';
@@ -163,6 +164,7 @@ const bridgeOnly = {
   'metrics.query': viaBridge,
   'card.usage.query': viaBridge,
   'contextPlanning.preview': viaBridge,
+  'contextPlanning.propose': viaBridge,
   'executionPolicy.read': viaBridge,
   'executionPolicy.simulate': viaBridge,
   'executionPolicy.assist': viaBridge,
@@ -619,6 +621,16 @@ export class MessageRouter {
     if (!this.policyAssistHandler) return Promise.reject(new Error('A assistência de IA não está disponível neste board.'));
     return this.policyAssistHandler(input);
   }
+  private contextProposeHandler?: (target: ContextActivityTarget, language: 'pt-BR' | 'en') => Promise<ContextProposal>;
+  setContextProposeHandler(handler: (target: ContextActivityTarget, language: 'pt-BR' | 'en') => Promise<ContextProposal>): void {
+    this.contextProposeHandler = handler;
+  }
+  /** Proposta de configuração mínima pela IA: um rascunho para a pessoa revisar; nada é gravado. */
+  proposeContext(target: ContextActivityTarget, language: 'pt-BR' | 'en'): Promise<ContextProposal> {
+    if (!this.contextProposeHandler) return Promise.reject(new Error('A assistência de IA não está disponível neste board.'));
+    return this.contextProposeHandler(target, language);
+  }
+
   private agentAssistHandler?: (input: AgentAssistInput) => Promise<AgentAssistResult>;
   setAgentAssistHandler(handler: (input: AgentAssistInput) => Promise<AgentAssistResult>): void {
     this.agentAssistHandler = handler;
@@ -669,7 +681,8 @@ export class MessageRouter {
   }
 
   /** Metadados do rascunho a partir do banco do host; só lê a admissão (recibos locais), sem inferência nem probes. */
-  previewContextDraft(target: ContextActivityTarget): ContextDraftResolution {
+  /** O estado com o catálogo atual da biblioteca (do banco), o que a prévia e a proposta da IA leem. */
+  contextDraftState(): BoardState {
     const state = this.snapshot();
     state.harness = {
       ...state.harness,
@@ -678,6 +691,11 @@ export class MessageRouter {
         artifacts: this.ctx.library.repo.list(this.ctx.boardId).map((a) => ({ ...a, path: '' })),
       },
     };
+    return state;
+  }
+
+  previewContextDraft(target: ContextActivityTarget): ContextDraftResolution {
+    const state = this.contextDraftState();
     const resolved = resolveContextDraft(state, target);
     const request = this.admissionReader ? strictRequestFromDraft(state, resolved) : null;
     const decision = request ? this.admissionReader!(request) : null;

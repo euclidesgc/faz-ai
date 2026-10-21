@@ -2,7 +2,7 @@
 // admissão que o gateway exige no runtime `v1`. Nada é ampliado sozinho: sem contrato válido, a execução não parte.
 import { resolveContextDraft, type ContextDraftResolution } from '../../shared/contextDraftResolution';
 import { strictRequestFromDraft } from '../../shared/contextAdmissionPreview';
-import type { ContextAction } from '../../shared/contextPlanning';
+import type { ContextAction, ContextActivityTarget } from '../../shared/contextPlanning';
 import type { StrictExecutionRequest } from '../../shared/executionAdmission';
 import type { BoardState } from '../../shared/model';
 import { blockingContextDiagnostics, type AiPrepared, type ContextRuntime } from './gateway';
@@ -15,11 +15,7 @@ export function contextRuntimeFromEnv(env: NodeJS.ProcessEnv = process.env): Con
 export type V1Fields = Required<Pick<AiPrepared, 'context' | 'strict'>>;
 
 /** Execução de um card (fase, refinar, resumo, conflito): o contrato vem do agente e da seleção da atividade. */
-export function cardV1(
-  state: BoardState,
-  profileId: string,
-  target: { cardId: string; workflowId: string | null; phaseId: string; action: ContextAction },
-): V1Fields {
+export function cardV1(state: BoardState, profileId: string, target: ContextActivityTarget): V1Fields {
   const context = resolveContextDraft(state, target);
   const missing = blockingContextDiagnostics(context);
   if (missing.length) throw new Error(`Runtime v1: o contrato da atividade não está pronto (${missing.join(', ')}).`);
