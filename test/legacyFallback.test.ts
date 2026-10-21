@@ -7,23 +7,43 @@ import { all } from '../src/extension/db/query';
 import { exportBoard, importBoard, parseExportFile } from '../src/extension/db/boardExport';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { evaluateExecutionPolicy, validateExecutionPolicy } from '../src/shared/executionPolicies';
-import { legacyFallbackNotes, legacyFallbackProposal, legacyFallbackProposals } from '../src/shared/legacyFallback';
-import type { ModelRule } from '../src/shared/models';
+import {
+  legacyFallbackNotes,
+  legacyFallbackProposal,
+  legacyFallbackProposals,
+  parseLegacyFallbacks,
+  type LegacyFallbackRule,
+} from '../src/shared/legacyFallback';
 import { catalog, evaluation } from './fixtures/executionPolicy';
 
-const rule = (over: Partial<ModelRule> = {}): ModelRule => ({
+const rule = (over: Partial<LegacyFallbackRule> = {}): LegacyFallbackRule => ({
   id: 'r1',
   name: 'Regra',
-  enabled: true,
-  groups: [],
   model: 'claude:opus@high',
   fallback: 'claude:haiku@medium',
+  index: 0,
   ...over,
 });
 
 describe('reserva legada como proposta de política (puro)', () => {
+  it('parseLegacyFallbacks lê do JSON bruto só as regras com reserva string não vazia, preservando o índice', () => {
+    const json = JSON.stringify([
+      { id: 'r0', name: 'Sem reserva', model: 'claude:opus@high' },
+      { id: 'r1', name: 'Com reserva', model: 'claude:opus@high', fallback: 'claude:haiku@medium' },
+      { id: 'r2', model: 'claude:opus@high', fallback: '' },
+      { id: 'r3', model: 'claude:opus@high', fallback: 42 },
+      { id: 'r4', model: 'claude:opus@high', fallback: 'claude:ausente' },
+    ]);
+    expect(parseLegacyFallbacks(json)).toEqual([
+      { id: 'r1', name: 'Com reserva', model: 'claude:opus@high', fallback: 'claude:haiku@medium', index: 1 },
+      { id: 'r4', name: '', model: 'claude:opus@high', fallback: 'claude:ausente', index: 4 },
+    ]);
+    expect(parseLegacyFallbacks('')).toEqual([]);
+    expect(parseLegacyFallbacks(null)).toEqual([]);
+    expect(parseLegacyFallbacks('{nada')).toEqual([]);
+  });
   it('gera política válida, desligada, com origem no id e no nome', () => {
-    const result = legacyFallbackProposal(rule(), 0, catalog);
+    const result = legacyFallbackProposal(rule(), catalog);
     if (!('policy' in result)) throw new Error('esperava proposta');
     expect(() => validateExecutionPolicy(result.policy)).not.toThrow();
     expect(result.policy).toMatchObject({
@@ -36,16 +56,16 @@ describe('reserva legada como proposta de política (puro)', () => {
     expect(result.policy.name).toContain('Regra');
   });
   it.each([
-    [{ fallback: null }, 'fallback-missing'],
     [{ fallback: 'claude:ausente' }, 'model-missing'],
     [{ model: 'claude:ausente' }, 'model-missing'],
     [{ fallback: 'claude:haiku@ultra' }, 'effort-invalid'],
     [{ id: 'com espaço' }, 'id-invalid'],
-  ] as [Partial<ModelRule>, string][])('sem conversão %j: %s', (over, reason) => {
-    expect(legacyFallbackProposal(rule(over), 0, catalog)).toEqual({ reason });
+  ] as [Partial<LegacyFallbackRule>, string][])('sem conversão %j: %s', (over, reason) => {
+    expect(legacyFallbackProposal(rule(over), catalog)).toEqual({ reason });
   });
-  it('as propostas ignoram regras sem reserva e os avisos separam convertidas de não convertidas', () => {
-    const rules = [rule(), rule({ id: 'r2', fallback: null }), rule({ id: 'r3', fallback: 'claude:ausente' })];
+  it('a prioridade vem do índice gravado e os avisos separam convertidas de não convertidas', () => {
+    const rules = [rule(), rule({ id: 'r3', fallback: 'claude:ausente', index: 2 })];
+    expect(legacyFallbackProposals([rule({ index: 3 })], catalog)[0]!.priority).toBe(130);
     const proposals = legacyFallbackProposals(rules, catalog);
     expect(proposals.map((p) => p.id)).toEqual(['legacy-r1']);
     const records = proposals.map((policy) => ({ policy, revision: 1, review: 'pending' as const, updatedAt: 1 }));
