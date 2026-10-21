@@ -21,6 +21,7 @@ import type { RunOptions } from './runner';
 import type { WorkClaim, WorkRecord, WorkRepo } from './repositories/workRepo';
 import type { RunMcpSessions } from './mcp/runSessions';
 import { acquireWorkspace, adoptWorkspace, type WorkspaceLease } from './workspaceLock';
+import { closingAdvice, subtaskAdvice } from './unitAdvice';
 import { processGroupState, type ProcessIdentity } from './processIdentity';
 
 /** O mesmo runner das portas existentes; a fundação também pode ser exercitada com processos Node. */
@@ -43,6 +44,8 @@ export interface OrchestratorOptions {
   /** Grava na mesma transação de finish; não pode publicar efeitos assíncronos. */
   comment(work: WorkRecord, outcome: Reconciled['kind'] | 'cancelled', body: string): string;
   publish(): void;
+  /** Bloqueia a história com o motivo (a parada do plano); sem ela, a parada só volta no resultado do `drive`. */
+  block?(storyId: string, reason: string): void;
   log(message: string): void;
   gitMode(): string;
   policy?(): PolicyLimits;
@@ -138,6 +141,12 @@ export class Orchestrator {
       const live = { byCard: new Map(relevant.filter((w) => w.cardId).map((w) => [w.cardId!, w])) };
       const done = new Set(records.filter((w) => w.state === 'done' || w.state === 'cancelled').map((w) => w.key));
       const plan = storyPlan(state, story, live, done);
+      if (plan.kind === 'paused') {
+        // o fechamento sem avanço (ou uma sub-tarefa que precisa de revisão) para a história e a entrega à pessoa
+        if (!isWithHuman(story)) this.options.block?.(storyId, plan.reason);
+        this.origins.delete(storyId);
+        return plan;
+      }
       if (plan.kind !== 'units') return plan;
       this.origins.set(storyId, origin);
       return this.start(plan.units[0]!, origin);
@@ -235,6 +244,7 @@ export class Orchestrator {
       this.options.starter.start(unit.cardId!, {
         origin,
         mode: 'phase',
+        advice: this.advice(unit),
         workId: claim.work.id,
         token: claim.token,
         beforeStart: async (identity) => {
@@ -273,6 +283,16 @@ export class Orchestrator {
       this.options.publish();
       throw error;
     }
+  }
+  /** O pedido extra de cada unidade: o ciclo da sub-tarefa ou o fechamento da fase. */
+  private advice(unit: WorkUnit): string[] {
+    const state = this.options.state();
+    const story = state.cards.find((c) => c.id === unit.storyId);
+    const card = state.cards.find((c) => c.id === unit.cardId);
+    if (!story) return [];
+    if (unit.kind === 'subtask' && card) return [subtaskAdvice(story, card)];
+    if (unit.kind === 'closing') return [closingAdvice(story)];
+    return [];
   }
   private revoke(claim: WorkClaim): void {
     try {

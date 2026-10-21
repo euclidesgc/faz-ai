@@ -17,6 +17,7 @@ import { t } from '../../../i18n';
 import { FormField } from '../../ui';
 import { Checks, Choice, NumberField, PolicySummary, FAILURE_LABELS, POLICY_ACTION_LABELS, ORIGIN_LABELS, profileLabel } from './parts';
 import { PolicySimulation } from './PolicySimulation';
+import { PolicyAssistant } from './PolicyAssistant';
 
 export function PolicyEditor({
   initial,
@@ -362,6 +363,17 @@ export function PolicyEditor({
           />
         ))}
       </div>
+      <PolicyAssistant
+        modes={['fallbacks', 'conflicts']}
+        draft={draft}
+        library={library}
+        applyLabel={t('Usar proposta no rascunho')}
+        onApply={(policy) => {
+          // só substitui o rascunho local: salvar continua exigindo comparar e confirmar
+          setDraft(policy);
+          setValidation('');
+        }}
+      />
       <PolicySimulation policy={draft} library={library} />
       {validation && <p role="alert">{t(validation)}</p>}
       <div className="actions">

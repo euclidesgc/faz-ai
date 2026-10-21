@@ -23,7 +23,7 @@ const create = (title: string, column: string, parent?: number) => {
 };
 const kind = (n: number, mode?: AiRunMode) => activityKindOf(router.snapshot(), card(n), mode);
 const run = (n: number, mode: AiRunMode, phase: string) =>
-  router.setAiRuns([{ cardId: card(n).id, runId: '', mode, origin: 'manual', phase, model: null, startedAt: 0 }]);
+  router.setAiRuns([{ cardId: card(n).id, runId: '', mode, origin: 'manual', phase, model: null, tool: 'claude', startedAt: 0 }]);
 
 beforeEach(async () => {
   const db = await openInMemory(WASM_DIR);

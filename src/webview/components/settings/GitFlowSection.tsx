@@ -12,10 +12,9 @@ import { flowRows, type FlowRow } from '../../../shared/gitflow';
 import { badgeStyle } from '../../../shared/color';
 import { useBoardStore } from '../../store/boardStore';
 import { settings, ui } from '../../commands';
-import { isWeb } from '../../vscode';
 import { t, dt } from '../../i18n';
 import { rich } from '../../i18n/rich';
-import { Button, Card, TextField } from '@radix-ui/themes';
+import { Card, TextField } from '@radix-ui/themes';
 import { FormField, SelectField, SwitchField } from '../ui';
 import { SectionHeader } from './SectionHeader';
 
@@ -123,59 +122,39 @@ export function GitFlowSection() {
           <p>{rich('As branches saem da principal (<code>{main}</code>) e os pull requests vão para ela.', { main: mainName })}</p>
         )}
 
-        {isWeb ? (
-          <>
-            <SwitchField label={t('Usar o gitflow')} checked={git.gitflow} disabled={off} onChange={(gitflow) => set({ gitflow })} />
-            {NAME_FIELDS.map((f) => (
-              <FormField
-                key={f.key}
-                label={t(f.label)}
-                hint={
-                  f.key === 'developBranch'
-                    ? undefined
-                    : rich('Vazio volta ao padrão (<code>{padrao}</code>).', { padrao: DEFAULT_GIT[f.key] })
-                }
-              >
-                {(id) => (
-                  <TextField.Root
-                    id={id}
-                    key={git[f.key]}
-                    disabled={off || !git.gitflow}
-                    defaultValue={git[f.key]}
-                    onBlur={(e) => {
-                      // o board troca o vazio e o inválido pelo padrão; o campo mostra já o que vai valer
-                      const clean =
-                        f.key === 'developBranch'
-                          ? cleanBranchName(e.target.value, DEFAULT_GIT[f.key])
-                          : cleanPrefix(e.target.value, DEFAULT_GIT[f.key]);
-                      e.target.value = clean;
-                      if (clean !== git[f.key]) setName(f.key, clean);
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                  />
-                )}
-              </FormField>
-            ))}
-          </>
-        ) : (
-          <>
-            <ul className="muted small" aria-label={t('Valores no Settings do editor')}>
-              <li>
-                {t('Usar o gitflow')}: {git.gitflow ? t('sim') : t('não')}
-              </li>
-              {NAME_FIELDS.map((f) => (
-                <li key={f.key}>
-                  {t(f.label)}: <code>{git[f.key]}</code>
-                </li>
-              ))}
-            </ul>
-            <div className="row">
-              <Button variant="soft" onClick={() => ui.openIdeSettings('fazai.git.gitflow')}>
-                {t('Abrir o gitflow no Settings do editor')}
-              </Button>
-            </div>
-          </>
-        )}
+        <>
+          <SwitchField label={t('Usar o gitflow')} checked={git.gitflow} disabled={off} onChange={(gitflow) => set({ gitflow })} />
+          {NAME_FIELDS.map((f) => (
+            <FormField
+              key={f.key}
+              label={t(f.label)}
+              hint={
+                f.key === 'developBranch'
+                  ? undefined
+                  : rich('Vazio volta ao padrão (<code>{padrao}</code>).', { padrao: DEFAULT_GIT[f.key] })
+              }
+            >
+              {(id) => (
+                <TextField.Root
+                  id={id}
+                  key={git[f.key]}
+                  disabled={off || !git.gitflow}
+                  defaultValue={git[f.key]}
+                  onBlur={(e) => {
+                    // o board troca o vazio e o inválido pelo padrão; o campo mostra já o que vai valer
+                    const clean =
+                      f.key === 'developBranch'
+                        ? cleanBranchName(e.target.value, DEFAULT_GIT[f.key])
+                        : cleanPrefix(e.target.value, DEFAULT_GIT[f.key]);
+                    e.target.value = clean;
+                    if (clean !== git[f.key]) setName(f.key, clean);
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                />
+              )}
+            </FormField>
+          ))}
+        </>
       </Card>
 
       <SectionHeader title={t('Tipo de branch por tipo de card')}>

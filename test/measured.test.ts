@@ -8,11 +8,12 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { spawnMeasured, cleanStaleTemp, formatArgs, refusesFormat, type SpawnFn } from '../src/extension/aiOutput/measured';
+import { spawnMeasured, cleanStaleTemp, formatArgs, refusesFormat, materialize, type SpawnFn } from '../src/extension/aiOutput/measured';
 import { MeasureEndedError, MeasureRefusedError } from '../src/extension/aiOutput/errors';
 import type { OutputStream } from '../src/extension/aiOutput/reader';
 import { headlessCommand, type HeadlessCommand, type HeadlessInput } from '../src/extension/headless';
 import type { RunningProcess } from '../src/extension/runner';
+import { SpawnNotStartedError } from '../src/extension/processIdentity';
 
 const FIXTURE = fs.readFileSync(path.join(__dirname, 'fixtures', 'claude-stream-json.jsonl'), 'utf8');
 
@@ -62,6 +63,24 @@ const REFUSE_FORMAT = "error: unknown option '--output-format'\n";
 beforeEach(() => {
   started = [];
   lines = [];
+});
+
+it('não deixa arquivos temporários se a materialização falha depois de gravar um segredo', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-materialize-test-'));
+  try {
+    const command: HeadlessCommand = {
+      command: 'node',
+      args: [],
+      format: 'text',
+      tempFiles: { 'mcp.json': 'segredo', 'broken.json': null as unknown as string },
+    };
+    expect(() => materialize(command, root)).toThrow();
+    expect(fs.readdirSync(root)).toEqual([]);
+    expect(() => materialize({ ...command, tempFiles: { '../escape': 'segredo' } }, root)).toThrow('Nome de arquivo temporário inválido');
+    expect(fs.readdirSync(root)).toEqual([]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 describe('o comando do modo estruturado, por ferramenta', () => {
@@ -307,7 +326,6 @@ describe('a falha antes do primeiro evento não é repetida (#739)', () => {
         exec: {
           agent: '',
           agentDefinition: null,
-          delegates: [],
           mcpAllowed: [],
           mcpBlocked: [],
           mcpConfig: null,
@@ -581,6 +599,32 @@ describe('empréstimo MCP no transporte medido', () => {
       run.proc.kill();
       expect(started[0]!.killed).toBe(true);
       expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('falha depois de eventos (código 1) devolve o arquivo', () => {
+    const { dir, deps } = setup();
+    try {
+      const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, deps);
+      run.proc.onExit(() => {});
+      started[0]!.emit(`${JSON.stringify({ type: 'system', subtype: 'init' })}\n`, 'stdout');
+      started[0]!.exit(1);
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('spawn que lança sem iniciar processo devolve o empréstimo antes de o erro subir', () => {
+    const { dir, deps } = setup();
+    try {
+      const failing: SpawnFn = () => {
+        throw new SpawnNotStartedError('não iniciou');
+      };
+      expect(() => spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { ...deps, spawn: failing })).toThrow('não iniciou');
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

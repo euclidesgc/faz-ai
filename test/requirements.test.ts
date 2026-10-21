@@ -7,7 +7,7 @@ import { registerClients } from '../src/extension/mcp/clientConfig';
 import { BUILTIN_PROFILES, type AiProfile } from '../src/shared/aiProfiles';
 import type { ExecutionAdmissionDecision } from '../src/shared/executionAdmission';
 import { profileHealth, type ProfileHealth } from '../src/shared/profileHealth';
-import { blocksExecution, type BoardRequirement } from '../src/shared/requirements';
+import { blocksExecution, noProfileAvailable, type BoardRequirement } from '../src/shared/requirements';
 
 let project: string;
 let home: string;
@@ -69,7 +69,9 @@ describe('requisitos do board', () => {
         action: { kind: 'diagnostic', profile: 'cursor' },
       },
     ]);
-    expect(blocksExecution({ requirements: list, authExpired: null, board: { aiTool: 'claude' } })).toBe(false);
+    expect(noProfileAvailable({ requirements: list })).toBe(false);
+    expect(blocksExecution({ requirements: list, authExpired: [] }, 'claude')).toBe(false);
+    expect(blocksExecution({ requirements: list, authExpired: [] }, 'cursor')).toBe(true);
   });
 
   it('sem node no PATH, o primeiro aviso é o node', () => {
@@ -79,14 +81,14 @@ describe('requisitos do board', () => {
   it('nenhum perfil ligado ou disponível: no-profile bloqueia, com os avisos de cada perfil', () => {
     const none = checkRequirements({ nodePath: process.execPath, health: [] });
     expect(none).toEqual([{ id: 'no-profile', reason: 'no-enabled', action: { kind: 'diagnostic' } }]);
-    expect(blocksExecution({ requirements: none, authExpired: null, board: { aiTool: 'claude' } })).toBe(true);
+    expect(noProfileAvailable({ requirements: none })).toBe(true);
     const list = checkRequirements({ nodePath: process.execPath, health: [down('claude'), down('cursor')] });
     expect(list.map((r) => [r.id, r.reason ?? r.profile])).toEqual([
       ['no-profile', 'unavailable'],
       ['profile', 'claude'],
       ['profile', 'cursor'],
     ]);
-    expect(blocksExecution({ requirements: list, authExpired: null, board: { aiTool: 'claude' } })).toBe(true);
+    expect(noProfileAvailable({ requirements: list })).toBe(true);
   });
 
   it('sem login num perfil pronto, o aviso traz o comando de login; num perfil personalizado, o link para o bloco', () => {
@@ -129,7 +131,9 @@ describe('requisitos do board', () => {
       nodePath: process.execPath,
       health: [health('claude', { authExpired: true, problem: 'signin' }), health('cursor')],
     });
-    expect(blocksExecution({ requirements: list, authExpired: null, board: { aiTool: 'claude' } })).toBe(false);
+    // o board segue disponível; só a execução no perfil de login vencido para
+    expect(noProfileAvailable({ requirements: list })).toBe(false);
+    expect(blocksExecution({ requirements: list, authExpired: [] }, 'cursor')).toBe(false);
   });
 
   it('desligado e pendente de revisão nunca viram aviso', () => {
@@ -157,26 +161,24 @@ describe('requisitos do board', () => {
 });
 
 describe('blocksExecution', () => {
-  const state = (requirements: BoardRequirement[], authExpired: string | null = null) => ({
-    requirements,
-    authExpired,
-    board: { aiTool: 'claude' },
-  });
-  it('bloqueia com no-profile e não por outro requisito, nem por um perfil só', () => {
-    expect(blocksExecution(state([{ id: 'no-profile', action: null }]))).toBe(true);
+  const state = (requirements: BoardRequirement[], authExpired: string[] = []) => ({ requirements, authExpired });
+  it('no-profile bloqueia o board; outro requisito não bloqueia nenhum perfil', () => {
+    expect(noProfileAvailable(state([{ id: 'no-profile', action: null }]))).toBe(true);
+    expect(blocksExecution(state([{ id: 'no-profile', action: null }]), 'claude')).toBe(false);
     expect(
       blocksExecution(
         state([
           { id: 'profile', action: null },
           { id: 'node', action: null },
         ]),
+        'claude',
       ),
     ).toBe(false);
-    expect(blocksExecution(state([]))).toBe(false);
+    expect(blocksExecution(state([]), 'claude')).toBe(false);
   });
-  it('o login vencido numa execução trava o perfil padrão, não o de outro perfil', () => {
-    expect(blocksExecution(state([], 'claude'))).toBe(true);
-    expect(blocksExecution(state([], 'cursor'))).toBe(false);
+  it('o login vencido numa execução trava o perfil dele, não o de outro perfil', () => {
+    expect(blocksExecution(state([], ['claude']), 'claude')).toBe(true);
+    expect(blocksExecution(state([], ['claude']), 'cursor')).toBe(false);
   });
 });
 

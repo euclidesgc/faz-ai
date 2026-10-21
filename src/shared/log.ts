@@ -196,7 +196,7 @@ export interface RunReport {
    * true = o leitor detectou, na própria saída da CLI, que o modelo esgotou o limite de uso do
    * plano (não confundir com `reason`, que é do transporte e nunca é preenchido pelo leitor). Sinal
    * estrutural, específico: nenhuma outra condição de erro (código de saída, timeout, erro genérico)
-   * liga esta flag — o runner decide a retentativa com o modelo reserva a partir dela.
+   * liga esta flag — o avaliador de políticas de execução decide a troca de alvo a partir dela.
    */
   usageLimitReached: boolean;
 }

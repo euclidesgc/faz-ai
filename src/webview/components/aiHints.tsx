@@ -22,7 +22,7 @@ export const workHint = (tool: string): ReactNode =>
   hint(
     'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está.',
     [
-      'Parte de <b>contexto vazio</b>: só entram as rules e skills marcadas no Harness e o agente do card (ou o padrão do board).',
+      'Parte <b>só do que está no board</b>: as rules e skills marcadas no Harness e o agente do card (ou o padrão do board). No Claude Code o contexto vazio é imposto; nas outras CLIs, veja o que elas carregam sozinhas em Ferramentas de IA.',
       'Ao terminar, passa a vez — pede revisão, pergunta ou move o card — sem acompanhamento ao vivo; a resposta chega na conversa.',
       'O consumo fica registrado em Métricas.',
     ],

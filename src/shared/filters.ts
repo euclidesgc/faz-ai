@@ -10,7 +10,7 @@ export interface Filters {
   typeIds: Id[];
   /** fieldId → valores aceitos (checkbox usa 'true' / 'false') */
   fields: Record<Id, string[]>;
-  /** 'createdAt', 'updatedAt' ou o id de um campo do tipo data */
+  /** 'createdAt', 'updatedAt', 'archivedAt' ou o id de um campo do tipo data */
   dateField: string | null;
   datePreset: DatePreset | null;
   /** yyyy-mm-dd, usados quando datePreset = 'custom' */
@@ -140,6 +140,7 @@ export function applyFilters(state: BoardState, f: Filters, now: number = Date.n
       let t: number | null;
       if (f.dateField === 'createdAt') t = c.createdAt;
       else if (f.dateField === 'updatedAt') t = c.updatedAt;
+      else if (f.dateField === 'archivedAt') t = c.archivedAt;
       else {
         const v = values.get(`${c.id}:${f.dateField}`);
         t = typeof v === 'string' ? parseDay(v) : null;

@@ -18,6 +18,7 @@ const activity = (over: Partial<AiActivity> = {}): AiActivity => ({
   origin: 'manual',
   phase: 'Discovery',
   model: null,
+  tool: 'claude',
   startedAt: NOW,
   ...over,
 });
@@ -96,6 +97,11 @@ describe('activityMessage: uma execução', () => {
       cards: [card('c1', { number: 12, title: 'Discovery do board' })],
       aiActivity: [activity(over)],
     });
+
+  it('identifica a origem de teste de ferramenta', () => {
+    const msg = activityMessage(baseState({ origin: 'test' }), { offline: false, now: NOW });
+    expect(msg.title).toContain('teste de ferramenta');
+  });
 
   it('fase: "agora"', () => {
     const state = baseState({ mode: 'phase', phase: 'Discovery', origin: 'manual', startedAt: NOW });

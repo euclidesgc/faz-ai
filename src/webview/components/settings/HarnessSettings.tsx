@@ -1,23 +1,23 @@
-import { baseInfo } from '../../../shared/harness';
+import { activeProfile, toolInfo } from '../../../shared/aiProfiles';
 import { Tabs } from '@radix-ui/themes';
 import { useBoardStore, type HarnessTab } from '../../store/boardStore';
 import { ProjectTool } from './harness/ProjectTool';
 import { RunnerSettings } from './harness/RunnerSettings';
 import { ArtifactsHarness } from './harness/ArtifactsHarness';
 import { ContextPlanDefaults } from '../card/ExecutionPlanPanel';
-import { ExecutionPoliciesSettings } from './policies/ExecutionPoliciesSettings';
 import { PageHeader } from './PageHeader';
 import { t } from '../../i18n';
 import { rich } from '../../i18n/rich';
 
 /**
- * Tela do harness. Toda execução do board parte de contexto vazio: só o que estiver no board entra. A aba
- * "Artefatos do board" organiza regras, skills, agentes e servidores MCP; "Ferramenta e execução" escolhe a IA e o executor.
+ * Tela do harness. Toda execução do board parte só do que está no board (no Claude Code, contexto vazio imposto; nas outras
+ * CLIs, o que elas carregam sozinhas aparece em Ferramentas de IA). A aba "Artefatos do board" organiza regras, skills,
+ * agentes e servidores MCP; "Ferramenta e execução" escolhe a IA e o executor. As políticas de execução ficam em Ferramentas de IA.
  */
 export function HarnessSettings() {
-  const projectTool = useBoardStore((s) => s.state!.board.aiTool);
+  const board = useBoardStore((s) => s.state!.board);
   const tab = useBoardStore((s) => s.harnessTab);
-  const tool = baseInfo(projectTool);
+  const tool = toolInfo(activeProfile(board));
   return (
     <div>
       <PageHeader title={t('Harness')}>
@@ -35,7 +35,6 @@ export function HarnessSettings() {
         </Tabs.Content>
         <Tabs.Content value="tool">
           <ProjectTool tool={tool} />
-          <ExecutionPoliciesSettings />
           <RunnerSettings tool={tool} />
           <ContextPlanDefaults />
         </Tabs.Content>

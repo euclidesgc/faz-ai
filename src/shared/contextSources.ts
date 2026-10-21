@@ -3,7 +3,7 @@ import type { HarnessItem } from './harness';
 import { selectedItems, toolItemsOf } from './harnessSelection';
 import type { BoardState, Card } from './model';
 
-export type ContextOrigin = 'board' | 'always' | 'agent' | 'card' | 'phase' | 'story' | 'story-phase' | 'default' | 'delegate';
+export type ContextOrigin = 'board' | 'always' | 'agent' | 'card' | 'phase' | 'story' | 'story-phase' | 'default';
 
 export interface ContextFile {
   id: string;

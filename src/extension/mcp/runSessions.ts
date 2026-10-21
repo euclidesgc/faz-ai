@@ -237,6 +237,8 @@ export class RunMcpSessions {
       'readHarnessFile',
       'projectArtifacts',
       'projectProfile',
+      // só leitura das políticas salvas; simular, salvar e ativar não entram na sessão MCP
+      'executionPolicyLibrary',
       'previewContextDraft',
       'readLibraryArtifact',
       'libraryMcpDefinitions',

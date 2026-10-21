@@ -32,8 +32,8 @@ export const library: Record<string, string> = {
   'Edita o conteúdo e as configurações deste artefato.': "Edits this artifact's content and settings.",
   'Excluir "{name}" da biblioteca?': 'Delete "{name}" from the library?',
   'A cópia do board será excluída. A origem será preservada.': 'The board copy will be deleted. The source will be preserved.',
-  '<b>Para que serve.</b> Toda execução do board parte de contexto vazio. A <b>Biblioteca do board</b> guarda regras, skills, subagentes e MCPs para qualquer ferramenta conectada.':
-    '<b>What it does.</b> Every board run starts with an empty context. The <b>Board library</b> stores rules, skills, subagents and MCPs for any connected tool.',
+  '<b>Para que serve.</b> Toda execução do board parte só do que está no board (no Claude Code, contexto vazio imposto; nas outras CLIs, veja o que elas carregam sozinhas em Ferramentas de IA). A <b>Biblioteca do board</b> guarda regras, skills, subagentes e MCPs para qualquer ferramenta conectada.':
+    '<b>What it does.</b> Every board run starts from only what is on the board (in Claude Code, empty context is enforced; for other CLIs, see what they load on their own in Ferramentas de IA). The <b>Board library</b> stores rules, skills, subagents and MCPs for any connected tool.',
   '<b>Por onde começar.</b> 1) Importe uma pasta e escolha os artefatos na prévia por tipo. 2) Crie artefatos nas abas, com o assistente guiado ou com IA. 3) Revise as regras e escolha quando cada artefato entra no contexto.':
     '<b>Where to start.</b> 1) Import a folder and select artifacts in the preview grouped by type. 2) Create artifacts in their tabs, using the guided assistant or AI. 3) Review the rules and choose when each artifact enters the context.',
   'Cole uma definição por vez ou importe o arquivo JSON pela pasta.':

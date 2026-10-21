@@ -170,7 +170,8 @@ describe('prévia do contexto efetivo', () => {
       agent('dev', { instructions: paragraph }),
       agent('revisor', { instructions: `${paragraph}\n\nRevise.`, isDefault: false }),
     ];
-    expect(executionContextOf(s, s.cards[0]!).overlaps).toEqual([{ agents: ['dev', 'revisor'], characters: paragraph.length }]);
+    // só o agente da execução entra: os outros agentes não são subagentes dela
+    expect(executionContextOf(s, s.cards[0]!).overlaps).toEqual([]);
     expect(executionContextOf(s, sub('t', 'h', 'todo')).overlaps).toEqual([]);
     s.board.aiTool = 'cursor';
     const p = executionContextOf(s, s.cards[0]!);

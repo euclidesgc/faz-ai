@@ -176,7 +176,9 @@ describe('aviso modal da renomeação no editor', () => {
       ...f.ui,
       warn: (message, modal, ...items) => {
         f.shown.push({ kind: 'warn', message, modal, items });
-        router.setAiRuns([{ cardId: id, runId: '', mode: 'phase', origin: 'manual', phase: 'Implementação', model: null, startedAt: 0 }]);
+        router.setAiRuns([
+          { cardId: id, runId: '', mode: 'phase', origin: 'manual', phase: 'Implementação', model: null, tool: 'claude', startedAt: 0 },
+        ]);
         return Promise.resolve(RENAME);
       },
     };

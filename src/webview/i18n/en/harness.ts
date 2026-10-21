@@ -219,13 +219,15 @@ export const harness: Record<string, string> = {
   'Rodar o heartbeat agora': 'Run the heartbeat now',
   'Histórias ao mesmo tempo': 'Stories at the same time',
   histórias: 'stories',
+  'Sub-tarefas em paralelo por história': 'Sub-tasks in parallel per story',
+  'sub-tarefas': 'sub-tasks',
+  'Efetivo: {effective}. As sub-tarefas escrevem na mesma pasta da história, então rodam uma por vez.':
+    'Effective: {effective}. The sub-tasks write to the same story folder, so they run one at a time.',
   'Tocar histórias em paralelo': 'Drive stories in parallel',
-  'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas. As sub-tarefas independentes de cada história já rodam em paralelo, sem limite, conforme o plano.':
-    'When on, the heartbeat drives several stories at once, each in its own folder (worktree). More stories in parallel use more memory and CPU and more of your account usage limit. Autonomous mode stays one at a time, because its stories are stacked. The independent sub-tasks of each story already run in parallel, with no limit, according to the plan.',
+  'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas.':
+    'When on, the heartbeat drives several stories at once, each in its own folder (worktree). More stories in parallel use more memory and CPU and more of your account usage limit. Autonomous mode stays one at a time, because its stories are stacked.',
   'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.':
     'Only available in "Worktree por história" mode (Settings > Git). Outside it the stories share the same folder and would cause conflicts, so the heartbeat drives one at a time.',
-  'Tocar histórias em paralelo agora fica no Settings do editor, em Faz AI › Git.':
-    'Driving stories in parallel now lives in the editor Settings, under Faz AI › Git.',
 
   // --- BoardInstall
   'O registro será gravado em {where}.': 'The registration will be written to {where}.',
@@ -298,6 +300,7 @@ export const harness: Record<string, string> = {
   'Skills e rules': 'Skills and rules',
   'Contexto vazio': 'Empty context',
   // --- Harness por ferramenta e por assunto
+
   'Entendi, não mostrar de novo': 'Got it, do not show again',
   'Sub-agentes': 'Sub-agents',
   MCPs: 'MCPs',
@@ -572,6 +575,31 @@ export const harness: Record<string, string> = {
   'Desmarca tudo; nada muda.': 'Unchecks everything; nothing changes.',
   'MCPs permitidos': 'Allowed MCPs',
   'Prévia do contrato': 'Contract preview',
+  'Contrato de contexto: {name}': 'Context contract: {name}',
+  'Rascunho v1. Salvar não altera a execução legada. A admissão por capacidades ainda está indisponível (#729).':
+    'Version 1 draft. Saving does not change legacy execution. Capability admission is still unavailable (#729).',
+  'Papel do agente': 'Agent role',
+  'Instruções do contrato': 'Contract instructions',
+  'Skills essenciais': 'Essential skills',
+  'Entram em toda atividade deste agente.': 'Included in every activity of this agent.',
+  'Skills sugeridas': 'Suggested skills',
+  'São sugestões para a atividade; não entram antecipadamente no contexto.':
+    'Suggestions for the activity; they are not loaded into context in advance.',
+  'Delimitam os MCPs que uma atividade pode selecionar; não ativam servidores por si só.':
+    'Limit which MCPs an activity can select; they do not activate servers by themselves.',
+  'Nenhum recurso deste tipo cadastrado.': 'No resources of this type registered.',
+  'Restrições de ferramentas': 'Tool restrictions',
+  'Categorias solicitadas no contrato. A tradução e a imposição dependem da admissão do executor. Lista vazia não concede todas as ferramentas.':
+    'Categories requested in the contract. Translation and enforcement depend on executor admission. An empty list does not grant all tools.',
+  'Ferramenta das restrições nativas': 'Tool for native restrictions',
+  'Permitir nativas (uma por linha)': 'Allow native tools (one per line)',
+  'Negar nativas (uma por linha)': 'Deny native tools (one per line)',
+  'Prévia do contrato com essenciais e itens Sempre. Complementos da atividade não estão selecionados.':
+    'Contract preview with essentials and Always items. Activity additions are not selected.',
+  'O contrato mudou em outra edição. Feche e abra novamente para carregar a revisão atual.':
+    'The contract changed in another editor. Close and reopen to load the current revision.',
+  'Salvar rascunho do contrato': 'Save contract draft',
+  'Editar contrato de contexto (rascunho)': 'Edit context contract (draft)',
   'Fase no card': 'Card phase',
   'Ação no card': 'Card action',
   'Fase no workflow': 'Workflow phase',

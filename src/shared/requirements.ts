@@ -1,6 +1,8 @@
 import type { AiBase } from './aiProfiles';
 import type { AiTool } from './harness';
 import type { HarnessIssue } from './harnessStatus';
+import type { BoardState, Card } from './model';
+import { runTargetOf } from './runTarget';
 import type { BoardAvailability, ProfileProblem } from './profileHealth';
 
 /**
@@ -48,16 +50,36 @@ export const CLI_COMMAND: Record<AiBase, string> = { claude: 'claude', cursor: '
 /** O comando que faz o login na CLI de cada ferramenta (conferido nas CLIs em 2026-10-13). */
 export const LOGIN_COMMAND: Record<AiBase, string> = { claude: 'claude auth login', cursor: 'cursor-agent login', kimi: 'kimi login' };
 
+/** O problema de um perfil de CLI que impede a execução: CLI ausente, sem login (probe) ou login vencido (falha numa execução). */
+export type CliProblem = 'cli' | 'signin' | 'expired';
+
+type ProblemState = { requirements: BoardRequirement[]; authExpired: AiTool[] };
+
 /**
- * Sem nenhum perfil disponível a execução pelo board nem começa, e o heartbeat e o autopiloto também
- * não insistem enquanto o login do perfil padrão (o alvo dos cards nesta versão) está vencido
- * numa execução. O problema de outro perfil (CLI ausente, login) não trava o board: vale só para o
- * que depende dele.
+ * O problema do perfil `cli` (id do perfil), ou null. Só olha os sinais daquele perfil. O requisito
+ * `profile` do Diagnóstico vale mesmo `optional` (outro perfil disponível não livra este); só a CLI
+ * ausente e o login (probe ou vencido numa execução) bloqueiam aqui. Os demais problemas (pendente de
+ * revisão, não validado, vencido, não admissível) são decididos pela admissão, não por este bloqueio.
  */
-export function blocksExecution(state: {
-  requirements: BoardRequirement[];
-  authExpired: AiTool | null;
-  board: { aiTool: AiTool };
-}): boolean {
-  return state.requirements.some((r) => r.id === 'no-profile') || state.authExpired === state.board.aiTool;
+export function cliProblem(state: ProblemState, cli: AiTool): CliProblem | null {
+  const own = state.requirements.find((r) => r.id === 'profile' && r.profile === cli);
+  if (own?.problem === 'cli') return 'cli';
+  if (own?.problem === 'signin') return own.expired ? 'expired' : 'signin';
+  return state.authExpired.includes(cli) ? 'expired' : null;
+}
+
+/** A execução no perfil `cli` nem começa: usado pelos gatilhos (manual, Refinar com IA, heartbeat, autopiloto). Os outros perfis seguem. */
+export const blocksExecution = (state: ProblemState, cli: AiTool): boolean => cliProblem(state, cli) !== null;
+
+/** Nenhum perfil ligado disponível (`no-profile`): nenhuma execução pelo board começa, nem a do heartbeat e do autopiloto. */
+export const noProfileAvailable = (state: { requirements: BoardRequirement[] }): boolean =>
+  state.requirements.some((r) => r.id === 'no-profile');
+
+/**
+ * O problema do perfil de CLI que executaria o card (`runTargetOf`), ou null. Um alvo bloqueado (escolha
+ * explícita inválida) não é problema de CLI: quem executa trata isso à parte.
+ */
+export function cardCliProblem(state: BoardState, card: Card): CliProblem | null {
+  const target = runTargetOf(state, card);
+  return target ? cliProblem(state, target.cli.id) : null;
 }

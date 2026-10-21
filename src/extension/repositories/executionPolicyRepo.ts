@@ -111,6 +111,22 @@ export class ExecutionPolicyRepo {
     );
     return record;
   }
+  /**
+   * Migração de reservas legadas: grava a proposta como versão 1, desligada e pendente. Idempotente: o id
+   * já usado (inclusive removido pela pessoa) não é regravado, e nunca altera política existente.
+   */
+  proposeMigrated(boardId: string, policies: readonly ExecutionPolicy[]): string[] {
+    const created: string[] = [];
+    for (const policy of policies) {
+      if (policy.enabled) throw new Error('Proposta migrada não pode nascer ligada.');
+      transaction(this.db, () => {
+        if (one(this.db, 'SELECT 1 FROM execution_policies WHERE id = ?', [policy.id])) return;
+        this.write(boardId, { expectedRevision: 0, policy, reviewed: false }, { profiles: [], models: [] });
+        created.push(policy.id);
+      });
+    }
+    return created;
+  }
   /** Remover não apaga o histórico nem as cópias já capturadas por um run. */
   remove(boardId: string, id: string, expectedRevision: number, catalog: PolicyCatalog, actor: 'person' | 'ai'): void {
     if (actor !== 'person') throw new Error('Políticas executáveis exigem revisão humana.');

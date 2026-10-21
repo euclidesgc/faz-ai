@@ -172,7 +172,7 @@ export function registerBoardRulesTools(tool: DefineTool): void {
         .boolean()
         .optional()
         .describe(
-          'Incluir no catálogo do Cursor as variantes rápidas dos modelos (respondem mais rápido e cobram mais pelos mesmos tokens). Ligar acrescenta as da última lista lida do Cursor; desligar as tira do catálogo.',
+          'Incluir no catálogo as variantes rápidas dos modelos, nas ferramentas que as têm (respondem mais rápido e cobram mais pelos mesmos tokens). Ligar acrescenta as da última lista lida da ferramenta; desligar as tira do catálogo.',
         ),
     },
     (a, router) => {

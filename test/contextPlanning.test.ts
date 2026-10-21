@@ -133,7 +133,9 @@ describe('contratos de contexto versionados', () => {
         if (name === 'board_artifacts' && r.kind === 'mcp')
           r.meta_json = JSON.stringify({ server: { command: 'github', env: { TOKEN: 'segredo-local' } } });
         const keys = Object.keys(r).filter(
-          (key) => name !== 'board_artifacts' || !['revision', 'secret_ref', 'review_state'].includes(key),
+          (key) =>
+            (name !== 'board_artifacts' || !['revision', 'secret_ref', 'review_state'].includes(key)) &&
+            (name !== 'cards' || key !== 'questions_json'),
         );
         old.run(
           `INSERT INTO ${name} (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`,
