@@ -154,18 +154,22 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
       </FormField>
 
       <FormField
-        label={t('Reserva (opcional)')}
+        label={t('Fallback')}
         hint={
           rule.fallback
-            ? modelDisplay(state.board.modelCatalog, rule.fallback, true)
-            : t('Sem reserva: se o modelo principal esgotar o limite, a execução não é repetida.')
+            ? t('reserva legada: {model}. Ela não troca de CLI sozinha; revise a proposta em Políticas de execução e fallback.', {
+                model: modelDisplay(state.board.modelCatalog, rule.fallback, true),
+              })
+            : t('A reserva por regra não existe mais: o fallback é uma política de execução, revisada por você.')
         }
       >
         {() => (
-          <ModelEditor
-            value={rule.fallback ?? null}
-            onChange={(v) => setRule({ ...rule, fallback: typeof v === 'string' && v ? v : null })}
-          />
+          <Button
+            variant="soft"
+            onClick={() => document.getElementById('execution-policies')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })}
+          >
+            {t('Ir para as políticas de execução')}
+          </Button>
         )}
       </FormField>
 
@@ -284,7 +288,7 @@ export function ModelRulesEditor() {
                 {modelDisplay(state.board.modelCatalog, r.model, true)}
                 {r.fallback && (
                   <div className="muted small">
-                    {t('reserva: {model}', { model: modelDisplay(state.board.modelCatalog, r.fallback, true) })}
+                    {t('reserva legada (desativada): {model}', { model: modelDisplay(state.board.modelCatalog, r.fallback, true) })}
                   </div>
                 )}
               </td>

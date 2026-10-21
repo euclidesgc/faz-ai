@@ -38,7 +38,8 @@ import { addAttachment, cardContentHandlers } from './handlers/cardContent';
 import { questionHandlers } from './handlers/questions';
 import { cardHandlers, createCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
-import { initModels, modelHandlers } from './handlers/models';
+import { initModels, modelHandlers, proposeLegacyFallbacks } from './handlers/models';
+import { legacyFallbackNotes } from '../../shared/legacyFallback';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
 import { branchRenameHandlers } from './handlers/branchRename';
 import { aiProfileHandlers, type AiProfileRuntime } from './handlers/aiProfiles';
@@ -228,6 +229,7 @@ export class MessageRouter {
     initModels(this.ctx);
     // os agentes de fábrica usam as regras de modelo, que initModels acabou de criar
     this.ctx.harness.bootstrap();
+    proposeLegacyFallbacks(this.ctx);
     dbHandle.scheduleSave();
   }
 
@@ -246,7 +248,11 @@ export class MessageRouter {
     return this.aiProfileRuntime.test(id);
   }
   executionPolicyLibrary(): PolicyLibrary {
-    return { snapshot: this.ctx.executionPolicies.snapshot(this.boardId), ...builtinPolicyCatalog(this.snapshot()) };
+    const snapshot = this.ctx.executionPolicies.snapshot(this.boardId);
+    const catalog = builtinPolicyCatalog(this.snapshot());
+    const { modelRules } = this.snapshot().board;
+    const legacy = legacyFallbackNotes(modelRules, snapshot.records, catalog.models);
+    return { snapshot, ...catalog, ...(legacy.length ? { legacy } : {}) };
   }
   executionPolicyHistory(id: string, before = Number.MAX_SAFE_INTEGER) {
     if (!Number.isSafeInteger(before) || before < 1 || typeof id !== 'string' || !id || id.length > 240)

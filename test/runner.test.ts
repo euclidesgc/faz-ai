@@ -1704,6 +1704,52 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(router.snapshot().aiActivity.find((a) => a.cardId === storyId)?.tool).toBe('cursor');
     expect(lastMessage()!.body).toMatch(/esgotou o limite; a execução segue com .* no Cursor\.$/);
   });
+
+  it('política editada durante a execução: vale a versão salva no fim da tentativa, e o log diz qual (r2)', () => {
+    useSonnetMedium();
+    policyToFable();
+    runner.start(storyId);
+    const saved = router.executionPolicyLibrary().snapshot.records[0]!;
+    router.handle({
+      type: 'settings.executionPolicy.save',
+      policy: { ...saved.policy, limits: { ...saved.policy.limits, maxAttempts: 5 } },
+      expectedRevision: saved.revision,
+      reviewed: true,
+    });
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(2);
+    expect(log.some((l) => l.includes('reserva r2'))).toBe(true);
+  });
+
+  it('política desligada durante a execução: o limite esgotado não troca, nem pela versão antiga', () => {
+    useSonnetMedium();
+    policyToFable();
+    runner.start(storyId);
+    const saved = router.executionPolicyLibrary().snapshot.records[0]!;
+    router.handle({
+      type: 'settings.executionPolicy.save',
+      policy: { ...saved.policy, enabled: false },
+      expectedRevision: saved.revision,
+      reviewed: true,
+    });
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('ready');
+    expect(log.some((l) => l.includes('block (no-policy)'))).toBe(true);
+  });
+
+  it('política de espera não troca de CLI nem repete na hora: o card volta para a IA e o log registra a espera', () => {
+    useSonnetMedium();
+    policyTo({ profileId: 'claude', model: 'fable', effort: 'low' }, { action: 'wait' });
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('ready');
+    expect(log.some((l) => l.includes('Política de execução: wait'))).toBe(true);
+  });
 });
 
 describe('alvo da execução por perfil de CLI (história #620)', () => {

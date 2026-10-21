@@ -1,5 +1,6 @@
 import { catalogTool } from '../../../shared/aiProfiles';
 import { isAiBase } from '../../../shared/harness';
+import { legacyFallbackProposals } from '../../../shared/legacyFallback';
 import { builtinPolicyCatalog } from '../../../shared/policyManagement';
 import type { AiTool } from '../../../shared/harness';
 import type { FieldDef } from '../../../shared/model';
@@ -151,6 +152,16 @@ export function applySuggestion(ctx: BoardContext, cardId: string, previous: str
   if ((current === null || current === previous) && next !== current) ctx.cards.setFieldValue(cardId, field.id, next);
 }
 
+/**
+ * A reserva (`fallback`) das regras de modelo não decide mais nada na execução: vira proposta de política
+ * desligada e pendente de revisão. Roda ao abrir o board, ao salvar regras e após importar; não repete.
+ */
+export function proposeLegacyFallbacks(ctx: BoardContext): void {
+  const { board } = ctx.state();
+  const proposals = legacyFallbackProposals(board.modelRules, board.modelCatalog);
+  if (proposals.length) ctx.executionPolicies.proposeMigrated(ctx.boardId, proposals);
+}
+
 /** Catálogo de modelos e regras de sugestão. */
 export const modelHandlers = {
   'settings.executionPolicy.save': (msg, ctx, actor) => {
@@ -175,6 +186,7 @@ export const modelHandlers = {
   },
   'settings.modelRules.set': (msg, ctx) => {
     ctx.boards.setModelRules(ctx.boardId, msg.rules);
+    proposeLegacyFallbacks(ctx);
     return true;
   },
   'settings.modelRules.suggest': (msg, ctx) => {

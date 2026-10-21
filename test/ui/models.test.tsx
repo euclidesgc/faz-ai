@@ -86,53 +86,19 @@ describe('ModelsSettings', () => {
     expect(lastSent('settings.modelRules.set').rules.at(-1)).toMatchObject({ name: 'Backend pesado', enabled: true });
   });
 
-  it('Montar nova regra: a reserva começa vazia e a regra salva vai sem reserva', async () => {
+  it('Montar nova regra: não há campo de reserva; o editor aponta para as políticas e a regra vai sem reserva', async () => {
     show();
     await userEvent.click(screen.getByRole('button', { name: 'Montar nova regra' }));
     const builder = within(screen.getByLabelText('Regra de sugestão'));
     await userEvent.type(builder.getByLabelText('Nome da regra'), 'Sem reserva');
-    const modelTriggers = builder.getAllByRole('combobox', { name: 'Modelo' });
-    expect(modelTriggers[1]).toHaveTextContent('—');
+    expect(builder.getAllByRole('combobox', { name: 'Modelo' })).toHaveLength(1);
+    expect(builder.getByText(/o fallback é uma política de execução/)).toBeInTheDocument();
+    expect(builder.getByRole('button', { name: 'Ir para as políticas de execução' })).toBeEnabled();
     await userEvent.click(builder.getByRole('button', { name: 'Adicionar à lista' }));
     expect(lastSent('settings.modelRules.set').rules.at(-1)).toMatchObject({ name: 'Sem reserva', fallback: null });
   });
 
-  it('Montar nova regra: escolher uma reserva grava o modelo nela', async () => {
-    show();
-    await userEvent.click(screen.getByRole('button', { name: 'Montar nova regra' }));
-    const builder = within(screen.getByLabelText('Regra de sugestão'));
-    await userEvent.type(builder.getByLabelText('Nome da regra'), 'Com reserva');
-    const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
-    const modelTriggers = builder.getAllByRole('combobox', { name: 'Modelo' });
-    await choose(modelTriggers[1]!, m.label);
-    await userEvent.click(builder.getByRole('button', { name: 'Adicionar à lista' }));
-    expect(lastSent('settings.modelRules.set').rules.at(-1)).toMatchObject({
-      name: 'Com reserva',
-      fallback: `${m.id}@${m.defaultEffort}`,
-    });
-  });
-
-  it('Montar nova regra: modelo no Kimi e reserva no Claude, de perfis diferentes', async () => {
-    const s = state();
-    const claude = s.board.modelCatalog.find((x) => x.tool === 'claude')!;
-    const kimi = { ...claude, id: 'kimi:k3', tool: 'kimi' as const, model: 'k3', label: 'Kimi K3', efforts: [], defaultEffort: null };
-    useBoardStore.setState({ state: { ...s, board: { ...s.board, modelCatalog: [...s.board.modelCatalog, kimi] } } });
-    show();
-    await userEvent.click(screen.getByRole('button', { name: 'Montar nova regra' }));
-    const builder = within(screen.getByLabelText('Regra de sugestão'));
-    await userEvent.type(builder.getByLabelText('Nome da regra'), 'Misto');
-    const triggers = builder.getAllByRole('combobox', { name: 'Modelo' });
-    await choose(triggers[0]!, 'Kimi K3');
-    await choose(triggers[1]!, claude.label);
-    await userEvent.click(builder.getByRole('button', { name: 'Adicionar à lista' }));
-    expect(lastSent('settings.modelRules.set').rules.at(-1)).toMatchObject({
-      name: 'Misto',
-      model: 'kimi:k3',
-      fallback: `${claude.id}@${claude.defaultEffort}`,
-    });
-  });
-
-  it('editar uma regra existente preserva a reserva já configurada', async () => {
+  it('editar uma regra com reserva legada a mostra como desativada, sem reativá-la nem alterá-la', async () => {
     const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
     board.router.handle({
       type: 'settings.modelRules.set',
@@ -149,7 +115,7 @@ describe('ModelsSettings', () => {
     });
     syncStore(board.router);
     show();
-    expect(screen.getByText(new RegExp(`reserva: .*${m.label}`))).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`reserva legada \\(desativada\\): .*${m.label}`))).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
     const builder = within(screen.getByLabelText('Regra de sugestão'));
     await userEvent.click(builder.getByRole('button', { name: 'Salvar regra' }));

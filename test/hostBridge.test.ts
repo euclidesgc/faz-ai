@@ -479,7 +479,7 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     expect(file.tables.cards!.map((c) => c.title)).toEqual(['Card 1']);
     expect(sent.at(-1)).toEqual({
       type: 'notice',
-      message: `Board exportado em /tmp/${saved[0]!.name}. O arquivo contém conversas e anexos: guarde-o com cuidado.`,
+      message: `Board exportado em /tmp/${saved[0]!.name}. O arquivo contém conversas e anexos: guarde-o com cuidado. Credenciais e variáveis dos perfis de CLI não vão no arquivo.`,
     });
   });
 
@@ -521,7 +521,7 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     expect(sent.at(-1)).toEqual({
       type: 'notice',
       message:
-        'Board "Meu Board" importado: 1 card(s) e 0 anexo(s). Perfis desativados para revisão local: Claude Code, Cursor, Kimi Code.',
+        'Board "Meu Board" importado: 1 card(s) e 0 anexo(s). Perfis desativados para revisão local: Claude Code, Cursor, Kimi Code. Credenciais dos perfis não vêm no arquivo: configure-as de novo neste computador.',
     });
     expect(changes).toBe(1);
     expect(router.boardId).toBe(oldBoardId); // o arquivo veio deste mesmo board: os ids se preservam
@@ -571,7 +571,7 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
 
   it('as mensagens de resultado listam os cards com anexo sem arquivo', () => {
     expect(exportNotice('/x/b.fazai.json', ['#3', '#8'])).toBe(
-      'Board exportado em /x/b.fazai.json. Anexos sem arquivo: #3, #8. O arquivo contém conversas e anexos: guarde-o com cuidado.',
+      'Board exportado em /x/b.fazai.json. Anexos sem arquivo: #3, #8. O arquivo contém conversas e anexos: guarde-o com cuidado. Credenciais e variáveis dos perfis de CLI não vão no arquivo.',
     );
     expect(importNotice({ boardId: 'b', boardName: 'B', cards: 2, attachments: 1, warnings: ['#3'], mcpSecrets: [] })).toBe(
       'Board "B" importado: 2 card(s) e 1 anexo(s). Anexos sem arquivo: #3.',
@@ -579,6 +579,20 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     expect(
       importNotice({ boardId: 'b', boardName: 'B', cards: 2, attachments: 1, warnings: [], mcpSecrets: ['github: GITHUB_TOKEN', 'x: K'] }),
     ).toBe('Board "B" importado: 2 card(s) e 1 anexo(s). Revise as configurações locais dos servidores MCP: github: GITHUB_TOKEN, x: K.');
+    expect(
+      importNotice({
+        boardId: 'b',
+        boardName: 'B',
+        cards: 0,
+        attachments: 0,
+        warnings: [],
+        mcpSecrets: [],
+        profileReviews: ['Claude Code'],
+        policyReviews: ['Quota'],
+      }),
+    ).toBe(
+      'Board "B" importado: 0 card(s) e 0 anexo(s). Perfis desativados para revisão local: Claude Code. Credenciais dos perfis não vêm no arquivo: configure-as de novo neste computador. Políticas pendentes de revisão: Quota.',
+    );
   });
 });
 

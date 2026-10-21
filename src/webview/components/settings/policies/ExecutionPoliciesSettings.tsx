@@ -14,6 +14,13 @@ import { PolicySummary } from './parts';
 import { PolicySimulation } from './PolicySimulation';
 import { PolicyAssistant } from './PolicyAssistant';
 
+const LEGACY_REASONS = {
+  'model-missing': 'o modelo não está no catálogo',
+  'fallback-missing': 'o modelo não está no catálogo',
+  'effort-invalid': 'o esforço não existe no modelo',
+  'id-invalid': 'o identificador da regra é inválido',
+} as const;
+
 const newId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
 
 export function ExecutionPoliciesSettings() {
@@ -174,6 +181,31 @@ export function ExecutionPoliciesSettings() {
                   applyLabel={t('Abrir proposta no editor')}
                   onApply={(initial) => setEditor({ base: null, initial })}
                 />
+                {library.legacy && (
+                  <div role="note">
+                    <h4>{t('Reservas de regras antigas')}</h4>
+                    <p>
+                      {t(
+                        'Cada reserva de regra antiga virou uma proposta desligada e pendente de revisão. Nada troca de CLI até você revisar e ligar a política; as condições da regra (campos e tipo do card) não foram copiadas.',
+                      )}
+                    </p>
+                    <ul>
+                      {library.legacy.map((note) => {
+                        const name = note.ruleName || note.ruleId;
+                        return (
+                          <li key={note.ruleId}>
+                            {note.status === 'proposed'
+                              ? t('Regra "{name}": proposta {state}', {
+                                  name,
+                                  state: t(note.review === 'reviewed' ? 'já revisada' : 'pendente de revisão'),
+                                })
+                              : t('Regra "{name}": sem conversão ({reason})', { name, reason: t(LEGACY_REASONS[note.reason!]) })}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
                 {!library.snapshot.records.length && <p>{t('Nenhuma política cadastrada.')}</p>}
                 {[...library.snapshot.records]
                   .sort((a, b) => a.policy.priority - b.policy.priority)

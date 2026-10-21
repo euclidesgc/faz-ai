@@ -21,6 +21,8 @@ export interface PolicyLibrary {
   snapshot: ExecutionPolicySnapshot;
   profiles: PolicyProfile[];
   models: ModelOption[];
+  /** Reservas de regras antigas que viraram proposta (ou ficaram sem conversão); ausente quando não há. */
+  legacy?: import('./legacyFallback').LegacyFallbackNote[];
 }
 export interface PolicyScenario {
   /** Rascunho a avaliar no lugar da salva; nulo avalia só as políticas salvas (Próxima execução). */

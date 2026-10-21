@@ -151,6 +151,24 @@ describe('host de políticas e simulação', () => {
     await bridge.handle({ type: 'executionPolicy.read', requestId: 'bad-page', id: 'quota', beforeRevision: -1 });
     expect(replies.at(-1)).toMatchObject({ type: 'executionPolicy.result', requestId: 'bad-page', error: 'Página de histórico inválida.' });
   });
+  it('assistente de IA indisponível: o erro chega correlacionado, o editor manual segue e nada é gravado', async () => {
+    await expect(router.assistExecutionPolicy({ mode: 'create', goal: 'trocar na quota', draft: null, language: 'pt-BR' })).rejects.toThrow(
+      'não está disponível',
+    );
+    await bridge.handle({
+      type: 'executionPolicy.assist',
+      requestId: 'assist',
+      input: { mode: 'create', goal: 'trocar na quota', draft: null, language: 'pt-BR' },
+    });
+    expect(replies.at(-1)).toMatchObject({
+      type: 'executionPolicy.result',
+      requestId: 'assist',
+      error: expect.stringContaining('não está disponível'),
+    });
+    expect(saves).toBe(0);
+    save();
+    expect(router.executionPolicyLibrary().snapshot.records).toHaveLength(1);
+  });
   it('histórico é paginado e ordenado sem sobreposição', () => {
     for (let i = 0; i < 55; i++)
       router.handle({ type: 'settings.executionPolicy.save', policy: policy({ enabled: false }), expectedRevision: i, reviewed: false });

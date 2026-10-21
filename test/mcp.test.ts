@@ -959,29 +959,20 @@ describe('regras de modelo com E e OU', () => {
     );
   });
 
-  it('aceita um modelo reserva por regra; sem reserva fica igual a antes da história', async () => {
+  it('recusa a reserva por regra (agora é política de execução) e não altera as regras salvas', async () => {
+    await call('set_model_rules', { rules: [{ name: 'Antes', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku' }] });
     const res = await call('set_model_rules', {
-      rules: [
-        { name: 'Com reserva', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku', fallback: 'opus high' },
-        { name: 'Sem reserva', when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'opus low' },
-      ],
+      rules: [{ name: 'Com reserva', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku', fallback: 'opus high' }],
     });
-    expect(res.data.rules[0]).toMatchObject({
-      name: 'Com reserva',
-      value: 'claude:haiku',
-      fallbackSuggest: expect.stringContaining('Opus'),
-      fallbackValue: 'claude:opus@high',
+    expect(res.error).toBe(true);
+    expect(res.text).toContain('políticas de execução');
+    expect(router.snapshot().board.modelRules.map((r) => r.name)).toEqual(['Antes']);
+    expect(router.executionPolicyLibrary().snapshot.records).toEqual([]);
+    const ok = await call('set_model_rules', {
+      rules: [{ name: 'Sem reserva', when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'opus low' }],
     });
-    expect(res.data.rules[1]).not.toHaveProperty('fallbackValue');
-    expect(res.data.rules[1]).not.toHaveProperty('fallbackSuggest');
-
-    const rules = router.snapshot().board.modelRules;
-    expect(rules[0]?.fallback).toBe('claude:opus@high');
-    expect(rules[1]?.fallback).toBe(null);
-
-    const fromGet = (await call('get_models')).data.rules;
-    expect(fromGet[0]).toMatchObject({ fallbackValue: 'claude:opus@high' });
-    expect(fromGet[1]).not.toHaveProperty('fallbackValue');
+    expect(ok.data.rules[0]).not.toHaveProperty('fallbackValue');
+    expect(router.snapshot().board.modelRules[0]?.fallback).toBe(null);
   });
 
   it('com o preenchimento automático desligado, só sugere', async () => {
