@@ -165,6 +165,11 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
    também todas as sub-tarefas arquivadas dela e desliga o modo autônomo; restaurar uma sub-tarefa
    cuja história está arquivada pede confirmação e restaura a história inteira (uma sub-tarefa de
    história ativa volta sozinha, sem confirmação).
+6. **Duplicar card** (menu de ações do card aberto) cria outro card a partir dele, um por vez. O título
+   ganha o prefixo "Cópia de"; a descrição, o tipo, os campos e o checklist (desmarcado) são copiados, e
+   o card novo vai para o fim da primeira coluna do workflow, sem confirmação. Sub-tarefas, anexos,
+   comentários e vínculos não são copiados. Não há duplicação em massa: na seleção de vários cards, a
+   opção não aparece.
 
 Nada acontece em silêncio: toda ação que vai ao board espera a confirmação e mostra que está
 trabalhando. Uma barra fina no topo acende enquanto qualquer pedido está em andamento; o card que

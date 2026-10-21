@@ -175,6 +175,12 @@ promise a percentage: it shows, in the inventory, what is being loaded.
    brings back all its archived sub-tasks and turns autonomous mode off; restoring a sub-task whose
    story is archived asks for confirmation and restores the whole story (a sub-task of an active
    story comes back on its own, with no confirmation).
+6. **Duplicar card** (duplicate card; card actions menu of the open card) creates another card from
+   it, one at a time. The title gets the prefix "Cópia de" (Copy of in the English interface); the
+   description, type, fields and checklist (unchecked) are copied, and the new card goes to the end of
+   the first column of its workflow, with no confirmation. Sub-tasks, attachments, comments and links
+   are not copied. There is no bulk duplication: with several cards selected, the option does not
+   appear.
 
 Nothing happens silently: every action that goes to the board waits for confirmation and shows it
 is working. A thin bar at the top lights up while any request is in progress; the card being moved,

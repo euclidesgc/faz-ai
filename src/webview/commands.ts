@@ -92,6 +92,7 @@ export const ai = {
 
 export const cards = {
   create: (input: Payload<'card.create'>) => req({ type: 'card.create', ...input }),
+  duplicate: (cardId: Id, title: string) => reqCard(cardId, { type: 'card.duplicate', cardId, title }),
   update: (cardId: Id, patch: PatchOf<'card.update'>) => reqCard(cardId, { type: 'card.update', cardId, patch }),
   move: (cardId: Id, columnId: Id, position: number, cancelChildren?: boolean) =>
     reqCard(cardId, { type: 'card.move', cardId, columnId, position, ...(cancelChildren ? { cancelChildren } : {}) }),
