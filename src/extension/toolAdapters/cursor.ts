@@ -14,6 +14,8 @@ import {
   ruleHeaderLoss,
   stripFrontmatter,
   toolListLosses,
+  listToolFolder,
+  mcpLocations,
   withFrontmatter,
   yamlString,
 } from './common';
@@ -24,6 +26,9 @@ export const cursorAdapter: ToolAdapter = {
   root: '.cursor',
   supports: (kind, target) => !(kind === 'rule' && target === 'user'),
   skillDir: (name) => `.cursor/skills/${name}`,
+  list: (target, base) =>
+    listToolFolder('.cursor', target, base, target === 'project' ? { ruleDir: '.cursor/rules', ruleExt: '.mdc' } : {}),
+  mcpFiles: (target) => mcpLocations(target, ['.cursor/mcp.json'], ['.cursor/mcp.json']),
   render(kind, sources, target) {
     if (!this.supports(kind, target))
       return { files: [], refused: sources.map((s) => ({ id: s.artifact.id, reason: 'unsupported' as const })) };

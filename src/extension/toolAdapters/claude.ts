@@ -15,6 +15,8 @@ import {
   stripFrontmatter,
   toolListLosses,
   yamlList,
+  listToolFolder,
+  mcpLocations,
 } from './common';
 import type { ToolAdapter } from './types';
 
@@ -23,6 +25,13 @@ export const claudeAdapter: ToolAdapter = {
   root: '.claude',
   supports: () => true,
   skillDir: (name) => `.claude/skills/${name}`,
+  list: (target, base) =>
+    listToolFolder('.claude', target, base, {
+      ruleDir: '.claude/rules',
+      ruleExt: '.md',
+      extraRules: target === 'project' ? ['CLAUDE.md'] : [],
+    }),
+  mcpFiles: (target) => mcpLocations(target, ['.mcp.json'], ['.claude.json']),
   render(kind, sources) {
     if (kind === 'skill') return renderSkills('.claude', sources);
     // regra sem frontmatter nova: carregada em toda conversa; da mesma ferramenta vai como está

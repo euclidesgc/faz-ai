@@ -5,7 +5,10 @@ import type { AiTool } from '../../shared/harness';
 import type { FormatLoss, RefuseReason } from '../../shared/toolExport';
 import { isSafeSegment } from '../attachments';
 import { frontmatterOf, frontmatterValue } from '../frontmatter';
-import type { ExportSource, RenderedFile } from './types';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import type { ExportSource, ListedSource, RenderedFile } from './types';
+import type { ExportTarget } from '../../shared/toolExport';
 
 /** Texto livre como string JSON, que é YAML válido: aspas, `:` e quebras de linha não quebram o cabeçalho. */
 export const yamlString = (s: string): string => JSON.stringify(s.replace(/\s+/g, ' ').trim());
@@ -169,3 +172,70 @@ export const flagLosses = (meta: AgentMeta): FormatLoss[] => [
   ...(meta.readonly ? [{ code: 'readonly' as const, effect: 'lost' as const }] : []),
   ...(meta.background ? [{ code: 'background' as const, effect: 'lost' as const }] : []),
 ];
+
+/** `location` de um caminho relativo à base: o do projeto fica relativo, o do usuário vira `~/…`. */
+const locationOf = (target: ExportTarget, rel: string): string => (target === 'user' ? `~/${rel}` : rel);
+
+/** O caminho real está dentro da pasta da ferramenta? Um link que sai dela fica de fora. */
+function inside(rootDir: string, file: string): boolean {
+  try {
+    const real = fs.realpathSync(file);
+    const root = fs.realpathSync(rootDir);
+    return real === root || real.startsWith(root + path.sep);
+  } catch {
+    return false;
+  }
+}
+
+/** Nomes (ordenados) dos filhos de `dir`; pasta ausente ou ilegível dá lista vazia. */
+function children(dir: string): fs.Dirent[] {
+  try {
+    return fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * O que há na pasta de uma ferramenta, só leitura (#851): regras (arquivos com `ruleExt` em `ruleDir`, mais os
+ * `extraRules` soltos na base), skills (`<root>/skills/<nome>/SKILL.md`) e agentes (`<root>/agents/*.md`).
+ * Link simbólico que sai da pasta da ferramenta é ignorado; erro de leitura deixa o item fora da lista.
+ */
+export function listToolFolder(
+  root: string,
+  target: ExportTarget,
+  base: string,
+  opts: { ruleDir?: string; ruleExt?: string; extraRules?: string[] },
+): ListedSource[] {
+  const out: ListedSource[] = [];
+  const rootDir = path.join(base, root);
+  const add = (kind: ListedSource['kind'], rel: string): void => {
+    out.push({ kind, location: locationOf(target, rel), scope: target });
+  };
+  for (const extra of opts.extraRules ?? []) {
+    const file = path.join(base, extra);
+    try {
+      if (fs.statSync(file).isFile()) add('rule', extra);
+    } catch {
+      /* ausente */
+    }
+  }
+  if (opts.ruleDir && opts.ruleExt) {
+    for (const e of children(path.join(base, opts.ruleDir))) {
+      if (e.name.endsWith(opts.ruleExt) && inside(rootDir, path.join(base, opts.ruleDir, e.name))) add('rule', `${opts.ruleDir}/${e.name}`);
+    }
+  }
+  for (const e of children(path.join(rootDir, 'skills'))) {
+    const dir = path.join(rootDir, 'skills', e.name);
+    if (!(e.isDirectory() || e.isSymbolicLink()) || !inside(rootDir, dir)) continue;
+    if (inside(rootDir, path.join(dir, 'SKILL.md'))) add('skill', `${root}/skills/${e.name}/SKILL.md`);
+  }
+  for (const e of children(path.join(rootDir, 'agents'))) {
+    if (e.name.endsWith('.md') && inside(rootDir, path.join(rootDir, 'agents', e.name))) add('agent', `${root}/agents/${e.name}`);
+  }
+  return out;
+}
+
+/** Os caminhos dos arquivos de MCP: o do projeto fica relativo, o do usuário vira `~/…`. */
+export const mcpLocations = (target: ExportTarget, project: string[], user: string[]): string[] =>
+  (target === 'user' ? user : project).map((rel) => locationOf(target, rel));

@@ -23,6 +23,13 @@ export interface RenderedFile {
   from: string[];
 }
 
+/** Um artefato encontrado na pasta da ferramenta; `location` é a que `readSource` entende. */
+export interface ListedSource {
+  kind: 'rule' | 'skill' | 'agent' | 'mcp';
+  location: string;
+  scope: 'project' | 'user';
+}
+
 export interface ToolAdapter {
   tool: AiTool;
   root: '.claude' | '.cursor' | '.kimi-code';
@@ -36,5 +43,9 @@ export interface ToolAdapter {
   ): { files: RenderedFile[]; refused: { id: string; reason: RefuseReason }[] };
   /** a pasta da skill no destino, relativa à base, para listar os extras */
   skillDir(name: string): string;
+  /** o que há na pasta da ferramenta (só lê); `base` é a pasta do projeto ou a do usuário, conforme o destino */
+  list(target: ExportTarget, base: string): ListedSource[];
+  /** os arquivos de servidores MCP da ferramenta, como `location` sem o `#nome` */
+  mcpFiles(target: ExportTarget, base: string): string[];
   losses(source: ExportSource): FormatLoss[];
 }
