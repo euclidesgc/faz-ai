@@ -1,3 +1,4 @@
+import { isFlowSkill } from '../flowSkill';
 import { baseValue } from '../../shared/harness';
 import type { AiProfile } from '../../shared/aiProfiles';
 import { agentOfArtifact, itemOfArtifact } from '../../shared/artifacts';
@@ -291,10 +292,15 @@ export function requiredRules(s: BoardState, c: Card) {
   });
 }
 
+/** Aponta o fluxo do board em `get_card` e `get_pending_work`: quem não leu as instruções do servidor ainda o encontra. */
+export const FLOW_NOTE = 'Fluxo do board: get_skill faz-ai-fluxo (as skills faz-ai-* também vêm por get_skill).';
+
 /** Skills marcadas no campo "Skills" do card e as do agente: obrigatórias na execução. */
 export function requiredSkills(s: BoardState, c: Card) {
   // as skills do card somam às do agente
   return manifestOf(s, c).skills.map((name) => {
+    // a skill do fluxo vem do texto do board pelo get_skill; uma cópia instalada na pasta da ferramenta é ignorada
+    if (isFlowSkill(name)) return { name, scope: 'board', via: 'get_skill' };
     if (s.harness.library) {
       const copy = toolItems(s).find((i) => i.kind === 'skill' && i.name === name);
       return copy
@@ -480,6 +486,7 @@ export function cardDetail(
   const suggested = suggestModel(s, c);
   return {
     ...cardSummary(s, c),
+    flowNote: FLOW_NOTE,
     ...(chosen ? { model: { ...describeModel(s, chosen), note: MODEL_NOTE } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
     harnessNote:
@@ -488,7 +495,8 @@ export function cardDetail(
     ...(skills.length
       ? {
           requiredSkills: skills,
-          requiredSkillsNote: 'Leia o SKILL.md de cada skill em `path` antes de executar, mesmo as fora da sua lista; `files` são apoio.',
+          requiredSkillsNote:
+            'Leia o SKILL.md de cada skill em `path` antes de executar, mesmo as fora da sua lista; sem `path` (`via: "get_skill"`), leia com get_skill; `files` são apoio.',
         }
       : {}),
     ...(phase ? { phase } : {}),
@@ -592,6 +600,7 @@ export function pendingOverview(s: BoardState) {
   };
   const queue = aiQueue(s, p);
   return {
+    flowNote: FLOW_NOTE,
     forYou: {
       approved: p.ai.approved.map((c) => cardSummary(s, c)),
       unanswered: p.ai.unanswered.map((c) => ({ ...cardSummary(s, c), ...lastHuman(c) })),

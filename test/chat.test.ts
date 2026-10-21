@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { FLOW_LINE } from '../src/extension/promptContext';
 import { ChatSession, chatPrompt, parseSuggestions, suggestRulesPrompt, suggestSkillsPrompt } from '../src/extension/chat';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import type { HeadlessCommand } from '../src/extension/headless';
@@ -118,6 +119,7 @@ describe('ChatSession', () => {
     expect(spawned).toHaveLength(1);
     expect(spawned[0]!.command.command).toBe('claude');
     expect(spawned[0]!.command.stdin).toContain('Pessoa: crie um card Login');
+    expect(spawned[0]!.command.stdin).toContain(FLOW_LINE);
 
     spawned[0]!.emit('Criei o card #1 ');
     spawned[0]!.emit('"Login".\u001b[0m');
@@ -384,6 +386,7 @@ describe('Indicar artefatos', () => {
     expect(stdin).toContain('key: .claude/skills/sql/SKILL.md | nome: sql');
     expect(stdin).not.toContain('nome: web');
     expect(stdin).toContain('uma skill por assunto');
+    expect(stdin).toContain(FLOW_LINE);
     // só leitura: a permissão "board"
     expect(spawned[0]!.command.args).toContain('dontAsk');
     spawned[0]!.emit(
@@ -466,6 +469,7 @@ describe('Sugerir regras e skills com IA', () => {
     // A sugestão grava no board sem depender do arquivo nativo da ferramenta.
     expect(spawned[0]!.command.stdin).toContain('save_board_artifact');
     expect(spawned[0]!.command.stdin).toContain('AGENTS.md');
+    expect(spawned[0]!.command.stdin).toContain(FLOW_LINE);
     expect(spawned[0]!.command.args).toContain('dontAsk');
     spawned[0]!.emit('Regras escritas.');
     spawned[0]!.exit(0);
@@ -474,10 +478,15 @@ describe('Sugerir regras e skills com IA', () => {
 
     router.chatCommand({ type: 'ai.suggestSkills' });
     expect(spawned[1]!.command.stdin).toContain('create_skill');
+    expect(spawned[1]!.command.stdin).toContain(FLOW_LINE);
     spawned[1]!.emit('Skills criadas.');
     spawned[1]!.exit(0);
     expect(messages().at(-2)!.text).toContain('Sugerir skills com IA');
     expect(messages().at(-1)).toMatchObject({ role: 'assistant', text: 'Skills criadas.' });
+
+    router.chatCommand({ type: 'ai.suggestAgents' });
+    expect(spawned[2]!.command.stdin).toContain(FLOW_LINE);
+    spawned[2]!.exit(0);
   });
 
   it('com a IA ocupada, o segundo pedido é recusado', () => {

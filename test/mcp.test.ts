@@ -7,8 +7,10 @@ import { spawn } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { openInMemory } from '../src/extension/db/database';
-import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
+import { FLOW_NOTE, SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 import { FLOW_SKILLS } from '../src/extension/flowSkill';
+import { FLOW_TEXT } from './flowSkillText';
+import { skillTemplate } from '../src/extension/harness';
 import { createMcpServer, MCP_INSTRUCTIONS, startMcpServer } from '../src/extension/mcp/server';
 import { boardServerFootprint } from '../src/extension/mcp/footprint';
 import { toolDefinitions } from '../src/extension/mcp/tools';
@@ -22,7 +24,8 @@ const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 // (https://code.claude.com/docs/en/mcp, "Tool search for MCP server authors", lida em 2026-10-13): o resto a IA não lê.
 const CLAUDE_CODE_CUT = 2048;
 // teto das notas fixas do get_card de uma história autônoma com rodadas (#588): eram 2.515 caracteres numa história de teste, de 4.573 no total
-const MAX_NOTES = 1500;
+// (1.700 desde o flowNote do #645, ~90 caracteres, e a frase de `via: "get_skill"` no requiredSkillsNote)
+const MAX_NOTES = 1700;
 
 let dir: string;
 let router: MessageRouter;
@@ -139,6 +142,59 @@ describe('servidor MCP', () => {
       .filter((t) => (t.description ?? '').length > CLAUDE_CODE_CUT)
       .map((t) => `${t.name} (${t.description!.length})`);
     expect(tooLong).toEqual([]);
+  });
+
+  it('as instruções abrem pelo fluxo servido pelo get_skill e dizem como ler as requiredSkills sem path', () => {
+    expect(MCP_INSTRUCTIONS.length).toBeLessThanOrEqual(CLAUDE_CODE_CUT);
+    expect(MCP_INSTRUCTIONS).toContain('Antes de trabalhar nele, leia o fluxo com get_skill faz-ai-fluxo e siga-o.');
+    expect(MCP_INSTRUCTIONS).toContain('sem `path`, por get_skill');
+  });
+
+  it('get_pending_work e get_card trazem o flowNote numa linha, e o requiredSkills do fluxo vem sem path', async () => {
+    for (const data of [(await call('get_pending_work')).data, (await call('create_card', { title: 'História' })).data]) {
+      expect(data.flowNote).toBe(FLOW_NOTE);
+      expect(data.flowNote).toContain('get_skill');
+      expect(data.flowNote).toContain('faz-ai-fluxo');
+      expect(data.flowNote).not.toContain('\n');
+    }
+    // uma cópia instalada na pasta da ferramenta é ignorada: a skill do fluxo vem sempre pelo get_skill
+    const installed = path.join(dir, '.claude', 'skills', 'faz-ai-fluxo');
+    fs.mkdirSync(installed, { recursive: true });
+    fs.writeFileSync(path.join(installed, 'SKILL.md'), '---\nname: faz-ai-fluxo\ndescription: cópia\n---\ntexto');
+    router.refreshHarness();
+    await call('create_skill', { name: 'testar', description: 'Use ao testar', content: 'passos' });
+    await call('create_agent', { name: 'condutor', description: 'Conduz', content: 'Instruções', skills: ['faz-ai-fluxo', 'testar'] });
+    router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'condutor' } } });
+    const card = (await call('get_card', { card: 1 })).data;
+    expect(card.requiredSkills[0]).toEqual({ name: 'faz-ai-fluxo', scope: 'board', via: 'get_skill' });
+    expect(card.requiredSkillsNote).toContain('sem `path` (`via: "get_skill"`), leia com get_skill');
+    // a skill comum mantém o caminho
+    expect(card.requiredSkills[1]).toMatchObject({ name: 'testar' });
+    expect(card.requiredSkills[1].path).toBeDefined();
+    expect(card.requiredSkills[1].via).toBeUndefined();
+  });
+
+  it('nenhum texto que a IA lê cita ferramenta de IA nem a pasta dela', async () => {
+    const tools = (await client.listTools()).tools;
+    const texts: string[] = [MCP_INSTRUCTIONS, FLOW_TEXT];
+    for (const t of tools) {
+      texts.push(t.description ?? '');
+      for (const prop of Object.values((t.inputSchema.properties ?? {}) as Record<string, { description?: string }>))
+        texts.push(prop.description ?? '');
+    }
+    const notes = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value.flatMap(notes)
+        : value && typeof value === 'object'
+          ? Object.entries(value).flatMap(([k, v]) => (/note$/i.test(k) && typeof v === 'string' ? [v] : notes(v)))
+          : [];
+    await call('create_agent', { name: 'condutor', description: 'Conduz', content: 'Instruções', skills: ['faz-ai-fluxo'] });
+    router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'condutor' } } });
+    const card = (await call('create_card', { title: 'História' })).data;
+    texts.push(...notes(card), ...notes((await call('get_card', { card: 1 })).data), ...notes((await call('get_pending_work')).data));
+    expect(texts.length).toBeGreaterThan(20);
+    const found = texts.filter((x) => /Claude Code|Cursor|Kimi|\.claude\/|\.cursor\/|\.kimi-code\/|Agent tool/.test(x));
+    expect(found).toEqual([]);
   });
 
   it('o que não cabe nas instruções está na descrição da ferramenta em que a IA precisa dele', async () => {
@@ -1239,6 +1295,32 @@ describe('status do card e checkpoint de revisão', () => {
     // só com replace a versão da pessoa é trocada
     expect((await call('install_flow_skill', { replace: true })).data).toMatchObject({ note: 'Skill substituída.' });
     expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
+  });
+
+  it('get_skill serve o fluxo e as skills por assunto do próprio board, sem arquivo instalado', async () => {
+    for (const k of FLOW_SKILLS) {
+      expect((await call('get_skill', { skill: k.name })).text).toBe(skillTemplate(k.name, k.description, k.body));
+    }
+    expect(fs.existsSync(path.join(dir, 'home-do-usuario', '.claude', 'skills'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, '.claude', 'skills'))).toBe(false);
+  });
+
+  it('get_skill devolve o texto do board mesmo com uma faz-ai-fluxo diferente na pasta de skills do projeto', async () => {
+    const dirOf = path.join(dir, '.claude', 'skills', 'faz-ai-fluxo');
+    fs.mkdirSync(dirOf, { recursive: true });
+    fs.writeFileSync(path.join(dirOf, 'SKILL.md'), '---\nname: faz-ai-fluxo\ndescription: do projeto\n---\ntexto do projeto');
+    router.refreshHarness();
+    const text = (await call('get_skill', { skill: 'faz-ai-fluxo' })).text;
+    expect(text).toContain('get_pending_work');
+    expect(text).not.toContain('texto do projeto');
+  });
+
+  it('get_skill lê do arquivo a skill comum e não trata faz-ai-deploy, do projeto, como do fluxo', async () => {
+    await call('create_skill', { name: 'faz-ai-deploy', description: 'Use ao publicar', content: 'passos do deploy' });
+    const text = (await call('get_skill', { skill: 'faz-ai-deploy' })).text;
+    expect(text).toContain('name: faz-ai-deploy');
+    expect(text).toContain('passos do deploy');
+    expect((await call('get_skill', { skill: 'nao-existe' })).error).toBe(true);
   });
 
   it('a skill do fluxo que já estava no disco, sem marcação, fica marcada em todo contexto ao "instalar" de novo', async () => {

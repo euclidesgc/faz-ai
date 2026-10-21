@@ -3,6 +3,8 @@ import { EXEC_ENFORCEMENT, manifestOf, withBoardTools, type ExecManifest } from 
 import type { AiTool } from '../shared/harness';
 import { selectedMcpNames } from '../shared/harnessSelection';
 import type { BoardState, Card } from '../shared/model';
+import { isFlowSkill } from './flowSkill';
+import { alwaysRefs } from './promptContext';
 
 /** Nome do servidor MCP do board, como registrado em cada ferramenta. */
 export const BOARD_SERVER = 'faz-ai';
@@ -139,7 +141,8 @@ export function executionPlan(
       mcpConfig = JSON.stringify({ mcpServers: Object.fromEntries([BOARD_SERVER, ...allowed].map((n) => [n, defs[n]])) });
   }
 
-  // o agente inline só no Claude Code, e só quando cabe na linha de comando; senão vai como texto
+  // o agente inline só na CLI que o aceita (perfil), e só quando cabe na linha de comando; senão vai como texto
+  const inline = how.agent === 'enforced';
   let agentDefinition: AgentDefinition | null = null;
   // a sessão de uma história leva os outros agentes do board como subagentes, para delegar as
   // sub-tarefas (é ela que as executa; a sub-tarefa nunca roda sozinha). Com isso a sessão fica com
@@ -147,7 +150,7 @@ export function executionPlan(
   // subagentes, e o que ele próprio pode usar vai na definição inline
   let delegates: AgentDefinition[] = [];
   let sessionTools = manifest.tools;
-  if (manifest.agent && tool === 'claude') {
+  if (manifest.agent && inline) {
     const def: AgentDefinition = { name: manifest.agent, description: manifest.purpose || manifest.agent, prompt: manifest.instructions };
     const size = (list: AgentDefinition[]) => JSON.stringify(Object.fromEntries(list.map(({ name, ...d }) => [name, d]))).length;
     if (manifest.delegates.length) {
@@ -176,13 +179,13 @@ export function executionPlan(
 
   const advice: string[] = [];
   // a história cujos subagentes não couberam na linha de comando: a sessão faz as sub-tarefas ela mesma
-  if (manifest.delegates.length && !delegates.length && tool === 'claude') {
+  if (manifest.delegates.length && !delegates.length && inline) {
     sessionTools = [];
     advice.push(
       'Os agentes especialistas do board não couberam nesta execução: faça você o trabalho das sub-tarefas, com as ferramentas da sessão, seguindo as instruções de cada card.',
     );
   }
-  if (manifest.agent && (how.agent === 'advised' || (tool === 'claude' && !agentDefinition))) advice.push(...agentAdvice(manifest));
+  if (manifest.agent && (how.agent === 'advised' || (inline && !agentDefinition))) advice.push(...agentAdvice(manifest));
   if (s.harness.library && allowed.length)
     advice.push(
       `MCPs da biblioteca: use list_board_mcp_tools e call_board_mcp_tool do servidor faz-ai, com server e card #${c.number}. Disponíveis: ${allowed.join(', ')}.`,
@@ -197,11 +200,17 @@ export function executionPlan(
       'Use só as rules, as skills e as instruções indicadas neste pedido; ignore instruções, skills e agentes carregados por conta própria.',
     );
 
-  const mark = (aspect: keyof typeof how) => (how[aspect] === 'enforced' ? 'imposto' : 'orientado');
+  // a origem de cada item: a CLI impõe por parâmetro ou o pedido orienta
+  const mark = (aspect: keyof typeof how) => (how[aspect] === 'enforced' ? 'imposto pela CLI' : 'pelo pedido');
+  const always = alwaysRefs(s).map((r) => `${r.kind} ${r.name}`);
+  const flow = [...new Set(['faz-ai-fluxo', ...manifest.skills.filter(isFlowSkill)])];
+  const cardSkills = manifest.skills.filter((k) => !isFlowSkill(k));
   const summary = [
     `Agente do board: ${manifest.profile ?? 'nenhum'}${manifest.agent ? ` (${agentDefinition ? 'inline' : mark('agent')})` : ''}`,
-    ...(manifest.skills.length ? [`Skills: ${manifest.skills.join(', ')} (pelo caminho do arquivo)`] : []),
-    ...(manifest.rules.length ? [`Rules: ${manifest.rules.join(', ')} (pelo caminho do arquivo)`] : []),
+    `Fluxo do board: ${flow.join(', ')} (pelo MCP)`,
+    ...(always.length ? [`Contexto fixo: ${always.join(', ')} (pelo pedido)`] : []),
+    ...(cardSkills.length ? [`Skills: ${cardSkills.join(', ')} (pelo pedido)`] : []),
+    ...(manifest.rules.length ? [`Rules: ${manifest.rules.join(', ')} (pelo pedido)`] : []),
     `Servidores MCP: ${[BOARD_SERVER, ...allowed].join(', ')} (${mark('mcp')})`,
     ...(delegates.length
       ? [
@@ -220,7 +229,7 @@ export function executionPlan(
     manifest,
     input: {
       // no Claude Code o agente vai inline (`--agents`) e é escolhido por `--agent`; nas demais só o nome
-      agent: tool === 'claude' && !agentDefinition ? '' : manifest.agent,
+      agent: inline && !agentDefinition ? '' : manifest.agent,
       agentDefinition,
       delegates,
       mcpAllowed: allowed,
