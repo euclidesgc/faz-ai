@@ -15,6 +15,8 @@ const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'attachment.read',
   'harness.artifact.read',
   'harness.project.profile',
+  'harness.export.plan',
+  'harness.export.apply',
   'harness.agent.assist',
   'metrics.query',
   'card.usage.query',
@@ -326,6 +328,25 @@ export class HostBridge {
             requestId: msg.requestId,
             error: e instanceof Error ? e.message : String(e),
           });
+        }
+        return;
+      case 'harness.export.plan':
+        // exportar não muda o board: o erro vai na própria resposta
+        try {
+          this.post({ type: 'harness.export.planResult', requestId: msg.requestId, plan: this.router.exportPlan(msg.tool, msg.target) });
+        } catch (e) {
+          this.post({ type: 'harness.export.planResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      case 'harness.export.apply':
+        try {
+          this.post({
+            type: 'harness.export.applyResult',
+            requestId: msg.requestId,
+            result: this.router.exportApply(msg.tool, msg.target, msg.ids, msg.replace),
+          });
+        } catch (e) {
+          this.post({ type: 'harness.export.applyResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
         }
         return;
       case 'ai.heartbeat.run': {

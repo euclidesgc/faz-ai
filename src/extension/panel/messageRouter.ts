@@ -5,7 +5,10 @@ import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssi
 import { scanLibraryFolder } from '../libraryImport';
 import { agentOfArtifact, type ArtifactKind } from '../../shared/artifacts';
 import type { ImportSource } from '../../shared/artifactImport';
+import * as os from 'node:os';
 import * as path from 'node:path';
+import { ToolExporter } from '../toolExport';
+import type { ExportPlan, ExportResult, ExportTarget } from '../../shared/toolExport';
 import type { BoardRequirement } from '../../shared/requirements';
 import type { EnvironmentReport } from '../../shared/environment';
 import { EMPTY_ORPHANS, type OrphanReport } from '../../shared/orphans';
@@ -127,6 +130,8 @@ const bridgeOnly = {
   'card.workspace.open': viaBridge,
   'harness.refresh': viaBridge,
   'harness.project.profile': viaBridge,
+  'harness.export.plan': viaBridge,
+  'harness.export.apply': viaBridge,
   'harness.agent.assist': viaBridge,
   'harness.import.pick': viaBridge,
   'harness.import.scan': viaBridge,
@@ -678,6 +683,26 @@ export class MessageRouter {
 
   projectProfile(): ProjectProfile {
     return readProjectProfile(this.ctx.opts.workspaceDir ?? '');
+  }
+
+  /** Prévia do "Exportar para a ferramenta": só lê o board e o disco. */
+  exportPlan(tool: AiTool, target: ExportTarget): ExportPlan {
+    return this.exporter().plan(tool, target);
+  }
+
+  /** Grava os artefatos escolhidos na pasta da ferramenta; o board não muda. */
+  exportApply(tool: AiTool, target: ExportTarget, ids: string[], replace: boolean): ExportResult {
+    return this.exporter().apply(tool, target, ids, replace);
+  }
+
+  private exporter(): ToolExporter {
+    const defaultAgent = this.ctx.boards.snapshot(this.ctx.boardId, this.ctx.opts.author).board.runner.defaultAgent;
+    return new ToolExporter(
+      this.ctx.library.repo,
+      this.ctx.boardId,
+      { projectDir: this.ctx.opts.workspaceDir || undefined, homeDir: os.homedir() },
+      defaultAgent,
+    );
   }
 
   private notify(): void {
