@@ -41,13 +41,13 @@ export const MCP_INSTRUCTIONS =
   'Ao começar um card chame start_work e siga `phase` do get_card. Nas colunas com `requiresApproval`, ao terminar o trabalho da fase chame request_review e PARE: ' +
   'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +
   'get_card devolve em `model` o modelo e o esforço que devem executar o card: se forem diferentes dos seus, delegue o trabalho a um subagente com essa configuração; ' +
-  'se não for possível, avise a pessoa em vez de executar com outra. ' +
+  'senão, avise a pessoa em vez de executar com outra. ' +
   'Antes de executar, leia os arquivos de `requiredRules` e `requiredSkills` do get_card, mesmo os que não estão na sua lista de skills. ' +
   'Toda conversa com a pessoa sobre um card acontece na conversa do card (add_comment, request_review, ask_question); registre ali decisões e resultados. ' +
   'Faltou informação: ask_question. Impedimento que você não resolve: block_card. ' +
   'Ficou algo dependendo da pessoa (decisão, dado, ponto em aberto que ela precisa avaliar)? Não registre só num comentário: entregue com request_review e `pending`, e o card fica com ela. No modo autônomo nada disso segura o card: decida você, registre e siga. ' +
   'Pull request: sempre com --base em workspace.prBase do get_card. ' +
-  'Uso, tokens e tempo: get_metrics. Rules, skills e agentes do projeto: get_harness. Modelos e regras de sugestão: get_models. ' +
+  'Uso, tokens e tempo: get_metrics. Rules, skills, agentes e servidores MCP do board: get_harness. Modelos e regras de sugestão: get_models. ' +
   'O detalhe vem onde você precisa: na descrição de cada ferramenta, nas notas do get_card e na skill faz-ai-fluxo.';
 
 /** Cria um servidor MCP (uma sessão) com as ferramentas do board. */

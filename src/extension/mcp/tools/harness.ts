@@ -1,48 +1,43 @@
 import { z } from 'zod';
-import { ALL_AI_BASES, RULE_FILES, type AiTool, type InstallScope } from '../../../shared/harness';
+import { RULE_NAME_PATTERN } from '../../../shared/artifactImport';
+import { skillDocument } from '../../../shared/artifacts';
+import { ALL_AI_BASES, type AiTool } from '../../../shared/harness';
 import { SELECTABLE_KINDS, toolItemsOf, selectionKey, type HarnessUsage, type SelectableKind } from '../../../shared/harnessSelection';
 import { FLOW_SKILL } from '../../flowSkill';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { harnessOverview } from '../format';
 import type { DefineTool } from './registry';
 
-const ruleArg = z.enum(RULE_FILES.map((r) => r.name) as [string, ...string[]]).describe('Arquivo de regras na raiz do projeto');
+const ruleArg = z
+  .string()
+  .describe('Nome da regra no board, em texto livre: letras minúsculas, números e hífens, com .md opcional (ex.: "convencoes")');
 const skillArg = z.string().describe('Nome da skill (nome da pasta), ex.: "revisar-spec"');
 const agentArg = z.string().describe('Nome do agente (nome do arquivo, sem a extensão), ex.: "revisor-de-spec"');
 
 const harness = (router: MessageRouter) => harnessOverview(router.snapshot());
-const agentScopeArg = z
-  .enum(['user', 'project'])
-  .optional()
-  .describe('Só para um agente que existe apenas na pasta da ferramenta: "user" (pasta do usuário) ou "project"; o agente do board ignora');
+const agentScopeArg = z.enum(['user', 'project']).optional().describe('Aceito por compatibilidade e ignorado: o agente fica no board');
 const listArg = (what: string) => z.array(z.string()).optional().describe(what);
 
-/** Skill do projeto pelo nome; lança se não existir. */
-const skill = (router: MessageRouter, name: string) => {
-  const k = router.snapshot().harness.skills.find((x) => x.name === name);
-  if (!k) throw new Error(`Skill "${name}" não encontrada.`);
-  return k;
+type BoardKind = 'rule' | 'skill' | 'agent';
+const KIND_LABEL: Record<BoardKind, string> = { rule: 'Regra', skill: 'Skill', agent: 'Agente' };
+
+/** O item do board (a cópia guardada no banco) com esse nome; lança se não existir. */
+const boardItem = (router: MessageRouter, kind: BoardKind, name: string) => {
+  const item = toolItemsOf(router.snapshot()).find(
+    (i) => i.boardArtifactId && i.kind === (kind === 'rule' ? 'instructions' : kind) && i.name === name,
+  );
+  if (!item) throw new Error(`${KIND_LABEL[kind]} "${name}" não está no board.`);
+  return item;
 };
 
-/** O agente guardado no board com esse nome, se houver: é nele que as ferramentas de agente agem. */
-const boardAgent = (router: MessageRouter, name: string) =>
-  router.snapshot().harness.library?.artifacts.find((x) => x.kind === 'agent' && x.name === name && !x.missing);
+/** O texto de uma regra ou skill do board, da cópia de leitura (numa execução gerenciada, a do snapshot dela). */
+const readBoard = (router: MessageRouter, kind: 'rule' | 'skill', name: string): string =>
+  router.readHarnessFile(boardItem(router, kind, name).path).content;
 
-/** Agente só da pasta da ferramenta, pelo nome (e escopo, quando informado); lança com a lista dos existentes. */
-const agent = (router: MessageRouter, name: string, scope?: InstallScope) => {
-  const all = router.snapshot().harness.agents.filter((x) => x.name === name && (!scope || x.scope === scope));
-  // com o mesmo nome nos dois escopos, vale o do projeto (como na execução)
-  const found = all.find((x) => x.scope === 'project') ?? all[0];
-  if (!found)
-    throw new Error(
-      `Agente "${name}" não encontrado. Existentes: ${
-        router
-          .snapshot()
-          .harness.agents.map((x) => `"${x.name}"`)
-          .join(', ') || 'nenhum'
-      }.`,
-    );
-  return found;
+/** O modo de uma regra, skill ou agente do board: a resposta de quem pede para desligar, ligar ou tirar. */
+const setUsage = (router: MessageRouter, kind: BoardKind, name: string, usage: HarnessUsage | null) => {
+  const item = boardItem(router, kind, name);
+  router.handle({ type: 'harness.selection.set', items: [{ kind: item.kind as SelectableKind, location: selectionKey(item) }], usage });
 };
 
 /** Harness do projeto: ferramenta de IA, arquivos de regras, skills e agentes. */
@@ -51,12 +46,14 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'get_harness',
-    'O banco de artefatos do board: a ferramenta em uso, o agente padrão e, com o modo (`usage`), as rules, skills, agentes e servidores MCP enviados ao board em Configurações → Harness. Toda execução parte de contexto vazio: o que não está no board não existe para ela. Com onlySelected = false, lista tudo que a ferramenta carrega nesta máquina (projeto, pasta do usuário, plugins e pastas importadas), esteja no board ou não.',
+    'O banco de artefatos do board: a ferramenta em uso, o agente padrão e, com o modo (`usage`), as rules, skills, agentes e servidores MCP que estão no board (Configurações → Harness). Toda execução parte de contexto vazio: o que não está no board não existe para ela. Com onlySelected = false, lista o que dá para importar: o que a ferramenta em uso carrega nesta máquina (projeto, pasta do usuário, plugins e pastas importadas) e ainda não está no board, com a `key` para set_harness_selection.',
     {
       onlySelected: z
         .boolean()
         .optional()
-        .describe('Padrão true: só o marcado. false: tudo que a ferramenta carrega, com a marcação de cada item'),
+        .describe(
+          'Padrão true: o que está no board. false: o que dá para importar (a ferramenta em uso, fora do board), com a `key` de cada item',
+        ),
     },
     (a, router) => harnessOverview(router.snapshot(), a.onlySelected ?? true),
     true,
@@ -64,7 +61,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'set_harness_selection',
-    'Envia rules, skills, agentes e servidores MCP ao board, muda o modo deles ou os tira do board. "always" (Sempre): entra em toda execução; "contextual" (Pelo card): disponível para indicar no card (campos Rules, Skills e MCPs) ou escolher como agente; "off" (Desligado): fica no board sem entrar em nada (é como as regras entram, para revisão); null: tira do board. Identifique o item por `location`, como get_harness o mostra; um agente, uma skill ou um servidor MCP também pelo nome.',
+    'Importa rules, skills, agentes e servidores MCP da ferramenta em uso para o board, muda o modo dos que já estão nele ou os tira do board (o agente padrão e a skill do fluxo não saem). "always" (Sempre): entra em toda execução; "contextual" (Pelo card): disponível para indicar no card (campos Rules, Skills e MCPs) ou escolher como agente; "off" (Desligado): fica no board sem entrar em nada (é como as regras entram, para revisão); null: tira do board. Identifique o item por `location`, como get_harness (com onlySelected = false) o mostra; um agente, uma skill ou um servidor MCP também pelo nome.',
     {
       items: z
         .array(
@@ -85,7 +82,7 @@ export function registerHarnessTools(tool: DefineTool): void {
         const found = items.find(
           (x) => x.kind === i.kind && (i.location ? selectionKey(x) === i.location || x.location === i.location : x.name === i.name),
         );
-        if (!found) throw new Error(`Item ${i.kind} "${i.location ?? i.name ?? ''}" não encontrado no harness da ferramenta em uso.`);
+        if (!found) throw new Error(`Item ${i.kind} "${i.location ?? i.name ?? ''}" não encontrado no board nem na ferramenta em uso.`);
         return { kind: i.kind, location: selectionKey(found) };
       });
       router.handle({ type: 'harness.selection.set', items: resolved, usage: a.usage as HarnessUsage | null });
@@ -95,7 +92,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'set_ai_tool',
-    'Define a ferramenta de IA com que o projeto trabalha (uma por vez). Isso troca a pasta de skills (.claude/skills ou .cursor/skills), o arquivo de regras, os modelos e as regras de esforço.',
+    'Define a ferramenta de IA com que o projeto trabalha (uma por vez). Isso troca os modelos, as regras de esforço e o que dá para importar (get_harness com onlySelected = false); o que já está no board não muda.',
     { tool: z.enum(ALL_AI_BASES as [string, ...string[]]) },
     (a, router) => {
       router.handle({ type: 'settings.board.update', patch: { aiTool: a.tool as AiTool } });
@@ -103,59 +100,49 @@ export function registerHarnessTools(tool: DefineTool): void {
     },
   );
 
-  tool(
-    'read_rule_file',
-    'Lê um arquivo de regras do projeto.',
-    { file: ruleArg },
-    (a, router) => {
-      if (router.mcpAccess()) {
-        const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'instructions' && i.boardArtifactId && i.name === a.file);
-        if (!copy) throw new Error('Arquivo fora do snapshot desta execução.');
-        return router.readHarnessFile(copy.path).content;
-      }
-      const r = router.snapshot().harness.rules.find((x) => x.name === a.file);
-      if (!r?.exists) throw new Error(`${a.file} não existe neste projeto.`);
-      return r.content;
-    },
-    true,
-  );
+  tool('read_rule_file', 'Lê uma regra do board pelo nome.', { file: ruleArg }, (a, router) => readBoard(router, 'rule', a.file), true);
 
   tool(
     'write_rule_file',
-    'Cria ou substitui por inteiro um arquivo de regras do projeto.',
-    { file: ruleArg, content: z.string() },
+    'Cria ou substitui por inteiro uma regra do board. Uma regra nova nasce em "Desligado" (fica no board para a pessoa revisar e ligar em Configurações → Harness); uma que já existe troca o texto e mantém o modo. Nada é gravado no projeto nem na pasta da ferramenta.',
+    { file: ruleArg.regex(RULE_NAME_PATTERN, 'Nome de regra inválido'), content: z.string() },
     (a, router) => {
-      router.handle({ type: 'harness.rule.write', name: a.file, content: a.content });
+      router.handle({ type: 'harness.artifact.save', kind: 'rule', name: a.file, body: a.content, via: 'ai' });
       return harness(router);
     },
   );
 
-  tool('delete_rule_file', 'Apaga um arquivo de regras do projeto. Não pode ser desfeito pelo board.', { file: ruleArg }, (a, router) => {
-    router.handle({ type: 'harness.rule.delete', name: a.file });
+  tool('delete_rule_file', 'Tira uma regra do board. Não pode ser desfeito pelo board.', { file: ruleArg }, (a, router) => {
+    setUsage(router, 'rule', a.file, null);
     return harness(router);
   });
 
   tool(
     'get_skill',
-    'Lê o SKILL.md completo da cópia do board; se ainda não foi adicionada, lê a skill do projeto.',
+    'Lê o SKILL.md completo da skill do board.',
     { skill: skillArg },
-    (a, router) => {
-      const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'skill' && i.boardArtifactId && i.name === a.skill);
-      return copy ? router.readHarnessFile(copy.path).content : skill(router, a.skill).content;
-    },
+    (a, router) => readBoard(router, 'skill', a.skill),
     true,
   );
 
   tool(
     'create_skill',
-    'Cria uma skill no projeto, na pasta de skills da ferramenta de IA em uso. Ela passa a ser uma opção do campo "Skills" dos cards.',
+    'Cria uma skill no board, direto no banco (nada vai para a pasta da ferramenta de IA). Ela nasce em "Pelo card" e passa a ser uma opção do campo "Skills" dos cards.',
     {
       name: z.string().describe('Letras minúsculas, números e hífens'),
       description: z.string().min(1).describe('Quando a skill deve ser usada; é por ela que a IA decide invocá-la'),
       content: z.string().describe('Instruções da skill em markdown (sem o frontmatter)'),
     },
     (a, router) => {
-      router.handle({ type: 'harness.skill.create', name: a.name, description: a.description, content: a.content });
+      if (router.snapshot().harness.library?.artifacts.some((x) => x.kind === 'skill' && x.name === a.name))
+        throw new Error(`Já existe uma skill "${a.name}" no board. Use update_skill para alterá-la.`);
+      router.handle({
+        type: 'harness.artifact.save',
+        kind: 'skill',
+        name: a.name,
+        body: skillDocument(`\n${a.content}`, a.name, a.description),
+        via: 'ai',
+      });
       return harness(router);
     },
   );
@@ -191,52 +178,49 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'update_skill',
-    'Substitui o SKILL.md inteiro da cópia do board, incluindo o frontmatter (name, description). Sem cópia no board, altera a skill do projeto.',
+    'Substitui o SKILL.md inteiro da skill do board, incluindo o frontmatter (name, description). Os arquivos de apoio e o modo ficam como estão.',
     { skill: skillArg, content: z.string().min(1) },
     (a, router) => {
-      const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'skill' && i.boardArtifactId && i.name === a.skill);
-      if (copy) {
-        router.writeHarnessFile(copy.path, a.content);
-        return harness(router);
-      }
-      skill(router, a.skill);
-      router.handle({ type: 'harness.skill.write', name: a.skill, content: a.content });
+      boardItem(router, 'skill', a.skill);
+      router.handle({ type: 'harness.artifact.save', kind: 'skill', name: a.skill, body: a.content, via: 'ai' });
       return harness(router);
     },
   );
 
   tool(
     'set_skill_enabled',
-    'Liga ou desliga uma skill. Desligada, ela sai da pasta que as ferramentas de IA leem (economiza contexto) mas o conteúdo é preservado.',
+    'Atalho do modo de uma skill do board. enabled = false leva a "Desligado" (continua no board, sem entrar em nada). enabled = true leva a "Pelo card" se ela estava desligada; se já estava ligada ("Sempre" ou "Pelo card"), não muda nada.',
     { skill: skillArg, enabled: z.boolean() },
     (a, router) => {
-      skill(router, a.skill);
-      router.handle({ type: 'harness.skill.setEnabled', name: a.skill, enabled: a.enabled });
+      const current = router.snapshot().harness.library?.artifacts.find((x) => x.kind === 'skill' && x.name === a.skill);
+      if (!current) throw new Error(`Skill "${a.skill}" não está no board.`);
+      if (!a.enabled) setUsage(router, 'skill', a.skill, 'off');
+      else if (current.usage === 'off') setUsage(router, 'skill', a.skill, 'contextual');
       return harness(router);
     },
   );
 
   tool(
     'delete_skill',
-    'Apaga uma skill do projeto, com todos os arquivos da pasta. Não pode ser desfeito pelo board.',
+    'Tira uma skill do board, com todos os arquivos de apoio. Não pode ser desfeito pelo board. A skill do fluxo não sai: só o modo dela muda.',
     { skill: skillArg },
     (a, router) => {
-      skill(router, a.skill);
-      router.handle({ type: 'harness.skill.delete', name: a.skill });
+      setUsage(router, 'skill', a.skill, null);
       return harness(router);
     },
   );
 
   tool(
     'write_skill_file',
-    'Grava um arquivo de apoio na cópia da skill do board (ou no projeto se ainda não foi adicionada): um modelo de classe ou exemplo de código em `references/`, um modelo de arquivo em `assets/` ou um script em `scripts/`. Substitui o arquivo se ele já existir. Para a IA ler o arquivo quando usar a skill, o SKILL.md precisa apontar para ele (use update_skill).',
+    'Grava um arquivo de apoio na skill do board: um modelo de classe ou exemplo de código em `references/`, um modelo de arquivo em `assets/` ou um script em `scripts/`. Substitui o arquivo se ele já existir; vale o limite de 512 KB por arquivo, 100 arquivos e 5 MB por skill. Para a IA ler o arquivo quando usar a skill, o SKILL.md precisa apontar para ele (use update_skill).',
     {
-      skill: z.string().describe('Nome da skill do projeto'),
+      skill: z.string().describe('Nome da skill do board'),
       file: z.string().describe('Caminho dentro da pasta da skill, ex.: "references/modelo-de-repositorio.ts"'),
       content: z.string(),
     },
     (a, router) => {
-      router.writeSkillFile(a.skill, a.file, a.content);
+      boardItem(router, 'skill', a.skill);
+      router.handle({ type: 'harness.skillFile.write', skill: a.skill, file: a.file, content: a.content });
       return harnessOverview(router.snapshot()).inventory.find((i) => i.kind === 'skill' && i.name === a.skill);
     },
   );
@@ -245,12 +229,9 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'get_agent',
-    'Lê um agente do board (listado em get_harness): o arquivo da cópia guardada no board, com o frontmatter. Um agente que só existe na pasta da ferramenta (fora do board) é lido de lá; `scope` escolhe entre o do projeto e o da pasta do usuário.',
-    { agent: agentArg, scope: agentScopeArg },
-    (a, router) => {
-      const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'agent' && i.boardArtifactId && i.name === a.agent);
-      return copy ? router.readHarnessFile(copy.path).content : agent(router, a.agent, a.scope as InstallScope | undefined).content;
-    },
+    'Lê um agente do board (listado em get_harness): o arquivo da cópia guardada no board, com o frontmatter.',
+    { agent: agentArg },
+    (a, router) => router.readHarnessFile(boardItem(router, 'agent', a.agent).path).content,
     true,
   );
 
@@ -276,7 +257,6 @@ export function registerHarnessTools(tool: DefineTool): void {
     (a, router) => {
       router.handle({
         type: 'harness.agent.create',
-        scope: a.scope as InstallScope | undefined,
         input: {
           name: a.name,
           description: a.description,
@@ -312,15 +292,13 @@ export function registerHarnessTools(tool: DefineTool): void {
       background: z.boolean().optional().describe('Só no Cursor: roda em segundo plano'),
     },
     (a, router) => {
-      const found = boardAgent(router, a.agent)
-        ? { name: a.agent, scope: 'user' as const }
-        : agent(router, a.agent, a.scope as InstallScope | undefined);
-      if (a.content) router.handle({ type: 'harness.agent.write', name: found.name, scope: found.scope, content: a.content });
+      boardItem(router, 'agent', a.agent);
+      if (a.content) router.handle({ type: 'harness.agent.write', name: a.agent, scope: 'user', content: a.content });
       else
         router.handle({
           type: 'harness.agent.update',
-          name: found.name,
-          scope: found.scope,
+          name: a.agent,
+          scope: 'user',
           patch: {
             ...(a.description !== undefined ? { description: a.description } : {}),
             ...(a.model !== undefined ? { model: a.model } : {}),
@@ -339,13 +317,11 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'delete_agent',
-    'Tira um agente do board; o arquivo de origem de um agente copiado não é apagado. Um agente que só existe na pasta da ferramenta (fora do board) tem o arquivo apagado. Não pode ser desfeito pelo board.',
+    'Tira um agente do board; o arquivo de origem de um agente copiado não é apagado. Não pode ser desfeito pelo board. O agente padrão não sai: escolha outro antes.',
     { agent: agentArg, scope: agentScopeArg },
     (a, router) => {
-      const found = boardAgent(router, a.agent)
-        ? { name: a.agent, scope: 'user' as const }
-        : agent(router, a.agent, a.scope as InstallScope | undefined);
-      router.handle({ type: 'harness.agent.delete', name: found.name, scope: found.scope });
+      boardItem(router, 'agent', a.agent);
+      router.handle({ type: 'harness.agent.delete', name: a.agent, scope: 'user' });
       return harness(router);
     },
   );

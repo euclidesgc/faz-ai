@@ -428,7 +428,13 @@ export class BoardLibrary {
   }
 
   saveMcp(name: string, server: McpServerInput, opts: { previous?: string; keepSecrets: string[] }): void {
-    const existing = this.target('mcp', name, opts.previous, MCP_NAME_PATTERN, 'Nome inválido: use letras, números, hífen, ponto ou sublinhado.');
+    const existing = this.target(
+      'mcp',
+      name,
+      opts.previous,
+      MCP_NAME_PATTERN,
+      'Nome inválido: use letras, números, hífen, ponto ou sublinhado.',
+    );
     if (name === 'faz-ai') throw new Error('O nome faz-ai é reservado ao MCP do board.');
     const saved = existing ? this.repo.mcpServer(this.ctx.boardId, existing.id) : undefined;
     const keep = (values: Record<string, string> | undefined, old: unknown): Record<string, string> => {
@@ -472,7 +478,8 @@ export class BoardLibrary {
   private skillWithFiles(skill: string) {
     const a = this.repo.get(this.ctx.boardId, 'skill', skill);
     if (!a) throw new Error(`Skill "${skill}" não está no board.`);
-    if ((a.meta as { generated?: unknown }).generated === true) throw new Error('A skill do fluxo é da extensão: só o modo dela pode mudar.');
+    if ((a.meta as { generated?: unknown }).generated === true)
+      throw new Error('A skill do fluxo é da extensão: só o modo dela pode mudar.');
     return { a, draft: this.draftOf(a) };
   }
 
@@ -667,6 +674,7 @@ export class BoardLibrary {
   deleteAgent(name: string): void {
     const existing = this.repo.get(this.ctx.boardId, 'agent', name);
     if (!existing) throw new Error(`Agente "${name}" não está no board.`);
+    if (name === this.ctx.state().board.runner.defaultAgent) throw new Error('Escolha outro agente padrão antes de apagar este.');
     this.repo.remove(this.ctx.boardId, existing.id);
   }
 
