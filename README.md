@@ -172,7 +172,13 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
    vez, e **Mostrar mais** traz os seguintes. Clicar numa história arquivada a seleciona: a linha de
    Sub-tarefas passa a mostrar só as sub-tarefas arquivadas dela, mesmo as que não batem no filtro.
    Clicar de novo, ou em **Limpar seleção**, desfaz a seleção. Abrir o card continua listando todas
-   as sub-tarefas.
+   as sub-tarefas. Para agir sobre vários de uma vez, marque os cards arquivados que quiser:
+   **Selecionar todos os visíveis** marca só os que os filtros mostram. **Restaurar** em massa segue
+   a mesma regra do individual (uma história volta com as sub-tarefas arquivadas dela, e uma
+   sub-tarefa cuja história está arquivada traz a história inteira), e **Enviar para a lixeira** em
+   massa leva junto as sub-tarefas arquivadas de cada história. Toda ação em massa pede confirmação,
+   dizendo quantos cards serão afetados e o que vai junto. Excluir definitivamente continua só pela
+   Lixeira.
 
 Nada acontece em silêncio: toda ação que vai ao board espera a confirmação e mostra que está
 trabalhando. Uma barra fina no topo acende enquanto qualquer pedido está em andamento; o card que
