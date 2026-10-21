@@ -842,4 +842,77 @@ export const harness: Record<string, string> = {
     'No agent on the board: every run has the full scope. Create one, use the ready suggestions or import.',
   'Nenhum servidor MCP no board. Cadastre um ou importe os que você já configurou.':
     'No MCP server on the board. Register one or import the ones you already set up.',
+
+  // --- Exportar para a ferramenta
+  'Copia regras, skills e agentes do board para a pasta de uma ferramenta (Claude Code, Cursor ou Kimi Code), no formato dela.':
+    "Copies board rules, skills and agents into a tool's folder (Claude Code, Cursor or Kimi Code), in its format.",
+  'Exportar para a ferramenta': 'Export to the tool',
+  '{n} gravados': '{n} written',
+  '{n} substituídos': '{n} replaced',
+  '{n} pulados': '{n} skipped',
+  '{n} recusados': '{n} refused',
+  '{n} com falha': '{n} failed',
+  'recusado: {reason}': 'refused: {reason}',
+  'já existe · será substituído': 'already exists · will be replaced',
+  'já existe · será pulado': 'already exists · will be skipped',
+  novo: 'new',
+  'Copia regras, skills e agentes do board no formato de {tool}.': 'Copies board rules, skills and agents in the {tool} format.',
+  'Ferramenta e destino': 'Tool and destination',
+  Destino: 'Destination',
+  'Pasta do projeto': 'Project folder',
+  'Pasta do usuário': 'User folder',
+  'Abra uma pasta de projeto para exportar para ela.': 'Open a project folder to export to it.',
+  'O resultado é uma cópia desconectada: o board não atualiza, não acompanha e não apaga o que for exportado. Uma mudança no board só chega à ferramenta exportando de novo.':
+    'The result is a disconnected copy: the board does not update, follow or delete what is exported. A change on the board only reaches the tool by exporting again.',
+  'Os {n} servidores MCP do board não são exportados: o "Conectar ao board" registra o do board, e os outros você configura na ferramenta.':
+    'The {n} MCP servers on the board are not exported: "Connect to the board" registers the board\'s own, and you set up the others in the tool.',
+  'Carregando a prévia…': 'Loading the preview…',
+  'Substituir os que já existem': 'Replace the ones that already exist',
+  'Nenhum artefato para exportar': 'No artifact to export',
+  'Exportar {name}': 'Export {name}',
+  'A sessão conectada ao board já recebe o fluxo pelo MCP; a cópia fica parada na versão de hoje.':
+    "The session connected to the board already gets the flow through MCP; the copy stays frozen at today's version.",
+  'A pasta no destino tem {n} arquivo(s) que o board não tem ({names}): eles ficam.':
+    'The destination folder has {n} file(s) the board does not have ({names}): they stay.',
+  'A skill do fluxo vai como uma cópia parada: a sessão conectada ao board recebe o fluxo atualizado pelo MCP, e esta cópia não acompanha.':
+    'The flow skill goes as a frozen copy: the session connected to the board gets the updated flow through MCP, and this copy does not follow it.',
+  'Nada foi gravado.': 'Nothing was written.',
+  'O resultado é uma cópia desconectada: o board não atualiza, não acompanha e não apaga o que foi exportado.':
+    'The result is a disconnected copy: the board does not update, follow or delete what was exported.',
+  'Fecha o resumo.': 'Closes the summary.',
+  'Fecha sem exportar nada.': 'Closes without exporting anything.',
+  'Grava os artefatos marcados na pasta da ferramenta.': "Writes the checked artifacts into the tool's folder.",
+  'Exportar {n}': 'Export {n}',
+  'Configurar na ferramenta: {value}': 'Configure in the tool: {value}',
+  'A restrição de ferramentas não vai para a cópia: o agente herda todas as ferramentas da sessão.':
+    "The tool restriction does not go to the copy: the agent inherits all the session's tools.",
+  'Os servidores MCP do agente não vão para a cópia: ele usa os da sessão.':
+    "The agent's MCP servers do not go to the copy: it uses the session's.",
+  'As skills do agente não vão para a cópia.': "The agent's skills do not go to the copy.",
+  'O modelo não vai para a cópia: o agente usa o da sessão.': "The model does not go to the copy: the agent uses the session's.",
+  'O esforço não vai para a cópia.': 'The effort does not go to the copy.',
+  'O modo somente leitura não vai para a cópia.': 'Read-only mode does not go to the copy.',
+  'A execução em segundo plano não vai para a cópia.': 'Background execution does not go to the copy.',
+  'O agente padrão do board não vai para a cópia.': "The board's default agent does not go to the copy.",
+  'O modo (Sempre ou Pelo card) não vai para a cópia: a ferramenta decide pela descrição.':
+    'The mode (Always or By card) does not go to the copy: the tool decides by the description.',
+  'O cabeçalho original da regra não vai para a cópia.': "The rule's original header does not go to the copy.",
+  'Arquivos que ficaram de fora na cópia para o board não vão para a cópia.':
+    'Files left out when copying to the board do not go to the copy.',
+  'Entra em toda conversa (o modo "Pelo card" não existe nesta ferramenta).':
+    'Applies to every conversation (the "By card" mode does not exist in this tool).',
+  'As regras escolhidas vão juntas num só arquivo e voltam como uma regra só na importação.':
+    'The chosen rules go together in a single file and come back as one rule on import.',
+  'Para usar com o board conectado, acrescente {value} à lista de ferramentas.':
+    'To use it with the board connected, add {value} to the tools list.',
+  'Diferença no formato: {value}': 'Format difference: {value}',
+  'origem ausente na cópia para o board': 'source missing from the board copy',
+  'esta ferramenta não tem esse artefato nesse destino': 'this tool has no such artifact at this destination',
+  'o nome não serve de nome de arquivo ou de pasta': 'the name cannot be a file or folder name',
+  'um arquivo de apoio tem caminho que sai da pasta da skill': 'a supporting file has a path that leaves the skill folder',
+  'o caminho real sai da pasta da ferramenta': 'the real path leaves the tool folder',
+  'o destino é um link simbólico': 'the destination is a symbolic link',
+  'o destino é uma pasta': 'the destination is a folder',
+  'outro artefato do lote grava o mesmo arquivo': 'another artifact in the batch writes the same file',
+  'Não há pasta de projeto aberta para exportar.': 'There is no open project folder to export to.',
 };

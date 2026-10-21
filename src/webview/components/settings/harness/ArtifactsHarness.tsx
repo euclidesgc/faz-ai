@@ -4,6 +4,7 @@ import { HARNESS_TOPICS, usageCounts, type HarnessTopic } from '../../../../shar
 import { useBoardStore } from '../../../store/boardStore';
 import { ActionButton, IconWarning } from '../../ui';
 import { ArtifactList } from './ArtifactList';
+import { ExportDialog } from './ExportDialog';
 import { ImportDialog } from './ImportDialog';
 import { t } from '../../../i18n';
 
@@ -20,6 +21,7 @@ export function ArtifactsHarness() {
   const [queries, setQueries] = useState<Record<HarnessTopic, string>>({ rules: '', skill: '', agent: '', mcp: '' });
   const [picked, setPicked] = useState(EMPTY_PICKED);
   const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const deferred = useDeferredValue(queries);
   const active = HARNESS_TOPICS.find((x) => x.id === topic) ?? HARNESS_TOPICS[0]!;
   const rules = usageCounts(artifacts, 'rule');
@@ -40,6 +42,15 @@ export function ArtifactsHarness() {
           onClick={() => setImporting(true)}
         >
           {t('Importar')}
+        </ActionButton>
+        <ActionButton
+          variant="soft"
+          hint={t(
+            'Copia regras, skills e agentes do board para a pasta de uma ferramenta (Claude Code, Cursor ou Kimi Code), no formato dela.',
+          )}
+          onClick={() => setExporting(true)}
+        >
+          {t('Exportar para a ferramenta')}
         </ActionButton>
       </div>
       <Tabs.Root value={active.id} onValueChange={(next) => useBoardStore.setState({ harnessTopic: next as HarnessTopic })}>
@@ -89,6 +100,7 @@ export function ArtifactsHarness() {
         ))}
       </Tabs.Root>
       {importing && <ImportDialog onClose={() => setImporting(false)} />}
+      {exporting && <ExportDialog onClose={() => setExporting(false)} />}
     </div>
   );
 }
