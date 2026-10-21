@@ -114,6 +114,9 @@ export const environment: Record<string, string> = {
   'Artefatos presentes': 'Artifacts present',
   'Um artefato do board sumiu da origem; a aba do assunto mostra quais estão ausentes, para tirar do board ou repor o arquivo.':
     "A board artifact vanished from its source; the subject's tab shows which are missing, to remove from the board or restore the file.",
+  'Isolamento do harness': 'Harness isolation',
+  'A CLI carrega artefatos sem passar pelo board; o Diagnóstico do Harness mostra quais, para tirar da máquina ou trazer para o board.':
+    'The CLI loads artifacts that bypass the board; the Harness diagnostics show which ones, to remove from the machine or bring into the board.',
   'regras do projeto': 'project rules',
   'regras do usuário': 'user rules',
   'skills do projeto': 'project skills',

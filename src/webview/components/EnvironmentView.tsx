@@ -51,6 +51,13 @@ function texts(c: EnvCheck): { title: string; hint: string } {
           'Um artefato do board sumiu da origem; a aba do assunto mostra quais estão ausentes, para tirar do board ou repor o arquivo.',
         ),
       };
+    case 'harness-isolation':
+      return {
+        title: t('Isolamento do harness'),
+        hint: t(
+          'A CLI carrega artefatos sem passar pelo board; o Diagnóstico do Harness mostra quais, para tirar da máquina ou trazer para o board.',
+        ),
+      };
     case 'git':
       return {
         title: t('Git'),
