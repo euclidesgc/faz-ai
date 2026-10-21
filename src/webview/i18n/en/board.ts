@@ -249,8 +249,8 @@ export const board: Record<string, string> = {
   'Parar a IA': 'Stop the AI',
   'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está.':
     'Runs {tool} in the background to do the work the phase asks for.',
-  'Parte de <b>contexto vazio</b>: só entram as rules e skills marcadas no Harness e o agente do card (ou o padrão do board).':
-    "Starts from <b>empty context</b>: only the rules and skills marked in the Harness, and the card's agent (or the board's default), come in.",
+  'Parte <b>só do que está no board</b>: as rules e skills marcadas no Harness e o agente do card (ou o padrão do board). No Claude Code o contexto vazio é imposto; nas outras CLIs, veja o que elas carregam sozinhas em Ferramentas de IA.':
+    "Starts from <b>only what is on the board</b>: the rules and skills marked in the Harness and the card's agent (or the board's default). In Claude Code the empty context is enforced; for other CLIs, see what they load on their own in Ferramentas de IA.",
   'Ao terminar, passa a vez — pede revisão, pergunta ou move o card — sem acompanhamento ao vivo; a resposta chega na conversa.':
     "When it's done, it hands off — asks for review, asks a question, or moves the card — with no live follow-along; the reply shows up in the conversation.",
   'O consumo fica registrado em Métricas.': 'Usage is logged in Metrics.',

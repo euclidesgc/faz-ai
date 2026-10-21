@@ -580,8 +580,8 @@ export const harness: Record<string, string> = {
     'What the AI may use in board runs. <b>Ferramenta e execução</b> (Tool and run) picks the AI, the permission and the default agent; each tool has its tab, one subject at a time, and in each one the origin: Board, Projeto, Global or Importados.',
   'Como funciona': 'How it works',
   'Como usar o Harness': 'How to use the Harness',
-  '<b>Para que serve.</b> Toda execução do board parte de contexto vazio. Esta tela é o catálogo do que existe na sua máquina e no projeto; o <b>Board</b> é só o que a IA pode usar.':
-    '<b>What it is for.</b> Every board run starts from an empty context. This screen is the catalog of what exists on your machine and in the project; the <b>Board</b> is only what the AI may use.',
+  '<b>Para que serve.</b> Toda execução do board parte só do que está no board (no Claude Code, contexto vazio imposto; nas outras CLIs, veja o que elas carregam sozinhas em Ferramentas de IA). Esta tela é o catálogo do que existe na sua máquina e no projeto; o <b>Board</b> é só o que a IA pode usar.':
+    '<b>What it is for.</b> Every board run starts from only what is on the board (in Claude Code, empty context is enforced; for other CLIs, see what they load on their own in Ferramentas de IA). This screen is the catalog of what exists on your machine and in the project; the <b>Board</b> is only what the AI may use.',
   '<b>Por que assim.</b> Menos contexto por execução é resposta mais rápida, mais barata e mais precisa. O planejamento de cada card escolhe o mínimo entre o que está no Board.':
     '<b>Why this way.</b> Less context per run means faster, cheaper and more precise answers. The planning of each card picks the minimum among what is on the Board.',
   '<b>Por onde começar.</b> 1) Abra a aba da ferramenta do projeto e, em Skills e MCPs, use <b>Indicar artefatos</b> e envie ao Board. 2) Em Sub-agentes, crie um agente com ajuda. 3) Em Regras, revise as que entraram desligadas e ative as que valem.':
