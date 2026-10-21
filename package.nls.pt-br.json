@@ -10,6 +10,7 @@
   "command.autopilot.pause.title": "Faz AI: Pausar o modo autônomo (YOLO)",
   "command.autopilot.resume.title": "Faz AI: Retomar o modo autônomo (YOLO)",
   "command.showLog.title": "Faz AI: Mostrar o log das execuções",
+  "command.verifyExecutor.title": "Faz AI: Verificar o isolamento da CLI de IA",
   "command.exportBoard.title": "Faz AI: Exportar o board",
   "command.importBoard.title": "Faz AI: Importar um board",
   "viewsContainer.fazai.title": "Faz AI",

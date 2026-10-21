@@ -56,6 +56,7 @@ import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../model
 import { cleanStaleTemp } from '../aiOutput/measured';
 import { ExecutionAdmission } from '../ai/admission';
 import { CapabilityEvidenceStore } from '../ai/capabilityEvidence';
+import { verifyExecutor } from '../ai/capabilityVerifier';
 import { recoverProjectServers } from '../mcp/projectServerLease';
 import { loginShellPath, spawnHeadless } from '../spawn';
 
@@ -117,6 +118,11 @@ export interface BoardHost {
    * refaz o global com os caminhos atuais. Devolve o resumo do que foi feito.
    */
   fixProjectServer(file: string): Promise<string>;
+  /**
+   * Roda a CLI do Claude numa fixture, contra uma API local, e grava os recibos assinados de isolamento.
+   * Só o host chama: não há caminho de escrita pela tela nem pelo MCP. Devolve o resumo do resultado.
+   */
+  verifyExecutor(): Promise<string>;
   dispose(): Promise<void>;
 }
 
@@ -208,10 +214,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // Procurado de novo a cada conferência dos requisitos: a pessoa pode instalar o node com o board aberto
   let nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
   // a única porta para chamar a IA: o executor de cards e o chat passam por ela, e é ela que escreve o log de uso
+  const evidenceStore = new CapabilityEvidenceStore(path.join(o.storageDir, 'capability-evidence'));
   const admission = new ExecutionAdmission({
     pathEnv: () => pathEnv,
     homeDir,
-    evidence: new CapabilityEvidenceStore(path.join(o.storageDir, 'capability-evidence')),
+    evidence: evidenceStore,
     environmentEvidence: () => collectClaudeEnvironment(),
   });
   const gateway = new AiGateway({
@@ -849,6 +856,21 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     mergeWatcher,
     chat,
     autopilot,
+    async verifyExecutor() {
+      const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, activeProfile(router.snapshot().board).id);
+      const result = await verifyExecutor({
+        executor: profile,
+        profileId: profile.id,
+        admission,
+        store: evidenceStore,
+        pathEnv,
+        spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
+      });
+      const failed = result.evidence.flatMap((e) => e.checks.filter((c) => c.outcome !== 'passed').map((c) => `${e.capability}/${c.id}`));
+      return result.verified
+        ? 'Isolamento verificado: as cinco capacidades têm recibos válidos.'
+        : `Isolamento não verificado. Pendentes: ${failed.join(', ') || 'checks ausentes'}.`;
+    },
     async connectAI(target = {}) {
       const tool = target.tool ?? router.snapshot().board.aiTool;
       const done = registerClients([tool], {

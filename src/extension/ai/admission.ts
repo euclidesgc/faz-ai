@@ -1,3 +1,4 @@
+import type { RunnerPermission } from '../../shared/runner';
 import { executorProfile, type AiExecutor } from './providers';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -47,6 +48,27 @@ function digestFile(file: string): string {
   }
 }
 
+/** Entrada canônica do vínculo de isolamento: as flags de isolamento não dependem do conteúdo por execução. */
+export function isolationInput(permission: RunnerPermission): HeadlessInput {
+  return {
+    prompt: '',
+    permission,
+    structured: true,
+    exec: {
+      agent: '',
+      agentDefinition: null,
+      mcpBlocked: [],
+      model: null,
+      tools: ['Read'],
+      deniedTools: ['Agent', 'Task', 'SendMessage', 'ListAgents'],
+      toolSet: 'explicit',
+      mcpTools: ['mcp__allowed__allowed'],
+      mcpAllowed: ['allowed'],
+      mcpConfig: '{"mcpServers":{"allowed":{}}}',
+    },
+  };
+}
+
 /** Uma fonte de decisão para o gateway; não transforma metadados recebidos do cliente em prova. */
 export class ExecutionAdmission {
   constructor(private readonly options: AdmissionOptions) {}
@@ -54,7 +76,7 @@ export class ExecutionAdmission {
     executor: AiExecutor,
     profileId: string,
     input: HeadlessInput,
-    cwd: string,
+    cwd: string | null,
   ): { binding: string; executable: string; environmentComplete: boolean } {
     const profile = executorProfile(executor);
     const template = headlessCommand(profile, { ...input, prompt: '<prompt-da-execucao>', structured: true });
@@ -80,8 +102,13 @@ export class ExecutionAdmission {
       binary: digestFile(real),
       permission: input.permission,
       invocation: template,
-      cwd: fs.realpathSync(cwd),
-      additionalDirectories: (input.addDirs ?? []).map((d) => fs.realpathSync(path.resolve(cwd, d))),
+      // cwd nulo = vínculo de isolamento: a prova roda numa fixture e vale para qualquer pasta de projeto
+      ...(cwd === null
+        ? { scope: 'isolation' }
+        : {
+            cwd: fs.realpathSync(cwd),
+            additionalDirectories: (input.addDirs ?? []).map((d) => fs.realpathSync(path.resolve(cwd, d))),
+          }),
       environment: { ...process.env, ...(this.options.pathEnv() ? { PATH: this.options.pathEnv() } : {}), ...template.env },
       environmentEvidence: environment,
     };
@@ -92,34 +119,30 @@ export class ExecutionAdmission {
     };
   }
   /**
+   * Vínculo das evidências de isolamento: identidade do executor, binário, flags de isolamento, ambiente e
+   * políticas gerenciadas, sem pasta de projeto nem listas por execução (ferramentas, MCP, diretórios).
+   * Os recibos são produzidos pelo verificador numa fixture com este mesmo vínculo.
+   */
+  isolationBinding(executor: AiExecutor, profileId: string, permission: RunnerPermission) {
+    return this.binding(executor, profileId, isolationInput(permission), null);
+  }
+  /** Digest das políticas gerenciadas lidas pelo host; vazio quando a leitura não foi completa. */
+  environmentDigest(): string {
+    const e = this.options.environmentEvidence();
+    return e.state === 'complete' ? e.digest : '';
+  }
+  /**
    * Só leitura para a prévia: mesma decisão pura e mesmas evidências locais, sem exigir as definições MCP
    * nem lançar. O vínculo é o de um comando sem MCP; com MCP ativo ele não coincide e a razão aparece.
    */
-  preview(executor: AiExecutor, profileId: string, request: StrictExecutionRequest, cwd: string): ExecutionAdmissionDecision {
+  preview(executor: AiExecutor, profileId: string, request: StrictExecutionRequest, _cwd: string): ExecutionAdmissionDecision {
     const now = this.options.now?.() ?? Date.now();
     const permission = 'board' as const;
     const tool = executorProfile(executor).base;
     const preliminary = admitExecution(tool, permission, request, '', [], now);
     try {
       if (preliminary.reasons.some((r) => r.code !== 'capability-not-verified')) return preliminary;
-      const input: HeadlessInput = {
-        prompt: '',
-        permission,
-        structured: true,
-        exec: {
-          agent: '',
-          agentDefinition: null,
-          mcpBlocked: [],
-          model: null,
-          tools: preliminary.tools,
-          deniedTools: preliminary.deniedTools,
-          toolSet: 'explicit',
-          mcpTools: preliminary.mcpTools,
-          mcpAllowed: [],
-          mcpConfig: '{"mcpServers":{}}',
-        },
-      };
-      const bound = this.binding(executor, profileId, input, cwd);
+      const bound = this.isolationBinding(executor, profileId, permission);
       const decision = admitExecution(tool, permission, request, bound.binding, this.options.evidence.load(bound.binding), now);
       if (!bound.environmentComplete) {
         decision.state = 'blocked';
@@ -182,12 +205,13 @@ export class ExecutionAdmission {
       };
     }
     const bound = this.binding(profile, profileId, effective, cwd);
+    const isolation = this.isolationBinding(profile, profileId, input.permission);
     const decision = admitExecution(
       tool,
       input.permission,
       request,
-      bound.binding,
-      this.options.evidence.load(bound.binding),
+      isolation.binding,
+      this.options.evidence.load(isolation.binding),
       this.options.now?.() ?? Date.now(),
     );
     if (!bound.environmentComplete) {
