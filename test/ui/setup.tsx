@@ -32,6 +32,8 @@ const { requestIds, SELF_ANSWERING } = vi.hoisted(() => ({
     'attachment.read',
     'harness.artifact.read',
     'harness.project.profile',
+    'harness.export.plan',
+    'harness.export.apply',
     'harness.agent.assist',
     'metrics.query',
     'card.usage.query',
