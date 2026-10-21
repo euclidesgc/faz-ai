@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { agentInputOf, parseAgentFile } from './agentFiles';
 import { frontmatterOf, frontmatterValue } from './frontmatter';
 import { scanLibraryFolder } from './libraryImport';
-import type { LibraryArtifactInput, LibraryImportPreview } from '../shared/artifacts';
+import type { ArtifactKind, LibraryArtifactInput, LibraryImportPreview } from '../shared/artifacts';
 import { LibraryDisk } from './libraryDisk';
 import { ArtifactMirror } from './artifactMirror';
 import { readSource, readMcpByName } from './artifactSource';
@@ -22,7 +22,9 @@ import {
 } from '../shared/artifacts';
 import { selectionKey, type HarnessUsage, type SelectableKind } from '../shared/harnessSelection';
 import { baseInfo, SKILL_NAME_PATTERN, type Harness, type HarnessItem } from '../shared/harness';
-import type { AgentInput } from '../shared/messages';
+import { MCP_NAME_PATTERN, type McpServerInput } from '../shared/harnessCatalog';
+import { RULE_NAME_PATTERN, createUsage } from '../shared/artifactImport';
+import type { AgentInput, McpServerView } from '../shared/messages';
 import type { BoardContext } from './panel/handlers/context';
 
 /** Biblioteca do board: as fontes são lidas só na importação ou numa atualização explícita. */
@@ -288,6 +290,7 @@ export class BoardLibrary {
   }
 
   select(items: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null, inventory: Harness['inventory']): void {
+    if (!usage) this.refuseRemoval(items);
     const drafts: { draft: ArtifactDraft; usage: HarnessUsage }[] = [];
     for (const item of items) {
       const existing = this.repo.findByLocation(this.ctx.boardId, kindOfSelectable(item.kind), item.location);
@@ -316,6 +319,215 @@ export class BoardLibrary {
         if (existing) this.repo.remove(this.ctx.boardId, existing.id);
         this.ctx.boards.setSelection(this.ctx.boardId, [item], null);
       }
+  }
+
+  /** Apagar recusa o agente padrão e a skill do fluxo (só o modo dela muda); nada é apagado antes da recusa. */
+  private refuseRemoval(items: { kind: SelectableKind; location: string }[]): void {
+    const defaultAgent = this.ctx.state().board.runner.defaultAgent;
+    for (const item of items) {
+      const a = this.repo.findByLocation(this.ctx.boardId, kindOfSelectable(item.kind), item.location);
+      if (a?.kind === 'agent' && defaultAgent && a.name === defaultAgent)
+        throw new Error('Escolha outro agente padrão antes de apagar este.');
+      if (a?.kind === 'skill' && (a.meta as { generated?: unknown }).generated === true)
+        throw new Error('A skill do fluxo é da extensão: só o modo dela pode mudar.');
+    }
+  }
+
+  // --- criar e editar direto no board (nada vai para o projeto nem para as pastas das ferramentas) ---
+
+  /** Cópia de leitura em dia depois de uma gravação; falha dela não desfaz o que já está no banco. */
+  private sync(): void {
+    try {
+      this.materialize();
+    } catch {
+      // a próxima abertura refaz a cópia
+    }
+  }
+
+  /** Valida o nome novo (criar ou renomear) e devolve o artefato a editar, se houver. */
+  private target(kind: ArtifactKind, name: string, previous: string | undefined, pattern: RegExp, invalid: string) {
+    const existing = this.repo.get(this.ctx.boardId, kind, previous ?? name);
+    if (previous !== undefined && !existing) throw new Error('Artefato não encontrado.');
+    if ((!existing || name !== existing.name) && !pattern.test(name)) throw new Error(invalid);
+    if (name !== existing?.name && this.repo.get(this.ctx.boardId, kind, name))
+      throw new Error('Já existe um artefato com este nome. Edite o existente ou escolha outro nome.');
+    return existing;
+  }
+
+  private store(existing: ArtifactRow | undefined, draft: ArtifactDraft, usage: HarnessUsage, reviewed = false): void {
+    // renomear: o artefato antigo sai e o novo herda o modo
+    if (existing && existing.name !== draft.name) {
+      this.repo.remove(this.ctx.boardId, existing.id);
+      this.repo.upsert(this.ctx.boardId, draft, existing.usage, reviewed);
+    } else this.repo.upsert(this.ctx.boardId, draft, existing ? undefined : usage, reviewed);
+  }
+
+  private tooBig(text: string): void {
+    if (Buffer.byteLength(text, 'utf8') > ARTIFACT_LIMITS.fileBytes) throw new Error('Arquivo maior que 512 KB.');
+  }
+
+  saveRule(name: string, body: string, opts: { previous?: string; via: 'manual' | 'wizard' | 'ai' }): void {
+    const existing = this.target(
+      'rule',
+      name,
+      opts.previous,
+      RULE_NAME_PATTERN,
+      'Nome de regra inválido: use letras minúsculas, números e hífens, com .md opcional.',
+    );
+    this.tooBig(body);
+    this.store(
+      existing,
+      {
+        kind: 'rule',
+        name,
+        description: '',
+        body,
+        meta: {},
+        origin: existing?.origin ?? '',
+        originTool: existing?.originTool ?? '',
+        missing: false,
+        skipped: [],
+        files: [],
+      },
+      createUsage('rule', opts.via),
+    );
+    this.sync();
+  }
+
+  saveSkill(name: string, skillMd: string, opts: { previous?: string; via: 'manual' | 'wizard' | 'ai'; files?: string[] }): void {
+    const existing = this.target(
+      'skill',
+      name,
+      opts.previous,
+      SKILL_NAME_PATTERN,
+      'Nome de skill inválido: use letras minúsculas, números e hífens (ex.: "revisar-spec").',
+    );
+    if (existing && (existing.meta as { generated?: unknown }).generated === true)
+      throw new Error('A skill do fluxo é da extensão: só o modo dela pode mudar.');
+    this.tooBig(skillMd);
+    const description = frontmatterValue(frontmatterOf(skillMd), 'description') ?? '';
+    const body = frontmatterValue(frontmatterOf(skillMd), 'name') === name ? skillMd : skillDocument(skillMd, name, description);
+    const kept = existing ? this.repo.content(existing.id).files.filter((f) => !opts.files || opts.files.includes(f.path)) : [];
+    this.store(
+      existing,
+      {
+        kind: 'skill',
+        name,
+        description,
+        body,
+        meta: {},
+        origin: existing?.origin ?? '',
+        originTool: existing?.originTool ?? '',
+        missing: false,
+        skipped: existing?.skipped ?? [],
+        files: kept,
+      },
+      createUsage('skill', opts.via),
+    );
+    this.sync();
+  }
+
+  saveMcp(name: string, server: McpServerInput, opts: { previous?: string; keepSecrets: string[] }): void {
+    const existing = this.target('mcp', name, opts.previous, MCP_NAME_PATTERN, 'Nome inválido: use letras, números, hífen, ponto ou sublinhado.');
+    if (name === 'faz-ai') throw new Error('O nome faz-ai é reservado ao MCP do board.');
+    const saved = existing ? this.repo.mcpServer(this.ctx.boardId, existing.id) : undefined;
+    const keep = (values: Record<string, string> | undefined, old: unknown): Record<string, string> => {
+      const out: Record<string, string> = {};
+      const prev = old && typeof old === 'object' ? (old as Record<string, unknown>) : {};
+      for (const [k, v] of Object.entries(values ?? {})) {
+        const kept = opts.keepSecrets.includes(k) && v === '' ? prev[k] : undefined;
+        out[k] = typeof kept === 'string' ? kept : v;
+      }
+      return out;
+    };
+    let def: Record<string, unknown>;
+    if (server.transport === 'http') {
+      if (!/^https?:\/\//.test(server.url)) throw new Error('Informe uma URL HTTP do servidor MCP.');
+      new URL(server.url);
+      def = { type: 'http', url: server.url, headers: keep(server.headers, saved?.headers) };
+    } else {
+      if (!server.command.trim()) throw new Error('Informe o comando do servidor MCP.');
+      def = { command: server.command.trim(), args: server.args ?? [], env: keep(server.env, saved?.env) };
+    }
+    this.store(
+      existing,
+      {
+        kind: 'mcp',
+        name,
+        description: '',
+        body: '',
+        meta: { server: def },
+        origin: existing?.origin ?? '',
+        originTool: existing?.originTool ?? '',
+        missing: false,
+        skipped: [],
+        files: [],
+      },
+      createUsage('mcp', 'manual'),
+      true,
+    );
+    this.sync();
+  }
+
+  private skillWithFiles(skill: string) {
+    const a = this.repo.get(this.ctx.boardId, 'skill', skill);
+    if (!a) throw new Error(`Skill "${skill}" não está no board.`);
+    if ((a.meta as { generated?: unknown }).generated === true) throw new Error('A skill do fluxo é da extensão: só o modo dela pode mudar.');
+    return { a, draft: this.draftOf(a) };
+  }
+
+  /** Devolve o caminho do arquivo na cópia de leitura. */
+  writeSkillFile(skill: string, file: string, content: string, encoding: 'utf8' | 'base64' = 'utf8'): string {
+    const { a, draft } = this.skillWithFiles(skill);
+    if (!isSafeRelPath(file) || file === 'SKILL.md') throw new Error('Caminho inválido dentro da skill.');
+    const size = encoding === 'base64' ? Buffer.from(content, 'base64').length : Buffer.byteLength(content, 'utf8');
+    const others = draft.files.filter((f) => f.path !== file);
+    if (size > ARTIFACT_LIMITS.fileBytes) throw new Error('Arquivo maior que 512 KB.');
+    if (others.length >= ARTIFACT_LIMITS.files) throw new Error('A skill já tem 100 arquivos de apoio.');
+    if (Buffer.byteLength(draft.body, 'utf8') + others.reduce((n, f) => n + f.size, 0) + size > ARTIFACT_LIMITS.totalBytes)
+      throw new Error('A skill passaria de 5 MB no total.');
+    draft.files = [...others, { path: file, content, encoding, size }];
+    this.repo.upsert(this.ctx.boardId, draft, a.usage);
+    this.sync();
+    const main = new ArtifactMirror(this.directory, this.repo, this.ctx.boardId).pathOf(a);
+    return path.join(path.dirname(main), ...file.split('/'));
+  }
+
+  deleteSkillFile(skill: string, file: string): void {
+    const { a, draft } = this.skillWithFiles(skill);
+    if (!draft.files.some((f) => f.path === file)) throw new Error('Arquivo de apoio não encontrado.');
+    draft.files = draft.files.filter((f) => f.path !== file);
+    this.repo.upsert(this.ctx.boardId, draft, a.usage);
+    this.sync();
+  }
+
+  /** O conteúdo para o editor: corpo da regra/skill/agente, um arquivo de apoio, ou o MCP com os segredos mascarados. */
+  content(kind: ArtifactKind, name: string, file?: string): { text?: string; server?: McpServerView } {
+    const a = this.repo.get(this.ctx.boardId, kind, name);
+    if (!a) throw new Error('Artefato não encontrado.');
+    if (kind === 'mcp') {
+      const s = this.repo.mcpServer(this.ctx.boardId, a.id) ?? {};
+      const mask = (v: unknown): Record<string, string> =>
+        Object.fromEntries(Object.keys(v && typeof v === 'object' ? v : {}).map((k) => [k, '']));
+      return {
+        server: {
+          name,
+          transport: typeof s.command === 'string' ? 'stdio' : 'http',
+          command: typeof s.command === 'string' ? s.command : '',
+          args: Array.isArray(s.args) ? s.args.map(String) : [],
+          env: mask(s.env),
+          url: typeof s.url === 'string' ? s.url : '',
+          headers: mask(s.headers),
+        },
+      };
+    }
+    if (file) {
+      const f = this.repo.content(a.id).files.find((x) => x.path === file);
+      if (!f) throw new Error('Arquivo de apoio não encontrado.');
+      if (f.encoding === 'base64') throw new Error('Arquivo binário: não dá para editar como texto.');
+      return { text: f.content };
+    }
+    return { text: a.body };
   }
 
   importSkills(root: string, paths: string[], known: { rel: string; valid: boolean }[]): void {
@@ -374,25 +586,6 @@ export class BoardLibrary {
       if (a.kind === 'skill') draft.description = frontmatterValue(frontmatterOf(content), 'description') ?? '';
     }
     this.repo.upsert(this.ctx.boardId, draft, a.usage);
-  }
-
-  writeSkillFile(name: string, rel: string, content: string): string | null {
-    const a = this.repo.get(this.ctx.boardId, 'skill', name);
-    if (!a) return null;
-    if (!isSafeRelPath(rel) || rel === 'SKILL.md') throw new Error('Caminho inválido dentro da skill.');
-    const draft = this.draftOf(a);
-    const size = Buffer.byteLength(content, 'utf8');
-    const files = draft.files.filter((f) => f.path !== rel);
-    if (
-      size > ARTIFACT_LIMITS.fileBytes ||
-      files.length >= ARTIFACT_LIMITS.files ||
-      Buffer.byteLength(draft.body, 'utf8') + files.reduce((n, f) => n + f.size, 0) + size > ARTIFACT_LIMITS.totalBytes
-    )
-      throw new Error('O arquivo ultrapassa os limites da biblioteca.');
-    draft.files = [...files, { path: rel, content, encoding: 'utf8', size }];
-    this.repo.upsert(this.ctx.boardId, draft, a.usage);
-    const mirror = new ArtifactMirror(this.directory, this.repo, this.ctx.boardId);
-    return path.join(path.dirname(mirror.pathOf(a)), ...rel.split('/'));
   }
 
   // Agentes do board: criados e editados pelo board ficam no banco, nunca na pasta da ferramenta. Uma

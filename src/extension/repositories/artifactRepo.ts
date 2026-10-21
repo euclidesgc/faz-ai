@@ -172,6 +172,12 @@ export class ArtifactRepo {
     return out;
   }
 
+  /** A definição completa (com `env` e `headers`) de um servidor MCP: só o host usa, nunca vai à interface. */
+  mcpServer(boardId: string, id: string): Record<string, unknown> | null {
+    const r = one(this.db, "SELECT secret_ref FROM board_artifacts WHERE id = ? AND board_id = ? AND kind = 'mcp'", [id, boardId]);
+    return r ? credentialsFor(this.db).get(credentialOwner(boardId, id), str(r.secret_ref)) : null;
+  }
+
   /** A marcação antiga (harness_selection) que ainda falta copiar. */
   legacySelection(boardId: string): HarnessSelection[] {
     return all(this.db, 'SELECT kind, location, usage FROM harness_selection WHERE board_id = ? ORDER BY kind, location', [boardId]).map(
