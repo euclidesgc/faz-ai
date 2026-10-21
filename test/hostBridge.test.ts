@@ -189,6 +189,17 @@ describe('HostBridge: harness.project.profile (assistentes de regras e skills)',
   });
 });
 
+describe('HostBridge: harness.export.plan/apply (Exportar para a ferramenta)', () => {
+  it('responde com o requestId, sem done por cima, e o erro vai na própria resposta', async () => {
+    await bridge.handle({ type: 'harness.export.plan', requestId: 'e1', tool: 'claude', target: 'project' });
+    expect(sent.at(-1)).toMatchObject({ type: 'harness.export.planResult', requestId: 'e1', plan: { tool: 'claude', items: [] } });
+    await bridge.handle({ type: 'harness.export.apply', requestId: 'e2', tool: 'claude', target: 'project', ids: [], replace: false });
+    expect(sent.at(-1)).toMatchObject({ type: 'harness.export.applyResult', requestId: 'e2', result: { files: [] } });
+    await bridge.handle({ type: 'harness.export.plan', requestId: 'e3', tool: 'sem-formato', target: 'project' });
+    expect(sent.at(-1)).toMatchObject({ type: 'harness.export.planResult', requestId: 'e3', error: expect.any(String) });
+  });
+});
+
 describe('HostBridge: plugins pela CLI do Claude Code', () => {
   const plugin = (rel: string, name: string) => {
     const manifest = path.join(dir, 'h', rel, '.claude-plugin', 'plugin.json');
