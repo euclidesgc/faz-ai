@@ -701,6 +701,16 @@ describe('modelos de IA', () => {
     expect((await call('detect_models', { tool: enabled.id })).text).toContain('Perfil personalizado: catálogo cadastrado à mão.');
   });
 
+  it('get_execution_policies só consulta: lista as políticas salvas, sem escrita nem segredos', async () => {
+    const listed = (await client.listTools()).tools.find((t) => t.name === 'get_execution_policies')!;
+    expect(listed.annotations?.readOnlyHint).toBe(true);
+    const result = await call('get_execution_policies');
+    console.log(result.text);
+    expect(result.error).toBe(false);
+    expect(result.data.policies).toEqual([]);
+    expect((await client.listTools()).tools.some((t) => /^(save|set|activate|delete)_.*polic/.test(t.name))).toBe(false);
+  });
+
   it('cópia usa o catálogo da origem e descrições de perfil não citam pastas de ferramenta', async () => {
     const copy = new AiProfileRepo(profileDb).save(
       router.snapshot().board.id,

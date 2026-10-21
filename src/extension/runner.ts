@@ -1,19 +1,19 @@
-import { createHash } from 'node:crypto';
 import { authFailed } from './ai/profileAuth';
 import type { AiProfile } from '../shared/aiProfiles';
 import { toolInfo, catalogTool, profileLabel } from '../shared/aiProfiles';
 import { resolveRunTarget, targetOfValue, type RunTarget, type RunTargetSource } from '../shared/runTarget';
 import { cliProblem } from '../shared/requirements';
+import type { ExecutionConstraints, PolicyAttempt, PolicyDecision } from '../shared/executionPolicies';
 import {
-  evaluateExecutionPolicy,
-  type ExecutionConstraints,
-  type ExecutionTarget,
-  type PolicyAttempt,
-  type PolicyBudget,
-  type PolicyDecision,
-  type PolicyFailure,
-  type TargetSource,
-} from '../shared/executionPolicies';
+  SAFE_ID,
+  chainAfter,
+  describeDecision,
+  evaluateRunPolicy,
+  newChain,
+  runTargetOfPolicy,
+  scopeDigest,
+  type Chain,
+} from './policyGate';
 import type { ContextAction } from '../shared/contextPlanning';
 import { cardRef } from '../shared/model';
 import type { AiRunOrigin, RunReport } from '../shared/log';
@@ -24,7 +24,6 @@ import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { executionPlan } from './execution';
 import { runArtifactRequest } from './runArtifactSnapshot';
-import { effortToRun } from '../shared/execution';
 import { modelDisplay, modelValue } from '../shared/models';
 import { effortTiers } from './models';
 import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
@@ -85,18 +84,6 @@ export interface RunOptions {
   onExit?(end: AiRunEnd): void;
   /** de uso interno: a cadeia de tentativas de uma troca por política (ver `Chain`); quem chama de fora nunca informa */
   chain?: Chain;
-}
-
-/**
- * A cadeia de uma execução trocada por política: o alvo que a pessoa pediu (congelado), quando a primeira
- * tentativa começou, as tentativas já feitas e o orçamento acumulado. Passa de uma tentativa para a
- * seguinte para que um destino já visitado não reinicie a cadeia.
- */
-interface Chain {
-  requested: RunTarget;
-  startedAt: number;
-  attempts: PolicyAttempt[];
-  budget: PolicyBudget | null;
 }
 
 /** O que a execução pede para continuar noutro alvo: o destino da política e a cadeia atualizada. */
@@ -297,13 +284,6 @@ function highTierTarget(state: BoardState, target: RunTarget): RunTarget {
   return high && high.cli.id === target.cli.id ? high : target;
 }
 
-/** O modelo/esforço do alvo no formato que a ferramenta entende (nome do modelo e esforço). */
-function targetModel(state: BoardState, target: RunTarget): { name: string; effort: string | null } | null {
-  if (!target.model) return null;
-  const option = state.board.modelCatalog.find((o) => o.tool === catalogTool(target.cli) && o.model === target.model!.name);
-  return { name: target.model.name, effort: option ? effortToRun(option, target.model.effort) : target.model.effort };
-}
-
 /** Texto de exibição do modelo de um alvo, traduzido de volta para o catálogo; sem o modelo nele, o nome bruto. */
 function targetDisplay(state: BoardState, target: RunTarget): string {
   if (!target.model) return profileLabel(state.board, target.cli.id);
@@ -321,36 +301,7 @@ const SOURCE_LABEL: Record<RunTargetSource, string> = {
   fallback: 'a política de execução',
 };
 
-const POLICY_SOURCE: Record<RunTargetSource, TargetSource> = {
-  card: 'card',
-  agent: 'agent',
-  rule: 'rule',
-  default: 'board',
-  chat: 'chat',
-  fallback: 'rule',
-};
-
-const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,239}$/;
 const MODE_ACTION: Record<AiRunMode, ContextAction> = { phase: 'work', refine: 'refine', summarize: 'summary', conflict: 'conflict' };
-
-/** O alvo no formato das políticas (perfil, modelo e esforço como a CLI os recebe). */
-function executionTargetOf(state: BoardState, target: RunTarget): ExecutionTarget {
-  const m = targetModel(state, target);
-  return { profileId: target.cli.id, model: m?.name ?? null, effort: m ? m.effort : null };
-}
-
-/**
- * O destino de uma política como alvo de execução: só vale com o perfil ligado e o modelo (e o esforço) no
- * catálogo dele. Sem isso a troca não acontece.
- */
-function runTargetOfPolicy(state: BoardState, t: ExecutionTarget): RunTarget | null {
-  const cli = state.board.aiProfiles.find((p) => p.id === t.profileId && p.enabled);
-  if (!cli) return null;
-  if (t.model === null) return { cli, model: null, value: '', source: 'fallback' };
-  const option = state.board.modelCatalog.find((o) => o.tool === catalogTool(cli) && o.model === t.model);
-  if (!option || (t.effort !== null && !option.efforts.includes(t.effort))) return null;
-  return { cli, model: { name: option.model, effort: t.effort }, value: modelValue(option.id, t.effort), source: 'fallback' };
-}
 
 /** O que a IA recebe ao ser chamada para um card. O ciclo completo está na skill do fluxo e nas instruções do servidor MCP. */
 export const cardPrompt = (
@@ -505,18 +456,14 @@ export class AiRunner {
             permission,
             regime: 'exclusive',
             agentId: policy.agentId,
-            scopeDigest: createHash('sha256')
-              .update(
-                JSON.stringify([
-                  plan.manifest.agent,
-                  plan.manifest.skills,
-                  plan.manifest.rules,
-                  plan.manifest.mcpServers,
-                  plan.manifest.tools,
-                  plan.manifest.deniedTools,
-                ]),
-              )
-              .digest('hex'),
+            scopeDigest: scopeDigest([
+              plan.manifest.agent,
+              plan.manifest.skills,
+              plan.manifest.rules,
+              plan.manifest.mcpServers,
+              plan.manifest.tools,
+              plan.manifest.deniedTools,
+            ]),
           };
           return {
             ...(options.token !== undefined ? { work: { id: options.workId!, token: options.token } } : {}),
@@ -599,7 +546,7 @@ export class AiRunner {
       tail,
       info,
       target,
-      chain: options.chain ?? { requested: target, startedAt: exec.startedAt, attempts: [], budget: null },
+      chain: options.chain ?? newChain(target, exec.startedAt),
       policy,
       origin,
     };
@@ -780,11 +727,9 @@ export class AiRunner {
     if (usageLimited) {
       // a troca de modelo ou de perfil só acontece por política aplicável, decidida pelo avaliador único; sem política
       // válida não há troca (RF11), e nenhum outro caminho escolhe um modelo reserva
-      const decision = this.evaluatePolicy(run, end, replied);
-      if (decision)
-        this.deps.log(
-          `[${cardRef(card)}] Política de execução: ${decision.action} (${decision.reason}${decision.policy ? `, ${decision.policy.id} r${decision.policy.revision}` : ''}).`,
-        );
+      const evaluated = this.evaluatePolicy(run, end, replied);
+      const decision = evaluated?.decision ?? null;
+      if (decision) this.deps.log(`[${cardRef(card)}] ${describeDecision(decision)}`);
       const next = decision?.action === 'fallback' && decision.target ? runTargetOfPolicy(this.router.snapshot(), decision.target) : null;
       if (decision && next) {
         const state = this.router.snapshot();
@@ -801,7 +746,7 @@ export class AiRunner {
           },
           { author: RUNNER_AUTHOR, source: 'ai' },
         );
-        return { target: next, chain: this.chainAfter(run, end, decision) };
+        return { target: next, chain: chainAfter(run.chain, evaluated!.attempt, decision) };
       }
       // trabalho parcial ou de efeito desconhecido: repetir às cegas, aqui ou noutro alvo, pode refazer ou desfazer o que já foi feito
       if (decision?.action === 'reconcile')
@@ -855,83 +800,26 @@ export class AiRunner {
     this.block(cardId, `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card.${output}`);
   }
 
-  /**
-   * A decisão do avaliador único para o limite de uso que esgotou nesta execução. Nunca inventa política: o
-   * snapshot salvo, o alvo pedido (congelado na cadeia) e os destinos que o board realmente consegue executar.
-   * Devolve null quando as políticas não puderam ser lidas (tratado como "sem política": não troca).
-   */
-  private evaluatePolicy(run: Run, end: AiRunEnd, replied: boolean): PolicyDecision | null {
-    if (!run.policy.constraints) return null;
-    try {
-      const state = this.router.snapshot();
-      const snapshot = this.router.executionPolicyLibrary().snapshot;
-      const explicit = run.chain.requested.source === 'card' || run.chain.requested.source === 'chat';
-      const targets = new Map<string, ExecutionTarget>();
-      for (const r of snapshot.records) for (const t of r.policy.targets) targets.set(JSON.stringify([t.profileId, t.model, t.effort]), t);
-      const others = [...this.runs.values()].filter((r) => r !== run);
-      const perProfile: Record<string, number> = {};
-      for (const r of others) perProfile[r.profile.id] = (perProfile[r.profile.id] ?? 0) + 1;
-      const attempt = this.attemptOf(run, end);
-      return evaluateExecutionPolicy({
-        snapshot,
-        requested: {
-          state: 'resolved',
-          target: executionTargetOf(state, run.chain.requested),
-          from: POLICY_SOURCE[run.chain.requested.source],
-          explicit,
-        },
-        context: {
-          action: run.policy.action,
-          agentId: run.policy.agentId,
-          phaseId: run.policy.phaseId,
-          cardTypeId: run.policy.cardTypeId,
-          origin: run.origin,
-        },
-        failure: 'quota' satisfies PolicyFailure,
-        // o que a IA já fez (resposta na conversa, ferramentas ou comandos) é efeito: a execução não pode ser refeita às cegas
-        effects: replied || end.report.inventory.length || end.report.bashCommands?.length ? 'partial' : 'none',
-        constraints: run.policy.constraints,
-        candidates: [...targets.values()].map((target) => {
-          const next = runTargetOfPolicy(state, target);
-          const profile = next?.cli;
-          return {
-            target,
-            available: !!next && cliProblem(state, next.cli.id) === null,
-            credential:
-              profile?.credentials?.review === 'pending'
-                ? ('pending' as const)
-                : profile && profile.kind !== 'builtin' && !(profile.credentials?.review === 'reviewed' && profile.credentials.available)
-                  ? ('missing' as const)
-                  : ('reviewed' as const),
-            admission: 'admitted' as const,
-            constraints: run.policy.constraints!,
-          };
-        }),
-        trace: { startedAt: run.chain.startedAt, attempts: [...run.chain.attempts, attempt], budget: run.chain.budget },
-        running: { global: others.length, perProfile },
-        now: attempt.endedAt,
-      });
-    } catch {
-      return null;
-    }
-  }
-
-  /** Esta tentativa na cadeia: alvo, janela de tempo e o consumo medido (null quando não houve medição, nunca zero). */
-  private attemptOf(run: Run, end: AiRunEnd): PolicyAttempt {
-    const last = run.chain.attempts.at(-1)?.endedAt ?? run.chain.startedAt;
-    const startedAt = Math.max(run.exec.startedAt, last);
-    const c = end.report.consumption;
-    return {
-      target: executionTargetOf(this.router.snapshot(), run.target),
-      startedAt,
-      endedAt: Math.max(Date.now(), startedAt),
-      consumption: c ? { inputTokens: c.inputTokens, outputTokens: c.outputTokens, costUsd: c.costUsd } : null,
-    };
-  }
-
-  /** A cadeia depois desta tentativa: o destino seguinte parte dela, então nenhum destino já visitado reinicia. */
-  private chainAfter(run: Run, end: AiRunEnd, decision: PolicyDecision): Chain {
-    return { ...run.chain, attempts: [...run.chain.attempts, this.attemptOf(run, end)], budget: decision.budget };
+  /** A decisão do avaliador único para o limite de uso que esgotou nesta execução (ver `evaluateRunPolicy`). */
+  private evaluatePolicy(run: Run, end: AiRunEnd, replied: boolean): { decision: PolicyDecision; attempt: PolicyAttempt } | null {
+    return evaluateRunPolicy({
+      state: this.router.snapshot(),
+      snapshot: this.router.executionPolicyLibrary().snapshot,
+      target: run.target,
+      chain: run.chain,
+      execStartedAt: run.exec.startedAt,
+      end,
+      failure: 'quota',
+      action: run.policy.action,
+      origin: run.origin,
+      agentId: run.policy.agentId,
+      phaseId: run.policy.phaseId,
+      cardTypeId: run.policy.cardTypeId,
+      constraints: run.policy.constraints,
+      // o que a IA já fez (resposta na conversa, ferramentas ou comandos) é efeito: a execução não pode ser refeita às cegas
+      acted: replied || !!end.report.inventory.length || !!end.report.bashCommands?.length,
+      runningProfiles: [...this.runs.values()].filter((r) => r !== run).map((r) => r.profile.id),
+    });
   }
 
   /** As sub-tarefas da história que a sessão encerrada deixou "Em execução" voltam para a IA. */

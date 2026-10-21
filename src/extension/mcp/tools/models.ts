@@ -27,6 +27,20 @@ export function registerModelTools(tool: DefineTool): void {
   );
 
   tool(
+    'get_execution_policies',
+    'Consulta as políticas de execução e troca de alvo do board (regra vencedora, destinos, limites e revisão). Só leitura: criar, alterar, revisar ou ativar política é ação da pessoa nas Configurações do board, e a IA não aprova a própria política. Não traz comandos, credenciais nem segredos.',
+    {},
+    (_a, router) => {
+      const { snapshot } = router.executionPolicyLibrary();
+      return {
+        policies: snapshot.records.map((r) => ({ ...r.policy, revision: r.revision, review: r.review })),
+        note: 'Alterações só pela interface do board.',
+      };
+    },
+    true,
+  );
+
+  tool(
     'detect_models',
     'Relê os modelos do perfil de CLI e os junta ao catálogo. Uma cópia usa o catálogo do pronto de origem; um perfil personalizado tem catálogo cadastrado à mão.',
     { tool: toolArg.optional().describe('Por padrão, a ferramenta em uso no projeto') },

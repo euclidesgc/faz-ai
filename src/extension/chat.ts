@@ -1,4 +1,6 @@
-import { toolInfo, activeProfile, catalogTool } from '../shared/aiProfiles';
+import { toolInfo, activeProfile, catalogTool, profileLabel } from '../shared/aiProfiles';
+import { cliProblem } from '../shared/requirements';
+import type { ContextAction } from '../shared/contextPlanning';
 import { defaultTarget, targetOfValue, type RunTarget } from '../shared/runTarget';
 import type { AgentAssistInput, AgentAssistResult } from '../shared/agentAssistance';
 import { agentAssistancePrompt, parseAgentAssistance } from './agentAssistance';
@@ -18,6 +20,7 @@ import { runArtifactRequest } from './runArtifactSnapshot';
 import { isCliNoise } from './cliNoise';
 import type { MessageRouter } from './panel/messageRouter';
 import { boardServer, PERMISSION_ADVICE, type RunnerDeps } from './runner';
+import { chainAfter, describeDecision, evaluateRunPolicy, newChain, runTargetOfPolicy, scopeDigest, type Chain } from './policyGate';
 
 /** Quantas mensagens anteriores entram no prompt, e o tamanho máximo de cada uma. */
 const HISTORY = 12;
@@ -218,7 +221,7 @@ export class ChatSession {
     const state = this.router.snapshot();
     // o prompt sai da conversa ANTES de a pergunta entrar nela: senão ela iria duas vezes (no histórico e no fim)
     const prompt = chatPrompt(this.messages, body, PERMISSION_ADVICE[state.board.runner.permission], contextLines(state).always);
-    this.run({ role: 'user', text: body, ...(model ? { model } : {}) }, prompt, state.board.runner.permission, model);
+    this.run({ role: 'user', text: body, ...(model ? { model } : {}) }, prompt, state.board.runner.permission, model, 'chat');
   }
 
   /** A IA lê o projeto e propõe os agentes do board; a conversa registra o pedido e o resultado. */
@@ -229,7 +232,13 @@ export class ChatSession {
       '\n',
     );
     // criar e marcar agentes é trabalho do board: roda só com ele
-    this.run({ role: 'user', text: 'Sugerir agentes com IA: leia o projeto e proponha os agentes deste board.' }, prompt, 'board', null);
+    this.run(
+      { role: 'user', text: 'Sugerir agentes com IA: leia o projeto e proponha os agentes deste board.' },
+      prompt,
+      'board',
+      null,
+      'harness-agent',
+    );
   }
 
   /** A IA lê o projeto e propõe regras, gravadas desligadas; a conversa registra o pedido e o resultado. */
@@ -240,7 +249,13 @@ export class ChatSession {
       state.harness.library ? suggestLibraryPrompt('rule') : suggestRulesPrompt(toolInfo(activeProfile(state.board)).rules),
       ...contextLines(state).always,
     ].join('\n');
-    this.run({ role: 'user', text: 'Sugerir regras com IA: leia o projeto e proponha regras para ele.' }, prompt, 'board', null);
+    this.run(
+      { role: 'user', text: 'Sugerir regras com IA: leia o projeto e proponha regras para ele.' },
+      prompt,
+      'board',
+      null,
+      'harness-rule',
+    );
   }
 
   /** A IA lê o projeto e propõe skills, enviadas ao board em "Pelo card"; a conversa registra o pedido e o resultado. */
@@ -250,7 +265,13 @@ export class ChatSession {
     const prompt = [state.harness.library ? suggestLibraryPrompt('skill') : suggestSkillsPrompt(), ...contextLines(state).always].join(
       '\n',
     );
-    this.run({ role: 'user', text: 'Sugerir skills com IA: leia o projeto e proponha skills para ele.' }, prompt, 'board', null);
+    this.run(
+      { role: 'user', text: 'Sugerir skills com IA: leia o projeto e proponha skills para ele.' },
+      prompt,
+      'board',
+      null,
+      'harness-skill',
+    );
   }
 
   /**
@@ -263,7 +284,7 @@ export class ChatSession {
     return new Promise((resolve, reject) => {
       const state = this.router.snapshot();
       const prompt = agentAssistancePrompt(input, state, this.router.projectProfile());
-      this.start(prompt, 'board', null, {
+      this.start(prompt, 'board', null, 'harness-agent', {
         draftOnly: true,
         done: (text) => {
           try {
@@ -289,7 +310,7 @@ export class ChatSession {
     const keys = candidates.map(selectionKey);
     this.router.setSuggestions(null);
     // só leitura: a IA lê o projeto e responde; nada é gravado sem a pessoa confirmar na tela
-    this.start([suggestArtifactsPrompt(kind, candidates), ...contextLines(state).always].join('\n'), 'board', null, {
+    this.start([suggestArtifactsPrompt(kind, candidates), ...contextLines(state).always].join('\n'), 'board', null, 'harness-suggest', {
       done: (text) => {
         const parsed = parseSuggestions(text, keys);
         this.router.setSuggestions(
@@ -301,8 +322,14 @@ export class ChatSession {
   }
 
   /** Uma execução do chat pelo gateway: a mensagem entra na conversa quando o processo começa, e a resposta (ou o erro) no fim. */
-  private run(message: Omit<ChatMessage, 'id' | 'at'>, prompt: string, permission: RunnerPermission, model: string | null): void {
-    this.start(prompt, permission, model, {
+  private run(
+    message: Omit<ChatMessage, 'id' | 'at'>,
+    prompt: string,
+    permission: RunnerPermission,
+    model: string | null,
+    action: ContextAction,
+  ): void {
+    this.start(prompt, permission, model, action, {
       started: () => this.add(message),
       done: (text) => this.add({ role: 'assistant', text: text || 'A IA terminou sem escrever uma resposta.' }),
       failed: (error) => this.add({ role: 'error', text: error }),
@@ -317,11 +344,19 @@ export class ChatSession {
     prompt: string,
     permission: RunnerPermission,
     model: string | null,
+    action: ContextAction,
     hooks: { draftOnly?: boolean; started?: () => void; done: (text: string) => void; failed: (error: string) => void },
+    /** de uso interno: a troca por política continua a mesma cadeia noutro alvo */
+    retry?: { target: RunTarget; chain: Chain },
   ): void {
     if (this.running) throw new Error('A IA ainda está respondendo. Espere ou interrompa.');
     const state = this.router.snapshot();
-    const target = chatTarget(state, model);
+    const target = retry?.target ?? chatTarget(state, model);
+    // a admissão recusa antes de abrir o processo, como no runner: nada é executado com a CLI ausente ou sem login
+    const problem = cliProblem(state, target.cli.id);
+    const label = profileLabel(state.board, target.cli.id);
+    if (problem === 'cli') throw new Error(`A CLI do ${label} não foi encontrada: veja o aviso no topo do board.`);
+    if (problem === 'signin') throw new Error(`O login do ${label} venceu: veja o aviso no topo do board.`);
     const tool = toolInfo(target.cli);
     // sem card não há agente: contexto vazio, só o servidor do board, os servidores em modo "Sempre" e o modelo escolhido
     const plan = bareExec(modelOf(state, target), boardServer(this.deps), state, this.router.libraryMcpDefinitions(), target.cli);
@@ -335,6 +370,12 @@ export class ChatSession {
     const tail: string[] = [];
     let started = false;
     let execution: AiExecution;
+    const constraints = {
+      permission,
+      regime: 'exclusive' as const,
+      agentId: null,
+      scopeDigest: scopeDigest([plan.tools, plan.deniedTools, plan.mcpAllowed, !!hooks.draftOnly]),
+    };
     try {
       // o chat é a quarta origem de execução, e a única sem card: nenhuma execução nasce da conversa de
       // um card (ela devolve o card para "pronto" e quem executa depois é o heartbeat ou o autopiloto)
@@ -392,6 +433,7 @@ export class ChatSession {
       hooks.failed(e instanceof Error ? e.message : String(e));
       return;
     }
+    const chain = retry?.chain ?? newChain(target, execution.startedAt);
     this.running = execution;
     this.assisting = !!hooks.draftOnly;
     this.publish();
@@ -403,6 +445,55 @@ export class ChatSession {
       this.publish();
       // a resposta é o texto final que a ferramenta deu, nunca o fluxo de eventos
       const text = end.report.answer.replace(ANSI, '').trim();
+      // o limite de uso do plano esgotou e a execução não respondeu: só uma política aplicável troca de alvo, decidida
+      // pelo avaliador único; a resposta já dada não se repete e a edição manual segue livre
+      // (o texto do erro de limite não é efeito: só ferramentas e comandos que a IA usou contam como trabalho feito)
+      if (!end.stopped && end.report.usageLimitReached && (end.code !== 0 || !text)) {
+        const evaluated = evaluateRunPolicy({
+          state: this.router.snapshot(),
+          snapshot: this.router.executionPolicyLibrary().snapshot,
+          target,
+          chain,
+          execStartedAt: execution.startedAt,
+          end,
+          failure: 'quota',
+          action,
+          origin: 'chat',
+          agentId: null,
+          phaseId: null,
+          cardTypeId: null,
+          constraints,
+          acted: !!end.report.inventory.length || !!end.report.bashCommands?.length,
+          runningProfiles: [],
+        });
+        const decision = evaluated?.decision ?? null;
+        if (decision) this.deps.log(`[chat] ${describeDecision(decision)}`);
+        const next = decision?.action === 'fallback' && decision.target ? runTargetOfPolicy(this.router.snapshot(), decision.target) : null;
+        if (decision && evaluated && next) {
+          try {
+            this.start(
+              prompt,
+              permission,
+              model,
+              action,
+              { ...hooks, started: undefined },
+              { target: next, chain: chainAfter(chain, evaluated.attempt, decision) },
+            );
+            return;
+          } catch (e) {
+            hooks.failed(e instanceof Error ? e.message : String(e));
+            return;
+          }
+        }
+        const extra =
+          decision?.action === 'reconcile'
+            ? ' A IA já agiu; o board não repete a execução sozinho.'
+            : decision?.action === 'offer' && decision.alternatives.length
+              ? ' A política oferece outro destino, que precisa da sua confirmação: escolha-o no campo Modelo.'
+              : '';
+        hooks.failed(`O limite de uso do plano do ${tool.label} esgotou.${extra}`);
+        return;
+      }
       if (end.stopped) hooks.failed('Interrompido.');
       else if (end.timedOut) hooks.failed(`A resposta passou do tempo limite (${state.board.runner.timeoutMinutes} min) e foi encerrada.`);
       else if (end.error) hooks.failed(`Não foi possível executar o ${tool.label}: ${end.error.message}`);
