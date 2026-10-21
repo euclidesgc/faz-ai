@@ -1,4 +1,4 @@
-import { profileLabel, type AiProfile } from '../../shared/aiProfiles';
+import { activeProfile, profileLabel, type AiProfile } from '../../shared/aiProfiles';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
 import { profileCanProbe, profileSignedIn } from '../cliProbe';
@@ -190,6 +190,12 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // Procurado de novo a cada conferência dos requisitos: a pessoa pode instalar o node com o board aberto
   let nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
   // a única porta para chamar a IA: o executor de cards e o chat passam por ela, e é ela que escreve o log de uso
+  const admission = new ExecutionAdmission({
+    pathEnv: () => pathEnv,
+    homeDir,
+    evidence: new CapabilityEvidenceStore(path.join(o.storageDir, 'capability-evidence')),
+    environmentEvidence: () => ({ state: 'unknown' }),
+  });
   const gateway = new AiGateway({
     resolveProfile: (id) => new AiProfileRepo(handle.db).resolveProfile(router.boardId, id),
     profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
@@ -198,13 +204,17 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     sessions: router.executions,
     redact: (text) => router.redactCredentials(text),
     snapshots: new RunArtifactSnapshots(path.join(o.storageDir, 'run-artifacts'), new ArtifactRepo(handle.db), router.boardId),
-    admission: new ExecutionAdmission({
-      pathEnv: () => pathEnv,
-      homeDir,
-      evidence: new CapabilityEvidenceStore(path.join(o.storageDir, 'capability-evidence')),
-      environmentEvidence: () => ({ state: 'unknown' }),
-    }),
+    admission,
     spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
+  });
+  router.setAdmissionReader((request) => {
+    try {
+      const board = router.snapshot().board;
+      const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, activeProfile(board).id);
+      return admission.preview(profile, profile.id, request, o.folderPath);
+    } catch {
+      return null;
+    }
   });
   router.setAiProfileRuntime(
     createAiProfileRuntime({

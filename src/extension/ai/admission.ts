@@ -91,6 +91,47 @@ export class ExecutionAdmission {
       environmentComplete: environment.state === 'complete' && /^[a-f0-9]{64}$/.test(environment.digest),
     };
   }
+  /**
+   * Só leitura para a prévia: mesma decisão pura e mesmas evidências locais, sem exigir as definições MCP
+   * nem lançar. O vínculo é o de um comando sem MCP; com MCP ativo ele não coincide e a razão aparece.
+   */
+  preview(executor: AiExecutor, profileId: string, request: StrictExecutionRequest, cwd: string): ExecutionAdmissionDecision {
+    const now = this.options.now?.() ?? Date.now();
+    const permission = 'board' as const;
+    const tool = executorProfile(executor).base;
+    const preliminary = admitExecution(tool, permission, request, '', [], now);
+    try {
+      if (preliminary.reasons.some((r) => r.code !== 'capability-not-verified')) return preliminary;
+      const input: HeadlessInput = {
+        prompt: '',
+        permission,
+        structured: true,
+        exec: {
+          agent: '',
+          agentDefinition: null,
+          mcpBlocked: [],
+          model: null,
+          delegates: [],
+          tools: preliminary.tools,
+          deniedTools: preliminary.deniedTools,
+          toolSet: 'explicit',
+          mcpTools: preliminary.mcpTools,
+          mcpAllowed: [],
+          mcpConfig: '{"mcpServers":{}}',
+        },
+      };
+      const bound = this.binding(executor, profileId, input, cwd);
+      const decision = admitExecution(tool, permission, request, bound.binding, this.options.evidence.load(bound.binding), now);
+      if (!bound.environmentComplete) {
+        decision.state = 'blocked';
+        decision.reasons.push({ code: 'environment-not-verified' });
+      }
+      return decision;
+    } catch {
+      preliminary.reasons.push({ code: 'executor-unavailable' });
+      return preliminary;
+    }
+  }
   prepare(executor: AiExecutor, profileId: string, input: HeadlessInput, cwd: string, request: StrictExecutionRequest): AdmittedExecution {
     if (!profileId.trim() || profileId.length > 240 || profileId.includes('\0')) throw new Error('Identidade de perfil inválida.');
     const profile = structuredClone(executorProfile(executor));

@@ -1,5 +1,7 @@
 import { builtinPolicyCatalog, simulatePolicyScenario, type PolicyLibrary, type PolicyScenario } from '../../shared/policyManagement';
 import { resolveContextDraft, type ContextDraftResolution } from '../../shared/contextDraftResolution';
+import { applyAdmissionDecision, strictRequestFromDraft } from '../../shared/contextAdmissionPreview';
+import type { ExecutionAdmissionDecision, StrictExecutionRequest } from '../../shared/executionAdmission';
 import type { ContextActivityTarget } from '../../shared/contextPlanning';
 import type { PolicyAssistInput, PolicyAssistResult } from '../../shared/policyAssistant';
 import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
@@ -235,6 +237,11 @@ export class MessageRouter {
 
   get boardId(): string {
     return this.ctx.boardId;
+  }
+  private admissionReader: ((request: StrictExecutionRequest) => ExecutionAdmissionDecision | null) | null = null;
+  /** Leitura da admissão real (recibos do host) para a prévia; sem ela a prévia diz que a admissão está indisponível. */
+  setAdmissionReader(reader: (request: StrictExecutionRequest) => ExecutionAdmissionDecision | null): void {
+    this.admissionReader = reader;
   }
   setAiProfileRuntime(runtime: AiProfileRuntime): void {
     this.aiProfileRuntime = runtime;
@@ -629,7 +636,7 @@ export class MessageRouter {
     return getPanelMetrics(this.ctx.dbHandle.db, this.ctx.boardId, query);
   }
 
-  /** Metadados do rascunho a partir do banco do host; nenhuma inferência ou admissão é executada. */
+  /** Metadados do rascunho a partir do banco do host; só lê a admissão (recibos locais), sem inferência nem probes. */
   previewContextDraft(target: ContextActivityTarget): ContextDraftResolution {
     const state = this.snapshot();
     state.harness = {
@@ -639,7 +646,10 @@ export class MessageRouter {
         artifacts: this.ctx.library.repo.list(this.ctx.boardId).map((a) => ({ ...a, path: '' })),
       },
     };
-    return resolveContextDraft(state, target);
+    const resolved = resolveContextDraft(state, target);
+    const request = this.admissionReader ? strictRequestFromDraft(state, resolved) : null;
+    const decision = request ? this.admissionReader!(request) : null;
+    return decision ? applyAdmissionDecision(resolved, decision) : resolved;
   }
 
   /** O que o card gastou até agora, por fase (e, numa história, as sub-tarefas), lido do log das execuções. */
