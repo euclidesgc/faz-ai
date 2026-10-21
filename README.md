@@ -164,7 +164,20 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
    coluna do workflow dele (Backlog / A fazer no board padrão), inativo. Restaurar uma história traz
    também todas as sub-tarefas arquivadas dela e desliga o modo autônomo; restaurar uma sub-tarefa
    cuja história está arquivada pede confirmação e restaura a história inteira (uma sub-tarefa de
-   história ativa volta sozinha, sem confirmação).
+   história ativa volta sozinha, sem confirmação). A aba tem uma barra de filtros própria, que não
+   muda o filtro do board: busca por texto (título, descrição, conversa, campos e `#número`), tipo,
+   campos de opção (como Tags) e período de arquivamento. O contador mostra os filtros ativos, e
+   **Limpar filtros** os desfaz; ao sair e voltar, a aba abre limpa. Cada linha mostra 50 cards por
+   vez, e **Mostrar mais** traz os seguintes. Clicar numa história arquivada a seleciona: a linha de
+   Sub-tarefas passa a mostrar só as sub-tarefas arquivadas dela, mesmo as que não batem no filtro.
+   Clicar de novo, ou em **Limpar seleção**, desfaz a seleção. Abrir o card continua listando todas
+   as sub-tarefas. Para agir sobre vários de uma vez, marque os cards arquivados que quiser:
+   **Selecionar todos os visíveis** marca só os que os filtros mostram. **Restaurar** em massa segue
+   a mesma regra do individual (uma história volta com as sub-tarefas arquivadas dela, e uma
+   sub-tarefa cuja história está arquivada traz a história inteira), e **Enviar para a lixeira** em
+   massa leva junto as sub-tarefas arquivadas de cada história. Toda ação em massa pede confirmação,
+   dizendo quantos cards serão afetados e o que vai junto. Excluir definitivamente continua só pela
+   Lixeira.
 
 **Seleção múltipla na lixeira.** Na lixeira, marque cards um a um ou use **Selecionar todos** no cabeçalho da tabela; a caixa fica em estado parcial quando só alguns estão marcados. Com ao menos um card marcado, aparece a barra com a contagem e as ações **Restaurar** e **Apagar de vez**, que valem para a seleção inteira. Restaurar segue direto; apagar de vez pede uma única confirmação para o lote. **Limpar** desmarca tudo. Restaurar ou apagar um card leva junto as sub-tarefas dele que estão na lixeira. **Esvaziar lixeira** continua como estava e não depende da seleção.
 
