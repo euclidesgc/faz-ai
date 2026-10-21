@@ -29,8 +29,7 @@ const FORBIDDEN: Array<[RegExp, string]> = [
 describe('o que a IA lê não cita o Diagnóstico como requisito (RF28)', () => {
   it('skills do fluxo, instruções do MCP, notas do get_card e descrições do get_harness sem a citação', () => {
     const found: string[] = [];
-    for (const [where, text] of TEXTS)
-      for (const [pattern, label] of FORBIDDEN) if (pattern.test(text)) found.push(`${where}: ${label}`);
+    for (const [where, text] of TEXTS) for (const [pattern, label] of FORBIDDEN) if (pattern.test(text)) found.push(`${where}: ${label}`);
     expect(found).toEqual([]);
   });
 });
