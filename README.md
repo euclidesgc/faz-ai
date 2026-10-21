@@ -140,9 +140,10 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
 - **Decidir antes o que a IA usa.** Um agente define as skills, os servidores MCP, as ferramentas e o
   modelo de cada fase ou card, em vez de a ferramenta descobrir sozinha durante a conversa. Toda
   execução pelo board roda através de um agente.
-- **Ver e configurar o harness inteiro.** Para cada ferramenta de IA instalada, o board mostra o
-  que ela carrega (instruções, skills, subagentes, comandos, hooks, servidores MCP, plugins e
-  configurações), separado entre o projeto, a sua pasta de usuário e os plugins.
+- **Um harness só do board.** Regras, skills, subagentes e servidores MCP vivem numa biblioteca guardada
+  no banco do board, no modo de cada um (Sempre, Pelo card ou Desligado). O board não varre as pastas das
+  ferramentas de IA nem grava nelas: só lê o que você importa. Plugins, hooks e permissões da ferramenta
+  não aparecem mais na tela de Harness; a conexão com o board fica em **Conectar ao board**.
 
 ## Como usar
 
@@ -1279,7 +1280,7 @@ O schema 40 migra configurações MCP da biblioteca somente após confirmar o se
 
 As ferramentas MCP `get_project_profile`, `get_board_artifact` e `save_board_artifact` permitem aos
 assistentes trabalhar na biblioteca. As APIs antigas de arquivos por ferramenta permanecem por
-compatibilidade, mas os agentes criados ou editados pelo board ficam no banco; hooks, comandos e configurações nativas continuam sob gerenciamento da ferramenta.
+compatibilidade, mas os agentes criados ou editados pelo board ficam no banco; hooks, comandos e configurações nativas ficam sob gerenciamento da ferramenta e o board não os lista. As ferramentas MCP `install_flow_skill` e `set_skill_enabled` foram removidas, `get_harness` não aceita mais `onlySelected` e `set_harness_selection` identifica cada item por `{ kind, name }`. Para apagar os agentes `faz-ai-*` que versões antigas gravaram em `.claude/agents`, `.cursor/agents`, `.kimi-code/agents` ou `~/.claude/agents`, remova os arquivos `faz-ai-*.md` dessas pastas.
 
 ## Configurações
 
