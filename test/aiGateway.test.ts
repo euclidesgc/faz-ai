@@ -260,6 +260,32 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     expect(procs).toHaveLength(0);
   });
 
+  it('MCP fora da configuração resolvida da atividade é recusado antes do spawn (E5.2)', () => {
+    const context = {
+      diagnostics: [],
+      items: [{ artifactId: 'planejado', kind: 'mcp', name: 'p', origins: [] }],
+    } as unknown as ContextDraftResolution;
+    const request = {
+      version: 1,
+      regime: 'exclusive',
+      activeMcpIds: ['planejado', 'extra'],
+      mcpServers: [],
+    } as unknown as StrictExecutionRequest;
+    expect(() =>
+      gateway().run(
+        call({
+          prepare: () => ({
+            context,
+            strict: { profileId: 'claude', request },
+            input: { prompt: 'oi', permission: 'board' },
+            config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: false, skills: [], mcp: null },
+          }),
+        }),
+      ),
+    ).toThrow('MCP fora da configuração da atividade: extra');
+    expect(procs).toHaveLength(0);
+  });
+
   it('a ferramenta que não roda com a permissão pedida não abre processo e fica registrada', () => {
     // o Claude Code recusa "Sem restrições" quando roda como root (contêiner, WSL como root)
     const getuid = vi.spyOn(process as { getuid: () => number }, 'getuid').mockReturnValue(0);

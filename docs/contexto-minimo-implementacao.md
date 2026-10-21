@@ -251,3 +251,7 @@ Schema 43 reconstrói ai_runs para incluir origem test, sem mudar migrações an
 ## E5.1 — configuração v1 congelada no snapshot (#998)
 
 `AiPrepared.context` recebe o resultado de `resolveContextDraft` (o mesmo da prévia). O gateway recusa iniciar, antes do snapshot, se houver qualquer diagnóstico além da leitura da admissão (recurso ausente, desligado, MCP sem revisão etc.), com o código e o recurso na mensagem; senão `RunArtifactSnapshots.capture` grava a configuração em `manifest.context` (só metadados), e edições posteriores da biblioteca ou do plano não a alteram. Nenhum chamador preenche `context` ainda: a ligação do runner, do chat e dos assistentes é a E5.3 (#1000), que também ativa o runtime v1 (`runtime` continua `legacy`). Não houve mudança de schema: o manifesto é um arquivo do snapshot.
+
+## E5.2 — só os MCPs selecionados (#999)
+
+Quando a execução traz `context` e `strict`, o gateway recusa antes do spawn qualquer MCP do pedido de admissão que não esteja nos itens `mcp` da configuração resolvida. Os limites do agente e do board, a lista exata de ferramentas e a montagem do arquivo MCP só com os servidores admitidos continuam em `admitExecution` e `ExecutionAdmission.prepare` (#729): MCP fora do contrato é `mcp-outside-boundary`, itens Sempre passam pelo mesmo teste e as definições vêm do cofre sem credencial em prompt, log ou export. Onde o executor só escolhe por servidor, a prévia lista o servidor e não a operação (`mcpTools` fica vazio até a execução preparar o MCP).

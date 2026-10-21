@@ -228,6 +228,12 @@ export class AiGateway {
       }
       if (prepared.artifacts && !this.deps.snapshots) throw new Error('Snapshot de artefatos indisponível; execução bloqueada.');
       const { admission: _admission, ...resolved } = config;
+      if (prepared.context && prepared.strict) {
+        // Só os MCPs da configuração resolvida entram: o pedido de admissão nunca ativa um a mais.
+        const planned = new Set(prepared.context.items.filter((i) => i.kind === 'mcp').map((i) => i.artifactId));
+        const extra = prepared.strict.request.activeMcpIds.filter((id) => !planned.has(id));
+        if (extra.length) throw new Error(`MCP fora da configuração da atividade: ${extra.join(', ')}.`);
+      }
       if (prepared.context) {
         const missing = blockingContextDiagnostics(prepared.context);
         if (missing.length) throw new Error(`Recurso obrigatório da atividade indisponível: ${missing.join(', ')}.`);
