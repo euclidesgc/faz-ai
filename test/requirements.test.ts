@@ -109,13 +109,11 @@ describe('requisitos do board', () => {
     expect(await ids('cursor')).toEqual([['mcp', false]]);
   });
 
-  it('sem a skill do fluxo, pede para instalar; sem o inventário lido, não diz nada', async () => {
+  it('a skill do fluxo não é requisito: nenhuma ferramenta pede para instalá-la', async () => {
     connect('cursor');
-    expect(await checkRequirements(probe({ skillInstalled: false }))).toEqual([
-      { id: 'skill', tool: 'cursor', action: { kind: 'installSkill' } },
-    ]);
-    expect(await checkRequirements(probe({ skillInstalled: true }))).toEqual([]);
-    expect(await checkRequirements(probe())).toEqual([]);
+    const list = await checkRequirements(probe({ tool: 'cursor' }));
+    expect(list.some((r) => r.id === 'skill')).toBe(false);
+    expect(await checkRequirements(probe({ tool: 'claude' }))).not.toContainEqual(expect.objectContaining({ id: 'skill' }));
   });
 
   it('o registro do Claude para o usuário inteiro ou só para esta pasta (~/.claude.json) também vale', async () => {

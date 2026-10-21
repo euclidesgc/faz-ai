@@ -170,8 +170,6 @@ export interface RequirementProbe {
    * instalado depois (o node pelo nvm) só entra nele quando o editor fecha e abre de novo
    */
   editorPath?: string;
-  /** a skill do fluxo está instalada na ferramenta; ausente quando não dá para saber (sem o inventário) */
-  skillInstalled?: boolean;
   /** o que falta no banco de artefatos do board; ausente quando não dá para saber (sem o inventário) */
   harnessIssues?: HarnessIssue[];
   /** o arquivo do projeto está no git (por padrão, `git ls-files`) */
@@ -270,8 +268,9 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
     return out;
   }
 
-  // o MCP e a skill do fluxo são necessários em todas as ferramentas: mesmo onde as execuções pelo board
-  // levam o servidor sozinhas (Claude, Cursor), a conversa no chat do editor ou no terminal depende dele
+  // o MCP é necessário em todas as ferramentas: mesmo onde as execuções pelo board levam o servidor
+  // sozinhas (Claude, Cursor), a conversa no chat do editor ou no terminal depende dele. A skill do fluxo
+  // não é requisito: o pedido e o MCP levam as instruções do fluxo até a execução (RF12)
   const registered = registeredServer(tool, p.workspaceDir, p.homeDir);
   if (!registered) out.push({ id: 'mcp', tool, action: { kind: 'connect' } });
   else {
@@ -332,9 +331,6 @@ export async function checkRequirements(p: RequirementProbe): Promise<BoardRequi
     else if (tool === 'cursor' && p.editor === 'cursor' && !cursorConnectedOnce(p.homeDir, p.workspaceDir))
       out.push({ id: 'mcp-enable', tool, action: { kind: 'openEditorMcp' } });
   }
-
-  // a skill ensina a IA a conduzir o fluxo do board (fases, documentos, revisão)
-  if (p.skillInstalled === false) out.push({ id: 'skill', tool, action: { kind: 'installSkill' } });
 
   // o harness definido é recomendação, não requisito: o board trabalha sem ele, só sem a economia de contexto
   if (p.harnessIssues?.length)

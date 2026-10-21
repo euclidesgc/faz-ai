@@ -62,8 +62,7 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
    Cada pasta tem o seu board, já com as fases do fluxo.
 2. **Conecte a IA ao board.** Em **Configurações → Harness**, escolha a ferramenta do projeto
    (Claude Code, Cursor ou Kimi Code). Na aba **Projeto**, clique em **Instalar (padrão da ferramenta)** no
-   grupo **Servidores MCP** e de novo no grupo **Skills**, para a skill do fluxo, que ensina a IA a
-   conduzir as fases.
+   grupo **Servidores MCP**. O fluxo do board chega à IA pelo próprio MCP, sem instalar skill.
 3. **Crie a tarefa.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título (por
    exemplo, "Login com Google") e dê Enter. Duplo clique abre o card: descreva o que você quer, em
    Markdown, e, se quiser, escolha o modelo da IA e as skills que ela deve ler.
@@ -91,9 +90,9 @@ necessário, na hora certa:
 - **Cada card é uma sessão nova e curta.** Em vez de uma conversa longa que acumula tudo, a IA abre o
   card pelo board (`get_card`), faz aquele trabalho e para. O histórico fica no card, e não na janela
   de contexto.
-- **Contexto vazio por padrão.** Toda execução pelo board começa sem nenhuma regra, skill, agente,
-  hook ou plugin da sua máquina ou do projeto: só entra o que você marcou em **Harness**. No
-  Claude Code isso é imposto por parâmetro (`--setting-sources ""`, `--disable-slash-commands` e um
+- **Contexto controlado por padrão.** Toda execução pelo board começa sem regras, skills, agentes,
+  hooks ou plugins da sua máquina ou do projeto que você não tenha marcado em **Harness**, na medida
+  em que a ferramenta deixa o board controlar isso. No Claude Code isso é imposto por parâmetro (`--setting-sources ""`, `--disable-slash-commands` e um
   arquivo de servidores MCP só com o do board); nas outras ferramentas, o que a linha de comando
   aceita (ver a tabela de [Agentes](#agentes)).
 - **Artefatos enviados ao board, não descobertos.** Rules, skills e servidores MCP entram no board
@@ -232,9 +231,9 @@ dependência pendente a subagentes simultâneos**, cada um com o modelo do seu c
 ela verifica o conjunto, faz o commit e parte para a rodada seguinte. `start_work` recusa a
 sub-tarefa que ainda espera outra. Sem dependências declaradas, todas as sub-tarefas em aberto são
 consideradas independentes. Depende de a ferramenta de IA ter subagentes (o Claude Code tem); sem
-eles, a execução segue uma por vez, na ordem das dependências. Projetos que já tinham a skill do
-fluxo instalada continuam com o texto antigo dela (o board não sobrescreve uma skill que você pode
-ter ajustado): apague-a e instale de novo em Configurações para receber a instrução nova.
+eles, a execução segue uma por vez, na ordem das dependências. O texto do fluxo é o atual do
+board, servido pelo MCP; uma cópia da skill do fluxo já instalada na pasta da ferramenta não é
+substituída pelo board. Para a ferramenta não carregar o texto antigo por conta própria, apague essa cópia.
 
 ### Board no navegador, fora do editor
 
@@ -264,12 +263,12 @@ o `faz-ai` do terminal avisa e não inicia.
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
    global que a ferramenta lê. Isso também acontece sozinho, em silêncio, ao abrir a pasta (e a cada
    versão nova da extensão), sempre no escopo do usuário; só uma falha gera aviso.
-3. No grupo **Skills** da mesma aba, clique em **Instalar (padrão da ferramenta)** para a
-   skill do fluxo (`faz-ai-fluxo`): ela ensina a IA a conduzir os cards pelas fases, gerar os
-   documentos, pedir revisão e retomar pendências. O botão instala também as skills por assunto
-   (harness do card, pasta de trabalho e PR, rodadas, revisão e homologação, modo autônomo). Podem ser editadas.
+3. Opcional: no grupo **Skills** da mesma aba, **Instalar (padrão da ferramenta)** copia a skill do
+   fluxo (`faz-ai-fluxo`) e as skills por assunto (harness do card, pasta de trabalho e PR, rodadas,
+   revisão e homologação, modo autônomo) para a ferramenta. Não é preciso: o board já serve essas
+   skills pelo MCP (`get_skill`). Instalá-las só serve se você quer que a ferramenta as carregue sozinha.
 
-**Só no global.** O servidor e a skill do fluxo ficam na configuração global da ferramenta, e nada
+**Só no global.** O servidor e a cópia instalada da skill do fluxo, se houver, ficam na configuração global da ferramenta, e nada
 disso entra na pasta do projeto (que pode ser compartilhada com quem não tem a extensão):
 
 | Item | Onde grava |
@@ -329,10 +328,9 @@ a janela), e diz quando nada mudou. Ao lado, no editor, **Recarregar a janela** 
 é o que faz valer uma extensão recém-atualizada. Com a IA trabalhando em algum card, pergunta antes,
 porque a execução para.
 
-O MCP do board e a skill do fluxo (`faz-ai-fluxo`) contam como requisito em todas as ferramentas:
-mesmo onde as execuções pelo board levam o MCP sozinhas (Claude, Cursor), a conversa no chat do
-editor ou no terminal depende dele, e a skill é o que faz a IA seguir o fluxo. A falta da skill tem o
-botão **Instalar a skill** no Diagnóstico e na faixa do chat. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
+O MCP do board conta como requisito em todas as ferramentas: mesmo onde as execuções pelo board levam
+o MCP sozinhas (Claude, Cursor), a conversa no chat do editor ou no terminal depende dele, e é por ele
+que o fluxo chega à IA (`get_skill`). A skill do fluxo instalada na ferramenta não é requisito. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
 desligados, com o motivo na dica.
 
 **Login vencido: aviso de erro e retomada sozinha.** Quando o motivo do aviso é login (faltando ou
@@ -356,7 +354,7 @@ linha de comando, o grafo dentro do Code Review Graph). Passe o mouse sobre um i
 board o usa.
 
 - **Necessários:** o Node.js 22 ou mais novo e a ferramenta de IA do projeto, com a linha de comando,
-  o login (`claude auth login` ou `cursor-agent login`), o MCP do board, a skill do fluxo, a
+  o login (`claude auth login` ou `cursor-agent login`), o MCP do board, a
   **definição do harness** e o nível de permissão. A definição do harness é recomendação, não bloqueio:
   o board trabalha sem ela, só sem o ganho de economia e precisão. Ela aponta, um filho por falta, o que
   falta no banco de artefatos: nenhuma skill, agente ou servidor MCP em modo Pelo card (use "Indicar
@@ -383,7 +381,7 @@ do sistema: `xcode-select --install` e `brew install gh` no macOS, `apt`, `dnf` 
 distribuição desconhecida, fica só o site. Os logins e as ações na pasta do projeto (`git init`, `gh auth login`, `code-review-graph build`,
 `code-review-graph install --platform …`, `code-review-graph embed --provider local`) também trazem o
 comando com botão de copiar. Só o que é do board tem botão: instalar o MCP
-do board e a skill do fluxo, e abrir a escolha do nível de permissão.
+do board (e, se quiser, a skill do fluxo), e abrir a escolha do nível de permissão.
 
 O chat do editor inicia o MCP do board com o PATH de quando o editor abriu: um Node instalado depois
 (pelo `nvm`, por exemplo) não está nele até o editor fechar e abrir de novo. Por isso, quando o Node
@@ -440,8 +438,8 @@ os documentos das fases anteriores, trabalha a partir da descrição, da convers
 Implementação, uma história sem sub-tarefas ganha uma a partir da descrição.
 
 Boards criados antes recebem os textos novos pelo **Atualizar board** (Configurações), só nas colunas
-que ainda têm o texto padrão anterior: o que você personalizou fica como está. A skill do fluxo
-instalada não muda sozinha; reinstale-a (substituindo) para ela ensinar o mesmo.
+que ainda têm o texto padrão anterior: o que você personalizou fica como está. O fluxo que a IA lê é o texto atual do
+board, pelo MCP: não depende de reinstalar nada.
 
 ### Chat com a IA
 

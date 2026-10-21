@@ -318,14 +318,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // faixa de aviso da interface, que fica enquanto faltar alguma coisa. Confere ao abrir, quando a
   // ferramenta ou a permissão mudam, depois de conectar, a cada poucos minutos (a pessoa instala a
   // CLI ou entra na conta fora do board) e quando ela pede "Verificar de novo".
-  // a skill do fluxo pronta para as execuções do board: existe para a ferramenta do projeto E está
-  // marcada como "incluir em todo contexto" (as execuções partem de contexto vazio: instalada e não
-  // marcada, ela não entra); undefined enquanto o inventário do harness não foi lido
-  const flowSkillInstalled = (): boolean | undefined => {
-    const s = router.snapshot();
-    const tool = s.harness.inventory.find((t) => t.tool === s.board.aiTool);
-    return tool ? selectedItems(s, 'skill', 'always').some((i) => i.name === FLOW_SKILL_NAME) : undefined;
-  };
   let checking: Promise<void> | null = null;
   let modelsBlocked = false;
   let enableTimer: NodeJS.Timeout | null = null;
@@ -395,7 +387,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       editor: o.editor?.name,
       windowStartedAt: o.editor?.startedAt,
       editorPath: o.editor ? (process.env.PATH ?? '') : undefined,
-      skillInstalled: flowSkillInstalled(),
       harnessIssues: harnessIssuesNow(),
     })
       .then((list) => {
@@ -607,14 +598,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let toolInUse = router.snapshot().board.aiTool;
   let permissionInUse = router.snapshot().board.runner.permission;
   if (toolInUse === 'cursor' || toolInUse === 'kimi') refreshToolModels(toolInUse);
-  // a skill do fluxo instalada ou apagada (pelo Diagnóstico, pelo Harness, à mão) muda o aviso
-  let skillInUse = flowSkillInstalled();
   router.onDidChange(() => {
-    const skill = flowSkillInstalled();
-    if (skill !== skillInUse) {
-      skillInUse = skill;
-      void checkNow();
-    }
     const { board } = router.snapshot();
     if (board.aiTool === toolInUse && board.runner.permission === permissionInUse) return;
     const toolChanged = board.aiTool !== toolInUse;

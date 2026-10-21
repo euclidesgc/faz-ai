@@ -69,8 +69,7 @@ In five minutes you have a task moving on the board, with the AI working on it.
 2. **Connect the AI to the board.** In **Configurações → Harness** (Settings → Harness),
    pick the project's tool (Claude Code, Cursor or Kimi Code). In the **Projeto** (project) tab, click
    **Instalar (padrão da ferramenta)** (install, tool default) in the **Servidores MCP** (MCP servers)
-   group and again in the **Skills** group, for the flow skill, which teaches the AI to drive the
-   phases.
+   group. The board's flow reaches the AI through the MCP itself, with no skill to install.
 3. **Create the task.** In the **Backlog** column, click **+ Novo card** (new card), type the title
    (for example, "Login with Google") and press Enter. Double-click opens the card: describe what
    you want, in Markdown, and optionally pick the AI model and the skills it must read.
@@ -99,8 +98,9 @@ is needed, at the right time:
 - **Each card is a new, short session.** Instead of one long conversation that accumulates
   everything, the AI opens the card through the board (`get_card`), does that piece of work and
   stops. The history stays on the card, not in the context window.
-- **Empty context by default.** Every run started by the board begins with no rule, skill, agent,
-  hook or plugin from your machine or the project: only what you checked under **Harness**
+- **Controlled context by default.** Every run started by the board begins without the rules, skills, agents,
+  hooks or plugins from your machine or the project that you did not check under **Harness**, as far as the
+  tool lets the board control it: only what you checked under **Harness**
   gets in. In Claude Code this is enforced by parameter (`--setting-sources ""`,
   `--disable-slash-commands` and an MCP servers file with the board's server only); in the other
   tools, whatever the command line accepts (see the [Agents](#agents) table).
@@ -243,9 +243,9 @@ pending dependency to simultaneous subagents**, each with its card's model; at t
 it verifies the whole, commits and moves on to the next round. `start_work` refuses a sub-task that
 is still waiting for another. With no dependencies declared, all open sub-tasks are considered
 independent. It depends on the AI tool having subagents (Claude Code does); without them, execution
-goes one at a time, in dependency order. Projects that already had the flow skill installed keep its
-old text (the board does not overwrite a skill you may have adjusted): delete it and install it
-again in the settings to get the new instruction.
+goes one at a time, in dependency order. The flow text is the board's current one, served
+through the MCP; a copy of the flow skill already installed in the tool's folder is not replaced by the
+board. To keep the tool from loading the old text on its own, delete that copy.
 
 ### The board in the browser, outside the editor
 
@@ -274,12 +274,12 @@ navegador**; the terminal `faz-ai` warns and does not start.
    profile in **Harness → Tool and execution**.
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
    **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads. This also happens on its own, silently, when the folder opens (and on every new extension version), always in the user scope; only a failure raises a notice.
-3. In the **Skills** group of the same tab, click **Instalar (padrão da ferramenta)** for the
-   flow skill (`faz-ai-fluxo`): it teaches the AI to take cards through the phases, write the
-   documents, ask for review and pick up pending work. The button also installs the per-topic skills
-   (card harness, working folder and PR, rounds, review and acceptance, autonomous mode). They can be edited.
+3. Optional: in the **Skills** group of the same tab, **Instalar (padrão da ferramenta)** (install, tool default)
+   copies the flow skill (`faz-ai-fluxo`) and the per-topic skills (card harness, working folder and PR,
+   rounds, review and acceptance, autonomous mode) into the tool. It is not needed: the board already serves
+   these skills through the MCP (`get_skill`). Installing them only matters if you want the tool to load them on its own.
 
-**Global only.** The server and the flow skill live in the tool's global configuration, and none of
+**Global only.** The server and any installed copy of the flow skill live in the tool's global configuration, and none of
 it goes into the project folder (which may be shared with people who do not have the extension):
 
 | Item | Where it writes |
@@ -346,10 +346,9 @@ changed. Next to it, in the editor, **Recarregar a janela** (reload the window) 
 extension: that is what makes a freshly updated extension take effect. With the AI working on a
 card, it asks first, because the run stops.
 
-The board MCP and the flow skill (`faz-ai-fluxo`) count as requirements for every tool: even where
-runs from the board carry the MCP on their own (Claude, Cursor), conversations in the editor chat or
-the terminal depend on it, and the skill is what makes the AI follow the flow. A missing skill has
-the **Install the skill** button in the environment check and in the chat bar. While the command line is missing or not signed in, the card's AI buttons are
+The board MCP counts as a requirement for every tool: even where runs from the board carry the MCP on
+their own (Claude, Cursor), conversations in the editor chat or the terminal depend on it, and it is how
+the flow reaches the AI (`get_skill`). An installed flow skill in the tool is not a requirement. While the command line is missing or not signed in, the card's AI buttons are
 disabled, with the reason in the tooltip.
 
 **Expired login: error warning and automatic resume.** When the warning's reason is sign-in (missing,
@@ -373,7 +372,7 @@ on another item shows inside it (the sign-in inside the command line, the graph 
 Graph). Hover over an item to see how the board uses it.
 
 - **Required:** Node.js 22 or newer and the project's AI tool, with its command line, the sign-in
-  (`claude auth login` or `cursor-agent login`), the board's MCP, the flow skill, the **harness
+  (`claude auth login` or `cursor-agent login`), the board's MCP, the **harness
   definition** and the permission level. The harness definition is a recommendation, not a blocker:
   the board works without it, only without the context savings and precision. It points out, one
   child per gap, what the artifact bank lacks: no skill, agent or MCP server in Pelo card mode (use
@@ -400,7 +399,7 @@ show the system's command: `xcode-select --install` and `brew install gh` on mac
 unknown distribution, only the site. Sign-ins and actions in the project folder (`git init`, `gh auth login`,
 `code-review-graph build`, `code-review-graph install --platform …`, `code-review-graph embed
 --provider local`) also show the command with a copy button. Only what belongs to
-the board has a button: installing the board's MCP and the flow skill, and opening the permission
+the board has a button: installing the board's MCP (and, if you want, the flow skill), and opening the permission
 level choice.
 
 The editor chat starts the board's MCP with the PATH the editor opened with: Node installed later
@@ -463,8 +462,8 @@ code, and `get_card` says which documents don't exist so it neither creates them
 of them. In Implementação, a story without sub-tasks gets one from the description.
 
 Boards created before get the new texts through **Atualizar board** (update board, in Settings), only
-in the columns that still have the previous default text: what you customized stays as it is. The
-installed flow skill doesn't change by itself; reinstall it (replacing) for it to teach the same.
+in the columns that still have the previous default text: what you customized stays as it is. The flow the AI reads is the board's
+current text, through the MCP: nothing needs reinstalling.
 
 ### Chat with the AI
 
