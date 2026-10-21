@@ -47,6 +47,23 @@ beforeEach(async () => {
 });
 
 describe('HostBridge: preferências da pessoa', () => {
+  it('publica status e resultado do teste de perfil sem configuração privada', async () => {
+    router.setAiProfileRuntime({
+      probe: async () => ({
+        type: 'aiProfiles.status',
+        profiles: { cli: { found: true, version: '1.0.0', signedIn: null, installUrl: null } },
+      }),
+      test: async (id) => ({ type: 'aiProfiles.testResult', id, ok: true, output: 'OK' }),
+    });
+    await bridge.handle({ type: 'settings.aiProfiles.probe', requestId: 'probe' });
+    await bridge.handle({ type: 'settings.aiProfiles.test', id: 'cli', requestId: 'test' });
+    expect(sent).toContainEqual({
+      type: 'aiProfiles.status',
+      profiles: { cli: { found: true, version: '1.0.0', signedIn: null, installUrl: null } },
+    });
+    expect(sent).toContainEqual({ type: 'aiProfiles.testResult', id: 'cli', ok: true, output: 'OK' });
+    expect(sent.filter((m) => m.type === 'done').map((m) => m.requestId)).toEqual(['probe', 'test']);
+  });
   it('o ready devolve as preferências guardadas e prefs.set grava no host, para o aviso dispensado não voltar', async () => {
     const data = new Map<string, unknown>();
     const prefs = new PrefsStore({ get: <T>(k: string) => data.get(k) as T | undefined, update: (k, v) => data.set(k, v) });
@@ -326,7 +343,7 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     expect(file.tables.cards!.map((c) => c.title)).toEqual(['Card 1']);
     expect(sent.at(-1)).toEqual({
       type: 'notice',
-      message: `Board exportado em /tmp/${saved[0]!.name}. O arquivo contém conversas e anexos: guarde-o com cuidado.`,
+      message: `Board exportado em /tmp/${saved[0]!.name}. O arquivo contém conversas e anexos: guarde-o com cuidado. Credenciais e variáveis dos perfis de CLI não vão no arquivo.`,
     });
   });
 
@@ -368,7 +385,7 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     expect(sent.at(-1)).toEqual({
       type: 'notice',
       message:
-        'Board "Meu Board" importado: 1 card(s) e 0 anexo(s). Perfis desativados para revisão local: Claude Code, Cursor, Kimi Code.',
+        'Board "Meu Board" importado: 1 card(s) e 0 anexo(s). Perfis desativados para revisão local: Claude Code, Cursor, Kimi Code. Credenciais dos perfis não vêm no arquivo: configure-as de novo neste computador.',
     });
     expect(changes).toBe(1);
     expect(router.boardId).toBe(oldBoardId); // o arquivo veio deste mesmo board: os ids se preservam
@@ -389,7 +406,16 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     const { token } = router.parkImport(parseExportFile(router.exportBoardFile().text), 10);
     createCard('Card 2');
     router.setAiRuns([
-      { cardId: router.snapshot().cards[0]!.id, runId: '', mode: 'phase', origin: 'manual', phase: '', model: null, startedAt: Date.now() },
+      {
+        cardId: router.snapshot().cards[0]!.id,
+        runId: '',
+        mode: 'phase',
+        origin: 'manual',
+        phase: '',
+        model: null,
+        tool: 'claude',
+        startedAt: Date.now(),
+      },
     ]);
     await bridge.handle({ type: 'backup.import.apply', token });
     expect(sent.at(-1)).toEqual({ type: 'error', message: 'Espere a execução da IA terminar para importar o board.' });
@@ -409,7 +435,7 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
 
   it('as mensagens de resultado listam os cards com anexo sem arquivo', () => {
     expect(exportNotice('/x/b.fazai.json', ['#3', '#8'])).toBe(
-      'Board exportado em /x/b.fazai.json. Anexos sem arquivo: #3, #8. O arquivo contém conversas e anexos: guarde-o com cuidado.',
+      'Board exportado em /x/b.fazai.json. Anexos sem arquivo: #3, #8. O arquivo contém conversas e anexos: guarde-o com cuidado. Credenciais e variáveis dos perfis de CLI não vão no arquivo.',
     );
     expect(importNotice({ boardId: 'b', boardName: 'B', cards: 2, attachments: 1, warnings: ['#3'], mcpSecrets: [] })).toBe(
       'Board "B" importado: 2 card(s) e 1 anexo(s). Anexos sem arquivo: #3.',
@@ -417,6 +443,20 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     expect(
       importNotice({ boardId: 'b', boardName: 'B', cards: 2, attachments: 1, warnings: [], mcpSecrets: ['github: GITHUB_TOKEN', 'x: K'] }),
     ).toBe('Board "B" importado: 2 card(s) e 1 anexo(s). Revise as configurações locais dos servidores MCP: github: GITHUB_TOKEN, x: K.');
+    expect(
+      importNotice({
+        boardId: 'b',
+        boardName: 'B',
+        cards: 0,
+        attachments: 0,
+        warnings: [],
+        mcpSecrets: [],
+        profileReviews: ['Claude Code'],
+        policyReviews: ['Quota'],
+      }),
+    ).toBe(
+      'Board "B" importado: 0 card(s) e 0 anexo(s). Perfis desativados para revisão local: Claude Code. Credenciais dos perfis não vêm no arquivo: configure-as de novo neste computador. Políticas pendentes de revisão: Quota.',
+    );
   });
 });
 
@@ -501,23 +541,7 @@ describe('HostBridge: card.usage.query', () => {
   });
 });
 
-describe('HostBridge: Settings do editor', () => {
-  it('ui.openIdeSettings pede ao editor para abrir o Settings na chave', async () => {
-    const keys: (string | undefined)[] = [];
-    env.openIdeSettings = (key) => void keys.push(key);
-    await bridge.handle({ type: 'ui.openIdeSettings', key: 'fazai.appearance.language' });
-    await bridge.handle({ type: 'ui.openIdeSettings' });
-    expect(keys).toEqual(['fazai.appearance.language', undefined]);
-  });
-
-  it('sem openIdeSettings no ambiente (modo navegador), a mensagem é ignorada sem erro', async () => {
-    delete env.openIdeSettings;
-    await expect(bridge.handle({ type: 'ui.openIdeSettings' })).resolves.toBeUndefined();
-    expect(sent.filter((m) => m.type === 'error')).toEqual([]);
-  });
-});
-
-describe('biblioteca: importar e abrir uma pasta', () => {
+describe('HostBridge: biblioteca do Harness', () => {
   it('o seletor lista as skills para revisão antes de copiar', async () => {
     const source = path.join(dir, 'colecao');
     fs.mkdirSync(path.join(source, 'react'), { recursive: true });

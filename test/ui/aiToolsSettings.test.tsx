@@ -1,0 +1,178 @@
+import { choose, confirmLast, lastSent, renderThemed, seedBoard, syncStore, type SeededBoard } from './setup';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { AiToolsSettings } from '../../src/webview/components/settings/AiToolsSettings';
+import { Dialog } from '../../src/webview/components/Dialog';
+import { useBoardStore } from '../../src/webview/store/boardStore';
+
+let board: SeededBoard;
+beforeAll(async () => {
+  board = await seedBoard();
+});
+const profileCard = (name: string) => screen.getByLabelText(name);
+const show = () => {
+  syncStore(board.router);
+  renderThemed(
+    <>
+      <AiToolsSettings />
+      <Dialog />
+    </>,
+  );
+  expect(lastSent('settings.aiProfiles.probe')).toBeDefined();
+  confirmLast();
+};
+
+describe('Ferramentas de IA', () => {
+  it('lista situação e capacidades sem tratar configuração como verificação; pronto e padrão não têm ações proibidas', async () => {
+    show();
+    act(() =>
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: {
+            type: 'aiProfiles.status',
+            profiles: {
+              claude: { found: true, version: '5.5.0', signedIn: true, installUrl: null },
+              cursor: { found: false, version: null, signedIn: null, installUrl: 'https://example.org' },
+            },
+          },
+        }),
+      ),
+    );
+    const claude = within(profileCard('Claude Code'));
+    expect(claude.getByText('Encontrada · 5.5.0')).toBeInTheDocument();
+    expect(claude.queryByRole('button', { name: 'Editar' })).toBeNull();
+    expect(claude.queryByRole('button', { name: 'Apagar' })).toBeNull();
+    expect(claude.getByRole('switch', { name: 'Ligado' })).toBeDisabled();
+    await userEvent.click(claude.getByText('Capacidades e evidências'));
+    expect(claude.getAllByText('Desconhecido').length).toBeGreaterThan(0);
+    expect(within(profileCard('Cursor')).getByText('Não encontrada')).toBeInTheDocument();
+  });
+
+  it('formulário novo exige nome e comando e mostra avisos de argumento no Windows e MCP nenhum', async () => {
+    show();
+    await userEvent.click(screen.getByRole('button', { name: 'Novo perfil' }));
+    const form = within(screen.getByLabelText('Novo perfil de CLI'));
+    const save = form.getByRole('button', { name: 'Salvar perfil' });
+    expect(save).toBeDisabled();
+    expect(form.getByText('Sem servidor do board, a CLI não poderá mover cards por MCP.')).toBeInTheDocument();
+    expect(form.queryByText(/8191 caracteres/)).toBeNull();
+    await choose(form.getByRole('combobox', { name: 'Entrada do pedido' }), 'Argumento');
+    expect(form.getByText(/8191 caracteres/)).toBeInTheDocument();
+    await userEvent.type(form.getByRole('textbox', { name: 'Nome' }), 'Minha CLI');
+    expect(save).toBeDisabled();
+    await userEvent.type(form.getByRole('textbox', { name: 'Comando' }), 'minha-cli');
+    expect(save).toBeEnabled();
+    await userEvent.click(save);
+    expect(lastSent('settings.aiProfiles.save').profile).toMatchObject({
+      name: 'Minha CLI',
+      kind: 'custom',
+      config: { command: 'minha-cli', promptVia: 'arg' },
+    });
+    confirmLast();
+  });
+
+  it('Testar pede confirmação de custo, mostra espera e publica o resultado', async () => {
+    show();
+    const claude = within(profileCard('Claude Code'));
+    await userEvent.click(claude.getByRole('button', { name: 'Testar' }));
+    expect(
+      screen.getByText('O teste roda a ferramenta e usa a sua assinatura. Uma resposta OK não comprova isolamento, permissões ou MCP.'),
+    ).toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Testar' }));
+    expect(lastSent('settings.aiProfiles.test')).toMatchObject({ id: 'claude' });
+    expect(claude.getByRole('status')).toHaveTextContent('Testando perfil…');
+    act(() =>
+      window.dispatchEvent(new MessageEvent('message', { data: { type: 'aiProfiles.testResult', id: 'claude', ok: true, output: 'OK' } })),
+    );
+    confirmLast();
+    await waitFor(() => expect(claude.getByText('OK')).toBeInTheDocument());
+    expect(claude.getByText('A resposta não comprova isolamento, permissões ou MCP.')).toBeInTheDocument();
+  });
+
+  it('perfil importado começa desligado e exige revisão local antes de ligar', async () => {
+    const custom = board.router.handle({
+      type: 'settings.aiProfiles.save',
+      profile: {
+        name: 'Importada',
+        kind: 'custom',
+        base: 'generic',
+        enabled: true,
+        position: 3,
+        config: { command: 'cli' },
+      },
+    });
+    const id = custom.board.aiProfiles.find((p) => p.name === 'Importada')!.id;
+    board.router.handle({ type: 'settings.aiProfiles.setEnabled', id, enabled: false });
+    show();
+    const current = useBoardStore.getState().state!;
+    act(() =>
+      useBoardStore.setState({
+        state: {
+          ...current,
+          board: {
+            ...current.board,
+            aiProfiles: current.board.aiProfiles.map((p) =>
+              p.id === id ? { ...p, credentials: { ...p.credentials!, review: 'pending' as const } } : p,
+            ),
+          },
+        },
+      }),
+    );
+    const imported = within(profileCard('Importada'));
+    expect(imported.getByRole('switch', { name: 'Ligado' })).toBeDisabled();
+    await userEvent.click(imported.getByRole('button', { name: 'Editar' }));
+    const form = within(screen.getByLabelText('Editar perfil Importada'));
+    expect(form.getByText('Os valores salvos não são mostrados. Deixe um campo vazio para manter o valor atual.')).toBeInTheDocument();
+    expect(form.getByText(/pendente de revisão local/)).toBeInTheDocument();
+    expect(form.getByRole('button', { name: 'Salvar perfil' })).toBeEnabled();
+    await userEvent.click(form.getByRole('button', { name: 'Salvar perfil' }));
+    expect(lastSent('settings.aiProfiles.save').profile).toMatchObject({ id, config: {} });
+    confirmLast();
+  });
+
+  it('torna um perfil ligado padrão, duplica e confirma antes de apagar', async () => {
+    const s = board.router.handle({
+      type: 'settings.aiProfiles.save',
+      profile: {
+        name: 'Perfil ações',
+        kind: 'custom',
+        base: 'generic',
+        enabled: true,
+        position: 4,
+        config: { command: 'cli' },
+      },
+    });
+    const custom = s.board.aiProfiles.find((p) => p.name === 'Perfil ações')!;
+    show();
+    const card = within(profileCard('Perfil ações'));
+    await userEvent.click(card.getByRole('radio', { name: 'Padrão' }));
+    expect(lastSent('settings.board.update')).toEqual({ type: 'settings.board.update', patch: { aiTool: custom.id } });
+    confirmLast();
+    await userEvent.click(card.getByRole('button', { name: 'Duplicar' }));
+    expect(lastSent('settings.aiProfiles.duplicate')).toMatchObject({ id: custom.id });
+    confirmLast();
+    await userEvent.click(card.getByRole('button', { name: 'Apagar' }));
+    expect(screen.getByText('Os cards que mencionam este perfil manterão o identificador antigo.')).toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Apagar' }));
+    expect(lastSent('settings.aiProfiles.remove')).toMatchObject({ id: custom.id });
+    confirmLast();
+  });
+
+  it('mostra o selo de isolamento sem tratar lista vazia como prova e grava o que a pessoa marcar', async () => {
+    show();
+    const claude = within(profileCard('Claude Code'));
+    expect(claude.getByText('Sem prova de isolamento')).toBeInTheDocument();
+    expect(within(profileCard('Cursor')).getByText('Carrega por conta própria')).toBeInTheDocument();
+    await userEvent.click(claude.getByText('Capacidades e evidências'));
+    expect(claude.getByText(/Conferido na documentação em 2026-10-16 · versão Claude Code/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Novo perfil' }));
+    const form = within(screen.getByLabelText('Novo perfil de CLI'));
+    await userEvent.type(form.getByRole('textbox', { name: 'Nome' }), 'Outra CLI');
+    await userEvent.type(form.getByRole('textbox', { name: 'Comando' }), 'outra-cli');
+    await userEvent.click(form.getByRole('checkbox', { name: 'Hooks · Usuário' }));
+    await userEvent.click(form.getByRole('button', { name: 'Salvar perfil' }));
+    expect(lastSent('settings.aiProfiles.save').profile.config.isolation).toEqual({ loads: [{ kind: 'hook', scope: 'user' }] });
+    confirmLast();
+  });
+});

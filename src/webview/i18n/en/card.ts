@@ -14,6 +14,8 @@ export const card: Record<string, string> = {
   'Ações do card': 'Card actions',
   Ações: 'Actions',
   Arquivar: 'Archive',
+  'Duplicar card': 'Duplicate card',
+  'Cópia de {title}': 'Copy of {title}',
   'Mover para a lixeira': 'Move to trash',
   'Fechar (Esc)': 'Close (Esc)',
   Fechar: 'Close',
@@ -274,4 +276,19 @@ export const card: Record<string, string> = {
   'Não foi possível ler o consumo do card.': "Could not read the card's usage.",
   'A consulta do consumo demorou demais. Tente de novo.': 'The usage query took too long. Try again.',
   '{name} (sempre)': '{name} (always)',
+  'Fora da conta: o que a CLI carrega por conta própria. {summary}': 'Outside the count: what the CLI loads on its own. {summary}',
+  // QuestionsCarousel
+  'Perguntas da IA': 'AI questions',
+  '{n} de {total}': '{n} of {total}',
+  Indicada: 'Recommended',
+  'Ou escreva a sua resposta': 'Or write your own answer',
+  Anterior: 'Previous',
+  Próxima: 'Next',
+  'Confira e envie': 'Review and send',
+  'não respondida': 'not answered',
+  '1 pergunta sem resposta': '1 unanswered question',
+  '{n} perguntas sem resposta': '{n} unanswered questions',
+  'As respostas vão para a descrição do card e a vez volta para a IA.':
+    'The answers go to the card description and the turn goes back to the AI.',
+  'Enviar respostas': 'Send answers',
 };

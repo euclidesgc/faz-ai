@@ -90,6 +90,23 @@ de vez, mexer em checklist, na conversa do card e em anexos (inclusive ler anexo
 colunas, tipos, campos e regras. Cards são referidos pelo número (`#12`) e colunas, tipos e campos
 pelo nome. Mensagens da IA na conversa saem assinadas com o nome do cliente (ex.: "Claude Code").
 
+`ask_questions` envia perguntas com opções para um carrossel no card. Antes, a IA detalha na descrição
+o motivo da opção indicada e as consequências das alternativas. Fora do modo autônomo, o card passa
+para `waiting_answer`; as respostas entram na seção "Perguntas e respostas" da descrição. No modo
+autônomo, o board registra a opção indicada para cada pergunta e a IA continua. `get_card` inclui
+`pendingQuestions` (pergunta, opções e indicada, sem IDs) somente enquanto houver perguntas pendentes.
+
+`ask_question` continua para a pergunta aberta, sem opções. `request_review` com `pending` fica para o que não é pergunta com opções (dado, acesso, ponto em aberto). Os modelos de documento das fases não têm mais a seção "Perguntas para você".
+
+Parâmetros de `ask_questions`: `card` e `questions`, uma lista de `{ question, options, recommended }`.
+`options` tem pelo menos duas opções, sem repetição, e `recommended` é o texto exato de uma delas. A
+chamada é recusada, sem gravar nada, com pergunta vazia, menos de duas opções, opções repetidas,
+indicada fora das opções, a mesma pergunta duas vezes na rodada ou lista vazia. Uma nova chamada
+substitui as perguntas ainda pendentes. A pergunta com o mesmo texto de uma já respondida substitui
+a resposta dela. O retorno traz `next`: fora do modo autônomo, manda parar até as respostas chegarem
+(o card volta para `ready`); no modo autônomo, avisa que cada pergunta foi respondida com a indicada
+e que a descrição deve ser relida com `get_card` antes de ser reescrita.
+
 Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) vêm com
 `board: true` em `get_board.fields`: as regras, a triagem e a IA dependem deles. `delete_field` e a
 troca de nome em `update_field` são recusadas neles, assim como opções e tipos de card (as opções de
@@ -104,6 +121,27 @@ Bash, sem argumentos, só do Claude Code), catálogo e regras de modelos (`get_m
 harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,
 `set_skill_enabled`, `delete_skill`…).
 
+`get_models.profiles` lista os perfis de CLI e seus IDs, sem comando, configuração ou ambiente
+privado. O prefixo do `value` escolhe o perfil de CLI que executa o card; sem modelo no card, no agente
+nem na regra, vale o perfil padrão. `set_ai_tool` define esse **perfil padrão**: recebe o ID de um perfil
+ligado e não cria, edita, revisa nem ativa perfis.
+Uma cópia usa o catálogo da origem. Para um perfil personalizado, os modelos podem ser cadastrados
+à mão; o campo Modelo também aceita “Outro modelo…” sem cadastro. O valor é
+`<perfil>:<modelo>@<esforço>` (sem `@<esforço>` quando não houver esforço). O perfil personalizado
+retorna saída em texto e consumo/custo desconhecidos, nunca zero presumido. Testar o perfil na
+interface usa a assinatura e uma resposta OK não comprova isolamento, permissões ou MCP.
+
+O bloco `model` do `get_card` é o alvo que de fato executa o card, resolvido na ordem Modelo do card,
+modelo do agente, regra de modelo (mesmo com o preenchimento automático desligado) e perfil padrão:
+`{ tool, model, effort, label, value, from, note }`. `tool` é o **perfil de CLI** que executa (não o
+agente) e `from` é `'card' | 'agent' | 'rule'`; no perfil padrão sem modelo o bloco não vem. Numa escolha
+explícita inválida (perfil desligado, modelo fora do catálogo, esforço inexistente) o bloco traz o valor
+escolhido, o `from` e `blocked: { reason, message }` (`profile-unavailable`, `model-unknown` ou
+`effort-invalid`), sem cair para o nível seguinte. `execution` (o que o board impõe) segue o perfil que
+executa. `get_execution_policies` lê as políticas de execução e troca de alvo (regra vencedora, destinos,
+limites e revisão), só leitura e sem segredos; criar, revisar e ativar política é ação da pessoa nas
+Configurações → Ferramentas de IA.
+
 Toda sessão recebe as instruções do servidor: o ciclo do card (por onde começar, status, revisão,
 modelo do card, rules e skills obrigatórias e pendências com a pessoa) em menos de 2.048 caracteres,
 o tamanho em que o Claude Code corta as instruções de cada servidor e a descrição de cada ferramenta
@@ -114,6 +152,13 @@ card pede; o texto completo fica em skills por assunto (`faz-ai-harness-do-card`
 `faz-ai-workspace-e-pr`, `faz-ai-implementacao-rodadas`, `faz-ai-revisao-e-homologacao` e
 `faz-ai-modo-autonomo`), que a nota aponta pelo nome.
 
+O fluxo chega por três caminhos, e nenhum deles depende de instalação: a linha que todo pedido do
+board traz (manda ler `faz-ai-fluxo` com `get_skill`), o `flowNote` de `get_card` e de `get_pending_work`
+(a mesma indicação) e as skills do fluxo em `requiredSkills`. Esse é o regime: uma orientação à IA,
+que a ferramenta segue como as demais instruções. Não há garantia de que a ferramenta leia o fluxo antes
+de agir, nem de que não carregue por conta própria uma cópia instalada da skill com o mesmo nome; o
+board só controla o que ele mesmo entrega.
+
 ### Status e revisão
 
 Cada card em que a IA atua tem um status de trabalho, devolvido em `work` por `get_card` e
@@ -123,7 +168,7 @@ Cada card em que a IA atua tem um status de trabalho, devolvido em `work` por `g
 | --- | --- | --- |
 | `ready` | IA | O card entrou numa coluna em que a IA atua, a pessoa pediu ajustes ou respondeu a uma pergunta |
 | `running` | IA | `start_work` |
-| `waiting_answer` | Pessoa | `ask_question` |
+| `waiting_answer` | Pessoa | `ask_question` ou `ask_questions` |
 | `waiting_review` | Pessoa | `request_review` |
 | `approved` | IA | A pessoa aprovou e o board não pôde mover o card (não há ferramenta para a IA aprovar; a aprovação normal já leva o card à próxima coluna) |
 | `blocked` | Pessoa | `block_card`, ou a pessoa bloqueou |
@@ -166,6 +211,7 @@ a origem não remove a cópia; `set_harness_selection` altera o modo, sem atuali
 - `get_project_profile`: perfil detectado do projeto, para sugestões sem executar comandos.
 - `preview_context_draft { target: { cardId, workflowId, phaseId, action } }`: prévia dos contratos v1 salvos, somente leitura. Use IDs estáveis (não números); `cardId` e `workflowId` são nulos ou mutuamente exclusivos e `phaseId` vazio indica ação sem fase. Ações: `work`, `refine`, `summary`, `conflict`, `chat`, `harness-agent`, `harness-rule`, `harness-skill`, `harness-suggest`. Retorna metadados, origens, revisões, caminho de herança e incompatibilidades, sem corpos de artefatos ou definições MCP. Não salva, não infere, não altera o runtime legado nem autoriza execução (`canExecute: false`, admissão #729 indisponível). Não há ferramenta MCP de escrita de contratos ou permissões.
 - `get_board_artifact { id }`: conteúdo completo de regra, skill ou agente; recusa MCPs.
+- `get_skill { skill }`: `SKILL.md` completo de uma skill do projeto ou de uma skill do fluxo do board: `faz-ai-fluxo` e as `faz-ai-*` por assunto. As do fluxo vêm do próprio board, sem arquivo instalado, e têm prioridade sobre um arquivo de mesmo nome.
 - `save_board_artifact { id?, kind, name, description, body, skills?, mcpServers?, categories? }`:
   cria/atualiza apenas na biblioteca. Tipos: `rule`, `skill`, `agent`; regra nova fica desligada.
   Edição exige id e mantém nome, arquivos de apoio e configurações omitidas. Categorias de agente:
@@ -211,9 +257,11 @@ arquivo mais o nome (`.mcp.json#github`). O `name` também serve para agente, sk
 "Skills" e "MCPs" dos cards só oferecem o que está em `contextual`; o servidor do board vai sempre, sem
 marcação. O inventário traz também o escopo `imported`: artefatos de pastas que a pessoa importou, que
 a ferramenta não carrega sozinha. Em `get_card`, `requiredRules` e `requiredSkills` trazem o caminho de cada
-arquivo que o card exige; para skills fora do projeto, `path` é o caminho absoluto do `SKILL.md`.
-Quando uma skill existe no projeto e fora dele com o mesmo nome, vale a do projeto. `create_skill` e
-`install_flow_skill` já marcam o que criam (`contextual` e `always`, respectivamente).
+arquivo que o card exige; para skills fora do projeto, `path` é o caminho absoluto do `SKILL.md`. As skills
+do fluxo do board vêm sem `path`, com `{ scope: "board", via: "get_skill" }`, e se leem com `get_skill`.
+Quando uma skill existe no projeto e fora dele com o mesmo nome, vale a do projeto (exceto as do fluxo, que
+são sempre as do board). `create_skill` e `install_flow_skill` já marcam o que criam (`contextual` e `always`,
+respectivamente). `install_flow_skill` é opcional: o board já serve o fluxo pelo `get_skill`.
 
 ### Skills sob demanda
 
@@ -260,9 +308,11 @@ linha de comando da ferramenta aceita é imposto por parâmetro:
 - `ready`: cards prontos para trabalhar (sub-tarefas de uma história que está com a pessoa ficam de fora).
 
 `withPerson` lista o que espera a pessoa. Cada mensagem da conversa traz `from` (`human` ou `ai`).
-A skill `faz-ai-fluxo`, instalada por `install_flow_skill` (sem `scope`: instala no global da ferramenta, para todos os projetos) ou pelo botão em Harness de IA, descreve
-o ciclo completo para a IA. A instalação grava também as skills por assunto citadas acima, que a skill
-principal e as notas do `get_card` apontam; checar se está instalada continua olhando só a `faz-ai-fluxo`.
+A skill `faz-ai-fluxo`, que descreve o ciclo completo para a IA, é servida pelo `get_skill` e não exige instalação.
+`install_flow_skill` (opcional; sem `scope`: instala no global da ferramenta, para todos os projetos, o mesmo que
+o botão em Harness de IA) copia para a pasta de skills da ferramenta a principal e as skills por assunto, para a
+ferramenta carregá-las sozinha. Não é requisito: a faixa de requisitos não cobra essa instalação.
+`get_card` e `get_pending_work` trazem `flowNote` com a indicação de ler o fluxo com `get_skill`.
 
 ### Execução pela conversa
 
@@ -296,7 +346,7 @@ pasta em que o código deve ser alterado. O nome da branch e a pasta são defini
 não deve criar branches por conta própria. Nas execuções pelo board, a pasta das worktrees é
 passada à ferramenta como pasta de trabalho extra (`--add-dir`).
 
-Com o gitflow ligado (`fazai.git.gitflow`, o padrão), a branch parte da `develop` (História, Débito
+Com o gitflow ligado (Configurações → Git › Usar o gitflow, o padrão), a branch parte da `develop` (História, Débito
 técnico e Retrabalho) ou da branch principal (Bug, que gera `hotfix/`); a pilha do modo autônomo e as
 histórias derivadas partem da branch da história anterior. `workspace` ganha três campos:
 
@@ -350,10 +400,10 @@ Configurações → Workflows e colunas ou por `update_column` (`ai_instruction`
 `artifact_template`).
 
 Ao ler um card (`get_card`), a IA recebe a ferramenta, o **modelo** e o **esforço** que devem executá-lo e as **Skills**
-obrigatórias com o caminho de cada `SKILL.md`. Ela é instruída a carregar essas skills antes de
-executar e a delegar o trabalho a um subagente com o modelo escolhido, ou avisar quando o cliente
-não permite. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue.
-
+obrigatórias com o caminho de cada `SKILL.md` (as do fluxo vêm sem caminho, para ler com `get_skill`). Ela é instruída a carregar essas skills antes de
+executar e a avisar a pessoa quando o modelo for outro. Na fase de código, as sub-tarefas são executadas
+pelo board (uma execução da CLI por sub-tarefa, com o modelo do card dela): a sessão da história cria e
+descreve as sub-tarefas e para, e `subtasksNow.byBoard` lista as que o board executa, na ordem. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue. Nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica negada; no Cursor e no Kimi Code, sem bloqueio comprovado, a capacidade fica "desconhecida" e a admissão decide). Em **Configurações → Harness de IA** (e em `fazai.git.parallelSubtasks`, de 1 a 6) a pessoa define **"Sub-tarefas em paralelo por história"**; a tela mostra o pedido e o efetivo (hoje 1).
 Fluxo SDD sugerido: a IA lê a história e a fase (`phase`), cria uma sub-tarefa com o campo Fase,
 constrói nela o documento da fase e o anexa à história (`artifact: true`), pede a revisão na
 história e para. Com a aprovação, move a história para a próxima coluna.
@@ -383,15 +433,15 @@ O schema 41 acrescenta definições e histórico de políticas. A importação f
 
 A webview e o navegador usam `executionPolicy.read` (biblioteca ou histórico paginado) e `executionPolicy.simulate` com respostas correlacionadas por `requestId`. A simulação usa uma cópia do rascunho e não grava, resolve segredos, gera recibos nem inicia CLI. Instalação, credenciais e admissão no cenário são hipóteses declaradas, não estado comprovado do host. O catálogo contém apenas metadados dos providers integrados.
 
-`settings.executionPolicy.save` e `settings.executionPolicy.remove` exigem ação da pessoa e revisão otimista; IA, MCP externo e tokens de execução são recusados. A UI permite salvar pendente ou confirmar revisão após comparar todas as condições/destinos/limites, preserva o rascunho em conflitos e permite recarregar a versão atual para nova comparação. Remoção cria revisão desativada e mantém o histórico. Rascunhos inválidos para o catálogo podem ser desativados ou removidos. Não foram adicionadas ferramentas MCP de escrita/ativação. A integração do avaliador com as inferências e a prévia Próxima execução continua pendente.
+A reserva legada das regras de modelo não existe mais em `ModelRule`: o valor `fallback` ainda gravado no JSON de boards antigos é lido só pela conversão, que ao abrir o board, salvar regras ou importar o transforma em proposta `legacy-<regra>` (desligada, pendente, versão 1; idempotente, sem migração de schema). `set_model_rules` não tem o parâmetro `fallback` (a chave é ignorada, como qualquer outra fora do schema) e `get_models` não devolve `fallbackSuggest` nem `fallbackValue`. `settings.executionPolicy.save` e `settings.executionPolicy.remove` exigem ação da pessoa e revisão otimista; IA, MCP externo e tokens de execução são recusados. A UI permite salvar pendente ou confirmar revisão após comparar todas as condições/destinos/limites, preserva o rascunho em conflitos e permite recarregar a versão atual para nova comparação. Remoção cria revisão desativada e mantém o histórico. Rascunhos inválidos para o catálogo podem ser desativados ou removidos. Não há ferramentas MCP de escrita/ativação: só `get_execution_policies`, de leitura. Runner, chat e assistentes decidem a troca de alvo pelo mesmo avaliador da prévia **Próxima execução**. O assistente de IA do editor (criar, sugerir fallbacks, revisar conflitos) só devolve uma proposta validada, sem segredos; não salva nem liga política.
 
 
 ### Perfis de CLI persistidos
 
-Schema 42 acrescenta `ai_profiles` à exportação e ao estado público do board. `config` é vazio nessa leitura; comandos/args/env e campos privados futuros ficam no mesmo cofre local dos MCPs, com posse por board/perfil. Importações aceitam somente referências, sem valores executáveis no JSON, e desativam os perfis até revisão humana local. A resposta da importação informa `profileReviews` com os nomes a revisar; não resolve credenciais nem executa probes. Duplicação explícita cria outra referência local e conserva revisão pendente/capacidades desconhecidas. Não há ferramenta MCP para criar/revisar/ativar perfis. Integração de perfis no gateway, catálogo/MCP e telas permanece para as etapas seguintes.
+Schema 42 acrescenta `ai_profiles` à exportação e ao estado público do board. `config` é vazio nessa leitura; comandos, argumentos, ambiente e outros valores privados ficam no cofre local dos MCPs, com posse por board/perfil. A exportação carrega referências, nunca os valores salvos. Importações desativam os perfis até revisão humana local. A resposta da importação informa `profileReviews` com os nomes a revisar; não resolve credenciais nem executa probes. Duplicação explícita cria outra referência local e conserva revisão pendente/capacidades desconhecidas. Não há ferramenta MCP para criar/revisar/ativar perfis: a gestão é feita na tela Configurações → Ferramentas de IA.
 
 
-`AiTool` agora identifica o perfil persistido; os dados nativos usam `AiBase` e `AI_BASES`/`ALL_AI_BASES`/`baseInfo`. O default do board valida perfis ligados/revisados e conserva IDs de cópias. Metadados desconhecidos são neutros, sem ampliar suporte/permissões. A gestão MCP do catálogo e a seleção por perfil ainda precisam da etapa #689; o enum público desses comandos continua restrito às três bases nesta etapa. Cópias/personalizados são recusados pelo provider atual, sem redirecionamento silencioso. O gateway do host também recusa perfis ausentes/desativados/pendentes antes de preparar snapshots ou iniciar CLI.
+O padrão do board aceita somente perfis ligados/revisados e conserva o ID de uma cópia; ela consulta o catálogo da origem, mas não herda a evidência de capacidades. Metadados desconhecidos não ampliam suporte ou permissões. O gateway recusa perfis ausentes, desativados ou pendentes antes de preparar a execução. A disponibilidade do comando e um resultado OK no teste não substituem evidência de isolamento, permissões ou MCP.
 
 
 ### Consultas de versão/login por perfil
@@ -400,7 +450,7 @@ Schema 42 acrescenta `ai_profiles` à exportação e ao estado público do board
 
 As sondas de perfil usam `execFile` sem shell, inclusive as consultas nativas; shims `.cmd`/`.bat` no Windows ficam desconhecidos nesse caminho. A versão retorna somente o trecho numérico reconhecido, com ocultação prévia dos valores privados; stdout/stderr brutos não vão ao estado. Sem `statusArgs`, personalizado não consulta/cobra login. Código zero/um/indisponível conserva verdadeiro/falso/desconhecido. As consultas configuradas exigem revisão humana e não comprovam capacidades. O cache é por perfil, executável e referência de credenciais.
 
-Requisitos de perfis configuráveis expõem nome público em `cli`, nunca comando/args/env. Link de instalação HTTPS revisado pode aparecer como metadado público; URL com usuário, senha, query ou fragmento é omitida. Cópias/personalizados não dependem do registro MCP global de outra conta. A execução e a admissão dos providers configuráveis ainda dependem de #687/#729.
+Requisitos de perfis configuráveis expõem nome público em `cli`, nunca comando/args/env. Link de instalação HTTPS revisado pode aparecer como metadado público; URL com usuário, senha, query ou fragmento é omitida. Cópias/personalizados não dependem do registro MCP global de outra conta. A execução de configuráveis exige contrato e admissão por capacidades; uma declaração manual não substitui a evidência exigida.
 
 
 ### Providers configuráveis e origem de teste
@@ -410,3 +460,7 @@ O gateway recebe a identidade/perfil escolhido, resolve a configuração privada
 O adaptador genérico monta stdin/argv, destinos MCP CLI/projeto/nenhum, modelo/esforço/pastas e argumentos por permissão. Caminho MCP precisa ficar no projeto; ausência de argumentos restritos recusa montagem. Lookup é exato por PATH/absoluto e não usa shell. Seu leitor de texto retorna `measure: none`, consumo/custo desconhecidos e não transforma isso em medição quebrada ou zero. O gateway oculta valores privados e classifica frases literais de autenticação antes da ocultação; não interpreta essas frases como regex.
 
 Schema 43 amplia o CHECK de `ai_runs.origin` para `test`. A reconstrução transacional preserva IDs, consumo, auditoria, inventário e Bash; as FKs dos filhos são conferidas e restauradas. Import/export continua versionado. A migração foi exercitada apenas em bancos descartáveis nesta implementação; o banco vivo do board não foi alterado diretamente.
+
+## O que a CLI carrega por conta própria (`cliLoads`)
+
+`get_card` (em `execution.cliLoads`) e `get_harness` (`cliLoads`) devolvem `{ contextEnforced, loads, unrecognized?, summary, note }` do perfil ativo. `loads` lista os tipos (`instructions`, `skill`, `agent`, `hook`, `mcp`) e a origem (`project`, `user`) que a CLI lê sozinha; `contextEnforced` só é verdadeiro com as capacidades de conversa nova e de controle de artefatos verificadas pelo host. Lista vazia significa nenhum item conhecido e não prova isolamento. Em conflito entre o que a CLI leu e o que o board entregou, vale o board. `ai_runs.clean` das execuções novas segue `contextEnforced`; as antigas mantêm o valor gravado.

@@ -3,6 +3,8 @@ import { modelDisplay } from '../../modelText';
 import { baseInfo } from '../../../shared/harness';
 import { EFFORT_FIELD, TYPE_CONDITION, describeRule, modelValue, type ModelRule, type RuleCondition } from '../../../shared/models';
 import type { BoardState } from '../../../shared/model';
+import { activeProfile } from '../../../shared/aiProfiles';
+import { modelGroups } from '../../../shared/runTarget';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { useAction } from '../../useAction';
@@ -151,22 +153,6 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
         {() => <ModelEditor value={rule.model} onChange={(v) => setRule({ ...rule, model: typeof v === 'string' ? v : '' })} />}
       </FormField>
 
-      <FormField
-        label={t('Reserva (opcional)')}
-        hint={
-          rule.fallback
-            ? modelDisplay(state.board.modelCatalog, rule.fallback, true)
-            : t('Sem reserva: se o modelo principal esgotar o limite, a execução não é repetida.')
-        }
-      >
-        {() => (
-          <ModelEditor
-            value={rule.fallback ?? null}
-            onChange={(v) => setRule({ ...rule, fallback: typeof v === 'string' && v ? v : null })}
-          />
-        )}
-      </FormField>
-
       <div className="form-actions">
         <Button variant="soft" color="gray" onClick={onCancel}>
           {t('Cancelar')}
@@ -182,8 +168,9 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
 /** Lista das regras em uso (a ordem importa) e o montador de regras. */
 export function ModelRulesEditor() {
   const state = useBoardStore((s) => s.state)!;
-  const { modelRules: rules, modelCatalog: allModels, aiTool } = state.board;
-  const catalog = allModels.filter((o) => o.tool === aiTool);
+  const { modelRules: rules, aiTool } = state.board;
+  // modelos de todos os perfis ligados; o padrão do novo modelo é o do perfil padrão (o primeiro grupo)
+  const catalog = modelGroups(state.board).flatMap((g) => g.options);
   const [editing, setEditing] = useState<ModelRule | null>(null);
   const suggest = useAction(() => settings.suggestModelRules(aiTool));
 
@@ -204,14 +191,13 @@ export function ModelRulesEditor() {
   const startNew = () => {
     const src = sources(state);
     const first = src.find((s) => s.name.toLowerCase() === EFFORT_FIELD.toLowerCase()) ?? src[0]!;
-    const o = catalog[0];
+    const o = modelGroups(state.board).find((g) => g.cli === activeProfile(state.board).id)?.options[0] ?? catalog[0];
     setEditing({
       id: newId(),
       name: '',
       enabled: true,
       groups: [[{ fieldId: first.id, op: 'is', value: first.values[0] ?? '' }]],
       model: o ? modelValue(o.id, o.defaultEffort) : '',
-      fallback: null,
     });
   };
   const tool = baseInfo(aiTool);
@@ -277,12 +263,7 @@ export function ModelRulesEditor() {
               </td>
               <td>{r.name ? dt(r.name) : <span className="muted">{t('(sem nome)')}</span>}</td>
               <td>{describeRule(state, r, { word: t, name: dt })}</td>
-              <td>
-                {modelDisplay(allModels, r.model, true)}
-                {r.fallback && (
-                  <div className="muted small">{t('reserva: {model}', { model: modelDisplay(allModels, r.fallback, true) })}</div>
-                )}
-              </td>
+              <td>{modelDisplay(state.board.modelCatalog, r.model, true)}</td>
               <td className="narrow">
                 <IconButton
                   variant="ghost"

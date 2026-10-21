@@ -90,6 +90,7 @@ describe('Diagnóstico do ambiente', () => {
           ['harness-agents', 'ok'],
           ['harness-rules', 'ok'],
           ['harness-missing', 'ok'],
+          ['harness-isolation', 'ok'],
         ],
       ],
     ]);
@@ -165,6 +166,7 @@ describe('Diagnóstico do ambiente', () => {
       ['harness-agents', 'ok'],
       ['harness-rules', 'missing'],
       ['harness-missing', 'missing'],
+      ['harness-isolation', 'ok'],
     ]);
     // recomendação: só as faltas dentro dele contam, e sem o inventário fica pulado
     expect(missingCount([r.harness])).toBe(2);

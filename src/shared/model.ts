@@ -20,6 +20,18 @@ import type { BranchRenamePending, RenameOutcome } from './branchRename';
 
 export type Id = string;
 
+/** Pergunta da IA à pessoa, com opções; fica pendente no card até a pessoa enviar as respostas. */
+export interface CardQuestion {
+  /** Gerado pelo board ao registrar; a resposta aponta para ele. */
+  id: Id;
+  /** Uma linha, sem quebras. */
+  question: string;
+  /** Pelo menos duas, sem repetidas. */
+  options: string[];
+  /** Uma das opções. */
+  recommended: string;
+}
+
 export type WorkflowKind = 'parent' | 'child';
 /** O que a coluna representa no fluxo. */
 export type ColumnCategory = 'open' | 'done' | 'cancelled';
@@ -99,6 +111,8 @@ export interface CardType {
 
 export interface Card {
   id: Id;
+  /** Perguntas pendentes da IA (o carrossel); vazio quando não há. */
+  questions: CardQuestion[];
   /** identificador visível (#12): sequencial por board, nunca reutilizado */
   number: number;
   boardId: Id;
@@ -235,6 +249,8 @@ export interface AiActivity {
   phase: string;
   /** nome do modelo, ou null quando a ferramenta decide */
   model: string | null;
+  /** o perfil de CLI (id) da execução */
+  tool: AiTool;
   /** ms, o mesmo startedAt da linha do log */
   startedAt: number;
 }
@@ -290,8 +306,8 @@ export interface BoardState {
   requirements: BoardRequirement[];
   /** quando o host terminou a última conferência dos requisitos (ms), mesmo sem mudança; 0 antes da primeira */
   requirementsCheckedAt: number;
-  /** a ferramenta ativa falhou por login vencido numa execução; null quando não há aviso reativo ativo */
-  authExpired: AiTool | null;
+  /** os perfis de CLI (ids) que falharam por login vencido numa execução; vazio quando não há aviso reativo ativo */
+  authExpired: AiTool[];
   /** branches e worktrees órfãs, varridas pelo host; vazio antes da primeira varredura (runtime, não vai para o banco) */
   orphans: OrphanReport;
   /** o último Diagnóstico do ambiente; null antes de rodar a primeira vez */

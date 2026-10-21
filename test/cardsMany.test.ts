@@ -1,5 +1,5 @@
-// Handlers das 3 mensagens "Many" (card.archiveMany, card.trashMany, card.moveMany), direto no
-// router — sem MCP nem UI, no padrão de test/delivery.test.ts. Cobre o que a Spec pede: ignorar
+// Handlers das mensagens "Many" (card.archiveMany, card.trashMany, card.restoreMany, card.deletePermanentMany,
+// card.moveMany), direto no router — sem MCP nem UI, no padrão de test/delivery.test.ts. Cobre o que a Spec pede: ignorar
 // sub-tarefa e card já arquivado/na lixeira da lista, e o moveMany pulando quem o `moveInner`
 // recusa (ou cancelando as sub-tarefas do lote) sem interromper os demais.
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -105,6 +105,97 @@ describe('card.trashMany', () => {
     expect(card(sub).deletedAt).toBeNull();
     // já estava arquivada: o lote não manda para a lixeira por cima
     expect(card(h2).deletedAt).toBeNull();
+  });
+});
+
+describe('card.unarchiveMany', () => {
+  it('restaurar a história traz as sub-tarefas arquivadas e deixa as da lixeira', () => {
+    const h = createStory('Uma');
+    const aberta = createSub('Aberta', h);
+    const lixo = createSub('Lixo', h);
+    router.handle({ type: 'card.trash', cardId: lixo });
+    router.handle({ type: 'card.archive', cardId: h });
+
+    router.handle({ type: 'card.unarchiveMany', cardIds: [h] });
+
+    expect(card(h).archivedAt).toBeNull();
+    expect(card(aberta).archivedAt).toBeNull();
+    expect(card(lixo).deletedAt).not.toBeNull();
+  });
+
+  it('restaurar a sub-tarefa de uma história arquivada traz a história inteira', () => {
+    const h = createStory('Uma');
+    const s1 = createSub('Um', h);
+    const s2 = createSub('Dois', h);
+    router.handle({ type: 'card.archive', cardId: h });
+
+    router.handle({ type: 'card.unarchiveMany', cardIds: [s1] });
+
+    expect(card(h).archivedAt).toBeNull();
+    expect(card(s1).archivedAt).toBeNull();
+    expect(card(s2).archivedAt).toBeNull();
+  });
+
+  it('lote misto: ignora duplicados, inexistentes, não arquivados e na lixeira, sem interromper o resto', () => {
+    const h1 = createStory('Uma');
+    const sub1 = createSub('Passo', h1);
+    const h2 = createStory('Duas');
+    const viva = createStory('Viva');
+    const lixo = createStory('Lixo');
+    router.handle({ type: 'card.archive', cardId: h1 });
+    router.handle({ type: 'card.archive', cardId: h2 });
+    router.handle({ type: 'card.archive', cardId: lixo });
+    router.handle({ type: 'card.trash', cardId: lixo });
+
+    router.handle({ type: 'card.unarchiveMany', cardIds: ['nao-existe', h1, sub1, h1, viva, lixo, h2] });
+
+    expect(card(h1).archivedAt).toBeNull();
+    expect(card(sub1).archivedAt).toBeNull();
+    expect(card(h2).archivedAt).toBeNull();
+    expect(card(viva).archivedAt).toBeNull();
+    expect(card(lixo).deletedAt).not.toBeNull();
+  });
+
+  it('lote vazio não faz nada', () => {
+    const h = createStory('Uma');
+    router.handle({ type: 'card.archive', cardId: h });
+    router.handle({ type: 'card.unarchiveMany', cardIds: [] });
+    expect(card(h).archivedAt).not.toBeNull();
+  });
+});
+
+describe('card.trashArchivedMany', () => {
+  it('a história arquivada vai para a lixeira com as sub-tarefas arquivadas', () => {
+    const h = createStory('Uma');
+    const sub = createSub('Passo', h);
+    router.handle({ type: 'card.archive', cardId: h });
+
+    router.handle({ type: 'card.trashArchivedMany', cardIds: [h, sub] });
+
+    expect(card(h).deletedAt).not.toBeNull();
+    expect(card(sub).deletedAt).not.toBeNull();
+  });
+
+  it('sub-tarefa arquivada sozinha vai para a lixeira sem levar a história', () => {
+    const h = createStory('Uma');
+    const sub = createSub('Passo', h);
+    router.handle({ type: 'card.archive', cardId: sub });
+
+    router.handle({ type: 'card.trashArchivedMany', cardIds: [sub] });
+
+    expect(card(sub).deletedAt).not.toBeNull();
+    expect(card(h).deletedAt).toBeNull();
+  });
+
+  it('lote misto: ignora não arquivados, inexistentes e duplicados', () => {
+    const arq = createStory('Arquivada');
+    const viva = createStory('Viva');
+    router.handle({ type: 'card.archive', cardId: arq });
+
+    router.handle({ type: 'card.trashArchivedMany', cardIds: [viva, 'nao-existe', arq, arq] });
+
+    expect(card(arq).deletedAt).not.toBeNull();
+    expect(card(viva).deletedAt).toBeNull();
   });
 });
 
@@ -225,5 +316,62 @@ describe('card.status.setMany', () => {
       'Só uma pessoa',
     );
     expect(card(a).status).not.toBe('blocked');
+  });
+});
+
+describe('card.restoreMany', () => {
+  it('restaura as lixeiras da lista e ignora card vivo e id inexistente', () => {
+    const h1 = createStory('Uma');
+    const h2 = createStory('Duas');
+    const viva = createStory('Viva');
+    router.handle({ type: 'card.trash', cardId: h1 });
+    router.handle({ type: 'card.trash', cardId: h2 });
+
+    router.handle({ type: 'card.restoreMany', cardIds: ['nao-existe', h1, viva, h2] });
+
+    expect(card(h1).deletedAt).toBeNull();
+    expect(card(h2).deletedAt).toBeNull();
+    expect(card(viva).deletedAt).toBeNull();
+  });
+
+  it('restaura a história com os filhos e não interrompe o lote quando a sub-tarefa vem antes do pai', () => {
+    const h1 = createStory('Uma');
+    const s1 = createSub('Passo', h1);
+    const h2 = createStory('Duas');
+    router.handle({ type: 'card.trash', cardId: h1 });
+    router.handle({ type: 'card.trash', cardId: h2 });
+
+    // a sub-tarefa vem primeiro: o pai ainda está na lixeira, então ela é recusada; h1 e h2 seguem
+    router.handle({ type: 'card.restoreMany', cardIds: [s1, h1, h2] });
+
+    expect(card(h1).deletedAt).toBeNull();
+    expect(card(s1).deletedAt).toBeNull();
+    expect(card(h2).deletedAt).toBeNull();
+  });
+});
+
+describe('card.deletePermanentMany', () => {
+  it('apaga de vez as lixeiras da lista com os filhos e ignora card vivo', () => {
+    const h1 = createStory('Uma');
+    const s1 = createSub('Passo', h1);
+    const viva = createStory('Viva');
+    router.handle({ type: 'card.trash', cardId: h1 });
+
+    router.handle({ type: 'card.deletePermanentMany', cardIds: [h1, viva, 'nao-existe'] });
+
+    const ids = router.snapshot().cards.map((c) => c.id);
+    expect(ids).not.toContain(h1);
+    expect(ids).not.toContain(s1);
+    expect(ids).toContain(viva);
+  });
+
+  it('ignora a sub-tarefa listada depois da história que já a levou junto', () => {
+    const h1 = createStory('Uma');
+    const s1 = createSub('Passo', h1);
+    router.handle({ type: 'card.trash', cardId: h1 });
+
+    router.handle({ type: 'card.deletePermanentMany', cardIds: [h1, s1] });
+
+    expect(router.snapshot().cards.map((c) => c.id)).not.toContain(h1);
   });
 });

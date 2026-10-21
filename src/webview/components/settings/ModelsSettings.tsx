@@ -1,6 +1,6 @@
-import type { AiBase } from '../../../shared/aiProfiles';
-import { useState, type KeyboardEvent } from 'react';
-import { AI_BASES, type AiTool } from '../../../shared/harness';
+import { activeProfile, catalogTool, type AiBase } from '../../../shared/aiProfiles';
+import { useEffect, useState, type KeyboardEvent } from 'react';
+import type { AiTool } from '../../../shared/harness';
 import { modelId, type ModelOption } from '../../../shared/models';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
@@ -110,7 +110,11 @@ function NewModelCard({
 
 export function ModelsSettings() {
   const state = useBoardStore((s) => s.state)!;
-  const { modelCatalog: catalog, modelRules, rules, aiTool } = state.board;
+  const { modelCatalog: catalog, modelRules, rules, aiTool, aiProfiles } = state.board;
+  const [profileId, setProfileId] = useState(aiTool);
+  useEffect(() => setProfileId(aiTool), [aiTool]);
+  const profile = aiProfiles.find((p) => p.id === profileId) ?? activeProfile(state.board);
+  const toolId = catalogTool(profile);
   const [adding, setAdding] = useState(false);
   // detectar lê a CLI ou a conta: o botão da ferramenta clicada mostra a espera
   const detect = useAction((tool: AiTool) => settings.detectModels(tool));
@@ -123,7 +127,8 @@ export function ModelsSettings() {
     setCatalog(sent.current().map((o) => (o.id === id ? { ...o, ...patch } : o)));
 
   // o projeto trabalha com uma ferramenta por vez: só os modelos dela aparecem
-  const tools = AI_BASES.filter((tl) => tl.id === aiTool);
+  const tools = [{ id: toolId, label: profile.name, kind: profile.kind, base: profile.base }];
+  const source = profile.kind === 'custom' ? t('cadastrada à mão') : t(SOURCES[profile.base as AiBase]);
 
   return (
     <div>
@@ -131,21 +136,23 @@ export function ModelsSettings() {
         title={t('Modelos de IA')}
         actions={
           <>
-            {tools.map((tl) => (
-              <ActionButton
-                key={tl.id}
-                variant="soft"
-                color="gray"
-                loading={detect.busy && detecting === tl.id}
-                hint={t('Fonte: {source}', { source: t(SOURCES[tl.id]) })}
-                onClick={() => {
-                  setDetecting(tl.id);
-                  void detect.run(tl.id);
-                }}
-              >
-                {t('Detectar modelos')}
-              </ActionButton>
-            ))}
+            {tools
+              .filter((tl) => tl.kind === 'builtin')
+              .map((tl) => (
+                <ActionButton
+                  key={tl.id}
+                  variant="soft"
+                  color="gray"
+                  loading={detect.busy && detecting === tl.id}
+                  hint={t('Fonte: {source}', { source })}
+                  onClick={() => {
+                    setDetecting(tl.id);
+                    void detect.run(tl.id);
+                  }}
+                >
+                  {t('Detectar modelos')}
+                </ActionButton>
+              ))}
             <ActionButton
               disabled={adding}
               disabledReason={t('O formulário já está aberto logo abaixo.')}
@@ -157,10 +164,19 @@ export function ModelsSettings() {
           </>
         }
       >
-        {t(
-          'Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards. A ferramenta é escolhida em Harness.',
-        )}
+        {t('Modelos do perfil selecionado, com os níveis de esforço de cada um. Escolher um catálogo não muda o perfil executor do board.')}
       </PageHeader>
+
+      <FormField label={t('Perfil')}>
+        {(id) => (
+          <SelectField
+            id={id}
+            value={profile.id}
+            onChange={setProfileId}
+            options={aiProfiles.filter((p) => p.enabled).map((p) => ({ value: p.id, label: p.name }))}
+          />
+        )}
+      </FormField>
 
       {tools.map((tl) => {
         const mine = catalog.filter((o) => o.tool === tl.id);
@@ -169,7 +185,7 @@ export function ModelsSettings() {
             key={tl.id}
             title={tl.label}
             badge={{ text: t('{count} modelo(s)', { count: mine.length }), on: false }}
-            hint={t('Ao detectar: {source}. Modelos que você acrescentou à mão são mantidos.', { source: t(SOURCES[tl.id]) })}
+            hint={t('Ao detectar: {source}. Modelos que você acrescentou à mão são mantidos.', { source })}
           >
             {tl.id === 'cursor' && (
               <div className="models-fast">
@@ -282,7 +298,9 @@ export function ModelsSettings() {
                 {mine.length === 0 && (
                   <tr>
                     <td colSpan={5} className="muted">
-                      {t('Nenhum modelo. Use "Detectar modelos" ou "Novo modelo".')}
+                      {profile.kind === 'builtin'
+                        ? t('Nenhum modelo. Use "Detectar modelos" ou "Novo modelo".')
+                        : t('Nenhum modelo. Use "Novo modelo" para cadastrar à mão.')}
                     </td>
                   </tr>
                 )}

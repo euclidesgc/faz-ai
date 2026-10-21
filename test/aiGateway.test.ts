@@ -9,7 +9,9 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Database } from 'sql.js';
-import { AiGateway, NO_CARD, type AiCall, type AiRunEnd } from '../src/extension/ai/gateway';
+import { AiGateway, NO_CARD, missingProfileCommand, type AiCall, type AiRunEnd } from '../src/extension/ai/gateway';
+import { commandNotFound } from '../src/extension/cliResolve';
+import { SpawnNotStartedError } from '../src/extension/processIdentity';
 import { MeasureEndedError } from '../src/extension/aiOutput/errors';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import { ChatSession } from '../src/extension/chat';
@@ -27,6 +29,27 @@ import { monthOf, type AiRunOrigin } from '../src/shared/log';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 const CLAUDE_OUTPUT = fs.readFileSync(path.join(__dirname, 'fixtures', 'claude-stream-json.jsonl'), 'utf8');
+
+it('comando ausente de perfil personalizado mostra só o link público de instalação revisado', () => {
+  const profile: import('../src/shared/aiProfiles').AiProfile = {
+    id: 'personalizado',
+    name: 'Minha CLI',
+    kind: 'custom',
+    base: 'generic',
+    enabled: true,
+    position: 3,
+    config: { command: 'missing-custom', installUrl: 'https://example.com/install' },
+    credentials: { secretRef: 'b'.repeat(64), review: 'reviewed', available: true },
+  };
+  const missing = () => new SpawnNotStartedError(commandNotFound('missing-custom'));
+  expect(missingProfileCommand(missing(), profile).message).toContain('Instalação do perfil: https://example.com/install');
+  expect(
+    missingProfileCommand(missing(), { ...profile, config: { ...profile.config, installUrl: 'https://example.com/?token=private' } })
+      .message,
+  ).not.toContain('https://');
+  expect(missingProfileCommand(missing(), { ...profile, kind: 'builtin' }).message).not.toContain('https://example.com/install');
+  expect(missingProfileCommand(new SpawnNotStartedError('Outra falha'), profile).message).toBe('Outra falha');
+});
 
 let dir: string;
 let db: Database;
@@ -125,6 +148,41 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     vi.advanceTimersByTime(61_000);
 
     expect(rows().map((r) => r.outcome)).toEqual(['failed', 'stopped', 'timeout']);
+  });
+
+  it('o empréstimo do arquivo MCP do projeto usa a raiz do gateway e volta no tempo limite (relógio falso)', () => {
+    vi.useFakeTimers();
+    const coordination = path.join(dir, 'coordenacao');
+    const file = path.join(dir, '.cursor/mcp.json');
+    // o processo falso confirma o fim da árvore: só então o arquivo pode voltar
+    const confirmingSpawn: SpawnFn = (command, cwd, out) => {
+      const proc = spawn(command, cwd, out);
+      let ended = false;
+      const kill = proc.kill;
+      return { ...proc, onExit: proc.onExit, kill: () => ((ended = true), kill()), terminationConfirmed: () => ended };
+    };
+    const g = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn: confirmingSpawn,
+      leaseCoordinationDir: coordination,
+    });
+    g.run(
+      call({
+        tool: 'cursor',
+        timeoutMinutes: 1,
+        prepare: () => ({
+          input: { prompt: 'oi', permission: 'board', boardServer: { command: '/usr/bin/node', args: ['/dados/bridge.js', dir] } },
+          config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: false, skills: [], mcp: null },
+        }),
+      }),
+    );
+    expect(fs.existsSync(file)).toBe(true);
+    expect(fs.readdirSync(coordination)).toHaveLength(1);
+    vi.advanceTimersByTime(61_000);
+    expect(rows()[0]!.outcome).toBe('timeout');
+    expect(fs.existsSync(file)).toBe(false);
+    expect(fs.readdirSync(coordination)).toEqual([]);
   });
 
   it('a falha antes do primeiro evento não é repetida e fica com o consumo desconhecido, não zero (#739)', () => {

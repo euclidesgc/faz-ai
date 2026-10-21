@@ -11,7 +11,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { executionPlan, type BoardServerSpec } from '../src/extension/execution';
 import { requiredRules, requiredSkills } from '../src/extension/mcp/format';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { contextLines } from '../src/extension/promptContext';
+import { FLOW_LINE, contextLines } from '../src/extension/promptContext';
 import type { ModelOption } from '../src/shared/models';
 import type { BoardState, Card } from '../src/shared/model';
 
@@ -43,6 +43,7 @@ interface Fixture {
   removeSources(): void;
   /** relê o board (como a abertura e cada mudança de artefato fazem) */
   reload(): BoardState;
+  router: MessageRouter;
   cleanup(): void;
 }
 
@@ -84,6 +85,11 @@ async function buildExecutionState(): Promise<Fixture> {
   write(path.join(skillDir, 'SKILL.md'), `---\nname: ${SKILL}\ndescription: Checklist de revisão\n---\n\nSiga a referência.\n`);
   write(path.join(skillDir, 'referencia.md'), '# Referência\nItens da revisão.\n');
   write(path.join(skillDir, 'logo.png'), PNG_BYTES);
+  // a skill do fluxo instalada à mão na pasta da ferramenta: o pedido a ignora (vem por get_skill)
+  write(
+    path.join(projectDir, '.claude', 'skills', 'faz-ai-fluxo', 'SKILL.md'),
+    '---\nname: faz-ai-fluxo\ndescription: Fluxo\n---\n\nCópia velha.\n',
+  );
   // instruções: CLAUDE.md em "Sempre" e uma rule pelo card
   write(path.join(projectDir, 'CLAUDE.md'), '# Regras do projeto\nResponda em português.\n');
   write(path.join(projectDir, '.claude', 'rules', `${RULE}.md`), '# Estilo\nSem ponto e vírgula solto.\n');
@@ -110,6 +116,7 @@ async function buildExecutionState(): Promise<Fixture> {
     });
   mark('agent', [AGENT], 'contextual');
   mark('skill', [SKILL], 'contextual');
+  mark('skill', ['faz-ai-fluxo'], 'always');
   mark('instructions', ['CLAUDE.md'], 'always');
   mark('instructions', [RULE], 'contextual');
   mark('mcp', ['memoria', 'github'], 'contextual');
@@ -135,6 +142,7 @@ async function buildExecutionState(): Promise<Fixture> {
     s,
     servers: router.libraryMcpDefinitions(),
     card: s.cards.find((c) => c.id === cardId)!,
+    router,
     projectDir,
     homeDir,
     removeSources: () => {
@@ -182,7 +190,6 @@ function expectSameExecution(f: Fixture) {
     description: 'Revisa código com rigor',
     prompt: 'Revise o código sem alterar arquivos.',
   });
-  expect(input.delegates).toEqual([]);
 
   // ferramentas liberadas e negadas
   expect(input.tools).toEqual(['Read', 'Grep', 'Glob']);
@@ -212,9 +219,10 @@ function expectSameExecution(f: Fixture) {
   expect(path.basename((rules[0] as { path: string }).path)).toBe(`${RULE}.md`);
 
   // o pedido: CLAUDE.md em "Sempre" no contexto fixo; skill e rule do card no contexto do card
-  expect(lines.always).toHaveLength(1);
-  expect(lines.always[0]).toContain('Contexto fixo deste board');
-  expect(lines.always[0]).toContain('rule CLAUDE.md (');
+  expect(lines.always).toHaveLength(2);
+  expect(lines.always[0]).toBe(FLOW_LINE);
+  expect(lines.always[1]).toContain('Contexto fixo deste board');
+  expect(lines.always[1]).toContain('rule CLAUDE.md (');
   expect(lines.card).toHaveLength(1);
   expect(lines.card[0]).toContain(`skill ${SKILL} (`);
   expect(lines.card[0]).toContain(`rule .claude/rules/${RULE}.md (`);
@@ -222,11 +230,13 @@ function expectSameExecution(f: Fixture) {
 
   // resumo e orientações do log da execução
   expect(plan.summary).toContain('Agente do board: revisor (inline)');
-  expect(plan.summary).toContain(`Skills: ${SKILL} (pelo caminho do arquivo)`);
-  expect(plan.summary).toContain('Servidores MCP: faz-ai, memoria (imposto)');
-  expect(plan.summary).toContain('Ferramentas: Read, Grep, Glob (imposto)');
-  expect(plan.summary).toContain('Ferramentas negadas: Write, Edit (imposto)');
-  expect(plan.summary).toContain('Modelo: sonnet · medium (imposto)');
+  expect(plan.summary).toContain('Fluxo do board: faz-ai-fluxo (pelo MCP)');
+  expect(plan.summary).toContain('Contexto fixo: rule CLAUDE.md (pelo pedido)');
+  expect(plan.summary).toContain(`Skills: ${SKILL} (pelo pedido)`);
+  expect(plan.summary).toContain('Servidores MCP: faz-ai, memoria (imposto pela CLI)');
+  expect(plan.summary).toContain('Ferramentas: Read, Grep, Glob (imposto pela CLI)');
+  expect(plan.summary).toContain('Ferramentas negadas: Write, Edit (imposto pela CLI)');
+  expect(plan.summary).toContain('Modelo: sonnet · medium (imposto pela CLI)');
   expect(plan.advice).toEqual([expect.stringContaining('list_board_mcp_tools')]);
 }
 
@@ -248,5 +258,42 @@ describe('paridade da execução: o que o card recebe a partir dos artefatos', (
     const s = fx.reload();
     expect(fs.existsSync(skill)).toBe(true);
     expectSameExecution({ ...fx, s, card: s.cards.find((c) => c.id === fx.card.id)! });
+  });
+});
+
+describe('pedido igual em toda ferramenta', () => {
+  const lineOf = (f: Fixture, tool: 'claude' | 'cursor' | 'kimi') => {
+    f.router.handle({ type: 'settings.board.update', patch: { aiTool: tool } });
+    const s = f.router.snapshot();
+    const card = s.cards.find((c) => c.id === f.card.id)!;
+    return { s, card, lines: contextLines(s, card) };
+  };
+
+  it('contextLines começa por FLOW_LINE, ignora a faz-ai-fluxo instalada e é o mesmo em claude, cursor e kimi', () => {
+    const claude = lineOf(fx, 'claude');
+    expect(claude.lines.always[0]).toBe(FLOW_LINE);
+    expect(claude.lines.always.join('\n')).not.toContain('SKILL.md');
+    expect(claude.lines.always[1]).toContain('rule CLAUDE.md (');
+    expect(claude.lines.card[0]).toContain(`skill ${SKILL} (`);
+    for (const tool of ['cursor', 'kimi'] as const) {
+      const other = lineOf(fx, tool);
+      expect(other.lines.always).toEqual(claude.lines.always);
+      expect(other.lines.card).toEqual(claude.lines.card);
+    }
+  });
+
+  it('o resumo marca a origem; no Cursor e no Kimi Code as instruções do agente vão no aviso do pedido', () => {
+    const claude = lineOf(fx, 'claude');
+    const summary = executionPlan(claude.s, claude.card, fx.servers, BOARD_SERVER).summary;
+    expect(summary).toContain('Fluxo do board: faz-ai-fluxo (pelo MCP)');
+    expect(summary).toContain('Agente do board: revisor (inline)');
+    for (const tool of ['cursor', 'kimi'] as const) {
+      const { s, card } = lineOf(fx, tool);
+      const plan = executionPlan(s, card, fx.servers, BOARD_SERVER);
+      expect(plan.input.agentDefinition).toBeNull();
+      expect(plan.summary).toContain('Fluxo do board: faz-ai-fluxo (pelo MCP)');
+      expect(plan.summary.join(' | ')).not.toContain('pelo caminho do arquivo');
+      expect(plan.advice.join('\n')).toContain('Revise o código sem alterar arquivos.');
+    }
   });
 });

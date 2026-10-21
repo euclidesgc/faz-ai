@@ -1,9 +1,10 @@
-import { resolveModelOption } from './aiProfiles';
-import type { AiBase } from './aiProfiles';
+import { catalogTool, contextEnforced, profileBase } from './aiProfiles';
+import type { AiBase, AiProfile } from './aiProfiles';
 import type { Agent } from './harness';
 import { BOARD_MCP_NAME, selectedMcpNames, selectedRuleLocations, selectedSkillNames, type HarnessSelection } from './harnessSelection';
 import type { BoardState, Card } from './model';
 import { type ModelOption } from './models';
+import { defaultTarget, runTargetOf, targetOfValue, type RunTarget } from './runTarget';
 import { columnOf, valueOf } from './selectors';
 
 /**
@@ -196,46 +197,14 @@ export interface ExecManifest {
   mcpServers: string[];
   tools: string[];
   deniedTools: string[];
-  /** modelo (nome que a ferramenta entende) e esforço, quando são da ferramenta do projeto */
+  /** o alvo da execução: o perfil de CLI que executa e o modelo, resolvidos pelo valor do campo Modelo */
+  target: RunTarget;
+  /** modelo (nome que a CLI entende) e esforço; é o `target.model`, vazio quando o alvo não indica modelo */
   model: { name: string; effort: string | null } | null;
-  /**
-   * Os outros agentes disponíveis no board, para a sessão da história delegar as sub-tarefas a eles
-   * como subagentes (é a sessão da história que executa as sub-tarefas; nenhuma roda sozinha). Vazio
-   * numa sub-tarefa: ela já roda com o agente dela.
-   */
-  delegates: ExecDelegate[];
 }
 
-/** Um agente do board como subagente de outra sessão: o que ele sabe, pode usar e com que modelo. */
-export interface ExecDelegate {
-  name: string;
-  purpose: string;
-  instructions: string;
-  tools: string[];
-  deniedTools: string[];
-  /** nome do modelo que a ferramenta entende; null = o da sessão */
-  model: string | null;
-}
-
-/** O modelo do catálogo da ferramenta em uso para um valor do campo Modelo (`<id>@<esforço>`). */
-const catalogModel = (s: BoardState, value: string | null | undefined) => {
-  return resolveModelOption(s.board, value ?? undefined) ?? undefined;
-};
-
-/** Os agentes do board que a sessão de uma história recebe como subagentes: todos os de arquivo, menos o dela. */
-export const delegatesOf = (s: BoardState, c: Card, own: ExecProfile | undefined): ExecDelegate[] =>
-  c.parentId
-    ? []
-    : s.board.execProfiles
-        .filter((p) => p.scope !== 'builtin' && p.id !== own?.id)
-        .map((p) => ({
-          name: p.id,
-          purpose: p.purpose,
-          instructions: p.instructions,
-          tools: p.tools,
-          deniedTools: p.deniedTools,
-          model: catalogModel(s, p.model)?.name ?? null,
-        }));
+/** O alvo do card, ou o padrão do board quando a escolha explícita está bloqueada (o bloqueio é tratado por quem executa). */
+const targetOfCard = (s: BoardState, c: Card): RunTarget => runTargetOf(s, c) ?? defaultTarget(s.board);
 
 const executionFieldValues = (s: BoardState, c: Card, name: string): string[] => {
   const field = s.fieldDefs.find((f) => f.kind === 'multiselect' && f.name.toLowerCase() === name);
@@ -276,11 +245,9 @@ export function executionCardSelectionsOf(s: BoardState, c: Card | null): { skil
 
 function manifestWithProfile(s: BoardState, c: Card | null, profile: ExecProfile | undefined): ExecManifest {
   const selected = executionCardSelectionsOf(s, c);
-  const modelField = s.fieldDefs.find((f) => f.kind === 'model');
-  const rawModel = (modelField && c ? valueOf(s, c.id, modelField.id) : undefined) || profile?.model;
-  const resolved = resolveModelOption(s.board, rawModel);
+  // sem card (prévia do agente) vale o modelo do próprio agente; com card, a resolução completa (card, agente, regra, padrão)
+  const target = c ? targetOfCard(s, c) : (targetOfValue(s.board, profile?.model, 'agent') ?? defaultTarget(s.board));
   return {
-    delegates: c ? delegatesOf(s, c, profile) : [],
     profile: profile?.name ?? null,
     agent: profile && profile.scope !== 'builtin' ? profile.id : '',
     purpose: profile?.purpose ?? '',
@@ -295,13 +262,15 @@ function manifestWithProfile(s: BoardState, c: Card | null, profile: ExecProfile
     ),
     tools: profile?.tools ?? [],
     deniedTools: profile?.deniedTools ?? [],
-    model: resolved
-      ? {
-          name: resolved.name,
-          effort: resolved.option ? effortToRun(resolved.option, resolved.effort) : resolved.effort,
-        }
-      : null,
+    target,
+    model: target.model ? { name: target.model.name, effort: effortOfTarget(s, target) } : null,
   };
+}
+
+/** O esforço do alvo como a CLI o recebe: o do catálogo do perfil, com o nível padrão que o Cursor exige no id. */
+function effortOfTarget(s: BoardState, target: RunTarget): string | null {
+  const option = s.board.modelCatalog.find((o) => o.tool === catalogTool(target.cli) && o.model === target.model?.name);
+  return option ? effortToRun(option, target.model!.effort) : target.model!.effort;
 }
 
 /**
@@ -328,14 +297,27 @@ export const EXEC_ASPECTS: { id: ExecAspect; label: string }[] = [
  * O que a execução pelo board consegue impor em cada ferramenta por parâmetro da linha de comando
  * (`enforced`) e o que só segue como orientação no prompt e no get_card (`advised`). Conforme a
  * documentação de cada CLI lida em 2026-10-02 e o Claude Code 2.1.278 testado em 2026-10-07: as skills e
- * as rules vão sempre pelo caminho do arquivo; `context` é o contexto vazio (nada do usuário nem do
- * projeto carregado por conta própria).
+ * as rules vão sempre pelo caminho do arquivo. `context` (contexto vazio) não está aqui: depende das
+ * capacidades verificadas de cada perfil, ver `enforcementOf`.
  */
-export const EXEC_ENFORCEMENT: Record<AiBase, Record<ExecAspect, 'enforced' | 'advised'>> = {
-  claude: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced', context: 'enforced' },
-  cursor: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', context: 'advised' },
+export type Enforcement = 'enforced' | 'advised';
+export const EXEC_ENFORCEMENT: Record<AiBase, Record<Exclude<ExecAspect, 'context'>, Enforcement>> = {
+  claude: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced' },
+  cursor: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced' },
   // Kimi Code 2.1.1: o servidor do board entra pelo `.kimi-code/mcp.json` do projeto, materializado antes
   // da execução (não há `--mcp-config`); em `-p` a permissão é sempre "auto", sem flags para estreitá-la;
   // não há `--agents` inline: o agente e os subagentes seguem como orientação no prompt
-  kimi: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', context: 'advised' },
+  kimi: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced' },
 };
+
+/**
+ * A tabela do perfil, com `context` calculado por `contextEnforced` (capacidades verificadas, nunca a
+ * lista de vazamentos nem a configuração). Perfil personalizado: tudo orientação.
+ */
+export function enforcementOf(profile: AiProfile): Record<ExecAspect, Enforcement> {
+  const base = profileBase(profile);
+  const row = base
+    ? EXEC_ENFORCEMENT[base]
+    : ({ agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'advised' } as const);
+  return { ...row, context: contextEnforced(profile) ? 'enforced' : 'advised' };
+}

@@ -140,7 +140,7 @@ async function main(): Promise<void> {
     env: {
       connectAI: async (target) => (await host.connectAI(target)).message,
       fixProjectMcp: (file) => host.fixProjectServer(file),
-      runAi: (cardId, mode) => runner.start(cardId, 'manual', mode),
+      runAi: (cardId, mode) => host.runAi(cardId, mode),
       stopAi: (cardId) => runner.stop(cardId),
       pauseAutopilot: () => host.autopilot.pause(),
       resumeAutopilot: () => host.autopilot.resume(),

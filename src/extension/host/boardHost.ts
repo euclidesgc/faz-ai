@@ -1,5 +1,6 @@
-import { PROFILE_CAPABILITIES, type AiProfile } from '../../shared/aiProfiles';
+import { PROFILE_CAPABILITIES, profileLabel, type AiProfile } from '../../shared/aiProfiles';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
+import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
 import { profileCanProbe, profileSignedIn, profileVersion } from '../cliProbe';
 import { baseValue } from '../../shared/harness';
 import { execFile } from 'node:child_process';
@@ -9,6 +10,13 @@ import * as path from 'node:path';
 import { openFile, type DbHandle } from '../db/database';
 import { dayOf } from '../../shared/log';
 import { Autopilot } from '../autopilot';
+import { Orchestrator } from '../orchestrator';
+import { orchestratesStory, LIVE_WORK_STATES } from '../../shared/orchestration';
+import { terminateProcessGroup } from '../processIdentity';
+import { CommentRepo } from '../repositories/commentRepo';
+import type { AiActivity } from '../../shared/model';
+import type { AiRunMode } from '../../shared/runner';
+import { columnOf } from '../../shared/selectors';
 import { Heartbeat } from '../heartbeat';
 import { AiGateway } from '../ai/gateway';
 import { RunArtifactSnapshots } from '../runArtifactSnapshot';
@@ -85,6 +93,8 @@ export interface BoardHost {
   router: MessageRouter;
   runner: AiRunner;
   heartbeat: Heartbeat;
+  /** "Chamar IA": numa história que o board conduz, passa pelo orquestrador; nas demais, pelo executor */
+  runAi(cardId: string, mode?: AiRunMode): Promise<void> | void;
   mergeWatcher: MergeWatcher;
   chat: ChatSession;
   /** toca sozinho as histórias em modo autônomo (YOLO) */
@@ -169,7 +179,15 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   };
   // os cards dessas execuções ficaram "Em execução" sem execução: voltam para a IA na hora
   if (ownsBoard)
-    maintain('fechar as execuções de IA que ficaram abertas', () => recoverAfterRestart(router, runLog.closeOpen(Date.now()), o.log));
+    maintain('fechar as execuções de IA que ficaram abertas', () =>
+      recoverAfterRestart(
+        router,
+        runLog.closeOpen(Date.now()),
+        o.log,
+        // o que o orquestrador reconcilia na abertura não volta para a IA por aqui
+        new Set(router.work.live().flatMap((w) => [w.cardId, w.storyId].filter((id): id is string => !!id))),
+      ),
+    );
   // a retenção: fora da janela, o detalhe do mês vira total em `log_months`. Roda aqui, na abertura,
   // no máximo uma vez por dia — nunca durante uma mutação do board, para não entrar no custo de uma
   // operação comum da pessoa mesmo que fique lenta.
@@ -204,6 +222,16 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     }),
     spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
   });
+  router.setAiProfileRuntime(
+    createAiProfileRuntime({
+      repo: new AiProfileRepo(handle.db),
+      gateway,
+      boardId: () => router.boardId,
+      cwd: o.folderPath,
+      homeDir,
+      pathEnv: () => pathEnv,
+    }),
+  );
   const runner = new AiRunner(router, {
     gateway,
     cwd: o.folderPath,
@@ -369,7 +397,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           isDefault: meta.id === board.aiTool,
           pendingReview: isPendingReview(meta),
           probe: probes.get(meta.id) ?? null,
-          authExpired: s.authExpired === meta.id,
+          authExpired: s.authExpired.includes(meta.id),
           // sem verificador de capacidades na base, a validação ainda não é requisito (ver profileHealth)
           validationRequired: false,
           credentials: meta.credentials ? [{ name: meta.credentials.secretRef, filled: meta.credentials.available }] : [],
@@ -408,13 +436,12 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         if (modelsBlocked && !blocked && modelReader && router.snapshot().board.aiTool === modelReader) refreshToolModels(modelReader);
         modelsBlocked = blocked;
         router.setRequirements(list);
-        // o sinal reativo (RF6) limpa quando o probe da própria ferramenta volta a confirmar o login —
+        // o sinal reativo (RF6) limpa, por perfil, quando o probe do próprio perfil volta a confirmar o login —
         // a essa altura `signinCache` já tem o valor fresco desta conferência; quando o probe não sabe
-        // dizer, só se recupera por uma execução manual que dá certo (em `runner.ts`). Ao trocar de
-        // ferramenta o sinal já foi limpo incondicionalmente
-        const expired = router.snapshot().authExpired;
-        if (expired && signinCache.get(expired)?.value === true && router.setAuthExpired(null))
-          o.log(`Login do ${baseInfo(expired).label} de volta: execuções retomadas.`);
+        // dizer, só se recupera por uma execução manual que dá certo (em `runner.ts`)
+        for (const expired of router.snapshot().authExpired)
+          if (signinCache.get(expired)?.value === true && router.setAuthExpired(expired, false))
+            o.log(`Login do ${profileLabel(router.snapshot().board, expired)} de volta: execuções retomadas.`);
         // o login (`profile` com `signin`) entra num timer: o perfil com probe retoma em até 10 s depois
         // de a pessoa entrar na conta, sem esperar os 5 minutos do ciclo normal
         if (list.some((r) => r.id === 'profile' && r.problem === 'signin')) {
@@ -560,7 +587,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let authExpiredInUse = router.snapshot().authExpired;
   router.onDidChange(() => {
     const expired = router.snapshot().authExpired;
-    if (expired !== authExpiredInUse) {
+    // por conteúdo: a lista é nova a cada mudança
+    if (expired.length !== authExpiredInUse.length || expired.some((id) => !authExpiredInUse.includes(id))) {
       authExpiredInUse = expired;
       void checkNow();
     }
@@ -569,12 +597,104 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     const toolChanged = board.aiTool !== toolInUse;
     toolInUse = board.aiTool;
     permissionInUse = board.runner.permission;
-    // o sinal reativo só vale para a ferramenta que falhou; trocando de ferramenta, ele não diz nada sobre a nova
-    if (toolChanged) router.setAuthExpired(null);
     void checkNow();
     if (toolChanged && (board.aiTool === 'cursor' || board.aiTool === 'kimi')) refreshToolModels(board.aiTool);
   });
-  const autopilot = new Autopilot(router, runner, { log: o.log, canRun: o.ownsBoard });
+  // o orquestrador (#621): o board executa as sub-tarefas da fase de código, uma execução da CLI por unidade.
+  // Existe em toda janela, mas só a dona age (`ownsBoard` é conferido a cada chamada, e a posse pode mudar);
+  // a reconciliação da abertura roda antes de qualquer gatilho (`ensureOrchestrator`)
+  const ownsNow = () => !o.ownsBoard || o.ownsBoard();
+  const storyOf = (unitStoryId: string | null) => router.snapshot().cards.find((c) => c.id === unitStoryId);
+  const orchestrator = new Orchestrator({
+    repo: () => router.work,
+    state: () => router.snapshot(),
+    sessions: router.executions,
+    starter: runner,
+    ownsBoard: ownsNow,
+    flush: () => handle.flush(),
+    // a pasta da história: a worktree dela ou, sem worktree, a pasta do projeto
+    workspace: async (unit) => storyOf(unit.storyId)?.worktreePath || o.folderPath,
+    // estado dos arquivos da pasta (status e HEAD): desconhecido (null) não autoriza repetir a unidade
+    fingerprint: async (folder) => {
+      try {
+        const status = await git(['status', '--porcelain'], folder);
+        const head = await git(['rev-parse', 'HEAD'], folder).catch(() => '');
+        return `${head.trim()}\n${status}`;
+      } catch {
+        return null;
+      }
+    },
+    terminate: terminateProcessGroup,
+    comment: (work, _outcome, body) => new CommentRepo(handle.db).add(work.storyId ?? work.cardId!, 'Faz AI', body, 'ai'),
+    publish: () => publishOrchestrations(),
+    block: (storyId, reason) =>
+      router.handle({ type: 'card.status.set', cardId: storyId, status: 'blocked', note: reason }, { author: 'Faz AI', source: 'ai' }),
+    log: o.log,
+    gitMode: () => router.snapshot().board.git.mode,
+    // as execuções do runner fora das unidades (chat de fase, refinar, resumir) também ocupam a pasta e o teto
+    otherProcesses: () => {
+      const unitCards = new Set(router.work.live().flatMap((w) => [w.cardId, w.storyId]));
+      return runner.running
+        .filter((id) => !unitCards.has(id))
+        .map((id) => {
+          const s = router.snapshot();
+          const card = s.cards.find((c) => c.id === id);
+          const story = card?.parentId ? s.cards.find((c) => c.id === card.parentId) : card;
+          const dir = story?.worktreePath || o.folderPath;
+          return {
+            activity: 'branch' as const,
+            profile: s.board.aiTool,
+            workspace: fs.existsSync(dir) ? fs.realpathSync(dir) : dir,
+            writer: true,
+          };
+        });
+    },
+  });
+  /** As histórias conduzidas agora aparecem "Em execução" também entre uma rodada e outra. */
+  function publishOrchestrations(): void {
+    const s = router.snapshot();
+    const seen = new Set<string>();
+    const runs: AiActivity[] = [];
+    for (const w of router.work.live().filter((x) => LIVE_WORK_STATES.includes(x.state))) {
+      const story = s.cards.find((c) => c.id === w.storyId);
+      if (!story || seen.has(story.id)) continue;
+      seen.add(story.id);
+      runs.push({
+        cardId: story.id,
+        runId: '',
+        mode: 'phase',
+        origin: 'manual',
+        phase: columnOf(s, story)?.name ?? '',
+        model: null,
+        tool: s.board.aiTool,
+        startedAt: w.createdAt,
+      });
+    }
+    router.setOrchestrations(runs);
+  }
+  // cancelar a história (ou uma sub-tarefa) interrompe as unidades dela e confirma o fim antes de liberar a pasta
+  router.onCardsCancelled((ids) => {
+    if (ownsNow() && ready)
+      void orchestrator.onCardsCancelled(ids).catch((e: unknown) => o.log(`Orquestrador: ${e instanceof Error ? e.message : String(e)}`));
+  });
+  let ready: Promise<void> | null = null;
+  let reconciledOnce = false;
+  /** Reconcilia o que a sessão anterior deixou, uma vez, antes de ligar autopiloto e heartbeat. */
+  const ensureOrchestrator = (): Promise<void> => {
+    if (!ownsNow()) return Promise.reject(new Error(Autopilot.NOT_OWNER_NOTE));
+    ready ??= orchestrator.reconcileOnOpen().then(() => {
+      reconciledOnce = true;
+    });
+    return ready;
+  };
+  if (ownsBoard) void ensureOrchestrator().catch((e: unknown) => o.log(`Orquestrador: ${e instanceof Error ? e.message : String(e)}`));
+  const driver = {
+    drive: async (storyId: string, origin: 'manual' | 'autopilot' | 'heartbeat') => {
+      await ensureOrchestrator();
+      return orchestrator.drive(storyId, origin);
+    },
+  };
+  const autopilot = new Autopilot(router, runner, { log: o.log, canRun: () => ownsNow(), driver });
   // sem timers próprios: a detecção de merges, a sincronização das branches, as órfãs e o arquivamento
   // das histórias publicadas acontecem na manutenção de cada rodada do heartbeat
   const releaseWatcher = new ReleaseWatcher(router, { cwd: o.folderPath, log: o.log, gh, git });
@@ -624,6 +744,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     releases: () => releaseWatcher.sweep(),
   });
   const heartbeat = new Heartbeat(runner, {
+    driver,
     snapshot: () => router.snapshot(),
     now: () => Date.now(),
     log: o.log,
@@ -661,7 +782,24 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     router,
     runner,
     sweepStaleRuns: () => {
-      if (!o.ownsBoard || o.ownsBoard()) sweepStaleRuns(router, runner.running, Date.now(), o.log);
+      if (!o.ownsBoard || o.ownsBoard()) {
+        sweepStaleRuns(router, runner.running, Date.now(), o.log);
+        if (reconciledOnce)
+          void orchestrator.sweep().catch((e: unknown) => o.log(`Orquestrador: ${e instanceof Error ? e.message : String(e)}`));
+      }
+    },
+    async runAi(cardId: string, mode?: AiRunMode) {
+      const s = router.snapshot();
+      const card = s.cards.find((c) => c.id === cardId);
+      const story = card?.parentId ? s.cards.find((c) => c.id === card.parentId) : card;
+      // numa história conduzida pelo board (ou numa sub-tarefa dela), "Chamar IA" segue o orquestrador: um escritor só na pasta
+      if (story && (mode === undefined || mode === 'phase') && orchestratesStory(s, story)) {
+        await ensureOrchestrator();
+        const result = await orchestrator.drive(story.id, 'manual');
+        if (result.kind === 'paused' || result.kind === 'wait') throw new Error(result.reason ?? 'O board não tem o que executar agora.');
+        return;
+      }
+      runner.start(cardId, 'manual', mode);
     },
     heartbeat,
     mergeWatcher,
