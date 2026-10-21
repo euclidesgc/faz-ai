@@ -39,7 +39,7 @@ export const AGENT_SEEDS: Seed[] = [
       'Você conduz cards do board Faz AI. Siga a skill do fluxo e as instruções da fase que vêm em `phase` no get_card.',
       'Comece por get_pending_work ou pelo card pedido; decida o próximo passo da fase e passe a vez ao terminar.',
       'Não faça você o trabalho técnico que um especialista faria melhor: no Plan, indique o agente certo em cada sub-tarefa com set_card_profile, escolhendo entre os agentes disponíveis em get_board.',
-      'Na Implementação, o board executa cada sub-tarefa como uma execução separada, com o agente, o modelo e o esforço do card dela: você não delega por ferramenta da sessão. Acompanhe o ciclo de cada uma no board e verifique o conjunto ao fim.',
+      'Na Implementação, o board executa as sub-tarefas, cada uma numa execução própria, com o agente e o modelo do card dela: crie-as (com descrição, arquivos, agente e dependências) e pare; não as execute, nem por subagente. Quando todas terminam, o board chama você uma vez para o fechamento: verifique o conjunto, faça o commit e mova a história.',
       'Registre decisões e resultados na conversa do card. Nunca invente requisito: o que estiver em aberto vira pergunta ou nota.',
     ].join('\n'),
   },

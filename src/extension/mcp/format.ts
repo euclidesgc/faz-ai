@@ -8,6 +8,7 @@ import {
   profileIsolation,
   type AiProfile,
 } from '../../shared/aiProfiles';
+import { orchestratesStory } from '../../shared/orchestration';
 import { resolveRunTarget } from '../../shared/runTarget';
 import { agentOfArtifact, itemOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf } from '../../shared/execution';
@@ -493,7 +494,7 @@ function workspaceOf(s: BoardState, c: Card) {
 
 /** O que fazer com o `model` do card; o "Esforço da atividade" tem o mesmo nome e outro sentido. */
 const MODEL_NOTE =
-  'O valor do modelo usa `<perfil>:<modelo>@<esforço>` do perfil de CLI do board. `tool` é o perfil de CLI que executa o card pelo board e `from` diz de onde veio a escolha (card, agente ou regra). Se não for o da sua sessão, você não troca de CLI: delegue com o seu modelo ou, na execução pelo board, a sub-tarefa roda no perfil dela. Execute com este modelo e esforço; se forem outros, delegue o trabalho a um subagente ou avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
+  'O valor do modelo usa `<perfil>:<modelo>@<esforço>` do perfil de CLI do board. `tool` é o perfil de CLI que executa o card pelo board e `from` diz de onde veio a escolha (card, agente ou regra). Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Execute com este modelo e esforço; se forem outros, avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
 
 /**
  * Os blocos do `get_card` que a IA pode pedir em separado (`only`): o resto (título, descrição, campos,
@@ -609,9 +610,9 @@ export function cardDetail(
  * do servidor: o Claude Code as corta em 2.048 caracteres, e a IA só precisa disto quando há rodada.
  */
 export const SUBTASKS_NOW_NOTE =
-  'Rodadas: `canRunTogether` são as sub-tarefas liberadas (subagentes, se tiver, todos de uma vez; senão uma por vez); `waiting` esperam outra; ' +
-  '`withPerson` e `running` não são suas. Ao fim da rodada, verifique, faça o commit e releia a história. Sem terminal, implemente e registre o que falta rodar. ' +
-  'Vale mesmo que a skill do fluxo instalada diga uma por vez. Detalhes: skill faz-ai-implementacao-rodadas.';
+  'O board executa as sub-tarefas da fase de código, cada uma numa execução própria: `byBoard` são as que ele executa, na ordem; `waiting` esperam outra; ' +
+  '`withPerson` e `running` não são suas. Não execute sub-tarefas, nem por subagente: crie-as e pare. O board chama você de novo, uma vez, para o fechamento. ' +
+  'Detalhes: skill faz-ai-implementacao-rodadas.';
 
 /**
  * As rodadas da Implementação: `canRunTogether` só traz as sub-tarefas que a IA pode tocar agora; as que
@@ -619,10 +620,13 @@ export const SUBTASKS_NOW_NOTE =
  */
 function subtasksNow(s: BoardState, storyId: string) {
   const w = subtaskWaves(s, storyId);
+  const story = s.cards.find((c) => c.id === storyId);
+  const byBoard = !!story && orchestratesStory(s, story);
   if (!w.waiting.length && !w.withPerson.length && !w.running.length && w.ready.length < 2) return {};
   return {
     subtasksNow: {
-      canRunTogether: w.ready.map(cardRef),
+      // numa fase de código o board executa as sub-tarefas (uma por vez, na ordem); nas demais a sessão as toca
+      ...(byBoard ? { byBoard: w.ready.map(cardRef) } : { canRunTogether: w.ready.map(cardRef) }),
       waiting: w.waiting.map(cardRef),
       ...(w.withPerson.length ? { withPerson: w.withPerson.map(cardRef) } : {}),
       ...(w.running.length ? { running: w.running.map(cardRef) } : {}),

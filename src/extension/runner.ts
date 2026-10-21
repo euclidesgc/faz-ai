@@ -16,6 +16,8 @@ import {
 } from './policyGate';
 import type { ContextAction } from '../shared/contextPlanning';
 import { cardRef } from '../shared/model';
+import { activityKindOf } from '../shared/activity';
+import { STORY_SESSION_ADVICE } from './unitAdvice';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { SHOW_COST } from '../shared/metrics';
 import { columnOf, isLive } from '../shared/selectors';
@@ -443,6 +445,11 @@ export class AiRunner {
           const permission = autonomous ? 'full' : refine || summarize ? 'board' : state.board.runner.permission;
           const permissionAdvice = refine || summarize ? null : PERMISSION_ADVICE[permission];
           const stopAdvice = autonomous && !conflict ? yoloStopAdvice(state, card) : null;
+          // a sessão da história numa fase de código só cria as sub-tarefas: quem as executa é o board
+          const storySessionAdvice =
+            options.workId === undefined && !card.parentId && mode === 'phase' && activityKindOf(state, card, 'phase') === 'branch'
+              ? STORY_SESSION_ADVICE
+              : null;
           if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
           if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
           if (summarize) log('Resumir a conversa: lê as mensagens e grava um resumo, sem mover o card nem mudar o status.');
@@ -495,6 +502,7 @@ export class AiRunner {
                         contextLines(state, card),
                         [
                           ...(stopAdvice ? [stopAdvice] : []),
+                          ...(storySessionAdvice ? [storySessionAdvice] : []),
                           ...plan.advice,
                           ...(permissionAdvice ? [permissionAdvice] : []),
                           ...(options.advice ?? []),
@@ -593,7 +601,7 @@ export class AiRunner {
       }
       // a sessão da história é quem marca as sub-tarefas "Em execução" (start_work); com ela encerrada, nenhuma
       // continua em execução de verdade. Sem isto a sub-tarefa ficava presa e segurava a história para sempre
-      if (!retry && options.workId === undefined) this.releaseSubtasks(cardId, tool.label);
+      if (!retry && options.workId === undefined && !this.orchestrated(cardId)) this.releaseSubtasks(cardId, tool.label);
       if (retry) {
         // a política autorizou a troca de alvo: uma nova execução assume, sem publicar nem avisar o fim
         // desta (quem decide o desfecho final é a execução do destino)
@@ -820,6 +828,13 @@ export class AiRunner {
       acted: replied || !!end.report.inventory.length || !!end.report.bashCommands?.length,
       runningProfiles: [...this.runs.values()].filter((r) => r !== run).map((r) => r.profile.id),
     });
+  }
+
+  /** O board executa as sub-tarefas desta história (fase de código): quem as libera é a reconciliação, não a sessão. */
+  private orchestrated(storyId: string): boolean {
+    const s = this.router.snapshot();
+    const story = s.cards.find((c) => c.id === storyId);
+    return !!story && !story.parentId && activityKindOf(s, story, 'phase') === 'branch';
   }
 
   /** As sub-tarefas da história que a sessão encerrada deixou "Em execução" voltam para a IA. */

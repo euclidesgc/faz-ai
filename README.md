@@ -76,7 +76,9 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
 5. **Revise e siga.** Leia o documento da fase, responda ou clique em **Aprovar** (ou **Pedir
    ajustes**). Com a aprovação, a história avança na hora para **PRD**, **Spec**, **Plan** e
    **Implementação**, sempre com a IA produzindo e você aprovando. As sub-tarefas da implementação
-   nascem no workflow de baixo e a IA as conclui uma a uma.
+   nascem no workflow de baixo e o **board** as executa, uma a uma, cada uma numa execução própria
+   da CLI (com o agente, o modelo e as skills do card dela); a sessão da história só as cria e,
+   no fim, o board a chama uma vez para verificar o conjunto, fazer o commit e mover a história.
 
 Para o dia a dia: o contador **N com você** no topo mostra o que espera por você, o **Chat** deixa
 você pedir à IA, em linguagem natural, para criar e mover cards, e o **heartbeat** pode chamar a IA
@@ -245,17 +247,13 @@ dependência.
 A IA usa isso para acelerar a Implementação. No Plan ela declara a ordem entre as sub-tarefas
 (`create_card` com `depends_on`, ou `link_cards` com `depends_on`): uma depende da outra quando usa o
 que ela produz ou quando as duas alteram os mesmos arquivos. Na Implementação, o `get_card` da
-história devolve em `subtasksNow` o que pode rodar agora (e em `subtasksNowNote`, como conduzir a
-rodada). **As sub-tarefas são execuções separadas do board**, cada uma com o agente, o modelo e as
-skills do seu card; a sessão da história **não delega a subagentes da ferramenta** (no Claude Code, a
-ferramenta de subagente, `Agent` — antes `Task` —, fica negada em toda execução do board). O board roda
-**uma sub-tarefa por vez**, porque todas escrevem na mesma pasta da história. Em **Configurações →
-Harness de IA** (e na chave `fazai.git.parallelSubtasks`, de 1 a 6, do Settings do editor) a pessoa
-define **"Sub-tarefas em paralelo por história"**, e a tela mostra o pedido e o efetivo
-(hoje 1). No Cursor e no Kimi Code não há bloqueio da delegação nativa comprovado: a capacidade fica
-"desconhecida" e a admissão decide. Ao fim da rodada a IA verifica o conjunto, faz o commit e parte
-para a seguinte. `start_work` recusa a sub-tarefa que ainda espera outra. Sem dependências declaradas,
-todas as sub-tarefas em aberto são consideradas independentes. O texto do fluxo é o atual do
+história devolve em `subtasksNow` o que o **board executa** (`byBoard`, na ordem) e o que espera
+(`waiting`). Na fase de código quem executa as sub-tarefas é o board, não a sessão da história: cada
+uma roda numa execução própria da CLI, com o agente, o modelo e as skills do card dela, **uma depois
+da outra** na pasta da história (um escritor por vez), respeitando as dependências; a sessão da
+história só as cria e para. `start_work` recusa a sub-tarefa que ainda espera outra. Sem dependências
+declaradas, todas as sub-tarefas em aberto são consideradas independentes. Quando todas terminam, o
+board chama a IA uma vez para o fechamento: verificar o conjunto, fazer o commit e mover a história. Nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica negada; no Cursor e no Kimi Code, sem bloqueio comprovado, a capacidade fica "desconhecida" e a admissão decide). Em **Configurações → Harness de IA** (e em `fazai.git.parallelSubtasks`, de 1 a 6) a pessoa define **"Sub-tarefas em paralelo por história"**; a tela mostra o pedido e o efetivo (hoje 1). O texto do fluxo é o atual do
 board, servido pelo MCP; uma cópia da skill do fluxo já instalada na pasta da ferramenta não é
 substituída pelo board. Para a ferramenta não carregar o texto antigo por conta própria, apague essa cópia.
 

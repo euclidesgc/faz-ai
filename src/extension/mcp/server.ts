@@ -41,7 +41,7 @@ export const MCP_INSTRUCTIONS =
   'Cada card tem um status de trabalho em `work`: "ready" e "approved" estão com você; "waiting_review", "waiting_answer" e "blocked" estão com a pessoa. ' +
   'Ao começar um card chame start_work e siga `phase` do get_card. Nas colunas com `requiresApproval`, ao terminar o trabalho da fase chame request_review e PARE: ' +
   'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +
-  '`model` do get_card é o modelo que deve executar o card, e `tool` o perfil de CLI da execução (o do modelo do card, do agente ou da regra; sem modelo, o perfil padrão): se for outro, delegue a um subagente ou avise a pessoa. ' +
+  '`model` do get_card é o modelo que deve executar o card, e `tool` o perfil de CLI da execução (o do modelo do card, do agente ou da regra; sem modelo, o perfil padrão): se for outro, avise a pessoa. ' +
   'Antes de executar, leia as `requiredRules` do get_card (arquivo em `path`) e as `requiredSkills` (o arquivo em `path` ou, sem `path`, por get_skill), mesmo as fora da sua lista. ' +
   'Toda conversa com a pessoa sobre um card acontece na conversa do card (add_comment, request_review, ask_question); registre ali decisões e resultados. ' +
   'Faltou informação: ask_question. Impedimento que você não resolve: block_card. ' +

@@ -7,6 +7,7 @@ import { cardCliProblem } from '../shared/requirements';
 import { limitOf, type AiRunMode } from '../shared/runner';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
 import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
+import { orchestratesStory } from '../shared/orchestration';
 import { autopilotQueue } from '../shared/autopilotQueue';
 import { commentsSinceSummary } from '../shared/conversation';
 import type { MessageRouter } from './panel/messageRouter';
@@ -34,7 +35,14 @@ export interface AutopilotRunner {
   onDidFinish(listener: (cardId: string, mode?: AiRunMode) => void): void;
 }
 
+/** Quem conduz uma história rodada após rodada (o `Orchestrator`): o autopiloto e o heartbeat só pedem que ela siga. */
+export interface StoryDriver {
+  drive(storyId: string, origin: AiRunOrigin): Promise<{ kind: string; reason?: string }>;
+}
+
 export interface AutopilotDeps {
+  /** conduz as histórias de fase de código que já têm sub-tarefas; sem ele, tudo passa por `runner.start` */
+  driver?: StoryDriver;
   log(line: string): void;
   /** só a janela dona do board toca as histórias, para duas não chamarem a IA em dobro; padrão: sempre */
   canRun?(): boolean;
@@ -430,6 +438,7 @@ export class Autopilot {
       const s = this.router.snapshot();
       this.progress.set(story.id, { sig: progressOf(s, story), stalls: this.progress.get(story.id)?.stalls ?? 0 });
       this.lastRunColumn.set(story.id, story.columnId);
+      if (this.deps.driver && orchestratesStory(s, story)) return this.drive(this.deps.driver, story);
       this.runner.start(story.id, 'autopilot');
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
@@ -439,6 +448,20 @@ export class Autopilot {
       this.active = false;
       this.publish(reason);
     }
+  }
+
+  /** O orquestrador conduz a história; uma recusa dele (outra janela, reconciliação) vai para o log e a nota, sem desligar a fila. */
+  private drive(driver: StoryDriver, story: Card): void {
+    driver
+      .drive(story.id, 'autopilot')
+      .then((result) => {
+        if (result.kind === 'paused' && result.reason) this.publish(result.reason);
+      })
+      .catch((e: unknown) => {
+        const reason = e instanceof Error ? e.message : String(e);
+        this.deps.log(`Autopiloto: ${cardRef(story)}: ${reason}`);
+        this.publish(reason);
+      });
   }
 
   private startSummary(s: BoardState, story: Card): void {
