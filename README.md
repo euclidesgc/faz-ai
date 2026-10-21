@@ -76,7 +76,9 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
 5. **Revise e siga.** Leia o documento da fase, responda ou clique em **Aprovar** (ou **Pedir
    ajustes**). Com a aprovação, a história avança na hora para **PRD**, **Spec**, **Plan** e
    **Implementação**, sempre com a IA produzindo e você aprovando. As sub-tarefas da implementação
-   nascem no workflow de baixo e a IA as conclui uma a uma.
+   nascem no workflow de baixo e o **board** as executa, uma a uma, cada uma numa execução própria
+   da CLI (com o agente, o modelo e as skills do card dela); a sessão da história só as cria e,
+   no fim, o board a chama uma vez para verificar o conjunto, fazer o commit e mover a história.
 
 Para o dia a dia: o contador **N com você** no topo mostra o que espera por você, o **Chat** deixa
 você pedir à IA, em linguagem natural, para criar e mover cards, e o **heartbeat** pode chamar a IA
@@ -245,13 +247,13 @@ dependência.
 A IA usa isso para acelerar a Implementação. No Plan ela declara a ordem entre as sub-tarefas
 (`create_card` com `depends_on`, ou `link_cards` com `depends_on`): uma depende da outra quando usa o
 que ela produz ou quando as duas alteram os mesmos arquivos. Na Implementação, o `get_card` da
-história devolve em `subtasksNow` o que pode rodar agora (e em `subtasksNowNote`, como conduzir a
-rodada), e a IA delega **as sub-tarefas sem
-dependência pendente a subagentes simultâneos**, cada um com o modelo do seu card; ao fim da rodada
-ela verifica o conjunto, faz o commit e parte para a rodada seguinte. `start_work` recusa a
-sub-tarefa que ainda espera outra. Sem dependências declaradas, todas as sub-tarefas em aberto são
-consideradas independentes. Depende de a ferramenta de IA ter subagentes (o Claude Code tem); sem
-eles, a execução segue uma por vez, na ordem das dependências. O texto do fluxo é o atual do
+história devolve em `subtasksNow` o que o **board executa** (`byBoard`, na ordem) e o que espera
+(`waiting`). Na fase de código quem executa as sub-tarefas é o board, não a sessão da história: cada
+uma roda numa execução própria da CLI, com o agente, o modelo e as skills do card dela, **uma depois
+da outra** na pasta da história (um escritor por vez), respeitando as dependências; a sessão da
+história só as cria e para. `start_work` recusa a sub-tarefa que ainda espera outra. Sem dependências
+declaradas, todas as sub-tarefas em aberto são consideradas independentes. Quando todas terminam, o
+board chama a IA uma vez para o fechamento: verificar o conjunto, fazer o commit e mover a história. O texto do fluxo é o atual do
 board, servido pelo MCP; uma cópia da skill do fluxo já instalada na pasta da ferramenta não é
 substituída pelo board. Para a ferramenta não carregar o texto antigo por conta própria, apague essa cópia.
 

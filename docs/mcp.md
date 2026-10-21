@@ -399,8 +399,9 @@ Configurações → Workflows e colunas ou por `update_column` (`ai_instruction`
 
 Ao ler um card (`get_card`), a IA recebe a ferramenta, o **modelo** e o **esforço** que devem executá-lo e as **Skills**
 obrigatórias com o caminho de cada `SKILL.md` (as do fluxo vêm sem caminho, para ler com `get_skill`). Ela é instruída a carregar essas skills antes de
-executar e a delegar o trabalho a um subagente com o modelo escolhido, ou avisar quando o cliente
-não permite. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue.
+executar e a avisar a pessoa quando o modelo for outro. Na fase de código, as sub-tarefas são executadas
+pelo board (uma execução da CLI por sub-tarefa, com o modelo do card dela): a sessão da história cria e
+descreve as sub-tarefas e para, e `subtasksNow.byBoard` lista as que o board executa, na ordem. Isso é uma orientação ao cliente de IA: cada ferramenta decide se e como a segue.
 
 Fluxo SDD sugerido: a IA lê a história e a fase (`phase`), cria uma sub-tarefa com o campo Fase,
 constrói nela o documento da fase e o anexa à história (`artifact: true`), pede a revisão na
