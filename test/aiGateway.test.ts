@@ -1,3 +1,4 @@
+import type { ContextDraftResolution } from '../src/shared/contextDraftResolution';
 import type { AiBase } from '../src/shared/aiProfiles';
 // A garantia de que nenhuma chamada à IA escapa do log de uso: toda execução passa por `AiGateway`, e
 // o gateway grava a linha de `ai_runs` sozinho. Três camadas:
@@ -238,6 +239,24 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     ).toThrow('plano impossível');
     expect(rows()).toHaveLength(1);
     expect(rows()[0]).toMatchObject({ outcome: 'unsupported', endedAt: expect.any(Number) });
+    expect(procs).toHaveLength(0);
+  });
+
+  it('configuração v1 com recurso obrigatório inválido não inicia e mostra o motivo (E5.1)', () => {
+    const context = {
+      diagnostics: [{ code: 'admission-unavailable' }, { code: 'missing-artifact', artifactId: 'skill-x' }],
+    } as unknown as ContextDraftResolution;
+    expect(() =>
+      gateway().run(
+        call({
+          prepare: () => ({
+            context,
+            input: { prompt: 'oi', permission: 'board' },
+            config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: false, skills: [], mcp: null },
+          }),
+        }),
+      ),
+    ).toThrow('missing-artifact:skill-x');
     expect(procs).toHaveLength(0);
   });
 
