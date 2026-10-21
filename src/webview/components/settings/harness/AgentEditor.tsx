@@ -5,7 +5,7 @@ import { agentContextOf } from '../../../../shared/executionContext';
 import { ExecutionContext } from '../../card/ExecutionContext';
 import { AGENT_FORMAT } from '../../../../shared/agentTools';
 import { activeProfile } from '../../../../shared/aiProfiles';
-import { enforcementForTexts, TOOL_PRESETS, type ExecAspect } from '../../../../shared/execution';
+import { enforcementOf, TOOL_PRESETS, type ExecAspect } from '../../../../shared/execution';
 import { selectedMcpNames } from '../../../../shared/harnessSelection';
 import type { Agent } from '../../../../shared/harness';
 import type { AiToolInfo } from '../../../../shared/harnessProject';
@@ -22,7 +22,7 @@ import { t } from '../../../i18n';
 export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: AiToolInfo; onClose: () => void }) {
   const state = useBoardStore((s) => s.state)!;
   const [body, setBody] = useState(a.body);
-  const how = enforcementForTexts(activeProfile({ aiTool: tool.id, aiProfiles: state.board.aiProfiles }));
+  const how = enforcementOf(activeProfile({ aiTool: tool.id, aiProfiles: state.board.aiProfiles }));
   const servers = [
     ...new Set(
       (state.harness.inventory.find((x) => x.tool === tool.id)?.items ?? [])

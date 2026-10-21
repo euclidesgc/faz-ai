@@ -352,14 +352,3 @@ export function enforcementOf(profile: AiProfile): Record<ExecAspect, Enforcemen
     : ({ agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'advised' } as const);
   return { ...row, context: contextEnforced(profile) ? 'enforced' : 'advised' };
 }
-
-/**
- * TRANSITÓRIO (até #713/#714/#715 trocarem os textos pela decisão real): o que os textos do pedido, do
- * get_card e das telas dizem hoje sobre o contexto vazio, para esta sub-tarefa não mudar o que a IA lê. O
- * pronto Claude segue com o que o comando impõe (`--setting-sources ""`); nada mais ganha selo. NUNCA usar
- * para admitir uma execução: a admissão usa `enforcementOf` e as capacidades verificadas.
- */
-export function enforcementForTexts(profile: AiProfile): Record<ExecAspect, Enforcement> {
-  const how = enforcementOf(profile);
-  return { ...how, context: profile.kind === 'builtin' && profile.base === 'claude' ? 'enforced' : how.context };
-}

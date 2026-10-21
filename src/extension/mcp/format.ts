@@ -1,7 +1,7 @@
 import { isFlowSkill } from '../flowSkill';
 import { activeProfile, type AiProfile } from '../../shared/aiProfiles';
 import { agentOfArtifact, itemOfArtifact } from '../../shared/artifacts';
-import { EXEC_ASPECTS, effortToRun, enforcementForTexts, manifestOf } from '../../shared/execution';
+import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
 import { isSelectableKind, selectionKey, usageOf, toolItemsOf } from '../../shared/harnessSelection';
 import { groupOf } from '../../shared/harnessCatalog';
@@ -251,7 +251,7 @@ export function modelsOverview(s: BoardState) {
 function executionOf(s: BoardState, c: Card) {
   const m = manifestOf(s, c);
   if (!m.profile) return {};
-  const how = enforcementForTexts(activeProfile(s.board));
+  const how = enforcementOf(activeProfile(s.board));
   const profile = s.board.execProfiles.find((p) => p.name === m.profile);
   return {
     execution: {

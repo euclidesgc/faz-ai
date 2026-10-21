@@ -216,12 +216,12 @@ export function ContextDetail({ estimate: e }: { estimate: ContextEstimate }) {
         </p>
         <p>{t('Apagar mensagens da conversa diminui só as próximas execuções: o que já foi gasto não volta.')}</p>
         <p>
-          {profile
-            ? t('Fora da conta: o que a CLI carrega por conta própria. {summary}', {
-                summary: isolationText(profileIsolation(profile), contextEnforced(profile)),
-              })
-            : e.tool === 'claude'
-              ? t('Fora da conta: o prompt e as ferramentas nativas do Claude Code, e as ferramentas dos servidores liberados pelo agente.')
+          {e.tool === 'claude'
+            ? t('Fora da conta: o prompt e as ferramentas nativas do Claude Code, e as ferramentas dos servidores liberados pelo agente.')
+            : profile
+              ? t('Fora da conta: o que a CLI carrega por conta própria. {summary}', {
+                  summary: isolationText(profileIsolation(profile), contextEnforced(profile)),
+                })
               : t('Fora da conta: o que o Cursor carrega por conta própria (rules, skills e servidores configurados nele).')}
         </p>
         {!e.window && (

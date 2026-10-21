@@ -137,6 +137,9 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   expect(plan.input.agentDefinition).toEqual({ name: 'restrito', description: 'Restrito', prompt: 'Siga.' });
   expect(plan.summary.join(' | ')).toContain('Servidores MCP: faz-ai, github (imposto pela CLI)');
   expect(plan.summary.join(' | ')).not.toContain('segredo');
+  // lista vazia de itens conhecidos não é prova: o resumo não promete contexto vazio e o `clean` fica falso
+  expect(plan.summary.at(-1)).toBe('Nenhum item conhecido carregado (sem prova de isolamento) (pelo pedido)');
+  expect(plan.clean).toBe(false);
 
   // o arquivo temporário existe enquanto o processo roda, só para o dono, e some ao terminar
   let exit: (code: number | null) => void = () => {};
@@ -166,7 +169,10 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
 
   // noutra ferramenta, o que não vai por parâmetro vira instrução no prompt
   router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
-  expect(executionPlan(router.snapshot(), card(), router.libraryMcpDefinitions(), bridge).advice).toEqual([
+  const cursorPlan = executionPlan(router.snapshot(), card(), router.libraryMcpDefinitions(), bridge);
+  expect(cursorPlan.summary.at(-1)).toContain('A CLI pode carregar por conta própria: regras do projeto');
+  expect(cursorPlan.clean).toBe(false);
+  expect(cursorPlan.advice).toEqual([
     'Você atua como o agente "restrito": Restrito.',
     'Instruções do agente:\nSiga.',
     expect.stringContaining('list_board_mcp_tools'),
@@ -1117,7 +1123,7 @@ describe('log das execuções de IA', () => {
       agent: 'restrito',
       permission: 'board',
       autonomous: false,
-      clean: true,
+      clean: false,
       skills: ['sql-queries'],
       mcp: [],
     });
@@ -1125,7 +1131,8 @@ describe('log das execuções de IA', () => {
     expect(summary).toContain(`Agente do board: ${row.profile}`);
     expect(summary).toContain(`Skills: ${row.skills.join(', ')}`);
     expect(summary).toContain(`Modelo: ${row.model} · ${row.effort}`);
-    expect(summary).toContain('Contexto vazio (imposto pela CLI)');
+    // sem capacidades verificadas, o resumo não promete contexto vazio
+    expect(summary).toContain('Nenhum item conhecido carregado (sem prova de isolamento) (pelo pedido)');
     expect(log.join('\n')).toContain(summary);
   });
 

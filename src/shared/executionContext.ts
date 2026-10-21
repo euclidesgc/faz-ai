@@ -3,7 +3,7 @@ import { estimateAgentContext, estimateContext, tokensOf, type ContextEstimate }
 import { contextAgentOrigin, contextFilesOf, type ContextOrigin } from './contextSources';
 import {
   agentManifestOf,
-  enforcementForTexts,
+  enforcementOf,
   type Enforcement,
   type ExecAspect,
   executionCardSelectionsOf,
@@ -105,7 +105,7 @@ function preview(s: BoardState, m: ExecManifest, estimate: ContextEstimate, p: E
   return {
     estimate,
     items,
-    enforcement: enforcementForTexts(activeProfile(s.board)),
+    enforcement: enforcementOf(activeProfile(s.board)),
     overlaps: instructionOverlaps(s.board.aiTool === 'claude' ? m : { ...m, delegates: [] }),
   };
 }
