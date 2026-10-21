@@ -100,6 +100,23 @@ describe('Diagnóstico do ambiente', () => {
     expect(useBoardStore.getState().settingsTab).toBe('git');
   });
 
+  it('a cópia antiga da skill do fluxo lista os arquivos a apagar, sem botão que apague', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    const file = '/home/u/.claude/skills/faz-ai-fluxo/SKILL.md';
+    show({ ...report(), recommended: [{ id: 'flow-skill-copy', status: 'missing', paths: [file] }] });
+    const row = item('Cópia antiga da skill do fluxo');
+    expect(within(row).getByText(file)).toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: /apagar|excluir|delete/i })).not.toBeInTheDocument();
+  });
+
+  it('sem cópia antiga, o aviso não aparece', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(report());
+    expect(screen.queryByText('Cópia antiga da skill do fluxo')).not.toBeInTheDocument();
+  });
+
   it('o nome da branch pronto não traz o botão', () => {
     syncStore(router);
     renderThemed(<EnvironmentView />);
