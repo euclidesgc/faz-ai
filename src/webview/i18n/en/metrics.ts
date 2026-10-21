@@ -74,6 +74,8 @@ export const metrics: Record<string, string> = {
   'Execuções de IA': 'AI runs',
   'Vezes em que a IA foi acionada num card, as em andamento incluídas.': 'Times the AI was started on a card, running ones included.',
   '{n} em andamento': '{n} in progress',
+  '{n} acima do limite de consumo': '{n} over the usage limit',
+  'Execuções com mais de 10 milhões de tokens de leitura de cache.': 'Runs with more than 10 million cache read tokens.',
   '{n} em andamento, fora desta soma': '{n} in progress, not in this sum',
   Tokens: 'Tokens',
   'Entrada, saída e cache das execuções medidas.': 'Input, output and cache of the measured runs.',

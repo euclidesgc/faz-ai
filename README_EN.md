@@ -721,6 +721,11 @@ and also in the board opened in the browser.
   total can exceed the elapsed clock time. What was not measured shows as "não medido" (not
   measured), never as 0, and when only some of the runs were measured the note says how many were
   left out.
+- **Runs over the usage limit.** A run that reads more than 10 million cache tokens goes over the
+  limit: the **AI runs** total shows "{n} over the usage limit" (in Portuguese, "acima do limite de
+  consumo") and, when the run ends, the card's conversation gets a notice with the consumption and
+  the duration. The limit is fixed and the alert interrupts nothing. Without measured tokens
+  (Cursor) there is no alert, and archived months are not counted.
 - **Tokens per month.** A bar chart with each month's tokens. The month in progress is hatched, because it has not ended yet; a month with no data at
   all is a gap marked "sem dado" (no data), not a zero-height bar. Below the chart a table has the
   same numbers and a notes column (partial, no data, monthly total only).

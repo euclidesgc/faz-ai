@@ -18,6 +18,7 @@ import type { ContextAction } from '../shared/contextPlanning';
 import { cardRef } from '../shared/model';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { SHOW_COST } from '../shared/metrics';
+import { exceedsRunLimit, RUN_CACHE_READ_LIMIT } from '../shared/runLimit';
 import { columnOf, isLive } from '../shared/selectors';
 import { isAtYoloStop, isWithHuman, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../shared/story';
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
@@ -165,6 +166,17 @@ export function consumptionLine(report: RunReport, why: { reason?: string | null
   if (why.explained) return 'Consumo não medido.';
   if (why.reason) return `Consumo não medido: ${why.reason}`;
   return report.reason ? `Consumo não medido. ${report.reason}` : 'Consumo não medido.';
+}
+
+/**
+ * O aviso de execução longa que vai para a conversa do card: `null` quando a leitura de cache não passou do
+ * limite ou não foi medida (Cursor). Só avisa; o desfecho da execução não depende dele.
+ */
+export function longRunNotice(report: RunReport, durationMs: number): string | null {
+  const cacheRead = report.consumption?.cacheReadTokens;
+  if (!exceedsRunLimit(cacheRead)) return null;
+  const minutes = Math.max(1, Math.round(durationMs / 60_000));
+  return `Esta execução passou do limite de consumo: ${COUNT.format(cacheRead as number)} de leitura de cache (limite ${COUNT.format(RUN_CACHE_READ_LIMIT)}) em ${minutes} min.`;
 }
 
 /** O que a IA recebe a mais quando a história está em modo autônomo (YOLO): sem aprovação, sem perguntas, até o pull request. */
@@ -604,6 +616,14 @@ export class AiRunner {
           // a retentativa nem começou (card arquivado, gateway recusou): o card não pode ficar "em
           // execução" sem execução, e quem espera o fim precisa ser avisado como em qualquer outro fim
           this.block(cardId, `Não foi possível repetir a execução no destino da política: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+      if (!retry) {
+        try {
+          const notice = longRunNotice(end.report, Date.now() - exec.startedAt);
+          if (notice) this.router.handle({ type: 'comment.add', cardId, body: notice }, { author: RUNNER_AUTHOR, source: 'ai' });
+        } catch {
+          // o aviso é só informação: falhar ao escrevê-lo não muda o desfecho da execução
         }
       }
       this.publish();

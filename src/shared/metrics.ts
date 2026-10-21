@@ -72,6 +72,11 @@ export interface MetricsMonth {
   cardsDone: number;
   runs: number;
   runsOpen: number;
+  /**
+   * Execuções medidas com leitura de cache acima de `RUN_CACHE_READ_LIMIT`. Opcional: o mês arquivado não
+   * guarda detalhe por execução e fica sem o campo.
+   */
+  overLimitRuns?: number;
   durationMs: number;
   measuredRuns: number;
   /**

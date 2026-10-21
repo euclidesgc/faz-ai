@@ -18,6 +18,7 @@
 import type { Database } from 'sql.js';
 import { monthRange, monthSpan } from '../../shared/log';
 import { all, num, str } from '../db/query';
+import { RUN_CACHE_READ_LIMIT } from '../../shared/runLimit';
 import { splitMcpName, type InventoryKind } from '../../shared/log';
 import { detailMonths } from './rollup';
 import { dayOf, monthOf } from '../../shared/log';
@@ -542,6 +543,7 @@ function addPanelNumbers(into: PanelNumbers, from: PanelNumbers): void {
   into.cardsDone += from.cardsDone;
   into.runs += from.runs;
   into.runsOpen += from.runsOpen;
+  into.overLimitRuns = (into.overLimitRuns ?? 0) + (from.overLimitRuns ?? 0);
   into.durationMs += from.durationMs;
   into.measuredRuns += from.measuredRuns;
   into.costedRuns = (into.costedRuns ?? 0) + (from.costedRuns ?? 0);
@@ -564,6 +566,7 @@ function panelRunsByMonth(db: Database, boardId: string, q: MetricsQuery, months
     `SELECT month, COUNT(*) AS n, SUM(COALESCE(duration_ms, 0)) AS ms,
             SUM(CASE WHEN outcome IS NULL THEN 1 ELSE 0 END) AS open,
             SUM(CASE WHEN measure <> 'none' THEN 1 ELSE 0 END) AS measured,
+            SUM(CASE WHEN measure <> 'none' AND cache_read_tokens > ${RUN_CACHE_READ_LIMIT} THEN 1 ELSE 0 END) AS over_limit,
             SUM(CASE WHEN measure <> 'none' THEN COALESCE(input_tokens, 0) ELSE 0 END) AS input,
             SUM(CASE WHEN measure <> 'none' THEN COALESCE(output_tokens, 0) ELSE 0 END) AS output,
             SUM(CASE WHEN measure <> 'none' THEN COALESCE(cache_read_tokens, 0) ELSE 0 END) AS cache_read,
@@ -595,6 +598,7 @@ function panelRunsByMonth(db: Database, boardId: string, q: MetricsQuery, months
       ...emptyPanelNumbers(),
       runs: num(r.n),
       runsOpen: num(r.open),
+      overLimitRuns: num(r.over_limit),
       durationMs: num(r.ms),
       measuredRuns: measured,
       costedRuns: estimatedN + informedN,
