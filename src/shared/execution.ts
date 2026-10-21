@@ -1,5 +1,5 @@
-import { resolveModelOption } from './aiProfiles';
-import type { AiBase } from './aiProfiles';
+import { contextEnforced, profileBase, resolveModelOption } from './aiProfiles';
+import type { AiBase, AiProfile } from './aiProfiles';
 import type { Agent } from './harness';
 import { BOARD_MCP_NAME, selectedMcpNames, selectedRuleLocations, selectedSkillNames, type HarnessSelection } from './harnessSelection';
 import type { BoardState, Card } from './model';
@@ -328,14 +328,38 @@ export const EXEC_ASPECTS: { id: ExecAspect; label: string }[] = [
  * O que a execução pelo board consegue impor em cada ferramenta por parâmetro da linha de comando
  * (`enforced`) e o que só segue como orientação no prompt e no get_card (`advised`). Conforme a
  * documentação de cada CLI lida em 2026-10-02 e o Claude Code 2.1.278 testado em 2026-10-07: as skills e
- * as rules vão sempre pelo caminho do arquivo; `context` é o contexto vazio (nada do usuário nem do
- * projeto carregado por conta própria).
+ * as rules vão sempre pelo caminho do arquivo. `context` (contexto vazio) não está aqui: depende das
+ * capacidades verificadas de cada perfil, ver `enforcementOf`.
  */
-export const EXEC_ENFORCEMENT: Record<AiBase, Record<ExecAspect, 'enforced' | 'advised'>> = {
-  claude: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced', context: 'enforced' },
-  cursor: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', context: 'advised' },
+export type Enforcement = 'enforced' | 'advised';
+export const EXEC_ENFORCEMENT: Record<AiBase, Record<Exclude<ExecAspect, 'context'>, Enforcement>> = {
+  claude: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced' },
+  cursor: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced' },
   // Kimi Code 2.1.1: o servidor do board entra pelo `.kimi-code/mcp.json` do projeto, materializado antes
   // da execução (não há `--mcp-config`); em `-p` a permissão é sempre "auto", sem flags para estreitá-la;
   // não há `--agents` inline: o agente e os subagentes seguem como orientação no prompt
-  kimi: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced', context: 'advised' },
+  kimi: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced' },
 };
+
+/**
+ * A tabela do perfil, com `context` calculado por `contextEnforced` (capacidades verificadas, nunca a
+ * lista de vazamentos nem a configuração). Perfil personalizado: tudo orientação.
+ */
+export function enforcementOf(profile: AiProfile): Record<ExecAspect, Enforcement> {
+  const base = profileBase(profile);
+  const row = base
+    ? EXEC_ENFORCEMENT[base]
+    : ({ agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'advised' } as const);
+  return { ...row, context: contextEnforced(profile) ? 'enforced' : 'advised' };
+}
+
+/**
+ * TRANSITÓRIO (até #713/#714/#715 trocarem os textos pela decisão real): o que os textos do pedido, do
+ * get_card e das telas dizem hoje sobre o contexto vazio, para esta sub-tarefa não mudar o que a IA lê. O
+ * pronto Claude segue com o que o comando impõe (`--setting-sources ""`); nada mais ganha selo. NUNCA usar
+ * para admitir uma execução: a admissão usa `enforcementOf` e as capacidades verificadas.
+ */
+export function enforcementForTexts(profile: AiProfile): Record<ExecAspect, Enforcement> {
+  const how = enforcementOf(profile);
+  return { ...how, context: profile.kind === 'builtin' && profile.base === 'claude' ? 'enforced' : how.context };
+}

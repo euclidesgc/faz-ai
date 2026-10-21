@@ -1,5 +1,5 @@
-import { baseValue } from '../shared/harness';
-import { EXEC_ENFORCEMENT, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
+import { activeProfile } from '../shared/aiProfiles';
+import { enforcementForTexts, manifestOf, withBoardTools, type ExecManifest } from '../shared/execution';
 import type { AiTool } from '../shared/harness';
 import { selectedMcpNames } from '../shared/harnessSelection';
 import type { BoardState, Card } from '../shared/model';
@@ -107,14 +107,7 @@ export function executionPlan(
 ): ExecPlan {
   const tool: AiTool = s.board.aiTool;
   const manifest = manifestOf(s, c);
-  const how = baseValue(EXEC_ENFORCEMENT, tool) ?? {
-    agent: 'advised',
-    skills: 'advised',
-    mcp: 'advised',
-    tools: 'advised',
-    model: 'advised',
-    context: 'advised',
-  };
+  const how = enforcementForTexts(activeProfile(s.board));
   const items = s.harness.inventory.find((t) => t.tool === tool)?.items ?? [];
   const known = [...new Set(items.filter((i) => i.kind === 'mcp').map((i) => i.name))].filter((n) => n !== BOARD_SERVER);
   const allowed = manifest.mcpServers;

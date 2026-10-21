@@ -10,7 +10,7 @@ import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { exportBoard, importBoard, parseExportFile } from '../src/extension/db/boardExport';
 import { credentialsFor } from '../src/extension/credentials';
-import type { AiProfileDraft } from '../src/shared/aiProfiles';
+import { BUILTIN_ISOLATION, type AiProfileDraft } from '../src/shared/aiProfiles';
 let db: Database, repo: AiProfileRepo, boardId: string;
 const draft = (extra: Partial<AiProfileDraft> = {}): AiProfileDraft => ({
   name: 'Minha CLI',
@@ -166,4 +166,25 @@ it('sonda um processo Node real com a configuração privada revisada, sem shell
   expect(
     await profileSignedIn({ ...profile, config: { ...profile.config, statusArgs: '-e process.exit(1)' } }, process.execPath, '/unused'),
   ).toBe(false);
+});
+
+it('duplicar um pronto copia a lista de itens carregados; salvar grava o isolamento e o expõe sem expor o resto', () => {
+  const copy = repo.duplicate(boardId, 'cursor', 'person');
+  expect(copy.config).toEqual({ isolation: { loads: BUILTIN_ISOLATION.cursor.loads } });
+  const saved = repo.save(
+    boardId,
+    {
+      ...draft({ id: copy.id, kind: 'copy', base: 'cursor', name: copy.name }),
+      config: { isolation: { loads: [{ kind: 'mcp', scope: 'user' }] } },
+    },
+    'person',
+  );
+  expect(saved.config).toEqual({ isolation: { loads: [{ kind: 'mcp', scope: 'user' }] } });
+  expect(repo.list(boardId).find((p) => p.id === copy.id)!.config).toEqual(saved.config);
+  const custom = repo.save(boardId, draft(), 'person');
+  expect(custom.config).toEqual({});
+  expect(JSON.stringify(repo.list(boardId))).not.toContain('private-command-sentinel');
+  expect(() =>
+    repo.save(boardId, draft({ config: { command: 'x', isolation: { loads: [{ kind: 'x', scope: 'user' }] } as never } }), 'person'),
+  ).toThrow('Isolamento');
 });
