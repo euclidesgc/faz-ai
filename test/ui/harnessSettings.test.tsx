@@ -411,9 +411,9 @@ describe('HarnessSettings: assistentes e sugestões de regras e skills', () => {
   it('Regras: o assistente abre no Projeto e no Global, a IA sugere, e nenhum aparece no Board', async () => {
     await renderScreen('rules');
     await userEvent.click(screen.getByRole('button', { name: 'Criar regra com ajuda' }));
-    expect(screen.getByText('Passo 1 de 5')).toBeInTheDocument();
+    expect(screen.getByText('Passo 1 de 4')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-    expect(screen.queryByText('Passo 1 de 5')).toBeNull();
+    expect(screen.queryByText('Passo 1 de 4')).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Sugerir regras com IA' }));
     expect(lastSent('ai.suggestRules')).toEqual({ type: 'ai.suggestRules' });
@@ -424,7 +424,7 @@ describe('HarnessSettings: assistentes e sugestões de regras e skills', () => {
     // trocar de origem fecha o assistente aberto; no Global ele grava na pasta do usuário
     await userEvent.click(screen.getByRole('button', { name: 'Criar regra com ajuda' }));
     await userEvent.click(screen.getByRole('radio', { name: 'Global' }));
-    expect(screen.queryByText('Passo 1 de 5')).toBeNull();
+    expect(screen.queryByText('Passo 1 de 4')).toBeNull();
     expect(screen.getByRole('button', { name: 'Criar regra com ajuda' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: 'Board' }));
     expect(screen.queryByRole('button', { name: 'Criar regra com ajuda' })).toBeNull();

@@ -226,6 +226,13 @@ export const harness = {
     req({ type: 'harness.skill.file.create', tool, path, file, link }),
   openSkillFile: (tool: AiTool, path: string, file: string) => post({ type: 'harness.skill.file.open', tool, path, file }),
   deleteSkillFile: (tool: AiTool, path: string, file: string) => req({ type: 'harness.skill.file.delete', tool, path, file }),
+  /** Salva regra, skill ou MCP no banco do board (editores e assistentes). */
+  saveArtifact: (input: Payload<'harness.artifact.save'>) => req({ type: 'harness.artifact.save', ...input }),
+  /** Grava (cria ou edita) um arquivo de apoio de uma skill do board. */
+  writeBoardSkillFile: (skill: string, file: string, content: string, link?: boolean) =>
+    req({ type: 'harness.skillFile.write', skill, file, content, ...(link ? { link } : {}) }),
+  /** Apaga um arquivo de apoio de uma skill do board. */
+  deleteBoardSkillFile: (skill: string, file: string) => req({ type: 'harness.skillFile.delete', skill, file }),
   /** envia artefatos ao board com um modo, muda o modo, ou os tira do board (usage null); `location` é a `selectionKey` */
   setSelection: (items: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null) =>
     req({ type: 'harness.selection.set', items, usage }),

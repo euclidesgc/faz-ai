@@ -143,10 +143,10 @@ export function TopicView({ tool, topic, origin, query }: { tool: AiTool; topic:
         </div>
       )}
       {assist && wizard === 'rule' && (
-        <RuleWizard key={`rule:${origin}`} tool={tool} scope={origin as 'project' | 'user'} onClose={() => setWizard(null)} />
+        <RuleWizard key={`rule:${origin}`} onClose={() => setWizard(null)} />
       )}
       {assist && wizard === 'skill' && (
-        <SkillWizard key={`skill:${origin}`} tool={tool} scope={origin as 'project' | 'user'} onClose={() => setWizard(null)} />
+        <SkillWizard key={`skill:${origin}`} onClose={() => setWizard(null)} />
       )}
       {canSuggest && suggestions?.tool === tool && suggestions.kind === topic.kind && suggestions.error && (
         <Callout.Root color="amber" size="1">

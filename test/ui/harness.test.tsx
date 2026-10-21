@@ -256,20 +256,14 @@ describe('Harness: criar, acrescentar, abrir, copiar e apagar nas abas Projeto e
     const row = screen.getByText('revisar-spec').closest('li')!;
     await userEvent.click(within(row).getByRole('button', { name: 'Arquivos (1)' }));
     const files = document.querySelector<HTMLElement>('.skill-files')!;
-    await userEvent.click(within(files).getByRole('button', { name: 'Abrir no editor' }));
-    expect(lastSent('harness.skill.file.open')).toEqual({
-      type: 'harness.skill.file.open',
-      tool: 'claude',
-      path: '/abs/.claude/skills/revisar-spec/SKILL.md',
-      file: 'references/modelo.md',
-    });
     await userEvent.type(within(files).getByPlaceholderText('modelo-de-repositorio.ts'), 'exemplo.ts');
     await userEvent.click(within(files).getByRole('button', { name: 'Novo arquivo' }));
-    expect(lastSent('harness.skill.file.create')).toEqual({
-      type: 'harness.skill.file.create',
-      tool: 'claude',
-      path: '/abs/.claude/skills/revisar-spec/SKILL.md',
+    // os arquivos de apoio são do board (#671): a linha antiga grava pelo mesmo caminho do editor novo
+    expect(lastSent('harness.skillFile.write')).toEqual({
+      type: 'harness.skillFile.write',
+      skill: 'revisar-spec',
       file: 'references/exemplo.ts',
+      content: '',
       link: true,
     });
   });

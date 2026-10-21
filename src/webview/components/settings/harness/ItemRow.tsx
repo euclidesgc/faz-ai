@@ -233,7 +233,7 @@ export function ItemRow({
       </div>
       {filesOpen && i.layout === 'skills' && (
         <div className="item-files">
-          <SkillFiles tool={tool} skill={i} editable={editable} />
+          <SkillFiles skill={i.name} files={i.files ?? []} editable={editable} />
         </div>
       )}
     </li>
