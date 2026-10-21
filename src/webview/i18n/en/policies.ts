@@ -213,13 +213,6 @@ export const policies: Record<string, string> = {
   'A política proposta pela IA foi recusada: cria prioridade ambígua, ciclo ou destino inválido.':
     'The AI-proposed policy was refused: it creates an ambiguous priority, a cycle or an invalid target.',
   'A resposta da IA foi descartada por parecer conter um segredo.': 'The AI answer was discarded because it seems to contain a secret.',
-  Fallback: 'Fallback',
-  'reserva legada: {model}. Ela não troca de CLI sozinha; revise a proposta em Políticas de execução e fallback.':
-    'legacy fallback: {model}. It does not switch CLI by itself; review the proposal in Execution and fallback policies.',
-  'A reserva por regra não existe mais: o fallback é uma política de execução, revisada por você.':
-    'Per-rule fallback no longer exists: fallback is an execution policy, reviewed by you.',
-  'Ir para as políticas de execução': 'Go to execution policies',
-  'reserva legada (desativada): {model}': 'legacy fallback (disabled): {model}',
   'Reservas de regras antigas': 'Fallbacks from old rules',
   'Cada reserva de regra antiga virou uma proposta desligada e pendente de revisão. Nada troca de CLI até você revisar e ligar a política; as condições da regra (campos e tipo do card) não foram copiadas.':
     'Each old rule fallback became a disabled proposal pending review. Nothing switches CLI until you review and enable the policy; the rule conditions (card fields and type) were not copied.',
