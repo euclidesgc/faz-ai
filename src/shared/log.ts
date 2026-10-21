@@ -180,6 +180,8 @@ export function splitMcpName(name: string): { server: string; tool: string } {
 export interface BashCommandItem {
   command: string;
   calls: number;
+  /** quantas dessas chamadas voltaram com erro (`tool_result` com `is_error`); 0 quando o leitor não mede (#605) */
+  failed: number;
 }
 
 export interface RunReport {

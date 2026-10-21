@@ -640,3 +640,32 @@ describe('migração 32 → 33 (ai_run_bash)', () => {
     expect(old.exec('SELECT COUNT(*) FROM ai_run_bash')[0]!.values[0]![0]).toBe(0);
   });
 });
+
+describe('migração 43 → 44 (ai_run_bash.failed)', () => {
+  it('acrescenta a coluna com 0 nos registros antigos (não medido) e o banco novo aceita o valor', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 43);
+    old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    old.run(
+      "INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x')",
+    );
+    old.run("INSERT INTO ai_run_bash (run_id, command, calls) VALUES ('r1', 'npm test', 2)");
+    expect(old.exec("SELECT COUNT(*) FROM pragma_table_info('ai_run_bash') WHERE name = 'failed'")[0]!.values[0]![0]).toBe(0);
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(44);
+    expect(old.exec("SELECT command, calls, failed FROM ai_run_bash WHERE run_id = 'r1'")[0]!.values).toEqual([['npm test', 2, 0]]);
+
+    const fresh = new SQL.Database();
+    migrate(fresh);
+    fresh.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    fresh.run(
+      "INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x')",
+    );
+    fresh.run("INSERT INTO ai_run_bash (run_id, command, calls, failed) VALUES ('r1', 'npm test', 3, 1)");
+    expect(fresh.exec("SELECT failed FROM ai_run_bash WHERE run_id = 'r1'")[0]!.values).toEqual([[1]]);
+  });
+});

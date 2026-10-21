@@ -326,15 +326,15 @@ describe('consolidate', () => {
     const report = {
       ...measured({}, []),
       bashCommands: [
-        { command: 'npm test', calls: 2 },
-        { command: 'cat', calls: 1 },
+        { command: 'npm test', calls: 2, failed: 0 },
+        { command: 'cat', calls: 1, failed: 0 },
       ],
     };
     runs.measure(id, report);
     runs.measure(id, report);
     expect(runs.bashUsage(id)).toEqual([
-      { command: 'cat', calls: 1 },
-      { command: 'npm test', calls: 2 },
+      { command: 'cat', calls: 1, failed: 0 },
+      { command: 'npm test', calls: 2, failed: 0 },
     ]);
     consolidate(db, boardId, TODAY, DEFAULT_LOG_RETENTION_MONTHS);
     expect(db.exec('SELECT COUNT(*) FROM ai_run_bash')[0]!.values[0]![0]).toBe(0);

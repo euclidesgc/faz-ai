@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 43;
+export const SCHEMA_VERSION = 44;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -583,6 +583,11 @@ const MIGRATIONS: Record<number, string> = {
     CREATE INDEX idx_ai_runs_month ON ai_runs(board_id, month, started_at);
     CREATE INDEX idx_ai_runs_card ON ai_runs(board_id, card_number, started_at);
     CREATE INDEX idx_ai_runs_open ON ai_runs(board_id, outcome);
+  `,
+  44: `
+    -- #605: quantas chamadas do comando voltaram com erro (tool_result com is_error), para o sinal
+    -- "npm test com falha" do Retrabalho. Registros anteriores ficam com 0: não medido antes desta versão.
+    ALTER TABLE ai_run_bash ADD COLUMN failed INTEGER NOT NULL DEFAULT 0;
   `,
 };
 

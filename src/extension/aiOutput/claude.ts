@@ -340,7 +340,7 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
         const [kind, name] = key.split('\u0000');
         return { kind: kind as InventoryKind, name: name!, calls };
       });
-      const bashCommands = [...bashCounts.entries()].map(([command, calls]) => ({ command, calls }));
+      const bashCommands = [...bashCounts.entries()].map(([command, calls]) => ({ command, calls, failed: 0 }));
       // `num_turns` é do segmento: é o único campo do `result` que se soma
       const turned = results.filter((r) => r.turns !== null);
       const turns = turned.length ? turned.reduce((sum, r) => sum + r.turns!, 0) : null;

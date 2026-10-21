@@ -4,7 +4,7 @@
 // `reworkOf` é puro (as contas); `panelRework` só faz as consultas.
 import type { Database } from 'sql.js';
 import { norm } from '../../shared/filters';
-import type { MetricsRework, MetricsReworkModel, MetricsReworkPhase } from '../../shared/metrics';
+import { ZERO_SIGNAL, type MetricsRework, type MetricsReworkModel, type MetricsReworkPhase } from '../../shared/metrics';
 import { all, num, str } from '../db/query';
 
 /** Uma mudança de status do log, com o modelo da execução que a produziu ('' = sem execução do board). */
@@ -25,7 +25,18 @@ export interface ReworkPeriod {
   end: number;
 }
 
-const emptyPhase = (phase: string): MetricsReworkPhase => ({ phase, reviews: 0, approved: 0, adjusted: 0, resolved: 0, firstPass: 0 });
+const emptyPhase = (phase: string): MetricsReworkPhase => ({
+  phase,
+  reviews: 0,
+  approved: 0,
+  adjusted: 0,
+  resolved: 0,
+  firstPass: 0,
+  bashRuns: 0,
+  reviewFixes: ZERO_SIGNAL,
+  testFailures: ZERO_SIGNAL,
+  commitsAfterPr: ZERO_SIGNAL,
+});
 
 /**
  * As contas do retrabalho. Pedido de revisão é o card indo para "Aguardando revisão"; a resposta é uma
@@ -92,7 +103,7 @@ function escapes(db: Database, boardId: string, period: ReworkPeriod, workflow: 
     [boardId, ...(workflow ? [workflow] : [])],
   ).filter((r) => num(r.done_at) >= period.start && num(r.done_at) <= period.end && norm(str(r.type)) !== 'bug');
   const doneAt = new Map(stories.map((r) => [str(r.id), num(r.done_at)]));
-  if (!doneAt.size) return { stories: 0, withBugs: 0, bugs: 0 };
+  if (!doneAt.size) return { stories: 0, withBugs: 0, bugs: 0, autonomousStories: 0, autonomousWithBugs: 0, autonomousBugs: 0 };
   const bugsOf = new Map<string, Set<string>>();
   const ids = [...doneAt.keys()];
   const marks = ids.map(() => '?').join(',');
@@ -118,6 +129,10 @@ function escapes(db: Database, boardId: string, period: ReworkPeriod, workflow: 
     stories: doneAt.size,
     withBugs: bugsOf.size,
     bugs: new Set([...bugsOf.values()].flatMap((s) => [...s])).size,
+    // a parte autônoma é conta da #1030; aqui só o contrato
+    autonomousStories: 0,
+    autonomousWithBugs: 0,
+    autonomousBugs: 0,
   };
 }
 
@@ -150,5 +165,10 @@ export function panelRework(db: Database, boardId: string, period: ReworkPeriod,
       source: str(r.source) === 'ai' ? 'ai' : 'human',
       model: str(r.model),
     }));
-  return { ...reworkOf(rows, period), escapes: escapes(db, boardId, period, workflow) };
+  return {
+    ...reworkOf(rows, period),
+    escapes: escapes(db, boardId, period, workflow),
+    // os sinais da IA são consulta da #1030; até lá, "não medido"
+    aiSignals: { bashRuns: 0, reviewFixes: ZERO_SIGNAL, testFailures: ZERO_SIGNAL, commitsAfterPr: ZERO_SIGNAL },
+  };
 }

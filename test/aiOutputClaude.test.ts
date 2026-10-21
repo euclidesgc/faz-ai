@@ -147,8 +147,8 @@ describe('inventário: os nomes que o painel vai ler', () => {
       event('Bash', { command: 'cat /tmp/segredo' }),
     ]);
     expect(reader.report().bashCommands).toEqual([
-      { command: 'npm test', calls: 2 },
-      { command: 'cat', calls: 1 },
+      { command: 'npm test', calls: 2, failed: 0 },
+      { command: 'cat', calls: 1, failed: 0 },
     ]);
   });
 

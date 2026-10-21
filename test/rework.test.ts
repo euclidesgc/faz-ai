@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { reworkOf, type ReworkEventRow } from '../src/extension/log/rework';
 import { formatRework } from '../src/extension/mcp/tools/metrics';
+import { EMPTY_REWORK } from '../src/shared/metrics';
+
+// Os sinais da IA (#605) são contas de outra função: nas fases do `reworkOf` vêm zerados.
+const noSignals = EMPTY_REWORK.aiSignals;
+const noEscapes = EMPTY_REWORK.escapes;
 
 // As contas do retrabalho (rework.ts), sem banco: só a sequência de mudanças de status.
 
@@ -38,7 +43,7 @@ describe('reworkOf', () => {
       ],
       PERIOD,
     );
-    expect(phases).toEqual([{ phase: 'PRD', reviews: 3, approved: 2, adjusted: 1, resolved: 2, firstPass: 1 }]);
+    expect(phases).toEqual([{ phase: 'PRD', reviews: 3, approved: 2, adjusted: 1, resolved: 2, firstPass: 1, ...noSignals }]);
   });
 
   it('a aprovação automática do modo autônomo e as mudanças da IA não são resposta da pessoa', () => {
@@ -82,8 +87,8 @@ describe('reworkOf', () => {
       PERIOD,
     );
     expect(phases).toEqual([
-      { phase: 'Spec', reviews: 0, approved: 1, adjusted: 0, resolved: 1, firstPass: 1 },
-      { phase: 'Plan', reviews: 0, approved: 1, adjusted: 0, resolved: 0, firstPass: 0 },
+      { phase: 'Spec', reviews: 0, approved: 1, adjusted: 0, resolved: 1, firstPass: 1, ...noSignals },
+      { phase: 'Plan', reviews: 0, approved: 1, adjusted: 0, resolved: 0, firstPass: 0, ...noSignals },
     ]);
     expect(models).toEqual([]);
   });
@@ -92,16 +97,15 @@ describe('reworkOf', () => {
 describe('formatRework', () => {
   it('tabela compacta por fase e por modelo, e as histórias com bug', () => {
     const text = formatRework({
-      phases: [{ phase: 'PRD', reviews: 3, approved: 2, adjusted: 1, resolved: 2, firstPass: 1 }],
+      phases: [{ phase: 'PRD', reviews: 3, approved: 2, adjusted: 1, resolved: 2, firstPass: 1, ...noSignals }],
       models: [{ model: '', reviews: 3, adjusted: 1 }],
-      escapes: { stories: 4, withBugs: 1, bugs: 2 },
+      escapes: { ...noEscapes, stories: 4, withBugs: 1, bugs: 2 },
+      aiSignals: EMPTY_REWORK.aiSignals,
     });
     expect(text).toContain('fase  revisões  de primeira  ajustes');
     expect(text).toContain('PRD   3         1 de 2       1');
     expect(text).toContain('não definido');
     expect(text).toContain('histórias concluídas no período: 4; com bug vinculado: 1 (2 bug(s))');
-    expect(formatRework({ phases: [], models: [], escapes: { stories: 0, withBugs: 0, bugs: 0 } })).toContain(
-      'nenhuma revisão no recorte.',
-    );
+    expect(formatRework(EMPTY_REWORK)).toContain('nenhuma revisão no recorte.');
   });
 });
