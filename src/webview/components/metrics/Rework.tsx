@@ -149,7 +149,7 @@ export function ReworkTables({ sections }: MetricsBlockProps) {
         </p>
         <p className="metrics-times-hint">
           {t(
-            'Os sinais da IA são aproximações (commit ≈ correção) e valem só para o Claude Code, desde o registro de comandos de Bash; "autônomas" é a parte feita em execuções do modo autônomo. Sem execução com registro de Bash no período, o sinal fica "não medido".',
+            'Os sinais da IA são aproximações (um commit conta como uma correção) e valem só para o Claude Code, desde o registro de comandos de Bash; "autônomas" é a parte feita em execuções do modo autônomo. Sem execução com registro de Bash no período, o sinal fica "não medido".',
           )}
         </p>
       </div>

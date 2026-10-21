@@ -180,8 +180,8 @@ export const metrics: Record<string, string> = {
   '{n} em {runs} execuções (autônomas: {a})': '{n} in {runs} runs (autonomous: {a})',
   '{n} em {runs} histórias (autônomas: {a})': '{n} in {runs} stories (autonomous: {a})',
   '{n} ({a})': '{n} ({a})',
-  'Os sinais da IA são aproximações (commit ≈ correção) e valem só para o Claude Code, desde o registro de comandos de Bash; "autônomas" é a parte feita em execuções do modo autônomo. Sem execução com registro de Bash no período, o sinal fica "não medido".':
-    'The AI signals are approximations (commit ≈ fix) and apply only to Claude Code, since Bash commands started being recorded; "autonomous" is the part done in autonomous-mode runs. With no run with recorded Bash in the period, the signal is "not measured".',
+  'Os sinais da IA são aproximações (um commit conta como uma correção) e valem só para o Claude Code, desde o registro de comandos de Bash; "autônomas" é a parte feita em execuções do modo autônomo. Sem execução com registro de Bash no período, o sinal fica "não medido".':
+    'The AI signals are approximations (a commit counts as a fix) and apply only to Claude Code, since Bash commands started being recorded; "autonomous" is the part done in autonomous-mode runs. With no run with recorded Bash in the period, the signal is "not measured".',
   'nenhuma história concluída no período': 'no story done in the period',
   'Retrabalho por fase': 'Rework by phase',
   'Retrabalho por modelo': 'Rework by model',
