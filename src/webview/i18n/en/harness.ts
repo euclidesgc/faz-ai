@@ -599,6 +599,7 @@ export const harness: Record<string, string> = {
   'O contrato mudou em outra edição. Feche e abra novamente para carregar a revisão atual.':
     'The contract changed in another editor. Close and reopen to load the current revision.',
   'Salvar rascunho do contrato': 'Save contract draft',
+  'Editar contrato de contexto (rascunho)': 'Edit context contract (draft)',
   'Fase no card': 'Card phase',
   'Ação no card': 'Card action',
   'Fase no workflow': 'Workflow phase',
