@@ -299,7 +299,7 @@ describe('atualização do board para o padrão atual', () => {
 
   it('versão 10: a Homologação com o texto da 0.39 passa a abrir o pull request com --base em workspace.prBase; a personalizada fica', () => {
     upgradeBoard(db, boardId);
-    expect(BOARD_TEMPLATE_VERSION).toBe(12);
+    expect(BOARD_TEMPLATE_VERSION).toBe(13);
     const settings = new SettingsRepo(db);
     const v9 = PHASE_HISTORY['Homologação']!.instructions.at(-1)!;
     // o texto de fábrica anterior é o atual sem a base do PR
@@ -324,8 +324,9 @@ describe('atualização do board para o padrão atual', () => {
   it('versão 12: as fases de documento com o texto da versão 11 recebem o "Mapa do código"; o personalizado fica', () => {
     upgradeBoard(db, boardId);
     const settings = new SettingsRepo(db);
+    // Discovery e Plan ganharam a versão 12 depois (trilha curta): o texto da versão 11 é o penúltimo
     const old = (n: string) => ({
-      aiInstruction: PHASE_HISTORY[n]!.instructions.at(-1)!,
+      aiInstruction: PHASE_HISTORY[n]!.instructions.at(n === 'Discovery' || n === 'Plan' ? -2 : -1)!,
       ...(n === 'Discovery' || n === 'Spec' ? { artifactTemplate: PHASE_HISTORY[n]!.templates.at(-1)! } : {}),
     });
     for (const n of ['Discovery', 'PRD', 'Spec', 'Plan']) settings.updateColumn(col(n).id, old(n));
@@ -342,6 +343,25 @@ describe('atualização do board para o padrão atual', () => {
       expect(d.artifactTemplate).not.toContain('code-review-graph');
     }
     expect(col('PRD').aiInstruction).toBe('meu PRD');
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+  });
+
+  it('versão 13: Discovery e Plan com o texto da versão 12 passam a explicar a trilha curta; o personalizado fica', () => {
+    upgradeBoard(db, boardId);
+    const settings = new SettingsRepo(db);
+    settings.updateColumn(col('Discovery').id, { aiInstruction: PHASE_HISTORY['Discovery']!.instructions.at(-1)! });
+    settings.updateColumn(col('Plan').id, { aiInstruction: 'meu Plan' });
+    run(db, 'UPDATE boards SET template_version = 12 WHERE id = ?', [boardId]);
+    const pending = pendingUpgrade(db, boardId);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toContain('trilha curta');
+    upgradeBoard(db, boardId);
+    expect(col('Discovery').aiInstruction).toBe(PHASE_DEFAULTS['Discovery']!.instruction);
+    expect(col('Discovery').aiInstruction).toContain('Trilha curta');
+    expect(col('Discovery').aiInstruction).toContain('update_card');
+    expect(PHASE_DEFAULTS['Plan']!.instruction).toContain('trilha curta');
+    expect(PHASE_DEFAULTS['Plan']!.instruction).toContain('DISCOVERY.md');
+    expect(col('Plan').aiInstruction).toBe('meu Plan');
     expect(pendingUpgrade(db, boardId)).toEqual([]);
   });
 

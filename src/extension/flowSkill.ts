@@ -37,6 +37,10 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
    quando houver. Uma história pode ser criada ou movida direto para uma fase adiante (o Plan, por
    exemplo) e começar dali: sem os documentos anteriores, trabalhe a partir da descrição, da conversa
    e do código, sem criar os documentos que faltam nem bloquear por falta deles.
+   Com a regra Trilha curta ligada (Configurações → Regras), uma história de esforço Baixo ou do tipo
+   Bug vai do Discovery direto ao Plan na aprovação ou pelo autopiloto, e o Plan parte do DISCOVERY;
+   não crie o PRD nem a Spec. No Discovery, se ela for maior do que parecia, suba o esforço com
+   \`update_card\`. Um \`move_card\` com a coluna PRD ou Spec continua valendo e força a trilha completa.
 4. Ao terminar:
    - se ficou algo dependendo da pessoa (veja "Pendências com a pessoa"), entregue com \`request_review\` e \`pending\`, e **pare**;
    - se \`phase.requiresApproval\` for verdadeiro, chame \`request_review\` na história, com um resumo do que fez e do que a pessoa deve olhar, e **pare**;

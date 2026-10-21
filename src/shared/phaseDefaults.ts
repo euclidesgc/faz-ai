@@ -257,6 +257,23 @@ const PLAN_INSTRUCTION_V11 = [
   'A descrição de cada sub-tarefa deve bastar para executá-la: o que fazer, onde e como verificar.',
 ].join('\n');
 
+const DISCOVERY_INSTRUCTION_V12 = [
+  'Entenda o problema de forma macro, antes de qualquer documento de requisitos.',
+  'Leia a descrição e a conversa do card (inclusive as imagens anexadas) e investigue o código e a documentação do projeto.',
+  'Esclareça o que precisa ser feito, qual é o objetivo, quem é afetado, os pré-requisitos e dependências, os riscos e o que fica de fora.',
+  'Use as ferramentas de índice de código que o Harness liberou, se houver, antes de Read e Grep; o arquivo lido continua sendo a fonte de verdade. Registre na seção "Mapa do código" os arquivos, funções, padrões e testes envolvidos: as fases seguintes partem dele e leem só o que faltar.',
+  'Discuta com a pessoa pela conversa do card: para cada dúvida ou decisão em aberto use ask_question e pare até a resposta. Pesquise o que for preciso para responder ao que ela escreveu.',
+  'Quando o entendimento estiver alinhado, registre-o no artefato e peça a revisão. Ele é o insumo do PRD.',
+].join('\n');
+
+const PLAN_INSTRUCTION_V12 = [
+  'Quebre a Spec aprovada em passos pequenos, que possam ser implementados e verificados um a um. Se a história começou nesta fase, sem Spec, parta da descrição e da conversa do card. Parta da seção "Mapa do código" da Spec e leia só o que faltar. Use as ferramentas de índice de código que o Harness liberou, se houver, antes de Read e Grep; o arquivo lido continua sendo a fonte de verdade.',
+  'Cada passo é uma parte inteligível da entrega, fácil de revisar sozinha, e diz como verificá-la (teste, typecheck, comando ou tela). Recortar por camada (dados, regras de negócio, tela) vale, desde que cada parte seja verificável e fácil de revisar.',
+  `Estime o tamanho da entrega em linhas de código. A história é uma funcionalidade e vira um pull request; se a estimativa passar de umas ${PR_LINES_BUDGET} linhas, divida a funcionalidade: deixe nesta história a primeira parte e crie as seguintes como histórias derivadas, em ordem, cada uma com derived_from = a parte anterior (a primeira derivada, desta história; a segunda, da primeira derivada, e assim por diante), para cada pull request ficar empilhado sobre o da parte anterior. Registre no plano o que fica em cada uma.`,
+  'Registre o plano no artefato e crie uma sub-tarefa para cada passo, com Fase = Implementação, o campo "Esforço da atividade" avaliado (o modelo é sugerido a partir dele) e as Skills necessárias.',
+  'A descrição de cada sub-tarefa deve bastar para executá-la: o que fazer, os arquivos que ela vai tocar (tirados do mapa) e como verificar.',
+].join('\n');
+
 export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   Discovery: {
     instruction: [
@@ -264,6 +281,7 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
       'Leia a descrição e a conversa do card (inclusive as imagens anexadas) e investigue o código e a documentação do projeto.',
       'Esclareça o que precisa ser feito, qual é o objetivo, quem é afetado, os pré-requisitos e dependências, os riscos e o que fica de fora.',
       'Use as ferramentas de índice de código que o Harness liberou, se houver, antes de Read e Grep; o arquivo lido continua sendo a fonte de verdade. Registre na seção "Mapa do código" os arquivos, funções, padrões e testes envolvidos: as fases seguintes partem dele e leem só o que faltar.',
+      'Com a regra Trilha curta ligada, uma história de esforço Baixo ou do tipo Bug vai deste Discovery direto ao Plan, sem PRD nem Spec: deixe o Mapa do código completo, porque o Plan parte dele. Se descobrir que a história é maior do que parecia, suba o campo "Esforço da atividade" com update_card (ou corrija o tipo) e registre na conversa: o avanço seguinte segue a trilha completa.',
       'Discuta com a pessoa pela conversa do card: para cada dúvida ou decisão em aberto use ask_question e pare até a resposta. Pesquise o que for preciso para responder ao que ela escreveu.',
       'Quando o entendimento estiver alinhado, registre-o no artefato e peça a revisão. Ele é o insumo do PRD.',
     ].join('\n'),
@@ -401,7 +419,7 @@ export const PHASE_DEFAULTS: Record<string, PhaseDefault> = {
   },
   Plan: {
     instruction: [
-      'Quebre a Spec aprovada em passos pequenos, que possam ser implementados e verificados um a um. Se a história começou nesta fase, sem Spec, parta da descrição e da conversa do card. Parta da seção "Mapa do código" da Spec e leia só o que faltar. Use as ferramentas de índice de código que o Harness liberou, se houver, antes de Read e Grep; o arquivo lido continua sendo a fonte de verdade.',
+      'Quebre a Spec aprovada em passos pequenos, que possam ser implementados e verificados um a um. Se a história começou nesta fase, sem Spec, ou veio pela trilha curta (só com o Discovery), parta do DISCOVERY.md, da descrição e da conversa do card, sem criar os documentos que faltam. Parta da seção "Mapa do código" da Spec ou do Discovery e leia só o que faltar. Use as ferramentas de índice de código que o Harness liberou, se houver, antes de Read e Grep; o arquivo lido continua sendo a fonte de verdade.',
       'Cada passo é uma parte inteligível da entrega, fácil de revisar sozinha, e diz como verificá-la (teste, typecheck, comando ou tela). Recortar por camada (dados, regras de negócio, tela) vale, desde que cada parte seja verificável e fácil de revisar.',
       `Estime o tamanho da entrega em linhas de código. A história é uma funcionalidade e vira um pull request; se a estimativa passar de umas ${PR_LINES_BUDGET} linhas, divida a funcionalidade: deixe nesta história a primeira parte e crie as seguintes como histórias derivadas, em ordem, cada uma com derived_from = a parte anterior (a primeira derivada, desta história; a segunda, da primeira derivada, e assim por diante), para cada pull request ficar empilhado sobre o da parte anterior. Registre no plano o que fica em cada uma.`,
       'Registre o plano no artefato e crie uma sub-tarefa para cada passo, com Fase = Implementação, o campo "Esforço da atividade" avaliado (o modelo é sugerido a partir dele) e as Skills necessárias.',
@@ -481,10 +499,10 @@ export interface PhaseHistory {
  */
 export const PHASE_HISTORY: Record<string, PhaseHistory> = {
   Discovery: {
-    instructions: [DISCOVERY_INSTRUCTION_V11],
+    instructions: [DISCOVERY_INSTRUCTION_V11, DISCOVERY_INSTRUCTION_V12],
     templates: [DISCOVERY_TEMPLATE_V8, DISCOVERY_TEMPLATE_V11],
     change:
-      'o documento ganha as seções "Perguntas para você" (alternativas, recomendação e espaço para a resposta) e "Mapa do código", de onde as fases seguintes partem',
+      'a fase explica a trilha curta (história de esforço Baixo ou do tipo Bug vai direto ao Plan quando a regra está ligada) e como devolver a história à trilha completa; o documento ganha as seções "Perguntas para você" e "Mapa do código", de onde as fases seguintes partem',
   },
   PRD: {
     instructions: [PRD_INSTRUCTION_V5, PRD_INSTRUCTION_V11],
@@ -499,9 +517,9 @@ export const PHASE_HISTORY: Record<string, PhaseHistory> = {
       'a Spec parte do mapa do código do Discovery e o completa, sem citar ferramentas do projeto; traz o desenho do programa (tipos, assinaturas e fluxo em diagramas Mermaid), o motivo de cada alternativa descartada e a seção "Perguntas para você"',
   },
   Plan: {
-    instructions: [PLAN_INSTRUCTION_V5, PLAN_INSTRUCTION_V11],
+    instructions: [PLAN_INSTRUCTION_V5, PLAN_INSTRUCTION_V11, PLAN_INSTRUCTION_V12],
     templates: [PLAN_TEMPLATE_V5, PLAN_TEMPLATE_V8],
-    change: `o plano parte do mapa do código da Spec e cada sub-tarefa traz os arquivos que vai tocar; cada passo fica fácil de revisar sozinho, o plano estima o tamanho da entrega, dividindo em histórias derivadas o que passar de umas ${PR_LINES_BUDGET} linhas, e ganha a seção "Perguntas para você"`,
+    change: `o plano parte do DISCOVERY quando a história veio pela trilha curta, sem PRD nem Spec; parte do mapa do código da Spec ou do Discovery e cada sub-tarefa traz os arquivos que vai tocar; cada passo fica fácil de revisar sozinho, o plano estima o tamanho da entrega, dividindo em histórias derivadas o que passar de umas ${PR_LINES_BUDGET} linhas, e ganha a seção "Perguntas para você"`,
   },
   Implementação: { instructions: [IMPLEMENTATION_INSTRUCTION_V5], templates: [], change: 'a fase pode começar sem sub-tarefas do Plan' },
   Homologação: {
