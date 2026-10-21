@@ -951,6 +951,21 @@ describe('EventLog no MessageRouter', () => {
     expect(only(of(s), 'trashed').cardId).toBe(s);
   });
 
+  it('lote de arquivados: card.unarchiveMany registra unarchived e card.trashArchivedMany registra trashed, na história e nas sub-tarefas', () => {
+    const h1 = story('Uma');
+    const s1 = subtask(h1, 'Filha');
+    const h2 = story('Duas');
+    router.handle({ type: 'card.archive', cardId: h1 });
+    router.handle({ type: 'card.archive', cardId: h2 });
+
+    router.handle({ type: 'card.unarchiveMany', cardIds: [h1, s1, h1] });
+    expect(only(of(h1), 'unarchived').cardId).toBe(h1);
+    expect(only(of(s1), 'unarchived').cardId).toBe(s1);
+
+    router.handle({ type: 'card.trashArchivedMany', cardIds: [h2] });
+    expect(only(of(h2), 'trashed').cardId).toBe(h2);
+  });
+
   it('handler que lança não registra nada: o log não conta o que não aconteceu', () => {
     const id = story('Travada', 'Discovery');
     expect(() => move(id, 'A fazer', { kind: 'child' })).toThrow();

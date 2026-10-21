@@ -128,6 +128,17 @@ export const board: Record<string, string> = {
     'Sub-task {sub} belongs to story {story}, which is archived. Restoring brings the story and all its archived sub-tasks back to the Backlog.',
   'Restaurar história': 'Restore story',
   'Restaurar {title}': 'Restore {title}',
+  'Ações em massa': 'Bulk actions',
+  'Selecionar todos os visíveis': 'Select all visible',
+  'Enviar para a lixeira': 'Move to trash',
+  'Restaurar {n} card(s)?': 'Restore {n} card(s)?',
+  'Voltam junto: {along} (sub-tarefas arquivadas das histórias e histórias das sub-tarefas).':
+    'Coming back too: {along} (archived sub-tasks of the stories and stories of the sub-tasks).',
+  'Os cards voltam para a primeira coluna do workflow e saem do modo autônomo.':
+    'The cards return to the first column of their workflow and leave autonomous mode.',
+  'Restaurando {n} card(s)…': 'Restoring {n} card(s)…',
+  'Excluir {n} card(s)?': 'Delete {n} card(s)?',
+  'Excluindo {n} card(s)…': 'Deleting {n} card(s)…',
 
   // Lixeira
   'Esvaziar a lixeira?': 'Empty the trash?',
@@ -388,7 +399,6 @@ export const board: Record<string, string> = {
   'Apagar {n} card(s) definitivamente?': 'Delete {n} card(s) for good?',
   'Comentários, anexos e sub-tarefas destes cards também serão apagados. Não dá para desfazer.':
     'Comments, attachments and sub-tasks of these cards will also be deleted. This cannot be undone.',
-  'Restaurando {n} card(s)…': 'Restoring {n} card(s)…',
   'Apagando {n} card(s)…': 'Deleting {n} card(s)…',
   'Ver todos os cards': 'See all cards',
   'Ver {n} com você': 'See {n} with you',

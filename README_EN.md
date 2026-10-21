@@ -181,7 +181,14 @@ promise a percentage: it shows, in the inventory, what is being loaded.
    clear. Each row shows 50 cards at a time, and **Mostrar mais** (show more) brings the next ones.
    Clicking an archived story selects it: the Sub-tarefas (sub-tasks) row then shows only its archived
    sub-tasks, even those that do not match the filter. Clicking again, or **Limpar seleção** (clear
-   selection), clears the selection. Opening the card still lists all sub-tasks.
+   selection), clears the selection. Opening the card still lists all sub-tasks. To act on several at
+   once, select the archived cards you want: **Selecionar todos os visíveis** (select all visible)
+   selects only the cards the filters show. **Restaurar** (restore) in bulk follows the same rule as
+   the single action (a story comes back with its archived sub-tasks, and a sub-task whose story is
+   archived brings back the whole story), and **Enviar para a lixeira** (send to trash) in bulk takes
+   each story's archived sub-tasks along. Every bulk action asks for confirmation, saying how many
+   cards will be affected and what goes along with them. Permanent deletion stays only in the Lixeira
+   (trash).
 
 **Multi-select in the trash.** In the **Lixeira** (trash), tick cards one by one or use **Selecionar todos** in the table header; the checkbox shows a partial state when only some are ticked. With at least one card ticked, a bar appears with the count and the actions **Restaurar** (restore) and **Apagar de vez** (delete permanently), which apply to the whole selection. Restore runs straight away; delete permanently asks for one confirmation for the batch. **Limpar** (clear) unticks everything. Restoring or deleting a card also takes its sub-tasks that are in the trash. **Esvaziar lixeira** (empty trash) stays as it was and does not depend on the selection.
 
