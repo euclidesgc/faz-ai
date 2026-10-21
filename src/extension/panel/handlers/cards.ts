@@ -243,6 +243,40 @@ function trashMany(ctx: BoardContext, msg: MessageOf<'card.trashMany'>): void {
   for (const story of liveStoriesOf(ctx, msg.cardIds)) ctx.cards.trash(story.id);
 }
 
+/** Os cards do lote que estão na lixeira, na ordem em que a mensagem listou os ids. */
+function trashedOf(ctx: BoardContext, cardIds: string[]): string[] {
+  const trashed = new Set(
+    ctx
+      .state()
+      .cards.filter((c) => c.deletedAt !== null)
+      .map((c) => c.id),
+  );
+  return cardIds.filter((id) => trashed.has(id));
+}
+
+/**
+ * Restaura várias lixeiras de uma vez. Um item que falha (ex.: sub-tarefa cuja história ainda está na lixeira,
+ * listada antes dela) não interrompe o lote: o erro vira só a ausência do efeito naquele card.
+ */
+function restoreMany(ctx: BoardContext, msg: MessageOf<'card.restoreMany'>): void {
+  for (const id of trashedOf(ctx, msg.cardIds)) {
+    try {
+      ctx.cards.restore(id);
+    } catch {
+      // pai ainda na lixeira: a sub-tarefa volta junto com a história, quando ela for restaurada
+    }
+  }
+}
+
+/**
+ * Apaga de vez várias lixeiras de uma vez, com os filhos. Um id já removido por um item anterior do lote
+ * (ex.: a sub-tarefa listada depois da história que a levou junto) não tem efeito: `deletePermanent` devolve
+ * vazio para ele.
+ */
+function deletePermanentMany(ctx: BoardContext, msg: MessageOf<'card.deletePermanentMany'>): void {
+  for (const id of trashedOf(ctx, msg.cardIds)) ctx.cards.deletePermanent(id).forEach((removed) => ctx.store.removeCard(removed));
+}
+
 /**
  * Move várias histórias de uma vez para a mesma coluna. `cancelChildren: true` sempre: cobre RF13
  * (cancelar as sub-tarefas em aberto do lote ao mover para uma coluna de cancelamento, sem perguntar
@@ -358,6 +392,14 @@ export const cardHandlers = {
   },
   'card.trashMany': (msg, ctx) => {
     trashMany(ctx, msg);
+    return true;
+  },
+  'card.restoreMany': (msg, ctx) => {
+    restoreMany(ctx, msg);
+    return true;
+  },
+  'card.deletePermanentMany': (msg, ctx) => {
+    deletePermanentMany(ctx, msg);
     return true;
   },
   'card.moveMany': (msg, ctx, { byAi }) => {

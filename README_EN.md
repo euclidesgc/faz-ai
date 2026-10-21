@@ -182,6 +182,8 @@ promise a percentage: it shows, in the inventory, what is being loaded.
    are not copied. There is no bulk duplication: with several cards selected, the option does not
    appear.
 
+**Multi-select in the trash.** In the **Lixeira** (trash), tick cards one by one or use **Selecionar todos** in the table header; the checkbox shows a partial state when only some are ticked. With at least one card ticked, a bar appears with the count and the actions **Restaurar** (restore) and **Apagar de vez** (delete permanently), which apply to the whole selection. Restore runs straight away; delete permanently asks for one confirmation for the batch. **Limpar** (clear) unticks everything. Restoring or deleting a card also takes its sub-tasks that are in the trash. **Esvaziar lixeira** (empty trash) stays as it was and does not depend on the selection.
+
 Nothing happens silently: every action that goes to the board waits for confirmation and shows it
 is working. A thin bar at the top lights up while any request is in progress; the card being moved,
 archived or changing status or title fades and gets a spinner on its bar (on the board and in the
@@ -322,6 +324,14 @@ answer). Answers go into the **Perguntas e respostas** (Questions and answers) s
 description; answering the same question again replaces the previous answer. In autonomous mode, the
 board answers each question with the recommended option, records it in the same section and the AI
 carries on. An open question, without options, is still `ask_question`.
+
+Questions with options appear on the open card, below the description, in a carousel: one question at a
+time, with the **{n} de {total}** counter (step n of total) and the recommended option marked with the
+**Indicada** (Recommended) badge. Clicking an option records the answer and moves on; to write your own
+answer, use the field of that question. **Anterior** (Previous) and **Próxima** (Next) go back and
+forward. The last screen is the summary, with the unanswered questions; **Enviar respostas** (Send
+answers) records everything in the **Perguntas e respostas** (Questions and answers) section and hands
+the turn back to the AI.
 
 While something is missing for the board to work with the tool, the **Configurações** (Settings) tab
 and the **Verificar ambiente** (Check environment) button get a warning icon. Its hint sums up what is
