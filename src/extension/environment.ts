@@ -1,3 +1,5 @@
+import { baseValue } from '../shared/harness';
+import type { AiBase } from '../shared/aiProfiles';
 import * as path from 'node:path';
 import type { BranchRenamePending } from '../shared/branchRename';
 import type { AiTool } from '../shared/harness';
@@ -76,7 +78,7 @@ const FROM: Partial<Record<EnvCheckId, RequirementId[]>> = {
 };
 
 /** O nome da ferramenta no `code-review-graph install --platform`. */
-const CRG_PLATFORM: Record<AiTool, string> = {
+const CRG_PLATFORM: Record<AiBase, string> = {
   claude: 'claude-code',
   cursor: 'cursor',
   // ainda sem plataforma própria no Code Review Graph: o nome genérico, a conferir quando ele suportar
@@ -97,7 +99,7 @@ const DOCS: Partial<Record<EnvCheckId, string>> = {
   uv: 'https://docs.astral.sh/uv/getting-started/installation/',
   'crg-embeddings': `${CRG_DOCS}#usage`,
 };
-const TOOL_DOCS: Record<AiTool, Partial<Record<EnvCheckId, string>>> = {
+const TOOL_DOCS: Record<AiBase, Partial<Record<EnvCheckId, string>>> = {
   claude: { cli: 'https://code.claude.com/docs/en/setup', permission: 'https://code.claude.com/docs/en/iam' },
   cursor: { cli: 'https://cursor.com/docs/cli/installation', permission: 'https://cursor.com/docs/cli/reference/permissions' },
   kimi: { cli: 'https://www.kimi.com/code/docs/en/', permission: 'https://www.kimi.com/code/docs/en/' },
@@ -110,7 +112,7 @@ const TOOL_DOCS: Record<AiTool, Partial<Record<EnvCheckId, string>>> = {
  */
 const steps = (...commands: string[]): InstallStep[] => commands.map((command) => ({ command }));
 const NVM: InstallStep = { command: 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash', step: 'nvm' };
-const INSTALL: Record<'unix' | 'windows', Record<'node' | AiTool | 'uv', InstallStep[]>> = {
+const INSTALL: Record<'unix' | 'windows', Record<'node' | AiBase | 'uv', InstallStep[]>> = {
   unix: {
     // o Node.js pelo nvm, como o site do Node.js ensina: primeiro o nvm, depois o Node com ele
     node: [NVM, { command: '. "$HOME/.nvm/nvm.sh"', step: 'nvm-load' }, { command: `nvm install ${NODE_MIN_MAJOR}`, step: 'node' }],
@@ -233,7 +235,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
   const install = INSTALL[windows ? 'windows' : 'unix'];
   const reopen = windows ? { reopenTerminal: true as const } : {};
   // a CLI de cada ferramenta, com o PATH quando ela cai numa pasta fora dele
-  const cliInstall = (t: AiTool) => [...install[t], ...localBin(p, true)];
+  const cliInstall = (t: AiTool) => [...(baseValue(install, t) ?? []), ...localBin(p, true)];
 
   // o Node.js que roda o MCP do board: a partir da versão mínima
   const nodeExe = p.resolve('node');
@@ -254,7 +256,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
   };
 
   const cliMissing = !!req('cli');
-  const cliExe = cliMissing ? null : p.resolve(CLI_COMMAND[tool]);
+  const cliExe = cliMissing ? null : p.resolve(baseValue(CLI_COMMAND, tool) ?? '');
   const signin = req('signin');
   const skill = p.skillInstalled ? undefined : (req('skill') ?? { id: 'skill' as const, tool, action: { kind: 'installSkill' as const } });
   const own = toolGroup(tool, [
@@ -263,15 +265,23 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
       tool,
       status: statusOf(!cliMissing),
       version: cliExe ? version(await p.run(cliExe, ['--version'])) : undefined,
-      docs: TOOL_DOCS[tool].cli,
+      docs: (baseValue(TOOL_DOCS, tool) ?? {}).cli,
       install: cliMissing ? cliInstall(tool) : undefined,
       ...(cliMissing ? reopen : {}),
-      children: [{ id: 'signin', tool, status: statusOf(!signin, !cliMissing), command: LOGIN_COMMAND[tool], requirement: signin }],
+      children: [
+        { id: 'signin', tool, status: statusOf(!signin, !cliMissing), command: baseValue(LOGIN_COMMAND, tool) ?? '', requirement: signin },
+      ],
     },
     { id: 'mcp', tool, status: statusOf(!req('mcp')), docs: DOCS.mcp, requirement: req('mcp') },
     { id: 'skill', tool, status: statusOf(p.skillInstalled), docs: DOCS.skill, requirement: skill },
     harnessCheck(tool, p.harnessIssues, cliMissing, req('harness')),
-    { id: 'permission', tool, status: statusOf(!req('permission')), docs: TOOL_DOCS[tool].permission, requirement: req('permission') },
+    {
+      id: 'permission',
+      tool,
+      status: statusOf(!req('permission')),
+      docs: (baseValue(TOOL_DOCS, tool) ?? {}).permission,
+      requirement: req('permission'),
+    },
   ]);
 
   // as outras ferramentas: o board só confere; ele instala o MCP e a skill quando uma vira a do projeto
@@ -284,14 +294,21 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
           tool: o.tool,
           status: statusOf(!!o.cli),
           version: o.cli ? version(await p.run(o.cli, ['--version'])) : undefined,
-          docs: TOOL_DOCS[o.tool].cli,
+          docs: (baseValue(TOOL_DOCS, o.tool) ?? {}).cli,
           install: o.cli ? undefined : cliInstall(o.tool),
           ...(o.cli ? {} : reopen),
-          children: [{ id: 'signin', tool: o.tool, status: statusOf(o.signedIn !== false, !!o.cli), command: LOGIN_COMMAND[o.tool] }],
+          children: [
+            {
+              id: 'signin',
+              tool: o.tool,
+              status: statusOf(o.signedIn !== false, !!o.cli),
+              command: baseValue(LOGIN_COMMAND, o.tool) ?? '',
+            },
+          ],
         },
         { id: 'mcp', tool: o.tool, status: statusOf(o.mcp), docs: DOCS.mcp },
         { id: 'skill', tool: o.tool, status: statusOf(o.skill), docs: DOCS.skill },
-        { id: 'permission', tool: o.tool, status: statusOf(!o.permission), docs: TOOL_DOCS[o.tool].permission },
+        { id: 'permission', tool: o.tool, status: statusOf(!o.permission), docs: (baseValue(TOOL_DOCS, o.tool) ?? {}).permission },
       ]),
     );
   }
@@ -351,7 +368,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
       id: 'crg-mcp',
       tool,
       status: statusOf(p.crgMcp, !!crgExe),
-      command: `code-review-graph install --platform ${CRG_PLATFORM[tool]}`,
+      command: baseValue(CRG_PLATFORM, tool) ? `code-review-graph install --platform ${baseValue(CRG_PLATFORM, tool)}` : undefined,
       inProject: true,
     },
     {

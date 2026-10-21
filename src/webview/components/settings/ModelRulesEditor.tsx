@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { modelDisplay } from '../../modelText';
-import { aiToolInfo } from '../../../shared/harness';
+import { baseInfo } from '../../../shared/harness';
 import { EFFORT_FIELD, TYPE_CONDITION, describeRule, modelValue, type ModelRule, type RuleCondition } from '../../../shared/models';
 import type { BoardState } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
@@ -214,7 +214,7 @@ export function ModelRulesEditor() {
       fallback: null,
     });
   };
-  const tool = aiToolInfo(aiTool);
+  const tool = baseInfo(aiTool);
   const hasEffort = state.fieldDefs.some((f) => f.name.toLowerCase() === EFFORT_FIELD.toLowerCase());
 
   return (

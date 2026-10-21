@@ -97,6 +97,11 @@ describe('activityMessage: uma execução', () => {
       aiActivity: [activity(over)],
     });
 
+  it('identifica a origem de teste de ferramenta', () => {
+    const msg = activityMessage(baseState({ origin: 'test' }), { offline: false, now: NOW });
+    expect(msg.title).toContain('teste de ferramenta');
+  });
+
   it('fase: "agora"', () => {
     const state = baseState({ mode: 'phase', phase: 'Discovery', origin: 'manual', startedAt: NOW });
     const msg = activityMessage(state, { offline: false, now: NOW });

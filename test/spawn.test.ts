@@ -42,6 +42,19 @@ describe('spawnHeadless', () => {
   });
 });
 
+it('a confirmação de término só aparece após o fechamento real do processo', async () => {
+  const proc = spawnHeadless(
+    { command: process.execPath, args: ['-e', 'setTimeout(()=>{},100)'], format: 'text' },
+    process.cwd(),
+    () => {},
+    undefined,
+  );
+  expect(proc.terminationConfirmed?.()).toBe(false);
+  await new Promise<void>((resolve) => proc.onExit(() => resolve()));
+  // O Windows ainda não dispõe de prova da árvore inteira; não recebe confirmação por encerrar só o pai.
+  expect(proc.terminationConfirmed?.()).toBe(process.platform !== 'win32');
+});
+
 describe('linha de comando do Windows', () => {
   it('um .exe roda direto, sem shell e sem escape', () => {
     expect(launchSpec('C:\\bin\\claude.exe', ['-p', 'a & b'], 'win32')).toEqual({

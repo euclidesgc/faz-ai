@@ -1,3 +1,4 @@
+import type { AiBase } from '../../src/shared/aiProfiles';
 import { choose, confirmLast, lastSent, posted, renderThemed, seedBoard, sentOf } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, cleanup, screen, within } from '@testing-library/react';
@@ -11,7 +12,7 @@ import { ToolHarness } from '../../src/webview/components/settings/harness/ToolH
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 /** Índice da fonte do catálogo pelo caminho, no escopo e no grupo pedidos. */
-const sourceOf = (tool: AiTool, path: string, group?: string) =>
+const sourceOf = (tool: AiBase, path: string, group?: string) =>
   HARNESS_CATALOG[tool].findIndex((s) => s.path === path && (!group || s.group === group));
 
 const item = (over: Partial<HarnessItem> & Pick<HarnessItem, 'name' | 'kind' | 'location'>): HarnessItem => ({

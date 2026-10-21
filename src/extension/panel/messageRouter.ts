@@ -1,3 +1,6 @@
+import { builtinPolicyCatalog, simulatePolicyScenario, type PolicyLibrary, type PolicyScenario } from '../../shared/policyManagement';
+import { resolveContextDraft, type ContextDraftResolution } from '../../shared/contextDraftResolution';
+import type { ContextActivityTarget } from '../../shared/contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
 import { scanLibraryFolder } from '../libraryImport';
 import { agentOfArtifact } from '../../shared/artifacts';
@@ -31,12 +34,17 @@ import { BoardContext, type Actor, type Handler, type HandlerMap, type MessageTy
 import { boardBackupHandlers } from './handlers/boardBackup';
 import { boardSettingsHandlers } from './handlers/boardSettings';
 import { addAttachment, cardContentHandlers } from './handlers/cardContent';
+import { questionHandlers } from './handlers/questions';
 import { cardHandlers, createCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
 import { initModels, modelHandlers } from './handlers/models';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
 import { branchRenameHandlers } from './handlers/branchRename';
+import { aiProfileHandlers, type AiProfileRuntime } from './handlers/aiProfiles';
 import { settleDelivery } from '../delivery';
+import { WorkRepo } from '../repositories/workRepo';
+import { credentialsFor } from '../credentials';
+import { RunMcpSessions, type RunMcpAccess } from '../mcp/runSessions';
 
 export type { RouterOptions };
 
@@ -44,6 +52,9 @@ export type { RouterOptions };
 export interface Origin {
   author?: string;
   source?: 'human' | 'ai';
+  /** Somente o host liga a origem à apresentação da conexão MCP. */
+  runToken?: string;
+  externalMcp?: true;
 }
 
 /** O que o host faz pelo Diagnóstico do ambiente. */
@@ -148,9 +159,14 @@ const bridgeOnly = {
   // ler o log não muda o board: a `HostBridge` responde por `panelMetrics`, sem passar por `handle`
   'metrics.query': viaBridge,
   'card.usage.query': viaBridge,
+  'contextPlanning.preview': viaBridge,
+  'executionPolicy.read': viaBridge,
+  'executionPolicy.simulate': viaBridge,
   'backup.export': viaBridge,
   'backup.import.pick': viaBridge,
   'backup.import.cancel': viaBridge,
+  'settings.aiProfiles.probe': viaBridge,
+  'settings.aiProfiles.test': viaBridge,
 } satisfies Partial<HandlerMap>;
 
 /** Um handler por tipo de mensagem, agrupados por domínio em ./handlers. */
@@ -158,16 +174,19 @@ const HANDLERS: HandlerMap = {
   ...bridgeOnly,
   ...cardHandlers,
   ...cardContentHandlers,
+  ...questionHandlers,
   ...workspaceHandlers,
   ...branchRenameHandlers,
   ...boardSettingsHandlers,
   ...boardBackupHandlers,
   ...modelHandlers,
+  ...aiProfileHandlers,
   ...harnessHandlers,
 };
 
 /** Aplica mensagens do webview no banco. Não depende da API do VSCode. */
 export class MessageRouter {
+  readonly executions: RunMcpSessions;
   private ctx: BoardContext;
   private listeners = new Set<() => void>();
   private errorListeners = new Set<(message: string) => void>();
@@ -189,11 +208,18 @@ export class MessageRouter {
   private environmentHooks: EnvironmentHooks | null = null;
   private orphans: OrphanReport = EMPTY_ORPHANS;
   private orphanHooks: OrphanHooks | null = null;
+  private aiProfileRuntime: AiProfileRuntime | null = null;
   readonly store: AttachmentStore;
   readonly harnessStore: HarnessStore | null;
 
   constructor(dbHandle: DbHandle, opts: RouterOptions) {
     this.ctx = new BoardContext(dbHandle, opts);
+    this.executions = new RunMcpSessions({
+      repo: () => this.work,
+      state: () => this.snapshot(),
+      definitions: () => this.libraryMcpDefinitions(),
+      save: () => dbHandle.scheduleSave(),
+    });
     this.store = this.ctx.store;
     this.harnessStore = this.ctx.harness.store;
     this.ctx.harness.load();
@@ -205,6 +231,36 @@ export class MessageRouter {
 
   get boardId(): string {
     return this.ctx.boardId;
+  }
+  setAiProfileRuntime(runtime: AiProfileRuntime): void {
+    this.aiProfileRuntime = runtime;
+  }
+  probeAiProfiles() {
+    if (!this.aiProfileRuntime) throw new Error('Situação dos perfis indisponível neste host.');
+    return this.aiProfileRuntime.probe();
+  }
+  testAiProfile(id: string) {
+    if (!this.aiProfileRuntime) throw new Error('Teste de perfil indisponível neste host.');
+    return this.aiProfileRuntime.test(id);
+  }
+  executionPolicyLibrary(): PolicyLibrary {
+    return { snapshot: this.ctx.executionPolicies.snapshot(this.boardId), ...builtinPolicyCatalog(this.snapshot()) };
+  }
+  executionPolicyHistory(id: string, before = Number.MAX_SAFE_INTEGER) {
+    if (!Number.isSafeInteger(before) || before < 1 || typeof id !== 'string' || !id || id.length > 240)
+      throw new Error('Página de histórico inválida.');
+    const records = this.ctx.executionPolicies.history(this.boardId, id, { before, limit: 51 });
+    return { history: records.slice(0, 50), nextBefore: records.length > 50 ? records[49]!.revision : null };
+  }
+  simulateExecutionPolicy(scenario: PolicyScenario) {
+    return simulatePolicyScenario(this.snapshot(), this.ctx.executionPolicies.snapshot(this.boardId), scenario);
+  }
+  get work(): WorkRepo {
+    return new WorkRepo(this.ctx.dbHandle.db, this.ctx.boardId);
+  }
+  /** A sessão MCP devolve uma capacidade restrita pelo proxy; a interface humana não a recebe. */
+  mcpAccess(): RunMcpAccess | null {
+    return null;
   }
 
   /** Lê um valor da tabela meta do board (ex.: config do Git da IDE); undefined se não existir. */
@@ -246,13 +302,16 @@ export class MessageRouter {
   libraryMcpDefinitions(): Record<string, unknown> {
     return this.ctx.library.mcpDefinitions();
   }
+  redactCredentials(text: string): string {
+    return credentialsFor(this.ctx.dbHandle.db).redact(text);
+  }
 
   snapshot(): BoardState {
     const s = this.ctx.boards.snapshot(this.ctx.boardId, this.ctx.opts.author);
     const { current, install } = this.ctx.harness;
     return {
       ...s,
-      // os agentes do board são os arquivos marcados: derivados aqui, nunca gravados
+      // os agentes do board são as cópias guardadas no banco (escopo `board`): derivados aqui, nunca gravados
       board: {
         ...s.board,
         execProfiles: agentProfiles(
@@ -261,7 +320,7 @@ export class MessageRouter {
             : current.agents,
           s.harnessSelection,
           s.board.runner.defaultAgent,
-        ),
+        ).map((p) => (current.library && p.scope !== 'builtin' ? { ...p, scope: 'board' as const } : p)),
       },
       harness: current,
       boardServer: boardServerFootprint(),
@@ -289,6 +348,13 @@ export class MessageRouter {
    */
   handle(msg: WebviewToHost, ctx: Origin = {}): BoardState {
     // o mapa garante o handler do tipo certo; o cast só junta a união de handlers numa assinatura
+    if (
+      (msg.type === 'settings.executionPolicy.save' || msg.type === 'settings.executionPolicy.remove') &&
+      (ctx.source === 'ai' || ctx.externalMcp || ctx.runToken !== undefined)
+    )
+      throw new Error('Políticas executáveis exigem revisão humana.');
+    if (msg.type.startsWith('settings.aiProfiles.') && (ctx.source === 'ai' || ctx.externalMcp || ctx.runToken !== undefined))
+      throw new Error('Perfis executáveis exigem revisão humana.');
     const handler = HANDLERS[msg.type] as Handler<MessageType>;
     const actor = this.actorOf(ctx);
     // o log: sonda antes, registro depois — só quando o handler diz que o board mudou (o que não aconteceu não entra)
@@ -326,7 +392,11 @@ export class MessageRouter {
   }
 
   private actorOf(ctx: Origin): Actor {
-    return { author: ctx.author ?? this.ctx.opts.author, byAi: ctx.source === 'ai' };
+    if (ctx.runToken !== undefined) {
+      const binding = this.executions.assert(ctx.runToken);
+      return { author: ctx.author ?? 'IA', byAi: true, runId: binding.attempt.runId };
+    }
+    return { author: ctx.author ?? this.ctx.opts.author, byAi: ctx.source === 'ai', ...(ctx.externalMcp ? { runId: null } : {}) };
   }
 
   /** O que falta para o board trabalhar com a ferramenta de IA (informado pelo host, que confere). */
@@ -540,6 +610,19 @@ export class MessageRouter {
   /** Consulta do painel de métricas: só lê o log (sem sonda, sem registro, sem `notify` nem gravação do banco). */
   panelMetrics(query: MetricsPanelQuery): MetricsPanelResult {
     return getPanelMetrics(this.ctx.dbHandle.db, this.ctx.boardId, query);
+  }
+
+  /** Metadados do rascunho a partir do banco do host; nenhuma inferência ou admissão é executada. */
+  previewContextDraft(target: ContextActivityTarget): ContextDraftResolution {
+    const state = this.snapshot();
+    state.harness = {
+      ...state.harness,
+      library: {
+        directory: state.harness.library?.directory ?? '',
+        artifacts: this.ctx.library.repo.list(this.ctx.boardId).map((a) => ({ ...a, path: '' })),
+      },
+    };
+    return resolveContextDraft(state, target);
   }
 
   /** O que o card gastou até agora, por fase (e, numa história, as sub-tarefas), lido do log das execuções. */

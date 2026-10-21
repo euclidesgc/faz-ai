@@ -269,8 +269,9 @@ navegador**; the terminal `faz-ai` warns and does not start.
 
 ## Using it with AI
 
-1. In Configurações (settings) → **Harness**, choose the project's tool (Claude Code,
-   Cursor or Kimi Code).
+1. In Settings → **AI tools**, choose the project's default CLI profile. Claude Code, Cursor and
+   Kimi Code are built in; you can also create copies and custom profiles. You can switch the active
+   profile in **Harness → Tool and execution**.
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
    **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai` server in the global file the tool reads. This also happens on its own, silently, when the folder opens (and on every new extension version), always in the user scope; only a failure raises a notice.
 3. In the **Skills** group of the same tab, click **Instalar (padrão da ferramenta)** for the
@@ -307,6 +308,14 @@ banner offers **Corrigir o registro** (fix the registration), which removes it a
 4. Open a new session of the tool in the project folder and ask, for example, "list the cards on
    the board", "take story #1 and write the PRD" or "check what is pending on the board and move it
    forward".
+
+**Questions with options.** When the AI needs a decision between alternatives, it records the
+questions on the card (`ask_questions`), each with short options and the recommended one, and
+explains the details in the description. The card stays in **Aguardando resposta** (waiting for an
+answer). Answers go into the **Perguntas e respostas** (Questions and answers) section of the
+description; answering the same question again replaces the previous answer. In autonomous mode, the
+board answers each question with the recommended option, records it in the same section and the AI
+carries on. An open question, without options, is still `ask_question`.
 
 While something is missing for the board to work with the tool, the **Configurações** (Settings) tab
 and the **Verificar ambiente** (Check environment) button get a warning icon. Its hint sums up what is
@@ -565,6 +574,48 @@ window comes from the card's model (or the agent's): 1M for Fable 5.1, Opus 5.5 
 ring shows only the total. In Cursor, which does not enforce the empty context, what the tool loads on
 its own is also left out, and the MCP tool definitions count in full. What the run actually spent
 shows up afterwards, in the consumption of each run.
+
+The **Run context** block under **Usage → Next run** shows the agent, native delegation candidates,
+rules, skills and MCP servers with all their sources: card, agent, phase, story, default or Always.
+A file selected by multiple sources appears once per identity (the board copy ID, when available).
+The agent editors show the same block for the draft and Always items, without selections from a card.
+
+The preview uses the current manifest and neither starts a run nor calls AI. It distinguishes
+restrictions enforced by the executor from prompt advice, flags identical paragraphs in agent
+instructions and explains that rule and skill contents are not compared. Unknown sizes remain
+unmeasured; initial context size does not predict total task usage. This delivery makes current
+behavior visible; configuration per action and new authorization boundaries are not active yet.
+
+Persistence now separates **version 1** context contracts from legacy fields, with revisions and
+selections keyed by action and phase ID. Inheritance and explicit empty selections are distinct.
+New contracts are drafts and do not govern runtime execution yet.
+The preview identifies legacy mode. Migration to schema 35 preserves original fields; its
+compatibility view identifies agent skills as essential and card skills as selected, including
+missing references. Legacy MCP selections do not become permissions in the new contract.
+Export/import preserves drafts and versions without embedding MCP definitions in these contracts;
+exports contain only local references to MCP configurations, without their values.
+
+When editing a saved library subagent, **Edit context contract (draft)** opens the v1 contract: role, instructions, essential skills, suggested skills, allowed MCPs and tool restrictions. The contract has a separate save action, without AI and with optimistic revisions; it does not automatically copy legacy permissions. The preview shows essentials and Always items, keeps optional resources inactive and explains missing resources or incompatible MCPs. Missing references remain available for review.
+
+The host–webview protocol and the `preview_context_draft` MCP tool preview saved drafts: they resolve inheritance, sources and conflicts without inference and return artifact metadata. Capability admission from #729 remains pending; previews do not authorize execution.
+
+The **Execution plan** tab lets you review the agent, model, additional skills, active MCPs, input attachments and expected result for each action. Stories include rows for open phases; tasks have four independent actions (work, refinement, summary and conflict resolution). Under **Settings → Harness → Tool**, board and workflow defaults use the same editor, including conversation and assistants without a card. The preview shows sources and incompatibilities. The catalog shows short descriptions without opening specialists’ instruction bodies.
+
+Changes remain drafts until **Compare changes** and **Apply reviewed drafts**, with differences, reasons and an estimate of the known context portion. Copying between activities also requires comparison. Criteria and dependencies reference the original card. Schema 37 stores reasons; the host saves the batch in one transaction and rejects stale revisions without partial writes. Failures preserve drafts, which also survive switching card tabs. This configuration prepares the plan; execution remains on the legacy path until E5 activation.
+
+Transport that requires project MCP files (Cursor and Kimi) uses a lease coordinated by the real file path. A protected journal under `~/.faz-ai/mcp-leases` precedes mutation; format attempts reuse the same ownership. After confirmed termination, the previous configuration is restored while preserving servers added by the person. Conflicting changes to the `faz-ai` entry or invalid JSON are not overwritten. Without confirmation that the process tree has ended, the lease is retained and a new run on that file is refused. The launcher receives the CLI command only after its identity is journaled. On startup, a demonstrably dead owner allows recovery of preparations whose command was never released and recorded process groups with confirmed termination. Old or ambiguous journals remain retained. Windows does not yet provide process-tree confirmation in this transport; that case requires reconciliation. This does not prove CLI isolation or complete #729.
+
+On the host, runner and chat publish selected library files under `run-artifacts/<boardId>/<runId>`, with revisions and SHA-256 hashes. Prompts and additional directories use that copy. Updating or deleting an artifact or its cache does not rewrite the snapshot; required materialization failures block process startup. Schema 38 adds monotonic artifact revisions. Published snapshots are preserved, including inconclusive runs; automatic cleanup is not implemented yet. This freezes prompt file references; managed MCP sessions also use the copy, as described below. External legacy sources and full v1 resolution have not been activated in E5.
+
+The local orchestration foundation uses `ai_work` and `ai_work_attempts` (schema 39), with unit ownership, generations, token hashes, process identity and mutation counts. These tables are excluded from exports; imports do not create ownership and are refused while local work is running or being reconciled. Database flush synchronizes the file before atomic replacement and the directory on POSIX systems. A cross-process lock keyed by the real workspace path releases a writer only after process-group termination is confirmed; adopting a dead host’s reservation does not release it automatically. Pure rules calculate rounds, reconciliation and requested/effective limits. Trigger integration remains pending; this foundation does not change who executes subtasks or prove CLI isolation.
+
+Managed runs now have per-attempt MCP identity: the host injects `FAZAI_RUN_TOKEN` only into the bridge environment, and the transport consumes its preface before the MCP protocol. Every call validates owner, generation and revocation; mutations are attributed to the authenticated run and counted. `get_skill`, `get_agent`, `get_board_artifact` and `read_rule_file` use the captured snapshot, and external forwarding freezes selected servers and operations. External sessions remain available but cannot take over a card reserved by the board. The runner accepts identity and guidance from the orchestrator without completing work solely on exit code zero. This API is not connected to triggers yet: automatic activation, persistence before CLI release and #824/#825 remain pending.
+
+The gateway also accepts asynchronous identity recording (`beforeStart`): the launcher waits for it before receiving the command. Failure, cancellation or revocation while waiting prevents late release. The measured transport preserves process identity and termination confirmation for reconciliation. The Orchestrator described below connects this hook to flush and workspace ownership through an injected UnitStarter; production triggers remain pending.
+
+The `Orchestrator` now provides `drive`, round continuation, startup reconciliation, sweeping and cancellation through an injected `UnitStarter`. It synchronizes preparation and process identity before releasing the CLI, confirms the process group and saves the result before releasing the lock. The workspace reference remains persisted until physical release is confirmed, including crashes in that interval; imports also respect that reservation. Tests using Node processes, the MCP bridge and an on-disk database cover three sequential children, one closing run, partial work, cancellation with a descendant and a real controller restart. Host creation and trigger integration remain pending, along with human return cycles and stable phase association. This does not activate the v1 plan or validate real AI CLIs yet.
+
+The v1 gateway admission foundation distinguishes conversation, artifacts, permissions, MCP and delegation, requiring local receipts bound to the current configuration. Decisions are recorded in history (schema 36), and export/import does not turn them into authorization. An empty list means no tools; strict Claude mapping uses exact tools and MCP operations without bypassing permissions. This foundation still awaits the real CLI verifier and activation across E5 actions: current execution remains legacy, and no executor is verified automatically.
 
 ### Card Usage tab
 
@@ -1163,11 +1214,11 @@ time limit (Settings → Harness → maximum time), with the explanation in the 
 Subagents are **Board library** artifacts with instructions, description, optional model, tool
 categories and dependencies on skills and MCPs. Creating or editing through the Harness writes to
 the board and its reading copies, without creating files in tool folders. Existing native agent
-files can be imported.
+files can be imported. Once copied, an agent does not depend on its original file: editing or deleting the file in the tool folder does not change the board. Agents created by earlier versions in `~/.claude/agents` stay there, but the board no longer writes to that folder; editing one in the tool folder does not update the board's copy, and to update it, remove the agent from the library and send it again.
 
 Runs select the card's agent, otherwise the phase's agent, then the default from **Harness →
 Tool and execution**. With no available agents, the built-in agent adds no instructions. Removing an
-agent releases card and phase selections that used it. Existing factory agents remain in the library.
+agent releases card and phase selections that used it. Factory agents are created inside each board, in its database; one you deleted does not come back unless you ask to recreate them.
 
 The **Sub-agents** tab offers **Create**, **Guided assistant** and **Generate from project**.
 Its creation and editing form opens in a modal with a dimmed background, separated from the existing agent list. Clicking outside keeps the draft open; use Cancel to leave.
@@ -1182,8 +1233,7 @@ of the profile as prompt guidance. The MCP bridge enforces Always/Per card/Off s
 independently of the executor.
 
 Through MCP, `get_board` lists available agents, `set_card_profile` selects a card's agent, and
-`get_board_artifact`/`save_board_artifact` read and edit the library. Native-file APIs `create_agent`,
-`update_agent`, `get_agent` and `delete_agent` remain for compatibility.
+`get_board_artifact`/`save_board_artifact` read and edit the library. `create_agent`, `update_agent`, `get_agent` and `delete_agent` also act on the board's agents: they do not write to `~/.claude/agents` or `.cursor/agents`, `get_agent` reads the board's copy, and `delete_agent` does not delete the original file.
 
 ## Harness
 
@@ -1191,6 +1241,8 @@ The board manages a **private library**, independent of the AI tool. Under **Set
 **Board library** provides CRUD for **Rules**, **Skills**, **Sub-agents** and **MCPs**. **Tool and
 execution** selects AI, models, permissions, default agent and heartbeat, and connects the selected
 tool to the board MCP server. Switching tools preserves artifacts and selections.
+
+Executions use only the copies stored in the board database. An item marked in **Settings → Harness** that exists only in the tool's folder and was never copied appears as missing and does not enter executions. Deleting or moving the original file after it was copied changes nothing on the board. An execution's MCP servers come only from the definitions stored on the board; if an agent or card cites a server that is not there, the execution does not start, and the error asks you to send it to the board in **Settings → Harness**.
 
 Each artifact notice has an outlined button below the text on the right to dismiss it and keep it hidden. The information icon shows the notice again.
 
@@ -1233,9 +1285,7 @@ In Rules, **Update from source** replaces the copy only after confirmation.
 **MCPs** display their saved functional description ahead of command or URL. Import reuses descriptions from configuration when available; use **Edit** to explain missing ones. The list does not automatically connect to servers to discover descriptions.
 
 **MCPs** can be created with a form (`command` and `args` for stdio, URL for HTTP) or **Edit JSON
-directly**, including a single definition wrapped in `mcpServers`. `env` variables and `headers`
-stay in the host and are exposed only when explicitly opening that MCP's editor, never in the
-shared snapshot or reading copies. The **faz-ai** MCP bridge provides `list_board_mcp_tools` and
+directly**, including a single definition wrapped in `mcpServers`. The entire definition, including command, arguments, URL, `env` and `headers`, is encrypted in the local host vault; the database, exports, interface and APIs receive only references and status. You can edit the description without reading saved values; **Replace saved configuration** requires a new definition. Imported MCPs remain pending and cannot run until this human review, even when their reference exists on this machine. The **faz-ai** MCP bridge provides `list_board_mcp_tools` and
 `call_board_mcp_tool`: any MCP client connected to the board can discover schemas and call tools
 from registered servers without copying their settings to each AI tool. Disabled servers are
 rejected; Per card requests must include a card selecting that server directly or through its
@@ -1243,8 +1293,10 @@ agent. The bridge supports stdio, Streamable HTTP and explicit SSE with static c
 not handle OAuth login. This version forwards tools, not MCP resources or prompts, and opens and
 closes a connection per operation.
 
+Schema 40 migrates library MCP configurations only after confirming the secret on disk. The `.credentials` vault beside the databases stores its key and encrypted files with restricted local permissions; it is excluded from exports. This does not replace operating system isolation against processes of the same user. CLI profiles and legacy native-file paths still require the complete #728 review.
+
 The `get_project_profile`, `get_board_artifact` and `save_board_artifact` MCP tools let assistants
-work in the library. Legacy tool-specific file APIs remain for compatibility; native hooks,
+work in the library. Legacy tool-specific file APIs remain for compatibility, but agents created or edited on the board are kept in the database; native hooks,
 commands and settings are still managed by their respective tool.
 
 ## Settings
@@ -1258,10 +1310,15 @@ commands and settings are still managed by their respective tool.
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section |
 | Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
 | Harness | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, default agent and heartbeat (see [Harness](#harness) and [Agents](#agents)) |
-| Modelos de IA | The tool's models and effort levels; rules that suggest each card's model |
+| Ferramentas de IA | CLI profiles: enable, set a default, duplicate, create and test |
+| Modelos de IA | Models and effort levels by profile; rules that suggest each card's model |
 | Git | Only the Git tab in browser mode; in the editor, points to the Settings (Faz AI › Git) |
 | Aparência | **Language** (automatic, Português (Brasil) or English; in the editor Settings along with theme, font and size); statuses (name and color, in the Workflows tab; here only in browser mode) |
 | Backup | In the editor, export and import through the command palette (`fazai.exportBoard`, `fazai.importBoard`); in browser mode, through the Settings tab (see [Board backup](#board-backup)) |
+
+A **CLI profile** identifies a tool the board can select for a run. The builtin profiles are Claude Code, Cursor and Kimi Code. A **copy** uses its source tool's model catalog and usage measurement, but keeps its own command, credentials and verification. A **custom** profile accepts another text-output CLI; tokens and cost remain unknown. In **Settings → AI Tools**, enable a reviewed profile and choose the default. Only this screen creates, edits, duplicates and tests profiles. Imports stay disabled until local review. Saved configuration and credentials are not returned to the screen or included in a board export.
+
+To create a custom profile, enter the command and one argument per line. The markers `{prompt}`, `{model}`, `{effort}`, `{mcpConfig}` and `{addDir}` insert the request, model, effort, MCP file and an additional directory when available. Choose **Prompt input** (argument or stdin) and **Board server** (CLI, project file or none). In a card's **Model** field, **Other model…** accepts a free-form identifier for that profile without adding it to the catalog. **Test** runs a short request using your subscription; an OK response does not prove isolation, permissions or MCP restrictions. Capabilities without evidence remain unknown and may prevent a run.
 
 ### Settings in the editor Settings
 
@@ -1308,6 +1365,10 @@ at Auto. Suggestion rules combine
 conditions with AND and OR, for example `Esforço da atividade = Alto E Tags = backend`. The result
 is always a suggestion: on the card, the model and the effort can be changed at any time.
 
+Imported CLI profiles stay disabled until local review. Commands, arguments, environment and credentials remain in the local vault: exports, the screen and MCP expose only references and status. Copies do not inherit isolation evidence, and a custom profile without a verified mapping cannot run. Version/login probes and **Test** do not prove capabilities. See [Settings](#settings) to create and select profiles.
+
+The new **execution and fallback policy** foundation separates versioned definitions, local human review and history (schema 41). Target resolution does not replace an invalid explicit choice with a default or redirect a prefix to a default copied profile. Evaluation and simulation share one function with explained rejections, ordered targets, accumulated limits and reconciliation for partial or unknown work. Imported policies remain pending review; edits do not change earlier snapshots. Under **Settings → Harness → Tool and execution → Manage policies**, the manual editor supports conditions, ordered targets, limits, duplication, removal and paginated history. A complete comparison precedes explicit human review; saving as pending grants no execution authority. Revision conflicts preserve the draft and let the user reload the base before reviewing again. The host simulator uses the same evaluator without AI, identifying credential/admission settings as scenario assumptions. Changes to saved policies or context invalidate the displayed result. This foundation is not yet connected to the runner, chat or assistants; the description below covers the legacy fallback model, which will migrate to a disabled proposal during integration.
+
 Each rule can have a **fallback model** (optional). When a card's execution fails because the primary model hit the plan's usage limit, and that model came from a rule with a fallback configured, the system automatically retries the execution with the fallback model, once only. If the fallback also fails or is not configured, the card is blocked as usual. The automatic switch appears as a comment in the card's conversation ("The `<primary model>` hit the usage limit; execution continues with `<fallback model>`"), and the card's Model field keeps showing the primary model — the next execution will try the primary again.
 
 **Dependency warnings between settings and cross-linked navigation.** Some configuration options only work because of another. The board shows a discreet line under dependent options (for example, "Depends on **a model suggestion rule** (now: none)" below "Fill in the suggested model automatically", or "Depends on **agents marked as available**" below "Default agent"); the option stays disabled when the dependency is not met. Links let you navigate: click one to go to the matching board section, which scrolls and highlights for 2 seconds, or click a link in the Settings to open the board at the right section. In browser mode, links to the Settings appear as text only. **"Fill in the suggested model automatically"** moved from Rules to Models, where it makes more sense — a simple notice in Rules indicates the move. The Heartbeat interval field stays disabled when the heartbeat is off, with no additional dependency component. New headers in Models, Agents, Rules and Skills show "Showing the X of [tool] · switch tool", letting you change the tool from any of these board screens.
@@ -1323,7 +1384,7 @@ The board and the attachments live in the extension's storage, outside the repos
 has its own database file (`boards/<folder key>.db`), so windows on different projects do not
 interfere with each other. The first time, the board starts from a copy of the single database of
 earlier versions (`fazai.db`), which is left untouched. Rules and skills are files in the project
-folder and go into git as usual. Avoid opening the same folder in two editor windows at the same
+folder and go into git as usual. Agents, skills, rules and MCP definitions are stored in the board database (the credentials of MCP definitions stay in the local vault); the library folder holds a readable copy, and each execution gets its own snapshot under `run-artifacts/`. Avoid opening the same folder in two editor windows at the same
 time: the last one to save wins (the extension warns when that happens).
 
 **Updating the extension updates the database.** When the board opens, the extension applies by
@@ -1386,6 +1447,8 @@ npm run build
 npm test
 npm run typecheck
 ```
+
+`npm run test:cli-real` separately checks the provider contract with **installed Claude Code**, using temporary project/configuration directories and local test API and MCP servers. It requires no login and calls no remote model; the API controls responses so forbidden attempts do not depend on model behavior. Positive controls load project, user, ancestor and additional-directory sentinels, plus a skill, agent, hook and external MCP; the strict path must exclude them. The test also reproduces the inherited additional-memory regression. A missing CLI or Windows platform fails explicitly. The seven tests use the real gateway and measured transport with disposable on-disk SQLite; they also check cancellation, forced termination, failure before release, no retry and private file cleanup. They do not enable a production profile: managed policies, the real authentication/API environment, Cursor/Kimi and accepted-task consumption still need validation.
 
 New features are integrated into `develop`. The **Unreleased** changelog section includes only
 changes already integrated into that branch; work still in progress stays on its branches and

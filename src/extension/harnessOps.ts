@@ -1,6 +1,7 @@
+import { baseValue } from '../shared/harness';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { SKILL_FILE_PATTERN, SKILL_NAME_PATTERN, aiToolInfo, type AiTool, type HarnessItem, type SkillMode } from '../shared/harness';
+import { SKILL_FILE_PATTERN, SKILL_NAME_PATTERN, baseInfo, type AiTool, type HarnessItem, type SkillMode } from '../shared/harness';
 import { HARNESS_CATALOG, copyTarget, type HarnessSource } from '../shared/harnessCatalog';
 import { renderAgentFile } from './agentFiles';
 import { parseFrontmatter, skillTemplate } from './harness';
@@ -11,7 +12,7 @@ function template(tool: AiTool, src: HarnessSource, file: string, name: string, 
   const oneLine = description.replace(/\r?\n/g, ' ').trim();
   if (src.layout === 'skills') return skillTemplate(name, oneLine, 'Instruções da skill.');
   if (src.kind === 'agent')
-    return renderAgentFile(aiToolInfo(tool).agents, {
+    return renderAgentFile(baseInfo(tool).agents, {
       name,
       description: oneLine,
       body: 'Instruções do agente.',
@@ -48,7 +49,7 @@ export class HarnessOps {
 
   /** Cria o item na fonte do catálogo indicada e devolve o caminho do arquivo criado. */
   create(tool: AiTool, source: number, name: string, description: string): string {
-    const src = HARNESS_CATALOG[tool][source];
+    const src = (baseValue(HARNESS_CATALOG, tool) ?? [])[source];
     if (!src || src.builtin || src.noCreate || (src.layout !== 'file' && src.layout !== 'files' && src.layout !== 'skills'))
       throw new Error('Não é possível criar um item neste lugar.');
     const root = path.join(this.base(src.scope), src.path);
@@ -71,7 +72,7 @@ export class HarnessOps {
    * (CLAUDE.md, AGENTS.md) ganha o conteúdo no fim, separado por uma linha em branco, em vez de dar erro.
    */
   write(tool: AiTool, source: number, name: string, content: string, files: string[] = [], append = false): string {
-    const src = HARNESS_CATALOG[tool][source];
+    const src = (baseValue(HARNESS_CATALOG, tool) ?? [])[source];
     if (append && src && !src.builtin && !src.noCreate && src.layout === 'file') {
       const file = path.join(this.base(src.scope), src.path);
       if (fs.existsSync(file)) {
@@ -158,9 +159,7 @@ export class HarnessOps {
     if (item.layout !== 'files' && item.layout !== 'skills') throw new Error('Este item não pode ser copiado.');
     const target = copyTarget(tool, item.kind, item.layout, to);
     if (!target)
-      throw new Error(
-        `O ${aiToolInfo(tool).label} não tem uma pasta de ${to === 'project' ? 'projeto' : 'usuário'} para este tipo de item.`,
-      );
+      throw new Error(`O ${baseInfo(tool).label} não tem uma pasta de ${to === 'project' ? 'projeto' : 'usuário'} para este tipo de item.`);
     const root = path.join(this.base(to), target.path);
     if (item.layout === 'skills') {
       const from = path.dirname(item.path);

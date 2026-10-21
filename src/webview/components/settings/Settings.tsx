@@ -10,6 +10,7 @@ import { FieldsSettings } from './FieldsSettings';
 import { RulesSettings } from './RulesSettings';
 import { HarnessSettings } from './HarnessSettings';
 import { ModelsSettings } from './ModelsSettings';
+import { AiToolsSettings } from './AiToolsSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 import { GitSettings } from './GitSettings';
 import { BackupSettings } from './BackupSettings';
@@ -21,6 +22,7 @@ import {
   DeleteButton,
   FormField,
   IconAppearance,
+  IconAi,
   IconBackup,
   IconBranch,
   IconColumns,
@@ -44,6 +46,7 @@ const TABS: [SettingsTab, string, Icon][] = [
   ['fields', 'Campos personalizados', IconFields],
   ['rules', 'Regras do board', IconRules],
   ['harness', 'Harness', IconHarness],
+  ['aiTools', 'Ferramentas de IA', IconAi],
   ['models', 'Modelos de IA', IconModels],
   ['git', 'Git', IconBranch],
   ['appearance', 'Aparência', IconAppearance],
@@ -190,6 +193,7 @@ export function Settings() {
         {tab === 'models' && <ModelsSettings />}
         {tab === 'appearance' && <AppearanceSettings />}
         {tab === 'harness' && <HarnessSettings />}
+        {tab === 'aiTools' && <AiToolsSettings />}
         {tab === 'git' && <GitSettings />}
         {tab === 'backup' && isWeb && <BackupSettings />}
       </div>

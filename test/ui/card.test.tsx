@@ -551,6 +551,7 @@ describe('CardDrawer', () => {
       board: { ...s.board, execProfiles: [profile] },
       harness: {
         ...s.harness,
+        library: undefined,
         inventory: [
           {
             tool: s.board.aiTool,

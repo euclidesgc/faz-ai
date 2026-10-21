@@ -17,6 +17,19 @@ Testes em `test/` (Vitest; `test/ui/` para as telas, com Testing Library).
   `dist/mcp-bridge.js` que o build gera.
 - `npm run build`: extensão e webview.
 
+### Testes durante o desenvolvimento
+
+A suíte completa (`npm test`) leva uns 16 minutos e só roda antes de um release. Na Implementação e
+na Revisão de uma história, rode só o que a mudança afeta:
+
+- `npx vitest related <arquivos alterados> --run`: os testes que importam os arquivos tocados (some
+  os testes novos ou alterados à lista);
+- `npm run typecheck`;
+- `npx eslint <arquivos alterados>` e `npx prettier --check <arquivos alterados>`;
+- `npm run build:ext` antes, se a mudança mexe no MCP (os testes dele usam o `dist/mcp-bridge.js`).
+
+Não rode `npm test` nem `vitest run` sem filtro fora do release, nem em subagentes em segundo plano.
+
 ## Convenções
 
 - Comentários, mensagens e nomes de teste em português. O comentário diz o porquê.

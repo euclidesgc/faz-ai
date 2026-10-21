@@ -199,6 +199,18 @@ export function BoardList({
             <div className="item-main">
               <div className="item-title">
                 <span className="item-name">{i.name}</span>
+                {i.kind === 'mcp' &&
+                  state.harness.library?.artifacts.find((a) => a.id === i.boardArtifactId)?.mcpCredential?.review === 'pending' && (
+                    <Badge color="amber" variant="soft">
+                      {t('Revisão humana pendente')}
+                    </Badge>
+                  )}
+                {i.kind === 'mcp' &&
+                  state.harness.library?.artifacts.find((a) => a.id === i.boardArtifactId)?.mcpCredential?.available === false && (
+                    <Badge color="amber" variant="soft">
+                      {t('Configuração local ausente')}
+                    </Badge>
+                  )}
                 <Badge color="gray" variant="soft" title={i.plugin}>
                   {i.boardArtifactId ? t('Biblioteca do board') : originLabel(i)}
                 </Badge>

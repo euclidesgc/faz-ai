@@ -31,7 +31,17 @@ export function elapsedLabel(startedAt: number, now: number): string {
 }
 
 const originLabel = (origin: AiRunOrigin): string =>
-  t(origin === 'manual' ? 'manual' : origin === 'heartbeat' ? 'heartbeat' : origin === 'autopilot' ? 'modo autônomo' : 'chat');
+  t(
+    origin === 'manual'
+      ? 'manual'
+      : origin === 'heartbeat'
+        ? 'heartbeat'
+        : origin === 'autopilot'
+          ? 'modo autônomo'
+          : origin === 'test'
+            ? 'teste de ferramenta'
+            : 'chat',
+  );
 
 /** `what` da execução: a fase (nome da coluna, sem tradução) ou o modo, traduzido. */
 const whatOf = (activity: AiActivity): string =>

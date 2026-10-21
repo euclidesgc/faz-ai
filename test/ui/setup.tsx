@@ -35,6 +35,8 @@ const { requestIds, SELF_ANSWERING } = vi.hoisted(() => ({
     'harness.agent.assist',
     'metrics.query',
     'card.usage.query',
+    'executionPolicy.read',
+    'executionPolicy.simulate',
   ]),
 }));
 export { requestIds };

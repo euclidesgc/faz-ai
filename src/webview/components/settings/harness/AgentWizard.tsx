@@ -1,3 +1,4 @@
+import { baseValue } from '../../../../shared/harness';
 import { useMemo, useState } from 'react';
 import { Badge, Button, Checkbox, TextArea, TextField } from '@radix-ui/themes';
 import { AGENT_FORMAT, agentToolGroup } from '../../../../shared/agentTools';
@@ -82,7 +83,7 @@ export function AgentWizard({
   onClose: () => void;
 }) {
   const state = useBoardStore((s) => s.state)!;
-  const format = AGENT_FORMAT[tool.id];
+  const format = baseValue(AGENT_FORMAT, tool.id) ?? { tools: false, skills: false, mcp: false, readonly: false, background: false };
   const catalog = state.board.modelCatalog;
   const [step, setStep] = useState(0);
   const [a, setA] = useState<Answers>(() => {

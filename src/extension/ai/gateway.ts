@@ -1,3 +1,8 @@
+import { executorProfile } from './providers';
+import { redactCredentialValues } from '../credentials';
+import { authFailed } from './profileAuth';
+import { profileInstallUrl } from '../requirements';
+import type { AiProfile } from '../../shared/aiProfiles';
 // A única porta por onde o board chama uma ferramenta de IA. Toda execução — de um card (a pessoa, o
 // heartbeat ou o autopiloto) ou do chat — passa por `AiGateway.run`, e é aqui que o log de uso é
 // escrito: abre a linha (`start`), grava a configuração (`describe`), fecha o desfecho (`finish`) e
@@ -16,6 +21,19 @@ import { spawnMeasured, type SpawnFn } from '../aiOutput/measured';
 import type { OutputFormat } from '../aiOutput/reader';
 import { headlessUnsupported, type HeadlessCommand, type HeadlessInput } from '../headless';
 import type { RunLog } from '../log/runLog';
+import type { StrictExecutionRequest } from '../../shared/executionAdmission';
+import { AdmissionBlockedError, type ExecutionAdmission, type AdmittedExecution } from './admission';
+import type { RunArtifactRequest, RunArtifactSnapshots } from '../runArtifactSnapshot';
+import type { RunMcpSessions } from '../mcp/runSessions';
+import { SpawnNotStartedError, type ProcessIdentity } from '../processIdentity';
+
+/** Só acrescenta um link público revisado ao erro de executável ausente do perfil personalizado. */
+export function missingProfileCommand(error: Error, profile: AiProfile | undefined): Error {
+  if (!(error instanceof SpawnNotStartedError) || !error.message.startsWith('comando "') || profile?.kind !== 'custom') return error;
+  const installUrl = profileInstallUrl(profile);
+  if (installUrl) error.message += ` Instalação do perfil: ${installUrl}`;
+  return error;
+}
 
 /** O contexto da execução que o log congela na hora da chamada: a IA move o card durante o trabalho. */
 export type AiRunContext = Omit<AiRunStart, 'boardId' | 'startedAt' | 'origin' | 'tool'>;
@@ -33,6 +51,10 @@ export const NO_CARD: AiRunContext = {
 
 /** O que a execução precisa depois que a linha do log já abriu. */
 export interface AiPrepared {
+  work?: { id: string; token: string };
+  artifacts?: RunArtifactRequest;
+  /** Contrato v1 preparado pelo host; não aceita evidência ou selo de verificação do cliente. */
+  strict?: { profileId: string; request: StrictExecutionRequest };
   input: HeadlessInput;
   /** a configuração que o log guarda; a permissão sai de `input.permission` */
   config: Omit<AiRunConfig, 'permission'>;
@@ -41,6 +63,8 @@ export interface AiPrepared {
 export interface AiCall {
   origin: AiRunOrigin;
   tool: AiTool;
+  /** Perfil escolhido; o host substitui a configuração pública pelos valores do cofre. */
+  profile?: AiProfile;
   context: AiRunContext;
   cwd: string;
   /** tempo máximo da execução, em minutos */
@@ -55,6 +79,8 @@ export interface AiCall {
    * ponto em que quem chama pode começar a mostrar a execução (o chat põe aqui a pergunta da pessoa).
    */
   beforeSpawn?(): void;
+  /** Persiste a identidade e aguarda o flush antes de o launcher receber o comando. Somente host. */
+  beforeStart?(identity: ProcessIdentity): void | Promise<void>;
   /** cada linha legível que a ferramenta produziu, mais os recados do board sobre a execução */
   log(line: string): void;
   /** a cada processo aberto: o primeiro e, na volta para texto, o segundo */
@@ -63,6 +89,9 @@ export interface AiCall {
 
 /** Como a execução terminou, já com o desfecho que o log gravou. */
 export interface AiRunEnd {
+  /** Classificado no host antes da ocultação das frases privadas. */
+  authExpired?: boolean;
+  process?: { identity?: ProcessIdentity; terminationConfirmed: boolean };
   code: number | null;
   error?: Error;
   outcome: AiRunOutcome;
@@ -82,6 +111,8 @@ export interface AiRunEnd {
 }
 
 export interface AiExecution {
+  readonly identity?: ProcessIdentity;
+  terminationConfirmed?(): boolean;
   /** o id da linha em `ai_runs`; `''` quando o log não conseguiu gravar */
   readonly runId: string;
   /** o mesmo valor passado a `runLog.start`: sem segundo relógio */
@@ -93,6 +124,14 @@ export interface AiExecution {
 }
 
 export interface AiGatewayDeps {
+  /** O host confere também perfis importados no caminho legado antes de preparar arquivos. */
+  profile?(id: string): AiProfile | null;
+  resolveProfile?(id: string): AiProfile;
+  redact?(text: string): string;
+  sessions?: RunMcpSessions;
+  snapshots?: Pick<RunArtifactSnapshots, 'capture'>;
+  admission?: ExecutionAdmission;
+  leaseCoordinationDir?: string;
   boardId: string;
   /** obrigatório: sem ele a execução não teria onde ser registrada */
   runLog: RunLog;
@@ -111,6 +150,10 @@ export function outcomeOf(end: { stopped: boolean; timedOut: boolean; code: numb
 export class AiGateway {
   constructor(private deps: AiGatewayDeps) {}
 
+  get supportsSnapshots(): boolean {
+    return !!this.deps.snapshots;
+  }
+
   /**
    * Abre a linha do log, confere se a ferramenta roda com a permissão pedida, inicia o processo e
    * devolve a execução. Lança erro se não for possível começar — e, nesse caso, a linha do log já
@@ -125,24 +168,131 @@ export class AiGateway {
     let measured: ReturnType<typeof spawnMeasured>;
     let attempts = 0;
     let format: OutputFormat = 'text';
+    let workToken: string | undefined;
+    let profile: AiProfile | undefined;
+    let privateAuthFailed = false;
+    const authTails = { stdout: '', stderr: '' };
+    const redact = (text: string) => {
+      const safe = redactCredentialValues(text, profile?.config);
+      return this.deps.redact?.(this.deps.sessions?.redact(safe) ?? safe) ?? this.deps.sessions?.redact(safe) ?? safe;
+    };
+    const revoke = () => {
+      if (workToken === undefined) return;
+      try {
+        this.deps.sessions?.revoke(workToken);
+      } catch (e) {
+        call.log(
+          redact(
+            `Não foi possível persistir a revogação; a sessão permanece recusada e exige reconciliação: ${e instanceof Error ? e.message : String(e)}`,
+          ),
+        );
+      }
+    };
     try {
-      const { input, config } = call.prepare();
+      if (this.deps.profile) {
+        const profile = this.deps.profile(call.tool);
+        if (!profile || !profile.enabled || profile.credentials?.review === 'pending')
+          throw new Error('Perfil desativado ou pendente de revisão.');
+      }
+      profile = structuredClone(this.deps.resolveProfile?.(call.tool) ?? call.profile ?? executorProfile(call.tool));
+      if (profile.id !== call.tool) throw new Error('O perfil resolvido não corresponde ao alvo solicitado.');
+      if (
+        !profile.enabled ||
+        profile.credentials?.review === 'pending' ||
+        (profile.kind !== 'builtin' && (profile.credentials?.review !== 'reviewed' || !profile.credentials.available))
+      )
+        throw new Error('Perfil desativado ou pendente de revisão.');
+      const prepared = call.prepare();
+      if (profile.kind !== 'builtin' && !prepared.strict)
+        throw new Error('Perfis configuráveis exigem contrato e admissão por capacidades.');
+      if (profile.kind !== 'builtin' && prepared.strict?.profileId !== profile.id)
+        throw new Error('A admissão não corresponde ao perfil solicitado.');
+      const { config } = prepared;
+      let input = prepared.input;
+      if (prepared.work) {
+        if (!this.deps.sessions || !this.deps.snapshots) throw new Error('Identidade MCP e snapshot obrigatórios indisponíveis.');
+        this.deps.sessions.bind(prepared.work.token, prepared.work.id, runId);
+        workToken = prepared.work.token;
+        if (!prepared.artifacts) throw new Error('A unidade precisa declarar os artefatos do snapshot, inclusive quando não há arquivos.');
+        input = this.deps.sessions.injectToken(workToken, input);
+      }
+      if (prepared.artifacts && !this.deps.snapshots) throw new Error('Snapshot de artefatos indisponível; execução bloqueada.');
+      const { admission: _admission, ...resolved } = config;
+      const snapshot = this.deps.snapshots?.capture(runId, prepared.artifacts, resolved);
+      if (snapshot) input = snapshot.rewrite(input);
+      let admitted: AdmittedExecution | undefined;
+      if (prepared.strict) {
+        if (!this.deps.admission) throw new Error('Admissão por capacidades indisponível; execução v1 bloqueada.');
+        try {
+          admitted = this.deps.admission.prepare(profile, prepared.strict.profileId, input, call.cwd, prepared.strict.request);
+        } catch (e) {
+          if (e instanceof AdmissionBlockedError)
+            runLog.describe(runId, { ...config, permission: input.permission, admission: e.decision });
+          throw e;
+        }
+        input = admitted.input;
+      }
       // a ferramenta sem suporte para esta permissão nem começa: confere antes de gravar a configuração
-      const unsupported = headlessUnsupported(call.tool, input.permission);
+      const unsupported = admitted ? null : headlessUnsupported(profile, input.permission);
       if (unsupported) throw new Error(unsupported);
-      runLog.describe(runId, { ...config, permission: input.permission });
+      if (admitted) {
+        if (!runLog.describeRequired) throw new Error('Registro obrigatório da admissão indisponível.');
+        runLog.describeRequired(runId, { ...config, permission: input.permission, admission: admitted.decision });
+      } else runLog.describe(runId, { ...config, permission: input.permission });
+      if (workToken !== undefined && snapshot) this.deps.sessions!.register(runId, snapshot, input);
       call.beforeSpawn?.();
-      measured = spawnMeasured(call.tool, input, call.cwd, {
-        spawn: (command, cwd, out) => {
+      snapshot?.validate();
+      measured = spawnMeasured(profile, input, call.cwd, {
+        spawn: (command, cwd, out, control) => {
           attempts++;
           format = command.format;
           call.onAttempt?.(command);
-          return this.deps.spawn(command, cwd, out);
+          snapshot?.validate();
+          const checked = admitted?.command(command) ?? command;
+          const validate = () => {
+            if (workToken !== undefined) this.deps.sessions!.assert(workToken);
+            snapshot?.validate();
+            admitted?.command(checked);
+          };
+          return this.deps.spawn(
+            checked,
+            cwd,
+            (text, stream) => {
+              if (profile!.kind !== 'builtin' && profile!.config.authPatterns?.length) {
+                authTails[stream] = (authTails[stream] + text).slice(-200000);
+                privateAuthFailed ||= authFailed(profile!, Object.values(authTails), false);
+              }
+              out(text, stream);
+            },
+            control && (admitted || snapshot || call.beforeStart)
+              ? {
+                  beforePreparation: () => {
+                    validate();
+                    control.beforePreparation();
+                  },
+                  beforeStart: (identity) => {
+                    validate();
+                    const previous = control.beforeStart(identity);
+                    const record = () => call.beforeStart?.(identity);
+                    const ready = previous ? previous.then(record) : record();
+                    if (ready) return ready.then(validate);
+                    validate();
+                  },
+                }
+              : control,
+          );
         },
-        log: call.log,
+        log: (line) => call.log(redact(line)),
         runId,
+        leaseCoordinationDir: this.deps.leaseCoordinationDir,
       });
     } catch (e) {
+      revoke();
+      if (e instanceof Error) {
+        missingProfileCommand(e, profile);
+        e.message = redact(e.message);
+        if (e.stack) e.stack = redact(e.stack);
+      }
       // nem chegou a existir processo (ferramenta sem suporte, plano impossível, spawn que falhou)
       runLog.finish(runId, 'unsupported');
       throw e;
@@ -152,25 +302,58 @@ export class AiGateway {
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
+      revoke();
       measured.proc.kill();
     }, call.timeoutMinutes * 60_000);
     const listeners: ((end: AiRunEnd) => void)[] = [];
 
     measured.proc.onExit((code, error) => {
       clearTimeout(timer);
+      revoke();
+      if (error) {
+        error.message = redact(error.message);
+        if (error.stack) error.stack = redact(error.stack);
+      }
       const outcome = outcomeOf({ stopped, timedOut, code, error });
       runLog.finish(runId, outcome, code);
-      const report = measured.report();
+      const rawReport = measured.report();
+      const safeReport = {
+        ...rawReport,
+        answer: redact(rawReport.answer),
+        reason: rawReport.reason === null ? null : redact(rawReport.reason),
+        inventory: rawReport.inventory.map((item) => ({ ...item, name: redact(item.name) })),
+        ...(rawReport.bashCommands
+          ? { bashCommands: rawReport.bashCommands.map((item) => ({ ...item, command: redact(item.command) })) }
+          : {}),
+      };
+      const report = this.deps.sessions?.sanitize(safeReport) ?? safeReport;
       runLog.measure(runId, report);
-      const end: AiRunEnd = { code, error, outcome, stopped, timedOut, report, attempts, format, measureError: measured.failure() };
+      const end: AiRunEnd = {
+        ...(privateAuthFailed ? { authExpired: true } : {}),
+        code,
+        error,
+        outcome,
+        stopped,
+        timedOut,
+        report,
+        attempts,
+        format,
+        measureError: measured.failure(),
+        process: { identity: measured.proc.identity, terminationConfirmed: measured.proc.terminationConfirmed?.() === true },
+      };
       for (const fn of listeners) fn(end);
     });
 
     return {
+      get identity() {
+        return measured.proc.identity;
+      },
+      terminationConfirmed: () => measured.proc.terminationConfirmed?.() === true,
       runId,
       startedAt,
       stop: () => {
         stopped = true;
+        revoke();
         measured.proc.kill();
       },
       onExit: (fn) => listeners.push(fn),

@@ -229,7 +229,7 @@ describe('telas montam sem erro', () => {
     expect(html(<FieldsSettings />)).toContain('Skills');
     const rules = html(<RulesSettings />);
     expect(rules).toContain('Avançar de fase');
-    expect(rules).toContain('Preencher o modelo sugerido');
+    expect(rules).not.toContain('mudou para a aba Modelos');
     const models = html(<ModelsSettings />);
     expect(models).not.toContain('gpt-6.1-sol'); // só a ferramenta em uso
     for (const text of [
@@ -306,7 +306,8 @@ describe('telas montam sem erro', () => {
       'Rodar o heartbeat agora',
       'Agente padrão',
       'revisor-de-spec',
-      '.claude/agents/revisor-de-spec.md',
+      // o agente criado pela tela vive no board: o caminho é o da cópia de leitura, não o da pasta da ferramenta
+      'agents/revisor-de-spec.md',
     ])
       expect(harness).toContain(text);
   });

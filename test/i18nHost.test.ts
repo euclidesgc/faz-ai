@@ -11,7 +11,7 @@ import { EXEC_ASPECTS, TOOL_PRESETS, defaultAgent } from '../src/shared/executio
 import { RULE_CONFLICT_REASONS } from '../src/shared/ruleConflicts';
 import { RULE_IDEAS, RULE_WIZARD_STEPS, conventionItems, pathSuggestions } from '../src/shared/ruleWizard';
 import { SKILL_WIZARD_STEPS } from '../src/shared/skillWizard';
-import { AI_TOOLS, HARNESS_KINDS, HARNESS_SCOPES, RULE_FILES, SKILL_FOLDERS, SKILL_MODES } from '../src/shared/harness';
+import { AI_BASES, HARNESS_KINDS, HARNESS_SCOPES, RULE_FILES, SKILL_FOLDERS, SKILL_MODES } from '../src/shared/harness';
 import { HARNESS_CATALOG, HARNESS_GROUPS, HARNESS_NOTES, PERMISSION_LIST_LABEL, PLUGIN_COMMANDS } from '../src/shared/harnessCatalog';
 import { BRANCH_KINDS, MERGE_METHODS, WORKSPACE_MODES } from '../src/shared/git';
 import { gitNoticeText, type GitNotice } from '../src/shared/gitflow';
@@ -24,6 +24,11 @@ afterEach(() => setLocale('pt-BR'));
 
 describe('i18n do host: mensagens preenchidas', () => {
   const cases: [pt: string, en: string][] = [
+    ['Este card não tem perguntas pendentes.', 'This card has no pending questions.'],
+    [
+      'As perguntas deste card mudaram: confira as novas antes de enviar.',
+      'The questions on this card have changed: review the new ones before sending.',
+    ],
     [
       'Não é possível concluir "Pagar fatura": 2 sub-tarefa(s) ainda em aberto.',
       'Cannot complete "Pagar fatura": 2 sub-task(s) still open.',
@@ -110,6 +115,14 @@ describe('i18n do host: mensagens preenchidas', () => {
     [
       'Board "B" importado: 2 card(s) e 1 anexo(s). Anexos sem arquivo: #3. Preencha os valores vazios dos servidores MCP: github: TOKEN.',
       'Board "B" imported: 2 card(s) and 1 attachment(s). Attachments without a file: #3. Fill in the empty values of the MCP servers: github: TOKEN.',
+    ],
+    [
+      'Board "B" importado: 2 card(s) e 1 anexo(s). Revise as configurações locais dos servidores MCP: github: revisão da configuração local.',
+      'Board "B" imported: 2 card(s) and 1 attachment(s). Review the local MCP server configurations: github: revisão da configuração local.',
+    ],
+    [
+      'Board "B" importado: 2 card(s) e 1 anexo(s). Anexos sem arquivo: #3. Revise as configurações locais dos servidores MCP: github.',
+      'Board "B" imported: 2 card(s) and 1 attachment(s). Attachments without a file: #3. Review the local MCP server configurations: github.',
     ],
     ['Migration 7 não encontrada', 'Migration 7 not found'],
   ];
@@ -203,6 +216,7 @@ describe('i18n do host: mensagens preenchidas', () => {
         heartbeatRefine: true,
         parallel: false,
         parallelStories: 2,
+        parallelSubtasks: 2,
         autopilotPaused: false,
         defaultAgent: '',
       },
@@ -252,7 +266,7 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
     ['HARNESS_KINDS', HARNESS_KINDS.flatMap((x) => [x.label, x.hint])],
     ['HARNESS_SCOPES', HARNESS_SCOPES.flatMap((x) => [x.label, x.hint, x.summary])],
     ['SKILL_FOLDERS', SKILL_FOLDERS.map((x) => x.hint)],
-    ['AI_TOOLS', AI_TOOLS.map((x) => x.mcp)],
+    ['AI_BASES', AI_BASES.map((x) => x.mcp)],
     ['RULE_FILES', RULE_FILES.map((x) => x.readBy).filter((x) => x.includes(' e '))],
     ['PERMISSION_LIST_LABEL', Object.values(PERMISSION_LIST_LABEL)],
     [

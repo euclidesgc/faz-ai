@@ -1,3 +1,5 @@
+import { activeProfile, catalogTool } from '../../../shared/aiProfiles';
+import { ExecutionPolicyRepo } from '../../repositories/executionPolicyRepo';
 import type { DbHandle } from '../../db/database';
 import type { BoardState } from '../../../shared/model';
 import type { WebviewToHost } from '../../../shared/messages';
@@ -44,6 +46,7 @@ export interface RouterOptions {
 /** Repositórios, anexos e harness do board aberto, compartilhados pelo router e pelos handlers. */
 export class BoardContext {
   readonly boards: BoardRepo;
+  readonly executionPolicies: ExecutionPolicyRepo;
   readonly cards: CardRepo;
   readonly checklist: ChecklistRepo;
   readonly links: LinkRepo;
@@ -77,6 +80,7 @@ export class BoardContext {
     const db = dbHandle.db;
     this.gh = opts.gh ?? ghProcess();
     this.boards = new BoardRepo(db);
+    this.executionPolicies = new ExecutionPolicyRepo(db);
     this.cards = new CardRepo(db);
     this.checklist = new ChecklistRepo(db);
     this.links = new LinkRepo(db);
@@ -90,7 +94,10 @@ export class BoardContext {
     // nada a mudar para chegar ao padrão atual: só registra a versão, sem perguntar
     if (!pendingUpgrade(db, board.id).length) upgradeBoard(db, board.id);
     this.library = new BoardLibrary(this);
-    this.harness = new BoardHarness(this, opts.workspaceDir ? new HarnessStore(opts.workspaceDir, board.aiTool, opts.homeDir ?? '') : null);
+    this.harness = new BoardHarness(
+      this,
+      opts.workspaceDir ? new HarnessStore(opts.workspaceDir, catalogTool(activeProfile(board)), opts.homeDir ?? '') : null,
+    );
   }
 
   /** Estado do board como está no banco (sem harness nem execuções). */
@@ -119,6 +126,7 @@ export class BoardContext {
 export interface Actor {
   author: string;
   byAi: boolean;
+  runId?: string | null;
 }
 
 export type MessageType = WebviewToHost['type'];

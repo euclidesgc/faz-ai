@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { parseAgentFile } from './agentFiles';
+import { agentInputOf, parseAgentFile } from './agentFiles';
 import { frontmatterOf, frontmatterValue } from './frontmatter';
 import { scanLibraryFolder } from './libraryImport';
 import type { LibraryArtifactInput, LibraryImportPreview } from '../shared/artifacts';
@@ -10,8 +10,10 @@ import { ArtifactMirror } from './artifactMirror';
 import { readSource, readMcpByName } from './artifactSource';
 import { ArtifactRepo, type ArtifactRow } from './repositories/artifactRepo';
 import {
+  agentOfArtifact,
   kindOfSelectable,
   skillDocument,
+  toolCategories,
   isSafeRelPath,
   ARTIFACT_LIMITS,
   type AgentMeta,
@@ -19,7 +21,8 @@ import {
   type BoardArtifact,
 } from '../shared/artifacts';
 import { selectionKey, type HarnessUsage, type SelectableKind } from '../shared/harnessSelection';
-import { aiToolInfo, type Harness, type HarnessItem } from '../shared/harness';
+import { baseInfo, SKILL_NAME_PATTERN, type Harness, type HarnessItem } from '../shared/harness';
+import type { AgentInput } from '../shared/messages';
 import type { BoardContext } from './panel/handlers/context';
 
 /** Biblioteca do board: as fontes são lidas só na importação ou numa atualização explícita. */
@@ -86,7 +89,7 @@ export class BoardLibrary {
       description: row.description,
       body: row.body,
       ...(row.agent ? { agent: row.agent } : {}),
-      ...(row.kind === 'mcp' ? { server: (row.meta as { server: Record<string, unknown> }).server } : {}),
+      ...(row.kind === 'mcp' ? { mcpCredential: row.mcpCredential } : {}),
     };
   }
 
@@ -104,9 +107,11 @@ export class BoardLibrary {
     if (Buffer.byteLength(input.body, 'utf8') > ARTIFACT_LIMITS.fileBytes) throw new Error('Arquivo maior que 512 KB.');
     let meta: ArtifactDraft['meta'] = {};
     if (input.kind === 'mcp') {
-      const server = input.server;
+      const server = input.server ?? (existing?.meta as { server?: Record<string, unknown> } | undefined)?.server;
       if (!server || typeof server !== 'object' || Array.isArray(server)) throw new Error('Definição MCP inválida.');
-      if (typeof server.command === 'string' && server.command.trim()) {
+      if (input.server?.secretRef !== undefined) throw new Error('Referências salvas não podem ser substituídas pelo editor.');
+      if (!input.server && existing) meta = existing.meta;
+      else if (typeof server.command === 'string' && server.command.trim()) {
         if (server.args !== undefined && (!Array.isArray(server.args) || !server.args.every((a) => typeof a === 'string')))
           throw new Error('args deve ser uma lista de textos.');
       } else if (typeof server.url === 'string' && /^https?:\/\//.test(server.url)) {
@@ -120,7 +125,7 @@ export class BoardLibrary {
         )
           throw new Error(`${key} deve conter pares de nome e texto.`);
       }
-      meta = { server };
+      if (input.server) meta = { server };
     } else if (input.kind === 'agent') {
       const agent = input.agent;
       if (
@@ -151,6 +156,7 @@ export class BoardLibrary {
         files: existing ? this.repo.content(existing.id).files : [],
       },
       existing?.usage,
+      input.kind === 'mcp' && input.server !== undefined,
     );
   }
 
@@ -357,7 +363,7 @@ export class BoardLibrary {
       Object.assign(f, { content, encoding: 'utf8', size: Buffer.byteLength(content, 'utf8') });
     } else if (a.kind === 'agent') {
       const agent = parseAgentFile(
-        aiToolInfo(a.originTool || 'claude').agents,
+        baseInfo(a.originTool || 'claude').agents,
         { name: a.name, scope: 'project', path: file, location: a.origin },
         content,
       );
@@ -387,6 +393,88 @@ export class BoardLibrary {
     this.repo.upsert(this.ctx.boardId, draft, a.usage);
     const mirror = new ArtifactMirror(this.directory, this.repo, this.ctx.boardId);
     return path.join(path.dirname(mirror.pathOf(a)), ...rel.split('/'));
+  }
+
+  // Agentes do board: criados e editados pelo board ficam no banco, nunca na pasta da ferramenta. Uma
+  // edição vale para as próximas execuções; as já iniciadas têm o próprio snapshot.
+
+  hasAgent(name: string): boolean {
+    return !!this.repo.get(this.ctx.boardId, 'agent', name);
+  }
+
+  /** O agente do board no formato do editor (ferramentas nos nomes da ferramenta em uso). */
+  agentInput(name: string): AgentInput {
+    const a = this.repo.get(this.ctx.boardId, 'agent', name);
+    if (!a) throw new Error(`Agente "${name}" não está no board.`);
+    // as instruções como estão guardadas (sem o aviso de escopo que a execução acrescenta)
+    return {
+      ...agentInputOf(agentOfArtifact({ ...a, agent: a.meta as AgentMeta, path: '' }, this.ctx.state().board.aiTool)),
+      body: a.body,
+    };
+  }
+
+  private saveAgent(input: AgentInput, existing: ArtifactRow | undefined, seed: boolean): void {
+    if (!input.description.trim()) throw new Error('O agente precisa de uma descrição: é por ela que a IA decide quando delegar a ele.');
+    const tool = this.ctx.state().board.aiTool;
+    const meta: AgentMeta = {
+      skills: input.skills,
+      mcpServers: input.mcp,
+      model: input.model,
+      tools: { categories: toolCategories(tool, input.tools), native: { tool, allow: input.tools, deny: input.deniedTools } },
+      ...(seed ? { seed: true } : {}),
+      ...(input.readonly ? { readonly: true } : {}),
+      ...(input.background ? { background: true } : {}),
+    };
+    this.repo.upsert(
+      this.ctx.boardId,
+      {
+        kind: 'agent',
+        name: input.name,
+        description: input.description,
+        body: input.body,
+        meta,
+        origin: existing?.origin ?? '',
+        originTool: existing?.originTool ?? '',
+        missing: false,
+        skipped: [],
+        files: [],
+      },
+      existing?.usage ?? 'contextual',
+    );
+  }
+
+  /** Cria o agente no board, disponível ("Pelo card"): criar um agente é querer usá-lo. */
+  createAgent(input: AgentInput, seed = false): void {
+    if (!SKILL_NAME_PATTERN.test(input.name))
+      throw new Error('Nome de agente inválido: use letras minúsculas, números e hífens (ex.: "revisor-de-spec").');
+    if (this.hasAgent(input.name)) throw new Error(`Já existe um agente "${input.name}" no board.`);
+    this.saveAgent(input, undefined, seed);
+  }
+
+  /** Regrava o que vier em `patch` e, se vier, as instruções; o resto fica como está. */
+  updateAgent(name: string, patch: Partial<AgentInput>, body?: string): void {
+    const existing = this.repo.get(this.ctx.boardId, 'agent', name);
+    if (!existing) throw new Error(`Agente "${name}" não está no board.`);
+    const input: AgentInput = { ...this.agentInput(name), ...patch, name, ...(body !== undefined ? { body } : {}) };
+    this.saveAgent(input, existing, !!(existing.meta as AgentMeta).seed);
+  }
+
+  /** Substitui o agente pelo conteúdo do editor de texto (frontmatter + instruções, no formato da ferramenta em uso). */
+  writeAgent(name: string, content: string): void {
+    const existing = this.repo.get(this.ctx.boardId, 'agent', name);
+    if (!existing) throw new Error(`Agente "${name}" não está no board.`);
+    const parsed = parseAgentFile(
+      baseInfo(this.ctx.state().board.aiTool).agents,
+      { name, scope: 'project', path: '', location: existing.origin || `board:${name}` },
+      content,
+    );
+    this.saveAgent({ ...agentInputOf(parsed), name }, existing, !!(existing.meta as AgentMeta).seed);
+  }
+
+  deleteAgent(name: string): void {
+    const existing = this.repo.get(this.ctx.boardId, 'agent', name);
+    if (!existing) throw new Error(`Agente "${name}" não está no board.`);
+    this.repo.remove(this.ctx.boardId, existing.id);
   }
 
   /** Definições MCP ficam no host e nunca são expostas no estado enviado à interface. */

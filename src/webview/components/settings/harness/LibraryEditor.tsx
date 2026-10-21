@@ -48,6 +48,7 @@ function ArtifactEditor({
   const [args, setArgs] = useState(JSON.stringify(initial?.server?.args ?? ['-y', 'nome-do-servidor']));
   const [url, setUrl] = useState(String(initial?.server?.url ?? ''));
   const [formatError, setFormatError] = useState('');
+  const [replaceServer, setReplaceServer] = useState(!initial?.mcpCredential);
   const parsedServer = (): Record<string, unknown> => {
     let value = JSON.parse(json) as Record<string, unknown>;
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(t('Definição MCP inválida.'));
@@ -86,7 +87,7 @@ function ArtifactEditor({
     }
   };
   const save = useAction(async () => {
-    const server = kind === 'mcp' ? (jsonMode ? parsedServer() : formServer()) : undefined;
+    const server = kind === 'mcp' && replaceServer ? (jsonMode ? parsedServer() : formServer()) : undefined;
     await harness.saveLibraryArtifact({
       id: initial?.id,
       kind,
@@ -213,62 +214,92 @@ function ArtifactEditor({
             </div>
           ) : (
             <>
-              <label className="row">
-                <Checkbox checked={jsonMode} onCheckedChange={(checked) => switchFormat(!!checked)} />
-                {t('Editar JSON diretamente')}
-              </label>
-              {jsonMode ? (
-                <FormField label={t('Definição JSON do MCP')}>
-                  {(id) => (
-                    <TextArea
-                      id={id}
-                      aria-label={t('Definição JSON do MCP')}
-                      rows={12}
-                      value={json}
-                      onChange={(e) => setJson(e.target.value)}
-                    />
-                  )}
-                </FormField>
-              ) : (
+              {initial?.mcpCredential && (
                 <>
-                  <div className="row">
-                    <Button variant={transport === 'stdio' ? 'solid' : 'soft'} onClick={() => setTransport('stdio')}>
-                      stdio
-                    </Button>
-                    <Button variant={transport === 'http' ? 'solid' : 'soft'} onClick={() => setTransport('http')}>
-                      HTTP
-                    </Button>
-                  </div>
-                  {transport === 'http' ? (
-                    <FormField label="URL">
-                      {(id) => <TextField.Root id={id} aria-label="URL" value={url} onChange={(e) => setUrl(e.target.value)} />}
+                  <p className="muted small">
+                    {t(
+                      'A configuração salva fica apenas no host e não é devolvida ao editor. Sem substituir, os valores atuais são preservados.',
+                    )}
+                  </p>
+                  {initial.mcpCredential.review === 'pending' && (
+                    <p className="muted small">
+                      {t('Este MCP está pendente de revisão. Informe uma nova definição para revisar e habilitar a execução.')}
+                    </p>
+                  )}
+                  {!initial.mcpCredential.available && (
+                    <p className="muted small">{t('A configuração local desta referência não está disponível nesta máquina.')}</p>
+                  )}
+                  <label className="row">
+                    <Checkbox checked={replaceServer} onCheckedChange={(checked) => setReplaceServer(checked === true)} />
+                    {t('Substituir a configuração salva')}
+                  </label>
+                </>
+              )}
+              {replaceServer && (
+                <>
+                  <label className="row">
+                    <Checkbox checked={jsonMode} onCheckedChange={(checked) => switchFormat(!!checked)} />
+                    {t('Editar JSON diretamente')}
+                  </label>
+                  {jsonMode ? (
+                    <FormField label={t('Definição JSON do MCP')}>
+                      {(id) => (
+                        <TextArea
+                          id={id}
+                          aria-label={t('Definição JSON do MCP')}
+                          rows={12}
+                          value={json}
+                          onChange={(e) => setJson(e.target.value)}
+                        />
+                      )}
                     </FormField>
                   ) : (
                     <>
-                      <FormField label={t('Comando')}>
-                        {(id) => (
-                          <TextField.Root id={id} aria-label={t('Comando')} value={command} onChange={(e) => setCommand(e.target.value)} />
-                        )}
-                      </FormField>
-                      <FormField label={t('Argumentos (lista JSON)')}>
-                        {(id) => (
-                          <TextField.Root
-                            id={id}
-                            aria-label={t('Argumentos (lista JSON)')}
-                            value={args}
-                            onChange={(e) => setArgs(e.target.value)}
-                          />
-                        )}
-                      </FormField>
+                      <div className="row">
+                        <Button variant={transport === 'stdio' ? 'solid' : 'soft'} onClick={() => setTransport('stdio')}>
+                          stdio
+                        </Button>
+                        <Button variant={transport === 'http' ? 'solid' : 'soft'} onClick={() => setTransport('http')}>
+                          HTTP
+                        </Button>
+                      </div>
+                      {transport === 'http' ? (
+                        <FormField label="URL">
+                          {(id) => <TextField.Root id={id} aria-label="URL" value={url} onChange={(e) => setUrl(e.target.value)} />}
+                        </FormField>
+                      ) : (
+                        <>
+                          <FormField label={t('Comando')}>
+                            {(id) => (
+                              <TextField.Root
+                                id={id}
+                                aria-label={t('Comando')}
+                                value={command}
+                                onChange={(e) => setCommand(e.target.value)}
+                              />
+                            )}
+                          </FormField>
+                          <FormField label={t('Argumentos (lista JSON)')}>
+                            {(id) => (
+                              <TextField.Root
+                                id={id}
+                                aria-label={t('Argumentos (lista JSON)')}
+                                value={args}
+                                onChange={(e) => setArgs(e.target.value)}
+                              />
+                            )}
+                          </FormField>
+                        </>
+                      )}
                     </>
                   )}
+                  <p className="muted small">
+                    {t(
+                      'O board conecta servidores stdio e HTTP e disponibiliza suas ferramentas pelo MCP faz-ai. Variáveis e cabeçalhos ficam na configuração local; use o JSON para informá-los.',
+                    )}
+                  </p>
                 </>
               )}
-              <p className="muted small">
-                {t(
-                  'O board conecta servidores stdio e HTTP e disponibiliza suas ferramentas pelo MCP faz-ai. Variáveis e cabeçalhos ficam na configuração local; use o JSON para informá-los.',
-                )}
-              </p>
             </>
           )}
           {kind === 'rule' && <p className="muted small">{t('A regra será salva desligada. Revise e ative quando estiver pronta.')}</p>}

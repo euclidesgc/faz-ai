@@ -3,9 +3,13 @@
 import type { Database } from 'sql.js';
 import { selectableOfKind, type AgentMeta, type ArtifactDraft, type ArtifactKind, type BoardArtifact } from '../../shared/artifacts';
 import { defaultUsage, type HarnessSelection, type HarnessUsage } from '../../shared/harnessSelection';
-import { ALL_AI_TOOLS, type AiTool } from '../../shared/harness';
+import { isAiBase, type AiTool } from '../../shared/harness';
 import { all, bool, num, one, run, str, transaction, type Row } from '../db/query';
 import { newId, now } from '../db/ids';
+import { credentialsFor, validSecretRef } from '../credentials';
+const credentialOwner = (boardId: string, id: string) => JSON.stringify(['mcp', boardId, id]);
+const transportOf = (s: Record<string, unknown>): 'stdio' | 'http' | 'sse' | '' =>
+  typeof s.command === 'string' ? 'stdio' : typeof s.url === 'string' ? (s.type === 'sse' ? 'sse' : 'http') : '';
 
 /** Um artefato lido do banco: o `BoardArtifact` sem o `path` (que o host preenche), com o corpo inteiro e o `meta` cru. */
 export type ArtifactRow = Omit<BoardArtifact, 'path'> & { meta: ArtifactDraft['meta'] };
@@ -23,11 +27,8 @@ function parseJson<T>(raw: string, fallback: T): T {
 }
 
 /** O que o servidor MCP roda ou onde ele está (o mesmo texto do inventário): sem argumentos, variáveis ou cabeçalhos. */
-function mcpSummaryOf(server: unknown): string {
-  const s = server && typeof server === 'object' ? (server as Record<string, unknown>) : {};
-  if (typeof s.command === 'string') return s.command;
-  if (typeof s.url === 'string') return s.url.split('?')[0]!;
-  return '';
+function mcpSummaryOf(transport: unknown): string {
+  return transport === 'stdio' ? 'MCP stdio' : transport === 'http' || transport === 'sse' ? 'MCP HTTP' : 'MCP';
 }
 
 function serverOf(meta: ArtifactDraft['meta']): Record<string, unknown> | undefined {
@@ -35,8 +36,52 @@ function serverOf(meta: ArtifactDraft['meta']): Record<string, unknown> | undefi
   return s && typeof s === 'object' && !Array.isArray(s) ? (s as Record<string, unknown>) : undefined;
 }
 
+/** Importar conserva referências, mas nunca importa uma autorização de executar. */
+export function protectImportedMcpRow(db: Database, row: Row): Row {
+  if (row.kind !== 'mcp') return row;
+  let meta: { server?: unknown; transport?: unknown };
+  try {
+    meta = JSON.parse(str(row.meta_json)) as typeof meta;
+  } catch {
+    throw new Error('Definição MCP importada inválida.');
+  }
+  const server =
+    meta && typeof meta === 'object' && meta.server && typeof meta.server === 'object' && !Array.isArray(meta.server)
+      ? (meta.server as Record<string, unknown>)
+      : undefined;
+  if (!server) throw new Error('Definição MCP importada inválida.');
+  const ref = validSecretRef(server.secretRef)
+    ? server.secretRef
+    : credentialsFor(db).put(credentialOwner(str(row.board_id), str(row.id)), server);
+  const transport = ['stdio', 'http', 'sse'].includes(String(meta.transport)) ? meta.transport : transportOf(server);
+  return { ...row, secret_ref: ref, review_state: 'pending', meta_json: JSON.stringify({ server: { secretRef: ref }, transport }) };
+}
+
 export class ArtifactRepo {
-  constructor(private db: Database) {}
+  constructor(private db: Database) {
+    this.protectLegacy();
+  }
+
+  /** Salva todos os valores primeiro; qualquer falha preserva o JSON legado inteiro no banco. */
+  protectLegacy(): void {
+    this.db.run('PRAGMA secure_delete = ON;');
+    const rows = all(this.db, "SELECT * FROM board_artifacts WHERE kind = 'mcp' AND secret_ref IS NULL AND review_state = 'legacy'");
+    const protectedRows = rows.map((r) => {
+      const server = serverOf(parseJson(str(r.meta_json), {}));
+      if (!server) throw new Error('Definição MCP legada inválida; valores originais preservados.');
+      const ref = credentialsFor(this.db).put(credentialOwner(str(r.board_id), str(r.id)), server);
+      return { id: str(r.id), ref, transport: transportOf(server) };
+    });
+    if (protectedRows.length)
+      transaction(this.db, () => {
+        for (const r of protectedRows)
+          run(this.db, "UPDATE board_artifacts SET meta_json = ?, secret_ref = ?, review_state = 'reviewed' WHERE id = ?", [
+            JSON.stringify({ server: { secretRef: r.ref }, transport: r.transport }),
+            r.ref,
+            r.id,
+          ]);
+      });
+  }
 
   /** Os artefatos do board, sem conteúdo de regra/skill (o do agente entra) e sem a definição MCP (só o resumo). */
   list(boardId: string): Omit<BoardArtifact, 'path'>[] {
@@ -88,8 +133,8 @@ export class ArtifactRepo {
    * Cria ou substitui (mesmo tipo e nome): mantém `id`, `created_at` e, sem `usage`, o modo atual (num
    * novo, o padrão do tipo); troca todos os arquivos de apoio. Devolve o id.
    */
-  upsert(boardId: string, draft: ArtifactDraft, usage?: HarnessUsage): string {
-    return transaction(this.db, () => this.write(boardId, draft, usage));
+  upsert(boardId: string, draft: ArtifactDraft, usage?: HarnessUsage, reviewed = false): string {
+    return transaction(this.db, () => this.write(boardId, draft, usage, reviewed));
   }
 
   /** Importação em lote: nenhum item fica pela metade se uma gravação falhar. */
@@ -100,7 +145,12 @@ export class ArtifactRepo {
   }
 
   setUsage(boardId: string, id: string, usage: HarnessUsage): void {
-    run(this.db, 'UPDATE board_artifacts SET usage = ?, updated_at = ? WHERE id = ? AND board_id = ?', [usage, now(), id, boardId]);
+    run(this.db, 'UPDATE board_artifacts SET usage = ?, updated_at = ?, revision = revision + 1 WHERE id = ? AND board_id = ?', [
+      usage,
+      now(),
+      id,
+      boardId,
+    ]);
   }
 
   /** Os arquivos de apoio saem pelo ON DELETE CASCADE. */
@@ -113,10 +163,10 @@ export class ArtifactRepo {
     const out: Record<string, unknown> = {};
     for (const r of all(
       this.db,
-      "SELECT name, meta_json FROM board_artifacts WHERE board_id = ? AND kind = 'mcp' AND missing = 0 ORDER BY name",
+      "SELECT id, name, secret_ref FROM board_artifacts WHERE board_id = ? AND kind = 'mcp' AND missing = 0 AND review_state = 'reviewed' ORDER BY name",
       [boardId],
     )) {
-      const server = serverOf(parseJson(str(r.meta_json), {}));
+      const server = credentialsFor(this.db).get(credentialOwner(boardId, str(r.id)), str(r.secret_ref));
       if (server) out[str(r.name)] = server;
     }
     return out;
@@ -149,36 +199,50 @@ export class ArtifactRepo {
 
   // --- internos ---
 
-  private write(boardId: string, d: ArtifactDraft, usage?: HarnessUsage): string {
+  private write(boardId: string, d: ArtifactDraft, usage?: HarnessUsage, reviewed = false): string {
     const t = now();
-    const existing = one(this.db, 'SELECT id, usage FROM board_artifacts WHERE board_id = ? AND kind = ? AND name = ?', [
-      boardId,
-      d.kind,
-      d.name,
-    ]);
+    const existing = one(
+      this.db,
+      'SELECT id, usage, secret_ref, review_state FROM board_artifacts WHERE board_id = ? AND kind = ? AND name = ?',
+      [boardId, d.kind, d.name],
+    );
+    const id = existing ? str(existing.id) : newId();
+    let meta = d.meta;
+    let ref: string | null = null;
+    let review = 'reviewed';
+    if (d.kind === 'mcp') {
+      const server = serverOf(d.meta);
+      if (!server) throw new Error('Definição MCP inválida.');
+      if (validSecretRef(server.secretRef)) {
+        if (!existing || existing.secret_ref !== server.secretRef) throw new Error('Referência de credencial fora deste artefato.');
+        ref = server.secretRef;
+        review = str(existing.review_state);
+      } else {
+        ref = credentialsFor(this.db).put(credentialOwner(boardId, id), server);
+        review = reviewed ? 'reviewed' : 'pending';
+        meta = { server: { secretRef: ref }, transport: transportOf(server) };
+      }
+    }
     const common = [
       d.description,
       d.body,
-      JSON.stringify(d.meta),
+      JSON.stringify(meta),
       d.origin,
       d.originTool,
       d.missing ? 1 : 0,
       JSON.stringify(d.skipped),
       t,
     ] as const;
-    let id: string;
     if (existing) {
-      id = str(existing.id);
       const keep = usage ?? (str(existing.usage) as HarnessUsage);
       run(
         this.db,
         `UPDATE board_artifacts SET description = ?, body = ?, meta_json = ?, origin = ?, origin_tool = ?, missing = ?,
-           skipped_json = ?, updated_at = ?, usage = ? WHERE id = ?`,
+           skipped_json = ?, updated_at = ?, usage = ?, revision = revision + 1 WHERE id = ?`,
         [...common, keep, id],
       );
       run(this.db, 'DELETE FROM board_artifact_files WHERE artifact_id = ?', [id]);
     } else {
-      id = newId();
       run(
         this.db,
         `INSERT INTO board_artifacts (id, board_id, kind, name, description, body, meta_json, origin, origin_tool, missing,
@@ -186,6 +250,7 @@ export class ArtifactRepo {
         [id, boardId, d.kind, d.name, ...common, usage ?? defaultUsage(selectableOfKind(d.kind)), t],
       );
     }
+    if (d.kind === 'mcp') run(this.db, 'UPDATE board_artifacts SET secret_ref = ?, review_state = ? WHERE id = ?', [ref, review, id]);
     for (const f of d.files) {
       run(this.db, 'INSERT INTO board_artifact_files (artifact_id, path, content, encoding, size) VALUES (?,?,?,?,?)', [
         id,
@@ -213,7 +278,7 @@ export class ArtifactRepo {
       description: str(row.description),
       usage,
       origin: str(row.origin),
-      originTool: ALL_AI_TOOLS.includes(str(row.origin_tool) as AiTool) ? (str(row.origin_tool) as AiTool) : '',
+      originTool: isAiBase(row.origin_tool) ? (str(row.origin_tool) as AiTool) : '',
       missing: bool(row.missing),
       skipped: parseJson<BoardArtifact['skipped']>(str(row.skipped_json), []),
       files,
@@ -221,9 +286,19 @@ export class ArtifactRepo {
       meta,
       createdAt: num(row.created_at),
       updatedAt: num(row.updated_at),
+      revision: num(row.revision),
     };
     if (kind === 'agent') a.agent = meta as AgentMeta;
-    if (kind === 'mcp') a.mcpSummary = mcpSummaryOf(serverOf(meta));
+    if (kind === 'mcp') {
+      const transport = (meta as { transport?: unknown }).transport;
+      a.mcpSummary = mcpSummaryOf(transport);
+      a.mcpCredential = {
+        secretRef: str(row.secret_ref),
+        available: credentialsFor(this.db).has(credentialOwner(str(row.board_id), a.id), str(row.secret_ref)),
+        review: row.review_state === 'reviewed' ? 'reviewed' : 'pending',
+        transport: transport === 'stdio' || transport === 'http' || transport === 'sse' ? transport : '',
+      };
+    }
     if (kind === 'skill' && (meta as { generated?: unknown }).generated === true) a.generated = true;
     return a;
   }

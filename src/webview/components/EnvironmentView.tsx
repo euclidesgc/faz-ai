@@ -1,5 +1,6 @@
+import { baseValue } from '../../shared/harness';
 import { useEffect, useState } from 'react';
-import { aiToolInfo, type AiTool } from '../../shared/harness';
+import { baseInfo, type AiTool } from '../../shared/harness';
 import { NODE_MIN_MAJOR, missingCount, type EnvCheck, type InstallStepKind } from '../../shared/environment';
 import { CLI_COMMAND } from '../../shared/requirements';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
@@ -14,7 +15,7 @@ import { Button, Hint, IconExternal, IconMissing, IconOk, IconSkipped } from './
 
 /** O nome do item e, no hint, como o board o usa; no idioma da interface. */
 function texts(c: EnvCheck, projectTool: AiTool): { title: string; hint: string } {
-  const tool = aiToolInfo(c.tool ?? projectTool).label;
+  const tool = baseInfo(c.tool ?? projectTool).label;
   switch (c.id) {
     case 'node':
       return {
@@ -35,7 +36,7 @@ function texts(c: EnvCheck, projectTool: AiTool): { title: string; hint: string 
           };
     case 'cli':
       return {
-        title: t('Linha de comando {cli}', { cli: CLI_COMMAND[c.tool ?? projectTool] }),
+        title: t('Linha de comando {cli}', { cli: baseValue(CLI_COMMAND, c.tool ?? projectTool) ?? '' }),
         hint: t('O board roda a linha de comando do {tool} em segundo plano, nesta pasta, para a IA trabalhar nos cards.', { tool }),
       };
     case 'signin':
@@ -420,7 +421,7 @@ export function EnvironmentView() {
       >
         {t(
           'O que o board precisa para trabalhar com o {tool}, as outras ferramentas de IA desta máquina e o que ele aproveita quando está instalado. Passe o mouse sobre um item para ver como o board o usa. O board instala só o próprio MCP e a skill do fluxo; o resto você instala pelo site indicado.',
-          { tool: aiToolInfo(tool).label },
+          { tool: baseInfo(tool).label },
         )}
       </PageHeader>
       <p role="status" className="env-summary">

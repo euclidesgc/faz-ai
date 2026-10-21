@@ -1,8 +1,8 @@
 // Regras do harness do projeto (arquivos de regras, skills e agentes da ferramenta em uso), sem React.
-import { RULE_FILES, SKILL_NAME_PATTERN, aiToolInfo, type AiTool, type RuleFile, type Skill, type ToolInventory } from './harness';
+import { RULE_FILES, SKILL_NAME_PATTERN, baseInfo, type AiTool, type RuleFile, type Skill, type ToolInventory } from './harness';
 
-/** O que o board sabe de uma ferramenta de IA (um item de AI_TOOLS). */
-export type AiToolInfo = ReturnType<typeof aiToolInfo>;
+/** O que o board sabe de uma ferramenta de IA (um item de AI_BASES). */
+export type AiToolInfo = ReturnType<typeof baseInfo>;
 
 /** Nome da skill que ensina a IA a conduzir os cards pelo fluxo do board. */
 export const FLOW_SKILL_NAME = 'faz-ai-fluxo';

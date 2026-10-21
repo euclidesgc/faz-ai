@@ -1,8 +1,15 @@
+import { validateProfileRows } from '../repositories/aiProfileRepo';
+import { ExecutionPolicyRepo } from '../repositories/executionPolicyRepo';
+import { validateExecutionPolicy } from '../../shared/executionPolicies';
+import { ContextPlanningRepo } from '../repositories/contextPlanningRepo';
+import { ArtifactRepo, protectImportedMcpRow } from '../repositories/artifactRepo';
+import { validateActivityContext, validateAgentContext, validateContextTarget, validateContextReason } from '../../shared/contextPlanning';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Database, SqlValue } from 'sql.js';
 import { LARGE_EXPORT_BYTES, type ImportSummary } from '../../shared/backup';
 import { isSafeRelPath } from '../../shared/artifacts';
+import { validateAdmissionDecision } from '../../shared/executionAdmission';
 import { isSafeSegment, safeName, type AttachmentStore } from '../attachments';
 import { newDatabase } from './database';
 import { all, num, one, run, str, transaction, type Row } from './query';
@@ -55,13 +62,18 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'harness_selection', where: 'board_id = ?', hasId: false },
   // as pastas importadas são caminhos absolutos desta máquina: vão junto, e na outra máquina os artefatos ficam ausentes até a pessoa reimportar
   { name: 'harness_imports', where: 'board_id = ?', hasId: false, since: 30 },
-  // os artefatos do board (#615); no export, `env`/`headers` dos MCPs saem com valor vazio (`scrubMcpSecrets`)
+  // Os artefatos do board (#615) exportam somente referências às configurações MCP locais.
   { name: 'board_artifacts', where: 'board_id = ?', hasId: true, since: 34 },
+  { name: 'agent_context_contracts', where: 'board_id = ?', hasId: false, since: 35 },
+  { name: 'activity_context_selections', where: 'board_id = ?', hasId: true, since: 35 },
+  { name: 'ai_profiles', where: 'board_id = ?', hasId: false, since: 42 },
+  { name: 'execution_policies', where: 'board_id = ?', hasId: true, since: 41 },
+  { name: 'execution_policy_versions', where: 'board_id = ?', hasId: false, since: 41 },
   { name: 'board_artifact_files', where: 'artifact_id IN (SELECT id FROM board_artifacts WHERE board_id = ?)', hasId: false, since: 34 },
 ];
 
 /** Tabelas que ficam fora do arquivo mesmo tendo `board_id` (o teste do `sqlite_master` as ignora). */
-export const NOT_EXPORTED = ['boards', 'log_months'];
+export const NOT_EXPORTED = ['boards', 'log_months', 'ai_work', 'ai_work_attempts'];
 
 /** Colunas de `boards` que nunca saem no arquivo: `workspace_key` liga o board à pasta desta máquina. */
 export const OMIT_BOARD_KEYS = ['workspace_key'];
@@ -101,14 +113,17 @@ export function exportBoard(
 ): ExportResult {
   const boardRow = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
   if (!boardRow) throw new Error('Board não encontrado');
+  new ArtifactRepo(db).protectLegacy();
+  new ContextPlanningRepo(db).validateBoard(boardId);
+  new ExecutionPolicyRepo(db).validateBoard(boardId);
+  validateAdmissionRows(all(db, 'SELECT * FROM ai_runs WHERE board_id = ?', [boardId]));
   const board: Row = {};
   for (const [k, v] of Object.entries(boardRow)) if (!OMIT_BOARD_KEYS.includes(k)) board[k] = omitSecrets(k, v);
 
   const tables: Record<string, Row[]> = {};
   for (const t of EXPORT_TABLES) tables[t.name] = all(db, `SELECT * FROM ${t.name} WHERE ${t.where} ORDER BY rowid`, [boardId]);
-  tables.board_artifacts = tables.board_artifacts!.map((r) =>
-    r.kind === 'mcp' ? { ...r, meta_json: scrubMcpSecrets(r.meta_json ?? null) } : r,
-  );
+
+  validateProfileRows(tables.ai_profiles!, boardId);
 
   const warnings: string[] = [];
   const numbers = new Map(tables.cards!.map((c) => [str(c.id), num(c.number)]));
@@ -142,23 +157,6 @@ export function exportBoard(
 /** O mapa `env`/`headers` do servidor MCP de um artefato, se houver (`meta_json.server`). */
 const SECRET_MAPS = ['env', 'headers'] as const;
 
-/** Mantém as chaves de `server.env` e `server.headers` e zera os valores: o segredo não sai da máquina. */
-function scrubMcpSecrets(metaJson: SqlValue): SqlValue {
-  if (typeof metaJson !== 'string') return metaJson;
-  try {
-    const meta: unknown = JSON.parse(metaJson);
-    const server = isPlain(meta) ? meta.server : undefined;
-    if (!isPlain(meta) || !isPlain(server)) return metaJson;
-    for (const k of SECRET_MAPS) {
-      const map = server[k];
-      if (isPlain(map)) server[k] = Object.fromEntries(Object.keys(map).map((key) => [key, '']));
-    }
-    return JSON.stringify(meta);
-  } catch {
-    return metaJson;
-  }
-}
-
 const isPlain = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** `"<servidor>: <CHAVE>"` de cada chave de `env`/`headers` sem valor nos MCPs do arquivo: o que a pessoa precisa preencher. */
@@ -170,6 +168,10 @@ function mcpSecretsOf(rows: Row[]): string[] {
       const meta: unknown = JSON.parse(r.meta_json);
       const server = isPlain(meta) ? meta.server : undefined;
       if (!isPlain(server)) continue;
+      if (typeof server.secretRef === 'string') {
+        out.push(`${str(r.name)}: revisão da configuração local`);
+        continue;
+      }
       for (const k of SECRET_MAPS) {
         const map = server[k];
         if (isPlain(map)) for (const [key, v] of Object.entries(map)) if (v === '') out.push(`${str(r.name)}: ${key}`);
@@ -242,6 +244,7 @@ export function parseExportFile(text: string): BoardExportFile {
       if (t.hasId && (typeof row.id !== 'string' || !row.id)) throw invalid(`linha sem id em "${t.name}".`);
     }
   }
+  validateAdmissionRows(tables.ai_runs as Row[]);
   // id de card e nome gravado de anexo viram caminho em disco (<anexos>/<card>/<nome>): nada que saia da pasta
   for (const c of tables.cards as Row[]) if (!isSafeSegment(str(c.id))) throw invalid('id de card inválido.');
   for (const a of tables.attachments as Row[]) {
@@ -249,11 +252,27 @@ export function parseExportFile(text: string): BoardExportFile {
     if (typeof a.stored_name !== 'string' || !isSafeSegment(a.stored_name)) throw invalid('nome de anexo inválido.');
   }
   // skill e agente viram pasta/arquivo em disco, e o arquivo de apoio um caminho dentro da pasta da skill
-  for (const a of tables.board_artifacts as Row[])
+  for (const a of tables.board_artifacts as Row[]) {
+    if (a.revision !== undefined && (!Number.isSafeInteger(a.revision) || Number(a.revision) < 1))
+      throw invalid('revisão de artefato inválida.');
     if ((a.kind === 'skill' || a.kind === 'agent') && (typeof a.name !== 'string' || !isSafeSegment(a.name)))
       throw invalid('nome de skill ou agente inválido.');
+  }
   for (const f of tables.board_artifact_files as Row[])
     if (typeof f.path !== 'string' || !isSafeRelPath(f.path)) throw invalid('caminho de arquivo de apoio inválido.');
+  for (const r of tables.agent_context_contracts as Row[]) {
+    validateAgentContext(JSON.parse(str(r.contract_json)));
+    if (typeof r.artifact_id !== 'string' || !r.artifact_id || !Number.isSafeInteger(r.revision) || Number(r.revision) < 1)
+      throw invalid('contrato de agente inválido.');
+  }
+  for (const r of tables.activity_context_selections as Row[]) {
+    validateContextReason(r.review_reason);
+    validateActivityContext(JSON.parse(str(r.selection_json)));
+    validateContextTarget({ cardId: r.card_id, workflowId: r.workflow_id, phaseId: r.phase_id, action: r.action });
+    if (!Number.isSafeInteger(r.revision) || Number(r.revision) < 1) throw invalid('revisão de atividade inválida.');
+  }
+  for (const table of ['execution_policies', 'execution_policy_versions'])
+    for (const row of tables[table] as Row[]) validateExecutionPolicy(JSON.parse(str(row.policy_json)));
   if (!Array.isArray(f.files)) throw invalid('falta a lista de arquivos dos anexos.');
   for (const file of f.files) {
     if (!isRow(file) || typeof file.attachmentId !== 'string') throw invalid('item inválido na lista de arquivos dos anexos.');
@@ -314,6 +333,8 @@ export interface ImportResult {
   attachmentsBackup?: string;
   /** `"<servidor>: <CHAVE>"` das chaves de `env`/`headers` dos MCPs que vieram vazias e precisam ser preenchidas */
   mcpSecrets: string[];
+  /** Perfis importados entram desativados e exigem revisão local. */
+  profileReviews?: string[];
 }
 
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -327,6 +348,12 @@ const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
  */
 export function importBoard(target: ImportTarget, file: BoardExportFile): ImportResult {
   const db = target.db;
+  if (
+    one(db, "SELECT 1 FROM ai_work WHERE board_id = ? AND (state IN ('prepared','started','reconciling') OR workspace IS NOT NULL)", [
+      target.boardId,
+    ])
+  )
+    throw new Error('Há trabalho em execução ou reconciliação. Resolva a posse antes de importar o board.');
   const newBoardId = str(file.board.id);
   const boardName = str(file.board.name);
 
@@ -358,6 +385,13 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
       insertRows(mem, t.name, t.name === 'cards' ? parentsFirst(rows) : rows);
     }
     migrate(mem);
+    new ContextPlanningRepo(mem).validateBoard(newBoardId);
+    new ExecutionPolicyRepo(mem).validateBoard(newBoardId);
+    validateProfileRows(all(mem, 'SELECT * FROM ai_profiles WHERE board_id = ?', [newBoardId]), newBoardId);
+    run(mem, "UPDATE ai_profiles SET enabled = 0, review_state = 'pending' WHERE board_id = ?", [newBoardId]);
+    // Revisão humana local nunca acompanha uma configuração executável importada.
+    run(mem, "UPDATE execution_policies SET review_state = 'pending' WHERE board_id = ?", [newBoardId]);
+    validateAdmissionRows(all(mem, 'SELECT * FROM ai_runs WHERE board_id = ?', [newBoardId]));
 
     // 3. o outro board com o mesmo id (o mesmo arquivo importado em duas pastas do mesmo banco) não pode ser engolido
     const clash = one(db, 'SELECT id FROM boards WHERE id = ? AND id != ?', [newBoardId, target.boardId]);
@@ -371,8 +405,10 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
     transaction(db, () => {
       run(db, 'DELETE FROM boards WHERE id = ?', [target.boardId]);
       insertRows(db, 'boards', all(mem, 'SELECT * FROM boards WHERE id = ?', [newBoardId]));
-      for (const t of EXPORT_TABLES)
-        insertRows(db, t.name, all(mem, `SELECT * FROM ${t.name} WHERE ${t.where} ORDER BY rowid`, [newBoardId]));
+      for (const t of EXPORT_TABLES) {
+        const rows = all(mem, `SELECT * FROM ${t.name} WHERE ${t.where} ORDER BY rowid`, [newBoardId]);
+        insertRows(db, t.name, t.name === 'board_artifacts' ? rows.map((r) => protectImportedMcpRow(db, r)) : rows);
+      }
     });
 
     // 6. arquivos de anexos, depois do COMMIT; os do board substituído vão para a pasta de backup
@@ -410,6 +446,9 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
       attachments: attachmentRows.length,
       warnings,
       mcpSecrets: mcpSecretsOf(file.tables.board_artifacts ?? []),
+      profileReviews: all(mem, 'SELECT name FROM ai_profiles WHERE board_id = ? ORDER BY position,id', [newBoardId]).map((r) =>
+        str(r.name),
+      ),
     };
     if (attachmentsBackup) result.attachmentsBackup = attachmentsBackup;
     return result;
@@ -460,4 +499,8 @@ function parentsFirst(rows: Row[]): Row[] {
     pending = next;
   }
   return out;
+}
+
+function validateAdmissionRows(rows: readonly Row[]): void {
+  for (const row of rows) if (row.admission_json != null) validateAdmissionDecision(JSON.parse(str(row.admission_json)));
 }

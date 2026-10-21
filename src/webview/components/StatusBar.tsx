@@ -1,8 +1,8 @@
+import { toolInfo, activeProfile } from '../../shared/aiProfiles';
 import { useState } from 'react';
 import { badgeStyle } from '../../shared/color';
 import type { Card } from '../../shared/model';
 import { CARD_STATUSES, OWNER_LABEL, statusInfo, type CardStatus } from '../../shared/status';
-import { aiToolInfo } from '../../shared/harness';
 import { columnOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
@@ -50,7 +50,7 @@ export function StatusBar({ card }: { card: Card }) {
   const column = columnOf(state, card);
   const styles = state.board.appearance.statuses;
   const running = state.aiRuns.includes(card.id);
-  const toolLabel = aiToolInfo(state.board.aiTool).label;
+  const toolLabel = toolInfo(activeProfile(state.board)).label;
   const blocked = aiBlockedReason(state);
   // o status novo mostra a espera no botão clicado; a nota só fecha quando o host confirma
   const change = useAction((status: CardStatus | null, text?: string) => cards.setStatus(card.id, status, text));

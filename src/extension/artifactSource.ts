@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ARTIFACT_LIMITS, isSafeRelPath, kindOfSelectable, toolCategories, type AgentMeta, type ArtifactDraft } from '../shared/artifacts';
-import { aiToolInfo, type AiTool, type HarnessItem } from '../shared/harness';
+import { baseInfo, type AiTool, type HarnessItem } from '../shared/harness';
 import { selectionKey, type SelectableKind } from '../shared/harnessSelection';
 import { parseAgentFile } from './agentFiles';
 import { FLOW_SKILLS } from './flowSkill';
@@ -160,7 +160,7 @@ function readAgent(location: string, dirs: SourceDirs, tool: AiTool | ''): Draft
   const main = readMain(file);
   if ('reason' in main) return missing(d, main.reason === 'size' ? [{ path: path.basename(file), reason: 'size' }] : []);
   const owner = agentTool(location, tool);
-  const a = parseAgentFile(aiToolInfo(owner || 'claude').agents, { name, scope: 'project', path: file, location }, main.text);
+  const a = parseAgentFile(baseInfo(owner || 'claude').agents, { name, scope: 'project', path: file, location }, main.text);
   const meta: AgentMeta = {
     skills: a.skills,
     mcpServers: a.mcp,

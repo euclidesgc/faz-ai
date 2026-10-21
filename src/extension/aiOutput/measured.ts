@@ -1,3 +1,5 @@
+import { toolInfo } from '../../shared/aiProfiles';
+import { executorProfile, type AiExecutor } from '../ai/providers';
 // O transporte da execução medida: monta o comando no modo estruturado, inicia o processo, passa
 // cada pedaço de `stdout` pelo partidor de linhas e pelo leitor, e devolve o mesmo
 // `RunningProcess` de sempre mais um `report()` lido no fim.
@@ -23,11 +25,11 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { aiToolInfo, type AiTool } from '../../shared/harness';
 import type { RunReport } from '../../shared/log';
-import { ensureProjectServer } from '../mcp/clientConfig';
+import { leaseProjectServer, type ProjectServerLease } from '../mcp/projectServerLease';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import type { RunningProcess } from '../runner';
+import { SpawnNotStartedError, type SpawnControl } from '../processIdentity';
 import { MeasureBrokenError, MeasureEndedError, MeasureIgnoredError, MeasureRefusedError, type MeasureError } from './errors';
 import { cut } from './json';
 import { lineSplitter } from './lines';
@@ -36,9 +38,16 @@ import { providerFor } from '../ai/providers';
 import { textReader } from './text';
 
 /** Como o board inicia um processo da CLI. O `out` recebe de qual canal cada pedaço veio. */
-export type SpawnFn = (command: HeadlessCommand, cwd: string, out: (text: string, stream: OutputStream) => void) => RunningProcess;
+export type SpawnFn = (
+  command: HeadlessCommand,
+  cwd: string,
+  out: (text: string, stream: OutputStream) => void,
+  control?: SpawnControl,
+) => RunningProcess;
 
 export interface MeasuredDeps {
+  /** Raiz compartilhada de coordenação; nos testes usa uma pasta temporária própria. */
+  leaseCoordinationDir?: string;
   spawn: SpawnFn;
   /**
    * Cada linha legível que a ferramenta produziu, mais os recados do board sobre a execução (a
@@ -79,7 +88,7 @@ const REFUSAL =
  * minúsculas (no Claude Code: `output-format`, `stream-json`, `verbose`). Sai da diferença entre os
  * dois comandos que o provider monta, então uma ferramenta nova não precisa de lista própria.
  */
-export function formatArgs(tool: AiTool, input: HeadlessInput): string[] {
+export function formatArgs(tool: AiExecutor, input: HeadlessInput): string[] {
   const plain = new Set(headlessCommand(tool, { ...input, structured: false }).args);
   return headlessCommand(tool, { ...input, structured: true })
     .args.filter((a) => !plain.has(a))
@@ -135,22 +144,29 @@ export function cleanStaleTemp(now = Date.now(), dir = os.tmpdir()): void {
   }
 }
 
-export function materialize(command: HeadlessCommand): { command: HeadlessCommand; cleanup: () => void } {
+export function materialize(command: HeadlessCommand, tempRoot = os.tmpdir()): { command: HeadlessCommand; cleanup: () => void } {
   const files = Object.entries(command.tempFiles ?? {});
   if (!files.length) return { command, cleanup: () => {} };
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-run-'));
-  let args = command.args;
-  for (const [name, content] of files) {
-    const file = path.join(dir, name);
-    // pode ter segredos (variáveis dos servidores MCP): só o dono lê
-    fs.writeFileSync(file, content, { mode: 0o600 });
-    args = args.map((a) => a.split(tmpArg(name)).join(file));
+  if (files.some(([name]) => !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name) || name === '..'))
+    throw new Error('Nome de arquivo temporário inválido.');
+  const dir = fs.mkdtempSync(path.join(tempRoot, 'fazai-run-'));
+  try {
+    let args = command.args;
+    for (const [name, content] of files) {
+      const file = path.join(dir, name);
+      // pode ter segredos (variáveis dos servidores MCP): só o dono lê
+      fs.writeFileSync(file, content, { mode: 0o600 });
+      args = args.map((a) => a.split(tmpArg(name)).join(file));
+    }
+    return { command: { ...command, args }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
+  } catch (error) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    throw error;
   }
-  return { command: { ...command, args }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
-export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, deps: MeasuredDeps): Measured {
-  const label = aiToolInfo(tool).label;
+export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: string, deps: MeasuredDeps): Measured {
+  const label = toolInfo(executorProfile(tool)).label;
   const provider = providerFor(tool);
   const model = input.exec?.model?.name ?? null;
   const fmtArgs = formatArgs(tool, input);
@@ -161,6 +177,8 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
   let current: RunningProcess | null = null;
   let killed = false;
   let done = false;
+  let projectLease: ProjectServerLease | null = null;
+  let processMayExist = false;
   /** o leitor da tentativa em curso; o `report()` é sempre o da última */
   let reader: OutputReader = textReader();
   /** por que a medição não aconteceu, quando não aconteceu */
@@ -169,22 +187,27 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
   const finish = (code: number | null, error?: Error): void => {
     if (done) return;
     done = true;
+    if (projectLease) {
+      if (current?.terminationConfirmed?.() === true) {
+        try {
+          projectLease.confirmProcessStopped();
+          projectLease.release();
+        } catch {
+          deps.log('Não foi possível restaurar o empréstimo MCP; diário preservado para reconciliação.');
+        }
+      } else {
+        deps.log('O fim da árvore de processos não foi confirmado; empréstimo MCP retido para reconciliação.');
+        error ??= new Error('O encerramento da árvore de processos ainda não foi confirmado.');
+      }
+    }
     for (const fn of listeners) fn(code, error);
   };
 
   const attempt = (structured: boolean): void => {
     const built = headlessCommand(tool, { ...input, structured });
-    // sem o servidor do board no arquivo que a ferramenta lê, a execução rodaria sem mover nem comentar nada
-    if (built.projectMcp) {
-      const { file } = built.projectMcp;
-      const result = ensureProjectServer(cwd, file, built.projectMcp.entry, undefined, { stdioType: built.projectMcp.stdioType });
-      if (result === 'added') deps.log(`Servidor do board registrado em ${file}, que o ${label} lê em segundo plano.`);
-      if (result === 'repaired')
-        deps.log(`O registro do servidor do board em ${file} apontava para outra pasta ou outro caminho; foi refeito para este projeto.`);
-      if (result === 'invalid')
-        deps.log(
-          `${file} não é um JSON válido e o board não conseguiu registrar o servidor dele: o ${label} pode rodar sem acesso ao board. Corrija o arquivo.`,
-        );
+    if (built.projectMcp && !projectLease) {
+      projectLease = leaseProjectServer(cwd, built.projectMcp, { coordinationDir: deps.leaseCoordinationDir, log: deps.log });
+      deps.log('Servidor do board disponível por empréstimo temporário do arquivo MCP do projeto.');
     }
     const { command, cleanup } = materialize(built);
     const format = command.format;
@@ -229,9 +252,18 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
 
     let proc: RunningProcess;
     try {
-      proc = deps.spawn(command, cwd, feed);
+      projectLease?.markProcessUnconfirmed();
+      processMayExist = true;
+      proc = deps.spawn(command, cwd, feed, {
+        beforePreparation: () => projectLease?.prepareControlledProcess(),
+        beforeStart: (identity) => projectLease?.recordControlledProcess(identity),
+      });
     } catch (e) {
       cleanup();
+      if (e instanceof SpawnNotStartedError && projectLease) {
+        projectLease.confirmProcessStopped();
+        projectLease.release();
+      }
       throw e;
     }
     current = proc;
@@ -285,6 +317,8 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
           return;
         }
         try {
+          if (projectLease && proc.terminationConfirmed?.() !== true)
+            throw new Error('A tentativa anterior ainda exige reconciliação de processos; não será repetida.');
           attempt(false);
         } catch (e) {
           finish(null, e instanceof Error ? e : new Error(String(e)));
@@ -301,10 +335,22 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
     });
   };
 
-  attempt(true);
+  const releaseUnusedLease = () => {
+    if (projectLease && !processMayExist) projectLease.release();
+  };
+  try {
+    attempt(true);
+  } catch (e) {
+    releaseUnusedLease();
+    throw e;
+  }
 
   return {
     proc: {
+      get identity() {
+        return current?.identity;
+      },
+      terminationConfirmed: () => current?.terminationConfirmed?.() === true,
       onExit: (fn) => listeners.push(fn),
       kill: () => {
         killed = true;
@@ -317,8 +363,9 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
       // aconteceu com o processo. Sem nada medido e sem motivo conhecido, o formato veio e não
       // trouxe consumo.
       if (report.measure !== 'none') return report;
+      if (provider.measure === 'none') return { ...report, reason: 'Este perfil fornece apenas texto; consumo desconhecido.' };
       return { ...report, reason: (failure ?? new MeasureBrokenError(label)).message };
     },
-    failure: () => (reader.report().measure !== 'none' ? null : (failure ?? new MeasureBrokenError(label))),
+    failure: () => (provider.measure === 'none' || reader.report().measure !== 'none' ? null : (failure ?? new MeasureBrokenError(label))),
   };
 }

@@ -153,7 +153,7 @@ const HARNESS_BODY = `# Harness do card
 
 O \`get_card\` devolve o que o card exige para a execução; leia antes de começar.
 
-- \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, delegue o trabalho a um subagente com essa configuração; se não for possível, avise a pessoa em vez de executar com outra. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, e as regras do board sugerem o modelo a partir dele (\`get_models\`).
+- \`model\`: o modelo e o esforço que devem executar o card. O valor usa \`<perfil>:<modelo>@<esforço>\` do perfil de CLI do board. Se forem diferentes dos seus, delegue o trabalho a um subagente com essa configuração; se não for possível, avise a pessoa em vez de executar com outra. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, e as regras do board sugerem o modelo a partir dele (\`get_models\`).
 - \`requiredRules\`: leia cada arquivo em \`path\` antes de executar o card: são as instruções que o card exige, além do contexto fixo do board.
 - \`requiredSkills\`: leia o SKILL.md de cada skill em \`path\`. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em \`files\` estão os arquivos de apoio (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.
 - Skills, rules, servidores MCP e agente do card: escolha só entre o que está no board em modo "Pelo card" (\`get_harness\`). O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.

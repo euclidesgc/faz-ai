@@ -1,7 +1,8 @@
 import { Checkbox, Select, TextField as RxTextField } from '@radix-ui/themes';
+import { useState } from 'react';
+import { activeProfile, catalogTool, profileLabel } from '../../shared/aiProfiles';
 import { modelDisplay } from '../modelText';
 import type { FieldDef, FieldValue } from '../../shared/model';
-import { AI_TOOLS } from '../../shared/harness';
 import { effortLabel, modelValue, parseModelValue } from '../../shared/models';
 import { useBoardStore } from '../store/boardStore';
 import { ChipsEditor, IconExternal, OptionLabel, optionChip, SelectField, TextField } from './ui';
@@ -105,6 +106,7 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
 
 /** Valor do item "sem modelo": o Select do Radix não aceita `value` vazio. */
 const NO_MODEL = '__none';
+const OTHER_MODEL = '__other';
 
 /**
  * Modelo + nível de esforço, escolhidos no catálogo do board. `part` mostra só o seletor de modelo ou só o de
@@ -119,16 +121,47 @@ export function ModelEditor({
   onChange: (v: FieldValue) => void;
   part?: 'both' | 'model' | 'effort';
 }) {
-  const all = useBoardStore((s) => s.state?.board.modelCatalog ?? []);
-  const tool = useBoardStore((s) => s.state?.board.aiTool);
+  const board = useBoardStore((s) => s.state?.board);
+  const all = board?.modelCatalog ?? [];
+  const active = board ? activeProfile(board) : null;
+  const [otherOpen, setOtherOpen] = useState(false);
+  const [otherName, setOtherName] = useState('');
   const current = parseModelValue(value);
-  // oferece os modelos da ferramenta em uso; um valor de outra ferramenta continua visível até ser trocado
-  const catalog = all.filter((o) => o.tool === tool || o.id === current?.id);
+  // Catálogos são associados a perfis existentes; um valor antigo continua visível até ser trocado.
+  const profiles = board?.aiProfiles.filter((p) => p.enabled) ?? [];
+  const catalog = all.filter((o) => profiles.some((p) => catalogTool(p) === o.tool) || o.id === current?.id);
   const option = current ? catalog.find((o) => o.id === current.id) : undefined;
-  const modelSelect = (
+  const submitOther = () => {
+    const name = otherName.trim();
+    if (!active || active.kind !== 'custom' || !name || /[\s\0:@]/.test(name)) return;
+    onChange(modelValue(`${active.id}:${name}`, null));
+    setOtherOpen(false);
+    setOtherName('');
+  };
+  const modelSelect = otherOpen ? (
+    <RxTextField.Root
+      autoFocus
+      aria-label={t('Outro modelo')}
+      placeholder={t('Identificador do modelo')}
+      value={otherName}
+      onChange={(e) => setOtherName(e.target.value)}
+      onBlur={submitOther}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') submitOther();
+        if (e.key === 'Escape') {
+          setOtherName('');
+          setOtherOpen(false);
+        }
+      }}
+    />
+  ) : (
     <Select.Root
       value={current?.id ?? NO_MODEL}
       onValueChange={(id) => {
+        if (id === OTHER_MODEL) {
+          setOtherOpen(true);
+          return;
+        }
         const o = catalog.find((x) => x.id === id);
         onChange(o ? modelValue(o.id, o.defaultEffort) : null);
       }}
@@ -137,18 +170,21 @@ export function ModelEditor({
       <Select.Content position="popper">
         <Select.Item value={NO_MODEL}>—</Select.Item>
         {current && !option && <Select.Item value={current.id}>{t('{id} (fora do catálogo)', { id: current.id })}</Select.Item>}
-        {AI_TOOLS.filter((tl) => catalog.some((o) => o.tool === tl.id)).map((tl) => (
-          <Select.Group key={tl.id}>
-            <Select.Label>{tl.label}</Select.Label>
-            {catalog
-              .filter((o) => o.tool === tl.id)
-              .map((o) => (
-                <Select.Item key={o.id} value={o.id}>
-                  {o.label}
-                </Select.Item>
-              ))}
-          </Select.Group>
-        ))}
+        {profiles
+          .filter((profile) => catalog.some((o) => o.tool === catalogTool(profile)))
+          .map((profile) => (
+            <Select.Group key={profile.id}>
+              <Select.Label>{board ? profileLabel(board, profile.id) : profile.name}</Select.Label>
+              {catalog
+                .filter((o) => o.tool === catalogTool(profile))
+                .map((o) => (
+                  <Select.Item key={o.id} value={o.id}>
+                    {o.label}
+                  </Select.Item>
+                ))}
+            </Select.Group>
+          ))}
+        {active?.kind === 'custom' && <Select.Item value={OTHER_MODEL}>{t('Outro modelo…')}</Select.Item>}
       </Select.Content>
     </Select.Root>
   );

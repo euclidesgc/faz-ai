@@ -8,7 +8,7 @@ import { createBoardHost, type BoardHost } from './host/boardHost';
 import { startMcpServer } from './mcp/server';
 import { readBridgeVersion, socketPath, stableBridgePath, workspaceKey, writeBridgeVersion } from './mcp/socketPath';
 import { registerCursorProject } from './mcp/clientConfig';
-import { aiToolInfo, type AiTool } from '../shared/harness';
+import { baseInfo, type AiTool } from '../shared/harness';
 import { ensureUserServers } from './mcp/reinstall';
 import { installFlowSkillFiles } from './flowSkill';
 import { copyTarget } from '../shared/harnessCatalog';
@@ -500,10 +500,10 @@ function ensureUserInstall(
         return;
       }
       for (const f of failed)
-        output.appendLine(`Faz AI: não foi possível instalar o servidor do board no ${aiToolInfo(f.tool).label}: ${f.message}`);
+        output.appendLine(`Faz AI: não foi possível instalar o servidor do board no ${baseInfo(f.tool).label}: ${f.message}`);
       const open = 'Abrir o board';
       const choice = await vscode.window.showWarningMessage(
-        `Faz AI: não foi possível instalar o servidor MCP do board no ${failed.map((f) => aiToolInfo(f.tool).label).join(', ')}. Abra o board e use "Instalar" na faixa de avisos.`,
+        `Faz AI: não foi possível instalar o servidor MCP do board no ${failed.map((f) => baseInfo(f.tool).label).join(', ')}. Abra o board e use "Instalar" na faixa de avisos.`,
         open,
       );
       if (choice === open) void vscode.commands.executeCommand('fazai.openBoard');

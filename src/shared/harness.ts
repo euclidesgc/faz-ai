@@ -1,3 +1,4 @@
+import type { AiBase } from './aiProfiles';
 import type { BoardArtifact } from './artifacts';
 /** Harness do projeto: arquivos de regras e skills, gerenciados pelo board. */
 
@@ -264,7 +265,7 @@ export interface Harness {
 }
 
 /** Ferramentas de IA que o board sabe configurar. O projeto trabalha com uma por vez. */
-export type AiTool = 'claude' | 'cursor' | 'kimi';
+export type AiTool = string;
 
 /** Onde e como uma ferramenta guarda os agentes do projeto (conforme a documentação de cada uma em 2026-10-02). */
 export interface AgentSpec {
@@ -273,8 +274,8 @@ export interface AgentSpec {
 }
 
 /** O que cada ferramenta lê no projeto (conforme a documentação de cada uma). */
-export const AI_TOOLS: {
-  id: AiTool;
+export const AI_BASES: {
+  id: AiBase;
   label: string;
   rules: string;
   skills: string;
@@ -313,15 +314,27 @@ export const AI_TOOLS: {
   },
 ];
 
-export const ALL_AI_TOOLS: AiTool[] = AI_TOOLS.map((t) => t.id);
-export const aiToolInfo = (tool: AiTool) => AI_TOOLS.find((t) => t.id === tool)!;
+export const ALL_AI_BASES: AiBase[] = AI_BASES.map((t) => t.id);
+/** Dados nativos desconhecidos ficam neutros, sem pastas ou permissões presumidas. */
+export const isAiBase = (value: unknown): value is AiBase => value === 'claude' || value === 'cursor' || value === 'kimi';
+export const baseValue = <T>(table: Partial<Record<AiBase, T>>, id: string | null): T | undefined => (isAiBase(id) ? table[id] : undefined);
+export const baseInfo = (tool: string) =>
+  AI_BASES.find((t) => t.id === tool) ?? {
+    id: tool,
+    label: tool,
+    rules: '',
+    skills: '',
+    mcp: '',
+    mcpUser: '',
+    agents: { dir: '', ext: '.md' },
+  };
 
 /** Lê a ferramenta salva. Versões antigas guardavam uma lista; vale a primeira. */
-export function parseAiTool(json: string | null | undefined): AiTool {
+export function parseAiTool(json: string | null | undefined, ids: readonly string[] = ALL_AI_BASES): AiTool {
   try {
     const v: unknown = JSON.parse(json ?? '');
     const first = Array.isArray(v) ? v[0] : v;
-    if (ALL_AI_TOOLS.includes(first as AiTool)) return first as AiTool;
+    if (typeof first === 'string' && ids.includes(first)) return first;
   } catch {
     /* inválido: usa o padrão */
   }

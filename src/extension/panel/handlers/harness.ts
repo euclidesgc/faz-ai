@@ -1,11 +1,13 @@
+import { toolInfo, activeProfile } from '../../../shared/aiProfiles';
+import { catalogTool } from '../../../shared/aiProfiles';
+import { ContextPlanningRepo } from '../../repositories/contextPlanningRepo';
 import { artifactLocation } from '../../../shared/artifacts';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
-  ALL_AI_TOOLS,
+  ALL_AI_BASES,
   EMPTY_HARNESS,
   REFERENCE_SKILL,
-  aiToolInfo,
   type AiTool,
   type Harness,
   type HarnessItem,
@@ -23,7 +25,7 @@ import {
   selectedSkillNames,
   selectionKey,
 } from '../../../shared/harnessSelection';
-import { CONDUCTOR_AGENT, migrateExecProfiles, seedAgents } from '../../agentSeeds';
+import { migrateExecProfiles, seedAgents } from '../../agentSeeds';
 import { FLOW_SKILL, installFlowSkillFiles } from '../../flowSkill';
 import { type HarnessStore } from '../../harness';
 import { HarnessOps } from '../../harnessOps';
@@ -72,7 +74,7 @@ export class BoardHarness {
     let state = this.ctx.state();
     // as pastas importadas são do board: a varredura as recebe a cada leitura, para a aba refletir o que está lá
     this.store.imports = Object.fromEntries(
-      ALL_AI_TOOLS.map((tool) => [tool, state.harnessImports.filter((x) => x.tool === tool).map((x) => x.dir)]),
+      ALL_AI_BASES.map((tool) => [tool, state.harnessImports.filter((x) => x.tool === tool).map((x) => x.dir)]),
     );
     this.current = this.store.scan();
     this.ctx.library.migrate(this.current.inventory);
@@ -108,53 +110,17 @@ export class BoardHarness {
   }
 
   /**
-   * Na abertura do board: os agentes que o banco guardava viram arquivos, os de fábrica são criados uma
-   * vez, e a varredura é refeita com eles. Sem pasta de projeto nada acontece.
+   * Na abertura do board: os agentes que o banco guardava em versões antigas viram arquivos (e a cópia do
+   * board), os de fábrica são criados uma vez no próprio board, e a varredura é refeita com eles. Sem
+   * pasta de projeto nada acontece.
    */
   bootstrap(): void {
     if (!this.store) return;
-    let changed = false;
-    if (Object.keys(migrateExecProfiles(this.ctx, this.store)).length) changed = true;
-    if (this.ctx.opts.seedAgents) {
-      // primeira abertura deste board: os de fábrica que já existem na máquina (criados por outro board)
-      // também ficam disponíveis, com o condutor como padrão
-      if (this.ctx.boards.seededAgents(this.ctx.boardId).length === 0) changed = true;
-      if (seedAgents(this.ctx, this.store).length) changed = true;
-    }
+    migrateExecProfiles(this.ctx, this.store);
     // agentes gravados antes de a lista de ferramentas levar o servidor do board: regravados uma vez
     this.store.repairAgentTools();
     this.load();
-    if (changed) {
-      this.markSeeded();
-      this.load();
-    }
-  }
-
-  /** Depois de recriar os agentes de fábrica pela tela: o mesmo que na abertura. */
-  markSeededPublic(): void {
-    this.markSeeded();
-    this.load();
-  }
-
-  /** Os agentes de fábrica recém-criados ficam marcados como disponíveis; o condutor vira o padrão quando não há outro. */
-  private markSeeded(): void {
-    const state = this.ctx.state();
-    const seeds = this.current.agents.filter((a) => a.seed && a.scope === 'user');
-    const unmarked = seeds.filter((a) => !state.harnessSelection.some((x) => x.kind === 'agent' && x.location === a.location));
-    if (unmarked.length)
-      this.ctx.boards.setSelection(
-        this.ctx.boardId,
-        unmarked.map((a) => ({ kind: 'agent' as const, location: a.location })),
-        'contextual',
-      );
-    if (!state.board.runner.defaultAgent && seeds.some((a) => a.name === CONDUCTOR_AGENT))
-      this.ctx.boards.updateBoard(this.ctx.boardId, { runner: { defaultAgent: CONDUCTOR_AGENT } });
-    // registrados como oferecidos: desmarcar ou apagar depois é decisão da pessoa, que o board respeita
-    if (seeds.length)
-      this.ctx.boards.addSeededAgents(
-        this.ctx.boardId,
-        seeds.map((a) => a.name),
-      );
+    if (this.ctx.opts.seedAgents && seedAgents(this.ctx).length) this.load();
   }
 
   /** Relê o disco e diz se algo mudou (chamado quando os arquivos mudam por fora). */
@@ -241,7 +207,8 @@ export class BoardHarness {
 
   /** Passa a varrer a pasta de skills da ferramenta. */
   setTool(tool: AiTool): void {
-    this.store?.setTool(tool);
+    const profile = this.ctx.state().board.aiProfiles.find((p) => p.id === tool);
+    this.store?.setTool(profile ? catalogTool(profile) : tool);
     this.load();
   }
 
@@ -331,9 +298,16 @@ export class BoardHarness {
     return { readonly };
   }
 
+  /** A configuração nativa de MCP pode conter credenciais; nem a leitura nem a escrita legada passam pelo editor do board. */
+  private assertNotNativeMcpFile(file: string): void {
+    if (this.current.inventory.some((t) => t.items.some((i) => i.kind === 'mcp' && i.path === file)))
+      throw new Error('Configurações MCP não são editadas pelo editor de arquivos. Use a biblioteca do board.');
+  }
+
   /** Conteúdo de um arquivo do harness para o editor do board. */
   readFile(file: string): { content: string; readonly: boolean } {
     const { readonly } = this.access(file);
+    this.assertNotNativeMcpFile(file);
     if (fs.statSync(file).size > MAX_EDIT_BYTES) throw new Error('Arquivo maior que 512 KB: abra no editor.');
     return { content: fs.readFileSync(file, 'utf8'), readonly };
   }
@@ -346,6 +320,7 @@ export class BoardHarness {
       return;
     }
     if (this.access(file).readonly) throw new Error('Este arquivo não pode ser alterado pelo board.');
+    this.assertNotNativeMcpFile(file);
     if (/\.json$/i.test(file)) {
       try {
         // os arquivos de configuração das ferramentas aceitam comentários de linha
@@ -418,6 +393,16 @@ function markSkill(ctx: BoardContext, name: string, scope: 'project' | 'user' = 
 
 /** Harness: regras, skills, agentes, hooks, permissões, servidores MCP e instalação de skills. */
 export const harnessHandlers = {
+  'contextPlanning.save': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('Contratos de contexto exigem revisão humana; a IA não pode alterar autorizações.');
+    new ContextPlanningRepo(ctx.dbHandle.db).save(ctx.boardId, msg.input);
+    return true;
+  },
+  'contextPlanning.saveBatch': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('Contratos de contexto exigem revisão humana; a IA não pode alterar autorizações.');
+    new ContextPlanningRepo(ctx.dbHandle.db).saveBatch(ctx.boardId, msg.inputs);
+    return true;
+  },
   'harness.library.scan': (msg, ctx) => {
     ctx.library.scanFolder(msg.dir);
     ctx.harness.load();
@@ -428,7 +413,8 @@ export const harnessHandlers = {
     ctx.harness.load();
     return true;
   },
-  'harness.library.save': (msg, ctx) => {
+  'harness.library.save': (msg, ctx, actor) => {
+    if (actor.byAi && msg.input.kind === 'mcp') throw new Error('Configurações e credenciais MCP exigem revisão humana.');
     ctx.library.saveArtifact(msg.input);
     ctx.harness.load();
     return true;
@@ -474,7 +460,7 @@ export const harnessHandlers = {
     const changed = ctx.harness.op((h) => {
       h.createSkill(REFERENCE_SKILL.name, REFERENCE_SKILL.description, REFERENCE_SKILL.body);
       h.setSkillMode(REFERENCE_SKILL.name, 'manual');
-      fs.mkdirSync(path.join(h.workspaceDir, aiToolInfo(ctx.state().board.aiTool).skills, REFERENCE_SKILL.name, 'references'), {
+      fs.mkdirSync(path.join(h.workspaceDir, toolInfo(activeProfile(ctx.state().board)).skills, REFERENCE_SKILL.name, 'references'), {
         recursive: true,
       });
     });
@@ -548,27 +534,36 @@ export const harnessHandlers = {
     return true;
   },
   // o agente nasce marcado como disponível: criar um agente é querer usá-lo
-  'harness.agent.create': (msg, ctx) =>
-    ctx.harness.op((h) => {
-      const scope = msg.scope ?? 'user';
-      h.createAgent(msg.input, scope);
-      const location = h.agents().find((a) => a.name === msg.input.name && a.scope === scope)?.location;
-      if (location) ctx.boards.setSelection(ctx.boardId, [{ kind: 'agent', location }], 'contextual');
-    }),
-  'harness.agent.update': (msg, ctx) => ctx.harness.op((h) => h.updateAgent(msg.name, msg.scope, msg.patch, msg.body)),
-  'harness.agent.write': (msg, ctx) => ctx.harness.op((h) => h.writeAgent(msg.name, msg.scope, msg.content)),
-  'harness.agent.delete': (msg, ctx) =>
-    ctx.harness.op((h) => {
+  // o agente nasce no board (no banco), disponível: criar um agente é querer usá-lo. O escopo da pasta
+  // da ferramenta não se aplica mais: o board não grava agentes nela
+  'harness.agent.create': (msg, ctx) => ctx.harness.change(() => ctx.library.createAgent(msg.input)),
+  // o agente que está no board é editado no board; um arquivo só do catálogo da ferramenta, como antes
+  'harness.agent.update': (msg, ctx) =>
+    ctx.library.hasAgent(msg.name)
+      ? ctx.harness.change(() => ctx.library.updateAgent(msg.name, msg.patch, msg.body))
+      : ctx.harness.op((h) => h.updateAgent(msg.name, msg.scope, msg.patch, msg.body)),
+  'harness.agent.write': (msg, ctx) =>
+    ctx.library.hasAgent(msg.name)
+      ? ctx.harness.change(() => ctx.library.writeAgent(msg.name, msg.content))
+      : ctx.harness.op((h) => h.writeAgent(msg.name, msg.scope, msg.content)),
+  'harness.agent.delete': (msg, ctx) => {
+    if (ctx.library.hasAgent(msg.name)) {
+      ctx.library.deleteAgent(msg.name);
+      ctx.boards.releaseAgent(ctx.boardId, msg.name);
+      ctx.harness.load();
+      return true;
+    }
+    return ctx.harness.op((h) => {
       const location = h.agents().find((a) => a.name === msg.name && a.scope === msg.scope)?.location;
       h.deleteAgent(msg.name, msg.scope);
       if (location) ctx.boards.setSelection(ctx.boardId, [{ kind: 'agent', location }], null);
       if (!h.agents().some((a) => a.name === msg.name)) ctx.boards.releaseAgent(ctx.boardId, msg.name);
-    }),
+    });
+  },
   'harness.agents.seed': (msg, ctx) => {
     if (!ctx.harness.store) return false;
-    const created = seedAgents(ctx, ctx.harness.store, msg.force);
+    seedAgents(ctx, msg.force);
     ctx.harness.load();
-    if (created.length) ctx.harness.markSeededPublic();
     return true;
   },
   // sem `replace`, não sobrescreve: se a pessoa já ajustou a skill, a versão dela fica. Mas a marcação

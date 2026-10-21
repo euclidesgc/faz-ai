@@ -1,5 +1,5 @@
+import { toolInfo, activeProfile } from '../../../shared/aiProfiles';
 import { useEffect, useRef, useState } from 'react';
-import { aiToolInfo } from '../../../shared/harness';
 import { useBoardStore } from '../../store/boardStore';
 import { t } from '../../i18n';
 import { chat } from '../../commands';
@@ -26,7 +26,7 @@ export function ChatPanel() {
   const [text, setText] = useState('');
   const log = useRef<HTMLDivElement>(null);
   const { messages, busy } = state.chat;
-  const tool = aiToolInfo(state.board.aiTool);
+  const tool = toolInfo(activeProfile(state.board));
 
   // acompanha a conversa: a mensagem nova fica à vista
   useEffect(() => {

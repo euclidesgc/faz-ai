@@ -1,18 +1,19 @@
+import { toolInfo, activeProfile, resolveModelOption } from '../shared/aiProfiles';
 import type { AgentAssistInput, AgentAssistResult } from '../shared/agentAssistance';
 import { agentAssistancePrompt, parseAgentAssistance } from './agentAssistance';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { MAX_CHAT_MESSAGES, type ChatMessage } from '../shared/chat';
-import { aiToolInfo, type AiTool, type HarnessItem } from '../shared/harness';
+import { type AiTool, type HarnessItem } from '../shared/harness';
 import { selectionKey, usageOf, type SelectableKind } from '../shared/harnessSelection';
 import type { RunnerPermission } from '../shared/runner';
 import { effortToRun } from '../shared/execution';
-import { parseModelValue } from '../shared/models';
 import type { BoardState } from '../shared/model';
 import { NO_CARD, type AiExecution } from './ai/gateway';
 import { MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { BOARD_SERVER, bareExec, type ExecInput } from './execution';
 import { contextLines } from './promptContext';
+import { runArtifactRequest } from './runArtifactSnapshot';
 import { isCliNoise } from './cliNoise';
 import type { MessageRouter } from './panel/messageRouter';
 import { boardServer, PERMISSION_ADVICE, type RunnerDeps } from './runner';
@@ -42,12 +43,12 @@ export function chatPrompt(history: ChatMessage[], text: string, advice: string 
   ].join('\n');
 }
 
-/** O que a IA recebe no "Sugerir agentes com IA": ler o projeto e propor os agentes do board, criando e ajustando arquivos de agente pelo MCP. */
+/** O que a IA recebe no "Sugerir agentes com IA": ler o projeto e propor os agentes do board, criando e ajustando os agentes do board pelo MCP. */
 export function suggestAgentsPrompt(): string {
   return [
-    'Você vai propor os agentes de execução deste board Faz AI, pelas ferramentas do servidor MCP "faz-ai". Um agente é um arquivo de agente da ferramenta de IA (instruções, modelo, ferramentas, skills) que o board usa para executar os cards.',
+    'Você vai propor os agentes de execução deste board Faz AI, pelas ferramentas do servidor MCP "faz-ai". Um agente do board (instruções, modelo, ferramentas, skills) fica guardado no próprio board e é o que ele usa para executar os cards.',
     'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, linguagens e frameworks) e o board: get_board (agentes atuais, campos, regras de modelo), get_harness com onlySelected = false (tudo que a ferramenta carrega, com a marcação do board) e get_models (catálogo de modelos).',
-    'Proponha de 3 a 8 agentes que façam sentido para ESTE projeto. Para cada um: se já existir um parecido, ajuste-o com update_agent (patch com description, body, model, tools, skills); senão, crie com create_agent (scope "user", available true). Descrição de uma frase que diga quando usá-lo; instruções curtas e específicas do projeto (padrões, comandos de teste, pastas); skills só entre as marcadas em get_harness; modelo pelo catálogo de get_models (valor como no campo Modelo, ex.: "claude:sonnet@medium"), seguindo as regras de esforço do board.',
+    'Proponha de 3 a 8 agentes que façam sentido para ESTE projeto. Para cada um: se já existir um parecido, ajuste-o com update_agent (patch com description, body, model, tools, skills); senão, crie com create_agent. Descrição de uma frase que diga quando usá-lo; instruções curtas e específicas do projeto (padrões, comandos de teste, pastas); skills só entre as marcadas em get_harness; modelo pelo catálogo de get_models (valor como no campo Modelo, ex.: "claude:sonnet@medium"), seguindo as regras de esforço do board.',
     'Mantenha um agente condutor (que conduz os cards pelo fluxo e delega aos especialistas) como padrão do board.',
     'Não altere arquivos do projeto nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: nome → para quê, o que criou e o que ajustou.',
   ].join('\n');
@@ -159,9 +160,10 @@ export function parseSuggestions(text: string, candidates: readonly string[]): {
 
 /** O modelo escolhido no chat, no formato que a linha de comando da ferramenta pede; null = o padrão dela. */
 function modelFor(s: BoardState, model: string | null): ExecInput['model'] {
-  const chosen = parseModelValue(model);
-  const option = chosen ? s.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === s.board.aiTool) : undefined;
-  return option ? { name: option.model, effort: effortToRun(option, chosen!.effort) } : null;
+  const resolved = resolveModelOption(s.board, model ?? undefined);
+  return resolved
+    ? { name: resolved.name, effort: resolved.option ? effortToRun(resolved.option, resolved.effort) : resolved.effort }
+    : null;
 }
 
 /**
@@ -221,7 +223,7 @@ export class ChatSession {
     if (!this.deps.cwd || !fs.existsSync(this.deps.cwd)) throw new Error('Abra um projeto existente para gerar artefatos.');
     const state = this.router.snapshot();
     const prompt = [
-      state.harness.library ? suggestLibraryPrompt('rule') : suggestRulesPrompt(aiToolInfo(state.board.aiTool).rules),
+      state.harness.library ? suggestLibraryPrompt('rule') : suggestRulesPrompt(toolInfo(activeProfile(state.board)).rules),
       ...contextLines(state).always,
     ].join('\n');
     this.run({ role: 'user', text: 'Sugerir regras com IA: leia o projeto e proponha regras para ele.' }, prompt, 'board', null);
@@ -305,18 +307,9 @@ export class ChatSession {
   ): void {
     if (this.running) throw new Error('A IA ainda está respondendo. Espere ou interrompa.');
     const state = this.router.snapshot();
-    const tool = aiToolInfo(state.board.aiTool);
+    const tool = toolInfo(activeProfile(state.board));
     // sem card não há agente: contexto vazio, só o servidor do board, os servidores em modo "Sempre" e o modelo escolhido
-    const plan = bareExec(
-      modelFor(state, model),
-      boardServer(this.deps),
-      state,
-      {
-        projectDir: this.deps.cwd,
-        homeDir: this.deps.homeDir ?? '',
-      },
-      this.router.libraryMcpDefinitions(),
-    );
+    const plan = bareExec(modelFor(state, model), boardServer(this.deps), state, this.router.libraryMcpDefinitions());
     if (hooks.draftOnly) {
       plan.tools = ['Read', 'Glob', 'Grep'];
       plan.deniedTools = [];
@@ -333,11 +326,13 @@ export class ChatSession {
       execution = this.deps.gateway.run({
         origin: 'chat',
         tool: state.board.aiTool,
+        profile: activeProfile(state.board),
         context: NO_CARD,
         cwd: this.deps.cwd,
         timeoutMinutes: state.board.runner.timeoutMinutes,
         // no chat não há agente do board nem subagente escolhido: `null` é "não definido", não "vazio"
         prepare: () => ({
+          artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state) : undefined,
           config: {
             model: plan.model?.name ?? null,
             effort: plan.model?.effort ?? null,

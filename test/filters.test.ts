@@ -13,6 +13,7 @@ const DAY = 86400000;
 
 const card = (id: string, over: Partial<Card> = {}): Card => ({
   id,
+  questions: [],
   number: 0,
   boardId: 'b',
   workflowId: 'wp',
@@ -51,6 +52,7 @@ const state: BoardState = {
     name: 'B',
     rules: DEFAULT_RULES,
     aiTool: 'claude',
+    aiProfiles: [],
     modelCatalog: [],
     modelRules: [],
     appearance: DEFAULT_APPEARANCE,

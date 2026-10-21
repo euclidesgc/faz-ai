@@ -1,3 +1,4 @@
+import { baseValue } from '../../../../shared/harness';
 import { useMemo, useState } from 'react';
 import { Button, Checkbox, SegmentedControl, TextArea, TextField } from '@radix-ui/themes';
 import { nameFromText } from '../../../../shared/agentWizard';
@@ -20,7 +21,7 @@ const STEPS = RULE_WIZARD_STEPS;
 /** Os lugares onde uma regra pode nascer neste escopo, separados em principal e por assunto. */
 function ruleTargets(tool: AiTool, scope: 'project' | 'user'): { main: CreateTarget[]; topic: CreateTarget[] } {
   const all = createTargets(tool).filter((c) => c.scope === scope && c.kind === 'instructions');
-  const group = (c: CreateTarget) => HARNESS_CATALOG[tool][c.source]!.group;
+  const group = (c: CreateTarget) => (baseValue(HARNESS_CATALOG, tool) ?? [])[c.source]!.group;
   return {
     main: all.filter((c) => c.layout === 'file' && group(c) === 'main'),
     topic: all.filter((c) => c.layout === 'files' && group(c) === 'topic'),

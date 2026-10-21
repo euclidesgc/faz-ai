@@ -73,7 +73,7 @@ export class EventLog {
     if (!probe) return;
     try {
       const after = probe.after();
-      const runId = this.runIdFor(probe, after);
+      const runId = actor.runId !== undefined ? actor.runId : this.runIdFor(probe, after);
       const extra: EventExtra = { boardId: this.deps.boardId(), at: Date.now(), runId, ...probe.extra };
       if (msg.type === 'card.workspace.prepare') extra.branch = branchOf(after, msg.cardId);
       for (const event of eventsFor(msg, actor, probe.before, after, extra)) this.events.add(event);

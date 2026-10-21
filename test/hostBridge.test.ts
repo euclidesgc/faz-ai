@@ -48,6 +48,23 @@ beforeEach(async () => {
 });
 
 describe('HostBridge: preferências da pessoa', () => {
+  it('publica status e resultado do teste de perfil sem configuração privada', async () => {
+    router.setAiProfileRuntime({
+      probe: async () => ({
+        type: 'aiProfiles.status',
+        profiles: { cli: { found: true, version: '1.0.0', signedIn: null, installUrl: null } },
+      }),
+      test: async (id) => ({ type: 'aiProfiles.testResult', id, ok: true, output: 'OK' }),
+    });
+    await bridge.handle({ type: 'settings.aiProfiles.probe', requestId: 'probe' });
+    await bridge.handle({ type: 'settings.aiProfiles.test', id: 'cli', requestId: 'test' });
+    expect(sent).toContainEqual({
+      type: 'aiProfiles.status',
+      profiles: { cli: { found: true, version: '1.0.0', signedIn: null, installUrl: null } },
+    });
+    expect(sent).toContainEqual({ type: 'aiProfiles.testResult', id: 'cli', ok: true, output: 'OK' });
+    expect(sent.filter((m) => m.type === 'done').map((m) => m.requestId)).toEqual(['probe', 'test']);
+  });
   it('o ready devolve as preferências guardadas e prefs.set grava no host, para o aviso dispensado não voltar', async () => {
     const data = new Map<string, unknown>();
     const prefs = new PrefsStore({ get: <T>(k: string) => data.get(k) as T | undefined, update: (k, v) => data.set(k, v) });
@@ -212,7 +229,7 @@ describe('HostBridge: harness.file.read / harness.file.write', () => {
     expect(result()).toMatchObject({ content: '# Guia', readonly: false });
   });
 
-  it('recusa arquivo fora da varredura, JSON inválido e o ~/.claude.json', async () => {
+  it('recusa arquivo fora da varredura e configuração MCP nativa do projeto ou global', async () => {
     const outside = path.join(dir, 'segredo.txt');
     fs.writeFileSync(outside, 'x');
     await bridge.handle({ type: 'harness.file.read', requestId: 'r2', path: outside });
@@ -224,12 +241,14 @@ describe('HostBridge: harness.file.read / harness.file.write', () => {
     router.refreshHarness();
     await bridge.handle({ type: 'harness.file.write', requestId: 'w2', path: path.join(dir, '.mcp.json'), content: '{ quebrado' });
     expect(result()).toMatchObject({ ok: false });
-    expect(result().error).toMatch(/^JSON inválido, nada foi gravado/);
+    expect(result().error).toBe('Configurações MCP não são editadas pelo editor de arquivos. Use a biblioteca do board.');
     expect(fs.readFileSync(path.join(dir, '.mcp.json'), 'utf8')).toContain('"a"');
 
     const claudeJson = path.join(dir, 'h', '.claude.json');
     await bridge.handle({ type: 'harness.file.read', requestId: 'r3', path: claudeJson });
-    expect(result()).toMatchObject({ readonly: true });
+    expect(result()).toMatchObject({
+      error: 'Configurações MCP não são editadas pelo editor de arquivos. Use a biblioteca do board.',
+    });
     await bridge.handle({ type: 'harness.file.write', requestId: 'w3', path: claudeJson, content: '{}' });
     expect(result()).toMatchObject({ ok: false, error: 'Este arquivo não pode ser alterado pelo board.' });
   });
@@ -499,7 +518,11 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     let changes = 0;
     router.onDidChange(() => changes++);
     await bridge.handle({ type: 'backup.import.apply', token: summary.token });
-    expect(sent.at(-1)).toEqual({ type: 'notice', message: 'Board "Meu Board" importado: 1 card(s) e 0 anexo(s).' });
+    expect(sent.at(-1)).toEqual({
+      type: 'notice',
+      message:
+        'Board "Meu Board" importado: 1 card(s) e 0 anexo(s). Perfis desativados para revisão local: Claude Code, Cursor, Kimi Code.',
+    });
     expect(changes).toBe(1);
     expect(router.boardId).toBe(oldBoardId); // o arquivo veio deste mesmo board: os ids se preservam
     expect(router.snapshot().cards.map((c) => c.title)).toEqual(['Card 1']);
@@ -546,7 +569,7 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
     );
     expect(
       importNotice({ boardId: 'b', boardName: 'B', cards: 2, attachments: 1, warnings: [], mcpSecrets: ['github: GITHUB_TOKEN', 'x: K'] }),
-    ).toBe('Board "B" importado: 2 card(s) e 1 anexo(s). Preencha os valores vazios dos servidores MCP: github: GITHUB_TOKEN, x: K.');
+    ).toBe('Board "B" importado: 2 card(s) e 1 anexo(s). Revise as configurações locais dos servidores MCP: github: GITHUB_TOKEN, x: K.');
   });
 });
 
@@ -578,6 +601,33 @@ describe('HostBridge: metrics.query', () => {
     expect(sent.filter((m) => m.type === 'metrics.result')).toHaveLength(10);
     expect(count('card_events')).toBe(events);
     expect(count('ai_runs')).toBe(runs);
+    expect(changes).toBe(0);
+    expect(saves).toBe(0);
+  });
+});
+
+describe('HostBridge: prévia dos rascunhos de contexto', () => {
+  it('responde com correlação e admissão indisponível, sem gravar ou iniciar IA', async () => {
+    let changes = 0;
+    router.onDidChange(() => void changes++);
+    saves = 0;
+    const runs = rawDb.exec('SELECT COUNT(*) FROM ai_runs')[0]!.values[0]![0];
+    await bridge.handle({
+      type: 'contextPlanning.preview',
+      requestId: 'context-1',
+      target: { cardId: null, workflowId: null, phaseId: '', action: 'chat' },
+    });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      type: 'contextPlanning.preview.result',
+      requestId: 'context-1',
+      preview: {
+        canExecute: false,
+        admission: { state: 'unavailable', dependency: 729 },
+        diagnostics: [{ code: 'admission-unavailable' }, { code: 'agent-required' }],
+      },
+    });
+    expect(rawDb.exec('SELECT COUNT(*) FROM ai_runs')[0]!.values[0]![0]).toBe(runs);
     expect(changes).toBe(0);
     expect(saves).toBe(0);
   });

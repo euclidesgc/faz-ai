@@ -1,3 +1,8 @@
+import type { AiProfile } from '../../shared/aiProfiles';
+import { AiProfileRepo } from '../repositories/aiProfileRepo';
+import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
+import { profileCanProbe, profileSignedIn } from '../cliProbe';
+import { baseValue } from '../../shared/harness';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -7,6 +12,8 @@ import { dayOf } from '../../shared/log';
 import { Autopilot } from '../autopilot';
 import { Heartbeat } from '../heartbeat';
 import { AiGateway } from '../ai/gateway';
+import { RunArtifactSnapshots } from '../runArtifactSnapshot';
+import { ArtifactRepo } from '../repositories/artifactRepo';
 import { createRunLog } from '../log/runLog';
 import { consolidate } from '../log/rollup';
 import { BoardRepo } from '../repositories/boardRepo';
@@ -26,7 +33,7 @@ import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
 import { claudeSignedIn, cursorModels, cursorSignedIn, kimiModels, kimiSignedIn, runCli } from '../cliProbe';
-import { aiToolInfo, ALL_AI_TOOLS, type AiTool } from '../../shared/harness';
+import { baseInfo, ALL_AI_BASES, type AiTool } from '../../shared/harness';
 import { allowKimiMcp, checkRequirements, registeredServer } from '../requirements';
 import { headlessCommand, headlessUnsupported } from '../headless';
 import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
@@ -39,6 +46,9 @@ import type { WebviewToHost } from '../../shared/messages';
 import { resolveCommand } from '../cliResolve';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
 import { cleanStaleTemp } from '../aiOutput/measured';
+import { ExecutionAdmission } from '../ai/admission';
+import { CapabilityEvidenceStore } from '../ai/capabilityEvidence';
+import { recoverProjectServers } from '../mcp/projectServerLease';
 import { loginShellPath, spawnHeadless } from '../spawn';
 
 /** Complemento do nome na mensagem de "comando não encontrado", para não piorar o que a pessoa já lê no log. */
@@ -171,17 +181,41 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     if (ownsBoard && opened.rollupDay !== dayOf(Date.now()))
       consolidate(handle.db, router.boardId, Date.now(), boardRepo.retentionMonths(router.boardId));
   });
-  if (ownsBoard) cleanStaleTemp();
+  if (ownsBoard) {
+    cleanStaleTemp();
+    maintain('reconciliar preparações de MCP interrompidas', () => recoverProjectServers({ log: o.log }));
+  }
   let pathEnv = await loginShellPath();
   // o node do PATH do terminal, com caminho absoluto: é ele que a ferramenta usa para iniciar o servidor do board.
   // Procurado de novo a cada conferência dos requisitos: a pessoa pode instalar o node com o board aberto
   let nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
   // a única porta para chamar a IA: o executor de cards e o chat passam por ela, e é ela que escreve o log de uso
   const gateway = new AiGateway({
+    resolveProfile: (id) => new AiProfileRepo(handle.db).resolveProfile(router.boardId, id),
+    profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
     boardId: router.boardId,
     runLog,
-    spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
+    sessions: router.executions,
+    redact: (text) => router.redactCredentials(text),
+    snapshots: new RunArtifactSnapshots(path.join(o.storageDir, 'run-artifacts'), new ArtifactRepo(handle.db), router.boardId),
+    admission: new ExecutionAdmission({
+      pathEnv: () => pathEnv,
+      homeDir,
+      evidence: new CapabilityEvidenceStore(path.join(o.storageDir, 'capability-evidence')),
+      environmentEvidence: () => ({ state: 'unknown' }),
+    }),
+    spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
   });
+  router.setAiProfileRuntime(
+    createAiProfileRuntime({
+      repo: new AiProfileRepo(handle.db),
+      gateway,
+      boardId: () => router.boardId,
+      cwd: o.folderPath,
+      homeDir,
+      pathEnv: () => pathEnv,
+    }),
+  );
   const runner = new AiRunner(router, {
     gateway,
     cwd: o.folderPath,
@@ -259,7 +293,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   let readingModels: Promise<void> | null = null;
   /** as ferramentas cuja CLI lista os modelos (hoje: Cursor e Kimi Code) */
   const readToolModels = async (tool: 'cursor' | 'kimi') => {
-    const exe = resolveCommand(CLI_COMMAND[tool], pathEnv, homeDir);
+    const exe = resolveCommand(baseValue(CLI_COMMAND, tool) ?? '', pathEnv, homeDir);
     if (!exe) return;
     const found = await (tool === 'cursor' ? cursorModels(exe, pathEnv) : kimiModels(exe, pathEnv));
     if (!found.length) return;
@@ -277,7 +311,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const refreshToolModels = (tool: 'cursor' | 'kimi') => {
     if (!ownsBoard || readingModels) return;
     readingModels = readToolModels(tool)
-      .catch((e) => o.log(`Não foi possível ler os modelos do ${aiToolInfo(tool).label}: ${e instanceof Error ? e.message : String(e)}`))
+      .catch((e) => o.log(`Não foi possível ler os modelos do ${baseInfo(tool).label}: ${e instanceof Error ? e.message : String(e)}`))
       .finally(() => (readingModels = null));
   };
   // o que falta para o board trabalhar com a ferramenta (CLI, login, servidor MCP, permissão): vira a
@@ -304,19 +338,18 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   /** o host encerrou: nenhuma conferência nova começa e a que estava em andamento não mexe mais no board */
   let disposed = false;
   const SIGNIN_CACHE_MS = 3 * 60_000;
-  const signinCache = new Map<AiTool, { at: number; value: boolean | null }>();
+  const signinCache = new Map<AiTool, { at: number; value: boolean | null; binding: string }>();
   // dispatch por ferramenta: cada uma tem o seu probe (o do Kimi Code não usa o executável: lê a
   // pasta de credenciais); quando o probe não sabe dizer (`null`), vale só o sinal reativo de falha
   // na execução
-  const probeSignedIn = async (tool: AiTool, exe: string, force: boolean): Promise<boolean | null> => {
+  const probeSignedIn = async (tool: AiTool, exe: string, force: boolean, profile?: AiProfile): Promise<boolean | null> => {
+    const binding = JSON.stringify([exe, profile?.credentials?.secretRef || 'builtin']);
     const cached = !force && signinCache.get(tool);
-    if (cached && Date.now() - cached.at < SIGNIN_CACHE_MS) return cached.value;
-    const value = await (tool === 'cursor'
-      ? cursorSignedIn(exe, pathEnv)
-      : tool === 'kimi'
-        ? kimiSignedIn(homeDir)
-        : claudeSignedIn(exe, pathEnv));
-    signinCache.set(tool, { at: Date.now(), value });
+    if (cached && cached.binding === binding && Date.now() - cached.at < SIGNIN_CACHE_MS) return cached.value;
+    const value = profile
+      ? await profileSignedIn(profile, exe, homeDir, { pathEnv })
+      : await (tool === 'cursor' ? cursorSignedIn(exe, pathEnv) : tool === 'kimi' ? kimiSignedIn(homeDir) : claudeSignedIn(exe, pathEnv));
+    signinCache.set(tool, { at: Date.now(), value, binding });
     return value;
   };
   /** O que falta no banco de artefatos; undefined sem o inventário lido (a pasta do projeto não existe). */
@@ -331,13 +364,24 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return checking;
     }
     const { board } = router.snapshot();
+    const meta = board.aiProfiles.find((p) => p.id === board.aiTool);
+    let profile = meta;
+    if (meta && profileCanProbe(meta) && meta.kind !== 'builtin') {
+      try {
+        profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, meta.id);
+      } catch {
+        profile = { ...meta, credentials: { ...meta.credentials!, available: false } };
+      }
+    }
     // a pessoa pode ter instalado o node com o board aberto: o registro do MCP no editor, gravado sem
     // ele, passa a ter o caminho completo (o editor não o acha no PATH de quando abriu)
     const hadNode = !!nodePath;
     nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
-    if (!hadNode && nodePath) pinMcp();
+    if (!hadNode && nodePath && (!profile || (profile.kind === 'builtin' && profileCanProbe(profile)))) pinMcp();
     lastCheckError = null;
     checking = checkRequirements({
+      profile,
+      profileSignedIn: (selected, exe) => probeSignedIn(selected.id, exe, forceSigninCheck, selected),
       tool: board.aiTool,
       permission: board.runner.permission,
       workspaceDir: o.folderPath,
@@ -346,7 +390,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       installedVersion: readBridgeVersion(homeDir),
       currentVersion: o.version,
       nodePath,
-      resolve: (command) => resolveCommand(command, pathEnv, homeDir),
+      resolve: (command, options) => resolveCommand(command, options?.pathEnv ?? pathEnv, homeDir, options),
       signedIn: (tool, exe) => probeSignedIn(tool, exe, forceSigninCheck),
       editor: o.editor?.name,
       windowStartedAt: o.editor?.startedAt,
@@ -370,7 +414,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         // manual que dá certo, em `runner.ts`). Ao trocar de ferramenta o sinal já foi limpo incondicionalmente
         const expired = router.snapshot().authExpired;
         if (expired && signinCache.get(expired)?.value === true && router.setAuthExpired(null))
-          o.log(`Login do ${aiToolInfo(expired).label} de volta: execuções retomadas.`);
+          o.log(`Login do ${baseInfo(expired).label} de volta: execuções retomadas.`);
         // ligar o MCP no Cursor é com a pessoa, fora do board: enquanto falta, confere a cada 10 s, para
         // o aviso sumir logo depois que ela liga (a conferência lê só uma pasta). O login (`signin`) entra
         // no mesmo timer: a ferramenta com probe (Claude, Cursor) retoma em até 10 s, sem esperar
@@ -458,9 +502,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   const otherTools = async (tool: AiTool): Promise<OtherToolProbe[]> => {
     const s = router.snapshot();
     const out: OtherToolProbe[] = [];
-    for (const other of ALL_AI_TOOLS) {
+    for (const other of ALL_AI_BASES) {
       if (other === tool) continue;
-      const cli = resolveHere(CLI_COMMAND[other]);
+      const cli = resolveHere(baseValue(CLI_COMMAND, other) ?? '');
       if (!cli && !(other === 'cursor' && o.editor?.name === 'cursor')) continue;
       const inventory = s.harness.inventory.find((t) => t.tool === other);
       out.push({
@@ -491,7 +535,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       const cliName = 'unsupported' in built ? null : built.command;
       const syntheticSignin: BoardRequirement | null =
         s.authExpired === tool && cliName && !s.requirements.some((r) => r.id === 'signin')
-          ? { id: 'signin', tool, cli: cliName, action: { kind: 'command', command: LOGIN_COMMAND[tool], terminal: true } }
+          ? { id: 'signin', tool, cli: cliName, action: { kind: 'command', command: baseValue(LOGIN_COMMAND, tool) ?? '', terminal: true } }
           : null;
       router.setEnvironment(
         await checkEnvironment({

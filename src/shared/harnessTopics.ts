@@ -1,6 +1,8 @@
+import { baseValue } from './harness';
+import type { AiBase } from './aiProfiles';
 // A organização da tela do Harness: uma aba por ferramenta; nela, a origem dos artefatos (Board, Projeto, Global,
 // Importados) escolhida antes; e, na origem, uma aba por assunto. Lógica pura, para a tela e os testes.
-import { AI_TOOLS, type AiTool, type HarnessItem } from './harness';
+import { AI_BASES, type AiTool, type HarnessItem } from './harness';
 import { HARNESS_CATALOG, HARNESS_NOTES, groupOf, type HarnessGroup } from './harnessCatalog';
 import { missingSelections, selectedItems, type SelectableKind } from './harnessSelection';
 import type { BoardState } from './model';
@@ -59,10 +61,10 @@ export function topicCount(tool: AiTool, items: HarnessItem[], topic: TopicInfo,
 /** Os assuntos que fazem sentido para a ferramenta: têm fonte no catálogo, item no inventário ou nota. */
 export function topicsOf(tool: AiTool, items: HarnessItem[]): TopicInfo[] {
   const inCatalog = new Set<HarnessGroup>(
-    HARNESS_CATALOG[tool].map((src, source) => groupOf(tool, { scope: src.scope, kind: src.kind, source })),
+    (baseValue(HARNESS_CATALOG, tool) ?? []).map((src, source) => groupOf(tool, { scope: src.scope, kind: src.kind, source })),
   );
   for (const i of items) inCatalog.add(groupOf(tool, i));
-  for (const n of HARNESS_NOTES[tool]) inCatalog.add(n.group);
+  for (const n of baseValue(HARNESS_NOTES, tool) ?? []) inCatalog.add(n.group);
   // os plugins são sempre oferecidos: a ferramenta os instala por comando, mesmo sem nenhum à vista
   inCatalog.add('plugin');
   return HARNESS_TOPICS.filter((topic) => topic.groups.some((g) => inCatalog.has(g)));
@@ -102,13 +104,13 @@ export type HarnessTab = 'tool' | 'library' | AiTool;
  */
 export function resolveHarnessTab(value: string | null | undefined, projectTool: AiTool): HarnessTab {
   if (value === 'tool' || value === 'library') return value;
-  return AI_TOOLS.some((x) => x.id === value) ? (value as AiTool) : projectTool;
+  return AI_BASES.some((x) => x.id === value) ? (value as AiTool) : projectTool;
 }
 
 /** As ferramentas na ordem das abas: a do projeto primeiro. */
 export const toolsInOrder = (projectTool: AiTool): AiTool[] => [
   projectTool,
-  ...AI_TOOLS.map((x) => x.id).filter((id) => id !== projectTool),
+  ...AI_BASES.map((x) => x.id).filter((id) => id !== projectTool),
 ];
 
 /**
@@ -118,4 +120,4 @@ export const toolsInOrder = (projectTool: AiTool): AiTool[] => [
  * da CLI antes de classificar uma ferramenta nova.
  */
 // o Kimi Code não tem flag para desligar artefatos: como no Cursor, a pessoa desliga nas configurações dele
-export const TOOL_REGIME: Record<AiTool, 'cli' | 'person'> = { claude: 'cli', cursor: 'person', kimi: 'person' };
+export const TOOL_REGIME: Record<AiBase, 'cli' | 'person'> = { claude: 'cli', cursor: 'person', kimi: 'person' };

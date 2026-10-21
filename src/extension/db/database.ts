@@ -1,7 +1,9 @@
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js';
 import { promises as fs, mkdirSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { migrate } from './schema';
+import { bindCredentials, LocalCredentials } from '../credentials';
 
 export interface DbHandle {
   db: Database;
@@ -41,6 +43,7 @@ export function newDatabase(): Database {
 export function exportBytes(db: Database): Uint8Array {
   const data = db.export();
   db.run('PRAGMA foreign_keys = ON;');
+  db.run('PRAGMA secure_delete = ON;');
   return data;
 }
 
@@ -115,6 +118,7 @@ export async function openFile(filePath: string, wasmDir: string, debounceMs = 5
     throw new Error(`Não foi possível ler o banco do board (${filePath}): ${e.message}`);
   });
   const db: Database = buf ? new SQL.Database(new Uint8Array(buf)) : new SQL.Database();
+  bindCredentials(db, new LocalCredentials(path.join(path.dirname(filePath), '.credentials')));
   migrate(db);
   // limpeza única: o arquivo pode ter órfãos gravados antes de as chaves serem religadas após o save
   if (!db.exec(`SELECT 1 FROM meta WHERE key = '${ORPHANS_CLEANED}'`).length) {
@@ -128,10 +132,28 @@ export async function openFile(filePath: string, wasmDir: string, debounceMs = 5
   const write = async () => {
     const data = exportBytes(db);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
-    const tmp = `${filePath}.tmp`;
-    await fs.writeFile(tmp, Buffer.from(data));
-    // no Windows a troca falha enquanto outro programa está com o arquivo aberto: tenta de novo
-    await retryBusy(() => fs.rename(tmp, filePath));
+    const tmp = `${filePath}.${randomUUID()}.tmp`;
+    try {
+      const file = await fs.open(tmp, 'wx', 0o600);
+      try {
+        await file.writeFile(Buffer.from(data));
+        await file.sync();
+      } finally {
+        await file.close();
+      }
+      // A posse pode liberar um comando depois do flush: bytes e troca precisam estar confirmados.
+      await retryBusy(() => fs.rename(tmp, filePath));
+      if (process.platform !== 'win32') {
+        const directory = await fs.open(path.dirname(filePath), 'r');
+        try {
+          await directory.sync();
+        } finally {
+          await directory.close();
+        }
+      }
+    } finally {
+      await fs.rm(tmp, { force: true });
+    }
   };
 
   const flush = async () => {

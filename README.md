@@ -258,8 +258,9 @@ o `faz-ai` do terminal avisa e não inicia.
 
 ## Usando com IA
 
-1. Em Configurações → **Harness**, escolha a ferramenta do projeto (Claude Code, Cursor ou
-   Kimi Code).
+1. Em Configurações → **Ferramentas de IA**, escolha o perfil de CLI padrão do projeto. Claude Code,
+   Cursor e Kimi Code vêm prontos; também é possível criar cópias e perfis personalizados. Em
+   **Harness → Ferramenta e execução**, você pode trocar o perfil em uso.
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O board registra o servidor `faz-ai` no arquivo
    global que a ferramenta lê. Isso também acontece sozinho, em silêncio, ao abrir a pasta (e a cada
    versão nova da extensão), sempre no escopo do usuário; só uma falha gera aviso.
@@ -295,6 +296,13 @@ instalação na ferramenta do projeto. Um registro de projeto antigo (`.mcp.json
 o registro**, que o tira e refaz o global.
 4. Abra uma sessão nova da ferramenta na pasta do projeto e peça, por exemplo, "liste os cards do
    board", "pegue a história #1 e escreva o PRD" ou "veja o que está pendente no board e dê andamento".
+
+**Perguntas com opções.** Quando a IA precisa de uma decisão com alternativas, ela registra as
+perguntas no card (`ask_questions`), cada uma com opções curtas e a indicada, e explica os detalhes
+na descrição. O card fica em **Aguardando resposta**. As respostas ficam na seção **Perguntas e
+respostas** da descrição; responder de novo a mesma pergunta substitui a resposta anterior. No modo
+autônomo, o board responde cada pergunta com a indicada, registra na mesma seção e a IA segue o
+trabalho. A pergunta aberta, sem opções, continua sendo `ask_question`.
 
 Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, a aba **Configurações** e o
 botão **Verificar ambiente** ganham um ícone de atenção. O hint dele resume o que falta, com o nome
@@ -540,6 +548,49 @@ no Haiku 4.5. Sem modelo, ou com um modelo de janela desconhecida (como os do Cu
 só o total. No Cursor, que não impõe o contexto vazio, o que a ferramenta carrega por conta própria
 também fica de fora, e as definições das ferramentas MCP contam inteiras. O que a execução gastou de
 fato aparece depois, no consumo de cada execução.
+
+O bloco **Contexto da execução**, em **Consumo → Próxima execução**, mostra agente, candidatos à
+delegação nativa, rules, skills e servidores MCP com todas as origens: card, agente, fase, história,
+padrão ou modo Sempre. Um arquivo selecionado por várias origens aparece uma vez por identidade
+(a da cópia do board, quando disponível). O bloco também aparece nos editores de agentes, com o
+rascunho e os itens Sempre, sem incorporar seleções de um card.
+
+A prévia usa o manifesto atual e não inicia uma execução nem chama IA. Ela distingue restrições
+impostas pelo executor de orientações no prompt, aponta parágrafos idênticos nas instruções dos
+agentes e informa que não compara o conteúdo de rules e skills. Tamanhos desconhecidos continuam
+não medidos; a estimativa inicial não prevê o consumo total de uma tarefa. Essa entrega torna o
+comportamento atual visível; configurações por ação e novos limites de autorização ainda não estão
+ativos.
+
+A persistência já separa contratos de contexto **versão 1** dos campos legados, com revisões e
+seleções por ação e ID de fase. Herança e seleção vazia são valores distintos. Os contratos novos
+são rascunhos e ainda não governam o runtime. A prévia identifica esse modo
+legado. A migração para o schema 35 mantém os campos originais; sua leitura de compatibilidade
+identifica skills dos agentes como essenciais e skills dos cards como selecionadas, inclusive
+referências ausentes. MCPs legados não viram autorizações do contrato novo. Exportar e importar
+preserva os rascunhos e suas versões, sem incluir definições MCP nesses contratos; a exportação contém somente referências locais das configurações MCP, sem seus valores.
+
+Ao editar um subagente já salvo na biblioteca, **Editar contrato de contexto (rascunho)** abre o contrato v1: papel, instruções, skills essenciais, skills sugeridas, MCPs permitidos e restrições de ferramentas. O contrato tem salvamento próprio, sem IA e com revisão otimista; não copia automaticamente autorizações legadas. A prévia mostra essenciais e itens Sempre, mantém opcionais inativos e explica recursos ausentes ou MCPs incompatíveis. Referências ausentes permanecem revisáveis.
+
+O protocolo host–webview e o MCP `preview_context_draft` oferecem a prévia dos rascunhos salvos: resolvem herança, origens e incompatibilidades sem inferência e retornam metadados dos artefatos. A admissão por capacidades de #729 continua pendente; a prévia não autoriza execução.
+
+A aba **Plano de execução** permite revisar agente, modelo, skills adicionais, MCPs ativos, anexos de entrada e resultado esperado por ação. Histórias incluem linhas por fase aberta; tarefas têm quatro ações independentes (trabalho, refino, resumo e conflito). Em **Configurações → Harness → Ferramenta**, os padrões do board e dos workflows usam o mesmo editor, incluindo conversa e assistentes sem card. As origens e incompatibilidades ficam na prévia. O catálogo mostra descrições curtas, sem abrir os corpos dos especialistas.
+
+As alterações ficam em rascunho até **Comparar alterações** e **Aplicar rascunhos revisados**, com diferenças, justificativa e estimativa da parcela conhecida do contexto. Copiar entre atividades também exige comparação. Critérios e dependências referenciam o card original. O schema 37 guarda justificativas; o host salva o lote em uma transação e recusa revisões atrasadas sem gravar parcialmente. Falhas preservam os rascunhos, que também sobrevivem à troca de abas do card. Essa configuração prepara o plano; a execução continua legada até a ativação da E5.
+
+O transporte que precisa de MCP por arquivo (Cursor e Kimi) usa um empréstimo coordenado pelo caminho real. O diário protegido em `~/.faz-ai/mcp-leases` precede a alteração; tentativas de formato reutilizam a mesma posse. Ao terminar com confirmação, o arquivo volta ao estado anterior, preservando servidores acrescentados pela pessoa. Alterações conflitantes da entrada `faz-ai` ou JSON inválido não são sobrescritos. Sem confirmação do fim da árvore de processos, o empréstimo fica retido e uma nova execução no mesmo arquivo é recusada. O launcher recebe o comando da CLI somente depois de sua identidade ser gravada no diário. Na abertura, um dono comprovadamente morto permite recuperar preparações sem comando liberado e grupos registrados cujo término foi confirmado. Diários antigos ou ambíguos permanecem retidos. O Windows ainda não tem confirmação de árvore nesse transporte; esse caso exige reconciliação. Isso não comprova isolamento da CLI nem conclui #729.
+
+No host, runner e chat publicam os arquivos selecionados da biblioteca em `run-artifacts/<boardId>/<runId>`, com revisão e SHA-256. Prompts e diretórios extras passam a usar essa cópia. Atualizar ou apagar o artefato ou seu cache não regrava o snapshot; uma falha de materialização obrigatória impede o processo. O schema 38 acrescenta revisões monotônicas aos artefatos. Snapshots publicados são preservados, inclusive em runs inconclusivos; ainda não há coleta automática. Isso congela os arquivos referenciados pelo prompt; sessões MCP controladas também usam a cópia, conforme descrito abaixo. Fontes externas legadas e a resolução v1 completa ainda não foram ativadas na E5.
+
+A fundação local da orquestração usa `ai_work` e `ai_work_attempts` (schema 39), com posse por unidade, gerações, hash do token, identidade do processo e contagem de mutações. Essas tabelas não são exportadas; importar não cria posses e é recusado enquanto houver trabalho local em execução ou reconciliação. O flush do banco sincroniza o arquivo antes da troca atômica e o diretório nos sistemas POSIX. Uma trava por pasta real, compartilhada entre processos, só libera um escritor depois da confirmação do grupo; adotar uma reserva de um host morto não a libera automaticamente. Regras puras calculam rodadas, reconciliação e limites solicitados/efetivos. A ligação aos gatilhos continua pendente; esta base não altera quem executa as sub-tarefas nem comprova isolamento de uma CLI.
+
+Execuções controladas agora têm identidade MCP por tentativa: o host injeta `FAZAI_RUN_TOKEN` apenas no ambiente da ponte, que envia um prefácio consumido pelo transporte antes do protocolo MCP. Cada chamada valida dono, geração e revogação; mutações recebem o run autenticado e são contadas. `get_skill`, `get_agent`, `get_board_artifact` e `read_rule_file` usam o snapshot capturado, e o encaminhamento externo fixa os servidores selecionados e suas operações. Sessões externas continuam disponíveis, mas não assumem um card reservado pelo board. O runner aceita identidade e orientação do orquestrador, sem concluir a unidade apenas por código zero. Essa API ainda não está ligada aos gatilhos: a ativação automática, a persistência anterior à liberação da CLI e #824/#825 continuam pendentes.
+
+O gateway também aceita um registro assíncrono de identidade (`beforeStart`): o launcher aguarda sua conclusão antes de receber o comando. Falha, cancelamento ou revogação durante a espera impedem liberação tardia. O transporte medido preserva a identidade e a confirmação de término para a reconciliação. O Orchestrator descrito abaixo já liga esse ponto ao flush e à posse da pasta por um UnitStarter injetado; os gatilhos de produção continuam pendentes.
+
+O `Orchestrator` já oferece `drive`, continuação de rodadas, reconciliação na abertura, varredura e cancelamento, com um `UnitStarter` injetado. Ele sincroniza a preparação e a identidade antes de liberar a CLI, confirma o grupo de processos e grava o resultado antes de liberar a trava. A referência à pasta permanece persistida até a liberação física ser confirmada, inclusive após queda nesse intervalo; a importação também respeita essa reserva. Testes com processos Node, ponte MCP e banco em disco cobrem três filhas em sequência, fechamento único, trabalho parcial, cancelamento com descendente e reinício real do controlador. A criação no host e a ligação aos gatilhos continuam pendentes, assim como os ciclos de devolução humana e a associação estável da Fase. Isso ainda não ativa o plano v1 nem valida CLIs reais de IA.
+
+A base de admissão v1 no gateway distingue conversa, artefatos, permissões, MCP e delegação e exige recibos locais vinculados à configuração atual. A decisão fica no histórico (schema 36), sem virar autorização ao exportar/importar. Lista vazia significa nenhuma ferramenta; o mapeamento estrito do Claude usa ferramentas e operações MCP exatas, sem pular permissões. Essa base ainda aguarda o verificador das CLIs reais e a ativação nas ações da E5: a execução atual continua legada e nenhum executor recebe verificação automaticamente.
 
 ### Aba Consumo do card
 
@@ -1116,12 +1167,12 @@ execução (Configurações → Harness → tempo máximo), com a explicação n
 Os subagentes são artefatos da **Biblioteca do board**, com instruções, descrição, modelo opcional,
 categorias de ferramentas e dependências de skills e MCPs. Criar ou editar pelo Harness grava no
 board e nas cópias de leitura, sem criar arquivos nas pastas das ferramentas. Agentes existentes
-nessas pastas podem ser importados.
+nessas pastas podem ser importados. Depois de copiado, o agente não depende do arquivo original: editar ou apagar o arquivo na pasta da ferramenta não muda o board. Agentes criados por versões anteriores em `~/.claude/agents` continuam ali, mas o board não grava mais nessa pasta; editar um deles na pasta da ferramenta não atualiza a cópia do board, e para atualizá-la basta remover o agente da biblioteca e enviá-lo de novo.
 
 A execução escolhe o agente do card; na ausência dele, o agente da fase; depois, o padrão de
 **Harness → Ferramenta e execução**. Sem agentes disponíveis, usa o agente embutido, sem
 instruções adicionais. Remover um agente libera as seleções dos cards e fases que o utilizavam.
-Os agentes de fábrica existentes são mantidos na biblioteca.
+Os agentes de fábrica são criados em cada board, no banco; um que você apagou não volta, a menos que peça para recriá-los.
 
 Na aba **Sub-agentes**, use **Criar**, **Assistente guiado** ou **Gerar com base no projeto**.
 O formulário de criação e edição abre em um modal com fundo escurecido, separado da lista de agentes existentes. Clicar fora dele mantém o rascunho aberto; use Cancelar para sair.
@@ -1136,8 +1187,8 @@ modelo; nos demais executores, parte do perfil é orientação no prompt. A pont
 Sempre/Pelo card/Desligado dos servidores da biblioteca independentemente do executor.
 
 Pelo MCP, `get_board` lista os agentes disponíveis, `set_card_profile` escolhe o do card e
-`get_board_artifact`/`save_board_artifact` leem e editam a biblioteca. As APIs de arquivos nativos
-`create_agent`, `update_agent`, `get_agent` e `delete_agent` continuam por compatibilidade.
+`get_board_artifact`/`save_board_artifact` leem e editam a biblioteca. As ferramentas
+`create_agent`, `update_agent`, `get_agent` e `delete_agent` atuam nos agentes do board: não gravam em `~/.claude/agents` nem em `.cursor/agents`, `get_agent` lê a cópia do board, e `delete_agent` não apaga o arquivo original.
 
 ## Harness
 
@@ -1146,6 +1197,8 @@ O board gerencia uma **biblioteca particular**, independente da ferramenta de IA
 **Skills**, **Sub-agentes** e **MCPs**. **Ferramenta e execução** escolhe a IA, os modelos, as
 permissões, o agente padrão e o heartbeat; também conecta a ferramenta ao servidor MCP do board.
 Trocar de ferramenta preserva os artefatos e suas seleções.
+
+Execuções usam só as cópias guardadas no banco do board. Um item marcado em **Configurações → Harness** que existe só na pasta da ferramenta, sem ter sido copiado, aparece como ausente e não entra nas execuções. Apagar ou mover o arquivo original depois da cópia não muda nada no board. Os servidores MCP de uma execução vêm só das definições guardadas no board; se um agente ou card citar um servidor que não está ali, a execução não começa, e o erro pede para enviá-lo ao board em **Configurações → Harness**.
 
 Os avisos de cada tipo têm um botão com contorno, abaixo do texto e à direita, para fechar e não exibir mais. O ícone de informação permite exibir o aviso novamente.
 
@@ -1190,9 +1243,7 @@ origem; em Regras, **Atualizar da origem** substitui a cópia somente com confir
 **MCPs** exibem a descrição funcional cadastrada, com prioridade sobre comando ou URL. Ao importar, uma descrição presente na configuração é aproveitada; se faltar, use **Editar** para explicar a finalidade. A lista não conecta servidores automaticamente para descobrir descrições.
 
 **MCPs** têm criação por formulário (`command` e `args` para stdio, URL para HTTP) e **Editar JSON
-diretamente**, inclusive uma definição envolvida por `mcpServers`. Variáveis `env` e cabeçalhos
-`headers` ficam no host e aparecem apenas ao abrir explicitamente o editor desse MCP; não entram no
-snapshot geral ou nas cópias de leitura. A ponte do MCP **faz-ai** oferece `list_board_mcp_tools` e
+diretamente**, inclusive uma definição envolvida por `mcpServers`. A definição inteira, incluindo comando, argumentos, URL, `env` e `headers`, fica cifrada no cofre local do host; banco, exportação, interface e APIs recebem somente referência e estado. O editor permite alterar a descrição sem ler valores salvos; **Substituir a configuração salva** exige uma definição nova. MCPs importados ficam pendentes e não executam até essa revisão humana, mesmo quando a referência existe nesta máquina. A ponte do MCP **faz-ai** oferece `list_board_mcp_tools` e
 `call_board_mcp_tool`: qualquer cliente MCP conectado ao board pode descobrir os schemas e chamar
 as ferramentas dos servidores cadastrados, sem copiar suas configurações para cada ferramenta.
 Servidores desligados são recusados; no modo Pelo card, a chamada deve informar um card que o
@@ -1200,9 +1251,11 @@ selecione, diretamente ou por seu agente. A ponte suporta stdio, Streamable HTTP
 com credenciais estáticas; não conduz login OAuth. Nesta versão encaminha ferramentas, não recursos
 ou prompts MCP, e abre/fecha uma conexão a cada operação.
 
+O schema 40 migra configurações MCP da biblioteca somente após confirmar o segredo no disco. O cofre `.credentials`, ao lado dos bancos, guarda chave e arquivos cifrados com permissões locais restritas; não acompanha a exportação. A proteção não substitui o isolamento do sistema operacional para processos do mesmo usuário. Perfis de CLI e os caminhos legados de arquivos nativos ainda precisam da revisão completa de #728.
+
 As ferramentas MCP `get_project_profile`, `get_board_artifact` e `save_board_artifact` permitem aos
 assistentes trabalhar na biblioteca. As APIs antigas de arquivos por ferramenta permanecem por
-compatibilidade; hooks, comandos e configurações nativas continuam sob gerenciamento da ferramenta.
+compatibilidade, mas os agentes criados ou editados pelo board ficam no banco; hooks, comandos e configurações nativas continuam sob gerenciamento da ferramenta.
 
 ## Configurações
 
@@ -1215,10 +1268,15 @@ compatibilidade; hooks, comandos e configurações nativas continuam sob gerenci
 | Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria |
 | Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
 | Harness | Biblioteca única de regras, skills, subagentes e MCPs, com importação por tipo, CRUD e assistentes; ferramenta, permissão, agente padrão e heartbeat (ver [Harness](#harness) e [Agentes](#agentes)) |
-| Modelos de IA | Modelos e níveis de esforço da ferramenta; regras que sugerem o modelo de cada card |
+| Ferramentas de IA | Perfis de CLI: ligar, escolher o padrão, duplicar, criar e testar |
+| Modelos de IA | Modelos e níveis de esforço por perfil; regras que sugerem o modelo de cada card |
 | Git | Fica só na aba Git do modo navegador; no editor, aponta para o Settings (Faz AI › Git) |
 | Aparência | **Idioma** (automático, Português (Brasil) ou English; fica no Settings do editor junto com tema, fonte e tamanho); status (nome e cor, na aba Fluxos; aqui só no modo navegador) |
 | Backup | No editor, exportar e importar pela paleta de comandos (`fazai.exportBoard`, `fazai.importBoard`); no modo navegador, pela aba Configurações (ver [Backup do board](#backup-do-board)) |
+
+Um **perfil de CLI** é uma ferramenta que o board pode escolher para executar. Os perfis prontos são Claude Code, Cursor e Kimi Code. Uma **cópia** usa o catálogo de modelos e a medição de consumo da ferramenta de origem, mas mantém comando, credenciais e verificação próprios. Um **personalizado** aceita outra CLI com saída em texto; tokens e custo ficam desconhecidos. Em **Configurações → Ferramentas de IA**, ligue um perfil revisado e escolha o padrão; só essa tela cria, edita, duplica e testa perfis. Importações ficam desligadas até revisão local. Configuração e credenciais salvas não voltam à tela nem entram no export do board.
+
+Para criar um personalizado, informe o comando e um argumento por linha. Os marcadores `{prompt}`, `{model}`, `{effort}`, `{mcpConfig}` e `{addDir}` inserem, respectivamente, o pedido, o modelo, o esforço, o arquivo MCP e uma pasta adicional quando estiverem disponíveis. Escolha **Entrada do pedido** (argumento ou stdin) e **Servidor do board** (CLI, arquivo no projeto ou nenhum). No campo **Modelo** de um card, **Outro modelo…** aceita um identificador livre desse perfil sem cadastrá-lo no catálogo. **Testar** executa um pedido curto e usa a sua assinatura; uma resposta OK não comprova isolamento, permissões nem restrições MCP. Capacidades sem evidência permanecem desconhecidas e podem impedir a execução.
 
 ### Configurações no Settings do editor
 
@@ -1262,6 +1320,10 @@ as regras de sugestão do Cursor começam todas em Auto. As regras de sugestão 
 condições com E e OU, por exemplo `Esforço da atividade = Alto E Tags = backend`. O resultado é
 sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento.
 
+Perfis de CLI importados ficam desligados até revisão local. Comandos, argumentos, ambiente e credenciais permanecem no cofre local: exportação, tela e MCP mostram apenas referências e estado. Cópias não herdam provas de isolamento, e um personalizado sem tradução verificada não executa. Sondas de versão/login e o botão **Testar** não comprovam capacidades. Consulte [Configurações](#configurações) para criar e escolher perfis.
+
+A base das novas **políticas de execução e fallback** já separa definição versionada, revisão humana local e histórico (schema 41). O resolvedor não troca uma escolha explícita inválida por um padrão nem redireciona um prefixo para o perfil-cópia padrão. O avaliador e a simulação usam a mesma função, com recusas explicadas, destinos ordenados, limites acumulados e exigência de reconciliação quando há trabalho parcial ou desconhecido. Políticas importadas permanecem pendentes de revisão; snapshots anteriores não mudam com a edição. Em **Configurações → Harness → Ferramenta e execução → Gerenciar políticas**, o editor manual permite condições, destinos ordenados, limites, duplicação, remoção e histórico paginado. A comparação integral precede a confirmação de revisão humana; salvar como pendente não autoriza execução. Conflitos de versão preservam o rascunho e permitem recarregar a base antes de revisar novamente. O simulador do host usa o mesmo avaliador, sem IA, e identifica credenciais/admissão como hipóteses do cenário. Mudanças nas políticas salvas ou no contexto invalidam o resultado exibido. Esta base ainda não está ligada ao runner, chat ou assistentes: a descrição abaixo é do modelo reserva legado, que será migrado para proposta desativada na etapa de integração.
+
 Cada regra pode ter um **modelo reserva** (opcional). Quando a execução de um card falha porque o modelo principal esgotou o limite de uso do plano, e esse modelo veio de uma regra com reserva configurada, o sistema repete automaticamente a execução com o modelo reserva, uma única vez. Se o reserva também falhar ou não estiver configurado, o card é bloqueado como hoje. A troca automática aparece como um comentário na conversa do card ("O `<modelo principal>` esgotou o limite; a execução segue com `<modelo reserva>`"), e o campo Modelo do card continua mostrando o modelo principal — a próxima execução tenta o principal de novo.
 
 **Avisos de dependência entre configurações e links cruzados.** Várias opções de Configurações só fazem efeito por causa de outra. O board mostra uma linha discreta sob as opções dependentes (por exemplo, "Depende de **uma regra de sugestão de modelo** (agora: nenhuma)" abaixo de "Preencher o modelo sugerido automaticamente", ou "Depende de **agentes marcados como disponíveis**" abaixo de "Agente padrão"); a opção fica desabilitada quando a dependência não está satisfeita. Os links permitem navegar: clique em um para ir até a seção correspondente do board, que rola e destaca por 2 segundos, ou clique em um link do Settings para abrir o board na seção certa. No modo navegador, os links para o Settings aparecem só como texto. **"Preencher o modelo sugerido automaticamente"** saiu de Regras e foi para Modelos, onde faz mais sentido — um aviso simples em Regras indica a mudança de lugar. O campo Intervalo do heartbeat fica desabilitado quando o heartbeat está desligado, sem um componente de dependência adicional. Cabeçalhos novos em Modelos, Agentes, Rules e Skills mostram "Mostrando os X do [ferramenta] · trocar ferramenta", permitindo mudar a ferramenta de qualquer uma dessas telas do board.
@@ -1276,7 +1338,7 @@ O board e os anexos ficam no armazenamento da extensão, fora do repositório. C
 arquivo de banco (`boards/<chave da pasta>.db`), então janelas em projetos diferentes não
 interferem uma na outra. Na primeira vez, o board parte de uma cópia do banco único das versões
 anteriores (`fazai.db`), que fica intacto. Regras e skills são arquivos da pasta do projeto e
-entram no git normalmente. Evite abrir a mesma pasta em duas janelas do editor ao mesmo tempo: a
+entram no git normalmente. Agentes, skills, regras e definições MCP ficam guardados no banco do board (as credenciais das definições MCP ficam no cofre local); a pasta da biblioteca guarda uma cópia legível, e cada execução grava um snapshot próprio em `run-artifacts/`. Evite abrir a mesma pasta em duas janelas do editor ao mesmo tempo: a
 última a salvar vence (a extensão avisa quando isso acontece).
 
 **Atualizar a extensão atualiza o banco.** Ao abrir o board, a extensão aplica sozinha, em ordem,
@@ -1345,6 +1407,8 @@ a release contém. Integrar na `develop` não publica a extensão.
 
 O `npm test` também roda o lint e confere a formatação; `npm run format` formata tudo. Para o
 `git blame` pular o commit que só formatou o código: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
+
+`npm run test:cli-real` roda separadamente o contrato do provider com o **Claude Code instalado**, em pasta e configuração temporárias, com API e MCPs locais de teste. Não requer login e não chama um modelo remoto; a API controla as respostas para testar tentativas proibidas sem depender do comportamento do modelo. Controles positivos carregam sentinelas do projeto, usuário, ancestrais e pasta adicional, além de skill, agente, hook e MCP externo; o caminho estrito precisa excluí-los. O teste também reproduz a regressão da variável de memória adicional. Ausência de CLI ou plataforma Windows produz falha explícita. Os sete testes passam pelo gateway e transporte medido reais, com SQLite descartável em disco: também conferem cancelamento, encerramento forçado, falha antes da liberação, ausência de repetição e limpeza dos arquivos privados. Eles não habilitam um perfil de produção: políticas gerenciadas, ambiente real de autenticação/API, Cursor/Kimi e consumo de tarefas aceitas ainda precisam de validação.
 
 Pressione `F5` para abrir o Extension Development Host. O código fica em `src/extension` (host e
 servidor MCP), `src/webview` (interface em React), `src/shared` (modelo, protocolo e as regras do

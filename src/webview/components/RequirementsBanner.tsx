@@ -1,5 +1,6 @@
+import { baseValue } from '../../shared/harness';
 import { useState, type ReactNode } from 'react';
-import { aiToolInfo } from '../../shared/harness';
+import { baseInfo } from '../../shared/harness';
 import type { BoardState } from '../../shared/model';
 import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
 import { useBoardStore } from '../store/boardStore';
@@ -15,7 +16,7 @@ export type RequirementsAlertLevel = 'error' | 'warn' | 'recommended';
 
 /** Título e explicação de cada requisito, no idioma da interface. */
 export function requirementTexts(r: BoardRequirement): { title: string; detail: string } {
-  const tool = aiToolInfo(r.tool).label;
+  const tool = baseInfo(r.tool).label;
   switch (r.id) {
     case 'node':
       return {
@@ -202,14 +203,14 @@ export function CopyCommand({ command }: { command: string }) {
 export function aiBlockedReason(state: BoardState): string | null {
   if (state.aiRunUnsupported) return t(state.aiRunUnsupported);
   if (state.authExpired)
-    return t('O login do {tool} venceu: veja em Configurações → Verificar ambiente.', { tool: aiToolInfo(state.authExpired).label });
+    return t('O login do {tool} venceu: veja em Configurações → Verificar ambiente.', { tool: baseInfo(state.authExpired).label });
   const cli = state.requirements.find((r) => r.id === 'cli' || r.id === 'signin');
   if (!cli) return null;
   return cli.id === 'cli'
     ? t('A linha de comando do {tool} não foi encontrada: veja em Configurações → Verificar ambiente.', {
-        tool: aiToolInfo(cli.tool).label,
+        tool: baseInfo(cli.tool).label,
       })
-    : t('A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.', { tool: aiToolInfo(cli.tool).label });
+    : t('A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.', { tool: baseInfo(cli.tool).label });
 }
 
 /** Botão que resolve um requisito pelo host (CLI, disco): mostra a espera até ele confirmar, e avisa quem confere de novo. */
@@ -406,8 +407,8 @@ function useRequirementItems(): { items: BoardRequirement[]; missing: number; au
           {
             id: 'signin',
             tool: authExpired,
-            cli: CLI_COMMAND[authExpired],
-            action: { kind: 'command', command: LOGIN_COMMAND[authExpired], terminal: true },
+            cli: baseValue(CLI_COMMAND, authExpired) ?? '',
+            action: { kind: 'command', command: baseValue(LOGIN_COMMAND, authExpired) ?? '', terminal: true },
           },
         ]
       : requirements;

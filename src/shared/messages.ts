@@ -1,3 +1,7 @@
+import type { PolicyReply, PolicyScenario } from './policyManagement';
+import type { ExecutionPolicy } from './executionPolicies';
+import type { ContextDraftResolution } from './contextDraftResolution';
+import type { ContextActivityTarget, ContextPlanningWrite, ActivityContextWrite } from './contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from './agentAssistance';
 import type { LibraryArtifactInput } from './artifacts';
 import type { Appearance } from './appearance';
@@ -9,6 +13,7 @@ import type { HarnessUsage, SelectableKind } from './harnessSelection';
 import type { HookInput, McpServerInput } from './harnessCatalog';
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { CardUsage } from './cardUsage';
+import type { QuestionInput } from './questions';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { RenameKind } from './branchRename';
@@ -16,6 +21,7 @@ import type { BulkCardStatus, CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { BranchKind, GitConfig } from './git';
 import type { ProjectProfile } from './projectProfile';
+import type { AiProfileDraft } from './aiProfiles';
 
 /** O que o board grava num arquivo de agente: o frontmatter (menos o nome) e o corpo. */
 export interface AgentInput {
@@ -74,6 +80,8 @@ export type WebviewToHost =
   | { type: 'ai.heartbeat.run' }
   | { type: 'card.create'; typeId: Id; columnId: Id; parentId: Id | null; title: string }
   | { type: 'card.update'; cardId: Id; patch: { title?: string; description?: string; typeId?: Id } }
+  | { type: 'card.questions.set'; cardId: Id; questions: QuestionInput[] }
+  | { type: 'card.questions.answer'; cardId: Id; answers: { questionId: Id; text: string; custom: boolean }[] }
   | {
       type: 'card.move';
       cardId: Id;
@@ -221,6 +229,18 @@ export type WebviewToHost =
   | { type: 'settings.board.reset' }
   /** leva o board ao padrão atual sem recriá-lo: só acrescenta e completa, os cards não saem do lugar */
   | { type: 'settings.board.upgrade' }
+  /** Cria ou atualiza um perfil de CLI; os valores privados ficam somente no host. */
+  | { type: 'settings.aiProfiles.save'; profile: AiProfileDraft }
+  /** Liga ou desliga um perfil revisado. */
+  | { type: 'settings.aiProfiles.setEnabled'; id: string; enabled: boolean }
+  /** Cria uma cópia desligada e pendente de revisão. */
+  | { type: 'settings.aiProfiles.duplicate'; id: string }
+  /** Apaga um perfil que não é pronto nem padrão. */
+  | { type: 'settings.aiProfiles.remove'; id: string }
+  /** Consulta a instalação e o login dos perfis sem devolver a configuração. */
+  | { type: 'settings.aiProfiles.probe' }
+  /** Faz um teste explícito, limitado a dois minutos, sem MCP nem ferramentas de alteração. */
+  | { type: 'settings.aiProfiles.test'; id: string }
   | { type: 'settings.models.set'; catalog: ModelOption[] }
   /**
    * relê os modelos da ferramenta (configuração local ou lista embutida) e os junta ao catálogo;
@@ -296,6 +316,13 @@ export type WebviewToHost =
   | { type: 'harness.library.pickDirectory' }
   | { type: 'harness.library.folders'; dir: string }
   | { type: 'harness.library.save'; input: LibraryArtifactInput }
+  | { type: 'executionPolicy.read'; requestId: string; id?: string; beforeRevision?: number }
+  | { type: 'executionPolicy.simulate'; requestId: string; scenario: PolicyScenario }
+  | { type: 'settings.executionPolicy.save'; policy: ExecutionPolicy; expectedRevision: number; reviewed: boolean }
+  | { type: 'settings.executionPolicy.remove'; id: string; expectedRevision: number }
+  | { type: 'contextPlanning.save'; input: ContextPlanningWrite }
+  | { type: 'contextPlanning.saveBatch'; inputs: ActivityContextWrite[] }
+  | { type: 'contextPlanning.preview'; requestId: string; target: ContextActivityTarget }
   | { type: 'harness.library.read'; id: string }
   | { type: 'harness.library.pickArtifacts' }
   | { type: 'harness.library.directory'; dir: string }
@@ -313,7 +340,7 @@ export type WebviewToHost =
   | { type: 'harness.import.add'; tool: AiTool; dir: string }
   /** tira a pasta importada da lista; os artefatos dela saem do board */
   | { type: 'harness.import.remove'; tool: AiTool; dir: string }
-  /** cria um agente na pasta de agentes da ferramenta (global por padrão) e o marca como disponível no board */
+  /** cria um agente no board (guardado no banco, não na pasta da ferramenta), disponível para os cards; `scope` é ignorado */
   | { type: 'harness.agent.create'; scope?: InstallScope; input: AgentInput }
   /** reescreve o frontmatter (o que vier em `patch`) e, se vier, o corpo de um agente, preservando o resto */
   | { type: 'harness.agent.update'; name: string; scope: InstallScope; patch: Partial<AgentInput>; body?: string }
@@ -366,6 +393,11 @@ export type WebviewToHost =
 
 export type HostToWebview =
   | { type: 'boardState'; state: BoardState; attachmentsBaseUri: string }
+  | {
+      type: 'aiProfiles.status';
+      profiles: Record<string, { found: boolean; version: string | null; signedIn: boolean | null; installUrl: string | null }>;
+    }
+  | { type: 'aiProfiles.testResult'; id: string; ok: boolean; output: string; error?: string }
   | { type: 'ui.openCard'; cardId: Id }
   | { type: 'viewState'; view: ViewState }
   | { type: 'prefs'; prefs: UiPrefs }
@@ -386,6 +418,9 @@ export type HostToWebview =
   | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
+  /** prévia dos contratos salvos, sem corpos de artefatos, inferência ou admissão */
+  | ({ type: 'executionPolicy.result'; requestId: string } & PolicyReply)
+  | { type: 'contextPlanning.preview.result'; requestId: string; preview?: ContextDraftResolution; error?: string }
   /** resposta a `card.usage.query`, correlacionada por `requestId` */
   | { type: 'card.usage.result'; requestId: string; usage?: CardUsage; error?: string }
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */

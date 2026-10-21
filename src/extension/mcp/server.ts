@@ -47,11 +47,11 @@ export const MCP_INSTRUCTIONS =
   'Faltou informação: ask_question. Impedimento que você não resolve: block_card. ' +
   'Ficou algo dependendo da pessoa (decisão, dado, ponto em aberto que ela precisa avaliar)? Não registre só num comentário: entregue com request_review e `pending`, e o card fica com ela. No modo autônomo nada disso segura o card: decida você, registre e siga. ' +
   'Pull request: sempre com --base em workspace.prBase do get_card. ' +
-  'Uso, tokens e tempo: get_metrics. Rules, skills e agentes do projeto: get_harness. Modelos e regras de sugestão: get_models. ' +
+  'Uso, tokens e tempo: get_metrics. Regras, skills e agentes: get_harness. Perfil de CLI e modelos: get_models. ' +
   'O detalhe vem onde você precisa: na descrição de cada ferramenta, nas notas do get_card e na skill faz-ai-fluxo.';
 
 /** Cria um servidor MCP (uma sessão) com as ferramentas do board. */
-export function createMcpServer(opts: McpOptions): McpServer {
+export function createMcpServer(opts: McpOptions, sessionToken: () => string | undefined = () => undefined): McpServer {
   const server = new McpServer(
     { name: 'faz-ai', version: opts.version },
     {
@@ -67,9 +67,25 @@ export function createMcpServer(opts: McpOptions): McpServer {
     getRunner: async () => {
       const runner = await opts.getRunner();
       if (!runner) throw new Error('Nenhuma pasta aberta no VSCode.');
-      return runner;
+      const token = sessionToken();
+      if (token === undefined) return runner;
+      const router = await opts.getRouter();
+      if (!router) throw new Error('Nenhuma pasta aberta no VSCode.');
+      router.executions.assert(token);
+      return new Proxy(runner, {
+        get(target, key) {
+          const value = Reflect.get(target, key, target);
+          return typeof value === 'function'
+            ? (...args: unknown[]) => {
+                router.executions.assert(token);
+                return Reflect.apply(value, target, args);
+              }
+            : value;
+        },
+      });
     },
     workspaceDir: opts.workspaceDir,
+    sessionToken,
     author: () => {
       const client = server.server.getClientVersion();
       // o VS Code se apresenta pelo nome do produto ("Visual Studio Code", "Visual Studio Code - Insiders")
@@ -86,8 +102,12 @@ class SocketTransport implements Transport {
   onerror?: (error: Error) => void;
   onmessage?: (message: JSONRPCMessage) => void;
   private buf = '';
+  private first = true;
 
-  constructor(private socket: net.Socket) {}
+  constructor(
+    private socket: net.Socket,
+    private present: (token: string) => void,
+  ) {}
 
   async start(): Promise<void> {
     this.socket.setEncoding('utf8');
@@ -99,9 +119,32 @@ class SocketTransport implements Transport {
         this.buf = this.buf.slice(i + 1);
         if (!line) continue;
         try {
-          this.onmessage?.(JSON.parse(line) as JSONRPCMessage);
-        } catch (e) {
-          this.onerror?.(e instanceof Error ? e : new Error(String(e)));
+          const message: unknown = JSON.parse(line);
+          if (message && typeof message === 'object' && 'fazai' in message) {
+            const header = (message as { fazai?: { run?: unknown } }).fazai;
+            if (
+              !this.first ||
+              Object.keys(message).length !== 1 ||
+              !header ||
+              typeof header !== 'object' ||
+              Object.keys(header).length !== 1 ||
+              typeof header.run !== 'string' ||
+              !/^[a-f0-9]{64}$/.test(header.run)
+            ) {
+              this.socket.destroy();
+              return;
+            }
+            this.first = false;
+            this.present(header.run);
+            continue;
+          }
+          this.first = false;
+          this.onmessage?.(message as JSONRPCMessage);
+        } catch {
+          // Erros do parser podem incluir a linha original; nunca registrar um bearer do run.
+          this.onerror?.(new Error('Mensagem MCP inválida.'));
+          this.socket.destroy();
+          return;
         }
       }
     });
@@ -147,8 +190,13 @@ export async function startMcpServer(address: string, opts: McpOptions): Promise
   const listener = net.createServer((socket) => {
     sockets.add(socket);
     socket.on('close', () => sockets.delete(socket));
-    void createMcpServer(opts)
-      .connect(new SocketTransport(socket))
+    let token: string | undefined;
+    void createMcpServer(opts, () => token)
+      .connect(
+        new SocketTransport(socket, (value) => {
+          token = value;
+        }),
+      )
       .catch(() => socket.destroy());
   });
   await new Promise<void>((resolve, reject) => {
