@@ -71,6 +71,9 @@ In five minutes you have a task moving on the board, with the AI working on it.
    **Instalar (padrão da ferramenta)** (install, tool default) in the **Servidores MCP** (MCP servers)
    group and again in the **Skills** group, for the flow skill, which teaches the AI to drive the
    phases.
+   The board's artifacts (rules, skills, agents and MCP servers) live in the Harness **Artefatos do
+   board** (board artifacts) tab: created there or imported from a folder, an installed tool or an
+   exported file, copied and with confirmation before replacing.
 3. **Create the task.** In the **Backlog** column, click **+ Novo card** (new card), type the title
    (for example, "Login with Google") and press Enter. Double-click opens the card: describe what
    you want, in Markdown, and optionally pick the AI model and the skills it must read.

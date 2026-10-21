@@ -64,6 +64,9 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
    (Claude Code, Cursor ou Kimi Code). Na aba **Projeto**, clique em **Instalar (padrão da ferramenta)** no
    grupo **Servidores MCP** e de novo no grupo **Skills**, para a skill do fluxo, que ensina a IA a
    conduzir as fases.
+   Os artefatos do board (regras, skills, agentes e servidores MCP) são mantidos na aba **Artefatos do
+   board** do Harness: criados ali ou importados de uma pasta, de uma ferramenta instalada ou de um
+   arquivo exportado, com cópia e confirmação antes de substituir.
 3. **Crie a tarefa.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título (por
    exemplo, "Login com Google") e dê Enter. Duplo clique abre o card: descreva o que você quer, em
    Markdown, e, se quiser, escolha o modelo da IA e as skills que ela deve ler.
