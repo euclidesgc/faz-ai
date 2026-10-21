@@ -1253,6 +1253,8 @@ empty ones, with independent filters. Selections persist across tabs and filters
 within a type are skipped while other items are imported; the summary groups conflicts and offers
 an explicit confirmation before overwriting them.
 
+**Import → Installed tool** reads only the chosen tool's folder (`.claude/`, `.cursor/` or `.kimi-code/`, in the project and in the user folder), and **Folder** recognizes those same folders inside it. Earlier versions may have left a copy of the `faz-ai-fluxo` skill in those folders: Diagnostics lists it under **Recommended** (**Old copy of the flow skill**) with each file's path. The board deletes nothing; to remove the copy, delete the listed `faz-ai-fluxo` folder (for example `rm -r .claude/skills/faz-ai-fluxo`). The flow comes from the board.
+
 In **Skills**, select items individually or all visible items and apply **Always**, **Per card** or **Off** in bulk. Selections persist across searches; **Clear selection** clears them. **Delete selected** requires confirmation and preserves source files. Subagents also support bulk selection and deletion or making them available on the board; MCPs support bulk usage changes and deletion. Skills, subagents and MCPs do not offer Update from source. The rules form only has Name and Content.
 
 Each tab offers **Create**, search, counts and actions to **Edit**, change usage, update from source

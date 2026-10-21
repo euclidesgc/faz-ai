@@ -1211,6 +1211,8 @@ A prévia tem quatro abas, inclusive vazias, com filtro por nome ou descrição.
 ao trocar de aba e filtrar. Nomes repetidos do mesmo tipo são ignorados: os demais itens entram,
 e o resumo agrupa os conflitos e oferece uma confirmação explícita para sobrescrevê-los.
 
+**Importar → Ferramenta instalada** lê só a pasta da ferramenta escolhida (`.claude/`, `.cursor/` ou `.kimi-code/`, no projeto e no usuário) e **Pasta** reconhece essas mesmas pastas dentro dela. Versões anteriores podem ter deixado uma cópia da skill `faz-ai-fluxo` nessas pastas: o Diagnóstico a lista em **Recomendados** (**Cópia antiga da skill do fluxo**) com o caminho de cada arquivo. O board não apaga nada; para remover a cópia, apague a pasta `faz-ai-fluxo` listada (por exemplo `rm -r .claude/skills/faz-ai-fluxo`). O fluxo vem do board.
+
 Em **Skills**, selecione os itens individualmente ou todos os visíveis e aplique **Sempre**, **Pelo card** ou **Desligado** em massa. A seleção acompanha a busca; **Limpar seleção** a desfaz. **Excluir selecionadas** pede confirmação e preserva os arquivos de origem. Subagentes também permitem selecionar e excluir em massa ou manter disponíveis no board; MCPs permitem alterar o modo e excluir em massa. Skills, subagentes e MCPs não oferecem Atualizar da origem. O formulário de regras tem apenas Nome e Conteúdo.
 
 Cada aba tem **Criar**, busca, quantidade e ações de **Editar**, mudar o modo de uso, atualizar da
