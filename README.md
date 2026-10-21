@@ -166,6 +166,8 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
    cuja história está arquivada pede confirmação e restaura a história inteira (uma sub-tarefa de
    história ativa volta sozinha, sem confirmação).
 
+**Seleção múltipla na lixeira.** Na lixeira, marque cards um a um ou use **Selecionar todos** no cabeçalho da tabela; a caixa fica em estado parcial quando só alguns estão marcados. Com ao menos um card marcado, aparece a barra com a contagem e as ações **Restaurar** e **Apagar de vez**, que valem para a seleção inteira. Restaurar segue direto; apagar de vez pede uma única confirmação para o lote. **Limpar** desmarca tudo. Restaurar ou apagar um card leva junto as sub-tarefas dele que estão na lixeira. **Esvaziar lixeira** continua como estava e não depende da seleção.
+
 Nada acontece em silêncio: toda ação que vai ao board espera a confirmação e mostra que está
 trabalhando. Uma barra fina no topo acende enquanto qualquer pedido está em andamento; o card que
 está sendo movido, arquivado, mudando de status ou de título esmaece e ganha um spinner na faixa
