@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs/promises';
-import { fetchSource, parseSource } from '../skillInstall';
 import { MAX_ATTACHMENT_BYTES } from '../attachments';
 import { parseExportFile, type ImportResult } from '../db/boardExport';
 import type { HostToWebview, Tracked, WebviewToHost } from '../../shared/messages';
@@ -15,7 +14,6 @@ import type { MessageRouter } from '../panel/messageRouter';
 const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'attachment.read',
   'harness.file.read',
-  'harness.project.profile',
   'harness.agent.assist',
   'metrics.query',
   'card.usage.query',
@@ -114,7 +112,6 @@ export class HostBridge {
   }
 
   dispose(): void {
-    this.router.clearInstall();
     this.subs.forEach((off) => off());
   }
 
@@ -214,11 +211,7 @@ export class HostBridge {
       case 'ai.suggestAgents':
       case 'ai.suggestRules':
       case 'ai.suggestSkills':
-      case 'harness.suggest.run':
         this.router.chatCommand(msg);
-        return;
-      case 'harness.suggest.clear':
-        this.router.setSuggestions(null);
         return;
       case 'ui.openInBrowser':
         await this.env.openInBrowser?.();
@@ -247,9 +240,8 @@ export class HostBridge {
         return;
       }
       case 'harness.item.open': {
-        // só abre arquivos que a varredura do harness listou
-        const known = this.router.snapshot().harness.inventory.some((t) => t.items.some((i) => i.path === msg.path));
-        if (!known) throw new Error('Arquivo fora do harness.');
+        // só abre arquivos da biblioteca do board
+        if (!this.router.isLibraryFile(msg.path)) throw new Error('Arquivo fora do harness.');
         await this.env.openFile(msg.path);
         return;
       }
@@ -263,26 +255,12 @@ export class HostBridge {
         return;
       }
       case 'harness.refresh':
-        await this.router.refreshHarnessAndPlugins();
-        return;
-      case 'harness.plugin.apply':
-        this.post({ type: 'notice', message: await this.router.applyPlugins(msg.tool, msg.action, msg.ids) });
+        this.router.refreshHarness();
         return;
       case 'harness.file.write':
         // a falha (JSON inválido, sem permissão) vira o erro do `done`, e a tela mantém o texto
         this.router.writeHarnessFile(msg.path, msg.content);
         return;
-      case 'harness.skill.file.create':
-        await this.env.openFile(this.router.createSkillFile(msg.tool, msg.path, msg.file, msg.link));
-        return;
-      case 'harness.skill.file.open':
-        await this.env.openFile(this.router.skillFilePath(msg.tool, msg.path, msg.file));
-        return;
-      case 'harness.install.scan': {
-        const fetched = await fetchSource(parseSource(msg.source, os.homedir()));
-        this.router.setInstall(msg.source.trim(), fetched.dir, fetched.cleanup);
-        return;
-      }
       case 'harness.library.read':
         this.post({ type: 'harness.library.content', input: this.router.readLibraryArtifact(msg.id) });
         return;
@@ -314,34 +292,11 @@ export class HostBridge {
         if (dir) this.router.handle({ type: 'harness.library.scan', dir });
         return;
       }
-      case 'harness.library.pick': {
-        if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
-        const dir = await this.env.pickFolder('Importar skills para o board');
-        if (dir) this.router.setInstall(dir, dir, () => {});
-        return;
-      }
       case 'harness.library.open': {
         const directory = this.router.snapshot().harness.library?.directory;
         if (directory) await this.env.openExternal(directory);
         return;
       }
-      case 'harness.import.pick': {
-        if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
-        const dir = await this.env.pickFolder('Importar artefatos de uma pasta');
-        if (dir) this.router.handle({ type: 'harness.import.add', tool: msg.tool, dir });
-        return;
-      }
-      case 'harness.item.create':
-        // o arquivo novo abre no editor do board, onde a pessoa já escreve o conteúdo
-        this.post({ type: 'harness.item.created', path: this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description) });
-        return;
-      case 'harness.item.write':
-        // o arquivo criado abre no editor do board, para a pessoa ler o que o assistente gravou
-        this.post({
-          type: 'harness.item.created',
-          path: this.router.writeHarnessItem(msg.tool, msg.source, msg.name, msg.content, msg.files, msg.append),
-        });
-        return;
       case 'harness.agent.assist':
         try {
           this.post({ type: 'harness.agent.assistResult', requestId: msg.requestId, result: await this.router.assistAgent(msg.input) });
@@ -350,18 +305,6 @@ export class HostBridge {
             type: 'harness.agent.assistResult',
             requestId: msg.requestId,
             error: error instanceof Error ? error.message : String(error),
-          });
-        }
-        return;
-      case 'harness.project.profile':
-        // ler o projeto não muda o board: o erro vai na própria resposta
-        try {
-          this.post({ type: 'harness.project.profileResult', requestId: msg.requestId, profile: this.router.projectProfile() });
-        } catch (e) {
-          this.post({
-            type: 'harness.project.profileResult',
-            requestId: msg.requestId,
-            error: e instanceof Error ? e.message : String(e),
           });
         }
         return;

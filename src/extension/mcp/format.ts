@@ -9,7 +9,7 @@ import {
   type AiProfile,
 } from '../../shared/aiProfiles';
 import { resolveRunTarget } from '../../shared/runTarget';
-import { agentOfArtifact, itemOfArtifact } from '../../shared/artifacts';
+import { agentOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
 import { isSelectableKind, selectionKey, usageOf, toolItemsOf } from '../../shared/harnessSelection';
@@ -338,7 +338,7 @@ export const FLOW_NOTE = 'Fluxo do board: get_skill faz-ai-fluxo (as skills faz-
 export function requiredSkills(s: BoardState, c: Card) {
   // as skills do card somam às do agente
   return manifestOf(s, c).skills.map((name) => {
-    // a skill do fluxo vem do texto do board pelo get_skill; uma cópia instalada na pasta da ferramenta é ignorada
+    // a skill do fluxo vem do texto do board pelo get_skill; uma cópia na pasta da ferramenta é ignorada
     if (isFlowSkill(name)) return { name, scope: 'board', via: 'get_skill' };
     if (s.harness.library) {
       const copy = toolItems(s).find((i) => i.kind === 'skill' && i.name === name);
@@ -611,7 +611,7 @@ export function cardDetail(
 export const SUBTASKS_NOW_NOTE =
   'Rodadas: `canRunTogether` são as sub-tarefas liberadas (subagentes, se tiver, todos de uma vez; senão uma por vez); `waiting` esperam outra; ' +
   '`withPerson` e `running` não são suas. Ao fim da rodada, verifique, faça o commit e releia a história. Sem terminal, implemente e registre o que falta rodar. ' +
-  'Vale mesmo que a skill do fluxo instalada diga uma por vez. Detalhes: skill faz-ai-implementacao-rodadas.';
+  'Vale mesmo que a skill do fluxo diga uma por vez. Detalhes: skill faz-ai-implementacao-rodadas.';
 
 /**
  * As rodadas da Implementação: `canRunTogether` só traz as sub-tarefas que a IA pode tocar agora; as que
@@ -716,48 +716,34 @@ export function boardOverview(s: BoardState) {
 }
 
 /**
- * O harness da ferramenta em uso, com a marcação do board. Por padrão só o que está marcado (é o que
- * as execuções enxergam); com `onlySelected` falso, tudo que a ferramenta carrega, com `usage` em cada item.
+ * O harness do board: só o que foi enviado a ele (Configurações → Harness), que é o que as execuções
+ * enxergam. O que a ferramenta de IA carrega por conta própria não entra: o board não depende dela.
  */
-export function harnessOverview(s: BoardState, onlySelected = true) {
+export function harnessOverview(s: BoardState) {
   const usage = (i: HarnessItem) => (isSelectableKind(i.kind) ? usageOf(s.harnessSelection, i) : null);
-  const sourceItems = s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
-  const inventory = (
-    onlySelected
-      ? toolItems(s)
-      : [...sourceItems, ...(s.harness.library ? s.harness.library.artifacts.filter((a) => !a.missing).map(itemOfArtifact) : [])]
-  ).filter((i) => !onlySelected || usage(i));
-  // os agentes do board (no banco) e, na lista completa, também os arquivos da ferramenta que não estão no board
+  const inventory = toolItems(s).filter((i) => usage(i));
+  // os agentes do board (no banco)
   const boardAgents = s.harness.library
     ? s.harness.library.artifacts.filter((a) => a.kind === 'agent' && !a.missing).map((a) => agentOfArtifact(a, s.board.aiTool))
     : null;
-  const agents = !boardAgents
-    ? s.harness.agents
-    : onlySelected
-      ? boardAgents
-      : [...boardAgents, ...s.harness.agents.filter((t) => !boardAgents.some((a) => a.location === t.location))].sort((x, y) =>
-          x.name.localeCompare(y.name),
-        );
+  const agents = boardAgents ?? s.harness.agents;
   const inBoard = (a: { location: string }) => !!boardAgents?.some((b) => b.location === a.location);
   return {
     library: s.harness.library ? { directory: s.harness.library.directory, artifacts: s.harness.library.artifacts } : undefined,
     aiTool: s.board.aiTool,
     cliLoads: cliLoadsOf(s),
     defaultAgent: s.board.execProfiles.find((p) => p.isDefault)?.id ?? null,
-    note: onlySelected
-      ? 'Só o que está no board (Configurações → Harness): é tudo o que as execuções do board usam. `usage` "always" (Sempre) entra em toda execução; "contextual" (Pelo card) só quando indicado no card (campos Rules, Skills e MCPs) ou escolhido no planejamento e no refinar; "off" (Desligado) está no board sem entrar em nada. Para ver tudo que a ferramenta carrega, chame get_harness com onlySelected = false.'
-      : 'Tudo que a ferramenta carrega nesta máquina, e o que há nas pastas importadas; `usage` diz o modo de cada item no board (null = fora do board: invisível para as execuções).',
+    note: 'Só o que está no board (Configurações → Harness): é tudo o que as execuções do board usam. `usage` "always" (Sempre) entra em toda execução; "contextual" (Pelo card) só quando indicado no card (campos Rules, Skills e MCPs) ou escolhido no planejamento e no refinar; "off" (Desligado) está no board sem entrar em nada.',
     ruleFiles: s.harness.rules.map((r) => ({ name: r.name, exists: r.exists, ...(r.exists ? { bytes: r.content.length } : {}) })),
-    skills:
-      onlySelected && s.harness.library
-        ? toolItems(s)
-            .filter((i) => i.kind === 'skill' && usage(i))
-            .map((i) => ({ name: i.name, enabled: true, mode: 'manual', description: i.description, path: i.path }))
-        : s.harness.skills
-            .filter((k) => !onlySelected || toolItems(s).some((i) => i.kind === 'skill' && i.location === k.path && usage(i)))
-            .map((k) => ({ name: k.name, enabled: k.enabled, mode: k.mode, description: k.description, path: k.path })),
+    skills: s.harness.library
+      ? toolItems(s)
+          .filter((i) => i.kind === 'skill' && usage(i))
+          .map((i) => ({ name: i.name, enabled: true, mode: 'manual', description: i.description, path: i.path }))
+      : s.harness.skills
+          .filter((k) => toolItems(s).some((i) => i.kind === 'skill' && i.location === k.path && usage(i)))
+          .map((k) => ({ name: k.name, enabled: k.enabled, mode: k.mode, description: k.description, path: k.path })),
     agents: agents
-      .filter((a) => !onlySelected || usageOf(s.harnessSelection, { kind: 'agent', location: a.location }))
+      .filter((a) => usageOf(s.harnessSelection, { kind: 'agent', location: a.location }))
       .map((a) => ({
         name: a.name,
         scope: a.scope,

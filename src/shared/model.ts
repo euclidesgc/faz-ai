@@ -6,7 +6,7 @@ import type { EnvironmentReport } from './environment';
 import type { ExecProfile } from './execution';
 import type { ChatState } from './chat';
 import type { McpFootprint } from './contextEstimate';
-import type { AiTool, Harness, HarnessImport, HarnessSuggestions, InstallPreview } from './harness';
+import type { AiTool, Harness } from './harness';
 import type { HarnessSelection } from './harnessSelection';
 import type { ModelOption, ModelRule } from './models';
 import type { Appearance } from './appearance';
@@ -285,8 +285,6 @@ export interface BoardState {
   harness: Harness;
   /** o banco de artefatos do board: o que as execuções podem usar (rules, skills, agentes e servidores MCP), por projeto */
   harnessSelection: HarnessSelection[];
-  /** as pastas importadas, por ferramenta: varridas a cada leitura do harness e listadas em "Importados" */
-  harnessImports: HarnessImport[];
   /** o que o servidor MCP do board põe em cada sessão (nomes, instruções e definições das ferramentas), para estimar o contexto de um card; null antes da medição */
   boardServer: McpFootprint | null;
   /** mudanças que a atualização para o board padrão atual faria; vazio quando não há o que atualizar */
@@ -315,10 +313,6 @@ export interface BoardState {
   environment: EnvironmentReport | null;
   /** o Diagnóstico ainda não abriu sozinho nesta máquina: a interface abre a tela uma vez */
   environmentFirstRun: boolean;
-  /** skills encontradas numa pasta ou repositório, antes de instalar; null fora de uma instalação */
-  harnessInstall: InstallPreview | null;
-  /** o último "Indicar artefatos": pré-seleção para a pessoa confirmar; null antes de pedir ou depois de descartar */
-  harnessSuggestions: HarnessSuggestions | null;
   /** branch principal detectada no repositório do projeto; null fora de um repositório git */
   mainBranch: MainBranch | null;
   /** mudanças de nome da principal ou da develop à espera de Renomear ou Desfazer (#466) */

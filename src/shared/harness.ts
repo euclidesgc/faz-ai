@@ -2,20 +2,8 @@ import type { AiBase } from './aiProfiles';
 import type { BoardArtifact } from './artifacts';
 /** Harness do projeto: arquivos de regras e skills, gerenciados pelo board. */
 
-/**
- * Como a ferramenta chega a uma skill: `auto` deixa a descrição à vista da IA, que decide quando usar;
- * `manual` tira a skill da invocação automática, e ela só é usada quando indicada no card ou chamada pelo nome.
- */
+/** Como a ferramenta invoca a skill: sozinha (`auto`) ou só quando um card a indica ou ela é chamada pelo nome (`manual`). */
 export type SkillMode = 'auto' | 'manual';
-
-export const SKILL_MODES: { id: SkillMode; label: string; hint: string }[] = [
-  { id: 'auto', label: 'Automática', hint: 'A IA vê a descrição em toda sessão e decide quando usar a skill.' },
-  {
-    id: 'manual',
-    label: 'Só quando indicada',
-    hint: 'A IA não invoca a skill sozinha: ela só é usada quando um card a indica ou quando é chamada pelo nome.',
-  },
-];
 
 export interface RuleFile {
   /** nome do arquivo na raiz do projeto, ex.: CLAUDE.md */
@@ -84,26 +72,6 @@ export type HarnessKind = 'instructions' | 'memory' | 'skill' | 'agent' | 'comma
  * plugin, ou de uma pasta importada (que a ferramenta não carrega sozinha: só o board a conhece).
  */
 export type HarnessScope = 'project' | 'user' | 'plugin' | 'imported';
-
-/**
- * O resultado de "Indicar artefatos": os artefatos de um assunto que a IA achou mais úteis para o
- * projeto, pré-selecionados na tela para a pessoa confirmar. Nada entra no board sem ela.
- */
-export interface HarnessSuggestions {
-  tool: AiTool;
-  kind: 'instructions' | 'skill' | 'agent' | 'mcp';
-  /** `location` é a identidade do item na marcação (`selectionKey`) */
-  items: { location: string; reason: string }[];
-  /** a IA não respondeu no formato esperado, ou a execução falhou */
-  error?: string;
-}
-
-/** Uma pasta importada: o board a varre atrás de artefatos no formato da ferramenta e os oferece ao board. */
-export interface HarnessImport {
-  tool: AiTool;
-  /** caminho absoluto da pasta */
-  dir: string;
-}
 
 /** Onde o board instala o servidor MCP e a skill do fluxo: global (`user`, o padrão) ou só neste projeto. */
 export type InstallScope = 'project' | 'user';
@@ -185,43 +153,7 @@ export interface HarnessItem {
   source?: number;
   /** valor inteiro da entrada, quando `description` o resume: o comando de um hook, ou a lista (allow, deny, ask) de uma regra de permissão */
   detail?: string;
-  /** só no item do próprio plugin (`kind: 'plugin'`): como ele está instalado, quando a ferramenta diz */
-  install?: PluginInstall;
 }
-
-/**
- * Um plugin instalado, como a ferramenta o informa. No Claude Code vem de `claude plugin list --json`:
- * o id é `nome@marketplace` (ou `@synced`, `@skills-dir`) e o escopo é onde ele foi instalado. No
- * Cursor é uma pasta de `~/.cursor/plugins/local`, e o id é o nome dela.
- */
-export interface PluginInstall {
-  id: string;
-  /** escopos em que está instalado: `user`, `project`, `local`, `managed`, `synced`… */
-  scopes: string[];
-  enabled: boolean;
-  /** pasta de onde a ferramenta carrega o plugin */
-  dir: string;
-}
-
-/** O que o board faz com um plugin instalado, pela própria ferramenta. */
-export type PluginAction = 'uninstall' | 'disable' | 'enable';
-
-/** Escopos de onde o Claude Code desinstala um plugin; os sincronizados do claude.ai e os da organização só são desativados. */
-const UNINSTALL_SCOPES = ['user', 'project', 'local'];
-
-/** As ações que valem para o plugin, conforme a ferramenta e como ele está instalado. */
-export function pluginActions(tool: AiTool, install: PluginInstall | undefined): PluginAction[] {
-  if (!install) return [];
-  // o Cursor não tem comando para desativar: um plugin local sai tirando a pasta
-  if (tool === 'cursor') return ['uninstall'];
-  const out: PluginAction[] = [install.enabled ? 'disable' : 'enable'];
-  if (/@(inline|synced|skills-dir)$/.test(install.id)) return out;
-  if (install.scopes.some((s) => UNINSTALL_SCOPES.includes(s))) out.push('uninstall');
-  return out;
-}
-
-/** Os escopos de que o Claude Code desinstala o plugin, um comando por escopo. */
-export const uninstallScopes = (install: PluginInstall): string[] => install.scopes.filter((s) => UNINSTALL_SCOPES.includes(s));
 
 /** Uma skill encontrada numa pasta ou num repositório, antes de ser instalada. */
 export interface InstallableSkill {
@@ -233,12 +165,6 @@ export interface InstallableSkill {
   files: number;
   /** o nome da pasta serve como nome de skill */
   valid: boolean;
-}
-
-/** Skills encontradas na origem informada, à espera da escolha do que instalar. */
-export interface InstallPreview {
-  source: string;
-  skills: InstallableSkill[];
 }
 
 export interface ToolInventory {
@@ -360,13 +286,3 @@ export const SKILL_FOLDERS: { id: string; label: string; hint: string }[] = [
   { id: 'assets', label: 'assets', hint: 'Modelos de arquivo e outros recursos estáticos.' },
   { id: 'scripts', label: 'scripts', hint: 'Scripts que a IA pode executar.' },
 ];
-
-/** Caminho de um arquivo de apoio dentro da pasta da skill: `pasta/arquivo.ext`, sem subir de pasta. */
-export const SKILL_FILE_PATTERN = /^(?:[A-Za-z0-9_][A-Za-z0-9_.-]*\/){0,3}[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
-
-/** Skill sugerida para guardar modelos de classe e exemplos de código do projeto. */
-export const REFERENCE_SKILL = {
-  name: 'modelos-do-projeto',
-  description: 'Modelos de classe e exemplos de código deste projeto. Use como referência ao criar código novo do mesmo tipo.',
-  body: 'Os arquivos em `references/` são exemplos reais ou modelos de como o código deste projeto deve ser escrito.\n\nAo criar algo novo, procure aqui o modelo do mesmo tipo e siga a estrutura, os nomes e o estilo dele.\n\n## Modelos\n\nListe aqui cada arquivo de `references/` com uma linha dizendo quando usar.',
-};

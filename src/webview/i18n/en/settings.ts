@@ -454,7 +454,6 @@ export const settings: Record<string, string> = {
   'ferramenta Cursor': 'Cursor tool',
   'em Harness': 'in Harness',
   'Mostrando os modelos do {tool}': 'Showing the {tool} models',
-  'Mostrando os agentes do {tool}': 'Showing the {tool} agents',
   'trocar ferramenta': 'switch tool',
   'Trocar a ferramenta de IA, em Harness': 'Switch the AI tool, in Harness',
   'Preencher o modelo sugerido automaticamente': 'Fill in the suggested model automatically',

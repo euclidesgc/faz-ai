@@ -303,7 +303,6 @@ it.each([
   await userEvent.click(screen.getByRole('button', { name: 'Voltar' }));
   await userEvent.click(screen.getByRole('button', { name: 'Pular esta parte' }));
   expect(screen.getByRole('textbox', { name: 'Conteúdo' })).toHaveValue('Revisão manual preservada');
-  expect(sentOf('harness.project.profile')).toHaveLength(0);
 });
 
 function seedSkills(kind: BoardArtifact['kind'] = 'skill') {

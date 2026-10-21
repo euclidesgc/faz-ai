@@ -8,7 +8,6 @@ import { EMPTY_PREFS } from '../src/shared/prefs';
 import { HostBridge, exportNotice, importNotice, type HostEnv } from '../src/extension/host/hostBridge';
 import { parseExportFile } from '../src/extension/db/boardExport';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { HARNESS_CATALOG } from '../src/shared/harnessCatalog';
 import type { HostToWebview } from '../src/shared/messages';
 
 let router: MessageRouter;
@@ -198,194 +197,30 @@ describe('HostBridge: chat', () => {
 describe('HostBridge: harness.file.read / harness.file.write', () => {
   const result = () => sent.at(-1) as { content?: string; readonly?: boolean; error?: string; ok?: boolean };
 
-  it('lê e grava um arquivo que a varredura listou, e relê o harness', async () => {
-    fs.mkdirSync(path.join(dir, '.claude', 'rules'), { recursive: true });
-    const rule = path.join(dir, '.claude', 'rules', 'estilo.md');
-    fs.writeFileSync(rule, '# Estilo\n');
-    router.refreshHarness();
+  it('lê e grava um arquivo da biblioteca do board', async () => {
+    router.handle({ type: 'harness.library.save', input: { kind: 'rule', name: 'estilo.md', description: '', body: '# Estilo\n' } });
+    const rule = router.snapshot().harness.library!.artifacts.find((a) => a.name === 'estilo.md')!.path;
     await bridge.handle({ type: 'harness.file.read', requestId: 'r1', path: rule });
     expect(sent.at(-1)).toEqual({ type: 'harness.file.readResult', requestId: 'r1', content: '# Estilo\n', readonly: false });
-    await bridge.handle({
-      type: 'harness.file.write',
-      requestId: 'w1',
-      path: rule,
-      content: '---\ndescription: Estilo do código\n---\n# Estilo\n',
-    });
+    await bridge.handle({ type: 'harness.file.write', requestId: 'w1', path: rule, content: '# Estilo do código\n' });
     expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'w1', ok: true });
     expect(fs.readFileSync(rule, 'utf8')).toContain('Estilo do código');
-    const item = router
-      .snapshot()
-      .harness.inventory.flatMap((t) => t.items)
-      .find((i) => i.path === rule);
-    expect(item?.description).toBe('Estilo do código');
+    expect(router.snapshot().harness.library!.artifacts.find((a) => a.name === 'estilo.md')?.size).toBeGreaterThan(0);
   });
 
-  it('abre também o arquivo que o CLAUDE.md importa com @', async () => {
-    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'Veja @docs/guia.md');
-    fs.mkdirSync(path.join(dir, 'docs'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'docs', 'guia.md'), '# Guia');
-    router.refreshHarness();
-    await bridge.handle({ type: 'harness.file.read', requestId: 'r4', path: path.join(dir, 'docs', 'guia.md') });
-    expect(result()).toMatchObject({ content: '# Guia', readonly: false });
-  });
-
-  it('recusa arquivo fora da varredura e configuração MCP nativa do projeto ou global', async () => {
+  it('recusa arquivo fora da biblioteca, inclusive a configuração MCP nativa do projeto ou global', async () => {
     const outside = path.join(dir, 'segredo.txt');
     fs.writeFileSync(outside, 'x');
     await bridge.handle({ type: 'harness.file.read', requestId: 'r2', path: outside });
     expect(result().error).toBe('Arquivo fora do harness.');
 
     fs.writeFileSync(path.join(dir, '.mcp.json'), '{ "mcpServers": { "a": { "command": "x" } } }');
-    fs.mkdirSync(path.join(dir, 'h'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'h', '.claude.json'), '{ "mcpServers": { "b": { "command": "y" } } }');
-    router.refreshHarness();
     await bridge.handle({ type: 'harness.file.write', requestId: 'w2', path: path.join(dir, '.mcp.json'), content: '{ quebrado' });
-    expect(result()).toMatchObject({ ok: false });
-    expect(result().error).toBe('Configurações MCP não são editadas pelo editor de arquivos. Use a biblioteca do board.');
+    expect(result()).toMatchObject({ ok: false, error: 'Este arquivo não pode ser alterado pelo board.' });
     expect(fs.readFileSync(path.join(dir, '.mcp.json'), 'utf8')).toContain('"a"');
 
-    const claudeJson = path.join(dir, 'h', '.claude.json');
-    await bridge.handle({ type: 'harness.file.read', requestId: 'r3', path: claudeJson });
-    expect(result()).toMatchObject({
-      error: 'Configurações MCP não são editadas pelo editor de arquivos. Use a biblioteca do board.',
-    });
-    await bridge.handle({ type: 'harness.file.write', requestId: 'w3', path: claudeJson, content: '{}' });
-    expect(result()).toMatchObject({ ok: false, error: 'Este arquivo não pode ser alterado pelo board.' });
-  });
-});
-
-describe('HostBridge: harness.item.write e harness.project.profile (assistentes de regras e skills)', () => {
-  const sourceOf = (tool: 'claude' | 'cursor', scope: 'project' | 'user', test: (s: { path: string; layout: string }) => boolean) =>
-    HARNESS_CATALOG[tool].findIndex((s) => s.scope === scope && !s.builtin && !s.noCreate && test(s));
-
-  it('uma regra por assunto nasce com o texto pronto, abre no editor e entra na varredura', async () => {
-    const source = sourceOf('claude', 'project', (s) => s.path === '.claude/rules' && s.layout === 'files');
-    await bridge.handle({
-      type: 'harness.item.write',
-      tool: 'claude',
-      source,
-      name: 'testes',
-      content: '---\ndescription: "Testes"\n---\n\n- Pequenos.\n',
-    });
-    const file = path.join(dir, '.claude', 'rules', 'testes.md');
-    expect(fs.readFileSync(file, 'utf8')).toBe('---\ndescription: "Testes"\n---\n\n- Pequenos.\n');
-    expect(sent.at(-1)).toEqual({ type: 'harness.item.created', path: file });
-    expect(
-      router
-        .snapshot()
-        .harness.inventory.flatMap((t) => t.items)
-        .find((i) => i.path === file)?.description,
-    ).toBe('Testes');
-  });
-
-  it('o arquivo principal que já existe recebe o texto no fim, só com append; sem ele dá erro e nada muda', async () => {
-    const source = sourceOf('claude', 'project', (s) => s.path === 'CLAUDE.md');
-    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), '# Projeto\n');
-    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: '', content: '## Regras\n- A\n' });
-    expect((sent.at(-1) as { type: string }).type).toBe('error');
-    expect(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8')).toBe('# Projeto\n');
-    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: '', content: '## Regras\n- A\n', append: true });
-    expect(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8')).toBe('# Projeto\n\n## Regras\n- A\n');
-    // sem o arquivo, o append cria
-    fs.rmSync(path.join(dir, 'CLAUDE.md'));
-    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: '', content: '## Regras\n', append: true });
-    expect(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8')).toBe('## Regras\n');
-  });
-
-  it('uma skill é criada com o SKILL.md pronto e os arquivos de apoio vazios; nome de arquivo inválido não cria nada', async () => {
-    const source = sourceOf('claude', 'project', (s) => s.layout === 'skills');
-    const content = '---\nname: migracao\ndescription: "Escrever uma migração."\n---\n\n# migracao\n';
-    await bridge.handle({ type: 'harness.item.write', tool: 'claude', source, name: 'migracao', content, files: ['../fora.md'] });
-    expect((sent.at(-1) as { type: string }).type).toBe('error');
-    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'migracao'))).toBe(false);
-    await bridge.handle({
-      type: 'harness.item.write',
-      tool: 'claude',
-      source,
-      name: 'migracao',
-      content,
-      files: ['references/exemplo.md', 'scripts/rodar.sh'],
-    });
-    const folder = path.join(dir, '.claude', 'skills', 'migracao');
-    expect(fs.readFileSync(path.join(folder, 'SKILL.md'), 'utf8')).toBe(content);
-    expect(fs.readFileSync(path.join(folder, 'references', 'exemplo.md'), 'utf8')).toBe('');
-    expect(fs.existsSync(path.join(folder, 'scripts', 'rodar.sh'))).toBe(true);
-    expect(router.snapshot().harness.skills.map((k) => k.name)).toContain('migracao');
-  });
-
-  it('o perfil do projeto responde com o requestId, ou com o erro na própria resposta', async () => {
-    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ scripts: { test: 'vitest' } }));
-    await bridge.handle({ type: 'harness.project.profile', requestId: 'p1' });
-    expect(sent.at(-1)).toMatchObject({
-      type: 'harness.project.profileResult',
-      requestId: 'p1',
-      profile: { languages: ['JavaScript'], scripts: { test: 'vitest' } },
-    });
-  });
-});
-
-describe('HostBridge: plugins pela CLI do Claude Code', () => {
-  const plugin = (rel: string, name: string) => {
-    const manifest = path.join(dir, 'h', rel, '.claude-plugin', 'plugin.json');
-    fs.mkdirSync(path.dirname(manifest), { recursive: true });
-    fs.writeFileSync(manifest, JSON.stringify({ name }));
-    return path.join(dir, 'h', rel);
-  };
-  const flush = () => new Promise((r) => setTimeout(r, 0));
-
-  it('lista os instalados pela CLI, desativa os marcados e avisa quando terminou', async () => {
-    const synced = plugin('.claude/plugins/synced/org/design~g2', 'design');
-    const cached = plugin('.claude/plugins/cache/loja/fmt/1.0', 'fmt');
-    plugin('.claude/plugins/marketplaces/loja/plugins/catalogo', 'catalogo');
-    const calls: string[][] = [];
-    router.setClaudeCli((args) => {
-      calls.push(args);
-      const stdout =
-        args[1] === 'list'
-          ? JSON.stringify([
-              { id: 'design@synced', scope: 'synced', enabled: true, installPath: synced },
-              { id: 'fmt@loja', scope: 'user', enabled: true, installPath: cached },
-            ])
-          : '{"outcome":"ok","message":"ok"}';
-      return Promise.resolve({ code: 0, stdout, stderr: '' });
-    });
-    await flush();
-    const plugins = () =>
-      router
-        .snapshot()
-        .harness.inventory.find((t) => t.tool === 'claude')!
-        .items.filter((i) => i.kind === 'plugin');
-    expect(plugins().map((p) => [p.name, p.install?.id])).toEqual([
-      ['design', 'design@synced'],
-      ['fmt', 'fmt@loja'],
-    ]);
-
-    await bridge.handle({ type: 'harness.plugin.apply', tool: 'claude', action: 'disable', ids: ['design@synced', 'fmt@loja'] });
-    expect(calls.filter((c) => c[1] === 'disable')).toEqual([
-      ['plugin', 'disable', 'design@synced', '--json'],
-      ['plugin', 'disable', 'fmt@loja', '--json'],
-    ]);
-    expect(sent.at(-1)).toEqual({
-      type: 'notice',
-      message:
-        'Plugins desativados: design, fmt. Vale a partir da próxima sessão do Claude Code, ou depois de /reload-plugins numa sessão aberta.',
-    });
-    // a lista é consultada de novo depois da ação
-    expect(calls.filter((c) => c[1] === 'list').length).toBe(2);
-  });
-
-  it('um plugin sincronizado do claude.ai não é desinstalado, e a tela recebe o erro e o fim', async () => {
-    const synced = plugin('.claude/plugins/synced/org/design', 'design');
-    router.setClaudeCli((args) =>
-      Promise.resolve({
-        code: 0,
-        stdout: args[1] === 'list' ? JSON.stringify([{ id: 'design@synced', scope: 'synced', enabled: true, installPath: synced }]) : '',
-        stderr: '',
-      }),
-    );
-    await flush();
-    await bridge.handle({ type: 'harness.plugin.apply', tool: 'claude', action: 'uninstall', ids: ['design@synced'] });
-    expect(sent.at(-1)).toEqual({ type: 'error', message: 'Nenhum dos plugins escolhidos aceita essa ação.' });
+    await bridge.handle({ type: 'harness.item.open', requestId: 'o1', path: outside });
+    expect(result()).toMatchObject({ ok: false, error: 'Arquivo fora do harness.' });
   });
 });
 
@@ -694,13 +529,13 @@ describe('HostBridge: Settings do editor', () => {
 });
 
 describe('biblioteca: importar e abrir uma pasta', () => {
-  it('o seletor lista as skills para revisão antes de copiar', async () => {
+  it('o seletor lista os artefatos para revisão antes de copiar', async () => {
     const source = path.join(dir, 'colecao');
     fs.mkdirSync(path.join(source, 'react'), { recursive: true });
     fs.writeFileSync(path.join(source, 'react/SKILL.md'), '---\nname: react\ndescription: Componentes\n---\nInstruções');
     env.pickFolder = async () => source;
-    await bridge.handle({ type: 'harness.library.pick', requestId: 'pick-library' });
-    expect(router.snapshot().harnessInstall?.skills.map((k) => k.name)).toEqual(['react']);
+    await bridge.handle({ type: 'harness.library.pickArtifacts', requestId: 'pick-library' });
+    expect(router.snapshot().harness.library!.preview?.items.map((k) => k.name)).toEqual(['react']);
     expect(router.snapshot().harness.library!.artifacts).toEqual([]);
     expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'pick-library', ok: true });
   });

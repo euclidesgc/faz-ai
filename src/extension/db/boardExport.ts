@@ -61,7 +61,6 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   // a marcação do harness é deste board: vai junto (os caminhos relativos ao projeto e a `~` valem na outra máquina)
   { name: 'harness_selection', where: 'board_id = ?', hasId: false },
   // as pastas importadas são caminhos absolutos desta máquina: vão junto, e na outra máquina os artefatos ficam ausentes até a pessoa reimportar
-  { name: 'harness_imports', where: 'board_id = ?', hasId: false, since: 30 },
   // Os artefatos do board (#615) exportam somente referências às configurações MCP locais.
   { name: 'board_artifacts', where: 'board_id = ?', hasId: true, since: 34 },
   { name: 'agent_context_contracts', where: 'board_id = ?', hasId: false, since: 35 },

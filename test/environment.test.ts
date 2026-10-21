@@ -141,7 +141,7 @@ describe('Diagnóstico do ambiente', () => {
   it('o board não instala nada de terceiros: cada item traz o site ou o comando para copiar', async () => {
     const r = await checkEnvironment(probe({ tool: 'claude' }));
     const items = all(r);
-    expect(items.filter((c) => c.requirement?.action && c.requirement.action.kind !== 'installSkill')).toEqual([]);
+    expect(items.filter((c) => c.requirement?.action && c.requirement.action.kind !== 'settings')).toEqual([]);
     expect(find(r.required, 'node').docs).toBe('https://nodejs.org/en/download');
     expect(find(r.required, 'cli').docs).toBe('https://code.claude.com/docs/en/setup');
     expect(find(r.required, 'signin').command).toBe('claude auth login');
@@ -162,7 +162,7 @@ describe('Diagnóstico do ambiente', () => {
     };
     const r = await checkEnvironment(probe({ requirements: [mcp, signin], commands: { 'cursor-agent': '/bin/cursor-agent' } }));
     expect(find(r.required, 'mcp')).toMatchObject({ status: 'missing', requirement: mcp });
-    expect(find(r.required, 'skill')).toMatchObject({ status: 'missing', requirement: { action: { kind: 'installSkill' } } });
+    expect(find(r.required, 'skill')).toMatchObject({ status: 'missing', requirement: { action: { kind: 'settings' } } });
     expect(find(r.required, 'signin')).toMatchObject({ status: 'missing', command: 'cursor-agent login', requirement: signin });
   });
 

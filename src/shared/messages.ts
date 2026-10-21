@@ -8,9 +8,8 @@ import type { Appearance } from './appearance';
 import type { ImportSummary } from './backup';
 import type { ViewState } from './filters';
 import type { UiPrefs } from './prefs';
-import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from './harness';
+import type { AiTool, InstallScope } from './harness';
 import type { HarnessUsage, SelectableKind } from './harnessSelection';
-import type { HookInput, McpServerInput } from './harnessCatalog';
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { CardUsage } from './cardUsage';
 import type { QuestionInput } from './questions';
@@ -20,7 +19,6 @@ import type { RenameKind } from './branchRename';
 import type { BulkCardStatus, CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { BranchKind, GitConfig } from './git';
-import type { ProjectProfile } from './projectProfile';
 import type { AiProfileDraft } from './aiProfiles';
 
 /** O que o board grava num arquivo de agente: o frontmatter (menos o nome) e o corpo. */
@@ -277,52 +275,13 @@ export type WebviewToHost =
   /** grava o texto editado no board num arquivo do harness; recusa os que são só leitura */
   /** grava o texto editado num arquivo do harness; a confirmação vem pelo `done` do `requestId` */
   | { type: 'harness.file.write'; path: string; content: string }
-  /** cria um item num lugar do catálogo da ferramenta (`source` é o índice em HARNESS_CATALOG) e abre o arquivo no editor */
-  | { type: 'harness.item.create'; tool: AiTool; source: number; name: string; description: string }
-  /**
-   * cria um item já com o conteúdo (os assistentes de regras e de skills) e abre o arquivo no editor do board. Numa
-   * skill, `files` são arquivos de apoio criados vazios na pasta dela. Com `append`, um arquivo fixo que já existe
-   * (CLAUDE.md, AGENTS.md) ganha o conteúdo no fim em vez de dar erro
-   */
-  | { type: 'harness.item.write'; tool: AiTool; source: number; name: string; content: string; files?: string[]; append?: boolean }
-  /** o perfil do projeto (linguagens, comandos, ferramentas, pastas) para os assistentes; a resposta é `harness.project.profileResult` */
-  | { type: 'harness.project.profile'; requestId: string }
   | { type: 'harness.agent.assist'; requestId: string; input: AgentAssistInput }
-  /** apaga um arquivo ou uma pasta de skill do projeto ou da pasta do usuário */
-  | { type: 'harness.item.delete'; tool: AiTool; kind: HarnessKind; path: string }
-  /** desinstala, desativa ou ativa plugins pela ferramenta; `ids` são os de `HarnessItem.install` */
-  | { type: 'harness.plugin.apply'; tool: AiTool; action: PluginAction; ids: string[] }
-  /** copia skills, agentes, comandos ou regras para o projeto ou para a pasta do usuário */
-  | { type: 'harness.item.copy'; tool: AiTool; items: { kind: HarnessKind; path: string }[]; to: 'project' | 'user' }
+  /** grava um arquivo de regras (CLAUDE.md, AGENTS.md) no board; sem a cópia, ela nasce desligada */
   | { type: 'harness.rule.write'; name: string; content: string }
   | { type: 'harness.rule.delete'; name: string }
+  /** cria uma skill no board, disponível para indicar nos cards; `content` são as instruções, sem o frontmatter */
   | { type: 'harness.skill.create'; name: string; description: string; content: string }
-  | { type: 'harness.skill.write'; name: string; content: string }
-  | { type: 'harness.skill.setEnabled'; name: string; enabled: boolean }
   | { type: 'harness.skill.delete'; name: string }
-  /** acrescenta um servidor MCP a um arquivo de configuração da ferramenta (`source` é o índice em HARNESS_CATALOG) */
-  | { type: 'harness.mcp.add'; tool: AiTool; source: number; server: McpServerInput }
-  | { type: 'harness.mcp.remove'; tool: AiTool; path: string; name: string }
-  /** acrescenta um hook a um arquivo de hooks da ferramenta (`source` é o índice em HARNESS_CATALOG) */
-  | { type: 'harness.hook.add'; tool: AiTool; source: number; hook: HookInput }
-  /** remove o hook listado: `event` é o nome do item e `command` o detalhe dele */
-  | { type: 'harness.hook.remove'; tool: AiTool; path: string; event: string; command: string }
-  /** regra de permissão numa das listas (allow, ask, deny) do arquivo de configuração */
-  | { type: 'harness.permission.add'; tool: AiTool; source: number; list: string; rule: string }
-  | { type: 'harness.permission.remove'; tool: AiTool; path: string; list: string; rule: string }
-  /** arquivo de apoio de uma skill (`path` é o SKILL.md, `file` o caminho dentro da pasta dela); criar abre o arquivo no editor */
-  | { type: 'harness.skill.file.create'; tool: AiTool; path: string; file: string; link: boolean }
-  | { type: 'harness.skill.file.open'; tool: AiTool; path: string; file: string }
-  | { type: 'harness.skill.file.delete'; tool: AiTool; path: string; file: string }
-  /** cria no projeto a skill de modelos e exemplos de código, só quando indicada */
-  | { type: 'harness.referenceSkill.create' }
-  /** procura skills numa pasta ou num repositório git (clonado numa pasta temporária); o resultado vem em `harnessInstall` */
-  | { type: 'harness.install.scan'; source: string }
-  /** copia as skills escolhidas para a pasta de skills da ferramenta, no projeto ou na pasta do usuário */
-  | { type: 'harness.install.apply'; tool: AiTool; to: 'project' | 'user'; rels: string[] }
-  | { type: 'harness.install.cancel' }
-  /** invocação automática ou só quando indicada, numa skill do projeto ou da pasta do usuário (`path` é o SKILL.md) */
-  | { type: 'harness.skill.setMode'; tool: AiTool; paths: string[]; mode: SkillMode }
   /**
    * envia artefatos ao board com um modo, muda o modo dos que já estão nele, ou os tira do board (com
    * `usage` null): `location` é a identidade do item na marcação (`selectionKey`: o caminho como o
@@ -345,19 +304,8 @@ export type WebviewToHost =
   | { type: 'harness.library.pickArtifacts' }
   | { type: 'harness.library.directory'; dir: string }
   | { type: 'harness.library.update'; id: string }
-  | { type: 'harness.library.import'; rels: string[] }
   | { type: 'harness.library.open' }
-  | { type: 'harness.library.pick' }
   | { type: 'harness.selection.set'; items: { kind: SelectableKind; location: string }[]; usage: HarnessUsage | null }
-  /** a IA analisa o projeto e o catálogo do assunto e pré-seleciona os artefatos que fazem mais sentido (resultado em `harnessSuggestions`) */
-  | { type: 'harness.suggest.run'; tool: AiTool; kind: SelectableKind }
-  | { type: 'harness.suggest.clear' }
-  /** abre o seletor de pasta do editor e importa a pasta escolhida para a ferramenta (só no editor) */
-  | { type: 'harness.import.pick'; tool: AiTool }
-  /** importa uma pasta: o board a varre atrás de artefatos no formato da ferramenta e os lista em "Importados" */
-  | { type: 'harness.import.add'; tool: AiTool; dir: string }
-  /** tira a pasta importada da lista; os artefatos dela saem do board */
-  | { type: 'harness.import.remove'; tool: AiTool; dir: string }
   /** cria um agente no board (guardado no banco, não na pasta da ferramenta), disponível para os cards; `scope` é ignorado */
   | { type: 'harness.agent.create'; scope?: InstallScope; input: AgentInput }
   /** reescreve o frontmatter (o que vier em `patch`) e, se vier, o corpo de um agente, preservando o resto */
@@ -399,7 +347,6 @@ export type WebviewToHost =
    * instala a skill do fluxo no global de uma ferramenta (padrão: a do projeto), nunca no projeto;
    * `replace` troca uma skill de mesmo nome que já esteja no destino (sem ele, a que existe fica)
    */
-  | { type: 'harness.flowSkill.install'; tool?: AiTool; replace?: boolean }
   /** exporta o board num arquivo JSON (no editor, abre o "salvar como"; na web a página baixa pela rota /backup/export) */
   | { type: 'backup.export' }
   /** escolhe um arquivo de export, valida e devolve o resumo em `backup.import.summary` (na web a página envia por /backup/import) */
@@ -426,14 +373,11 @@ export type HostToWebview =
   | { type: 'attachment.readResult'; requestId: string; content?: string; error?: string }
   /** resposta a `harness.file.read`: o conteúdo e se o arquivo pode ser alterado pelo board */
   | { type: 'harness.file.readResult'; requestId: string; content?: string; readonly?: boolean; error?: string }
-  /** item do harness criado pela tela: ela abre o arquivo no editor do board */
-  | { type: 'harness.item.created'; path: string }
   /** resposta a `harness.project.profile`, correlacionada por `requestId` */
   | { type: 'harness.library.content'; input: LibraryArtifactInput }
   | { type: 'harness.agent.assistResult'; requestId: string; result?: AgentAssistResult; error?: string }
   | { type: 'harness.library.directorySelected'; directory: string }
   | { type: 'harness.library.foldersResult'; directory: string; parent: string; folders: { name: string; path: string }[] }
-  | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
   /** prévia dos contratos salvos, sem corpos de artefatos, inferência ou admissão */

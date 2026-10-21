@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { frontmatterOf, frontmatterValue } from '../src/extension/frontmatter';
-import { parseFrontmatter } from '../src/extension/harness';
+import { parseFrontmatter } from '../src/extension/frontmatter';
 
 describe('frontmatter', () => {
   it('lê aspas duplas como string JSON, com escapes', () => {

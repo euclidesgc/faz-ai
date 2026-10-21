@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 44;
+export const SCHEMA_VERSION = 45;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -588,6 +588,11 @@ const MIGRATIONS: Record<number, string> = {
     -- #895: perguntas da IA ainda sem resposta (o carrossel do card), em JSON.
     -- Vazio quando não há; o envio das respostas grava a descrição e esvazia.
     ALTER TABLE cards ADD COLUMN questions_json TEXT NOT NULL DEFAULT '[]';
+  `,
+  45: `
+    -- #926: o board não varre mais pastas de ferramentas; a lista de pastas importadas por ferramenta sai.
+    -- harness_selection fica: a marcação de uso (Sempre / Pelo card) continua sendo do board.
+    DROP TABLE IF EXISTS harness_imports;
   `,
 };
 

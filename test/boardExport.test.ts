@@ -219,15 +219,18 @@ describe('parseExportFile', () => {
   });
 
   it('aceita schema mais antigo (a importação migra) e preenche o que faltar no cabeçalho', () => {
-    // um export da 0.40.0 (formato 29) não tem a tabela de pastas importadas, criada no formato 30: vale vazia
-    const f = parseExportFile(
-      bad((x) => ((x.schemaVersion = 21), delete x.exportedAt, delete x.extensionVersion, delete x.tables.harness_imports)),
-    );
+    const f = parseExportFile(bad((x) => ((x.schemaVersion = 21), delete x.exportedAt, delete x.extensionVersion)));
     expect(f.schemaVersion).toBe(21);
-    expect(f.tables.harness_imports).toEqual([]);
-    expect(() => parseExportFile(bad((x) => delete x.tables.harness_imports))).toThrow('falta a tabela "harness_imports"');
     expect(f.exportedAt).toBe('');
     expect(f.extensionVersion).toBe('');
+  });
+
+  it('um export antigo com a tabela harness_imports (removida no formato 45) ainda é aceito, e o export novo não a traz', () => {
+    expect(doExport().file.tables.harness_imports).toBeUndefined();
+    const f = parseExportFile(
+      bad((x) => ((x.schemaVersion = 44), (x.tables.harness_imports = [{ board_id: 'b', tool: 'claude', dir: '/x' }]))),
+    );
+    expect(f.schemaVersion).toBe(44);
   });
 });
 
@@ -252,17 +255,7 @@ describe('summarize', () => {
 
 /** O snapshot sem o que muda de propósito na importação (a chave da pasta) e sem o que não vem do banco. */
 function comparable(s: BoardState) {
-  const {
-    board,
-    harness: _h,
-    chat: _c,
-    aiRuns: _a,
-    autopilot: _p,
-    aiRunUnsupported: _u,
-    harnessInstall: _i,
-    pendingUpgrade: _g,
-    ...rest
-  } = s;
+  const { board, harness: _h, chat: _c, aiRuns: _a, autopilot: _p, aiRunUnsupported: _u, pendingUpgrade: _g, ...rest } = s;
   const { workspaceKey: _k, ...b } = board;
   return { ...rest, board: b };
 }

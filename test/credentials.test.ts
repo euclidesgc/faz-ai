@@ -39,15 +39,15 @@ function makeRouter(db: Awaited<ReturnType<typeof openInMemory>>) {
   });
 }
 describe('credenciais locais e referências MCP', () => {
-  it('o editor legado não lê nem sobrescreve o arquivo MCP nativo com segredos', async () => {
+  it('o editor não lê nem sobrescreve o arquivo MCP nativo com segredos (só a biblioteca do board é editável)', async () => {
     const db = await openInMemory(wasm);
     const router = makeRouter(db);
     const file = path.join(dir, '.mcp.json');
     const content = JSON.stringify({ mcpServers: { private: definition } });
     fs.writeFileSync(file, content);
     router.refreshHarness();
-    expect(() => router.readHarnessFile(file)).toThrow('Configurações MCP');
-    expect(() => router.writeHarnessFile(file, '{"mcpServers":{}}')).toThrow('Configurações MCP');
+    expect(() => router.readHarnessFile(file)).toThrow('fora do harness');
+    expect(() => router.writeHarnessFile(file, '{"mcpServers":{}}')).toThrow('não pode ser alterado');
     expect(fs.readFileSync(file, 'utf8')).toBe(content);
     db.close();
   });

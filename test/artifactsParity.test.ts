@@ -107,11 +107,20 @@ async function buildExecutionState(): Promise<Fixture> {
   });
   router.handle({ type: 'settings.models.set', catalog: [SONNET] });
 
-  const inventory = () => router.snapshot().harness.inventory.find((t) => t.tool === 'claude')!.items;
+  // localização de cada item na pasta de origem (o que a importação lê); o inventário por ferramenta saiu
+  const locations: Record<string, string> = {
+    [`agent:${AGENT}`]: `~/.claude/agents/${AGENT}.md`,
+    [`skill:${SKILL}`]: `.claude/skills/${SKILL}/SKILL.md`,
+    'skill:faz-ai-fluxo': '.claude/skills/faz-ai-fluxo/SKILL.md',
+    'instructions:CLAUDE.md': 'CLAUDE.md',
+    [`instructions:${RULE}`]: `.claude/rules/${RULE}.md`,
+    'mcp:memoria': '.mcp.json',
+    'mcp:github': '.mcp.json',
+  };
   const mark = (kind: 'agent' | 'skill' | 'instructions' | 'mcp', names: string[], usage: 'always' | 'contextual') =>
     router.handle({
       type: 'harness.selection.set',
-      items: names.map((n) => ({ kind, location: selectionLocation(inventory(), kind, n) })),
+      items: names.map((n) => ({ kind, location: selectionLocation(locations, kind, n) })),
       usage,
     });
   mark('agent', [AGENT], 'contextual');
@@ -135,7 +144,7 @@ async function buildExecutionState(): Promise<Fixture> {
     title: 'Revisar',
   });
   const rulesField = router.snapshot().fieldDefs.find((f) => f.kind === 'multiselect' && f.name.toLowerCase() === 'rules')!;
-  router.handle({ type: 'field.setValue', cardId, fieldId: rulesField.id, value: [selectionLocation(inventory(), 'instructions', RULE)] });
+  router.handle({ type: 'field.setValue', cardId, fieldId: rulesField.id, value: [selectionLocation(locations, 'instructions', RULE)] });
 
   const s = router.snapshot();
   return {
@@ -158,10 +167,10 @@ async function buildExecutionState(): Promise<Fixture> {
 }
 
 /** A identidade do item na marcação, como a tela a manda: `arquivo#nome` para servidor MCP, a localização para o resto. */
-function selectionLocation(items: { kind: string; name: string; location: string }[], kind: string, name: string): string {
-  const found = items.find((i) => i.kind === kind && i.name === name);
+function selectionLocation(locations: Record<string, string>, kind: string, name: string): string {
+  const found = locations[`${kind}:${name}`];
   if (!found) throw new Error(`item de fixture não encontrado: ${kind} ${name}`);
-  return kind === 'mcp' ? `${found.location}#${name}` : found.location;
+  return kind === 'mcp' ? `${found}#${name}` : found;
 }
 
 /** Tudo o que a execução do card recebe, reduzido a valores comparáveis (sem caminho absoluto). */

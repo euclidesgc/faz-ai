@@ -151,7 +151,6 @@ describe('contexto estimado de um card', () => {
     const s = stateWith({
       cards: [story],
       harnessSelection: [],
-      harnessImports: [],
       fieldValues: [{ cardId: 'h1', fieldId: 'f-skills', value: ['apagada'] }],
     });
     const e = estimateContext(s, story);

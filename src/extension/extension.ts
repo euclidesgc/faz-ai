@@ -10,8 +10,6 @@ import { readBridgeVersion, socketPath, stableBridgePath, workspaceKey, writeBri
 import { registerCursorProject } from './mcp/clientConfig';
 import { baseInfo, type AiTool } from '../shared/harness';
 import { ensureUserServers } from './mcp/reinstall';
-import { installFlowSkillFiles } from './flowSkill';
-import { copyTarget } from '../shared/harnessCatalog';
 import { resolveCommand } from './cliResolve';
 import { loginShellPath } from './spawn';
 import { BoardPanel } from './panel/BoardPanel';
@@ -28,7 +26,6 @@ import type { AiRunner } from './runner';
 import { Autopilot } from './autopilot';
 import type { Heartbeat } from './heartbeat';
 import { revealInSystem } from './web/osOpen';
-import { HarnessWatcher, userWatchTargets, type WatchFn } from './harnessWatch';
 import { preferredPort, startWebServer, type WebServer } from './web/webServer';
 import { exportNotice, importNotice } from './host/hostBridge';
 import { parseExportFile } from './db/boardExport';
@@ -42,7 +39,6 @@ let heartbeat: Heartbeat | null = null;
 let autopilot: Autopilot | null = null;
 let heartbeatTimer: NodeJS.Timeout | undefined;
 let web: WebServer | null = null;
-let harnessWatch: HarnessWatcher | null = null;
 /** outra janela do editor (ou o faz-ai do terminal) já serve o board desta pasta */
 let servedElsewhere = false;
 const HEARTBEAT_KEY = 'fazai.heartbeatEnabled';
@@ -96,12 +92,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!f) return Promise.resolve(undefined);
     routerPromise ??= (async () => {
       const log = (line: string) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`);
-      // os arquivos globais do harness passam a ser observados quando o board carrega, e não em toda janela
-      harnessWatch = new HarnessWatcher(
-        () => userWatchTargets(os.homedir(), f.uri.fsPath),
-        watchOutside,
-        () => void routerPromise?.then((r) => r.refreshHarness()),
-      );
       host = await createBoardHost({
         storageDir: storage,
         wasmDir,
@@ -388,20 +378,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
   );
 
-  // regras e skills editadas por fora (editor, IA, git) aparecem no board: as do projeto por este
-  // watcher, as da pasta do usuário pelo `harnessWatch`, que junta as duas numa releitura só
-  const wf = folder();
-  if (wf) {
-    const watcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(
-        wf,
-        '{CLAUDE.md,CLAUDE.local.md,AGENTS.md,AGENTS.override.md,.mcp.json,.vscode/mcp.json,.claude/**,.agents/**,.cursor/**,.kimi-code/**}',
-      ),
-    );
-    const refresh = () => harnessWatch?.notify();
-    context.subscriptions.push(watcher, watcher.onDidCreate(refresh), watcher.onDidChange(refresh), watcher.onDidDelete(refresh));
-  }
-
   // servidor MCP: deixa uma IA consultar e editar o board desta pasta (o banco só é aberto no primeiro uso)
   const f = folder();
   if (f) {
@@ -490,10 +466,6 @@ function ensureUserInstall(
         currentVersion: version,
         wanted,
       });
-      for (const tool of done) {
-        const skills = copyTarget(tool, 'skill', 'skills', 'user');
-        if (skills) installFlowSkillFiles(path.join(homeDir, skills.path));
-      }
       if (done.length) output.appendLine(`Faz AI ${version}: servidor do board instalado no usuário em ${done.join(', ')}.`);
       if (!failed.length) {
         if (installedVersion !== version) writeBridgeVersion(version, homeDir);
@@ -553,27 +525,7 @@ async function connectAI(
   void vscode.window.showInformationMessage(done.message);
 }
 
-/**
- * Watcher do editor num caminho fora da pasta aberta (documentação de `createFileSystemWatcher`): `**`
- * observa a pasta com as subpastas, e `*` sobre um arquivo observa só ele, sem watcher recursivo.
- */
-const watchOutside: WatchFn = (target, onEvent) => {
-  const watcher = vscode.workspace.createFileSystemWatcher(
-    new vscode.RelativePattern(vscode.Uri.file(target.path), target.recursive ? '**' : '*'),
-  );
-  const listeners = [watcher.onDidCreate(onEvent), watcher.onDidChange(onEvent), watcher.onDidDelete(onEvent)];
-  return {
-    dispose() {
-      for (const l of listeners) l.dispose();
-      watcher.dispose();
-    },
-  };
-};
-
 export async function deactivate(): Promise<void> {
-  // antes de fechar o banco: uma releitura agendada não chega a um board já fechado
-  harnessWatch?.dispose();
-  harnessWatch = null;
   clearInterval(heartbeatTimer);
   web?.close();
   web = null;

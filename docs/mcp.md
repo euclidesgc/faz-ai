@@ -117,7 +117,7 @@ agente, skill, ferramenta usada, ferramenta MCP ou `bash_command`: o comando-bas
 Bash, sem argumentos, só do Claude Code), catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
 `set_model_rules`), padrões por tipo de card (`update_card_type`), recriar o board (`reset_board`) e o
 harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,
-`set_skill_enabled`, `delete_skill`…).
+`delete_skill`…).
 
 `get_models.profiles` lista os perfis de CLI e seus IDs, sem comando, configuração ou ambiente
 privado. O prefixo do `value` escolhe o perfil de CLI que executa o card; sem modelo no card, no agente
@@ -179,19 +179,18 @@ vira aprovação na hora nas outras, e a IA é mandada decidir e seguir. `update
 
 ### Agentes
 
-Um agente do board é uma cópia guardada no banco do board. `get_harness` lista os marcados como
-disponíveis; com `onlySelected: false`, lista também os agentes do board junto com os arquivos de agente
-da ferramenta, com a marcação em `usage`. `get_agent` lê a cópia do board. `create_agent`,
+Um agente do board é uma cópia guardada no banco do board. `get_harness` lista só o que está no
+board, com a marcação em `usage`. `get_agent` lê a cópia do board. `create_agent`,
 `update_agent` e `delete_agent` gravam só no board: `scope` é aceito e ignorado, e o agente criado já
 nasce disponível. Editar um agente copiado de um arquivo da ferramenta não altera o arquivo original;
-`delete_agent` tira o agente do board sem apagar o arquivo, e um agente que existe só na pasta da
-ferramenta (sem cópia no board) continua sendo editado ou apagado no seu arquivo. `create_agent` e
+`delete_agent` tira o agente do board sem apagar o arquivo. `create_agent` e
 `update_agent` aceitam, além das instruções, `description`, `model` (valor do campo Modelo, ex.:
 `claude:sonnet@medium`), `tools`, `deniedTools`, `skills` e `mcp`, e, no Cursor (que não tem lista de
 ferramentas, skills nem MCP por subagente), `readonly` e `background` (`readonly: true` e
-`is_background: true` no frontmatter); num agente do board, o que é só do board fica no banco; num arquivo
-de agente da ferramenta editado pelo board, em chaves `faz-ai-*` do frontmatter. Os arquivos de agente de cada ferramenta ficam numa
-pasta própria (a global fica em `~/`); o board não grava nessas pastas:
+`is_background: true` no frontmatter); o que é só do board fica no banco. Os arquivos de agente de cada ferramenta ficam numa
+pasta própria (a global fica em `~/`); o board só os lê na importação e não grava nessas pastas.
+Para apagar os agentes `faz-ai-*` que versões antigas gravaram nelas, remova os arquivos `faz-ai-*.md` de
+`~/.claude/agents`, `.claude/agents`, `.cursor/agents` e `.kimi-code/agents` (o board não os apaga sozinho):
 
 | Ferramenta | Pasta | Arquivo | Modelo por agente |
 | --- | --- | --- | --- |
@@ -230,51 +229,44 @@ dos demais. A IA descobre os schemas antes de chamar uma ferramenta.
 
 As definições MCP da biblioteca ficam cifradas no cofre local do host. Leituras, inclusive do editor, devolvem apenas referência, transporte e estado de revisão/disponibilidade. `save_board_artifact` por IA não pode gravar configurações MCP. A pessoa substitui a definição no editor; importações ficam pendentes e são recusadas antes da preparação e do encaminhamento. A leitura de arquivos de configuração MCP pela interface também é recusada. Logs e resultados encaminhados ocultam valores conhecidos pelo cofre. Perfis de CLI e APIs legadas de arquivos nativos ainda não têm a cobertura completa de #728. `get_skill`, `update_skill` e
 `write_skill_file` priorizam a cópia; `get_agent` lê a cópia do board. APIs de arquivos nativos seguem
-por compatibilidade. `onlySelected: false` inclui também os agentes do board, junto com as fontes nativas para clientes antigos.
+por compatibilidade com cópias já feitas.
 
-### Projeto, global e plugins
+### O que o board usa
 
-O board lê o harness de cada ferramenta em três escopos: a pasta do projeto (`project`), a pasta do
-usuário (`user`, vale em todos os projetos) e os plugins instalados (`plugin`; no Claude Code, os que
-`claude plugin list` mostra, sem o catálogo dos marketplaces). `get_harness` devolve
-em `inventory` tudo que a ferramenta do projeto carrega (instruções e regras, skills, agentes,
-comandos, hooks, servidores MCP, plugins e arquivos de configuração), com o escopo e o caminho de
-cada item, e o `group` em que a tela de Harness o mostra: `main` (regras principais), `topic` (regras
-por assunto), `memory` (memória automática do Claude Code), `skill`, `agent`, `command`, `hook`, `mcp`,
-`settings`, `style` (estilos de saída), `plugin` e `managed` (política da organização, só leitura).
-De hooks e servidores MCP só vão o nome e o comando ou a URL, sem argumentos nem variáveis.
+O board **não varre** as pastas das ferramentas nem grava nelas (fora de "Conectar ao board", de
+"Exportar para a ferramenta" e do MCP temporário da execução). `get_harness` devolve só o que foi enviado
+ao board (Configurações → Harness): as rules, skills, agentes e servidores MCP, cada um com o modo em
+`usage`, em `skills`, `agents`, `library.artifacts` e `inventory` (a lista do que está no board, com o
+`group` que a tela usa). Plugins, hooks e permissões da ferramenta não aparecem mais no board.
+`get_harness` não aceita mais `onlySelected`.
 
-Toda execução pelo board parte de contexto vazio: só entra o que está no board (Configurações →
-Harness). `set_harness_selection` envia ao board rules (`instructions`), skills, agentes e servidores
-MCP (`mcp`), muda o modo deles ou os tira do board: `always` (Sempre) entra em toda execução, pelo
-caminho do arquivo ou na configuração de servidores da execução; `contextual` (Pelo card) vira opção
-dos campos "Rules", "Skills" e "MCPs" dos cards (e agente disponível); `off` (Desligado) fica no
-board sem entrar em nada, que é como as regras entram, para revisão; `null` tira do board. Cada item do
-inventário traz em `key` a identidade para `set_harness_selection`: o caminho; num servidor MCP, o
-arquivo mais o nome (`.mcp.json#github`). O `name` também serve para agente, skill e servidor. Os campos "Rules",
-"Skills" e "MCPs" dos cards só oferecem o que está em `contextual`; o servidor do board vai sempre, sem
-marcação. O inventário traz também o escopo `imported`: artefatos de pastas que a pessoa importou, que
-a ferramenta não carrega sozinha. Em `get_card`, `requiredRules` e `requiredSkills` trazem o caminho de cada
-arquivo que o card exige; para skills fora do projeto, `path` é o caminho absoluto do `SKILL.md`. As skills
-do fluxo do board vêm sem `path`, com `{ scope: "board", via: "get_skill" }`, e se leem com `get_skill`.
-Quando uma skill existe no projeto e fora dele com o mesmo nome, vale a do projeto (exceto as do fluxo, que
-são sempre as do board). `create_skill` e `install_flow_skill` já marcam o que criam (`contextual` e `always`,
-respectivamente). `install_flow_skill` é opcional: o board já serve o fluxo pelo `get_skill`.
+Toda execução pelo board parte de contexto vazio: só entra o que está no board.
+`set_harness_selection` envia ao board rules (`instructions`), skills, agentes e servidores MCP
+(`mcp`), muda o modo deles ou os tira do board, e identifica cada item por `{ kind, name }`, como
+`get_harness` o mostra (o item é estrito: `location` dá erro): `always` (Sempre) entra em toda execução;
+`contextual` (Pelo card) vira opção dos campos "Rules", "Skills" e "MCPs" dos cards (e agente
+disponível); `off` (Desligado) fica no board sem entrar em nada, que é como as regras entram, para
+revisão; `null` tira do board. Os campos "Rules", "Skills" e "MCPs" dos cards só oferecem o que está em
+`contextual`; o servidor do board vai sempre, sem marcação. Em `get_card`, `requiredRules` e
+`requiredSkills` trazem o caminho de cada arquivo que o card exige. As skills do fluxo do board vêm sem
+`path`, com `{ scope: "board", via: "get_skill" }`, e se leem com `get_skill`; elas são sempre as do
+board. `create_skill` marca o que cria como `contextual`.
+
+**Removido:** `install_flow_skill` (o fluxo chega pelo `get_skill`, sem arquivo na pasta da ferramenta) e
+`set_skill_enabled` (não há mais skill ligada ou desligada na pasta da ferramenta). `set_ai_tool` continua.
 
 ### Skills sob demanda
 
-Cada skill do projeto ou da pasta do usuário tem um modo: `auto` (a IA vê a descrição e decide quando
-usar) ou `manual` (só quando indicada num card ou chamada pelo nome). O modo é gravado no formato de
-cada ferramenta: `disable-model-invocation: true` no frontmatter do `SKILL.md` (Claude Code e Cursor). Uma skill
-desligada ou em modo `manual` continua valendo nos cards que a indicam: `requiredSkills` traz o
-caminho do `SKILL.md`, e a execução pelo board passa esses caminhos no prompt.
+No board, uma skill em `contextual` (Pelo card) só vale nos cards que a indicam; em `always`, entra em toda
+execução. O board não grava o modo na pasta da ferramenta. `requiredSkills` traz a skill da cópia do board,
+e a execução pelo board passa esses caminhos no prompt.
 
 ### Modelos e referências
 
 Modelos de classe, exemplos de código e outros arquivos de apoio ficam na pasta da skill
 (`references/`, `assets/`, `scripts/`), como as ferramentas preveem: só são lidos quando o `SKILL.md`
 aponta para eles. `get_harness` lista os arquivos de cada skill em `files`, `write_skill_file` grava
-um arquivo numa skill do projeto, e em `get_card` cada skill de `requiredSkills` traz em `files` os
+um arquivo na cópia da skill no board, e em `get_card` cada skill de `requiredSkills` traz em `files` os
 caminhos dos arquivos de apoio dela.
 
 ### Agente de cada card
@@ -307,9 +299,7 @@ linha de comando da ferramenta aceita é imposto por parâmetro:
 
 `withPerson` lista o que espera a pessoa. Cada mensagem da conversa traz `from` (`human` ou `ai`).
 A skill `faz-ai-fluxo`, que descreve o ciclo completo para a IA, é servida pelo `get_skill` e não exige instalação.
-`install_flow_skill` (opcional; sem `scope`: instala no global da ferramenta, para todos os projetos, o mesmo que
-o botão em Harness de IA) copia para a pasta de skills da ferramenta a principal e as skills por assunto, para a
-ferramenta carregá-las sozinha. Não é requisito: a faixa de requisitos não cobra essa instalação.
+Não há instalação da skill na pasta da ferramenta: a faixa de requisitos aponta para Configurações → Harness.
 `get_card` e `get_pending_work` trazem `flowNote` com a indicação de ler o fluxo com `get_skill`.
 
 ### Execução pela conversa

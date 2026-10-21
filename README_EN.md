@@ -149,9 +149,10 @@ promise a percentage: it shows, in the inventory, what is being loaded.
 - **Decide beforehand what the AI uses.** An agent sets the skills, MCP servers, tools and model for
   each phase or card, instead of letting the tool figure it out during the conversation. Every run
   started by the board goes through an agent.
-- **See and configure the whole harness.** For each AI tool installed, the board shows what it
-  loads (instructions, skills, subagents, commands, hooks, MCP servers, plugins and settings), split
-  between the project, your user folder and plugins.
+- **A harness that belongs to the board.** Rules, skills, subagents and MCP servers live in a library
+  kept in the board's database, each in its own mode (Always, By card or Off). The board does not scan the
+  AI tools' folders or write to them: it only reads what you import. Plugins, hooks and permissions of the
+  tool no longer appear in the Harness screen; the connection to the board lives under **Connect to the board**.
 
 ## How to use it
 
@@ -1327,7 +1328,7 @@ Schema 40 migrates library MCP configurations only after confirming the secret o
 
 The `get_project_profile`, `get_board_artifact` and `save_board_artifact` MCP tools let assistants
 work in the library. Legacy tool-specific file APIs remain for compatibility, but agents created or edited on the board are kept in the database; native hooks,
-commands and settings are still managed by their respective tool.
+commands and settings stay managed by their tool and the board does not list them. The `install_flow_skill` and `set_skill_enabled` MCP tools were removed, `get_harness` no longer accepts `onlySelected`, and `set_harness_selection` identifies each item by `{ kind, name }`. To delete the `faz-ai-*` agents that older versions wrote to `.claude/agents`, `.cursor/agents`, `.kimi-code/agents` or `~/.claude/agents`, remove the `faz-ai-*.md` files from those folders.
 
 ## Settings
 
