@@ -49,7 +49,10 @@ ponto que ficou em aberto para ela avaliar, algo que ficou de fora da entrega e 
 O status do card tem de mostrar quem está com a vez, então uma pendência **nunca fica só num
 comentário**: ela entrega o card para a pessoa.
 
-- Precisa da resposta para continuar: \`ask_question\`.
+- Precisa da resposta para continuar: \`ask_questions\` para pergunta com alternativas (inclusive o que iria
+  em \`pending\`), \`ask_question\` para pergunta aberta. Faça as perguntas na história: a descrição dela é o
+  insumo dos documentos. Pergunta sem resposta depois do envio: decida pelo padrão do projeto e registre
+  a decisão na seção "Perguntas e respostas" (\`update_card\`) e na conversa.
 - Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\`.
 - Decidiu ou deixou algo em aberto que ela precisa avaliar: \`request_review\` com \`pending\`
   dizendo o que depende dela. Vale mesmo em coluna sem aprovação. No modo autônomo, não: ali nada
@@ -64,12 +67,9 @@ Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela
    (arquivos, funções, padrões e testes envolvidos) e a Spec a completa. PRD, Spec e Plan começam
    por esse mapa e leem só o que falta; use antes de Read e Grep as ferramentas de índice de código
    que o Harness liberou, se houver. O arquivo lido continua sendo a fonte de verdade.
-   Construa o documento seguindo o modelo em \`phase.artifact.template\`. O que depende de uma
-   resposta da pessoa vai na seção **"Perguntas para você"**, no fim do documento, uma pergunta por
-   vez: as alternativas com o impacto de cada uma (o que custa, o que quebra, o que adia), a sua
-   recomendação com a justificativa e o espaço \`**R.** >\` para ela responder. Repita as perguntas
-   no \`request_review\` (ou em \`ask_question\`, quando não dá para seguir sem a resposta). Sem
-   perguntas, escreva "Nenhuma" na seção.
+   Construa o documento seguindo o modelo em \`phase.artifact.template\`. O que depende da pessoa
+   vai por \`ask_questions\` antes de escrever o documento; o documento não repete as perguntas e usa as
+   respostas da seção "Perguntas e respostas" da descrição em modo afirmativo.
 3. Grave com \`add_attachment\` usando \`artifact: true\` e o nome em \`phase.artifact.filename\`. O arquivo fica anexado à história, mesmo enviado da sub-tarefa, e substitui a versão anterior.
 4. Mova a sub-tarefa para a coluna de conclusão e peça a revisão na história.
 
@@ -114,7 +114,7 @@ não houver):
   ser validados (marque-os explicitamente como não validados).
 
 Se "Travado em mim" tiver qualquer item, o resumo vai no \`request_review\` com esse item em
-\`pending\` (ou em \`ask_question\`/\`block_card\`, conforme o caso), não num \`add_comment\`:
+\`pending\` (ou em \`ask_questions\`/\`ask_question\`/\`block_card\`, conforme o caso), não num \`add_comment\`:
 o card precisa ficar com a pessoa.
 
 Ao revisar código (Implementação, Revisão ou Homologação), concentre-se no diff da branch da história e no
@@ -123,7 +123,8 @@ expressamente uma auditoria geral.
 
 ## Quando parar
 
-- Faltou uma informação ou decisão: \`ask_question\` no card, e pare de trabalhar nele.
+- Faltou uma informação ou decisão: \`ask_questions\` (com alternativas) ou \`ask_question\` (pergunta aberta)
+  no card, e pare de trabalhar nele.
 - Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\` com o motivo.
 - Ficou algo para a pessoa avaliar: \`request_review\` com \`pending\`, e pare.
 - Depois de \`request_review\`: pare. Só uma pessoa aprova.
@@ -233,7 +234,7 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
    novo entre módulos.
 3. Trate cada achado. O que tem diretriz clara (regra do projeto, padrão já usado no código, teste
    que falha) você corrige agora (ou cria uma sub-tarefa de correção com o especialista e para, para o board executá-la) e registra na conversa. O que é ambíguo
-   ou muda o comportamento combinado é decisão da pessoa: \`ask_question\` e pare (no modo autônomo,
+   ou muda o comportamento combinado é decisão da pessoa: \`ask_questions\` e pare (no modo autônomo,
    decida pelo padrão do projeto e pelo caminho menos complexo, registre e siga).
 4. Rode as checagens de novo, faça o commit, registre o resultado na conversa (ele alimenta o "Como
    revisar" do pull request) e mova a história para a próxima coluna.
@@ -273,15 +274,14 @@ const AUTONOMO_BODY = `# Modo autônomo
 Quando o card (ou a história dele) mostra \`autonomous: true\`, a pessoa liberou a história para
 rodar sozinha: ninguém aprova nem responde. Então:
 
-- não chame \`ask_question\` (a pergunta é recusada) nem \`request_review\`, com ou sem \`pending\`,
+- não chame \`ask_question\` (a pergunta aberta é recusada) nem \`request_review\`, com ou sem \`pending\`,
   exceto quando \`phase.requiresApproval\` vier verdadeiro (a coluna em que o modo para, abaixo) e na
   única situação descrita no item da Homologação: ao terminar a fase, registre na conversa o que fez e
   mova o card para a próxima coluna. Nada segura a história antes da coluna escolhida, nem uma
   pendência;
-- as perguntas do documento da fase continuam: escreva cada uma na seção "Perguntas para você" com as
-  alternativas, o impacto de cada uma e a sua recomendação justificada, e responda você mesmo no
-  espaço \`**R.** >\` com a alternativa escolhida e "(decidido pela IA no modo autônomo)". A pessoa
-  lê as decisões quando o modo parar;
+- \`ask_questions\` é aceita: o board responde cada pergunta com a indicada e a registra na seção
+  "Perguntas e respostas" da descrição; use-a para as decisões com alternativas. A pessoa lê as
+  decisões quando o modo parar;
 - a pessoa pode ter liberado o modo só até uma fase (\`autonomousUntil\` no \`get_card\`). Nessa fase,
   faça o trabalho sem perguntas e, ao terminar, chame \`request_review\` na história com o resumo e
   pare: o modo se desliga e a revisão é da pessoa (\`phase.requiresApproval\` vem verdadeiro ali);

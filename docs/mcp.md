@@ -96,6 +96,8 @@ para `waiting_answer`; as respostas entram na seção "Perguntas e respostas" da
 autônomo, o board registra a opção indicada para cada pergunta e a IA continua. `get_card` inclui
 `pendingQuestions` (pergunta, opções e indicada, sem IDs) somente enquanto houver perguntas pendentes.
 
+`ask_question` continua para a pergunta aberta, sem opções. `request_review` com `pending` fica para o que não é pergunta com opções (dado, acesso, ponto em aberto). Os modelos de documento das fases não têm mais a seção "Perguntas para você".
+
 Parâmetros de `ask_questions`: `card` e `questions`, uma lista de `{ question, options, recommended }`.
 `options` tem pelo menos duas opções, sem repetição, e `recommended` é o texto exato de uma delas. A
 chamada é recusada, sem gravar nada, com pergunta vazia, menos de duas opções, opções repetidas,

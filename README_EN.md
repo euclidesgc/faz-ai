@@ -78,9 +78,8 @@ In five minutes you have a task moving on the board, with the AI working on it.
    **Conversa** (conversation) tab. When it finishes, the status changes to **Aguardando
    revisão** (waiting for review): it is your turn. The same happens when the AI leaves something
    depending on you (a decision, an open point): the item shows up in the conversation as **Blocked
-   on you** and the card stays with you. Whatever depends on your answer also goes in the
-   **Perguntas para você** (questions for you) section of the phase document, with the alternatives,
-   the AI's recommendation and an `R. >` slot for your answer.
+   on you** and the card stays with you. A question with alternatives arrives as a carousel on
+   the card (`ask_questions`), with the option the AI recommends; the phase documents do not repeat the questions.
 5. **Review and move on.** Read the phase document, answer, or click **Aprovar** (approve) or
    **Pedir ajustes** (ask for changes). On approval the story moves on right away to **PRD**, **Spec**,
    **Plan** and **Implementação** (implementation), always with the AI producing and you approving.
@@ -1165,9 +1164,8 @@ story by itself, **without asking for authorization or confirmation on anything*
   `pending`, which is recorded in the conversation while the AI is told to decide) nor the story
   being core.
 - **No questions**: the AI does not use `ask_question`; faced with a doubt it decides and records
-  the decision and the reason in the conversation. The phase document's questions are still written
-  in the **Perguntas para você** section, with alternatives and a recommendation, and the AI itself
-  answers them in the `R. >` slot, marking that it decided in autonomous mode. Only a real impediment
+  the decision and the reason in the conversation. `ask_questions` is accepted: the board answers each question with the
+  recommended option and records it in the **Perguntas e respostas** section of the description. Only a real impediment
   (access, environment, a failure it cannot fix) blocks the card.
 - **Conversation summarized between phases**: when the story moves to another column with three or
   more messages since the last summary (or two that add up to a lot of text; at least one from the AI), the autopilot runs **Resumir a
