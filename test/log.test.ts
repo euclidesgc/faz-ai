@@ -813,6 +813,26 @@ describe('EventLog no MessageRouter', () => {
     for (const e of events.byCard(number)) expect(e).toMatchObject({ author: 'Ana', source: 'human' });
   });
 
+  it('restaurar e apagar em lote registram um evento por card, filhos incluídos', () => {
+    const a = story('Lote A');
+    const sub = subtask(a, 'Passo');
+    const b = story('Lote B');
+    router.handle({ type: 'card.trash', cardId: a });
+    router.handle({ type: 'card.trash', cardId: b });
+    const numberA = card(a).number;
+    const numberB = card(b).number;
+
+    router.handle({ type: 'card.restoreMany', cardIds: [a, b] });
+    expect(kinds(of(a))).toEqual(['created', 'subtask_created', 'trashed', 'restored']);
+    expect(kinds(of(b))).toEqual(['created', 'trashed', 'restored']);
+    expect(kinds(events.byCard(card(sub).number))).toEqual(['created', 'trashed', 'restored']);
+
+    router.handle({ type: 'card.trash', cardId: a });
+    router.handle({ type: 'card.deletePermanentMany', cardIds: [a] });
+    expect(kinds(events.byCard(numberA))).toEqual(['created', 'subtask_created', 'trashed', 'restored', 'trashed', 'deleted']);
+    expect(kinds(events.byCard(numberB))).toEqual(['created', 'trashed', 'restored']);
+  });
+
   it('RF-09: os quatro campos de triagem registram field_changed com o nome do campo e os valores; "Fase" não', () => {
     const id = story('Triagem');
     router.handle({ type: 'field.setValue', cardId: id, fieldId: field('Tags').id, value: ['infra', 'db'] });

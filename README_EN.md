@@ -176,6 +176,8 @@ promise a percentage: it shows, in the inventory, what is being loaded.
    story is archived asks for confirmation and restores the whole story (a sub-task of an active
    story comes back on its own, with no confirmation).
 
+**Multi-select in the trash.** In the **Lixeira** (trash), tick cards one by one or use **Selecionar todos** in the table header; the checkbox shows a partial state when only some are ticked. With at least one card ticked, a bar appears with the count and the actions **Restaurar** (restore) and **Apagar de vez** (delete permanently), which apply to the whole selection. Restore runs straight away; delete permanently asks for one confirmation for the batch. **Limpar** (clear) unticks everything. Restoring or deleting a card also takes its sub-tasks that are in the trash. **Esvaziar lixeira** (empty trash) stays as it was and does not depend on the selection.
+
 Nothing happens silently: every action that goes to the board waits for confirmation and shows it
 is working. A thin bar at the top lights up while any request is in progress; the card being moved,
 archived or changing status or title fades and gets a spinner on its bar (on the board and in the
