@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { TextField } from '@radix-ui/themes';
 import { ARCHIVED_EMPTY_FILTERS, ARCHIVED_PAGE, archivedRowCards, type ArchivedRowCards } from '../../shared/archived';
 import { activeFilterCount, applyFilters, type Filters } from '../../shared/filters';
@@ -42,14 +42,10 @@ export function ArchivedView() {
     return { workflow: wf, ...row, shown: row.cards.slice(0, limits[wf.id] ?? ARCHIVED_PAGE) };
   });
   const visibleIds = new Set(rows.flatMap((r) => r.shown.map((c) => c.id)));
-  // Só vale o que está na lista; o efeito grava a poda para o id não ressurgir marcado quando voltar à lista.
+  // Só vale o que está na lista; a poda é gravada durante o render (ajuste de estado, sem efeito) para o id não
+  // ressurgir marcado quando voltar à lista. Converge no mesmo render: depois dela marked == selected.
   const selected = new Set([...marked].filter((id) => visibleIds.has(id)));
-  const prunedSize = selected.size;
-  useEffect(() => {
-    if (prunedSize !== marked.size) setMarked(new Set([...marked].filter((id) => visibleIds.has(id))));
-    // visibleIds muda a cada render; prunedSize já reflete a diferença entre o marcado e o visível.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prunedSize, marked]);
+  if (selected.size !== marked.size) setMarked(selected);
   const toggleMarked = (id: Id) =>
     setMarked((current) => {
       const next = new Set(current);
