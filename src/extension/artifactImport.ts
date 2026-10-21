@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { ARTIFACT_LIMITS, isSafeRelPath, type ArtifactDraft, type ArtifactKind } from '../shared/artifacts';
 import { importUsage, type ImportCandidate, type ImportPreview, type ImportSource, type OnConflict } from '../shared/artifactImport';
 import { isAiBase, SKILL_NAME_PATTERN, type AiTool } from '../shared/harness';
-import { selectionKey, type HarnessUsage } from '../shared/harnessSelection';
+import { isSelectableKind, selectionKey, type HarnessUsage } from '../shared/harnessSelection';
 import { isSafeSegment } from './attachments';
 import { readSource } from './artifactSource';
 import { parseExportFile } from './db/boardExport';
@@ -231,7 +231,7 @@ export class ArtifactImporter {
     const flow = new Set(FLOW_SKILLS.map((k) => k.name));
     const out: Entry[] = [];
     for (const item of scanInventory(tool, this.dirs.projectDir, this.dirs.homeDir)) {
-      if (!(TOOL_KINDS as readonly string[]).includes(item.kind)) continue;
+      if (!isSelectableKind(item.kind) || !(TOOL_KINDS as readonly string[]).includes(item.kind)) continue;
       const draft = readSource({ kind: item.kind, location: selectionKey(item) }, this.dirs, tool, false);
       if (draft.kind === 'rule') draft.name = path.basename(item.path);
       // o servidor e a skill do fluxo são da própria extensão
