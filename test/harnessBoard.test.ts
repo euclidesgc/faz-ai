@@ -9,7 +9,6 @@ import { openInMemory } from '../src/extension/db/database';
 import { migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
 import { scanImportedFolder } from '../src/extension/importScan';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { catalogLines, refineCatalog } from '../src/extension/promptContext';
 import { bareExec, executionPlan } from '../src/extension/execution';
 import { manifestOf } from '../src/shared/execution';
@@ -250,13 +249,11 @@ describe('migração 29 → 30 (banco de artefatos)', () => {
     ]);
     db.run("INSERT INTO harness_selection VALUES ('b', 'mcp', '.mcp.json#x', 'contextual')");
     db.run("INSERT INTO harness_selection VALUES ('b', 'instructions', 'CLAUDE.md', 'off')");
-    db.run("INSERT INTO harness_imports VALUES ('b', 'claude', '/tmp/colecao')");
     expect(db.exec("SELECT name FROM field_defs WHERE board_id = 'b'")[0]!.values).toEqual([['MCPs']]);
-    // apagar o board leva a marcação e as pastas junto
+    // apagar o board leva a marcação junto
     db.run('PRAGMA foreign_keys = ON');
     db.run("DELETE FROM boards WHERE id = 'b'");
     expect(db.exec('SELECT count(*) FROM harness_selection')[0]!.values[0]![0]).toBe(0);
-    expect(db.exec('SELECT count(*) FROM harness_imports')[0]!.values[0]![0]).toBe(0);
   });
 });
 
@@ -363,30 +360,5 @@ describe('revisão: o que a pilha corrigiu', () => {
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
-  });
-
-  it('tirar a pasta importada apaga a marcação dos artefatos dela, em qualquer separador', async () => {
-    const db = await openInMemory(WASM_DIR);
-    const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
-      workspaceKey: 'ws',
-      folderName: 'P',
-      author: 'Pessoa',
-      attachmentsDir: path.join(os.tmpdir(), 'fazai-att-x'),
-    });
-    const boardId = router.snapshot().board.id;
-    new BoardRepo(db).setSelection(
-      boardId,
-      [
-        { kind: 'skill', location: '/col/web/SKILL.md' },
-        { kind: 'skill', location: '/colecao/x/SKILL.md' },
-        { kind: 'mcp', location: 'C:\\col\\.mcp.json#github' },
-      ],
-      'contextual',
-    );
-    new BoardRepo(db).removeImport(boardId, 'claude', '/col');
-    // a marcação sai ordenada por tipo (mcp antes de skill) e caminho
-    expect(router.snapshot().harnessSelection.map((x) => x.location)).toEqual(['C:\\col\\.mcp.json#github', '/colecao/x/SKILL.md']);
-    new BoardRepo(db).removeImport(boardId, 'claude', 'C:\\col');
-    expect(router.snapshot().harnessSelection.map((x) => x.location)).toEqual(['/colecao/x/SKILL.md']);
   });
 });
