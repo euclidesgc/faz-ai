@@ -451,6 +451,15 @@ You answer on the card itself:
 The instructions and document templates of the default board ask, in each phase, for what makes the
 code review quick later:
 
+- **Short track for small stories.** With the rule on (Settings → Rules; off by default), a story
+  with **Baixo** (low) effort or of type **Bug** approved in Discovery, or advanced by the autopilot,
+  goes straight to Plan, skipping PRD and Spec, and the Plan starts from the DISCOVERY. The rule reads
+  the current effort and type at each advance: if Discovery finds the story is bigger than it looked,
+  the AI raises the effort and the story follows the full track. To force the full track on a small
+  story, drag it (or ask the AI to move it with `move_card`) to PRD or Spec: an explicit move is never
+  redirected. The skipped columns are recognized by the document they produce (PRD.md and SPEC.md),
+  so renaming them does not turn the rule off.
+
 - **Spec with the program design.** Besides the architecture, the Spec brings the new or changed
   types and signatures, the file of each one and who calls whom on the main path, with the feature
   flow in Mermaid diagrams. Discarded alternatives come with the reason for each one.
@@ -1338,7 +1347,7 @@ commands and settings are still managed by their respective tool.
 | Workflows e colunas | As many workflows as you want (independent cards or sub-tasks), with editable names and a position you change by dragging; **Nova coluna** (new column) on each one; names, order (drag) and meaning of the columns; where the AI works and which ones require approval; each column's phase (AI instruction and document template). Opening and closing workflows and columns happens on the board itself and is remembered |
 | Tipos de card | Story, Bug, Sub-task…, with color and default field values per type |
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section |
-| Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
+| Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model, short track for small stories (Baixo effort or Bug type skips PRD and Spec) |
 | Harness | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, default agent and heartbeat (see [Harness](#harness) and [Agents](#agents)) |
 | Ferramentas de IA | CLI profiles: enable, set a default, duplicate, create and test |
 | Modelos de IA | Models and effort levels by profile; rules that suggest each card's model |

@@ -111,7 +111,6 @@ export class ExecutionAdmission {
           agentDefinition: null,
           mcpBlocked: [],
           model: null,
-          delegates: [],
           tools: preliminary.tools,
           deniedTools: preliminary.deniedTools,
           toolSet: 'explicit',

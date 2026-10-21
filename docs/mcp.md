@@ -392,6 +392,10 @@ e o modelo do documento que ela produz e se a coluna exige aprovação. Numa sub
 fase da história e `storyArtifacts` lista os documentos já anexados a ela. Uma história criada ou
 movida direto para uma fase adiante recebe em `phase.missingArtifacts` os documentos das fases
 anteriores que não existem: a IA trabalha a partir da descrição e da conversa, sem criá-los.
+Com a regra **Trilha curta** ligada (`shortTrack` em `update_rules` e nas `rules` de `get_board`;
+desligada por padrão), a aprovação da pessoa e o autopiloto levam uma história de esforço Baixo ou
+do tipo Bug do Discovery direto ao Plan, que parte do DISCOVERY; `move_card` com a coluna continua
+livre e, para o PRD ou a Spec, força a trilha completa.
 
 O documento é construído numa sub-tarefa (campo Fase = nome da coluna), mas fica na história:
 `add_attachment` com `artifact: true` grava o arquivo no card da história, mesmo quando chamado na
