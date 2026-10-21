@@ -62,6 +62,7 @@ describe('parseModelRules', () => {
 describe('suggestModelRule e suggestModel', () => {
   const card = (over: Partial<Card> = {}): Card => ({
     id: 'c1',
+    questions: [],
     number: 1,
     boardId: 'b',
     workflowId: 'wp',

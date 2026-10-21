@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 43;
+export const SCHEMA_VERSION = 44;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -583,6 +583,11 @@ const MIGRATIONS: Record<number, string> = {
     CREATE INDEX idx_ai_runs_month ON ai_runs(board_id, month, started_at);
     CREATE INDEX idx_ai_runs_card ON ai_runs(board_id, card_number, started_at);
     CREATE INDEX idx_ai_runs_open ON ai_runs(board_id, outcome);
+  `,
+  44: `
+    -- #895: perguntas da IA ainda sem resposta (o carrossel do card), em JSON.
+    -- Vazio quando não há; o envio das respostas grava a descrição e esvazia.
+    ALTER TABLE cards ADD COLUMN questions_json TEXT NOT NULL DEFAULT '[]';
   `,
 };
 

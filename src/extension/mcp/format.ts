@@ -514,6 +514,9 @@ export function cardDetail(
     ...executionOf(s, c),
     ...workspaceOf(s, c),
     description: c.description,
+    ...(c.questions.length
+      ? { pendingQuestions: c.questions.map(({ question, options, recommended }) => ({ question, options, recommended })) }
+      : {}),
     createdAt: iso(c.createdAt),
     updatedAt: iso(c.updatedAt),
     ...(wants('subtasks')

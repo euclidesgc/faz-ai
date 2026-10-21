@@ -90,6 +90,21 @@ de vez, mexer em checklist, na conversa do card e em anexos (inclusive ler anexo
 colunas, tipos, campos e regras. Cards são referidos pelo número (`#12`) e colunas, tipos e campos
 pelo nome. Mensagens da IA na conversa saem assinadas com o nome do cliente (ex.: "Claude Code").
 
+`ask_questions` envia perguntas com opções para um carrossel no card. Antes, a IA detalha na descrição
+o motivo da opção indicada e as consequências das alternativas. Fora do modo autônomo, o card passa
+para `waiting_answer`; as respostas entram na seção "Perguntas e respostas" da descrição. No modo
+autônomo, o board registra a opção indicada para cada pergunta e a IA continua. `get_card` inclui
+`pendingQuestions` (pergunta, opções e indicada, sem IDs) somente enquanto houver perguntas pendentes.
+
+Parâmetros de `ask_questions`: `card` e `questions`, uma lista de `{ question, options, recommended }`.
+`options` tem pelo menos duas opções, sem repetição, e `recommended` é o texto exato de uma delas. A
+chamada é recusada, sem gravar nada, com pergunta vazia, menos de duas opções, opções repetidas,
+indicada fora das opções, a mesma pergunta duas vezes na rodada ou lista vazia. Uma nova chamada
+substitui as perguntas ainda pendentes. A pergunta com o mesmo texto de uma já respondida substitui
+a resposta dela. O retorno traz `next`: fora do modo autônomo, manda parar até as respostas chegarem
+(o card volta para `ready`); no modo autônomo, avisa que cada pergunta foi respondida com a indicada
+e que a descrição deve ser relida com `get_card` antes de ser reescrita.
+
 Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) vêm com
 `board: true` em `get_board.fields`: as regras, a triagem e a IA dependem deles. `delete_field` e a
 troca de nome em `update_field` são recusadas neles, assim como opções e tipos de card (as opções de
@@ -138,7 +153,7 @@ Cada card em que a IA atua tem um status de trabalho, devolvido em `work` por `g
 | --- | --- | --- |
 | `ready` | IA | O card entrou numa coluna em que a IA atua, a pessoa pediu ajustes ou respondeu a uma pergunta |
 | `running` | IA | `start_work` |
-| `waiting_answer` | Pessoa | `ask_question` |
+| `waiting_answer` | Pessoa | `ask_question` ou `ask_questions` |
 | `waiting_review` | Pessoa | `request_review` |
 | `approved` | IA | A pessoa aprovou e o board não pôde mover o card (não há ferramenta para a IA aprovar; a aprovação normal já leva o card à próxima coluna) |
 | `blocked` | Pessoa | `block_card`, ou a pessoa bloqueou |
