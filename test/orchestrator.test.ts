@@ -332,4 +332,27 @@ describe('orquestrador com processo, ponte, disco e trava reais', () => {
     expect(next).not.toBeNull();
     expect(next.release()).toBe(true);
   });
+  it('cada unidade recebe o pedido do ciclo da sub-tarefa; a parada do plano bloqueia a história com o motivo', async () => {
+    const child = subtask('Com pedido');
+    const advices: (string[] | undefined)[] = [];
+    const realStart = options.starter.start.bind(options.starter);
+    options.starter.start = (id, opts) => {
+      advices.push(opts.advice);
+      realStart(id, opts);
+    };
+    const blocked: [string, string][] = [];
+    options.block = (id, reason) => blocked.push([id, reason]);
+    // sub-tarefa parada com a pessoa: depois da primeira unidade o plano para e a história vai para ela
+    const stuck = subtask('Parada');
+    router.handle({ type: 'card.status.set', cardId: stuck, status: 'blocked', note: 'x' }, { author: 'Fixture', source: 'ai' });
+    await orchestrator.drive(storyId, 'manual');
+    expect(advices).toHaveLength(1);
+    expect(advices[0]![0]).toContain(`#${router.snapshot().cards.find((c) => c.id === child)!.number}`);
+    expect(advices[0]![0]).toContain('quem executa as outras é o board');
+    await completed(1);
+    await orchestrator.settled();
+    await vi.waitFor(() => expect(blocked).toHaveLength(1));
+    expect(blocked[0]![0]).toBe(storyId);
+    expect(blocked[0]![1]).toContain('precisa de revisão');
+  });
 });

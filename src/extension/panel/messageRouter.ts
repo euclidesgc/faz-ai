@@ -194,6 +194,10 @@ export class MessageRouter {
   private listeners = new Set<() => void>();
   private errorListeners = new Set<(message: string) => void>();
   private approveListeners: ((cardId: string) => void)[] = [];
+  private cancelListeners: ((cardIds: string[]) => void)[] = [];
+  /** o que o executor informou (`setAiRuns`) e o que o orquestrador conduz entre as rodadas (`setOrchestrations`) */
+  private runnerRuns: AiActivity[] = [];
+  private orchestrations: AiActivity[] = [];
   private aiRuns: string[] = [];
   private aiActivity: AiActivity[] = [];
   private heartbeatNextAt: number | null = null;
@@ -369,7 +373,12 @@ export class MessageRouter {
     const probe = this.ctx.log.probe(msg);
     const changed = handler(msg, this.ctx, actor);
     if (changed) this.ctx.log.record(msg, actor, probe);
-    return changed ? this.changed() : this.snapshot();
+    const result = changed ? this.changed() : this.snapshot();
+    if (changed && msg.type === 'card.move') {
+      const column = result.columns.find((c) => c.id === msg.columnId);
+      if (column?.category === 'cancelled') this.cancelListeners.forEach((fn) => fn([msg.cardId]));
+    }
+    return result;
   }
 
   /** Como `card.create`, mas devolve o id do card criado. */
@@ -487,10 +496,31 @@ export class MessageRouter {
 
   /** Execuções de IA em curso, uma por card (informado pelo executor); `aiRuns` é derivado delas. */
   setAiRuns(runs: AiActivity[]): void {
-    this.aiActivity = runs;
-    this.aiRuns = runs.map((r) => r.cardId);
+    this.runnerRuns = runs;
+    this.publishAiRuns();
+  }
+
+  /**
+   * As histórias que o orquestrador conduz agora (informado pelo host): entre uma rodada e outra a
+   * história continua "Em execução", e o `staleRunning` não a libera. A execução de uma unidade já
+   * aparece em `setAiRuns` e prevalece.
+   */
+  setOrchestrations(runs: AiActivity[]): void {
+    this.orchestrations = runs;
+    this.publishAiRuns();
+  }
+
+  private publishAiRuns(): void {
+    const own = new Set(this.runnerRuns.map((r) => r.cardId));
+    this.aiActivity = [...this.runnerRuns, ...this.orchestrations.filter((r) => !own.has(r.cardId))];
+    this.aiRuns = this.aiActivity.map((r) => r.cardId);
     this.ctx.aiRuns = this.aiRuns;
     this.notify();
+  }
+
+  /** Avisa quando cards vão para uma coluna de cancelamento (o orquestrador interrompe as execuções deles). */
+  onCardsCancelled(fn: (cardIds: string[]) => void): void {
+    this.cancelListeners.push(fn);
   }
 
   /** Próxima rodada agendada do heartbeat (informado pelo host); só notifica quando o valor muda. */

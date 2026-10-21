@@ -84,7 +84,7 @@ In five minutes you have a task moving on the board, with the AI working on it.
 5. **Review and move on.** Read the phase document, answer, or click **Aprovar** (approve) or
    **Pedir ajustes** (ask for changes). On approval the story moves on right away to **PRD**, **Spec**,
    **Plan** and **Implementação** (implementation), always with the AI producing and you approving.
-   The implementation sub-tasks are born in the lower workflow and the AI completes them one by one.
+   The implementation sub-tasks are born in the lower workflow and the board runs them one by one, each in its own CLI run.
 
 For day to day: the **N com você** (N with you) counter at the top shows what is waiting for you,
 the **Chat** lets you ask the AI, in natural language, to create and move cards, and the
@@ -256,16 +256,16 @@ other one is a prerequisite) or "só começa depois deste card". The open card s
 **Depende de** (depends on, with how many dependencies are still open) and **Libera** (unblocks).
 The board refuses a dependency cycle.
 
-The AI uses this to speed up Implementation. In Plan it declares the order between sub-tasks
+The AI uses this to order the Implementation. In Plan it declares the order between sub-tasks
 (`create_card` with `depends_on`, or `link_cards` with `depends_on`): one depends on another when it
 uses what the other produces or when both change the same files. In Implementation, the story's
-`get_card` returns in `subtasksNow` what can run now (and in `subtasksNowNote`, how to run the
-round), and the AI delegates **the sub-tasks with no
-pending dependency to simultaneous subagents**, each with its card's model; at the end of the round
-it verifies the whole, commits and moves on to the next round. `start_work` refuses a sub-task that
-is still waiting for another. With no dependencies declared, all open sub-tasks are considered
-independent. It depends on the AI tool having subagents (Claude Code does); without them, execution
-goes one at a time, in dependency order. The flow text is the board's current one, served
+`get_card` returns in `subtasksNow` what the **board runs** (`byBoard`, in order) and what waits
+(`waiting`). In a code phase the board, not the story session, runs the sub-tasks: each one in its
+own CLI run, with the agent, model and skills of its card, **one after another** in the story's
+folder (a single writer at a time), respecting dependencies; the story session only creates them and
+stops. `start_work` refuses a sub-task that is still waiting for another. With no dependencies
+declared, all open sub-tasks are considered independent. When all of them finish, the board calls the
+AI once for the closing: verify the whole, commit and move the story. The flow text is the board's current one, served
 through the MCP; a copy of the flow skill already installed in the tool's folder is not replaced by the
 board. To keep the tool from loading the old text on its own, delete that copy.
 
