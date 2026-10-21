@@ -392,6 +392,15 @@ board o usa.
   verificação: o bloco diz "Não validado: este perfil ainda não foi testado" como informação, sem selo
   de verificado, e isso não impede o perfil de ser usado. O link do aviso do topo abre o Diagnóstico já
   no bloco do perfil.
+- **Capacidades, admissão e Testar:** cada bloco de perfil traz uma linha por capacidade (**Verificada**,
+  **Parcial** ou **Desconhecida**; só a verificada leva o selo de pronto) e a admissão ("Admissível no
+  regime exclusivo/compatível" ou "Não admissível", com um motivo por exigência). No regime compatível,
+  lista o que a CLI pode carregar por conta própria. O botão **Testar** roda a ferramenta (usa a sua
+  assinatura, e o aviso fica na tela), uma tentativa de até 2 minutos, e o aviso do topo se atualiza
+  sozinho ao fim.
+- **Próxima execução e limites:** mostra o regime, o alvo padrão (com a regra e a versão, ou o bloqueio),
+  os cards cujo alvo está indisponível e a tabela de limites com pedido, efetivo e motivo. Vem do
+  simulador de políticas e dos limites efetivos; sem eles, mostra "Indisponível nesta versão".
 - **Banco de artefatos** (antes "definição do harness"): recomendação, não bloqueio. O board trabalha
   sem ele, só sem o ganho de economia e precisão. Aponta, um filho por falta, o que falta: nenhuma
   skill, agente ou servidor MCP em modo Pelo card (use "Indicar artefatos"), nenhum agente do board,

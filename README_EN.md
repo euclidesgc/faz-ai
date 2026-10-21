@@ -410,6 +410,16 @@ Graph). Hover over an item to see how the board uses it.
   record that verification yet: the block says "Not validated: this profile has not been tested yet"
   as information, with no verified seal, and that does not stop the profile from being used. The
   link in the top warning opens the environment check on the profile's block.
+- **Capabilities, admission and Test:** each profile block has one line per capability (**Verified**,
+  **Partial** or **Unknown**; only verified gets the ready seal) and the admission ("Admissible under the
+  exclusive/compatible regime" or "Not admissible", with one reason per requirement). In the compatible
+  regime it lists what the CLI may load on its own. The **Test** button runs the tool (it uses your
+  subscription, and the warning stays on screen), one attempt of up to 2 minutes, and the top warning
+  updates itself at the end.
+- **Next run and limits:** shows the regime, the default target (with the rule and version, or the
+  block), the cards whose target is unavailable and the limits table with requested, effective and
+  reason. It comes from the policy simulator and the effective limits; without them it shows
+  "Unavailable in this version".
 - **Artifact bank** (formerly the "harness definition"): a recommendation, not a blocker. The board
   works without it, only without the context savings and precision. It points out, one child per gap,
   what is missing: no skill, agent or MCP server in Pelo card mode (use "Indicar artefatos"), no board

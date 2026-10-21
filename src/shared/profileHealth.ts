@@ -1,7 +1,7 @@
 // Regras puras da saúde de cada perfil de CLI: o que o Diagnóstico e o aviso do topo mostram.
 // Não consulta banco, arquivo nem processo: recebe os probes, as capacidades e a decisão de admissão
 // já prontas e só as junta. Quem decide a admissão é `admitExecution` (executionAdmission.ts).
-import type { AiProfile } from './aiProfiles';
+import type { AiProfile, ProfileIsolation } from './aiProfiles';
 import type { CapabilityState, ExecutionAdmissionDecision } from './executionAdmission';
 import type { AiTool } from './harness';
 import type { InstallStep } from './environment';
@@ -45,6 +45,8 @@ export interface ProfileHealth {
   capabilities: CapabilityState[];
   /** a decisão de admissão no regime em vigor; null sem probe (pendente) */
   admission: ExecutionAdmissionDecision | null;
+  /** o que a CLI carrega por conta própria (regime compatível); ausente quando o host não informou */
+  isolation?: ProfileIsolation;
   evidence: { state: EvidenceState; checkedAt?: number; version?: string; ok?: boolean };
   /** prontos: os comandos oficiais; cópia/personalizado: o installUrl; null: o perfil não informou */
   install: { steps: InstallStep[]; docs: string } | { url: string } | null;
@@ -69,6 +71,7 @@ export interface ProfileHealthInput {
   credentials: ProfileHealth['credentials'];
   capabilities: CapabilityState[];
   admission: ExecutionAdmissionDecision | null;
+  isolation?: ProfileIsolation;
   evidence: ProfileHealth['evidence'];
   install: ProfileHealth['install'];
 }
@@ -104,6 +107,7 @@ export function profileHealth(i: ProfileHealthInput): ProfileHealth {
     credentials: i.credentials,
     capabilities: i.capabilities,
     admission: i.pendingReview ? null : i.admission,
+    ...(i.isolation ? { isolation: i.isolation } : {}),
     evidence: i.evidence,
     install: i.install,
     authExpired: i.authExpired,

@@ -1,4 +1,4 @@
-import { PROFILE_CAPABILITIES, profileLabel, type AiProfile } from '../../shared/aiProfiles';
+import { PROFILE_CAPABILITIES, profileIsolation, profileLabel, type AiProfile } from '../../shared/aiProfiles';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
 import { profileCanProbe, profileSignedIn, profileVersion } from '../cliProbe';
@@ -403,6 +403,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           credentials: meta.credentials ? [{ name: meta.credentials.secretRef, filled: meta.credentials.available }] : [],
           capabilities: PROFILE_CAPABILITIES.map((c) => meta.capabilities?.[c] ?? 'unknown'),
           admission: null,
+          isolation: profileIsolation(resolved.get(meta.id)!),
           evidence: { state: 'never' },
           install: url ? { url } : null,
         });

@@ -4764,3 +4764,21 @@ div.metrics-breakdown {
     max-height: none;
   }
 }
+
+.env-limits {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-small, 0.85em);
+}
+.env-limits th,
+.env-limits td {
+  text-align: left;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.3));
+}
+.env-warning {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--vscode-inputValidation-warningBorder, #b89500);
+  background: var(--vscode-inputValidation-warningBackground, rgba(184, 149, 0, 0.12));
+}
