@@ -1538,7 +1538,7 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(card().status).toBe('waiting_answer');
   });
 
-  it('a regra de modelo com reserva legada não troca nada sem política: o card volta para a IA (#551), sem segunda chamada', () => {
+  it('a regra de modelo não troca nada sem política: o card volta para a IA (#551), sem segunda chamada', () => {
     useSonnetMedium();
     router.handle({
       type: 'settings.modelRules.set',
@@ -1549,7 +1549,6 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
           enabled: true,
           groups: [[{ fieldId: TYPE_CONDITION, op: 'is', value: 'História' }]],
           model: modelValue(sonnet().id, 'medium'),
-          fallback: modelValue(fable().id, 'low'),
         },
       ],
     });
