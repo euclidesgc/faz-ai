@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ChatSession, chatPrompt, parseSuggestions, suggestRulesPrompt, suggestSkillsPrompt } from '../src/extension/chat';
+import { ChatSession, chatPrompt, parseSuggestions, suggestAgentsPrompt, suggestRulesPrompt, suggestSkillsPrompt } from '../src/extension/chat';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import type { HeadlessCommand } from '../src/extension/headless';
 import { openInMemory } from '../src/extension/db/database';
@@ -441,14 +441,29 @@ describe('Indicar artefatos', () => {
 });
 
 describe('Sugerir regras e skills com IA', () => {
-  it('o pedido de regras manda ler o projeto, preservar o arquivo, deixar desligado e respeitar o fluxo do board', () => {
-    const prompt = suggestRulesPrompt('AGENTS.md');
+  it('o pedido de regras cria de 3 a 5 regras do board, desligadas, sem tocar nos arquivos de regras do projeto', () => {
+    const prompt = suggestRulesPrompt();
     expect(prompt).toContain('de 3 a 5 regras');
-    expect(prompt).toContain('write_rule_file em AGENTS.md');
+    expect(prompt).toContain('write_rule_file');
+    expect(prompt).toContain('minúsculas e hífens');
     expect(prompt).toContain('read_rule_file');
     expect(prompt).toContain('usage "off"');
     expect(prompt).toContain('o fluxo do board vale acima das regras');
     expect(prompt).toContain('Termine com um resumo');
+  });
+
+  it('nenhum dos três pedidos manda gravar na pasta ou no arquivo de uma ferramenta', () => {
+    expect(suggestAgentsPrompt()).toContain('create_agent');
+    expect(suggestAgentsPrompt()).not.toContain('scope"');
+    expect(suggestAgentsPrompt()).toContain('sem scope');
+    for (const prompt of [suggestRulesPrompt(), suggestSkillsPrompt(), suggestAgentsPrompt()]) {
+      expect(prompt).toContain('faz-ai');
+      expect(prompt).not.toContain('CLAUDE.md');
+      expect(prompt).not.toContain('AGENTS.md');
+      expect(prompt).not.toContain('.claude/');
+      expect(prompt).not.toContain('.cursor/');
+      expect(prompt).not.toContain('arquivo de agente da ferramenta');
+    }
   });
 
   it('o pedido de skills manda criar de 3 a 5 estreitas, em "Pelo card", e nunca "always"', () => {
@@ -464,8 +479,8 @@ describe('Sugerir regras e skills com IA', () => {
     router.chatCommand({ type: 'ai.suggestRules' });
     expect(router.snapshot().chat.busy).toBe(true);
     // A sugestão grava no board sem depender do arquivo nativo da ferramenta.
-    expect(spawned[0]!.command.stdin).toContain('save_board_artifact');
-    expect(spawned[0]!.command.stdin).toContain('AGENTS.md');
+    expect(spawned[0]!.command.stdin).toContain('write_rule_file');
+    expect(spawned[0]!.command.stdin).not.toContain('AGENTS.md');
     expect(spawned[0]!.command.args).toContain('dontAsk');
     spawned[0]!.emit('Regras escritas.');
     spawned[0]!.exit(0);
