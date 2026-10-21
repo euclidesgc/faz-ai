@@ -132,6 +132,16 @@ export class EventLog {
         const ids = msg.cardIds;
         return { before: cardFacts(db, ids), after: () => cardFacts(db, ids), cardId: null, extra: {} };
       }
+      case 'card.restoreMany':
+      case 'card.deletePermanentMany': {
+        // cada card leva os filhos junto (como `card.restore` e `card.deletePermanent`): o recorte é a família de cada id
+        const families = (): Map<string, CardFacts> => {
+          const all = new Map<string, CardFacts>();
+          for (const id of msg.cardIds) for (const [key, fact] of cardFamilyFacts(db, id)) all.set(key, fact);
+          return all;
+        };
+        return { before: families(), after: families, cardId: null, extra: {} };
+      }
       case 'field.setValue': {
         // o handler troca só o valor do campo: nenhum fato do card muda, e `after` reaproveita a leitura.
         // Limite aceito: mudar "Esforço da atividade" pode trocar "Modelo" em cascata na mesma mensagem,

@@ -40,7 +40,7 @@ export function registerModelTools(tool: DefineTool): void {
 
   tool(
     'upsert_model',
-    'Cria ou atualiza um modelo no catálogo. Use para registrar os modelos e níveis de esforço que você (a ferramenta de IA em uso) realmente tem disponíveis. No Cursor, `model` é o id que `cursor-agent models` lista (ex.: "claude-opus-5-5") e o modelo fica no board como `cursor:<model>`; as variantes rápidas (`-fast`) são modelos à parte, com id próprio.',
+    'Cria ou atualiza um modelo no catálogo. Use para registrar os modelos e níveis de esforço que você (a ferramenta de IA em uso) realmente tem disponíveis. `model` é o id que a CLI da ferramenta lista (ex.: "claude-opus-5-5") e o modelo fica no board como `<ferramenta>:<model>`; as variantes rápidas (`-fast`), quando a ferramenta as tem, são modelos à parte, com id próprio.',
     {
       tool: toolArg,
       model: z.string().min(1).describe('Identificador usado pela ferramenta para escolher o modelo, ex.: "opus", "k3", "gpt-6.1-sol"'),

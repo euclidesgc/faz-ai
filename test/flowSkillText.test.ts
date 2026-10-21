@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FLOW_SKILL, FLOW_SKILLS } from '../src/extension/flowSkill';
+import { FLOW_SKILL, FLOW_SKILLS, FLOW_SKILL_NAMES, flowSkillMarkdown, isFlowSkill } from '../src/extension/flowSkill';
 import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 
 describe('conjunto de skills do fluxo (#588)', () => {
@@ -54,5 +54,32 @@ describe('aviso de conflito com a base (#747)', () => {
 
   it('a principal aponta a skill também para o aviso de conflito', () => {
     expect(FLOW_SKILL.body).toContain('a pilha e o aviso de conflito com a base');
+  });
+});
+
+describe('fluxo servido pelo get_skill (#643)', () => {
+  it('requiredSkills sem path e a seção "Skills por assunto" mandam ler com get_skill', () => {
+    expect(FLOW_SKILL.body).toContain('sem `path`');
+    expect(FLOW_SKILL.body).toContain('`get_skill <nome>`');
+    expect(FLOW_SKILL.body).toContain('Leia com `get_skill <nome>`');
+    const harness = FLOW_SKILLS.find((k) => k.name === 'faz-ai-harness-do-card')!;
+    expect(harness.body).toContain('sem `path`');
+    expect(harness.body).toContain('`get_skill <nome>`');
+  });
+
+  it('o texto não cita ferramenta, pastas de skills nem "contexto vazio"', () => {
+    for (const k of FLOW_SKILLS) {
+      expect(k.body).not.toMatch(/\.claude|\.cursor|\.kimi-code|Agent tool/);
+      expect(k.body).not.toContain('contexto vazio');
+    }
+  });
+
+  it('isFlowSkill confere a lista exata, não o prefixo', () => {
+    expect(FLOW_SKILL_NAMES).toEqual(FLOW_SKILLS.map((k) => k.name));
+    expect(isFlowSkill('faz-ai-fluxo')).toBe(true);
+    expect(isFlowSkill('faz-ai-modo-autonomo')).toBe(true);
+    expect(isFlowSkill('faz-ai-deploy')).toBe(false);
+    expect(flowSkillMarkdown('faz-ai-deploy')).toBeUndefined();
+    expect(flowSkillMarkdown('faz-ai-fluxo')).toContain('name: faz-ai-fluxo');
   });
 });

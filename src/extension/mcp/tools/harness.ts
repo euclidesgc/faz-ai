@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ALL_AI_BASES, RULE_FILES, type AiTool, type InstallScope } from '../../../shared/harness';
 import { SELECTABLE_KINDS, toolItemsOf, selectionKey, type HarnessUsage, type SelectableKind } from '../../../shared/harnessSelection';
-import { FLOW_SKILL } from '../../flowSkill';
+import { FLOW_SKILL, flowSkillMarkdown } from '../../flowSkill';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { harnessOverview } from '../format';
 import type { DefineTool } from './registry';
@@ -142,9 +142,12 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'get_skill',
-    'Lê o SKILL.md completo da cópia do board; se ainda não foi adicionada, lê a skill do projeto.',
+    'Lê o SKILL.md completo de uma skill do projeto ou de uma skill do fluxo do board (`faz-ai-fluxo` e as `faz-ai-*` por assunto), que vêm do próprio board, sem arquivo instalado.',
     { skill: skillArg },
     (a, router) => {
+      // a skill do fluxo é sempre a do board, mesmo que o projeto tenha uma de mesmo nome
+      const flow = flowSkillMarkdown(a.skill);
+      if (flow !== undefined) return flow;
       const copy = toolItemsOf(router.snapshot()).find((i) => i.kind === 'skill' && i.boardArtifactId && i.name === a.skill);
       return copy ? router.readHarnessFile(copy.path).content : skill(router, a.skill).content;
     },
@@ -167,7 +170,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'install_flow_skill',
-    'Instala a skill "faz-ai-fluxo", que ensina a conduzir os cards pelo fluxo do board (fases, documentos, pendências), junto com as skills por assunto (faz-ai-harness-do-card, faz-ai-workspace-e-pr, faz-ai-implementacao-rodadas, faz-ai-revisao-e-homologacao, faz-ai-modo-autonomo), e marca a principal como "incluir em todo contexto" neste board. Sempre no global da ferramenta (~/.claude/skills, ~/.cursor/skills, ~/.kimi-code/skills), para todos os projetos: nada entra na pasta do projeto. Não sobrescreve uma skill de mesmo nome no destino, a menos que replace seja true.',
+    'Opcional: o board já serve o fluxo pelo get_skill. Copia as skills do fluxo para a pasta de skills da ferramenta. A principal, "faz-ai-fluxo", ensina a conduzir os cards pelo fluxo do board (fases, documentos, pendências), junto com as skills por assunto (faz-ai-harness-do-card, faz-ai-workspace-e-pr, faz-ai-implementacao-rodadas, faz-ai-revisao-e-homologacao, faz-ai-modo-autonomo), e marca a principal como "incluir em todo contexto" neste board. Sempre no global da ferramenta, para todos os projetos: nada entra na pasta do projeto. Não sobrescreve uma skill de mesmo nome no destino, a menos que replace seja true.',
     {
       tool: z.enum(ALL_AI_BASES).optional().describe('Ferramenta de IA; padrão: a do projeto'),
       replace: z.boolean().optional().describe('Troca a skill de mesmo nome que já esteja no destino'),
@@ -268,15 +271,15 @@ export function registerHarnessTools(tool: DefineTool): void {
       content: z.string().describe('Instruções do agente em markdown (sem o frontmatter)'),
       scope: z.enum(['user', 'project']).optional().describe('Aceito por compatibilidade e ignorado: o agente fica no board'),
       model: z.string().optional().describe('Valor do campo Modelo (ex.: "claude:sonnet@medium"); sem ele o agente usa o modelo da sessão'),
-      tools: listArg('Ferramentas embutidas liberadas (nomes do Claude Code); vazio = as da permissão'),
+      tools: listArg('Ferramentas embutidas liberadas (nomes na convenção da ferramenta); vazio = as da permissão'),
       deniedTools: listArg('Ferramentas retiradas da sessão'),
       skills: listArg('Skills que toda execução com o agente lê (só as marcadas em get_harness)'),
       mcp: listArg('Servidores MCP liberados além do do board'),
       readonly: z
         .boolean()
         .optional()
-        .describe('Só no Cursor: o agente não edita arquivos nem roda comandos que mudem estado (`readonly: true`)'),
-      background: z.boolean().optional().describe('Só no Cursor: o agente roda em segundo plano (`is_background: true`)'),
+        .describe('Nas ferramentas que aceitam: o agente não edita arquivos nem roda comandos que mudem estado'),
+      background: z.boolean().optional().describe('Nas ferramentas que aceitam: o agente roda em segundo plano'),
     },
     (a, router) => {
       router.handle({
@@ -313,8 +316,8 @@ export function registerHarnessTools(tool: DefineTool): void {
       deniedTools: listArg('Ferramentas retiradas'),
       skills: listArg('Skills do agente'),
       mcp: listArg('Servidores MCP além do do board'),
-      readonly: z.boolean().optional().describe('Só no Cursor: sem edição de arquivos nem comandos que mudem estado'),
-      background: z.boolean().optional().describe('Só no Cursor: roda em segundo plano'),
+      readonly: z.boolean().optional().describe('Nas ferramentas que aceitam: sem edição de arquivos nem comandos que mudem estado'),
+      background: z.boolean().optional().describe('Nas ferramentas que aceitam: roda em segundo plano'),
     },
     (a, router) => {
       const found = boardAgent(router, a.agent)

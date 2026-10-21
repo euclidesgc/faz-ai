@@ -217,6 +217,24 @@ export function requestTrashMany(histories: Card[], after?: () => void): void {
   });
 }
 
+/** Restaura o lote da lixeira, sem confirmação (nada se perde). */
+export function requestRestoreMany(roots: Card[], after?: () => void): void {
+  void withBulkStatus(t('Restaurando {n} card(s)…', { n: roots.length }), () => cards.restoreMany(roots.map((c) => c.id)), after);
+}
+
+/** Apaga o lote da lixeira de vez; a confirmação é daqui (o host não pergunta). */
+export function requestDeletePermanentMany(roots: Card[], after?: () => void): void {
+  const { ask } = useBoardStore.getState();
+  ask({
+    title: t('Apagar {n} card(s) definitivamente?', { n: roots.length }),
+    message: t('Comentários, anexos e sub-tarefas destes cards também serão apagados. Não dá para desfazer.'),
+    confirmLabel: t('Apagar de vez'),
+    danger: true,
+    onConfirm: () =>
+      void withBulkStatus(t('Apagando {n} card(s)…', { n: roots.length }), () => cards.deletePermanentMany(roots.map((c) => c.id)), after),
+  });
+}
+
 /** Um lote de cards vai ao host: a barra de seleção mostra o status até ele confirmar, e só então `after` roda. */
 export async function withBulkStatus(label: string, send: () => Promise<void>, after?: () => void): Promise<void> {
   const { setBulkBusy } = useBoardStore.getState();

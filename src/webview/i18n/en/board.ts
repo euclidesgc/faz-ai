@@ -383,6 +383,13 @@ export const board: Record<string, string> = {
     'Position {n} in the autonomous-mode queue: the AI takes this story after the ones before it, respecting dependencies.',
   'Selecionar todos de {name}': 'Select all in {name}',
   'Desmarcar todos de {name}': 'Deselect all in {name}',
+  'Selecionar todas as linhas': 'Select all rows',
+  'Desmarcar todas as linhas': 'Deselect all rows',
+  'Apagar {n} card(s) definitivamente?': 'Delete {n} card(s) for good?',
+  'Comentários, anexos e sub-tarefas destes cards também serão apagados. Não dá para desfazer.':
+    'Comments, attachments and sub-tasks of these cards will also be deleted. This cannot be undone.',
+  'Restaurando {n} card(s)…': 'Restoring {n} card(s)…',
+  'Apagando {n} card(s)…': 'Deleting {n} card(s)…',
   'Ver todos os cards': 'See all cards',
   'Ver {n} com você': 'See {n} with you',
   'Abrir chat': 'Open chat',
