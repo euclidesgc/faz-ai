@@ -309,6 +309,14 @@ banner offers **Corrigir o registro** (fix the registration), which removes it a
    the board", "take story #1 and write the PRD" or "check what is pending on the board and move it
    forward".
 
+**Questions with options.** When the AI needs a decision between alternatives, it records the
+questions on the card (`ask_questions`), each with short options and the recommended one, and
+explains the details in the description. The card stays in **Aguardando resposta** (waiting for an
+answer). Answers go into the **Perguntas e respostas** (Questions and answers) section of the
+description; answering the same question again replaces the previous answer. In autonomous mode, the
+board answers each question with the recommended option, records it in the same section and the AI
+carries on. An open question, without options, is still `ask_question`.
+
 While something is missing for the board to work with the tool, the **Configurações** (Settings) tab
 and the **Verificar ambiente** (Check environment) button get a warning icon. Its hint sums up what is
 missing, with each item's name, and each item's explanation and action are in the environment check.

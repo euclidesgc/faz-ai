@@ -297,6 +297,13 @@ o registro**, que o tira e refaz o global.
 4. Abra uma sessão nova da ferramenta na pasta do projeto e peça, por exemplo, "liste os cards do
    board", "pegue a história #1 e escreva o PRD" ou "veja o que está pendente no board e dê andamento".
 
+**Perguntas com opções.** Quando a IA precisa de uma decisão com alternativas, ela registra as
+perguntas no card (`ask_questions`), cada uma com opções curtas e a indicada, e explica os detalhes
+na descrição. O card fica em **Aguardando resposta**. As respostas ficam na seção **Perguntas e
+respostas** da descrição; responder de novo a mesma pergunta substitui a resposta anterior. No modo
+autônomo, o board responde cada pergunta com a indicada, registra na mesma seção e a IA segue o
+trabalho. A pergunta aberta, sem opções, continua sendo `ask_question`.
+
 Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, a aba **Configurações** e o
 botão **Verificar ambiente** ganham um ícone de atenção. O hint dele resume o que falta, com o nome
 de cada item, e a explicação com a ação de cada um fica no Diagnóstico do ambiente. No painel de
