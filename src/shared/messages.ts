@@ -346,7 +346,6 @@ export type WebviewToHost =
    * instala a skill do fluxo no global de uma ferramenta (padrão: a do projeto), nunca no projeto;
    * `replace` troca uma skill de mesmo nome que já esteja no destino (sem ele, a que existe fica)
    */
-  | { type: 'harness.flowSkill.install'; tool?: AiTool; replace?: boolean }
   /** exporta o board num arquivo JSON (no editor, abre o "salvar como"; na web a página baixa pela rota /backup/export) */
   | { type: 'backup.export' }
   /** escolhe um arquivo de export, valida e devolve o resumo em `backup.import.summary` (na web a página envia por /backup/import) */

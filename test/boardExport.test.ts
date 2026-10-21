@@ -255,17 +255,7 @@ describe('summarize', () => {
 
 /** O snapshot sem o que muda de propósito na importação (a chave da pasta) e sem o que não vem do banco. */
 function comparable(s: BoardState) {
-  const {
-    board,
-    harness: _h,
-    chat: _c,
-    aiRuns: _a,
-    autopilot: _p,
-    aiRunUnsupported: _u,
-    harnessInstall: _i,
-    pendingUpgrade: _g,
-    ...rest
-  } = s;
+  const { board, harness: _h, chat: _c, aiRuns: _a, autopilot: _p, aiRunUnsupported: _u, pendingUpgrade: _g, ...rest } = s;
   const { workspaceKey: _k, ...b } = board;
   return { ...rest, board: b };
 }

@@ -46,7 +46,7 @@ describe('credenciais locais e referências MCP', () => {
     const content = JSON.stringify({ mcpServers: { private: definition } });
     fs.writeFileSync(file, content);
     router.refreshHarness();
-    expect(() => router.readHarnessFile(file)).toThrow('não pode ser alterado');
+    expect(() => router.readHarnessFile(file)).toThrow('fora do harness');
     expect(() => router.writeHarnessFile(file, '{"mcpServers":{}}')).toThrow('não pode ser alterado');
     expect(fs.readFileSync(file, 'utf8')).toBe(content);
     db.close();

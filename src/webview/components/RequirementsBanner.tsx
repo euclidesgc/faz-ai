@@ -5,7 +5,7 @@ import type { BoardState } from '../../shared/model';
 import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement } from '../../shared/requirements';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
-import { harness, ui } from '../commands';
+import { ui } from '../commands';
 import { useAction } from '../useAction';
 import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
 import { isWeb } from '../vscode';
@@ -125,7 +125,7 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
       return {
         title: t('A skill do fluxo ({name}) não está pronta para o {tool}', { name: FLOW_SKILL_NAME, tool }),
         detail: t(
-          'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem só do que está no board (no Claude Code, contexto vazio imposto; nas outras CLIs, veja o que elas carregam sozinhas em Ferramentas de IA): a skill precisa existir e estar no board em modo "Sempre" em Configurações → Harness. Instalar por aqui grava na pasta global de skills da ferramenta e já marca.',
+          'É ela que ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. As execuções do board partem só do que está no board (no Claude Code, contexto vazio imposto; nas outras CLIs, veja o que elas carregam sozinhas em Ferramentas de IA): a skill precisa existir e estar no board em modo "Sempre" em Configurações → Harness.',
         ),
       };
     case 'mcp-enable':
@@ -247,14 +247,7 @@ function actionable(r: BoardRequirement, compact: boolean): boolean {
   // recarregar a janela e abrir os MCPs do editor só existem dentro do editor; no navegador, fica a explicação
   if (kind === 'reload' || kind === 'openEditorMcp') return !isWeb;
   if (kind === 'settings') return !compact;
-  return (
-    kind === 'command' ||
-    kind === 'connect' ||
-    kind === 'fixProject' ||
-    kind === 'pinMcp' ||
-    kind === 'installSkill' ||
-    kind === 'allowKimiMcp'
-  );
+  return kind === 'command' || kind === 'connect' || kind === 'fixProject' || kind === 'pinMcp' || kind === 'allowKimiMcp';
 }
 
 /**
@@ -304,12 +297,6 @@ export function RequirementFix({
       return (
         <FixButton variant={variant} run={() => ui.fixProjectMcp(action.file)} onFixed={onFixed}>
           <IconConnect /> {t('Corrigir o registro')}
-        </FixButton>
-      );
-    case 'installSkill':
-      return (
-        <FixButton variant={variant} run={() => harness.installFlowSkill(r.tool)} onFixed={onFixed}>
-          {t('Instalar a skill')}
         </FixButton>
       );
     case 'pinMcp':

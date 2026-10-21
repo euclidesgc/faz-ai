@@ -10,8 +10,6 @@ import { readBridgeVersion, socketPath, stableBridgePath, workspaceKey, writeBri
 import { registerCursorProject } from './mcp/clientConfig';
 import { baseInfo, type AiTool } from '../shared/harness';
 import { ensureUserServers } from './mcp/reinstall';
-import { installFlowSkillFiles } from './flowSkill';
-import { copyTarget } from '../shared/harnessCatalog';
 import { resolveCommand } from './cliResolve';
 import { loginShellPath } from './spawn';
 import { BoardPanel } from './panel/BoardPanel';
@@ -468,10 +466,6 @@ function ensureUserInstall(
         currentVersion: version,
         wanted,
       });
-      for (const tool of done) {
-        const skills = copyTarget(tool, 'skill', 'skills', 'user');
-        if (skills) installFlowSkillFiles(path.join(homeDir, skills.path));
-      }
       if (done.length) output.appendLine(`Faz AI ${version}: servidor do board instalado no usuário em ${done.join(', ')}.`);
       if (!failed.length) {
         if (installedVersion !== version) writeBridgeVersion(version, homeDir);

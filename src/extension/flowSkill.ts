@@ -1,5 +1,3 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { FLOW_SKILL_NAME } from '../shared/harnessProject';
 import { skillTemplate } from './frontmatter';
 
@@ -343,20 +341,4 @@ export function isFlowSkill(name: string): boolean {
 export function flowSkillMarkdown(name: string): string | undefined {
   const k = FLOW_SKILLS.find((x) => x.name === name);
   return k ? skillTemplate(k.name, k.description, k.body) : undefined;
-}
-
-/**
- * Grava o conjunto de skills do fluxo na pasta de skills da ferramenta (`skillsRoot`). Sem `replace`, o
- * que já está no disco fica como está (a pessoa pode ter ajustado a skill). Devolve os nomes gravados.
- */
-export function installFlowSkillFiles(skillsRoot: string, replace = false): string[] {
-  const written: string[] = [];
-  for (const k of FLOW_SKILLS) {
-    const file = path.join(skillsRoot, k.name, 'SKILL.md');
-    if (!replace && fs.existsSync(file)) continue;
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, skillTemplate(k.name, k.description, k.body));
-    written.push(k.name);
-  }
-  return written;
 }

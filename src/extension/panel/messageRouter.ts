@@ -319,7 +319,6 @@ export class MessageRouter {
       authExpired: this.authExpired,
       environment: this.environment,
       environmentFirstRun: this.environmentFirstRun,
-      harnessInstall: null,
       mainBranch: this.ctx.mainBranch(),
       orphans: this.orphans,
     };

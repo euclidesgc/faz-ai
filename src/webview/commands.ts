@@ -226,5 +226,4 @@ export const harness = {
   setLibraryDirectory: (dir: string) => req({ type: 'harness.library.directory', dir }),
   updateLibraryArtifact: (id: string) => req({ type: 'harness.library.update', id }),
   openLibrary: () => req({ type: 'harness.library.open' }),
-  installFlowSkill: (tool: AiTool, replace = false) => req({ type: 'harness.flowSkill.install', tool, replace }),
 };

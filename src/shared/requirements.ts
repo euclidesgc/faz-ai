@@ -33,8 +33,6 @@ export type RequirementAction =
   | { kind: 'reload' }
   /** abrir a tela de MCPs do editor (no Cursor, Customize → MCPs), onde só a pessoa ativa o MCP */
   | { kind: 'openEditorMcp' }
-  /** instalar a skill do fluxo na ferramenta do projeto, no escopo global */
-  | { kind: 'installSkill' }
   /** gravar o caminho completo do comando nos registros que o editor não acha (o node instalado depois que ele abriu) */
   | { kind: 'pinMcp' }
   /** liberar as ferramentas do board sem aprovação nas conversas da ferramenta (a regra `mcp__faz-ai__*` no config.toml do Kimi Code) */

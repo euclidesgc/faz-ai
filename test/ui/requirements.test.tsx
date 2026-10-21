@@ -141,13 +141,12 @@ describe('MCP do board no Cursor', () => {
 });
 
 describe('skill do fluxo', () => {
-  it('sem ela, a faixa conta como requisito e instala no escopo global', async () => {
-    set([{ id: 'skill', tool: 'cursor', action: { kind: 'installSkill' } }]);
+  it('sem ela, a faixa conta como requisito e leva ao Harness (nada é gravado na pasta da ferramenta)', async () => {
+    set([{ id: 'skill', tool: 'cursor', action: { kind: 'settings' } }]);
     renderThemed(<RequirementsBanner />);
     expect(screen.getByText('Falta 1 requisito para o board trabalhar com a IA')).toBeInTheDocument();
     expect(screen.getByText('A skill do fluxo (faz-ai-fluxo) não está pronta para o Cursor')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Instalar a skill' }));
-    expect(sentOf('harness.flowSkill.install')).toEqual([{ type: 'harness.flowSkill.install', tool: 'cursor', replace: false }]);
+    expect(screen.getByRole('button', { name: 'Abrir Harness' })).toBeInTheDocument();
   });
 });
 

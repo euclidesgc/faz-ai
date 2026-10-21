@@ -1,13 +1,10 @@
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { ContextPlanningRepo } from '../../repositories/contextPlanningRepo';
 import { artifactLocation } from '../../../shared/artifacts';
 import { EMPTY_HARNESS, type Harness } from '../../../shared/harness';
 import { MCPS_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../../shared/boardFields';
 import { selectedMcpNames, selectedRuleLocations, selectedSkillNames } from '../../../shared/harnessSelection';
 import { migrateExecProfiles, seedAgents } from '../../agentSeeds';
-import { FLOW_SKILL, installFlowSkillFiles } from '../../flowSkill';
-import { copyTarget } from '../../../shared/harnessCatalog';
 import type { BoardContext, HandlerMap } from './context';
 
 /** Teto do arquivo que o editor do board abre. */
@@ -99,13 +96,6 @@ export class BoardHarness {
   }
 }
 
-/** O SKILL.md da skill do fluxo na pasta de skills da ferramenta, na pasta do usuário. */
-export function flowSkillFile(ctx: BoardContext, tool: Parameters<typeof copyTarget>[0]): string {
-  const target = copyTarget(tool, 'skill', 'skills', 'user');
-  if (!target || !ctx.home) throw new Error('Esta ferramenta não tem uma pasta de skills na pasta do usuário.');
-  return path.join(ctx.home, target.path, FLOW_SKILL.name, 'SKILL.md');
-}
-
 /** Harness: biblioteca do board (regras, skills, agentes e servidores MCP) e a marcação deles. */
 export const harnessHandlers = {
   'contextPlanning.save': (msg, ctx, actor) => {
@@ -174,11 +164,5 @@ export const harnessHandlers = {
     seedAgents(ctx, msg.force);
     ctx.harness.load();
     return true;
-  },
-  // sem `replace`, não sobrescreve: se a pessoa já ajustou a skill, a versão dela fica
-  'harness.flowSkill.install': (msg, ctx) => {
-    const tool = msg.tool ?? ctx.state().board.aiTool;
-    const root = path.dirname(path.dirname(flowSkillFile(ctx, tool)));
-    return installFlowSkillFiles(root, msg.replace).length > 0;
   },
 } satisfies Partial<HandlerMap>;

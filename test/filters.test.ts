@@ -150,7 +150,6 @@ const state: BoardState = {
   orphans: { items: [], failed: {}, scannedAt: null },
   environment: null,
   environmentFirstRun: false,
-  harnessInstall: null,
   mainBranch: null,
   branchRenames: [],
   branchRenameResult: null,

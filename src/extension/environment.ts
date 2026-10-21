@@ -258,7 +258,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
   const cliMissing = !!req('cli');
   const cliExe = cliMissing ? null : p.resolve(baseValue(CLI_COMMAND, tool) ?? '');
   const signin = req('signin');
-  const skill = p.skillInstalled ? undefined : (req('skill') ?? { id: 'skill' as const, tool, action: { kind: 'installSkill' as const } });
+  const skill = p.skillInstalled ? undefined : (req('skill') ?? { id: 'skill' as const, tool, action: { kind: 'settings' as const } });
   const own = toolGroup(tool, [
     {
       id: 'cli',

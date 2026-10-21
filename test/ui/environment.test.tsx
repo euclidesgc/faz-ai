@@ -55,7 +55,7 @@ const cursor = (skill: EnvCheck['status'] = 'missing'): EnvCheck => ({
       id: 'skill',
       tool: 'cursor',
       status: skill,
-      requirement: skill === 'missing' ? { id: 'skill', tool: 'cursor', action: { kind: 'installSkill' } } : undefined,
+      requirement: skill === 'missing' ? { id: 'skill', tool: 'cursor', action: { kind: 'settings' } } : undefined,
     },
     { id: 'permission', tool: 'cursor', status: 'ok' },
   ],
@@ -230,30 +230,9 @@ describe('Diagnóstico do ambiente', () => {
     syncStore(router);
     renderThemed(<EnvironmentView />);
     show(report());
-    expect(screen.getAllByRole('button', { name: 'Instalar a skill' })).toHaveLength(1);
+    expect(within(item('Skill do fluxo (faz-ai-fluxo)')).getAllByRole('button', { name: 'Abrir Harness' })).toHaveLength(1);
     const optional = screen.getByRole('region', { name: 'Opcionais' });
     expect(within(optional).queryByRole('button', { name: /Instalar/ })).toBeNull();
-  });
-
-  it('depois de instalar a skill, mostra que está trabalhando e confere de novo sozinho', async () => {
-    syncStore(router);
-    renderThemed(<EnvironmentView />);
-    show(report());
-    confirmLast();
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(Date.now() + 5000);
-    await userEvent.click(within(item('Skill do fluxo (faz-ai-fluxo)')).getByRole('button', { name: 'Instalar a skill' }));
-    expect(posted.mock.calls.map(([m]) => m.type).slice(-2)).toEqual(['harness.flowSkill.install', 'environment.check']);
-    const skill = item('Skill do fluxo (faz-ai-fluxo)');
-    expect(within(skill).getByText('Aplicando e conferindo de novo…')).toBeInTheDocument();
-    expect(within(skill).queryByRole('button', { name: 'Instalar a skill' })).toBeNull();
-    // a resposta chega com a skill instalada e o host confirma a conferência: o item vira "Pronto"
-    show({ ...report({ skill: 'ok' }), checkedAt: Date.now() + 1 });
-    confirmLast();
-    await act(async () => {});
-    expect(within(item('Skill do fluxo (faz-ai-fluxo)')).getByText('Pronto:')).toBeInTheDocument();
-    expect(screen.queryByText('Aplicando e conferindo de novo…')).toBeNull();
-    vi.useRealTimers();
   });
 
   it('"Verificar de novo" roda outra vez e fica desligado até a resposta', async () => {

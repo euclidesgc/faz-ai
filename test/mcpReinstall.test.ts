@@ -3,7 +3,6 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { ensureUserServers, runRegistrationSteps, toolsNeedingInstall, userRegisteredTools } from '../src/extension/mcp/reinstall';
-import { installFlowSkillFiles } from '../src/extension/flowSkill';
 import type { Registration } from '../src/extension/mcp/clientConfig';
 
 let project: string;
@@ -165,18 +164,5 @@ describe('ensureUserServers', () => {
     const r = await ensure(['kimi']);
     expect(r.done).toEqual([]);
     expect(r.failed).toEqual([{ tool: 'kimi', message: expect.any(String) }]);
-  });
-});
-
-describe('installFlowSkillFiles', () => {
-  it('grava o conjunto e é idempotente: sem replace não sobrescreve o que a pessoa ajustou', () => {
-    const root = path.join(home, 'skills');
-    const first = installFlowSkillFiles(root);
-    expect(first.length).toBeGreaterThan(0);
-    const file = path.join(root, first[0]!, 'SKILL.md');
-    fs.writeFileSync(file, 'minha versão');
-    expect(installFlowSkillFiles(root)).toEqual([]);
-    expect(fs.readFileSync(file, 'utf8')).toBe('minha versão');
-    expect(installFlowSkillFiles(root, true).length).toBe(first.length);
   });
 });

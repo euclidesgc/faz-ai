@@ -339,10 +339,10 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     signinCache.set(tool, { at: Date.now(), value, binding });
     return value;
   };
-  /** O que falta no banco de artefatos; undefined sem o inventário lido (a pasta do projeto não existe). */
+  /** O que falta no banco de artefatos; undefined sem a biblioteca carregada (a pasta do projeto não existe). */
   const harnessIssuesNow = (): ReturnType<typeof harnessIssues> | undefined => {
     const s = router.snapshot();
-    return s.harness.inventory.some((t) => t.tool === s.board.aiTool) ? harnessIssues(s) : undefined;
+    return s.harness.library ? harnessIssues(s) : undefined;
   };
   const checkNow = (): Promise<void> => {
     if (disposed) return Promise.resolve();
@@ -492,13 +492,13 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       if (other === tool) continue;
       const cli = resolveHere(baseValue(CLI_COMMAND, other) ?? '');
       if (!cli && !(other === 'cursor' && o.editor?.name === 'cursor')) continue;
-      const inventory = s.harness.inventory.find((t) => t.tool === other);
       out.push({
         tool: other,
         cli,
         signedIn: cli ? await probeSignedIn(other, cli, false) : null,
         mcp: !!registeredServer(other, o.folderPath, homeDir),
-        skill: !!inventory?.items.some((i) => i.kind === 'skill' && i.name === FLOW_SKILL_NAME),
+        // a skill do fluxo é do board (vale para qualquer ferramenta), não da pasta de cada uma
+        skill: selectedItems(s, 'skill', 'always').some((i) => i.name === FLOW_SKILL_NAME),
         permission: headlessUnsupported(other, s.board.runner.permission),
       });
     }
