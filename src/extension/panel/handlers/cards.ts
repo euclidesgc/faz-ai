@@ -244,6 +244,30 @@ function trashMany(ctx: BoardContext, msg: MessageOf<'card.trashMany'>): void {
 }
 
 /**
+ * Aplica `act` a cada card arquivado do lote, na ordem da mensagem. Repetidos, inexistentes, não arquivados
+ * e na lixeira ficam de fora. O estado é lido uma vez (um snapshot por id custaria caro com centenas de
+ * cards) e não precisa ser relido: `restoreArchived` e `trash` são idempotentes, então a sub-tarefa listada
+ * depois da história (que já a levou junto) vira no-op.
+ */
+function eachArchived(ctx: BoardContext, cardIds: string[], act: (id: string) => void): void {
+  const byId = new Map(ctx.state().cards.map((c) => [c.id, c]));
+  for (const id of new Set(cardIds)) {
+    const card = byId.get(id);
+    if (card && card.archivedAt != null && card.deletedAt == null) act(id);
+  }
+}
+
+/** Restaura vários cards arquivados, com a regra do Restaurar individual (`restoreArchived`) em cada um. */
+function unarchiveMany(ctx: BoardContext, msg: MessageOf<'card.unarchiveMany'>): void {
+  eachArchived(ctx, msg.cardIds, (id) => ctx.cards.restoreArchived(id));
+}
+
+/** Manda vários cards arquivados para a lixeira; `trash` na história leva as sub-tarefas arquivadas. */
+function trashArchivedMany(ctx: BoardContext, msg: MessageOf<'card.trashArchivedMany'>): void {
+  eachArchived(ctx, msg.cardIds, (id) => ctx.cards.trash(id));
+}
+
+/**
  * Move várias histórias de uma vez para a mesma coluna. `cancelChildren: true` sempre: cobre RF13
  * (cancelar as sub-tarefas em aberto do lote ao mover para uma coluna de cancelamento, sem perguntar
  * de novo) sem efeito quando o destino não é cancelamento (mesma regra de `card.move` de hoje).
@@ -353,6 +377,14 @@ export const cardHandlers = {
   },
   'card.trashMany': (msg, ctx) => {
     trashMany(ctx, msg);
+    return true;
+  },
+  'card.unarchiveMany': (msg, ctx) => {
+    unarchiveMany(ctx, msg);
+    return true;
+  },
+  'card.trashArchivedMany': (msg, ctx) => {
+    trashArchivedMany(ctx, msg);
     return true;
   },
   'card.moveMany': (msg, ctx, { byAi }) => {
