@@ -62,7 +62,7 @@ export function useToolExport(tool: AiTool, target: ExportTarget, enabled = true
     setError(null);
     setPlan(null);
     const req = ask<ExportPlan>(
-      (requestId) => postToHost({ type: 'harness.export.plan', requestId, tool, target } as never),
+      (requestId) => postToHost({ type: 'harness.export.plan', requestId, tool, target }),
       'harness.export.planResult',
       (m: { plan?: ExportPlan; error?: string }) => ({ value: m.plan, error: m.error }),
     );
@@ -84,7 +84,7 @@ export function useToolExport(tool: AiTool, target: ExportTarget, enabled = true
       setApplying(true);
       setError(null);
       const req = ask<ExportResult>(
-        (requestId) => postToHost({ type: 'harness.export.apply', requestId, tool, target, ids, replace } as never),
+        (requestId) => postToHost({ type: 'harness.export.apply', requestId, tool, target, ids, replace }),
         'harness.export.applyResult',
         (m: { result?: ExportResult; error?: string }) => ({ value: m.result, error: m.error }),
       );
