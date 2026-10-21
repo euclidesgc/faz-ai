@@ -304,6 +304,12 @@ respostas** da descrição; responder de novo a mesma pergunta substitui a respo
 autônomo, o board responde cada pergunta com a indicada, registra na mesma seção e a IA segue o
 trabalho. A pergunta aberta, sem opções, continua sendo `ask_question`.
 
+As perguntas com opções aparecem no card aberto, abaixo da descrição, num carrossel: uma pergunta por
+vez, com o contador **{n} de {total}** e a opção indicada marcada com o selo **Indicada**. Clicar numa
+opção grava a resposta e avança; para escrever uma resposta própria, use o campo da própria pergunta.
+**Anterior** e **Próxima** voltam e avançam. A última tela é o resumo, com as perguntas não respondidas;
+**Enviar respostas** grava tudo na seção **Perguntas e respostas** e devolve a vez para a IA.
+
 Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, a aba **Configurações** e o
 botão **Verificar ambiente** ganham um ícone de atenção. O hint dele resume o que falta, com o nome
 de cada item, e a explicação com a ação de cada um fica no Diagnóstico do ambiente. No painel de
