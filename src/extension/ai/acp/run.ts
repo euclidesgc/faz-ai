@@ -23,6 +23,7 @@ import { BOARD_SERVER, SUBAGENT_TOOLS } from '../../execution';
 import { ensureProjectServer } from '../../mcp/clientConfig';
 import type { HeadlessInput } from '../provider';
 import { AUTH_REQUIRED, RpcError, rpcConnection } from './connection';
+import { version as EXTENSION_VERSION } from '../../../../package.json';
 import { acpCommand, acpMcpToolOf, type AcpAgent, type AcpMcpServer, type AcpProcess, type AcpSpawnFn, type AcpToolCall } from './provider';
 import { acpReader, toolCallOf } from './reader';
 
@@ -224,7 +225,8 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
       // o board não empresta o editor ao agente: sem `fs/*` nem `terminal/*`, ele lê e roda sozinho, e
       // cada escrita ou comando passa pelo pedido de permissão
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
-      clientInfo: { name: 'faz-ai', title: 'Faz AI Kanban' },
+      // `version` é obrigatório no esquema do ACP: Gemini CLI e OpenCode recusam o initialize sem ele
+      clientInfo: { name: 'faz-ai', title: 'Faz AI Kanban', version: EXTENSION_VERSION },
     });
     const version = init.protocolVersion;
     if (version !== ACP_PROTOCOL_VERSION)

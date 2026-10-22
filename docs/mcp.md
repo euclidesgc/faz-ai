@@ -477,7 +477,8 @@ Catálogo de agentes, comando de execução e login (nenhum validado com a CLI r
 
 | Agente | Comando | Login (no terminal) | Consumo informado |
 | --- | --- | --- | --- |
-| Gemini CLI | `gemini --acp` | `gemini` | tokens por turno, sem custo |
+| Gemini CLI | `gemini --acp --skip-trust` | `gemini` | tokens por turno, sem custo |
+| Google Antigravity | `agy_acp_server.par` (binário do registro do ACP; a pasta dele no PATH, sem link simbólico) | `agy` (o servidor pede login pelo protocolo) | não informado |
 | OpenCode | `opencode acp` | `opencode auth login` | tokens por turno e custo acumulado (USD) |
 | Codex | `codex-acp` | `codex login` | só o último pedido do turno, sem custo |
 | Cursor | `cursor-agent acp` | `cursor-agent login` | não informado |

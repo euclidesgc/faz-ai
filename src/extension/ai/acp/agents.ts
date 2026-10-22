@@ -20,7 +20,9 @@ export const ACP_AGENTS: readonly AcpAgent[] = [
     id: 'gemini',
     label: 'Gemini CLI',
     command: 'gemini',
-    args: ['--acp'],
+    // `--skip-trust`: sem a pasta marcada como confiável o Gemini CLI em ACP fica mudo no session/prompt
+    // (conferido na 0.65.0); a confiança é do board, que responde cada permissão pelo card
+    args: ['--acp', '--skip-trust'],
     login: 'gemini',
     docs: 'https://geminicli.com/docs/cli/acp-mode',
     // `usage` e `usage_update` (só contexto, sem custo) desde o PR #29549, de 2026-09-29; antes, só `_meta.quota`
@@ -40,6 +42,25 @@ export const ACP_AGENTS: readonly AcpAgent[] = [
         ? null
         : { inputTokens: input, outputTokens: output, cacheReadTokens: 0, cacheWriteTokens: 0 };
     },
+  },
+  {
+    id: 'antigravity-acp',
+    label: 'Google Antigravity',
+    // o registro do ACP distribui um binário (`agy_acp_server.par`, no zip da plataforma), sem pacote npm:
+    // a pessoa põe a PASTA dele no PATH (por link simbólico ele não acha o próprio harness). O `agy`
+    // interativo é outro programa, sem modo ACP.
+    command: 'agy_acp_server.par',
+    args: [],
+    // o servidor pede login pelo `authenticate` do protocolo (Google, Gemini Enterprise, chave de API) e grava a
+    // escolha em `~/.gemini/antigravity-acp/settings.json`; sem a história do login pela tela, vale o `agy`
+    // (não conferido se o login dele é compartilhado)
+    login: 'agy',
+    docs: 'https://antigravity.google/docs/ide/extensions',
+    // conferido na 1.4.1: a resposta do prompt não traz `usage`; só `usage_update` com o contexto ocupado
+    usage: { tokens: 'none', cost: false },
+    // o modelo e o nível de raciocínio vêm em `configOptions` (`model`, `thinking_level`) e no `models` do
+    // session/new (`gemini-3.8-flash-high`), não na linha de comando
+    fullMode: 'yolo',
   },
   {
     id: 'opencode',
