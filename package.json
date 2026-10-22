@@ -10,6 +10,9 @@
     "type": "git",
     "url": "https://github.com/euclidesgc/faz-ai.git"
   },
+  "sponsor": {
+    "url": "https://buymeacoffee.com/euclidesca2"
+  },
   "bugs": {
     "url": "https://github.com/euclidesgc/faz-ai/issues"
   },

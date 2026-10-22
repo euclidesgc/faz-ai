@@ -17,6 +17,8 @@
 
 Gostou? Ajude o Faz AI a crescer:
 
+- ☕ **Apoie o projeto** em [buymeacoffee.com/euclidesca2](https://buymeacoffee.com/euclidesca2): é o que
+  mantém o Faz AI gratuito e em evolução.
 - ⭐ **Dê uma estrela** no [repositório do GitHub](https://github.com/euclidesgc/faz-ai).
 - 💬 **Avalie a extensão** no [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=euclidesgc.faz-ai&ssr=false#review-details)
   ou no [Open VSX](https://open-vsx.org/extension/euclidesgc/faz-ai/reviews) (a loja do Cursor).

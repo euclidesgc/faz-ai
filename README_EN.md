@@ -17,6 +17,8 @@
 
 Enjoying it? Help Faz AI grow:
 
+- ☕ **Support the project** at [buymeacoffee.com/euclidesca2](https://buymeacoffee.com/euclidesca2): it is
+  what keeps Faz AI free and evolving.
 - ⭐ **Star** the [GitHub repository](https://github.com/euclidesgc/faz-ai).
 - 💬 **Rate the extension** on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=euclidesgc.faz-ai&ssr=false#review-details)
   or on [Open VSX](https://open-vsx.org/extension/euclidesgc/faz-ai/reviews) (Cursor's store).
