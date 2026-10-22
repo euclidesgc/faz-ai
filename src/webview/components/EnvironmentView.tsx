@@ -1,11 +1,5 @@
-import { baseValue } from '../../shared/harness';
-import { useEffect, useState } from 'react';
-import { baseInfo, type AiTool } from '../../shared/harness';
+import { useEffect } from 'react';
 import { NODE_MIN_MAJOR, missingCount, type EnvCheck, type InstallStepKind } from '../../shared/environment';
-import { CLI_COMMAND } from '../../shared/requirements';
-import { FLOW_SKILL_NAME } from '../../shared/harnessProject';
-import { activeProfile, profileIsolation } from '../../shared/aiProfiles';
-import { leaksList } from '../isolation';
 import { useBoardStore } from '../store/boardStore';
 import { t, tn } from '../i18n';
 import { ui } from '../commands';
@@ -13,55 +7,22 @@ import { useAction } from '../useAction';
 import { isWeb } from '../vscode';
 import { PageHeader } from './settings/PageHeader';
 import { CopyCommand, RequirementFix, requirementTexts } from './RequirementsBanner';
+import type { ProfileHealth } from '../../shared/profileHealth';
+import { ProfileBlock } from './environment/ProfileBlock';
+import { NextRunSection } from './environment/NextRunSection';
 import { Button, Hint, IconExternal, IconMissing, IconOk, IconSkipped } from './ui';
 
 /** O nome do item e, no hint, como o board o usa; no idioma da interface. */
-function texts(c: EnvCheck, projectTool: AiTool, leaks: string): { title: string; hint: string } {
-  const tool = baseInfo(c.tool ?? projectTool).label;
+function texts(c: EnvCheck): { title: string; hint: string } {
   switch (c.id) {
     case 'node':
       return {
         title: t('Node.js {min} ou mais novo', { min: String(NODE_MIN_MAJOR) }),
         hint: t('Roda o MCP do board: a ferramenta de IA o inicia com o Node.js do PATH a cada conversa e a cada execução pelo board.'),
       };
-    case 'tool':
-      return c.tool === projectTool
-        ? {
-            title: t('{tool} (ferramenta do projeto)', { tool }),
-            hint: t('A ferramenta de IA que o board usa nos botões de IA dos cards, no chat, no heartbeat e no modo autônomo.'),
-          }
-        : {
-            title: t('{tool} (encontrado na máquina)', { tool }),
-            hint: t(
-              'Outra ferramenta de IA nesta máquina. O board passa a usá-la se você a escolher em Configurações → Harness, e aí instala nela o MCP e a skill do board.',
-            ),
-          };
-    case 'cli':
-      return {
-        title: t('Linha de comando {cli}', { cli: baseValue(CLI_COMMAND, c.tool ?? projectTool) ?? '' }),
-        hint: t('O board roda a linha de comando do {tool} em segundo plano, nesta pasta, para a IA trabalhar nos cards.', { tool }),
-      };
-    case 'signin':
-      return {
-        title: t('Login na linha de comando'),
-        hint: t('As execuções pelo board usam a sua conta e o seu plano no {tool}. Sem login, elas falham antes de começar.', { tool }),
-      };
-    case 'mcp':
-      return {
-        title: t('MCP do board (faz-ai)'),
-        hint: t(
-          'O canal pelo qual a IA do {tool} lê e atualiza os cards deste board: consulta, move entre as colunas, comenta e anexa. Roda na sua máquina.',
-          { tool },
-        ),
-      };
-    case 'skill':
-      return {
-        title: t('Skill do fluxo ({name})', { name: FLOW_SKILL_NAME }),
-        hint: t('Ensina a IA do {tool} a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências.', { tool }),
-      };
     case 'harness':
       return {
-        title: t('Definição do harness'),
+        title: t('Banco de artefatos do board'),
         hint: t(
           'O banco de artefatos do board: as skills, agentes, servidores MCP e regras que as execuções podem usar, no modo de cada um. Sem ele o board funciona, mas sem o ganho de economia e precisão.',
         ),
@@ -70,8 +31,7 @@ function texts(c: EnvCheck, projectTool: AiTool, leaks: string): { title: string
       return {
         title: t('Artefatos no board'),
         hint: t(
-          'Nenhuma skill, agente ou servidor MCP em modo "Pelo card": o planejamento dos cards não tem de onde escolher. Use "Indicar artefatos" na aba do {tool} no Harness.',
-          { tool },
+          'Nenhuma skill, agente ou servidor MCP em modo "Pelo card": o planejamento dos cards não tem de onde escolher. Importe ou crie artefatos em Harness, na aba Artefatos do board.',
         ),
       };
     case 'harness-agents':
@@ -93,18 +53,10 @@ function texts(c: EnvCheck, projectTool: AiTool, leaks: string): { title: string
       };
     case 'harness-isolation':
       return {
-        title: t('Artefatos fora do board que a CLI carrega'),
+        title: t('Isolamento do harness'),
         hint: t(
-          'A linha de comando do {tool} não desliga tudo: {list} entram no contexto sem passar pelo board. Desligue na configuração da ferramenta ou remova; o board só confere.',
-          { tool, list: leaks },
+          'A CLI carrega artefatos sem passar pelo board; o Diagnóstico do Harness mostra quais, para tirar da máquina ou trazer para o board.',
         ),
-      };
-    case 'permission':
-      return {
-        title: t('Nível de permissão das execuções'),
-        hint: t('Diz o que a IA do {tool} pode fazer sozinha nas execuções pelo board. É escolhido em Configurações → Harness.', {
-          tool,
-        }),
       };
     case 'git':
       return {
@@ -155,11 +107,6 @@ function texts(c: EnvCheck, projectTool: AiTool, leaks: string): { title: string
       return {
         title: t('Grafo deste projeto'),
         hint: t('O Code Review Graph analisa o projeto uma vez; depois, o grafo se atualiza a cada mudança.'),
-      };
-    case 'crg-mcp':
-      return {
-        title: t('MCP do Code Review Graph'),
-        hint: t('É por ele que a IA do {tool} consulta o grafo nas conversas e nas execuções.', { tool }),
       };
     case 'crg-embeddings':
       return {
@@ -219,15 +166,11 @@ function DocsLink({ href }: { href: string }) {
 
 interface RowProps {
   check: EnvCheck;
-  projectTool: AiTool;
-  busy: boolean;
-  onFixed: () => void;
 }
 
 /** Uma linha da lista: estado, nome (com o hint), versão, site e o comando; o que depende dela vem dentro. */
-function Row({ check, projectTool, busy, onFixed }: RowProps) {
-  const profile = useBoardStore((s) => activeProfile(s.state!.board));
-  const x = texts(check, projectTool, leaksList(profileIsolation(profile)));
+function Row({ check }: RowProps) {
+  const x = texts(check);
   const r = check.requirement;
   const openSettings = useBoardStore((s) => s.openSettings);
   const nodeTooOld = check.id === 'node' && check.status === 'missing' && check.version;
@@ -265,11 +208,11 @@ function Row({ check, projectTool, busy, onFixed }: RowProps) {
           )}
         </div>
       )}
-      {/* o comando com copiar; o login da ferramenta do projeto vem com o "Abrir no terminal" do aviso */}
+      {/* o comando com copiar */}
       {check.command && (
         <div className="env-fix">
           {check.install && check.status !== 'ok' && <span className="small muted">{t('Depois:')}</span>}
-          {r?.action?.kind === 'command' ? <RequirementFix r={r} variant="primary" /> : <CopyCommand command={check.command} />}
+          <CopyCommand command={check.command} />
           {check.inProject && <span className="small muted">{t('Na pasta do projeto.')}</span>}
         </div>
       )}
@@ -281,23 +224,17 @@ function Row({ check, projectTool, busy, onFixed }: RowProps) {
           </Button>
         </div>
       )}
-      {/* o que o board resolve sozinho: o MCP, a skill e a permissão da ferramenta do projeto */}
+      {/* a recomendação do banco de artefatos: o texto do aviso e o atalho para o Harness */}
       {check.status === 'missing' && r && !check.command && (
         <div className="env-fix">
           <p className="small muted">{requirementTexts(r).detail}</p>
-          {busy ? (
-            <p role="status" className="env-busy">
-              <span className="spinner" aria-hidden /> {t('Aplicando e conferindo de novo…')}
-            </p>
-          ) : (
-            <RequirementFix r={r} variant="primary" onFixed={onFixed} />
-          )}
+          <RequirementFix r={r} variant="primary" />
         </div>
       )}
       {check.children && check.children.length > 0 && (
         <ul className="env-list">
           {check.children.map((c) => (
-            <Row key={c.id} check={c} projectTool={projectTool} busy={busy} onFixed={onFixed} />
+            <Row key={c.id} check={c} />
           ))}
         </ul>
       )}
@@ -305,15 +242,42 @@ function Row({ check, projectTool, busy, onFixed }: RowProps) {
   );
 }
 
-function Section({ id, title, checks, ...rest }: { id: string; title: string; checks: EnvCheck[] } & Omit<RowProps, 'check'>) {
+function Section({ id, title, checks }: { id: string; title: string; checks: EnvCheck[] }) {
   return (
     <section aria-labelledby={id}>
       <h3 id={id}>{title}</h3>
       <ul className="env-list">
         {checks.map((c) => (
-          <Row key={`${c.id}-${c.tool ?? ''}`} check={c} {...rest} />
+          <Row key={c.id} check={c} />
         ))}
       </ul>
+    </section>
+  );
+}
+
+/**
+ * Os perfis de CLI: um bloco por perfil ligado (o padrão primeiro) e, recolhido, o grupo dos desligados
+ * e dos pendentes de revisão. O perfil que o aviso do topo apontou fica à vista, e o grupo abre se ele
+ * estiver lá dentro.
+ */
+function ProfilesSection({ profiles, focus }: { profiles: ProfileHealth[]; focus: string | null }) {
+  const on = profiles.filter((p) => p.registration === 'enabled');
+  const off = profiles.filter((p) => p.registration !== 'enabled');
+  return (
+    <section aria-labelledby="env-profiles">
+      <h3 id="env-profiles">{t('Perfis de CLI')}</h3>
+      {on.length === 0 && <p className="small muted">{t('Nenhum perfil de CLI está ligado.')}</p>}
+      {on.map((p) => (
+        <ProfileBlock key={p.id} health={p} focused={p.id === focus} />
+      ))}
+      {off.length > 0 && (
+        <details open={off.some((p) => p.id === focus)}>
+          <summary>{t('Desligados ({n})', { n: off.length })}</summary>
+          {off.map((p) => (
+            <ProfileBlock key={p.id} health={p} focused={p.id === focus} />
+          ))}
+        </details>
+      )}
     </section>
   );
 }
@@ -327,7 +291,7 @@ function Section({ id, title, checks, ...rest }: { id: string; title: string; ch
  */
 export function EnvironmentView() {
   const report = useBoardStore((s) => s.state?.environment ?? null);
-  const tool = useBoardStore((s) => s.state!.board.aiTool);
+  const focusProfile = useBoardStore((s) => s.environmentProfile);
   const setView = useBoardStore((s) => s.setView);
   // a espera é a da mensagem: o host confirma (`done`) quando o relatório já está no board, ou avisa a falha
   const check = useAction(() => ui.checkEnvironment());
@@ -337,15 +301,7 @@ export function EnvironmentView() {
     void check.run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // um pedido no meio de uma conferência (instalou a skill enquanto a abertura ainda confere) roda logo depois
-  const [again, setAgain] = useState(false);
-  const recheck = () => (check.busy ? setAgain(true) : void check.run());
-  useEffect(() => {
-    if (check.busy || !again) return;
-    setAgain(false);
-    void check.run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [check.busy, again]);
+  const recheck = () => void check.run();
   // recarregar a janela reinicia a extensão: as execuções de IA em andamento param, então pergunta antes
   const ask = useBoardStore((s) => s.ask);
   const running = useBoardStore((s) => s.state?.aiRuns.length ?? 0);
@@ -363,16 +319,8 @@ export function EnvironmentView() {
           onConfirm: () => ui.reloadWindow(),
         })
       : ui.reloadWindow();
-  // um botão do board foi clicado: até a conferência seguinte terminar, os botões mostram que estão trabalhando
-  const [fixing, setFixing] = useState(false);
-  const busy = checking && fixing;
-  const onFixed = () => {
-    setFixing(true);
-    recheck();
-  };
-
-  const missing = report ? missingCount(report.required) : 0;
-  const suggested = report ? missingCount(report.recommended) : 0;
+  const missing = report ? missingCount(report.required) + (report.availability.blocked ? 1 : 0) : 0;
+  const suggested = report ? missingCount(report.recommended) + missingCount([report.harness]) + report.availability.warnings.length : 0;
   const summary = !report
     ? check.error
       ? t('A conferência falhou. Tente de novo.')
@@ -388,7 +336,6 @@ export function EnvironmentView() {
             'O board está pronto para trabalhar com a IA. Há {n} recomendações para aproveitar melhor.',
           )
         : t('Tudo pronto: o board tem tudo o que usa.');
-  const rowProps = { projectTool: report?.tool ?? tool, busy, onFixed };
 
   return (
     <div className="environment">
@@ -424,8 +371,7 @@ export function EnvironmentView() {
         }
       >
         {t(
-          'O que o board precisa para trabalhar com o {tool}, as outras ferramentas de IA desta máquina e o que ele aproveita quando está instalado. Passe o mouse sobre um item para ver como o board o usa. O board instala só o próprio MCP e a skill do fluxo; o resto você instala pelo site indicado.',
-          { tool: baseInfo(tool).label },
+          'O que o board precisa para trabalhar com a IA: o Node.js, cada perfil de CLI (linha de comando, login e credenciais), o banco de artefatos e o que ele aproveita quando está instalado. Passe o mouse sobre um item para ver como o board o usa. O board não instala nada de terceiros: instale pelo comando ou pelo site indicado.',
         )}
       </PageHeader>
       <p role="status" className="env-summary">
@@ -441,9 +387,11 @@ export function EnvironmentView() {
       )}
       {report && (
         <>
-          <Section id="env-required" title={t('Necessários')} checks={report.required} {...rowProps} />
-          {report.optional.length > 0 && <Section id="env-optional" title={t('Opcionais')} checks={report.optional} {...rowProps} />}
-          <Section id="env-recommended" title={t('Recomendados')} checks={report.recommended} {...rowProps} />
+          <Section id="env-required" title={t('Necessários')} checks={report.required} />
+          <ProfilesSection profiles={report.profiles} focus={focusProfile} />
+          <NextRunSection report={report} />
+          <Section id="env-harness" title={t('Banco de artefatos')} checks={[report.harness]} />
+          <Section id="env-recommended" title={t('Recomendados')} checks={report.recommended} />
         </>
       )}
     </div>

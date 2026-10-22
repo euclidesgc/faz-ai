@@ -2,10 +2,13 @@ import { baseValue } from '../shared/harness';
 import type { AiBase } from '../shared/aiProfiles';
 import * as path from 'node:path';
 import type { BranchRenamePending } from '../shared/branchRename';
-import type { AiTool } from '../shared/harness';
-import { NODE_MIN_MAJOR, type EnvCheck, type EnvCheckId, type EnvironmentReport, type InstallStep } from '../shared/environment';
+import { NODE_MIN_MAJOR, type EnvCheck, type EnvironmentReport, type InstallStep } from '../shared/environment';
 import { HARNESS_ISSUES, type HarnessIssue } from '../shared/harnessStatus';
-import { CLI_COMMAND, LOGIN_COMMAND, type BoardRequirement, type RequirementId } from '../shared/requirements';
+import { boardAvailability, type ProfileHealth } from '../shared/profileHealth';
+import type { AiTool } from '../shared/harness';
+import type { EffectiveLimits } from '../shared/orchestration';
+import type { PolicySimulation } from '../shared/policyManagement';
+import type { BoardRequirement } from '../shared/requirements';
 
 /** As famílias de distribuição Linux com gerenciador de pacotes conhecido. */
 export type LinuxFamily = 'debian' | 'fedora' | 'arch';
@@ -20,36 +23,25 @@ export function linuxFamily(osRelease: string | null): LinuxFamily | null {
   return null;
 }
 
-/** Outra ferramenta de IA, como o host a encontrou na máquina. */
-export interface OtherToolProbe {
-  tool: AiTool;
-  /** o executável da CLI, ou null (a ferramenta foi achada pelo editor: o board está aberto no Cursor) */
-  cli: string | null;
-  /** null quando a CLI não diz */
-  signedIn: boolean | null;
-  /** o MCP do board está registrado nela */
-  mcp: boolean;
-  /** a skill do fluxo existe para ela */
-  skill: boolean;
-  /** por que ela não roda com o nível de permissão do board; null quando roda */
-  permission: string | null;
-}
-
 export interface EnvironmentProbe {
-  tool: AiTool;
-  /** o que `checkRequirements` acabou de achar: os itens da ferramenta do projeto vêm daí, com o texto e a ação do aviso */
+  /** o que `checkRequirements` acabou de achar: o Node.js e o banco de artefatos vêm daí, com o texto e a ação do aviso */
   requirements: BoardRequirement[];
+  /** a saúde de cada perfil de CLI, já montada pelo host (todos os perfis, ligados ou não) */
+  health: ProfileHealth[];
   workspaceDir: string;
-  /** a skill do fluxo está pronta para a ferramenta do projeto */
-  skillInstalled: boolean;
+  /** os perfis que o board usa por conta própria (`profilesInUse`) */
+  profilesInUse?: AiTool[];
+  /**
+   * O simulador de políticas (#620) para o alvo padrão: recebe se o padrão está disponível. Nunca chama
+   * o gateway nem a IA. Ausente: `nextRun` fica null.
+   */
+  simulateNextRun?(defaultAvailable: boolean): PolicySimulation | null;
+  /** Os limites efetivos (#621); ausente: `limits` fica null. */
+  effectiveLimits?(): EffectiveLimits | null;
   /** o que falta no banco de artefatos do board; null quando não dá para saber (sem o inventário) */
   harnessIssues: HarnessIssue[] | null;
-  /** as outras ferramentas encontradas na máquina */
-  others: OtherToolProbe[];
   /** as renomeações de branch à espera de Renomear/Desfazer (#466): o item "Nome da branch" fica pendente enquanto houver */
   branchRenames?: BranchRenamePending[];
-  /** o MCP do Code Review Graph está registrado na ferramenta do projeto */
-  crgMcp: boolean;
   /** o sistema: no Windows, os comandos de instalação são os do PowerShell */
   platform: NodeJS.Platform;
   homeDir: string;
@@ -66,32 +58,10 @@ export interface EnvironmentProbe {
   exists(file: string): boolean;
 }
 
-/** Os requisitos do aviso que cada item da ferramenta do projeto resume. */
-const FROM: Partial<Record<EnvCheckId, RequirementId[]>> = {
-  node: ['node'],
-  cli: ['cli'],
-  signin: ['signin'],
-  mcp: ['mcp', 'mcp-stale', 'mcp-elsewhere', 'mcp-outdated', 'mcp-reload', 'mcp-enable', 'mcp-path'],
-  permission: ['permission', 'permission-mcp'],
-  skill: ['skill'],
-  harness: ['harness'],
-};
-
-/** O nome da ferramenta no `code-review-graph install --platform`. */
-const CRG_PLATFORM: Record<AiBase, string> = {
-  claude: 'claude-code',
-  cursor: 'cursor',
-  // ainda sem plataforma própria no Code Review Graph: o nome genérico, a conferir quando ele suportar
-  kimi: 'kimi',
-};
-
 /** Onde cada item explica como instalar ou configurar (conferido em 2026-10-13). */
-const BOARD_DOCS = 'https://github.com/euclidesgc/faz-ai#usando-com-ia';
 const CRG_DOCS = 'https://github.com/tirth8205/code-review-graph';
-const DOCS: Partial<Record<EnvCheckId, string>> = {
+const DOCS: Record<string, string> = {
   node: 'https://nodejs.org/en/download',
-  mcp: BOARD_DOCS,
-  skill: BOARD_DOCS,
   harness: `https://github.com/euclidesgc/faz-ai#harness-de-ia`,
   git: 'https://git-scm.com/downloads',
   gh: 'https://cli.github.com',
@@ -99,10 +69,11 @@ const DOCS: Partial<Record<EnvCheckId, string>> = {
   uv: 'https://docs.astral.sh/uv/getting-started/installation/',
   'crg-embeddings': `${CRG_DOCS}#usage`,
 };
-const TOOL_DOCS: Record<AiBase, Partial<Record<EnvCheckId, string>>> = {
-  claude: { cli: 'https://code.claude.com/docs/en/setup', permission: 'https://code.claude.com/docs/en/iam' },
-  cursor: { cli: 'https://cursor.com/docs/cli/installation', permission: 'https://cursor.com/docs/cli/reference/permissions' },
-  kimi: { cli: 'https://www.kimi.com/code/docs/en/', permission: 'https://www.kimi.com/code/docs/en/' },
+/** Onde cada CLI pronta explica como instalar (conferido em 2026-10-13). */
+const CLI_DOCS: Record<AiBase, string> = {
+  claude: 'https://code.claude.com/docs/en/setup',
+  cursor: 'https://cursor.com/docs/cli/installation',
+  kimi: 'https://www.kimi.com/code/docs/en/',
 };
 
 /**
@@ -195,47 +166,33 @@ async function hasEmbeddings(p: EnvironmentProbe, python: string | null): Promis
 
 const statusOf = (ok: boolean, parentOk = true): EnvCheck['status'] => (!parentOk ? 'skipped' : ok ? 'ok' : 'missing');
 
-/** O bloco de uma ferramenta: pronto só quando tudo dentro dele está pronto; o harness é recomendação e não pesa. */
-function toolGroup(tool: AiTool, children: EnvCheck[]): EnvCheck {
-  const required = children.filter((c) => c.id !== 'harness');
-  return {
-    id: 'tool',
-    tool,
-    status: required.every((c) => c.status === 'ok' && (c.children ?? []).every((g) => g.status === 'ok')) ? 'ok' : 'missing',
-    children,
-  };
-}
-
 /**
- * A definição do harness: o que falta no banco de artefatos do board, um filho por falta. Pulado
- * enquanto a ferramenta não está instalada (sem ela nada roda) ou sem o inventário. É recomendação:
- * o requisito do aviso do topo é `optional`.
+ * O banco de artefatos do board: o que falta nele, um filho por falta. Pulado sem o inventário. É
+ * recomendação: o requisito do aviso do topo é `optional`.
  */
-function harnessCheck(tool: AiTool, issues: HarnessIssue[] | null, cliMissing: boolean, requirement?: BoardRequirement): EnvCheck {
-  const known = !cliMissing && issues !== null;
+function harnessCheck(issues: HarnessIssue[] | null, requirement?: BoardRequirement): EnvCheck {
+  const known = issues !== null;
   return {
     id: 'harness',
-    tool,
     status: statusOf(known && issues.length === 0, known),
     docs: DOCS.harness,
     requirement,
-    children: HARNESS_ISSUES.map((issue) => ({ id: `harness-${issue}` as const, tool, status: statusOf(!issues?.includes(issue), known) })),
+    children: HARNESS_ISSUES.map((issue) => ({ id: `harness-${issue}` as const, status: statusOf(!issues?.includes(issue), known) })),
   };
 }
 
 /**
- * O Diagnóstico do ambiente: uma lista do que o board precisa, do que é opcional (a outra ferramenta
- * de IA) e do que ele aproveita quando existe. O board não instala nada de terceiros: cada item diz se
- * está pronto e onde a pessoa encontra como instalar. Só o MCP e a skill do board têm botão.
+ * O Diagnóstico do ambiente: o Node.js, um bloco por perfil de CLI (CLI, login, credenciais), o banco
+ * de artefatos do board e o que ele aproveita quando existe. O board não instala nada de terceiros:
+ * cada item diz se está pronto e onde a pessoa encontra como instalar.
  */
 export async function checkEnvironment(p: EnvironmentProbe): Promise<EnvironmentReport> {
-  const req = (id: EnvCheckId) => p.requirements.find((r) => FROM[id]?.includes(r.id));
-  const tool = p.tool;
+  const req = (id: BoardRequirement['id']) => p.requirements.find((r) => r.id === id);
   const windows = p.platform === 'win32';
   const install = INSTALL[windows ? 'windows' : 'unix'];
   const reopen = windows ? { reopenTerminal: true as const } : {};
-  // a CLI de cada ferramenta, com o PATH quando ela cai numa pasta fora dele
-  const cliInstall = (t: AiTool) => [...(baseValue(install, t) ?? []), ...localBin(p, true)];
+  // a CLI de cada perfil pronto, com o PATH quando ela cai numa pasta fora dele
+  const cliInstall = (base: AiBase) => [...(baseValue(install, base) ?? []), ...localBin(p, true)];
 
   // o Node.js que roda o MCP do board: a partir da versão mínima
   const nodeExe = p.resolve('node');
@@ -255,63 +212,12 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     ...(nodeOk ? {} : reopen),
   };
 
-  const cliMissing = !!req('cli');
-  const cliExe = cliMissing ? null : p.resolve(baseValue(CLI_COMMAND, tool) ?? '');
-  const signin = req('signin');
-  const skill = p.skillInstalled ? undefined : (req('skill') ?? { id: 'skill' as const, tool, action: { kind: 'installSkill' as const } });
-  const own = toolGroup(tool, [
-    {
-      id: 'cli',
-      tool,
-      status: statusOf(!cliMissing),
-      version: cliExe ? version(await p.run(cliExe, ['--version'])) : undefined,
-      docs: (baseValue(TOOL_DOCS, tool) ?? {}).cli,
-      install: cliMissing ? cliInstall(tool) : undefined,
-      ...(cliMissing ? reopen : {}),
-      children: [
-        { id: 'signin', tool, status: statusOf(!signin, !cliMissing), command: baseValue(LOGIN_COMMAND, tool) ?? '', requirement: signin },
-      ],
-    },
-    { id: 'mcp', tool, status: statusOf(!req('mcp')), docs: DOCS.mcp, requirement: req('mcp') },
-    { id: 'skill', tool, status: statusOf(p.skillInstalled), docs: DOCS.skill, requirement: skill },
-    harnessCheck(tool, p.harnessIssues, cliMissing, req('harness')),
-    {
-      id: 'permission',
-      tool,
-      status: statusOf(!req('permission')),
-      docs: (baseValue(TOOL_DOCS, tool) ?? {}).permission,
-      requirement: req('permission'),
-    },
-  ]);
-
-  // as outras ferramentas: o board só confere; ele instala o MCP e a skill quando uma vira a do projeto
-  const optional: EnvCheck[] = [];
-  for (const o of p.others) {
-    optional.push(
-      toolGroup(o.tool, [
-        {
-          id: 'cli',
-          tool: o.tool,
-          status: statusOf(!!o.cli),
-          version: o.cli ? version(await p.run(o.cli, ['--version'])) : undefined,
-          docs: (baseValue(TOOL_DOCS, o.tool) ?? {}).cli,
-          install: o.cli ? undefined : cliInstall(o.tool),
-          ...(o.cli ? {} : reopen),
-          children: [
-            {
-              id: 'signin',
-              tool: o.tool,
-              status: statusOf(o.signedIn !== false, !!o.cli),
-              command: baseValue(LOGIN_COMMAND, o.tool) ?? '',
-            },
-          ],
-        },
-        { id: 'mcp', tool: o.tool, status: statusOf(o.mcp), docs: DOCS.mcp },
-        { id: 'skill', tool: o.tool, status: statusOf(o.skill), docs: DOCS.skill },
-        { id: 'permission', tool: o.tool, status: statusOf(!o.permission), docs: (baseValue(TOOL_DOCS, o.tool) ?? {}).permission },
-      ]),
-    );
-  }
+  // os perfis: o que faltar em cada CLI pronta traz o instalador oficial do sistema; os demais já trazem o link
+  const profiles = p.health.map((h): ProfileHealth =>
+    h.kind === 'builtin' && h.probe?.found !== true && h.base !== 'generic'
+      ? { ...h, install: { steps: cliInstall(h.base), docs: CLI_DOCS[h.base] } }
+      : h,
+  );
 
   const gitExe = p.resolve('git');
   const repo = gitExe ? (await p.run(gitExe, ['rev-parse', '--is-inside-work-tree'], p.workspaceDir))?.trim() === 'true' : false;
@@ -365,13 +271,6 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
   const crgChildren: EnvCheck[] = [
     { id: 'crg-graph', status: statusOf(graph, !!crgExe), command: 'code-review-graph build', inProject: true },
     {
-      id: 'crg-mcp',
-      tool,
-      status: statusOf(p.crgMcp, !!crgExe),
-      command: baseValue(CRG_PLATFORM, tool) ? `code-review-graph install --platform ${baseValue(CRG_PLATFORM, tool)}` : undefined,
-      inProject: true,
-    },
-    {
       id: 'crg-embeddings',
       status: statusOf(embeddings, !!crgExe),
       install: embeddings ? undefined : steps(addEmbeddings),
@@ -400,10 +299,26 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
         children: [crg],
       };
 
+  const defaultHealth = profiles.find((h) => h.isDefault);
+  const simulation = p.simulateNextRun?.(!!defaultHealth && defaultHealth.problem === null) ?? null;
+  const inUse = new Set(p.profilesInUse ?? []);
+  const nextRun = simulation
+    ? {
+        simulation,
+        blockedInUse: profiles.flatMap((h) =>
+          inUse.has(h.id) && h.problem !== null ? [{ id: h.id, name: h.name, problem: h.problem }] : [],
+        ),
+      }
+    : null;
+
   return {
-    tool,
-    required: [node, own],
-    optional,
+    required: [node],
+    profiles,
+    availability: boardAvailability(profiles),
+    regime: 'exclusive',
+    nextRun,
+    limits: p.effectiveLimits?.() ?? null,
+    harness: harnessCheck(p.harnessIssues, req('harness')),
     recommended: [git, branchName, gh, codeGraph],
     // os instaladores do Linux e do macOS baixam pelo curl, que um Ubuntu desktop novo não traz
     ...(!windows && !p.resolve('curl') ? { curlMissing: true as const } : {}),

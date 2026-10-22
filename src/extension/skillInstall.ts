@@ -97,27 +97,3 @@ export function findSkills(root: string): InstallableSkill[] {
   visit(root, 0);
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
-
-/**
- * Copia as skills escolhidas para a pasta de skills de destino. Não copia links simbólicos (poderiam
- * apontar para fora da skill) e não substitui uma skill que já existe. Nada da origem é executado.
- */
-export function installSkills(root: string, rels: string[], destRoot: string): string[] {
-  const known = new Map(findSkills(root).map((k) => [k.rel, k]));
-  const chosen = rels.map((rel) => {
-    const found = known.get(rel);
-    if (!found) throw new Error(`Skill não encontrada na origem: ${rel}`);
-    if (!found.valid) throw new Error(`"${found.name}" não é um nome de skill válido (letras minúsculas, números e hífens).`);
-    if (fs.existsSync(path.join(destRoot, found.name))) throw new Error(`Já existe uma skill "${found.name}" no destino.`);
-    return found;
-  });
-  fs.mkdirSync(destRoot, { recursive: true });
-  return chosen.map((k) => {
-    const dest = path.join(destRoot, k.name);
-    fs.cpSync(k.rel === '.' ? root : path.join(root, ...k.rel.split('/')), dest, {
-      recursive: true,
-      filter: (src) => !fs.lstatSync(src).isSymbolicLink() && path.basename(src) !== '.git',
-    });
-    return path.join(dest, 'SKILL.md');
-  });
-}

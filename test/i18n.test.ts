@@ -12,7 +12,6 @@ import { workflows } from '../src/webview/i18n/en/workflows';
 import { fill, setLocale, t, tn } from '../src/webview/i18n';
 import { flowRows } from '../src/shared/gitflow';
 import { DEFAULT_GIT } from '../src/shared/git';
-import { LIBRARY_GUIDE } from '../src/webview/components/settings/harness/libraryGuide';
 
 const ROOT = path.resolve(__dirname, '../src/webview');
 
@@ -50,11 +49,6 @@ const names = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sor
 const tags = (s: string) => [...s.matchAll(/<\/?(?:b|i|code)>/g)].map((m) => m[0]).sort();
 
 describe('i18n: dicionário', () => {
-  it('traduz títulos, dicas e exemplos de cada etapa do assistente da biblioteca', () => {
-    for (const sections of Object.values(LIBRARY_GUIDE))
-      for (const section of sections) for (const text of Object.values(section)) expect(EN, text).toHaveProperty([text]);
-  });
-
   it('todo texto passado a t(), tn() e rich() tem tradução em inglês', () => {
     const missing = [...usedKeys()].filter(([key]) => !(key in EN)).map(([key, file]) => `${file}: ${key}`);
     expect(missing).toEqual([]);

@@ -1,22 +1,18 @@
-import type { AiTool } from './harness';
 import type { HarnessIssue } from './harnessStatus';
+import type { AiTool } from './harness';
+import type { EffectiveLimits } from './orchestration';
+import type { PolicySimulation } from './policyManagement';
+import type { BoardAvailability, ProfileHealth } from './profileHealth';
 import type { BoardRequirement } from './requirements';
 
 /**
- * Os itens do Diagnóstico do ambiente. `tool` é o bloco de uma ferramenta de IA, com a CLI, o login,
- * o MCP do board, a skill do fluxo, a definição do harness (com o que falta nela) e o nível de
- * permissão dentro dele.
+ * Os itens do Diagnóstico do ambiente. `harness` é o banco de artefatos do board (com o que falta
+ * nele). A CLI, o login e o resto de cada perfil não são itens da lista: vêm no `ProfileHealth`.
  */
 export type EnvCheckId =
   | 'node'
-  | 'tool'
-  | 'cli'
-  | 'signin'
-  | 'mcp'
-  | 'skill'
   | 'harness'
   | `harness-${HarnessIssue}`
-  | 'permission'
   | 'git'
   | 'repo'
   | 'gh'
@@ -25,7 +21,6 @@ export type EnvCheckId =
   | 'crg'
   | 'uv'
   | 'crg-graph'
-  | 'crg-mcp'
   | 'crg-embeddings';
 
 /**
@@ -35,15 +30,12 @@ export type EnvCheckId =
 export type EnvStatus = 'ok' | 'missing' | 'skipped';
 
 /**
- * Um item da lista. O board só resolve o que é dele (o MCP, a skill e a permissão da ferramenta do
- * projeto, pelo `requirement`); o resto ele só confere, com o site de onde instalar e os comandos para
- * copiar.
+ * Um item da lista. O board só confere, com o site de onde instalar e os comandos para copiar; o
+ * `requirement` do banco de artefatos leva ao atalho do Harness.
  */
 export interface EnvCheck {
   id: EnvCheckId;
   status: EnvStatus;
-  /** a ferramenta de IA do item: o bloco `tool` e os itens dentro dele */
-  tool?: AiTool;
   /** a versão encontrada, quando o comando diz */
   version?: string;
   /** os comandos que instalam o programa, em ordem, quando falta (os instaladores oficiais neutros: curl, PowerShell) */
@@ -74,13 +66,31 @@ export interface InstallStep {
   step?: InstallStepKind;
 }
 
+/**
+ * A próxima execução, como o simulador de políticas responde (sem regra recalculada aqui): o alvo do
+ * padrão e os perfis em uso que não estão disponíveis (os cards com esse alvo não rodam).
+ */
+export interface NextRunReport {
+  simulation: PolicySimulation;
+  /** os perfis que o board usa por conta própria e não estão disponíveis, com o motivo */
+  blockedInUse: { id: AiTool; name: string; problem: NonNullable<ProfileHealth['problem']> }[];
+}
+
 export interface EnvironmentReport {
-  /** a ferramenta de IA do projeto quando o diagnóstico rodou */
-  tool: AiTool;
-  /** sem eles o board não trabalha com a IA: o Node.js e a ferramenta do projeto */
+  /** sem eles o board não trabalha com a IA: o Node.js */
   required: EnvCheck[];
-  /** a outra ferramenta de IA, quando encontrada na máquina */
-  optional: EnvCheck[];
+  /** um bloco por perfil de CLI: os ligados (o padrão primeiro), depois os desligados e os pendentes de revisão */
+  profiles: ProfileHealth[];
+  /** o que o aviso do topo mostra: bloqueia só quando nenhum perfil ligado está disponível */
+  availability: BoardAvailability;
+  /** o regime de contexto em vigor nas execuções do board */
+  regime: 'exclusive' | 'compatible';
+  /** a próxima execução (simulador); null quando a base não tem o simulador */
+  nextRun: NextRunReport | null;
+  /** os limites efetivos (`effectiveLimits`); null quando a base não os expõe */
+  limits: EffectiveLimits | null;
+  /** o banco de artefatos do board: o que falta nele, um filho por falta (recomendação) */
+  harness: EnvCheck;
   /** o que o board aproveita quando existe: git, GitHub CLI, Code Review Graph */
   recommended: EnvCheck[];
   /** os comandos de instalação do Linux e do macOS usam o curl, e ele não está nesta máquina */
@@ -93,12 +103,9 @@ export interface EnvironmentReport {
 export const NODE_MIN_MAJOR = 22;
 
 /**
- * Os itens que faltam na árvore, sem contar o bloco da ferramenta (que só resume os de dentro) nem o
- * do harness (que só resume o que falta nele: cada falta é um filho).
+ * Os itens que faltam na árvore, sem contar o do banco de artefatos (que só resume o que falta nele:
+ * cada falta é um filho).
  */
 export function missingCount(checks: EnvCheck[]): number {
-  return checks.reduce(
-    (n, c) => n + (c.id !== 'tool' && c.id !== 'harness' && c.status === 'missing' ? 1 : 0) + missingCount(c.children ?? []),
-    0,
-  );
+  return checks.reduce((n, c) => n + (c.id !== 'harness' && c.status === 'missing' ? 1 : 0) + missingCount(c.children ?? []), 0);
 }

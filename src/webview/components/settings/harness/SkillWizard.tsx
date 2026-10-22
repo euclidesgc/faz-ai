@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Button, TextArea, TextField } from '@radix-ui/themes';
-import { SKILL_FILE_PATTERN, SKILL_FOLDERS, SKILL_NAME_PATTERN, type AiTool } from '../../../../shared/harness';
-import { createTargets } from '../../../../shared/harnessCatalog';
+import { SKILL_FILE_PATTERN, SKILL_FOLDERS, SKILL_NAME_PATTERN } from '../../../../shared/harness';
 import { toItemName } from '../../../../shared/harnessProject';
 import {
   DEFAULT_SKILL_LIMITS,
@@ -14,8 +13,6 @@ import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import { Chip, FormField, IconClose } from '../../ui';
 import { StringListEditor, WizardQuestion, WizardShell } from './Wizard';
-import { TargetPicker } from './TargetPicker';
-import { GLOBAL_WARNING } from './text';
 import { useProjectProfile } from './useProjectProfile';
 import { t } from '../../../i18n';
 
@@ -23,15 +20,13 @@ const STEPS = SKILL_WIZARD_STEPS;
 
 /**
  * "Criar skill com ajuda": seis passos para escrever um SKILL.md no formato da ferramenta, com os passos propostos a
- * partir dos verbos da tarefa e dos comandos do projeto. A skill é gravada na pasta do escopo escolhido e enviada ao
- * board em "Pelo card": não entra no contexto sozinha. Nada é gravado antes do último passo.
+ * partir dos verbos da tarefa e dos comandos do projeto. A skill é gravada no board em "Pelo card" (o host decide pelo
+ * `via: 'wizard'`): não entra no contexto sozinha. Nada é gravado antes do último passo.
  */
-export function SkillWizard({ tool, scope, onClose }: { tool: AiTool; scope: 'project' | 'user'; onClose: () => void }) {
-  const state = useBoardStore((s) => s.state)!;
+export function SkillWizard({ onClose }: { onClose: () => void }) {
+  const artifacts = useBoardStore((s) => s.state?.harness.library?.artifacts) ?? [];
   const { profile } = useProjectProfile();
-  const targets = createTargets(tool).filter((c) => c.scope === scope && c.layout === 'skills');
   const [step, setStep] = useState(0);
-  const [source, setSource] = useState(targets[0]?.source ?? -1);
   const [task, setTask] = useState('');
   const [trigger, setTrigger] = useState('');
   const [steps, setSteps] = useState<string[] | null>(null);
@@ -44,9 +39,7 @@ export function SkillWizard({ tool, scope, onClose }: { tool: AiTool; scope: 'pr
   const proposed = useMemo(() => proposeSkillSteps(task, profile), [task, profile]);
   const effectiveSteps = steps ?? proposed;
   const skillName = name ?? skillNameFromTask(task);
-  const target = targets.find((x) => x.source === source);
-  const items = state.harness.inventory.find((x) => x.tool === tool)?.items ?? [];
-  const nameOk = SKILL_NAME_PATTERN.test(skillName) && !items.some((i) => i.kind === 'skill' && i.scope === scope && i.name === skillName);
+  const nameOk = SKILL_NAME_PATTERN.test(skillName) && !artifacts.some((a) => a.kind === 'skill' && a.name === skillName);
   const draft = renderSkill({ name: skillName, task, trigger, steps: effectiveSteps, limits, files });
   const body = text ?? draft;
 
@@ -62,14 +55,11 @@ export function SkillWizard({ tool, scope, onClose }: { tool: AiTool; scope: 'pr
   };
 
   const finish = () => {
-    if (!target) return;
-    harness.writeItem(tool, target.source, skillName, body, files);
-    // a skill nasce "Pelo card": criar pelo assistente é querer indicá-la nos cards, não carregá-la sempre
-    harness.setSelection([{ kind: 'skill', location: target.label.replace('<nome>', skillName) }], 'contextual');
+    void harness.saveArtifact({ kind: 'skill', name: skillName, body, ...(files.length ? { files } : {}), via: 'wizard' });
     onClose();
   };
 
-  const disabled = step === 0 ? !task.trim() || !target : step === 1 ? !trigger.trim() : step === 5 ? !nameOk || !body.trim() : false;
+  const disabled = step === 0 ? !task.trim() : step === 1 ? !trigger.trim() : step === 5 ? !nameOk || !body.trim() : false;
 
   return (
     <WizardShell
@@ -90,7 +80,6 @@ export function SkillWizard({ tool, scope, onClose }: { tool: AiTool; scope: 'pr
           <FormField label={t('A tarefa')} hint={t('Uma tarefa só: skill estreita é mais precisa e pesa menos no contexto.')}>
             {(id) => <TextArea id={id} autoFocus rows={2} value={task} onChange={(e) => setTask(e.target.value)} />}
           </FormField>
-          {targets.length === 0 && <p className="muted small">{t('Este escopo não tem pasta de skills para a ferramenta escolhida.')}</p>}
         </WizardQuestion>
       )}
 
@@ -166,14 +155,13 @@ export function SkillWizard({ tool, scope, onClose }: { tool: AiTool; scope: 'pr
             {files.length === 0 && <span className="muted small">{t('Nenhum arquivo de apoio.')}</span>}
           </div>
           {files.length > 0 && (
-            <p className="muted small">{t('Os arquivos são criados vazios na pasta da skill; escreva o conteúdo depois.')}</p>
+            <p className="muted small">{t('Os arquivos são criados vazios na skill; escreva o conteúdo depois, no editor.')}</p>
           )}
         </WizardQuestion>
       )}
 
       {step === 5 && (
         <WizardQuestion question={t('Confira a skill. Nada é gravado antes do botão de baixo.')}>
-          {targets.length > 1 && <TargetPicker label={t('Onde')} targets={targets} value={source} onChange={setSource} />}
           <FormField label={t('Nome da skill')} hint={skillName && !nameOk ? t('Nome inválido ou já usado.') : undefined}>
             {(id) => (
               <TextField.Root
@@ -185,10 +173,6 @@ export function SkillWizard({ tool, scope, onClose }: { tool: AiTool; scope: 'pr
             )}
           </FormField>
           <dl className="wizard-summary">
-            <dt>{t('Onde')}</dt>
-            <dd>
-              <code>{target ? target.label.replace('<nome>', skillName) : ''}</code>
-            </dd>
             <dt>{t('No board')}</dt>
             <dd>{t('Pelo card: só entra quando um card a indica')}</dd>
           </dl>
@@ -211,7 +195,6 @@ export function SkillWizard({ tool, scope, onClose }: { tool: AiTool; scope: 'pr
               </>
             )}
           </FormField>
-          {scope === 'user' && <p className="muted small">{t(GLOBAL_WARNING)}</p>}
         </WizardQuestion>
       )}
     </WizardShell>

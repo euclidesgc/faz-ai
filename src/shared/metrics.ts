@@ -264,7 +264,32 @@ export interface MetricsReworkPhase {
   resolved: number;
   /** desses, os aprovados de primeira, sem nenhum pedido de ajuste antes */
   firstPass: number;
+  /** execuções da fase com registro de comandos de Bash no período; 0 = sinais da IA não medidos nesta fase */
+  bashRuns: number;
+  /** commits em execuções da fase Revisão (≈ achados corrigidos); zero nas outras fases */
+  reviewFixes: MetricsAiSignal;
+  /** chamadas de `npm test` que voltaram com erro */
+  testFailures: MetricsAiSignal;
+  /** commits depois de a história registrar o pull request; `runs` = execuções */
+  commitsAfterPr: MetricsAiSignal;
 }
+
+/**
+ * Um sinal de precisão medido do lado da IA (#605): o total e a parte que veio de execuções (ou
+ * histórias) em modo autônomo, que a revisão de uma pessoa não cobre.
+ */
+export interface MetricsAiSignal {
+  /** ocorrências (commits, falhas) */
+  count: number;
+  /** execuções em que aconteceu (histórias, em `aiSignals.commitsAfterPr`) */
+  runs: number;
+  /** das ocorrências, as de execuções/histórias autônomas */
+  autonomousCount: number;
+  /** das execuções/histórias, as autônomas */
+  autonomousRuns: number;
+}
+
+export const ZERO_SIGNAL: MetricsAiSignal = { count: 0, runs: 0, autonomousCount: 0, autonomousRuns: 0 };
 
 /** Os pedidos de revisão e de ajuste pelo modelo da execução que entregou o trabalho; '' = não definido. */
 export interface MetricsReworkModel {
@@ -277,11 +302,35 @@ export interface MetricsReworkModel {
 export interface MetricsRework {
   phases: MetricsReworkPhase[];
   models: MetricsReworkModel[];
-  /** histórias concluídas no período e quantas delas já têm um bug vinculado (o defeito que escapou) */
-  escapes: { stories: number; withBugs: number; bugs: number };
+  /**
+   * histórias concluídas no período e quantas delas já têm um bug vinculado (o defeito que escapou);
+   * `autonomous*` é a parte das histórias que tiveram alguma execução em modo autônomo
+   */
+  escapes: {
+    stories: number;
+    withBugs: number;
+    bugs: number;
+    autonomousStories: number;
+    autonomousWithBugs: number;
+    autonomousBugs: number;
+  };
+  /** os sinais do lado da IA no período inteiro, para medir a precisão também no modo autônomo (#605) */
+  aiSignals: {
+    /** execuções do período com registro de comandos de Bash, a base dos três sinais; 0 = não medido, não zero */
+    bashRuns: number;
+    reviewFixes: MetricsAiSignal;
+    testFailures: MetricsAiSignal;
+    /** `runs` = histórias distintas com commit depois do pull request */
+    commitsAfterPr: MetricsAiSignal;
+  };
 }
 
-export const EMPTY_REWORK: MetricsRework = { phases: [], models: [], escapes: { stories: 0, withBugs: 0, bugs: 0 } };
+export const EMPTY_REWORK: MetricsRework = {
+  phases: [],
+  models: [],
+  escapes: { stories: 0, withBugs: 0, bugs: 0, autonomousStories: 0, autonomousWithBugs: 0, autonomousBugs: 0 },
+  aiSignals: { bashRuns: 0, reviewFixes: ZERO_SIGNAL, testFailures: ZERO_SIGNAL, commitsAfterPr: ZERO_SIGNAL },
+};
 
 /** As seções que acompanham `MetricsPanelResult`. */
 export interface MetricsPanelSections {

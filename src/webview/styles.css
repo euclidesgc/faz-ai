@@ -1049,6 +1049,8 @@ button.ghost.on {
   position: fixed;
   inset: 0;
   z-index: 60;
+  /* aberto sobre um diálogo do Radix (body com pointer-events: none) precisa continuar clicável */
+  pointer-events: auto;
   background: var(--overlay);
   display: flex;
   align-items: center;
@@ -4761,4 +4763,22 @@ div.metrics-breakdown {
     position: static;
     max-height: none;
   }
+}
+
+.env-limits {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+.env-limits th,
+.env-limits td {
+  text-align: left;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.env-warning {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--warn-border);
+  background: var(--warn-bg);
 }

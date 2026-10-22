@@ -1,7 +1,14 @@
 // Artefatos do board (#615): leitura e gravação de board_artifacts e board_artifact_files. Só banco: a
 // leitura das origens e a cópia de leitura em disco são de outros módulos.
 import type { Database } from 'sql.js';
-import { selectableOfKind, type AgentMeta, type ArtifactDraft, type ArtifactKind, type BoardArtifact } from '../../shared/artifacts';
+import {
+  artifactLocation,
+  selectableOfKind,
+  type AgentMeta,
+  type ArtifactDraft,
+  type ArtifactKind,
+  type BoardArtifact,
+} from '../../shared/artifacts';
 import { defaultUsage, type HarnessSelection, type HarnessUsage } from '../../shared/harnessSelection';
 import { isAiBase, type AiTool } from '../../shared/harness';
 import { all, bool, num, one, run, str, transaction, type Row } from '../db/query';
@@ -110,7 +117,7 @@ export class ArtifactRepo {
   /** Pela identidade na marcação (`artifactLocation`): a origem, ou `board:<nome>` no criado no board. */
   findByLocation(boardId: string, kind: ArtifactKind, location: string): ArtifactRow | undefined {
     const r = all(this.db, 'SELECT * FROM board_artifacts WHERE board_id = ? AND kind = ?', [boardId, kind]).find(
-      (x) => (str(x.origin) || `board:${str(x.name)}`) === location,
+      (x) => artifactLocation({ kind, origin: str(x.origin), name: str(x.name) }) === location,
     );
     return r && this.toRow(r, this.filePaths(str(r.id)));
   }
@@ -170,6 +177,12 @@ export class ArtifactRepo {
       if (server) out[str(r.name)] = server;
     }
     return out;
+  }
+
+  /** A definição completa (com `env` e `headers`) de um servidor MCP: só o host usa, nunca vai à interface. */
+  mcpServer(boardId: string, id: string): Record<string, unknown> | null {
+    const r = one(this.db, "SELECT secret_ref FROM board_artifacts WHERE id = ? AND board_id = ? AND kind = 'mcp'", [id, boardId]);
+    return r ? credentialsFor(this.db).get(credentialOwner(boardId, id), str(r.secret_ref)) : null;
   }
 
   /** A marcação antiga (harness_selection) que ainda falta copiar. */

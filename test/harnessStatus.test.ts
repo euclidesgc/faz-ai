@@ -2,10 +2,12 @@
 // recomendação no aviso do topo (nunca bloqueio).
 import { describe, expect, it } from 'vitest';
 import { checkEnvironment } from '../src/extension/environment';
-import { checkRequirements, type RequirementProbe } from '../src/extension/requirements';
+import { BUILTIN_PROFILES } from '../src/shared/aiProfiles';
+import { profileHealth } from '../src/shared/profileHealth';
+import { checkRequirements } from '../src/extension/requirements';
 import { profileOfAgent } from '../src/shared/execution';
 import type { Agent, HarnessItem } from '../src/shared/harness';
-import { harnessIssues } from '../src/shared/harnessStatus';
+import { harnessIssues, type HarnessIssue } from '../src/shared/harnessStatus';
 import { missingCount } from '../src/shared/environment';
 import { boardState } from './fakes/board';
 
@@ -95,7 +97,7 @@ describe('harnessIssues', () => {
               installed: true,
               items: [
                 item({ kind: 'instructions', name: 'AGENTS.md', location: 'AGENTS.md' }),
-                item({ kind: 'mcp', name: 'faz-ai', location: '.cursor/mcp.json', layout: 'entry' }),
+                item({ kind: 'mcp', name: 'outro', location: '.cursor/mcp.json', layout: 'entry' }),
                 item({ kind: 'skill', name: 'sql', location: '.cursor/skills/sql/SKILL.md', layout: 'skills' }),
               ],
             },
@@ -116,7 +118,7 @@ describe('harnessIssues', () => {
       ...s,
       harness: { ...s.harness, inventory: [{ ...s.harness.inventory[0]!, items: s.harness.inventory[0]!.items.slice(1, 2) }] },
     };
-    expect(harnessIssues(clean)).toEqual(['missing']);
+    expect(harnessIssues(clean)).toEqual(['missing', 'isolation']);
   });
 });
 
@@ -146,67 +148,50 @@ describe('harnessIssues: problema isolation pela lista do perfil ativo', () => {
 });
 
 describe('o harness no aviso e no Diagnóstico', () => {
-  const probe = (over: Partial<RequirementProbe> = {}): RequirementProbe => ({
-    tool: 'claude',
-    permission: 'full',
-    workspaceDir: '/nao-existe',
-    homeDir: '/nao-existe-home',
-    bridgePath: '/b.js',
-    nodePath: process.execPath,
-    resolve: (command) => (command === 'node' ? process.execPath : `/usr/bin/${command}`),
-    signedIn: async () => true,
-    ...over,
-  });
+  const health = [
+    profileHealth({
+      profile: BUILTIN_PROFILES[0]!,
+      isDefault: true,
+      pendingReview: false,
+      probe: { id: 'claude', found: true, login: 'signed-in' },
+      authExpired: false,
+      validationRequired: false,
+      credentials: [],
+      capabilities: [],
+      admission: null,
+      evidence: { state: 'never' },
+      install: null,
+    }),
+  ];
 
-  it('o requisito é recomendação (optional), com o que falta e o atalho para o Harness; sem faltas ou sem inventário, nada', async () => {
-    const list = await checkRequirements(probe({ harnessIssues: ['artifacts', 'agents'] }));
+  it('o requisito é recomendação (optional), com o que falta e o atalho para o Harness; sem faltas ou sem inventário, nada', () => {
+    const list = checkRequirements({ nodePath: '/n', health, harnessIssues: ['artifacts', 'agents'] });
     expect(list.find((r) => r.id === 'harness')).toMatchObject({
-      tool: 'claude',
       optional: true,
       harnessIssues: ['artifacts', 'agents'],
       action: { kind: 'settings' },
     });
-    expect((await checkRequirements(probe({ harnessIssues: [] }))).some((r) => r.id === 'harness')).toBe(false);
-    expect((await checkRequirements(probe())).some((r) => r.id === 'harness')).toBe(false);
+    expect(checkRequirements({ nodePath: '/n', health, harnessIssues: [] }).some((r) => r.id === 'harness')).toBe(false);
+    expect(checkRequirements({ nodePath: '/n', health }).some((r) => r.id === 'harness')).toBe(false);
   });
 
-  it('no Diagnóstico, o item fica depois da skill, com um filho por falta; não pesa no bloco da ferramenta nem na contagem', async () => {
-    const env = (issues: string[] | null, cli = true) =>
+  it('no Diagnóstico, o banco de artefatos é um bloco à parte, com um filho por falta, que não depende de ferramenta', async () => {
+    const env = (issues: HarnessIssue[] | null) =>
       checkEnvironment({
-        tool: 'claude',
-        requirements: [
-          ...(cli ? [] : [{ id: 'cli' as const, tool: 'claude' as const, cli: 'claude', action: null }]),
-          ...(issues?.length
-            ? [
-                {
-                  id: 'harness' as const,
-                  tool: 'claude' as const,
-                  optional: true as const,
-                  harnessIssues: issues as never,
-                  action: { kind: 'settings' as const },
-                },
-              ]
-            : []),
-        ],
+        requirements: issues?.length ? [{ id: 'harness', optional: true, harnessIssues: issues, action: { kind: 'settings' } }] : [],
+        health,
         workspaceDir: '/proj',
-        skillInstalled: true,
-        harnessIssues: issues as never,
-        others: [],
-        crgMcp: false,
+        harnessIssues: issues,
         platform: 'linux',
         homeDir: '/home/u',
         pathDirs: [],
         linux: null,
-        resolve: (c) => (cli || c !== 'claude' ? `/usr/bin/${c}` : null),
+        resolve: () => null,
         run: async () => null,
         firstLine: () => null,
         exists: () => false,
       });
-    const report = await env(['rules', 'missing']);
-    const own = report.required[1]!;
-    const ids = own.children!.map((c) => c.id);
-    expect(ids.indexOf('harness')).toBe(ids.indexOf('skill') + 1);
-    const harness = own.children!.find((c) => c.id === 'harness')!;
+    const { harness, required } = await env(['rules', 'missing']);
     expect(harness.status).toBe('missing');
     expect(harness.requirement?.id).toBe('harness');
     expect(harness.children!.map((c) => [c.id, c.status])).toEqual([
@@ -216,14 +201,10 @@ describe('o harness no aviso e no Diagnóstico', () => {
       ['harness-missing', 'missing'],
       ['harness-isolation', 'ok'],
     ]);
-    // recomendação: o bloco da ferramenta continua pronto, e só as faltas contam
-    expect(own.status).toBe('ok');
-    expect(missingCount([own])).toBe(2);
-    expect((await env([])).required[1]!.children!.find((c) => c.id === 'harness')!.status).toBe('ok');
-    // sem a CLI (ou sem o inventário), fica pulado, como o login sem a CLI
-    const skipped = (await env(['agents'], false)).required[1]!.children!.find((c) => c.id === 'harness')!;
-    expect(skipped.status).toBe('skipped');
-    expect(skipped.children!.every((c) => c.status === 'skipped')).toBe(true);
-    expect((await env(null)).required[1]!.children!.find((c) => c.id === 'harness')!.status).toBe('skipped');
+    // recomendação: não está entre os necessários, e só as faltas dentro dele contam
+    expect(required.some((c) => c.id === 'harness')).toBe(false);
+    expect(missingCount([harness])).toBe(2);
+    expect((await env([])).harness.status).toBe('ok');
+    expect((await env(null)).harness.status).toBe('skipped');
   });
 });

@@ -104,3 +104,13 @@ describe('fluxo servido pelo get_skill (#643)', () => {
     expect(flowSkillMarkdown('faz-ai-fluxo')).toContain('name: faz-ai-fluxo');
   });
 });
+
+describe('skill do fluxo e as pastas das ferramentas (RF23)', () => {
+  it('nenhum texto manda criar skill, regra ou agente na pasta da ferramenta', () => {
+    for (const k of FLOW_SKILLS) {
+      const text = `${k.description}\n${k.body}`;
+      expect(text).not.toMatch(/\.claude\/|\.cursor\/|\.kimi-code\//);
+      expect(text).not.toMatch(/arquivo (de|da) (skill|regra|agente)[^.\n]*pasta d[ae] ferramenta/i);
+    }
+  });
+});

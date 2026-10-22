@@ -63,6 +63,9 @@ Em cinco minutos você tem uma tarefa andando no board, com a IA trabalhando nel
 2. **Conecte a IA ao board.** Em **Configurações → Harness**, escolha a ferramenta do projeto
    (Claude Code, Cursor ou Kimi Code). Na aba **Projeto**, clique em **Instalar (padrão da ferramenta)** no
    grupo **Servidores MCP**. O fluxo do board chega à IA pelo próprio MCP, sem instalar skill.
+   Os artefatos do board (regras, skills, agentes e servidores MCP) são mantidos na aba **Artefatos do
+   board** do Harness: criados ali ou importados de uma pasta, de uma ferramenta instalada ou de um
+   arquivo exportado, com cópia e confirmação antes de substituir.
 3. **Crie a tarefa.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título (por
    exemplo, "Login com Google") e dê Enter. Duplo clique abre o card: descreva o que você quer, em
    Markdown, e, se quiser, escolha o modelo da IA e as skills que ela deve ler.
@@ -313,8 +316,8 @@ para **ligar o `faz-ai`** em Cursor Settings → MCP (o Cursor deixa desligado t
 projeto). Substituir uma skill do fluxo que já existe no destino pede confirmação (o que foi
 ajustado nela se perde). O comando **Faz AI: Instalar o MCP do board (global)** da paleta faz a
 instalação na ferramenta do projeto. Um registro de projeto antigo (`.mcp.json`,
-`.kimi-code/mcp.json`) vale sobre o global e não é migrado: a faixa de requisitos oferece **Corrigir
-o registro**, que o tira e refaz o global.
+`.kimi-code/mcp.json`) vale sobre o global e não é migrado: tire o `faz-ai` desse arquivo à mão, ou rode o
+comando de instalação de novo.
 4. Abra uma sessão nova da ferramenta na pasta do projeto e peça, por exemplo, "liste os cards do
    board", "pegue a história #1 e escreva o PRD" ou "veja o que está pendente no board e dê andamento".
 
@@ -331,42 +334,45 @@ opção grava a resposta e avança; para escrever uma resposta própria, use o c
 **Anterior** e **Próxima** voltam e avançam. A última tela é o resumo, com as perguntas não respondidas;
 **Enviar respostas** grava tudo na seção **Perguntas e respostas** e devolve a vez para a IA.
 
-Enquanto faltar alguma coisa para o board trabalhar com a ferramenta, a aba **Configurações** e o
-botão **Verificar ambiente** ganham um ícone de atenção. O hint dele resume o que falta, com o nome
-de cada item, e a explicação com a ação de cada um fica no Diagnóstico do ambiente. No painel de
-chat, que não tem as Configurações, fica uma faixa com os mesmos itens. A conferência olha o Node.js (o servidor do board roda
-com ele), a linha de comando da ferramenta, o login dela (no Cursor por `cursor-agent status`, no
-Claude Code por `claude auth status`, no Kimi Code pela pasta de credenciais dele), o
-registro do servidor do board no arquivo que a ferramenta lê (no Claude, vale também o registro
-para o seu usuário, de `claude mcp add -s user`), um registro apontando para um node ou um caminho
-que não existe mais, para outra pasta ou para a ponte de uma versão anterior, e o nível de
-permissão. Cada item diz o efeito e traz a ação: o comando para copiar, **Instalar o MCP do board**
-(abre a seção Servidores MCP da ferramenta), **Corrigir o registro** (um registro quebrado no arquivo
-do projeto vale no lugar do global; corrigir tira ele dali e deixa o global valendo), **Recarregar a
-janela** ou o atalho para o Harness. O ícone some sozinho quando o último item é resolvido. A conferência roda ao abrir o board, quando a
-ferramenta ou a permissão mudam, depois de conectar, a cada 5 minutos e em **Verificar de novo**,
-que relê também o PATH do terminal (um node instalado com o board aberto é encontrado sem recarregar
-a janela), e diz quando nada mudou. Ao lado, no editor, **Recarregar a janela** reinicia a extensão:
-é o que faz valer uma extensão recém-atualizada. Com a IA trabalhando em algum card, pergunta antes,
-porque a execução para.
+Enquanto faltar alguma coisa para o board trabalhar, a aba **Configurações** e o botão **Verificar
+ambiente** ganham um ícone de atenção. O hint dele resume o que falta, com o nome de cada item, e a
+explicação com a ação de cada um fica no Diagnóstico do ambiente. No painel de chat, que não tem as
+Configurações, fica uma faixa com os mesmos itens. O board confere o Node.js (o servidor do board
+roda com ele) e **cada perfil de CLI ligado**: se a linha de comando existe, se está logada (no
+Cursor por `cursor-agent status`, no Claude Code por `claude auth status`, no Kimi Code pela pasta de
+credenciais dele, e nos perfis personalizados pelo comando de status que o perfil informa) e se o
+perfil não espera revisão. O perfil importado que ainda não foi revisado não roda nenhum comando.
 
-O MCP do board conta como requisito em todas as ferramentas: mesmo onde as execuções pelo board levam
-o MCP sozinhas (Claude, Cursor), a conversa no chat do editor ou no terminal depende dele, e é por ele
-que o fluxo chega à IA (`get_skill`). A skill do fluxo instalada na ferramenta não é requisito. Enquanto a linha de comando falta ou está sem login, os botões de IA do card ficam
-desligados, com o motivo na dica.
+O aviso só **bloqueia** o board (ícone vermelho, botões de IA desligados, heartbeat e modo autônomo
+parados) quando **nenhum** perfil ligado está disponível. Um perfil com problema, enquanto outro está
+pronto, vira só um aviso dele, com o link para o bloco dele no Diagnóstico: com o Claude Code
+instalado e logado e o Cursor ausente, o board trabalha e o Cursor aparece como não encontrado. Os
+perfis desligados e os pendentes de revisão nunca geram aviso. O ícone some sozinho quando o último
+item é resolvido. A conferência roda ao abrir o board, quando a ferramenta ou a permissão mudam, a
+cada 5 minutos e em **Verificar de novo**, que relê também o PATH do terminal (um node instalado com
+o board aberto é encontrado sem recarregar a janela) e diz quando nada mudou. Ao lado, no editor,
+**Recarregar a janela** reinicia a extensão: é o que faz valer uma extensão recém-atualizada. Com a IA
+trabalhando em algum card, pergunta antes, porque a execução para.
 
-**Login vencido: aviso de erro e retomada sozinha.** Quando o motivo do aviso é login (faltando ou
-vencido no meio de uma execução), o ícone de atenção fica vermelho, em vez do amarelo comum, e o
-item ganha o botão **Abrir no terminal** ao lado do comando para copiar: o board abre um terminal do editor e roda
-o comando ali, mas o login em si é sempre feito por você. Antes de cada chamada da IA (o botão do
-card, o heartbeat e o modo autônomo) o board confere o login de novo; se ele venceu, a execução nem
-começa. Quando o login vence no meio de uma execução, a primeira falha que bater um padrão conhecido ("OAuth session expired", "not logged in",
-"401" etc.) não bloqueia o card: ele volta ao status que tinha, com um comentário curto, e o mesmo
-aviso de erro liga — o heartbeat e o modo autônomo não tentam de novo sozinhos
-enquanto ele estiver ligado. O aviso some e a fila volta a andar sozinha quando o login é confirmado
-de novo (pela conferência periódica, em até 10 segundos depois de ligar, ou por **Já entrei:
-verificar de novo**) ou, quando a conferência não sabe dizer, na primeira execução manual que der
-certo. O Diagnóstico do ambiente mostra o mesmo aviso no item **Login na linha de comando**.
+**Mudança de comportamento.** O Diagnóstico e o aviso do topo deixam de cobrar o MCP do board
+registrado na ferramenta, a skill do fluxo instalada nela, o nível de permissão no arquivo dela e o
+MCP do Code Review Graph: o board entrega o contexto às execuções, e isso não depende mais de a
+ferramenta estar configurada. Saem também os botões que resolviam esses itens (**Instalar o MCP do
+board**, **Corrigir o registro**, **Corrigir o caminho**, **Instalar a skill**, **Liberar as
+ferramentas do board**, **Abrir MCPs do Cursor**). Enquanto a linha de comando do perfil padrão falta
+ou está sem login, os botões de IA do card ficam desligados, com o motivo na dica.
+
+**Login vencido: aviso e retomada sozinha.** Quando o motivo do aviso é login (faltando ou vencido no
+meio de uma execução), o perfil ganha o aviso "sem login" e, nos perfis prontos, o botão **Abrir no
+terminal** ao lado do comando para copiar: o board abre um terminal do editor e roda o comando ali,
+mas o login em si é sempre feito por você. Antes de cada chamada da IA (o botão do card, o heartbeat
+e o modo autônomo) o board confere o login de novo; se ele venceu, a execução nem começa. Quando o
+login vence no meio de uma execução, a primeira falha que bater um padrão conhecido ("OAuth session
+expired", "not logged in", "401" etc.) não bloqueia o card: ele volta ao status que tinha, com um
+comentário curto, e o heartbeat e o modo autônomo não tentam de novo sozinhos enquanto o login do
+perfil padrão estiver vencido. A fila volta a andar sozinha quando o login é confirmado de novo (pela
+conferência periódica, em até 10 segundos) ou, quando a conferência não sabe dizer, na primeira
+execução manual que der certo. O Diagnóstico mostra o mesmo aviso na linha **Login** do perfil.
 
 **Diagnóstico do ambiente.** Na primeira abertura do board na máquina, abre sozinha uma lista com
 tudo de que o board precisa e o que ele aproveita. Depois, ela abre pelo botão **Verificar
@@ -375,22 +381,35 @@ um ícone de pronto ou de falta, e o que depende de outro item aparece dentro de
 linha de comando, o grafo dentro do Code Review Graph). Passe o mouse sobre um item para ver como o
 board o usa.
 
-- **Necessários:** o Node.js 22 ou mais novo e a ferramenta de IA do projeto, com a linha de comando,
-  o login (`claude auth login` ou `cursor-agent login`), o MCP do board, a
-  **definição do harness** e o nível de permissão. A definição do harness é recomendação, não bloqueio:
-  o board trabalha sem ela, só sem o ganho de economia e precisão. Ela aponta, um filho por falta, o que
-  falta no banco de artefatos: nenhuma skill, agente ou servidor MCP em modo Pelo card (use "Indicar
-  artefatos"), nenhum agente do board, regras enviadas e ainda desligadas, artefato que sumiu da
-  origem e, no Cursor, regras, servidores ou hooks do projeto que entram no contexto sem passar pelo
-  board. O mesmo aparece no aviso do topo do board como linha discreta de recomendação, com o atalho
-  para o Harness.
-- **Opcionais:** a outra ferramenta de IA, quando está na máquina (a linha de comando no PATH ou, no
-  Cursor, o próprio editor). Projeto com o Claude Code mostra o Cursor aqui, e vice-versa. A lista só
-  mostra o estado: o board instala o MCP e a skill nela quando ela vira a ferramenta do projeto.
+- **Necessários:** o Node.js 22 ou mais novo.
+- **Perfis de CLI:** um bloco por perfil ligado, com o padrão primeiro, e o grupo **Desligados**, fechado,
+  com os desligados e os pendentes de revisão. Cada bloco mostra a **situação** (Ligado, Desligado ou
+  Pendente de revisão), a **linha de comando** (o caminho e a versão encontrados, ou "não encontrada"
+  com a instalação: o instalador oficial dos perfis prontos, o link que o perfil informa, ou "Este
+  perfil não informou como instalar"), o **login** (conectado, desconectado ou "não conferido" quando
+  o perfil não tem comando de status), as **credenciais** (só o nome da referência e se está preenchida
+  ou ausente, nunca o valor) e a **última verificação real**. Hoje o board ainda não grava essa
+  verificação: o bloco diz "Não validado: este perfil ainda não foi testado" como informação, sem selo
+  de verificado, e isso não impede o perfil de ser usado. O link do aviso do topo abre o Diagnóstico já
+  no bloco do perfil.
+- **Capacidades, admissão e Testar:** cada bloco de perfil traz uma linha por capacidade (**Verificada**,
+  **Parcial** ou **Desconhecida**; só a verificada leva o selo de pronto) e a admissão ("Admissível no
+  regime exclusivo/compatível" ou "Não admissível", com um motivo por exigência). No regime compatível,
+  lista o que a CLI pode carregar por conta própria. O botão **Testar** roda a ferramenta (usa a sua
+  assinatura, e o aviso fica na tela), uma tentativa de até 2 minutos, e o aviso do topo se atualiza
+  sozinho ao fim.
+- **Próxima execução e limites:** mostra o regime, o alvo padrão (com a regra e a versão, ou o bloqueio),
+  os cards cujo alvo está indisponível e a tabela de limites com pedido, efetivo e motivo. Vem do
+  simulador de políticas e dos limites efetivos; sem eles, mostra "Indisponível nesta versão".
+- **Banco de artefatos** (antes "definição do harness"): recomendação, não bloqueio. O board trabalha
+  sem ele, só sem o ganho de economia e precisão. Aponta, um filho por falta, o que falta: nenhuma
+  skill, agente ou servidor MCP em modo Pelo card (use "Indicar artefatos"), nenhum agente do board,
+  regras enviadas e ainda desligadas e artefato que sumiu da origem. Não depende de ferramenta nenhuma.
+  O mesmo aparece no aviso do topo como linha discreta de recomendação, com o atalho para o Harness.
 - **Recomendados:** o Git e um repositório na pasta, o GitHub CLI e o login dele (para o merge
   automático e o acompanhamento dos PRs) e o [Code Review Graph](https://github.com/tirth8205/code-review-graph),
-  um grafo do código que a IA consulta em vez de ler arquivos inteiros, com o grafo do projeto, o MCP
-  dele e a busca semântica. Enquanto falta, o Code Review Graph aparece dentro do
+  um grafo do código que a IA consulta em vez de ler arquivos inteiros, com o grafo do projeto e a busca
+  semântica. Enquanto falta, o Code Review Graph aparece dentro do
   [uv](https://docs.astral.sh/uv/), na ordem de instalar: o uv instala o Code Review Graph
   (`uv tool install code-review-graph`) e baixa um Python 3.10 ou mais novo só para ele, se faltar.
 
@@ -401,16 +420,15 @@ que valem em qualquer distribuição: `curl` no Linux e no macOS, PowerShell no 
 do sistema: `xcode-select --install` e `brew install gh` no macOS, `apt`, `dnf` ou `pacman` no Linux
 (com o `sudo apt update` antes, que uma máquina nova precisa) e `winget` no Windows; numa
 distribuição desconhecida, fica só o site. Os logins e as ações na pasta do projeto (`git init`, `gh auth login`, `code-review-graph build`,
-`code-review-graph install --platform …`, `code-review-graph embed --provider local`) também trazem o
-comando com botão de copiar. Só o que é do board tem botão: instalar o MCP
-do board (e, se quiser, a skill do fluxo), e abrir a escolha do nível de permissão.
+`code-review-graph embed --provider local`) também trazem o comando com botão de copiar. O Diagnóstico só confere e orienta: os únicos botões levam ao Harness e
+ao terminal do login.
 
 O chat do editor inicia o MCP do board com o PATH de quando o editor abriu: um Node instalado depois
 (pelo `nvm`, por exemplo) não está nele até o editor fechar e abrir de novo. Por isso, quando o Node
-aparece, ou pelo botão **Corrigir o caminho** do item do MCP no Diagnóstico, o board grava o caminho completo do
-comando nos registros do `faz-ai` e do `code-review-graph` que o editor não acha. O caminho é descoberto na hora, na máquina onde
-a extensão roda, e o arquivo fica fora do git (`.git/info/exclude`). Se o arquivo de MCPs do projeto
-estiver versionado, o board não grava nele e explica as saídas.
+aparece, o board grava o caminho completo do comando nos registros do `faz-ai` e do
+`code-review-graph` que o editor não acha. O caminho é descoberto na hora, na máquina onde a extensão
+roda, e o arquivo fica fora do git (`.git/info/exclude`). Se o arquivo de MCPs do projeto estiver
+versionado, o board não grava nele.
 
 Fluxo sugerido: a IA lê a história e a instrução da fase, cria uma sub-tarefa para construir o
 documento da fase, anexa o documento à história e pede a revisão pela conversa do card. Você
@@ -725,7 +743,13 @@ pelo navegador.
   em cada fase, quantas a pessoa aprovou **de primeira** (a primeira resposta a um card naquela fase
   foi a aprovação) e quantas voltaram com **pedido de ajuste**, também pelo modelo da execução que pediu
   a revisão, e quantas histórias concluídas no período já têm um **Bug vinculado**. Só conta a resposta
-  de uma pessoa: a aprovação automática do modo autônomo não é revisão.
+  de uma pessoa: a aprovação automática do modo autônomo não é revisão. Por isso o bloco traz também
+  os **sinais da IA**, medidos sem revisão de pessoa: **correções na Revisão** (commits em execuções
+  da fase Revisão), **`npm test` com falha** e **commits depois do pull request**, no resumo e por
+  fase, cada um com a parte feita em execuções do modo autônomo; a linha de bugs diz quantas das
+  histórias concluídas foram autônomas. São aproximações (commit ≈ correção), valem só para o Claude
+  Code desde o registro de comandos de Bash, e a fase Revisão é reconhecida pelo nome. Sem execução
+  com registro de Bash no período, o sinal fica "não medido", não zero.
 - **Fases mais caras e Cards mais caros.** Dois rankings lado a lado, em tabelas que você ordena por
   tokens, execuções ou tempo de IA clicando no cabeçalho (ou com Enter/Espaço). O padrão são os
   tokens quando o período tem tokens medidos e o tempo de IA quando não tem, e a tela escreve o
@@ -773,8 +797,9 @@ economizar tokens.
 - Tokens contam em toda execução medida, do Claude Code e do Cursor. A tabela não traz custo em dólar.
 - Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`. O retrabalho está:
   com `rework: true` (e, se quiser, `start_date` e `end_date`), a resposta traz as revisões, as
-  aprovações de primeira e os pedidos de ajuste por fase e por modelo, e as histórias concluídas com bug
-  vinculado.
+  aprovações de primeira e os pedidos de ajuste por fase e por modelo, as histórias concluídas com bug
+  vinculado e os sinais da IA (correções na Revisão, `npm test` com falha, commits depois do PR), cada
+  um com a parte do modo autônomo; "não medidos" quando não há execução com registro de Bash.
 - Valores não medidos aparecem como "-" (nunca 0).
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
   (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm detalhe e só agregam os
@@ -1244,10 +1269,12 @@ Os avisos de cada tipo têm um botão com contorno, abaixo do texto e à direita
 ou informe seu caminho no computador onde o board roda. A prévia mostra os quatro tipos, suas
 quantidades e caixas de seleção; **Importar selecionados** copia cada item para sua aba. O board
 reconhece formatos das ferramentas e coleções neutras: `AGENTS.md`, pastas `rules/`, `agents/` e
-skills com `SKILL.md`, inclusive em subpastas. Arquivos `mcp.json` e `.mcp.json` usam `mcpServers`.
+skills com `SKILL.md`, inclusive em subpastas; no Kimi Code, o `.kimi-code/AGENTS.md` do projeto também é lido. Arquivos `mcp.json` e `.mcp.json` usam `mcpServers`.
 A prévia tem quatro abas, inclusive vazias, com filtro por nome ou descrição. Seleções são mantidas
 ao trocar de aba e filtrar. Nomes repetidos do mesmo tipo são ignorados: os demais itens entram,
 e o resumo agrupa os conflitos e oferece uma confirmação explícita para sobrescrevê-los.
+
+**Exportar para a ferramenta** (ao lado de **Importar**) faz o caminho inverso: copia regras, skills e agentes do board para a pasta de **Claude Code**, **Cursor** ou **Kimi Code**, no formato de cada uma, na **Pasta do projeto** (desabilitada sem projeto aberto) ou na **Pasta do usuário**. A prévia agrupa por Regras, Skills e Agentes, com busca, caixas de seleção (vêm marcados os itens em "Sempre" ou "Pelo card"; a skill do fluxo vem desmarcada, com aviso), a situação de cada item ("novo", "já existe · será pulado", "recusado" com o motivo), o que o formato da ferramenta perde ou mapeia e os arquivos extras do destino, que ficam. **Substituir os que já existem** regrava o que já está lá; sem a opção, o item inteiro é pulado. O resumo conta gravados, substituídos, pulados, recusados e falhas. O resultado é uma **cópia desconectada**: o board não a atualiza, não a acompanha nem apaga o que foi exportado, e os servidores MCP não são exportados (o **Conectar ao board** registra o do board). A exportação existe só na tela do Harness: não há ferramenta MCP nem comando da CLI para ela (#623).
 
 Em **Skills**, selecione os itens individualmente ou todos os visíveis e aplique **Sempre**, **Pelo card** ou **Desligado** em massa. A seleção acompanha a busca; **Limpar seleção** a desfaz. **Excluir selecionadas** pede confirmação e preserva os arquivos de origem. Subagentes também permitem selecionar e excluir em massa ou manter disponíveis no board; MCPs permitem alterar o modo e excluir em massa. Skills, subagentes e MCPs não oferecem Atualizar da origem. O formulário de regras tem apenas Nome e Conteúdo.
 
@@ -1488,7 +1515,7 @@ por exemplo), eles precisam ser refeitos:
 | Item | Para que serve | Como obter |
 |---|---|---|
 | Node.js 22+ e git | build, testes e o comando `faz-ai` | instalação normal |
-| `.mcp.json` e `.claude/settings.local.json` | ligam a IA ao board; guardam caminhos da máquina | o board não os cria mais (só o `.cursor/mcp.json` do Cursor); um registro antigo some com **Corrigir o registro**, na faixa de requisitos |
+| `.mcp.json` e `.claude/settings.local.json` | ligam a IA ao board; guardam caminhos da máquina | o board não os cria mais (só o `.cursor/mcp.json` do Cursor); um registro antigo só some se você o tirar à mão |
 | Board e anexos | ficam no armazenamento da extensão, não no repositório | o board da pasta começa vazio na outra máquina |
 | `.env.release` com `OVSX_PAT` | publicar no Open VSX | token em https://open-vsx.org/user-settings/tokens |
 | Login da Azure CLI | publicar no VS Code Marketplace | `az login --allow-no-subscriptions`, com a conta dona do publisher |

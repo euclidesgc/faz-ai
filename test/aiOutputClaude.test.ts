@@ -147,8 +147,39 @@ describe('inventário: os nomes que o painel vai ler', () => {
       event('Bash', { command: 'cat /tmp/segredo' }),
     ]);
     expect(reader.report().bashCommands).toEqual([
-      { command: 'npm test', calls: 2 },
-      { command: 'cat', calls: 1 },
+      { command: 'npm test', calls: 2, failed: 0 },
+      { command: 'cat', calls: 1, failed: 0 },
+    ]);
+  });
+
+  it('conta por comando-base as chamadas de Bash que voltaram com erro, sem guardar a saída (#605)', () => {
+    const result = (id: string, isError: boolean): string =>
+      JSON.stringify({
+        type: 'user',
+        session_id: 's',
+        message: { content: [{ type: 'tool_result', tool_use_id: id, is_error: isError, content: 'FAIL test/x.test.ts' }] },
+      });
+    const bash = (id: string, command: string): string =>
+      JSON.stringify({
+        type: 'assistant',
+        session_id: 's',
+        message: { id: `m-${id}`, model: 'claude-haiku-4-5', content: [{ type: 'tool_use', id, name: 'Bash', input: { command } }] },
+      });
+    const { reader } = read([
+      bash('t1', 'npm test'),
+      result('t1', true),
+      bash('t2', 'npm test'),
+      result('t2', false),
+      bash('t3', 'npm test && git commit -m x'),
+      result('t3', true),
+      // erro de outra ferramenta e de um id desconhecido: não entram
+      event('Read', { file_path: '/x' }),
+      result('t-Read', true),
+      result('t-desconhecido', true),
+    ]);
+    expect(reader.report().bashCommands).toEqual([
+      { command: 'npm test', calls: 3, failed: 2 },
+      { command: 'git commit', calls: 1, failed: 1 },
     ]);
   });
 

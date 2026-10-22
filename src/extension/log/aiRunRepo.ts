@@ -240,7 +240,12 @@ export class AiRunRepo {
         ]);
       }
       for (const item of report.measure === 'none' ? [] : (report.bashCommands ?? [])) {
-        run(this.db, 'INSERT OR REPLACE INTO ai_run_bash(run_id, command, calls) VALUES (?,?,?)', [id, item.command, item.calls]);
+        run(this.db, 'INSERT OR REPLACE INTO ai_run_bash(run_id, command, calls, failed) VALUES (?,?,?,?)', [
+          id,
+          item.command,
+          item.calls,
+          item.failed,
+        ]);
       }
     });
   }
@@ -256,9 +261,10 @@ export class AiRunRepo {
 
   /** Os comandos de Bash gravados de uma execução (#604), ordenados por comando. */
   bashUsage(id: string): BashCommandItem[] {
-    return all(this.db, 'SELECT command, calls FROM ai_run_bash WHERE run_id = ? ORDER BY command', [id]).map((r) => ({
+    return all(this.db, 'SELECT command, calls, failed FROM ai_run_bash WHERE run_id = ? ORDER BY command', [id]).map((r) => ({
       command: str(r.command),
       calls: num(r.calls),
+      failed: num(r.failed),
     }));
   }
 

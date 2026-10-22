@@ -47,7 +47,6 @@ describe('credenciais locais e referências MCP', () => {
     fs.writeFileSync(file, content);
     router.refreshHarness();
     expect(() => router.readHarnessFile(file)).toThrow('Configurações MCP');
-    expect(() => router.writeHarnessFile(file, '{"mcpServers":{}}')).toThrow('Configurações MCP');
     expect(fs.readFileSync(file, 'utf8')).toBe(content);
     db.close();
   });
