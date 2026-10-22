@@ -66,7 +66,8 @@ in the Portuguese interface.
   outline.
 - **Short sessions, controlled context.** Each run opens the card through the MCP, does that work and
   stops; it starts without rules, skills, agents or hooks you have not selected, and reads the
-  attached documents only when needed. [Harness](docs/harness_EN.md)
+  attached documents only when needed. The conversation it reads holds at most 20 messages (or starts
+  at the last summary). [Harness](docs/harness_EN.md)
 - **Board harness.** Rules, skills, agents and MCP servers live in a board library, in **Sempre**
   (always), **Pelo card** (per card) or **Desligado** (off) mode, with import and export to the tool.
   Every run goes through an agent, with the minimum it needs.

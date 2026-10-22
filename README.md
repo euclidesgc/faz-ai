@@ -62,7 +62,8 @@ cada fase e move os cards conforme avança, sempre parando para a sua aprovaçã
   escolhida nas listas ganham uma sombra que os separa do board, sem tirar o contorno de foco.
 - **Sessões curtas, contexto controlado.** Cada execução abre o card pelo MCP, faz aquele trabalho e
   para; começa sem regras, skills, agentes ou hooks que você não tenha marcado, e lê os documentos
-  anexados só quando precisa. [Harness](docs/harness.md)
+  anexados só quando precisa. A conversa que ela lê tem no máximo 20 mensagens (ou começa no último
+  resumo). [Harness](docs/harness.md)
 - **Harness do board.** Regras, skills, agentes e servidores MCP vivem numa biblioteca do board, no
   modo **Sempre**, **Pelo card** ou **Desligado**, com importação e exportação para a ferramenta.
   Toda execução roda por um agente, com o mínimo de que ele precisa.

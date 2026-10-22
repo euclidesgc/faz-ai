@@ -16,7 +16,7 @@ import type { HarnessItem } from '../../shared/harness';
 import { isSelectableKind, selectionKey, usageOf, toolItemsOf } from '../../shared/harnessSelection';
 import { groupOf } from '../../shared/harnessCatalog';
 import { norm } from '../../shared/filters';
-import { activeComments } from '../../shared/conversation';
+import { contextComments } from '../../shared/conversation';
 import {
   describeRule,
   modelFieldOf,
@@ -583,8 +583,8 @@ export function cardDetail(
     ...(wants('links') ? linksOf(s, c) : {}),
     ...(wants('conversation')
       ? {
-          // a partir do último resumo: as mensagens anteriores já estão nele e só inchariam o contexto
-          comments: activeComments(s.comments, c.id).map((m) => ({
+          // a partir do último resumo (as anteriores já estão nele) e, no máximo, as últimas AI_CONVERSATION_LIMIT
+          comments: contextComments(s.comments, c.id).comments.map((m) => ({
             commentId: m.id,
             author: m.author,
             ...(m.source ? { from: m.source } : {}),
@@ -592,6 +592,7 @@ export function cardDetail(
             at: iso(m.createdAt),
             body: m.body,
           })),
+          ...(contextComments(s.comments, c.id).omitted > 0 ? { omittedBefore: contextComments(s.comments, c.id).omitted } : {}),
         }
       : {}),
     ...(wants('attachments')

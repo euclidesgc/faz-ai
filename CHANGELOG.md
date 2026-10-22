@@ -8,6 +8,11 @@
 
 - **Sombra no card selecionado (#1069).** O card selecionado ganha uma sombra que sai do canto superior esquerdo e o destaca dos demais, sem tirar o contorno de foco do teclado. Os cards marcados na seleção múltipla recebem o mesmo destaque, e as linhas selecionadas das listas (como as do Harness) recebem uma sombra mais discreta. Um card pendente selecionado mantém o anel da cor do status, e a sombra vai por cima dele.
 
+### Alterado
+
+- **Refinar não guarda mais o texto anterior da descrição (#1076).** O **Refinar com IA** deixou de gravar o anexo `descricao-anterior-*.md` antes de reescrever a descrição, e a instrução que pedia isso saiu do prompt. O texto anterior não fica guardado em lugar nenhum; o comentário do refino resume o que mudou e por quê. Anexos antigos com esse nome continuam na história, sem uso.
+- **A IA recebe no máximo as últimas 20 mensagens da conversa (#1076).** Sem resumo, o `get_card` manda só as 20 últimas mensagens e diz em `omittedBefore` quantas ficaram de fora. Com resumo, ele sempre vem; passando de 20 mensagens, vêm as 19 últimas depois dele. A aba **Conversa** segue mostrando tudo. Mensagens repetidas e avisos do board continuam como estavam.
+
 ## 0.47.0
 
 ### Adicionado
