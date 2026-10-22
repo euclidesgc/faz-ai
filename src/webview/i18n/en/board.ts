@@ -528,4 +528,9 @@ export const board: Record<string, string> = {
     'The board does not know the context window of {model}: without it, there is no percentage.',
   'O card não tem modelo: sem a janela de contexto, não há porcentagem.':
     'The card has no model: without the context window, there is no percentage.',
+  // pausa por limite de uso (#1047): a faixa do topo, uma linha por perfil de CLI
+  'Limite de uso do {profile}: a fila dele retoma às {time}.': 'Usage limit for {profile}: its queue resumes at {time}.',
+  'Limite de uso do {profile}: nova tentativa às {time}.': 'Usage limit for {profile}: next try at {time}.',
+  'O perfil esgotou o limite de uso do plano: o autopiloto e o heartbeat não disparam nada dele até a hora indicada; os outros perfis seguem. A execução pedida à mão continua liberada.':
+    'The profile ran out of its plan usage limit: the autopilot and the heartbeat start nothing on it until the time shown; other profiles keep going. A run you start by hand is still allowed.',
 };

@@ -34,6 +34,8 @@ export interface OrchestratorOptions {
   state(): BoardState;
   sessions: RunMcpSessions;
   starter: UnitStarter;
+  /** Motivo da pausa por limite de uso do perfil da unidade, ou null: o início automático vira espera, não falha. */
+  usageHold?(cardId: string): string | null;
   ownsBoard(): boolean;
   flush(): Promise<void>;
   workspace(unit: WorkUnit): Promise<string>;
@@ -149,6 +151,8 @@ export class Orchestrator {
       }
       if (plan.kind !== 'units') return plan;
       this.origins.set(storyId, origin);
+      const hold = origin === 'manual' ? null : (this.options.usageHold?.(plan.units[0]!.cardId!) ?? null);
+      if (hold) return { kind: 'wait', reason: hold };
       return this.start(plan.units[0]!, origin);
     });
   }

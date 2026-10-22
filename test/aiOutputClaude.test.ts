@@ -342,6 +342,25 @@ describe('usageLimitReached: detecção do limite de uso esgotado', () => {
     expect(reader.report().usageLimitReached).toBe(true);
   });
 
+  it('a dica de renovação acompanha o limite esgotado: `resetsAt` da janela a 100% ou o texto do `result`', () => {
+    const janela = JSON.stringify({
+      type: 'rate_limit_event',
+      session_id: 's',
+      rate_limit_info: { status: 'allowed', unifiedWindows: { five_hour: { utilization: 1, resetsAt: 1_900_000_000 } } },
+    });
+    expect(read([janela]).reader.report().usageLimitHint).toEqual({ resetsAt: 1_900_000_000, text: null });
+    const texto = JSON.stringify({
+      type: 'result',
+      is_error: true,
+      result: "You've hit your session limit · resets 1:50pm (America/Sao_Paulo)",
+    });
+    expect(read([texto]).reader.report().usageLimitHint).toEqual({
+      resetsAt: null,
+      text: "You've hit your session limit · resets 1:50pm (America/Sao_Paulo)",
+    });
+    expect(read([]).reader.report().usageLimitHint).toBeUndefined();
+  });
+
   it('um `rate_limit_event` com todas as janelas abaixo de 100% e `status: "allowed"` não liga a flag', () => {
     const monitoramento = JSON.stringify({
       type: 'rate_limit_event',

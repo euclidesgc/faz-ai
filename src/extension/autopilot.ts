@@ -10,6 +10,7 @@ import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
 import { orchestratesStory } from '../shared/orchestration';
 import { autopilotQueue } from '../shared/autopilotQueue';
 import { commentsSinceSummary } from '../shared/conversation';
+import { UsageLimitHeld } from './runner';
 import type { MessageRouter } from './panel/messageRouter';
 
 const AUTHOR = 'Faz AI';
@@ -434,6 +435,8 @@ export class Autopilot {
     }
   }
 
+  private heldLogged = new Set<string>();
+
   private start(story: Card): void {
     try {
       this.deps.log(`Autopiloto: chamando a IA em ${cardRef(story)}.`);
@@ -443,6 +446,8 @@ export class Autopilot {
       if (this.deps.driver && orchestratesStory(s, story)) return this.drive(this.deps.driver, story);
       this.runner.start(story.id, 'autopilot');
     } catch (e) {
+      // perfil pausado pelo limite de uso: não é falha; a história espera a pausa vencer e os outros perfis seguem
+      if (e instanceof UsageLimitHeld) return this.logHeld(e);
       const reason = e instanceof Error ? e.message : String(e);
       this.deps.log(`Autopiloto: ${reason}`);
       // sem como executar a ferramenta, insistir não adianta
@@ -450,6 +455,14 @@ export class Autopilot {
       this.active = false;
       this.publish(reason);
     }
+  }
+
+  /** Registra a pausa por limite de uso uma vez por perfil e horário, para a fila que reavalia a cada mudança não repetir. */
+  private logHeld(e: UsageLimitHeld): void {
+    const key = `${e.profileId}@${e.resumeAt}`;
+    if (this.heldLogged.has(key)) return;
+    this.heldLogged.add(key);
+    this.deps.log(`Autopiloto: ${e.message}`);
   }
 
   /** O orquestrador conduz a história; uma recusa dele (outra janela, reconciliação) vai para o log e a nota, sem desligar a fila. */
@@ -475,6 +488,7 @@ export class Autopilot {
     } catch (e) {
       // sem resumo a fase segue mesmo assim: o resumo é economia, não requisito
       this.summarizing.delete(story.id);
+      if (e instanceof UsageLimitHeld) return this.logHeld(e);
       this.deps.log(
         `Autopiloto: o resumo de ${cardRef(story)} não começou (${e instanceof Error ? e.message : String(e)}); seguindo sem ele.`,
       );

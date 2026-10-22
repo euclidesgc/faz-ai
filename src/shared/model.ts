@@ -16,6 +16,7 @@ import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { AiRunOrigin } from './log';
 import type { BranchKind, GitConfig, MainBranch } from './git';
+import type { UsageLimitState } from './usageLimit';
 import type { BranchRenamePending, RenameOutcome } from './branchRename';
 
 export type Id = string;
@@ -308,6 +309,8 @@ export interface BoardState {
   requirementsCheckedAt: number;
   /** os perfis de CLI (ids) que falharam por login vencido numa execução; vazio quando não há aviso reativo ativo */
   authExpired: AiTool[];
+  /** a pausa por limite de uso, uma entrada por perfil de CLI (a fila automática daquele perfil espera; a lista vem da `meta`) */
+  usageLimit: UsageLimitState[];
   /** branches e worktrees órfãs, varridas pelo host; vazio antes da primeira varredura (runtime, não vai para o banco) */
   orphans: OrphanReport;
   /** o último Diagnóstico do ambiente; null antes de rodar a primeira vez */

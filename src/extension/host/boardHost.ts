@@ -634,6 +634,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     state: () => router.snapshot(),
     sessions: router.executions,
     starter: runner,
+    usageHold: (cardId) => runner.usageHold(cardId),
     ownsBoard: ownsNow,
     flush: () => handle.flush(),
     // a pasta da história: a worktree dela ou, sem worktree, a pasta do projeto

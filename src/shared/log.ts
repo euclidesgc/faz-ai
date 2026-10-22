@@ -1,3 +1,5 @@
+import type { UsageLimitHint } from './usageLimit';
+
 // Vocabulário e tipos puros do log de utilização do board: eventos do card e execuções de IA.
 // Sem dependência de banco nem de VSCode, como o resto de `shared`. O que grava e lê este vocabulário
 // fica em `src/extension/log`; aqui só o contrato.
@@ -201,6 +203,8 @@ export interface RunReport {
    * liga esta flag — o avaliador de políticas de execução decide a troca de alvo a partir dela.
    */
   usageLimitReached: boolean;
+  /** a dica de renovação que o leitor achou na saída (só o Claude Code a informa); sem ela, a pausa usa o backoff */
+  usageLimitHint?: UsageLimitHint;
 }
 
 /** Uma linha de `log_months`: o total de uma métrica (e, opcionalmente, um corte dela) num mês já arquivado. */

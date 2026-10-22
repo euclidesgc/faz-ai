@@ -107,3 +107,13 @@ export function tn(n: number, one: string, many: string, params?: Params): strin
 
 /** Data e hora no idioma da interface. */
 export const formatDateTime = (ms: number): string => new Date(ms).toLocaleString(current === 'en' ? 'en-US' : 'pt-BR');
+
+/** Hora no idioma da interface, com a data curta na frente quando não é o mesmo dia de `now` (a pausa por limite pode ir até a semana seguinte). */
+export function formatClock(ms: number, now: number): string {
+  const locale = current === 'en' ? 'en-US' : 'pt-BR';
+  const d = new Date(ms);
+  const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  return d.toDateString() === new Date(now).toDateString()
+    ? time
+    : `${d.toLocaleDateString(locale, { day: '2-digit', month: '2-digit' })} ${time}`;
+}

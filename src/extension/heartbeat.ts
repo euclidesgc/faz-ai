@@ -13,12 +13,11 @@ import { USAGE_LIMIT_TEXT } from '../shared/conversation';
 import { isWithHuman } from '../shared/story';
 import { autopilotStep, needsSummary, type StoryDriver } from './autopilot';
 import { orchestratesStory } from '../shared/orchestration';
+import { UsageLimitHeld } from './runner';
 
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
 export interface HeartbeatRunner {
   readonly running: string[];
-  /** a última execução terminou por limite de uso do plano */
-  readonly usageLimited?: boolean;
   start(cardId: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(cardId: string): void;
   onDidFinish(listener: (cardId: string) => void): void;
@@ -272,12 +271,6 @@ export class Heartbeat {
     this.lastRoundAt = deps.now();
     runner.onDidFinish((cardId) => {
       this.yieldToAutopilot = !this.isAutopilotRun(cardId);
-      // limite de uso esgotado: as demais histórias da fila falhariam do mesmo jeito; fica para a próxima rodada
-      if (this.runner.usageLimited && this.queue.length) {
-        this.deps.log(`Heartbeat: limite de uso da ferramenta esgotado; ${this.queue.length} história(s) ficam para a próxima rodada.`);
-        this.queue = [];
-        return this.changed();
-      }
       this.pump();
     });
   }
@@ -454,6 +447,7 @@ export class Heartbeat {
     const limit = (kind: ActivityKind) => limitOf(s.board.runner, s.board.git.mode, kind) - (kind === reservedKind ? 1 : 0);
     const rest: HeartbeatItem[] = [];
     const waiting: Record<ActivityKind, number> = { text: 0, branch: 0 };
+    const pausedProfiles = new Map<string, { message: string; count: number }>();
     for (const item of this.queue) {
       const current = this.deps.snapshot();
       const card = this.stillValid(current, item);
@@ -469,12 +463,14 @@ export class Heartbeat {
         if (item.mode === 'phase' && this.deps.driver && orchestratesStory(current, card)) this.drive(this.deps.driver, card);
         else this.runner.start(item.id, 'heartbeat', item.mode);
         counts[kind]++;
-        // o limite de uso esgotou na última execução: só uma de teste, as outras esperam o resultado dela
-        if (this.runner.usageLimited) {
-          rest.push(...this.queue.slice(this.queue.indexOf(item) + 1));
-          break;
-        }
       } catch (e) {
+        // perfil pausado pelo limite de uso: só as histórias dele ficam para a rodada em que a pausa vencer; os outros
+        // perfis seguem. Não é falha, então a fila não é esvaziada
+        if (e instanceof UsageLimitHeld) {
+          const held = pausedProfiles.get(e.profileId);
+          pausedProfiles.set(e.profileId, { message: e.message, count: (held?.count ?? 0) + 1 });
+          continue;
+        }
         this.deps.log(`Heartbeat: ${e instanceof Error ? e.message : String(e)}`);
         // sem como executar a ferramenta, não adianta tentar as demais
         this.queue = [];
@@ -483,6 +479,7 @@ export class Heartbeat {
       }
     }
     this.queue = rest;
+    for (const { message, count } of pausedProfiles.values()) this.deps.log(`Heartbeat: ${message} ${count} história(s) esperando.`);
     if (waiting.branch) this.deps.log(`Heartbeat: ${waiting.branch} história(s) com branch esperando vaga.`);
     if (waiting.text) this.deps.log(`Heartbeat: ${waiting.text} história(s) em fase de texto esperando vaga.`);
     this.changed();
