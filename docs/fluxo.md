@@ -154,12 +154,10 @@ continua visível mesmo quando o botão está bloqueado.
   e descrição (sem inventar requisito; o que estiver ambíguo vira uma lista "Dúvidas em aberto"),
   revisa Tags, Esforço da atividade, Modelo e Skills mesmo que já tenham valor e acrescenta ao
   checklist os passos que faltam. Não trabalha a fase, não cria sub-tarefas, não move o card e não
-  mexe em arquivos: roda só com o board. Antes de reescrever a descrição, grava o texto anterior, sem
-  alteração, como anexo da história (`descricao-anterior-AAAA-MM-DD-HHMM.md`, sem virar artefato); a
-  conversa não recebe o texto, só o nome do anexo. No fim, resume na conversa o que mudou (citando o
-  anexo, se reescreveu a descrição) e o card volta ao status que tinha, também quando a execução
-  falha: a falha fica na conversa, sem bloquear o card. Um refino não conta como execução sem
-  progresso para o modo autônomo.
+  mexe em arquivos: roda só com o board. Não guarda o texto anterior da descrição: ela é reescrita.
+  No fim, resume na conversa o que mudou e por quê, e o card volta ao status que tinha, também quando
+  a execução falha: a falha fica na conversa, sem bloquear o card. Um refino não conta como execução
+  sem progresso para o modo autônomo.
 
 Imagens coladas na mensagem ou na descrição do card viram anexos dele e a IA as recebe.
 
@@ -176,6 +174,11 @@ mensagem pode ser apagada por você; logo abaixo do resumo, o botão **Apagar me
 apaga, com confirmação, todas as anteriores a ele; resumir de novo cria um registro novo, sem
 substituir o anterior. O [heartbeat](automacao.md) resume sozinho a conversa que cresceu. Está
 disponível também como ferramenta MCP (`generate_summary`), com o mesmo resultado.
+
+Sem resumo, a IA lê só as **últimas 20 mensagens** da conversa, e o `get_card` avisa quantas ficaram de
+fora (`omittedBefore`). Com resumo, ela lê o resumo e, se a conversa passar de 20 mensagens, as últimas
+19 depois dele. Assim uma conversa longa não cresce no contexto de cada execução. A aba **Conversa** segue
+mostrando tudo.
 
 ### Permissão, ferramenta e falhas
 

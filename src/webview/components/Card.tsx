@@ -90,6 +90,7 @@ export function CardView({
   const queuePosition = isParent && !archived && state.autopilot.active ? queuePositions(state).get(card.id) : undefined;
   // pendência com a pessoa: a borda ganha a cor do status para achar de relance o que espera por ela
   const mine = status !== null && statusInfo(status).owner === 'human';
+  const chosen = selectedIds.has(card.id);
   const style = mine ? ({ '--status-color': state.board.appearance.statuses[status].color } as CSSProperties) : undefined;
   const classes = [
     'card',
@@ -97,6 +98,7 @@ export function CardView({
     overlay && 'overlay',
     archived && 'archived',
     mine && 'mine',
+    chosen && 'chosen',
     (onSelect ? Boolean(externalSelected) : selectedIds.size > 0) && 'selecting',
     collapsed && 'card-collapsed',
   ]

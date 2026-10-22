@@ -2,6 +2,17 @@
 
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Shadow on the selected card (#1069).** The selected card gets a shadow that comes out of its top-left corner and sets it apart from the others, without removing the keyboard focus outline. Cards marked in multiple selection get the same emphasis, and selected rows in lists (such as the Harness ones) get a lighter shadow. A selected card with a pending item keeps its status-colored ring, and the shadow is drawn over it.
+
+### Changed
+
+- **Refine no longer keeps the previous description text (#1076).** **Refine with AI** stopped saving the `descricao-anterior-*.md` attachment before rewriting the description, and the instruction that asked for it left the prompt. The previous text is no longer kept anywhere; the refine comment summarizes what changed and why. Old attachments with that name stay on the story, unused.
+- **The AI receives at most the last 20 conversation messages (#1076).** Without a summary, `get_card` sends only the 20 latest messages and says in `omittedBefore` how many were left out. With a summary, the summary always comes; past 20 messages, the last 19 after it come. The **Conversa** tab still shows everything. Repeated messages and board notices stay as they were.
+
 ## 0.47.0
 
 ### Added

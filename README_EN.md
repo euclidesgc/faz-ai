@@ -61,9 +61,13 @@ in the Portuguese interface.
   options arrive as a carousel on the card. [Story flow](docs/fluxo_EN.md)
 - **Card search.** In the board search, `#980` shows only card 980, and `980` shows card 980 and the
   cards that mention it, in stories and sub-tasks. [Story flow](docs/fluxo_EN.md)
+- **Highlighted selected card.** The selected card, the cards marked in multiple selection and the
+  chosen row in lists get a shadow that sets them apart from the board, without removing the focus
+  outline.
 - **Short sessions, controlled context.** Each run opens the card through the MCP, does that work and
   stops; it starts without rules, skills, agents or hooks you have not selected, and reads the
-  attached documents only when needed. [Harness](docs/harness_EN.md)
+  attached documents only when needed. The conversation it reads holds at most 20 messages (or starts
+  at the last summary). [Harness](docs/harness_EN.md)
 - **Board harness.** Rules, skills, agents and MCP servers live in a board library, in **Sempre**
   (always), **Pelo card** (per card) or **Desligado** (off) mode, with import and export to the tool.
   Every run goes through an agent, with the minimum it needs.

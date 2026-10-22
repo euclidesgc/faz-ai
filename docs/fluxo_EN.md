@@ -165,13 +165,11 @@ on keyboard focus, closes with Esc, and stays visible even when the button is bl
   on it: rewrites the title and description (without inventing requirements; whatever is ambiguous
   becomes a "Dúvidas em aberto" list), reviews Tags, Esforço da atividade, Modelo and Skills even if
   they already have a value, and adds the missing steps to the checklist. It does not work on the
-  phase, create sub-tasks, move the card or touch files: it runs with the board only. Before it
-  rewrites the description, it saves the previous text, unchanged, as an attachment of the story
-  (`descricao-anterior-AAAA-MM-DD-HHMM.md`, not an artifact); the conversation gets the name of the
-  attachment, not the text. At the end it summarizes in the conversation what changed (citing the
-  attachment, if it rewrote the description) and the card returns to the status it had, also when
-  the run fails: the failure goes to the conversation, without blocking the card. A refine does not
-  count as a run without progress for the autonomous mode.
+  phase, create sub-tasks, move the card or touch files: it runs with the board only. It does not
+  keep the previous text of the description: the description is rewritten. At the end it summarizes
+  in the conversation what changed and why, and the card returns to the status it had, also when the
+  run fails: the failure goes to the conversation, without blocking the card. A refine does not count
+  as a run without progress for the autonomous mode.
 
 Images pasted into the message or into the card description become card attachments and the AI
 receives them.
@@ -191,6 +189,11 @@ text. Any message can be deleted by you; right below the summary, the **Apagar m
 again creates a new record, it does not replace the previous one. The
 [heartbeat](automacao_EN.md) summarizes on its own a conversation that has grown. It is also
 available as the MCP tool `generate_summary`, with the same result.
+
+Without a summary, the AI reads only the **last 20 messages** of the conversation, and `get_card` says
+how many were left out (`omittedBefore`). With a summary, it reads the summary and, if the conversation
+goes past 20 messages, the last 19 after it. This keeps a long conversation from growing in every run's
+context. The **Conversa** tab still shows everything.
 
 ### Permission, tool and failures
 

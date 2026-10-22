@@ -26,6 +26,8 @@ body {
   --shadow-1: 0 1px 6px var(--shadow-color);
   --shadow-2: 0 6px 20px var(--shadow-color);
   --shadow-3: 0 8px 32px var(--shadow-color);
+  --shadow-select-2: -6px -6px 20px var(--shadow-color);
+  --shadow-select-1: -2px -2px 6px var(--shadow-color);
   --focus-ring: 2px solid var(--accent);
   /* Tipografia. Duas famílias: a da interface para tudo, e a monoespaçada só para código e nomes de arquivo.
      A mono não usa a fonte do editor do VS Code: quando ela não está disponível no webview, o navegador cai numa serifada. */
