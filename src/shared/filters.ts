@@ -100,6 +100,19 @@ const valueText = (v: FieldValue): string => (v === null ? '' : Array.isArray(v)
 export const norm = (s: string): string => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 /**
+ * Uma palavra da busca contra um card. `h` é o texto do card já normalizado (`haystack`).
+ * - `#N` casa só o número exato do card: `#1` não pega o card 12;
+ * - `N` (só dígitos) casa o número do card ou N como palavra inteira no texto: `12` não pega 123;
+ * - o resto casa por substring, como sempre.
+ */
+function wordMatches(c: Card, w: string, h: string): boolean {
+  const byNumber = /^#(\d+)$/.exec(w);
+  if (byNumber) return c.number === Number(byNumber[1]);
+  if (/^\d+$/.test(w)) return c.number === Number(w) || new RegExp(`(?<!\\d)${w}(?!\\d)`).test(h);
+  return h.includes(w);
+}
+
+/**
  * Devolve os ids dos cards que passam nos filtros, ou null quando nenhum filtro está ativo.
  * Só considera cards fora da lixeira.
  */
@@ -158,7 +171,7 @@ export function applyFilters(state: BoardState, f: Filters, now: number = Date.n
 
     if (words.length) {
       const h = haystack(c);
-      if (!words.every((w) => h.includes(w))) return false;
+      if (!words.every((w) => wordMatches(c, w, h))) return false;
     }
     return true;
   };
