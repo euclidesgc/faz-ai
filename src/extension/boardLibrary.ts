@@ -6,7 +6,9 @@ import { scanLibraryFolder } from './libraryImport';
 import type { ArtifactKind, LibraryArtifactInput, LibraryImportPreview } from '../shared/artifacts';
 import { LibraryDisk } from './libraryDisk';
 import { ArtifactMirror } from './artifactMirror';
-import { agentInputOf, parseAgentFile, readSource } from './artifactSource';
+import { agentInputOf, parseAgentFile, readSource, mcpServerNames } from './artifactSource';
+import { TOOL_ADAPTERS } from './toolAdapters';
+import type { ToolAdapter } from './toolAdapters/types';
 import { ArtifactRepo, type ArtifactRow } from './repositories/artifactRepo';
 import {
   agentOfArtifact,
@@ -20,11 +22,17 @@ import {
   type BoardArtifact,
 } from '../shared/artifacts';
 import { type HarnessUsage, type SelectableKind } from '../shared/harnessSelection';
-import { baseInfo, SKILL_NAME_PATTERN, type Harness } from '../shared/harness';
+import { baseInfo, SKILL_NAME_PATTERN, type AiTool, type Harness } from '../shared/harness';
 import { MCP_NAME_PATTERN, type McpServerInput } from '../shared/harnessCatalog';
 import { RULE_NAME_PATTERN, createUsage } from '../shared/artifactImport';
 import type { AgentInput, McpServerView } from '../shared/messages';
 import type { BoardContext } from './panel/handlers/context';
+
+/** Como achar a dependência (skill ou servidor MCP) de um agente copiado: pelo nome, na ferramenta dele. */
+interface DependencyResolver {
+  mcp(name: string, tool: string): ArtifactDraft | null;
+  skill(name: string, tool: string): ArtifactDraft | null;
+}
 
 /** Biblioteca do board: as fontes são lidas só na importação ou numa atualização explícita. */
 export class BoardLibrary {
@@ -231,19 +239,110 @@ export class BoardLibrary {
     return readSource(sel, this.dirs, this.ctx.state().board.aiTool);
   }
 
-  /** Preserva a marcação antiga na primeira abertura, inclusive origens que já estavam ausentes. */
+  /** A ferramenta dona da origem, pela pasta que o adaptador declara; sem pista, a do board. */
+  private ownerOf(location: string): AiTool {
+    const p = `/${location.replace(/\\/g, '/')}`;
+    const adapters = Object.values(TOOL_ADAPTERS).filter((a): a is ToolAdapter => !!a);
+    for (const adapter of adapters) {
+      if (p.includes(`/${adapter.root}/`)) return adapter.tool;
+      for (const [target, base] of [
+        ['project', this.dirs.projectDir],
+        ['user', this.dirs.homeDir],
+      ] as const)
+        if (base && adapter.mcpFiles(target, base).includes(location.split('#')[0]!)) return adapter.tool;
+    }
+    return this.ctx.state().board.aiTool;
+  }
+
+  /**
+   * Preserva a marcação antiga na primeira abertura, inclusive origens que já estavam ausentes. Sem
+   * varredura e sem gravar nada na pasta da ferramenta: cada origem é lida pelo caminho que a marcação
+   * guardou, e as dependências de um agente são procuradas pelos adaptadores (projeto antes do usuário).
+   */
   migrate(): void {
     const legacy = this.repo.legacySelection(this.ctx.boardId);
     if (!legacy.length) return;
+    const read = (selection: { kind: SelectableKind; location: string }) =>
+      readSource(selection, this.dirs, this.ownerOf(selection.location));
+    const drafts = legacy.map((selection) => ({ draft: read(selection), usage: selection.usage }));
     this.repo.importLegacy(
       this.ctx.boardId,
-      legacy.map((selection) => {
-        const draft = this.source(selection);
+      legacy.map((selection, i) => {
         // Uma marcação antiga nunca substitui uma cópia já personalizada na biblioteca.
+        const draft = drafts[i]!.draft;
         const existing = this.repo.get(this.ctx.boardId, draft.kind, draft.name);
         return { selection, draft: existing ? this.draftOf(existing) : draft };
       }),
     );
+    const dependencies = this.withDependencies(drafts, this.adapterResolver()).slice(drafts.length);
+    if (dependencies.length) this.repo.upsertMany(this.ctx.boardId, dependencies);
+  }
+
+  /** Procura skills e servidores MCP pelo nome nas pastas das ferramentas, via adaptadores: projeto antes do usuário. */
+  private adapterResolver(): DependencyResolver {
+    const targets = [
+      ['project', this.dirs.projectDir],
+      ['user', this.dirs.homeDir],
+    ] as const;
+    const adapters = (tool: string) =>
+      tool && TOOL_ADAPTERS[tool as AiTool]
+        ? [TOOL_ADAPTERS[tool as AiTool]!]
+        : Object.values(TOOL_ADAPTERS).filter((a): a is ToolAdapter => !!a);
+    return {
+      mcp: (name, tool) => {
+        for (const adapter of adapters(tool))
+          for (const [target, base] of targets) {
+            if (!base) continue;
+            for (const file of adapter.mcpFiles(target, base)) {
+              if (!mcpServerNames(file, this.dirs).includes(name)) continue;
+              const draft = readSource({ kind: 'mcp', location: `${file}#${name}` }, this.dirs, adapter.tool);
+              if (!draft.missing) return draft;
+            }
+          }
+        return null;
+      },
+      skill: (name, tool) => {
+        for (const adapter of adapters(tool))
+          for (const [target, base] of targets) {
+            if (!base) continue;
+            const found = adapter.list(target, base).find((l) => l.kind === 'skill' && path.basename(path.dirname(l.location)) === name);
+            if (!found) continue;
+            const draft = readSource({ kind: 'skill', location: found.location }, this.dirs, adapter.tool);
+            if (!draft.missing) return draft;
+          }
+        return null;
+      },
+    };
+  }
+
+  /** Um agente leva as dependências declaradas e encontradas, sem substituir artefatos já no board. */
+  private withDependencies(items: { draft: ArtifactDraft; usage: HarnessUsage }[], resolver: DependencyResolver) {
+    const result = [...items];
+    const present = new Set([
+      ...this.repo.list(this.ctx.boardId).map((a) => `${a.kind}:${a.name}`),
+      ...items.map(({ draft }) => `${draft.kind}:${draft.name}`),
+    ]);
+    for (const { draft } of items) {
+      if (draft.kind !== 'agent' || draft.missing) continue;
+      const meta = draft.meta as AgentMeta;
+      for (const name of meta.mcpServers) {
+        if (present.has(`mcp:${name}`) || name === 'faz-ai') continue;
+        const dependency = resolver.mcp(name, draft.originTool);
+        if (dependency) {
+          result.push({ draft: dependency, usage: 'contextual' });
+          present.add(`mcp:${name}`);
+        }
+      }
+      for (const name of meta.skills) {
+        if (present.has(`skill:${name}`)) continue;
+        const dependency = resolver.skill(name, draft.originTool);
+        if (dependency && !dependency.missing) {
+          result.push({ draft: dependency, usage: 'contextual' });
+          present.add(`skill:${name}`);
+        }
+      }
+    }
+    return result;
   }
 
   private draftOf(a: ArtifactRow): ArtifactDraft {
@@ -274,7 +373,7 @@ export class BoardLibrary {
         throw new Error(`Mais de uma origem para o artefato "${draft.name}". Importe uma origem por vez.`);
       identities.set(key, draft.origin);
     }
-    this.repo.upsertMany(this.ctx.boardId, drafts);
+    this.repo.upsertMany(this.ctx.boardId, this.withDependencies(drafts, this.adapterResolver()));
     if (!usage)
       for (const item of items) {
         const existing = this.repo.findByLocation(this.ctx.boardId, kindOfSelectable(item.kind), item.location);
@@ -505,7 +604,7 @@ export class BoardLibrary {
     const kind = a.kind === 'rule' ? 'instructions' : a.kind;
     const draft = readSource({ kind, location: a.origin }, this.dirs, a.originTool);
     if (draft.missing) throw new Error('A origem não está disponível. A cópia do board foi preservada.');
-    this.repo.upsertMany(this.ctx.boardId, [{ draft, usage: a.usage }]);
+    this.repo.upsertMany(this.ctx.boardId, this.withDependencies([{ draft, usage: a.usage }], this.adapterResolver()));
   }
 
   /** Só os arquivos já conhecidos da biblioteca podem ser abertos no editor do board. */

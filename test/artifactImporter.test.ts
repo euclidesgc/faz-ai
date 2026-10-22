@@ -238,11 +238,12 @@ describe('ArtifactImporter: ferramenta instalada', () => {
     expect([...tree(path.join(root, 'project')), ...tree(path.join(root, 'home'))]).toEqual(snapshot);
   });
 
-  it('segue o catálogo da ferramenta escolhida (o Cursor lê as regras dele e as skills do .claude, não o CLAUDE.md)', async () => {
+  it('segue o adaptador da ferramenta escolhida (o Cursor lê só a pasta .cursor: não traz o CLAUDE.md nem as skills do .claude)', async () => {
     const preview = await new ArtifactImporter(ctx).scan({ from: 'tool', tool: 'cursor' });
     const names = preview.candidates.map((c) => c.name);
     expect(names).toContain('cursor-so.mdc');
     expect(names).not.toContain('CLAUDE.md');
+    expect(names).not.toContain('local');
   });
 });
 

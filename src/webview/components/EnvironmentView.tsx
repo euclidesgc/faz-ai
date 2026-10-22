@@ -77,6 +77,13 @@ function texts(c: EnvCheck): { title: string; hint: string } {
           'O nome novo já está nas configurações, mas o repositório ainda usa o antigo. Renomear ou Desfazer na tela Git acerta o clone, o upstream e o origin; o comando abaixo é só o do clone local.',
         ),
       };
+    case 'flow-skill-copy':
+      return {
+        title: t('Cópia antiga da skill do fluxo'),
+        hint: t(
+          'Versões anteriores instalaram a skill faz-ai-fluxo nas pastas das ferramentas. O fluxo agora vem do board, e a cópia só confunde as sessões que não são do board. O board não apaga o arquivo: apague os listados abaixo se não precisar deles.',
+        ),
+      };
     case 'gh':
       return {
         title: t('GitHub CLI (gh)'),
@@ -216,6 +223,19 @@ function Row({ check }: RowProps) {
           {check.inProject && <span className="small muted">{t('Na pasta do projeto.')}</span>}
         </div>
       )}
+      {/* a cópia antiga da skill do fluxo: os arquivos a apagar à mão */}
+      {check.paths?.length ? (
+        <div className="env-fix">
+          <span className="small muted">{t('Arquivos para apagar:')}</span>
+          <ul className="env-commands">
+            {check.paths.map((p) => (
+              <li key={p}>
+                <CopyCommand command={p} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {/* a renomeação pendente se resolve na tela Git (Renomear / Desfazer) */}
       {check.id === 'branch-name' && check.status === 'missing' && (
         <div className="env-fix">

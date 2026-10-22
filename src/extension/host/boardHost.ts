@@ -50,6 +50,7 @@ import { isPendingReview, probeProfiles } from '../profileProbe';
 import { profileHealth, profilesInUse, type ProfileHealth } from '../../shared/profileHealth';
 import { editorMcpFiles, pinEditorCommands } from '../mcp/pinCommands';
 import { harnessIssues } from '../../shared/harnessStatus';
+import { findFlowSkillCopies } from '../flowSkillCopies';
 import type { WebviewToHost } from '../../shared/messages';
 import { resolveCommand, resolveProfileCommand } from '../cliResolve';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
@@ -576,6 +577,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           },
           harnessIssues: harnessIssuesNow() ?? null,
           branchRenames: s.branchRenames,
+          flowSkillCopies: findFlowSkillCopies({ projectDir: o.folderPath, homeDir }),
           platform: process.platform,
           homeDir,
           pathDirs: (pathEnv ?? process.env.PATH ?? '').split(path.delimiter),
