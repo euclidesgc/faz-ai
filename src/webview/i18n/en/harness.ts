@@ -915,4 +915,7 @@ export const harness: Record<string, string> = {
   'o destino é uma pasta': 'the destination is a folder',
   'outro artefato do lote grava o mesmo arquivo': 'another artifact in the batch writes the same file',
   'Não há pasta de projeto aberta para exportar.': 'There is no open project folder to export to.',
+  'Conectar ao board': 'Connect to the board',
+  'Conecta a ferramenta de IA ao MCP do board.': 'Connects the AI tool to the board MCP.',
+  'Registra o servidor MCP do board em {tool}.': 'Registers the board MCP server in {tool}.',
 };

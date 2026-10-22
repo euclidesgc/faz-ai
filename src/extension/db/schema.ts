@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 45;
+export const SCHEMA_VERSION = 46;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -593,6 +593,11 @@ const MIGRATIONS: Record<number, string> = {
     -- #605: quantas chamadas do comando voltaram com erro (tool_result com is_error), para o sinal
     -- "npm test com falha" do Retrabalho. Registros anteriores ficam com 0: não medido antes desta versão.
     ALTER TABLE ai_run_bash ADD COLUMN failed INTEGER NOT NULL DEFAULT 0;
+  `,
+  46: `
+    -- #926: o board não varre mais pastas de ferramentas; a lista de pastas importadas por ferramenta sai.
+    -- harness_selection fica: a marcação de uso (Sempre / Pelo card) continua sendo do board.
+    DROP TABLE IF EXISTS harness_imports;
   `,
 };
 

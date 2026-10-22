@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { RULE_NAME_PATTERN } from '../../../shared/artifactImport';
 import { skillDocument } from '../../../shared/artifacts';
-import { ALL_AI_BASES, type AiTool } from '../../../shared/harness';
+import { type AiTool } from '../../../shared/harness';
 import { SELECTABLE_KINDS, toolItemsOf, selectionKey, type HarnessUsage, type SelectableKind } from '../../../shared/harnessSelection';
-import { FLOW_SKILL, flowSkillMarkdown } from '../../flowSkill';
+import { flowSkillMarkdown } from '../../flowSkill';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { harnessOverview } from '../format';
 import type { DefineTool } from './registry';
@@ -15,7 +15,6 @@ const skillArg = z.string().describe('Nome da skill (nome da pasta), ex.: "revis
 const agentArg = z.string().describe('Nome do agente (nome do arquivo, sem a extensão), ex.: "revisor-de-spec"');
 
 const harness = (router: MessageRouter) => harnessOverview(router.snapshot());
-const agentScopeArg = z.enum(['user', 'project']).optional().describe('Aceito por compatibilidade e ignorado: o agente fica no board');
 const listArg = (what: string) => z.array(z.string()).optional().describe(what);
 
 type BoardKind = 'rule' | 'skill' | 'agent';
@@ -46,43 +45,35 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'get_harness',
-    'O banco de artefatos do board: a ferramenta em uso, o agente padrão e, com o modo (`usage`), as rules, skills, agentes e servidores MCP que estão no board (Configurações → Harness). `cliLoads` diz o que a CLI da ferramenta carrega por conta própria e se o contexto vazio está imposto: lista vazia não prova isolamento. Toda execução parte de contexto vazio: o que não está no board não existe para ela. Com onlySelected = false, lista o que dá para importar: o que a ferramenta em uso carrega nesta máquina (projeto, pasta do usuário, plugins e pastas importadas) e ainda não está no board, com a `key` para set_harness_selection.',
-    {
-      onlySelected: z
-        .boolean()
-        .optional()
-        .describe(
-          'Padrão true: o que está no board. false: o que dá para importar (a ferramenta em uso, fora do board), com a `key` de cada item',
-        ),
-    },
-    (a, router) => harnessOverview(router.snapshot(), a.onlySelected ?? true),
+    'O banco de artefatos do board: a ferramenta em uso, o agente padrão e, com o modo (`usage`), as rules, skills, agentes e servidores MCP que estão no board (Configurações → Harness). `cliLoads` diz o que a CLI da ferramenta carrega por conta própria e se o contexto vazio está imposto: lista vazia não prova isolamento. Toda execução parte de contexto vazio: o que não está no board não existe para ela.',
+    {},
+    (_a, router) => harnessOverview(router.snapshot()),
     true,
   );
 
   tool(
     'set_harness_selection',
-    'Importa rules, skills, agentes e servidores MCP da ferramenta em uso para o board, muda o modo dos que já estão nele ou os tira do board (o agente padrão e a skill do fluxo não saem). "always" (Sempre): entra em toda execução; "contextual" (Pelo card): disponível para indicar no card (campos Rules, Skills e MCPs) ou escolher como agente; "off" (Desligado): fica no board sem entrar em nada (é como as regras entram, para revisão); null: tira do board. Identifique o item por `location`, como get_harness (com onlySelected = false) o mostra; um agente, uma skill ou um servidor MCP também pelo nome.',
+    'Envia rules, skills, agentes e servidores MCP ao board, muda o modo deles ou os tira do board. "always" (Sempre): entra em toda execução; "contextual" (Pelo card): disponível para indicar no card (campos Rules, Skills e MCPs) ou escolher como agente; "off" (Desligado): fica no board sem entrar em nada (é como as regras entram, para revisão); null: tira do board. Identifique cada item por `kind` e `name`, como get_harness o mostra.',
     {
       items: z
         .array(
-          z.object({
-            kind: z.enum(SELECTABLE_KINDS as [SelectableKind, ...SelectableKind[]]),
-            location: z.string().optional().describe('A `key` como em get_harness (o caminho; num servidor MCP, `arquivo#nome`)'),
-            name: z.string().optional().describe('Nome do agente, da skill ou do servidor MCP, quando não souber a chave'),
-          }),
+          // estrito: um `location` (a identidade antiga, por caminho) dá erro em vez de ser ignorado
+          z
+            .object({
+              kind: z.enum(SELECTABLE_KINDS as [SelectableKind, ...SelectableKind[]]),
+              name: z.string().min(1).describe('Nome da rule, da skill, do agente ou do servidor MCP, como em get_harness'),
+            })
+            .strict(),
         )
         .min(1),
       usage: z.enum(['always', 'contextual', 'off']).nullable(),
     },
     (a, router) => {
       const s = router.snapshot();
-      const items = [...toolItemsOf(s), ...s.harness.inventory.flatMap((t) => t.items)];
+      const items = toolItemsOf(s);
       const resolved = a.items.map((i) => {
-        // `location` é a `key` do get_harness (num servidor MCP, arquivo mais `#nome`); o caminho sem o nome também vale
-        const found = items.find(
-          (x) => x.kind === i.kind && (i.location ? selectionKey(x) === i.location || x.location === i.location : x.name === i.name),
-        );
-        if (!found) throw new Error(`Item ${i.kind} "${i.location ?? i.name ?? ''}" não encontrado no board nem na ferramenta em uso.`);
+        const found = items.find((x) => x.kind === i.kind && x.name === i.name);
+        if (!found) throw new Error(`Item ${i.kind} "${i.name}" não encontrado no harness.`);
         return { kind: i.kind, location: selectionKey(found) };
       });
       router.handle({ type: 'harness.selection.set', items: resolved, usage: a.usage as HarnessUsage | null });
@@ -153,54 +144,12 @@ export function registerHarnessTools(tool: DefineTool): void {
   );
 
   tool(
-    'install_flow_skill',
-    'Opcional: o board já serve o fluxo pelo get_skill. Copia as skills do fluxo para a pasta de skills da ferramenta. A principal, "faz-ai-fluxo", ensina a conduzir os cards pelo fluxo do board (fases, documentos, pendências), junto com as skills por assunto (faz-ai-harness-do-card, faz-ai-workspace-e-pr, faz-ai-implementacao-rodadas, faz-ai-revisao-e-homologacao, faz-ai-modo-autonomo), e marca a principal como "incluir em todo contexto" neste board. Sempre no global da ferramenta, para todos os projetos: nada entra na pasta do projeto. Não sobrescreve uma skill de mesmo nome no destino, a menos que replace seja true.',
-    {
-      tool: z.enum(ALL_AI_BASES).optional().describe('Ferramenta de IA; padrão: a do projeto'),
-      replace: z.boolean().optional().describe('Troca a skill de mesmo nome que já esteja no destino'),
-    },
-    (a, router) => {
-      const tool = a.tool ?? router.snapshot().board.aiTool;
-      const found = () =>
-        router
-          .snapshot()
-          .harness.inventory.find((t) => t.tool === tool)
-          ?.items.find((i) => i.kind === 'skill' && i.scope === 'user' && i.name === FLOW_SKILL.name);
-      const had = !!found();
-      router.handle({ type: 'harness.flowSkill.install', tool, replace: a.replace });
-      return {
-        installed: !had || !!a.replace,
-        note:
-          had && !a.replace
-            ? 'A skill já existia no destino e foi mantida como está; marcada em todo contexto.'
-            : had
-              ? 'Skill substituída.'
-              : 'Skill criada.',
-        skill: found()?.path,
-      };
-    },
-  );
-
-  tool(
     'update_skill',
     'Substitui o SKILL.md inteiro da skill do board, incluindo o frontmatter (name, description). Os arquivos de apoio e o modo ficam como estão.',
     { skill: skillArg, content: z.string().min(1) },
     (a, router) => {
       boardItem(router, 'skill', a.skill);
       router.handle({ type: 'harness.artifact.save', kind: 'skill', name: a.skill, body: a.content, via: 'ai' });
-      return harness(router);
-    },
-  );
-
-  tool(
-    'set_skill_enabled',
-    'Atalho do modo de uma skill do board. enabled = false leva a "Desligado" (continua no board, sem entrar em nada). enabled = true leva a "Pelo card" se ela estava desligada; se já estava ligada ("Sempre" ou "Pelo card"), não muda nada.',
-    { skill: skillArg, enabled: z.boolean() },
-    (a, router) => {
-      const current = router.snapshot().harness.library?.artifacts.find((x) => x.kind === 'skill' && x.name === a.skill);
-      if (!current) throw new Error(`Skill "${a.skill}" não está no board.`);
-      if (!a.enabled) setUsage(router, 'skill', a.skill, 'off');
-      else if (current.usage === 'off') setUsage(router, 'skill', a.skill, 'contextual');
       return harness(router);
     },
   );
@@ -247,7 +196,6 @@ export function registerHarnessTools(tool: DefineTool): void {
       name: z.string().describe('Letras minúsculas, números e hífens'),
       description: z.string().min(1).describe('Quando usar este agente, em uma frase; é por ela que o refinar escolhe'),
       content: z.string().describe('Instruções do agente em markdown (sem o frontmatter)'),
-      scope: z.enum(['user', 'project']).optional().describe('Aceito por compatibilidade e ignorado: o agente fica no board'),
       model: z.string().optional().describe('Valor do campo Modelo (ex.: "claude:sonnet@medium"); sem ele o agente usa o modelo da sessão'),
       tools: listArg('Ferramentas embutidas liberadas (nomes na convenção da ferramenta); vazio = as da permissão'),
       deniedTools: listArg('Ferramentas retiradas da sessão'),
@@ -284,7 +232,6 @@ export function registerHarnessTools(tool: DefineTool): void {
     'Altera um agente do board: com `content`, substitui o agente inteiro (frontmatter e instruções, no formato da ferramenta em uso); com os demais campos, reescreve só o que vier, preservando o resto. A mudança fica no board e vale para as próximas execuções; as já iniciadas seguem com a versão delas. O arquivo de origem de um agente copiado não é alterado.',
     {
       agent: agentArg,
-      scope: agentScopeArg,
       content: z.string().min(1).optional().describe('Arquivo inteiro, com o frontmatter'),
       description: z.string().optional(),
       body: z.string().optional().describe('Instruções (sem o frontmatter)'),
@@ -298,12 +245,11 @@ export function registerHarnessTools(tool: DefineTool): void {
     },
     (a, router) => {
       boardItem(router, 'agent', a.agent);
-      if (a.content) router.handle({ type: 'harness.agent.write', name: a.agent, scope: 'user', content: a.content });
+      if (a.content) router.handle({ type: 'harness.agent.write', name: a.agent, content: a.content });
       else
         router.handle({
           type: 'harness.agent.update',
           name: a.agent,
-          scope: 'user',
           patch: {
             ...(a.description !== undefined ? { description: a.description } : {}),
             ...(a.model !== undefined ? { model: a.model } : {}),
@@ -323,10 +269,10 @@ export function registerHarnessTools(tool: DefineTool): void {
   tool(
     'delete_agent',
     'Tira um agente do board; o arquivo de origem de um agente copiado não é apagado. Não pode ser desfeito pelo board. O agente padrão não sai: escolha outro antes.',
-    { agent: agentArg, scope: agentScopeArg },
+    { agent: agentArg },
     (a, router) => {
       boardItem(router, 'agent', a.agent);
-      router.handle({ type: 'harness.agent.delete', name: a.agent, scope: 'user' });
+      router.handle({ type: 'harness.agent.delete', name: a.agent });
       return harness(router);
     },
   );

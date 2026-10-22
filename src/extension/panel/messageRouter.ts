@@ -19,15 +19,13 @@ import { newId } from '../db/ids';
 import type { ImportSummary } from '../../shared/backup';
 import type { AiActivity, Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
-import type { AiTool, HarnessSuggestions } from '../../shared/harness';
+import type { AiTool } from '../../shared/harness';
 import type { ProjectProfile } from '../../shared/projectProfile';
 import { readProjectProfile } from '../projectProfile';
-import type { ClaudeCli } from '../plugins';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
 import { agentProfiles } from '../../shared/execution';
 import { columnsOf } from '../../shared/selectors';
 import type { AttachmentStore } from '../attachments';
-import type { HarnessStore } from '../harness';
 import { headlessUnsupported } from '../headless';
 import { boardServerFootprint } from '../mcp/footprint';
 import type { RunResolver } from '../log/eventLog';
@@ -93,7 +91,7 @@ export interface OrphanHooks {
 /** As mensagens do webview que o chat executa. */
 export type ChatMessageIn = Extract<
   WebviewToHost,
-  { type: 'chat.send' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' | 'ai.suggestRules' | 'ai.suggestSkills' | 'harness.suggest.run' }
+  { type: 'chat.send' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' | 'ai.suggestRules' | 'ai.suggestSkills' }
 >;
 
 /** Tratadas pela ponte do webview (dependem do VSCode): aqui não mudam o board. */
@@ -118,8 +116,6 @@ const bridgeOnly = {
   'ai.suggestAgents': viaBridge,
   'ai.suggestRules': viaBridge,
   'ai.suggestSkills': viaBridge,
-  'harness.suggest.run': viaBridge,
-  'harness.suggest.clear': viaBridge,
   'ui.showChat': viaBridge,
   'requirements.check': viaBridge,
   // a limpeza das órfãs é ligada ao host nas partes seguintes (#489, #492): até lá, nada responde a elas
@@ -140,7 +136,6 @@ const bridgeOnly = {
   'harness.import.scan': viaBridge,
   'harness.artifact.read': viaBridge,
   'harness.library.open': viaBridge,
-  'harness.library.pick': viaBridge,
   'harness.library.pickArtifacts': viaBridge,
   'harness.library.pickDirectory': viaBridge,
   'harness.library.folders': viaBridge,
@@ -195,7 +190,6 @@ export class MessageRouter {
   private heartbeatNextAt: number | null = null;
   private chat: ChatState = EMPTY_CHAT;
   private chatHandler: ((msg: ChatMessageIn) => void) | null = null;
-  private suggestions: HarnessSuggestions | null = null;
   private autopilot: Autopilot = { active: false, note: null };
   private requirements: BoardRequirement[] = [];
   private requirementsCheckedAt = 0;
@@ -209,7 +203,6 @@ export class MessageRouter {
   private orphanHooks: OrphanHooks | null = null;
   private aiProfileRuntime: AiProfileRuntime | null = null;
   readonly store: AttachmentStore;
-  readonly harnessStore: HarnessStore | null;
 
   constructor(dbHandle: DbHandle, opts: RouterOptions) {
     this.ctx = new BoardContext(dbHandle, opts);
@@ -220,7 +213,6 @@ export class MessageRouter {
       save: () => dbHandle.scheduleSave(),
     });
     this.store = this.ctx.store;
-    this.harnessStore = this.ctx.harness.store;
     this.ctx.harness.load();
     initModels(this.ctx);
     // os agentes de fábrica usam as regras de modelo, que initModels acabou de criar
@@ -315,7 +307,7 @@ export class MessageRouter {
 
   snapshot(): BoardState {
     const s = this.ctx.boards.snapshot(this.ctx.boardId, this.ctx.opts.author);
-    const { current, install } = this.ctx.harness;
+    const { current } = this.ctx.harness;
     return {
       ...s,
       // os agentes do board são as cópias guardadas no banco (escopo `board`): derivados aqui, nunca gravados
@@ -342,9 +334,7 @@ export class MessageRouter {
       authExpired: this.authExpired,
       environment: this.environment,
       environmentFirstRun: this.environmentFirstRun,
-      harnessInstall: install ? { source: install.source, skills: install.skills } : null,
       artifactImport: this.ctx.importer.current,
-      harnessSuggestions: this.suggestions,
       mainBranch: this.ctx.mainBranch(),
       orphans: this.orphans,
     };
@@ -577,12 +567,6 @@ export class MessageRouter {
     return result;
   }
 
-  /** O resultado de "Indicar artefatos" (informado pela sessão de chat), ou null para descartar. */
-  setSuggestions(suggestions: HarnessSuggestions | null): void {
-    this.suggestions = suggestions;
-    this.notify();
-  }
-
   /** O chat com a IA (informado pela sessão de chat): as mensagens e se a IA está respondendo. */
   setChat(chat: ChatState): void {
     this.chat = chat;
@@ -684,34 +668,9 @@ export class MessageRouter {
     return this.changed();
   }
 
-  /** Relê regras e skills do disco (chamado quando os arquivos mudam por fora) e avisa os webviews se algo mudou. */
+  /** Relê a biblioteca do board e avisa os webviews se algo mudou. */
   refreshHarness(): void {
     if (this.ctx.harness.refresh()) this.changed();
-  }
-
-  /**
-   * O "Reler pastas" da tela: relê o disco e espera também a lista de plugins da CLI, para o `done` da mensagem
-   * só sair quando tudo o que a tela vai mostrar já chegou.
-   */
-  async refreshHarnessAndPlugins(): Promise<void> {
-    this.refreshHarness();
-    await this.ctx.harness.refreshPlugins();
-  }
-
-  /** Liga a CLI do Claude Code, que diz quais plugins estão instalados e os desinstala, desativa e ativa. */
-  setClaudeCli(cli: ClaudeCli | null): void {
-    this.ctx.harness.setClaudeCli(cli, () => this.changed());
-  }
-
-  /** Guarda a origem de skills já disponível numa pasta, para a pessoa escolher o que instalar. */
-  setInstall(source: string, dir: string, cleanup: () => void): void {
-    this.ctx.harness.setInstall(source, dir, cleanup);
-    this.notify();
-  }
-
-  clearInstall(): void {
-    this.ctx.harness.clearInstall();
-    this.ctx.importer.cancel();
   }
 
   /** Lê a origem de artefatos e deixa a prévia no estado do board. */

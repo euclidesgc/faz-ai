@@ -246,17 +246,17 @@ describe('manifesto e plano pelo alvo da execução', () => {
     expect(m.model).toEqual({ name: 'composer-2.5', effort: null });
   });
 
-  it('executionPlan de um card do Cursor num board com padrão Claude usa a imposição e o inventário do Cursor', () => {
+  it('executionPlan de um card do Cursor num board com padrão Claude usa a imposição do Cursor e os servidores da biblioteca do board', () => {
     const { s, c } = cenario('cursor:composer-2.5');
     s.harness = {
       ...s.harness,
-      inventory: [
-        { tool: 'claude', items: [{ kind: 'mcp', name: 'so-claude' }] },
-        { tool: 'cursor', items: [{ kind: 'mcp', name: 'so-cursor' }] },
-      ],
+      library: {
+        directory: '',
+        artifacts: [{ id: 'a', kind: 'mcp', name: 'da-biblioteca', description: '', origin: '', usage: 'off', missing: false }],
+      },
     } as never;
     const plan = executionPlan(s, c, {}, { command: 'node', args: [] });
-    expect(plan.input.mcpBlocked).toEqual(['so-cursor']);
+    expect(plan.input.mcpBlocked).toEqual(['da-biblioteca']);
     // o Cursor não recebe o arquivo de MCP nem o agente por parâmetro: a orientação vai no pedido
     expect(plan.input.mcpConfig).toBeNull();
     expect(plan.summary).toContain('Servidores MCP: faz-ai (pelo pedido)');

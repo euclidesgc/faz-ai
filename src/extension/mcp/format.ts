@@ -338,7 +338,7 @@ export const FLOW_NOTE = 'Fluxo do board: get_skill faz-ai-fluxo (as skills faz-
 export function requiredSkills(s: BoardState, c: Card) {
   // as skills do card somam às do agente
   return manifestOf(s, c).skills.map((name) => {
-    // a skill do fluxo vem do texto do board pelo get_skill; uma cópia instalada na pasta da ferramenta é ignorada
+    // a skill do fluxo vem do texto do board pelo get_skill; uma cópia na pasta da ferramenta é ignorada
     if (isFlowSkill(name)) return { name, scope: 'board', via: 'get_skill' };
     if (s.harness.library) {
       const copy = toolItems(s).find((i) => i.kind === 'skill' && i.name === name);
@@ -719,19 +719,13 @@ export function boardOverview(s: BoardState) {
 }
 
 /**
- * O harness da ferramenta em uso, com a marcação do board. Por padrão só o que está marcado (é o que
- * as execuções enxergam); com `onlySelected` falso, tudo que a ferramenta carrega, com `usage` em cada item.
+ * O harness do board: só o que foi enviado a ele (Configurações → Harness), que é o que as execuções
+ * enxergam. O que a ferramenta de IA carrega por conta própria não entra: o board não depende dela.
  */
-export function harnessOverview(s: BoardState, onlySelected = true) {
+export function harnessOverview(s: BoardState) {
   const usage = (i: HarnessItem) => (isSelectableKind(i.kind) ? usageOf(s.harnessSelection, i) : null);
-  const sourceItems = s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
-  // o que dá para importar: o inventário da ferramenta em uso que ainda não está no board
-  const inBoardOrigin = new Set((s.harness.library?.artifacts ?? []).map((a) => a.origin).filter(Boolean));
-  const importable = sourceItems.filter(
-    (i) => isSelectableKind(i.kind) && !usage(i) && !inBoardOrigin.has(selectionKey(i)) && !inBoardOrigin.has(i.location),
-  );
-  const inventory = onlySelected ? toolItems(s).filter((i) => usage(i)) : importable;
-  // os agentes do board (no banco); os arquivos da ferramenta que ainda não estão nele aparecem no inventário importável
+  const inventory = toolItems(s).filter((i) => usage(i));
+  // os agentes do board (no banco)
   const boardAgents = s.harness.library
     ? s.harness.library.artifacts.filter((a) => a.kind === 'agent' && !a.missing).map((a) => agentOfArtifact(a, s.board.aiTool))
     : null;
@@ -742,24 +736,20 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
     aiTool: s.board.aiTool,
     cliLoads: cliLoadsOf(s),
     defaultAgent: s.board.execProfiles.find((p) => p.isDefault)?.id ?? null,
-    note: onlySelected
-      ? 'Só o que está no board (Configurações → Harness): é tudo o que as execuções do board usam. `usage` "always" (Sempre) entra em toda execução; "contextual" (Pelo card) só quando indicado no card (campos Rules, Skills e MCPs) ou escolhido no planejamento e no refinar; "off" (Desligado) está no board sem entrar em nada. Para ver tudo que a ferramenta carrega, chame get_harness com onlySelected = false.'
-      : 'O que dá para importar: o que a ferramenta em uso carrega nesta máquina (projeto, pasta do usuário, plugins e pastas importadas) e ainda não está no board, com a `key` de cada item (`usage` null = fora do board, invisível para as execuções). Para trazer um item, chame set_harness_selection com a `key` e o modo. `rules`, `skills` e `agents` são o que já está no board.',
+    note: 'Só o que está no board (Configurações → Harness): é tudo o que as execuções do board usam. `usage` "always" (Sempre) entra em toda execução; "contextual" (Pelo card) só quando indicado no card (campos Rules, Skills e MCPs) ou escolhido no planejamento e no refinar; "off" (Desligado) está no board sem entrar em nada.',
     // as regras do board, pelo nome que read_rule_file e write_rule_file usam
     rules: (s.harness.library?.artifacts ?? [])
       .filter((a) => a.kind === 'rule' && !a.missing)
       .map((a) => ({ name: a.name, usage: a.usage, ...(a.size === undefined ? {} : { bytes: a.size }), path: a.path })),
-    skills: s.harness.library
-      ? toolItems(s)
-          .filter((i) => i.kind === 'skill' && usage(i))
-          .map((i) => ({
-            name: i.name,
-            usage: usage(i),
-            description: i.description,
-            path: i.path,
-            ...(i.files?.length ? { files: i.files } : {}),
-          }))
-      : s.harness.skills.map((k) => ({ name: k.name, usage: null, description: k.description, path: k.path })),
+    skills: toolItems(s)
+      .filter((i) => i.kind === 'skill' && usage(i))
+      .map((i) => ({
+        name: i.name,
+        usage: usage(i),
+        description: i.description,
+        path: i.path,
+        ...(i.files?.length ? { files: i.files } : {}),
+      })),
     agents: agents
       .filter((a) => usageOf(s.harnessSelection, { kind: 'agent', location: a.location }))
       .map((a) => ({

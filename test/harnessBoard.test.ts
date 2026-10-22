@@ -7,11 +7,10 @@ import initSqlJs from 'sql.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openInMemory } from '../src/extension/db/database';
 import { migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
-import { scanInventory } from '../src/extension/harnessScan';
+import { scanImportedFolder } from '../src/extension/importScan';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { catalogLines, refineCatalog } from '../src/extension/promptContext';
 import { bareExec, executionPlan } from '../src/extension/execution';
-import { parseSuggestions } from '../src/extension/chat';
 import { manifestOf } from '../src/shared/execution';
 import type { HarnessItem } from '../src/shared/harness';
 import {
@@ -168,7 +167,7 @@ describe('servidores MCP na execução do card', () => {
       expect(Object.keys(config).sort()).toEqual(['faz-ai', 'github', 'memoria']);
       expect(config.memoria).toEqual({ command: 'mem' });
       expect(config['faz-ai']).toEqual({ type: 'stdio', command: 'node', args: ['b.js'] });
-      expect(plan.input.mcpBlocked).toEqual(['sql']);
+      expect(plan.input.mcpBlocked).toEqual([]); // bloqueado é só o que a biblioteca do board tem e o agente não libera
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -188,29 +187,26 @@ describe('pastas importadas', () => {
     fs.writeFileSync(file, content);
   };
 
-  it('a varredura encontra na pasta o que a ferramenta reconhece num projeto, e a própria pasta como pasta de skills', () => {
+  it('a leitura encontra na pasta o que a ferramenta reconhece num projeto, e a própria pasta como pasta de skills', () => {
     write('colecao/.claude/skills/sql/SKILL.md', '---\nname: sql\ndescription: Consultas SQL\n---\n');
     write('colecao/.claude/agents/revisor.md', '---\nname: revisor\ndescription: Revisa\n---\n');
     write('colecao/.mcp.json', JSON.stringify({ mcpServers: { postgres: { command: 'pg-mcp' } } }));
     write('colecao/CLAUDE.md', '# Regras da coleção');
     write('so-skills/navegar/SKILL.md', '---\nname: navegar\ndescription: Navega\n---\n');
-    fs.mkdirSync(path.join(root, 'projeto'));
-    const items = scanInventory('claude', path.join(root, 'projeto'), '', undefined, null, [
-      path.join(root, 'colecao'),
-      path.join(root, 'so-skills'),
-      path.join(root, 'nao-existe'),
-    ]);
-    const imported = items.filter((i) => i.scope === 'imported');
-    expect(imported.map((i) => [i.kind, i.name]).sort()).toEqual([
+    const items = [
+      ...scanImportedFolder('claude', path.join(root, 'colecao')),
+      ...scanImportedFolder('claude', path.join(root, 'so-skills')),
+      ...scanImportedFolder('claude', path.join(root, 'nao-existe')),
+    ];
+    expect(items.map((i) => [i.kind, i.name]).sort()).toEqual([
       ['agent', 'revisor'],
       ['instructions', 'CLAUDE.md'],
       ['mcp', 'postgres'],
       ['skill', 'navegar'],
       ['skill', 'sql'],
     ]);
-    // a identidade é o caminho absoluto: fora do projeto e da home, é o que o inventário mostra
-    expect(imported.find((i) => i.name === 'sql')!.location).toBe(path.join(root, 'colecao/.claude/skills/sql/SKILL.md'));
-    expect(items.filter((i) => i.scope === 'project')).toEqual([]);
+    // a identidade é o caminho absoluto
+    expect(items.find((i) => i.name === 'sql')!.path).toBe(path.join(root, 'colecao/.claude/skills/sql/SKILL.md'));
   });
 });
 
@@ -235,13 +231,11 @@ describe('migração 29 → 30 (banco de artefatos)', () => {
     ]);
     db.run("INSERT INTO harness_selection VALUES ('b', 'mcp', '.mcp.json#x', 'contextual')");
     db.run("INSERT INTO harness_selection VALUES ('b', 'instructions', 'CLAUDE.md', 'off')");
-    db.run("INSERT INTO harness_imports VALUES ('b', 'claude', '/tmp/colecao')");
     expect(db.exec("SELECT name FROM field_defs WHERE board_id = 'b'")[0]!.values).toEqual([['MCPs']]);
-    // apagar o board leva a marcação e as pastas junto
+    // apagar o board leva a marcação junto
     db.run('PRAGMA foreign_keys = ON');
     db.run("DELETE FROM boards WHERE id = 'b'");
     expect(db.exec('SELECT count(*) FROM harness_selection')[0]!.values[0]![0]).toBe(0);
-    expect(db.exec('SELECT count(*) FROM harness_imports')[0]!.values[0]![0]).toBe(0);
   });
 });
 
@@ -302,10 +296,6 @@ describe('revisão: o que a pilha corrigiu', () => {
     expect(m.skills).toEqual(['sql']);
     expect(m.rules).toEqual([]);
     expect(m.mcpServers).toEqual([]);
-  });
-
-  it('parseSuggestions aceita texto com chaves depois do JSON', () => {
-    expect(parseSuggestions('{"items":[{"key":"a","reason":"r"}]}\nObs.: {x}', ['a'])).toEqual([{ location: 'a', reason: 'r' }]);
   });
 
   it('o chat leva os servidores do board em modo Sempre, com a definição guardada no board; sem definição, fica de fora', () => {

@@ -8,7 +8,7 @@ import { isSafeSegment } from './attachments';
 import { readSource } from './artifactSource';
 import { parseExportFile } from './db/boardExport';
 import { FLOW_SKILLS } from './flowSkill';
-import { scanInventory } from './harnessScan';
+import { scanImportedFolder } from './importScan';
 import { scanLibraryFolder } from './libraryImport';
 import type { BoardContext } from './panel/handlers/context';
 import { fetchSource, findSkills, parseSource, runGit, type GitRunner } from './skillInstall';
@@ -230,9 +230,16 @@ export class ArtifactImporter {
     if (!isAiBase(tool)) throw new Error('Ferramenta não reconhecida.');
     const flow = new Set(FLOW_SKILLS.map((k) => k.name));
     const out: Entry[] = [];
-    for (const item of scanInventory(tool, this.dirs.projectDir, this.dirs.homeDir)) {
+    // só leitura, a pedido da pessoa que importa: pasta do projeto e do usuário
+    const roots = [this.dirs.projectDir, this.dirs.homeDir].filter((d): d is string => !!d);
+    for (const item of roots.flatMap((d) => scanImportedFolder(tool, d))) {
       if (!isSelectableKind(item.kind) || !(TOOL_KINDS as readonly string[]).includes(item.kind)) continue;
-      const draft = readSource({ kind: item.kind, location: selectionKey(item) }, this.dirs, tool, false);
+      const draft = readSource(
+        { kind: item.kind, location: selectionKey({ location: item.path, name: item.name, layout: item.layout }) },
+        this.dirs,
+        tool,
+        false,
+      );
       if (draft.kind === 'rule') draft.name = path.basename(item.path);
       // o servidor e a skill do fluxo são da própria extensão
       if ((draft.kind === 'skill' && flow.has(draft.name)) || (draft.kind === 'mcp' && draft.name === RESERVED_MCP)) continue;

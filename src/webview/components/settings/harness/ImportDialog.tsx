@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Badge, Checkbox, Dialog, RadioGroup, Text, TextField } from '@radix-ui/themes';
 import { AI_BASES, type AiTool } from '../../../../shared/harness';
-import { selectableOfKind, type ArtifactKind } from '../../../../shared/artifacts';
+import { type ArtifactKind } from '../../../../shared/artifacts';
 import type { ImportCandidate, ImportSource } from '../../../../shared/artifactImport';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
@@ -25,12 +25,10 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
   const state = useBoardStore((s) => s.state)!;
   const ask = useBoardStore((s) => s.ask);
   const preview = state.artifactImport;
-  const suggestions = state.harnessSuggestions;
   const [origin, setOrigin] = useState<Origin>('folder');
   const [path, setPath] = useState('');
   const [subdir, setSubdir] = useState('');
   const [chosen, setChosen] = useState<string[]>([]);
-  const [reasons, setReasons] = useState<Record<string, string>>({});
 
   const scan = useAction(async (source: ImportSource) => {
     await harness.importScan(source);
@@ -44,18 +42,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
   // uma prévia nova começa sem nada marcado
   useEffect(() => {
     setChosen([]);
-    setReasons({});
   }, [preview]);
-
-  // a IA indicou: marca só o que é candidato desta lista e guarda a razão
-  useEffect(() => {
-    if (!suggestions || !preview) return;
-    const valid = new Set(preview.candidates.filter((c) => !c.problem).map((c) => c.key));
-    const hits = suggestions.items.filter((i) => valid.has(i.location));
-    if (!hits.length) return;
-    setChosen((cur) => [...new Set([...cur, ...hits.map((i) => i.location)])]);
-    setReasons((cur) => ({ ...cur, ...Object.fromEntries(hits.map((i) => [i.location, i.reason])) }));
-  }, [suggestions, preview]);
 
   const close = () => {
     harness.importCancel();
@@ -90,13 +77,8 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
   const showError = scan.error ?? pick.error;
   const inStep2 = !!preview && !showError;
   const installed = (tool: AiTool) => state.harness.inventory.find((i) => i.tool === tool)?.installed ?? false;
-  const toolSource = preview?.source.from === 'tool' ? preview.source.tool : null;
 
   const toggle = (c: ImportCandidate, on: boolean) => setChosen((cur) => (on ? [...cur, c.key] : cur.filter((k) => k !== c.key)));
-
-  const suggest = (kind: ArtifactKind) => {
-    if (toolSource) harness.suggest(toolSource, selectableOfKind(kind));
-  };
 
   return (
     <Dialog.Root open onOpenChange={(open) => !open && !apply.busy && close()}>
@@ -203,16 +185,6 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
               return (
                 <fieldset key={kind} className="import-group">
                   <legend>{t(ARTIFACT_LABELS[kind])}</legend>
-                  {toolSource && (
-                    <ActionButton
-                      size="1"
-                      variant="ghost"
-                      hint={t('A IA lê o projeto e marca o que faz mais sentido; você confirma antes de importar.')}
-                      onClick={() => suggest(kind)}
-                    >
-                      {t('Indicar artefatos')}
-                    </ActionButton>
-                  )}
                   <ul className="plain-list">
                     {group.map((c) => (
                       <li key={c.key} className={c.problem ? 'off' : ''}>
@@ -235,7 +207,6 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
                           </Badge>
                         )}
                         <span className="muted small"> {c.description || c.origin}</span>
-                        {reasons[c.key] && <span className="muted small"> · {reasons[c.key]}</span>}
                       </li>
                     ))}
                   </ul>
