@@ -299,7 +299,7 @@ linha de comando da ferramenta aceita é imposto por parâmetro:
 | Ferramenta | Imposto por parâmetro | Só orientado |
 | --- | --- | --- |
 | Claude Code | agente (inline, `--agents` + `--agent`), servidores MCP (`--strict-mcp-config`), ferramentas, modelo e esforço, contexto vazio (`--setting-sources ""`, `--disable-slash-commands`) | skills e rules (vão pelo caminho do arquivo) |
-| Cursor | modelo | todo o resto |
+| Cursor | modelo; servidores MCP, ferramentas e subagentes pelo hook global do board (só com o hook instalado e atual; sem ele, voltam a orientação) | agente, skills e rules |
 | Kimi Code | modelo (`-m`), servidor do board (materializado no `.kimi-code/mcp.json`) | todo o resto (não há `--agents`, `--allowedTools` nem `--mcp-config`; em `-p` a permissão é sempre "auto") |
 
 ### Pendências

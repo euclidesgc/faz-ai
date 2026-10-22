@@ -1,5 +1,5 @@
 import { collectClaudeEnvironment } from '../ai/environmentEvidence';
-import { defaultManifestDir } from '../ai/cursorHookMain';
+import { defaultManifestDir } from '../ai/cursorManifest';
 import { cursorHookStatus } from '../mcp/cursorHooks';
 import { PROFILE_CAPABILITIES, activeProfile, profileIsolation, profileLabel, type AiProfile } from '../../shared/aiProfiles';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';

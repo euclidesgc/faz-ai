@@ -51,4 +51,14 @@ describe('decide', () => {
     expect(denied(decide({ hook_event_name: 'preToolUse', tool_name: 'Shell' }, open))).toBe(true);
     expect(denied(decide({ hook_event_name: 'preToolUse', tool_name: 'Task', tool_input: { subagent_type: 'x' } }, open))).toBe(true);
   });
+  it('chamada MCP no preToolUse não confere `tools` (o servidor é conferido no beforeMCPExecution)', () => {
+    const restrito: CursorManifest = { ...m, tools: ['Read', 'Grep', 'Task', 'Shell'], deniedTools: ['Write'] };
+    expect(decide({ hook_event_name: 'preToolUse', tool_name: 'MCP:get_card' }, restrito).permission).toBe('allow');
+    expect(decide({ hook_event_name: 'beforeMCPExecution', mcp_server_name: 'faz-ai' }, restrito).permission).toBe('allow');
+    expect(denied(decide({ hook_event_name: 'preToolUse', tool_name: 'Delete' }, restrito))).toBe(true);
+  });
+  it('skill do snapshot em run-artifacts é liberada, mesmo fora de `skills`', () => {
+    const f = '/dados/run-artifacts/x/y/skills/sempre/SKILL.md';
+    expect(decide({ hook_event_name: 'beforeReadFile', file_path: f }, m).permission).toBe('allow');
+  });
 });

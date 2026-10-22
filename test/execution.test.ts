@@ -265,6 +265,15 @@ describe('manifesto e plano pelo alvo da execução', () => {
     expect(plan.summary.some((l) => l.startsWith('Modelo: composer-2.5') && l.endsWith('(imposto pela CLI)'))).toBe(true);
   });
 
+  it('Cursor sem hook pronto volta a orientação para MCP e ferramentas', () => {
+    const { s, c } = cenario('cursor:composer-2.5');
+    const sem = executionPlan(s, c, {}, { command: 'node', args: [] }, undefined, false);
+    expect(sem.summary).toContain('Servidores MCP: faz-ai (pelo pedido)');
+    expect(sem.advice.join(' ')).toContain('De servidores MCP, use só o do board');
+    const com = executionPlan(s, c, {}, { command: 'node', args: [] }, undefined, true);
+    expect(com.summary).toContain('Servidores MCP: faz-ai (imposto pela CLI)');
+  });
+
   it('um board com um perfil só sai como hoje: padrão Claude, MCP imposto e arquivo de configuração', () => {
     const { s, c } = cenario('claude:sonnet', ['claude']);
     const plan = executionPlan(s, c, {}, { command: 'node', args: [] });

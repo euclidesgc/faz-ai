@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { manifestPath, writeManifest, type CursorManifest } from '../src/extension/ai/cursorManifest';
+import { cursorToolNames, manifestPath, writeManifest, type CursorManifest } from '../src/extension/ai/cursorManifest';
 
 const make = (runId: string): CursorManifest => ({
   runId,
@@ -52,5 +52,17 @@ describe('manifesto do Cursor', () => {
   it('não deixa arquivos temporários', () => {
     writeManifest(dir, ws, make('a'))();
     expect(fs.readdirSync(dir)).toEqual([]);
+  });
+});
+
+describe('cursorToolNames', () => {
+  it('traduz os nomes do Claude Code para os do Cursor', () => {
+    expect(cursorToolNames(['Bash', 'Read', 'Agent', 'Edit', 'Write'])).toEqual({
+      names: ['Shell', 'Read', 'Task', 'Write'],
+      complete: true,
+    });
+  });
+  it('marca como incompleta a lista com ferramenta sem equivalente', () => {
+    expect(cursorToolNames(['Read', 'Glob'])).toEqual({ names: ['Read'], complete: false });
   });
 });

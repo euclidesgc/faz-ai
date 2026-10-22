@@ -4,7 +4,7 @@ import { redactCredentialValues } from '../credentials';
 import { authFailed } from './profileAuth';
 import { profileInstallUrl } from '../requirements';
 import { profileBase, type AiProfile } from '../../shared/aiProfiles';
-import type { CursorManifest } from './cursorManifest';
+import { cursorToolNames, type CursorManifest } from './cursorManifest';
 // A única porta por onde o board chama uma ferramenta de IA. Toda execução — de um card (a pessoa, o
 // heartbeat ou o autopiloto) ou do chat — passa por `AiGateway.run`, e é aqui que o log de uso é
 // escrito: abre a linha (`start`), grava a configuração (`describe`), fecha o desfecho (`finish`) e
@@ -196,18 +196,27 @@ export class AiGateway {
       return undefined;
     }
     const m = conference.manifest;
+    const allowed = cursorToolNames(m.tools);
+    // sem equivalente no Cursor para alguma ferramenta: só as negadas valem, `tools` fica como orientação
+    if (!allowed.complete)
+      log('Garantia do Cursor parcial: há ferramentas do card sem equivalente no Cursor; a lista de ferramentas segue como orientação.');
     return {
       dir: this.deps.cursorHook.dir,
       manifest: {
         runId,
         mcpServers: [conference.boardServer, ...m.mcpServers],
-        subagents: m.agent ? [m.agent] : [],
-        tools: m.tools,
-        deniedTools: m.deniedTools,
+        subagents: [],
+        tools: allowed.complete ? allowed.names : [],
+        deniedTools: cursorToolNames(m.deniedTools).names,
         skills: m.skills,
         createdAt: new Date().toISOString(),
       },
     };
+  }
+
+  /** O hook do Cursor está instalado e atual: só então MCP e ferramentas são impostos no Cursor. */
+  cursorHookReady(): boolean {
+    return !!this.deps.cursorHook && this.deps.cursorHook.status() === null;
   }
 
   get supportsSnapshots(): boolean {

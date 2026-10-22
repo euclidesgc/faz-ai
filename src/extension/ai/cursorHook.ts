@@ -58,6 +58,8 @@ export function decide(input: unknown, manifest: CursorManifest | null): HookVer
     }
     if (event === 'preToolUse') {
       const tool = str(input.tool_name);
+      // chamadas MCP também passam por aqui (`MCP:<ferramenta>`); o servidor é conferido no beforeMCPExecution
+      if (tool && /^mcp[:_]/i.test(tool)) return ALLOW;
       // `tools` vazio: o card não restringe as ferramentas (só as negadas e o Task valem)
       if (tool && list(manifest.deniedTools).includes(tool)) return deny(`a ferramenta "${tool}" está negada pelo card.`);
       if (!tool || (allowedTools.length && !allowedTools.includes(tool)))
@@ -71,6 +73,8 @@ export function decide(input: unknown, manifest: CursorManifest | null): HookVer
     }
     if (event === 'beforeReadFile') {
       const file = str(input.file_path);
+      // o snapshot do pedido (skills "Sempre" e as do card) fica em run-artifacts e já foi filtrado pelo board
+      if (file && /[\\/]run-artifacts[\\/]/.test(file)) return ALLOW;
       const skill = file ? skillOfPath(file) : undefined;
       if (skill && !list(manifest.skills).includes(skill)) return deny(`a skill "${skill}" não foi escolhida no card.`);
       return ALLOW;

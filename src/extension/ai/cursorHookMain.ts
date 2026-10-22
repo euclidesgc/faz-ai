@@ -1,12 +1,8 @@
 // Script `dist/cursor-hook.js`, chamado pelo Cursor a cada evento: lê o evento do stdin, acha o
 // manifesto da pasta de trabalho e responde allow/deny no stdout. Qualquer falha libera.
 import * as fs from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
 import { decide } from './cursorHook';
-import { MANIFEST_DIR_ENV, manifestPath, type CursorManifest } from './cursorManifest';
-
-export const defaultManifestDir = (home = os.homedir()): string => path.join(home, '.faz-ai', 'cursor-manifests');
+import { MANIFEST_DIR_ENV, defaultManifestDir, manifestPath, type CursorManifest } from './cursorManifest';
 
 export function loadManifest(input: unknown, dir: string): CursorManifest | null {
   try {

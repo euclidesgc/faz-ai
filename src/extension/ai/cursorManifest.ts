@@ -3,6 +3,7 @@
 // não está nele. O board grava antes de iniciar a CLI e apaga no fim, também em falha ou cancelamento.
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 export interface CursorManifest {
@@ -22,6 +23,27 @@ export interface CursorManifest {
 
 /** Variável de ambiente que leva o diretório dos manifestos ao hook. */
 export const MANIFEST_DIR_ENV = 'FAZ_AI_MANIFEST_DIR';
+
+export const defaultManifestDir = (home = os.homedir()): string => path.join(home, '.faz-ai', 'cursor-manifests');
+
+// Nomes do Claude Code (os do manifesto do card) → `tool_name` do preToolUse do Cursor (Shell, Read, Write, Grep, Delete, Task).
+const CURSOR_TOOL: Record<string, string> = {
+  Bash: 'Shell',
+  Read: 'Read',
+  Write: 'Write',
+  Edit: 'Write',
+  MultiEdit: 'Write',
+  NotebookEdit: 'Write',
+  Grep: 'Grep',
+  Agent: 'Task',
+  Task: 'Task',
+};
+
+/** Traduz os nomes de ferramentas do card para o Cursor; `complete` é falso se algum não tem equivalente. */
+export function cursorToolNames(names: string[]): { names: string[]; complete: boolean } {
+  const out = names.flatMap((n) => (CURSOR_TOOL[n] ? [CURSOR_TOOL[n]] : []));
+  return { names: [...new Set(out)], complete: out.length === names.length };
+}
 
 function realOrSelf(p: string): string {
   try {
