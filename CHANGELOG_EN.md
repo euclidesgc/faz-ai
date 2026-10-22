@@ -2,10 +2,6 @@
 
 # Changelog
 
-What changed in each version of Faz AI Kanban, newest first. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the numbering [Semantic Versioning](https://semver.org/). The interface exists in Portuguese and English; names of screens and buttons appear here as they are in the Portuguese interface.
-
-The top section is the next version (the one in `package.json`) and includes only changes already integrated into `develop`. Work exclusive to other branches stays out of these notes.
-
 ## 0.47.0
 
 ### Added

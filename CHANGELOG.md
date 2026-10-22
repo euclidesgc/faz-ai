@@ -2,10 +2,6 @@
 
 # Changelog
 
-As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antiga. O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), e a numeração o [Versionamento Semântico](https://semver.org/lang/pt-BR/).
-
-A seção do topo é a próxima versão (a mesma do `package.json`) e reúne apenas mudanças já integradas na `develop`. Trabalho exclusivo de outras branches fica fora destas notas.
-
 ## 0.47.0
 
 ### Adicionado
