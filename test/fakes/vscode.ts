@@ -166,7 +166,12 @@ export class FakePanel {
   iconPath: unknown;
   constructor(public title: string) {}
   private onDispose: (() => void) | undefined;
+  visible = true;
   reveal(): void {}
+  /** o painel saiu ou voltou à vista (aba trocada); o teste não simula, só registra */
+  onDidChangeViewState() {
+    return disposable;
+  }
   onDidDispose(fn: () => void) {
     this.onDispose = fn;
     return disposable;
