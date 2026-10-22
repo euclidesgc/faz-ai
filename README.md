@@ -56,6 +56,8 @@ cada fase e move os cards conforme avança, sempre parando para a sua aprovaçã
 - **Status e "com você".** Todo card diz se a pendência está com a IA ou com você; o contador
   **N com você** e o filtro **Com você** mostram o que espera por você. Perguntas com alternativas
   chegam como um carrossel no card. [Fluxo da história](docs/fluxo.md)
+- **Busca por card.** Na busca do board, `#980` mostra só o card 980, e `980` mostra o card 980 e os
+  cards que o citam, em histórias e sub-tarefas. [Fluxo da história](docs/fluxo.md)
 - **Sessões curtas, contexto controlado.** Cada execução abre o card pelo MCP, faz aquele trabalho e
   para; começa sem regras, skills, agentes ou hooks que você não tenha marcado, e lê os documentos
   anexados só quando precisa. [Harness](docs/harness.md)
