@@ -1451,10 +1451,10 @@ npm test
 npm run typecheck
 ```
 
-Novas funcionalidades são integradas na `develop`. A seção **Não lançado** do changelog reúne
-apenas mudanças que já chegaram a essa branch; itens ainda em desenvolvimento ficam nas suas
-branches e nos cards. Na release, essa seção recebe a versão publicada e descreve o código que
-a release contém. Integrar na `develop` não publica a extensão.
+Novas funcionalidades são integradas na `develop`. O changelog segue o Keep a Changelog, com uma seção
+por versão e os títulos **Adicionado**, **Alterado**, **Removido** e **Corrigido**; a seção do topo é a próxima versão (a mesma do
+`package.json`) e reúne apenas mudanças que já chegaram à `develop`. Itens ainda em desenvolvimento
+ficam nas suas branches e nos cards. Integrar na `develop` não publica a extensão.
 
 O `npm test` também roda o lint e confere a formatação; `npm run format` formata tudo. Para o
 `git blame` pular o commit que só formatou o código: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
@@ -1536,9 +1536,10 @@ por exemplo), eles precisam ser refeitos:
 Os três últimos só são necessários para publicar. A `main` só aceita mudanças por pull request, e o
 script já cuida disso. Com o gitflow, o release parte da branch em que você está:
 
-- na `develop`: `npm run release -- <patch|minor|major>` exige a `develop` atualizada e limpa, testa,
-  cria a branch `release/vX.Y.Z` e nela ajusta a versão e os CHANGELOGs ("Não lançado" vira a
-  versão), faz o commit e empacota;
+- na `develop`: `npm run release -- X.Y.Z` (a versão do `package.json`, que é a do topo do
+  changelog) exige a `develop` atualizada e limpa, testa, cria a branch `release/vX.Y.Z`, faz o
+  commit e empacota; `patch|minor|major` ainda funcionam e renomeiam uma seção "Não lançado", se
+  houver;
 - numa `hotfix/...`: o commit da versão vai na própria branch da correção, e o PR dela, se já
   estiver aberto, é reaproveitado;
 - em qualquer outra branch, o script recusa e diz de onde rodar (a opção `--allow-branch` deixou de
@@ -1561,11 +1562,11 @@ Entre empacotar e publicar, o release abre o `.vsix` e confere os quatro arquivo
 (`README.md`, `README_EN.md`, `CHANGELOG.md`, `CHANGELOG_EN.md`): o changelog precisa ter o título
 da versão que está saindo no topo, sem nenhum "Não lançado"/"Unreleased" sobrando em lugar nenhum, e
 o README precisa ter os blocos de aviso de fase alpha e de agradecimento. Falhando qualquer coisa, o
-release recusa antes de publicar em qualquer loja. O renomear de "Não lançado" para a versão
-acontece em todos os modos, inclusive no `--dry-run`; quando o release não chega a commitar (dry-run
-ou `--no-git`), os CHANGELOGs renomeados são restaurados ao original ao final. Sem nenhuma seção
-"Não lançado"/"Unreleased" para renomear, use `--allow-no-notes` — só é exigida quando faltar essa
-seção **e** a primeira seção do CHANGELOG não for a versão que está saindo.
+release recusa antes de publicar em qualquer loja. Se ainda existir uma seção "Não lançado", o
+release a renomeia para a versão em todos os modos, inclusive no `--dry-run`; quando o release não
+chega a commitar (dry-run ou `--no-git`), os CHANGELOGs renomeados são restaurados ao original ao
+final. `--allow-no-notes` só é exigida quando não há essa seção **e** a primeira seção do CHANGELOG
+não for a versão que está saindo.
 
 Dois cuidados:
 

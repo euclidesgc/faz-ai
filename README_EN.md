@@ -1508,10 +1508,10 @@ npm run typecheck
 
 `npm run test:cli-real` separately checks the provider contract with **installed Claude Code**, using temporary project/configuration directories and local test API and MCP servers. It requires no login and calls no remote model; the API controls responses so forbidden attempts do not depend on model behavior. Positive controls load project, user, ancestor and additional-directory sentinels, plus a skill, agent, hook and external MCP; the strict path must exclude them. The test also reproduces the inherited additional-memory regression. A missing CLI or Windows platform fails explicitly. The seven tests use the real gateway and measured transport with disposable on-disk SQLite; they also check cancellation, forced termination, failure before release, no retry and private file cleanup. They do not enable a production profile: managed policies, the real authentication/API environment, Cursor/Kimi and accepted-task consumption still need validation.
 
-New features are integrated into `develop`. The **Unreleased** changelog section includes only
-changes already integrated into that branch; work still in progress stays on its branches and
-cards. At release time, this section takes the published version and describes the code included
-in that release. Integrating into `develop` does not publish the extension.
+New features are integrated into `develop`. The changelog follows Keep a Changelog, with one
+section per version and the **Added**, **Changed**, **Removed** and **Fixed** headings; the top section is the next version (the one
+in `package.json`) and includes only changes already integrated into `develop`. Work still in
+progress stays on its branches and cards. Integrating into `develop` does not publish the extension.
 
 `npm test` also runs the linter and checks formatting; `npm run format` formats everything. To make
 `git blame` skip the formatting-only commit: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
@@ -1592,9 +1592,10 @@ machine, for example), they must be set up again:
 The last three are only needed to publish. `main` only accepts changes through pull requests, and
 the script already deals with that. With gitflow, the release starts from the branch you are on:
 
-- on `develop`: `npm run release -- <patch|minor|major>` requires an up-to-date, clean `develop`,
-  runs the tests, creates the `release/vX.Y.Z` branch and, on it, sets the version and the
-  CHANGELOGs ("Unreleased" becomes the version), commits and packages;
+- on `develop`: `npm run release -- X.Y.Z` (the `package.json` version, which is the changelog's
+  top section) requires an up-to-date, clean `develop`, runs the tests, creates the
+  `release/vX.Y.Z` branch, commits and packages; `patch|minor|major` still work and rename an
+  "Unreleased" section, if there is one;
 - on a `hotfix/...`: the version commit goes on the fix's own branch, and its PR, if already open,
   is reused;
 - on any other branch the script refuses and says where to run it from (the `--allow-branch`
@@ -1618,11 +1619,11 @@ Between packaging and publishing, the release opens the `.vsix` and checks the f
 (`README.md`, `README_EN.md`, `CHANGELOG.md`, `CHANGELOG_EN.md`): the changelog needs the version
 being released as its top heading, with no leftover "Não lançado"/"Unreleased" anywhere, and the
 README needs the alpha-notice and thank-you blocks. If anything fails, the release refuses before
-publishing to any store. Renaming "Não lançado"/"Unreleased" to the version happens in every mode, including
-`--dry-run`; when the release doesn't get to commit (dry-run or `--no-git`), the renamed CHANGELOGs
-are restored to their original content at the end. With no "Não lançado"/"Unreleased" section to
-rename, use `--allow-no-notes` — it's only required when that section is missing **and** the
-CHANGELOG's first section isn't the version being released.
+publishing to any store. If a "Não lançado"/"Unreleased" section still exists, the release renames it
+to the version in every mode, including `--dry-run`; when the release doesn't get to commit (dry-run
+or `--no-git`), the renamed CHANGELOGs are restored to their original content at the end.
+`--allow-no-notes` is only required when that section is missing **and** the CHANGELOG's first
+section isn't the version being released.
 
 Two things to watch for:
 

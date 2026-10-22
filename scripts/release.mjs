@@ -3,6 +3,10 @@
 //
 //   npm run release -- <patch|minor|major|x.y.z|current|finish> [opções]
 //
+// Fluxo normal: a develop já tem no package.json a versão que está no topo do changelog, então o
+// release roda com essa versão explícita (ex.: `npm run release -- 0.47.0`); nada é renomeado nem
+// subido. `patch|minor|major` seguem valendo para quem mantém uma seção "Não lançado".
+//
 // Gitflow: a main só aceita mudanças por pull request e a develop recebe o trabalho. O release
 // roda na develop (versão nova) ou numa branch hotfix/... (correção); outra branch é recusada
 // (só o --dry-run vale em qualquer branch). Nada é empurrado direto para a main:
@@ -370,7 +374,9 @@ run('npm test');
 // Versão, CHANGELOGs e commit, na branch de release (a main nunca recebe push direto)
 const releaseBranch = source === 'hotfix' ? branch : `${BRANCHES.release}${tag}`;
 if (viaPullRequest && source === 'develop') run(`git switch -c ${releaseBranch}`);
-if (bump !== 'current') run(`npm version ${next} --no-git-tag-version`, { stdio: 'pipe' });
+// A develop já traz a versão no package.json quando a seção do topo do changelog é a versão que
+// está saindo (`npm run release -- x.y.z` com a versão atual): o npm recusaria "subir" para a mesma.
+if (next !== previous) run(`npm version ${next} --no-git-tag-version`, { stdio: 'pipe' });
 
 if (viaPullRequest) run('git add package.json package-lock.json');
 prepareChangelogs(next, viaPullRequest);
@@ -398,7 +404,7 @@ await checkPackage(vsix, next);
 
 if (dryRun) {
   console.log(`\n✔ Dry-run concluído: ${vsix} gerado. Nada foi publicado.`);
-  if (bump !== 'current') console.log('  (package.json foi alterado; descarte com: git checkout package.json package-lock.json)');
+  if (next !== previous) console.log('  (package.json foi alterado; descarte com: git checkout package.json package-lock.json)');
   process.exit(0);
 }
 

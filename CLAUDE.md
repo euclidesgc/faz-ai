@@ -46,11 +46,14 @@ Não rode `npm test` nem `vitest run` sem filtro fora do release, nem em subagen
   (`src/shared/phaseDefaults.ts`).
 - O que a IA lê é produto: a skill do fluxo (`src/extension/flowSkill.ts`), as instruções do servidor
   MCP, as notas do `get_card` e os pedidos do runner mudam junto com o comportamento e têm teste.
-- Toda mudança visível entra em `CHANGELOG.md` e `CHANGELOG_EN.md`, na seção "Não lançado" /
-  "Unreleased", e na seção certa de `README.md` e `README_EN.md` (e de `docs/mcp.md` quando muda o
-  MCP). Na `develop`, essa seção contém apenas entregas já integradas, sem itens previstos ou
-  exclusivos de outras branches. O `npm run release` transforma "Não lançado" na versão, com as
-  notas das mudanças presentes na branch da release.
+- Toda mudança visível entra em `CHANGELOG.md` e `CHANGELOG_EN.md`, na seção da próxima versão
+  (a mesma do `package.json`), e na seção certa de `README.md` e `README_EN.md` (e de `docs/mcp.md`
+  quando muda o MCP). O changelog segue o Keep a Changelog: uma seção por versão, com as subseções
+  "Adicionado", "Alterado", "Removido" e "Corrigido" ("Added" / "Changed" / "Removed" / "Fixed"),
+  um item por mudança, com o título em negrito e o número da história. Não existe seção "Não lançado": a `develop` sobe a
+  versão do `package.json` na primeira entrega da versão seguinte, e a seção do topo contém apenas
+  entregas já integradas, sem itens previstos ou exclusivos de outras branches. O
+  release roda com essa versão explícita: `npm run release -- <versão do topo>`.
 - Integração com uma ferramenta de IA (Claude Code, Cursor): leia a documentação oficial atual antes
   de mexer em caminhos, formatos de arquivo ou flags da CLI.
 
