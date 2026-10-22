@@ -46,6 +46,10 @@ export const environment: Record<string, string> = {
   uv: 'uv',
   'Repositório Git nesta pasta': 'Git repository in this folder',
   'Nome da branch principal/develop': 'Main/develop branch name',
+  'Cópia antiga da skill do fluxo': 'Old copy of the flow skill',
+  'Versões anteriores instalaram a skill faz-ai-fluxo nas pastas das ferramentas. O fluxo agora vem do board, e a cópia só confunde as sessões que não são do board. O board não apaga o arquivo: apague os listados abaixo se não precisar deles.':
+    'Earlier versions installed the faz-ai-fluxo skill in the tool folders. The flow now comes from the board, and the copy only confuses sessions that are not from the board. The board does not delete the file: delete the ones listed below if you do not need them.',
+  'Arquivos para apagar:': 'Files to delete:',
   'O nome novo já está nas configurações, mas o repositório ainda usa o antigo. Renomear ou Desfazer na tela Git acerta o clone, o upstream e o origin; o comando abaixo é só o do clone local.':
     'The new name is already in the settings, but the repository still uses the old one. Rename or Undo on the Git screen fixes the clone, the upstream and the origin; the command below is only the local clone one.',
   'Abrir a tela Git': 'Open the Git screen',
