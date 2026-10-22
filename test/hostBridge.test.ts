@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { openInMemory } from '../src/extension/db/database';
+import { openFile, openInMemory } from '../src/extension/db/database';
+import { CommentRepo } from '../src/extension/repositories/commentRepo';
 import { PrefsStore } from '../src/extension/prefs';
 import { EMPTY_PREFS } from '../src/shared/prefs';
 import { HostBridge, exportNotice, importNotice, type HostEnv } from '../src/extension/host/hostBridge';
@@ -19,7 +20,11 @@ let saves: number;
 let rawDb: Awaited<ReturnType<typeof openInMemory>>;
 let dir: string;
 
-afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+afterEach(() => {
+  // o envio agendado de um teste não pode cair no `sent` do seguinte
+  bridge.dispose();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
 
 beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-bridge-'));
@@ -608,5 +613,146 @@ it('a assistência indisponível responde com erro próprio para destravar o edi
     type: 'harness.agent.assistResult',
     requestId: 'agent-error',
     error: 'A assistência de IA não está disponível neste board.',
+  });
+});
+
+/** Um card novo no workflow de histórias, pelo roteador (sem passar pela ponte). */
+function newCard(title: string): string {
+  const s = router.snapshot();
+  const wf = s.workflows.find((w) => w.kind === 'parent')!;
+  return router.createCard({
+    typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+    columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+    parentId: null,
+    title,
+  });
+}
+
+describe('MessageRouter: cache do snapshot (#1066)', () => {
+  it('devolve o mesmo objeto até a próxima mudança, e um novo depois dela', () => {
+    const a = router.snapshot();
+    expect(router.snapshot()).toBe(a);
+    const id = newCard('Nova');
+    const b = router.snapshot();
+    expect(b).not.toBe(a);
+    expect(b.cards.some((c) => c.id === id)).toBe(true);
+    expect(router.snapshot()).toBe(b);
+  });
+
+  it('um ouvinte da mudança que pede o snapshot recebe o estado já gravado, sem montar de novo', () => {
+    const seen: ReturnType<typeof router.snapshot>[] = [];
+    router.onDidChange(() => seen.push(router.snapshot()));
+    newCard('Vista pelo ouvinte');
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toBe(router.snapshot());
+  });
+
+  it('a prévia do contrato de contexto não altera o snapshot compartilhado', () => {
+    const before = router.snapshot();
+    const draft = router.contextDraftState();
+    expect(draft).not.toBe(before);
+    expect(router.snapshot()).toBe(before);
+    expect(before.harness.library).toBe(router.snapshot().harness.library);
+    expect(draft.harness.library?.artifacts.every((a) => a.path === '')).toBe(true);
+  });
+});
+
+describe('MessageRouter: cache do snapshot num banco em arquivo (#1066)', () => {
+  it('o save (que reabre a conexão e zera o total_changes) não deixa o cache valer por engano', async () => {
+    const file = path.join(dir, 'board.db');
+    const handle = await openFile(file, path.resolve(__dirname, '../node_modules/sql.js/dist'));
+    try {
+      const r = new MessageRouter(handle, { workspaceKey: 'arq', folderName: 'P', author: 'Pessoa', attachmentsDir: path.join(dir, 'a') });
+      const s = r.snapshot();
+      const wf = s.workflows.find((w) => w.kind === 'parent')!;
+      const id = r.createCard({
+        typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+        columnId: s.columns.find((c) => c.workflowId === wf.id)!.id,
+        parentId: null,
+        title: 'Em arquivo',
+      });
+      // uma gravação depois do card: o cache fica montado com total_changes = N
+      new CommentRepo(handle.db).add(id, 'Faz AI', 'um', 'ai');
+      expect(r.snapshot().comments).toHaveLength(1);
+      await handle.flush(); // reabre a conexão: total_changes volta a 0
+      // N gravações novas levam o contador de volta ao mesmo N: só a geração do export distingue
+      expect(r.snapshot().comments).toHaveLength(1);
+      new CommentRepo(handle.db).add(id, 'Faz AI', 'dois', 'ai');
+      expect(r.snapshot().comments).toHaveLength(2);
+    } finally {
+      await handle.close();
+    }
+  });
+});
+
+describe('HostBridge: envios coalescidos e recortados (#1066)', () => {
+  const states = () => sent.filter((m) => m.type === 'boardState') as Extract<HostToWebview, { type: 'boardState' }>[];
+
+  it('mudanças por outra origem vão num envio só, depois do intervalo', async () => {
+    vi.useFakeTimers();
+    try {
+      newCard('Um');
+      newCard('Dois');
+      expect(states()).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(60);
+      expect(states()).toHaveLength(1);
+      expect(states()[0]!.state.cards.map((c) => c.title)).toEqual(expect.arrayContaining(['Um', 'Dois']));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uma ação da própria interface não espera: o estado novo vai antes do done, e o pendente antes de uma leitura', async () => {
+    vi.useFakeTimers();
+    try {
+      newCard('Pendente');
+      expect(states()).toHaveLength(0);
+      await bridge.handle({ type: 'card.usage.query', requestId: 'u1', cardId: 'nada' });
+      expect(sent.map((m) => m.type)).toEqual(['boardState', 'card.usage.result']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('escondida, a interface não recebe estado; ao voltar recebe o acumulado de uma vez', async () => {
+    vi.useFakeTimers();
+    try {
+      bridge.setVisible(false);
+      newCard('No escuro');
+      newCard('Ainda no escuro');
+      await vi.advanceTimersByTimeAsync(100);
+      expect(states()).toHaveLength(0);
+      bridge.setVisible(true);
+      expect(states()).toHaveLength(1);
+      bridge.setVisible(true);
+      expect(states()).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('o recorte: a lixeira só chega na tela da lixeira, a conversa só do card aberto, e as contagens cobrem tudo', async () => {
+    const vivo = newCard('Vivo');
+    const apagado = newCard('Apagado');
+    router.handle({ type: 'comment.add', cardId: vivo, body: 'oi' });
+    router.handle({ type: 'comment.add', cardId: apagado, body: 'tchau' });
+    router.handle({ type: 'card.trash', cardId: apagado });
+    await bridge.handle({ type: 'ready' });
+    let last = states().at(-1)!.state;
+    expect(last.cards.map((c) => c.id)).toContain(vivo);
+    expect(last.cards.map((c) => c.id)).not.toContain(apagado);
+    expect(last.comments).toEqual([]);
+    expect(last.commentCounts).toMatchObject({ [vivo]: 1, [apagado]: 1 });
+    expect(last.cardCounts).toEqual({ trash: 1, archived: 0 });
+
+    await bridge.handle({ type: 'ui.scope.set', view: 'trash', openCardId: apagado });
+    last = states().at(-1)!.state;
+    expect(last.cards.map((c) => c.id)).toContain(apagado);
+    expect(last.comments.map((c) => c.body)).toEqual(['tchau']);
+
+    // o mesmo recorte de novo não reenvia nada
+    const n = states().length;
+    await bridge.handle({ type: 'ui.scope.set', view: 'trash', openCardId: apagado });
+    expect(states()).toHaveLength(n);
   });
 });

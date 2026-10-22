@@ -53,6 +53,8 @@ export class BoardPanel {
       pending = undefined;
     });
     panel.webview.html = webviewHtml(context, panel.webview, 'board');
+    // o painel escondido atrás de outra aba não recebe estado; recebe o acumulado ao voltar
+    panel.onDidChangeViewState((e) => this.bridge.setVisible(e.webviewPanel.visible));
     panel.onDidDispose(() => {
       BoardPanel.current = undefined;
       this.bridge.dispose();

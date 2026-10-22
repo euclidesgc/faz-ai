@@ -3,6 +3,7 @@ import { useAppearance } from './appearance';
 import { t, tn } from './i18n';
 import { rich } from './i18n/rich';
 import { humanQueue, pendingWork } from '../shared/pending';
+import { trashCountOf } from '../shared/webviewState';
 import { useBoardStore, useHostSync } from './store/boardStore';
 import { ui, attachments } from './commands';
 import { AttachmentModal } from './components/attachment/AttachmentModal';
@@ -95,7 +96,7 @@ export function App() {
     ) : (
       <BoardPlaceholder />
     );
-  const trashCount = state.cards.filter((c) => c.deletedAt !== null).length;
+  const trashCount = trashCountOf(state);
   const pendingOrphans = state.orphans.items.filter((i) => i.verdict === 'decision').length;
   const withYou = humanQueue(state, pendingWork(state)).length;
   const onlyMine = filters.owner === 'human';

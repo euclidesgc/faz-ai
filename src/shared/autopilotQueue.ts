@@ -49,8 +49,14 @@ export function autopilotQueue(s: BoardState): Card[] {
  * entram as que estão esperando: a história em execução (nela ou numa sub-tarefa) e a que está com a
  * pessoa (bloqueada, aguardando resposta ou revisão) não têm posição.
  */
+const positionsCache = new WeakMap<BoardState, Map<Id, number>>();
+
 export function queuePositions(s: BoardState): Map<Id, number> {
+  // cada card do board pergunta a própria posição a cada redesenho: a fila é calculada uma vez por estado
+  const cached = positionsCache.get(s);
+  if (cached) return cached;
   const out = new Map<Id, number>();
+  positionsCache.set(s, out);
   for (const story of autopilotQueue(s)) {
     if (isAiWorking(s, story) || childrenOf(s, story.id).some((c) => isLive(c) && isAiWorking(s, c))) continue;
     if (isWithHuman(story)) continue;

@@ -9,6 +9,14 @@ import type { AiTool } from '../../shared/harness';
 import type { ViewStateStore } from '../viewState';
 import type { PrefsStore } from '../prefs';
 import type { MessageRouter } from '../panel/messageRouter';
+import { DEFAULT_SCOPE, projectForWebview, sameScope, type WebviewScope } from '../../shared/webviewState';
+
+/**
+ * Quanto tempo as mudanças do board se acumulam antes de um envio à interface (#1066). Uma execução da IA
+ * grava várias mudanças seguidas (comentário, status, coluna) e cada uma avisava a interface com o estado
+ * inteiro; agora vão juntas. Uma ação da própria interface não espera: o `done` dela força o envio antes.
+ */
+export const POST_COALESCE_MS = 50;
 
 /** Mensagens que já respondem com o próprio `requestId` (payload de leitura ou resultado de gravação): não ganham `done`. */
 const SELF_ANSWERING = new Set<WebviewToHost['type']>([
@@ -94,6 +102,13 @@ export function importNotice(r: ImportResult): string {
  */
 export class HostBridge {
   private subs: (() => void)[] = [];
+  /** a tela e o card aberto desta interface, que decidem o recorte do estado enviado */
+  private scope: WebviewScope = DEFAULT_SCOPE;
+  /** há mudança do board ainda não enviada */
+  private dirty = false;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  /** interface escondida (aba ou painel fora de vista): as mudanças esperam ela voltar */
+  private visible = true;
 
   constructor(
     private send: (msg: HostToWebview) => void,
@@ -103,36 +118,78 @@ export class HostBridge {
     private env: HostEnv,
     private onReady?: () => void,
   ) {
-    this.subs.push(router.onDidChange(() => this.postBoard()));
+    this.subs.push(router.onDidChange(() => this.scheduleBoard()));
     this.subs.push(router.onDidError((message) => this.post({ type: 'error', message })));
     this.subs.push(viewState.onDidChange((view, origin) => origin !== this && this.post({ type: 'viewState', view })));
     this.subs.push(prefs.onDidChange((prefs, origin) => origin !== this && this.post({ type: 'prefs', prefs })));
   }
 
   post(msg: HostToWebview): void {
+    // o estado que mudou vai antes de qualquer outra mensagem: um aviso ou resultado nunca chega com a tela atrasada
+    if (msg.type !== 'boardState') this.flushBoard();
     this.send(msg);
   }
 
   dispose(): void {
     this.subs.forEach((off) => off());
-  }
-
-  private postBoard(): void {
-    this.post({ type: 'boardState', state: this.router.snapshot(), attachmentsBaseUri: this.env.attachmentsBaseUri() });
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
   }
 
   /**
-   * Trata a mensagem e, se ela veio com `requestId`, confirma com `done` ao terminar (depois do `boardState`, que
-   * o roteador já reenviou de forma síncrona). Uma exceção vira o toast de erro e um `done` com `ok: false`.
-   * As leituras que têm resposta própria correlacionada (`*.readResult`, `metrics.result`...) não recebem `done`.
+   * A interface entrou ou saiu de vista. Escondida, não recebe estado (o editor guarda o webview, mas ninguém
+   * olha); ao voltar, recebe o que mudou enquanto isso, de uma vez.
+   */
+  setVisible(visible: boolean): void {
+    if (this.visible === visible) return;
+    this.visible = visible;
+    if (visible && this.dirty) this.flushBoard();
+  }
+
+  /** Marca que o board mudou e agenda um envio; mudanças seguidas vão num envio só. */
+  private scheduleBoard(): void {
+    this.dirty = true;
+    if (this.timer || !this.visible) return;
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      if (this.dirty) this.flushBoard();
+    }, POST_COALESCE_MS);
+  }
+
+  /** Envia o estado agora, se há mudança pendente e a interface está à vista. */
+  private flushBoard(): void {
+    if (!this.dirty || !this.visible) return;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.postBoard();
+  }
+
+  private postBoard(): void {
+    this.dirty = false;
+    this.post({
+      type: 'boardState',
+      state: projectForWebview(this.router.snapshot(), this.scope),
+      attachmentsBaseUri: this.env.attachmentsBaseUri(),
+    });
+  }
+
+  /**
+   * Trata a mensagem e, se ela veio com `requestId`, confirma com `done` ao terminar, depois do `boardState`: a
+   * mudança que a mensagem provocou fica agendada (`scheduleBoard`) e é enviada aqui, antes da confirmação, para
+   * a interface já ter o estado novo quando a ação resolve. Uma exceção vira o toast de erro e um `done` com
+   * `ok: false`. As leituras que têm resposta própria correlacionada (`*.readResult`, `metrics.result`...) não recebem `done`.
    */
   async handle(msg: Tracked): Promise<void> {
     const requestId = SELF_ANSWERING.has(msg.type) ? undefined : msg.requestId;
+    // o que mudou por outra origem (a IA, outra janela) e ainda esperava o intervalo vai antes da resposta
+    this.flushBoard();
     try {
       await this.dispatch(msg);
+      this.flushBoard();
       if (requestId) this.post({ type: 'done', requestId, ok: true });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      this.flushBoard();
       this.post({ type: 'error', message });
       if (requestId) this.post({ type: 'done', requestId, ok: false, error: message });
     }
@@ -146,6 +203,15 @@ export class HostBridge {
         this.postBoard();
         this.onReady?.();
         return;
+      case 'ui.scope.set': {
+        const scope: WebviewScope = { view: msg.view, openCardId: msg.openCardId };
+        if (sameScope(scope, this.scope)) return;
+        this.scope = scope;
+        // a tela nova (ou o card aberto) precisa do que o recorte anterior não trazia
+        this.dirty = true;
+        this.flushBoard();
+        return;
+      }
       case 'settings.aiProfiles.probe':
         this.post(await this.router.probeAiProfiles());
         return;

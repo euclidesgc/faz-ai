@@ -58,6 +58,8 @@ export type WebviewToHost =
   | { type: 'view.set'; patch: Partial<ViewState> }
   /** preferências da pessoa (avisos dispensados...), guardadas no host para valerem entre painéis e reinícios */
   | { type: 'prefs.set'; patch: Partial<UiPrefs> }
+  /** a tela e o card aberto desta interface: o host recorta o estado que manda a ela (`projectForWebview`) */
+  | { type: 'ui.scope.set'; view: string; openCardId: Id | null }
   | { type: 'ui.showFilters' }
   /** instala o servidor MCP do board no global de uma ferramenta (padrão: a do projeto); nada entra no projeto */
   | { type: 'ui.connectAI'; tool?: AiTool }

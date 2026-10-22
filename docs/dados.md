@@ -72,6 +72,11 @@ O board não depende da janela do editor:
 - **Abrir no navegador** (no topo do board, ou o comando **Faz AI: Abrir board no navegador**)
   abre o mesmo board numa aba do navegador. O editor continua aberto e é ele que guarda o board;
   as duas telas ficam sincronizadas.
+- **O que cada tela recebe**: o estado do board é montado uma vez por mudança e cada tela (o painel
+  do editor, a barra lateral, a aba do navegador) recebe só o que mostra: os cards vivos, a lixeira
+  ou os arquivados quando essas telas estão abertas, e a conversa só do card aberto. Mudanças
+  seguidas chegam juntas, e uma tela escondida só recebe ao voltar. As operações do host que passam
+  de 200 ms entram no canal de log **Faz AI** com a duração.
 - **Sem o editor**: rode `~/.faz-ai/bin/faz-ai` na pasta do projeto (ou `faz-ai <pasta>`). O
   comando serve o board no navegador, com o servidor MCP, a execução da IA e o heartbeat, e fica
   rodando até você encerrar com Ctrl+C. O atalho é criado pela extensão e usa os mesmos dados dela;
