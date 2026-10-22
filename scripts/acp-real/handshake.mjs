@@ -4,7 +4,9 @@
 // ferramenta por ACP" precisa conferir em cada CLI: `authMethods`, capacidades, `models`, `modes`,
 // `configOptions`, as permissões pedidas, o `usage` e os erros (login, cota).
 //
-// Uso: node scripts/acp-real/handshake.mjs [--prompt "texto"] [--cwd pasta] [--timeout ms] -- <comando> [args...]
+// Uso: node scripts/acp-real/handshake.mjs [--auth metodo] [--prompt "texto"] [--cwd pasta] [--timeout ms] -- <comando> [args...]
+// `--auth` chama `authenticate` com o id do método (de `authMethods`) antes do `session/new`: o agente
+// abre o login dele (navegador ou código), como a tela "Conectar ferramenta" da épica faria.
 // Permissões pedidas pelo agente são sempre negadas (o teste não escreve nem executa nada).
 import { spawn } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
@@ -13,7 +15,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
 const argv = process.argv.slice(2);
-const opt = { prompt: null, cwd: null, timeout: 120000 };
+const opt = { prompt: null, cwd: null, timeout: 120000, auth: null };
 let cmd = [];
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
@@ -22,6 +24,7 @@ for (let i = 0; i < argv.length; i++) {
     break;
   }
   if (a === '--prompt') opt.prompt = argv[++i];
+  else if (a === '--auth') opt.auth = argv[++i];
   else if (a === '--cwd') opt.cwd = argv[++i];
   else if (a === '--timeout') opt.timeout = Number(argv[++i]);
   else {
@@ -39,6 +42,7 @@ const out = {
   command: cmd.join(' '),
   cwd,
   initialize: null,
+  authenticate: null,
   session: null,
   prompt: null,
   permissions: [],
@@ -130,6 +134,7 @@ try {
     clientInfo: { name: 'faz-ai-handshake', title: 'Faz AI (teste real do ACP)', version: '0.0.0' },
   });
   out.initialize = init;
+  if (opt.auth) out.authenticate = (await request('authenticate', { methodId: opt.auth })) ?? 'ok';
   const session = await request('session/new', { cwd, mcpServers: [] });
   out.session = session;
   if (opt.prompt) {

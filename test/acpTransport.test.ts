@@ -439,6 +439,7 @@ describe('catálogo do conector ACP', () => {
   it('cada agente com o comando do registro do ACP', () => {
     expect(Object.fromEntries(ACP_AGENTS.map((a) => [a.id, [a.command, ...a.args].join(' ')]))).toEqual({
       gemini: 'gemini --acp --skip-trust',
+      'antigravity-acp': 'agy_acp_server.par',
       opencode: 'opencode acp',
       'codex-acp': 'codex-acp',
       cursor: 'cursor-agent acp',
