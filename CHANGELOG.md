@@ -6,7 +6,7 @@ As mudanças de cada versão do Faz AI Kanban, da mais recente para a mais antig
 
 A seção **Não lançado** reúne apenas mudanças integradas na `develop`, aguardando release. Cada seção versionada descreve as mudanças incluídas naquela release. Trabalho exclusivo de outras branches fica fora destas notas.
 
-## Não lançado
+## 0.47.0
 
 - **Editor de contrato de contexto volta a abrir pelo agente (#1054).** Depois da #926, nenhuma tela levava ao contrato de contexto de um agente. O editor do agente, em **Configurações → Harness**, ganha de novo o botão **Editar contrato de contexto (rascunho)**, que abre o contrato do agente existente sem copiar permissões nem skills do formato antigo. As traduções que faltavam para esse texto e para as mensagens de linha de comando do {tool} entram no inglês.
 

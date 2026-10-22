@@ -7,7 +7,7 @@ English; names of screens and buttons appear here as they are in the Portuguese 
 
 The **Unreleased** section includes only changes integrated into `develop` and awaiting release. Each versioned section describes changes included in that release. Work exclusive to other branches stays out of these notes.
 
-## Unreleased
+## 0.47.0
 
 - **Context contract editor opens from the agent again (#1054).** After #926, no screen led to an agent's context contract. The agent editor, in **Settings → Harness**, has the **Edit context contract (draft)** button back, which opens the contract of the existing agent without copying permissions or skills from the old format. The missing English translations for that text and for the {tool} command-line messages are added.
 
