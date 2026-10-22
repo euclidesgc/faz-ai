@@ -67,6 +67,8 @@ export interface AiProfileConfig {
   statusArgs?: string;
   authPatterns?: string[];
   installUrl?: string;
+  /** Id do agente no catálogo ACP (`acp/agents.ts`): com `base: 'generic'`, o perfil roda por ACP em vez de CLI one-shot. */
+  acpAgent?: string;
   /** O que a CLI pode carregar por conta própria, declarado por quem configura. Não é evidência. */
   isolation?: { loads: IsolationLeak[] };
   [key: string]: unknown;
@@ -99,6 +101,8 @@ export const BUILTIN_PROFILES: readonly AiProfile[] = AI_BASES.map((tool, positi
 export const PROFILE_MARKERS = ['prompt', 'model', 'effort', 'mcpConfig', 'addDir'] as const;
 export const unknownProfileCapabilities = (): Record<ProfileCapability, CapabilityState> =>
   Object.fromEntries(PROFILE_CAPABILITIES.map((c) => [c, 'unknown'])) as Record<ProfileCapability, CapabilityState>;
+/** Perfil executado pelo transporte ACP (a CLI do agente fala o Agent Client Protocol), e não pela CLI one-shot. */
+export const isAcpProfile = (profile: AiProfile): boolean => profile.base === 'generic' && typeof profile.config.acpAgent === 'string';
 export const profileBase = (profile: AiProfile): AiBase | null => (profile.base === 'generic' ? null : profile.base);
 /** Compatibilidade do seletor legado. A admissão v1 resolve o alvo explícito sem este fallback. */
 export function activeProfile(board: { aiTool: string; aiProfiles: readonly AiProfile[] }): AiProfile {

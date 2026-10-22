@@ -61,7 +61,7 @@ import { ExecutionAdmission } from '../ai/admission';
 import { CapabilityEvidenceStore } from '../ai/capabilityEvidence';
 import { verifyExecutor } from '../ai/capabilityVerifier';
 import { recoverProjectServers } from '../mcp/projectServerLease';
-import { loginShellPath, spawnHeadless } from '../spawn';
+import { loginShellPath, spawnAcpProcess, spawnHeadless } from '../spawn';
 
 /** Complemento do nome na mensagem de "comando não encontrado", para não piorar o que a pessoa já lê no log. */
 const COMMAND_HINT: Record<string, string> = { gh: ' (GitHub CLI)' };
@@ -239,6 +239,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       status: () => cursorHookStatus({ homeDir, scriptPath: path.join(path.dirname(o.bridgePath), 'cursor-hook.js') }),
     },
     spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
+    spawnAcp: (command, cwd, out) => spawnAcpProcess({ ...command, format: 'text' }, cwd, out, pathEnv),
   });
   router.setAdmissionReader((request) => {
     try {

@@ -18,7 +18,8 @@ import type { MeasuredDeps, Measured } from '../../aiOutput/measured';
 import { lineSplitter } from '../../aiOutput/lines';
 import { asList, asObject, asText, cut, type Json } from '../../aiOutput/json';
 import { MeasureBrokenError } from '../../aiOutput/errors';
-import { BOARD_SERVER } from '../../execution';
+import type { ExecInput } from '../../execution';
+import { BOARD_SERVER, SUBAGENT_TOOLS } from '../../execution';
 import { ensureProjectServer } from '../../mcp/clientConfig';
 import type { HeadlessInput } from '../provider';
 import { AUTH_REQUIRED, RpcError, rpcConnection } from './connection';
@@ -59,14 +60,49 @@ export function acpMcpServers(input: HeadlessInput): AcpMcpServer[] {
   return servers;
 }
 
+/** A decisão do board para um pedido de permissão, com o motivo quando nega. */
+export interface AcpDecision {
+  allow: boolean;
+  reason: string | null;
+}
+
+/** O nome do subagente lançado, se a chamada é de delegação (`Agent`/`Task`); null = não é. */
+function subagentOf(call: AcpToolCall): string | null {
+  const first = (call.title ?? '').trim().split(/[\s:(]/)[0] ?? '';
+  return SUBAGENT_TOOLS.some((t) => t.toLowerCase() === first.toLowerCase()) ? first : null;
+}
+
+/**
+ * Decide pelo manifesto do card: ferramenta MCP só dos servidores do card, subagente só da lista de
+ * ferramentas do card, edição e comando pelo nível. Na dúvida (título que não se reconhece), vale o nível.
+ */
+export function boardDecision(
+  permission: RunnerPermission,
+  call: AcpToolCall,
+  mcp: { server: string } | null,
+  servers: string[],
+  exec?: Pick<ExecInput, 'tools' | 'deniedTools'>,
+): AcpDecision {
+  if (mcp && !servers.includes(mcp.server)) return { allow: false, reason: `o servidor MCP ${mcp.server} não é do card` };
+  const sub = subagentOf(call);
+  if (sub && !mcp) {
+    const listed = (exec?.tools ?? []).some((t) => t.toLowerCase().startsWith(sub.toLowerCase()));
+    if (!listed) return { allow: false, reason: `o subagente não está na lista do card` };
+  }
+  const denied = (exec?.deniedTools ?? []).find((t) => call.title?.toLowerCase().startsWith(t.toLowerCase()));
+  if (denied) return { allow: false, reason: `a ferramenta ${denied} está negada no card` };
+  if (!boardAllows(permission, call, mcp, servers)) return { allow: false, reason: `fora do nível ${permission}` };
+  return { allow: true, reason: null };
+}
+
 /**
  * O que o board permite sem ninguém aprovando, pelo nível da execução: o mesmo recorte que o Claude
  * Code recebe na linha de comando (`board` = ler o projeto e usar os servidores MCP que o board passou;
  * `edits` = mais editar arquivos; `full` = tudo).
  */
 export function boardAllows(permission: RunnerPermission, call: AcpToolCall, mcp: { server: string } | null, servers: string[]): boolean {
-  if (permission === 'full') return true;
   if (mcp) return servers.includes(mcp.server);
+  if (permission === 'full') return true;
   const kind = call.kind ?? 'other';
   if (['read', 'search', 'think'].includes(kind)) return true;
   return permission === 'edits' && ['edit', 'delete', 'move'].includes(kind);
@@ -128,11 +164,11 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
       const call = toolCallOf(asObject(params.toolCall)) ?? { toolCallId: '?', title: null, kind: null };
       if (killed) return { outcome: { outcome: 'cancelled' } };
       const mcp = mcpToolOf(call);
-      const allow = boardAllows(input.permission, call, mcp, names);
+      const { allow, reason } = boardDecision(input.permission, call, mcp, names, input.exec);
       const optionId = pickOption(params, allow);
       const what = mcp ? `${mcp.server}/${mcp.tool}` : (call.title ?? call.kind ?? 'ferramenta');
       deps.log(
-        `${agent.label} pediu permissão para ${cut(what, 120)}: ${allow ? 'permitido' : 'negado'} pelo board (nível ${input.permission}).`,
+        `${agent.label} pediu permissão para ${cut(what, 120)}: ${allow ? 'permitido' : `negado (${reason})`} pelo board (nível ${input.permission}).`,
       );
       // sem a opção pedida na lista, o board não inventa uma: cancela, que todo agente precisa aceitar.
       // A resposta é imediata (a regra do nível decide, como o `dontAsk` do Claude Code): não fica

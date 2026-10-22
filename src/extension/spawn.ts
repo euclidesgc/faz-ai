@@ -4,6 +4,7 @@ import { StringDecoder } from 'node:string_decoder';
 import type { OutputStream } from './aiOutput/reader';
 import type { HeadlessCommand } from './headless';
 import type { RunningProcess } from './runner';
+import type { AcpProcess } from './ai/acp/provider';
 import { commandNotFound, resolveCommand } from './cliResolve';
 import { randomUUID } from 'node:crypto';
 import { processBirth, processGroupState, SpawnNotStartedError, type SpawnControl, type ProcessIdentity } from './processIdentity';
@@ -80,7 +81,9 @@ export function spawnHeadless(
   out: (text: string, stream: OutputStream) => void,
   pathEnv: string | undefined,
   control?: SpawnControl,
-): RunningProcess {
+  opts: { stdin?: 'close' | 'open' } = {},
+): RunningProcess & Partial<AcpProcess> {
+  const open = opts.stdin === 'open';
   // quem só usa a extensão da ferramenta no editor não tem a CLI no PATH: procura também onde ela costuma ficar
   const executable = resolveCommand(command.command, command.env?.PATH ?? pathEnv, os.homedir(), command.lookup);
   if (!executable) throw new SpawnNotStartedError(commandNotFound(command.command));
@@ -172,7 +175,10 @@ export function spawnHeadless(
     const release = () => {
       // Parar ou queda do launcher durante o flush não pode liberar uma CLI atrasada.
       if (cancelled || exited || child.stdin.destroyed) return;
-      child.stdin.end(JSON.stringify({ version: 1, ...launch, cwd, env, stdin: command.stdin ?? '' }));
+      const description = JSON.stringify({ version: 1, ...launch, cwd, env, stdin: command.stdin ?? '', stdinOpen: open });
+      // entrada aberta: a descrição termina na primeira quebra de linha e o pipe segue para o agente
+      if (open) child.stdin.write(description + '\n');
+      else child.stdin.end(description);
     };
     try {
       const ready = control.beforeStart(identity);
@@ -189,9 +195,20 @@ export function spawnHeadless(
       child.kill('SIGKILL');
       throw new SpawnNotStartedError('Não foi possível registrar a identidade da execução antes de iniciar a IA.', e);
     }
-  } else child.stdin.end(control ? '' : (command.stdin ?? ''));
+  } else if (!open) child.stdin.end(control ? '' : (command.stdin ?? ''));
+  else if (command.stdin) child.stdin.write(command.stdin);
 
   return {
+    ...(open
+      ? {
+          write: (text: string) => {
+            if (!child.stdin.destroyed && child.stdin.writable) child.stdin.write(text);
+          },
+          end: () => {
+            if (!child.stdin.destroyed) child.stdin.end();
+          },
+        }
+      : {}),
     identity,
     terminationConfirmed: () => {
       if (identity && directClosed) return processGroupState(identity) === 'dead';
@@ -229,4 +246,15 @@ export function spawnHeadless(
       }, 5000).unref();
     },
   };
+}
+
+/** Inicia o agente ACP: o mesmo processo de `spawnHeadless`, com a entrada aberta a sessão inteira. */
+export function spawnAcpProcess(
+  command: HeadlessCommand,
+  cwd: string,
+  out: (text: string, stream: OutputStream) => void,
+  pathEnv: string | undefined,
+  control?: SpawnControl,
+): AcpProcess {
+  return spawnHeadless(command, cwd, out, pathEnv, control, { stdin: 'open' }) as AcpProcess;
 }

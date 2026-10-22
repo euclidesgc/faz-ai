@@ -252,11 +252,28 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
       '→ faz-ai/get_card: get_card (faz-ai MCP Server)',
       'Gemini CLI pediu permissão para faz-ai/get_card: permitido pelo board (nível board).',
       '→ edit: Editar src/app.ts',
-      'Gemini CLI pediu permissão para Editar src/app.ts: negado pelo board (nível board).',
+      'Gemini CLI pediu permissão para Editar src/app.ts: negado (fora do nível board) pelo board (nível board).',
       'mover o card.',
       'Pronto',
     ]);
     expect(end.code).toBe(0);
+  });
+
+  it('o manifesto do card nega MCP fora dos servidores, subagente fora da lista e diz o motivo', async () => {
+    const answers: any[] = [];
+    const agent = new FakeAgent({
+      onPrompt: async (a) => {
+        answers.push(await a.ask({ toolCallId: 'm1', title: 'outro: listar', kind: 'other' }));
+        answers.push(await a.ask({ toolCallId: 's1', title: 'Agent: revisar', kind: 'other' }));
+        return { stopReason: 'end_turn' };
+      },
+    });
+    const mcpConfig = JSON.stringify({ mcpServers: { outro: { command: 'x' } } });
+    const { ended, lines } = run(agent, { permission: 'full', exec: { mcpConfig, tools: [], deniedTools: [] } as never });
+    await ended;
+    expect(answers[0]).toEqual({ outcome: { outcome: 'selected', optionId: 'opt-allow_once' } });
+    expect(answers[1]).toEqual({ outcome: { outcome: 'selected', optionId: 'opt-reject_once' } });
+    expect(lines.some((l) => l.includes('negado (o subagente não está na lista do card)'))).toBe(true);
   });
 
   it('no nível "board e arquivos" a edição é permitida', async () => {

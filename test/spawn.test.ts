@@ -77,3 +77,26 @@ describe('linha de comando do Windows', () => {
     expect(cmdArg('linha 1\nlinha 2')).not.toContain('\n');
   });
 });
+
+describe('spawnAcpProcess', () => {
+  it('a entrada fica aberta: escreve depois do início e end() fecha', async () => {
+    const { spawnAcpProcess } = await import('../src/extension/spawn');
+    let got = '';
+    const proc = spawnAcpProcess(
+      {
+        command: process.execPath,
+        args: ['-e', "process.stdin.on('data',d=>process.stdout.write('eco:'+d)).on('end',()=>process.stdout.write('fim'))"],
+        format: 'text',
+      },
+      process.cwd(),
+      (text, stream) => stream === 'stdout' && (got += text),
+      undefined,
+    );
+    await new Promise((r) => setTimeout(r, 100));
+    proc.write('oi');
+    await new Promise((r) => setTimeout(r, 100));
+    proc.end();
+    await new Promise<void>((resolve) => proc.onExit(() => resolve()));
+    expect(got).toBe('eco:oifim');
+  });
+});

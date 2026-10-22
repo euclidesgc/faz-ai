@@ -1,4 +1,4 @@
-import { catalogTool, contextEnforced, profileBase } from './aiProfiles';
+import { catalogTool, contextEnforced, isAcpProfile, profileBase } from './aiProfiles';
 import type { AiBase, AiProfile } from './aiProfiles';
 import type { Agent } from './harness';
 import { BOARD_MCP_NAME, selectedMcpNames, selectedRuleLocations, selectedSkillNames, type HarnessSelection } from './harnessSelection';
@@ -323,6 +323,13 @@ export function enforcementOf(profile: AiProfile): Record<ExecAspect, Enforcemen
   const base = profileBase(profile);
   const row = base
     ? EXEC_ENFORCEMENT[base]
-    : ({ agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'advised' } as const);
+    : ({
+        agent: 'advised',
+        skills: 'advised',
+        // perfil ACP: os servidores do card vão no `session/new` (garantido); agente e ferramentas seguem como orientação no prompt
+        mcp: isAcpProfile(profile) ? 'enforced' : 'advised',
+        tools: 'advised',
+        model: 'advised',
+      } as const);
   return { ...row, context: contextEnforced(profile) ? 'enforced' : 'advised' };
 }
