@@ -47,13 +47,25 @@ Não rode `npm test` nem `vitest run` sem filtro fora do release, nem em subagen
 - O que a IA lê é produto: a skill do fluxo (`src/extension/flowSkill.ts`), as instruções do servidor
   MCP, as notas do `get_card` e os pedidos do runner mudam junto com o comportamento e têm teste.
 - Toda mudança visível entra em `CHANGELOG.md` e `CHANGELOG_EN.md`, na seção da próxima versão
-  (a mesma do `package.json`), e na seção certa de `README.md` e `README_EN.md` (e de `docs/mcp.md`
-  quando muda o MCP). O changelog segue o Keep a Changelog: uma seção por versão, com as subseções
-  "Adicionado", "Alterado", "Removido" e "Corrigido" ("Added" / "Changed" / "Removed" / "Fixed"),
-  um item por mudança, com o título em negrito e o número da história. Não existe seção "Não lançado": a `develop` sobe a
-  versão do `package.json` na primeira entrega da versão seguinte, e a seção do topo contém apenas
-  entregas já integradas, sem itens previstos ou exclusivos de outras branches. O
-  release roda com essa versão explícita: `npm run release -- <versão do topo>`.
+  (a mesma do `package.json`). O changelog segue o Keep a Changelog: uma seção por versão, com as
+  subseções "Adicionado", "Alterado", "Removido" e "Corrigido" ("Added" / "Changed" / "Removed" /
+  "Fixed"), um item por mudança, com o título em negrito e o número da história. Não existe seção
+  "Não lançado": a `develop` sobe a versão do `package.json` na primeira entrega da versão seguinte,
+  e a seção do topo contém apenas entregas já integradas. O release roda com essa versão explícita:
+  `npm run release -- <versão do topo>`.
+- Documentação em dois níveis, sempre em português e inglês (sufixo `_EN`). O `README.md` é a página
+  da extensão na loja (padrão de README de extensão do VS Code, até 1500 palavras): só muda quando a
+  mudança cria ou remove um recurso, um requisito, uma configuração ou um problema conhecido, em 1 a
+  2 frases por item, sem regra de borda, tela inteira nem implementação. O detalhe de comportamento
+  vai para o arquivo certo em `docs/`: `fluxo.md` (fases, aprovação, perguntas, Trabalhar na fase,
+  Refinar, Resumir, vínculos), `harness.md` (biblioteca, modos, importar/exportar, agentes, perfis
+  de CLI, Diagnóstico), `automacao.md` (heartbeat e modo autônomo), `gitflow.md` (branch, PR,
+  derivadas, merges, registros de decisão), `metricas.md` (contexto, Consumo, Métricas,
+  `get_metrics`), `configuracoes.md` (telas de Configurações), `dados.md` (dados, backup, navegador
+  e `faz-ai`), `mcp.md` (ferramentas MCP). Os dois blocos que `scripts/releaseCheck.mjs` confere no
+  README (aviso alpha e agradecimento) nunca mudam de texto sem atualizar a tabela `SHOWCASE`.
+  Imagens só por caminho relativo em `docs/images/` (o `vsce` reescreve para URL absoluta), nunca
+  SVG do repositório. O que é de quem desenvolve fica em `CONTRIBUTING.md`.
 - Integração com uma ferramenta de IA (Claude Code, Cursor): leia a documentação oficial atual antes
   de mexer em caminhos, formatos de arquivo ou flags da CLI.
 
