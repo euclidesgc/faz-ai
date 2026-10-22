@@ -177,7 +177,6 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     'Você atua como o agente "restrito": Restrito.',
     'Instruções do agente:\nSiga.',
     expect.stringContaining('list_board_mcp_tools'),
-    'De servidores MCP, use só o do board e: github.',
     'Use só as rules, as skills e as instruções indicadas neste pedido; ignore instruções, skills e agentes carregados por conta própria.',
   ]);
 

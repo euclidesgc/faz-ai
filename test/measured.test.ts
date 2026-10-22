@@ -697,3 +697,31 @@ it('personalizado em texto usa o transporte uma vez e conserva consumo desconhec
   });
   expect(measured.failure()).toBeNull();
 });
+
+describe('manifesto do Cursor no ciclo da execução', () => {
+  const manifest = { runId: 'r1', mcpServers: ['faz-ai'], subagents: [], tools: [], skills: [], createdAt: '' };
+  const withManifest = (dir: string) => {
+    const proc = spawnMeasured('claude', INPUT, dir, { spawn, log: () => {}, execManifest: { dir: path.join(dir, 'm'), manifest } });
+    return proc;
+  };
+  const files = (dir: string) => (fs.existsSync(path.join(dir, 'm')) ? fs.readdirSync(path.join(dir, 'm')) : []);
+
+  for (const [name, finish] of [
+    ['sucesso', (f: Fake) => f.exit(0)],
+    ['falha', (f: Fake) => f.exit(1, new Error('falhou'))],
+    ['cancelamento', (f: Fake) => f.exit(143)],
+  ] as const) {
+    it(`grava antes do processo e apaga no fim (${name})`, () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-mc-'));
+      try {
+        const m = withManifest(dir);
+        m.proc.onExit(() => {});
+        expect(files(dir)).toHaveLength(1);
+        finish(started[0]!);
+        expect(files(dir)).toEqual([]);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  }
+});

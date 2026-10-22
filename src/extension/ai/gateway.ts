@@ -3,7 +3,8 @@ import { executorProfile } from './providers';
 import { redactCredentialValues } from '../credentials';
 import { authFailed } from './profileAuth';
 import { profileInstallUrl } from '../requirements';
-import type { AiProfile } from '../../shared/aiProfiles';
+import { profileBase, type AiProfile } from '../../shared/aiProfiles';
+import type { CursorManifest } from './cursorManifest';
 // A única porta por onde o board chama uma ferramenta de IA. Toda execução — de um card (a pessoa, o
 // heartbeat ou o autopiloto) ou do chat — passa por `AiGateway.run`, e é aqui que o log de uso é
 // escrito: abre a linha (`start`), grava a configuração (`describe`), fecha o desfecho (`finish`) e
@@ -152,6 +153,11 @@ export interface AiGatewayDeps {
    */
   runtime?: ContextRuntime;
   leaseCoordinationDir?: string;
+  /**
+   * Garantia do Cursor por hook: a pasta dos manifestos e a leitura do estado do hook (null = pronto; senão o
+   * motivo). Sem ele, ou com o hook ausente ou desatualizado, o manifesto não é gravado e a garantia é parcial.
+   */
+  cursorHook?: { dir: string; status(): string | null };
   boardId: string;
   /** obrigatório: sem ele a execução não teria onde ser registrada */
   runLog: RunLog;
@@ -174,6 +180,34 @@ export class AiGateway {
 
   get runtime(): ContextRuntime {
     return this.deps.runtime ?? 'legacy';
+  }
+
+  /** O manifesto do card para o hook do Cursor; null fora do Cursor, sem a conferência do card ou com o hook indisponível. */
+  private cursorManifestFor(
+    profile: AiProfile,
+    runId: string,
+    conference: AiPrepared['conference'],
+    log: (line: string) => void,
+  ): { dir: string; manifest: CursorManifest } | undefined {
+    if (profileBase(profile) !== 'cursor' || !conference || !this.deps.cursorHook) return undefined;
+    const reason = this.deps.cursorHook.status();
+    if (reason) {
+      log(`Garantia do Cursor parcial: ${reason}. MCP, subagentes e ferramentas seguem como orientação nesta execução.`);
+      return undefined;
+    }
+    const m = conference.manifest;
+    return {
+      dir: this.deps.cursorHook.dir,
+      manifest: {
+        runId,
+        mcpServers: [conference.boardServer, ...m.mcpServers],
+        subagents: m.agent ? [m.agent] : [],
+        tools: m.tools,
+        deniedTools: m.deniedTools,
+        skills: m.skills,
+        createdAt: new Date().toISOString(),
+      },
+    };
   }
 
   get supportsSnapshots(): boolean {
@@ -326,6 +360,7 @@ export class AiGateway {
         log: (line) => call.log(redact(line)),
         runId,
         leaseCoordinationDir: this.deps.leaseCoordinationDir,
+        execManifest: this.cursorManifestFor(profile, runId, conference, call.log),
       });
     } catch (e) {
       revoke();

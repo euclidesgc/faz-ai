@@ -65,6 +65,12 @@ cada fase e move os cards conforme avança, sempre parando para a sua aprovaçã
   modo **Sempre**, **Pelo card** ou **Desligado**, com importação e exportação para a ferramenta.
   Toda execução roda por um agente, com o mínimo de que ele precisa.
   ![Harness do board](docs/images/harness.png) [Harness](docs/harness.md)
+- **Garantia no Cursor pelo hook do board.** O board registra um hook global em `~/.cursor/hooks.json`.
+  Em cada execução do board, ele nega o que o card não permite: servidores MCP, subagentes e ferramentas
+  fora da lista do card. Skills e o texto do agente seguem como orientação. Fora das execuções do board,
+  o hook libera tudo e o Cursor segue como antes. Para tirar, apague do `~/.cursor/hooks.json` as
+  entradas cujo comando termina em `cursor-hook.js`; a extensão as registra de novo ao abrir uma pasta
+  do board no Cursor.
 - **Chat com a IA.** Peça em linguagem natural para criar, mover e vincular cards, ou pergunte o que
   está esperando por você. ![Chat com a IA](docs/images/chat.png) [Fluxo da história](docs/fluxo.md)
 - **Heartbeat e modo autônomo (YOLO).** O heartbeat chama a IA sozinho nas pendências dela, resume

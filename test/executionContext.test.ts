@@ -176,7 +176,7 @@ describe('prévia do contexto efetivo', () => {
     s.board.aiTool = 'cursor';
     const p = executionContextOf(s, s.cards[0]!);
     expect(p.overlaps).toEqual([]);
-    expect(p.enforcement.mcp).toBe('advised');
-    expect(p.enforcement.tools).toBe('advised');
+    expect(p.enforcement.mcp).toBe('enforced');
+    expect(p.enforcement.tools).toBe('enforced');
   });
 });

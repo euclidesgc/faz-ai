@@ -303,7 +303,12 @@ export const EXEC_ASPECTS: { id: ExecAspect; label: string }[] = [
 export type Enforcement = 'enforced' | 'advised';
 export const EXEC_ENFORCEMENT: Record<AiBase, Record<Exclude<ExecAspect, 'context'>, Enforcement>> = {
   claude: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced' },
-  cursor: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced' },
+  // Cursor CLI 2026.10.01 (spike #966): o hook global do board (`preToolUse`, `beforeMCPExecution`, `subagentStart`)
+  // nega na hora do uso o que não está no manifesto do card (MCP, ferramentas e subagentes). O texto do agente
+  // do card segue no pedido (a CLI não tem `--agents`), por isso `agent` continua orientação. Garantido só com o hook instalado e atual; sem
+  // ele o gateway não grava o manifesto e a execução registra o motivo (garantia parcial). As skills ficam
+  // como orientação: `beforeReadFile` não cobre toda leitura. O teste real é o #970.
+  cursor: { agent: 'advised', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced' },
   // Kimi Code 2.1.1: o servidor do board entra pelo `.kimi-code/mcp.json` do projeto, materializado antes
   // da execução (não há `--mcp-config`); em `-p` a permissão é sempre "auto", sem flags para estreitá-la;
   // não há `--agents` inline: o agente e os subagentes seguem como orientação no prompt

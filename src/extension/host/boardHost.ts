@@ -1,4 +1,6 @@
 import { collectClaudeEnvironment } from '../ai/environmentEvidence';
+import { defaultManifestDir } from '../ai/cursorHookMain';
+import { cursorHookStatus } from '../mcp/cursorHooks';
 import { PROFILE_CAPABILITIES, activeProfile, profileIsolation, profileLabel, type AiProfile } from '../../shared/aiProfiles';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
@@ -232,6 +234,10 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     snapshots: new RunArtifactSnapshots(path.join(o.storageDir, 'run-artifacts'), new ArtifactRepo(handle.db), router.boardId),
     admission,
     runtime: contextRuntimeFromEnv(),
+    cursorHook: {
+      dir: defaultManifestDir(homeDir),
+      status: () => cursorHookStatus({ homeDir, scriptPath: path.join(path.dirname(o.bridgePath), 'cursor-hook.js') }),
+    },
     spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
   });
   router.setAdmissionReader((request) => {

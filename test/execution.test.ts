@@ -114,6 +114,8 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
       tools: 'enforced',
       model: 'enforced',
     });
+    // o Cursor passa a garantir MCP, subagentes e ferramentas pelo hook (o texto do agente segue no pedido) do board; as skills seguem como orientação
+    expect(EXEC_ENFORCEMENT.cursor).toMatchObject({ agent: 'advised', mcp: 'enforced', tools: 'enforced', skills: 'advised' });
     // o contexto vazio depende das capacidades verificadas do perfil (enforcementOf), não desta tabela
     expect(EXEC_ENFORCEMENT.claude).not.toHaveProperty('context');
   });
@@ -259,7 +261,7 @@ describe('manifesto e plano pelo alvo da execução', () => {
     expect(plan.input.mcpBlocked).toEqual(['da-biblioteca']);
     // o Cursor não recebe o arquivo de MCP nem o agente por parâmetro: a orientação vai no pedido
     expect(plan.input.mcpConfig).toBeNull();
-    expect(plan.summary).toContain('Servidores MCP: faz-ai (pelo pedido)');
+    expect(plan.summary).toContain('Servidores MCP: faz-ai (imposto pela CLI)');
     expect(plan.summary.some((l) => l.startsWith('Modelo: composer-2.5') && l.endsWith('(imposto pela CLI)'))).toBe(true);
   });
 
