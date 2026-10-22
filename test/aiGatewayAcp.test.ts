@@ -97,4 +97,33 @@ describe('transporte escolhido pelo perfil', () => {
     expect(() => without.run(call(profile({ acpAgent: 'gemini' })))).toThrow(/ACP indisponível/);
     expect(new AiRunRepo(db).byMonth(monthOf(Date.now())).map((r) => r.outcome)).toEqual(['unsupported', 'unsupported']);
   });
+
+  it('perfil ACP personalizado admitido é recusado: a admissão vincula a CLI one-shot, não o agente ACP', () => {
+    let started = 0;
+    const spawn: SpawnFn = () => {
+      started++;
+      return { onExit: () => {}, kill: () => {} };
+    };
+    const spawnAcp: AcpSpawnFn = () => {
+      started++;
+      throw new Error('não deveria iniciar');
+    };
+    const custom: AiProfile = {
+      ...profile({ acpAgent: 'gemini' }),
+      kind: 'custom',
+      credentials: { review: 'reviewed', available: true },
+    } as never;
+    // a admissão de mentira admite tudo: a recusa tem de vir do gateway, não dela
+    const admission = {
+      prepare: (_p: unknown, _id: string, input: unknown) => ({ input, decision: { state: 'admitted' }, command: (c: unknown) => c }),
+    } as never;
+    const runLog = createRunLog(db);
+    const gw = new AiGateway({ boardId: router.boardId, runLog, spawn, spawnAcp, admission });
+    const strictCall: AiCall = {
+      ...call(custom),
+      prepare: () => ({ ...call(custom).prepare(), strict: { profileId: custom.id, request: { activeMcpIds: [] } as never } }),
+    };
+    expect(() => gw.run(strictCall)).toThrow(/admissão por capacidades ainda não cobre o transporte ACP/);
+    expect(started).toBe(0);
+  });
 });

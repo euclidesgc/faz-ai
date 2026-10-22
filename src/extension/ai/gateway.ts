@@ -326,6 +326,9 @@ export class AiGateway {
       if (isAcpProfile(profile)) {
         if (!agent) throw new Error(`Agente ACP desconhecido: ${String(profile.config.acpAgent)}.`);
         if (!this.deps.spawnAcp) throw new Error('Transporte ACP indisponível neste host.');
+        // a admissão vincula o executável e os argumentos da CLI one-shot, não o comando do agente ACP:
+        // rodar o agente com ela seria ignorar o vínculo admitido, então recusa até a admissão cobrir o ACP
+        if (admitted) throw new Error('A admissão por capacidades ainda não cobre o transporte ACP; o perfil não roda.');
       }
       const unsupported = admitted || agent ? null : headlessUnsupported(profile, input.permission);
       if (unsupported) throw new Error(unsupported);
@@ -377,10 +380,7 @@ export class AiGateway {
               checked,
               cwd,
               (text, stream) => {
-                if (profile!.kind !== 'builtin' && profile!.config.authPatterns?.length) {
-                  authTails[stream] = (authTails[stream] + text).slice(-200000);
-                  privateAuthFailed ||= authFailed(profile!, Object.values(authTails), false);
-                }
+                watch(text, stream);
                 out(text, stream);
               },
               control && (admitted || snapshot || call.beforeStart)

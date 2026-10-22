@@ -94,7 +94,7 @@ in the Portuguese interface.
   used). The AI queries the same with `get_metrics`. [Metrics](docs/metricas_EN.md)
 - **Board in the browser.** Open the same board in a browser tab, in sync with the editor, or serve it
   without the editor with the `faz-ai` command. [Data and browser](docs/dados_EN.md)
-- **ACP agents (not validated).** A CLI profile can run through the Agent Client Protocol, with Gemini CLI, OpenCode, Codex, Cursor, Kimi Code, GitHub Copilot CLI, Qwen Code and goose. The board answers permissions by the card, and the card's MCP servers join the session without a file in the project. Sign in to the tool in the terminal before using it (each one's command is in [MCP tools](docs/mcp.md#execução-por-acp-transporte-do-perfil)). It has not been validated with the real CLIs yet; Claude Code keeps running through the CLI.
+- **ACP agents (not validated).** A CLI profile can run through the Agent Client Protocol, with Gemini CLI, OpenCode, Codex, Cursor, Kimi Code, GitHub Copilot CLI, Qwen Code and goose. The board answers permissions by the card, and the card's MCP servers join the session without a file in the project. Sign in to the tool in the terminal before using it (each one's command is in [MCP tools](docs/mcp.md#execução-por-acp-transporte-do-perfil)). It does not run in the extension yet: the capability admission refuses the ACP profile until it covers the agent's command. It has not been validated with the real CLIs either; Claude Code keeps running through the CLI.
 - **MCP server.** Claude Code, Cursor or any MCP client can query and edit the board.
   [MCP tools](docs/mcp.md)
 
