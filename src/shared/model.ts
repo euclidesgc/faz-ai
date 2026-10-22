@@ -280,6 +280,13 @@ export interface BoardState {
   /** vínculos entre cards (pai/filho e relativo) */
   links: CardLink[];
   comments: Comment[];
+  /**
+   * Só no estado recortado para uma interface (`projectForWebview`): quantas mensagens cada card tem, já
+   * que `comments` traz só a conversa do card aberto. Ausente no estado inteiro do host.
+   */
+  commentCounts?: Record<Id, number>;
+  /** Só no estado recortado: quantos cards estão na lixeira e arquivados, que o recorte deixa de fora. */
+  cardCounts?: { trash: number; archived: number };
   attachments: Attachment[];
   /** autor usado em novos comentários */
   currentUser: string;

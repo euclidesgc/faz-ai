@@ -1,4 +1,5 @@
 import { useBoardStore } from '../../store/boardStore';
+import { commentCountOf } from '../../../shared/webviewState';
 import { Button } from '../ui';
 import { t } from '../../i18n';
 
@@ -7,7 +8,7 @@ export type CardTab = 'details' | 'comments' | 'attachments' | 'usage' | 'plan';
 /** Abas do drawer; Conversa e Anexos mostram quantos itens o card tem, e Consumo o contexto e o gasto de IA. */
 export function CardTabs({ cardId, tab, onChange }: { cardId: string; tab: CardTab; onChange: (tab: CardTab) => void }) {
   const state = useBoardStore((s) => s.state)!;
-  const commentCount = state.comments.filter((c) => c.cardId === cardId).length;
+  const commentCount = commentCountOf(state, cardId);
   const attachmentCount = state.attachments.filter((a) => a.cardId === cardId).length;
 
   return (

@@ -377,3 +377,26 @@ describe('ações contextuais da seleção', () => {
     expect(bar().queryByRole('button', { name: /Duplicar/ })).toBeNull();
   });
 });
+
+describe('classe chosen nos cards marcados', () => {
+  it('marcar um card adiciona chosen só nele e desmarcar remove', async () => {
+    const { id: secondId, title } = createExtraStory();
+    const { container } = renderBoard();
+    const cardOf = (name: string) => screen.getByRole('checkbox', { name: `Selecionar ${name}` }).closest('article')!;
+    expect(container.querySelectorAll('.chosen')).toHaveLength(0);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Selecionar Login com Google' }));
+    expect(cardOf('Login com Google')).toHaveClass('chosen');
+    expect(cardOf(title)).not.toHaveClass('chosen');
+    expect(useBoardStore.getState().selectedIds.has(secondId)).toBe(false);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Selecionar Login com Google' }));
+    expect(container.querySelectorAll('.chosen')).toHaveLength(0);
+  });
+
+  it('card pendente marcado recebe mine e chosen', async () => {
+    patchCard(board.storyId, { status: 'waiting_review', statusAt: Date.now() });
+    renderBoard();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Selecionar Login com Google' }));
+    const article = screen.getByRole('checkbox', { name: 'Selecionar Login com Google' }).closest('article')!;
+    expect(article).toHaveClass('mine', 'chosen');
+  });
+});

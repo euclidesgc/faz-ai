@@ -22,6 +22,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     view.webview.options = webviewOptions(this.context, router);
     const bridge = new WebviewBridge(view.webview, router, this.viewState, this.prefs);
     view.webview.html = webviewHtml(this.context, view.webview, 'chat');
+    // a barra lateral recolhida não recebe estado; recebe o acumulado ao abrir
+    bridge.setVisible(view.visible);
+    view.onDidChangeVisibility(() => bridge.setVisible(view.visible));
     view.onDidDispose(() => bridge.dispose());
   }
 }
