@@ -199,7 +199,9 @@ describe('getPanelMetrics: os seis cortes', () => {
     expect(consolidateNow()).toEqual(['2025-03']);
     const after = sections();
     for (const dim of METRICS_BREAKDOWN_DIMS) {
-      expect(cut(after, dim).cells).toEqual(cut(before, dim).cells);
+      // a conferência da execução não vai para o arquivo mensal
+      const plain = (b: ReturnType<typeof cut>) => b.cells.map(({ checks: _checks, ...cell }) => cell);
+      expect(plain(cut(after, dim))).toEqual(plain(cut(before, dim)));
       expect(cut(after, dim).covered).toEqual(cut(before, dim).covered);
       expect(cut(after, dim).includesArchive).toBe(true);
       expect(cut(after, dim).excludedMonths).toEqual([]);

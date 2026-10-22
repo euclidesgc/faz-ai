@@ -9,6 +9,7 @@
 // chama não precisa saber se o log está funcionando.
 import type { Database } from 'sql.js';
 import type { AiRunConfig, AiRunOutcome, AiRunStart, RunReport } from '../../shared/log';
+import type { RunCheck } from '../../shared/runCheck';
 import { AiRunRepo } from './aiRunRepo';
 
 export interface RunLog {
@@ -21,7 +22,7 @@ export interface RunLog {
   /** Fecha a linha com o desfecho e o código de saída, quando houver. */
   finish(id: string, outcome: AiRunOutcome, exitCode?: number | null): void;
   /** Grava o consumo e o inventário medidos, de uma vez, junto do desfecho. `measure: 'none'` grava só "não medido". */
-  measure(id: string, report: RunReport): void;
+  measure(id: string, report: RunReport, check?: RunCheck): void;
   /**
    * Marca como `unknown` as execuções que a sessão anterior não chegou a fechar e devolve os cards
    * delas. Chamada na abertura do board, só pela janela dona dele.
@@ -64,9 +65,9 @@ export function createRunLog(db: Database, log?: (line: string) => void): RunLog
       if (!id) return;
       guard(() => runs.finish(id, outcome, exitCode));
     },
-    measure(id, report) {
+    measure(id, report, check) {
       if (!id) return;
-      guard(() => runs.measure(id, report));
+      guard(() => runs.measure(id, report, check));
     },
     closeOpen(at) {
       try {

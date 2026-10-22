@@ -79,8 +79,10 @@ in the Portuguese interface.
   merge, cleans up the branch and can record the decision in `docs/decisoes`.
   [Gitflow](docs/gitflow_EN.md)
 - **Usage metrics.** A ring on the card estimates the context of the next run; the **Consumo** tab
-  and the **Métricas** panel show tokens, AI time, rework and what the AI used. The AI queries the
-  same with `get_metrics`. [Metrics](docs/metricas_EN.md)
+  and the **Métricas** panel show tokens, AI time, rework and what the AI used. Each run is also
+  checked against what the card allowed: **no deviation**, **with deviation** (the card warns in the
+  conversation, and the panel counts per AI tool) or **not checked** (the tool did not report what it
+  used). The AI queries the same with `get_metrics`. [Metrics](docs/metricas_EN.md)
 - **Board in the browser.** Open the same board in a browser tab, in sync with the editor, or serve it
   without the editor with the `faz-ai` command. [Data and browser](docs/dados_EN.md)
 - **MCP server.** Claude Code, Cursor or any MCP client can query and edit the board.

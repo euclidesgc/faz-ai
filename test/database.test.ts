@@ -712,3 +712,30 @@ describe('migração 46: harness_imports sai e a marcação fica', () => {
     ]);
   });
 });
+
+describe('migração 47: a conferência da execução em ai_runs', () => {
+  it('a partir do esquema 46 acrescenta as colunas nulas e preserva o que existia (nada é inventado)', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 46);
+    old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    old.run(
+      "INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x')",
+    );
+    expect(
+      old.exec("SELECT COUNT(*) FROM pragma_table_info('ai_runs') WHERE name IN ('check_status','check_detail')")[0]!.values[0]![0],
+    ).toBe(0);
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(47);
+    expect(old.exec("SELECT tool, check_status, check_detail FROM ai_runs WHERE id = 'r1'")[0]!.values).toEqual([['claude', null, null]]);
+
+    const fresh = new SQL.Database();
+    migrate(fresh);
+    expect(
+      fresh.exec("SELECT COUNT(*) FROM pragma_table_info('ai_runs') WHERE name IN ('check_status','check_detail')")[0]!.values[0]![0],
+    ).toBe(2);
+  });
+});

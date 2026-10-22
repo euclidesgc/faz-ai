@@ -2,6 +2,12 @@
 
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Run check: what the AI used against what the card asked for (#972).** When each run ends, the board compares what the session used (MCP servers, subagents, skills and native tools, when the CLI reports them) with what the card allowed: agent, skills, MCP servers and tools. Each run is in one of three states: **no deviation** (it used only what was allowed), **with deviation** (the list of what went beyond the allowed set, with the number of calls) or **not checked** (the CLI did not report what it used, or the run was not measured; it never becomes "no deviation"). The board's own MCP server and the flow skills (`faz-ai-*`) do not count as deviation. The check only reports: it does not block the run, and a failure in it does not break the run. The deviation shows in three places: a comment in the card's conversation, only when there is a deviation; the "Conferência" line in the run log; and the **Métricas** panel, which shows per AI tool the columns **checked**, **with deviation** and **not checked** (`get_metrics` with `group_by` `tool` returns the same counts). Runs before this version show as not checked.
+
 ## 0.47.0
 
 ### Added

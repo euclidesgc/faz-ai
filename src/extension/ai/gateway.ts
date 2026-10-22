@@ -22,6 +22,7 @@ import { spawnMeasured, type SpawnFn } from '../aiOutput/measured';
 import type { OutputFormat } from '../aiOutput/reader';
 import { headlessUnsupported, type HeadlessCommand, type HeadlessInput } from '../headless';
 import type { RunLog } from '../log/runLog';
+import { checkRun, type RunCheck, type RunCheckManifest } from '../../shared/runCheck';
 import type { StrictExecutionRequest } from '../../shared/executionAdmission';
 import { AdmissionBlockedError, type ExecutionAdmission, type AdmittedExecution } from './admission';
 import type { RunArtifactRequest, RunArtifactSnapshots } from '../runArtifactSnapshot';
@@ -65,6 +66,8 @@ export interface AiPrepared {
   /** Configuração v1 resolvida pelo `resolveContextDraft` antes do spawn; congelada no snapshot da execução. */
   context?: ContextDraftResolution;
   strict?: { profileId: string; request: StrictExecutionRequest };
+  /** O que o card liberou, para a conferência no fim; sem ele (chat) a execução fica "não conferida". */
+  conference?: { manifest: RunCheckManifest; boardServer: string };
   input: HeadlessInput;
   /** a configuração que o log guarda; a permissão sai de `input.permission` */
   config: Omit<AiRunConfig, 'permission'>;
@@ -109,6 +112,8 @@ export interface AiRunEnd {
   timedOut: boolean;
   /** o consumo e o inventário medidos, os mesmos que foram para o log */
   report: RunReport;
+  /** a conferência do inventário contra o que o card liberou, a mesma que foi para o log */
+  check: RunCheck;
   /** quantos processos a execução abriu (2 = a CLI recusou a saída estruturada e rodou em texto) */
   attempts: number;
   /** o formato do último processo */
@@ -192,6 +197,7 @@ export class AiGateway {
     let workToken: string | undefined;
     let profile: AiProfile | undefined;
     let privateAuthFailed = false;
+    let conference: AiPrepared['conference'];
     const authTails = { stdout: '', stderr: '' };
     const redact = (text: string) => {
       const safe = redactCredentialValues(text, profile?.config);
@@ -231,6 +237,7 @@ export class AiGateway {
       if (profile.kind !== 'builtin' && prepared.strict?.profileId !== profile.id)
         throw new Error('A admissão não corresponde ao perfil solicitado.');
       const { config } = prepared;
+      conference = prepared.conference;
       let input = prepared.input;
       if (prepared.work) {
         if (!this.deps.sessions || !this.deps.snapshots) throw new Error('Identidade MCP e snapshot obrigatórios indisponíveis.');
@@ -361,7 +368,14 @@ export class AiGateway {
           : {}),
       };
       const report = this.deps.sessions?.sanitize(safeReport) ?? safeReport;
-      runLog.measure(runId, report);
+      // a conferência nunca derruba a execução: se falhar, grava "não conferida" e segue
+      let check: RunCheck = { status: 'unchecked', reason: report.measure === 'none' ? 'not_measured' : 'no_inventory' };
+      try {
+        if (conference) check = checkRun(report, conference.manifest, conference.boardServer);
+      } catch (e) {
+        call.log(redact(`Conferência da execução indisponível: ${e instanceof Error ? e.message : String(e)}`));
+      }
+      runLog.measure(runId, report, check);
       const end: AiRunEnd = {
         ...(privateAuthFailed ? { authExpired: true } : {}),
         code,
@@ -370,6 +384,7 @@ export class AiGateway {
         stopped,
         timedOut,
         report,
+        check,
         attempts,
         format,
         measureError: measured.failure(),

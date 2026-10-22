@@ -181,7 +181,9 @@ describe('getMetrics: mês arquivado com tokens e custo', () => {
 
     DIMS.forEach((dim, i) => {
       expect(after[i]!.archivedMonths, `group_by=${dim ?? '(total)'}`).toEqual(['2024-03']);
-      expect(after[i]!.rows, `group_by=${dim ?? '(total)'}`).toEqual(before[i]!.rows);
+      // a conferência da execução não vai para o arquivo mensal: fica fora desta comparação
+      const plain = (rows: (typeof before)[number]['rows']) => rows.map(({ checks: _checks, ...row }) => row);
+      expect(plain(after[i]!.rows), `group_by=${dim ?? '(total)'}`).toEqual(plain(before[i]!.rows));
       expect(after[i]!.costPartial, `group_by=${dim ?? '(total)'}`).toBe(before[i]!.costPartial);
     });
     // uma conferência com números à mão, para o teste não passar com os dois lados igualmente errados

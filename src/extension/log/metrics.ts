@@ -22,7 +22,7 @@ import { RUN_CACHE_READ_LIMIT } from '../../shared/runLimit';
 import { splitMcpName, type InventoryKind } from '../../shared/log';
 import { detailMonths } from './rollup';
 import { dayOf, monthOf } from '../../shared/log';
-import type { MetricsMonth, MetricsPanelQuery, MetricsPanelResult, MetricsTokens } from '../../shared/metrics';
+import type { MetricsMonth, MetricsPanelQuery, MetricsPanelResult, MetricsTokens, RunChecks } from '../../shared/metrics';
 import { parseRules } from '../../shared/rules';
 // #172: os tempos e o inventário do painel
 import type { CardEventKind } from '../../shared/log';
@@ -113,7 +113,15 @@ export interface MetricsRow {
   calls?: number;
   /** só nas linhas de `mcp_tool`: o servidor do nome; '' = o registro não trouxe o servidor (RF-26) */
   server?: string;
+  /**
+   * Só na dimensão `tool`: quantas execuções do detalhe foram conferidas sem desvio, com desvio e não
+   * conferidas (inclui as anteriores à conferência). Mês já consolidado não guarda a conferência e não entra.
+   */
+  checks?: RunChecks;
 }
+
+export type { RunChecks };
+const EMPTY_CHECKS: RunChecks = { ok: 0, deviation: 0, unchecked: 0 };
 
 export interface MetricsResult {
   rows: MetricsRow[];
@@ -276,6 +284,23 @@ function detailByRunColumn(db: Database, boardId: string, q: MetricsQuery, colum
   return map;
 }
 
+/** A conferência por ferramenta de IA, no detalhe: `NULL` (execução anterior à migração 47) conta como não conferida. */
+function checksByTool(db: Database, boardId: string, q: MetricsQuery): Map<string, RunChecks> {
+  const { sql: where, params } = runsWhere(boardId, q);
+  const out = new Map<string, RunChecks>();
+  for (const r of all(
+    db,
+    `SELECT tool AS label,
+            SUM(CASE WHEN check_status = 'ok' THEN 1 ELSE 0 END) AS ok,
+            SUM(CASE WHEN check_status = 'deviation' THEN 1 ELSE 0 END) AS dev,
+            SUM(CASE WHEN check_status IS NULL OR check_status NOT IN ('ok','deviation') THEN 1 ELSE 0 END) AS unc
+     FROM ai_runs WHERE ${where} GROUP BY tool`,
+    params,
+  ))
+    out.set(str(r.label), { ok: num(r.ok), deviation: num(r.dev), unchecked: num(r.unc) });
+  return out;
+}
+
 /**
  * Rótulo da linha das execuções sem card (RF-20). Fica à parte das linhas '#N título' — nunca '#0' — e
  * o contrato do painel decide como ela viaja (`value: ''`).
@@ -433,6 +458,7 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
     if (canUseArchive) for (const month of archivedMonths) merge(acc, archiveByDim(db, boardId, month, dim ?? ''));
   }
 
+  let pendingOthersChecks: RunChecks | undefined;
   const isInventory = !!inventoryKind;
   const sorted = [...acc.entries()].sort(
     (a, b) => (isInventory ? b[1].calls - a[1].calls : b[1].runs - a[1].runs) || a[0].localeCompare(b[0]),
@@ -460,6 +486,25 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
           costUsd: a.costedRuns > 0 ? a.costUsd : null,
         };
   const rows = head.map(([label, a]) => toRow(label, a));
+  if (dim === 'tool') {
+    const checks = checksByTool(db, boardId, query);
+    for (const row of rows) {
+      if (row.label === 'outros') continue;
+      row.checks = checks.get(row.label) ?? { ok: 0, deviation: 0, unchecked: 0 };
+    }
+    if (tail.length) {
+      const others = { ok: 0, deviation: 0, unchecked: 0 };
+      for (const [label] of tail) {
+        const c = checks.get(label);
+        if (!c) continue;
+        others.ok += c.ok;
+        others.deviation += c.deviation;
+        others.unchecked += c.unchecked;
+      }
+      // a linha "outros" é montada depois; guarda para anexar abaixo
+      pendingOthersChecks = others;
+    }
+  }
   const allGroups = [...acc.values()];
   if (tail.length) {
     const other = newAcc();
@@ -472,7 +517,9 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
       other.costUsd += a.costUsd;
       other.calls += a.calls;
     }
-    rows.push(toRow('outros', other));
+    const othersRow = toRow('outros', other);
+    if (pendingOthersChecks) othersRow.checks = pendingOthersChecks;
+    rows.push(othersRow);
   }
 
   const boardRow = all(db, 'SELECT log_since FROM boards WHERE id = ?', [boardId])[0];
@@ -1115,11 +1162,16 @@ function panelBreakdowns(db: Database, boardId: string, q: MetricsQuery, archive
     .map(([phase]) => phase)
     .sort((a, b) => a.localeCompare(b));
 
+  const toolChecks = checksByTool(db, boardId, q);
   return PANEL_DIMS.map((dim) => {
     const map = byDim.get(dim)!;
     return {
       dim,
-      cells: [...map.entries()].sort(byRunsThenLabel).map(([value, a]) => panelCell(value, a)),
+      cells: [...map.entries()]
+        .sort(byRunsThenLabel)
+        .map(([value, a]) =>
+          dim === 'tool' ? { ...panelCell(value, a), checks: toolChecks.get(value) ?? EMPTY_CHECKS } : panelCell(value, a),
+        ),
       covered: panelCovered(map.values()),
       includesArchive,
       excludedMonths,

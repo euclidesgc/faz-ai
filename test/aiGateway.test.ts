@@ -137,6 +137,37 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     expect(seen).toMatchObject({ outcome: 'done', measure: 'full' });
   });
 
+  it('a conferência é calculada pelo gateway e gravada junto do consumo: subagente fora do card é desvio', () => {
+    const conference = {
+      manifest: { skills: [], mcpServers: [], tools: [], deniedTools: [], agent: '' },
+      boardServer: 'faz-ai',
+    };
+    const prepare = () => ({ ...call().prepare(), conference });
+    const run = gateway().run(call({ prepare }));
+    let end: AiRunEnd | undefined;
+    run.onExit((e) => (end = e));
+    procs[0]!.write(CLAUDE_OUTPUT);
+    procs[0]!.exit(0);
+    expect(end!.check).toEqual({ status: 'deviation', deviations: [{ kind: 'agent', name: 'Explore', calls: 1 }] });
+    expect(rows()[0]!.check).toEqual(end!.check);
+  });
+
+  it('o card que libera o subagente grava "sem desvio"; sem manifesto (chat) a execução fica não conferida', () => {
+    const liberado = {
+      manifest: { skills: [], mcpServers: [], tools: [], deniedTools: [], agent: 'Explore' },
+      boardServer: 'faz-ai',
+    };
+    gateway().run(call({ prepare: () => ({ ...call().prepare(), conference: liberado }) }));
+    procs[0]!.write(CLAUDE_OUTPUT);
+    procs[0]!.exit(0);
+    gateway().run(call());
+    procs[1]!.write(CLAUDE_OUTPUT);
+    procs[1]!.exit(0);
+    const [conferida, semManifesto] = rows();
+    expect(conferida!.check).toEqual({ status: 'ok' });
+    expect(semManifesto!.check.status).not.toBe('ok');
+  });
+
   it('falha, interrupção e tempo limite ficam registrados com o desfecho certo', () => {
     vi.useFakeTimers();
     const g = gateway();

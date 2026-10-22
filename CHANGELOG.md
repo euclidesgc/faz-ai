@@ -2,6 +2,12 @@
 
 # Changelog
 
+## Não lançado
+
+### Adicionado
+
+- **Conferência da execução: o que a IA usou contra o que o card pediu (#972).** Ao terminar cada execução, o board compara o que a sessão usou (servidores MCP, subagentes, skills e ferramentas nativas, quando a CLI informa) com o que o card liberou: agente, skills, servidores MCP e ferramentas. Cada execução fica em um de três estados: **sem desvio** (usou só o liberado), **com desvio** (a lista do que saiu do liberado, com o número de chamadas) ou **não conferida** (a CLI não informou o que usou, ou a execução não foi medida; nunca vira "sem desvio"). O servidor do próprio board e as skills do fluxo (`faz-ai-*`) não contam como desvio. A conferência só informa: não bloqueia a execução, e uma falha nela não a derruba. O desvio aparece em três lugares: um comentário na conversa do card, só quando há desvio; a linha "Conferência" do log da execução; e o painel **Métricas**, que mostra por ferramenta de IA as colunas **conferidas**, **com desvio** e **não conferidas** (o `get_metrics` com `group_by` `tool` traz as mesmas contagens). Execuções anteriores a esta versão aparecem como não conferidas.
+
 ## 0.47.0
 
 ### Adicionado

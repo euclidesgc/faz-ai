@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 46;
+export const SCHEMA_VERSION = 47;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -598,6 +598,14 @@ const MIGRATIONS: Record<number, string> = {
     -- #926: o board não varre mais pastas de ferramentas; a lista de pastas importadas por ferramenta sai.
     -- harness_selection fica: a marcação de uso (Sempre / Pelo card) continua sendo do board.
     DROP TABLE IF EXISTS harness_imports;
+  `,
+  47: `
+    -- #972: a conferência da execução (o que a sessão usou contra o que o card pediu), congelada no fim.
+    -- check_status: 'ok' | 'deviation' | 'unchecked' (sem CHECK: um estado novo não deve pedir migração).
+    -- check_detail: JSON dos desvios (ou da razão de não conferir). Execuções anteriores ficam NULL,
+    -- que a leitura trata como "não conferida"; nada é inventado.
+    ALTER TABLE ai_runs ADD COLUMN check_status TEXT;
+    ALTER TABLE ai_runs ADD COLUMN check_detail TEXT;
   `,
 };
 
