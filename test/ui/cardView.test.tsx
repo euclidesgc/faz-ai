@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CardView } from '../../src/webview/components/Card';
+import { CardPreview } from '../../src/webview/components/settings/ColorPreview';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import type { BoardState, Card } from '../../src/shared/model';
 import { readableOn } from '../../src/shared/color';
@@ -246,5 +247,16 @@ describe('caixa de seleção na faixa do card', () => {
     expect(box).not.toBeNull();
     expect(bar.firstElementChild).toBe(box);
     expect(container.querySelector('article > input.card-select')).toBeNull();
+  });
+});
+
+describe('prévia do card', () => {
+  it('nunca recebe selected nem chosen, mesmo com cards marcados', () => {
+    useBoardStore.getState().toggleSelected(board.storyId);
+    const { container } = render(<CardPreview typeName="História" color="#3366cc" />);
+    const preview = container.querySelector('.card.card-preview')!;
+    expect(preview).not.toHaveClass('selected');
+    expect(preview).not.toHaveClass('chosen');
+    useBoardStore.getState().clearSelected();
   });
 });

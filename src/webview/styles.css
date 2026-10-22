@@ -446,6 +446,21 @@ button.active {
   outline: var(--focus-ring);
   outline-offset: -1px;
 }
+/* sombra de seleção: a posição importa. .card:hover e .card.selected têm a mesma especificidade, então
+   esta regra, depois de .card:hover, ganha do hover (RF2). .card.selected.mine vem depois de
+   .card.mine:hover, que tem especificidade maior, para a seleção de um card pendente vencer o hover (RF3).
+   A sombra vai para cima e para a esquerda; o corte pelo contêiner (.columns) é conferido à parte. */
+.card.selected,
+.card.chosen {
+  box-shadow: var(--shadow-select-2);
+}
+/* pendência e seleção juntas: o anel de status continua e a sombra de seleção vem por cima */
+.card.selected.mine,
+.card.chosen.mine {
+  box-shadow:
+    0 0 0 1px var(--status-color),
+    var(--shadow-select-2);
+}
 /* caixa de marcação da seleção múltipla (card 324): tem lugar fixo na faixa do card, antes do LED,
    para nunca cobrir o ID nem o tipo; some por padrão (o lugar fica reservado, nada se mexe) e aparece
    sob o mouse, já marcada ou enquanto há alguma seleção ativa no board (classe .selecting) */
@@ -2934,8 +2949,10 @@ body.host-web .drawer {
   padding: var(--sp-8) var(--sp-4);
   border-bottom: 1px solid var(--border);
 }
+/* linha selecionada: sombra leve, sem anel, para não competir com o destaque de fundo de .item-row.selected */
 .item-row.selected {
   background: var(--hover);
+  box-shadow: var(--shadow-select-1);
 }
 .item-check {
   padding-top: var(--sp-2);

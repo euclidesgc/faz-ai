@@ -2,6 +2,12 @@
 
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Shadow on the selected card (#1069).** The selected card gets a shadow that comes out of its top-left corner and sets it apart from the others, without removing the keyboard focus outline. Cards marked in multiple selection get the same emphasis, and selected rows in lists (such as the Harness ones) get a lighter shadow. A selected card with a pending item keeps its status-colored ring, and the shadow is drawn over it. The values live in `tokens.css`, for the light and dark themes.
+
 ## 0.47.0
 
 ### Added

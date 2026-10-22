@@ -58,6 +58,8 @@ cada fase e move os cards conforme avança, sempre parando para a sua aprovaçã
   chegam como um carrossel no card. [Fluxo da história](docs/fluxo.md)
 - **Busca por card.** Na busca do board, `#980` mostra só o card 980, e `980` mostra o card 980 e os
   cards que o citam, em histórias e sub-tarefas. [Fluxo da história](docs/fluxo.md)
+- **Card selecionado em destaque.** O card selecionado, os marcados na seleção múltipla e a linha
+  escolhida nas listas ganham uma sombra que os separa do board, sem tirar o contorno de foco.
 - **Sessões curtas, contexto controlado.** Cada execução abre o card pelo MCP, faz aquele trabalho e
   para; começa sem regras, skills, agentes ou hooks que você não tenha marcado, e lê os documentos
   anexados só quando precisa. [Harness](docs/harness.md)
