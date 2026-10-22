@@ -59,6 +59,8 @@ in the Portuguese interface.
 - **Status and "with you".** Every card says whether the pending item is with the AI or with you; the
   **N com você** counter and the **Com você** filter show what is waiting for you. Questions with
   options arrive as a carousel on the card. [Story flow](docs/fluxo_EN.md)
+- **Card search.** In the board search, `#980` shows only card 980, and `980` shows card 980 and the
+  cards that mention it, in stories and sub-tasks. [Story flow](docs/fluxo_EN.md)
 - **Short sessions, controlled context.** Each run opens the card through the MCP, does that work and
   stops; it starts without rules, skills, agents or hooks you have not selected, and reads the
   attached documents only when needed. [Harness](docs/harness_EN.md)
