@@ -198,13 +198,15 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
     const { ended } = run(agent);
     const end = await ended;
 
-    expect(agent.command).toEqual({ command: 'gemini', args: ['--acp'] });
+    expect(agent.command).toEqual({ command: 'gemini', args: ['--acp', '--skip-trust'] });
     expect(agent.methods()).toEqual(['initialize', 'session/new', 'session/prompt']);
     const init = agent.received.find((m) => m.method === 'initialize')!.params;
     // o board não empresta o editor: sem fs nem terminal, cada escrita passa pela permissão
     expect(init).toMatchObject({
       protocolVersion: 1,
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+      // Gemini CLI e OpenCode recusam o initialize sem a versão do cliente
+      clientInfo: { name: 'faz-ai', version: expect.stringMatching(/^\d+\.\d+\.\d+/) },
     });
     const session = agent.received.find((m) => m.method === 'session/new')!.params;
     expect(session).toEqual({
@@ -245,7 +247,7 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
     expect(boardAnswer).toEqual({ outcome: { outcome: 'selected', optionId: 'opt-allow_once' } });
     expect(editAnswer).toEqual({ outcome: { outcome: 'selected', optionId: 'opt-reject_once' } });
     expect(lines).toEqual([
-      'Chamando Gemini CLI (ACP): gemini --acp',
+      'Chamando Gemini CLI (ACP): gemini --acp --skip-trust',
       'Sessão ACP aberta com faz-ai.',
       'Lendo o card.',
       'Vou ',
@@ -436,7 +438,7 @@ describe('catálogo do conector ACP', () => {
   // os comandos do registro oficial do ACP (registry.json, 2026-10-18), com o executável da instalação
   it('cada agente com o comando do registro do ACP', () => {
     expect(Object.fromEntries(ACP_AGENTS.map((a) => [a.id, [a.command, ...a.args].join(' ')]))).toEqual({
-      gemini: 'gemini --acp',
+      gemini: 'gemini --acp --skip-trust',
       opencode: 'opencode acp',
       'codex-acp': 'codex-acp',
       cursor: 'cursor-agent acp',
@@ -476,7 +478,7 @@ describe('catálogo do conector ACP', () => {
     const exec = { model: { name: 'gemini-3-pro', effort: 'high' } } as never;
     const agent = new FakeAgent({ onPrompt: () => ({ stopReason: 'end_turn' }) });
     run(agent, { exec }, gemini);
-    expect(agent.command!.args).toEqual(['--acp', '--model', 'gemini-3-pro']);
+    expect(agent.command!.args).toEqual(['--acp', '--skip-trust', '--model', 'gemini-3-pro']);
   });
 
   it('sem padrão de título, a ferramenta MCP é reconhecida pelo nome do servidor que o board passou', async () => {

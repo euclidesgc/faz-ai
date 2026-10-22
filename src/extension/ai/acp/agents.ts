@@ -20,7 +20,9 @@ export const ACP_AGENTS: readonly AcpAgent[] = [
     id: 'gemini',
     label: 'Gemini CLI',
     command: 'gemini',
-    args: ['--acp'],
+    // `--skip-trust`: sem a pasta marcada como confiável o Gemini CLI em ACP fica mudo no session/prompt
+    // (conferido na 0.65.0); a confiança é do board, que responde cada permissão pelo card
+    args: ['--acp', '--skip-trust'],
     login: 'gemini',
     docs: 'https://geminicli.com/docs/cli/acp-mode',
     // `usage` e `usage_update` (só contexto, sem custo) desde o PR #29549, de 2026-09-29; antes, só `_meta.quota`
