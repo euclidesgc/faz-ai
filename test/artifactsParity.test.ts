@@ -12,6 +12,7 @@ import { executionPlan, type BoardServerSpec } from '../src/extension/execution'
 import { requiredRules, requiredSkills } from '../src/extension/mcp/format';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { FLOW_LINE, contextLines } from '../src/extension/promptContext';
+import { runArtifactRequest } from '../src/extension/runArtifactSnapshot';
 import type { ModelOption } from '../src/shared/models';
 import type { BoardState, Card } from '../src/shared/model';
 
@@ -267,6 +268,27 @@ describe('paridade da execução: o que o card recebe a partir dos artefatos', (
     const s = fx.reload();
     expect(fs.existsSync(skill)).toBe(true);
     expectSameExecution({ ...fx, s, card: s.cards.find((c) => c.id === fx.card.id)! });
+  });
+});
+
+describe('snapshot da execução com a skill do fluxo no agente', () => {
+  const withAgentSkills = (s: BoardState, skills: string[]): BoardState => ({
+    ...s,
+    board: { ...s.board, execProfiles: s.board.execProfiles.map((p) => (p.id === AGENT ? { ...p, skills: [...p.skills, ...skills] } : p)) },
+  });
+
+  it('o agente que declara a faz-ai-fluxo não recusa a execução: a skill vai pelo get_skill, não pelo snapshot', () => {
+    // regressão: o condutor-do-board declara `skills: faz-ai-fluxo` e todo card dele parava em
+    // "Artefato obrigatório do card está indisponível", porque as referências nunca a listam
+    const s = withAgentSkills(fx.s, ['faz-ai-fluxo']);
+    const request = runArtifactRequest(s, fx.card)!;
+    expect(request.artifacts.map((a) => a.name)).toContain(SKILL);
+    expect(request.artifacts.map((a) => a.name)).not.toContain('faz-ai-fluxo');
+  });
+
+  it('uma skill de verdade que falta continua recusando a execução', () => {
+    const s = withAgentSkills(fx.s, ['skill-que-nao-existe']);
+    expect(() => runArtifactRequest(s, fx.card)).toThrow('Artefato obrigatório do card está indisponível.');
   });
 });
 

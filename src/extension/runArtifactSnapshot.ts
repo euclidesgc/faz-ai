@@ -10,6 +10,7 @@ import type { ContextDraftResolution } from '../shared/contextDraftResolution';
 import type { HeadlessInput } from './headless';
 import type { AiRunConfig } from '../shared/log';
 import { alwaysRefs, cardRefs } from './promptContext';
+import { isFlowSkill } from './flowSkill';
 import { isSafeSegment } from './attachments';
 import { ArtifactMirror } from './artifactMirror';
 
@@ -60,9 +61,12 @@ export function runArtifactRequest(s: BoardState, card?: Card): RunArtifactReque
   const manifest = card ? manifestOf(s, card) : null;
   if (library.artifacts.some((a) => a.usage === 'always' && a.missing && a.kind !== 'mcp'))
     throw new Error('Artefato obrigatório Sempre está indisponível.');
+  // as skills do fluxo (faz-ai-fluxo e as faz-ai-*) vêm do texto do board pelo get_skill, nunca por arquivo: as
+  // referências as deixam de fora de propósito, então exigi-las aqui recusava toda execução de um agente que
+  // as declara (o condutor-do-board, agente padrão)
   if (
     manifest &&
-    (manifest.skills.some((name) => !refs.some((r) => r.kind === 'skill' && r.name === name)) ||
+    (manifest.skills.some((name) => !isFlowSkill(name) && !refs.some((r) => r.kind === 'skill' && r.name === name)) ||
       manifest.rules.some((name) => !refs.some((r) => r.kind === 'rule' && r.name === name)))
   )
     throw new Error('Artefato obrigatório do card está indisponível.');
