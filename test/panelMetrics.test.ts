@@ -7,6 +7,7 @@ import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { getPanelMetrics } from '../src/extension/log/metrics';
 import { consolidate } from '../src/extension/log/rollup';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
+import { RUN_CACHE_READ_LIMIT } from '../src/shared/runLimit';
 import type { MetricsMonth, MetricsPanelResult } from '../src/shared/metrics';
 
 // #155: `getPanelMetrics`, a consulta do painel de métricas (#71). Um teste por requisito do PRD; a
@@ -133,6 +134,15 @@ const month = (result: MetricsPanelResult, m: string): MetricsMonth => {
 describe('getPanelMetrics', () => {
   it('RF-04: data final antes da inicial lança', () => {
     expect(() => getPanelMetrics(db, boardId, { startDate: '2026-06-10', endDate: '2026-06-01' })).toThrow();
+  });
+
+  it('overLimitRuns conta só as execuções medidas com leitura de cache acima do limite', () => {
+    run(at(2026, 6, 1), 60_000, { consumption: { cacheRead: RUN_CACHE_READ_LIMIT + 1 } });
+    run(at(2026, 6, 2), 60_000, { consumption: { cacheRead: RUN_CACHE_READ_LIMIT } });
+    run(at(2026, 6, 3), 60_000);
+    const { totals, months } = getPanelMetrics(db, boardId, { startDate: '2026-06-01', endDate: '2026-06-30' });
+    expect(totals.overLimitRuns).toBe(1);
+    expect(months[months.length - 1]?.overLimitRuns).toBe(1);
   });
 
   it('RF-09: os cinco totais batem com o log montado à mão', () => {
@@ -313,7 +323,7 @@ describe('getPanelMetrics', () => {
       const after = month(getPanelMetrics(db, boardId, {}), '2025-11');
       expect(before.archived).toBe(false);
       expect(after.archived).toBe(true);
-      expect({ ...after, archived: false }).toEqual(before);
+      expect({ ...after, archived: false }).toEqual({ ...before, overLimitRuns: undefined });
       expect(after.tokens).toEqual({ input: 101, output: 20, cacheRead: 3, cacheWrite: 4, total: 128 });
       expect(after).toMatchObject({ costUsd: 0.75, costEstimatedUsd: 0.5, costInformedUsd: 0.25, measuredRuns: 2, runs: 3, cardsDone: 1 });
     });

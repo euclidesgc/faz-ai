@@ -44,6 +44,12 @@ let runner: {
 
 const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
 const columnName = (n: number) => router.snapshot().columns.find((c) => c.id === card(n).columnId)!.name;
+/** A coluna do workflow de Histórias com este nome. */
+const columnOfName = (name: string) => {
+  const s = router.snapshot();
+  const wf = s.workflows.find((w) => w.kind === 'parent')!;
+  return s.columns.find((c) => c.name === name && c.workflowId === wf.id)!;
+};
 const ai = (msg: Parameters<MessageRouter['handle']>[0]) => router.handle(msg, { author: 'Claude Code', source: 'ai' });
 const move = (n: number, column: string) =>
   ai({
@@ -236,6 +242,17 @@ describe('autopilotStep', () => {
     expect(autopilotStep(router.snapshot()).kind).toBe('idle');
     yolo(1);
     expect(autopilotStep(router.snapshot()).kind).toBe('advance');
+  });
+
+  it('trilha curta: o avanço calculado de um Bug numa coluna em que a IA não atua pula o PRD e a Spec; com a regra desligada, vai ao PRD', () => {
+    // o Discovery deixa de ser da IA, para o autopiloto calcular o avanço a partir dele
+    router.handle({ type: 'settings.column.update', columnId: columnOfName('Discovery').id, patch: { aiActive: false } });
+    router.handle({ type: 'settings.rules.update', patch: { shortTrack: true } });
+    createTyped('Bug', 'Bug', 'Discovery');
+    yolo(1);
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 1 }, column: { name: 'Plan' } });
+    router.handle({ type: 'settings.rules.update', patch: { shortTrack: false } });
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 1 }, column: { name: 'PRD' } });
   });
 
   it('o card bloqueado não trava mais a fila: a sub-tarefa fica com a história, mas a próxima avança', () => {

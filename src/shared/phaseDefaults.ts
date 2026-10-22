@@ -478,12 +478,31 @@ const askQuestions = (text: string): string =>
       'ask_questions (no modo autônomo, o board responde com a indicada) e pare',
     );
 
-/** Os textos padrão atuais: os da versão 12, sem a seção "Perguntas para você" e com ask_questions. */
-export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+/** Os textos padrão da versão 13: os da versão 12, sem a seção "Perguntas para você" e com ask_questions. */
+const PHASE_DEFAULTS_V13: Record<string, PhaseDefault> = Object.fromEntries(
   Object.entries(PHASE_DEFAULTS_V12).map(([name, d]) => [
     name,
     { ...d, instruction: askQuestions(d.instruction), artifactTemplate: withoutQuestions(d.artifactTemplate) },
   ]),
+);
+
+// A versão 14 explica a trilha curta (regra shortTrack): o Discovery avisa que a história pequena vai direto ao
+// Plan e como devolvê-la à trilha completa; o Plan parte do DISCOVERY quando não há PRD nem Spec.
+const SHORT_TRACK_DISCOVERY =
+  'Com a regra Trilha curta ligada, uma história de esforço Baixo ou do tipo Bug vai deste Discovery direto ao Plan, sem PRD nem Spec: deixe o Mapa do código completo, porque o Plan parte dele. Se descobrir que a história é maior do que parecia, suba o campo "Esforço da atividade" com update_card (ou corrija o tipo) e registre na conversa: o avanço seguinte segue a trilha completa.';
+const shortTrack = (name: string, text: string): string => {
+  if (name === 'Discovery') return text.replace('\nDiscuta com a pessoa', `\n${SHORT_TRACK_DISCOVERY}\nDiscuta com a pessoa`);
+  if (name === 'Plan')
+    return text.replace(
+      'Se a história começou nesta fase, sem Spec, parta da descrição e da conversa do card. Parta da seção "Mapa do código" da Spec e leia só o que faltar.',
+      'Se a história começou nesta fase, sem Spec, ou veio pela trilha curta (só com o Discovery), parta do DISCOVERY.md, da descrição e da conversa do card, sem criar os documentos que faltam. Parta da seção "Mapa do código" da Spec ou do Discovery e leia só o que faltar.',
+    );
+  return text;
+};
+
+/** Os textos padrão atuais (versão 14): os da versão 13 com a trilha curta no Discovery e no Plan. */
+export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+  Object.entries(PHASE_DEFAULTS_V13).map(([name, d]) => [name, { ...d, instruction: shortTrack(name, d.instruction) }]),
 );
 
 /** Textos padrão anteriores de uma fase e o que a versão atual traz de novo, para a atualização do board. */
@@ -501,9 +520,10 @@ export interface PhaseHistory {
  */
 export const PHASE_HISTORY: Record<string, PhaseHistory> = {
   Discovery: {
-    instructions: [DISCOVERY_INSTRUCTION_V11, PHASE_DEFAULTS_V12.Discovery!.instruction],
+    instructions: [DISCOVERY_INSTRUCTION_V11, PHASE_DEFAULTS_V12.Discovery!.instruction, PHASE_DEFAULTS_V13.Discovery!.instruction],
     templates: [DISCOVERY_TEMPLATE_V8, DISCOVERY_TEMPLATE_V11, PHASE_DEFAULTS_V12.Discovery!.artifactTemplate],
-    change: 'as dúvidas com alternativas vão por ask_questions (carrossel no card) e o documento perde a seção "Perguntas para você"',
+    change:
+      'a fase explica a trilha curta (história de esforço Baixo ou do tipo Bug vai direto ao Plan quando a regra está ligada) e como devolver a história à trilha completa; as dúvidas com alternativas vão por ask_questions (carrossel no card) e o documento perde a seção "Perguntas para você"',
   },
   PRD: {
     instructions: [PRD_INSTRUCTION_V5, PRD_INSTRUCTION_V11],
@@ -516,9 +536,10 @@ export const PHASE_HISTORY: Record<string, PhaseHistory> = {
     change: 'o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
   },
   Plan: {
-    instructions: [PLAN_INSTRUCTION_V5, PLAN_INSTRUCTION_V11],
+    instructions: [PLAN_INSTRUCTION_V5, PLAN_INSTRUCTION_V11, PHASE_DEFAULTS_V12.Plan!.instruction, PHASE_DEFAULTS_V13.Plan!.instruction],
     templates: [PLAN_TEMPLATE_V5, PLAN_TEMPLATE_V8, PHASE_DEFAULTS_V12.Plan!.artifactTemplate],
-    change: 'o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
+    change:
+      'o plano parte do DISCOVERY quando a história veio pela trilha curta, sem PRD nem Spec; o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
   },
   Revisão: {
     instructions: [PHASE_DEFAULTS_V12.Revisão!.instruction],

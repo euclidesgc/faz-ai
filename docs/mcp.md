@@ -395,6 +395,10 @@ e o modelo do documento que ela produz e se a coluna exige aprovação. Numa sub
 fase da história e `storyArtifacts` lista os documentos já anexados a ela. Uma história criada ou
 movida direto para uma fase adiante recebe em `phase.missingArtifacts` os documentos das fases
 anteriores que não existem: a IA trabalha a partir da descrição e da conversa, sem criá-los.
+Com a regra **Trilha curta** ligada (`shortTrack` em `update_rules` e nas `rules` de `get_board`;
+desligada por padrão), a aprovação da pessoa e o autopiloto levam uma história de esforço Baixo ou
+do tipo Bug do Discovery direto ao Plan, que parte do DISCOVERY; `move_card` com a coluna continua
+livre e, para o PRD ou a Spec, força a trilha completa.
 
 O documento é construído numa sub-tarefa (campo Fase = nome da coluna), mas fica na história:
 `add_attachment` com `artifact: true` grava o arquivo no card da história, mesmo quando chamado na
@@ -422,6 +426,10 @@ Leituras de skills, agentes, regras e artefatos de sessões controladas usam a c
 A API já é usada pelo Orchestrator com UnitStarter injetado nos testes; gatilhos legados não passam a criar unidades automaticamente. Testes usam servidor MCP e ponte compilada reais, com processos Node; não comprovam isolamento de uma CLI de IA, ativação v1 completa ou conclusão de #824/#825.
 
 O hook interno de host `AiCall.beforeStart(identity)` pode aguardar persistência assíncrona. A CLI permanece atrás do launcher até a confirmação; ao sair da espera, token, snapshot e admissão são revalidados. Parar ou revogar durante a espera impede liberação tardia. O Orchestrator liga o hook ao flush e à posse da pasta por um UnitStarter injetado. A criação no host e a ativação nos gatilhos continuam pendentes.
+
+### Contexto mínimo em execução (runtime v1)
+
+`AiGateway.runtime` é `legacy` (padrão) ou `v1` (`FAZ_AI_CONTEXT_RUNTIME=v1` ao abrir o host). No `v1` o gateway recusa, antes de snapshot ou processo, toda chamada sem `context` (configuração resolvida) e `strict` (pedido de admissão); runner (fase, refinar, resumo, conflito), chat, assistentes do Harness e teste do perfil montam ambos em `src/extension/ai/v1Prepare.ts`. A configuração resolvida é validada no gateway (recurso obrigatório ausente ou desativado, MCP fora da atividade) e congelada em `manifest.context` do snapshot. A prévia (`preview_context_draft`) usa o mesmo resolvedor e a mesma admissão. Os recibos vêm do comando `fazai.verifyExecutor` (validade de 14 dias); sem eles a admissão estrita bloqueia a execução. A proposta da IA para a configuração de uma atividade (`contextPlanning.propose`) é só leitura, validada no host e nunca grava.
 
 ### Verificação real do contrato do provider
 

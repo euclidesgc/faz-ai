@@ -47,6 +47,13 @@ describe('conjunto de skills do fluxo (#588)', () => {
     expect(SUBTASKS_NOW_NOTE).toContain('faz-ai-implementacao-rodadas');
   });
 
+  it('a principal explica a trilha curta: Baixo ou Bug vai do Discovery ao Plan, o esforço sobe com update_card e move_card força a trilha completa', () => {
+    expect(FLOW_SKILL.body).toContain('Trilha curta');
+    expect(FLOW_SKILL.body).toContain('direto ao Plan');
+    expect(FLOW_SKILL.body).toContain('`update_card`');
+    expect(FLOW_SKILL.body).toContain('força a trilha completa');
+  });
+
   it('a principal manda partir do mapa do código e pede os arquivos de cada sub-tarefa', () => {
     expect(FLOW_SKILL.body).toContain('Mapa do código');
     expect(FLOW_SKILL.body).toContain('os arquivos que ela vai tocar');

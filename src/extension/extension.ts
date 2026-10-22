@@ -350,6 +350,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (!(await getRouter()) || !host) throw new Error('Abra uma pasta para conectar uma IA ao board.');
       return host.fixProjectServer(file);
     }),
+    vscode.commands.registerCommand('fazai.verifyExecutor', async () => {
+      if (!(await getRouter()) || !host) return void vscode.window.showWarningMessage('Abra uma pasta para verificar o isolamento da IA.');
+      try {
+        void vscode.window.showInformationMessage(
+          await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title: 'Faz AI: verificando o isolamento da CLI…' },
+            () => host!.verifyExecutor(),
+          ),
+        );
+      } catch (e) {
+        void vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
+      }
+    }),
     output,
     vscode.commands.registerCommand('fazai.ai.run', aiCommand('start')),
     vscode.commands.registerCommand('fazai.ai.stop', aiCommand('stop')),

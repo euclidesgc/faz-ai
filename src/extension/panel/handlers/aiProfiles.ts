@@ -1,8 +1,9 @@
 import type { AiProfile } from '../../../shared/aiProfiles';
 import type { HostToWebview } from '../../../shared/messages';
 import type { StrictExecutionRequest } from '../../../shared/executionAdmission';
-import type { AiGateway } from '../../ai/gateway';
+import type { AiGateway, ContextRuntime } from '../../ai/gateway';
 import { NO_CARD } from '../../ai/gateway';
+import { closedV1 } from '../../ai/v1Prepare';
 import { profileCanProbe, profileSignedIn, profileVersion } from '../../cliProbe';
 import { resolveProfileCommand } from '../../cliResolve';
 import { redactCredentialValues } from '../../credentials';
@@ -37,7 +38,7 @@ export interface AiProfileRuntime {
 
 export interface AiProfileRuntimeDeps {
   repo: AiProfileRepo;
-  gateway: Pick<AiGateway, 'run'>;
+  gateway: Pick<AiGateway, 'run'> & { runtime?: ContextRuntime };
   boardId: () => string;
   cwd: string;
   homeDir: string;
@@ -119,6 +120,8 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
           timeoutMinutes: 2,
           prepare: () => ({
             ...(profile!.kind === 'builtin' ? {} : { strict: { profileId: id, request: strict } }),
+            // runtime v1: o teste do perfil também passa pelo contrato (fechado, sem MCP)
+            ...(deps.gateway.runtime === 'v1' ? closedV1(id, 'chat') : {}),
             config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: true, skills: [], mcp: [] },
             input: { prompt: 'Responda apenas com a palavra OK.', permission: 'board', structured: true },
           }),

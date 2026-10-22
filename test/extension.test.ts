@@ -85,6 +85,7 @@ it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serv
     'fazai.autopilot.resume',
     'fazai.upgradeBoard',
     'fazai.showLog',
+    'fazai.verifyExecutor',
   ])
     expect(fake.commands.has(id), id).toBe(true);
   // o atalho de terminal aponta para esta versão e para os mesmos dados

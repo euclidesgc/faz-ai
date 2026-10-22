@@ -1,3 +1,4 @@
+import type { ContextDraftResolution } from '../../shared/contextDraftResolution';
 import { executorProfile } from './providers';
 import { redactCredentialValues } from '../credentials';
 import { authFailed } from './profileAuth';
@@ -38,6 +39,13 @@ export function missingProfileCommand(error: Error, profile: AiProfile | undefin
 /** O contexto da execução que o log congela na hora da chamada: a IA move o card durante o trabalho. */
 export type AiRunContext = Omit<AiRunStart, 'boardId' | 'startedAt' | 'origin' | 'tool'>;
 
+/** Motivos que impedem iniciar: tudo, menos a leitura da admissão, que o gateway decide por conta própria. */
+export function blockingContextDiagnostics(context: ContextDraftResolution): string[] {
+  return context.diagnostics
+    .filter((d) => d.code !== 'admission-unavailable' && d.code !== 'admission-blocked')
+    .map((d) => (d.artifactId ? `${d.code}:${d.artifactId}` : d.code));
+}
+
 /** Contexto de uma execução sem card, como a do chat. */
 export const NO_CARD: AiRunContext = {
   cardId: null,
@@ -54,6 +62,8 @@ export interface AiPrepared {
   work?: { id: string; token: string };
   artifacts?: RunArtifactRequest;
   /** Contrato v1 preparado pelo host; não aceita evidência ou selo de verificação do cliente. */
+  /** Configuração v1 resolvida pelo `resolveContextDraft` antes do spawn; congelada no snapshot da execução. */
+  context?: ContextDraftResolution;
   strict?: { profileId: string; request: StrictExecutionRequest };
   input: HeadlessInput;
   /** a configuração que o log guarda; a permissão sai de `input.permission` */
@@ -131,6 +141,11 @@ export interface AiGatewayDeps {
   sessions?: RunMcpSessions;
   snapshots?: Pick<RunArtifactSnapshots, 'capture'>;
   admission?: ExecutionAdmission;
+  /**
+   * Runtime do contexto (E5.3). `legacy` (padrão) mantém o comportamento anterior; `v1` recusa toda execução que
+   * não traga a configuração resolvida e o pedido de admissão: nenhum caminho de IA roda ignorando o plano.
+   */
+  runtime?: ContextRuntime;
   leaseCoordinationDir?: string;
   boardId: string;
   /** obrigatório: sem ele a execução não teria onde ser registrada */
@@ -147,8 +162,14 @@ export function outcomeOf(end: { stopped: boolean; timedOut: boolean; code: numb
   return 'done';
 }
 
+export type ContextRuntime = 'legacy' | 'v1';
+
 export class AiGateway {
   constructor(private deps: AiGatewayDeps) {}
+
+  get runtime(): ContextRuntime {
+    return this.deps.runtime ?? 'legacy';
+  }
 
   get supportsSnapshots(): boolean {
     return !!this.deps.snapshots;
@@ -203,6 +224,8 @@ export class AiGateway {
       )
         throw new Error('Perfil desativado ou pendente de revisão.');
       const prepared = call.prepare();
+      if (this.runtime === 'v1' && !(prepared.context && prepared.strict))
+        throw new Error('Runtime v1: a execução precisa da configuração resolvida e da admissão; nenhum caminho de IA ignora o plano.');
       if (profile.kind !== 'builtin' && !prepared.strict)
         throw new Error('Perfis configuráveis exigem contrato e admissão por capacidades.');
       if (profile.kind !== 'builtin' && prepared.strict?.profileId !== profile.id)
@@ -218,7 +241,18 @@ export class AiGateway {
       }
       if (prepared.artifacts && !this.deps.snapshots) throw new Error('Snapshot de artefatos indisponível; execução bloqueada.');
       const { admission: _admission, ...resolved } = config;
-      const snapshot = this.deps.snapshots?.capture(runId, prepared.artifacts, resolved);
+      if (prepared.context && prepared.strict) {
+        // Só os MCPs da configuração resolvida entram: o pedido de admissão nunca ativa um a mais.
+        const planned = new Set(prepared.context.items.filter((i) => i.kind === 'mcp').map((i) => i.artifactId));
+        const extra = prepared.strict.request.activeMcpIds.filter((id) => !planned.has(id));
+        if (extra.length) throw new Error(`MCP fora da configuração da atividade: ${extra.join(', ')}.`);
+      }
+      if (prepared.context) {
+        const missing = blockingContextDiagnostics(prepared.context);
+        if (missing.length) throw new Error(`Recurso obrigatório da atividade indisponível: ${missing.join(', ')}.`);
+        if (!this.deps.snapshots) throw new Error('Snapshot de artefatos indisponível; a configuração v1 não pode ser congelada.');
+      }
+      const snapshot = this.deps.snapshots?.capture(runId, prepared.artifacts, resolved, prepared.context);
       if (snapshot) input = snapshot.rewrite(input);
       let admitted: AdmittedExecution | undefined;
       if (prepared.strict) {

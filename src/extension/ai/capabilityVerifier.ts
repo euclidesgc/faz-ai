@@ -1,0 +1,451 @@
+// Verificador do host para a CLI do Claude: roda a CLI real numa fixture descartável contra uma API local
+// controlada e grava as evidências assinadas das cinco capacidades. O vínculo é o de isolamento
+// (`ExecutionAdmission.isolationBinding`), independente da pasta do projeto: nenhuma sentinela é plantada
+// no projeto da pessoa. O que a fixture prova são as flags de isolamento da CLI; o ambiente e as políticas
+// gerenciadas reais fazem parte do vínculo.
+import * as fs from 'node:fs';
+import * as http from 'node:http';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  CAPABILITY_CHECKS,
+  EXECUTOR_CAPABILITIES,
+  type CapabilityEvidence,
+  type ExecutorCapability,
+} from '../../shared/executionAdmission';
+import { headlessCommand, type HeadlessCommand, type HeadlessInput } from '../headless';
+import { materialize } from '../aiOutput/measured';
+import type { RunningProcess } from '../runner';
+import type { AiExecutor } from './providers';
+import type { ExecutionAdmission } from './admission';
+import { canonical, type CapabilityEvidenceStore } from './capabilityEvidence';
+
+const API_KEY = 'fazai-local-verification-only';
+const NO_DELEGATION = ['Agent', 'Task', 'SendMessage', 'ListAgents'];
+const DAY = 24 * 3600_000;
+
+export interface ProbeToolResult {
+  name: string;
+  isError: boolean;
+}
+/** O que uma execução da CLI deixou observável: pedidos à API, chamadas MCP e efeitos em disco. */
+export interface ProbeObservation {
+  code: number | null;
+  timedOut: boolean;
+  requestText: string;
+  toolNames: string[];
+  toolResults: ProbeToolResult[];
+  mcpConnections: string[];
+  mcpCalls: string[];
+  sessionId: string | null;
+}
+export interface ProbeRun {
+  /** barreiras retiradas: precisa tornar a contaminação observável, senão a ausência não prova nada */
+  control: ProbeObservation;
+  strict: ProbeObservation;
+  controlHook: boolean;
+  strictHook: boolean;
+  forbiddenFileWritten: boolean;
+  allowedReadContent: string;
+  canaries: Record<string, string>;
+  /** duas execuções vazias seguidas, com marcadores distintos */
+  first: ProbeObservation & { marker: string };
+  second: ProbeObservation & { marker: string };
+  environmentDigest: string;
+}
+type Check = CapabilityEvidence['checks'][number];
+const sha = (value: unknown) => createHash('sha256').update(canonical(value)).digest('hex');
+
+/** Decisão pura sobre as observações; recibo = hash dos fatos observados e do vínculo. */
+export function evaluateProbes(binding: string, run: ProbeRun): Record<ExecutorCapability, Check[]> {
+  const check = (id: string, ok: boolean | null, facts: unknown): Check => ({
+    id,
+    outcome: ok === null ? 'unavailable' : ok ? 'passed' : 'failed',
+    receipt: sha({ binding, id, ok, facts }),
+  });
+  const leaks = (text: string, scope: string) => text.includes(run.canaries[scope]!);
+  const detectable = (scope: string) => leaks(run.control.requestText, scope);
+  // Sentinela ausente só prova isolamento quando o controle a enxergou; senão o resultado é indisponível.
+  const sentinel = (scope: string) => (!detectable(scope) ? null : !leaks(run.strict.requestText, scope));
+  const resultOf = (name: string) => run.strict.toolResults.find((r) => r.name === name);
+  const started = run.strict.code === 0 && !run.strict.timedOut && run.strict.requestText.length > 0;
+  const refused = (name: string) => resultOf(name)?.isError === true;
+  const hookSeen = run.controlHook;
+  return {
+    conversation: [
+      check(
+        'fresh-conversation',
+        run.first.code === 0 && run.second.code === 0 && run.first.sessionId !== null
+          ? run.first.sessionId !== run.second.sessionId && !run.second.requestText.includes(run.first.marker)
+          : false,
+        { distinct: run.first.sessionId !== run.second.sessionId },
+      ),
+    ],
+    artifacts: [
+      check('project-sentinel', started ? sentinel('project') : false, { control: detectable('project') }),
+      check('user-sentinel', started ? sentinel('user') : false, { control: detectable('user') }),
+      check('ancestor-sentinel', started ? sentinel('ancestor') : false, { control: detectable('ancestor') }),
+      check('additional-directory-sentinel', started ? sentinel('additional') : false, { control: detectable('additional') }),
+      check('managed-settings', /^[a-f0-9]{64}$/.test(run.environmentDigest), { digest: run.environmentDigest }),
+    ],
+    permissions: [
+      check('allowed-tool', started && resultOf('Read')?.isError === false && run.strict.requestText.includes(run.allowedReadContent), {}),
+      check(
+        'forbidden-tool',
+        started &&
+          refused('Bash') &&
+          refused('Write') &&
+          !run.forbiddenFileWritten &&
+          !run.strict.toolNames.some((n) => n === 'Bash' || n === 'Write'),
+        { hook: hookSeen && !run.strictHook },
+      ),
+    ],
+    mcp: [
+      check(
+        'allowed-server',
+        started && run.strict.mcpCalls.includes('allowed:allowed') && resultOf('mcp__allowed__allowed')?.isError === false,
+        {},
+      ),
+      check(
+        'forbidden-server',
+        started && run.control.mcpConnections.includes('forbidden') ? !run.strict.mcpConnections.includes('forbidden') : null,
+        {},
+      ),
+      check('operation-scope', started && refused('mcp__allowed__forbidden') && !run.strict.mcpCalls.includes('allowed:forbidden'), {}),
+    ],
+    delegation: [
+      check('native-delegation-denied', started && refused('Agent') && !run.strict.toolNames.some((n) => NO_DELEGATION.includes(n)), {}),
+    ],
+  };
+}
+
+export function buildEvidence(
+  binding: string,
+  checks: Record<ExecutorCapability, Check[]>,
+  now: number,
+  ttlMs = 14 * DAY,
+): CapabilityEvidence[] {
+  return EXECUTOR_CAPABILITIES.map((capability) => ({
+    version: 1,
+    capability,
+    source: 'host-probe',
+    binding,
+    checkedAt: now,
+    expiresAt: now + ttlMs,
+    // só os checks previstos para a capacidade; um check ausente deixa a capacidade parcial
+    checks: checks[capability].filter((c) => CAPABILITY_CHECKS[capability].includes(c.id)),
+  }));
+}
+
+interface Attempt {
+  name: string;
+  input: Record<string, unknown>;
+}
+interface ApiState {
+  texts: string[];
+  tools: string[][];
+  results: { id: string; isError: boolean }[];
+  uses: Map<string, string>;
+  attempts: Attempt[];
+  sent: boolean;
+  connections: string[];
+  calls: string[];
+}
+const json = (v: unknown) => JSON.stringify(v);
+const write = (file: string, text: string) => {
+  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(file, text, { mode: 0o600 });
+};
+function reply(res: http.ServerResponse, body: unknown, status = 200): void {
+  res.writeHead(status, { 'content-type': 'application/json' }).end(json(body));
+}
+/** Resposta SSE mínima da API: as respostas do modelo são roteirizadas, nunca valores aceitos como prova. */
+function message(res: http.ServerResponse, model: string, calls: Attempt[]): void {
+  const send = (type: string, data: unknown) => res.write(`event: ${type}\ndata: ${json(data)}\n\n`);
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+  send('message_start', {
+    type: 'message_start',
+    message: {
+      id: `msg_${randomUUID()}`,
+      type: 'message',
+      role: 'assistant',
+      model,
+      content: [],
+      stop_reason: null,
+      stop_sequence: null,
+      usage: { input_tokens: 1, output_tokens: 0 },
+    },
+  });
+  const blocks = calls.length
+    ? calls.map((c) => ({ type: 'tool_use', id: `toolu_${randomUUID()}`, name: c.name, input: c.input }))
+    : [{ type: 'text', text: 'Verificação local encerrada.' }];
+  blocks.forEach((block, index) => {
+    send('content_block_start', {
+      type: 'content_block_start',
+      index,
+      content_block: block.type === 'tool_use' ? { ...block, input: {} } : block,
+    });
+    if ('input' in block)
+      send('content_block_delta', {
+        type: 'content_block_delta',
+        index,
+        delta: { type: 'input_json_delta', partial_json: json(block.input) },
+      });
+    send('content_block_stop', { type: 'content_block_stop', index });
+  });
+  send('message_delta', {
+    type: 'message_delta',
+    delta: { stop_reason: calls.length ? 'tool_use' : 'end_turn', stop_sequence: null },
+    usage: { output_tokens: 1 },
+  });
+  send('message_stop', { type: 'message_stop' });
+  res.end();
+}
+
+export interface VerifierDeps {
+  executor: AiExecutor;
+  profileId: string;
+  admission: ExecutionAdmission;
+  store: CapabilityEvidenceStore;
+  pathEnv: string | undefined;
+  /** quem inicia a CLI é o host (regra do gateway): ele entrega o iniciador */
+  spawn(command: HeadlessCommand, cwd: string, out: (text: string, stream: 'stdout' | 'stderr') => void): RunningProcess;
+  now?(): number;
+  /** limite por execução da CLI */
+  timeoutMs?: number;
+  /** substituível em testes: roda as sondagens e devolve as observações */
+  probe?(binding: string): Promise<ProbeRun>;
+}
+export interface VerifierResult {
+  binding: string;
+  evidence: CapabilityEvidence[];
+  /** nenhuma capacidade verificada de fato quando há check falho ou indisponível */
+  verified: boolean;
+}
+
+/** Executa as sondagens e grava as evidências. Recusa quando o ambiente gerenciado não pôde ser lido. */
+export async function verifyExecutor(deps: VerifierDeps): Promise<VerifierResult> {
+  if (deps.executor !== 'claude') throw new Error('O verificador de isolamento só existe para a CLI do Claude.');
+  const bound = deps.admission.isolationBinding(deps.executor, deps.profileId, 'board');
+  if (!bound.environmentComplete) throw new Error('Ambiente gerenciado não verificado; recibos não são gravados.');
+  const run = await (deps.probe ?? ((binding) => runClaudeProbes(deps, bound.executable, binding)))(bound.binding);
+  const evidence = buildEvidence(bound.binding, evaluateProbes(bound.binding, run), deps.now?.() ?? Date.now());
+  const verified = evidence.every((e) =>
+    CAPABILITY_CHECKS[e.capability].every((id) => e.checks.some((c) => c.id === id && c.outcome === 'passed')),
+  );
+  // Também grava falhas: uma falha mais nova nunca recorre ao sucesso antigo.
+  for (const e of evidence) deps.store.record(e);
+  return { binding: bound.binding, evidence, verified };
+}
+
+/** A fixture neutraliza provedores/chaves: nunca usa nem reencaminha a autenticação da pessoa. */
+async function runClaudeProbes(deps: VerifierDeps, executable: string, _binding: string): Promise<ProbeRun> {
+  if (process.platform === 'win32') throw new Error('Verificador de isolamento: Windows não validado.');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-verify-'));
+  fs.chmodSync(root, 0o700);
+  const project = path.join(root, 'ancestor', 'project');
+  const config = path.join(root, 'config');
+  const additional = path.join(root, 'additional');
+  const marker = path.join(root, 'hook-executed');
+  const canaries = Object.fromEntries(
+    ['project', 'user', 'ancestor', 'additional', 'skill', 'agent'].map((n) => [n, `FAZAI_${n}_${randomUUID().replaceAll('-', '')}`]),
+  );
+  write(path.join(project, 'CLAUDE.md'), canaries.project!);
+  write(path.join(config, 'CLAUDE.md'), canaries.user!);
+  write(path.join(project, '..', 'CLAUDE.md'), canaries.ancestor!);
+  write(path.join(additional, 'CLAUDE.md'), canaries.additional!);
+  write(path.join(project, 'allowed.txt'), 'FAZAI_READ_ALLOWED');
+  const hook = path.join(root, 'hook.cjs');
+  write(hook, `require('node:fs').writeFileSync(${json(marker)}, 'executado')`);
+  const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+  write(
+    path.join(project, '.claude', 'settings.local.json'),
+    json({
+      enableAllProjectMcpServers: true,
+      hooks: { SessionStart: [{ hooks: [{ type: 'command', command: `${q(process.execPath)} ${q(hook)}` }] }] },
+    }),
+  );
+  let state: ApiState = { texts: [], tools: [], results: [], uses: new Map(), attempts: [], sent: false, connections: [], calls: [] };
+  const server = http.createServer(async (req, res) => {
+    try {
+      if (req.method !== 'POST') return reply(res, {}, 405);
+      let body = '';
+      for await (const chunk of req) {
+        body += String(chunk);
+        if (body.length > 8_000_000) return reply(res, {}, 413);
+      }
+      const data = JSON.parse(body);
+      if (req.url?.startsWith('/mcp/')) {
+        const name = req.url.slice('/mcp/'.length);
+        if (data.id === undefined) return void res.writeHead(202).end();
+        if (data.method === 'initialize') state.connections.push(name);
+        const result =
+          data.method === 'initialize'
+            ? { protocolVersion: data.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name, version: '1' } }
+            : data.method === 'tools/list'
+              ? {
+                  tools: ['allowed', 'forbidden'].map((tool) => ({
+                    name: tool,
+                    description: `Operação ${tool} do teste`,
+                    inputSchema: { type: 'object', properties: {} },
+                  })),
+                }
+              : data.method === 'tools/call'
+                ? (state.calls.push(`${name}:${data.params.name}`), { content: [{ type: 'text', text: 'FAZAI_MCP_ALLOWED' }] })
+                : {};
+        return reply(res, { jsonrpc: '2.0', id: data.id, result });
+      }
+      if (req.url?.split('?')[0] === '/v1/messages') {
+        if (req.headers['x-api-key'] !== API_KEY || req.headers.authorization)
+          return reply(res, { error: { type: 'authentication_error', message: 'Apenas autenticação fictícia é aceita.' } }, 401);
+        state.texts.push(body);
+        state.tools.push((data.tools ?? []).map((t: { name: string }) => t.name));
+        for (const m of data.messages ?? [])
+          if (Array.isArray(m.content))
+            for (const b of m.content) {
+              if (b.type === 'tool_use') state.uses.set(b.id, b.name);
+              if (b.type === 'tool_result') state.results.push({ id: b.tool_use_id, isError: b.is_error === true });
+            }
+        const attempts = state.sent ? [] : state.attempts;
+        state.sent = true;
+        return message(res, data.model, attempts);
+      }
+      return reply(res, req.url?.includes('count_tokens') ? { input_tokens: 1 } : {});
+    } catch {
+      if (!res.headersSent) reply(res, {}, 400);
+      else res.end();
+    }
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  write(path.join(project, '.mcp.json'), json({ mcpServers: { forbidden: { type: 'http', url: `${url}/mcp/forbidden` } } }));
+  const mcpConfig = json({ mcpServers: { allowed: { type: 'http', url: `${url}/mcp/allowed` } } });
+  const env: Record<string, string> = {
+    ...Object.fromEntries(
+      Object.keys(process.env)
+        .filter((k) => /^(ANTHROPIC_|CLAUDE_|AWS_|GOOGLE_|AZURE_|NODE_OPTIONS$|NODE_PATH$)/.test(k))
+        .map((k) => [k, '']),
+    ),
+    PATH: deps.pathEnv ?? process.env.PATH ?? '',
+    CLAUDE_CONFIG_DIR: config,
+    ANTHROPIC_API_KEY: API_KEY,
+    ANTHROPIC_BASE_URL: url,
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+    CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
+    NO_COLOR: '1',
+  };
+  const execute = async (opts: {
+    control?: boolean;
+    empty?: boolean;
+    attempts?: Attempt[];
+    prompt?: string;
+  }): Promise<ProbeObservation> => {
+    fs.rmSync(marker, { force: true });
+    state = { texts: [], tools: [], results: [], uses: new Map(), attempts: opts.attempts ?? [], sent: false, connections: [], calls: [] };
+    const input: HeadlessInput = {
+      prompt: opts.prompt ?? 'Verificação local de contrato.',
+      permission: 'board',
+      structured: true,
+      addDirs: [additional],
+      exec: {
+        agent: '',
+        agentDefinition: null,
+        model: { name: 'claude-sonnet-4-6', effort: null },
+        mcpBlocked: [],
+        mcpAllowed: opts.empty ? [] : ['allowed'],
+        mcpConfig: opts.empty ? '{"mcpServers":{}}' : mcpConfig,
+        tools: opts.empty ? [] : ['Read'],
+        deniedTools: NO_DELEGATION,
+        toolSet: 'explicit',
+        mcpTools: opts.empty ? [] : ['mcp__allowed__allowed'],
+      },
+    };
+    let built: HeadlessCommand = headlessCommand(deps.executor, input);
+    if (opts.control) {
+      // Controle positivo: retirar as barreiras precisa tornar a contaminação observável.
+      let args = built.args.filter((a) => !['--strict-mcp-config', '--disable-slash-commands'].includes(a));
+      for (const flag of ['--setting-sources', '--tools', '--disallowedTools']) {
+        const i = args.indexOf(flag);
+        if (i >= 0) {
+          const end = args.findIndex((a, j) => j > i && a.startsWith('--'));
+          args = [...args.slice(0, i), ...(end < 0 ? [] : args.slice(end))];
+        }
+      }
+      built = { ...built, args, env: undefined };
+    }
+    const { command, cleanup } = materialize(built);
+    let stdout = '';
+    try {
+      const code = await new Promise<{ code: number | null; timedOut: boolean }>((resolve) => {
+        const proc = deps.spawn({ ...command, command: executable, env: { ...env, ...command.env } }, project, (text, stream) => {
+          if (stream === 'stdout') stdout += text;
+        });
+        const timer = setTimeout(() => {
+          proc.kill();
+          resolve({ code: null, timedOut: true });
+        }, deps.timeoutMs ?? 90_000);
+        proc.onExit((c) => {
+          clearTimeout(timer);
+          resolve({ code: c, timedOut: false });
+        });
+      });
+      let sessionId: string | null = null;
+      for (const line of stdout.split('\n'))
+        try {
+          const event = JSON.parse(line) as { type?: string; subtype?: string; session_id?: string };
+          if (event.type === 'system' && event.subtype === 'init' && typeof event.session_id === 'string') sessionId = event.session_id;
+        } catch {
+          /* linha que não é JSON */
+        }
+      return {
+        ...code,
+        requestText: state.texts.join('\n'),
+        toolNames: state.tools[0] ?? [],
+        toolResults: state.results.flatMap((r) => (state.uses.has(r.id) ? [{ name: state.uses.get(r.id)!, isError: r.isError }] : [])),
+        mcpConnections: [...state.connections],
+        mcpCalls: [...state.calls],
+        sessionId,
+      };
+    } finally {
+      cleanup();
+    }
+  };
+  try {
+    const control = await execute({ control: true });
+    const controlHook = fs.existsSync(marker);
+    const strict = await execute({
+      attempts: [
+        { name: 'Read', input: { file_path: path.join(project, 'allowed.txt') } },
+        { name: 'Bash', input: { command: 'exit 73' } },
+        { name: 'Write', input: { file_path: path.join(project, 'forbidden.txt'), content: 'não escrever' } },
+        { name: 'mcp__allowed__allowed', input: {} },
+        { name: 'mcp__allowed__forbidden', input: {} },
+        { name: 'Agent', input: { description: 'Não delegar', prompt: 'Não delegar', subagent_type: 'general-purpose' } },
+      ],
+    });
+    const strictHook = fs.existsSync(marker);
+    const forbiddenFileWritten = fs.existsSync(path.join(project, 'forbidden.txt'));
+    const m1 = `FAZAI_CONVERSATION_${randomUUID()}`;
+    const m2 = `FAZAI_CONVERSATION_${randomUUID()}`;
+    const first = { ...(await execute({ empty: true, prompt: m1 })), marker: m1 };
+    const second = { ...(await execute({ empty: true, prompt: m2 })), marker: m2 };
+    const environment = deps.admission.environmentDigest();
+    return {
+      control,
+      strict,
+      controlHook,
+      strictHook,
+      forbiddenFileWritten,
+      allowedReadContent: 'FAZAI_READ_ALLOWED',
+      canaries,
+      first,
+      second,
+      environmentDigest: environment,
+    };
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}

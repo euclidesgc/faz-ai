@@ -41,6 +41,26 @@ describe('RulesSettings', () => {
     });
   });
 
+  it('Trilha curta: o cartão nasce desligado, o interruptor liga a regra e o selo acompanha', async () => {
+    show();
+    const card = rule('Trilha curta para histórias pequenas');
+    expect(rules().shortTrack).toBe(false);
+    expect(within(card).getByText('Desligada')).toBeInTheDocument();
+    expect(within(card).getByText(/seguir coluna a coluna/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole('switch', { name: 'Ligar' }));
+    expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { shortTrack: true } });
+  });
+
+  it('Trilha curta ligada no board: o selo diz Ativa e o "Então" explica o pulo', () => {
+    board.router.handle({ type: 'settings.rules.update', patch: { shortTrack: true } });
+    syncStore(board.router);
+    show();
+    const card = rule('Trilha curta para histórias pequenas');
+    expect(within(card).getByText('Ativa')).toBeInTheDocument();
+    expect(within(card).getByText(/direto ao Plan/)).toBeInTheDocument();
+    board.router.handle({ type: 'settings.rules.update', patch: { shortTrack: false } });
+  });
+
   it('o seletor da regra grava a opção escolhida', async () => {
     show();
     await userEvent.click(screen.getByRole('combobox', { name: 'Ao excluir um card' }));

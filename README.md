@@ -448,6 +448,15 @@ responde no próprio card:
 As instruções e os modelos de documento do board padrão pedem, em cada fase, o que deixa a revisão
 do código rápida depois:
 
+- **Trilha curta para histórias pequenas.** Com a regra ligada (Configurações → Regras; desligada
+  por padrão), uma história de esforço **Baixo** ou do tipo **Bug** aprovada no Discovery, ou levada
+  adiante pelo autopiloto, vai direto ao Plan, sem PRD nem Spec, e o Plan parte do DISCOVERY. A regra
+  lê o esforço e o tipo atuais a cada avanço: se o Discovery descobre que a história é maior do que
+  parecia, a IA sobe o esforço e a história segue a trilha completa. Para forçar a trilha completa
+  numa história pequena, arraste-a (ou peça à IA que a mova com `move_card`) para o PRD ou a Spec: o
+  movimento explícito nunca é redirecionado. As colunas puladas são reconhecidas pelo documento que
+  produzem (PRD.md e SPEC.md), então renomeá-las não desliga a regra.
+
 - **Spec com o desenho do programa.** Além da arquitetura, a Spec traz os tipos e as assinaturas
   novos ou alterados, o arquivo de cada um e quem chama quem no caminho principal, com o fluxo da
   funcionalidade em diagramas Mermaid. As alternativas descartadas vêm com o motivo de cada uma.
@@ -634,7 +643,9 @@ O gateway também aceita um registro assíncrono de identidade (`beforeStart`): 
 
 O `Orchestrator` já oferece `drive`, continuação de rodadas, reconciliação na abertura, varredura e cancelamento, com um `UnitStarter` injetado. Ele sincroniza a preparação e a identidade antes de liberar a CLI, confirma o grupo de processos e grava o resultado antes de liberar a trava. A referência à pasta permanece persistida até a liberação física ser confirmada, inclusive após queda nesse intervalo; a importação também respeita essa reserva. Testes com processos Node, ponte MCP e banco em disco cobrem três filhas em sequência, fechamento único, trabalho parcial, cancelamento com descendente e reinício real do controlador. A criação no host e a ligação aos gatilhos continuam pendentes, assim como os ciclos de devolução humana e a associação estável da Fase. Isso ainda não ativa o plano v1 nem valida CLIs reais de IA.
 
-A base de admissão v1 no gateway distingue conversa, artefatos, permissões, MCP e delegação e exige recibos locais vinculados à configuração atual. A decisão fica no histórico (schema 36), sem virar autorização ao exportar/importar. Lista vazia significa nenhuma ferramenta; o mapeamento estrito do Claude usa ferramentas e operações MCP exatas, sem pular permissões. Essa base ainda aguarda o verificador das CLIs reais e a ativação nas ações da E5: a execução atual continua legada e nenhum executor recebe verificação automaticamente.
+A base de admissão v1 no gateway distingue conversa, artefatos, permissões, MCP e delegação e exige recibos locais vinculados à configuração atual. A decisão fica no histórico (schema 36), sem virar autorização ao exportar/importar. Lista vazia significa nenhuma ferramenta; o mapeamento estrito do Claude usa ferramentas e operações MCP exatas, sem pular permissões. O comando **Faz AI: Verificar o isolamento da CLI de IA** roda a CLI do Claude numa fixture descartável contra uma API local e grava os recibos (validade de 14 dias); nenhum executor é verificado automaticamente. A configuração resolvida da atividade é validada antes de abrir o processo e congelada no snapshot da execução (`manifest.context`): editar a biblioteca depois não muda uma execução em curso, e um MCP fora da configuração da atividade é recusado. O plano só governa as execuções com o runtime v1, que é opcional (abaixo); sem ele, a execução continua legada.
+
+**Runtime v1 (opcional).** Com `FAZ_AI_CONTEXT_RUNTIME=v1` no ambiente que abre o editor, o gateway só executa com a configuração resolvida e a admissão por capacidades: runner (fase, refinar, resumo, conflito), chat, assistentes do Harness e teste do perfil. Sem agente com contrato válido ou sem recibos (comando **Faz AI: Verificar o isolamento da CLI de IA**, validade de 14 dias), o processo não abre. O legado continua o padrão.
 
 ### Aba Consumo do card
 
@@ -708,6 +719,10 @@ pelo navegador.
   execuções simultâneas somam, então o total pode passar do tempo decorrido no relógio. O que não
   foi medido aparece como "não medido", nunca como 0, e quando só parte das execuções foi medida o
   aviso diz quantas ficaram de fora.
+- **Execuções acima do limite de consumo.** Uma execução que lê mais de 10 milhões de tokens de
+  cache passa do limite: o total **Execuções de IA** mostra "{n} acima do limite de consumo" e, ao
+  fim da execução, a conversa do card recebe um aviso com o consumo e a duração. O limite é fixo e o
+  alerta não interrompe nada. Sem tokens medidos (Cursor) não há alerta, e meses arquivados não contam.
 - **Tokens por mês.** Gráfico de barras com os tokens de cada mês.
   O mês em andamento aparece com hachura, porque ainda não terminou; um mês sem nenhum dado é um
   espaço marcado "sem dado", não uma barra de altura zero. Abaixo do gráfico fica uma tabela com os
@@ -1316,7 +1331,7 @@ compatibilidade, mas os agentes criados ou editados pelo board ficam no banco; h
 | Workflows e colunas | Quantos workflows quiser (cards independentes ou sub-tarefas), com nome editável e posição que você muda arrastando; **Nova coluna** em cada um; nomes, ordem (arrastando) e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento). Abrir e fechar workflows e colunas é feito no próprio board e fica lembrado |
 | Tipos de card | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo |
 | Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria |
-| Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido |
+| Regras do board | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido, trilha curta para histórias pequenas (esforço Baixo ou tipo Bug pula o PRD e a Spec) |
 | Harness | Biblioteca única de regras, skills, subagentes e MCPs, com importação por tipo, CRUD e assistentes; ferramenta, permissão, agente padrão e heartbeat (ver [Harness](#harness) e [Agentes](#agentes)) |
 | Ferramentas de IA | Perfis de CLI: ligar, escolher o padrão, duplicar, criar e testar |
 | Modelos de IA | Modelos e níveis de esforço por perfil; regras que sugerem o modelo de cada card |
