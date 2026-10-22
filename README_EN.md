@@ -1079,6 +1079,16 @@ does. In each round it:
 - **returns to the AI** the cards blocked by the tool's usage limit (the limit renews on its own),
   with a notice in the conversation, and **warns once** about a card that has been with you for two
   days or more;
+- **respects the usage-limit pause, profile by profile**: when a CLI profile runs out of the plan's
+  limit and no execution policy offers another destination, the card goes back to the AI and that
+  profile's queue pauses, in the heartbeat, the autopilot and the orchestrator, until the renewal
+  the output reported (plus 3 minutes); with no time given, the wait is 5 minutes and doubles on
+  each new failure, up to 60. Other profiles keep going, the round log says which profile waits and
+  until when, and the top of the board shows one line per profile ("Usage limit for Claude Code: its
+  queue resumes at 1:53 PM."). Once the pause expires, the profile's first automatic run is the
+  test. With a fallback policy, the run continues on its destination. The pause is saved in the board
+  (it survives reopening the editor); a run you start by hand stays allowed and, when it finishes
+  well, ends the pause;
 - **checks the pull requests** of every story that has one ([automatic merge detection](#automatic-merge-detection))
   and cleans up leftover branches and worktrees ([orphan branches and worktrees](#orphan-branches-and-worktrees));
 - **syncs the local branches** the board knows about (the main branch, `develop` and the branch of each

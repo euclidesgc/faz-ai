@@ -16,6 +16,7 @@ import {
 } from './policyGate';
 import type { ContextAction } from '../shared/contextPlanning';
 import { cardRef } from '../shared/model';
+import { canDispatch, limitClock, limitHolds, pauseOf, resetAtOf } from '../shared/usageLimit';
 import { activityKindOf } from '../shared/activity';
 import { STORY_SESSION_ADVICE } from './unitAdvice';
 import type { AiRunOrigin, RunReport } from '../shared/log';
@@ -120,6 +121,22 @@ interface Run {
 }
 
 const RUNNER_AUTHOR = 'Faz AI';
+
+/**
+ * O início automático foi recusado porque o perfil de CLI está pausado pelo limite de uso (ou a execução de teste dele
+ * está em curso). Não é falha: quem despacha (heartbeat, autopiloto, orquestrador) registra o motivo e segue com os
+ * outros perfis, sem esvaziar a fila.
+ */
+export class UsageLimitHeld extends Error {
+  constructor(
+    readonly profileId: string,
+    readonly resumeAt: number,
+    label: string,
+  ) {
+    super(`O limite de uso do ${label} esgotou; a fila daquele perfil volta a rodar às ${limitClock(resumeAt, Date.now())}.`);
+    this.name = 'UsageLimitHeld';
+  }
+}
 
 /**
  * Padrões de saída que indicam login vencido, por ferramenta: a falha vira o aviso global (RF6), não
@@ -390,6 +407,11 @@ export class AiRunner {
     const toolName = profileLabel(state.board, target.cli.id);
     if (problem === 'cli') throw new Error(`A CLI do ${toolName} não foi encontrada: veja o aviso no topo do board.`);
     if (problem === 'signin') throw new Error(`O login do ${toolName} venceu: veja o aviso no topo do board.`);
+    // pausa por limite de uso (por perfil): só o início automático é recusado; o manual nunca (serve de teste) e a troca por
+    // política (`forceTarget`) já foi decidida em settle(). Pausa vencida deixa passar uma execução, o teste
+    const gated = origin !== 'manual' && !forceTarget;
+    const held = pauseOf(state, target.cli.id);
+    if (gated && held && !canDispatch(state, target.cli.id, Date.now())) throw new UsageLimitHeld(target.cli.id, held.resumeAt, toolName);
     const tool = toolInfo(target.cli);
     const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
     const refine = mode === 'refine';
@@ -559,6 +581,9 @@ export class AiRunner {
       origin,
     };
     this.runs.set(cardId, run);
+    // a primeira execução depois da pausa é o teste: as outras do perfil esperam ela terminar
+    const probing = gated && !!held;
+    if (probing) this.router.setLimitProbe(target.cli.id, cardId);
     this.setStatus(cardId, 'running', tool.label);
     this.publish();
 
@@ -595,7 +620,10 @@ export class AiRunner {
           if (expired) this.router.setAuthExpired(run.profile.id, true);
           else if (!end.stopped && !end.error && end.code === 0) this.router.setAuthExpired(run.profile.id, false);
         }
+        // terminou sem esbarrar no limite: a pausa do perfil acaba (a execução manual também a limpa)
+        if (!end.report.usageLimitReached && !end.stopped && !end.error && end.code === 0) this.router.clearUsageLimit(run.profile.id);
       } finally {
+        if (probing) this.router.setLimitProbe(run.profile.id, null);
         // a limpeza precisa acontecer antes da retentativa: start() recusa começar com o card ainda em `this.runs`
         this.runs.delete(cardId);
       }
@@ -618,6 +646,19 @@ export class AiRunner {
       options.onExit?.(end);
       this.finishListeners.forEach((fn) => fn(cardId, run.mode));
     });
+  }
+
+  /** O motivo da pausa por limite de uso que recusaria o início automático do card agora, ou null (alvo inválido não é pausa). */
+  usageHold(cardId: string): string | null {
+    const state = this.router.snapshot();
+    const card = state.cards.find((c) => c.id === cardId);
+    if (!card) return null;
+    const resolved = resolveRunTarget(state, card);
+    if (resolved.blocked) return null;
+    const id = resolved.target.cli.id;
+    const held = pauseOf(state, id);
+    if (!held || canDispatch(state, id, Date.now())) return null;
+    return new UsageLimitHeld(id, held.resumeAt, profileLabel(state.board, id)).message;
   }
 
   /** Avisa quando a execução de um card termina, seja como for. Devolve uma função para cancelar o aviso. */
@@ -738,7 +779,10 @@ export class AiRunner {
       const evaluated = this.evaluatePolicy(run, end, replied);
       const decision = evaluated?.decision ?? null;
       if (decision) this.deps.log(`[${cardRef(card)}] ${describeDecision(decision)}`);
-      const next = decision?.action === 'fallback' && decision.target ? runTargetOfPolicy(this.router.snapshot(), decision.target) : null;
+      const candidate =
+        decision?.action === 'fallback' && decision.target ? runTargetOfPolicy(this.router.snapshot(), decision.target) : null;
+      // destino de fallback com o limite esgotado também conta como "sem política aplicável"
+      const next = candidate && !limitHolds(this.router.snapshot(), candidate.cli.id, Date.now()) ? candidate : null;
       if (decision && next) {
         const state = this.router.snapshot();
         const principal = targetDisplay(state, run.target);
@@ -763,7 +807,10 @@ export class AiRunner {
           `O limite de uso do plano do ${toolLabel} esgotou depois de a IA já ter agido neste card; o board não repete a execução sozinho. Confira o que ficou feito e chame a IA de novo.${output}`,
         );
       // sem política que autorize a troca: o limite renova sozinho, então o card volta para a IA em vez de ficar
-      // bloqueado esperando a pessoa (o heartbeat tenta de novo na próxima rodada, no mesmo alvo)
+      // bloqueado esperando a pessoa. O perfil fica pausado até a renovação (ou o backoff) e a fila dele espera
+      const now = Date.now();
+      const pause = this.router.recordUsageLimit(run.profile.id, resetAtOf(end.report.usageLimitHint, now), now);
+      this.deps.log(`[${cardRef(card)}] Perfil ${toolLabel} pausado pelo limite de uso até ${limitClock(pause.resumeAt, now)}.`);
       const offered =
         decision?.action === 'offer' && decision.alternatives.length
           ? ' A política oferece outro destino, que precisa da sua confirmação.'
@@ -772,7 +819,7 @@ export class AiRunner {
         {
           type: 'comment.add',
           cardId,
-          body: `O limite de uso do plano do ${toolLabel} esgotou. O card voltou para a IA e a execução é repetida pelo heartbeat quando o limite renovar.${offered}${output}`,
+          body: `O limite de uso do plano do ${toolLabel} esgotou. O card voltou para a IA; as execuções automáticas desse perfil ficam pausadas até as ${limitClock(pause.resumeAt, now)}, quando a fila tenta de novo.${offered}${output}`,
         },
         { author: RUNNER_AUTHOR, source: 'ai' },
       );

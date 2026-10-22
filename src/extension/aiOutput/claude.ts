@@ -68,6 +68,23 @@ function rateLimitExhausted(info: Json): boolean {
 }
 
 /**
+ * O `resetsAt` do limite que esgotou, como veio (a CLI grava segundos; quem converte é `resetAtOf`): o do próprio
+ * evento quando ele foi recusado e, sem ele, o da janela esgotada que renova mais tarde. null sem horário.
+ */
+function exhaustedResetsAt(info: Json): number | null {
+  const own = asNumber(info.resetsAt);
+  if (asText(info.status) === 'rejected' && own !== null) return own;
+  let latest: number | null = null;
+  for (const raw of Object.values(asObject(info.unifiedWindows) ?? {})) {
+    const window = asObject(raw);
+    const utilization = asNumber(window?.utilization);
+    const resetsAt = asNumber(window?.resetsAt);
+    if (utilization !== null && utilization >= 1 && resetsAt !== null && (latest === null || resetsAt > latest)) latest = resetsAt;
+  }
+  return latest ?? own;
+}
+
+/**
  * O argumento que identifica a chamada, na ordem em que vale a pena mostrar. `file_path` aparece
  * só pelo nome do arquivo: o caminho inteiro empurraria o resto da linha para fora. `subagent_type`
  * e `skill` vêm antes de `description` porque identificam melhor a chamada — uma chamada de
@@ -165,6 +182,9 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
   // sinal estrutural de limite de uso esgotado: só `rate_limit_event` indisponível ou `result` de
   // erro com texto conhecido ligam isto — nenhuma outra condição de erro (ver comentário no topo)
   let usageLimitReached = false;
+  // a dica de renovação que acompanhou o limite, crua: o leitor não tem relógio (`resetAtOf` a resolve)
+  let limitResetsAt: number | null = null;
+  let limitText: string | null = null;
   const results: ResultEvent[] = [];
   /** `tool_use_id` → nome da ferramenta, para a linha que explica o erro dela */
   const calledTools = new Map<string, string>();
@@ -303,7 +323,11 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
     const failed = o.is_error === true || asText(o.subtype) === 'error';
     // só `is_error`/erro com texto que bate com os termos conhecidos de limite esgotado liga a flag:
     // um erro genérico (qualquer outro texto) nunca a liga, por design (RF-03 da história #257)
-    if (failed && USAGE_LIMIT_TEXT.test(asText(o.result) ?? '')) usageLimitReached = true;
+    if (failed && USAGE_LIMIT_TEXT.test(asText(o.result) ?? '')) {
+      usageLimitReached = true;
+      // "You've hit your session limit · resets 1:50pm (America/Sao_Paulo)": o horário vem no texto
+      limitText = asText(o.result);
+    }
     return [failed ? 'Terminou com erro' : 'Pronto'];
   };
 
@@ -336,7 +360,10 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
           return onResult(o);
         case 'rate_limit_event': {
           const info = asObject(o.rate_limit_info);
-          if (info && rateLimitExhausted(info)) usageLimitReached = true;
+          if (info && rateLimitExhausted(info)) {
+            usageLimitReached = true;
+            limitResetsAt = exhaustedResetsAt(info) ?? limitResetsAt;
+          }
           // o monitoramento de rotina (`status: "allowed"`) não vira linha, só o sinal estrutural
           return [];
         }
@@ -347,6 +374,11 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
     },
 
     report(): RunReport {
+      const limit = {
+        usageLimitReached,
+        usageLimitHint:
+          usageLimitReached && (limitResetsAt !== null || limitText) ? { resetsAt: limitResetsAt, text: limitText } : undefined,
+      };
       const items: InventoryItem[] = [...inventory.entries()].map(([key, calls]) => {
         const [kind, name] = key.split('\u0000');
         return { kind: kind as InventoryKind, name: name!, calls };
@@ -386,7 +418,7 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
           bashCommands,
           answer,
           reason: null,
-          usageLimitReached,
+          ...limit,
         };
       }
 
@@ -405,16 +437,15 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
           bashCommands,
           answer,
           reason: null,
-          usageLimitReached,
+          ...limit,
         };
       }
 
       // leu eventos e chamadas de ferramenta, mas nenhum número: o inventário vale, o consumo não
       // existe. `none` só quando não há nem uma coisa nem a outra — é a invariante que impede "não
       // medido" de parecer "medido e zero".
-      if (items.length)
-        return { measure: 'partial', consumption: null, inventory: items, bashCommands, answer, reason: null, usageLimitReached };
-      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached };
+      if (items.length) return { measure: 'partial', consumption: null, inventory: items, bashCommands, answer, reason: null, ...limit };
+      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, ...limit };
     },
 
     get sawEvent(): boolean {

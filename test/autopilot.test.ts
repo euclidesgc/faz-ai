@@ -6,6 +6,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Autopilot, MAX_RUNS_WITHOUT_PROGRESS, autopilotRuns, autopilotStep } from '../src/extension/autopilot';
+import { UsageLimitHeld } from '../src/extension/runner';
 import { openInMemory } from '../src/extension/db/database';
 import { heartbeatTargets } from '../src/extension/heartbeat';
 import type { AiRunOrigin } from '../src/shared/log';
@@ -36,6 +37,8 @@ let runner: {
   /** o modo de cada start (fase, resumo), na mesma ordem de `started` */
   modes: (AiRunMode | undefined)[];
   failToStart: string | null;
+  /** recusa o início automático como o runner faz com o perfil pausado por limite de uso */
+  heldByLimit: boolean;
   start(id: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(id: string): void;
   onDidFinish(fn: (id: string, mode?: AiRunMode) => void): void;
@@ -103,7 +106,9 @@ beforeEach(async () => {
     origins: [],
     modes: [],
     failToStart: null,
+    heldByLimit: false,
     start(id, origin, mode) {
+      if (this.heldByLimit) throw new UsageLimitHeld('claude', 4_000_000_000_000, 'Claude Code');
       if (this.failToStart) throw new Error(this.failToStart);
       this.running.push(id);
       this.started.push(id);
@@ -669,6 +674,23 @@ describe('autopiloto', () => {
     yolo(1);
     expect(autopilot.isActive).toBe(false);
     expect(router.snapshot().autopilot).toEqual({ active: false, note: 'O Claude Code não está instalado.' });
+  });
+
+  it('perfil pausado pelo limite de uso: não é falha, o autopiloto segue ligado e registra o motivo uma vez (#1047)', () => {
+    runner.heldByLimit = true;
+    create('A', 'PRD');
+    yolo(1);
+    expect(autopilot.isActive).toBe(true);
+    expect(router.snapshot().autopilot.note).toBeNull();
+    router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!' } });
+    flush();
+    expect(autopilot.isActive).toBe(true);
+    expect(log.filter((l) => /limite de uso do Claude Code/.test(l))).toHaveLength(1);
+
+    runner.heldByLimit = false;
+    router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!!' } });
+    flush();
+    expect(runner.started).toEqual([card(1).id]);
   });
 
   it('a pausa fica gravada no board: ao reabrir o editor não liga sozinho; retomar limpa a pausa e liga (#220)', () => {

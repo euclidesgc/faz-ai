@@ -20,6 +20,7 @@ import type { ImportSummary } from '../../shared/backup';
 import type { AiActivity, Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
 import type { AiTool } from '../../shared/harness';
+import { nextPause, parsePauses, USAGE_LIMIT_META_KEY, type UsageLimitPause, type UsageLimitState } from '../../shared/usageLimit';
 import type { ProjectProfile } from '../../shared/projectProfile';
 import { readProjectProfile } from '../projectProfile';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
@@ -195,6 +196,7 @@ export class MessageRouter {
   private requirementsCheckedAt = 0;
   private requirementsCheck: (() => Promise<void>) | null = null;
   private authExpired: AiTool[] = [];
+  private usageLimit: UsageLimitState[] = [];
   private openTerminalHook: ((command: string) => void) | null = null;
   private environment: EnvironmentReport | null = null;
   private environmentFirstRun = false;
@@ -213,6 +215,7 @@ export class MessageRouter {
       save: () => dbHandle.scheduleSave(),
     });
     this.store = this.ctx.store;
+    this.usageLimit = parsePauses(this.ctx.boards.getMeta(USAGE_LIMIT_META_KEY)).map((p) => ({ ...p, probe: null }));
     this.ctx.harness.load();
     initModels(this.ctx);
     // os agentes de fábrica usam as regras de modelo, que initModels acabou de criar
@@ -332,6 +335,7 @@ export class MessageRouter {
       requirements: this.requirements,
       requirementsCheckedAt: this.requirementsCheckedAt,
       authExpired: this.authExpired,
+      usageLimit: this.usageLimit,
       environment: this.environment,
       environmentFirstRun: this.environmentFirstRun,
       artifactImport: this.ctx.importer.current,
@@ -438,6 +442,48 @@ export class MessageRouter {
     this.authExpired = expired ? [...this.authExpired, cli] : this.authExpired.filter((c) => c !== cli);
     this.notify();
     return true;
+  }
+
+  /** Grava a lista de pausas na `meta` (sem o `probe`, que é só de memória); falha vira só memória. */
+  private persistUsageLimit(): void {
+    const list: UsageLimitPause[] = this.usageLimit.map(({ profileId, resumeAt, source, attempts }) => ({
+      profileId,
+      resumeAt,
+      source,
+      attempts,
+    }));
+    try {
+      this.ctx.boards.setMeta(USAGE_LIMIT_META_KEY, JSON.stringify(list));
+    } catch {
+      // sem gravar, a pausa vale só nesta sessão do editor
+    }
+  }
+
+  /** O perfil `profileId` esgotou o limite de uso: grava a pausa (renovação + folga, ou backoff) e devolve-a. */
+  recordUsageLimit(profileId: string, resetAt: number | null, now: number): UsageLimitPause {
+    const prev = this.usageLimit.find((p) => p.profileId === profileId) ?? null;
+    const pause = nextPause(prev, profileId, resetAt, now);
+    const state: UsageLimitState = { ...pause, probe: prev?.probe ?? null };
+    this.usageLimit = prev ? this.usageLimit.map((p) => (p.profileId === profileId ? state : p)) : [...this.usageLimit, state];
+    this.persistUsageLimit();
+    this.notify();
+    return pause;
+  }
+
+  /** A execução do perfil terminou sem esbarrar no limite: a pausa acaba. Devolve se havia uma. */
+  clearUsageLimit(profileId: string): boolean {
+    if (!this.usageLimit.some((p) => p.profileId === profileId)) return false;
+    this.usageLimit = this.usageLimit.filter((p) => p.profileId !== profileId);
+    this.persistUsageLimit();
+    this.notify();
+    return true;
+  }
+
+  /** Marca (ou, com null, solta) a execução de teste do perfil depois que a pausa venceu. Só memória. */
+  setLimitProbe(profileId: string, cardId: string | null): void {
+    if (!this.usageLimit.some((p) => p.profileId === profileId)) return;
+    this.usageLimit = this.usageLimit.map((p) => (p.profileId === profileId ? { ...p, probe: cardId } : p));
+    this.notify();
   }
 
   /** O resultado do Diagnóstico do ambiente (informado pelo host, que confere). */

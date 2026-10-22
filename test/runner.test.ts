@@ -22,6 +22,7 @@ import {
   nomeDoAnexoAnterior,
   refinePrompt,
   summarizePrompt,
+  UsageLimitHeld,
   yoloStopAdvice,
 } from '../src/extension/runner';
 import { boardState, card as fakeCard, column as fakeColumn } from './fakes/board';
@@ -1571,6 +1572,56 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     procs[0]!.exit(1);
     expect(procs).toHaveLength(1);
     expect(card().status).toBe('ready');
+  });
+
+  it('sem política: o limite pausa o perfil; o início automático é recusado, o manual executa e o sucesso limpa a pausa (#1047)', () => {
+    useSonnetMedium();
+    runner.start(storyId);
+    procs[0]!.emit(JSON.stringify({ type: 'result', is_error: true, result: "You've hit your limit · resets 11pm (UTC)" }));
+    procs[0]!.exit(1);
+    expect(card().status).toBe('ready');
+    const pause = router.snapshot().usageLimit.find((p) => p.profileId === 'claude');
+    expect(pause).toBeDefined();
+    expect(pause!.resumeAt).toBeGreaterThan(Date.now());
+    expect(lastMessage()!.body).toMatch(/pausadas até as/);
+
+    // automático: recusado com o motivo, sem gastar uma execução
+    expect(() => runner.start(storyId, 'heartbeat')).toThrow(UsageLimitHeld);
+    expect(procs).toHaveLength(1);
+    expect(runner.usageHold(storyId)).toMatch(/limite de uso/);
+
+    // manual: sempre sai, e terminar bem solta a pausa
+    runner.start(storyId, 'manual');
+    expect(procs).toHaveLength(2);
+    ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
+    procs[1]!.exit(0);
+    expect(router.snapshot().usageLimit).toEqual([]);
+    expect(runner.usageHold(storyId)).toBeNull();
+  });
+
+  it('pausa vencida: a primeira execução automática é o teste e, se o limite esgotar de novo, a pausa estende com backoff (#1047)', () => {
+    useSonnetMedium();
+    router.recordUsageLimit('claude', null, Date.now() - 10 * 60_000); // backoff de 5 min, já vencido
+    expect(router.snapshot().usageLimit[0]!.attempts).toBe(1);
+    runner.start(storyId, 'heartbeat');
+    expect(procs).toHaveLength(1);
+    expect(router.snapshot().usageLimit[0]!.probe).toBe(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    const pause = router.snapshot().usageLimit[0]!;
+    expect(pause.attempts).toBe(2);
+    expect(pause.probe).toBeNull();
+    expect(pause.resumeAt).toBeGreaterThan(Date.now());
+  });
+
+  it('com fallback executável a execução segue no destino e o perfil de origem não é pausado (#1047)', () => {
+    useSonnetMedium();
+    policyToFable();
+    runner.start(storyId, 'heartbeat');
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(2);
+    expect(router.snapshot().usageLimit).toEqual([]);
   });
 
   it('o destino também esgota o limite: o card volta para a IA (#551), sem uma terceira tentativa nem reinício da cadeia', () => {

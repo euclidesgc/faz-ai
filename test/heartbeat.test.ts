@@ -15,6 +15,7 @@ import {
 import type { AiRunMode } from '../src/shared/runner';
 import type { AiRunOrigin } from '../src/shared/log';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { UsageLimitHeld } from '../src/extension/runner';
 import { BUG_TYPE } from '../src/shared/priority';
 import type { CardStatus } from '../src/shared/status';
 
@@ -34,7 +35,8 @@ let runner: {
   /** o modo de cada start, na mesma ordem de `started` */
   modes: (AiRunMode | undefined)[];
   fail: boolean;
-  usageLimited: boolean;
+  /** ids cujo início automático o runner recusa por pausa de limite de uso */
+  held: Set<string>;
   start(id: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(id: string): void;
   onDidFinish(fn: (id: string) => void): void;
@@ -91,8 +93,9 @@ beforeEach(async () => {
     origins: [],
     modes: [],
     fail: false,
-    usageLimited: false,
+    held: new Set<string>(),
     start(id, origin, mode) {
+      if (this.held.has(id)) throw new UsageLimitHeld('claude', now + 600_000, 'Claude Code');
       if (this.fail) throw new Error('ferramenta indisponível');
       this.running.push(id);
       this.started.push(id);
@@ -135,23 +138,21 @@ describe('heartbeat', () => {
     expect(rounds).toBe(2);
   });
 
-  it('limite de uso esgotado: a rodada testa uma história e deixa as outras para a próxima rodada (#551)', () => {
+  it('perfil pausado pelo limite de uso: a história dele espera, a dos outros perfis segue e a fila não é esvaziada', () => {
     create('A', 'Implementação'); // #1
     create('B', 'Implementação'); // #2
     setStatus(1, 'ready');
     setStatus(2, 'ready');
-    runner.usageLimited = true;
+    runner.held.add(card(1).id);
     heartbeat.runNow();
-    expect(runner.started.map(number)).toEqual([1]);
-    // a execução termina por limite: o card volta para a IA e a fila é descartada, sem iniciar a B
+    expect(runner.started.map(number)).toEqual([2]);
+    expect(log.filter((l) => /limite de uso do Claude Code/.test(l))).toHaveLength(1);
+    expect(log.some((l) => /1 história\(s\) esperando/.test(l))).toBe(true);
+    // a pausa venceu: a próxima rodada executa a A
+    runner.held.clear();
     runner.finish('ready');
-    expect(runner.started.map(number)).toEqual([1]);
-    expect(heartbeat.queued).toBe(0);
-    expect(log.some((l) => /limite de uso/.test(l))).toBe(true);
-    // o limite renovou: a próxima rodada executa de novo
-    runner.usageLimited = false;
     heartbeat.runNow();
-    expect(runner.started.map(number)).toEqual([1, 1]); // a A é a primeira da fila e tem a vaga
+    expect(runner.started.map(number)).toContain(1);
   });
 
   it('enqueue inicia a história na hora, mesmo com o heartbeat desligado, sem duplicar', () => {

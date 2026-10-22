@@ -1034,6 +1034,15 @@ cada rodada ele:
 
 - **devolve para a IA** os cards bloqueados por limite de uso da ferramenta (o limite renova sozinho),
   com um aviso na conversa, e **avisa uma vez** o card que está com você há dois dias ou mais;
+- **respeita a pausa por limite de uso, perfil a perfil**: quando um perfil de CLI esgota o limite do
+  plano e nenhuma política de execução oferece outro destino, o card volta para a IA e a fila daquele
+  perfil pausa, no heartbeat, no autopiloto e no orquestrador, até a renovação que a saída informou
+  (mais 3 minutos); sem horário, a espera é de 5 minutos e dobra a cada nova falha, até 60. Os outros
+  perfis seguem, o log da rodada diz qual perfil espera e até que horas, e o topo do board mostra uma
+  linha por perfil ("Limite de uso do Claude Code: a fila dele retoma às 13:53."). Vencida a pausa, a
+  primeira execução automática do perfil é o teste. Com política de fallback, a execução segue no
+  destino dela. A pausa fica gravada no board (sobrevive a reabrir o editor); a execução pedida à mão
+  continua liberada e, terminando bem, encerra a pausa;
 - **confere os pull requests** de toda história que tem um ([detecção automática de merges](#detecção-automática-de-merges))
   e limpa as branches e worktrees que sobraram ([branches e worktrees órfãs](#branches-e-worktrees-órfãs));
 - **sincroniza as branches locais** que o board conhece (a principal, a `develop` e a branch de cada
