@@ -481,8 +481,8 @@ describe('estrutura: só o gateway chama a IA e escreve o log de uso', () => {
     expect(offenders(/\bspawnMeasured\b/, ['extension/ai/gateway.ts', 'extension/aiOutput/measured.ts'])).toEqual([]);
   });
 
-  it('o transporte ACP (spawnAcp, ainda protótipo) também só pode ser chamado pelo gateway', () => {
-    expect(offenders(/\bspawnAcp\b/, ['extension/ai/gateway.ts', 'extension/ai/acp/run.ts'])).toEqual([]);
+  it('o transporte ACP (spawnAcp) só é chamado pelo gateway; o host só entrega o spawn', () => {
+    expect(offenders(/\bspawnAcp\b/, ['extension/ai/gateway.ts', 'extension/ai/acp/run.ts', 'extension/host/boardHost.ts'])).toEqual([]);
   });
 
   it('o processo da CLI só é iniciado pelo host, e só para entregá-lo ao gateway', () => {

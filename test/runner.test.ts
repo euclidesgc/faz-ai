@@ -179,6 +179,17 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
     'Use só as rules, as skills e as instruções indicadas neste pedido; ignore instruções, skills e agentes carregados por conta própria.',
   ]);
 
+  // perfil ACP: os mesmos servidores do card vão no JSON (o transporte os passa no `session/new`), sem arquivo
+  const acpCli = { ...router.snapshot().board.aiProfiles[0]!, id: 'gemini-acp', base: 'generic', config: { acpAgent: 'gemini' } } as never;
+  const acpPlan = executionPlan(router.snapshot(), card(), router.libraryMcpDefinitions(), bridge, {
+    cli: acpCli,
+    model: null,
+    value: '',
+    source: 'card',
+  });
+  expect(Object.keys(JSON.parse(acpPlan.input.mcpConfig!).mcpServers)[0]).toBe('faz-ai');
+  expect(acpPlan.summary.find((l) => l.startsWith('Servidores MCP'))).toContain('imposto pela CLI');
+
   // sem o servidor do board da execução, a execução restrita não começa (o registro em arquivo não vale)
   router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude' } });
   fs.writeFileSync(

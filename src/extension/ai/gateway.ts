@@ -1,9 +1,12 @@
 import type { ContextDraftResolution } from '../../shared/contextDraftResolution';
+import type { AcpSpawnFn } from './acp/provider';
+import { acpAgent } from './acp/agents';
+import { spawnAcp } from './acp/run';
 import { executorProfile } from './providers';
 import { redactCredentialValues } from '../credentials';
 import { authFailed } from './profileAuth';
 import { profileInstallUrl } from '../requirements';
-import { profileBase, type AiProfile } from '../../shared/aiProfiles';
+import { isAcpProfile, profileBase, type AiProfile } from '../../shared/aiProfiles';
 import { cursorToolNames, type CursorManifest } from './cursorManifest';
 // A única porta por onde o board chama uma ferramenta de IA. Toda execução — de um card (a pessoa, o
 // heartbeat ou o autopiloto) ou do chat — passa por `AiGateway.run`, e é aqui que o log de uso é
@@ -19,7 +22,7 @@ import { cursorToolNames, type CursorManifest } from './cursorManifest';
 import type { AiTool } from '../../shared/harness';
 import type { AiRunConfig, AiRunOrigin, AiRunOutcome, AiRunStart, RunReport } from '../../shared/log';
 import type { MeasureError } from '../aiOutput/errors';
-import { spawnMeasured, type SpawnFn } from '../aiOutput/measured';
+import { spawnMeasured, type Measured, type SpawnFn } from '../aiOutput/measured';
 import type { OutputFormat } from '../aiOutput/reader';
 import { headlessUnsupported, type HeadlessCommand, type HeadlessInput } from '../headless';
 import type { RunLog } from '../log/runLog';
@@ -140,6 +143,8 @@ export interface AiExecution {
 }
 
 export interface AiGatewayDeps {
+  /** Inicia um agente ACP com a entrada aberta (só o host inicia processos de IA). */
+  spawnAcp?: AcpSpawnFn;
   /** O host confere também perfis importados no caminho legado antes de preparar arquivos. */
   profile?(id: string): AiProfile | null;
   resolveProfile?(id: string): AiProfile;
@@ -234,7 +239,7 @@ export class AiGateway {
     // o id da ferramenta, não o rótulo: o rótulo muda e levaria as séries antigas com ele
     const runId = runLog.start({ ...call.context, boardId, startedAt, origin: call.origin, tool: call.tool });
 
-    let measured: ReturnType<typeof spawnMeasured>;
+    let measured: Measured;
     let attempts = 0;
     let format: OutputFormat = 'text';
     let workToken: string | undefined;
@@ -317,7 +322,12 @@ export class AiGateway {
         input = admitted.input;
       }
       // a ferramenta sem suporte para esta permissão nem começa: confere antes de gravar a configuração
-      const unsupported = admitted ? null : headlessUnsupported(profile, input.permission);
+      const agent = isAcpProfile(profile) ? acpAgent(String(profile.config.acpAgent)) : undefined;
+      if (isAcpProfile(profile)) {
+        if (!agent) throw new Error(`Agente ACP desconhecido: ${String(profile.config.acpAgent)}.`);
+        if (!this.deps.spawnAcp) throw new Error('Transporte ACP indisponível neste host.');
+      }
+      const unsupported = admitted || agent ? null : headlessUnsupported(profile, input.permission);
       if (unsupported) throw new Error(unsupported);
       if (admitted) {
         if (!runLog.describeRequired) throw new Error('Registro obrigatório da admissão indisponível.');
@@ -326,51 +336,76 @@ export class AiGateway {
       if (workToken !== undefined && snapshot) this.deps.sessions!.register(runId, snapshot, input);
       call.beforeSpawn?.();
       snapshot?.validate();
-      measured = spawnMeasured(profile, input, call.cwd, {
-        spawn: (command, cwd, out, control) => {
-          attempts++;
-          format = command.format;
-          call.onAttempt?.(command);
-          snapshot?.validate();
-          const checked = admitted?.command(command) ?? command;
-          const validate = () => {
-            if (workToken !== undefined) this.deps.sessions!.assert(workToken);
+      const watch = (text: string, stream: 'stdout' | 'stderr') => {
+        if (profile!.kind !== 'builtin' && profile!.config.authPatterns?.length) {
+          authTails[stream] = (authTails[stream] + text).slice(-200000);
+          privateAuthFailed ||= authFailed(profile!, Object.values(authTails), false);
+        }
+      };
+      // o transporte é a única diferença: o ciclo do log, a admissão e o cancelamento seguem iguais
+      if (agent) {
+        const spawnProcess = this.deps.spawnAcp!;
+        measured = spawnAcp(agent, input, call.cwd, {
+          spawn: (command, cwd, out) => {
+            attempts++;
+            format = 'text';
             snapshot?.validate();
-            admitted?.command(checked);
-          };
-          return this.deps.spawn(
-            checked,
-            cwd,
-            (text, stream) => {
-              if (profile!.kind !== 'builtin' && profile!.config.authPatterns?.length) {
-                authTails[stream] = (authTails[stream] + text).slice(-200000);
-                privateAuthFailed ||= authFailed(profile!, Object.values(authTails), false);
-              }
+            if (workToken !== undefined) this.deps.sessions!.assert(workToken);
+            return spawnProcess(command, cwd, (text, stream) => {
+              watch(text, stream);
               out(text, stream);
-            },
-            control && (admitted || snapshot || call.beforeStart)
-              ? {
-                  beforePreparation: () => {
-                    validate();
-                    control.beforePreparation();
-                  },
-                  beforeStart: (identity) => {
-                    validate();
-                    const previous = control.beforeStart(identity);
-                    const record = () => call.beforeStart?.(identity);
-                    const ready = previous ? previous.then(record) : record();
-                    if (ready) return ready.then(validate);
-                    validate();
-                  },
+            });
+          },
+          log: (line) => call.log(redact(line)),
+          runId,
+          leaseCoordinationDir: this.deps.leaseCoordinationDir,
+        });
+      } else
+        measured = spawnMeasured(profile, input, call.cwd, {
+          spawn: (command, cwd, out, control) => {
+            attempts++;
+            format = command.format;
+            call.onAttempt?.(command);
+            snapshot?.validate();
+            const checked = admitted?.command(command) ?? command;
+            const validate = () => {
+              if (workToken !== undefined) this.deps.sessions!.assert(workToken);
+              snapshot?.validate();
+              admitted?.command(checked);
+            };
+            return this.deps.spawn(
+              checked,
+              cwd,
+              (text, stream) => {
+                if (profile!.kind !== 'builtin' && profile!.config.authPatterns?.length) {
+                  authTails[stream] = (authTails[stream] + text).slice(-200000);
+                  privateAuthFailed ||= authFailed(profile!, Object.values(authTails), false);
                 }
-              : control,
-          );
-        },
-        log: (line) => call.log(redact(line)),
-        runId,
-        leaseCoordinationDir: this.deps.leaseCoordinationDir,
-        execManifest: this.cursorManifestFor(profile, runId, conference, call.log),
-      });
+                out(text, stream);
+              },
+              control && (admitted || snapshot || call.beforeStart)
+                ? {
+                    beforePreparation: () => {
+                      validate();
+                      control.beforePreparation();
+                    },
+                    beforeStart: (identity) => {
+                      validate();
+                      const previous = control.beforeStart(identity);
+                      const record = () => call.beforeStart?.(identity);
+                      const ready = previous ? previous.then(record) : record();
+                      if (ready) return ready.then(validate);
+                      validate();
+                    },
+                  }
+                : control,
+            );
+          },
+          log: (line) => call.log(redact(line)),
+          runId,
+          leaseCoordinationDir: this.deps.leaseCoordinationDir,
+          execManifest: this.cursorManifestFor(profile, runId, conference, call.log),
+        });
     } catch (e) {
       revoke();
       if (e instanceof Error) {

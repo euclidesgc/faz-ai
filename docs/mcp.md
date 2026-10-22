@@ -467,6 +467,27 @@ As sondas de perfil usam `execFile` sem shell, inclusive as consultas nativas; s
 Requisitos de perfis configuráveis expõem nome público em `cli`, nunca comando/args/env. Link de instalação HTTPS revisado pode aparecer como metadado público; URL com usuário, senha, query ou fragmento é omitida. Cópias/personalizados não dependem do registro MCP global de outra conta. A execução de configuráveis exige contrato e admissão por capacidades; uma declaração manual não substitui a evidência exigida.
 
 
+### Execução por ACP (transporte do perfil)
+
+Um perfil de CLI roda pelo Agent Client Protocol (ACP) quando a configuração do perfil personalizado traz `acpAgent` com o id de um agente do catálogo (`src/extension/ai/acp/agents.ts`). Uma execução é um processo, uma sessão e um `session/prompt`, e devolve o mesmo registro de uso da CLI de uma passada. O gateway só escolhe esse transporte para perfil `generic` com `acpAgent`; agente desconhecido é recusado na admissão, e sem o transporte no host o perfil é recusado com "ACP indisponível". Hoje a tela de Ferramentas de IA não tem campo para `acpAgent`: a chave é lida da configuração do perfil.
+
+As permissões chegam por `session/request_permission` e são respondidas chamada a chamada: o nível da execução e o manifesto do card decidem, e servidor MCP ou ferramenta fora do card é negado (`reject_once`). Os servidores MCP do card (o do board e os liberados) entram no `session/new`, só em stdio; nenhum arquivo é escrito no projeto, exceto para o Cursor: o board registra o servidor do board no `.cursor/mcp.json` da pasta, que o `cursor-agent acp` lê no modo ACP. Parar é `session/cancel`; depois de 5 segundos o processo é encerrado. Login pedido pelo agente (`auth_required`) vira erro com o comando de login, sem `authenticate` e sem abrir o navegador.
+
+Catálogo de agentes, comando de execução e login (nenhum validado com a CLI real ainda; o teste com as ferramentas, #988, ficou pendente):
+
+| Agente | Comando | Login (no terminal) | Consumo informado |
+| --- | --- | --- | --- |
+| Gemini CLI | `gemini --acp` | `gemini` | tokens por turno, sem custo |
+| OpenCode | `opencode acp` | `opencode auth login` | tokens por turno e custo acumulado (USD) |
+| Codex | `codex-acp` | `codex login` | só o último pedido do turno, sem custo |
+| Cursor | `cursor-agent acp` | `cursor-agent login` | não informado |
+| Kimi Code | `kimi acp` | `kimi` | não informado |
+| GitHub Copilot CLI | `copilot --acp` | `copilot` | não informado (cobrança por pedido premium) |
+| Qwen Code | `qwen --acp` | `qwen` | não informado |
+| goose | `goose acp` | `goose configure` | não informado |
+
+Consumo não informado fica desconhecido: nunca vira zero. O Claude Code não entra por ACP e segue pela CLI `claude`.
+
 ### Providers configuráveis e origem de teste
 
 O gateway recebe a identidade/perfil escolhido, resolve a configuração privada pelo cofre no host e conserva uma cópia por run. `ai_runs.tool` guarda o ID real do perfil; não vira a base. Configuráveis exigem contrato v1 e admissão antes do spawn. A cópia usa a tradução da base com evidência própria: configuração/comando/args/env entram no vínculo, e recibos de outra configuração não autorizam execução. O genérico sem tradução continua recusado; argumentos declarados não comprovam restrições. Não foi criado endpoint MCP de ativação/revisão de perfil.

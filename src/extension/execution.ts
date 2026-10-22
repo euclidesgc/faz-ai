@@ -1,5 +1,13 @@
 import { effortToRun, enforcementOf, manifestOf, type ExecManifest } from '../shared/execution';
-import { activeProfile, catalogTool, isolationSummary, profileBase, profileIsolation, type AiProfile } from '../shared/aiProfiles';
+import {
+  activeProfile,
+  catalogTool,
+  isAcpProfile,
+  isolationSummary,
+  profileBase,
+  profileIsolation,
+  type AiProfile,
+} from '../shared/aiProfiles';
 import type { RunTarget } from '../shared/runTarget';
 import { selectedMcpNames } from '../shared/harnessSelection';
 import type { BoardState, Card } from '../shared/model';
@@ -145,7 +153,7 @@ export function executionPlan(
   // conhecido (nem desta execução nem registrado na pasta) e sem nada liberado, fica sem arquivo, e a
   // linha de comando segue sem restrição de servidores (só acontece fora da extensão)
   let mcpConfig: string | null = null;
-  if (base === 'claude') {
+  if (base === 'claude' || isAcpProfile(cli)) {
     // só as definições guardadas no board (no host, com as credenciais do cofre): a execução não lê
     // `.mcp.json` nem `~/.claude.json`, e um servidor que ficou só na pasta da ferramenta não entra
     const defs: Record<string, unknown> = { ...libraryServers };
