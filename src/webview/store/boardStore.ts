@@ -9,6 +9,7 @@ import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
 import { formatBytes, type ImportSummary } from '../../shared/backup';
 import { formatDateTime, t } from '../i18n';
 import { backup } from '../commands';
+import { reconcileState } from './reconcile';
 
 /** Ordenação de uma tabela do painel: `key` é o id da coluna; `null` em `MetricsBlocksState` = o padrão do bloco. */
 export interface MetricsSort {
@@ -236,9 +237,11 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     selectedIds: new Set(),
     collapsed: {},
 
-    setState(state, attachmentsBaseUri) {
-      const ids = new Set(state.cards.map((c) => c.id));
+    setState(incoming, attachmentsBaseUri) {
       const { selectedParentId, selectedIds, openCardId } = get();
+      // o que não mudou mantém a identidade do estado anterior: os componentes memoizados não redesenham à toa
+      const state = reconcileState(get().state, incoming);
+      const ids = new Set(state.cards.map((c) => c.id));
       set({ state, attachmentsBaseUri, openCardId: openCardId && ids.has(openCardId) ? openCardId : null });
       // a história selecionada saiu do board (lixeira, arquivo ou apagada): limpa o filtro
       if (selectedParentId && !state.cards.some((c) => c.id === selectedParentId && isLive(c))) setShared({ selectedParentId: null });
@@ -376,7 +379,21 @@ export function useHostSync(): void {
       } else if (msg.type === 'ui.openView') s.setView(msg.view);
     });
     postToHost({ type: 'ready' });
-    return off;
+    // o host recorta o estado pela tela e pelo card aberto: avisa a cada troca (e já no começo)
+    let last = '';
+    const tell = () => {
+      const { view, openCardId } = useBoardStore.getState();
+      const key = `${view}|${openCardId ?? ''}`;
+      if (key === last) return;
+      last = key;
+      postToHost({ type: 'ui.scope.set', view, openCardId });
+    };
+    tell();
+    const offScope = useBoardStore.subscribe(tell);
+    return () => {
+      off();
+      offScope();
+    };
   }, []);
 }
 

@@ -125,6 +125,11 @@ export class WebviewBridge implements vscode.Disposable {
     this.bridge.post(msg);
   }
 
+  /** O webview entrou ou saiu de vista (aba do painel, visibilidade da barra lateral). */
+  setVisible(visible: boolean): void {
+    this.bridge.setVisible(visible);
+  }
+
   dispose(): void {
     this.bridge.dispose();
     this.disposables.forEach((d) => d.dispose());

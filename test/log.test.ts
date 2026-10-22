@@ -1038,8 +1038,9 @@ describe('EventLog no MessageRouter', () => {
 
     expect(scheduled).toBe(1);
     // 2 consultas do log, mais 1 do `yoloStoryIdOf` que o card.move usa para reavaliar a entrega
-    // da história em modo autônomo (#275) sem montar o snapshot inteiro do board
-    expect(withLog.prepare - baseline.prepare).toBeLessThanOrEqual(3);
+    // da história em modo autônomo (#275) sem montar o snapshot inteiro do board, mais 1 do
+    // `total_changes()` que valida o cache do snapshot (#1066): uma por montagem, não por leitura
+    expect(withLog.prepare - baseline.prepare).toBeLessThanOrEqual(4);
     expect(withLog.exec).toBe(baseline.exec); // o log não abre transação própria
     // as gravações a mais são os INSERTs dos eventos (column_changed e status_changed: Discovery tem IA ativa)
     expect(withLog.run - baseline.run).toBe(2);

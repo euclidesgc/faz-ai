@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type CSSProperties } from 'react';
+import { memo, useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cardRef, type Card, type FieldDef } from '../../shared/model';
@@ -19,7 +19,8 @@ import { TitleBar } from './cardView/TitleBar';
 /** Duração e curva da animação de arrastar (reutilizadas no dropAnimation do DragOverlay). */
 export const DRAG_ANIMATION = { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' } as const;
 
-export function SortableCard({ card }: { card: Card }) {
+/** Memoizado: o store devolve o mesmo objeto para o card que não mudou (`reconcileState`), e o arraste não o remonta. */
+export const SortableCard = memo(function SortableCard({ card }: { card: Card }) {
   const reduced = useReducedMotion();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
@@ -31,7 +32,7 @@ export function SortableCard({ card }: { card: Card }) {
       <CardView card={card} />
     </div>
   );
-}
+});
 
 /** Card do board; consumidores externos podem controlar a seleção com selected/onSelect. */
 export function CardView({
@@ -89,6 +90,7 @@ export function CardView({
   const queuePosition = isParent && !archived && state.autopilot.active ? queuePositions(state).get(card.id) : undefined;
   // pendência com a pessoa: a borda ganha a cor do status para achar de relance o que espera por ela
   const mine = status !== null && statusInfo(status).owner === 'human';
+  const chosen = selectedIds.has(card.id);
   const style = mine ? ({ '--status-color': state.board.appearance.statuses[status].color } as CSSProperties) : undefined;
   const classes = [
     'card',
@@ -96,6 +98,7 @@ export function CardView({
     overlay && 'overlay',
     archived && 'archived',
     mine && 'mine',
+    chosen && 'chosen',
     (onSelect ? Boolean(externalSelected) : selectedIds.size > 0) && 'selecting',
     collapsed && 'card-collapsed',
   ]

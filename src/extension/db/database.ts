@@ -44,7 +44,14 @@ export function exportBytes(db: Database): Uint8Array {
   const data = db.export();
   db.run('PRAGMA foreign_keys = ON;');
   db.run('PRAGMA secure_delete = ON;');
+  exportCounts.set(db, exportGeneration(db) + 1);
   return data;
+}
+
+/** Quantas vezes a conexão foi exportada (e, portanto, reaberta): o `total_changes()` do SQLite volta a zero a cada uma. */
+const exportCounts = new WeakMap<Database, number>();
+export function exportGeneration(db: Database): number {
+  return exportCounts.get(db) ?? 0;
 }
 
 /**

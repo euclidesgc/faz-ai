@@ -16,7 +16,7 @@ import type { ExportPlan, ExportResult, ExportTarget } from '../../shared/toolEx
 import type { BoardRequirement } from '../../shared/requirements';
 import type { EnvironmentReport } from '../../shared/environment';
 import { EMPTY_ORPHANS, type OrphanReport } from '../../shared/orphans';
-import type { DbHandle } from '../db/database';
+import { exportGeneration, type DbHandle } from '../db/database';
 import { exportBoard, exportFileName, summarize, type BoardExportFile, type ImportResult } from '../db/boardExport';
 import { newId } from '../db/ids';
 import type { ImportSummary } from '../../shared/backup';
@@ -55,6 +55,9 @@ import { credentialsFor } from '../credentials';
 import { RunMcpSessions, type RunMcpAccess } from '../mcp/runSessions';
 
 export type { RouterOptions };
+
+/** A partir de quanto tempo (ms) uma operação do host entra no log com a duração: o que passa disso trava a tela. */
+export const SLOW_MS = 200;
 
 /** De onde vem a mensagem: quem assina (`author`) e se é a pessoa (padrão) ou a IA. */
 export interface Origin {
@@ -104,6 +107,7 @@ const bridgeOnly = {
   ready: viaBridge,
   'view.set': viaBridge,
   'prefs.set': viaBridge,
+  'ui.scope.set': viaBridge,
   'ui.showFilters': viaBridge,
   'ui.connectAI': viaBridge,
   'ui.fixProjectMcp': viaBridge,
@@ -208,6 +212,15 @@ export class MessageRouter {
   private orphans: OrphanReport = EMPTY_ORPHANS;
   private orphanHooks: OrphanHooks | null = null;
   private aiProfileRuntime: AiProfileRuntime | null = null;
+  /**
+   * O último snapshot montado, válido até a próxima mudança (#1066). Cada mudança do board avisa uma dezena
+   * de ouvintes, e cada um pedia o snapshot de novo: num board grande são ~150 ms de consultas por pedido,
+   * tudo síncrono no host. Com o cache, a montagem acontece uma vez por mudança. Quem recebe o snapshot não
+   * o altera (é compartilhado entre os ouvintes).
+   */
+  private cachedSnapshot: BoardState | null = null;
+  /** a marca de gravações quando o cache foi montado (`changeKey`): uma gravação por qualquer repositório o invalida */
+  private cachedChanges = '';
   readonly store: AttachmentStore;
 
   constructor(dbHandle: DbHandle, opts: RouterOptions) {
@@ -241,11 +254,11 @@ export class MessageRouter {
   }
   probeAiProfiles() {
     if (!this.aiProfileRuntime) throw new Error('Situação dos perfis indisponível neste host.');
-    return this.aiProfileRuntime.probe();
+    return this.aiProfileRuntime.probe().finally(() => this.invalidateSnapshot());
   }
   testAiProfile(id: string) {
     if (!this.aiProfileRuntime) throw new Error('Teste de perfil indisponível neste host.');
-    return this.aiProfileRuntime.test(id);
+    return this.aiProfileRuntime.test(id).finally(() => this.invalidateSnapshot());
   }
   executionPolicyLibrary(): PolicyLibrary {
     const snapshot = this.ctx.executionPolicies.snapshot(this.boardId);
@@ -281,6 +294,7 @@ export class MessageRouter {
 
   /** Grava um valor na tabela meta do board, substituindo o existente. */
   setMeta(key: string, value: string): void {
+    this.invalidateSnapshot();
     this.ctx.boards.setMeta(key, value);
   }
 
@@ -318,6 +332,39 @@ export class MessageRouter {
   }
 
   snapshot(): BoardState {
+    // a marca de gravações da conexão: quem grava por um repositório, sem passar por aqui, também a move
+    const changes = this.changeKey();
+    if (this.cachedSnapshot && this.cachedChanges === changes) return this.cachedSnapshot;
+    const startedAt = performance.now();
+    const built = this.buildSnapshot();
+    const elapsed = performance.now() - startedAt;
+    if (elapsed >= SLOW_MS) this.ctx.opts.log?.(`[tempo] montar o estado do board levou ${Math.round(elapsed)} ms`);
+    this.cachedSnapshot = built;
+    this.cachedChanges = changes;
+    return built;
+  }
+
+  /**
+   * O `total_changes()` do SQLite (linhas gravadas pela conexão) junto com quantas vezes ela foi exportada: o
+   * save e o backup reabrem a conexão e zeram o contador, e sem a geração um cache montado com N gravações
+   * valeria de novo quando N gravações novas se seguissem a um save.
+   */
+  private changeKey(): string {
+    const db = this.ctx.dbHandle.db;
+    const stmt = db.prepare('SELECT total_changes()');
+    try {
+      return `${exportGeneration(db)}:${stmt.step() ? Number(stmt.get()[0]) : -1}`;
+    } finally {
+      stmt.free();
+    }
+  }
+
+  /** Esquece o snapshot em cache: o próximo pedido monta um novo. Toda mudança (`notify`) chama; quem grava fora dela também. */
+  invalidateSnapshot(): void {
+    this.cachedSnapshot = null;
+  }
+
+  private buildSnapshot(): BoardState {
     const s = this.ctx.boards.snapshot(this.ctx.boardId, this.ctx.opts.author);
     const { current } = this.ctx.harness;
     return {
@@ -370,9 +417,14 @@ export class MessageRouter {
     const actor = this.actorOf(ctx);
     // o log: sonda antes, registro depois — só quando o handler diz que o board mudou (o que não aconteceu não entra)
     const probe = this.ctx.log.probe(msg);
+    const startedAt = performance.now();
+    // um handler que lança depois de gravar em parte deixaria o cache desatualizado: esquece antes
+    this.invalidateSnapshot();
     const changed = handler(msg, this.ctx, actor);
     if (changed) this.ctx.log.record(msg, actor, probe);
     const result = changed ? this.changed() : this.snapshot();
+    const elapsed = performance.now() - startedAt;
+    if (elapsed >= SLOW_MS) this.ctx.opts.log?.(`[tempo] ${msg.type} levou ${Math.round(elapsed)} ms (com os ouvintes da mudança)`);
     if (changed && msg.type === 'card.move') {
       const column = result.columns.find((c) => c.id === msg.columnId);
       if (column?.category === 'cancelled') this.cancelListeners.forEach((fn) => fn([msg.cardId]));
@@ -385,6 +437,7 @@ export class MessageRouter {
     const msg: WebviewToHost = { type: 'card.create', ...input };
     const actor = this.actorOf(ctx);
     const probe = this.ctx.log.probe(msg);
+    this.invalidateSnapshot();
     const id = createCard(this.ctx, input);
     this.ctx.log.record(msg, actor, probe);
     this.changed();
@@ -508,6 +561,8 @@ export class MessageRouter {
   onEnvironment(hooks: EnvironmentHooks, firstRun: boolean): void {
     this.environmentHooks = hooks;
     this.environmentFirstRun = firstRun;
+    // entra no snapshot sem avisar os ouvintes (é a configuração da abertura): só o cache precisa saber
+    this.invalidateSnapshot();
   }
 
   checkEnvironment(): Promise<void> {
@@ -699,15 +754,18 @@ export class MessageRouter {
   /** Metadados do rascunho a partir do banco do host; só lê a admissão (recibos locais), sem inferência nem probes. */
   /** O estado com o catálogo atual da biblioteca (do banco), o que a prévia e a proposta da IA leem. */
   contextDraftState(): BoardState {
+    // cópia: o snapshot é compartilhado (cache) e não pode ser alterado
     const state = this.snapshot();
-    state.harness = {
-      ...state.harness,
-      library: {
-        directory: state.harness.library?.directory ?? '',
-        artifacts: this.ctx.library.repo.list(this.ctx.boardId).map((a) => ({ ...a, path: '' })),
+    return {
+      ...state,
+      harness: {
+        ...state.harness,
+        library: {
+          directory: state.harness.library?.directory ?? '',
+          artifacts: this.ctx.library.repo.list(this.ctx.boardId).map((a) => ({ ...a, path: '' })),
+        },
       },
     };
-    return state;
   }
 
   previewContextDraft(target: ContextActivityTarget): ContextDraftResolution {
@@ -732,6 +790,7 @@ export class MessageRouter {
   /** Copia arquivos do disco como anexos do card (usado pelo seletor de arquivos). */
   addAttachmentFiles(cardId: string, paths: string[], artifact = false, ctx: Origin = {}): BoardState {
     const actor = this.actorOf(ctx);
+    this.invalidateSnapshot();
     for (const p of paths) {
       // o mesmo par sonda/registro do `attachment.addData`, com a mensagem equivalente
       const msg: WebviewToHost = { type: 'attachment.addData', cardId, filename: path.basename(p), base64: '', artifact };
@@ -744,6 +803,7 @@ export class MessageRouter {
 
   /** Relê a biblioteca do board e avisa os webviews se algo mudou. */
   refreshHarness(): void {
+    this.invalidateSnapshot();
     if (this.ctx.harness.refresh()) this.changed();
   }
 
@@ -808,6 +868,7 @@ export class MessageRouter {
   }
 
   private notify(): void {
+    this.invalidateSnapshot();
     this.listeners.forEach((fn) => fn());
   }
 

@@ -73,6 +73,11 @@ The board does not depend on the editor window:
 - **Abrir no navegador** (open in browser, at the top of the board, or the command **Faz AI:
   Abrir board no navegador**) opens the same board in a browser tab. The editor stays open and
   keeps the board; both screens stay in sync.
+- **What each screen receives**: the board state is built once per change and each screen (the
+  editor panel, the sidebar, the browser tab) receives only what it shows: the live cards, the trash
+  or the archived cards when those screens are open, and the conversation only for the open card.
+  Consecutive changes arrive together, and a hidden screen only receives when it is back. Host
+  operations over 200 ms are written to the **Faz AI** log channel with their duration.
 - **Without the editor**: run `~/.faz-ai/bin/faz-ai` in the project folder (or `faz-ai <folder>`).
   It serves the board in the browser, with the MCP server, AI runs and the heartbeat, and keeps
   running until you stop it with Ctrl+C. The launcher is created by the extension and uses the same
