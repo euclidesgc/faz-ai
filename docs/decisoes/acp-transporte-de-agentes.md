@@ -4,6 +4,10 @@
 > fica em `src/extension/ai/acp/` e só os testes o chamam. Documentação e registro do ACP consultados
 > em 2026-10-18; nenhuma CLI de agente estava instalada na máquina do spike, então nada foi conferido
 > ao vivo.
+>
+> O spike está no código da develop (#1055) como base para a #983 (transporte ACP como tipo de
+> executor do perfil de CLI). Ele fica fora do caminho de execução padrão: nenhum executor do board o
+> usa, e não há ativação por padrão até a história de produto do ACP ser decidida.
 
 ## Contexto
 

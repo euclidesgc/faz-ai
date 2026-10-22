@@ -251,5 +251,7 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
       if (report.measure !== 'none') return report;
       return { ...report, reason: new MeasureBrokenError(agent.label).message };
     },
+    // mesmo critério de `spawnMeasured`: sem medição, a classe diz o caso; com medição, null
+    failure: () => (reader.report(sessionId).measure !== 'none' ? null : new MeasureBrokenError(agent.label)),
   };
 }
