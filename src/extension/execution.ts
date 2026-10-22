@@ -120,6 +120,8 @@ export function executionPlan(
   board?: BoardServerSpec,
   /** o alvo que vale nesta execução (a troca por política pode ser noutra CLI); sem ele, o do card */
   target?: RunTarget,
+  /** Cursor: o hook do board está pronto? `false` volta MCP e ferramentas a orientação no pedido; sem o dado, vale a tabela */
+  cursorHookReady?: boolean,
 ): ExecPlan {
   const manifest = target ? withTarget(s, manifestOf(s, c), target) : manifestOf(s, c);
   // o perfil de CLI do alvo do card (não o padrão do board): a imposição, o inventário e o arquivo de MCP seguem a CLI que executa
@@ -127,6 +129,10 @@ export function executionPlan(
   const base = profileBase(cli);
   const profile = cli;
   const how = enforcementOf(cli);
+  if (base === 'cursor' && cursorHookReady === false) {
+    how.mcp = 'advised';
+    how.tools = 'advised';
+  }
   // os servidores que o board conhece são os da biblioteca dele (o inventário das pastas das ferramentas saiu)
   const known = [...new Set((s.harness.library?.artifacts ?? []).filter((a) => a.kind === 'mcp').map((a) => a.name))].filter(
     (n) => n !== BOARD_SERVER,

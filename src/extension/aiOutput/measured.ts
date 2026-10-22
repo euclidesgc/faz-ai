@@ -26,6 +26,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { RunReport } from '../../shared/log';
+import { writeManifest, type CursorManifest } from '../ai/cursorManifest';
 import { leaseProjectServer, type ProjectServerLease } from '../mcp/projectServerLease';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import type { RunningProcess } from '../runner';
@@ -57,6 +58,11 @@ export interface MeasuredDeps {
   log: (line: string) => void;
   /** o id da execução em `ai_runs`, para o canal identificar a chamada; ausente ou '' quando o log não gravou */
   runId?: string;
+  /**
+   * Manifesto do que o card permite no Cursor: gravado antes de iniciar a CLI e apagado no fim da
+   * execução (sucesso, falha ou cancelamento). Ausente fora do Cursor.
+   */
+  execManifest?: { dir: string; manifest: CursorManifest };
 }
 
 export interface Measured {
@@ -179,6 +185,7 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
   let done = false;
   let projectLease: ProjectServerLease | null = null;
   let processMayExist = false;
+  let disposeManifest: (() => void) | null = null;
   /** o leitor da tentativa em curso; o `report()` é sempre o da última */
   let reader: OutputReader = textReader();
   /** por que a medição não aconteceu, quando não aconteceu */
@@ -187,6 +194,12 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
   const finish = (code: number | null, error?: Error): void => {
     if (done) return;
     done = true;
+    try {
+      disposeManifest?.();
+    } catch {
+      deps.log('Não foi possível apagar o manifesto da execução no Cursor.');
+    }
+    disposeManifest = null;
     if (projectLease) {
       if (current?.terminationConfirmed?.() === true) {
         try {
@@ -208,6 +221,13 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
     if (built.projectMcp && !projectLease) {
       projectLease = leaseProjectServer(cwd, built.projectMcp, { coordinationDir: deps.leaseCoordinationDir, log: deps.log });
       deps.log('Servidor do board disponível por empréstimo temporário do arquivo MCP do projeto.');
+    }
+    if (deps.execManifest && !disposeManifest) {
+      try {
+        disposeManifest = writeManifest(deps.execManifest.dir, cwd, deps.execManifest.manifest);
+      } catch {
+        deps.log('Não foi possível gravar o manifesto da execução no Cursor; a garantia não vale para esta execução.');
+      }
     }
     const { command, cleanup } = materialize(built);
     const format = command.format;

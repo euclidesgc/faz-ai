@@ -11,7 +11,7 @@ beforeEach(() => posted.mockClear());
 
 it('abrir a prévia não chama IA, não inicia execução e explica o desconhecido e os limites do executor', async () => {
   const s = boardState();
-  s.board.aiTool = 'cursor';
+  s.board.aiTool = 'kimi';
   const p = executionContextOf(s, card('h'));
   renderThemed(<ExecutionContext preview={p} />);
   await userEvent.click(screen.getByText('Contexto da execução'));

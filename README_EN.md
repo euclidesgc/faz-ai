@@ -72,6 +72,11 @@ in the Portuguese interface.
   (always), **Pelo card** (per card) or **Desligado** (off) mode, with import and export to the tool.
   Every run goes through an agent, with the minimum it needs.
   ![Board harness](docs/images/harness_en.png) [Harness](docs/harness_EN.md)
+- **Cursor guarantee through the board hook.** The board registers a global hook in `~/.cursor/hooks.json`.
+  In each board run, it denies what the card does not allow: MCP servers, subagents and tools outside the
+  card's list. Skills and the agent text stay as guidance. Outside board runs, the hook allows everything
+  and Cursor works as before. To remove it, delete from `~/.cursor/hooks.json` the entries whose command
+  ends in `cursor-hook.js`; the extension registers them again the next time a board folder opens in Cursor.
 - **Chat with the AI.** Ask in natural language to create, move and link cards, or ask what is
   waiting for you. ![Chat with the AI](docs/images/chat_en.png) [Story flow](docs/fluxo_EN.md)
 - **Heartbeat and autonomous mode (YOLO).** The heartbeat calls the AI on its own for its pending

@@ -30,6 +30,13 @@ const bridge = {
   sourcemap: false,
 };
 
+// hook global do Cursor (~/.cursor/hooks.json): script sem dependências, rápido e sem rede
+const cursorHook = {
+  ...bridge,
+  entryPoints: ['src/extension/ai/cursorHookMain.ts'],
+  outfile: 'dist/cursor-hook.js',
+};
+
 // board fora do editor: `node dist/cli.js [pasta]` serve o board no navegador
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
 const cli = {
@@ -44,7 +51,7 @@ const cli = {
 };
 
 if (watch) {
-  for (const o of [options, bridge, cli]) await (await context(o)).watch();
+  for (const o of [options, bridge, cursorHook, cli]) await (await context(o)).watch();
 } else {
-  await Promise.all([build(options), build(bridge), build(cli)]);
+  await Promise.all([build(options), build(bridge), build(cursorHook), build(cli)]);
 }

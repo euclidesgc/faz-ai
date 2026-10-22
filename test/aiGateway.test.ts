@@ -168,6 +168,64 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     expect(semManifesto!.check.status).not.toBe('ok');
   });
 
+  it('Cursor: o manifesto leva o servidor do board, nomes do Cursor e nenhum subagente; ferramenta sem equivalente deixa `tools` vazio', async () => {
+    const { manifestPath } = await import('../src/extension/ai/cursorManifest');
+    const mdir = path.join(dir, 'manifestos');
+    const lines: string[] = [];
+    const g = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn,
+      cursorHook: { dir: mdir, status: () => null },
+    });
+    const run = (tools: string[]) =>
+      g.run(
+        call({
+          tool: 'cursor',
+          log: (l) => lines.push(l),
+          prepare: () => ({
+            ...call().prepare(),
+            conference: {
+              manifest: { skills: [], mcpServers: ['github'], tools, deniedTools: ['Edit', 'Glob'], agent: 'condutor' },
+              boardServer: 'faz-ai',
+            },
+          }),
+        }),
+      );
+    run(['Read', 'Bash', 'Agent']);
+    let m = JSON.parse(fs.readFileSync(manifestPath(mdir, dir), 'utf8'));
+    expect(m).toMatchObject({ mcpServers: ['faz-ai', 'github'], subagents: [], tools: ['Read', 'Shell', 'Task'], deniedTools: ['Write'] });
+    procs[0]!.exit(0);
+    run(['Read', 'Glob']);
+    m = JSON.parse(fs.readFileSync(manifestPath(mdir, dir), 'utf8'));
+    expect(m.tools).toEqual([]);
+    expect(lines.some((l) => l.includes('parcial'))).toBe(true);
+    procs[1]!.exit(0);
+  });
+
+  it('Cursor sem hook pronto: nada de manifesto e a linha "parcial" no log', () => {
+    const lines: string[] = [];
+    const g = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn,
+      cursorHook: { dir: path.join(dir, 'm2'), status: () => 'o hook está desatualizado' },
+    });
+    expect(g.cursorHookReady()).toBe(false);
+    g.run(
+      call({
+        tool: 'cursor',
+        log: (l) => lines.push(l),
+        prepare: () => ({
+          ...call().prepare(),
+          conference: { manifest: { skills: [], mcpServers: [], tools: [], deniedTools: [], agent: '' }, boardServer: 'faz-ai' },
+        }),
+      }),
+    );
+    expect(fs.existsSync(path.join(dir, 'm2'))).toBe(false);
+    expect(lines.some((l) => l.includes('Garantia do Cursor parcial'))).toBe(true);
+  });
+
   it('falha, interrupção e tempo limite ficam registrados com o desfecho certo', () => {
     vi.useFakeTimers();
     const g = gateway();

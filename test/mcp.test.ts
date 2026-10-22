@@ -685,7 +685,7 @@ describe('modelos de IA', () => {
     const viaAgent = (await call('create_card', { title: 'Pelo agente' })).data;
     const agentCard = (await call('get_card', { card: viaAgent.id })).data;
     expect(agentCard.model).toMatchObject({ tool: 'cursor', from: 'agent' });
-    expect(agentCard.execution.enforcedByBoardRun).toEqual(['model']);
+    expect(agentCard.execution.enforcedByBoardRun).toEqual(['mcp', 'tools', 'model']);
   });
 
   it('as descrições de get_models e set_ai_tool e as instruções falam de perfil de CLI, não de "ferramenta do board" (#703)', async () => {
