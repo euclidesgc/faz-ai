@@ -77,8 +77,10 @@ cada fase e move os cards conforme avança, sempre parando para a sua aprovaçã
   no gitflow; a Homologação abre o PR com **Como testar**, e o board detecta o merge, limpa a branch
   e pode registrar a decisão em `docs/decisoes`. [Gitflow](docs/gitflow.md)
 - **Métricas de consumo.** Um anel no card estima o contexto da próxima execução; a aba **Consumo** e
-  o painel **Métricas** mostram tokens, tempo de IA, retrabalho e o que a IA usou. A IA consulta o
-  mesmo com `get_metrics`. [Métricas](docs/metricas.md)
+  o painel **Métricas** mostram tokens, tempo de IA, retrabalho e o que a IA usou. Cada execução também
+  é conferida contra o que o card liberou: **sem desvio**, **com desvio** (o card avisa na conversa, e o
+  painel conta por ferramenta de IA) ou **não conferida** (a ferramenta não informou o que usou). A IA
+  consulta o mesmo com `get_metrics`. [Métricas](docs/metricas.md)
 - **Board no navegador.** Abra o mesmo board numa aba do navegador, sincronizado com o editor, ou
   sirva-o sem o editor com o comando `faz-ai`. [Dados e navegador](docs/dados.md)
 - **Servidor MCP.** Claude Code, Cursor ou qualquer cliente MCP consulta e edita o board.

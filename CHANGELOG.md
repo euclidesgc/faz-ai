@@ -6,6 +6,8 @@
 
 ### Adicionado
 
+- **Conferência da execução: o que a IA usou contra o que o card pediu (#972).** Ao terminar cada execução, o board compara o que a sessão usou (servidores MCP, subagentes, skills e ferramentas nativas, quando a CLI informa) com o que o card liberou: agente, skills, servidores MCP e ferramentas. Cada execução fica em um de três estados: **sem desvio** (usou só o liberado), **com desvio** (a lista do que saiu do liberado, com o número de chamadas) ou **não conferida** (a CLI não informou o que usou, ou a execução não foi medida; nunca vira "sem desvio"). O servidor do próprio board e as skills do fluxo (`faz-ai-*`) não contam como desvio. A conferência só informa: não bloqueia a execução, e uma falha nela não a derruba. O desvio aparece em três lugares: um comentário na conversa do card, só quando há desvio; a linha "Conferência" do log da execução; e o painel **Métricas**, que mostra por ferramenta de IA as colunas **conferidas**, **com desvio** e **não conferidas** (o `get_metrics` com `group_by` `tool` traz as mesmas contagens). Execuções anteriores a esta versão aparecem como não conferidas.
+
 - **Sombra no card selecionado (#1069).** O card selecionado ganha uma sombra que sai do canto superior esquerdo e o destaca dos demais, sem tirar o contorno de foco do teclado. Os cards marcados na seleção múltipla recebem o mesmo destaque, e as linhas selecionadas das listas (como as do Harness) recebem uma sombra mais discreta. Um card pendente selecionado mantém o anel da cor do status, e a sombra vai por cima dele.
 
 ### Alterado

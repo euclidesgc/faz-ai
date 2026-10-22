@@ -13,6 +13,7 @@ import type {
   RunReport,
 } from '../../shared/log';
 import { monthOf, truncateTitle, type BashCommandItem } from '../../shared/log';
+import { runCheckDetail, runCheckFrom, type RunCheck } from '../../shared/runCheck';
 import { newId } from '../db/ids';
 import { validateAdmissionDecision, type ExecutionAdmissionDecision } from '../../shared/executionAdmission';
 import { all, num, one, run, str, strOrNull, transaction, type Row } from '../db/query';
@@ -59,6 +60,8 @@ export interface AiRun {
   sessionId: string | null;
   /** linha gravada antes da migração 24 lê 'none' (RF-16) */
   measure: AiRunMeasure;
+  /** a conferência gravada; linha anterior à migração 47 lê 'não conferida' */
+  check: RunCheck;
 }
 
 const numOrNull = (v: Row[string] | undefined): number | null => (v == null ? null : num(v));
@@ -112,6 +115,7 @@ function toRun(r: Row): AiRun {
     turns: numOrNull(r.turns),
     sessionId: strOrNull(r.session_id),
     measure: str(r.measure) as AiRunMeasure,
+    check: runCheckFrom(strOrNull(r.check_status), strOrNull(r.check_detail)),
   };
 }
 
@@ -206,7 +210,7 @@ export class AiRunRepo {
    * vale da próxima execução em diante. O inventário usa `INSERT OR REPLACE` sobre a chave
    * `(run_id, kind, name)`: uma segunda chamada com o mesmo inventário não duplica linha.
    */
-  measure(id: string, report: RunReport): void {
+  measure(id: string, report: RunReport, check?: RunCheck): void {
     const c = report.measure === 'none' ? null : report.consumption;
     // o inventário vale sempre que algo foi medido, com ou sem consumo: `partial` sem tokens é o caso
     // normal do Cursor, que não informa uso mas dizem quais ferramentas chamaram
@@ -215,7 +219,8 @@ export class AiRunRepo {
       run(
         this.db,
         `UPDATE ai_runs SET input_tokens = ?, output_tokens = ?, cache_read_tokens = ?, cache_write_tokens = ?,
-           cost_usd = ?, cost_estimated = ?, turns = ?, session_id = ?, measure = ?
+           cost_usd = ?, cost_estimated = ?, turns = ?, session_id = ?, measure = ?,
+           check_status = ?, check_detail = ?
          WHERE id = ?`,
         [
           c ? c.inputTokens : null,
@@ -227,6 +232,8 @@ export class AiRunRepo {
           c ? c.turns : null,
           c ? c.sessionId : null,
           report.measure,
+          check ? check.status : null,
+          check ? JSON.stringify(runCheckDetail(check)) : null,
           id,
         ],
       );

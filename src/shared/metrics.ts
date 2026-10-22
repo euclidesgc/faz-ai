@@ -144,6 +144,13 @@ export const METRICS_MEASURES: MetricsMeasure[] = (['cost', 'tokens', 'runs', 'd
   (m) => SHOW_COST || m !== 'cost',
 );
 
+/** A conferência da execução (o que foi usado contra o que o card pediu) contada por estado. */
+export interface RunChecks {
+  ok: number;
+  deviation: number;
+  unchecked: number;
+}
+
 /** Uma categoria de um corte ou de um ranking. */
 export interface MetricsCell {
   /**
@@ -170,6 +177,8 @@ export interface MetricsCell {
   costUsd: number | null;
   /** a parte estimada do custo, no vocabulário de #71 (RF-31) */
   costEstimatedUsd: number | null;
+  /** só no corte por ferramenta de IA: execuções conferidas, com desvio e não conferidas (as sem conferência contam em não conferidas) */
+  checks?: RunChecks;
 }
 
 export interface MetricsBreakdown {

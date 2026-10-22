@@ -411,6 +411,19 @@ export function Breakdown({ result, sections, dim, measure, onChange }: Props) {
                   <th scope="col" className="is-number">
                     {t('Tempo de IA')}
                   </th>
+                  {dim === 'tool' && (
+                    <>
+                      <th scope="col" className="is-number">
+                        {t('Conferidas')}
+                      </th>
+                      <th scope="col" className="is-number">
+                        {t('Com desvio')}
+                      </th>
+                      <th scope="col" className="is-number">
+                        {t('Não conferidas')}
+                      </th>
+                    </>
+                  )}
                   <th scope="col">{t('Observação')}</th>
                 </tr>
               </thead>
@@ -422,6 +435,13 @@ export function Breakdown({ result, sections, dim, measure, onChange }: Props) {
                     <td className="is-number">{formatTokens(r.cell.tokens)}</td>
                     <td className="is-number">{formatNumber(r.cell.runs)}</td>
                     <td className="is-number">{formatDuration(r.cell.durationMs)}</td>
+                    {dim === 'tool' && (
+                      <>
+                        <td className="is-number">{r.cell.checks ? formatNumber(r.cell.checks.ok) : '–'}</td>
+                        <td className="is-number">{r.cell.checks ? formatNumber(r.cell.checks.deviation) : '–'}</td>
+                        <td className="is-number">{r.cell.checks ? formatNumber(r.cell.checks.unchecked) : '–'}</td>
+                      </>
+                    )}
                     <td>{rowMarks(r).join('; ')}</td>
                   </tr>
                 ))}

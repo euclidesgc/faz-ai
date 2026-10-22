@@ -26,7 +26,8 @@ import { columnOf, isLive } from '../shared/selectors';
 import { isAtYoloStop, isWithHuman, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../shared/story';
 import type { AiRunMode, RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
-import { executionPlan } from './execution';
+import { BOARD_SERVER, executionPlan } from './execution';
+import { runCheckLine, runCheckNotice } from '../shared/runCheck';
 import { runArtifactRequest } from './runArtifactSnapshot';
 import { modelDisplay, modelValue } from '../shared/models';
 import { effortTiers } from './models';
@@ -503,6 +504,7 @@ export class AiRunner {
               : {}),
             ...(options.token !== undefined ? { work: { id: options.workId!, token: options.token } } : {}),
             artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state, card) : undefined,
+            conference: { manifest: plan.manifest, boardServer: BOARD_SERVER },
             // a configuração completa só existe depois do plano; é a mesma que o resumo manda para o canal de log
             config: {
               model: activityModel,
@@ -615,6 +617,7 @@ export class AiRunner {
               : {},
         ),
       );
+      log(runCheckLine(end.check));
       let retry: Retry | undefined;
       this.usageLimited = !end.stopped && !!end.report.usageLimitReached;
       try {
@@ -647,6 +650,13 @@ export class AiRunner {
           // execução" sem execução, e quem espera o fim precisa ser avisado como em qualquer outro fim
           this.block(cardId, `Não foi possível repetir a execução no destino da política: ${e instanceof Error ? e.message : String(e)}`);
         }
+      }
+      try {
+        // o desvio vale para esta execução, mesmo que a política a troque de alvo; sem desvio nada é escrito
+        const deviation = runCheckNotice(end.check);
+        if (deviation) this.router.handle({ type: 'comment.add', cardId, body: deviation }, { author: RUNNER_AUTHOR, source: 'ai' });
+      } catch {
+        // o aviso é só informação: falhar ao escrevê-lo não muda o desfecho da execução
       }
       if (!retry) {
         try {

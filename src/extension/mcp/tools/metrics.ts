@@ -56,16 +56,24 @@ function formatCost(usd: number): string {
   return `US$ ${usd.toFixed(2)}`;
 }
 
-type TableVariant = 'normal' | 'inventory' | 'mcp';
+type TableVariant = 'normal' | 'inventory' | 'mcp' | 'tool';
 
 const HEADERS: Record<TableVariant, string[]> = {
   normal: SHOW_COST ? ['grupo', 'execuções', 'duração', 'tokens', 'custo'] : ['grupo', 'execuções', 'duração', 'tokens'],
+  // por ferramenta de IA: as colunas normais e a conferência da execução (o que usou contra o que o card pediu)
+  tool: [
+    ...(SHOW_COST ? ['grupo', 'execuções', 'duração', 'tokens', 'custo'] : ['grupo', 'execuções', 'duração', 'tokens']),
+    'conferidas',
+    'com desvio',
+    'não conferidas',
+  ],
   inventory: ['grupo', 'execuções', 'usos'],
   mcp: ['grupo', 'servidor', 'execuções', 'usos'],
 };
 
 function variantOf(groupBy: MetricsDim | undefined): TableVariant {
   if (groupBy === 'mcp_tool') return 'mcp';
+  if (groupBy === 'tool') return 'tool';
   return INVENTORY_DIMS.has(groupBy) ? 'inventory' : 'normal';
 }
 
@@ -82,6 +90,12 @@ function formatRow(r: MetricsRow, variant: TableVariant): string[] {
     formatDuration(r.durationMs),
     r.tokens == null ? '-' : String(r.tokens),
     ...(SHOW_COST ? [r.costUsd == null ? '-' : formatCost(r.costUsd)] : []),
+    // "conferidas" = sem desvio; execução anterior à conferência ou sem inventário conta em "não conferidas"
+    ...(variant === 'tool'
+      ? r.checks
+        ? [String(r.checks.ok), String(r.checks.deviation), String(r.checks.unchecked)]
+        : ['-', '-', '-']
+      : []),
   ];
 }
 
