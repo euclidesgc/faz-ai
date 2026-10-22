@@ -182,6 +182,16 @@ describe('regras configuráveis', () => {
     expect(() => boards.retentionMonths('inexistente')).toThrow();
   });
 
+  it('trilha curta: nasce desligada, só booleano vale e updateRules a persiste', () => {
+    expect(DEFAULT_RULES.shortTrack).toBe(false);
+    // banco anterior à regra: sem a chave
+    expect(parseRules('{"confirmTrash":"never"}').shortTrack).toBe(false);
+    expect(parseRules('{"shortTrack":"true"}').shortTrack).toBe(false);
+    expect(parseRules('{"shortTrack":true}').shortTrack).toBe(true);
+    boards.updateRules(boardId, { shortTrack: true });
+    expect(snap().board.rules.shortTrack).toBe(true);
+  });
+
   it('updateRules persiste só o que foi alterado', () => {
     boards.updateRules(boardId, { onCancelParent: 'cascade' });
     boards.updateRules(boardId, { confirmArchive: 'always' });

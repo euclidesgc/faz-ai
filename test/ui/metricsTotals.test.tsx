@@ -51,6 +51,18 @@ function result(over: Partial<MetricsPanelResult['totals']> = {}): MetricsPanelR
 
 const card = (name: string) => screen.getByRole('group', { name });
 
+describe('Totals: execuções acima do limite de consumo', () => {
+  it('mostra a contagem quando é maior que zero', () => {
+    renderThemed(<Totals result={result({ overLimitRuns: 3 })} />);
+    expect(within(card('Execuções de IA')).getByText('3 acima do limite de consumo')).toBeInTheDocument();
+  });
+
+  it.each([0, undefined])('não mostra a linha com %s', (overLimitRuns) => {
+    renderThemed(<Totals result={result({ overLimitRuns })} />);
+    expect(within(card('Execuções de IA')).queryByText(/acima do limite/)).toBeNull();
+  });
+});
+
 describe('Totals: os cinco totais', () => {
   it('mostra os cinco valores da resposta (RF-09)', () => {
     renderThemed(<Totals result={result()} />);

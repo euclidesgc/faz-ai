@@ -191,6 +191,13 @@ export const settings: Record<string, string> = {
     'a story is moved to a later column and still has open sub-tasks whose "Phase" field is the current column',
   'bloquear o movimento e avisar quantas sub-tarefas da fase faltam. Voltar de coluna e cancelar continuam livres.':
     'block the move and say how many sub-tasks of the phase are left. Moving back and cancelling stay free.',
+  'Trilha curta para histórias pequenas': 'Short track for small stories',
+  'uma história de esforço "Baixo" ou do tipo "Bug" é aprovada ou avançada pelo autopiloto':
+    'a story with "Baixo" (low) effort or of type "Bug" is approved or advanced by the autopilot',
+  'pular as colunas de PRD e Spec e levar a história direto ao Plan. Arrastar a história ou movê-la pela IA para o PRD ou a Spec continua valendo e força a trilha completa.':
+    'skip the PRD and Spec columns and take the story straight to Plan. Dragging the story, or the AI moving it, to PRD or Spec still works and forces the full track.',
+  'seguir coluna a coluna, como as demais histórias.': 'go column by column, like the other stories.',
+  Ligar: 'Turn on',
   'Cancelar história com sub-tarefas em aberto': 'Cancel a story with open sub-tasks',
   'uma história é movida para uma coluna de cancelamento ({names}) e ainda tem sub-tarefas em aberto':
     'a story is moved to a cancelled column ({names}) and still has open sub-tasks',

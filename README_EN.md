@@ -470,6 +470,15 @@ You answer on the card itself:
 The instructions and document templates of the default board ask, in each phase, for what makes the
 code review quick later:
 
+- **Short track for small stories.** With the rule on (Settings → Rules; off by default), a story
+  with **Baixo** (low) effort or of type **Bug** approved in Discovery, or advanced by the autopilot,
+  goes straight to Plan, skipping PRD and Spec, and the Plan starts from the DISCOVERY. The rule reads
+  the current effort and type at each advance: if Discovery finds the story is bigger than it looked,
+  the AI raises the effort and the story follows the full track. To force the full track on a small
+  story, drag it (or ask the AI to move it with `move_card`) to PRD or Spec: an explicit move is never
+  redirected. The skipped columns are recognized by the document they produce (PRD.md and SPEC.md),
+  so renaming them does not turn the rule off.
+
 - **Spec with the program design.** Besides the architecture, the Spec brings the new or changed
   types and signatures, the file of each one and who calls whom on the main path, with the feature
   flow in Mermaid diagrams. Discarded alternatives come with the reason for each one.
@@ -663,7 +672,11 @@ The gateway also accepts asynchronous identity recording (`beforeStart`): the la
 
 The `Orchestrator` now provides `drive`, round continuation, startup reconciliation, sweeping and cancellation through an injected `UnitStarter`. It synchronizes preparation and process identity before releasing the CLI, confirms the process group and saves the result before releasing the lock. The workspace reference remains persisted until physical release is confirmed, including crashes in that interval; imports also respect that reservation. Tests using Node processes, the MCP bridge and an on-disk database cover three sequential children, one closing run, partial work, cancellation with a descendant and a real controller restart. Host creation and trigger integration remain pending, along with human return cycles and stable phase association. This does not activate the v1 plan or validate real AI CLIs yet.
 
-The v1 gateway admission foundation distinguishes conversation, artifacts, permissions, MCP and delegation, requiring local receipts bound to the current configuration. Decisions are recorded in history (schema 36), and export/import does not turn them into authorization. An empty list means no tools; strict Claude mapping uses exact tools and MCP operations without bypassing permissions. This foundation still awaits the real CLI verifier and activation across E5 actions: current execution remains legacy, and no executor is verified automatically.
+The v1 gateway admission foundation distinguishes conversation, artifacts, permissions, MCP and delegation, requiring local receipts bound to the current configuration. Decisions are recorded in history (schema 36), and export/import does not turn them into authorization. An empty list means no tools; strict Claude mapping uses exact tools and MCP operations without bypassing permissions. The **Faz AI: Verify AI CLI isolation** command runs the Claude CLI in a disposable fixture against a local API and records the receipts (valid for 14 days); no executor is verified automatically. The activity's resolved configuration is validated before the process opens and frozen in the run snapshot (`manifest.context`): editing the library later does not change a run in progress, and an MCP outside the activity's configuration is refused. The plan governs executions only with the v1 runtime, which is opt-in (below); without it, execution stays legacy.
+
+**AI proposal.** On each Execution plan action that already has a valid agent, **Propose with AI** asks for the minimal configuration (additional skills and active MCPs, within the agent contract, with a reason for each). The reply is validated in the host and becomes a draft only with **Use as draft**; the comparison and **Apply reviewed drafts** stay yours. If the card, the agent or the catalog change, the proposal shows as outdated.
+
+**v1 runtime (opt-in).** With `FAZ_AI_CONTEXT_RUNTIME=v1` in the environment that opens the editor, the gateway only runs with the resolved configuration and capability admission: runner (phase, refine, summary, conflict), chat, Harness assistants and profile test. Without an agent with a valid contract or without receipts (command **Faz AI: Verify the AI CLI isolation**, valid for 14 days), the process does not start. The legacy runtime remains the default.
 
 ### Card Usage tab
 
@@ -739,6 +752,11 @@ and also in the board opened in the browser.
   total can exceed the elapsed clock time. What was not measured shows as "não medido" (not
   measured), never as 0, and when only some of the runs were measured the note says how many were
   left out.
+- **Runs over the usage limit.** A run that reads more than 10 million cache tokens goes over the
+  limit: the **AI runs** total shows "{n} over the usage limit" (in Portuguese, "acima do limite de
+  consumo") and, when the run ends, the card's conversation gets a notice with the consumption and
+  the duration. The limit is fixed and the alert interrupts nothing. Without measured tokens
+  (Cursor) there is no alert, and archived months are not counted.
 - **Tokens per month.** A bar chart with each month's tokens. The month in progress is hatched, because it has not ended yet; a month with no data at
   all is a gap marked "sem dado" (no data), not a zero-height bar. Below the chart a table has the
   same numbers and a notes column (partial, no data, monthly total only).
@@ -1372,7 +1390,7 @@ commands and settings stay managed by their tool and the board does not list the
 | Workflows e colunas | As many workflows as you want (independent cards or sub-tasks), with editable names and a position you change by dragging; **Nova coluna** (new column) on each one; names, order (drag) and meaning of the columns; where the AI works and which ones require approval; each column's phase (AI instruction and document template). Opening and closing workflows and columns happens on the board itself and is remembered |
 | Tipos de card | Story, Bug, Sub-task…, with color and default field values per type |
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section |
-| Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model |
+| Regras do board | Completion and phase-advance blocks, confirmations, filling in the suggested model, short track for small stories (Baixo effort or Bug type skips PRD and Spec) |
 | Harness | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, default agent and heartbeat (see [Harness](#harness) and [Agents](#agents)) |
 | Ferramentas de IA | CLI profiles: enable, set a default, duplicate, create and test |
 | Modelos de IA | Models and effort levels by profile; rules that suggest each card's model |

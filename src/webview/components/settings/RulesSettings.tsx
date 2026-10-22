@@ -154,6 +154,20 @@ export function RulesSettings() {
       />
 
       <Rule
+        title={t('Trilha curta para histórias pequenas')}
+        active={rules.shortTrack}
+        when={t('uma história de esforço "Baixo" ou do tipo "Bug" é aprovada ou avançada pelo autopiloto')}
+        then={
+          rules.shortTrack
+            ? t(
+                'pular as colunas de PRD e Spec e levar a história direto ao Plan. Arrastar a história ou movê-la pela IA para o PRD ou a Spec continua valendo e força a trilha completa.',
+              )
+            : t('seguir coluna a coluna, como as demais histórias.')
+        }
+        control={<SwitchField label={t('Ligar')} checked={rules.shortTrack} onChange={(shortTrack) => set({ shortTrack })} />}
+      />
+
+      <Rule
         title={t('Cancelar história com sub-tarefas em aberto')}
         active={rules.onCancelParent !== 'keep'}
         when={t('uma história é movida para uma coluna de cancelamento ({names}) e ainda tem sub-tarefas em aberto', {

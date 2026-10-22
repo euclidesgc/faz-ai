@@ -5,7 +5,8 @@ import { aiQueue, pendingWork } from '../shared/pending';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
 import { cardCliProblem, noProfileAvailable } from '../shared/requirements';
 import { limitOf, type AiRunMode } from '../shared/runner';
-import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
+import { nextColumnFor } from '../shared/advance';
+import { childrenOf, columnOf, isAiWorking, isLive } from '../shared/selectors';
 import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
 import { orchestratesStory } from '../shared/orchestration';
 import { autopilotQueue } from '../shared/autopilotQueue';
@@ -148,7 +149,8 @@ function storyStep(s: BoardState, story: Card): AutopilotStep {
     };
 
   if (!column.aiActive) {
-    const next = columnsOf(s, story.workflowId).find((c) => c.position > column.position && c.category !== 'cancelled');
+    // o avanço calculado: com a trilha curta ligada, a história pequena pula o PRD e a Spec
+    const next = nextColumnFor(s, story);
     return next ? { kind: 'advance', story, column: next } : { kind: 'idle' };
   }
   const queue = aiQueue(s, pendingWork(s));

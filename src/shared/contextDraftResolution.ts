@@ -11,6 +11,7 @@ import {
   type ContextChoice,
 } from './contextPlanning';
 import type { BoardState } from './model';
+import type { ExecutorCapability, CapabilityAssessment } from './executionAdmission';
 
 export type ContextDraftOrigin =
   'card-phase' | 'card-action' | 'workflow-phase' | 'workflow-action' | 'board-phase' | 'board-action' | 'agent-essential' | 'board-always';
@@ -18,6 +19,7 @@ type SelectionField = 'agent' | 'model' | 'additionalSkillIds' | 'activeMcpIds';
 export interface ContextDraftDiagnostic {
   code:
     | 'admission-unavailable'
+    | 'admission-blocked'
     | 'invalid-target'
     | 'invalid-selection'
     | 'agent-required'
@@ -32,6 +34,9 @@ export interface ContextDraftDiagnostic {
     | 'missing-input'
     | 'input-outside-board';
   artifactId?: string;
+  /** Só em `admission-blocked`: o código da razão devolvida pela admissão do host. */
+  reason?: string;
+  capability?: ExecutorCapability;
 }
 export interface ContextDraftItem {
   artifactId: string;
@@ -59,7 +64,8 @@ export interface ContextDraftResolution {
   trace: ContextDraftTrace[];
   diagnostics: ContextDraftDiagnostic[];
   /** Não aceita um booleano do cliente como prova de capacidade ou admissão. */
-  admission: { state: 'unavailable'; dependency: 729 };
+  admission: { state: 'unavailable'; dependency: 729 } | { state: 'evaluated'; admitted: boolean; capabilities: CapabilityAssessment[] };
+  /** A prévia nunca autoriza: quem executa decide de novo na admissão do gateway. */
   canExecute: false;
 }
 

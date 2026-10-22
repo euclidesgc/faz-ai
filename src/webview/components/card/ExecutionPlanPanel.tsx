@@ -16,7 +16,9 @@ import {
 import { useBoardStore } from '../../store/boardStore';
 import { contextPlanning } from '../../commands';
 import { useAction } from '../../useAction';
-import { t } from '../../i18n';
+import { requestContextProposal } from '../../request';
+import { isProposalStale, type ContextProposal } from '../../../shared/contextProposal';
+import { getLocale, t } from '../../i18n';
 import { ActivityContextEditor } from './ActivityContextEditor';
 import { ContextDraftPreview, CONTEXT_DRAFT_ORIGINS } from './ContextDraftPreview';
 
@@ -37,8 +39,10 @@ export function ExecutionPlanPanel({
   const [editing, setEditing] = useState<ContextActivityTarget | null>(null);
   const [review, setReview] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
+  const [proposals, setProposals] = useState<Record<string, ContextProposal>>({});
   useEffect(() => {
     setPicked([]);
+    setProposals({});
     setEditing(null);
     setReview(false);
   }, [workflowId, card?.id]);
@@ -98,6 +102,28 @@ export function ExecutionPlanPanel({
     setReview(false);
     setPicked([]);
   });
+  const propose = useAction(async (target: ContextActivityTarget) => {
+    const proposal = await requestContextProposal(target, getLocale(), (state.board.runner.timeoutMinutes + 1) * 60_000);
+    setProposals((current) => ({ ...current, [contextTargetKey(target)]: proposal }));
+  });
+  /** Só vira rascunho: a pessoa compara e aplica pelo fluxo de sempre. Agente, contrato e prioridades não mudam. */
+  const applyProposal = (proposal: ContextProposal) => {
+    const key = contextTargetKey(proposal.target);
+    const base = draftOf(proposal.target);
+    const reasons = [...proposal.additionalSkills, ...proposal.activeMcps].map(
+      (i) => `${state.harness.library?.artifacts.find((a) => a.id === i.artifactId)?.name ?? i.artifactId}: ${i.reason}`,
+    );
+    modify({
+      ...base,
+      selection: {
+        ...base.selection,
+        additionalSkillIds: { mode: 'explicit', value: proposal.additionalSkills.map((i) => i.artifactId) },
+        activeMcpIds: { mode: 'explicit', value: proposal.activeMcps.map((i) => i.artifactId) },
+      },
+      reason: [proposal.explanation, ...reasons].filter(Boolean).join('\n'),
+    });
+    setProposals(({ [key]: _used, ...rest }) => rest);
+  };
   const stale = !save.busy && allDrafts.some((d) => activityDraft(state, d.target).expectedRevision !== d.expectedRevision);
   const copySource = targets.find((target) => contextTargetKey(target) === picked[0]);
   const modify = (value: ActivityContextWrite) => {
@@ -195,7 +221,18 @@ export function ExecutionPlanPanel({
                   <td>
                     <Button size="1" variant="soft" disabled={save.busy} onClick={() => setEditing(target)}>
                       {t('Configurar {activity}', { activity: name(target) })}
-                    </Button>
+                    </Button>{' '}
+                    {planPreview(state, target).agent && (
+                      <Button
+                        size="1"
+                        variant="ghost"
+                        disabled={save.busy || propose.busy}
+                        onClick={() => void propose.run(target)}
+                        aria-label={t('Propor configuração de {activity} com IA', { activity: name(target) })}
+                      >
+                        {propose.busy ? t('Pedindo proposta…') : t('Propor com IA')}
+                      </Button>
+                    )}
                     <details>
                       <summary>{t('Origens e incompatibilidades')}</summary>
                       <ContextDraftPreview preview={p} />
@@ -222,6 +259,46 @@ export function ExecutionPlanPanel({
           'A estimativa cobre só o texto conhecido. MCPs, anexos e arquivos de apoio podem acrescentar contexto; consumo total continua desconhecido.',
         )}
       </p>
+      {propose.error && <p role="alert">{t(propose.error)}</p>}
+      {Object.entries(proposals).map(([key, proposal]) => {
+        const target = targets.find((tg) => contextTargetKey(tg) === key);
+        if (!target) return null;
+        const outdated = isProposalStale(state, proposal);
+        const artifactName = (id: string) => state.harness.library?.artifacts.find((a) => a.id === id)?.name ?? id;
+        return (
+          <section key={key} className="context-plan-proposal" aria-label={t('Proposta da IA para {activity}', { activity: name(target) })}>
+            <h4>{t('Proposta da IA para {activity}', { activity: name(target) })}</h4>
+            <p className="muted small">
+              {t('A IA só sugere skills e MCPs dentro do que o agente permite. Nada é gravado até você comparar e aplicar.')}
+            </p>
+            {proposal.explanation && <p>{proposal.explanation}</p>}
+            <ul>
+              {proposal.additionalSkills.map((i) => (
+                <li key={`s-${i.artifactId}`}>
+                  {t('Skill')} {artifactName(i.artifactId)}: {i.reason}
+                </li>
+              ))}
+              {proposal.activeMcps.map((i) => (
+                <li key={`m-${i.artifactId}`}>
+                  {t('MCP')} {artifactName(i.artifactId)}: {i.reason}
+                </li>
+              ))}
+              {proposal.additionalSkills.length + proposal.activeMcps.length === 0 && (
+                <li>{t('Nenhuma skill ou MCP além do essencial.')}</li>
+              )}
+            </ul>
+            {outdated && (
+              <p role="alert">{t('A proposta está desatualizada: o card, o agente ou o catálogo mudaram. Peça uma nova proposta.')}</p>
+            )}
+            <Button disabled={outdated || save.busy} onClick={() => applyProposal(proposal)}>
+              {t('Usar como rascunho')}
+            </Button>{' '}
+            <Button variant="ghost" onClick={() => setProposals(({ [key]: _gone, ...rest }) => rest)}>
+              {t('Descartar proposta')}
+            </Button>
+          </section>
+        );
+      })}
       {picked.length > 1 && copySource && (
         <Button variant="soft" disabled={save.busy} onClick={copy}>
           {t('Copiar {activity} para as atividades marcadas', { activity: name(copySource!) })}

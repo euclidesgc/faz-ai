@@ -188,3 +188,11 @@ it('não transporta permissões ou modelos ocultos na definição nativa do agen
     disallowedTools: admitted.decision.deniedTools,
   });
 });
+
+describe('prévia da admissão (E3)', () => {
+  it('lê a decisão sem lançar nem exigir definições MCP, e explica a falta de recibos', () => {
+    const decision = admission.preview('claude', 'claude', { ...request(), mcpLevel: { permission: 'board', tools: [] } }, dir);
+    expect(decision.state).toBe('blocked');
+    expect(decision.reasons.map((r) => r.code)).toContain('capability-not-verified');
+  });
+});

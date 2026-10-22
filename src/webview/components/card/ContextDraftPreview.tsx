@@ -13,6 +13,7 @@ export const CONTEXT_DRAFT_ORIGINS: Record<ContextDraftOrigin, string> = {
 };
 const DIAGNOSTICS: Record<ContextDraftDiagnostic['code'], string> = {
   'admission-unavailable': 'Admissão indisponível (#729). Esta prévia não autoriza execução.',
+  'admission-blocked': 'Não admitido pela execução',
   'invalid-target': 'O alvo da atividade não pertence ao board ou à fase indicada.',
   'invalid-selection': 'Seleção de contexto inválida.',
   'agent-required': 'Escolha um agente válido para a atividade.',
@@ -27,6 +28,32 @@ const DIAGNOSTICS: Record<ContextDraftDiagnostic['code'], string> = {
   'missing-input': 'Anexo de entrada ausente.',
   'input-outside-board': 'Anexo de entrada de outro board.',
 };
+
+const REASONS: Record<string, string> = {
+  'capability-not-verified': 'capacidade sem prova verificada do host',
+  'environment-not-verified': 'ambiente do executor não verificado',
+  'executor-unavailable': 'executor indisponível',
+  'invalid-request': 'pedido de execução inválido',
+  'mcp-outside-boundary': 'MCP fora do limite do agente ou do board',
+  'mcp-operation-outside-boundary': 'operação MCP fora do limite',
+  'native-executor-mismatch': 'restrição nativa de outro executor',
+  'native-executor-required': 'restrição nativa sem executor definido',
+  'unsupported-native-restriction': 'restrição nativa não reconhecida',
+  'tool-mapping-unavailable': 'tradução de ferramentas indisponível para este executor',
+  'compatibility-not-reviewed': 'compatibilidade sem revisão humana',
+};
+const CAPABILITIES: Record<string, string> = {
+  conversation: 'conversa',
+  artifacts: 'artefatos',
+  permissions: 'permissões',
+  mcp: 'MCP',
+  delegation: 'delegação',
+};
+function admissionText(d: ContextDraftDiagnostic): string {
+  const reason = d.reason ? t(REASONS[d.reason] ?? d.reason) : '';
+  const capability = d.capability ? ` (${t(CAPABILITIES[d.capability] ?? d.capability)})` : '';
+  return `${t(DIAGNOSTICS['admission-blocked'])}: ${reason}${capability}`;
+}
 
 export function ContextDraftPreview({ preview }: { preview: ContextDraftResolution }) {
   return (
@@ -43,7 +70,7 @@ export function ContextDraftPreview({ preview }: { preview: ContextDraftResoluti
       <ul>
         {preview.diagnostics.map((d) => (
           <li key={`${d.code}:${d.artifactId ?? ''}`}>
-            {t(DIAGNOSTICS[d.code])}
+            {d.code === 'admission-blocked' ? admissionText(d) : t(DIAGNOSTICS[d.code])}
             {d.artifactId && (
               <>
                 {' '}
