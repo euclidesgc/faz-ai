@@ -1094,6 +1094,19 @@ export const harness: Record<string, string> = {
   'Sem justificativa informada': 'No reason provided',
   'Aplicar rascunhos revisados': 'Apply reviewed drafts',
   'Descartar rascunhos do plano': 'Discard plan drafts',
+  'Propor configuração de {activity} com IA': 'Propose configuration for {activity} with AI',
+  'Pedindo proposta…': 'Requesting proposal…',
+  'Propor com IA': 'Propose with AI',
+  'Proposta da IA para {activity}': 'AI proposal for {activity}',
+  'A IA só sugere skills e MCPs dentro do que o agente permite. Nada é gravado até você comparar e aplicar.':
+    'The AI only suggests skills and MCPs within what the agent allows. Nothing is saved until you compare and apply.',
+  Skill: 'Skill',
+  MCP: 'MCP',
+  'Nenhuma skill ou MCP além do essencial.': 'No skill or MCP beyond the essentials.',
+  'A proposta está desatualizada: o card, o agente ou o catálogo mudaram. Peça uma nova proposta.':
+    'The proposal is outdated: the card, agent or catalog changed. Request a new proposal.',
+  'Usar como rascunho': 'Use as draft',
+  'Descartar proposta': 'Discard proposal',
   'Referências de conclusão': 'Completion references',
   'Critérios e dependências são lidos do card; editar o plano não cria cópias.':
     'Criteria and dependencies are read from the card; editing the plan does not create copies.',

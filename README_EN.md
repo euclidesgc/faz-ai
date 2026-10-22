@@ -655,6 +655,8 @@ The `Orchestrator` now provides `drive`, round continuation, startup reconciliat
 
 The v1 gateway admission foundation distinguishes conversation, artifacts, permissions, MCP and delegation, requiring local receipts bound to the current configuration. Decisions are recorded in history (schema 36), and export/import does not turn them into authorization. An empty list means no tools; strict Claude mapping uses exact tools and MCP operations without bypassing permissions. This foundation still awaits the real CLI verifier and activation across E5 actions: current execution remains legacy, and no executor is verified automatically.
 
+**AI proposal.** On each Execution plan action that already has a valid agent, **Propose with AI** asks for the minimal configuration (additional skills and active MCPs, within the agent contract, with a reason for each). The reply is validated in the host and becomes a draft only with **Use as draft**; the comparison and **Apply reviewed drafts** stay yours. If the card, the agent or the catalog change, the proposal shows as outdated.
+
 **v1 runtime (opt-in).** With `FAZ_AI_CONTEXT_RUNTIME=v1` in the environment that opens the editor, the gateway only runs with the resolved configuration and capability admission: runner (phase, refine, summary, conflict), chat, Harness assistants and profile test. Without an agent with a valid contract or without receipts (command **Faz AI: Verify the AI CLI isolation**, valid for 14 days), the process does not start. The legacy runtime remains the default.
 
 ### Card Usage tab
