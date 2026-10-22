@@ -27,6 +27,8 @@ export interface BoardRules {
   includeFastModels: boolean;
   /** meses completos de detalhe do log guardados além do mês corrente (de 1 a 24); os totais por mês nunca expiram */
   logRetentionMonths: number;
+  /** história de esforço Baixo ou do tipo Bug pula as colunas de PRD e Spec no avanço calculado (aprovação da pessoa e autopiloto) */
+  shortTrack: boolean;
 }
 
 export const DEFAULT_RULES: BoardRules = {
@@ -39,6 +41,7 @@ export const DEFAULT_RULES: BoardRules = {
   autoApplyModelSuggestion: true,
   includeFastModels: false,
   logRetentionMonths: DEFAULT_LOG_RETENTION_MONTHS,
+  shortTrack: false,
 };
 
 /** Lê o JSON salvo, completando com os padrões o que faltar ou for inválido. */
@@ -74,5 +77,6 @@ export function parseRules(json: string | null | undefined): BoardRules {
       raw.logRetentionMonths <= LOG_RETENTION_MAX
         ? raw.logRetentionMonths
         : DEFAULT_RULES.logRetentionMonths,
+    shortTrack: typeof raw.shortTrack === 'boolean' ? raw.shortTrack : DEFAULT_RULES.shortTrack,
   };
 }

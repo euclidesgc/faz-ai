@@ -17,6 +17,7 @@ const CONNECT_WRITERS = [
   'extension/extension.ts', // instala a ponte e registra o board no `.cursor/mcp.json` do projeto
   'extension/mcp/clientConfig.ts', // registra o servidor do board em cada ferramenta
   'extension/mcp/pinCommands.ts', // grava o caminho completo do comando nos registros do board
+  'extension/ai/capabilityVerifier.ts', // monta a fixture do verificador de isolamento numa pasta temporária (mkdtemp), nunca na da pessoa
 ];
 
 const TOOL_FOLDER = /\.claude|\.cursor|\.kimi-code|\.mcp\.json/;

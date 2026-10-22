@@ -6,6 +6,9 @@ import type { AgentAssistInput, AgentAssistResult } from '../shared/agentAssista
 import type { PolicyAssistInput, PolicyAssistResult } from '../shared/policyAssistant';
 import { policyAssistancePrompt, parsePolicyAssistance } from './policyAssistant';
 import { agentAssistancePrompt, parseAgentAssistance } from './agentAssistance';
+import { contextProposalPrompt, parseContextProposal } from './contextProposal';
+import type { ContextProposal } from '../shared/contextProposal';
+import type { ContextActivityTarget } from '../shared/contextPlanning';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { MAX_CHAT_MESSAGES, type ChatMessage } from '../shared/chat';
@@ -13,6 +16,7 @@ import type { RunnerPermission } from '../shared/runner';
 import { effortToRun } from '../shared/execution';
 import type { BoardState } from '../shared/model';
 import { NO_CARD, type AiExecution } from './ai/gateway';
+import { closedV1 } from './ai/v1Prepare';
 import { MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { BOARD_SERVER, bareExec, type ExecInput } from './execution';
 import { contextLines } from './promptContext';
@@ -124,6 +128,7 @@ export class ChatSession {
     this.messages = this.load();
     router.setAgentAssistHandler((input) => this.assistAgent(input));
     router.setPolicyAssistHandler((input) => this.assistPolicy(input));
+    router.setContextProposeHandler((target, language) => this.proposeContext(target, language));
     router.setChatHandler((msg) => {
       if (msg.type === 'chat.send') this.send(msg.text, msg.model);
       else if (msg.type === 'ai.suggestAgents') this.suggestAgents();
@@ -207,6 +212,31 @@ export class ChatSession {
         },
         failed: (error) => reject(new Error(error)),
       });
+    });
+  }
+
+  /**
+   * Proposta de configuração mínima da atividade: a IA só lê (rascunho, sem ferramentas) e a resposta passa pelo
+   * validador do host. Falha ou cancelamento rejeitam sem tocar no rascunho da pessoa; nada é gravado aqui.
+   */
+  proposeContext(target: ContextActivityTarget, language: 'pt-BR' | 'en'): Promise<ContextProposal> {
+    return new Promise((resolve, reject) => {
+      try {
+        const prompt = contextProposalPrompt(this.router.contextDraftState(), target, language);
+        this.start(prompt, 'board', null, 'harness-suggest', {
+          draftOnly: true,
+          done: (text) => {
+            try {
+              resolve(parseContextProposal(text, this.router.contextDraftState(), target));
+            } catch (error) {
+              reject(error);
+            }
+          },
+          failed: (error) => reject(new Error(error)),
+        });
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
@@ -305,6 +335,8 @@ export class ChatSession {
         timeoutMinutes: state.board.runner.timeoutMinutes,
         // no chat não há agente do board nem subagente escolhido: `null` é "não definido", não "vazio"
         prepare: () => ({
+          // runtime v1: contexto fechado, sem agente nem MCP além do contrato vazio (o chat não tem card)
+          ...(this.deps.gateway.runtime === 'v1' ? closedV1(target.cli.id, action, !!hooks.draftOnly) : {}),
           artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state) : undefined,
           config: {
             model: plan.model?.name ?? null,

@@ -99,6 +99,10 @@
         "title": "%command.showLog.title%"
       },
       {
+        "command": "fazai.verifyExecutor",
+        "title": "%command.verifyExecutor.title%"
+      },
+      {
         "command": "fazai.openEnvironment",
         "title": "%command.openEnvironment.title%"
       },

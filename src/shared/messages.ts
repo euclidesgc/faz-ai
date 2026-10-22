@@ -303,6 +303,7 @@ export type WebviewToHost =
   | { type: 'contextPlanning.save'; input: ContextPlanningWrite }
   | { type: 'contextPlanning.saveBatch'; inputs: ActivityContextWrite[] }
   | { type: 'contextPlanning.preview'; requestId: string; target: ContextActivityTarget }
+  | { type: 'contextPlanning.propose'; requestId: string; target: ContextActivityTarget; language: 'pt-BR' | 'en' }
   | { type: 'harness.library.read'; id: string }
   | { type: 'harness.library.pickArtifacts' }
   | { type: 'harness.library.directory'; dir: string }
@@ -411,6 +412,7 @@ export type HostToWebview =
   /** prévia dos contratos salvos, sem corpos de artefatos, inferência ou admissão */
   | ({ type: 'executionPolicy.result'; requestId: string } & PolicyReply)
   | { type: 'contextPlanning.preview.result'; requestId: string; preview?: ContextDraftResolution; error?: string }
+  | { type: 'contextPlanning.propose.result'; requestId: string; proposal?: import('./contextProposal').ContextProposal; error?: string }
   /** resposta a `card.usage.query`, correlacionada por `requestId` */
   | { type: 'card.usage.result'; requestId: string; usage?: CardUsage; error?: string }
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */

@@ -19,6 +19,7 @@ import {
   cardPrompt,
   conflictPrompt,
   consumptionLine,
+  longRunNotice,
   nomeDoAnexoAnterior,
   refinePrompt,
   summarizePrompt,
@@ -1887,6 +1888,32 @@ describe('parseRunner', () => {
 
   it('autopilotPaused: true é lido', () => {
     expect(parseRunner(JSON.stringify({ autopilotPaused: true })).autopilotPaused).toBe(true);
+  });
+});
+
+describe('longRunNotice', () => {
+  const report = (cacheReadTokens: number | null): RunReport => ({
+    measure: cacheReadTokens === null ? 'none' : 'full',
+    consumption:
+      cacheReadTokens === null
+        ? null
+        : { inputTokens: 1, outputTokens: 1, cacheReadTokens, cacheWriteTokens: 0, turns: 1, sessionId: null, costUsd: null },
+    inventory: [],
+    answer: '',
+    reason: null,
+    usageLimitReached: false,
+  });
+
+  it('acima do limite: consumo e duração em minutos', () => {
+    expect(longRunNotice(report(10_000_001), 59 * 60_000)).toBe(
+      'Esta execução passou do limite de consumo: 10.000.001 de leitura de cache (limite 10.000.000) em 59 min.',
+    );
+  });
+
+  it('no limite, abaixo dele ou sem medida (Cursor): sem aviso', () => {
+    expect(longRunNotice(report(10_000_000), 60_000)).toBeNull();
+    expect(longRunNotice(report(5), 60_000)).toBeNull();
+    expect(longRunNotice(report(null), 60_000)).toBeNull();
   });
 });
 

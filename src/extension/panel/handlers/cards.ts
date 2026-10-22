@@ -1,7 +1,8 @@
 import { canSetBulkStatus } from '../../../shared/status';
 import { linkProblem } from '../../../shared/links';
 import { norm } from '../../../shared/filters';
-import { columnOf, columnsOf, isLive } from '../../../shared/selectors';
+import { nextColumnFor } from '../../../shared/advance';
+import { columnOf, isLive } from '../../../shared/selectors';
 import { isAtYoloStop, lastAiColumn, yoloStopOptions } from '../../../shared/story';
 import { fieldValueBlocker } from '../../../shared/boardFields';
 import { settleDelivery } from '../../delivery';
@@ -87,9 +88,8 @@ function advanceApproved(ctx: BoardContext, cardId: string): void {
   const state = ctx.state();
   const card = state.cards.find((c) => c.id === cardId);
   if (!card || card.parentId) return;
-  const column = columnOf(state, card);
-  if (!column) return;
-  const next = columnsOf(state, card.workflowId).find((c) => c.position > column.position && c.category !== 'cancelled');
+  // o avanço calculado: com a trilha curta ligada, a história pequena pula o PRD e a Spec
+  const next = nextColumnFor(state, card);
   if (!next) return;
   if (next.category === 'done' && state.board.git.autoMerge && card.prUrl) return;
   try {

@@ -243,3 +243,47 @@ Frases privadas de autenticação são literais, classificadas antes da ocultaç
 Schema 43 reconstrói ai_runs para incluir origem test, sem mudar migrações anteriores. Segue o [procedimento de reconstrução do SQLite](https://www.sqlite.org/lang_altertable.html#making_other_kinds_of_table_schema_changes), com FKs suspensas fora da transação, cópia, verificação e restauração. Testes preservam histórico/inventário/Bash e confirmam rollback quando há inconsistência. A origem de teste passa pelo gateway e recebe rótulo próprio na atividade.
 
 **#687 ainda parcial:** faltam preparadores de contrato/admissão em todos os chamadores, tradutores/verificador de produção para os perfis suportados e prova real do fluxo personalizado aceito. O genérico configurável permanece bloqueado onde não há tradução; o teste de Node não é recibo de capacidades. Integrações #688–#692, #699/#700/#701/#702/#732 e E3/E5 seguem pendentes. Mensagem de comando ausente com link público de instalação e o restante do fluxo por perfil devem ser fechados junto dos adaptadores do host.
+
+## E3 — prévia com a leitura da admissão real (#993)
+
+`contextPlanning.preview` e `preview_context_draft` passam a ler a admissão do host (#729): o roteador monta o pedido com `strictRequestFromDraft` (regime exclusivo, ferramentas do contrato do agente, só os MCPs selecionados) e `ExecutionAdmission.preview` devolve a mesma decisão pura do gateway, a partir das evidências locais assinadas, sem lançar e sem exigir definições MCP. `applyAdmissionDecision` troca `admission-unavailable` por `admission-blocked` com a razão, a capacidade e o recurso. A prévia continua sem autorizar (`canExecute: false`): o gateway decide de novo na execução. Com MCP ativo o vínculo da prévia não coincide com o da execução e a razão aparece. Sem leitor de admissão (host sem ela) permanece `unavailable`. O ambiente continua `unknown` na produção, então toda prévia segue bloqueada até o coletor real existir.
+
+## E5.1 — configuração v1 congelada no snapshot (#998)
+
+`AiPrepared.context` recebe o resultado de `resolveContextDraft` (o mesmo da prévia). O gateway recusa iniciar, antes do snapshot, se houver qualquer diagnóstico além da leitura da admissão (recurso ausente, desligado, MCP sem revisão etc.), com o código e o recurso na mensagem; senão `RunArtifactSnapshots.capture` grava a configuração em `manifest.context` (só metadados), e edições posteriores da biblioteca ou do plano não a alteram. Nenhum chamador preenche `context` ainda: a ligação do runner, do chat e dos assistentes é a E5.3 (#1000), que também ativa o runtime v1 (`runtime` continua `legacy`). Não houve mudança de schema: o manifesto é um arquivo do snapshot.
+
+## E5.2 — só os MCPs selecionados (#999)
+
+Quando a execução traz `context` e `strict`, o gateway recusa antes do spawn qualquer MCP do pedido de admissão que não esteja nos itens `mcp` da configuração resolvida. Os limites do agente e do board, a lista exata de ferramentas e a montagem do arquivo MCP só com os servidores admitidos continuam em `admitExecution` e `ExecutionAdmission.prepare` (#729): MCP fora do contrato é `mcp-outside-boundary`, itens Sempre passam pelo mesmo teste e as definições vêm do cofre sem credencial em prompt, log ou export. Onde o executor só escolhe por servidor, a prévia lista o servidor e não a operação (`mcpTools` fica vazio até a execução preparar o MCP).
+
+## #1045 — environmentEvidence real (parte 1 do coletor)
+
+`src/extension/ai/environmentEvidence.ts` calcula o digest das políticas gerenciadas do Claude Code (`managed-settings.json`, `managed-settings.d/`, `managed-mcp.json`) e o host passa a usá-lo em vez de `unknown` fixo. Pasta ausente é fonte conferida; erro de leitura mantém `unknown`. ## #1045 — verificador de recibos (parte 2 do coletor)
+
+Decisão da pessoa: opção (a), vínculo de isolamento independente de cwd, com sondagem em fixture. `ExecutionAdmission.isolationBinding` hasheia identidade do executor, binário, flags de isolamento (entrada canônica `isolationInput`), ambiente e `environmentEvidence`, sem pasta de projeto, diretórios adicionais nem listas por execução. Prévia e `prepare` leem as evidências por esse vínculo; o vínculo completo (com cwd) continua revalidando comando e ambiente antes de cada tentativa.
+
+`src/extension/ai/capabilityVerifier.ts` (`verifyExecutor`) roda a CLI real do Claude numa fixture descartável (CLAUDE.md de projeto, usuário, ancestral e pasta adicional, hook, `.mcp.json`) contra uma API local com chave fictícia, usando o mesmo `headlessCommand` da produção: um controle positivo (sem barreiras) prova que a contaminação seria visível, e a execução estrita confere fontes, ferramenta permitida/proibida, servidor e operação MCP, delegação; duas execuções vazias conferem conversa nova. Cada check vira recibo (hash dos fatos e do vínculo) e as cinco `CapabilityEvidence` são gravadas assinadas, inclusive as falhas. Sentinela só passa se o controle a enxergou; senão fica `unavailable`. `managed-settings` passa quando o `environmentEvidence` está completo; com ambiente `unknown` nada é gravado. Disparo: comando `fazai.verifyExecutor` (host; sem escrita pela tela ou MCP). Validade: 14 dias.
+
+**Limite conhecido:** a prova vale para as flags de isolamento da CLI na fixture; as fontes reais da pessoa (CLAUDE.md do usuário e ancestrais) não são lidas. Prova real: `npm run test:cli-real -- test/cli-real/verifier.real.ts` (12 checks passaram na CLI instalada). Falta ainda a E5.3 (#1000) ligar o v1 nas portas de IA.
+
+
+## E5.3 — runtime v1 nas portas de IA (#1000), opt-in
+
+`AiGateway` ganha `runtime` (`legacy` padrão | `v1`). No `v1` o gateway recusa, logo depois do `prepare()` e antes de qualquer snapshot ou processo, toda execução sem `context` (configuração resolvida) e `strict` (pedido de admissão): nenhum caminho de IA roda ignorando o plano. Os preparadores ficam em `src/extension/ai/v1Prepare.ts`:
+
+- `cardV1` (runner: fase, refinar, resumo e conflito, inclusive sub-tarefas do Orchestrator): `resolveContextDraft` + `strictRequestFromDraft`; sem agente com contrato válido, ou com recurso indisponível, a execução não parte e a mensagem explica o motivo;
+- `closedV1` (chat, assistentes do Harness e teste do perfil): contexto fechado, sem agente, sem MCP, sem ferramentas do board; o rascunho do Harness (`draftOnly`) só lê (`read`).
+
+Ativação: variável de ambiente `FAZ_AI_CONTEXT_RUNTIME=v1` ao abrir o host (`contextRuntimeFromEnv`). **Decisão (modo autônomo):** o legado continua o padrão, porque a admissão estrita só admite com recibos válidos (`fazai.verifyExecutor`, 14 dias) e o `v1` não foi exercitado com uma CLI real em todas as portas; trocar o padrão, e remover o `legacy`, fica para depois da E5 (#995). **Pendente:** a conversão do legado em proposta de contrato v1 para revisão (E6) e os testes de aceite com admissão real (#995). O runner no `v1` ainda usa a configuração de MCP da atividade só pela admissão; a ligação fina de `mcpTools` por operação continua sendo da preparação do MCP.
+
+## E5 — aceite do plano em execução (#995)
+
+Mapa do aceite, com o teste de cada item: prévia = runtime = snapshot e biblioteca editada depois não muda o run (`test/contextAcceptance.test.ts`, `runArtifactSnapshot.test.ts`); recurso obrigatório ausente não inicia (`aiGateway.test.ts`, E5.1); MCP fora do plano recusado (`aiGateway.test.ts`, E5.2; `admissionBoundary.test.ts`); queda, cancelamento, resposta tardia e retomada sem execução duplicada (`orchestratorIntegration.test.ts`, `orchestrator.test.ts`); nenhuma porta executa ignorando o plano (`contextRuntimeV1.test.ts`, um teste por porta); prova com a CLI real (`test/cli-real/verifier.real.ts`). **Decisão (autônomo):** não criei um cenário novo de história atravessando várias fases com CLI falsa nem em `test:cli-real`: o `v1` é opt-in e as fases já são cobertas pelos testes do Orchestrator; fica como lacuna registrada.
+
+## E4 — fechamento (#994)
+
+O aceite da E4 agora tem teste (`test/contextAcceptance.test.ts`): Discovery resolve um agente de leitura sem MCP, a Implementação resolve o especialista com o MCP dele, e o refino e o resumo da mesma fase não herdam as seleções da Implementação. **Lacuna registrada:** "mudar requisitos, dependências, agente ou artefatos marca a proposta como desatualizada" depende da proposta de plano pela IA, que só nasce na E6.1 (#996); o teste de desatualização entra lá.
+
+## E6.1 — proposta de plano pela IA (#996)
+
+`contextPlanning.propose` (host; `ChatSession.proposeContext`, mesmo caminho `draftOnly` dos assistentes, sem ferramentas) pede à IA a configuração mínima de uma atividade. `src/extension/contextProposal.ts` monta o prompt só com o que o agente permite (skills fora das essenciais; MCPs do contrato do agente) e valida a resposta: ids fora dos candidatos, repetidos, sem justificativa ou em formato inesperado lançam erro e não viram rascunho. A IA não troca agente, contrato nem prioridades, e o host não grava nada; a pessoa aplica pela tela (#1002). `proposalInputsHash`/`isProposalStale` (`src/shared/contextProposal.ts`) marcam a proposta como desatualizada quando mudam o texto e as ligações do card, o agente e seu contrato, ou a revisão e a disponibilidade das skills e MCPs do catálogo. Falha ou cancelamento da execução rejeitam a promessa sem tocar no rascunho da tela.

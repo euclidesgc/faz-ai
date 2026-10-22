@@ -1,8 +1,11 @@
 import { builtinPolicyCatalog, simulatePolicyScenario, type PolicyLibrary, type PolicyScenario } from '../../shared/policyManagement';
 import { resolveContextDraft, type ContextDraftResolution } from '../../shared/contextDraftResolution';
+import { applyAdmissionDecision, strictRequestFromDraft } from '../../shared/contextAdmissionPreview';
+import type { ExecutionAdmissionDecision, StrictExecutionRequest } from '../../shared/executionAdmission';
 import type { ContextActivityTarget } from '../../shared/contextPlanning';
 import type { PolicyAssistInput, PolicyAssistResult } from '../../shared/policyAssistant';
 import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
+import type { ContextProposal } from '../../shared/contextProposal';
 import { scanLibraryFolder } from '../libraryImport';
 import { agentOfArtifact, type ArtifactKind } from '../../shared/artifacts';
 import type { ImportSource } from '../../shared/artifactImport';
@@ -150,6 +153,7 @@ const bridgeOnly = {
   'metrics.query': viaBridge,
   'card.usage.query': viaBridge,
   'contextPlanning.preview': viaBridge,
+  'contextPlanning.propose': viaBridge,
   'executionPolicy.read': viaBridge,
   'executionPolicy.simulate': viaBridge,
   'executionPolicy.assist': viaBridge,
@@ -226,6 +230,11 @@ export class MessageRouter {
 
   get boardId(): string {
     return this.ctx.boardId;
+  }
+  private admissionReader: ((request: StrictExecutionRequest) => ExecutionAdmissionDecision | null) | null = null;
+  /** Leitura da admissão real (recibos do host) para a prévia; sem ela a prévia diz que a admissão está indisponível. */
+  setAdmissionReader(reader: (request: StrictExecutionRequest) => ExecutionAdmissionDecision | null): void {
+    this.admissionReader = reader;
   }
   setAiProfileRuntime(runtime: AiProfileRuntime): void {
     this.aiProfileRuntime = runtime;
@@ -628,6 +637,16 @@ export class MessageRouter {
     if (!this.policyAssistHandler) return Promise.reject(new Error('A assistência de IA não está disponível neste board.'));
     return this.policyAssistHandler(input);
   }
+  private contextProposeHandler?: (target: ContextActivityTarget, language: 'pt-BR' | 'en') => Promise<ContextProposal>;
+  setContextProposeHandler(handler: (target: ContextActivityTarget, language: 'pt-BR' | 'en') => Promise<ContextProposal>): void {
+    this.contextProposeHandler = handler;
+  }
+  /** Proposta de configuração mínima pela IA: um rascunho para a pessoa revisar; nada é gravado. */
+  proposeContext(target: ContextActivityTarget, language: 'pt-BR' | 'en'): Promise<ContextProposal> {
+    if (!this.contextProposeHandler) return Promise.reject(new Error('A assistência de IA não está disponível neste board.'));
+    return this.contextProposeHandler(target, language);
+  }
+
   private agentAssistHandler?: (input: AgentAssistInput) => Promise<AgentAssistResult>;
   setAgentAssistHandler(handler: (input: AgentAssistInput) => Promise<AgentAssistResult>): void {
     this.agentAssistHandler = handler;
@@ -677,8 +696,9 @@ export class MessageRouter {
     return getPanelMetrics(this.ctx.dbHandle.db, this.ctx.boardId, query);
   }
 
-  /** Metadados do rascunho a partir do banco do host; nenhuma inferência ou admissão é executada. */
-  previewContextDraft(target: ContextActivityTarget): ContextDraftResolution {
+  /** Metadados do rascunho a partir do banco do host; só lê a admissão (recibos locais), sem inferência nem probes. */
+  /** O estado com o catálogo atual da biblioteca (do banco), o que a prévia e a proposta da IA leem. */
+  contextDraftState(): BoardState {
     const state = this.snapshot();
     state.harness = {
       ...state.harness,
@@ -687,7 +707,15 @@ export class MessageRouter {
         artifacts: this.ctx.library.repo.list(this.ctx.boardId).map((a) => ({ ...a, path: '' })),
       },
     };
-    return resolveContextDraft(state, target);
+    return state;
+  }
+
+  previewContextDraft(target: ContextActivityTarget): ContextDraftResolution {
+    const state = this.contextDraftState();
+    const resolved = resolveContextDraft(state, target);
+    const request = this.admissionReader ? strictRequestFromDraft(state, resolved) : null;
+    const decision = request ? this.admissionReader!(request) : null;
+    return decision ? applyAdmissionDecision(resolved, decision) : resolved;
   }
 
   /** O que o card gastou até agora, por fase (e, numa história, as sub-tarefas), lido do log das execuções. */

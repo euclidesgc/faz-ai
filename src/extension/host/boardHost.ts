@@ -1,4 +1,5 @@
-import { PROFILE_CAPABILITIES, profileIsolation, profileLabel, type AiProfile } from '../../shared/aiProfiles';
+import { collectClaudeEnvironment } from '../ai/environmentEvidence';
+import { PROFILE_CAPABILITIES, activeProfile, profileIsolation, profileLabel, type AiProfile } from '../../shared/aiProfiles';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
 import { profileCanProbe, profileSignedIn, profileVersion } from '../cliProbe';
@@ -18,6 +19,7 @@ import type { AiActivity } from '../../shared/model';
 import type { AiRunMode } from '../../shared/runner';
 import { columnOf } from '../../shared/selectors';
 import { Heartbeat } from '../heartbeat';
+import { contextRuntimeFromEnv } from '../ai/v1Prepare';
 import { AiGateway } from '../ai/gateway';
 import { RunArtifactSnapshots } from '../runArtifactSnapshot';
 import { ArtifactRepo } from '../repositories/artifactRepo';
@@ -54,6 +56,7 @@ import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../model
 import { cleanStaleTemp } from '../aiOutput/measured';
 import { ExecutionAdmission } from '../ai/admission';
 import { CapabilityEvidenceStore } from '../ai/capabilityEvidence';
+import { verifyExecutor } from '../ai/capabilityVerifier';
 import { recoverProjectServers } from '../mcp/projectServerLease';
 import { loginShellPath, spawnHeadless } from '../spawn';
 
@@ -115,6 +118,11 @@ export interface BoardHost {
    * refaz o global com os caminhos atuais. Devolve o resumo do que foi feito.
    */
   fixProjectServer(file: string): Promise<string>;
+  /**
+   * Roda a CLI do Claude numa fixture, contra uma API local, e grava os recibos assinados de isolamento.
+   * Só o host chama: não há caminho de escrita pela tela nem pelo MCP. Devolve o resumo do resultado.
+   */
+  verifyExecutor(): Promise<string>;
   dispose(): Promise<void>;
 }
 
@@ -206,6 +214,13 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // Procurado de novo a cada conferência dos requisitos: a pessoa pode instalar o node com o board aberto
   let nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
   // a única porta para chamar a IA: o executor de cards e o chat passam por ela, e é ela que escreve o log de uso
+  const evidenceStore = new CapabilityEvidenceStore(path.join(o.storageDir, 'capability-evidence'));
+  const admission = new ExecutionAdmission({
+    pathEnv: () => pathEnv,
+    homeDir,
+    evidence: evidenceStore,
+    environmentEvidence: () => collectClaudeEnvironment(),
+  });
   const gateway = new AiGateway({
     resolveProfile: (id) => new AiProfileRepo(handle.db).resolveProfile(router.boardId, id),
     profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
@@ -214,13 +229,18 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     sessions: router.executions,
     redact: (text) => router.redactCredentials(text),
     snapshots: new RunArtifactSnapshots(path.join(o.storageDir, 'run-artifacts'), new ArtifactRepo(handle.db), router.boardId),
-    admission: new ExecutionAdmission({
-      pathEnv: () => pathEnv,
-      homeDir,
-      evidence: new CapabilityEvidenceStore(path.join(o.storageDir, 'capability-evidence')),
-      environmentEvidence: () => ({ state: 'unknown' }),
-    }),
+    admission,
+    runtime: contextRuntimeFromEnv(),
     spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
+  });
+  router.setAdmissionReader((request) => {
+    try {
+      const board = router.snapshot().board;
+      const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, activeProfile(board).id);
+      return admission.preview(profile, profile.id, request, o.folderPath);
+    } catch {
+      return null;
+    }
   });
   router.setAiProfileRuntime(
     createAiProfileRuntime({
@@ -830,6 +850,21 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     mergeWatcher,
     chat,
     autopilot,
+    async verifyExecutor() {
+      const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, activeProfile(router.snapshot().board).id);
+      const result = await verifyExecutor({
+        executor: profile,
+        profileId: profile.id,
+        admission,
+        store: evidenceStore,
+        pathEnv,
+        spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
+      });
+      const failed = result.evidence.flatMap((e) => e.checks.filter((c) => c.outcome !== 'passed').map((c) => `${e.capability}/${c.id}`));
+      return result.verified
+        ? 'Isolamento verificado: as cinco capacidades têm recibos válidos.'
+        : `Isolamento não verificado. Pendentes: ${failed.join(', ') || 'checks ausentes'}.`;
+    },
     async connectAI(target = {}) {
       const tool = target.tool ?? router.snapshot().board.aiTool;
       const done = registerClients([tool], {

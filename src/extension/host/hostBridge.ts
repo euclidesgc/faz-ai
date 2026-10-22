@@ -21,6 +21,7 @@ const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'metrics.query',
   'card.usage.query',
   'contextPlanning.preview',
+  'contextPlanning.propose',
   'executionPolicy.read',
   'executionPolicy.simulate',
   'executionPolicy.assist',
@@ -439,6 +440,22 @@ export class HostBridge {
         } catch (e) {
           this.post({
             type: 'contextPlanning.preview.result',
+            requestId: msg.requestId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+        return;
+      }
+      case 'contextPlanning.propose': {
+        try {
+          this.post({
+            type: 'contextPlanning.propose.result',
+            requestId: msg.requestId,
+            proposal: await this.router.proposeContext(msg.target, msg.language),
+          });
+        } catch (e) {
+          this.post({
+            type: 'contextPlanning.propose.result',
             requestId: msg.requestId,
             error: e instanceof Error ? e.message : String(e),
           });
