@@ -446,17 +446,16 @@ button.active {
   outline: var(--focus-ring);
   outline-offset: -1px;
 }
-/* sombra de seleção: a posição importa. .card:hover e .card.selected têm a mesma especificidade, então
-   esta regra, depois de .card:hover, ganha do hover (RF2). .card.selected.mine vem depois de
-   .card.mine:hover, que tem especificidade maior, para a seleção de um card pendente vencer o hover (RF3).
-   A sombra vai para cima e para a esquerda; o corte pelo contêiner (.columns) é conferido à parte. */
+/* sombra de seleção: a ordem importa. Depois de .card:hover, que tem a mesma especificidade, para o card
+   selecionado não perder a sombra para o hover. */
 .card.selected,
 .card.chosen {
   box-shadow: var(--shadow-select-2);
 }
-/* pendência e seleção juntas: o anel de status continua e a sombra de seleção vem por cima */
-.card.selected.mine,
-.card.chosen.mine {
+/* pendência e seleção juntas: o anel de status continua e a sombra de seleção vem por cima.
+   :not(.overlay) deixa o card arrastado com a elevação de .card.overlay, que é mais específica que .card.selected */
+.card.selected.mine:not(.overlay),
+.card.chosen.mine:not(.overlay) {
   box-shadow:
     0 0 0 1px var(--status-color),
     var(--shadow-select-2);
@@ -2949,7 +2948,7 @@ body.host-web .drawer {
   padding: var(--sp-8) var(--sp-4);
   border-bottom: 1px solid var(--border);
 }
-/* linha selecionada: sombra leve, sem anel, para não competir com o destaque de fundo de .item-row.selected */
+/* sombra leve, sem anel: o destaque de fundo já marca a linha */
 .item-row.selected {
   background: var(--hover);
   box-shadow: var(--shadow-select-1);

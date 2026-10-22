@@ -6,8 +6,7 @@
 
 ### Adicionado
 
-- **Sombra no card selecionado (#1069).** O card selecionado ganha uma sombra que sai do canto superior esquerdo e o destaca dos demais, sem tirar o contorno de foco do teclado. Os cards marcados na seleção múltipla recebem o mesmo destaque, e as linhas selecionadas das listas (como as do Harness) recebem uma sombra mais discreta. Um card pendente selecionado mantém o anel da cor do status, e a sombra vai por cima dele. Os valores ficam em `tokens.css`, nos temas claro e escuro.
-
+- **Sombra no card selecionado (#1069).** O card selecionado ganha uma sombra que sai do canto superior esquerdo e o destaca dos demais, sem tirar o contorno de foco do teclado. Os cards marcados na seleção múltipla recebem o mesmo destaque, e as linhas selecionadas das listas (como as do Harness) recebem uma sombra mais discreta. Um card pendente selecionado mantém o anel da cor do status, e a sombra vai por cima dele.
 ## 0.47.0
 
 ### Adicionado

@@ -253,10 +253,14 @@ describe('caixa de seleção na faixa do card', () => {
 describe('prévia do card', () => {
   it('nunca recebe selected nem chosen, mesmo com cards marcados', () => {
     useBoardStore.getState().toggleSelected(board.storyId);
-    const { container } = render(<CardPreview typeName="História" color="#3366cc" />);
-    const preview = container.querySelector('.card.card-preview')!;
-    expect(preview).not.toHaveClass('selected');
-    expect(preview).not.toHaveClass('chosen');
-    useBoardStore.getState().clearSelected();
+    try {
+      const { container } = render(<CardPreview typeName="História" color="#3366cc" />);
+      const preview = container.querySelector('.card.card-preview')!;
+      expect(preview).not.toHaveClass('selected');
+      expect(preview).not.toHaveClass('chosen');
+    } finally {
+      // a seleção não pode vazar para os testes seguintes, mesmo quando a asserção falha
+      useBoardStore.getState().clearSelected();
+    }
   });
 });
