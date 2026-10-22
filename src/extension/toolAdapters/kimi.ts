@@ -13,6 +13,8 @@ import {
   ruleHeaderLoss,
   stripFrontmatter,
   toolListLosses,
+  listToolFolder,
+  mcpLocations,
 } from './common';
 import type { ToolAdapter } from './types';
 
@@ -21,6 +23,11 @@ export const kimiAdapter: ToolAdapter = {
   root: '.kimi-code',
   supports: () => true,
   skillDir: (name) => `.kimi-code/skills/${name}`,
+  list: (target, base) =>
+    listToolFolder('.kimi-code', target, base, {
+      extraRules: target === 'project' ? ['AGENTS.md', '.kimi-code/AGENTS.md'] : ['.kimi-code/AGENTS.md'],
+    }),
+  mcpFiles: (target) => mcpLocations(target, ['.kimi-code/mcp.json'], ['.kimi-code/mcp.json']),
   render(kind, sources) {
     if (kind === 'skill') return renderSkills('.kimi-code', sources);
     if (kind === 'rule') {
