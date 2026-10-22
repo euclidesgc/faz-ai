@@ -293,7 +293,6 @@ describe('telas montam sem erro', () => {
       'Ferramenta deste projeto',
       'type="radio"',
       'Artefatos do board',
-      'Instalar (padrão da ferramenta)',
       'Execução pela conversa e heartbeat',
       'A IA lê o projeto e usa as ferramentas do board',
       'Tempo limite por execução',

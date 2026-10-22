@@ -11,8 +11,8 @@ import { EXEC_ASPECTS, TOOL_PRESETS, defaultAgent } from '../src/shared/executio
 import { RULE_CONFLICT_REASONS } from '../src/shared/ruleConflicts';
 import { RULE_IDEAS, RULE_WIZARD_STEPS, conventionItems, pathSuggestions } from '../src/shared/ruleWizard';
 import { SKILL_WIZARD_STEPS } from '../src/shared/skillWizard';
-import { AI_BASES, HARNESS_KINDS, HARNESS_SCOPES, RULE_FILES, SKILL_FOLDERS, SKILL_MODES } from '../src/shared/harness';
-import { HARNESS_CATALOG, HARNESS_GROUPS, HARNESS_NOTES, PERMISSION_LIST_LABEL, PLUGIN_COMMANDS } from '../src/shared/harnessCatalog';
+import { AI_BASES, HARNESS_KINDS, HARNESS_SCOPES, RULE_FILES, SKILL_FOLDERS } from '../src/shared/harness';
+import { HARNESS_CATALOG } from '../src/shared/harnessCatalog';
 import { BRANCH_KINDS, MERGE_METHODS, WORKSPACE_MODES } from '../src/shared/git';
 import { gitNoticeText, type GitNotice } from '../src/shared/gitflow';
 import { EFFORT_FIELD, EFFORT_LABELS, EFFORT_LEVELS, MODEL_EFFORT_LABEL } from '../src/shared/models';
@@ -270,21 +270,13 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
     ],
     ['agente padrão', [defaultAgent().name]],
     ['esforço', [EFFORT_FIELD, MODEL_EFFORT_LABEL, ...EFFORT_LEVELS, ...Object.values(EFFORT_LABELS)]],
-    ['SKILL_MODES', SKILL_MODES.flatMap((x) => [x.label, x.hint])],
     ['HARNESS_KINDS', HARNESS_KINDS.flatMap((x) => [x.label, x.hint])],
     ['HARNESS_SCOPES', HARNESS_SCOPES.flatMap((x) => [x.label, x.hint, x.summary])],
     ['SKILL_FOLDERS', SKILL_FOLDERS.map((x) => x.hint)],
     ['AI_BASES', AI_BASES.map((x) => x.mcp)],
     ['RULE_FILES', RULE_FILES.map((x) => x.readBy).filter((x) => x.includes(' e '))],
-    ['PERMISSION_LIST_LABEL', Object.values(PERMISSION_LIST_LABEL)],
-    [
-      'PLUGIN_COMMANDS',
-      Object.values(PLUGIN_COMMANDS).flatMap((x) => [x.where, ...x.commands.filter((c) => /dono|termo|endereço|pasta/.test(c))]),
-    ],
     ['HARNESS_CATALOG', Object.values(HARNESS_CATALOG).flatMap((list) => list.flatMap((s) => (s.builtin ? [s.builtin] : [])))],
     ['HARNESS_CATALOG (frases)', Object.values(HARNESS_CATALOG).flatMap((list) => list.flatMap((s) => (s.hint ? [s.hint] : [])))],
-    ['HARNESS_GROUPS', HARNESS_GROUPS.flatMap((x) => [x.label, x.hint])],
-    ['HARNESS_NOTES', Object.values(HARNESS_NOTES).flatMap((list) => list.flatMap((x) => [x.name, x.hint]))],
   ];
 
   it.each(texts)('%s: tudo que a interface mostra tem tradução', (_name, list) => {
@@ -302,6 +294,5 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
     expect(t(EXEC_ASPECTS[4]!.label)).toBe('Model and effort');
     expect(t(TOOL_PRESETS[0]!.label)).toBe('Read-only');
     expect(t(EFFORT_LABELS.xhigh!)).toBe('very high');
-    expect(t(PLUGIN_COMMANDS.claude!.where)).toBe('in the terminal');
   });
 });

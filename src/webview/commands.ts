@@ -212,8 +212,6 @@ export const harness = {
   /** envia artefatos ao board com um modo, muda o modo, ou os tira do board (usage null); `location` é a `selectionKey` */
   setSelection: (items: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null) =>
     req({ type: 'harness.selection.set', items, usage }),
-  /** a IA pré-seleciona os artefatos do assunto que fazem mais sentido para o projeto */
-  suggest: (tool: AiTool, kind: SelectableKind) => post({ type: 'harness.suggest.run', tool, kind }),
   /** Abre o seletor de pasta ou de arquivo de exportação para importar artefatos ao board. */
   importPick: (what: 'folder' | 'export') => req({ type: 'harness.import.pick', what }),
   /** Examina a origem e devolve a prévia em `state.artifactImport`. */
@@ -225,5 +223,4 @@ export const harness = {
     req({ type: 'harness.agent.update', name, patch, ...(body !== undefined ? { body } : {}) }),
   deleteAgent: (name: string) => req({ type: 'harness.agent.delete', name }),
   seedAgents: (force = false) => req({ type: 'harness.agents.seed', force }),
-  installFlowSkill: (tool: AiTool, replace = false) => req({ type: 'harness.flowSkill.install', tool, replace }),
 };

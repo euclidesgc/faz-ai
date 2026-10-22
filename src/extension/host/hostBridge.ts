@@ -113,7 +113,6 @@ export class HostBridge {
   }
 
   dispose(): void {
-    this.router.clearInstall();
     this.subs.forEach((off) => off());
   }
 
@@ -209,11 +208,7 @@ export class HostBridge {
       case 'ai.suggestAgents':
       case 'ai.suggestRules':
       case 'ai.suggestSkills':
-      case 'harness.suggest.run':
         this.router.chatCommand(msg);
-        return;
-      case 'harness.suggest.clear':
-        this.router.setSuggestions(null);
         return;
       case 'ui.openInBrowser':
         await this.env.openInBrowser?.();
@@ -260,7 +255,7 @@ export class HostBridge {
         return;
       }
       case 'harness.refresh':
-        await this.router.refreshHarnessAndPlugins();
+        this.router.refreshHarness();
         return;
       case 'harness.library.read':
         this.post({ type: 'harness.library.content', input: this.router.readLibraryArtifact(msg.id) });
@@ -291,12 +286,6 @@ export class HostBridge {
         if (!this.env.pickFolder) throw new Error('Informe o caminho da pasta.');
         const dir = await this.env.pickFolder('Importar artefatos para o board');
         if (dir) this.router.handle({ type: 'harness.library.scan', dir });
-        return;
-      }
-      case 'harness.library.pick': {
-        if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
-        const dir = await this.env.pickFolder('Importar skills para o board');
-        if (dir) this.router.setInstall(dir, dir, () => {});
         return;
       }
       case 'harness.library.open': {

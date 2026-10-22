@@ -1,13 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { agentInputOf, parseAgentFile } from './agentFiles';
 import { frontmatterOf, frontmatterValue } from './frontmatter';
 import { scanLibraryFolder } from './libraryImport';
 import type { ArtifactKind, LibraryArtifactInput, LibraryImportPreview } from '../shared/artifacts';
 import { LibraryDisk } from './libraryDisk';
 import { ArtifactMirror } from './artifactMirror';
-import { readSource, readMcpByName } from './artifactSource';
+import { agentInputOf, parseAgentFile, readSource } from './artifactSource';
 import { ArtifactRepo, type ArtifactRow } from './repositories/artifactRepo';
 import {
   agentOfArtifact,
@@ -20,8 +19,8 @@ import {
   type ArtifactDraft,
   type BoardArtifact,
 } from '../shared/artifacts';
-import { selectionKey, type HarnessUsage, type SelectableKind } from '../shared/harnessSelection';
-import { baseInfo, SKILL_NAME_PATTERN, type Harness, type HarnessItem } from '../shared/harness';
+import { type HarnessUsage, type SelectableKind } from '../shared/harnessSelection';
+import { baseInfo, SKILL_NAME_PATTERN, type Harness } from '../shared/harness';
 import { MCP_NAME_PATTERN, type McpServerInput } from '../shared/harnessCatalog';
 import { RULE_NAME_PATTERN, createUsage } from '../shared/artifactImport';
 import type { AgentInput, McpServerView } from '../shared/messages';
@@ -228,60 +227,23 @@ export class BoardLibrary {
     this.ctx.boards.setMeta(`harness.library.${this.ctx.opts.workspaceKey}`, dir);
   }
 
-  private source(sel: { kind: SelectableKind; location: string }, inventory: Harness['inventory']): ArtifactDraft {
-    const owner = inventory.find((t) => t.items.some((i) => i.kind === sel.kind && selectionKey(i) === sel.location));
-    return readSource(sel, this.dirs, owner?.tool ?? this.ctx.state().board.aiTool);
+  private source(sel: { kind: SelectableKind; location: string }): ArtifactDraft {
+    return readSource(sel, this.dirs, this.ctx.state().board.aiTool);
   }
 
   /** Preserva a marcação antiga na primeira abertura, inclusive origens que já estavam ausentes. */
-  migrate(inventory: Harness['inventory']): void {
+  migrate(): void {
     const legacy = this.repo.legacySelection(this.ctx.boardId);
     if (!legacy.length) return;
-    const drafts = legacy.map((selection) => ({ draft: this.source(selection, inventory), usage: selection.usage }));
     this.repo.importLegacy(
       this.ctx.boardId,
       legacy.map((selection) => {
-        const draft = this.source(selection, inventory);
+        const draft = this.source(selection);
         // Uma marcação antiga nunca substitui uma cópia já personalizada na biblioteca.
         const existing = this.repo.get(this.ctx.boardId, draft.kind, draft.name);
         return { selection, draft: existing ? this.draftOf(existing) : draft };
       }),
     );
-    const dependencies = this.withDependencies(drafts, inventory).slice(drafts.length);
-    if (dependencies.length) this.repo.upsertMany(this.ctx.boardId, dependencies);
-  }
-
-  /** Um agente leva as dependências declaradas e encontradas, sem substituir artefatos já no board. */
-  private withDependencies(items: { draft: ArtifactDraft; usage: HarnessUsage }[], inventory: Harness['inventory']) {
-    const result = [...items];
-    const present = new Set([
-      ...this.repo.list(this.ctx.boardId).map((a) => `${a.kind}:${a.name}`),
-      ...items.map(({ draft }) => `${draft.kind}:${draft.name}`),
-    ]);
-    for (const { draft } of items) {
-      if (draft.kind !== 'agent' || draft.missing) continue;
-      const meta = draft.meta as AgentMeta;
-      const sources = inventory.find((t) => t.tool === draft.originTool)?.items ?? inventory.flatMap((t) => t.items);
-      for (const name of meta.mcpServers) {
-        if (present.has(`mcp:${name}`) || name === 'faz-ai') continue;
-        const dependency = readMcpByName(name, sources, this.dirs);
-        if (dependency) {
-          result.push({ draft: dependency, usage: 'contextual' });
-          present.add(`mcp:${name}`);
-        }
-      }
-      for (const name of meta.skills) {
-        if (present.has(`skill:${name}`)) continue;
-        const item = sources.find((i) => i.kind === 'skill' && i.name === name);
-        if (!item) continue;
-        const dependency = readSource({ kind: 'skill', location: item.location }, this.dirs, draft.originTool);
-        if (!dependency.missing) {
-          result.push({ draft: dependency, usage: 'contextual' });
-          present.add(`skill:${name}`);
-        }
-      }
-    }
-    return result;
   }
 
   private draftOf(a: ArtifactRow): ArtifactDraft {
@@ -289,7 +251,7 @@ export class BoardLibrary {
     return { ...a, body, files };
   }
 
-  select(items: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null, inventory: Harness['inventory']): void {
+  select(items: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null): void {
     if (!usage) this.refuseRemoval(items);
     const drafts: { draft: ArtifactDraft; usage: HarnessUsage }[] = [];
     for (const item of items) {
@@ -297,7 +259,7 @@ export class BoardLibrary {
       if (existing) {
         if (usage) drafts.push({ draft: this.draftOf(existing), usage });
       } else if (usage) {
-        const draft = this.source(item, inventory);
+        const draft = this.source(item);
         if (draft.missing) throw new Error('Não foi possível ler o artefato de origem. Releia as pastas e tente novamente.');
         const collision = this.repo.get(this.ctx.boardId, draft.kind, draft.name);
         if (collision && collision.origin !== draft.origin)
@@ -312,7 +274,7 @@ export class BoardLibrary {
         throw new Error(`Mais de uma origem para o artefato "${draft.name}". Importe uma origem por vez.`);
       identities.set(key, draft.origin);
     }
-    this.repo.upsertMany(this.ctx.boardId, this.withDependencies(drafts, inventory));
+    this.repo.upsertMany(this.ctx.boardId, drafts);
     if (!usage)
       for (const item of items) {
         const existing = this.repo.findByLocation(this.ctx.boardId, kindOfSelectable(item.kind), item.location);
@@ -537,23 +499,13 @@ export class BoardLibrary {
     return { text: a.body };
   }
 
-  importSkills(root: string, paths: string[], known: { rel: string; valid: boolean }[]): void {
-    const allowed = new Set(known.filter((k) => k.valid).map((k) => k.rel));
-    const items = [...new Set(paths)].map((rel) => {
-      if (!allowed.has(rel)) throw new Error('Skill não encontrada na origem selecionada.');
-      return { kind: 'skill' as const, location: path.join(root, rel, 'SKILL.md') };
-    });
-    const inventory = [{ tool: this.ctx.state().board.aiTool, installed: true, items: [] as HarnessItem[] }];
-    this.select(items, 'contextual', inventory);
-  }
-
   update(id: string): void {
     const a = this.repo.list(this.ctx.boardId).find((x) => x.id === id);
     if (!a?.origin) throw new Error('Este artefato não tem uma origem para atualizar.');
     const kind = a.kind === 'rule' ? 'instructions' : a.kind;
     const draft = readSource({ kind, location: a.origin }, this.dirs, a.originTool);
     if (draft.missing) throw new Error('A origem não está disponível. A cópia do board foi preservada.');
-    this.repo.upsertMany(this.ctx.boardId, this.withDependencies([{ draft, usage: a.usage }], this.ctx.harness.current.inventory));
+    this.repo.upsertMany(this.ctx.boardId, [{ draft, usage: a.usage }]);
   }
 
   /** Só os arquivos já conhecidos da biblioteca podem ser abertos no editor do board. */

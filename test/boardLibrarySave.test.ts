@@ -133,9 +133,9 @@ describe('BoardLibrary: gravar regra, skill e MCP no board', () => {
     lib().createAgent({ name: 'outro', description: 'd', body: 'b', model: '', tools: [], deniedTools: [], skills: [], mcp: [] } as never);
     ctx.boards.updateBoard(ctx.boardId, { runner: { defaultAgent: 'padrao' } });
     const sel = (name: string) => [{ kind: 'agent' as const, location: `board:${name}` }];
-    expect(() => lib().select(sel('padrao'), null, [])).toThrow('Escolha outro agente padrão antes de apagar este');
+    expect(() => lib().select(sel('padrao'), null)).toThrow('Escolha outro agente padrão antes de apagar este');
     expect(get('agent', 'padrao')).toBeDefined();
-    lib().select(sel('outro'), null, []);
+    lib().select(sel('outro'), null);
     expect(get('agent', 'outro')).toBeUndefined();
     lib().repo.upsert(ctx.boardId, {
       kind: 'skill',
@@ -149,7 +149,7 @@ describe('BoardLibrary: gravar regra, skill e MCP no board', () => {
       skipped: [],
       files: [],
     });
-    expect(() => lib().select([{ kind: 'skill', location: 'board:faz-ai-fluxo' }], null, [])).toThrow(/do fluxo/);
+    expect(() => lib().select([{ kind: 'skill', location: 'board:faz-ai-fluxo' }], null)).toThrow(/do fluxo/);
     expect(() => lib().writeSkillFile('faz-ai-fluxo', 'a.md', 'x')).toThrow(/do fluxo/);
     expect(get('skill', 'faz-ai-fluxo')).toBeDefined();
   });

@@ -28,8 +28,8 @@ import type { RenameKind } from './branchRename';
 import type { BulkCardStatus, CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { BranchKind, GitConfig } from './git';
-import type { ProjectProfile } from './projectProfile';
 import type { AiProfileDraft } from './aiProfiles';
+import type { ProjectProfile } from './projectProfile';
 import type { ExportPlan, ExportResult, ExportTarget } from './toolExport';
 
 /** O que o board grava num arquivo de agente: o frontmatter (menos o nome) e o corpo. */
@@ -307,13 +307,8 @@ export type WebviewToHost =
   | { type: 'harness.library.pickArtifacts' }
   | { type: 'harness.library.directory'; dir: string }
   | { type: 'harness.library.update'; id: string }
-  | { type: 'harness.library.import'; rels: string[] }
   | { type: 'harness.library.open' }
-  | { type: 'harness.library.pick' }
   | { type: 'harness.selection.set'; items: { kind: SelectableKind; location: string }[]; usage: HarnessUsage | null }
-  /** a IA analisa o projeto e o catálogo do assunto e pré-seleciona os artefatos que fazem mais sentido (resultado em `harnessSuggestions`) */
-  | { type: 'harness.suggest.run'; tool: AiTool; kind: SelectableKind }
-  | { type: 'harness.suggest.clear' }
   /** Opens the folder or export-file picker for importing artifacts into the board. */
   | { type: 'harness.import.pick'; what: 'folder' | 'export'; tool?: AiTool }
   /** Saves a rule, skill, or MCP server in the board's artifact store. */
@@ -377,7 +372,6 @@ export type WebviewToHost =
    * instala a skill do fluxo no global de uma ferramenta (padrão: a do projeto), nunca no projeto;
    * `replace` troca uma skill de mesmo nome que já esteja no destino (sem ele, a que existe fica)
    */
-  | { type: 'harness.flowSkill.install'; tool?: AiTool; replace?: boolean }
   /** exporta o board num arquivo JSON (no editor, abre o "salvar como"; na web a página baixa pela rota /backup/export) */
   | { type: 'backup.export' }
   /** escolhe um arquivo de export, valida e devolve o resumo em `backup.import.summary` (na web a página envia por /backup/import) */

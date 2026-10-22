@@ -11,7 +11,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { FLOW_NOTE, SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 import { FLOW_SKILLS } from '../src/extension/flowSkill';
 import { FLOW_TEXT } from './flowSkillText';
-import { skillTemplate } from '../src/extension/harness';
+import { skillTemplate } from '../src/extension/frontmatter';
 import { createMcpServer, MCP_INSTRUCTIONS, startMcpServer } from '../src/extension/mcp/server';
 import { boardServerFootprint } from '../src/extension/mcp/footprint';
 import { toolDefinitions } from '../src/extension/mcp/tools';
@@ -386,38 +386,14 @@ describe('servidor MCP', () => {
   });
 });
 
-describe('instalar skills pelo board', () => {
-  it('mostra o que foi encontrado e descarta a origem ao cancelar', async () => {
-    const src = path.join(dir, 'origem');
-    for (const name of ['commit', 'deploy']) {
-      fs.mkdirSync(path.join(src, name), { recursive: true });
-      fs.writeFileSync(path.join(src, name, 'SKILL.md'), `---\nname: ${name}\ndescription: Skill ${name}\n---\n`);
-    }
-    let cleaned = false;
-    router.setInstall('origem', src, () => {
-      cleaned = true;
-    });
-    expect(router.snapshot().harnessInstall).toEqual({
-      source: 'origem',
-      skills: [
-        { rel: 'commit', name: 'commit', description: 'Skill commit', files: 0, valid: true },
-        { rel: 'deploy', name: 'deploy', description: 'Skill deploy', files: 0, valid: true },
-      ],
-    });
-    router.clearInstall();
-    expect(router.snapshot().harnessInstall).toBeNull();
-    expect(cleaned).toBe(true);
-  });
-});
-
 describe('modelos e referências nas skills', () => {
-  it('a skill de modelos nasce só quando indicada, e o card entrega os arquivos dela', async () => {
-    await call('create_skill', { name: 'modelos-do-projeto', description: 'Modelos e exemplos de código', content: 'Passos' });
+  it('a skill de modelos é criada no board, e o card entrega os arquivos dela', async () => {
+    await call('create_skill', { name: 'modelos-do-projeto', description: 'Modelos', content: 'Veja references/.' });
 
     const written = (
       await call('write_skill_file', { skill: 'modelos-do-projeto', file: 'references/repositorio.ts', content: 'export class Repo {}' })
     ).data;
-    expect(written.files).toEqual(['references/repositorio.ts']);
+    expect(written.name).toBe('modelos-do-projeto');
     expect((await call('write_skill_file', { skill: 'modelos-do-projeto', file: '../fora.ts', content: 'x' })).error).toBe(true);
     expect((await call('write_skill_file', { skill: 'nao-existe', file: 'references/a.ts', content: 'x' })).error).toBe(true);
 
@@ -505,53 +481,11 @@ describe('perfis de execução', () => {
     expect(s.cards.every((c) => c.execProfile === null)).toBe(true);
     expect((await call('get_card', { card: 1 })).data.execution.profile).toBe('geral');
     // tirar do board um agente criado no board o apaga: ele não tinha arquivo na pasta da ferramenta
-    expect((await call('get_harness', { onlySelected: false })).data.agents.map((a: any) => [a.name, a.usage])).toEqual([
-      ['geral', 'contextual'],
-    ]);
+    expect((await call('get_harness')).data.agents.map((a: any) => [a.name, a.usage])).toEqual([['geral', 'contextual']]);
   });
 });
 
 describe('harness e padrões pelo MCP', () => {
-  it('oferece nos cards as skills globais e de plugins da ferramenta em uso', async () => {
-    const home = path.join(dir, 'home-do-usuario');
-    const put = (rel: string, text: string) => {
-      fs.mkdirSync(path.dirname(path.join(home, rel)), { recursive: true });
-      fs.writeFileSync(path.join(home, rel), text);
-    };
-    put('.claude/skills/commit/SKILL.md', '---\nname: commit\ndescription: Escreve o commit\n---\n');
-    put('.claude/plugins/cache/loja/design/.claude-plugin/plugin.json', '{"name":"design"}');
-    put('.claude/plugins/cache/loja/design/skills/critica/SKILL.md', '---\nname: critica\ndescription: Critica\n---\n');
-    put('.cursor/skills/de-outra-ferramenta/SKILL.md', '---\nname: x\ndescription: x\n---\n');
-    await call('create_skill', { name: 'revisar-spec', description: 'Revisa', content: 'Passos' });
-    router.refreshHarness();
-    // a skill criada pelo board já nasce marcada; as que estão no disco por fora precisam ser marcadas
-    expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['revisar-spec']);
-    await call('set_harness_selection', {
-      items: [
-        { kind: 'skill', name: 'commit' },
-        { kind: 'skill', name: 'critica' },
-      ],
-      usage: 'contextual',
-    });
-    const field = router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
-    expect(field.options).toEqual(['commit', 'critica', 'revisar-spec']);
-    const created = (await call('create_card', { title: 'História', fields: { Skills: ['commit', 'critica', 'revisar-spec'] } })).data;
-    const card = (await call('get_card', { card: created.id })).data;
-    expect(card.requiredSkills).toEqual(['commit', 'critica', 'revisar-spec'].map(copiedSkill));
-    const inventory = (await call('get_harness')).data.inventory;
-    expect(inventory.find((i: any) => i.name === 'commit')).toEqual({
-      id: expect.any(String),
-      kind: 'skill',
-      group: 'skill',
-      scope: 'project',
-      usage: 'contextual',
-      key: '~/.claude/skills/commit/SKILL.md',
-      name: 'commit',
-      description: 'Escreve o commit',
-      path: libraryPath('skill', 'commit'),
-    });
-  });
-
   it('gerencia regras e skills do board e sincroniza o campo Skills', async () => {
     const usageOf = async (list: 'rules' | 'skills', name: string) =>
       (await call('get_harness')).data[list].find((r: any) => r.name === name)?.usage;
@@ -579,7 +513,6 @@ describe('harness e padrões pelo MCP', () => {
     expect(h.skills).toEqual([
       { name: 'revisar-spec', usage: 'contextual', description: 'Use ao revisar uma spec', path: libraryPath('skill', 'revisar-spec') },
     ]);
-    expect((await call('create_skill', { name: 'revisar-spec', description: 'd', content: 'c' })).error).toBe(true);
     expect((await call('get_skill', { skill: 'revisar-spec' })).text).toContain('name: "revisar-spec"');
     const skillsField = () => router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
     expect(skillsField().options).toEqual(['revisar-spec']);
@@ -592,117 +525,19 @@ describe('harness e padrões pelo MCP', () => {
     expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', scope: 'board', path: libraryPath('skill', 'revisar-spec') }]);
     expect(card.model).toMatchObject({ tool: 'claude', model: 'haiku', effort: null, value: 'claude:haiku' });
 
-    // update_skill troca o SKILL.md inteiro e mantém o modo
-    await call('update_skill', { skill: 'revisar-spec', content: '---\nname: revisar-spec\ndescription: Outra\n---\nNovo' });
-    expect((await call('get_skill', { skill: 'revisar-spec' })).text).toContain('Novo');
-    expect((await call('update_skill', { skill: 'nao-existe', content: 'x' })).error).toBe(true);
-
-    // set_skill_enabled é atalho de modo: false desliga; true religa em "Pelo card"; ligada, não muda nada
-    await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false });
-    expect(await usageOf('skills', 'revisar-spec')).toBe('off');
-    // desligada, a skill não vale mais para o card
-    expect((await call('get_card', { card: 1 })).data.requiredSkills ?? []).toEqual([]);
-    await call('set_skill_enabled', { skill: 'revisar-spec', enabled: true });
     expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual(copiedSkill('revisar-spec'));
-    expect(await usageOf('skills', 'revisar-spec')).toBe('contextual');
-    router.handle({ type: 'harness.selection.set', items: [{ kind: 'skill', location: 'board:revisar-spec' }], usage: 'always' });
-    await call('set_skill_enabled', { skill: 'revisar-spec', enabled: true });
-    expect(await usageOf('skills', 'revisar-spec')).toBe('always');
-    expect((await call('set_skill_enabled', { skill: 'nao-existe', enabled: true })).error).toBe(true);
-
+    expect(fs.existsSync(path.join(dir, '.claude'))).toBe(false);
     await call('delete_skill', { skill: 'revisar-spec' });
     expect((await call('get_harness')).data.skills).toEqual([]);
     expect(skillsField().options).toEqual([]);
-    expect((await call('delete_skill', { skill: 'revisar-spec' })).error).toBe(true);
-  });
+    await call('create_skill', { name: 'revisar-spec', description: 'Use ao revisar uma spec', content: 'Passos…' });
+    await call('set_harness_selection', { items: [{ kind: 'skill', name: 'revisar-spec' }], usage: null });
+    expect((await call('get_harness')).data.skills).toEqual([]);
 
-  it('o que a tela cria aparece em get_harness e o que o MCP cria aparece no snapshot; o importável traz a key', async () => {
-    await call('create_skill', { name: 'pelo-mcp', description: 'd', content: 'c' });
-    expect(router.snapshot().harness.library!.artifacts.map((a) => [a.kind, a.name, a.usage])).toContainEqual([
-      'skill',
-      'pelo-mcp',
-      'contextual',
-    ]);
-    router.handle({ type: 'harness.artifact.save', kind: 'rule', name: 'pela-tela', body: 'x', via: 'manual' });
-    expect((await call('get_harness')).data.rules.map((r: any) => [r.name, r.usage])).toEqual([['pela-tela', 'contextual']]);
-    expect((await call('read_rule_file', { file: 'pela-tela' })).text).toBe('x');
-
-    // o que está só na pasta da ferramenta aparece como importável, com a key; depois de importado, sai da lista
-    const file = path.join(dir, 'home-do-usuario', '.claude', 'skills', 'externa', 'SKILL.md');
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, '---\nname: externa\ndescription: Veio de fora\n---\nx');
-    router.refreshHarness();
-    const importable = async () => (await call('get_harness', { onlySelected: false })).data;
-    const found = (await importable()).inventory.find((i: any) => i.name === 'externa');
-    expect(found).toMatchObject({ kind: 'skill', usage: null, key: expect.any(String) });
-    expect((await call('get_harness')).data.inventory.some((i: any) => i.name === 'externa')).toBe(false);
-    expect((await importable()).inventory.some((i: any) => i.name === 'pelo-mcp')).toBe(false);
-    await call('set_harness_selection', { items: [{ kind: 'skill', location: found.key }], usage: 'contextual' });
-    expect((await importable()).inventory.some((i: any) => i.name === 'externa')).toBe(false);
-    expect((await call('get_skill', { skill: 'externa' })).text).toContain('Veio de fora');
-    expect((await call('get_harness')).data.note).not.toContain('onlySelected = false: ');
-    expect((await importable()).note).toContain('dá para importar');
-  });
-
-  it('escreve arquivos de apoio na skill do board e respeita os limites', async () => {
-    await call('create_skill', { name: 'com-apoio', description: 'd', content: 'c' });
-    const item = (await call('write_skill_file', { skill: 'com-apoio', file: 'references/a.ts', content: 'export {}' })).data;
-    expect(item).toMatchObject({ kind: 'skill', name: 'com-apoio' });
-    expect(item.files).toHaveLength(1);
-    expect(
-      (await call('write_skill_file', { skill: 'com-apoio', file: 'references/grande.ts', content: 'x'.repeat(600 * 1024) })).error,
-    ).toBe(true);
-    expect((await call('write_skill_file', { skill: 'com-apoio', file: '../fora', content: 'x' })).error).toBe(true);
-    expect((await call('write_skill_file', { skill: 'nao-existe', file: 'a.ts', content: 'x' })).error).toBe(true);
-    expect(fs.existsSync(path.join(dir, '.claude'))).toBe(false);
-  });
-
-  it('o agente padrão e a skill do fluxo não saem do board', async () => {
-    await call('create_agent', { name: 'padrao', description: 'd', content: 'c' });
-    router.handle({ type: 'settings.board.update', patch: { runner: { ...router.snapshot().board.runner, defaultAgent: 'padrao' } } });
-    expect((await call('delete_agent', { agent: 'padrao' })).error).toBe(true);
-    expect((await call('set_harness_selection', { items: [{ kind: 'agent', name: 'padrao' }], usage: null })).error).toBe(true);
-    expect((await call('get_agent', { agent: 'padrao' })).error).toBe(false);
-    expect((await call('delete_agent', { agent: 'nao-existe' })).error).toBe(true);
-    expect((await call('update_agent', { agent: 'nao-existe', description: 'x' })).error).toBe(true);
-
-    await call('install_flow_skill');
-    expect((await call('delete_skill', { skill: 'faz-ai-fluxo' })).error).toBe(true);
-    expect((await call('set_harness_selection', { items: [{ kind: 'skill', name: 'faz-ai-fluxo' }], usage: null })).error).toBe(true);
-    // só o modo dela muda
-    await call('set_skill_enabled', { skill: 'faz-ai-fluxo', enabled: false });
-    expect((await call('get_harness')).data.skills.find((k: any) => k.name === 'faz-ai-fluxo').usage).toBe('off');
-  });
-
-  it('nenhuma ferramenta de artefato grava nas pastas das ferramentas, nem manda criar arquivo nelas', async () => {
-    await call('write_rule_file', { file: 'r', content: 'x' });
-    await call('create_skill', { name: 's', description: 'd', content: 'c' });
-    await call('write_skill_file', { skill: 's', file: 'references/a.md', content: 'x' });
-    await call('create_agent', { name: 'a', description: 'd', content: 'c' });
-    for (const rel of ['.claude', '.cursor', '.agents', 'AGENTS.md', 'CLAUDE.md']) expect(fs.existsSync(path.join(dir, rel))).toBe(false);
-    const tools = (await client.listTools()).tools;
-    const description = (name: string) => tools.find((t) => t.name === name)!.description;
-    const names = [
-      'get_harness',
-      'set_harness_selection',
-      'read_rule_file',
-      'write_rule_file',
-      'delete_rule_file',
-      'get_skill',
-      'create_skill',
-      'update_skill',
-      'set_skill_enabled',
-      'delete_skill',
-      'write_skill_file',
-      'get_agent',
-      'create_agent',
-      'update_agent',
-      'delete_agent',
-    ];
-    for (const n of names) expect(description(n)).not.toMatch(/\.claude|\.cursor|CLAUDE\.md|AGENTS\.md|pasta de skills/);
-    expect(description('write_rule_file')).toContain('do board');
-    expect(client.getInstructions()).toContain('do board: get_harness');
-    expect(client.getInstructions()).not.toMatch(/\.claude|\.cursor|pasta da ferramenta/);
+    // a regra do board some ao ser apagada
+    await call('write_rule_file', { file: 'temporaria', content: 'x' });
+    await call('delete_rule_file', { file: 'temporaria' });
+    expect((await call('read_rule_file', { file: 'temporaria' })).error).toBe(true);
   });
 
   it('aplica os padrões do tipo aos cards novos e recria o board', async () => {
@@ -1363,7 +1198,7 @@ describe('status do card e checkpoint de revisão', () => {
     expect(p.next).toContain('order');
   });
 
-  it('cria, edita e apaga agentes no board, sem gravar na pasta da ferramenta; o agente só da ferramenta segue no arquivo', async () => {
+  it('cria, edita e apaga agentes no board, sem gravar na pasta da ferramenta; o que está só na pasta da ferramenta não é tocado', async () => {
     const home = path.join(dir, 'home-do-usuario');
     const stored = (name: string) => router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'agent' && a.name === name);
     expect((await call('get_harness')).data.agents).toEqual([]);
@@ -1374,7 +1209,6 @@ describe('status do card e checkpoint de revisão', () => {
         content: 'Leia a spec e aponte lacunas.',
         model: 'claude:opus@high',
         tools: ['Read', 'Grep'],
-        scope: 'project',
       })
     ).data;
     expect(h.agents).toEqual([
@@ -1391,9 +1225,7 @@ describe('status do card e checkpoint de revisão', () => {
     expect(stored('revisor-de-spec')).toMatchObject({ origin: '', body: 'Leia a spec e aponte lacunas.' });
     expect(stored('revisor-de-spec')!.agent).toMatchObject({ model: 'claude:opus@high', tools: { native: { allow: ['Read', 'Grep'] } } });
     expect((await call('get_agent', { agent: 'revisor-de-spec' })).text).toContain('aponte lacunas');
-    expect((await call('create_agent', { name: 'revisor-de-spec', description: 'd', content: 'c', scope: 'project' })).text).toContain(
-      'Já existe',
-    );
+    expect((await call('create_agent', { name: 'revisor-de-spec', description: 'd', content: 'c' })).text).toContain('Já existe');
     expect((await call('create_agent', { name: 'Nome Inválido', description: 'd', content: 'c' })).error).toBe(true);
 
     // o patch regrava só o que vier; o conteúdo inteiro substitui tudo
@@ -1407,18 +1239,16 @@ describe('status do card e checkpoint de revisão', () => {
     expect(stored('revisor-de-spec')).toMatchObject({ description: 'Outra', body: 'Novo corpo' });
     expect(fs.existsSync(path.join(dir, '.claude/agents'))).toBe(false);
 
-    // agente criado por fora aparece no inventário completo, mas só entra no board depois de enviado
+    // agente criado por fora da pasta do board não aparece no get_harness: ele só mostra o que está no board
     fs.mkdirSync(path.join(dir, '.claude/agents'), { recursive: true });
     fs.writeFileSync(path.join(dir, '.claude/agents/planejador.md'), '---\nname: planejador\ndescription: Quebra a spec em passos\n---\nx');
     router.refreshHarness();
     expect((await call('get_harness')).data.agents.map((a: any) => a.name)).toEqual(['revisor-de-spec']);
-    expect((await call('get_harness', { onlySelected: false })).data.inventory.map((a: any) => [a.kind, a.name])).toEqual([
-      ['agent', 'planejador'],
-    ]);
+    expect((await call('get_harness')).data.agents.map((a: any) => a.name)).toEqual(['revisor-de-spec']);
 
     // no Cursor o agente guarda somente leitura e segundo plano; update_agent liga e desliga
     await call('set_ai_tool', { tool: 'cursor' });
-    await call('create_agent', { name: 'leitor', description: 'd', content: 'c', scope: 'project', readonly: true });
+    await call('create_agent', { name: 'leitor', description: 'd', content: 'c', readonly: true });
     expect(stored('leitor')!.agent).toMatchObject({ readonly: true });
     await call('update_agent', { agent: 'leitor', readonly: false, background: true });
     expect(stored('leitor')!.agent).toMatchObject({ background: true });
@@ -1426,33 +1256,21 @@ describe('status do card e checkpoint de revisão', () => {
     expect(fs.existsSync(path.join(dir, '.cursor/agents'))).toBe(false);
     await call('set_ai_tool', { tool: 'claude' });
 
-    // o agente só da pasta da ferramenta não é do board: as ferramentas de agente não mexem no arquivo dele
-    expect((await call('delete_agent', { agent: 'planejador' })).error).toBe(true);
-    expect((await call('update_agent', { agent: 'planejador', description: 'x' })).error).toBe(true);
-    expect((await call('get_agent', { agent: 'planejador' })).error).toBe(true);
+    // o agente que está só na pasta da ferramenta não é do board: nada é apagado lá
+    expect((await call('delete_agent', { agent: 'planejador' })).text).toContain('não está no board');
     expect(fs.existsSync(path.join(dir, '.claude/agents/planejador.md'))).toBe(true);
     await call('delete_agent', { agent: 'revisor-de-spec' });
     expect(stored('revisor-de-spec')).toBeUndefined();
   });
 
-  it('instala a skill do fluxo sempre no global da ferramenta, sem sobrescrever', async () => {
-    const file = path.join(dir, 'home-do-usuario', '.claude', 'skills', 'faz-ai-fluxo', 'SKILL.md');
-    expect((await call('install_flow_skill')).data).toMatchObject({
-      installed: true,
-      skill: expect.stringContaining('.claude/skills/faz-ai-fluxo'),
-    });
-    expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
-    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'faz-ai-fluxo'))).toBe(false);
-    // os artefatos padrão do board não entram no projeto: o escopo deixou de ser um parâmetro
-    expect((await call('install_flow_skill', { scope: 'project' })).error).toBe(true);
-    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'faz-ai-fluxo'))).toBe(false);
+  it('não há mais install_flow_skill', async () => {
+    expect((await call('install_flow_skill')).error).toBe(true);
+    expect(fs.existsSync(path.join(dir, 'home-do-usuario', '.claude', 'skills'))).toBe(false);
+  });
 
-    fs.writeFileSync(file, '---\nname: faz-ai-fluxo\ndescription: minha versão\n---\nmeu texto');
-    expect((await call('install_flow_skill')).data.installed).toBe(false);
-    expect(fs.readFileSync(file, 'utf8')).toContain('meu texto');
-    // só com replace a versão da pessoa é trocada
-    expect((await call('install_flow_skill', { replace: true })).data).toMatchObject({ note: 'Skill substituída.' });
-    expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
+  it('set_harness_selection aceita só kind e name: um location dá erro', async () => {
+    const r = await call('set_harness_selection', { items: [{ kind: 'skill', location: '/x/SKILL.md' }], usage: 'always' });
+    expect(r.error).toBe(true);
   });
 
   it('get_skill serve o fluxo e as skills por assunto do próprio board, sem arquivo instalado', async () => {
@@ -1476,31 +1294,9 @@ describe('status do card e checkpoint de revisão', () => {
   it('get_skill lê do arquivo a skill comum e não trata faz-ai-deploy, do projeto, como do fluxo', async () => {
     await call('create_skill', { name: 'faz-ai-deploy', description: 'Use ao publicar', content: 'passos do deploy' });
     const text = (await call('get_skill', { skill: 'faz-ai-deploy' })).text;
-    expect(text).toMatch(/name: "?faz-ai-deploy"?/);
+    expect(text).toContain('name: "faz-ai-deploy"');
     expect(text).toContain('passos do deploy');
     expect((await call('get_skill', { skill: 'nao-existe' })).error).toBe(true);
-  });
-
-  it('a skill do fluxo que já estava no disco, sem marcação, fica marcada em todo contexto ao "instalar" de novo', async () => {
-    // a skill foi instalada antes de a marcação existir (ou a pessoa a desmarcou): o Diagnóstico avisa, e o
-    // botão de instalar precisa resolver o aviso sem sobrescrever o arquivo
-    const dirOf = path.join(dir, 'home-do-usuario', '.claude', 'skills', 'faz-ai-fluxo');
-    fs.mkdirSync(dirOf, { recursive: true });
-    fs.writeFileSync(path.join(dirOf, 'SKILL.md'), '---\nname: faz-ai-fluxo\ndescription: minha versão\n---\nmeu texto');
-    router.refreshHarness();
-    const usage = async () =>
-      (await call('get_harness')).data.inventory.find((i: any) => i.kind === 'skill' && i.name === 'faz-ai-fluxo')?.usage;
-    expect((await call('get_harness', { onlySelected: false })).data.inventory.find((i: any) => i.name === 'faz-ai-fluxo')).toMatchObject({
-      usage: null,
-      key: expect.any(String),
-    });
-    expect(await usage()).toBeUndefined();
-    expect((await call('install_flow_skill')).data).toMatchObject({
-      installed: false,
-      note: expect.stringContaining('marcada em todo contexto'),
-    });
-    expect(await usage()).toBe('always');
-    expect(fs.readFileSync(path.join(dirOf, 'SKILL.md'), 'utf8')).toContain('meu texto');
   });
 
   it('pergunta, bloqueio e colunas configuráveis', async () => {
@@ -1578,21 +1374,22 @@ describe('status do card e checkpoint de revisão', () => {
 describe('ferramentas de IA', () => {
   const skillMd = (base: string) => path.join(dir, base, 'revisar-spec', 'SKILL.md');
 
-  it('cria só no board e mantém as cópias ao trocar de ferramenta', async () => {
+  it('cria no board, sem escrever nas pastas das ferramentas, e mantém as cópias ao trocar de ferramenta', async () => {
     const names = async () => (await call('get_harness')).data.skills.map((k: any) => k.name);
     await call('create_skill', { name: 'revisar-spec', description: 'd', content: 'c' });
+    expect(await names()).toEqual(['revisar-spec']);
+    // a skill vive no banco do board: nada na pasta de nenhuma ferramenta
     expect(fs.existsSync(skillMd('.claude/skills'))).toBe(false);
     expect(fs.existsSync(path.join(dir, '.agents'))).toBe(false);
 
-    // a troca de ferramenta não mexe no que está no board
     const h = (await call('set_ai_tool', { tool: 'cursor' })).data;
     expect(h.aiTool).toBe('cursor');
     expect(h.skills.map((k: any) => k.name)).toEqual(['revisar-spec']);
     expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['revisar-spec']);
     await call('create_skill', { name: 'do-cursor', description: 'd', content: 'c' });
-    expect(fs.existsSync(path.join(dir, '.cursor'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, '.cursor/skills/do-cursor/SKILL.md'))).toBe(false);
     expect(await names()).toEqual(['do-cursor', 'revisar-spec']);
-    await call('set_skill_enabled', { skill: 'do-cursor', enabled: false });
+    await call('set_harness_selection', { items: [{ kind: 'skill', name: 'do-cursor' }], usage: 'off' });
     expect((await call('get_harness')).data.skills.find((k: any) => k.name === 'do-cursor').usage).toBe('off');
 
     await call('set_ai_tool', { tool: 'claude' });

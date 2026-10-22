@@ -2,20 +2,8 @@ import type { AiBase } from './aiProfiles';
 import type { BoardArtifact } from './artifacts';
 /** Harness do projeto: arquivos de regras e skills, gerenciados pelo board. */
 
-/**
- * Como a ferramenta chega a uma skill: `auto` deixa a descrição à vista da IA, que decide quando usar;
- * `manual` tira a skill da invocação automática, e ela só é usada quando indicada no card ou chamada pelo nome.
- */
+/** Como a ferramenta invoca a skill: sozinha (`auto`) ou só quando um card a indica ou ela é chamada pelo nome (`manual`). */
 export type SkillMode = 'auto' | 'manual';
-
-export const SKILL_MODES: { id: SkillMode; label: string; hint: string }[] = [
-  { id: 'auto', label: 'Automática', hint: 'A IA vê a descrição em toda sessão e decide quando usar a skill.' },
-  {
-    id: 'manual',
-    label: 'Só quando indicada',
-    hint: 'A IA não invoca a skill sozinha: ela só é usada quando um card a indica ou quando é chamada pelo nome.',
-  },
-];
 
 export interface RuleFile {
   /** nome do arquivo na raiz do projeto, ex.: CLAUDE.md */
@@ -84,19 +72,6 @@ export type HarnessKind = 'instructions' | 'memory' | 'skill' | 'agent' | 'comma
  * plugin, ou de uma pasta importada (que a ferramenta não carrega sozinha: só o board a conhece).
  */
 export type HarnessScope = 'project' | 'user' | 'plugin' | 'imported';
-
-/**
- * O resultado de "Indicar artefatos": os artefatos de um assunto que a IA achou mais úteis para o
- * projeto, pré-selecionados na tela para a pessoa confirmar. Nada entra no board sem ela.
- */
-export interface HarnessSuggestions {
-  tool: AiTool;
-  kind: 'instructions' | 'skill' | 'agent' | 'mcp';
-  /** `location` é a identidade do item na marcação (`selectionKey`) */
-  items: { location: string; reason: string }[];
-  /** a IA não respondeu no formato esperado, ou a execução falhou */
-  error?: string;
-}
 
 /** Onde o board instala o servidor MCP e a skill do fluxo: global (`user`, o padrão) ou só neste projeto. */
 export type InstallScope = 'project' | 'user';
@@ -178,22 +153,6 @@ export interface HarnessItem {
   source?: number;
   /** valor inteiro da entrada, quando `description` o resume: o comando de um hook, ou a lista (allow, deny, ask) de uma regra de permissão */
   detail?: string;
-  /** só no item do próprio plugin (`kind: 'plugin'`): como ele está instalado, quando a ferramenta diz */
-  install?: PluginInstall;
-}
-
-/**
- * Um plugin instalado, como a ferramenta o informa. No Claude Code vem de `claude plugin list --json`:
- * o id é `nome@marketplace` (ou `@synced`, `@skills-dir`) e o escopo é onde ele foi instalado. No
- * Cursor é uma pasta de `~/.cursor/plugins/local`, e o id é o nome dela.
- */
-export interface PluginInstall {
-  id: string;
-  /** escopos em que está instalado: `user`, `project`, `local`, `managed`, `synced`… */
-  scopes: string[];
-  enabled: boolean;
-  /** pasta de onde a ferramenta carrega o plugin */
-  dir: string;
 }
 
 /** Uma skill encontrada numa pasta ou num repositório, antes de ser instalada. */
@@ -206,12 +165,6 @@ export interface InstallableSkill {
   files: number;
   /** o nome da pasta serve como nome de skill */
   valid: boolean;
-}
-
-/** Skills encontradas na origem informada, à espera da escolha do que instalar. */
-export interface InstallPreview {
-  source: string;
-  skills: InstallableSkill[];
 }
 
 export interface ToolInventory {

@@ -2,9 +2,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readMcpByName, readSource, resolveLocation, type SourceDirs } from '../src/extension/artifactSource';
+import { readSource, resolveLocation, type SourceDirs } from '../src/extension/artifactSource';
 import { FLOW_SKILL } from '../src/extension/flowSkill';
-import { scanInventory } from '../src/extension/harnessScan';
 import { ARTIFACT_LIMITS, type AgentMeta } from '../src/shared/artifacts';
 
 let root: string;
@@ -241,24 +240,5 @@ describe('readSource', () => {
     }
     expect(readSource({ kind: 'agent', location: '.claude/agents/nada.md' }, dirs, 'claude').name).toBe('nada');
     expect(readSource({ kind: 'mcp', location: '.cursor/mcp.json#srv' }, dirs, 'claude').name).toBe('srv');
-  });
-});
-
-describe('readMcpByName', () => {
-  it('acha o servidor no inventário com a precedência do Claude Code: pasta do projeto no ~/.claude.json, projeto, usuário', () => {
-    write(dirs.projectDir, '.mcp.json', JSON.stringify({ mcpServers: { a: { command: 'projeto-a' }, b: { command: 'projeto-b' } } }));
-    write(
-      dirs.homeDir,
-      '.claude.json',
-      JSON.stringify({
-        mcpServers: { b: { command: 'global-b' }, c: { command: 'global-c' } },
-        projects: { [dirs.projectDir]: { mcpServers: { a: { command: 'local-a' } } } },
-      }),
-    );
-    const inventory = scanInventory('claude', dirs.projectDir, dirs.homeDir, path.join(root, 'managed'), []);
-    expect(readMcpByName('a', inventory, dirs)).toMatchObject({ meta: { server: { command: 'local-a' } }, origin: '~/.claude.json#a' });
-    expect(readMcpByName('b', inventory, dirs)).toMatchObject({ meta: { server: { command: 'projeto-b' } }, origin: '.mcp.json#b' });
-    expect(readMcpByName('c', inventory, dirs)).toMatchObject({ meta: { server: { command: 'global-c' } }, originTool: 'claude' });
-    expect(readMcpByName('nada', inventory, dirs)).toBeNull();
   });
 });

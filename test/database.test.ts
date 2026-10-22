@@ -693,3 +693,22 @@ describe('migração 44 → 45 (ai_run_bash.failed)', () => {
     expect(fresh.exec("SELECT failed FROM ai_run_bash WHERE run_id = 'r1'")[0]!.values).toEqual([[1]]);
   });
 });
+
+describe('migração 46: harness_imports sai e a marcação fica', () => {
+  it('a partir do esquema 45 apaga a tabela das pastas importadas e preserva harness_selection', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 45);
+    old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    old.run("INSERT INTO harness_imports VALUES ('b', 'claude', '/tmp/colecao')");
+    old.run("INSERT INTO harness_selection VALUES ('b', 'skill', '.claude/skills/x/SKILL.md', 'always')");
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(old.exec("SELECT name FROM sqlite_master WHERE name = 'harness_imports'")).toEqual([]);
+    expect(old.exec('SELECT kind, location, usage FROM harness_selection')[0]!.values).toEqual([
+      ['skill', '.claude/skills/x/SKILL.md', 'always'],
+    ]);
+  });
+});

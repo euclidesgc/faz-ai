@@ -39,7 +39,7 @@ import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
-import { cursorModels, kimiModels, runCli } from '../cliProbe';
+import { cursorModels, kimiModels } from '../cliProbe';
 import { baseInfo, type AiTool } from '../../shared/harness';
 import { checkRequirements, profileInstallUrl } from '../requirements';
 import { CLI_COMMAND } from '../../shared/requirements';
@@ -244,11 +244,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   });
   // o log do board liga cada evento à execução em curso no card (`run_id`); sem execução, fica nulo
   router.setRunResolver((cardId) => runner.runIdOf(cardId));
-  // os plugins do Claude Code: a lista de instalados e as ações sobre eles passam pela CLI, na pasta do projeto
-  router.setClaudeCli((args) => {
-    const exe = resolveCommand('claude', pathEnv, homeDir);
-    return exe ? runCli(exe, args, pathEnv, 60_000, o.folderPath) : Promise.resolve({ code: null, stdout: '', stderr: '' });
-  });
   // os comandos externos das rotinas periódicas: resolvem com a saída padrão, rejeitam com `CommandError`,
   // que traz a mensagem do comando (é ela que vai para o log), o código de saída e a saída padrão (o
   // `merge-tree` da conferência com a base sai com 1 no conflito, #747). `git` aqui é assíncrono de propósito — o `src/extension/git.ts`
@@ -357,10 +352,10 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     signinCache.set(profile.id, { at: Date.now(), value, binding });
     return value;
   };
-  /** O que falta no banco de artefatos; undefined sem o inventário lido (a pasta do projeto não existe). */
+  /** O que falta no banco de artefatos; undefined sem a biblioteca carregada (a pasta do projeto não existe). */
   const harnessIssuesNow = (): ReturnType<typeof harnessIssues> | undefined => {
     const s = router.snapshot();
-    return s.harness.inventory.some((t) => t.tool === s.board.aiTool) ? harnessIssues(s) : undefined;
+    return s.harness.library ? harnessIssues(s) : undefined;
   };
   /** O perfil com a configuração privada, para resolver o comando e os probes; a pública traz `config` vazio. */
   const resolvedProfile = (meta: AiProfile): AiProfile => {
@@ -857,7 +852,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     },
     async dispose() {
       disposed = true;
-      router.setClaudeCli(null);
       clearInterval(requirementsTimer);
       if (enableTimer) clearInterval(enableTimer);
       // espera a conferência em andamento: sem isso ela pode gravar o board depois de o banco fechar

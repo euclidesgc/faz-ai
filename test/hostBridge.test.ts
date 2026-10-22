@@ -230,42 +230,6 @@ describe('HostBridge: harness.export.plan/apply (Exportar para a ferramenta)', (
   });
 });
 
-describe('HostBridge: plugins pela CLI do Claude Code', () => {
-  const plugin = (rel: string, name: string) => {
-    const manifest = path.join(dir, 'h', rel, '.claude-plugin', 'plugin.json');
-    fs.mkdirSync(path.dirname(manifest), { recursive: true });
-    fs.writeFileSync(manifest, JSON.stringify({ name }));
-    return path.join(dir, 'h', rel);
-  };
-  const flush = () => new Promise((r) => setTimeout(r, 0));
-
-  it('lista os instalados pela CLI', async () => {
-    const synced = plugin('.claude/plugins/synced/org/design~g2', 'design');
-    const cached = plugin('.claude/plugins/cache/loja/fmt/1.0', 'fmt');
-    plugin('.claude/plugins/marketplaces/loja/plugins/catalogo', 'catalogo');
-    router.setClaudeCli((args) => {
-      const stdout =
-        args[1] === 'list'
-          ? JSON.stringify([
-              { id: 'design@synced', scope: 'synced', enabled: true, installPath: synced },
-              { id: 'fmt@loja', scope: 'user', enabled: true, installPath: cached },
-            ])
-          : '{"outcome":"ok","message":"ok"}';
-      return Promise.resolve({ code: 0, stdout, stderr: '' });
-    });
-    await flush();
-    const plugins = () =>
-      router
-        .snapshot()
-        .harness.inventory.find((t) => t.tool === 'claude')!
-        .items.filter((i) => i.kind === 'plugin');
-    expect(plugins().map((p) => [p.name, p.install?.id])).toEqual([
-      ['design', 'design@synced'],
-      ['fmt', 'fmt@loja'],
-    ]);
-  });
-});
-
 describe('HostBridge: attachment.read / attachment.write', () => {
   function createAttachment(content: string, filename = 'nota.txt'): string {
     const snap = router.snapshot();
@@ -560,8 +524,8 @@ describe('HostBridge: biblioteca do Harness', () => {
     fs.mkdirSync(path.join(source, 'react'), { recursive: true });
     fs.writeFileSync(path.join(source, 'react/SKILL.md'), '---\nname: react\ndescription: Componentes\n---\nInstruções');
     env.pickFolder = async () => source;
-    await bridge.handle({ type: 'harness.library.pick', requestId: 'pick-library' });
-    expect(router.snapshot().harnessInstall?.skills.map((k) => k.name)).toEqual(['react']);
+    await bridge.handle({ type: 'harness.library.pickArtifacts', requestId: 'pick-library' });
+    expect(router.snapshot().harness.library!.preview?.items.map((k) => k.name)).toEqual(['react']);
     expect(router.snapshot().harness.library!.artifacts).toEqual([]);
     expect(sent.at(-1)).toEqual({ type: 'done', requestId: 'pick-library', ok: true });
   });

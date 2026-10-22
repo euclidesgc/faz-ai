@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fetchSource, findSkills, parseSource } from '../src/extension/skillInstall';
-import { parseFrontmatter, skillTemplate } from '../src/extension/harness';
+import { parseFrontmatter, skillTemplate } from '../src/extension/frontmatter';
 import { FLOW_SKILL } from '../src/extension/flowSkill';
 import { FLOW_TEXT } from './flowSkillText';
 

@@ -128,20 +128,6 @@ describe('ImportDialog', () => {
     expect(screen.getByText('Nenhum artefato encontrado')).toBeInTheDocument();
   });
 
-  it('Indicar artefatos só na ferramenta instalada e marca o indicado', async () => {
-    renderThemed(<ImportDialog onClose={() => {}} />);
-    showPreview([cand({})]);
-    expect(screen.queryByRole('button', { name: 'Indicar artefatos' })).toBeNull();
-    showPreview([cand({})], { from: 'tool', tool: 'claude' });
-    await userEvent.click(screen.getByRole('button', { name: 'Indicar artefatos' }));
-    expect(lastSent('harness.suggest.run')).toEqual({ type: 'harness.suggest.run', tool: 'claude', kind: 'skill' });
-    act(() =>
-      setState(() => ({ harnessSuggestions: { tool: 'claude', kind: 'skill', items: [{ location: 'skill:a', reason: 'combina' }] } })),
-    );
-    expect(screen.getByRole('checkbox', { name: 'Importar a' })).toBeChecked();
-    expect(screen.getByText(/combina/)).toBeInTheDocument();
-  });
-
   it('o erro da origem volta ao passo 1 com a mensagem', async () => {
     renderThemed(<ImportDialog onClose={() => {}} />);
     await userEvent.type(screen.getByLabelText('Caminho da pasta ou endereço do repositório'), '/x');

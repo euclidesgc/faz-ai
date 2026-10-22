@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { ALL_AI_BASES, type AiTool } from '../shared/harness';
 import type { ArtifactDraft } from '../shared/artifacts';
 import { readSource } from './artifactSource';
-import { scanInventory } from './harnessScan';
+import { scanImportedFolder } from './importScan';
 import { selectionKey } from '../shared/harnessSelection';
 
 /** Reconhece coleções neutras e formatos de origem sem vincular a biblioteca a uma ferramenta. */
@@ -26,9 +26,12 @@ export function scanLibraryFolder(root: string): ArtifactDraft[] {
     if (!draft.missing && draft.name !== 'faz-ai') found.set(key, draft);
   };
   for (const tool of ALL_AI_BASES)
-    for (const item of scanInventory(tool, '', '', '', [], [root]))
-      if (['instructions', 'skill', 'agent', 'mcp'].includes(item.kind))
-        add(item.kind as 'instructions' | 'skill' | 'agent' | 'mcp', selectionKey(item), tool);
+    for (const item of scanImportedFolder(tool, root))
+      add(
+        item.kind as 'instructions' | 'skill' | 'agent' | 'mcp',
+        selectionKey({ location: item.path, name: item.name, layout: item.layout }),
+        tool,
+      );
   let visited = 0;
   const walk = (dir: string, depth: number) => {
     if (depth > 8 || ++visited > 4000) return;

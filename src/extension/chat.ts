@@ -9,8 +9,6 @@ import { agentAssistancePrompt, parseAgentAssistance } from './agentAssistance';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { MAX_CHAT_MESSAGES, type ChatMessage } from '../shared/chat';
-import { type AiTool, type HarnessItem } from '../shared/harness';
-import { selectionKey, usageOf, type SelectableKind } from '../shared/harnessSelection';
 import type { RunnerPermission } from '../shared/runner';
 import { effortToRun } from '../shared/execution';
 import type { BoardState } from '../shared/model';
@@ -53,7 +51,7 @@ export function chatPrompt(history: ChatMessage[], text: string, advice: string 
 export function suggestAgentsPrompt(): string {
   return [
     'Você vai propor os agentes de execução deste board Faz AI, pelas ferramentas do servidor MCP "faz-ai". Um agente do board (instruções, modelo, ferramentas, skills) fica guardado no próprio board e é o que ele usa para executar os cards.',
-    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, linguagens e frameworks) e o board: get_board (agentes atuais, campos, regras de modelo), get_harness com onlySelected = false (tudo que o board tem, com a marcação de cada artefato) e get_models (catálogo de modelos).',
+    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, linguagens e frameworks) e o board: get_board (agentes atuais, campos, regras de modelo), get_harness (tudo que o board tem, com a marcação de cada artefato) e get_models (catálogo de modelos).',
     'Proponha de 3 a 8 agentes que façam sentido para ESTE projeto. Para cada um: se já existir um parecido, ajuste-o com update_agent (patch com description, body, model, tools, skills); senão, crie com create_agent (sem scope: o agente fica no board). Descrição de uma frase que diga quando usá-lo; instruções curtas e específicas do projeto (padrões, comandos de teste, pastas do código); skills só entre as marcadas em get_harness; modelo pelo catálogo de get_models (valor como no campo Modelo, ex.: "claude:sonnet@medium"), seguindo as regras de esforço do board.',
     'Mantenha um agente condutor (que conduz os cards pelo fluxo e delega aos especialistas) como padrão do board.',
     'Não altere arquivos do projeto nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: nome → para quê, o que criou e o que ajustou.',
@@ -67,7 +65,7 @@ export function suggestAgentsPrompt(): string {
 export function suggestRulesPrompt(): string {
   return [
     'Você vai propor regras para este projeto, pelas ferramentas do servidor MCP "faz-ai". Uma regra do board é uma instrução curta, guardada no próprio board, que a IA lê quando o card ou o modo "Sempre" a indica.',
-    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, scripts de teste, lint e formatação, README, linguagens e frameworks) e o que o board já tem: get_harness com onlySelected = false e read_rule_file para ler uma regra existente.',
+    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, scripts de teste, lint e formatação, README, linguagens e frameworks) e o que o board já tem: get_harness e read_rule_file para ler uma regra existente.',
     'Proponha de 3 a 5 regras que façam sentido para ESTE projeto, uma por assunto (por exemplo testes, estilo, commits, estrutura de pastas): convenções que se vê no código, comandos de teste, lint e formatação, padrões de commit e o que nunca fazer. Cada regra com frases diretas, no imperativo, sem repetir regra que já existe no board. Nada que mande ignorar o board, o servidor MCP, as aprovações ou as branches por história: o fluxo do board vale acima das regras.',
     'Crie cada regra com write_rule_file, com o nome em letras minúsculas e hífens (ex.: "testes-e-lint"). Depois de criar, deixe cada uma desligada com set_harness_selection (kind "instructions", usage "off"), para a pessoa revisar e ativar em "Desligado"; se uma regra do mesmo nome já existir no board, não mude o modo dela.',
     'Não altere arquivos do projeto (nem os arquivos de instruções dele) nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: cada regra, em uma linha, e o que ficou desligado.',
@@ -81,70 +79,11 @@ export function suggestRulesPrompt(): string {
 export function suggestSkillsPrompt(): string {
   return [
     'Você vai propor skills para este projeto, pelas ferramentas do servidor MCP "faz-ai". Uma skill do board (guardada no próprio board) ensina a IA a fazer UMA tarefa do projeto, carregada só quando um card a indica.',
-    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, regras, linguagens e frameworks, tarefas que se repetem como migração, novo endpoint, novo componente, release) e o que já existe: get_harness com onlySelected = false.',
+    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, regras, linguagens e frameworks, tarefas que se repetem como migração, novo endpoint, novo componente, release) e o que já existe: get_harness.',
     'Proponha de 3 a 5 skills que façam sentido para ESTE projeto, cada uma de um assunto diferente e estreita: uma tarefa, os arquivos envolvidos, o passo a passo com os comandos do projeto e o que a skill nunca faz. Não repita uma skill que já existe e não crie skills genéricas (como "boas práticas").',
     'Crie cada uma com create_skill (name em letras minúsculas e hífens, description de uma frase que diga a tarefa e quando usar, content com o passo a passo). Elas já nascem "Pelo card" no board (usage "contextual"); não use "always": uma skill sempre ligada pesa em toda execução.',
     'Não altere outros arquivos do projeto nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: nome → tarefa e quando usar.',
   ].join('\n');
-}
-
-/** O que cada tipo de artefato é, para o pedido de "Indicar artefatos". */
-const KIND_LABEL: Record<SelectableKind, string> = {
-  instructions: 'arquivos de regras e instruções',
-  skill: 'skills',
-  agent: 'agentes (subagentes)',
-  mcp: 'servidores MCP',
-};
-
-/**
- * O que a IA recebe no "Indicar artefatos": ler o projeto e escolher, só entre os candidatos listados
- * (o catálogo daquele assunto que ainda não está no board), os que fazem mais sentido para ele. A
- * resposta é um JSON e nada mais: é a pessoa quem confirma na tela; a IA só sugere.
- */
-export function suggestArtifactsPrompt(kind: SelectableKind, candidates: HarnessItem[]): string {
-  const list = candidates.map(
-    (i) => `- key: ${selectionKey(i)} | nome: ${i.name} | origem: ${i.scope}${i.description ? ` | ${i.description}` : ''}`,
-  );
-  return [
-    `Você vai indicar quais ${KIND_LABEL[kind]} deste projeto valem a pena entrar no board Faz AI, para as execuções dos cards poderem usá-los. Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, CLAUDE.md, linguagens e frameworks). Não altere nada: só leia.`,
-    `Candidatos (só estes existem; não invente outros):`,
-    ...list,
-    `Escolha os que fazem sentido para ESTE projeto e as tarefas que ele costuma ter, poucos e precisos: excesso de artefatos piora o resultado. ${
-      kind === 'skill' ? 'No máximo uma skill por assunto: entre duas do mesmo assunto, a mais próxima do projeto. ' : ''
-    }Deixe de fora o que é genérico demais, de outra stack, ou redundante com algo já escolhido.`,
-    'Responda SOMENTE com um JSON neste formato, sem texto antes nem depois: {"items":[{"key":"<key do candidato>","reason":"<por que, numa frase curta, em português do Brasil>"}]}. Sem nenhum candidato útil, responda {"items":[]}.',
-  ].join('\n');
-}
-
-/**
- * Lê a resposta de "Indicar artefatos": o primeiro JSON com `items` no texto (a IA às vezes escreve
- * algo em volta). Só valem as chaves dos candidatos; o resto é descartado.
- */
-export function parseSuggestions(text: string, candidates: readonly string[]): { location: string; reason: string }[] | null {
-  const allowed = new Set(candidates);
-  const parsed = (from: number, end: number): unknown[] | null => {
-    try {
-      const v: unknown = JSON.parse(text.slice(from, end + 1));
-      return v && typeof v === 'object' && Array.isArray((v as { items?: unknown }).items) ? (v as { items: unknown[] }).items : null;
-    } catch {
-      return null;
-    }
-  };
-  for (let from = text.indexOf('{'); from >= 0; from = text.indexOf('{', from + 1)) {
-    // a IA às vezes escreve algo com chaves depois do JSON: vale o primeiro trecho que é o JSON esperado
-    let items: unknown[] | null = null;
-    for (let end = text.lastIndexOf('}'); end > from && !items; end = text.lastIndexOf('}', end - 1)) items = parsed(from, end);
-    if (!items) continue;
-    const seen = new Set<string>();
-    return items.flatMap((raw) => {
-      const r = raw as { key?: unknown; reason?: unknown };
-      const key = typeof r?.key === 'string' ? r.key : '';
-      if (!allowed.has(key) || seen.has(key)) return [];
-      seen.add(key);
-      return [{ location: key, reason: typeof r.reason === 'string' ? r.reason.trim() : '' }];
-    });
-  }
-  return null;
 }
 
 /**
@@ -190,7 +129,6 @@ export class ChatSession {
       else if (msg.type === 'ai.suggestAgents') this.suggestAgents();
       else if (msg.type === 'ai.suggestRules') this.suggestRules();
       else if (msg.type === 'ai.suggestSkills') this.suggestSkills();
-      else if (msg.type === 'harness.suggest.run') this.suggestArtifacts(msg.tool, msg.kind);
       else if (msg.type === 'chat.stop') this.stop();
       else this.clear();
     });
@@ -253,12 +191,7 @@ export class ChatSession {
     );
   }
 
-  /**
-   * "Indicar artefatos": a IA lê o projeto e o catálogo do assunto (o que ainda não está no board, da
-   * ferramenta do projeto) e devolve os que fazem mais sentido; a tela os pré-seleciona e a pessoa
-   * confirma. Fica fora da conversa do chat: o resultado vai em `harnessSuggestions`. Só a ferramenta
-   * do projeto, porque só a marcação dela vale.
-   */
+  /** A IA monta um rascunho de agente a partir do pedido da pessoa; nada é gravado sem ela confirmar. */
   assistAgent(input: AgentAssistInput): Promise<AgentAssistResult> {
     return new Promise((resolve, reject) => {
       const state = this.router.snapshot();
@@ -302,29 +235,6 @@ export class ChatSession {
       } catch (error) {
         reject(error);
       }
-    });
-  }
-
-  suggestArtifacts(tool: AiTool, kind: SelectableKind): void {
-    const state = this.router.snapshot();
-    if (tool !== state.board.aiTool) throw new Error('Indicar artefatos só vale para a ferramenta do projeto.');
-    const items = state.harness.inventory.find((t) => t.tool === tool)?.items ?? [];
-    const candidates = items.filter((i) => i.kind === kind && !usageOf(state.harnessSelection, i));
-    if (!candidates.length) {
-      this.router.setSuggestions({ tool, kind, items: [], error: 'Não há artefatos fora do board neste assunto.' });
-      return;
-    }
-    const keys = candidates.map(selectionKey);
-    this.router.setSuggestions(null);
-    // só leitura: a IA lê o projeto e responde; nada é gravado sem a pessoa confirmar na tela
-    this.start([suggestArtifactsPrompt(kind, candidates), ...contextLines(state).always].join('\n'), 'board', null, 'harness-suggest', {
-      done: (text) => {
-        const parsed = parseSuggestions(text, keys);
-        this.router.setSuggestions(
-          parsed ? { tool, kind, items: parsed } : { tool, kind, items: [], error: 'A IA não respondeu no formato esperado.' },
-        );
-      },
-      failed: (error) => this.router.setSuggestions({ tool, kind, items: [], error }),
     });
   }
 
