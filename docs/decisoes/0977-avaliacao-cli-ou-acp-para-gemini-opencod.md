@@ -137,3 +137,30 @@ Antes de qualquer ferramenta virar perfil pronto:
    Codex entrar.
 7. Não citar o spike `acp-transporte-de-agentes.md` como fonte verificada: é um registro de spike, sem
    conferência ao vivo.
+
+## Decisão
+
+Cada ferramenta entra pelo caminho que consegue isolar MCPs e artefatos, na ordem da regra acima
+(ACP, depois CLI, depois "não entra"). A escolha por ferramenta está nas seções de cada uma e na
+tabela de capacidades. Gemini, OpenCode e Codex ficam com decisão provisória (não validado); o Kimi
+foi verificado na máquina (`kimi` 2.2.0).
+
+## Alternativas descartadas
+
+- **ACP para todas por padrão**: descartada, porque o ACP é só transporte e não garante o isolamento
+  de MCPs e artefatos.
+- **CLI para todas por padrão**: descartada, porque perderia a permissão chamada a chamada e a
+  medição que o ACP traz nas ferramentas que a oferecem.
+- **Testar as quatro ao vivo nesta história**: descartada, porque só o `kimi` está instalado; as
+  demais CLIs não estão no PATH.
+
+## Consequências
+
+- Nenhum código de produto muda; cada ferramenta aprovada vira depois uma história própria de perfil
+  pronto.
+- A lista de pendências acima deve ser cumprida antes de qualquer perfil pronto.
+- A história #983 (transporte ACP) parte deste registro.
+
+## Diagramas
+
+O diagrama Mermaid do desenho da decisão está em "Contexto e regra de decisão".
