@@ -441,6 +441,10 @@ export const board: Record<string, string> = {
   'Conferido agora: nada mudou.': 'Checked just now: nothing changed.',
   recomendado: 'recommended',
   'O login do {tool} venceu: veja em Configurações → Verificar ambiente.': "{tool}'s login expired: see Settings → Check environment.",
+  'A linha de comando do {tool} não foi encontrada: veja em Configurações → Verificar ambiente.':
+    "{tool}'s command line was not found: see Settings → Check environment.",
+  'A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.':
+    "{tool}'s command line is not signed in: see Settings → Check environment.",
   '{name}: linha de comando não encontrada': '{name}: command line not found',
   '{name}: sem login': '{name}: not signed in',
   '{name}: não validado': '{name}: not validated',

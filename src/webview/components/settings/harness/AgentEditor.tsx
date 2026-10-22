@@ -17,11 +17,13 @@ import { SkillPicker } from '../../skills/SkillPicker';
 import { ChipsEditor, FormField } from '../../ui';
 import { ToolChecklist } from './ToolChecklist';
 import { t } from '../../../i18n';
+import { AgentContractEditor } from './AgentContractEditor';
 
 /** Edição de um agente: o frontmatter por campos (cada um grava ao sair) e as instruções com salvar. */
 export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: AiToolInfo; onClose: () => void }) {
   const state = useBoardStore((s) => s.state)!;
   const [body, setBody] = useState(a.body);
+  const [editingContract, setEditingContract] = useState(false);
   const how = enforcementOf(activeProfile({ aiTool: tool.id, aiProfiles: state.board.aiProfiles }));
   // os servidores MCP oferecidos são os do board (a aba MCPs), nunca os da pasta da ferramenta
   const library = state.harness.library;
@@ -54,6 +56,9 @@ export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: A
     </Badge>
   );
   const dirty = body !== a.body;
+  // o contrato de contexto é do artefato do agente no banco do board, achado pelo nome
+  const contractId = state.harness.library?.artifacts.find((x) => x.kind === 'agent' && x.name === a.name)?.id;
+  if (editingContract && contractId) return <AgentContractEditor artifactId={contractId} onClose={() => setEditingContract(false)} />;
   return (
     <div className="profile-editor" aria-label={t('Agente {name}', { name: a.name })}>
       <ExecutionContext
@@ -101,6 +106,11 @@ export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: A
           <>
             <TextArea id={id} className="code-area" value={body} onChange={(e) => setBody(e.target.value)} rows={12} spellCheck={false} />
             <div className="form-actions">
+              {contractId && (
+                <Button variant="soft" onClick={() => setEditingContract(true)}>
+                  {t('Editar contrato de contexto (rascunho)')}
+                </Button>
+              )}
               {dirty && <span className="muted small">{t('Alterações não salvas')}</span>}
               <Button variant="soft" color="gray" onClick={onClose}>
                 {dirty ? t('Descartar') : t('Fechar')}

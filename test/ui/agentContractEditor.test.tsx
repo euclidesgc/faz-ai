@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { confirmLast, lastSent, renderThemed, seedBoard, sentOf } from './setup';
 import { AgentContractEditor } from '../../src/webview/components/settings/harness/AgentContractEditor';
+import { baseInfo, type Agent } from '../../src/shared/harness';
+import { AgentEditor } from '../../src/webview/components/settings/harness/AgentEditor';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import type { BoardArtifact } from '../../src/shared/artifacts';
 import type { AgentContextContract } from '../../src/shared/contextPlanning';
@@ -66,6 +68,28 @@ function seedContract(contract?: AgentContextContract) {
 }
 beforeEach(async () => {
   await seedBoard();
+});
+
+it('abre o contrato pelo agente existente sem copiar permissões ou skills legadas', async () => {
+  seedContract();
+  const legacy = {
+    name: 'revisor',
+    description: 'Legado',
+    body: 'Instruções antigas',
+    skills: [],
+    mcp: [],
+    tools: [],
+    deniedTools: [],
+    toolsAll: true,
+  } as unknown as Agent;
+  renderThemed(<AgentEditor agent={legacy} tool={baseInfo('claude')} onClose={vi.fn()} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Editar contrato de contexto (rascunho)' }));
+  expect(screen.getByRole('textbox', { name: 'Papel do agente' })).toHaveValue('');
+  expect(screen.getByRole('textbox', { name: 'Instruções do contrato' })).toHaveValue('');
+  expect(within(screen.getByRole('region', { name: 'Skills essenciais' })).getByRole('checkbox', { name: 'essencial' })).not.toBeChecked();
+  expect(within(screen.getByRole('region', { name: 'MCPs permitidos' })).getByRole('checkbox', { name: 'memoria' })).not.toBeChecked();
+  expect(sentOf('contextPlanning.save')).toHaveLength(0);
+  expect(sentOf('harness.agent.assist')).toHaveLength(0);
 });
 
 it('mostra essenciais e Sempre, deixa opcionais e MCPs inativos e explica incompatibilidades', async () => {
