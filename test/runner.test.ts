@@ -20,7 +20,6 @@ import {
   conflictPrompt,
   consumptionLine,
   longRunNotice,
-  nomeDoAnexoAnterior,
   refinePrompt,
   summarizePrompt,
   UsageLimitHeld,
