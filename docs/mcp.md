@@ -338,6 +338,10 @@ A conversa em `comments` de `get_card` vem **a partir do último resumo** (a men
 antes já está no resumo e não é enviado. As mensagens anteriores continuam no board, esmaecidas na
 tela; apagá-las é decisão da pessoa.
 
+Sem resumo, `comments` traz só as **últimas 20 mensagens**. Com resumo, o resumo sempre vem; se a
+conversa passar de 20 mensagens, vêm as 19 últimas depois dele. Quando algo ficou de fora, `get_card`
+traz `omittedBefore` com a quantidade de mensagens omitidas.
+
 ### Branch e pasta de trabalho
 
 `prepare_workspace` cria (ou reaproveita) a branch da história e, no modo worktree, a pasta de
