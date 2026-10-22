@@ -303,3 +303,14 @@ export function readSource(
   }
   return missing(base(kind, sel.location, sel.location, tool));
 }
+
+/**
+ * Os nomes dos servidores MCP de um arquivo de configuração (`mcpServers`; no `~/.claude.json` entram
+ * também os desta pasta de projeto). Arquivo ausente ou JSON inválido dá lista vazia; nunca lança.
+ */
+export function mcpServerNames(file: string, dirs: SourceDirs): string[] {
+  const json = readJson(resolveLocation(file, dirs));
+  if (!json) return [];
+  const local = isClaudeJson(file) ? obj(obj(byPath(obj(json.projects), dirs.projectDir)).mcpServers) : {};
+  return [...new Set([...Object.keys(local), ...Object.keys(obj(json.mcpServers))])];
+}

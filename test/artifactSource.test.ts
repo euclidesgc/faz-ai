@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readSource, resolveLocation, type SourceDirs } from '../src/extension/artifactSource';
+import { mcpServerNames, readSource, resolveLocation, type SourceDirs } from '../src/extension/artifactSource';
 import { FLOW_SKILL } from '../src/extension/flowSkill';
 import { ARTIFACT_LIMITS, type AgentMeta } from '../src/shared/artifacts';
 
@@ -240,5 +240,21 @@ describe('readSource', () => {
     }
     expect(readSource({ kind: 'agent', location: '.claude/agents/nada.md' }, dirs, 'claude').name).toBe('nada');
     expect(readSource({ kind: 'mcp', location: '.cursor/mcp.json#srv' }, dirs, 'claude').name).toBe('srv');
+  });
+});
+
+describe('mcpServerNames', () => {
+  it('lê .mcp.json, as do projeto no ~/.claude.json e ignora JSON inválido', () => {
+    write(dirs.projectDir, '.mcp.json', JSON.stringify({ mcpServers: { a: {}, b: {} } }));
+    write(
+      dirs.homeDir,
+      '.claude.json',
+      JSON.stringify({ mcpServers: { u: {} }, projects: { [dirs.projectDir]: { mcpServers: { l: {} } } } }),
+    );
+    write(dirs.projectDir, 'ruim.json', '{');
+    expect(mcpServerNames('.mcp.json', dirs)).toEqual(['a', 'b']);
+    expect(mcpServerNames('~/.claude.json', dirs).sort()).toEqual(['l', 'u']);
+    expect(mcpServerNames('ruim.json', dirs)).toEqual([]);
+    expect(mcpServerNames('ausente.json', dirs)).toEqual([]);
   });
 });
