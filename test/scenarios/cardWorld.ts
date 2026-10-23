@@ -117,6 +117,8 @@ export interface CardWorldOptions {
    * do cofre (`keys`, o cofre do banco do mundo) e o regime da ciência por perfil, como o host.
    */
   viaConnect?: boolean;
+  /** o gateway lê a chave do cofre também fora do Conectar (o ACP real do teste da história 14 autentica por ela) */
+  gatewayKey?: boolean;
 }
 
 export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
@@ -291,7 +293,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
           apiKey: (profile: AiProfile) => profileApiKey(keys, profile),
           regimeOf: (profileId: string) => admissionRegimeOf(router.snapshot().board.runner, profileId),
         }
-      : options.profile === 'gemini-cli'
+      : options.profile === 'gemini-cli' || options.gatewayKey
         ? { apiKey: (profile: AiProfile) => profileApiKey(keys, profile) }
         : {}),
   });

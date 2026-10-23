@@ -42,9 +42,11 @@ aceitas ainda precisam de validação.
 
 `test/cli-real/gemini.real.ts` (também em `npm run test:cli-real`) é diferente: roda um card mínimo
 pelo board nos três modos do Gemini (CLI, ACP e API) com o binário e a API de verdade, e **gasta cota
-da sua conta**. Por isso só roda com `FAZAI_REAL_CONFIRM=1` (o roteiro `node scripts/gemini-real.mjs
---sim` põe e explica); sem a confirmação, sem o binário `gemini` ou sem `GEMINI_API_KEY`, cada modo é
-**pulado** com o motivo, nunca falha nem passa em silêncio. Os rótulos de verificado e não validado
+da sua conta**. Por isso só o roteiro `node scripts/gemini-real.mjs --sim` o liga (ele define uma variável própria,
+`FAZAI_REAL_CONFIRMED_BY_SCRIPT`, e explica o gasto); exportar `FAZAI_REAL_CONFIRM=1` no shell não liga o
+teste. No `npm run test:cli-real` solto, sem a confirmação, sem o binário `gemini` ou sem `GEMINI_API_KEY`,
+cada modo é **pulado** com o motivo; o roteiro, ao contrário, trata modo pedido e pulado como **falha**
+(código de saída 1). O ACP sem chave usa o login e a home real (`~/.gemini`), que o Gemini pode alterar. Os rótulos de verificado e não validado
 ficam em `docs/decisoes/ferramenta-por-modo-14-teste-real-gemini.md`.
 
 ## Fluxo de trabalho

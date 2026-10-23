@@ -26,19 +26,27 @@ validados**; o rótulo muda para **verificado** só com a saída gravada neste r
   mais saída maiores que zero); `ai_runs` traz `tool: gemini` e o `mode` certo; a chave não aparece no log, na
   conversa nem na linha de uso. Cada modo imprime uma linha JSON (`"gemini": "<modo>"`) com os tokens, para a
   comparação com o painel.
-- **Pula, não falha, e nunca gasta sem confirmação.** Os outros testes reais tratam ausência como falha (o
-  Claude e o Cursor não custam por execução). O Gemini cobra, então a regra aqui é outra, explícita no
-  código: sem `FAZAI_REAL_CONFIRM=1` nada roda (inclusive o ACP por login OAuth); com a confirmação, a CLI
-  pede o binário e a `GEMINI_API_KEY` (a home isolada do board não enxerga o login da conta), o ACP pede o
-  binário (a chave é opcional) e a API pede a chave. O motivo vai no título do teste pulado e no `stderr`.
+- **Pula no teste, é falha no roteiro, e nunca gasta sem confirmação.** Os outros testes reais tratam
+  ausência como falha (o Claude e o Cursor não custam por execução). O Gemini cobra, então a regra aqui é
+  outra, explícita no código: o teste só liga com `FAZAI_REAL_CONFIRMED_BY_SCRIPT=1`, variável que só o
+  roteiro define (exportar `FAZAI_REAL_CONFIRM=1` no shell não gasta cota em todo `test:cli-real`); sem ela
+  nada roda, nem o `gemini --version`. Com ela, a CLI pede o binário e a `GEMINI_API_KEY` (a home isolada do
+  board não enxerga o login da conta), o ACP pede o binário e a API pede a chave. O motivo vai no título do
+  teste pulado e no `stderr`. O roteiro lê o resultado em JSON do vitest e **sai com 1 se algum modo pedido
+  foi pulado** (com `--modo`, pular é falha).
 - **`scripts/gemini-real.mjs`**: explica o que vai acontecer, avisa que gasta cota, e **recusa (código 2)**
   sem `--sim` ou `FAZAI_REAL_CONFIRM=1`, antes de qualquer chamada. Com a confirmação roda o teste
-  (`--modo cli|acp|api` filtra um modo) e, com `--capturar-429 <arquivo>`, captura um 429 real (abaixo).
-  Os processos saem por lista de argumentos, sem shell.
-- **A chave no ACP.** No board a chave do cofre chega ao ACP pelo Conectar (`authenticate`). O teste não
-  passa pelo Conectar (que depende de verificação de capacidades, só provada à mão aqui): põe os recibos como
-  os cenários e entrega a `GEMINI_API_KEY` no ambiente do processo. Isso exercita o transporte, o leitor e a
-  conferência, mas **não** o `authenticate` com a chave pelo protocolo; ver "Fora do alcance".
+  (`--modo cli|acp|api` filtra um modo); `--capturar-429 <arquivo>` (valor que não começa com `-`) captura
+  um 429 real, só se o teste passou, sem sobrescrever arquivo existente sem `--forcar`, com tempo limite e
+  pausa entre pedidos, e falha se o corpo ou o erro contiver a chave; `--so-capturar` pula o teste dos três
+  modos. Os processos saem por lista de argumentos, sem shell.
+- **A chave e a home no ACP.** O teste não passa pelo Conectar: põe os recibos como os cenários e dá ao
+  gateway a chave do cofre (`gatewayKey` do `cardWorld`), de modo que o driver ACP autentica por ela
+  (`authenticate`), como o produto. O comando é o que o driver monta, com o ambiente fixado do provider
+  (`geminiPinnedEnv`). Com a chave, a home é uma pasta temporária vazia (`GEMINI_CLI_HOME`). **Sem a chave
+  (login OAuth) vale a home real**: o Gemini usa e pode alterar `~/.gemini` (credenciais renovadas, histórico)
+  e carrega as settings, o GEMINI.md e as extensões da pessoa, que podem gerar desvio na conferência. Nesse
+  caso **não se confere vazamento do token OAuth** (a conferência da chave só vale para a `GEMINI_API_KEY`).
 
 ## Rótulos por modo
 
@@ -105,8 +113,8 @@ Contra o que é **verificado** hoje, e por que não basta: a CLI 0.65.0 e o stre
 
 ## Fora do alcance
 
-- O `authenticate` do ACP com a chave do cofre pelo Conectar não é exercitado pelo teste (ver acima);
-  rode o Conectar à mão no cartão ACP e registre.
+- O Conectar do cartão ACP (verificação de capacidades, ciência, leitura de modelos) não é exercitado pelo
+  teste; o `authenticate` com a chave é (com `GEMINI_API_KEY`). Rode o Conectar à mão e registre.
 - Nenhuma prova de isolamento é refeita com a conta: as sondas da história 8 seguem contra a API local.
 - O consumo de tarefas longas (muitas chamadas de função, `max_turn_requests`) fica para quando houver
   uso real; o card mínimo tem poucos pedidos.

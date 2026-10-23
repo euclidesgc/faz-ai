@@ -179,9 +179,12 @@ What Gemini enforces in this mode:
 
 The real test runs a minimal card through the board's path in the three modes (CLI, ACP and API), with
 the real binary and Google's real API. **It spends your account's quota**, so it stays out of `npm test`
-and only runs with explicit confirmation: `node scripts/gemini-real.mjs --sim` (or `FAZAI_REAL_CONFIRM=1`
-on `npm run test:cli-real -- test/cli-real/gemini.real.ts`). Without confirmation the script refuses and
-the test skips each mode with the reason (a missing `gemini` binary or `GEMINI_API_KEY` skips too). What
+and only runs with explicit confirmation, given only by the script: `node scripts/gemini-real.mjs --sim`
+(or `FAZAI_REAL_CONFIRM=1` when calling the script). Without confirmation the script refuses and the test
+skips each mode with the reason (a missing `gemini` binary or `GEMINI_API_KEY` skips too); in the script, a
+requested but skipped mode is a failure. Mind ACP without `GEMINI_API_KEY` (OAuth login): it uses and may
+change your `~/.gemini` (renewed credentials, history), and your settings, GEMINI.md and extensions may
+cause a deviation in the run check. What
 each mode has verified and not validated, and how to check usage against the AI Studio dashboard, is in
 `docs/decisoes/ferramenta-por-modo-14-teste-real-gemini.md` (Portuguese).
 

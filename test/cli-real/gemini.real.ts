@@ -5,16 +5,24 @@
 // vocabulário do modo, o consumo é registrado e o modo aparece em `ai_runs`.
 //
 // GASTA COTA da conta do Gemini. Por isso cada modo só roda com a confirmação explícita
-// (`FAZAI_REAL_CONFIRM=1`, que o roteiro `scripts/gemini-real.mjs --sim` põe) e, além dela:
+// (`FAZAI_REAL_CONFIRMED_BY_SCRIPT=1`, que SÓ o roteiro `scripts/gemini-real.mjs --sim` põe: uma variável
+// exportada no shell não liga o teste por engano) e, além dela:
 //   - CLI: o binário `gemini` e a `GEMINI_API_KEY` (a home isolada do board não enxerga o login da conta);
-//   - ACP: o binário `gemini`; a chave é opcional (sem ela vale o login da pessoa, que também gasta cota);
+//   - ACP: o binário `gemini`. Com a chave, ela vai pelo `authenticate` do driver e a home é uma pasta temporária
+//     vazia (`GEMINI_CLI_HOME`). SEM a chave vale o login da pessoa na home REAL: o Gemini lê e pode alterar
+//     `~/.gemini` (credenciais renovadas, histórico) e carrega settings, GEMINI.md e extensões dela, o que pode
+//     gerar desvio na conferência. Não se confere vazamento do token OAuth;
 //   - API: a `GEMINI_API_KEY`.
 // Diferente dos outros testes reais (ausência = falha), aqui a ausência PULA com o motivo no título: a chave e a
 // confirmação são decisão da pessoa, e o `npm run test:cli-real` não pode gastar dinheiro sem ela.
 // `FAZAI_REAL_GEMINI_MODEL` troca o modelo (padrão `gemini-2.5-flash`, o mais barato).
 import { spawnSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { GEMINI_API_ENDPOINT } from '../../src/extension/ai/drivers/gemini/api';
+import { GEMINI_HOME_ENV, geminiPinnedEnv } from '../../src/extension/ai/providers/gemini';
 import { spawnAcpProcess, spawnHeadless } from '../../src/extension/spawn';
 import { GEMINI_TOOL_EQUIVALENTS } from '../../src/shared/agentTools';
 import type { InventoryKind } from '../../src/shared/log';
@@ -22,15 +30,20 @@ import type { ModelOption } from '../../src/shared/models';
 import { cardWorld, type CardWorld } from '../scenarios/cardWorld';
 
 const KEY = process.env.GEMINI_API_KEY ?? '';
-const CONFIRMED = process.env.FAZAI_REAL_CONFIRM === '1';
+const CONFIRMED = process.env.FAZAI_REAL_CONFIRMED_BY_SCRIPT === '1';
 const MODEL = process.env.FAZAI_REAL_GEMINI_MODEL || 'gemini-2.5-flash';
 
-const gemini = spawnSync('gemini', ['--version'], { encoding: 'utf8' });
-const BINARY = !gemini.error && gemini.status === 0;
+// só com a confirmação: sem ela nada do Gemini é executado, nem a versão
+const BINARY =
+  CONFIRMED &&
+  (() => {
+    const v = spawnSync('gemini', ['--version'], { encoding: 'utf8' });
+    return !v.error && v.status === 0;
+  })();
 
 /** O motivo de o modo não rodar, ou null quando roda. */
 function why(needs: { binary: boolean; key: boolean }): string | null {
-  if (!CONFIRMED) return 'sem FAZAI_REAL_CONFIRM=1 (gasta cota; use scripts/gemini-real.mjs --sim)';
+  if (!CONFIRMED) return 'sem a confirmação do roteiro (gasta cota; use node scripts/gemini-real.mjs --sim)';
   if (needs.binary && !BINARY) return 'binário gemini ausente do PATH';
   if (needs.key && !KEY) return 'GEMINI_API_KEY ausente do ambiente';
   return null;
@@ -47,15 +60,20 @@ const MODEL_OPTION: ModelOption = {
 };
 
 const TOOLS = ['Read', 'Grep', 'Glob'];
+/** Os kinds do ACP que o leitor grava como nome de ferramenta (o espelho de `ACP_KIND_EQUIVALENTS`, não exportado). */
+const ACP_KINDS = ['think', 'switch_mode', 'other', 'read', 'search', 'edit', 'delete', 'move', 'execute', 'fetch'];
 const INVENTORY_KINDS: InventoryKind[] = ['tool', 'mcp_tool', 'agent', 'skill'];
 /** O que o card pede: mínimo, sem editar nada, para gastar poucos tokens. */
 const DESCRIPTION =
   'Teste real de integração. Leia este card com a ferramenta get_card do board, responda em uma frase com a palavra OK e não altere nenhum arquivo.';
 
 let world: CardWorld | undefined;
+let acpHome: string | undefined;
 afterEach(() => {
   world?.dispose();
   world = undefined;
+  if (acpHome) fs.rmSync(acpHome, { recursive: true, force: true });
+  acpHome = undefined;
 });
 
 /** Escolhe o modelo barato no card (o atalho do mundo põe o Pro) e dá o texto mínimo ao card. */
@@ -97,8 +115,17 @@ async function expectRealRun(w: CardWorld, mode: 'cli' | 'acp' | 'api') {
     expect(item.calls).toBeGreaterThan(0);
     // MCP é `<servidor>/<ferramenta>`; e na CLI as ferramentas nativas são os nomes do Gemini (a tabela da conferência)
     if (item.kind === 'mcp_tool') expect(item.name).toMatch(/^[^/]+\/.+/);
-    if (item.kind === 'tool' && mode === 'cli') expect(Object.keys(GEMINI_TOOL_EQUIVALENTS)).toContain(item.name);
+    // as ferramentas nativas no vocabulário do modo: CLI = nomes do Gemini; ACP = kinds do protocolo; API = nomes do card
+    if (item.kind === 'tool') {
+      const vocabulary = mode === 'cli' ? Object.keys(GEMINI_TOOL_EQUIVALENTS) : mode === 'acp' ? ACP_KINDS : TOOLS;
+      expect(vocabulary, `ferramenta ${item.name} fora do vocabulário de ${mode}`).toContain(item.name);
+    }
   }
+  // o card mínimo manda ler o card pelo board: pelo menos uma chamada MCP a get_card, em qualquer modo
+  expect(
+    end.report.inventory.some((i) => i.kind === 'mcp_tool' && i.name.endsWith('get_card')),
+    JSON.stringify(end.report.inventory),
+  ).toBe(true);
   // o consumo registrado (tokens), sem custo, e a linha em ai_runs com o modo
   expect(['full', 'tokens']).toContain(end.report.measure);
   expect(run).toMatchObject({ tool: 'gemini', mode });
@@ -144,14 +171,26 @@ describe('Gemini real nos três modos (gasta cota; só com confirmação)', () =
   it.skipIf(!!acp)(
     `ACP: gemini --acp pelo transporte do board${acp ? ` (pulado: ${acp})` : ''}`,
     async () => {
+      if (KEY) acpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-gemini-real-acp-'));
+      else
+        console.warn(
+          '[gemini.real] ACP SEM GEMINI_API_KEY: usa o login da home REAL (~/.gemini), que o Gemini pode alterar (credenciais, histórico); settings, GEMINI.md e extensões da pessoa podem gerar desvio na conferência.',
+        );
       world = await cardWorld({
         profile: 'gemini',
         tools: TOOLS,
         permission: 'board',
-        // a chave do cofre só chega ao ACP pelo Conectar; aqui ela vai no ambiente do processo, se houver
+        // o gateway entrega ao driver a chave do cofre, e o driver a usa no authenticate (como o produto); o
+        // comando é o que o driver montou. Como o boardHost, só se acrescenta o formato; o ambiente é o fixado
+        // do provider do Gemini (o .env da pasta não redireciona a API) e, com a chave, a home é uma pasta vazia
+        gatewayKey: true,
         spawnAcp: (command, cwd, out) =>
           spawnAcpProcess(
-            { ...command, format: 'text', ...(KEY ? { apiKeyEnv: 'GEMINI_API_KEY', apiKey: KEY } : {}) },
+            {
+              ...command,
+              format: 'text',
+              env: { ...command.env, ...geminiPinnedEnv(), ...(acpHome ? { [GEMINI_HOME_ENV]: acpHome } : {}) },
+            },
             cwd,
             out,
             process.env.PATH,
