@@ -11,6 +11,7 @@ import {
   ACP_PROJECT_CONFIG,
   commandEnv,
   confinePath,
+  foldName,
   LocalToolError,
   LocalToolStopped,
   realLocalRoots,
@@ -122,6 +123,36 @@ describe('confinamento: todo caminho cai numa pasta do card, pelo caminho real',
     ).toBeUndefined();
   });
 
+  it('um symlink de arquivo para o .git ou para um segredo do host não entra no grep nem no glob', async () => {
+    fs.symlinkSync(path.join(card, '.git', 'config'), path.join(card, 'inocente.txt'));
+    fs.symlinkSync(path.join(home, '.ssh', 'id_rsa'), path.join(card, 'chave.txt'));
+    // a pasta pessoal como diretório adicional: o destino fica nas pastas, mas é segredo
+    const withHome = { ...ctx, roots: realLocalRoots(card, [extra, home]) };
+    const found = await runLocalTool(tool('grep'), { pattern: '.' }, withHome);
+    expect(found.response.output).not.toContain('token');
+    expect(found.response.output).not.toContain('chave privada');
+    const listed = await runLocalTool(tool('glob'), { pattern: '*.txt' }, withHome);
+    expect(listed.response.output).toBe('a.txt');
+    // pedido direto, o mesmo confinamento recusa
+    expect(await error('read_file', { path: 'inocente.txt' }, withHome)).toMatch(/é do git/);
+    expect(await error('read_file', { path: 'chave.txt' }, withHome)).toMatch(/segredo do computador/);
+  });
+
+  it('nomes com ſ (U+017F) e o sinal de Kelvin (U+212A) não contornam os protegidos', async () => {
+    expect(foldName('.vſcode')).toBe('.vscode');
+    expect(foldName('.Kimi-code')).toBe('.kimi-code');
+    // a forma decomposta (NFD) também cai na mesma forma
+    expect(foldName('.vſcode'.normalize('NFD'))).toBe('.vscode');
+    for (const p of ['.vſcode/tasks.json', '.mcp.jſon', '.github/hookſ/x.json', '.Kimi-code/mcp.json', '.Kimi-code/AGENTS.md'])
+      expect(await error('write_file', { path: p, content: '{}' }), p).toMatch(/configuração de ferramenta de IA ou do editor/);
+    expect(fs.existsSync(path.join(card, '.vscode'))).toBe(false);
+    expect(writeProtected(['.ﬁle'])).toBe(false);
+    // o segredo do host pela grafia que o macOS dobra: num volume que diferencia, `.ſsh` não existe
+    const inHome = { ...ctx, roots: realLocalRoots(home) };
+    const folds = fs.existsSync(path.join(home, '.ſsh'));
+    expect(await error('read_file', { path: '.ſsh/id_rsa' }, inHome)).toMatch(folds ? /segredo do computador/ : /Não existe/);
+  });
+
   it('as listas de proibidos não diferenciam maiúsculas onde o sistema não diferencia: .SSH, .AWS, .GIT', async () => {
     expect(within('/h/.ssh', '/h/.SSH/id_rsa', true)).toBe(true);
     expect(within('/h/.ssh', '/h/.SSH/id_rsa', false)).toBe(false);
@@ -146,6 +177,9 @@ describe('confinamento: todo caminho cai numa pasta do card, pelo caminho real',
     expect(windowsPathProblem('.git./config')).toMatch(/ponto ou espaço/);
     expect(windowsPathProblem('.ssh /id_rsa')).toMatch(/ponto ou espaço/);
     expect(windowsPathProblem('\\\\?\\C:\\x')).toMatch(/dispositivo/);
+    for (const reserved of ['nul', 'NUL.txt', 'src/COM1.json', 'Aux', 'lpt9.log', 'con .txt', 'prn.tar.gz'])
+      expect(windowsPathProblem(reserved), reserved).toMatch(/nome reservado/);
+    for (const fine of ['console.txt', 'nullish.ts', 'com10.txt', 'auxiliar/a.ts']) expect(windowsPathProblem(fine), fine).toBeNull();
     expect(windowsPathProblem('C:\\projeto\\src\\a.ts')).toBeNull();
     expect(windowsPathProblem('src/../a.ts')).toBeNull();
     // a recusa entra no confinamento quando o sistema é o Windows (aqui, simulado)
@@ -225,6 +259,18 @@ describe('arquivos: ler, buscar, escrever e editar, com limites', () => {
       'Não é um arquivo nem uma pasta: fila',
     );
     expect(Date.now() - started).toBeLessThan(2000);
+    // gravar por cima da FIFO também é recusado, sem prender a gravação (o fstat confere o que foi aberto)
+    expect(await error('write_file', { path: 'fila', content: 'x' })).toMatch(/Não é um arquivo/);
+  });
+
+  it('a busca de arquivos tem orçamento de entradas e de tempo, e para com aviso', async () => {
+    for (let i = 0; i < 20; i++) fs.writeFileSync(path.join(card, `f${i}.ts`), '');
+    const byEntries = await runLocalTool(tool('glob'), { pattern: '*.ts' }, { ...ctx, limits: { walkEntries: 5 } });
+    expect(byEntries.response.output).toMatch(/\[busca encerrada pelo board: passou de 5 entradas visitadas/);
+    const byTime = await runLocalTool(tool('glob'), { pattern: '*.ts' }, { ...ctx, limits: { walkMs: -1 } });
+    expect(byTime.response.output).toMatch(/\[busca encerrada pelo board: passou de -?0(\.\d+)? s/);
+    const grepByTime = await runLocalTool(tool('grep'), { pattern: 'x' }, { ...ctx, limits: { walkMs: -1 } });
+    expect(grepByTime.response.output).toMatch(/\[busca encerrada pelo board: passou de/);
   });
 
   it('write_file cria as pastas; edit_file exige o trecho único (ou replace_all) e recusa o que não existe', async () => {
@@ -345,6 +391,11 @@ describe('a decisão por nível, no vocabulário do card', () => {
     // o reconhecido de outro grupo não tira nada daqui
     for (const name of ['WebFetch', 'Agent', 'Task', 'web_fetch', 'mcp__docs__search', 'Skill'])
       expect(deniedLocal(name), name).toEqual([]);
+    // o servidor MCP inteiro, servidor com ponto e os nomes do Claude Code fora da tabela de agentes
+    for (const name of ['mcp__github', 'mcp__claude.ai__x', 'mcp__github__*', 'KillShell', 'BashOutput', 'ExitPlanMode', 'AskUserQuestion'])
+      expect(deniedLocal(name), name).toEqual([]);
+    expect(deniedLocal('LS')).toEqual(['Glob']);
+    expect(deniedLocal('NotebookRead')).toEqual(['Read', 'Glob', 'Grep']);
     // (d) o desconhecido: null, e no laço nega todas as locais
     expect(deniedLocal('Bashful')).toBeNull();
     expect(deniedLocal('FerramentaInventada')).toBeNull();

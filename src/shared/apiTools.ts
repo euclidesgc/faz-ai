@@ -3,7 +3,7 @@
 // do card admite. Esta é a parte pura: o nome da função que o modelo vê, o nome no vocabulário do card
 // (Read/Glob/Grep/Write/Edit/Bash, o mesmo do Claude Code, que é o que o card, a admissão e a conferência
 // usam) e a categoria do nível de permissão. Quem executa é `src/extension/ai/apiTools.ts`.
-import { AGENT_TOOLS, type ToolGroup } from './agentTools';
+import { AGENT_TOOLS, AGENT_TOOLS_ALWAYS_REMOVED, type ToolGroup } from './agentTools';
 import type { RunnerPermission } from './runner';
 
 /** As ferramentas de delegação que toda execução do board nega (`Agent`, `Task`…): nomes reconhecidos. */
@@ -93,6 +93,9 @@ const DENY_GROUPS: Record<string, Card[]> = {
   edit: EDIT_GROUP,
   multiedit: EDIT_GROUP,
   notebookedit: EDIT_GROUP,
+  // nomes anteriores do Claude Code: listar a pasta e ler o notebook
+  ls: ['Glob'],
+  notebookread: READ_GROUP,
   bash: RUN_GROUP,
   powershell: RUN_GROUP,
   monitor: RUN_GROUP,
@@ -111,10 +114,22 @@ const DENY_GROUPS: Record<string, Card[]> = {
 };
 
 /** Os nomes que o board reconhece e que não tiram nada das ferramentas locais (rede, delegação, skills…). */
-const KNOWN_ELSEWHERE = new Set([
-  ...Object.values(AGENT_TOOLS).flatMap((groups) => groups.flatMap((g) => g.tools.map((t) => t.name.toLowerCase()))),
-  ...SUBAGENT_NAMES.map((n) => n.toLowerCase()),
-]);
+const KNOWN_ELSEWHERE = new Set(
+  [
+    ...Object.values(AGENT_TOOLS).flatMap((groups) => groups.flatMap((g) => g.tools.map((t) => t.name))),
+    ...SUBAGENT_NAMES,
+    // as que a tabela de agentes deixa de fora de propósito (o Claude Code sempre as tira de um subagente)
+    ...AGENT_TOOLS_ALWAYS_REMOVED,
+    // outros nomes do Claude Code que um card nega sem tirar nada daqui: o acompanhamento e o fim de um
+    // comando em segundo plano (o comando em si é `Bash`), o modo de plano, a pergunta e os comandos
+    // (code.claude.com/docs/en/tools-reference e nomes anteriores)
+    'KillShell',
+    'KillBash',
+    'BashOutput',
+    'SlashCommand',
+    'TodoRead',
+  ].map((n) => n.toLowerCase()),
+);
 
 /**
  * As ferramentas locais que uma entrada de `deniedTools` do card tira. Vale o nome (sem diferenciar
@@ -131,7 +146,8 @@ export function deniedLocal(entry: string): Card[] | null {
     .toLowerCase();
   if (!name) return null;
   if (Object.hasOwn(DENY_GROUPS, name)) return DENY_GROUPS[name]!;
-  if (/^mcp__[a-z0-9_-]+__[a-z0-9_*-]+$/.test(name) || KNOWN_ELSEWHERE.has(name)) return [];
+  // `mcp__servidor` (o servidor inteiro) ou `mcp__servidor__ferramenta`, com ponto no servidor (`claude.ai`)
+  if (/^mcp__[a-z0-9_.-]+(__[a-z0-9_.*-]+)?$/.test(name) || KNOWN_ELSEWHERE.has(name)) return [];
   return null;
 }
 

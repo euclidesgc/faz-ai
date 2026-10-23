@@ -46,6 +46,8 @@ export interface LocalToolLimits {
   writeBytes: number;
   /** quantas entradas a busca de arquivos visita no máximo */
   walkEntries: number;
+  /** quanto tempo a busca de arquivos pode levar percorrendo as pastas */
+  walkMs: number;
   /** quantos caminhos `glob` e quantas linhas `grep` devolvem no máximo */
   matches: number;
   /** quanto a busca com expressão regular pode levar */
@@ -62,6 +64,7 @@ export const LOCAL_TOOL_LIMITS: LocalToolLimits = {
   resultChars: 60_000,
   writeBytes: 5_000_000,
   walkEntries: 50_000,
+  walkMs: 10_000,
   matches: 500,
   grepMs: 20_000,
   commandMs: 120_000,
@@ -112,8 +115,21 @@ const isWindows = process.platform === 'win32';
 const FOLD_CASE = process.platform === 'win32' || process.platform === 'darwin';
 /** O caminho real do sistema (`realpath(3)`), que no macOS e no Windows devolve a grafia do disco. */
 const realpath = (p: string): string => fs.realpathSync.native(p);
+/**
+ * A forma única com que todo nome é comparado com as listas de proibidos. O APFS do macOS (e o NTFS) não
+ * diferencia maiúsculas nem a forma de normalização, e dobra caracteres que o `toLowerCase` não dobra: `ſ`
+ * (U+017F) abre o arquivo com `s`, e o sinal de Kelvin (U+212A) o com `k`, então `.vſcode/tasks.json` gravava
+ * no `.vscode`. A normalização NFKC leva as formas de compatibilidade (ligaduras, Kelvin, `ſ`) à letra comum,
+ * a ida e volta pelas maiúsculas dobra o que sobra, e `ſ` e Kelvin ainda são trocados explicitamente.
+ */
+export function foldName(name: string): string {
+  return name.normalize('NFKC').replace(/ſ/g, 's').replace(/K/g, 'k').toUpperCase().toLowerCase();
+}
 /** Nunca lidos nem escritos, em nenhum nível: credenciais e hooks do git, arquivos do próprio board. */
-const NEVER = (segment: string): boolean => segment === '.git' || segment.startsWith('.faz-ai');
+const NEVER = (segment: string): boolean => {
+  const name = foldName(segment);
+  return name === '.git' || name.startsWith('.faz-ai');
+};
 
 /**
  * O que cada agente ACP do catálogo (`ACP_AGENTS`) lê do projeto como configuração, conferido na documentação
@@ -153,15 +169,15 @@ export const WRITE_PROTECTED: readonly string[] = [
       ...Object.values(TOOL_ADAPTERS).map((a) => a!.root),
       ...ACP_AGENTS.flatMap((a) => (a.projectMcpFile ? [a.projectMcpFile.split('/')[0]!] : [])),
       ...Object.values(ACP_PROJECT_CONFIG).flat(),
-    ].map((p) => p.toLowerCase()),
+    ].map(foldName),
   ),
 ];
 /** Os arquivos protegidos pelo fim do nome (um espaço de trabalho do VS Code roda tarefas e extensões). */
 const WRITE_PROTECTED_SUFFIX = ['.code-workspace'];
 
-/** Se os trechos (em minúsculas) caem numa configuração protegida, em qualquer profundidade. */
+/** Se os trechos (comparados pela forma única, `foldName`) caem numa configuração protegida, em qualquer profundidade. */
 export function writeProtected(segments: readonly string[]): boolean {
-  const lower = segments.map((s) => s.toLowerCase());
+  const lower = segments.map(foldName);
   if (lower.length && WRITE_PROTECTED_SUFFIX.some((suffix) => lower.at(-1)!.endsWith(suffix))) return true;
   return WRITE_PROTECTED.some((entry) => {
     const parts = entry.split('/');
@@ -172,7 +188,8 @@ export function writeProtected(segments: readonly string[]): boolean {
 /**
  * O que o Windows resolve por outro nome e que passaria pelas listas de nomes: o nome curto 8.3 (`GIT~1` é o
  * `.git`), o fluxo alternativo (`a.txt:oculto`, `.git::$INDEX_ALLOCATION`), o trecho terminado em ponto ou
- * espaço (`.git.` abre `.git`) e o caminho de dispositivo (`\\?\`, `\\.\`). Pura, para o teste rodar em
+ * espaço (`.git.` abre `.git`), o nome reservado de dispositivo (`NUL`, `COM1.txt`) e o caminho de
+ * dispositivo (`\\?\`, `\\.\`). Pura, para o teste rodar em
  * qualquer sistema; a recusa só é aplicada no Windows, onde esses nomes valem outra coisa.
  */
 export function windowsPathProblem(asked: string): string | null {
@@ -183,6 +200,9 @@ export function windowsPathProblem(asked: string): string | null {
     if (segment.includes('~')) return 'nome curto do Windows (com ~)';
     if (segment.includes(':')) return 'fluxo alternativo do Windows (com :)';
     if (/[. ]$/.test(segment)) return 'trecho terminado em ponto ou espaço';
+    // `nul.txt`, `COM1.json` abrem o dispositivo, em qualquer pasta: o nome antes do primeiro ponto é o que vale
+    if (/^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])$/i.test(segment.split('.')[0]!.trimEnd()))
+      return 'nome reservado do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9)';
   }
   return null;
 }
@@ -215,7 +235,7 @@ export function realLocalRoots(cwd: string, addDirs: readonly string[] = []): st
  * devolve a grafia do disco), para uma pasta irmã com outra grafia, num volume que diferencia, não entrar.
  */
 export function within(parent: string, child: string, fold = false): boolean {
-  const rel = fold ? path.relative(parent.toLowerCase(), child.toLowerCase()) : path.relative(parent, child);
+  const rel = fold ? path.relative(foldName(parent), foldName(child)) : path.relative(parent, child);
   return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
 }
 
@@ -287,11 +307,7 @@ export function confinePath(
   }
   const root = ctx.roots.find((r) => within(r, real));
   if (!root) throw new LocalToolError(`Fora das pastas do card (o caminho real sai delas): ${asked}`);
-  const segments = path
-    .relative(root, real)
-    .split(path.sep)
-    .filter(Boolean)
-    .map((s) => s.toLowerCase());
+  const segments = path.relative(root, real).split(path.sep).filter(Boolean).map(foldName);
   if (segments.some(NEVER))
     throw new LocalToolError(`O board não deixa ${mode === 'read' ? 'ler' : 'escrever'} ${asked}: é do git ou do próprio board.`);
   if (mode === 'write' && writeProtected(segments))
@@ -358,18 +374,21 @@ function globOf(pattern: string): (rel: string) => boolean {
 /**
  * Percorre uma pasta confinada sem seguir symlink de pasta (um symlink para fora, ou um laço, não é
  * visitado), pulando o `.git`, os arquivos do board e o `node_modules` (a menos que o padrão o peça). Um
- * arquivo por symlink só entra se o real dele também ficar nas pastas da execução.
+ * arquivo por symlink passa pelo mesmo confinamento de um caminho pedido (`confinePath`): o destino real
+ * precisa ficar nas pastas e não pode ser do `.git`, do board nem um segredo do host (`inocente.txt ->
+ * .git/config` não entra). O percurso tem orçamento de entradas e de tempo; ao estourar, para com aviso.
  */
 async function walk(
   start: Confined,
   ctx: LocalToolContext,
   keep: (rel: string) => boolean,
   opts: { includeSkipped: boolean; max: number },
-): Promise<{ files: Confined[]; truncated: boolean }> {
+): Promise<{ files: Confined[]; truncated: boolean; overBudget?: string }> {
   const limits = limitsOf(ctx);
   const files: Confined[] = [];
   let visited = 0;
   let truncated = false;
+  const deadline = Date.now() + limits.walkMs;
   const queue: string[] = [start.real];
   const secrets = hostSecrets(ctx.homeDir ?? os.homedir());
   const base = ctx.roots[0]!;
@@ -386,8 +405,10 @@ async function walk(
     for (const entry of entries) {
       // o Parar vale entre um arquivo e outro, não só entre as pastas
       if (ctx.signal.aborted) throw new LocalToolStopped();
-      if (++visited > limits.walkEntries) return { files, truncated: true };
-      const name = entry.name.toLowerCase();
+      if (++visited > limits.walkEntries)
+        return { files, truncated: true, overBudget: `passou de ${limits.walkEntries} entradas visitadas` };
+      if (Date.now() > deadline) return { files, truncated: true, overBudget: `passou de ${limits.walkMs / 1000} s` };
+      const name = foldName(entry.name);
       if (NEVER(name) || (!opts.includeSkipped && SKIP_WALK.has(name))) continue;
       const full = path.join(dir, entry.name);
       if (isHostSecret(secrets, full)) continue;
@@ -396,8 +417,8 @@ async function walk(
         let real = full;
         if (entry.isSymbolicLink()) {
           try {
-            real = realpath(full);
-            if (!fs.statSync(real).isFile() || !ctx.roots.some((r) => within(r, real))) continue;
+            real = confinePath(ctx, full, 'read').real;
+            if (!fs.statSync(real).isFile()) continue;
           } catch {
             continue;
           }
@@ -422,13 +443,18 @@ async function glob(args: Json, ctx: LocalToolContext): Promise<LocalToolResult>
   const start = confinePath(ctx, asText(args.path) ?? '.', 'read');
   if (!fs.statSync(start.real).isDirectory()) throw new LocalToolError(`Não é uma pasta: ${start.shown}`);
   const matches = globOf(pattern);
-  const { files, truncated } = await walk(start, ctx, matches, {
+  const { files, truncated, overBudget } = await walk(start, ctx, matches, {
     includeSkipped: /node_modules/i.test(pattern),
     max: limits.matches,
   });
   const list = files.map((f) => f.shown).sort();
   const output = list.length ? list.join('\n') : 'Nenhum arquivo encontrado.';
-  return { response: { output: capped(output, limits.resultChars) + (truncated ? '\n[lista cortada pelo board: refine o padrão]' : '') } };
+  const notice = overBudget
+    ? `\n[busca encerrada pelo board: ${overBudget}; restrinja a pasta ou o padrão]`
+    : truncated
+      ? '\n[lista cortada pelo board: refine o padrão]'
+      : '';
+  return { response: { output: capped(output, limits.resultChars) + notice } };
 }
 
 /**
@@ -518,7 +544,12 @@ async function grep(args: Json, ctx: LocalToolContext): Promise<LocalToolResult>
     worker.once('error', (e) => done(() => reject(new LocalToolError(`A busca falhou: ${e.message}`))));
   });
   const output = found.out.length ? found.out.join('\n') : 'Nenhuma linha encontrada.';
-  const cut = found.truncated || listed.truncated ? '\n[resultado cortado pelo board: refine a busca]' : '';
+  const over = 'overBudget' in listed ? listed.overBudget : undefined;
+  const cut = over
+    ? `\n[busca encerrada pelo board: ${over}; restrinja a pasta]`
+    : found.truncated || listed.truncated
+      ? '\n[resultado cortado pelo board: refine a busca]'
+      : '';
   return { response: { output: capped(output, limits.resultChars) + cut } };
 }
 
@@ -530,9 +561,19 @@ function writeConfined(file: Confined, content: string, limits: LocalToolLimits)
   fs.mkdirSync(dir, { recursive: true });
   // a pasta criada agora continua dentro: entre a conferência e a criação ninguém trocou um trecho por symlink
   if (path.relative(realpath(dir), dir) !== '') throw new LocalToolError('A pasta do arquivo mudou durante a gravação.');
-  const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | (fs.constants.O_NOFOLLOW ?? 0);
-  const fd = fs.openSync(file.real, flags, 0o666);
+  // sem `O_TRUNC` na abertura e com `O_NONBLOCK`: uma FIFO ou um dispositivo no lugar do arquivo não prende a
+  // gravação nem é truncado; o `fstat` no descritor aberto confirma o arquivo regular, e só então ele é
+  // esvaziado e escrito (a conferência é do que foi aberto, não do nome, que pode ter mudado no meio)
+  const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0);
+  let fd: number;
   try {
+    fd = fs.openSync(file.real, flags, 0o666);
+  } catch (e) {
+    throw new LocalToolError(`Não foi possível abrir ${file.shown} para gravar (${(e as NodeJS.ErrnoException).code ?? 'erro'}).`);
+  }
+  try {
+    if (!fs.fstatSync(fd).isFile()) throw new LocalToolError(`Não é um arquivo regular: ${file.shown}`);
+    fs.ftruncateSync(fd, 0);
     fs.writeSync(fd, content);
   } finally {
     fs.closeSync(fd);

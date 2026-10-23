@@ -142,6 +142,45 @@ casos contra ele) e passa agora:
 6. **`grep` num caminho único (baixa).** O que não é arquivo nem pasta (FIFO, dispositivo, socket) é recusado
    antes de ir à thread da busca, que também pula o que não é arquivo.
 
+## Re-revisão de segurança do ddca1e28
+
+Reproduzidos no `ddca1e28` e corrigidos, cada um com teste em `test/apiTools.test.ts`:
+
+1. **Symlink de arquivo no `grep` e no `glob` (bloqueante).** O percurso só conferia que o destino de um
+   symlink de arquivo era arquivo dentro das pastas: `inocente.txt -> .git/config` devolvia o token, e
+   `chave.txt -> ~/.ssh/id_rsa` com a pasta pessoal nos diretórios adicionais devolvia a chave. Agora o
+   destino passa pelo mesmo `confinePath` de um caminho pedido (`.git`, `.faz-ai*`, segredos do host), e o
+   symlink nem é listado.
+2. **`ſ` e o sinal de Kelvin no macOS (bloqueante).** O APFS dobra `ſ` (U+017F) em `s` e o Kelvin (U+212A) em
+   `k`, o `toLowerCase` não: `.vſcode/tasks.json` gravava no `.vscode`. Toda comparação com as listas usa uma
+   forma única, `foldName` (NFKC, `ſ`→`s` e Kelvin→`k` explícitos, ida e volta pelas maiúsculas), em `NEVER`,
+   `WRITE_PROTECTED`, nos nomes do percurso e nos caminhos dos segredos do host.
+3. **Nomes negados reconhecidos (menor).** `mcp__servidor` (o servidor inteiro), servidor com ponto
+   (`mcp__claude.ai__x`) e os nomes do Claude Code fora da tabela de agentes (`KillShell`, `BashOutput`,
+   `ExitPlanMode`, `AskUserQuestion`…) eram desconhecidos e travavam o card. `LS` e `NotebookRead` passam a
+   negar as leituras correspondentes.
+4. **Orçamento do percurso (menor).** Além das 50 mil entradas, 10 s; ao estourar, o `glob` e o `grep` param
+   com o aviso "busca encerrada pelo board".
+5. **Gravação (menor).** Abre com `O_NONBLOCK` e sem `O_TRUNC`, confere com `fstat` no descritor que é um
+   arquivo regular e só então esvazia e escreve: uma FIFO ou um dispositivo trocado no lugar do nome não
+   prende nem é truncado. (A conferência por nome que já existia recusa a FIFO; o `fstat` fecha a janela
+   entre a conferência e a abertura, que o teste não tem como provocar.)
+6. **Nomes reservados do Windows (menor).** `CON`, `PRN`, `AUX`, `NUL`, `COM1-9` e `LPT1-9`, com ou sem
+   extensão, em qualquer trecho.
+
+## Risco residual (documentado, não bloqueado)
+
+- **Configuração em JavaScript executada pelas extensões do editor.** `eslint.config.js`,
+  `prettier.config.js`, `vite.config.ts`, `jest.config.js` e afins rodam quando a extensão correspondente
+  do editor os carrega. Gravá-los em `edits` faz código rodar sem `full`. Não são bloqueados: são arquivos
+  de projeto que um card de implementação edita de verdade, e a lista não teria fim (todo `*.config.*`).
+- **Hooks de git por ferramenta** (`.husky/`, `lefthook.yml`, `.pre-commit-config.yaml`): rodam no próximo
+  commit da pessoa. Mesmo motivo; o `.git/hooks` em si continua protegido.
+- **Arquivos de instrução como persistência de injeção.** `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursor/rules`
+  (este protegido) e afins são lidos pelas ferramentas nas próximas sessões; um modelo enganado por um
+  conteúdo pode gravar ali uma instrução que outra ferramenta seguirá depois. Não executam nada por si, e
+  editá-los é trabalho normal de um card; ficam a cargo da revisão do PR.
+
 ## Onde a especificação não cabia no código
 
 - **"`deniedTools` do card respeitado".** A execução admitida perdia as negadas do card em todo transporte
