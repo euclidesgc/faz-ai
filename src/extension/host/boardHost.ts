@@ -54,7 +54,9 @@ import { editorMcpFiles, pinEditorCommands } from '../mcp/pinCommands';
 import { harnessIssues } from '../../shared/harnessStatus';
 import { findFlowSkillCopies } from '../flowSkillCopies';
 import type { WebviewToHost } from '../../shared/messages';
-import { resolveCommand, resolveProfileCommand } from '../cliResolve';
+import { commandNotFound, profileCommand, resolveCommand, resolveProfileCommand } from '../cliResolve';
+import { acpAgent } from '../ai/acp/agents';
+import { acpSessionModels } from '../ai/acp/models';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
 import { cleanStaleTemp } from '../aiOutput/measured';
 import { ExecutionAdmission } from '../ai/admission';
@@ -261,6 +263,31 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       runner: () => router.snapshot().board.runner,
     }),
   );
+  // os modelos de um agente ACP vêm da sessão que ele abre (`session/new`), lidos numa pasta descartável
+  // para não tocar o projeto; a lista fica guardada para o "Detectar modelos" juntar ao catálogo
+  router.onAcpModels(async (profile) => {
+    const agent = acpAgent(String(profile.config.acpAgent));
+    if (!agent) throw new Error(`Agente ACP desconhecido: ${String(profile.config.acpAgent)}.`);
+    const executable = resolveProfileCommand(profile, pathEnv, homeDir);
+    if (!executable) throw new Error(commandNotFound(profileCommand(profile)));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-acp-models-'));
+    try {
+      const found = await acpSessionModels(agent, profile.id, dir, {
+        executable,
+        spawn: (command, cwd, out) => spawnAcpProcess({ ...command, env: profile.config.env, format: 'text' }, cwd, out, pathEnv),
+      });
+      if (!found.options.length)
+        throw new Error(
+          `${agent.label} não anunciou modelos na sessão; cadastre-os à mão em Modelos de IA ou use "Outro modelo…" no card.`,
+        );
+      rememberModels(profile.id, found.options);
+      o.log(
+        `${agent.label}: ${found.options.length} modelo(s) lidos da sessão (${found.source === 'models' ? 'forma anterior do protocolo' : 'opções da sessão'}).`,
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
   const runner = new AiRunner(router, {
     gateway,
     cwd: o.folderPath,

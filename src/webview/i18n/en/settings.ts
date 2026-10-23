@@ -1,6 +1,8 @@
 export const settings: Record<string, string> = {
   Perfil: 'Profile',
   'cadastrada à mão': 'entered manually',
+  'lida do agente ao abrir uma sessão ACP (session/new), sem gastar a sua conta; o agente precisa estar instalado e com login':
+    'read from the agent when opening an ACP session (session/new), without spending your account; the agent must be installed and signed in',
   'Modelos do perfil selecionado, com os níveis de esforço de cada um. Escolher um catálogo não muda o perfil executor do board.':
     'Models for the selected profile, with their effort levels. Choosing a catalog does not change the board executor profile.',
   'Nenhum modelo. Use "Novo modelo" para cadastrar à mão.': 'No models. Use "New model" to add one manually.',

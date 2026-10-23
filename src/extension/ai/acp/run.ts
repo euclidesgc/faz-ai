@@ -24,11 +24,21 @@ import { ensureProjectServer } from '../../mcp/clientConfig';
 import type { HeadlessInput } from '../provider';
 import { AUTH_REQUIRED, RpcError, rpcConnection } from './connection';
 import { version as EXTENSION_VERSION } from '../../../../package.json';
-import { acpCommand, acpMcpToolOf, type AcpAgent, type AcpMcpServer, type AcpProcess, type AcpSpawnFn, type AcpToolCall } from './provider';
+import {
+  ACP_PROTOCOL_VERSION,
+  acpCommand,
+  acpMcpToolOf,
+  type AcpAgent,
+  type AcpMcpServer,
+  type AcpProcess,
+  type AcpSpawnFn,
+  type AcpToolCall,
+} from './provider';
 import { acpReader, toolCallOf } from './reader';
+import { ACP_CLIENT_CAPABILITIES, modelConfigOption } from './models';
 
 /** A versão do protocolo que este cliente fala. */
-export const ACP_PROTOCOL_VERSION = 1;
+export { ACP_PROTOCOL_VERSION };
 
 /** Quanto o board espera o agente sair sozinho (fim do `stdin` ou `session/cancel`) antes de matar. */
 const GRACE_MS = 5_000;
@@ -222,9 +232,7 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
   const run = async (): Promise<void> => {
     const init = await rpc.request('initialize', {
       protocolVersion: ACP_PROTOCOL_VERSION,
-      // o board não empresta o editor ao agente: sem `fs/*` nem `terminal/*`, ele lê e roda sozinho, e
-      // cada escrita ou comando passa pelo pedido de permissão
-      clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+      clientCapabilities: ACP_CLIENT_CAPABILITIES,
       // `version` é obrigatório no esquema do ACP: Gemini CLI e OpenCode recusam o initialize sem ele
       clientInfo: { name: 'faz-ai', title: 'Faz AI Kanban', version: EXTENSION_VERSION },
     });
@@ -244,6 +252,20 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
       await rpc
         .request('session/set_mode', { sessionId, modeId: mode })
         .catch((e: Error) => deps.log(`Modo ${mode} recusado: ${e.message}`));
+
+    // o modelo do card: pelo seletor da sessão quando o agente o expõe (a forma atual do protocolo); a
+    // linha de comando (`modelArgs`) já foi, onde o agente aceita. Um seletor sem o modelo pedido não
+    // derruba a execução: o canal diz com qual ela segue
+    const wanted = input.exec?.model?.name;
+    const selector = wanted ? modelConfigOption(session) : null;
+    if (wanted && selector && selector.current !== wanted) {
+      if (selector.values.some((v) => v.value === wanted))
+        await rpc
+          .request('session/set_config_option', { sessionId, configId: selector.configId, value: wanted })
+          .then(() => deps.log(`Modelo ${wanted} escolhido na sessão.`))
+          .catch((e: Error) => deps.log(`Modelo ${wanted} recusado pelo ${agent.label}: ${e.message}`));
+      else deps.log(`O ${agent.label} não oferece o modelo ${wanted} nesta sessão; segue com ${selector.current ?? 'o padrão dele'}.`);
+    }
 
     if (killed) {
       result = 143;

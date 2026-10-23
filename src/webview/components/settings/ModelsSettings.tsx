@@ -1,4 +1,4 @@
-import { activeProfile, catalogTool, type AiBase } from '../../../shared/aiProfiles';
+import { activeProfile, catalogTool, isAcpProfile, type AiBase } from '../../../shared/aiProfiles';
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import type { AiTool } from '../../../shared/harness';
 import { modelId, type ModelOption } from '../../../shared/models';
@@ -127,8 +127,15 @@ export function ModelsSettings() {
     setCatalog(sent.current().map((o) => (o.id === id ? { ...o, ...patch } : o)));
 
   // o projeto trabalha com uma ferramenta por vez: só os modelos dela aparecem
+  // o agente ACP anuncia os modelos ao abrir a sessão: o "Detectar" vale para ele como para as CLIs prontas
+  const acp = isAcpProfile(profile);
+  const detectable = profile.kind === 'builtin' || acp;
   const tools = [{ id: toolId, label: profile.name, kind: profile.kind, base: profile.base }];
-  const source = profile.kind === 'custom' ? t('cadastrada à mão') : t(SOURCES[profile.base as AiBase]);
+  const source = acp
+    ? t('lida do agente ao abrir uma sessão ACP (session/new), sem gastar a sua conta; o agente precisa estar instalado e com login')
+    : profile.kind === 'custom'
+      ? t('cadastrada à mão')
+      : t(SOURCES[profile.base as AiBase]);
 
   return (
     <div>
@@ -137,7 +144,7 @@ export function ModelsSettings() {
         actions={
           <>
             {tools
-              .filter((tl) => tl.kind === 'builtin')
+              .filter(() => detectable)
               .map((tl) => (
                 <ActionButton
                   key={tl.id}
@@ -298,7 +305,7 @@ export function ModelsSettings() {
                 {mine.length === 0 && (
                   <tr>
                     <td colSpan={5} className="muted">
-                      {profile.kind === 'builtin'
+                      {detectable
                         ? t('Nenhum modelo. Use "Detectar modelos" ou "Novo modelo".')
                         : t('Nenhum modelo. Use "Novo modelo" para cadastrar à mão.')}
                     </td>

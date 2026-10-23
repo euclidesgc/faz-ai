@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { activeProfile, catalogTool, type AiProfile } from '../../../shared/aiProfiles';
+import { activeProfile, catalogTool, isAcpProfile, type AiProfile } from '../../../shared/aiProfiles';
 import { TYPE_CONDITION, modelId, resolveModelInput, type ModelRule } from '../../../shared/models';
 import { newId } from '../../db/ids';
 import type { MessageRouter } from '../../panel/messageRouter';
@@ -42,11 +42,12 @@ export function registerModelTools(tool: DefineTool): void {
 
   tool(
     'detect_models',
-    'Relê os modelos do perfil de CLI e os junta ao catálogo. Uma cópia usa o catálogo do pronto de origem; um perfil personalizado tem catálogo cadastrado à mão.',
+    'Relê os modelos do perfil de CLI e os junta ao catálogo. Uma cópia usa o catálogo do pronto de origem; um perfil ACP abre uma sessão com o agente e lê os modelos que ele anuncia; um perfil personalizado de CLI própria tem catálogo cadastrado à mão.',
     { tool: toolArg.optional().describe('Por padrão, a ferramenta em uso no projeto') },
-    (a, router) => {
+    async (a, router) => {
       const profile = profileOf(router, a.tool);
-      if (profile.kind === 'custom') throw new Error('Perfil personalizado: catálogo cadastrado à mão.');
+      if (profile.kind === 'custom' && !isAcpProfile(profile)) throw new Error('Perfil personalizado: catálogo cadastrado à mão.');
+      await router.readAcpModels(profile.id);
       router.handle({ type: 'settings.models.detect', tool: catalogTool(profile) });
       return models(router);
     },

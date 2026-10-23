@@ -130,6 +130,8 @@ class FakeAgent {
       }
       case 'session/set_mode':
         return this.send({ id: msg.id, result: {} });
+      case 'session/set_config_option':
+        return this.send({ id: msg.id, result: { configOptions: [] } });
       case 'session/prompt': {
         this.promptId = msg.id;
         const result = await this.script.onPrompt?.(this, msg.params);
@@ -480,6 +482,62 @@ describe('catálogo do conector ACP', () => {
     const agent = new FakeAgent({ onPrompt: () => ({ stopReason: 'end_turn' }) });
     run(agent, { exec }, gemini);
     expect(agent.command!.args).toEqual(['--acp', '--skip-trust', '--model', 'gemini-3-pro']);
+  });
+
+  const modelSelector = (current: string) => ({
+    sessionId: 'sess-1',
+    configOptions: [
+      { id: 'mode', name: 'Mode', category: 'mode', currentValue: 'default', options: [{ value: 'default', name: 'Default' }] },
+      {
+        id: 'model',
+        name: 'Model',
+        category: 'model',
+        currentValue: current,
+        options: [
+          { value: 'gpt-5', name: 'GPT-5' },
+          { value: 'gpt-5-mini', name: 'GPT-5 mini' },
+        ],
+      },
+    ],
+  });
+
+  it('o modelo do card vai pelo seletor da sessão (session/set_config_option) quando o agente o expõe', async () => {
+    const exec = { model: { name: 'gpt-5-mini', effort: null } } as never;
+    const agent = new FakeAgent({ sessionNew: () => modelSelector('gpt-5'), onPrompt: () => ({ stopReason: 'end_turn' }) });
+    const { ended, lines } = run(agent, { exec }, acpAgent('opencode')!);
+    await ended;
+    expect(agent.methods()).toEqual(['initialize', 'session/new', 'session/set_config_option', 'session/prompt']);
+    expect(agent.received.find((m) => m.method === 'session/set_config_option')!.params).toEqual({
+      sessionId: 'sess-1',
+      configId: 'model',
+      value: 'gpt-5-mini',
+    });
+    // o board anuncia que entende as opções de configuração: sem isso o agente não manda o seletor
+    expect(agent.received.find((m) => m.method === 'initialize')!.params.clientCapabilities.session).toEqual({ configOptions: {} });
+    expect(lines).toContain('Modelo gpt-5-mini escolhido na sessão.');
+  });
+
+  it('modelo já atual na sessão, ou que o seletor não oferece: sem set_config_option, e o canal diz com qual segue', async () => {
+    const same = new FakeAgent({ sessionNew: () => modelSelector('gpt-5'), onPrompt: () => ({ stopReason: 'end_turn' }) });
+    await run(same, { exec: { model: { name: 'gpt-5', effort: null } } as never }, acpAgent('opencode')!).ended;
+    expect(same.methods()).toEqual(['initialize', 'session/new', 'session/prompt']);
+
+    const other = new FakeAgent({ sessionNew: () => modelSelector('gpt-5'), onPrompt: () => ({ stopReason: 'end_turn' }) });
+    const { ended, lines } = run(other, { exec: { model: { name: 'claude-x', effort: null } } as never }, acpAgent('opencode')!);
+    await ended;
+    expect(other.methods()).toEqual(['initialize', 'session/new', 'session/prompt']);
+    expect(lines).toContain('O OpenCode não oferece o modelo claude-x nesta sessão; segue com gpt-5.');
+  });
+
+  it('agente na forma anterior do protocolo (models, sem configOptions): a escolha fica só na linha de comando', async () => {
+    const exec = { model: { name: 'gemini-2.5-pro', effort: null } } as never;
+    const agent = new FakeAgent({
+      sessionNew: () => ({ sessionId: 'sess-1', models: { currentModelId: 'auto', availableModels: [{ modelId: 'auto', name: 'Auto' }] } }),
+      onPrompt: () => ({ stopReason: 'end_turn' }),
+    });
+    await run(agent, { exec }, gemini).ended;
+    expect(agent.methods()).toEqual(['initialize', 'session/new', 'session/prompt']);
+    expect(agent.command!.args).toContain('--model');
   });
 
   it('sem padrão de título, a ferramenta MCP é reconhecida pelo nome do servidor que o board passou', async () => {

@@ -40,11 +40,18 @@ export class AiProfileRepo {
       if (!result.some((row) => row.id === p.id)) result.push({ ...structuredClone(p), capabilities: unknownProfileCapabilities() });
     return result.sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
   }
-  /** O isolamento declarado não é segredo: é a única parte da configuração que volta para a leitura pública. */
-  private isolationOf(row: Row): AiProfileConfig {
+  /**
+   * O que volta da configuração para a leitura pública: o isolamento declarado e o agente ACP (o id do catálogo),
+   * que não são segredo. É por `acpAgent` que o board, a interface e o MCP reconhecem um perfil ACP; o resto
+   * (comando, argumentos, ambiente) fica no cofre.
+   */
+  private publicConfigOf(row: Row): AiProfileConfig {
     try {
       const saved = credentialsFor(this.db).get(ownerOf(str(row.board_id), str(row.id)), str(row.secret_ref));
-      return saved?.isolation === undefined ? {} : { isolation: saved.isolation as AiProfileConfig['isolation'] };
+      const config: AiProfileConfig = {};
+      if (saved?.isolation !== undefined) config.isolation = saved.isolation as AiProfileConfig['isolation'];
+      if (typeof saved?.acpAgent === 'string') config.acpAgent = saved.acpAgent;
+      return config;
     } catch {
       return {};
     }
@@ -59,7 +66,7 @@ export class AiProfileRepo {
             name: str(row.name),
             kind: str(row.kind) as AiProfile['kind'],
             base: str(row.base) as AiProfile['base'],
-            config: this.isolationOf(row),
+            config: this.publicConfigOf(row),
           }),
       enabled: bool(row.enabled),
       position: num(row.position),

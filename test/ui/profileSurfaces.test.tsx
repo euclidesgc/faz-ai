@@ -78,6 +78,22 @@ describe('Superfícies de perfis de CLI', () => {
     expect(value).toBe('local-cli:modelo-avulso');
   });
 
+  it('num perfil ACP, Modelos de IA oferece Detectar modelos: a lista vem da sessão do agente', async () => {
+    const acp: AiProfile = { ...custom, id: 'gemini-acp', name: 'Gemini ACP', config: { acpAgent: 'gemini' }, position: 4 };
+    const state = useBoardStore.getState().state!;
+    useBoardStore.setState({
+      state: { ...state, board: { ...state.board, aiTool: acp.id, aiProfiles: [...state.board.aiProfiles, acp] } },
+    });
+    render(
+      <Theme>
+        <ModelsSettings />
+      </Theme>,
+    );
+    expect(screen.getByText('Nenhum modelo. Use "Detectar modelos" ou "Novo modelo".')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Detectar modelos' }));
+    expect(lastSent('settings.models.detect')).toMatchObject({ tool: 'gemini-acp' });
+  });
+
   it('o perfil personalizado aparece no campo Modelo mesmo sem modelo cadastrado e sem ser o padrão', async () => {
     const state = useBoardStore.getState().state!;
     // o padrão volta a ser o Claude: o personalizado tem de aparecer por estar ligado, não por ser o padrão

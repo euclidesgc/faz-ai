@@ -49,7 +49,7 @@ Entregar a forma de uso em histórias derivadas, empilhadas na `develop`, nesta 
 | 2 | Regime compatível escolhido pela pessoa (`#1091`, entregue) | 1 | o board roda no regime compatível, com a revisão do que a CLI carrega |
 | 3 | Agente ACP como perfil pronto do catálogo | 2 | o agente aparece em Ferramentas de IA sem perfil personalizado |
 | 4 | Conectar ferramenta: login pela tela | 3 | botão Conectar, estado "conectada", login pelo agente |
-| 5 | Modelos descobertos na conexão | 4 | lista de modelos por ferramenta, em todo campo de modelo e nas políticas |
+| 5 | Modelos descobertos na conexão (`#1094`, entregue pelo Detectar modelos) | 4 | lista de modelos por ferramenta, em todo campo de modelo e nas políticas |
 | 6 | Limite de uso por agente | 3 | a pausa e o fallback das políticas valem para os agentes ACP |
 | 7 | Teste real do transporte (reabre a `#988`) | 3 | cada agente validado com a CLI, fixture gravada |
 | 8 | Catálogo lido do registro do ACP | 3 | agente novo sem versão nova da extensão (opcional) |
@@ -121,11 +121,18 @@ recusado, e os perfis prontos da 3 nasceriam sem poder rodar.
 
 ### 5. Modelos descobertos na conexão
 
-- Ao conectar (e em **Detectar modelos**), o host abre uma sessão, lê `models.availableModels` e
-  grava no `modelCatalog` com `tool` igual ao id do agente; `currentModelId` vira o padrão. Agente que
-  não devolve `models` fica com a lista embutida do catálogo e um aviso.
-- Na execução, o modelo escolhido vai por `session/set_config_option` (ou `modelArgs` na linha de
-  comando, onde o agente aceita: Gemini, Copilot, Qwen). Esforço só onde o agente expõe a opção.
+> Entregue antes da 3 e da 4 (`#1094`), pela parte que não depende delas: **Detectar modelos** no
+> perfil ACP personalizado. Quando a 4 chegar, Conectar chama a mesma leitura. Registro em
+> [`1094-modelos-descobertos-acp.md`](1094-modelos-descobertos-acp.md).
+
+- Ao conectar (e em **Detectar modelos**), o host abre uma sessão e lê os modelos que o agente
+  anuncia: o seletor de modelo em `configOptions` (categoria `model`, o esquema atual do ACP) ou
+  `models.availableModels` (a forma anterior, que o Gemini CLI 0.65.0 ainda usa); grava no
+  `modelCatalog` com `tool` igual ao id do perfil, com o modelo atual do agente em primeiro. Agente
+  que não anuncia modelos deixa o catálogo como está e avisa (não há lista embutida por agente).
+- Na execução, o modelo escolhido vai por `session/set_config_option` quando o agente expõe o
+  seletor, e por `modelArgs` na linha de comando onde o agente aceita (Gemini, Copilot, Qwen).
+  Esforço só onde o agente expõe a opção (nenhum, por ora).
 - Todo campo de modelo (card, regras de modelo, agentes, políticas) lista os modelos agrupados por
   ferramenta, com os da ferramenta padrão primeiro. A troca de ferramenta padrão não apaga as
   escolhas feitas para as outras.

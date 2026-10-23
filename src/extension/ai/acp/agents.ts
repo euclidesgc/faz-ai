@@ -28,6 +28,8 @@ export const ACP_AGENTS: readonly AcpAgent[] = [
     // `usage` e `usage_update` (só contexto, sem custo) desde o PR #29549, de 2026-09-29; antes, só `_meta.quota`
     usage: { tokens: 'turn', cost: false },
     modelArgs: modelFlag,
+    // os modelos vêm no `session/new` ainda na forma anterior do protocolo (`models.availableModels`,
+    // conferido na 0.65.0), sem `configOptions`: a escolha do card vai só pela linha de comando
     fullMode: 'yolo',
     // o nome de exibição que o Gemini CLI dá às ferramentas MCP: `ferramenta (servidor MCP Server)`
     mcpTitle: /^(?<tool>.+?) \((?<server>.+?) MCP Server\)/,
