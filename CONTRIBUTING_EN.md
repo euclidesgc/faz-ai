@@ -9,11 +9,15 @@ npm install
 npm run build
 npm test
 npm run typecheck
+npm run validate
 ```
 
 `npm run build` generates `dist/`. `npm test` also runs the linter and checks formatting;
 `npm run format` formats everything. To make `git blame` skip the formatting-only commit:
 `git config blame.ignoreRevsFile .git-blame-ignore-revs`. `npm run typecheck` checks the types.
+`npm run validate` is the check before finishing a story or opening the PR: typecheck, eslint and
+prettier on the files changed against `origin/develop`, `vitest related` and the end-to-end card
+scenarios in `test/scenarios/`.
 
 Press `F5` to open the Extension Development Host. The code is in `src/extension` (host and MCP
 server), `src/webview` (React interface), `src/shared` (model, protocol and the board rules used by
