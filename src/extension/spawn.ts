@@ -10,6 +10,20 @@ import { randomUUID } from 'node:crypto';
 import { processBirth, processGroupState, SpawnNotStartedError, type SpawnControl, type ProcessIdentity } from './processIdentity';
 import { SPAWN_GATE } from './spawnGate';
 
+/**
+ * As variáveis da sessão do Claude Code que abriu o editor: a execução do board é uma sessão própria e
+ * não as herda. Mudam a cada sessão, então também ficam fora do vínculo de isolamento (`admission.ts`).
+ */
+export const INHERITED_SESSION_ENV: readonly string[] = [
+  'CLAUDECODE',
+  'CLAUDE_CODE_ENTRYPOINT',
+  'CLAUDE_CODE_SESSION_ID',
+  'CLAUDE_CODE_CHILD_SESSION',
+  'CLAUDE_CODE_HOST_SESSION_ID',
+  'CLAUDE_CODE_MESSAGING_SOCKET',
+  'CLAUDE_CODE_MESSAGING_TOKEN',
+];
+
 let shellPath: Promise<string | undefined> | undefined;
 
 /**
@@ -89,16 +103,7 @@ export function spawnHeadless(
   if (!executable) throw new SpawnNotStartedError(commandNotFound(command.command));
   // um editor aberto de dentro de uma sessão do Claude Code herda as variáveis dela; a execução do board é uma sessão própria
   const env: NodeJS.ProcessEnv = { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}), ...command.env };
-  for (const name of [
-    'CLAUDECODE',
-    'CLAUDE_CODE_ENTRYPOINT',
-    'CLAUDE_CODE_SESSION_ID',
-    'CLAUDE_CODE_CHILD_SESSION',
-    'CLAUDE_CODE_HOST_SESSION_ID',
-    'CLAUDE_CODE_MESSAGING_SOCKET',
-    'CLAUDE_CODE_MESSAGING_TOKEN',
-  ])
-    delete env[name];
+  for (const name of INHERITED_SESSION_ENV) delete env[name];
   // no Windows as CLIs instaladas pelo npm são .cmd e só rodam pelo shell, com os argumentos escapados
   if (command.noShell && process.platform === 'win32' && /\.(cmd|bat)$/i.test(executable))
     throw new SpawnNotStartedError('O perfil precisa de executável direto, sem shell.');

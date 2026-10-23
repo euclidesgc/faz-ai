@@ -17,6 +17,7 @@ import { acpCommand, type AcpAgent } from './acp/provider';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import { boardOnlyMcpConfig } from '../execution';
 import { canonical, CapabilityEvidenceStore } from './capabilityEvidence';
+import { INHERITED_SESSION_ENV } from '../spawn';
 
 export class AdmissionBlockedError extends Error {
   constructor(readonly decision: ExecutionAdmissionDecision) {
@@ -72,6 +73,42 @@ function digestFile(file: string): { digest: string; stat: fs.Stats } {
   } finally {
     fs.closeSync(fd);
   }
+}
+
+/**
+ * As variáveis que o verificador neutraliza na fixture do Claude (provedor, chave, pasta de configuração,
+ * pré-carga do Node): na execução real elas mudam o que a CLI carrega ou com quem ela fala.
+ */
+export const VERIFIER_OBSERVED_ENV = /^(ANTHROPIC_|CLAUDE_|AWS_|GOOGLE_|AZURE_|NODE_OPTIONS$|NODE_PATH$)/;
+/** O PATH, as pastas de configuração da pessoa e as do Gemini (a ferramenta da épica); o resto do ambiente não muda o isolamento. */
+const RELEVANT_ENV = /^(PATH|HOME|USERPROFILE|XDG_CONFIG_HOME|GEMINI_[A-Z0-9_]*)$/;
+/** Nome de variável que costuma guardar segredo: o valor entra no vínculo só pelo digest. */
+const SENSITIVE_ENV = /KEY|TOKEN|SECRET|PASSW|CREDENTIAL|AUTH|COOKIE/;
+
+/**
+ * O ambiente que entra no vínculo: o mesmo que a execução recebe (o do host, o PATH do shell e as
+ * variáveis do comando, sem as da sessão do Claude Code que o spawn tira), filtrado às variáveis que
+ * mudam o que a ferramenta carrega: o PATH e as pastas de configuração, as que o verificador observa e
+ * as do próprio perfil. Uma variável volátil (terminal, sessão do editor, socket) não muda o vínculo,
+ * então a prova sobrevive ao reinício do editor. O valor de variável sensível vira digest: o vínculo só
+ * é gravado como hash, e nem em memória a chave fica em claro.
+ */
+export function bindingEnvironment(
+  base: NodeJS.ProcessEnv,
+  pathEnv: string | undefined,
+  own: Record<string, string> | undefined,
+): Record<string, string> {
+  const env: NodeJS.ProcessEnv = { ...base, ...(pathEnv ? { PATH: pathEnv } : {}), ...own };
+  for (const name of INHERITED_SESSION_ENV) delete env[name];
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(env)) {
+    if (value === undefined) continue;
+    // no Windows o ambiente não distingue maiúsculas: `Path` é o PATH
+    const upper = name.toUpperCase();
+    if (!RELEVANT_ENV.test(upper) && !VERIFIER_OBSERVED_ENV.test(upper) && !(own && name in own)) continue;
+    out[name] = SENSITIVE_ENV.test(upper) ? `sha256:${createHash('sha256').update(value).digest('hex')}` : value;
+  }
+  return out;
 }
 
 /** Entrada canônica do vínculo de isolamento: as flags de isolamento não dependem do conteúdo por execução. */
@@ -137,7 +174,8 @@ export class ExecutionAdmission {
     const real = fs.realpathSync(executable);
     const environment = this.options.environmentEvidence();
     const context = {
-      version: 1,
+      // 2: sem a permissão e com o ambiente filtrado; toda prova gravada no formato 1 perde a validade
+      version: 2,
       providerRevision: 1,
       platform: process.platform,
       arch: process.arch,
@@ -147,7 +185,9 @@ export class ExecutionAdmission {
       ...(profile.kind !== 'builtin' ? { profileConfig: profile.config } : {}),
       executable: real,
       binary: this.binaryDigest(real),
-      permission: input.permission,
+      // a permissão não entra por si: no modo estrito a invocação do Claude é a mesma nos três níveis
+      // (o conjunto exato de ferramentas é a execução que fixa, no vínculo dela) e no ACP o comando não
+      // a carrega; onde ela muda a linha de comando (perfil personalizado), entra pela invocação
       invocation: template,
       // cwd nulo = vínculo de isolamento: a prova roda numa fixture e vale para qualquer pasta de projeto
       ...(cwd === null
@@ -156,11 +196,7 @@ export class ExecutionAdmission {
             cwd: fs.realpathSync(cwd),
             additionalDirectories: (input.addDirs ?? []).map((d) => fs.realpathSync(path.resolve(cwd, d))),
           }),
-      environment: {
-        ...process.env,
-        ...(this.options.pathEnv() ? { PATH: this.options.pathEnv() } : {}),
-        ...('env' in template ? template.env : {}),
-      },
+      environment: bindingEnvironment(process.env, this.options.pathEnv(), 'env' in template ? template.env : undefined),
       environmentEvidence: environment,
     };
     return {
@@ -172,7 +208,8 @@ export class ExecutionAdmission {
   /**
    * Vínculo das evidências de isolamento: identidade do executor, binário, flags de isolamento, ambiente e
    * políticas gerenciadas, sem pasta de projeto nem listas por execução (ferramentas, MCP, diretórios).
-   * Os recibos são produzidos pelo verificador numa fixture com este mesmo vínculo.
+   * Os recibos são produzidos pelo verificador numa fixture com este mesmo vínculo. A permissão não muda o
+   * vínculo (ver `binding`): a prova feita em `board` vale para `edits` e `full`.
    */
   isolationBinding(executor: AiExecutor, profileId: string, permission: RunnerPermission) {
     return this.binding(executor, profileId, isolationInput(permission), null);

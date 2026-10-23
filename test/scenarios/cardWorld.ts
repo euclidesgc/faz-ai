@@ -139,9 +139,10 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   });
   if (options.profile === 'gemini') {
     // os recibos que o verificador do host gravaria para este agente: o ACP não prova os arquivos de
-    // contexto próprios (`own-context-files`), por isso o perfil só roda no regime compatível
+    // contexto próprios (`own-context-files`), por isso o perfil só roda no regime compatível. Como o
+    // verificador, a prova é feita em `board`: ela vale para qualquer permissão do card (história 3)
     const resolved = profiles.resolveProfile(router.boardId, 'gemini');
-    const { binding } = admission.isolationBinding(resolved, 'gemini', options.permission ?? 'full');
+    const { binding } = admission.isolationBinding(resolved, 'gemini', 'board');
     const now = Date.now();
     for (const capability of EXECUTOR_CAPABILITIES)
       evidence.record({

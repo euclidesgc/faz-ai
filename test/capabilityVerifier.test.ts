@@ -379,6 +379,57 @@ describe('verificação por perfil', () => {
     expect(evidenceCurrent(failed.binding, store.load(failed.binding), 1000, 'acp')).toBe(false);
   });
 
+  it('a prova feita pelo verificador vale para edits e full, e o perfil guarda o vínculo dela', async () => {
+    const { store, admission } = make();
+    const claude = builtin('claude');
+    expect(store.lastBinding('claude')).toBeNull();
+    const result = await verifyExecutor(deps(claude, store, admission));
+    expect(store.lastBinding('claude')).toBe(result.binding);
+    for (const permission of ['edits', 'full'] as const)
+      expect(admission.isolationBinding(claude, 'claude', permission).binding).toBe(result.binding);
+    // o índice é por perfil: o agente ACP verificado depois não apaga o do Claude
+    const gemini = await verifyExecutor(deps(builtin('gemini', { enabled: true }), store, admission));
+    expect(store.lastBinding('gemini')).toBe(gemini.binding);
+    expect(store.lastBinding('claude')).toBe(result.binding);
+  });
+
+  it('binário trocado depois da prova: o vínculo atual não é mais o da última prova', async () => {
+    const { store, admission } = make();
+    const gemini = builtin('gemini', { enabled: true });
+    const result = await verifyExecutor(deps(gemini, store, admission));
+    fs.writeFileSync(path.join(dir, 'gemini'), 'binário atualizado, outra versão', { mode: 0o755 });
+    const current = admission.isolationBinding(gemini, gemini.id, 'board').binding;
+    expect(current).not.toBe(result.binding);
+    expect(store.lastBinding(gemini.id)).toBe(result.binding);
+    expect(evidenceCurrent(current, store.load(current), 1000, 'acp')).toBe(false);
+  });
+
+  it('nenhuma variável sensível do ambiente é gravada em claro nas evidências nem no índice', async () => {
+    const secrets = {
+      ANTHROPIC_API_KEY: 'sk-ant-nao-gravar-1234',
+      GEMINI_API_KEY: 'gemini-nao-gravar-5678',
+      AWS_SESSION_TOKEN: 'aws-nao-gravar',
+    };
+    const before = Object.fromEntries(Object.keys(secrets).map((k) => [k, process.env[k]]));
+    Object.assign(process.env, secrets);
+    try {
+      const { store, admission } = make();
+      await verifyExecutor(deps(builtin('claude'), store, admission));
+      await verifyExecutor(deps(builtin('gemini', { enabled: true }), store, admission));
+      const files = fs.readdirSync(path.join(dir, 'evidence'));
+      expect(files).toContain('profiles.json');
+      const written = files.map((f) => fs.readFileSync(path.join(dir, 'evidence', f), 'latin1')).join('\n');
+      for (const [name, value] of Object.entries(secrets)) {
+        expect(written).not.toContain(value);
+        expect(written).not.toContain(name);
+      }
+    } finally {
+      for (const [k, v] of Object.entries(before))
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+    }
+  });
+
   it('o comando oferece só os perfis ligados, revisados e verificáveis, com o padrão primeiro', () => {
     const board = {
       aiTool: 'gemini',

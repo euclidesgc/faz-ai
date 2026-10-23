@@ -103,6 +103,39 @@ describe('faixa de requisitos do board', () => {
     expect(useBoardStore.getState()).toMatchObject({ view: 'environment', environmentProfile: 'cursor' });
   });
 
+  it('a prova de capacidades invalidada avisa sem bloquear e diz como ela é refeita', () => {
+    set([
+      {
+        id: 'profile',
+        profile: 'claude',
+        name: 'Claude Code',
+        problem: 'evidence-invalidated',
+        optional: true,
+        action: { kind: 'diagnostic', profile: 'claude' },
+      },
+      {
+        id: 'profile',
+        profile: 'kimi',
+        name: 'Gemini CLI',
+        problem: 'evidence-invalidated',
+        automatic: true,
+        optional: true,
+        action: { kind: 'diagnostic', profile: 'kimi' },
+      },
+    ]);
+    renderThemed(<RequirementsBanner />);
+    expect(screen.getByText('2 perfis de CLI precisam de atenção')).toBeInTheDocument();
+    expect(screen.getByText('Claude Code: a verificação de capacidades perdeu a validade')).toBeInTheDocument();
+    expect(screen.getByText('Gemini CLI: a verificação de capacidades perdeu a validade')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Rode "Faz AI: Verificar o isolamento da CLI de IA" na paleta de comandos e escolha este perfil/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/O board já está verificando de novo, sem gastar a sua conta/)).toBeInTheDocument();
+    expect(region()).toHaveClass('warn');
+    expect(region()).not.toHaveClass('error');
+    expect(aiBlockedReason(useBoardStore.getState().state!)).toBeNull();
+  });
+
   it('o login de um perfil pronto traz o comando de login e o "Abrir no terminal"', async () => {
     set([CLAUDE_LOGIN]);
     renderThemed(<RequirementsBanner />);

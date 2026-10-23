@@ -69,6 +69,13 @@ export interface ProfileHealth {
   validationRequired: boolean;
   /** o host sabe provar as capacidades deste perfil (Claude ou agente ACP): o comando de verificação o oferece */
   verifiable?: boolean;
+  /**
+   * a última prova gravada para o perfil foi feita num vínculo de isolamento que não é mais o atual (o
+   * binário, o ambiente relevante ou o formato do vínculo mudou): ela não vale mais e precisa ser refeita.
+   * Não bloqueia; vira aviso na faixa de requisitos. `automatic`: o board refaz sozinho (agente ACP);
+   * `command`: pelo comando da paleta (Claude Code).
+   */
+  evidenceInvalidated?: 'automatic' | 'command';
   problem: ProfileProblem | null;
 }
 
@@ -86,6 +93,7 @@ export interface ProfileHealthInput {
   evidence: ProfileHealth['evidence'];
   install: ProfileHealth['install'];
   verifiable?: boolean;
+  evidenceInvalidated?: ProfileHealth['evidenceInvalidated'];
 }
 
 /**
@@ -125,6 +133,7 @@ export function profileHealth(i: ProfileHealthInput): ProfileHealth {
     authExpired: i.authExpired,
     validationRequired: i.validationRequired,
     ...(i.verifiable ? { verifiable: true } : {}),
+    ...(i.evidenceInvalidated ? { evidenceInvalidated: i.evidenceInvalidated } : {}),
   };
   return { ...base, problem: profileProblem(base) };
 }

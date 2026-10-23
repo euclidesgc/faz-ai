@@ -126,6 +126,18 @@ export function checkRequirements(p: RequirementProbe): BoardRequirement[] {
       action: login ? { kind: 'command', command: login, terminal: true } : { kind: 'diagnostic', profile: w.id },
     });
   }
+  // a prova de capacidades que perdeu a validade não impede o perfil: só avisa, e só quando nada mais o impede
+  for (const h of p.health)
+    if (h.registration === 'enabled' && !h.problem && h.evidenceInvalidated)
+      out.push({
+        id: 'profile',
+        profile: h.id,
+        name: h.name,
+        problem: 'evidence-invalidated',
+        ...(h.evidenceInvalidated === 'automatic' ? { automatic: true as const } : {}),
+        optional: true,
+        action: { kind: 'diagnostic', profile: h.id },
+      });
   // o harness definido é recomendação, não requisito: o board trabalha sem ele, só sem a economia de contexto
   if (p.harnessIssues?.length) out.push({ id: 'harness', optional: true, harnessIssues: p.harnessIssues, action: { kind: 'settings' } });
   return out;

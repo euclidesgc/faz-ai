@@ -14,6 +14,8 @@ export function canonical(value: unknown): string {
       .join(',')}}`;
   return JSON.stringify(value) ?? 'null';
 }
+/** O índice do vínculo da última prova por perfil (não começa com um hash, então `load` nunca o lê como evidência). */
+const PROFILES_FILE = 'profiles.json';
 export class CapabilityEvidenceStore {
   constructor(private readonly directory: string) {}
   private key(create: boolean): Buffer {
@@ -49,6 +51,40 @@ export class CapabilityEvidenceStore {
       fs.renameSync(temp, file);
     } finally {
       fs.rmSync(temp, { force: true });
+    }
+  }
+  /**
+   * Guarda o vínculo da última prova de cada perfil, para o host saber quando ela perdeu a validade (o
+   * vínculo atual é outro) e avisar ou refazer. Só o id do perfil e o hash: nada do ambiente nem do
+   * comando. Não é prova nem passa pela assinatura: decide só o aviso e a nova verificação, nunca a
+   * admissão, que continua lendo as evidências assinadas do vínculo atual.
+   */
+  remember(profileId: string, binding: string): void {
+    if (!/^[a-f0-9]{64}$/.test(binding)) throw new Error('Vínculo de evidência inválido.');
+    const all = { ...this.lastBindings(), [profileId]: binding };
+    fs.mkdirSync(this.directory, { recursive: true, mode: 0o700 });
+    const file = path.join(this.directory, PROFILES_FILE);
+    const temp = `${file}.${randomUUID()}.tmp`;
+    try {
+      fs.writeFileSync(temp, JSON.stringify({ version: 1, profiles: all }), { flag: 'wx', mode: 0o600 });
+      fs.renameSync(temp, file);
+    } finally {
+      fs.rmSync(temp, { force: true });
+    }
+  }
+  /** O vínculo da última prova gravada para o perfil; null quando ele nunca foi verificado (ou o índice não se lê). */
+  lastBinding(profileId: string): string | null {
+    const binding = this.lastBindings()[profileId];
+    return typeof binding === 'string' && /^[a-f0-9]{64}$/.test(binding) ? binding : null;
+  }
+  private lastBindings(): Record<string, string> {
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(this.directory, PROFILES_FILE), 'utf8')) as { profiles?: unknown };
+      const profiles = data.profiles;
+      return profiles && typeof profiles === 'object' && !Array.isArray(profiles) ? { ...(profiles as Record<string, string>) } : {};
+    } catch {
+      // índice ausente ou estragado: nenhum perfil tem prova anterior conhecida, e o aviso simplesmente não aparece
+      return {};
     }
   }
   /** Falha de integridade bloqueia a leitura; não recorre a uma evidência antiga silenciosamente. */

@@ -176,15 +176,24 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   2 minutos, e o aviso do topo se atualiza sozinho ao fim. As capacidades vêm dos recibos do
   **próprio perfil**: a prova de um perfil nunca vale para outro, e a cópia não herda a do original.
   Os recibos vêm da verificação de capacidades, que existe para o Claude Code (a CLI pronta e as
-  cópias dela) e para os agentes ACP. Num agente ACP, ela roda sozinha quando você o liga e ao
-  conectar a ferramenta dele ao board, a menos que a prova do vínculo atual ainda valha (o resultado
-  vai para Saída › Faz AI). Em qualquer perfil verificável, ela roda pelo comando **Faz AI: Verificar o
+  cópias dela) e para os agentes ACP. Num agente ACP, ela roda sozinha quando você o liga, ao
+  conectar a ferramenta dele ao board e, com o agente ligado, quando a conferência do ambiente acha o
+  vínculo dele sem prova em vigor (uma vez por vínculo), a menos que a prova do vínculo atual ainda
+  valha (o resultado vai para Saída › Faz AI). Em qualquer perfil verificável, ela roda pelo comando **Faz AI: Verificar o
   isolamento da CLI de IA**, que pergunta qual dos perfis ligados verificar (o padrão do board vem
   primeiro). No Claude Code, a CLI roda numa pasta descartável contra uma API local, com uma chave
   falsa; num agente ACP, são dois handshakes numa pasta descartável. Nenhuma das duas gasta a sua
   conta. Enquanto um perfil verificável não tem recibos, o bloco dele diz como verificá-lo pela
   paleta. No agente ACP, a capacidade de artefatos fica parcial de propósito, porque o agente lê os
-  próprios arquivos de contexto, e o perfil é admissível só no regime compatível. A prévia da
+  próprios arquivos de contexto, e o perfil é admissível só no regime compatível. A prova vale para
+  as três permissões (**Só o board**, **Board e arquivos** e **Sem restrições**) e sobrevive ao
+  reinício do editor: o vínculo dela é o binário, os argumentos de isolamento, as políticas
+  gerenciadas e só as variáveis de ambiente que mudam o que a ferramenta carrega (o PATH, as pastas
+  de configuração, as do provedor e as do perfil; as que guardam segredo entram só por digest, e nada
+  disso é gravado: o recibo guarda só o hash do vínculo). Quando o vínculo muda depois da última
+  prova (a ferramenta foi atualizada, uma dessas variáveis mudou ou o formato do vínculo mudou numa
+  versão nova), o aviso do topo diz que a verificação perdeu a validade, sem bloquear o board: num
+  agente ACP o board já refaz sozinho; no Claude Code, rode o comando de novo. A prévia da
   admissão no card avalia o perfil que vai executar o card (o do modelo do card, do agente ou da
   regra), não o padrão do board.
 - **Próxima execução e limites:** mostra o regime escolhido em Harness › Ferramenta e execução, o

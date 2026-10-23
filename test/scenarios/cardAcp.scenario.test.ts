@@ -86,6 +86,34 @@ describe('cenário: card com agente da fase no perfil ACP do catálogo (Gemini),
   });
 });
 
+describe('cenário: a prova do verificador (feita em board) vale para o card em outra permissão (história 3)', () => {
+  it('F: card em edits é admitido com os recibos do vínculo de isolamento, sem verificar de novo', async () => {
+    const agent = new FakeAgent({ onPrompt: workingTurn(() => world!) });
+    world = await cardWorld({ profile: 'gemini', tools: CONDUTOR_TOOLS, permission: 'edits', spawnAcp: agent.spawn });
+
+    const end = await world.run();
+
+    expect(world.lines.join('\n')).not.toMatch(/bloqueada pela admissão|capability-not-verified/);
+    expect(end.outcome).toBe('done');
+    expect(world.aiRun()).toMatchObject({ tool: 'gemini', outcome: 'done' });
+  });
+
+  it('G: uma variável volátil que mudou depois da prova (outro terminal, outra sessão) não bloqueia o card', async () => {
+    const agent = new FakeAgent({ onPrompt: workingTurn(() => world!) });
+    world = await cardWorld({ profile: 'gemini', tools: CONDUTOR_TOOLS, spawnAcp: agent.spawn });
+    const before = process.env.TERM_SESSION_ID;
+    process.env.TERM_SESSION_ID = `outra-sessao-${Date.now()}`;
+    try {
+      const end = await world.run();
+      expect(world.lines.join('\n')).not.toMatch(/bloqueada pela admissão|capability-not-verified/);
+      expect(end.outcome).toBe('done');
+    } finally {
+      if (before === undefined) delete process.env.TERM_SESSION_ID;
+      else process.env.TERM_SESSION_ID = before;
+    }
+  });
+});
+
 describe('cenário: o mesmo card no perfil Claude CLI padrão', () => {
   it('C: o plano leva o agente inline e o comando do Claude Code tem --agents e --agent', async () => {
     world = await cardWorld({ profile: 'claude', tools: CONDUTOR_TOOLS });

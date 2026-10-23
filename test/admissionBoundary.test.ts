@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { AdmissionBlockedError, ExecutionAdmission } from '../src/extension/ai/admission';
+import { AdmissionBlockedError, ExecutionAdmission, bindingEnvironment } from '../src/extension/ai/admission';
 import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
 import type { AiProfile } from '../src/shared/aiProfiles';
 import {
@@ -196,5 +196,77 @@ describe('fronteira da admissão do board', () => {
     const ai = request({ regime: 'compatible', compatibilityReview: { actor: 'ai' as 'person', revision: 1 } });
     expect(blocked(claude, ai).decision.reasons).toContainEqual({ code: 'compatibility-not-reviewed' });
     expect(blocked(claude, request({ regime: 'compatible' })).decision.state).toBe('blocked');
+  });
+});
+
+describe('vínculo de isolamento saneado', () => {
+  const withEnv = <T>(vars: Record<string, string | undefined>, fn: () => T): T => {
+    const before = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]));
+    for (const [k, v] of Object.entries(vars))
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    try {
+      return fn();
+    } finally {
+      for (const [k, v] of Object.entries(before))
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+    }
+  };
+  const level = (permission: 'board' | 'edits' | 'full') => request({ mcpLevel: { permission, tools: [] } });
+
+  it('Claude: a prova feita em board vale para edits e full', () => {
+    const claude = profile({ config: { command: exe('claude-f', 'binário F') } });
+    const board = admission.isolationBinding(claude, claude.id, 'board').binding;
+    expect(admission.isolationBinding(claude, claude.id, 'edits').binding).toBe(board);
+    expect(admission.isolationBinding(claude, claude.id, 'full').binding).toBe(board);
+    authorize(board);
+    for (const permission of ['board', 'edits', 'full'] as const) {
+      const admitted = admission.prepare(claude, claude.id, { prompt: 'objetivo', permission }, dir, level(permission));
+      expect(admitted.decision.state).toBe('admitted');
+      expect(admitted.decision.binding).toBe(board);
+    }
+  });
+  it('ACP: a permissão não entra no comando nem no vínculo', () => {
+    exe('gemini', 'agente de teste');
+    const acp = profile({ kind: 'custom', base: 'generic', config: { acpAgent: 'gemini' } });
+    const board = admission.isolationBinding(acp, acp.id, 'board').binding;
+    expect(admission.isolationBinding(acp, acp.id, 'edits').binding).toBe(board);
+    expect(admission.isolationBinding(acp, acp.id, 'full').binding).toBe(board);
+  });
+  it('variável volátil e as da sessão do Claude Code não mudam o vínculo; as que a ferramenta lê, mudam', () => {
+    const claude = profile({ config: { command: exe('claude-g', 'binário G') } });
+    const bind = () => admission.isolationBinding(claude, claude.id, 'board').binding;
+    const base = bind();
+    expect(withEnv({ TERM_SESSION_ID: 'w0t0p0:qualquer', VSCODE_PID: String(Math.random()), OLDPWD: '/tmp' }, bind)).toBe(base);
+    // o spawn tira as variáveis da sessão que abriu o editor: elas também não contam no vínculo
+    expect(withEnv({ CLAUDE_CODE_SESSION_ID: 'sessao-1', CLAUDECODE: '1' }, bind)).toBe(base);
+    // a pasta de configuração e a pré-carga do Node mudam o que a CLI carrega
+    expect(withEnv({ CLAUDE_CONFIG_DIR: '/outra/config' }, bind)).not.toBe(base);
+    expect(withEnv({ NODE_OPTIONS: '--require /x.js' }, bind)).not.toBe(base);
+  });
+  it('o ambiente do vínculo: PATH, pastas de configuração, as observadas e as do perfil; segredo só por digest', () => {
+    const env = bindingEnvironment(
+      {
+        PATH: '/usr/bin',
+        HOME: '/home/p',
+        TERM: 'xterm',
+        SHLVL: '2',
+        ANTHROPIC_API_KEY: 'sk-ant-segredo',
+        ANTHROPIC_BASE_URL: 'https://api.local',
+        GEMINI_API_KEY: 'chave-gemini',
+        CLAUDE_CODE_SESSION_ID: 'volatil',
+      },
+      '/opt/bin:/usr/bin',
+      { MINHA_VAR: 'do-perfil', MEU_TOKEN: 'segredo-do-perfil' },
+    );
+    expect(Object.keys(env).sort()).toEqual(
+      ['ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'GEMINI_API_KEY', 'HOME', 'MEU_TOKEN', 'MINHA_VAR', 'PATH'].sort(),
+    );
+    expect(env.PATH).toBe('/opt/bin:/usr/bin');
+    expect(env.ANTHROPIC_BASE_URL).toBe('https://api.local');
+    expect(env.MINHA_VAR).toBe('do-perfil');
+    for (const k of ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'MEU_TOKEN']) expect(env[k]).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(JSON.stringify(env)).not.toMatch(/segredo|chave-gemini/);
   });
 });
