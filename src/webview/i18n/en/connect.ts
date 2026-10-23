@@ -41,7 +41,25 @@ export const connect: Record<string, string> = {
   'Conectar parou com erro no passo "{step}"': 'Connect stopped with an error at "{step}"',
   'Conectar em andamento: "{step}"': 'Connect in progress: "{step}"',
   'versão desconhecida': 'unknown version',
-  'chave de API no cofre': 'API key in the vault',
+  'chave de API guardada': 'API key stored',
+  'regime compatível, sem ciência: o perfil não roda até você dar a ciência':
+    'compatible regime, not acknowledged: the profile does not run until you acknowledge it',
+  'O Conectar espera você no passo "{step}": continue no cartão em Conectar ferramenta, acima.':
+    'Connect is waiting for you at "{step}": continue on the card in Connect a tool, above.',
+  'Trocar a chave': 'Change the key',
+  'Guarda outra chave no cofre e refaz o login e a verificação.': 'Stores another key in the vault and redoes the sign-in and the check.',
+  'Fecha o campo sem trocar a chave guardada.': 'Closes the field without changing the stored key.',
+  'Revogar ciência': 'Revoke acknowledgment',
+  'Tira a sua ciência do regime compatível: o perfil deixa de rodar até você dar a ciência de novo.':
+    'Removes your acknowledgment of the compatible regime: the profile stops running until you acknowledge it again.',
+  'Dar ciência do regime compatível': 'Acknowledge the compatible regime',
+  'Grava a sua ciência do regime compatível para este perfil, depois de ler o que ele carrega.':
+    'Records your acknowledgment of the compatible regime for this profile, after reading what it loads.',
+  'Dar ciência do regime compatível ao perfil "{name}"?': 'Acknowledge the compatible regime for profile "{name}"?',
+  'Regime compatível com a sua ciência (revisão {n})': 'Compatible regime with your acknowledgment (revision {n})',
+  'Sem ciência do regime compatível': 'No acknowledgment of the compatible regime',
+  'Ligue o perfil antes.': 'Turn the profile on first.',
+  'Retoma o Conectar do passo em que parou.': 'Resumes Connect from the step where it stopped.',
   'login confirmado': 'signed in',
   'login não verificado': 'sign-in not verified',
   'regime exclusivo': 'exclusive regime',
@@ -52,8 +70,8 @@ export const connect: Record<string, string> = {
   '{n} modelos': '{n} models',
   'Chave de API': 'API key',
   'Cole a chave aqui': 'Paste the key here',
-  'A chave vai só para o cofre deste computador e para o login da ferramenta; ela não volta para esta tela.':
-    'The key goes only to this computer’s vault and to the tool’s sign-in; it never comes back to this screen.',
+  'A chave fica guardada no cofre deste computador e vai para o login da ferramenta; ela não volta para esta tela. A ferramenta a confere de fato na primeira execução: uma chave errada aparece ali, com a mensagem dela.':
+    'The key is stored in this computer’s vault and goes to the tool’s sign-in; it never comes back to this screen. The tool actually checks it on the first run: a wrong key shows up there, with the tool’s message.',
   'Guarda a chave no cofre e continua o Conectar.': 'Stores the key in the vault and continues Connect.',
   'Guardar a chave e continuar': 'Store the key and continue',
   'O {name} roda no regime compatível: ele carrega por conta própria arquivos de instruções e configuração que o board não montou. Permissões, MCP e delegação continuam decididos pelo card.':
@@ -63,13 +81,12 @@ export const connect: Record<string, string> = {
     'Records your acknowledgment for this profile; the revision goes up each time.',
   'Entendo o que a ferramenta carrega': 'I understand what the tool loads',
   'Abre um terminal com o comando de login.': 'Opens a terminal with the sign-in command.',
-  'Refaz o Conectar a partir do começo.': 'Runs Connect again from the start.',
   'Tentar de novo': 'Try again',
   'Abrir o Conectar': 'Open Connect',
   'Regime compatível ligado para o board inteiro (revisão {n}), de uma versão anterior. Agora o regime é de cada perfil: a ciência é dada no Conectar, em Ferramentas de IA.':
     'Compatible regime turned on for the whole board (revision {n}), from an earlier version. The regime is now per profile: you acknowledge it in Connect, under AI tools.',
-  'Desliga o regime compatível do board; os perfis com ciência no Conectar seguem no compatível.':
-    'Turns off the board-wide compatible regime; profiles acknowledged in Connect stay compatible.',
+  'Desliga o regime compatível do board. Os perfis com ciência seguem no compatível; os que não passam pelo Conectar (cópias, personalizados) recebem a ciência na lista de Ferramentas de IA.':
+    'Turns off the board-wide compatible regime. Acknowledged profiles stay compatible; those that do not go through Connect (copies, custom profiles) get the acknowledgment in the AI tools list.',
   'Voltar ao exclusivo': 'Back to exclusive',
 
   // as fichas dos modos (`TOOLS`)

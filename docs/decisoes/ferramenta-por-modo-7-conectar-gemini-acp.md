@@ -124,6 +124,20 @@ verificador, a leitura de modelos) precisa autenticar de novo.
 - **i18n**: as fichas de `TOOLS` ganharam a tradução que a história 5 deixou para cá, em `i18n/en/connect.ts`,
   com moldes (`{name}`, `{command}`) para as linhas que se repetem por agente; o teste de i18n percorre `TOOLS`.
 - O console de desenvolvimento (a tela fora do editor e do navegador) mascara a chave na mensagem.
+- **Depois da revisão do #374**:
+  - **Ciência para quem não passa pelo Conectar.** Cópias e personalizados verificáveis ganham, na lista de
+    Ferramentas de IA, **Dar ciência do regime compatível** (com o mesmo texto da ciência do Conectar, numa
+    confirmação) e **Revogar ciência**, pela mensagem `settings.aiProfiles.review` da 7a. Sem isso, "Voltar ao
+    exclusivo" os deixava sem caminho de volta ao compatível; o hint do botão diz onde dar a ciência. O cartão
+    conectado e a lista também revogam a ciência dos perfis do Conectar, e o resumo da conexão usa a ciência de
+    agora (revogada, diz que o perfil não roda até a ciência voltar).
+  - **A chave não é validada no Conectar**: os textos dizem que ela fica guardada e é conferida na primeira
+    execução; o cartão conectado tem **Trocar a chave** (com Cancelar).
+  - **O campo da chave só limpa quando o fluxo passa do login** (a chave aceita) ou termina: na recusa, o que a
+    pessoa colou continua no campo.
+  - **A lista diz quando o Conectar espera você** e aponta para o cartão.
+  - **O aviso do topo abre o Conectar já na ferramenta do perfil** (`openConnect`, `connectTool` na store).
+  - "Tentar de novo" diz que retoma do passo em que parou (o host retoma, ver 7a).
 
 ## Onde a especificação não cabia no código
 

@@ -165,6 +165,8 @@ export const settings = {
    * O Conectar de um perfil (história 7): o `done` sai quando o fluxo para (conectada, à espera da chave ou da
    * ciência, ou com o erro no passo). Os handshakes e a leitura de modelos podem levar alguns minutos.
    */
+  /** Dá ou revoga a ciência do regime compatível de um perfil (o caminho de quem não passa pelo Conectar, e a revogação). */
+  reviewAiProfile: (id: string, accept: boolean) => req({ type: 'settings.aiProfiles.review', id, accept }),
   connectAiProfile: (id: string, input: { apiKey?: string; acknowledge?: boolean } = {}) =>
     request({ type: 'settings.aiProfiles.connect', id, ...input }, { timeout: 600_000 }),
   updateBoard: (patch: BoardPatch) => req({ type: 'settings.board.update', patch }),

@@ -44,10 +44,12 @@ O botão **Conectar** de um cartão leva o perfil do catálogo daquele modo por 
 progresso na tela:
 
 1. **Achar a ferramenta**: o comando no PATH do terminal e a versão; sem ele, o link **Instalar**.
-2. **Entrar na conta**: no Gemini, o campo da **chave de API** (de senha). A chave vai só para o cofre
-   deste computador e, a cada processo, para o login do agente pelo protocolo; ela não volta para a
-   tela e não entra no log, no registro das execuções nem na exportação do board. É a mesma em todas
-   as pastas. Nas CLIs prontas, a sonda de login, com o comando para o terminal quando falta.
+2. **Entrar na conta**: no Gemini, o campo da **chave de API** (de senha). A chave fica guardada no
+   cofre deste computador e, a cada processo, vai para o login do agente pelo protocolo; ela não volta
+   para a tela e não entra no log, no registro das execuções nem na exportação do board. É a mesma em
+   todas as pastas. O Gemini CLI aceita a chave no login sem consultar a API: ela é conferida de fato
+   na primeira execução, e uma chave errada aparece ali, com a mensagem do Gemini. O perfil só é ligado
+   depois deste passo. Nas CLIs prontas, a sonda de login, com o comando para o terminal quando falta.
 3. **Verificar as capacidades**: as sondas do verificador gravam as provas do perfil, e o regime sai
    delas, sem pergunta: as cinco capacidades provadas dão o regime exclusivo; permissões, MCP e
    delegação provadas, o compatível. Um agente ACP é sempre compatível (os arquivos de contexto que
@@ -57,9 +59,18 @@ progresso na tela:
    enquanto o Claude Code segue no exclusivo.
 5. **Ler os modelos**: os modelos que a ferramenta anuncia entram no catálogo, em todo campo de modelo.
 
-No fim, **Conectada** com a versão, o login, o regime, quantos modelos e a data. Um erro fica preso ao
-passo em que ocorreu, com **Tentar de novo**; a chave recusada devolve o campo. Cada perfil do catálogo,
-na lista abaixo, mostra o estado da conexão e **Reconectar**. A faixa de requisitos continua
+No fim, **Conectada** com a versão, o login, o regime, quantos modelos e a data, e as ações **Trocar a
+chave** e **Revogar ciência**. Um erro fica preso ao passo em que ocorreu, com **Tentar de novo**, que
+retoma desse passo (a ciência e os modelos não refazem o login nem as sondas); se o agente recusar a
+chave no login, o campo volta com o que você colou. Cada perfil do catálogo, na lista abaixo, mostra o
+estado da conexão (inclusive quando o Conectar espera você) e **Reconectar**.
+
+A ciência é de cada perfil e pode sair: **Revogar ciência** a tira (o perfil deixa de rodar no
+compatível até você dar a ciência de novo); reconectar um perfil que passa a provar o regime exclusivo
+a tira sozinho; e **importar um board não traz a ciência dos perfis**: quem importa dá a própria, na
+máquina em que o perfil roda. Os perfis que não passam pelo Conectar (cópias e personalizados) dão e
+revogam a ciência na lista, com **Dar ciência do regime compatível** e o mesmo texto do Conectar.
+Uma política de execução não troca o perfil por outro com regime diferente (`constraints-changed`). A faixa de requisitos continua
 conferindo a ferramenta e o login: no Gemini, sem a chave no cofre o login fica "não verificado" (ele
 pode ter a sua `GEMINI_API_KEY`), e o aviso de login leva ao Conectar.
 

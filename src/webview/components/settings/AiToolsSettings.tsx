@@ -7,6 +7,7 @@ import {
   modeLabel,
   profileIsolation,
   toolLabel,
+  verifiableProfile,
   type AiProfile,
 } from '../../../shared/aiProfiles';
 import type { HostToWebview } from '../../../shared/messages';
@@ -18,7 +19,7 @@ import { useAction } from '../../useAction';
 import { onHostMessage } from '../../vscode';
 import { ActionButton, DeleteButton, IconPlus, SwitchField } from '../ui';
 import { AiProfileForm } from './AiProfileForm';
-import { ConnectTool, STEP_NAMES, connectionSummary } from './ConnectTool';
+import { ConnectTool, STEP_NAMES, connectionSummary, reviewText } from './ConnectTool';
 import { SectionHeader } from './SectionHeader';
 import { toolModeEntry } from '../../../shared/aiTools';
 import { ExecutionPoliciesSettings } from './policies/ExecutionPoliciesSettings';
@@ -59,11 +60,15 @@ export function AiToolsSettings() {
   const connectionLine = (p: AiProfile): string => {
     const c = state.connections?.[p.id];
     if (!c) return t('Não conectada pelo Conectar');
-    if (c.status === 'connected') return `${t('Conectada')} · ${connectionSummary(c.summary)}`;
-    return t(c.status === 'failed' ? 'Conectar parou com erro no passo "{step}"' : 'Conectar em andamento: "{step}"', {
-      step: t(STEP_NAMES[c.step]),
-    });
+    if (c.status === 'connected') return `${t('Conectada')} · ${connectionSummary(c.summary, reviewOf(p))}`;
+    const step = t(STEP_NAMES[c.step]);
+    if (c.status === 'waiting')
+      return t('O Conectar espera você no passo "{step}": continue no cartão em Conectar ferramenta, acima.', { step });
+    return t(c.status === 'failed' ? 'Conectar parou com erro no passo "{step}"' : 'Conectar em andamento: "{step}"', { step });
   };
+  const review = useAction((id: string, accept: boolean) => settings.reviewAiProfile(id, accept));
+  /** A ciência do regime compatível do perfil, a de agora (o runner do board), ou null. */
+  const reviewOf = (p: AiProfile): number | null => state.board.runner.compatibilityReviews?.[p.id] ?? null;
   useEffect(() => {
     const off = onHostMessage((msg) => {
       if (msg.type === 'aiProfiles.status') setStatuses(msg.profiles);
@@ -236,6 +241,41 @@ export function AiToolsSettings() {
                           }}
                         >
                           {t(state.connections?.[profile.id] ? 'Reconectar' : 'Conectar')}
+                        </ActionButton>
+                      </>
+                    )}
+                    {/* quem não passa pelo Conectar (cópias, personalizados) dá ou revoga a ciência aqui; o
+                        perfil do Conectar com ciência também a revoga daqui */}
+                    {(reviewOf(profile) !== null || (!connectable(profile) && verifiableProfile(profile))) && (
+                      <>
+                        <span className="muted" data-testid={`review-${profile.id}`}>
+                          {reviewOf(profile) !== null
+                            ? t('Regime compatível com a sua ciência (revisão {n})', { n: reviewOf(profile)! })
+                            : t('Sem ciência do regime compatível')}
+                        </span>
+                        <ActionButton
+                          size="1"
+                          variant="soft"
+                          color="gray"
+                          hint={
+                            reviewOf(profile) !== null
+                              ? t('Tira a sua ciência do regime compatível: o perfil deixa de rodar até você dar a ciência de novo.')
+                              : t('Grava a sua ciência do regime compatível para este perfil, depois de ler o que ele carrega.')
+                          }
+                          disabled={!profile.enabled || review.busy}
+                          disabledReason={t('Ligue o perfil antes.')}
+                          onClick={() =>
+                            reviewOf(profile) !== null
+                              ? void review.run(profile.id, false)
+                              : ask({
+                                  title: t('Dar ciência do regime compatível ao perfil "{name}"?', { name: profile.name }),
+                                  message: reviewText(profile.name),
+                                  confirmLabel: t('Entendo o que a ferramenta carrega'),
+                                  onConfirm: () => review.run(profile.id, true),
+                                })
+                          }
+                        >
+                          {t(reviewOf(profile) !== null ? 'Revogar ciência' : 'Dar ciência do regime compatível')}
                         </ActionButton>
                       </>
                     )}

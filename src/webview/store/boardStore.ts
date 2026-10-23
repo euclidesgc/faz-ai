@@ -102,6 +102,10 @@ interface BoardStore extends UiState, ViewState, UiPrefs {
   environmentProfile: string | null;
   /** abre o Diagnóstico do ambiente, no bloco de um perfil quando há um */
   openEnvironment(profile?: string): void;
+  /** a ferramenta que o Conectar ferramenta mostra ao abrir (vinda do aviso do topo); fica na memória */
+  connectTool: string | null;
+  /** abre Ferramentas de IA › Conectar ferramenta, já na ferramenta do perfil (o perfil pronto tem o id da ferramenta) */
+  openConnect(profile: string): void;
   /** o chat está aberto no painel lateral do board (no navegador; no editor ele fica na barra lateral) */
   chatOpen: boolean;
   setChatOpen(open: boolean): void;
@@ -222,6 +226,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     harnessTab: resolveHarnessTab(persisted?.harnessTab),
     harnessTopic: 'rules',
     environmentProfile: null,
+    connectTool: null,
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
@@ -260,6 +265,10 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     },
     openEnvironment(profile) {
       set({ view: 'environment', environmentProfile: profile ?? null, openCardId: null, attachmentModal: null });
+      persist(get());
+    },
+    openConnect(profile) {
+      set({ view: 'settings', settingsTab: 'aiTools', connectTool: profile, openCardId: null, attachmentModal: null });
       persist(get());
     },
     openSettings(settingsTab) {

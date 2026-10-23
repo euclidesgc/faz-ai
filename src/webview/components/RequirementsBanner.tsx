@@ -197,6 +197,7 @@ export function RequirementFix({
 }) {
   const openSettings = useBoardStore((s) => s.openSettings);
   const openEnvironment = useBoardStore((s) => s.openEnvironment);
+  const openConnect = useBoardStore((s) => s.openConnect);
   if (!actionable(r, compact)) return null;
   const action = r.action!;
   switch (action.kind) {
@@ -226,7 +227,7 @@ export function RequirementFix({
     // a ferramenta que entra por chave de API: o login é o Conectar, em Ferramentas de IA
     case 'connect':
       return (
-        <Button size="small" variant={variant} onClick={() => openSettings('aiTools')}>
+        <Button size="small" variant={variant} onClick={() => openConnect(action.profile)}>
           {t('Abrir o Conectar')}
         </Button>
       );

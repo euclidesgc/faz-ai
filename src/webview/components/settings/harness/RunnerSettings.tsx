@@ -91,7 +91,9 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
                 <ActionButton
                   size="1"
                   variant="soft"
-                  hint={t('Desliga o regime compatível do board; os perfis com ciência no Conectar seguem no compatível.')}
+                  hint={t(
+                    'Desliga o regime compatível do board. Os perfis com ciência seguem no compatível; os que não passam pelo Conectar (cópias, personalizados) recebem a ciência na lista de Ferramentas de IA.',
+                  )}
                   onClick={() => settings.updateBoard({ runner: { admissionRegime: 'exclusive' } })}
                 >
                   {t('Voltar ao exclusivo')}

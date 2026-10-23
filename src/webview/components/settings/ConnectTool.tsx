@@ -2,7 +2,7 @@
 // traz (`TOOLS`), um cartão por modo oferecido com a mesma ficha em cada um, o selo Recomendado só quando o
 // modo recomendado é oferecido, e o progresso do Conectar de cada perfil, com o erro preso ao passo. A tela
 // só mostra: o fluxo é do host (`src/extension/ai/connect.ts`), e a chave colada vai direto para ele.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Badge, Callout, Card, TextField } from '@radix-ui/themes';
 import {
   MODE_SHEET_LINES,
@@ -46,15 +46,20 @@ export const STEP_NAMES: Record<ConnectStep, string> = {
 export const catalogProfileOf = (profiles: readonly AiProfile[], tool: string, mode: string): AiProfile | undefined =>
   profiles.find((p) => isReadyProfile(p) && p.tool === tool && p.mode === mode);
 
-/** "Conectada · 0.65.0 · chave de API no cofre · regime compatível (ciência 1) · 6 modelos · data". */
-export function connectionSummary(s: Partial<ConnectSummary>): string {
+/**
+ * "Conectada · 0.65.0 · chave de API guardada · regime compatível (ciência 1) · 6 modelos · data". A ciência é a de
+ * agora (`review`, do runner do board), não a da hora da conexão: revogada depois, o resumo diz que falta.
+ */
+export function connectionSummary(s: Partial<ConnectSummary>, review: number | null = s.reviewed ?? null): string {
   const parts = [
     s.version ?? t('versão desconhecida'),
-    t(s.signIn === 'api-key' ? 'chave de API no cofre' : s.signIn === 'signed-in' ? 'login confirmado' : 'login não verificado'),
+    t(s.signIn === 'api-key' ? 'chave de API guardada' : s.signIn === 'signed-in' ? 'login confirmado' : 'login não verificado'),
     s.regime === 'exclusive'
       ? t('regime exclusivo')
       : s.regime === 'compatible'
-        ? t('regime compatível (ciência {n})', { n: s.reviewed ?? 0 })
+        ? review
+          ? t('regime compatível (ciência {n})', { n: review })
+          : t('regime compatível, sem ciência: o perfil não roda até você dar a ciência')
         : t('sem sonda de capacidades'),
     s.models === null || s.models === undefined ? t('lista de modelos embutida') : tn(s.models, '1 modelo', '{n} modelos'),
   ];
@@ -62,19 +67,36 @@ export function connectionSummary(s: Partial<ConnectSummary>): string {
   return parts.join(' · ');
 }
 
+/** O texto da ciência do regime compatível: o mesmo no Conectar e na lista dos perfis. */
+export const reviewText = (name: string): string =>
+  t(
+    'O {name} roda no regime compatível: ele carrega por conta própria arquivos de instruções e configuração que o board não montou. Permissões, MCP e delegação continuam decididos pelo card.',
+    { name },
+  );
+
 /** O progresso do Conectar de um perfil: os passos, o que o passo atual espera da pessoa e o erro preso a ele. */
 export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; state: ConnectState; mode?: ToolModeEntry }) {
   const [apiKey, setApiKey] = useState('');
+  /** "Trocar a chave" aberto no cartão conectado */
+  const [changing, setChanging] = useState(false);
+  const review = useBoardStore((s) => s.state?.board.runner.compatibilityReviews?.[profile.id] ?? null);
   const connect = useAction((input: { apiKey?: string; acknowledge?: boolean }) => settings.connectAiProfile(profile.id, input));
+  const revoke = useAction(() => settings.reviewAiProfile(profile.id, false));
   const current = CONNECT_STEPS.indexOf(state.step);
+  const waitingKey = state.status === 'waiting' && state.needs === 'api-key';
+  // o campo só limpa quando o fluxo passa do login (a chave foi aceita) ou termina: na recusa, o que a pessoa
+  // colou fica no campo para ela conferir
+  const pastSignIn = state.status === 'connected' || current > CONNECT_STEPS.indexOf('signIn');
+  useEffect(() => {
+    if (pastSignIn && !changing) setApiKey('');
+  }, [pastSignIn, changing, state.step, state.status]);
   const stepState = (i: number): string => {
     if (state.status === 'connected' || i < current) return t('feito');
     if (i > current) return t('a seguir');
     return t(state.status === 'running' ? 'em curso' : state.status === 'waiting' ? 'espera você' : 'falhou');
   };
   const sendKey = async () => {
-    // o campo só limpa quando o host confirma: se falhar, o que a pessoa colou fica
-    if (await connect.run({ apiKey })) setApiKey('');
+    if (await connect.run({ apiKey })) setChanging(false);
   };
   return (
     <div className="connect-progress" aria-busy={state.status === 'running' || connect.busy}>
@@ -86,9 +108,36 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
         ))}
       </ol>
       {state.status === 'connected' && (
-        <p role="status" className="row">
-          <IconCheck /> {t('Conectada')} · {connectionSummary(state.summary)}
-        </p>
+        <>
+          <p role="status" className="row">
+            <IconCheck /> {t('Conectada')} · {connectionSummary(state.summary, review)}
+          </p>
+          <div className="row end">
+            {state.summary.signIn === 'api-key' && !changing && (
+              <ActionButton
+                size="1"
+                variant="soft"
+                color="gray"
+                hint={t('Guarda outra chave no cofre e refaz o login e a verificação.')}
+                onClick={() => setChanging(true)}
+              >
+                {t('Trocar a chave')}
+              </ActionButton>
+            )}
+            {review !== null && (
+              <ActionButton
+                size="1"
+                variant="soft"
+                color="gray"
+                hint={t('Tira a sua ciência do regime compatível: o perfil deixa de rodar até você dar a ciência de novo.')}
+                loading={revoke.busy}
+                onClick={() => void revoke.run()}
+              >
+                {t('Revogar ciência')}
+              </ActionButton>
+            )}
+          </div>
+        </>
       )}
       {state.error && (
         <Callout.Root color={state.status === 'failed' ? 'red' : 'amber'} size="1" role="alert">
@@ -98,7 +147,7 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
           <Callout.Text>{t(state.error)}</Callout.Text>
         </Callout.Root>
       )}
-      {state.status === 'waiting' && state.needs === 'api-key' && (
+      {(waitingKey || changing) && (
         <form
           className="connect-key"
           onSubmit={(e) => {
@@ -117,9 +166,25 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
             placeholder={t('Cole a chave aqui')}
           />
           <p className="muted small">
-            {t('A chave vai só para o cofre deste computador e para o login da ferramenta; ela não volta para esta tela.')}
+            {t(
+              'A chave fica guardada no cofre deste computador e vai para o login da ferramenta; ela não volta para esta tela. A ferramenta a confere de fato na primeira execução: uma chave errada aparece ali, com a mensagem dela.',
+            )}
           </p>
           <div className="row end">
+            {changing && (
+              <ActionButton
+                variant="soft"
+                color="gray"
+                type="button"
+                hint={t('Fecha o campo sem trocar a chave guardada.')}
+                onClick={() => {
+                  setChanging(false);
+                  setApiKey('');
+                }}
+              >
+                {t('Cancelar')}
+              </ActionButton>
+            )}
             <ActionButton
               type="submit"
               hint={t('Guarda a chave no cofre e continua o Conectar.')}
@@ -137,10 +202,7 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
             <IconWarning />
           </Callout.Icon>
           <Callout.Text>
-            {t(
-              'O {name} roda no regime compatível: ele carrega por conta própria arquivos de instruções e configuração que o board não montou. Permissões, MCP e delegação continuam decididos pelo card.',
-              { name: profile.name },
-            )}
+            {reviewText(profile.name)}
             {mode && ` ${t('O que ele traz: {brings}.', { brings: t(mode.sheet.brings) })}`}
           </Callout.Text>
           <div className="row end">
@@ -172,7 +234,7 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
               {t('Instalar')}
             </a>
           )}
-          <ActionButton hint={t('Refaz o Conectar a partir do começo.')} loading={connect.busy} onClick={() => void connect.run({})}>
+          <ActionButton hint={t('Retoma o Conectar do passo em que parou.')} loading={connect.busy} onClick={() => void connect.run({})}>
             {t('Tentar de novo')}
           </ActionButton>
         </div>
@@ -229,7 +291,12 @@ function ModeCard({ tool, mode, recommended }: { tool: AiToolEntry; mode: ToolMo
 
 /** Ferramentas de IA › Conectar ferramenta. */
 export function ConnectTool() {
-  const [toolId, setToolId] = useState(TOOLS[0]!.id);
+  // o aviso do topo abre o Conectar já na ferramenta do perfil (o perfil pronto tem o id da ferramenta)
+  const requested = useBoardStore((s) => s.connectTool);
+  const [toolId, setToolId] = useState(requested && toolEntry(requested) ? requested : TOOLS[0]!.id);
+  useEffect(() => {
+    if (requested && toolEntry(requested)) setToolId(requested);
+  }, [requested]);
   const tool = toolEntry(toolId) ?? TOOLS[0]!;
   const recommended = recommendedOffered(tool);
   return (

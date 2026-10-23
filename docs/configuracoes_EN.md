@@ -45,10 +45,13 @@ progress on screen:
 
 1. **Find the tool**: the command on the terminal's PATH and its version; without it, the **Install**
    link.
-2. **Sign in**: for Gemini, the **API key** field (a password field). The key goes only to this
-   computer's vault and, for each process, to the agent's sign-in through the protocol; it never
+2. **Sign in**: for Gemini, the **API key** field (a password field). The key is stored in this
+   computer's vault and, for each process, goes to the agent's sign-in through the protocol; it never
    comes back to the screen and never goes to the log, the run records or the board export. It is the
-   same in every folder. For the ready CLIs, the sign-in probe, with the terminal command when missing.
+   same in every folder. Gemini CLI accepts the key at sign-in without calling the API: it is actually
+   checked on the first run, and a wrong key shows up there, with Gemini's message. The profile is
+   only turned on after this step. For the ready CLIs, the sign-in probe, with the terminal command
+   when missing.
 3. **Check the capabilities**: the verifier's probes record the profile's evidence, and the regime
    follows from it, without asking: all five capabilities proven give the exclusive regime;
    permissions, MCP and delegation proven, the compatible one. An ACP agent is always compatible (the
@@ -58,9 +61,20 @@ progress on screen:
    in the compatible regime while Claude Code stays exclusive.
 5. **Read the models**: the models the tool announces join the catalog, in every model field.
 
-At the end, **Connected** with the version, the sign-in, the regime, how many models and the date. An
-error stays on the step where it happened, with **Try again**; a refused key brings the field back.
-Each catalog profile, in the list below, shows its connection state and **Reconnect**. The
+At the end, **Connected** with the version, the sign-in, the regime, how many models and the date, plus
+the **Change the key** and **Revoke acknowledgment** actions. An error stays on the step where it
+happened, with **Try again**, which resumes from that step (the acknowledgment and the models do not
+redo the sign-in or the probes); if the agent refuses the key at sign-in, the field comes back with
+what you pasted. Each catalog profile, in the list below, shows its connection state (including when
+Connect is waiting for you) and **Reconnect**.
+
+The acknowledgment is per profile and can go away: **Revoke acknowledgment** removes it (the profile
+stops running in the compatible regime until you acknowledge it again); reconnecting a profile that now
+proves the exclusive regime removes it on its own; and **importing a board does not bring the profiles'
+acknowledgments**: whoever imports gives their own, on the machine where the profile runs. Profiles that
+do not go through Connect (copies and custom profiles) give and revoke the acknowledgment in the list,
+with **Acknowledge the compatible regime** and the same text as Connect. An execution policy does not
+switch to a profile with a different regime (`constraints-changed`). The
 requirements banner keeps checking the tool and the sign-in: for Gemini, without the key in the vault
 the sign-in stays "not verified" (you may have your own `GEMINI_API_KEY`), and the sign-in warning
 leads to Connect.
