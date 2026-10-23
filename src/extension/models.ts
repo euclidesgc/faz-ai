@@ -183,9 +183,16 @@ export function parseKimiModels(text: string): ModelOption[] {
 /** Listas lidas da própria ferramenta por um comando (o Cursor, o Kimi Code), guardadas para o próximo "Detectar". */
 const fromCli = new Map<AiTool, ModelOption[]>();
 
-/** Guarda a lista que a ferramenta informou; uma lista vazia não apaga a anterior. */
-export function rememberModels(tool: AiTool, found: ModelOption[]): void {
-  if (found.length) fromCli.set(tool, found);
+/**
+ * Guarda a lista que a ferramenta informou, com a data da leitura em cada modelo (`readAt`), que vai com ele para
+ * o catálogo do board; uma lista vazia não apaga a anterior.
+ */
+export function rememberModels(tool: AiTool, found: ModelOption[], now = Date.now()): void {
+  if (found.length)
+    fromCli.set(
+      tool,
+      found.map((o) => ({ ...o, readAt: now })),
+    );
 }
 
 /** Esquece a lista lida da ferramenta (a CLI saiu da conta, ou nos testes). */

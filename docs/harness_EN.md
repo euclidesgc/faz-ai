@@ -194,7 +194,9 @@ stopped) when **no** enabled profile is available. A profile with a problem, whi
 ready, becomes just its own warning, with a link to its block in the environment check: with Claude
 Code installed and signed in and Cursor absent, the board works and Cursor shows as not found.
 Disabled profiles and profiles pending review never raise a warning. The icon goes away on its own
-when the last item is solved.
+when the last item is solved. Each profile's block shows the mode in its title ("Gemini CLI · API",
+"Claude Code · CLI"): the same Gemini has different requirements in the CLI (the binary), in ACP (the
+agent) and in the API (only the key in the vault).
 
 The check runs when the board opens, when the tool or permission changes, every 5 minutes and on
 **Verificar de novo** (check again), which also rereads the terminal PATH (a node installed with the

@@ -8,6 +8,7 @@ const GROUP_BY = [
   'card_type',
   'model',
   'tool',
+  'mode',
   'card',
   'agent',
   'skill',

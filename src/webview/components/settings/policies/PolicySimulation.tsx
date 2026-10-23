@@ -9,7 +9,7 @@ import { requestExecutionPolicy } from '../../../request';
 import { useAction } from '../../../useAction';
 import { t } from '../../../i18n';
 import { useBoardStore } from '../../../store/boardStore';
-import { Choice, NumberField, ORIGIN_LABELS, FAILURE_LABELS, REASON_LABELS, profileLabel, targetLabel } from './parts';
+import { Choice, NumberField, ORIGIN_LABELS, FAILURE_LABELS, REASON_LABELS, offTargetNote, profileLabel, targetLabel } from './parts';
 
 export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy | null; library: PolicyLibrary }) {
   const state = useBoardStore((s) => s.state)!;
@@ -182,6 +182,9 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
           )}
           {result.value.decision.target && (
             <p>{t('Próximo destino: {target}', { target: targetLabel(library, result.value.decision.target) })}</p>
+          )}
+          {result.value.decision.target && offTargetNote(library, result.value.decision.target.profileId) && (
+            <p role="note">{offTargetNote(library, result.value.decision.target.profileId)}</p>
           )}
           <p>{t('Próxima tentativa: {number}', { number: result.value.decision.nextAttempt })}</p>
           <p>{t('Consumo da tentativa anterior: desconhecido neste cenário.')}</p>

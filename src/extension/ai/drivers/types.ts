@@ -4,12 +4,13 @@
 // `drivers/index.ts`; o catálogo da tela é `TOOLS` (`src/shared/aiTools.ts`). A execução (`run`,
 // `bindingContext`) é o outro contrato, o `Executor` (história 6), que todo driver também cumpre. A
 // verificação de capacidades segue no verificador do host (`capabilityVerifier.ts`), chamado pelo Conectar
-// (`ai/connect.ts`, história 7); a classificação de falhas (`classifyFailure`) entra na história 12.
+// (`ai/connect.ts`, história 7); a classificação de falhas (`classifyFailure`) é da história 12.
 import type { InstallStep } from '../../../shared/environment';
 import type { ModeEnforcement, ToolMode } from '../../../shared/aiTools';
 import type { AiProfile } from '../../../shared/aiProfiles';
 import type { ExecutionTransport } from '../../../shared/executionAdmission';
 import type { ModelOption } from '../../../shared/models';
+import type { FailureClass, ToolFailure } from '../../../shared/usageLimit';
 import type { CliRun } from '../../cliRun';
 import type { HeadlessCommand, HeadlessInput } from '../../headless';
 import type { Measured, MeasuredDeps } from '../../aiOutput/measured';
@@ -158,6 +159,14 @@ export interface Executor {
    * não cumpre fica sem recibo, e a capacidade sai parcial, em vez de uma promessa assinada.
    */
   guarantees?(input: HeadlessInput): readonly string[];
+  /**
+   * Se a falha que a ferramenta devolveu é o limite de uso, e até quando (história 12). É a mesma função que o
+   * leitor do modo usa para ligar `usageLimitReached` e `usageLimitHint` no relatório: os três modos do Gemini
+   * falam da mesma cota da API e classificam igual (`gemini/limit.ts`). Ausente: o leitor da ferramenta
+   * decide sozinho (o Claude Code lê o `rate_limit_event`, o Kimi Code a frase do plano) ou não há limite
+   * reconhecido (o Cursor e os demais agentes ACP).
+   */
+  classifyFailure?(failure: ToolFailure): FailureClass;
 }
 
 /** Um driver: a conexão e a execução de uma ferramenta num modo. */

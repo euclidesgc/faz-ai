@@ -295,6 +295,46 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
     expect(other.lines).toContain('OpenCode pede login. Rode `opencode auth login` no terminal uma vez e entre com a sua conta.');
   });
 
+  it('cota diária do Gemini no session/prompt (429): limite de uso com a renovação da meia-noite do Pacífico (história 12)', async () => {
+    const agent = new FakeAgent({
+      onPrompt: (a) => {
+        a.update({ sessionUpdate: 'tool_call', toolCallId: 't1', title: 'Ler src/app.ts', kind: 'read', status: 'pending' });
+        a.rejectPrompt({ code: 429, message: 'You have exhausted your daily quota on this model.' });
+      },
+    });
+    const { ended, lines } = run(agent);
+    const end = await ended;
+    expect(end.code).toBe(1);
+    expect(end.error?.message).toBe('You have exhausted your daily quota on this model.');
+    expect(lines).toContain('You have exhausted your daily quota on this model.');
+    expect(end.report).toMatchObject({
+      usageLimitReached: true,
+      usageLimitHint: { resetsAt: null, text: null, dailyResetZone: 'America/Los_Angeles' },
+      // o que já rodou antes do limite continua no inventário (a política lê como trabalho parcial)
+      inventory: [{ kind: 'tool', name: 'read', calls: 1 }],
+    });
+  });
+
+  it('429 que escapou das tentativas do Gemini: limite sem horário (backoff); a falha comum não é limite', async () => {
+    const limited = new FakeAgent({ onPrompt: (a) => a.rejectPrompt({ code: 429, message: 'Rate limit exceeded. Try again later.' }) });
+    const limitedEnd = await run(limited).ended;
+    expect(limitedEnd.report.usageLimitReached).toBe(true);
+    expect(limitedEnd.report.usageLimitHint).toBeUndefined();
+
+    const broken = new FakeAgent({ onPrompt: (a) => a.rejectPrompt({ code: 500, message: 'Unknown stream execution error.' }) });
+    const brokenEnd = await run(broken).ended;
+    expect(brokenEnd.code).toBe(1);
+    expect(brokenEnd.report.usageLimitReached).toBe(false);
+  });
+
+  it('o mesmo 429 num agente que não declara como escreve o limite não liga a pausa (o board não adivinha)', async () => {
+    const agent = new FakeAgent({ onPrompt: (a) => a.rejectPrompt({ code: 429, message: 'You have exhausted your daily quota.' }) });
+    const end = await run(agent, {}, acpAgent('opencode')!).ended;
+    expect(end.code).toBe(1);
+    expect(end.report.usageLimitReached).toBe(false);
+    expect(acpAgent('opencode')!.classifyFailure).toBeUndefined();
+  });
+
   it('versão do protocolo diferente: não abre sessão', async () => {
     const agent = new FakeAgent({ initialize: () => ({ protocolVersion: 2, agentCapabilities: {} }) });
     const end = await run(agent).ended;

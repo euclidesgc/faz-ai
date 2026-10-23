@@ -21,6 +21,11 @@ export interface ModelOption {
    * com ele já recebeu a lista real, mesmo que a pessoa o tenha reduzido aos mesmos ids da embutida
    */
   fromTool?: true;
+  /**
+   * Quando a lista da ferramenta foi lida (epoch ms), no modelo que veio dela (história 12): a tela de Modelos diz
+   * de quando é o catálogo, e um catálogo velho (a conta mudou de plano, o Google tirou um modelo) fica visível.
+   */
+  readAt?: number;
 }
 
 /** Campo especial usado em condições: o tipo do card. */

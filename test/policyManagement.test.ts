@@ -179,6 +179,59 @@ describe('host de políticas e simulação', () => {
     expect(second.history.map((r) => r.revision)).toEqual([5, 4, 3, 2, 1]);
     expect(second.nextBefore).toBeNull();
   });
+  it('o catálogo das políticas são os perfis do board, com o modo no rótulo, e não uma lista fixa (história 12)', () => {
+    const library = router.executionPolicyLibrary();
+    const label = (id: string) => library.profiles.find((p) => p.id === id)?.label;
+    expect(label('claude')).toBe('Claude Code · CLI');
+    expect(label('gemini')).toBe('Gemini · ACP');
+    // os agentes ACP do catálogo também são perfis do board, mesmo desligados: a política os pode nomear
+    expect(library.profiles.map((p) => p.id)).toEqual(expect.arrayContaining(['claude', 'cursor', 'kimi', 'gemini', 'codex-acp']));
+    expect(new Set(library.profiles.map((p) => p.id)).size).toBe(library.profiles.length);
+    // o desligado entra como ligado para a validação (salvar não é bloqueado), marcado `off` para a tela avisar
+    expect(library.profiles.find((p) => p.id === 'codex-acp')).toMatchObject({ enabled: true, off: true });
+    expect(library.profiles.find((p) => p.id === 'claude')?.off).toBeUndefined();
+    // trocar o modo do perfil muda o rótulo; o id (o que a política grava) não muda
+    router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: true });
+    router.setProfileMode('gemini', 'api');
+    expect(router.executionPolicyLibrary().profiles.find((p) => p.id === 'gemini')?.label).toBe('Gemini · API');
+  });
+  it('a falha quota de um perfil Gemini: a política com ele grava e a simulação troca para o modelo reserva (história 12)', () => {
+    const gemini = (model: string, label: string) => ({
+      id: `gemini:${model}`,
+      tool: 'gemini',
+      model,
+      label,
+      efforts: [],
+      defaultEffort: null,
+    });
+    router.handle({
+      type: 'settings.models.set',
+      catalog: [...catalog, gemini('gemini-2.5-pro', 'Gemini 2.5 Pro'), gemini('gemini-2.5-flash', 'Gemini 2.5 Flash')],
+    });
+    const draft = policy({
+      id: 'gemini-quota',
+      conditions: { ...policy().conditions, profileIds: ['gemini'], models: ['gemini-2.5-pro'] },
+      targets: [{ profileId: 'gemini', model: 'gemini-2.5-flash', effort: null }],
+      limits: { ...policy().limits, perProfile: { gemini: 1 } },
+    });
+    // antes da história 12 o perfil Gemini não estava no catálogo das políticas: "Destino inválido"
+    router.handle({ type: 'settings.executionPolicy.save', policy: draft, expectedRevision: 0, reviewed: true });
+    expect(router.executionPolicyLibrary().snapshot.records[0]).toMatchObject({ review: 'reviewed', policy: { id: 'gemini-quota' } });
+    const result = router.simulateExecutionPolicy({
+      ...scenario(),
+      draft: null,
+      sourceValue: 'gemini:gemini-2.5-pro',
+      defaultProfileId: 'gemini',
+      runningByProfile: { gemini: 0 },
+    });
+    expect(result.problems).toEqual([]);
+    expect(result.requested).toMatchObject({ state: 'resolved', target: { profileId: 'gemini', model: 'gemini-2.5-pro' } });
+    expect(result.decision).toMatchObject({
+      action: 'fallback',
+      policy: { id: 'gemini-quota' },
+      target: { profileId: 'gemini', model: 'gemini-2.5-flash', effort: null },
+    });
+  });
   it('rascunho inválido pode ser preservado/desativado e removido, mas não ativado', () => {
     const draft = policy({ targets: [{ profileId: 'missing', model: null, effort: null }] });
     router.handle({ type: 'settings.executionPolicy.save', policy: draft, expectedRevision: 0, reviewed: false });

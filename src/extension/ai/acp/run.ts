@@ -145,6 +145,7 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
     quota: agent.quota,
     inputIncludesCache: agent.inputIncludesCache,
     undercounts: agent.usage.tokens === 'last_request' ? agent.label : undefined,
+    classifyFailure: agent.classifyFailure,
   });
   const graceMs = deps.graceMs ?? GRACE_MS;
   const listeners: ((code: number | null, error?: Error) => void)[] = [];
@@ -296,6 +297,9 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
       const err = e instanceof Error ? e : new Error(String(e));
       // sem login o agente recusa a sessão; o board não abre o navegador da pessoa sozinho
       const msg = err instanceof RpcError && err.code === AUTH_REQUIRED ? acpLoginHint(agent) : err.message;
+      // o erro que o agente devolveu (o do `session/prompt`, com o 429 da cota no Gemini) passa pela
+      // classificação do limite de uso; um erro do próprio board (versão, sessão sem id) não
+      if (err instanceof RpcError) reader.fail({ message: err.message, code: err.code, body: err.data });
       deps.log(msg);
       failure = new Error(msg);
       result = 1;

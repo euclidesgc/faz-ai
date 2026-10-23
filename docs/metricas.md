@@ -243,6 +243,14 @@ com a contagem de chamadas.
   consumo "não medido": a ferramenta pode ter alterado arquivos ou mexido no board antes de cair, e
   repetir duplicaria o efeito e o consumo. O card bloqueado e o erro do chat avisam que a execução não
   foi repetida, e a linha "Chamando…" do canal diz a tentativa e o id da execução.
+- **O Gemini nos três modos.** Cada execução guarda o modo em que rodou (CLI, ACP ou API), e o
+  Consumo separa os três pelo corte **Modo da ferramenta**. Na CLI os tokens vêm do `stream-json`, por
+  modelo; no ACP, do `usage` que o agente informa a cada turno; na API, do `usageMetadata` de cada
+  pedido, somados na execução. Nenhum dos três informa custo em dólar. Quando a cota da API do Gemini
+  esgota, nos três modos, a execução termina com o limite de uso: o board não repete às cegas, e a
+  pausa do perfil (ou a política de execução com a falha _quota_) decide o que vem depois, como no
+  Claude Code (ver [automação](automacao.md)). A execução que esbarrou no limite antes de responder
+  fica "não medida".
 - **Perguntas no chat do board** também entram no registro, sem card associado.
 - **O detalhe de cada execução é guardado por uma janela que você configura**, de 1 a 24 meses (o
   mês corrente mais os anteriores). O padrão é 6 meses. Depois da janela o detalhe é descartado, mas
@@ -281,8 +289,11 @@ pelo navegador.
   barra de altura zero. Abaixo do gráfico fica uma tabela com os mesmos números e uma coluna de
   observação (parcial, sem dado, só total mensal).
 - **Onde o consumo aconteceu.** O consumo do período repartido por **fase, tipo de card, modelo,
-  ferramenta de IA, esforço ou perfil** (seletor **Recortar por**), em barras horizontais na medida
-  escolhida em **Medida da barra**: tokens, execuções ou tempo de IA. Ao lado fica a tabela com
+  ferramenta de IA, modo da ferramenta, esforço ou perfil** (seletor **Recortar por**), em barras
+  horizontais na medida escolhida em **Medida da barra**: tokens, execuções ou tempo de IA. O **modo da
+  ferramenta** é como o board falou com ela (CLI, ACP ou API): o mesmo Gemini mede de formas
+  diferentes em cada modo, e a linha da ferramenta soma os três. Execuções anteriores ao registro do
+  modo (e os meses arquivados antes dele) aparecem como "não definido". Ao lado fica a tabela com
   as três medidas. As categorias além do limite somam numa linha "outros". Alcança a série inteira
   do período, inclusive os meses já arquivados.
 - **Fases mais caras e Cards mais caros.** Dois rankings lado a lado, em tabelas que você ordena por
@@ -337,7 +348,8 @@ mês?", "qual agente foi usado mais?". A ferramenta responde em uma tabela compa
 economizar tokens.
 
 - A agregação pode agrupar por fase (`phase`), tipo de card (`card_type`), ferramenta de IA
-  (`tool`), modelo (`model`), esforço (`effort`), perfil (`profile`), card (`card`), agente (`agent`),
+  (`tool`), modo da ferramenta (`mode`: `cli`, `acp` ou `api`), modelo (`model`), esforço (`effort`),
+  perfil (`profile`), card (`card`), agente (`agent`),
   skill (`skill`), ferramenta usada (`used_tool`), ferramenta de MCP (`mcp_tool`) ou comando de Bash
   (`bash_command`). Omita para obter apenas o total do período.
 - `tool` e `used_tool` não são a mesma coisa: `tool` é a ferramenta de IA que rodou (claude, cursor);
@@ -349,7 +361,7 @@ economizar tokens.
   (ex. fase, modelo, tipo de card).
 - Nas dimensões **agent**, **skill**, **used_tool**, **mcp_tool** e **bash_command** a tabela mostra
   só a contagem de execuções e de usos (sem tokens, que não é possível repartir entre componentes de
-  uma execução). `effort` e `profile` têm tokens.
+  uma execução). `effort`, `profile` e `mode` têm tokens.
 - Tokens contam em toda execução medida, do Claude Code e do Cursor. A tabela não traz custo em dólar.
 - Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`. O retrabalho está:
   com `rework: true` (e, se quiser, `start_date` e `end_date`), a resposta traz as revisões, as

@@ -159,7 +159,12 @@ describe('Diagnóstico do ambiente', () => {
         ],
       }),
     );
-    expect(screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Claude Code · Padrão', 'Cursor', 'importado']);
+    // o modo do perfil vai no título (história 12)
+    expect(screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual([
+      'Claude Code · CLI · Padrão',
+      'Cursor · CLI',
+      'importado · CLI',
+    ]);
     const claude = block('Claude Code');
     expect(within(claude).getByText('Ligado')).toBeInTheDocument();
     expect(within(claude).getByText('Linha de comando encontrada · /bin/claude · 2.1.4')).toBeInTheDocument();
@@ -167,6 +172,23 @@ describe('Diagnóstico do ambiente', () => {
     const group = screen.getByText('Desligados (2)').closest('details')!;
     expect(group).not.toHaveAttribute('open');
     expect(within(group).getByText('Desligado')).toBeInTheDocument();
+  });
+
+  it('o mesmo Gemini em modos diferentes: o título de cada bloco diz o modo (história 12)', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show(
+      report({
+        profiles: [
+          profile('claude'),
+          profile('gemini', { name: 'Gemini CLI', tool: 'gemini', mode: 'api', base: 'generic', isDefault: false }),
+        ],
+      }),
+    );
+    expect(screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual([
+      'Claude Code · CLI · Padrão',
+      'Gemini CLI · API',
+    ]);
   });
 
   it('critério de aceite: Claude Code pronto e Cursor sem CLI aparece como não encontrado, com a instalação, sem bloquear', () => {

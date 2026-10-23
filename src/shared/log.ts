@@ -208,7 +208,10 @@ export interface RunReport {
    * liga esta flag — o avaliador de políticas de execução decide a troca de alvo a partir dela.
    */
   usageLimitReached: boolean;
-  /** a dica de renovação que o leitor achou na saída (só o Claude Code a informa); sem ela, a pausa usa o backoff */
+  /**
+   * a dica de renovação que o leitor achou na saída (o horário do Claude Code; a cota diária ou o `retryDelay` do
+   * Gemini nos três modos); sem ela, a pausa usa o backoff
+   */
   usageLimitHint?: UsageLimitHint;
 }
 
@@ -218,7 +221,7 @@ export interface LogMetric {
   month: string;
   metric: 'events' | 'runs' | 'cards_done' | 'tokens' | 'cost' | 'usage';
   /**
-   * '' (total) | 'kind' | 'workflow' | 'outcome' | 'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile'
+   * '' (total) | 'kind' | 'workflow' | 'outcome' | 'phase' | 'card_type' | 'model' | 'tool' | 'mode' | 'effort' | 'profile'
    * | 'source' (só em 'cost': `estimated` | `informed`) | os tipos do inventário (só em 'usage').
    * Em 'tokens', `kind` é o tipo de token: `input` | `output` | `cache_read` | `cache_write`.
    */

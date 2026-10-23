@@ -5,7 +5,7 @@ import { modelId, type ModelOption } from '../../../shared/models';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { useAction } from '../../useAction';
-import { t } from '../../i18n';
+import { formatDateTime, t } from '../../i18n';
 import { Button, Card, IconButton, Text, TextField } from '@radix-ui/themes';
 import { ActionButton, FormField, IconPlus, IconTrash, SelectField, SwitchField } from '../ui';
 import { DependsOn } from './DependsOn';
@@ -187,6 +187,8 @@ export function ModelsSettings() {
 
       {tools.map((tl) => {
         const mine = catalog.filter((o) => o.tool === tl.id);
+        // a leitura mais recente da lista da ferramenta (história 12); sem ela, a lista é a embutida ou a sua
+        const readAt = Math.max(0, ...mine.map((o) => o.readAt ?? 0));
         return (
           <SettingsCard
             key={tl.id}
@@ -216,6 +218,7 @@ export function ModelsSettings() {
             )}
             <Text as="p" size="1" color="gray">
               {t('Mostrando os modelos do {tool}', { tool: tl.label })}
+              {readAt > 0 && ` · ${t('lista lida da ferramenta em {date}', { date: formatDateTime(readAt) })}`}
               {' · '}
               <Button
                 variant="ghost"

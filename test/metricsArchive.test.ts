@@ -167,7 +167,8 @@ describe('getMetrics: mês arquivado com tokens e custo', () => {
     });
   }
 
-  const DIMS: (MetricsDim | undefined)[] = [undefined, 'phase', 'card_type', 'model', 'tool', 'effort', 'profile'];
+  // `mode` (história 12) no fim, para os índices das conferências à mão não mudarem
+  const DIMS: (MetricsDim | undefined)[] = [undefined, 'phase', 'card_type', 'model', 'tool', 'effort', 'profile', 'mode'];
 
   it('regressão das seis dimensões (RF-08): execuções, duração, tokens e custo iguais antes e depois de consolidar', () => {
     seedMixedMonth(2024, 3);
@@ -189,6 +190,20 @@ describe('getMetrics: mês arquivado com tokens e custo', () => {
     // uma conferência com números à mão, para o teste não passar com os dois lados igualmente errados
     expect(row(after[0]!, 'total')).toEqual({ label: 'total', runs: 6, durationMs: 16200, tokens: 480, costUsd: 0.9375 });
     expect(row(after[5]!, 'low')).toEqual({ label: 'low', runs: 2, durationMs: 2500, tokens: 320, costUsd: 0.625 });
+  });
+
+  it('mês arquivado antes do corte por modo (sem linhas mode) entra no corte como "não definido", com o total do mês (história 12)', () => {
+    seedMixedMonth(2024, 3);
+    expect(consolidateNow()).toEqual(['2024-03']);
+    // o arquivo gravado por uma versão anterior não tem `dim = 'mode'`
+    db.run(`DELETE FROM log_months WHERE dim = 'mode'`);
+    const total = row(getMetrics(db, boardId, { limit: 100 }), 'total')!;
+    const mode = getMetrics(db, boardId, { groupBy: 'mode', limit: 100 });
+    expect(mode.rows).toHaveLength(1);
+    const { label: _label, ...numbers } = mode.rows[0]!;
+    const { label: _total, ...expected } = total;
+    expect(numbers).toMatchObject(expected);
+    expect(mode.archivedMonths).toEqual(['2024-03']);
   });
 
   it('mês arquivado sem nenhuma medição devolve tokens e custo null, nunca zero (RF-09, RF-30)', () => {

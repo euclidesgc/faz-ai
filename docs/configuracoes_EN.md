@@ -179,6 +179,12 @@ model goes through the session selector (`session/set_config_option`) when the a
 through the command line (`--model`) where the agent accepts it; an agent that takes neither keeps
 its own model, and the run log says which.
 
+Each model read from the tool (by **Detectar modelos** or by **Conectar**, connect) keeps the date it
+was read, and the tool's block says "lista lida da ferramenta em …" (list read from the tool on …) with
+the most recent one. Without that line, the list is the built-in one or the one you built by hand. An
+old list (the account changed plan, the tool dropped a model) is fixed by detecting again or
+reconnecting.
+
 For Cursor, the list has one line per level of each model (`claude-opus-5-5-low`, `-medium`,
 `-high`…); the board groups the variants into one model with its levels. The fast versions (`-fast`,
 they answer sooner and charge more for the same tokens) stay out until you turn on **Incluir os
@@ -210,6 +216,20 @@ execution. Version conflicts preserve the draft and let you reload the base befo
 The host simulator uses the same evaluator, without AI, and identifies credentials/admission as
 scenario assumptions. Changes to the saved policies or to the context invalidate the displayed
 result.
+
+The profiles the policies and the simulator know are the board's profiles (the extension's, the
+copies and the custom ones), with the mode in the name ("Gemini · API", "Claude Code · CLI"), and each
+one's models are those in the board catalog. So a Gemini profile, in any mode, can be the source and
+the target of a policy: with the _quota_ failure, Pro's exhausted quota can continue on Flash, for
+example. The mode is not part of the policy: switching Gemini's mode in **Conectar** (connect) keeps
+its policies.
+
+The Gemini quota is **per model** (Pro can run out while Flash still has quota), but the usage-limit
+pause is **per profile**: without a policy, the whole Gemini profile waits for the renewal. To continue
+with another model when one runs out, create a policy with the _quota_ failure and the target on the
+other model (Pro → Flash): the switch happens right away, and the profile is not paused. A target on a
+turned-off profile shows a warning in the editor, the summary and the simulator; the policy saves, but
+the run only switches to it after you turn the profile on.
 
 The runner, the chat and the assistants ("Sugerir agentes, regras ou skills", suggest agents,
 rules or skills; "Indicar artefatos", suggest artifacts) decide the target switch through this same

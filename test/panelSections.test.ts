@@ -45,6 +45,8 @@ interface RunOpts {
   model?: string | null;
   effort?: string | null;
   profile?: string | null;
+  /** o modo em que a ferramenta rodou (história 12) */
+  mode?: 'cli' | 'acp' | 'api' | null;
   /** sem consumo, a execução não é medida; `costUsd` omitido = medida sem custo */
   tokens?: number;
   costUsd?: number;
@@ -67,11 +69,12 @@ function run(startedAt: number, durationMs: number, opts: RunOpts = {}): string 
     columnName: opts.phase ?? 'Implementação',
     phase: opts.phase ?? 'Implementação',
   });
-  if ('model' in opts || 'effort' in opts || 'profile' in opts)
+  if ('model' in opts || 'effort' in opts || 'profile' in opts || 'mode' in opts)
     runs.describe(id, {
       model: opts.model ?? null,
       effort: opts.effort ?? null,
       profile: opts.profile ?? null,
+      mode: opts.mode ?? null,
       agent: null,
       permission: 'default',
       autonomous: false,
@@ -157,6 +160,37 @@ describe('getPanelMetrics: os seis cortes', () => {
       expect(cell(b, '')).toMatchObject({ runs: 3, durationMs: 7000 });
       expect(b.covered.runs).toBe(4);
     }
+  });
+
+  it('o corte por modo separa o mesmo Gemini na CLI, no ACP e na API; a execução sem modo é "não definido" (história 12)', () => {
+    run(at(2026, 6), 1000, { tool: 'gemini', mode: 'api', tokens: 100 });
+    run(at(2026, 6), 2000, { tool: 'gemini', mode: 'api', tokens: 50 });
+    run(at(2026, 6), 4000, { tool: 'gemini', mode: 'acp', tokens: 30 });
+    run(at(2026, 6), 500, { tool: 'claude', mode: 'cli', tokens: 7 });
+    run(at(2026, 6), 300); // anterior à migração 48: sem modo
+    const mode = cut(sections(), 'mode');
+    expect(mode.cells.map((c) => [c.value, c.runs, c.tokens])).toEqual([
+      ['api', 2, 150],
+      ['', 1, null],
+      ['acp', 1, 30],
+      ['cli', 1, 7],
+    ]);
+    expect(mode.covered.runs).toBe(5);
+    // a ferramenta continua uma linha só: o modo é outro corte
+    expect(cell(cut(sections(), 'tool'), 'gemini')).toMatchObject({ runs: 3, tokens: 180 });
+  });
+
+  it('o corte por modo não perde o mês arquivado antes dele: o total do mês entra como "não definido" (história 12)', () => {
+    seedMonth(2025, 3);
+    run(at(2026, 6), 1000, { tool: 'gemini', mode: 'api', tokens: 10 });
+    expect(consolidateNow()).toEqual(['2025-03']);
+    db.run(`DELETE FROM log_months WHERE dim = 'mode'`);
+    const s = sections();
+    const mode = cut(s, 'mode');
+    expect(mode.covered.runs).toBe(cut(s, 'tool').covered.runs);
+    expect(mode.covered.durationMs).toBe(cut(s, 'tool').covered.durationMs);
+    expect(cell(mode, 'api')).toMatchObject({ runs: 1 });
+    expect(cell(mode, '')?.runs).toBe(mode.covered.runs - 1);
   });
 
   it('RF-23: o corte por fase é o ranking de fases — os mesmos números de get_metrics por fase', () => {

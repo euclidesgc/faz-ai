@@ -56,9 +56,24 @@ export const REASON_LABELS: Record<string, string> = {
 };
 export const profileLabel = (library: PolicyLibrary, id: string): string => {
   const p = library.profiles.find((p) => p.id === id);
+  // o catálogo monta o rótulo com o modo a partir dos perfis do board ("Gemini · API")
+  if (p?.label) return p.label;
   const name = AI_BASES.find((tool) => tool.id === p?.tool)?.label;
   return name ? (id === p?.tool ? name : `${id} (${name})`) : t('Ausente: {name}', { name: id });
 };
+/**
+ * O aviso do destino num perfil desligado no board (história 12): a política salva e o simulador a avalia, mas na
+ * execução a troca não acontece até a pessoa ligar o perfil. Não bloqueia salvar.
+ */
+export const offTargetNote = (library: PolicyLibrary, profileId: string): string | null =>
+  library.profiles.find((p) => p.id === profileId)?.off
+    ? t(
+        'O perfil {name} está desligado: a política pode ser salva, mas a execução só troca para ele depois que você o ligar em Ferramentas de IA.',
+        {
+          name: profileLabel(library, profileId),
+        },
+      )
+    : null;
 export const targetLabel = (library: PolicyLibrary, target: ExecutionTarget) =>
   `${profileLabel(library, target.profileId)} · ${target.model ?? t('Modelo padrão')}${target.effort ? ` · ${target.effort}` : ''}`;
 export function Choice({
@@ -184,9 +199,15 @@ export function PolicySummary({ policy, library }: { policy: ExecutionPolicy; li
       <dt>{t('Destinos ordenados')}</dt>
       <dd>
         <ol>
-          {policy.targets.map((target, i) => (
-            <li key={i}>{targetLabel(library, target)}</li>
-          ))}
+          {policy.targets.map((target, i) => {
+            const off = offTargetNote(library, target.profileId);
+            return (
+              <li key={i}>
+                {targetLabel(library, target)}
+                {off && <p role="note">{off}</p>}
+              </li>
+            );
+          })}
         </ol>
       </dd>
       <dt>{t('Máximo de tentativas')}</dt>

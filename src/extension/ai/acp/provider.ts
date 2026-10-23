@@ -7,6 +7,7 @@
 // - os servidores MCP vão no `session/new`, e não num arquivo do projeto — exceto no agente que,
 //   pela documentação, ainda só lê o arquivo dele (`projectMcpFile`).
 import type { AiRunTokens } from '../../../shared/log';
+import type { FailureClass, ToolFailure } from '../../../shared/usageLimit';
 import type { Json } from '../../aiOutput/json';
 import type { OutputStream } from '../../aiOutput/reader';
 import type { RunningProcess } from '../../runner';
@@ -96,6 +97,12 @@ export interface AcpAgent {
    * do terminal. Ausente: o login é o da própria ferramenta (`login`).
    */
   readonly apiKeyAuth?: { methodId: string };
+  /**
+   * Se o erro do `session/prompt` é o limite de uso do agente, e até quando (história 12). O protocolo não tem
+   * campo para isso: cada agente escreve o seu erro, e só o que o agente declara é lido. Ausente: o erro é
+   * uma falha comum, sem pausa por limite (o board não adivinha pelo texto de um agente que não conhece).
+   */
+  classifyFailure?(failure: ToolFailure): FailureClass;
 }
 
 /**

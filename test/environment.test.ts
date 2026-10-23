@@ -314,6 +314,26 @@ describe('Diagnóstico do ambiente', () => {
     expect(windows.curlMissing).toBeUndefined();
   });
 
+  it('o Gemini nos três modos: o Diagnóstico leva o modo de cada bloco, e só a CLI sugere instalar a CLI (história 12)', async () => {
+    const gemini = (mode: ProfileHealth['mode'], found: boolean): ProfileHealth => ({
+      ...health('gemini', found),
+      mode,
+      isDefault: false,
+    });
+    const r = await checkEnvironment(probe({ health: [health('claude'), gemini('cli', false), gemini('api', true)] }));
+    expect(r.profiles.map((h) => [h.id, h.mode])).toEqual([
+      ['claude', 'cli'],
+      ['gemini', 'cli'],
+      ['gemini', 'api'],
+    ]);
+    expect(r.profiles[1]!.install).toMatchObject({ docs: 'https://geminicli.com/docs/get-started/installation/' });
+    expect((r.profiles[1]!.install as { steps: { command: string }[] }).steps.map((s) => s.command)).toContain(
+      'npm install -g @google/gemini-cli',
+    );
+    // no modo API não há binário: nada para instalar
+    expect(r.profiles[2]!.install).toBeNull();
+  });
+
   it('perfil com a CLI achada não sugere instalar; o que já traz um link (cópia ou personalizado) fica como veio', async () => {
     const ok = health('claude');
     const custom: ProfileHealth = {

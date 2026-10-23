@@ -38,6 +38,8 @@ const dimLabel = (dim: MetricsBreakdownDim): string => {
       return t('Modelo');
     case 'tool':
       return t('Ferramenta de IA');
+    case 'mode':
+      return t('Modo da ferramenta');
     case 'effort':
       return t('Esforço do modelo');
     case 'profile':
@@ -56,6 +58,8 @@ const dimInline = (dim: MetricsBreakdownDim): string => {
       return t('modelo');
     case 'tool':
       return t('ferramenta de IA');
+    case 'mode':
+      return t('modo da ferramenta');
     case 'effort':
       return t('esforço do modelo');
     case 'profile':
@@ -182,9 +186,11 @@ export function breakdownRows(b: MetricsBreakdown, measure: MetricsMeasure): Bre
 }
 
 /** O nome que a linha mostra. "Não definido" é uma categoria, contada e visível (RF-04). */
-function rowLabel(row: BreakdownRow): string {
+function rowLabel(row: BreakdownRow, dim: MetricsBreakdownDim): string {
   if (row.other) return row.other.count > 0 ? t('outros ({n})', { n: row.other.count }) : t('outros');
-  return row.value === '' ? t('não definido') : row.value;
+  if (row.value === '') return t('não definido');
+  // o modo como o resto da tela o escreve ("CLI", "ACP", "API")
+  return dim === 'mode' ? row.value.toUpperCase() : row.value;
 }
 
 /**
@@ -342,8 +348,8 @@ export function Breakdown({ result, sections, dim, measure, onChange }: Props) {
             <div className="metrics-breakdown-chart">
               <ol className="metrics-breakdown-labels" aria-hidden="true">
                 {rows.map((r) => (
-                  <li key={r.key} title={rowLabel(r)}>
-                    <span className="metrics-breakdown-label">{rowLabel(r)}</span>
+                  <li key={r.key} title={rowLabel(r, dim)}>
+                    <span className="metrics-breakdown-label">{rowLabel(r, dim)}</span>
                     {r.bar === null && <span className="metrics-breakdown-mark">{unmeasured()}</span>}
                   </li>
                 ))}
@@ -430,7 +436,7 @@ export function Breakdown({ result, sections, dim, measure, onChange }: Props) {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.key} data-category={r.other ? 'other' : r.value}>
-                    <th scope="row">{rowLabel(r)}</th>
+                    <th scope="row">{rowLabel(r, dim)}</th>
                     {SHOW_COST && <td className="is-number">{formatCost(r.cell.costUsd)}</td>}
                     <td className="is-number">{formatTokens(r.cell.tokens)}</td>
                     <td className="is-number">{formatNumber(r.cell.runs)}</td>

@@ -28,6 +28,8 @@ export function acpDriver(agent: AcpAgent): ToolDriver {
     // o agente ACP fora do catálogo da tela (o do Cursor, o do Kimi Code) tem a linha do protocolo
     enforcement: toolModeEntry(agent.id, 'acp')?.enforcement ?? ACP_ENFORCEMENT,
     transport: 'acp',
+    // só o agente que declara como escreve o limite (o Gemini); o leitor do ACP usa a mesma função
+    ...(agent.classifyFailure ? { classifyFailure: agent.classifyFailure } : {}),
     run: (input, ctx) => {
       // o gateway confere o transporte antes de chegar aqui; a falta dele é um erro de quem chamou
       if (!ctx.spawnAcp) throw new Error('Transporte ACP indisponível neste host.');

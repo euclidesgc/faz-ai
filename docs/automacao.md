@@ -26,7 +26,10 @@ relógio do board que, a cada rodada, primeiro arruma o board e depois decide o 
   linha por perfil ("Limite de uso do Claude Code: a fila dele retoma às 13:53."). Vencida a pausa, a
   primeira execução automática do perfil é o teste. Com política de fallback, a execução segue no
   destino dela. A pausa fica gravada no board (sobrevive a reabrir o editor); a execução pedida à mão
-  continua liberada e, terminando bem, encerra a pausa.
+  continua liberada e, terminando bem, encerra a pausa. No Gemini, nos modos CLI, ACP e API, a
+  renovação vem do erro da API: a cota diária renova à meia-noite do horário do Pacífico (a regra da
+  API do Gemini), e o limite por minuto (429 `RESOURCE_EXHAUSTED`) traz a espera no `retryDelay`, uma
+  pausa curta; sem nenhum dos dois, vale o backoff.
 - **Confere os pull requests** de toda história que tem um (detecção automática de merges) e limpa
   as branches e worktrees que sobraram (branches e worktrees órfãs).
 - **Sincroniza as branches locais** que o board conhece (a principal, a `develop` e a branch de cada

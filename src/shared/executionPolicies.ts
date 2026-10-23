@@ -30,6 +30,13 @@ export interface PolicyProfile {
   tool: AiTool;
   enabled: boolean;
   modelIds: string[];
+  /** o rótulo do perfil com o modo ("Gemini · API"), para a tela das políticas; ausente no catálogo antigo */
+  label?: string;
+  /**
+   * O perfil está desligado no board. Só informa a tela (aviso no destino, sem bloquear salvar): o catálogo trata
+   * todo perfil como `enabled`, e quem recusa o destino desligado na hora da troca é a execução (`runTargetOfPolicy`).
+   */
+  off?: true;
 }
 export type TargetSource = 'card' | 'activity' | 'chat' | 'agent' | 'phase' | 'rule' | 'board';
 export type TargetResolution =

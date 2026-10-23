@@ -60,6 +60,8 @@ export const policies: Record<string, string> = {
   'Tipos de origem': 'Source types',
   'Origens da chamada': 'Call origins',
   'Destinos ordenados': 'Ordered targets',
+  'O perfil {name} está desligado: a política pode ser salva, mas a execução só troca para ele depois que você o ligar em Ferramentas de IA.':
+    'The {name} profile is turned off: the policy can be saved, but the run only switches to it after you turn it on in AI tools.',
   'Destino {number}': 'Target {number}',
   'Perfil do destino {number}': 'Target {number} profile',
   'Modelo do destino {number}': 'Target {number} model',

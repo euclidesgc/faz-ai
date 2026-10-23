@@ -44,6 +44,23 @@ describe('ModelsSettings', () => {
     expect(screen.queryByLabelText('Modelo novo')).toBeNull();
   });
 
+  it('com a lista lida da ferramenta, a tela diz a data da leitura; só a embutida, não diz (história 12)', () => {
+    const { unmount } = show();
+    expect(screen.queryByText(/lista lida da ferramenta em/)).toBeNull();
+    unmount();
+    const catalog = state().board.modelCatalog;
+    const first = catalog.findIndex((m) => m.tool === tool());
+    const readAt = new Date(2026, 9, 23, 15, 7).getTime();
+    useBoardStore.setState({
+      state: {
+        ...state(),
+        board: { ...state().board, modelCatalog: catalog.map((m, i) => (i === first ? { ...m, fromTool: true, readAt } : m)) },
+      },
+    });
+    show();
+    expect(screen.getByText(/lista lida da ferramenta em .*15:07/)).toBeInTheDocument();
+  });
+
   it('o rascunho recusa um identificador que já existe', async () => {
     show();
     await userEvent.click(screen.getByRole('button', { name: 'Novo modelo' }));

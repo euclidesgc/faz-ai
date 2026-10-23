@@ -15,7 +15,17 @@ import { executionPolicies } from '../../../commands';
 import { useAction } from '../../../useAction';
 import { t } from '../../../i18n';
 import { FormField } from '../../ui';
-import { Checks, Choice, NumberField, PolicySummary, FAILURE_LABELS, POLICY_ACTION_LABELS, ORIGIN_LABELS, profileLabel } from './parts';
+import {
+  Checks,
+  Choice,
+  NumberField,
+  PolicySummary,
+  FAILURE_LABELS,
+  POLICY_ACTION_LABELS,
+  ORIGIN_LABELS,
+  offTargetNote,
+  profileLabel,
+} from './parts';
 import { PolicySimulation } from './PolicySimulation';
 import { PolicyAssistant } from './PolicyAssistant';
 
@@ -260,6 +270,7 @@ export function PolicyEditor({
                     onChange={(v) => updateTarget(index, { ...target, effort: v === '__default' ? null : v })}
                   />
                 </div>
+                {offTargetNote(library, target.profileId) && <p role="note">{offTargetNote(library, target.profileId)}</p>}
                 <div className="actions">
                   <Button
                     size="1"

@@ -1,4 +1,8 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { driverFor } from '../src/extension/ai/drivers';
+import { GEMINI_DAILY_RESET_ZONE, classifyGeminiFailure, durationMs } from '../src/extension/ai/drivers/gemini/limit';
 import {
   BACKOFF_MAX_MS,
   LIMIT_SLACK_MS,
@@ -13,6 +17,7 @@ import {
   parsePauses,
   parseResetText,
   resetAtOf,
+  stricterHint,
   type UsageLimitPause,
   type UsageLimitState,
 } from '../src/shared/usageLimit';
@@ -62,6 +67,27 @@ describe('nextWallTime', () => {
   it('fuso inválido cai no fuso local', () => {
     expect(nextWallTime(13, 50, 'Nada/Isso', NOW)).toBe(nextWallTime(13, 50, null, NOW));
   });
+
+  const LA = 'America/Los_Angeles';
+  it('fim do horário de verão no Pacífico (1º/11/2026, dia de 25 h): o dia seguinte vem do calendário, nunca no passado', () => {
+    // 1º/11 00:30 PDT (07:30 UTC), 01:30 PST, a segunda vez (09:30 UTC), 10:00 PST e 23:30 PST: meia-noite de 2/11 PST
+    for (const now of [Date.UTC(2026, 10, 1, 7, 30), Date.UTC(2026, 10, 1, 9, 30), Date.UTC(2026, 10, 1, 18), Date.UTC(2026, 10, 2, 7, 30)])
+      expect(nextWallTime(0, 0, LA, now)).toBe(Date.UTC(2026, 10, 2, 8, 0));
+    // 31/10 23:00 PDT: a meia-noite de 1º/11 ainda é PDT
+    expect(nextWallTime(0, 0, LA, Date.UTC(2026, 10, 1, 6, 0))).toBe(Date.UTC(2026, 10, 1, 7, 0));
+    // 13:50 já passou em 1º/11 (14:00 PST): 13:50 de 2/11 PST
+    expect(nextWallTime(13, 50, LA, Date.UTC(2026, 10, 1, 22, 0))).toBe(Date.UTC(2026, 10, 2, 21, 50));
+    expect(resetAtOf({ resetsAt: null, text: null, dailyResetZone: LA }, Date.UTC(2026, 10, 1, 18))).toBe(Date.UTC(2026, 10, 2, 8, 0));
+  });
+
+  it('início do horário de verão no Pacífico (8/3/2026 e 14/3/2027, dia de 23 h)', () => {
+    // 7/3 23:30 PST: a meia-noite de 8/3 ainda é PST
+    expect(nextWallTime(0, 0, LA, Date.UTC(2026, 2, 8, 7, 30))).toBe(Date.UTC(2026, 2, 8, 8, 0));
+    // 8/3 10:00 PDT: a meia-noite de 9/3 já é PDT
+    expect(nextWallTime(0, 0, LA, Date.UTC(2026, 2, 8, 17, 0))).toBe(Date.UTC(2026, 2, 9, 7, 0));
+    expect(nextWallTime(0, 0, LA, Date.UTC(2027, 2, 14, 19, 0))).toBe(Date.UTC(2027, 2, 15, 7, 0));
+    expect(nextWallTime(23, 0, LA, Date.UTC(2027, 2, 15, 6, 30))).toBe(Date.UTC(2027, 2, 15, 6, 0) + 24 * 60 * MIN);
+  });
 });
 
 describe('resetAtOf', () => {
@@ -87,6 +113,150 @@ describe('resetAtOf', () => {
     expect(resetAtOf({ resetsAt: (NOW - MIN) / 1000, text: 'resets 1:50pm (America/Sao_Paulo)' }, NOW)).toBe(reset);
     expect(resetAtOf({ resetsAt: null, text: 'usage limit reached' }, NOW)).toBeNull();
     expect(resetAtOf(null, NOW)).toBeNull();
+  });
+});
+
+describe('resetAtOf: a cota diária e a espera pedida pela API (história 12)', () => {
+  it('a cota diária renova na próxima meia-noite do Pacífico', () => {
+    // 16/10 16:45 UTC é 09:45 em Los Angeles (horário de verão, UTC-7): a meia-noite seguinte é 17/10 07:00 UTC
+    expect(resetAtOf({ resetsAt: null, text: null, dailyResetZone: GEMINI_DAILY_RESET_ZONE }, NOW)).toBe(Date.UTC(2026, 9, 17, 7, 0));
+    // depois do fim do horário de verão (1º/11/2026), UTC-8
+    expect(resetAtOf({ resetsAt: null, text: null, dailyResetZone: GEMINI_DAILY_RESET_ZONE }, Date.UTC(2026, 10, 10, 12))).toBe(
+      Date.UTC(2026, 10, 11, 8, 0),
+    );
+  });
+
+  it('o retryDelay é a pausa curta, a partir de agora; a cota diária vence o retryDelay curto', () => {
+    expect(resetAtOf({ resetsAt: null, text: null, retryAfterMs: 41_000 }, NOW)).toBe(NOW + 41_000);
+    expect(resetAtOf({ resetsAt: null, text: null, retryAfterMs: 13_000, dailyResetZone: GEMINI_DAILY_RESET_ZONE }, NOW)).toBe(
+      Date.UTC(2026, 9, 17, 7, 0),
+    );
+    // a pausa do perfil: a espera + a folga de sempre
+    expect(nextPause(null, 'gemini', resetAtOf({ resetsAt: null, text: null, retryAfterMs: 41_000 }, NOW), NOW)).toEqual({
+      profileId: 'gemini',
+      resumeAt: NOW + 41_000 + LIMIT_SLACK_MS,
+      source: 'reset',
+      attempts: 0,
+    });
+  });
+
+  it('espera inválida ou longe demais cai no backoff', () => {
+    expect(resetAtOf({ resetsAt: null, text: null, retryAfterMs: 0 }, NOW)).toBeNull();
+    expect(resetAtOf({ resetsAt: null, text: null, retryAfterMs: RESET_MAX_AHEAD_MS + MIN }, NOW)).toBeNull();
+  });
+});
+
+const fixture = (name: string): unknown => JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', name), 'utf8'));
+const DAILY = { resetsAt: null, text: null, dailyResetZone: GEMINI_DAILY_RESET_ZONE };
+
+describe('classifyGeminiFailure: o limite de uso do Gemini nos três modos', () => {
+  it('CLI: o erro do result da 0.65.0 com a cota diária (a fixture gravada) é limite, com a renovação da meia-noite', () => {
+    const line = fs
+      .readFileSync(path.join(__dirname, 'fixtures', 'gemini-stream-json-quota.jsonl'), 'utf8')
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l))
+      .find((e) => e.type === 'result');
+    expect(classifyGeminiFailure({ message: line.error.message })).toEqual({ usageLimitReached: true, usageLimitHint: DAILY });
+  });
+
+  it('ACP: o session/prompt com o código 429 do Gemini CLI, na cota diária e no 429 que escapou das tentativas', () => {
+    expect(classifyGeminiFailure({ code: 429, message: 'You have exhausted your daily quota on this model.' })).toEqual({
+      usageLimitReached: true,
+      usageLimitHint: DAILY,
+    });
+    // sem horário: a pausa usa o backoff
+    expect(classifyGeminiFailure({ code: 429, message: 'Rate limit exceeded. Try again later.' })).toEqual({ usageLimitReached: true });
+  });
+
+  it('API: o 429 RESOURCE_EXHAUSTED por minuto dá a pausa curta do RetryInfo; o diário, a meia-noite', () => {
+    const minute = fixture('gemini-api-429-minute.json') as { error: { message: string; status: string } };
+    expect(classifyGeminiFailure({ code: 429, message: minute.error.message, status: minute.error.status, body: minute })).toEqual({
+      usageLimitReached: true,
+      usageLimitHint: { resetsAt: null, text: null, retryAfterMs: 41_000 },
+    });
+    const daily = fixture('gemini-api-429-daily.json') as { error: { message: string } };
+    expect(classifyGeminiFailure({ code: 429, message: daily.error.message, body: daily })).toEqual({
+      usageLimitReached: true,
+      usageLimitHint: DAILY,
+    });
+  });
+
+  it('a espera escrita no texto (sem detalhes): "Please retry in", "Suggested retry after" e o JSON embutido pela CLI', () => {
+    expect(classifyGeminiFailure({ message: 'Quota exceeded for metric x. Please retry in 41.536s.' }).usageLimitHint).toEqual({
+      resetsAt: null,
+      text: null,
+      retryAfterMs: 41_536,
+    });
+    expect(
+      classifyGeminiFailure({ message: 'You exceeded your current quota.\nSuggested retry after 30s.' }).usageLimitHint?.retryAfterMs,
+    ).toBe(30_000);
+    const embedded = `[API Error: ${JSON.stringify(fixture('gemini-api-429-daily.json'))}]`;
+    expect(classifyGeminiFailure({ message: embedded })).toEqual({ usageLimitReached: true, usageLimitHint: DAILY });
+  });
+
+  it('créditos e capacidade esgotados são limite; chave recusada, modelo inexistente e erro comum não', () => {
+    expect(
+      classifyGeminiFailure({
+        message: 'Insufficient credits',
+        code: 403,
+        body: {
+          error: {
+            code: 403,
+            details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'INSUFFICIENT_G1_CREDITS_BALANCE' }],
+          },
+        },
+      }).usageLimitReached,
+    ).toBe(true);
+    expect(classifyGeminiFailure({ message: 'Model capacity exhausted: MODEL_CAPACITY_EXHAUSTED', code: 503 }).usageLimitReached).toBe(
+      true,
+    );
+    for (const failure of [
+      { message: 'API key not valid. Please pass a valid API key.', code: 400, status: 'INVALID_ARGUMENT' },
+      { message: 'models/gemini-9 is not found for API version v1beta', code: 404, status: 'NOT_FOUND' },
+      { message: 'Gemini API key is missing or not configured.', code: -32000 },
+      { message: 'erro sem mensagem' },
+    ])
+      expect(classifyGeminiFailure(failure)).toEqual({ usageLimitReached: false });
+  });
+
+  it('um 429 solto no texto não é limite; como status ("status: 429 Too Many Requests", "HTTP 429") é', () => {
+    for (const message of ['Lines 1-429 processed', 'Li 429 arquivos', 'issue #429 resolvida'])
+      expect(classifyGeminiFailure({ message })).toEqual({ usageLimitReached: false });
+    expect(classifyGeminiFailure({ message: '[API Error: got status: 429 Too Many Requests.]' }).usageLimitReached).toBe(true);
+    expect(classifyGeminiFailure({ message: 'Request failed: HTTP 429' }).usageLimitReached).toBe(true);
+    // no ACP e na API vale o código numérico, não o texto
+    expect(classifyGeminiFailure({ message: 'Too many', code: 429 }).usageLimitReached).toBe(true);
+    expect(classifyGeminiFailure({ message: 'Lines 1-429 processed', code: 500 }).usageLimitReached).toBe(false);
+  });
+
+  it('stricterHint: a diária vence a curta, nas duas ordens; entre curtas, a mais recente', () => {
+    const short = (ms: number) => ({ resetsAt: null, text: null, retryAfterMs: ms });
+    expect(stricterHint(DAILY, short(41_000))).toBe(DAILY);
+    expect(stricterHint(short(41_000), DAILY)).toBe(DAILY);
+    expect(stricterHint(short(41_000), short(5_000))).toEqual(short(5_000));
+    expect(stricterHint(undefined, short(1))).toEqual(short(1));
+    expect(stricterHint(DAILY, undefined)).toBe(DAILY);
+  });
+
+  it('durationMs lê a Duration do protobuf em JSON', () => {
+    expect(['41s', '0.5s', '1500ms', '41.536101329s', 'x', '', '-3s'].map((d) => durationMs(d))).toEqual([
+      41_000,
+      500,
+      1500,
+      41_537,
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it('os três modos do Gemini expõem a mesma classificação no driver; o Claude Code e o Cursor não têm', () => {
+    for (const mode of ['cli', 'acp', 'api'] as const) expect(driverFor('gemini', mode)?.classifyFailure).toBe(classifyGeminiFailure);
+    expect(driverFor('claude', 'cli')?.classifyFailure).toBeUndefined();
+    expect(driverFor('cursor', 'cli')?.classifyFailure).toBeUndefined();
+    // os outros agentes ACP não dizem como escrevem o limite: o board não adivinha pelo texto
+    expect(driverFor('opencode', 'acp')?.classifyFailure).toBeUndefined();
   });
 });
 
