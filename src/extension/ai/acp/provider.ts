@@ -95,6 +95,20 @@ export interface AcpAgent {
 /** O que o gateway promete medir do agente: o custo, se ele manda; senão, "tokens", a menor promessa. */
 export const acpMeasure = (agent: AcpAgent): AiMeasure => (agent.usage.cost ? 'cost' : 'tokens');
 
+/**
+ * O modo de sessão que o board pede ao agente; undefined = o modo padrão, em que o agente pergunta e o
+ * board responde cada pedido pelo card. O `fullMode` (`yolo` no Gemini) faz o agente parar de perguntar,
+ * e aí as negações do card (delegação, ferramentas negadas, servidores fora do card) deixam de valer:
+ * por isso ele só vale para uma execução sem restrição declarada. Toda execução admitida traz o conjunto
+ * explícito e ao menos a delegação negada, então roda no modo padrão nos três níveis, e a prova feita no
+ * modo padrão (`board`) é a do que roda. O modo entra no vínculo de isolamento (`admission.ts`).
+ */
+export function acpSessionMode(agent: AcpAgent, input: Pick<HeadlessInput, 'permission' | 'exec'>): string | undefined {
+  if (input.permission !== 'full' || !agent.fullMode) return undefined;
+  const restricted = input.exec?.toolSet === 'explicit' || !!input.exec?.deniedTools?.length;
+  return restricted ? undefined : agent.fullMode;
+}
+
 /** Como iniciar o agente em modo ACP. */
 export function acpCommand(agent: AcpAgent, input: HeadlessInput): { command: string; args: string[] } {
   const model = input.exec?.model && agent.modelArgs ? agent.modelArgs(input.exec.model) : [];

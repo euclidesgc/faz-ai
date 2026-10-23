@@ -31,8 +31,13 @@ export interface BoardRequirement {
   profile?: AiTool;
   /** o nome do perfil, para o texto (o perfil pode ter sido apagado depois) */
   name?: string;
-  /** o que impede o perfil, em `profile` */
-  problem?: ProfileProblem;
+  /**
+   * o que impede o perfil, em `profile`; `evidence-invalidated` não impede: a prova de capacidades gravada
+   * deixou de valer porque o vínculo de isolamento mudou (binário, ambiente, extensão) e precisa ser refeita
+   */
+  problem?: ProfileProblem | 'evidence-invalidated';
+  /** em `evidence-invalidated`: o board refaz a verificação sozinho (agente ACP); sem isso, pelo comando da paleta */
+  automatic?: true;
   /** só o login que venceu numa execução (o probe não confirmou a saída): uma execução manual ainda pode limpar */
   expired?: true;
   /** por que nenhum perfil serve, em `no-profile` */

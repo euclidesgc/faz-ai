@@ -437,15 +437,22 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
    * As capacidades que o Diagnóstico mostra: as provas gravadas no vínculo de isolamento do próprio perfil.
    * Só o perfil verificável e liberado para rodar comando tem vínculo; os outros ficam como vieram.
    */
-  const capabilitiesOf = (meta: AiProfile, profile: AiProfile) => {
+  const evidenceOf = (
+    meta: AiProfile,
+    profile: AiProfile,
+  ): { capabilities: ProfileHealth['capabilities']; invalidated?: ProfileHealth['evidenceInvalidated'] } => {
     const declared = PROFILE_CAPABILITIES.map((c) => meta.capabilities?.[c] ?? 'unknown');
-    if (!verifiableProfile(meta) || !profileCanProbe(profile)) return declared;
+    if (!verifiableProfile(meta) || !profileCanProbe(profile)) return { capabilities: declared };
     try {
       const bound = admission.isolationBinding(profile, profile.id, 'board');
-      return evidenceCapabilities(bound.binding, evidenceStore.load(bound.binding), Date.now(), admissionTransport(profile));
+      const capabilities = evidenceCapabilities(bound.binding, evidenceStore.load(bound.binding), Date.now(), admissionTransport(profile));
+      // a última prova foi feita noutro vínculo: o binário, o ambiente relevante ou o formato do vínculo mudou
+      const last = evidenceStore.lastBinding(profile.id);
+      if (!meta.enabled || !last || last === bound.binding) return { capabilities };
+      return { capabilities, invalidated: isAcpProfile(profile) ? 'automatic' : 'command' };
     } catch {
       // sem o executável não há vínculo: nada foi provado
-      return declared;
+      return { capabilities: declared };
     }
   };
   /**
@@ -469,6 +476,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     return board.aiProfiles
       .map((meta) => {
         const url = profileInstallUrl(resolved.get(meta.id)!);
+        const evidence = evidenceOf(meta, resolved.get(meta.id)!);
         return profileHealth({
           profile: meta,
           isDefault: meta.id === board.aiTool,
@@ -478,16 +486,19 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           // sem verificador de capacidades na base, a validação ainda não é requisito (ver profileHealth)
           validationRequired: false,
           credentials: meta.credentials ? [{ name: meta.credentials.secretRef, filled: meta.credentials.available }] : [],
-          capabilities: capabilitiesOf(meta, resolved.get(meta.id)!),
+          capabilities: evidence.capabilities,
           admission: null,
           isolation: profileIsolation(resolved.get(meta.id)!),
           evidence: { state: 'never' },
           install: url ? { url } : null,
           verifiable: verifiableProfile(meta),
+          ...(evidence.invalidated ? { evidenceInvalidated: evidence.invalidated } : {}),
         });
       })
       .sort((a, b) => rank(a) - rank(b));
   };
+  /** O vínculo em que o board já mandou provar cada agente ACP nesta sessão. */
+  const attempted = new Map<string, string>();
   const checkNow = (): Promise<void> => {
     if (disposed) return Promise.resolve();
     if (checking) {
@@ -515,6 +526,15 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         if (modelsBlocked && !blocked && modelReader && router.snapshot().board.aiTool === modelReader) refreshToolModels(modelReader);
         modelsBlocked = blocked;
         router.setRequirements(list);
+        // agente ACP ligado sem prova em vigor (perdeu a validade porque o vínculo mudou, ou nunca foi
+        // provado neste formato): o board refaz sozinho, uma vez por vínculo, para uma verificação que falha
+        // antes de gravar não repetir a cada conferência
+        for (const meta of router.snapshot().board.aiProfiles)
+          if (meta.enabled && isAcpProfile(meta))
+            verifyOncePerBinding(
+              meta.id,
+              health.find((h) => h.id === meta.id),
+            );
         // o sinal reativo (RF6) limpa, por perfil, quando o probe do próprio perfil volta a confirmar o login —
         // a essa altura `signinCache` já tem o valor fresco desta conferência; quando o probe não sabe
         // dizer, só se recupera por uma execução manual que dá certo (em `runner.ts`)
@@ -552,6 +572,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   router.onRequirementsCheck(async () => {
     forceSigninCheck = true;
     requestedCheck = true;
+    // é também o clique depois de entrar na conta do agente ACP: a prova que falhou sem login (authRequired
+    // no handshake) é refeita; a que está em vigor continua pulada (hasCurrentEvidence)
+    attempted.clear();
     try {
       pathEnv = (await loginShellPath(true)) ?? pathEnv;
       await checkNow();
@@ -907,6 +930,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
       spawnAgent: (command, cwd, out) => spawnAcpProcess({ ...command, format: 'text' }, cwd, out, pathEnv),
     });
+    if (result.indexError) o.log(`${meta.name}: ${result.indexError}`);
     const failed = result.evidence.flatMap((e) => e.checks.filter((c) => c.outcome !== 'passed').map((c) => `${e.capability}/${c.id}`));
     if (result.verified) return `${meta.name}: isolamento verificado; as cinco capacidades têm recibos válidos.`;
     // no ACP os arquivos de contexto do agente ficam sem prova de propósito: o perfil vale no regime compatível
@@ -932,11 +956,29 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
    */
   const verifyInBackground = (profileId: string, why: string): void => {
     const meta = router.snapshot().board.aiProfiles.find((p) => p.id === profileId);
-    if (disposed || !meta || !meta.enabled || !isAcpProfile(meta) || hasCurrentEvidence(profileId)) return;
+    // uma verificação deste perfil já em andamento (ligar e conferir ao mesmo tempo) não abre outro handshake
+    if (disposed || !meta || !meta.enabled || !isAcpProfile(meta) || verifying.has(profileId) || hasCurrentEvidence(profileId)) return;
     api
       .verifyExecutor(profileId)
       .then((message) => o.log(`Verificação de capacidades (${why}): ${message}`))
       .catch((e: unknown) => o.log(`Verificação de capacidades de ${meta.name} (${why}): ${e instanceof Error ? e.message : String(e)}`));
+  };
+  /** Prova o agente ACP no vínculo atual se ainda não tentou nele; sem executável (CLI ausente), nada a provar. */
+  const verifyOncePerBinding = (profileId: string, health: ProfileHealth | undefined): void => {
+    // sem login (ou com o login vencido) a tentativa deste vínculo fica esquecida: quando o login voltar,
+    // a prova (que pode ter falhado por falta dele, como o authRequired do handshake) é refeita
+    if (health?.problem === 'signin' || health?.authExpired) attempted.delete(profileId);
+    if (health?.problem || health?.authExpired) return;
+    let binding: string;
+    try {
+      const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, profileId);
+      binding = admission.isolationBinding(profile, profile.id, 'board').binding;
+    } catch {
+      return;
+    }
+    if (attempted.get(profileId) === binding) return;
+    attempted.set(profileId, binding);
+    verifyInBackground(profileId, health?.evidenceInvalidated ? 'a prova anterior perdeu a validade' : 'perfil sem prova em vigor');
   };
   // ligar um agente ACP já prova o handshake dele: sem isso o perfil ficaria com as capacidades sem prova
   router.onProfileEnabled((profileId) => verifyInBackground(profileId, 'perfil ligado'));

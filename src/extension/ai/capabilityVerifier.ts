@@ -21,7 +21,7 @@ import { asObject, asText, type Json } from '../aiOutput/json';
 import { lineSplitter } from '../aiOutput/lines';
 import type { RunningProcess } from '../runner';
 import { executorProfile, type AiExecutor } from './providers';
-import { admissionAgent, type ExecutionAdmission } from './admission';
+import { admissionAgent, VERIFIER_OBSERVED_ENV, type ExecutionAdmission } from './admission';
 import { canonical, type CapabilityEvidenceStore } from './capabilityEvidence';
 import { ACP_PROTOCOL_VERSION } from './acp/run';
 import { AUTH_REQUIRED, RpcError, rpcConnection } from './acp/connection';
@@ -286,6 +286,8 @@ export interface VerifierResult {
   evidence: CapabilityEvidence[];
   /** nenhuma capacidade verificada de fato quando há check falho ou indisponível */
   verified: boolean;
+  /** o índice do vínculo da última prova por perfil não foi gravado; os recibos foram */
+  indexError?: string;
 }
 
 /** Executa as sondagens e grava as evidências. Recusa quando o ambiente gerenciado não pôde ser lido. */
@@ -310,7 +312,15 @@ export async function verifyExecutor(deps: VerifierDeps): Promise<VerifierResult
   const verified = evidence.every((e) => expected[e.capability].every((id) => e.checks.some((c) => c.id === id && c.outcome === 'passed')));
   // Também grava falhas: uma falha mais nova nunca recorre ao sucesso antigo.
   for (const e of evidence) deps.store.record(e);
-  return { binding: bound.binding, evidence, verified };
+  // a partir daqui o host sabe que este perfil tem prova neste vínculo, e avisa quando o vínculo mudar.
+  // O índice só serve ao aviso: uma falha nele não perde os recibos já gravados nem o resultado
+  let indexError: string | undefined;
+  try {
+    deps.store.remember(deps.profileId, bound.binding);
+  } catch (e) {
+    indexError = `O índice das provas por perfil não foi gravado (${e instanceof Error ? e.message : String(e)}); os recibos valem, mas o aviso de prova invalidada não aparece para este perfil.`;
+  }
+  return { binding: bound.binding, evidence, verified, ...(indexError ? { indexError } : {}) };
 }
 
 /** A fixture neutraliza provedores/chaves: nunca usa nem reencaminha a autenticação da pessoa. */
@@ -398,7 +408,7 @@ async function runClaudeProbes(deps: VerifierDeps, executable: string, _binding:
   const env: Record<string, string> = {
     ...Object.fromEntries(
       Object.keys(process.env)
-        .filter((k) => /^(ANTHROPIC_|CLAUDE_|AWS_|GOOGLE_|AZURE_|NODE_OPTIONS$|NODE_PATH$)/.test(k))
+        .filter((k) => VERIFIER_OBSERVED_ENV.test(k))
         .map((k) => [k, '']),
     ),
     PATH: deps.pathEnv ?? process.env.PATH ?? '',

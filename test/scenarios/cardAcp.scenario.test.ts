@@ -57,8 +57,9 @@ describe('cenário: card com agente da fase no perfil ACP do catálogo (Gemini),
     expect(world.aiRun()).toMatchObject({ tool: 'gemini', outcome: 'done' });
     // o agente da fase segue pelo pedido, que o ACP não tem descoberta nativa de agente
     expect(promptOf(agent)).toContain('Você atua como o agente "condutor-do-board"');
-    // a permissão full liga o modo sem confirmação do agente, e o board respondeu o pedido do comando
-    expect(agent.methods()).toContain('session/set_mode');
+    // a permissão full não liga o modo sem perguntas do agente (yolo): nele as negações do card deixariam
+    // de valer; o board respondeu o pedido do comando (história 3)
+    expect(agent.methods()).not.toContain('session/set_mode');
     expect(world.lines.some((l) => /pediu permissão para npm test: permitido/.test(l))).toBe(true);
 
     expect(end.outcome).toBe('done');
@@ -83,6 +84,59 @@ describe('cenário: card com agente da fase no perfil ACP do catálogo (Gemini),
     expect(end.outcome).toBe('done');
     expect(end.check).toEqual({ status: 'deviation', deviations: [{ kind: 'tool', name: 'execute', calls: 1 }] });
     expect(world.comments()).toContain(`${DEVIATION} do que o card liberou (ferramenta execute).`);
+  });
+});
+
+describe('cenário: a prova do verificador (feita em board) vale para o card em outra permissão (história 3)', () => {
+  it('F: card em edits é admitido com os recibos do vínculo de isolamento, sem verificar de novo', async () => {
+    const agent = new FakeAgent({ onPrompt: workingTurn(() => world!) });
+    world = await cardWorld({ profile: 'gemini', tools: CONDUTOR_TOOLS, permission: 'edits', spawnAcp: agent.spawn });
+
+    const end = await world.run();
+
+    expect(world.lines.join('\n')).not.toMatch(/bloqueada pela admissão|capability-not-verified/);
+    expect(end.outcome).toBe('done');
+    expect(world.aiRun()).toMatchObject({ tool: 'gemini', outcome: 'done' });
+  });
+
+  it('H: card em full com a prova de board: sem yolo, a delegação negada pelo card continua negada', async () => {
+    const asked: unknown[] = [];
+    const agent = new FakeAgent({
+      onPrompt: async (a) => {
+        asked.push(await a.ask({ toolCallId: 'd1', title: 'Agent: revisar o código', kind: 'other' }));
+        a.update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Fase concluída.\n' } });
+        return { stopReason: 'end_turn' };
+      },
+    });
+    world = await cardWorld({
+      profile: 'gemini',
+      tools: CONDUTOR_TOOLS.filter((t) => t !== 'Agent'),
+      permission: 'full',
+      spawnAcp: agent.spawn,
+    });
+
+    const end = await world.run();
+
+    expect(world.lines.join('\n')).not.toMatch(/bloqueada pela admissão|capability-not-verified/);
+    expect(agent.methods()).not.toContain('session/set_mode');
+    expect(asked).toEqual([{ outcome: { outcome: 'selected', optionId: 'opt-reject_once' } }]);
+    expect(world.lines.some((l) => /negado/.test(l))).toBe(true);
+    expect(end.outcome).toBe('done');
+  });
+
+  it('G: uma variável volátil que mudou depois da prova (outro terminal, outra sessão) não bloqueia o card', async () => {
+    const agent = new FakeAgent({ onPrompt: workingTurn(() => world!) });
+    world = await cardWorld({ profile: 'gemini', tools: CONDUTOR_TOOLS, spawnAcp: agent.spawn });
+    const before = process.env.TERM_SESSION_ID;
+    process.env.TERM_SESSION_ID = `outra-sessao-${Date.now()}`;
+    try {
+      const end = await world.run();
+      expect(world.lines.join('\n')).not.toMatch(/bloqueada pela admissão|capability-not-verified/);
+      expect(end.outcome).toBe('done');
+    } finally {
+      if (before === undefined) delete process.env.TERM_SESSION_ID;
+      else process.env.TERM_SESSION_ID = before;
+    }
   });
 });
 

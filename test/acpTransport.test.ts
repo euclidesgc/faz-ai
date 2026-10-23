@@ -163,6 +163,22 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
     expect(agent.received.find((m) => m.method === 'session/set_mode')!.params).toEqual({ sessionId: 'sess-1', modeId: 'yolo' });
   });
 
+  it('"sem restrições" com restrição do card (execução admitida) não troca o modo: o board segue decidindo', async () => {
+    let answer: unknown;
+    const agent = new FakeAgent({
+      onPrompt: async (a) => {
+        answer = await a.ask({ toolCallId: 's1', title: 'Agent: revisar', kind: 'other' });
+        return { stopReason: 'end_turn' };
+      },
+    });
+    const exec = { tools: ['Read'], deniedTools: ['Agent', 'Task'], toolSet: 'explicit' } as never;
+    const { ended, lines } = run(agent, { permission: 'full', exec });
+    await ended;
+    expect(agent.methods()).not.toContain('session/set_mode');
+    expect(answer).toEqual({ outcome: { outcome: 'selected', optionId: 'opt-reject_once' } });
+    expect(lines.some((l) => l.includes('negado'))).toBe(true);
+  });
+
   it('sem a opção de negar, o board cancela o pedido em vez de inventar uma resposta', async () => {
     let answer: unknown;
     const agent = new FakeAgent({

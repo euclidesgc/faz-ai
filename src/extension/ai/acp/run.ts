@@ -28,6 +28,7 @@ import {
   ACP_PROTOCOL_VERSION,
   acpCommand,
   acpMcpToolOf,
+  acpSessionMode,
   type AcpAgent,
   type AcpMcpServer,
   type AcpProcess,
@@ -245,7 +246,8 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
     if (!sessionId) throw new Error(`${agent.label} abriu a sessão sem id.`);
     deps.log(`Sessão ACP aberta com ${servers.length ? servers.map((s) => s.name).join(', ') : 'nenhum servidor MCP'}.`);
 
-    const mode = input.permission === 'full' ? agent.fullMode : undefined;
+    // o modo sem perguntas só fora da admissão: com restrição do card, o board responde cada pedido (acpSessionMode)
+    const mode = acpSessionMode(agent, input);
     const modes = asList(asObject(session.modes)?.availableModes).map((m) => asText(asObject(m)?.id));
     // um modo recusado não derruba a execução: no modo padrão o board responde a cada pedido
     if (mode && modes.includes(mode))

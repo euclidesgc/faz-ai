@@ -185,15 +185,26 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   from the receipts of **the profile itself**: one profile's proof never counts for another, and a
   copy does not inherit the original's. The receipts come from the capability check, which exists
   for Claude Code (the built-in CLI and its copies) and for ACP agents. For an ACP agent it runs on
-  its own when you turn it on and when you connect its tool to the board, unless the proof for the
-  current binding is still valid (the result goes to Output › Faz AI). For any checkable profile it
+  its own when you turn it on, when you connect its tool to the board and, with the agent on, when
+  the environment check finds its binding without a valid proof (once per binding), unless the
+  proof for the current binding is still valid (the result goes to Output › Faz AI). For any checkable profile it
   runs through the **Faz AI: Verify the AI CLI isolation** command, which asks which of the
   enabled profiles to check (the board default comes first). For Claude Code, the CLI runs in a
   throwaway folder against a local API with a fake key; for an ACP agent, it is two handshakes in a
   throwaway folder. Neither spends your account. While a checkable profile has no receipts, its
   block says how to check it from the Command Palette. For an ACP agent the artifacts capability
   stays partial on purpose, because the agent reads its own context files, and the profile is
-  admissible only in the compatible regime. The admission preview on the card evaluates the profile
+  admissible only in the compatible regime. The proof counts for all three permissions (**Só o
+  board**, **Board e arquivos** and **Sem restrições**) and survives an editor restart: its binding
+  is the binary, the isolation arguments, the managed policies, the ACP agent's session mode and
+  only the environment variables that change what the tool does (PATH, the person's folders, proxy
+  and certificates, the provider's and the profile's; for those holding credentials only their
+  presence enters, and none of it is stored: the receipt keeps only the binding's hash). For an ACP
+  agent, even under **Sem restrições**, the board answers every request from the agent: it does not
+  ask for the no-questions mode, in which the card's denials would not apply. When the binding changes after the last proof (the tool was
+  updated, one of those variables changed or the binding format changed in a new version), the top
+  warning says the check is no longer valid, without blocking the board: for an ACP agent the board
+  already redoes it on its own; for Claude Code, run the command again. The admission preview on the card evaluates the profile
   that will run the card (the one from the card's model, the agent or the rule), not the board
   default.
 - **Next run and limits:** shows the regime chosen in Harness › Ferramenta e execução, the default

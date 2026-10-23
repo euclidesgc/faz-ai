@@ -13,10 +13,11 @@ import {
 import { isAcpProfile } from '../../shared/aiProfiles';
 import { resolveCommand } from '../cliResolve';
 import { acpAgent } from './acp/agents';
-import { acpCommand, type AcpAgent } from './acp/provider';
+import { acpCommand, acpSessionMode, type AcpAgent } from './acp/provider';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import { boardOnlyMcpConfig } from '../execution';
 import { canonical, CapabilityEvidenceStore } from './capabilityEvidence';
+import { INHERITED_SESSION_ENV } from '../spawn';
 
 export class AdmissionBlockedError extends Error {
   constructor(readonly decision: ExecutionAdmissionDecision) {
@@ -74,6 +75,62 @@ function digestFile(file: string): { digest: string; stat: fs.Stats } {
   }
 }
 
+/**
+ * As variáveis que o verificador neutraliza na fixture do Claude (provedor, chave, pasta de configuração,
+ * pré-carga do Node): na execução real elas mudam o que a CLI carrega ou com quem ela fala.
+ */
+export const VERIFIER_OBSERVED_ENV = /^(ANTHROPIC_|CLAUDE_|AWS_|GOOGLE_|AZURE_|NODE_OPTIONS$|NODE_PATH$)/;
+/**
+ * Além das observadas, o que muda o comportamento da ferramenta sem passar pela linha de comando: o PATH,
+ * as pastas da pessoa (configuração, dados, estado, cache; as do Windows), a rede (proxy e certificados),
+ * a carga de bibliotecas nativas e as do Gemini (a ferramenta da épica). O resto do ambiente não muda o
+ * isolamento.
+ */
+const RELEVANT_ENV =
+  /^(PATH|HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|APPDATA|LOCALAPPDATA|XDG_(CONFIG|DATA|STATE|CACHE)_HOME|(HTTPS?|ALL|NO)_PROXY|NODE_EXTRA_CA_CERTS|NODE_TLS_REJECT_UNAUTHORIZED|SSL_CERT_(FILE|DIR)|LD_PRELOAD|LD_LIBRARY_PATH|DYLD_[A-Z0-9_]+|GEMINI_[A-Z0-9_]*)$/;
+/**
+ * As `CLAUDE_CODE_*` que mudam o que a CLI faz (provedor, tráfego, memória dos diretórios adicionais,
+ * shell). As demais são da sessão do Claude Code que abriu o editor (porta do SSE, caminho do
+ * executável, ponto de entrada, ids) e mudam a cada sessão: ficam fora, senão a prova cairia a cada
+ * reinício.
+ */
+const CLAUDE_CODE_BEHAVIOR =
+  /^CLAUDE_CODE_(USE_BEDROCK|USE_VERTEX|USE_FOUNDRY|SKIP_BEDROCK_AUTH|SKIP_VERTEX_AUTH|SKIP_FOUNDRY_AUTH|DISABLE_NONESSENTIAL_TRAFFIC|ADDITIONAL_DIRECTORIES_CLAUDE_MD|MAX_OUTPUT_TOKENS|SHELL|SHELL_PREFIX|GIT_BASH_PATH|API_KEY_HELPER_TTL_MS|CLIENT_CERT|CLIENT_KEY|DISABLE_AUTO_MEMORY|SUBAGENT_MODEL)$/;
+/**
+ * Nome de variável que costuma guardar credencial: entra no vínculo só a presença, nunca o valor (nem
+ * digest). Chave e token de sessão giram (`AWS_SESSION_TOKEN`, o token do login) sem mudar o isolamento,
+ * e o vínculo não precisa do segredo para nada.
+ */
+const SENSITIVE_ENV = /KEY|TOKEN|SECRET|PASSW|CREDENTIAL|AUTH|COOKIE/;
+
+/**
+ * O ambiente que entra no vínculo: o mesmo que a execução recebe (o do host, o PATH do shell e as
+ * variáveis do comando, sem as da sessão do Claude Code que o spawn tira), filtrado às variáveis que
+ * mudam o que a ferramenta carrega: o PATH e as pastas de configuração, as que o verificador observa e
+ * as do próprio perfil. Uma variável volátil (terminal, sessão do editor, socket) não muda o vínculo,
+ * então a prova sobrevive ao reinício do editor. De variável sensível entra só a presença: o vínculo só
+ * é gravado como hash, e nem em memória a credencial entra nele.
+ */
+export function bindingEnvironment(
+  base: NodeJS.ProcessEnv,
+  pathEnv: string | undefined,
+  own: Record<string, string> | undefined,
+): Record<string, string> {
+  const env: NodeJS.ProcessEnv = { ...base, ...(pathEnv ? { PATH: pathEnv } : {}), ...own };
+  for (const name of INHERITED_SESSION_ENV) delete env[name];
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(env)) {
+    if (value === undefined) continue;
+    // no Windows o ambiente não distingue maiúsculas: `Path` é o PATH
+    const upper = name.toUpperCase();
+    const ownVar = !!own && name in own;
+    if (!ownVar && upper.startsWith('CLAUDE_CODE_') && !CLAUDE_CODE_BEHAVIOR.test(upper)) continue;
+    if (!ownVar && !RELEVANT_ENV.test(upper) && !VERIFIER_OBSERVED_ENV.test(upper)) continue;
+    out[name] = SENSITIVE_ENV.test(upper) ? '<definida>' : value;
+  }
+  return out;
+}
+
 /** Entrada canônica do vínculo de isolamento: as flags de isolamento não dependem do conteúdo por execução. */
 export function isolationInput(permission: RunnerPermission): HeadlessInput {
   return {
@@ -123,9 +180,16 @@ export class ExecutionAdmission {
     const profile = executorProfile(executor);
     const agent = admissionAgent(profile);
     // no ACP o vínculo é o comando e os argumentos do agente do catálogo: não há flags de isolamento,
-    // arquivo temporário nem formato de saída; o modelo do card entra nos argumentos quando o agente aceita
+    // arquivo temporário nem formato de saída; o modelo do card entra nos argumentos quando o agente aceita.
+    // O modo da sessão também entra: no modo sem perguntas (`fullMode`) o board não decide mais cada
+    // pedido, então uma prova feita no modo padrão nunca pode valer para ele
     const template = agent
-      ? { transport: 'acp' as const, agent: agent.id, ...acpCommand(agent, { ...input, prompt: '<prompt-da-execucao>' }) }
+      ? {
+          transport: 'acp' as const,
+          agent: agent.id,
+          ...acpCommand(agent, { ...input, prompt: '<prompt-da-execucao>' }),
+          sessionMode: acpSessionMode(agent, input) ?? 'padrao',
+        }
       : headlessCommand(profile, { ...input, prompt: '<prompt-da-execucao>', structured: true });
     const executable = resolveCommand(
       template.command,
@@ -137,7 +201,8 @@ export class ExecutionAdmission {
     const real = fs.realpathSync(executable);
     const environment = this.options.environmentEvidence();
     const context = {
-      version: 1,
+      // 2: sem a permissão e com o ambiente filtrado; toda prova gravada no formato 1 perde a validade
+      version: 2,
       providerRevision: 1,
       platform: process.platform,
       arch: process.arch,
@@ -147,7 +212,9 @@ export class ExecutionAdmission {
       ...(profile.kind !== 'builtin' ? { profileConfig: profile.config } : {}),
       executable: real,
       binary: this.binaryDigest(real),
-      permission: input.permission,
+      // a permissão não entra por si: no modo estrito a invocação do Claude é a mesma nos três níveis
+      // (o conjunto exato de ferramentas é a execução que fixa, no vínculo dela) e no ACP o comando não
+      // a carrega; onde ela muda a linha de comando (perfil personalizado), entra pela invocação
       invocation: template,
       // cwd nulo = vínculo de isolamento: a prova roda numa fixture e vale para qualquer pasta de projeto
       ...(cwd === null
@@ -156,11 +223,7 @@ export class ExecutionAdmission {
             cwd: fs.realpathSync(cwd),
             additionalDirectories: (input.addDirs ?? []).map((d) => fs.realpathSync(path.resolve(cwd, d))),
           }),
-      environment: {
-        ...process.env,
-        ...(this.options.pathEnv() ? { PATH: this.options.pathEnv() } : {}),
-        ...('env' in template ? template.env : {}),
-      },
+      environment: bindingEnvironment(process.env, this.options.pathEnv(), 'env' in template ? template.env : undefined),
       environmentEvidence: environment,
     };
     return {
@@ -172,7 +235,8 @@ export class ExecutionAdmission {
   /**
    * Vínculo das evidências de isolamento: identidade do executor, binário, flags de isolamento, ambiente e
    * políticas gerenciadas, sem pasta de projeto nem listas por execução (ferramentas, MCP, diretórios).
-   * Os recibos são produzidos pelo verificador numa fixture com este mesmo vínculo.
+   * Os recibos são produzidos pelo verificador numa fixture com este mesmo vínculo. A permissão não muda o
+   * vínculo (ver `binding`): a prova feita em `board` vale para `edits` e `full`.
    */
   isolationBinding(executor: AiExecutor, profileId: string, permission: RunnerPermission) {
     return this.binding(executor, profileId, isolationInput(permission), null);
@@ -248,6 +312,10 @@ export class ExecutionAdmission {
     });
     // o transporte ACP não tem descoberta nativa de agente: o agente já segue pelo pedido
     if (transport === 'acp') effective.exec!.agent = '';
+    // defesa: a execução admitida roda no modo padrão do agente, em que o board decide cada pedido; o
+    // modo sem perguntas desligaria as negações do card e não é o modo que a prova cobriu
+    if (transport === 'acp' && acpSessionMode(admissionAgent(profile)!, effective))
+      throw new Error('O modo sem perguntas do agente ACP não é admitido: o board precisa decidir cada pedido.');
     if (effective.exec!.agent && !effective.exec!.agentDefinition)
       throw new Error('Agente obrigatório precisa de definição do board; descoberta nativa não é permitida.');
     if (effective.exec!.agentDefinition) {

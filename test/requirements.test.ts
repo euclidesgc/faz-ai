@@ -148,6 +148,49 @@ describe('requisitos do board', () => {
     expect(list).toEqual([]);
   });
 
+  it('prova de capacidades invalidada: aviso que não bloqueia, dizendo se o board refaz sozinho', () => {
+    const list = checkRequirements({
+      nodePath: process.execPath,
+      health: [
+        health('claude', { evidenceInvalidated: 'command' }),
+        health('gemini', { registration: 'enabled', evidenceInvalidated: 'automatic' }),
+        // com outro problema, o aviso é o do problema; desligado, nenhum
+        health('cursor', { evidenceInvalidated: 'command', probe: { id: 'cursor', found: false, login: 'unchecked' }, problem: 'cli' }),
+        health('opencode', { registration: 'disabled', evidenceInvalidated: 'automatic' }),
+      ],
+    });
+    expect(list).toEqual([
+      {
+        id: 'profile',
+        profile: 'cursor',
+        name: 'Cursor',
+        problem: 'cli',
+        optional: true,
+        action: { kind: 'diagnostic', profile: 'cursor' },
+      },
+      {
+        id: 'profile',
+        profile: 'claude',
+        name: 'Claude Code',
+        problem: 'evidence-invalidated',
+        optional: true,
+        action: { kind: 'diagnostic', profile: 'claude' },
+      },
+      {
+        id: 'profile',
+        profile: 'gemini',
+        name: expect.any(String),
+        problem: 'evidence-invalidated',
+        automatic: true,
+        optional: true,
+        action: { kind: 'diagnostic', profile: 'gemini' },
+      },
+    ]);
+    expect(noProfileAvailable({ requirements: list })).toBe(false);
+    expect(blocksExecution({ requirements: list, authExpired: [] }, 'claude')).toBe(false);
+    expect(blocksExecution({ requirements: list, authExpired: [] }, 'gemini')).toBe(false);
+  });
+
   it('o harness é recomendação (optional), com o que falta e o atalho para o Harness; sem faltas ou sem inventário, nada', () => {
     const list = checkRequirements({ nodePath: process.execPath, health: [health('claude')], harnessIssues: ['artifacts', 'agents'] });
     expect(list).toEqual([{ id: 'harness', optional: true, harnessIssues: ['artifacts', 'agents'], action: { kind: 'settings' } }]);

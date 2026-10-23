@@ -84,13 +84,18 @@ describe('admissão no host', () => {
     fs.mkdirSync(child);
     expect(admission.binding('claude', 'claude', { ...i, addDirs: [child] }, dir).binding).not.toBe(base);
     expect(admission.binding('claude', 'claude', i, child).binding).not.toBe(base);
-    const before = process.env.FAZAI_ADMISSION_TEST;
+    // o ambiente que conta é o que muda o que a CLI carrega (história 3); uma variável qualquer não conta
+    const before = { relevant: process.env.CLAUDE_CONFIG_DIR, other: process.env.FAZAI_ADMISSION_TEST };
     try {
       process.env.FAZAI_ADMISSION_TEST = 'mudou';
+      expect(admission.binding('claude', 'claude', i, dir).binding).toBe(base);
+      process.env.CLAUDE_CONFIG_DIR = path.join(dir, 'outra-config');
       expect(admission.binding('claude', 'claude', i, dir).binding).not.toBe(base);
     } finally {
-      if (before === undefined) delete process.env.FAZAI_ADMISSION_TEST;
-      else process.env.FAZAI_ADMISSION_TEST = before;
+      if (before.other === undefined) delete process.env.FAZAI_ADMISSION_TEST;
+      else process.env.FAZAI_ADMISSION_TEST = before.other;
+      if (before.relevant === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+      else process.env.CLAUDE_CONFIG_DIR = before.relevant;
     }
     expect(admission.binding('claude', 'claude', { ...i, prompt: 'outro objetivo sem mudar capacidades' }, dir).binding).toBe(base);
   });

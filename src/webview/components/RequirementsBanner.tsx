@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { profileLabel } from '../../shared/aiProfiles';
 import type { BoardState, Card } from '../../shared/model';
-import type { ProfileProblem } from '../../shared/profileHealth';
 import { defaultTarget, runTargetOf } from '../../shared/runTarget';
 import { cliProblem, type BoardRequirement } from '../../shared/requirements';
 import { useBoardStore } from '../store/boardStore';
@@ -15,7 +14,7 @@ import { Button, IconCheck, IconWarning, type ButtonVariant } from './ui';
 export type RequirementsAlertLevel = 'error' | 'warn' | 'recommended';
 
 /** O problema de um perfil, em poucas palavras, para o título do aviso. */
-function profileProblemTitle(problem: ProfileProblem | undefined, name: string): string {
+function profileProblemTitle(problem: BoardRequirement['problem'], name: string): string {
   switch (problem) {
     case 'cli':
       return t('{name}: linha de comando não encontrada', { name });
@@ -27,6 +26,8 @@ function profileProblemTitle(problem: ProfileProblem | undefined, name: string):
       return t('{name}: precisa verificar de novo', { name });
     case 'not-admissible':
       return t('{name}: não admissível', { name });
+    case 'evidence-invalidated':
+      return t('{name}: a verificação de capacidades perdeu a validade', { name });
     case 'pending-review':
     default:
       return t('{name}: pendente de revisão', { name });
@@ -77,9 +78,17 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
                 ? t(
                     'Este perfil ainda não foi testado, ou a linha de comando mudou desde o último teste. Veja o estado dele no Diagnóstico do ambiente.',
                   )
-                : r.problem === 'not-admissible'
-                  ? t('O regime em vigor não admite este perfil. Veja o motivo no Diagnóstico do ambiente.')
-                  : t('Este perfil foi importado e espera revisão. O board não roda nenhum comando dele enquanto isso.'),
+                : r.problem === 'evidence-invalidated'
+                  ? r.automatic
+                    ? t(
+                        'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. O board já está verificando de novo, sem gastar a sua conta; o resultado fica em Saída › Faz AI.',
+                      )
+                    : t(
+                        'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Rode "Faz AI: Verificar o isolamento da CLI de IA" na paleta de comandos e escolha este perfil.',
+                      )
+                  : r.problem === 'not-admissible'
+                    ? t('O regime em vigor não admite este perfil. Veja o motivo no Diagnóstico do ambiente.')
+                    : t('Este perfil foi importado e espera revisão. O board não roda nenhum comando dele enquanto isso.'),
       };
     }
     case 'harness': {
