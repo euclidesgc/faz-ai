@@ -49,6 +49,9 @@ function legacyIdentity(row: Row, acpAgent: unknown): Identity {
   const ready = BUILTIN_PROFILES.find((p) => p.id === row.id);
   if (ready) return { kind: ready.kind, tool: ready.tool, mode: ready.mode };
   const id = str(row.id);
+  // o agente ACP pronto que saiu do catálogo continua o que era: a própria ferramenta, em acp. Pela base
+  // (generic) ele viraria uma cópia, mudaria o catalogTool e o caminho de volta o gravaria como copy
+  if (row.kind === 'acp') return { kind: 'catalog', tool: id, mode: 'acp' };
   if (normalizeProfileKind(row.kind) === 'catalog') return { kind: 'catalog', tool: str(row.base), mode: 'cli' };
   return { kind: 'custom', tool: id, mode: typeof acpAgent === 'string' ? 'acp' : 'cli' };
 }

@@ -164,3 +164,31 @@ it('ida e volta: o caminho de volta devolve o banco ao schema 47 com os tipos an
   migrate(db);
   expect(new AiProfileRepo(db).list(BOARD)).toEqual(listed);
 });
+
+it('agente ACP pronto que saiu do catálogo continua a própria ferramenta em acp, também na volta ao 47', () => {
+  // um id que nenhum catálogo atual tem: a linha foi gravada quando ele era um agente ACP pronto
+  run(
+    db,
+    "INSERT INTO ai_profiles(board_id,id,name,enabled,kind,base,position,review_state) VALUES (?,'agente-antigo','Agente antigo',0,'acp','generic',20,'reviewed')",
+    [BOARD],
+  );
+  const before = all(db, 'SELECT * FROM ai_profiles ORDER BY id');
+  migrate(db);
+  const old = new AiProfileRepo(db).list(BOARD).find((p) => p.id === 'agente-antigo')!;
+  expect(old).toMatchObject({ kind: 'catalog', tool: 'agente-antigo', mode: 'acp', base: 'generic' });
+  expect(catalogTool(old)).toBe('agente-antigo');
+  expect(one(db, "SELECT kind, tool, mode FROM ai_profiles WHERE id = 'agente-antigo'")).toEqual({
+    kind: 'catalog',
+    tool: 'agente-antigo',
+    mode: 'acp',
+  });
+  migrateDown(db, 47);
+  // volta como acp, não como uma cópia com base generic (que o schema 47 recusa)
+  expect(all(db, 'SELECT * FROM ai_profiles ORDER BY id')).toEqual(before);
+});
+
+it('modo de execução fora dos conhecidos lê como não registrado', () => {
+  migrate(db);
+  run(db, "UPDATE ai_runs SET mode = 'xyz' WHERE id = 'r1'");
+  expect(new AiRunRepo(db).byMonth('2026-10').find((r) => r.id === 'r1')!.mode).toBeNull();
+});

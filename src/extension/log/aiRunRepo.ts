@@ -17,7 +17,7 @@ import { runCheckDetail, runCheckFrom, type RunCheck } from '../../shared/runChe
 import { newId } from '../db/ids';
 import { validateAdmissionDecision, type ExecutionAdmissionDecision } from '../../shared/executionAdmission';
 import { all, num, one, run, str, strOrNull, transaction, type Row } from '../db/query';
-import type { ProfileMode } from '../../shared/aiProfiles';
+import { PROFILE_MODES, type ProfileMode } from '../../shared/aiProfiles';
 
 /** Uma linha de `ai_runs`, como lida de volta (ver `AiRunStart`/`AiRunConfig` para o que cada campo significa). */
 export interface AiRun {
@@ -105,7 +105,8 @@ function toRun(r: Row): AiRun {
     profile: strOrNull(r.profile),
     agent: strOrNull(r.agent),
     permission: str(r.permission),
-    mode: (strOrNull(r.mode) as ProfileMode | null) ?? null,
+    // um valor que nenhuma versão grava (banco adulterado) lê como não registrado
+    mode: PROFILE_MODES.find((m) => m === r.mode) ?? null,
     autonomous: num(r.autonomous) === 1,
     clean: num(r.clean) === 1,
     skills: JSON.parse(str(r.skills_json) || '[]'),

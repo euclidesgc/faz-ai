@@ -419,6 +419,21 @@ describe('importBoard', () => {
     expect(() => parseExportFile(JSON.stringify(broken))).toThrow('falta a coluna "tool" em "ai_profiles"');
   });
 
+  it('o modo das execuções importadas é um dos que o board grava, ou nulo', () => {
+    run(
+      db,
+      "INSERT INTO ai_runs(id,board_id,started_at,month,origin,tool,permission,mode) VALUES ('run-1',?,1,'2026-10','manual','claude','board','cli')",
+      [router.boardId],
+    );
+    const { file } = doExport();
+    const row = (mode: unknown) => ({ ...file.tables.ai_runs![0], id: 'run-importada', mode }) as never;
+    const withRun = (mode: unknown) => ({ ...file, tables: { ...file.tables, ai_runs: [row(mode)] } });
+    expect(file.tables.ai_runs!.length).toBeGreaterThan(0);
+    expect(() => parseExportFile(JSON.stringify(withRun('xyz')))).toThrow('modo de execução inválido');
+    expect(() => parseExportFile(JSON.stringify(withRun('acp')))).not.toThrow();
+    expect(() => parseExportFile(JSON.stringify(withRun(null)))).not.toThrow();
+  });
+
   it('export antigo sem branch_kind: a importação migra e o Bug sai em hotfix, o Retrabalho em bugfix', () => {
     const old = newDatabase();
     migrate(old, 29);

@@ -32,13 +32,16 @@ Consumo da história 12 misturaria medições incomparáveis. O número da migra
   `acpAgent` no cofre, senão `(id, cli)`. O personalizado só é gravado quando o cofre responde: com a
   leitura falhando ou sem o valor (o perfil importado de outra máquina), a leitura deduz `(id, cli)` em
   memória e o primeiro `save` grava. A leitura de uma linha ainda não preenchida usa a mesma dedução.
+  Uma linha `acp` cujo id saiu de `ACP_READY_AGENTS` continua `(id, acp)`, independentemente do catálogo
+  atual: pela base (`generic`) ela viraria cópia, mudaria o `catalogTool` e voltaria ao 47 como `copy`.
 - **`save` e `duplicate` derivam ferramenta e modo, nunca do rascunho.** A cópia é a ferramenta da base
   em `cli`; o personalizado é a própria ferramenta, em `acp` quando aponta um agente. As linhas novas do
   agente ACP pronto (ao ligar) e das CLIs prontas (semente) já nascem com os dois.
 - **`catalogTool` não muda de valor.** Passa a ser `tool || id`, que dá a base na cópia e o id nos
   demais, como antes. O teste da migração compara a regra antiga com a nova em todos os perfis.
 - **`ai_runs.mode` é gravado pelo gateway**, nas três chamadas de `describe`, com o transporte que de
-  fato roda (`isAcpProfile`), não o declarado. O `prepare()` dos chamadores não informa o modo.
+  fato roda (`isAcpProfile`), não o declarado. O `prepare()` dos chamadores não informa o modo. A
+  leitura devolve `null` para um valor fora de `PROFILE_MODES`, e a importação recusa o arquivo com ele.
 - **Exportação.** `ExportTable.columns` registra as colunas que entraram depois da tabela
   (`ai_profiles.tool` e `mode`, `ai_runs.mode`, todas `48`): um arquivo do schema 48 em diante sem elas é
   recusado; um anterior importa pelo caminho que já existia (o banco em memória na versão do arquivo,

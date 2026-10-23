@@ -10,6 +10,7 @@ import type { Database, SqlValue } from 'sql.js';
 import { LARGE_EXPORT_BYTES, type ImportSummary } from '../../shared/backup';
 import { isSafeRelPath } from '../../shared/artifacts';
 import { validateAdmissionDecision } from '../../shared/executionAdmission';
+import { PROFILE_MODES } from '../../shared/aiProfiles';
 import { isSafeSegment, safeName, type AttachmentStore } from '../attachments';
 import { newDatabase } from './database';
 import { all, num, one, run, str, transaction, type Row } from './query';
@@ -514,6 +515,11 @@ function parentsFirst(rows: Row[]): Row[] {
   return out;
 }
 
+/** As linhas de `ai_runs` que entram ou saem no arquivo: a decisão de admissão e o modo da execução (48). */
 function validateAdmissionRows(rows: readonly Row[]): void {
-  for (const row of rows) if (row.admission_json != null) validateAdmissionDecision(JSON.parse(str(row.admission_json)));
+  for (const row of rows) {
+    if (row.admission_json != null) validateAdmissionDecision(JSON.parse(str(row.admission_json)));
+    // nulo é "não registrado" (execução anterior à 48); fora isso, só os modos que o board grava
+    if (row.mode != null && !PROFILE_MODES.some((m) => m === row.mode)) throw invalid('modo de execução inválido.');
+  }
 }
