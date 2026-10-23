@@ -71,7 +71,11 @@ num driver; o board, as telas e a admissão só falam com o contrato.
    gravadas: só com uma mudança de formato deliberada (o `version` do contexto) e um registro de
    decisão; `test/admissionBoundary.test.ts` compara os vínculos com a régua de
    `test/helpers/bindingReference.ts`. A CLI personalizada não tem driver e roda pelo executor genérico
-   de CLI (`cliExecutor`), o mesmo das CLIs prontas.
+   de CLI (`cliExecutor`), o mesmo das CLIs prontas. No modo API (`transport: 'api'`) não há processo:
+   o `bindingContext` devolve `apiBinding(...)` (`ai/apiBinding.ts`: endpoint, modelo, versão da
+   extensão e o digest da chave, nunca a chave), e a prova não vem de sonda, mas da evidência por
+   construção que o host assina (`recordByConstruction`, com os checks de `API_CAPABILITY_CHECKS`); o
+   laço do driver é quem cumpre esses checks, com teste.
 2. **A linha do catálogo**: a entrada da ferramenta em `TOOLS` (`src/shared/aiTools.ts`), com a
    página, a nota de cobrança, os modos oferecidos (só os que têm driver), os planejados (com a
    história que os entrega), o modo recomendado com o motivo e a ficha de cada modo, com as oito

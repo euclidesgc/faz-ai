@@ -6,6 +6,7 @@ import {
   EXECUTOR_CAPABILITIES,
   assessCapability,
   capabilityChecks,
+  evidenceSource,
   type CapabilityEvidence,
   type CapabilityState,
   type ExecutionAdmissionDecision,
@@ -154,9 +155,10 @@ export function evidenceCapabilities(
   transport: ExecutionTransport,
 ): CapabilityState[] {
   const checks = capabilityChecks(transport);
+  const source = evidenceSource(transport);
   return PROFILE_CAPABILITIES.map((c) =>
     (EXECUTOR_CAPABILITIES as readonly string[]).includes(c)
-      ? assessCapability(c as ExecutorCapability, binding, evidence, now, checks).state
+      ? assessCapability(c as ExecutorCapability, binding, evidence, now, checks, source).state
       : 'unknown',
   );
 }
@@ -173,8 +175,9 @@ export function evidenceCurrent(
   transport: ExecutionTransport,
 ): boolean {
   const checks = capabilityChecks(transport);
+  const source = evidenceSource(transport);
   return EXECUTOR_CAPABILITIES.every((c) =>
-    ['verified', 'incomplete'].includes(assessCapability(c, binding, evidence, now, checks).reason),
+    ['verified', 'incomplete'].includes(assessCapability(c, binding, evidence, now, checks, source).reason),
   );
 }
 

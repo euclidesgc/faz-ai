@@ -360,7 +360,9 @@ export function validateProfileRows(rows: Row[], boardId: string): void {
         : (kind === 'custom') !== (row.base === 'generic') ||
           !['claude', 'cursor', 'kimi', 'generic'].includes(str(row.base)) ||
           (tool !== '' && tool !== (kind === 'catalog' ? str(row.base) : id)) ||
-          (kind === 'catalog' && mode !== 'cli'))
+          (kind === 'catalog' && mode !== 'cli') ||
+          // o personalizado tem comando próprio (CLI) ou um agente ACP: não há personalizado pela API
+          (kind === 'custom' && mode === 'api'))
     )
       throw new Error('Tipo ou base do perfil importado inválido.');
     if (

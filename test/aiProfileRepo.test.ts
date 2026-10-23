@@ -372,6 +372,10 @@ it('a importação aceita os dois conjuntos de valores e recusa ferramenta ou mo
   bad({ kind: 'catalog', tool: 'cursor' });
   bad({ kind: 'catalog', tool: 'claude', mode: 'acp' });
   bad({ kind: 'catalog', tool: 'claude', mode: 'api' });
+  // `api` é um modo conhecido desde a história 9, mas nenhum perfil roda nele ainda: nem pronto, nem
+  // personalizado (que tem comando próprio ou agente ACP)
+  bad({ id: 'meu', kind: 'custom', base: 'generic', tool: 'meu', mode: 'api' });
+  bad({ id: 'gemini', kind: 'catalog', base: 'generic', tool: 'gemini', mode: 'api' });
   bad({ kind: 'builtin' });
   bad({ id: 'meu', kind: 'custom', base: 'generic', tool: 'outro' });
   bad({ id: 'claude', kind: 'acp' });

@@ -1,19 +1,25 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import {
   AdmissionBlockedError,
   ExecutionAdmission,
+  admissionTransport,
   bindingEnvironment,
   isolationInput as isolationInputOf,
 } from '../src/extension/ai/admission';
+import { apiBinding, apiEndpoint, apiKeyDigest } from '../src/extension/ai/apiBinding';
+import { executorOf, type Executor } from '../src/extension/ai/drivers';
+import { cliExecutor } from '../src/extension/ai/drivers/cli';
 import { acpSessionMode } from '../src/extension/ai/acp/provider';
 import { acpAgent } from '../src/extension/ai/acp/agents';
 import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
-import type { AiProfile } from '../src/shared/aiProfiles';
+import { isAcpProfile, type AiProfile } from '../src/shared/aiProfiles';
 import {
   ACP_CAPABILITY_CHECKS,
+  API_CAPABILITY_CHECKS,
   CAPABILITY_CHECKS,
   EXECUTOR_CAPABILITIES,
   type StrictExecutionRequest,
@@ -453,5 +459,239 @@ describe('os mesmos vínculos com o contrato de execução (história 6)', () =>
     // o PATH do perfil não entra no ACP: o executável sai do PATH do host e o vínculo é o mesmo de sem ele
     const withPath = profile({ ...acp, config: { acpAgent: 'gemini', env: { PATH: '/caminho/que/nao/existe' } } });
     expect(admission.binding(withPath, acp.id, isolationInputOf('board'), null).executable).toBe(fs.realpathSync(path.join(dir, 'gemini')));
+  });
+});
+
+describe('admissão do modo API (história 9)', () => {
+  // Ainda não há driver da API (história 10): o executor falso usa a parte pura do vínculo (`apiBinding`)
+  // com a chave lida do perfil, como o driver fará com o cofre. Nenhuma rede.
+  const API_KEY = 'AIzaSyChaveDeTesteSEGREDO0123456789';
+  const MODEL = { name: 'gemini-2.5-pro', effort: null };
+  const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta';
+  const apiProfile = (key = API_KEY) =>
+    profile({ id: 'gemini', kind: 'catalog', tool: 'gemini', mode: 'api', base: 'generic', config: { apiKey: key } });
+  const apiExecutor = (
+    over: { endpoint?: string; extensionVersion?: string } = {},
+    transport: Executor['transport'] = 'api',
+  ): Executor => ({
+    transport,
+    run: () => {
+      throw new Error('o laço do modo API é da história 10');
+    },
+    bindingContext: (i, { profile: p }) =>
+      apiBinding({
+        endpoint: over.endpoint ?? ENDPOINT,
+        model: i.exec?.model?.name,
+        extensionVersion: over.extensionVersion ?? '0.47.0',
+        apiKey: String(p.config.apiKey),
+      }),
+  });
+  const admissionWith = (executor: Executor) =>
+    new ExecutionAdmission({
+      pathEnv: () => dir,
+      homeDir: dir,
+      evidence: store,
+      now: () => now,
+      environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
+      executorOf: (p) => (p.mode === 'api' ? executor : executorOf(p)),
+    });
+  const apiInput = (model: typeof MODEL | null = MODEL, permission: 'board' | 'edits' | 'full' = 'board'): HeadlessInput => ({
+    prompt: 'objetivo',
+    permission,
+    exec: { agent: '', agentDefinition: null, mcpBlocked: [], model } as unknown as HeadlessInput['exec'],
+  });
+  const withEnv = <T>(vars: Record<string, string>, fn: () => T): T => {
+    const before = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]));
+    Object.assign(process.env, vars);
+    try {
+      return fn();
+    } finally {
+      for (const [k, v] of Object.entries(before))
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+    }
+  };
+
+  it('o vínculo não tem executável e prende endpoint, modelo, versão da extensão e chave; o ambiente não entra', () => {
+    const api = admissionWith(apiExecutor());
+    const bind = (a = api, p = apiProfile(), model: typeof MODEL | null = MODEL) => a.isolationBinding(p, 'gemini', 'board', model);
+    const base = bind();
+    expect(base.executable).toBe('');
+    expect(base.environmentComplete).toBe(true);
+    expect(base.binding).toMatch(/^[a-f0-9]{64}$/);
+    // a permissão não muda o vínculo de isolamento, como na CLI e no ACP
+    expect(api.isolationBinding(apiProfile(), 'gemini', 'full', MODEL).binding).toBe(base.binding);
+    expect(bind(api, apiProfile(), { name: 'gemini-2.5-flash', effort: null }).binding).not.toBe(base.binding);
+    expect(bind(api, apiProfile('AIzaSyOutraChave')).binding).not.toBe(base.binding);
+    expect(bind(admissionWith(apiExecutor({ endpoint: 'https://outro.exemplo/v1' }))).binding).not.toBe(base.binding);
+    expect(bind(admissionWith(apiExecutor({ extensionVersion: '0.48.0' }))).binding).not.toBe(base.binding);
+    // a barra final do endpoint não muda nada
+    expect(bind(admissionWith(apiExecutor({ endpoint: `${ENDPOINT}/` }))).binding).toBe(base.binding);
+    // sem processo da ferramenta, o ambiente não muda o que o board faz: nem PATH, nem proxy, nem chave no ambiente
+    expect(withEnv({ PATH: '/outro/path', HTTPS_PROXY: 'http://proxy.local:3128', GEMINI_API_KEY: 'x' }, () => bind().binding)).toBe(
+      base.binding,
+    );
+    // a prova é de um modelo: sem ele não há vínculo
+    expect(() => bind(api, apiProfile(), null)).toThrow('O modo API precisa de um modelo explícito.');
+  });
+
+  it('sem a evidência por construção a execução é bloqueada; com ela, admitida no transporte api', () => {
+    const api = admissionWith(apiExecutor());
+    const p = apiProfile();
+    const isolation = api.isolationBinding(p, 'gemini', 'board', MODEL).binding;
+    let error: unknown;
+    try {
+      api.prepare(p, 'gemini', apiInput(), dir, request());
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(AdmissionBlockedError);
+    expect((error as AdmissionBlockedError).decision.reasons).toEqual(
+      EXECUTOR_CAPABILITIES.map((capability) => ({ code: 'capability-not-verified', capability })),
+    );
+    // uma prova forjada como sonda, mesmo assinada pelo host, não vale para o modo API
+    for (const capability of EXECUTOR_CAPABILITIES)
+      store.record({
+        version: 1,
+        capability,
+        binding: isolation,
+        source: 'host-probe',
+        checkedAt: now - 10,
+        expiresAt: now + 1000,
+        checks: API_CAPABILITY_CHECKS[capability].map((id) => ({ id, outcome: 'passed', receipt: 'a'.repeat(64) })),
+      });
+    expect(() => api.prepare(p, 'gemini', apiInput(), dir, request())).toThrow(AdmissionBlockedError);
+    fs.rmSync(path.join(dir, 'evidence'), { recursive: true, force: true });
+    store.recordByConstruction(isolation, now - 10);
+    const admitted = api.prepare(p, 'gemini', apiInput(MODEL, 'edits'), dir, request({ mcpLevel: { permission: 'edits', tools: [] } }));
+    expect(admitted.transport).toBe('api');
+    expect(admitted.decision.state).toBe('admitted');
+    expect(admitted.decision.binding).toBe(isolation);
+    // os validadores de processo não servem ao modo API
+    expect(() => admitted.command({ command: 'gemini', args: [] } as never)).toThrow(
+      'A admissão é do modo API, não de uma CLI de uma passada.',
+    );
+    expect(() => admitted.acpCommand({ command: 'gemini', args: [] })).toThrow('A admissão é do modo API, não de um agente ACP.');
+    // outro modelo é outro vínculo: a prova do primeiro não o cobre
+    const other = { name: 'gemini-2.5-flash', effort: null };
+    expect(() => api.prepare(p, 'gemini', apiInput(other), dir, request())).toThrow(AdmissionBlockedError);
+  });
+
+  it('a chave nunca é gravada nem logada: nem a chave, nem o digest dela', () => {
+    const logged: string[] = [];
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) =>
+      vi.spyOn(console, m).mockImplementation((...args: unknown[]) => void logged.push(args.map(String).join(' '))),
+    );
+    try {
+      const api = admissionWith(apiExecutor());
+      const p = apiProfile();
+      const isolation = api.isolationBinding(p, 'gemini', 'board', MODEL).binding;
+      let blockedMessage = '';
+      try {
+        api.prepare(p, 'gemini', apiInput(), dir, request());
+      } catch (e) {
+        blockedMessage = `${(e as Error).message} ${JSON.stringify((e as AdmissionBlockedError).decision)}`;
+      }
+      store.recordByConstruction(isolation, now - 10);
+      store.remember('gemini', isolation);
+      const admitted = api.prepare(p, 'gemini', apiInput(), dir, request());
+      const files = fs.readdirSync(path.join(dir, 'evidence'));
+      const written = files.map((f) => `${f}\n${fs.readFileSync(path.join(dir, 'evidence', f)).toString('latin1')}`).join('\n');
+      // a decisão é o que vai para `ai_runs.admission_json`
+      const surfaces = [written, blockedMessage, JSON.stringify(admitted.decision), ...logged];
+      for (const secret of [API_KEY, apiKeyDigest(API_KEY)]) for (const s of surfaces) expect(s).not.toContain(secret);
+      // as mensagens de erro também não repetem a chave nem um endpoint com ela
+      expect(() => apiKeyDigest('chave com espaço SEGREDO')).toThrow('Chave de API ausente ou inválida.');
+      try {
+        apiKeyDigest('chave com espaço SEGREDO');
+      } catch (e) {
+        expect((e as Error).message).not.toContain('SEGREDO');
+      }
+      try {
+        apiEndpoint(`${ENDPOINT}/models?key=${API_KEY}`);
+        throw new Error('aceitou a chave na URL');
+      } catch (e) {
+        expect((e as Error).message).toBe('Endpoint da API inválido.');
+      }
+    } finally {
+      for (const s of spies) s.mockRestore();
+    }
+  });
+
+  it('o digest da chave é estável, com rótulo, e o endpoint só HTTPS (HTTP só no próprio computador)', () => {
+    expect(apiKeyDigest(API_KEY)).toMatch(/^[a-f0-9]{64}$/);
+    expect(apiKeyDigest(API_KEY)).toBe(apiKeyDigest(API_KEY));
+    expect(apiKeyDigest(API_KEY)).not.toBe(apiKeyDigest(`${API_KEY}x`));
+    expect(apiKeyDigest(API_KEY)).not.toBe(createHash('sha256').update(API_KEY).digest('hex'));
+    expect(() => apiKeyDigest('')).toThrow('Chave de API');
+    expect(apiEndpoint('https://generativelanguage.googleapis.com/v1beta/')).toBe(ENDPOINT);
+    expect(apiEndpoint('http://127.0.0.1:8080/v1beta')).toBe('http://127.0.0.1:8080/v1beta');
+    for (const bad of [
+      'http://generativelanguage.googleapis.com/v1beta',
+      'https://user:senha@exemplo.com',
+      'https://exemplo.com/#x',
+      'ftp://exemplo.com',
+      'nada',
+    ])
+      expect(() => apiEndpoint(bad), bad).toThrow('Endpoint da API inválido.');
+    expect(() => apiBinding({ endpoint: ENDPOINT, model: 'gemini-2.5-pro', extensionVersion: 'dev', apiKey: API_KEY })).toThrow(
+      'Versão da extensão',
+    );
+  });
+
+  it('um driver cujo vínculo não bate com o transporte é recusado', () => {
+    // transporte de CLI com o vínculo da API: a admissão não aceita perder o executável por engano
+    const cliWithApi = new ExecutionAdmission({
+      pathEnv: () => dir,
+      homeDir: dir,
+      evidence: store,
+      now: () => now,
+      environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
+      executorOf: () => apiExecutor({}, 'cli'),
+    });
+    expect(() => cliWithApi.isolationBinding(apiProfile(), 'gemini', 'board', MODEL)).toThrow(
+      'Vínculo do executor incoerente com o transporte.',
+    );
+    // e o transporte api com o vínculo de um processo (executável a resolver)
+    const apiWithProcess = admissionWith({
+      ...cliExecutor,
+      transport: 'api',
+      bindingContext: () => ({ invocation: {}, command: 'gemini' }),
+    });
+    expect(() => apiWithProcess.isolationBinding(apiProfile(), 'gemini', 'board', MODEL)).toThrow(
+      'Vínculo do executor incoerente com o transporte.',
+    );
+  });
+
+  it('sem driver da API, o perfil no modo API é recusado com a causa, e nunca cai na CLI nem no ACP', () => {
+    const p = apiProfile();
+    expect(admissionTransport(p)).toBe('api');
+    expect(() => executorOf(p)).toThrow('O modo API de Gemini ainda não roda nesta versão da extensão.');
+    expect(() => admission.prepare(p, 'gemini', apiInput(), dir, request())).toThrow('ainda não roda nesta versão');
+    expect(admission.preview(p, 'gemini', request(), dir).reasons).toContainEqual({ code: 'executor-unavailable' });
+    // o Gemini pronto traz o agente ACP do código: no modo API ele não é ACP
+    const ready = { ...BUILTIN_PROFILES.find((b) => b.id === 'gemini')!, mode: 'api' as const };
+    expect(isAcpProfile(ready)).toBe(false);
+    expect(admissionTransport(ready)).toBe('api');
+    expect(() => executorOf(ready)).toThrow('O modo API de Gemini');
+  });
+
+  it('o vínculo da CLI e do ACP continua sem o modelo do card (a régua da história 6)', () => {
+    const options = { pathEnv: dir, homeDir: dir, environmentEvidence: { state: 'complete' as const, digest: 'a'.repeat(64) } };
+    const claude = profile({ config: { command: exe('claude-h9', 'binário H9') } });
+    const isolation = referenceBinding(claude, claude.id, isolationInputOf('board'), null, options);
+    authorize(isolation);
+    const withModel: HeadlessInput = {
+      ...input(),
+      exec: { agent: '', agentDefinition: null, mcpBlocked: [], model: MODEL } as unknown as HeadlessInput['exec'],
+    };
+    expect(admission.prepare(claude, claude.id, withModel, dir, request()).decision.binding).toBe(isolation);
+    exe('gemini', 'agente de teste');
+    const acp = profile({ kind: 'custom', tool: 'perfil', mode: 'acp', base: 'generic', config: { acpAgent: 'gemini' } });
+    expect(admission.isolationBinding(acp, acp.id, 'board').binding).toBe(
+      referenceBinding(acp, acp.id, isolationInputOf('board'), null, options),
+    );
+    // e o executor injetado não muda nada fora do modo API
+    expect(admissionWith(apiExecutor()).isolationBinding(claude, claude.id, 'board').binding).toBe(isolation);
   });
 });

@@ -192,3 +192,9 @@ it('modo de execução fora dos conhecidos lê como não registrado', () => {
   run(db, "UPDATE ai_runs SET mode = 'xyz' WHERE id = 'r1'");
   expect(new AiRunRepo(db).byMonth('2026-10').find((r) => r.id === 'r1')!.mode).toBeNull();
 });
+
+it('o modo API (história 9) lê como gravado, sem migração nova', () => {
+  migrate(db);
+  run(db, "UPDATE ai_runs SET mode = 'api' WHERE id = 'r1'");
+  expect(new AiRunRepo(db).byMonth('2026-10').find((r) => r.id === 'r1')!.mode).toBe('api');
+});

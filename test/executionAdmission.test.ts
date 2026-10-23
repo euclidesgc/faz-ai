@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACP_CAPABILITY_CHECKS,
+  API_CAPABILITY_CHECKS,
   admitExecution,
   assessCapability,
   CAPABILITY_CHECKS,
+  capabilityChecks,
+  evidenceSource,
+  validateAdmissionDecision,
   EXECUTOR_CAPABILITIES,
   type CapabilityEvidence,
   type StrictExecutionRequest,
@@ -220,6 +224,81 @@ describe('admissão por capacidades', () => {
     // o genérico pela CLI continua sem tradução
     expect(admitExecution('generic', 'full', reviewed, BINDING, evidence(), NOW, 'cli').reasons).toContainEqual({
       code: 'tool-mapping-unavailable',
+    });
+  });
+  describe('modo API: evidência por construção (história 9)', () => {
+    const api = (source: CapabilityEvidence['source'] = 'by-construction', binding = BINDING): CapabilityEvidence[] =>
+      EXECUTOR_CAPABILITIES.map((capability) => ({
+        version: 1,
+        capability,
+        binding,
+        source,
+        checkedAt: NOW - 100,
+        expiresAt: NOW + 1000,
+        checks: API_CAPABILITY_CHECKS[capability].map((id) => ({ id, outcome: 'passed', receipt: 'c'.repeat(64) })),
+      }));
+    it('o transporte api tem os próprios checks e só aceita a fonte por construção', () => {
+      expect(capabilityChecks('api')).toBe(API_CAPABILITY_CHECKS);
+      expect(evidenceSource('api')).toBe('by-construction');
+      expect(evidenceSource('cli')).toBe('host-probe');
+      expect(evidenceSource('acp')).toBe('host-probe');
+      // um check por capacidade, sem repetir os ids da CLI nem do ACP: um recibo de outro transporte nunca casa
+      for (const c of EXECUTOR_CAPABILITIES) {
+        expect(API_CAPABILITY_CHECKS[c].length).toBeGreaterThan(0);
+        for (const id of API_CAPABILITY_CHECKS[c]) {
+          expect(CAPABILITY_CHECKS[c]).not.toContain(id);
+          expect(ACP_CAPABILITY_CHECKS[c]).not.toContain(id);
+        }
+      }
+    });
+    it('com a evidência por construção, o modo API é admitido no regime exclusivo, sem tradução de CLI', () => {
+      const decision = admitExecution('generic', 'full', request(), BINDING, api(), NOW, 'api');
+      expect(decision.reasons).toEqual([]);
+      expect(decision.state).toBe('admitted');
+      expect(decision.capabilities.every((c) => c.state === 'verified')).toBe(true);
+      // a delegação continua negada; as ferramentas são as que a decisão lista, e só elas serão declaradas
+      expect(decision.deniedTools).toEqual(['Agent', 'Task', 'SendMessage', 'ListAgents']);
+    });
+    it('sem evidência, vencida ou de outro vínculo, o modo API não é admitido', () => {
+      expect(admitExecution('generic', 'full', request(), BINDING, [], NOW, 'api').reasons).toEqual(
+        EXECUTOR_CAPABILITIES.map((capability) => ({ code: 'capability-not-verified', capability })),
+      );
+      expect(admitExecution('generic', 'full', request(), BINDING, api('by-construction', 'd'.repeat(64)), NOW, 'api').state).toBe(
+        'blocked',
+      );
+      expect(admitExecution('generic', 'full', request(), BINDING, api(), NOW + 5000, 'api').state).toBe('blocked');
+    });
+    it('uma sonda não prova o modo API, e a evidência por construção não prova a CLI nem o ACP', () => {
+      // os mesmos ids, com a fonte das sondas: inválida no transporte api
+      const probed = admitExecution('generic', 'full', request(), BINDING, api('host-probe'), NOW, 'api');
+      expect(probed.state).toBe('blocked');
+      expect(probed.capabilities.every((c) => c.state === 'unknown' && c.reason === 'invalid')).toBe(true);
+      // a evidência sintética com os ids da CLI, ou do ACP, nunca admite um processo de ferramenta
+      const synthetic = evidence().map((e) => ({ ...e, source: 'by-construction' as const }));
+      const cli = admitExecution('claude', 'full', request(), BINDING, synthetic, NOW, 'cli');
+      expect(cli.state).toBe('blocked');
+      expect(cli.capabilities.every((c) => c.reason === 'invalid')).toBe(true);
+      const reviewed = request({ regime: 'compatible', compatibilityReview: { actor: 'person', revision: 1 } });
+      expect(admitExecution('generic', 'full', reviewed, BINDING, api(), NOW, 'acp').state).toBe('blocked');
+      // e a leitura sem fonte declarada é a das sondas, que recusa a sintética
+      expect(assessCapability('conversation', BINDING, api(), NOW, API_CAPABILITY_CHECKS)).toEqual({
+        capability: 'conversation',
+        state: 'unknown',
+        reason: 'invalid',
+      });
+    });
+    it('a decisão do modo API passa na validação da auditoria, sem formato novo', () => {
+      const decision = admitExecution(
+        'generic',
+        'board',
+        request({ mcpLevel: { permission: 'board', tools: [] } }),
+        BINDING,
+        api(),
+        NOW,
+        'api',
+      );
+      expect(decision.state).toBe('admitted');
+      expect(() => validateAdmissionDecision(JSON.parse(JSON.stringify(decision)))).not.toThrow();
     });
   });
   it('a decisão é determinística e não modifica as entradas', () => {
