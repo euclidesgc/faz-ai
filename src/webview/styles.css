@@ -1747,6 +1747,18 @@ button.ghost.on {
   flex: 1;
   min-width: 0;
 }
+/* o nome do grupo (perfil de CLI) vira um cabeçalho com linha, para separar os catálogos à vista */
+.rt-SelectLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.rt-SelectLabel::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
 .field-row select,
 .field-row input:not([type='checkbox']):not([type='range']):not([type='color']) {
   width: 100%;

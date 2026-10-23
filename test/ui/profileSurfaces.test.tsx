@@ -77,4 +77,27 @@ describe('Superfícies de perfis de CLI', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'Outro modelo' }), 'modelo-avulso{Enter}');
     expect(value).toBe('local-cli:modelo-avulso');
   });
+
+  it('o perfil personalizado aparece no campo Modelo mesmo sem modelo cadastrado e sem ser o padrão', async () => {
+    const state = useBoardStore.getState().state!;
+    // o padrão volta a ser o Claude: o personalizado tem de aparecer por estar ligado, não por ser o padrão
+    useBoardStore.setState({ state: { ...state, board: { ...state.board, aiTool: 'claude' } } });
+    let value: unknown;
+    render(
+      <Theme>
+        <ModelEditor
+          value={null}
+          onChange={(next) => {
+            value = next;
+          }}
+          part="model"
+        />
+      </Theme>,
+    );
+    await userEvent.click(screen.getByRole('combobox'));
+    expect(screen.getByText('CLI local')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('option', { name: 'Outro modelo…' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Outro modelo' }), 'gemini-3-pro{Enter}');
+    expect(value).toBe('local-cli:gemini-3-pro');
+  });
 });

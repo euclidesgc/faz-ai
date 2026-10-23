@@ -170,5 +170,20 @@ describe('profilesInUse e modelGroups', () => {
     const g = modelGroups(s.board);
     expect(g.map((x) => x.cli)).toEqual(['claude', 'cursor']);
     expect(g[0]!.options.map((o) => o.model)).toEqual(['haiku', 'opus']);
+    expect(g.map((x) => x.custom)).toEqual([false, false]);
+  });
+
+  it('o perfil personalizado forma grupo mesmo sem modelo no catálogo, marcado como custom', () => {
+    const custom: AiProfile = {
+      id: 'gemini-acp',
+      name: 'Gemini ACP',
+      enabled: true,
+      kind: 'custom',
+      base: 'generic',
+      config: {},
+      position: 9,
+    };
+    const g = modelGroups(state({ aiProfiles: [profile('claude'), custom] }).board);
+    expect(g[1]).toMatchObject({ cli: 'gemini-acp', label: 'Gemini ACP', options: [], custom: true });
   });
 });
