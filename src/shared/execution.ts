@@ -1,4 +1,6 @@
-import { catalogTool, contextEnforced, isAcpProfile, profileBase } from './aiProfiles';
+import { catalogTool, contextEnforced } from './aiProfiles';
+import { ACP_ENFORCEMENT, toolModeEntry, toolModeOf, type ModeEnforcement } from './aiTools';
+import { ALL_AI_BASES } from './harness';
 import type { AiBase, AiProfile } from './aiProfiles';
 import type { Agent } from './harness';
 import { BOARD_MCP_NAME, selectedMcpNames, selectedRuleLocations, selectedSkillNames, type HarnessSelection } from './harnessSelection';
@@ -295,41 +297,26 @@ export const EXEC_ASPECTS: { id: ExecAspect; label: string }[] = [
 
 /**
  * O que a execução pelo board consegue impor em cada ferramenta por parâmetro da linha de comando
- * (`enforced`) e o que só segue como orientação no prompt e no get_card (`advised`). Conforme a
- * documentação de cada CLI lida em 2026-10-02 e o Claude Code 2.1.278 testado em 2026-10-07: as skills e
- * as rules vão sempre pelo caminho do arquivo. `context` (contexto vazio) não está aqui: depende das
- * capacidades verificadas de cada perfil, ver `enforcementOf`.
+ * (`enforced`) e o que só segue como orientação no prompt e no get_card (`advised`). A fonte é a ficha
+ * do modo CLI de cada ferramenta no catálogo (`TOOLS`, em `aiTools.ts`), a mesma que o driver da
+ * conexão expõe; esta tabela é a vista por CLI pronta, para quem já a lia. `context` (contexto vazio) não
+ * está aqui: depende das capacidades verificadas de cada perfil, ver `enforcementOf`.
  */
 export type Enforcement = 'enforced' | 'advised';
-export const EXEC_ENFORCEMENT: Record<AiBase, Record<Exclude<ExecAspect, 'context'>, Enforcement>> = {
-  claude: { agent: 'enforced', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced' },
-  // Cursor CLI 2026.10.01 (spike #966): o hook global do board (`preToolUse`, `beforeMCPExecution`, `subagentStart`)
-  // nega na hora do uso o que não está no manifesto do card (MCP, ferramentas e subagentes). O texto do agente
-  // do card segue no pedido (a CLI não tem `--agents`), por isso `agent` continua orientação. Garantido só com o hook instalado e atual; sem
-  // ele o gateway não grava o manifesto e a execução registra o motivo (garantia parcial). As skills ficam
-  // como orientação: `beforeReadFile` não cobre toda leitura. O teste real é o #970.
-  cursor: { agent: 'advised', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced' },
-  // Kimi Code 2.1.1: o servidor do board entra pelo `.kimi-code/mcp.json` do projeto, materializado antes
-  // da execução (não há `--mcp-config`); em `-p` a permissão é sempre "auto", sem flags para estreitá-la;
-  // não há `--agents` inline: o agente e os subagentes seguem como orientação no prompt
-  kimi: { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced' },
-};
+export const EXEC_ENFORCEMENT: Record<AiBase, ModeEnforcement> = Object.fromEntries(
+  ALL_AI_BASES.map((base) => [base, toolModeEntry(base, 'cli')!.enforcement]),
+) as Record<AiBase, ModeEnforcement>;
 
+/** A CLI personalizada não tem driver: nada é imposto, tudo segue como orientação. */
+const CUSTOM_CLI: ModeEnforcement = { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'advised' };
 /**
  * A tabela do perfil, com `context` calculado por `contextEnforced` (capacidades verificadas, nunca a
  * lista de vazamentos nem a configuração). Perfil personalizado: tudo orientação.
  */
 export function enforcementOf(profile: AiProfile): Record<ExecAspect, Enforcement> {
-  const base = profileBase(profile);
-  const row = base
-    ? EXEC_ENFORCEMENT[base]
-    : ({
-        agent: 'advised',
-        skills: 'advised',
-        // perfil ACP: os servidores do card vão no `session/new` (garantido); agente e ferramentas seguem como orientação no prompt
-        mcp: isAcpProfile(profile) ? 'enforced' : 'advised',
-        tools: 'advised',
-        model: 'advised',
-      } as const);
+  // a ferramenta e o modo do perfil escolhem a linha do catálogo; o agente ACP fora do catálogo (perfil
+  // personalizado) tem a mesma do protocolo, e a CLI personalizada fica toda como orientação
+  const tm = toolModeOf(profile);
+  const row: ModeEnforcement = (tm && toolModeEntry(tm.tool, tm.mode)?.enforcement) ?? (tm?.mode === 'acp' ? ACP_ENFORCEMENT : CUSTOM_CLI);
   return { ...row, context: contextEnforced(profile) ? 'enforced' : 'advised' };
 }

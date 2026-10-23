@@ -13,7 +13,6 @@ import { admissionProfileOf } from '../../shared/contextAdmissionPreview';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
 import { profileCanProbe, profileSignedIn, profileVersion } from '../cliProbe';
-import { baseValue } from '../../shared/harness';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -51,10 +50,9 @@ import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
-import { cursorModels, kimiModels } from '../cliProbe';
+import { driverFor } from '../ai/drivers';
 import { baseInfo, type AiTool } from '../../shared/harness';
 import { checkRequirements, profileInstallUrl } from '../requirements';
-import { CLI_COMMAND } from '../../shared/requirements';
 import { checkEnvironment, linuxFamily } from '../environment';
 import { isPendingReview, probeProfiles } from '../profileProbe';
 import { evidenceCapabilities, evidenceCurrent, profileHealth, profilesInUse, type ProfileHealth } from '../../shared/profileHealth';
@@ -369,11 +367,16 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // depois, só pelo "Detectar modelos", para não trazer de volta um modelo que a pessoa tirou do
   // catálogo. Uma leitura de cada vez.
   let readingModels: Promise<void> | null = null;
-  /** as ferramentas cuja CLI lista os modelos (hoje: Cursor e Kimi Code) */
-  const readToolModels = async (tool: 'cursor' | 'kimi') => {
-    const exe = resolveCommand(baseValue(CLI_COMMAND, tool) ?? '', pathEnv, homeDir);
-    if (!exe) return;
-    const found = await (tool === 'cursor' ? cursorModels(exe, pathEnv) : kimiModels(exe, pathEnv));
+  /**
+   * A ferramenta em uso, quando a CLI dela lista os modelos: as que têm `listModels` no driver (hoje: Cursor
+   * e Kimi Code). O id é o do perfil pronto, que é o da ferramenta; uma cópia não lê a lista.
+   */
+  const modelReaderOf = (tool: string): string | null => (driverFor(tool, 'cli')?.listModels ? tool : null);
+  const readToolModels = async (tool: string) => {
+    const driver = driverFor(tool, 'cli');
+    const exe = driver?.locate(pathEnv, homeDir);
+    if (!exe || !driver?.listModels) return;
+    const found = await driver.listModels(exe, pathEnv);
     if (!found.length) return;
     rememberModels(tool, found);
     const { board } = router.snapshot();
@@ -386,7 +389,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     const fastMissing = board.rules.includeFastModels && found.some((m) => isFastVariant(m, found) && !has(m.id) && has(fastBaseId(m)));
     if (fastMissing) router.handle({ type: 'settings.models.detect', tool, fastOnly: true });
   };
-  const refreshToolModels = (tool: 'cursor' | 'kimi') => {
+  const refreshToolModels = (tool: string) => {
     if (!ownsBoard || readingModels) return;
     readingModels = readToolModels(tool)
       .catch((e) => o.log(`Não foi possível ler os modelos do ${baseInfo(tool).label}: ${e instanceof Error ? e.message : String(e)}`))
@@ -520,7 +523,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         if (disposed) return;
         // a CLI da ferramenta que lista modelos (Cursor, Kimi Code) acabou de ficar pronta (instalada,
         // com login): só agora dá para ler os modelos da conta
-        const modelReader = board.aiTool === 'cursor' || board.aiTool === 'kimi' ? board.aiTool : null;
+        const modelReader = modelReaderOf(board.aiTool);
         const own = health.find((h) => h.id === board.aiTool);
         const blocked = !!modelReader && (own?.problem === 'cli' || own?.problem === 'signin');
         if (modelsBlocked && !blocked && modelReader && router.snapshot().board.aiTool === modelReader) refreshToolModels(modelReader);
@@ -714,7 +717,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
 
   let toolInUse = router.snapshot().board.aiTool;
   let permissionInUse = router.snapshot().board.runner.permission;
-  if (toolInUse === 'cursor' || toolInUse === 'kimi') refreshToolModels(toolInUse);
+  if (modelReaderOf(toolInUse)) refreshToolModels(toolInUse);
   // o login que venceu (ou voltou) numa execução muda o aviso do perfil: confere já, sem esperar o ciclo
   let authExpiredInUse = router.snapshot().authExpired;
   router.onDidChange(() => {
@@ -730,7 +733,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     toolInUse = board.aiTool;
     permissionInUse = board.runner.permission;
     void checkNow();
-    if (toolChanged && (board.aiTool === 'cursor' || board.aiTool === 'kimi')) refreshToolModels(board.aiTool);
+    if (toolChanged && modelReaderOf(board.aiTool)) refreshToolModels(board.aiTool);
   });
   // o orquestrador (#621): o board executa as sub-tarefas da fase de código, uma execução da CLI por unidade.
   // Existe em toda janela, mas só a dona age (`ownsBoard` é conferido a cada chamada, e a posse pode mudar);

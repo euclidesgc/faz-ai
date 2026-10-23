@@ -1,6 +1,5 @@
-import { baseValue } from './harness';
 // Decisão pura de admissão: evidência de isolamento não se confunde com configuração ou orientação.
-import { AGENT_TOOLS } from './agentTools';
+import { NATIVE_AGENT_TOOLS, agentToolsOf } from './agentTools';
 import type { AiTool } from './harness';
 import type { ToolCategory } from './artifacts';
 import type { AgentContextContract, ContextChoice } from './contextPlanning';
@@ -176,7 +175,7 @@ export function admitExecution(
     (request.boardTools.mode === 'inherit' && Object.keys(request.boardTools).length !== 1) ||
     !categories(request.agentTools?.categories) ||
     !native ||
-    !['', 'claude', 'cursor', 'kimi'].includes(native.tool) ||
+    !NATIVE_AGENT_TOOLS.includes(native.tool) ||
     !texts(native.allow) ||
     !texts(native.deny) ||
     [request.activeMcpIds, request.allowedMcpIds, request.boardMcpIds, request.mcpTools, request.boardMcpTools].some((v) => !texts(v)) ||
@@ -212,7 +211,7 @@ export function admitExecution(
   if (native.tool && native.tool !== tool) reason('native-executor-mismatch');
   if (!native.tool && (native.allow.length || native.deny.length)) reason('native-executor-required');
   // Regras detalhadas que não sabemos intersectar são recusadas; não se tornam instrução no prompt.
-  const builtin = new Set((baseValue(AGENT_TOOLS, tool) ?? []).flatMap((g) => g.tools.map((t) => t.name)));
+  const builtin = new Set((agentToolsOf(tool) ?? []).flatMap((g) => g.tools.map((t) => t.name)));
   const recognized = (name: unknown): name is string => typeof name === 'string' && (builtin.has(name) || mcpTool(name));
   if (native.allow.some((name) => !recognized(name)) || native.deny.some((name) => !recognized(name)))
     reason('unsupported-native-restriction');
@@ -220,7 +219,7 @@ export function admitExecution(
     (c) => c !== 'agents' && (request.boardTools.mode === 'inherit' || request.boardTools.value.includes(c)),
   );
   const level = permission === 'full' ? ['read', 'edit', 'run', 'net'] : permission === 'edits' ? ['read', 'edit'] : ['read'];
-  const candidates = (baseValue(AGENT_TOOLS, tool) ?? [])
+  const candidates = (agentToolsOf(tool) ?? [])
     .filter((g) => allowedCategories.includes(g.id as ToolCategory) && level.includes(g.id))
     .flatMap((g) => g.tools.map((t) => t.name));
   const nativeAllow = native.tool ? new Set(native.allow) : null;

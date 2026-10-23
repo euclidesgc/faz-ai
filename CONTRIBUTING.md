@@ -47,6 +47,39 @@ Faz AI: o card conduz a história pelas fases, e cada história vira um pull req
 Itens ainda em desenvolvimento ficam nas suas branches e nos cards. Integrar na `develop` não publica
 a extensão. A `main` só aceita mudanças por pull request, e o script de release já cuida disso.
 
+## Como entra uma ferramenta de IA
+
+O board fala com cada ferramenta de IA num **modo**: a CLI de uma passada (`cli`), o Agent Client
+Protocol (`acp`) ou a API do modelo (`api`). As peculiaridades de cada par (ferramenta, modo) ficam
+num driver; o board, as telas e a admissão só falam com o contrato.
+
+1. **O driver**: `src/extension/ai/drivers/<ferramenta>/<modo>.ts`, com o contrato de conexão
+   (`ConnectionDriver`, em `drivers/types.ts`): comando, `locate`, argumentos de versão, página e
+   comandos de instalação, como se entra (`auth`), a sonda de login (`signedIn`), a lista de modelos
+   quando a ferramenta a dá por comando (`listModels`), o que o gateway mede (`measure`) e o que o
+   board impõe (`enforcement`). Uma CLI pronta envolve o provider dela (`ai/providers/`, com o leitor
+   em `aiOutput/`) por `cliDriver`; um agente ACP é uma entrada de `ACP_AGENTS` (`ai/acp/agents.ts`),
+   que `acpDriver` transforma em driver. Registre o driver em `drivers/index.ts` (`driverFor`).
+2. **A linha do catálogo**: a entrada da ferramenta em `TOOLS` (`src/shared/aiTools.ts`), com a
+   página, a nota de cobrança, os modos oferecidos (só os que têm driver), os planejados (com a
+   história que os entrega), o modo recomendado com o motivo e a ficha de cada modo, com as oito
+   linhas que a tela compara: o que o board controla, o regime esperado, a precisão do que foi usado,
+   o consumo, o que a ferramenta traz por conta própria, como se entra, a cobrança e quando escolher.
+3. **O teste**: `test/drivers.test.ts` confere que todo modo oferecido tem driver, que nenhum modo
+   planejado tem, que o recomendado é um dos modos da ferramenta e que toda ficha tem as oito linhas.
+   O leitor da saída ganha fixtures reais em `test/aiOutput*.test.ts`.
+
+**A regra da recomendação** é a mesma para toda ferramenta: recomendado é o modo em que o board
+controla mais do que o agente acessa e mede o que ele gasta; o empate se desfaz pelo que a ferramenta
+carrega por conta própria (menos é melhor). O recomendado pode ser um modo ainda planejado: o selo da
+tela só aparece quando ele é oferecido (`recommendedOffered`). Para o Gemini é a API; para o Claude
+Code, a CLI, o único modo que usa a assinatura.
+
+Enquanto o perfil não tem os campos `tool` e `mode`, `toolModeOf` (em `aiTools.ts`) os deriva dos
+campos atuais (`base` e `acpAgent`); use sempre `driverOf(perfil)`, nunca `base` direto, para o
+código não mudar quando o perfil ganhar os campos. Antes de codificar algo de uma ferramenta, leia a
+documentação oficial atual dela e cite a fonte no comentário.
+
 ## Changelog
 
 O changelog segue o Keep a Changelog, com uma seção por versão e os títulos **Adicionado**,

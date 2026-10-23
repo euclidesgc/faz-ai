@@ -472,6 +472,8 @@ export const harness: Record<string, string> = {
   Leitura: 'Reading',
   'Lê e busca no projeto; não muda nada.': 'Reads and searches the project; changes nothing.',
   'Lê arquivos.': 'Reads files.',
+  'Lê vários arquivos de uma vez.': 'Reads several files at once.',
+  'Lista os arquivos e as pastas de uma pasta.': 'Lists the files and folders in a folder.',
   'Encontra arquivos pelo nome ou padrão.': 'Finds files by name or pattern.',
   'Busca texto dentro dos arquivos.': 'Searches for text inside files.',
   'Consulta definições e referências de código.': 'Looks up code definitions and references.',
