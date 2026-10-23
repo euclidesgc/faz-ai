@@ -128,8 +128,13 @@ próprio CLI usa.
 ### 2. Contrato por modo, em duas partes
 
 Uma implementação por (ferramenta, modo) em `src/extension/ai/drivers/<ferramenta>/<modo>.ts`,
-um registro `driverFor(tool, mode)` e um catálogo `TOOLS` em `src/shared/aiTools.ts` (id, nome,
-modos oferecidos, página oficial, nota de cobrança). O contrato se divide em dois para não virar
+um registro `driverFor(tool, mode)` e um catálogo `TOOLS` em `src/shared/aiTools.ts`. O catálogo é
+a **lista fixa de ferramentas** que a tela mostra, e cada entrada traz: id, nome, página oficial, nota
+de cobrança, os modos oferecidos (só os que têm driver), o **modo recomendado** com o motivo em uma
+frase, e uma **ficha por modo** com o que a tela compara: o que o board controla (contexto,
+ferramentas, MCP, permissões), o regime esperado, o que mede, como se entra, o que a ferramenta
+carrega por conta própria. A ficha é dado do código, por ferramenta e por modo, escrito por quem
+desenvolve a extensão; a tela só a mostra. O contrato se divide em dois para não virar
 "`AiProvider` com outro nome": as telas, a sonda e os requisitos só precisam da conexão; o gateway e
 a admissão só precisam da execução.
 
@@ -162,14 +167,42 @@ admissão precisam conhecer `gemini` antes do driver existir, senão a admissão
 
 ### 3. Conectar: a tela
 
-A pessoa escolhe a ferramenta numa lista, escolhe o modo entre os que a extensão oferece para ela e
-clica em **Conectar**. Tudo o que vem depois é do driver, com o progresso na tela e o erro preso ao
-passo em que ocorreu, com "Tentar de novo".
+A pessoa escolhe a ferramenta numa **lista fixa** (as entradas de `TOOLS`, Gemini primeiro), escolhe
+o modo entre os que a extensão oferece para ela, vendo lado a lado o que cada um dá e tira e qual é
+o recomendado, e clica em **Conectar**. Tudo o que vem depois é do driver, com o progresso na tela e
+o erro preso ao passo em que ocorreu, com "Tentar de novo".
+
+#### A escolha do modo: comparação e recomendação
+
+A finalidade do board é saber de antemão o que cada agente vai poder acessar (contexto, ferramentas,
+servidores MCP, permissões) e, com isso, ganhar precisão e economia nos discoveries (documentos) e
+nas implementações das tarefas de um plano. A regra da recomendação segue essa finalidade, e é a
+mesma para toda ferramenta: **recomendado é o modo em que o board controla mais do que o agente
+acessa e mede o que ele gasta**; empate se desfaz pelo que a ferramenta carrega por conta própria
+(menos é melhor). A tela mostra os modos como cartões, com o selo **Recomendado** num deles, e a
+mesma ficha em cada cartão, para a comparação ser por linha:
+
+| Linha da ficha                      | Gemini · API (recomendado)                                                             | Gemini · ACP                                                                              | Gemini · CLI                                                                     |
+| ----------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| O que o board controla              | tudo: contexto, ferramentas, MCP e permissões, chamada a chamada                       | MCP e permissões, pedido a pedido; o contexto o agente carrega por conta própria          | MCP e a aprovação por nível; o contexto depende do que a home isolada prova      |
+| Regime esperado                     | exclusivo, por construção                                                              | compatível (o agente lê `GEMINI.md`, extensões e configuração próprios)                   | exclusivo se as sondas passarem; senão compatível                                |
+| Precisão do que foi usado           | exata: o inventário é a lista de chamadas que o board executou                         | boa: o agente anuncia cada ferramenta e MCP                                               | boa: `tool_use` e `tool_result` no `stream-json`                                 |
+| Consumo                             | tokens por chamada (`usageMetadata`); nada gasto com contexto que o board não pediu     | tokens do turno (`usage`); o contexto próprio do agente também conta                      | tokens por modelo (`result.stats`); o contexto próprio da home conta             |
+| O que a ferramenta traz             | só o modelo: as ferramentas de arquivo e shell são as do board                         | o agente completo do Gemini CLI (ferramentas, planejamento, modos)                        | o agente completo, numa passada                                                  |
+| Como se entra                       | chave de API (cofre)                                                                   | chave de API (cofre, pelo `authenticate`)                                                 | chave de API (cofre, no ambiente)                                                |
+| Cobrança                            | por token                                                                              | por token                                                                                 | por token                                                                        |
+| Quando escolher                     | para a finalidade do board: prever o acesso e gastar só o pedido                       | quando se quer o agente da própria ferramenta decidindo como trabalhar                    | quando o ACP não está disponível na versão instalada                             |
+
+Para o Gemini, a recomendação é a **API**: é o único modo em que o board sabe de antemão tudo o que o
+agente pode acessar e paga só pelo que pediu. Até a história 10 entregar o modo API, a tela não o
+lista (um modo só aparece com driver) e o selo fica no **ACP**, que já roda de ponta a ponta. Para o
+Claude Code só há a CLI, e o cartão diz o porquê (assinatura; o ACP exige cobrança por API). A
+recomendação nunca esconde os outros modos nem escolhe por ninguém: é um selo e uma frase.
 
 ```mermaid
 flowchart TD
-  A[Ferramentas de IA › Conectar ferramenta] --> B[Escolhe a ferramenta<br/>Gemini primeiro, com a nota de cobrança]
-  B --> C[Escolhe o modo<br/>só os que a extensão oferece: CLI, ACP ou API]
+  A[Ferramentas de IA › Conectar ferramenta] --> B[Lista fixa de ferramentas<br/>Gemini primeiro, com a nota de cobrança]
+  B --> C[Cartões dos modos oferecidos<br/>mesma ficha em cada um, selo Recomendado e o motivo]
   C --> D{locate}
   D -- não achou --> D1[Instalar: página oficial<br/>e comando quando houver] --> D
   D -- achou, versão --> E{auth.kind}
@@ -324,6 +357,11 @@ cliente de si mesmo (`withBoardMcp`), e é preciso garantir um só servidor por 
 
 - **Um perfil por (ferramenta, modo)**, com ids `gemini`, `gemini-api`: duplicaria políticas e
   orçamento, que são por perfil, e não representaria que a cota é da conta.
+- **Mostrar os modos sem comparação nem recomendação**: a pessoa teria de conhecer ACP, `-p` e
+  function calling para escolher; a ficha por modo e o selo traduzem isso para o que importa ao
+  board (o que o agente acessa, o que gasta).
+- **Esconder os modos não recomendados**: tira da pessoa a escolha de usar o agente da própria
+  ferramenta; o selo orienta, não impõe.
 - **Registro de dados preenchido pela pessoa** (como o perfil personalizado de hoje, só que
   por ferramenta): é o que se quer eliminar; as peculiaridades de flags, saída, medição e cota ficam
   no código, por ferramenta e por modo.
@@ -355,6 +393,9 @@ cliente de si mesmo (`withBoardMcp`), e é preciso garantir um só servidor por 
   `vscode`); ela nunca volta à tela nem ao log (`PrivateValues`).
 - O modo API faz do board um executor de ferramentas: cliente MCP, arquivos e shell por nível de
   permissão; a conferência da execução (`checkRun`) ganha o inventário das chamadas de função.
+- A ficha de cada modo e a frase da recomendação são texto de interface (chave em português,
+  tradução em `i18n/en/`), escritos por ferramenta e por modo em `TOOLS`; mudar a recomendação de uma
+  ferramenta é mudar uma linha do catálogo, com teste.
 - Documentação: `docs/harness.md` (Conectar, o que o Gemini aplica, Diagnóstico),
   `docs/configuracoes.md` (Ferramentas de IA, modelos, políticas), `docs/metricas.md` (modo no
   Consumo), `docs/mcp.md` (board como cliente no modo API), README (recurso novo) e CHANGELOGs, em

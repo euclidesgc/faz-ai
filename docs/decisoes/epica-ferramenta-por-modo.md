@@ -18,7 +18,10 @@ escolhe o modo entre os que a extensão oferece para aquela ferramenta (CLI, ACP
 não funciona) e clica em **Conectar**. A extensão acha ou instala o binário, abre o login da própria
 ferramenta (ou pede a chave de API e guarda no cofre), verifica as capacidades sem perguntar sobre
 regime, lê os modelos e deixa a ferramenta "conectada", com os modelos em todo campo de modelo. O que
-a pessoa faz é só entrar na conta. As peculiaridades de cada ferramenta e modo ficam no código, numa
+a pessoa faz é só entrar na conta. Na hora de escolher o modo, a tela mostra lado a lado o que cada
+um dá e tira para a finalidade do board (prever o que o agente vai poder acessar, para ganhar
+precisão e economia nos discoveries e nas implementações) e qual é o **recomendado**, com o motivo;
+para o Gemini, a API. As peculiaridades de cada ferramenta e modo ficam no código, numa
 implementação por ferramenta e por modo, atrás de um contrato claro; entrar com a segunda ferramenta
 é escrever a implementação dela, sem mexer no board, nas telas nem na admissão.
 
@@ -143,15 +146,19 @@ flowchart LR
 ### 5. Contrato de conexão (`ConnectionDriver`)
 
 - `src/shared/aiTools.ts` com `TOOLS` (Gemini, Claude Code, Cursor, Kimi Code e os agentes ACP do
-  catálogo, com os modos que cada um oferece, a página e a nota de cobrança) e
+  catálogo, com os modos que cada um oferece, a página, a nota de cobrança, o **modo recomendado**
+  com o motivo e a **ficha por modo**: o que o board controla, regime esperado, precisão do que foi
+  usado, consumo, o que a ferramenta traz, como se entra, cobrança, quando escolher) e
   `src/extension/ai/drivers/` com `driverFor(tool, mode)`: `claude/cli`, `cursor/cli`, `kimi/cli`
   envolvem os providers atuais; `gemini/acp` e os demais agentes envolvem `ACP_AGENTS`.
 - `cliProbe`, `requirements`, `environment` (`CLI_DOCS`, `INSTALL`), `readToolModels` e
   `EXEC_ENFORCEMENT` passam a consultar o driver. `AGENT_TOOLS` e a lista de `native.tool` da admissão
   conhecem `gemini`.
 - Sem mudança de comportamento: os testes existentes continuam verdes. Testes: `test/drivers.test.ts`
-  (um driver por entrada de `TOOLS`; nenhum modo oferecido sem driver). Docs: `CONTRIBUTING.md`
-  ("como entra uma ferramenta").
+  (um driver por entrada de `TOOLS`; nenhum modo oferecido sem driver; o modo recomendado é um dos
+  oferecidos; toda ficha tem as oito linhas). Docs: `CONTRIBUTING.md` ("como entra uma ferramenta",
+  com a regra da recomendação: o modo em que o board controla mais do que o agente acessa e mede o
+  que ele gasta).
 
 ### 6. Contrato de execução (`Executor`)
 
@@ -167,15 +174,20 @@ flowchart LR
   nunca devolvida) → `authenticate(gemini-api-key, _meta["api-key"])` → `verify` → passo de ciência
   (só no regime compatível; grava `compatibilityReview` por perfil) → `listModels` (catálogo com a
   data) → "Conectada". Erros ficam no passo, com "Tentar de novo".
-- Tela: Ferramentas de IA ganha **Conectar ferramenta** (lista de `TOOLS` com os modos; Gemini
-  primeiro), o estado de cada perfil do catálogo (versão, login, regime, modelos, data) e
-  **Reconectar**. A opção "Regime de admissão" sai de Harness › Ferramenta e execução; a faixa de
-  requisitos reconfere `signedIn` e `locate`.
+- Tela: Ferramentas de IA ganha **Conectar ferramenta**: a lista fixa de `TOOLS` (Gemini primeiro,
+  com a nota de cobrança) e, escolhida a ferramenta, um cartão por modo oferecido com a mesma ficha
+  (o que o board controla, regime esperado, precisão, consumo, o que a ferramenta traz, como se
+  entra, cobrança, quando escolher), o selo **Recomendado** com o motivo em uma frase, e o botão
+  Conectar em cada cartão. Nesta história o Gemini oferece só o ACP (o selo fica nele até a 10); o
+  Claude Code mostra a CLI com o porquê de ser a única. Depois: o estado de cada perfil do catálogo
+  (versão, login, regime, modelos, data) e **Reconectar**. A opção "Regime de admissão" sai de
+  Harness › Ferramenta e execução; a faixa de requisitos reconfere `signedIn` e `locate`.
 - Dividir se passar de ~600 linhas: 7a (host, handlers, mensagens) e 7b (tela).
 - Testes: `test/connect.test.ts` (fluxo com driver falso, passo a passo e erro em cada passo),
-  `test/acpTransport.test.ts` (`authenticate` com `_meta`), `test/ui/connect.test.tsx`,
-  `test/ui/aiToolsSettings.test.tsx`, i18n. Docs: `docs/configuracoes.md`, README (recurso),
-  CHANGELOG.
+  `test/acpTransport.test.ts` (`authenticate` com `_meta`), `test/ui/connect.test.tsx` (a lista
+  fixa, um cartão por modo oferecido, o selo no modo recomendado, nenhum cartão para modo sem
+  driver), `test/ui/aiToolsSettings.test.tsx`, i18n. Docs: `docs/configuracoes.md` (a comparação
+  dos modos e a recomendação, em pt e en), README (recurso), CHANGELOG.
 
 ### 8. Gemini pela CLI
 
@@ -207,7 +219,9 @@ flowchart LR
   `functionCall` passa por `boardDecision`; `thoughtSignature` volta inalterado; limite de turnos.
 - `Measured` sem processo: `onExit(0)` no fim, `kill()` aborta e impede a próxima iteração,
   `report()` soma `usageMetadata` (`measure: 'tokens'`), inventário = chamadas executadas. Um só
-  servidor do board por pasta (o board é cliente de si mesmo). O Conectar oferece o modo API.
+  servidor do board por pasta (o board é cliente de si mesmo). O Conectar passa a oferecer o modo
+  API, e o selo **Recomendado** do Gemini vai para ele, com a ficha dizendo que até a 11 o modo serve
+  a Refinar, Resumir e Trabalhar com permissão `board`.
 - Testes: `test/geminiApi.test.ts` (servidor HTTP falso: ciclo de duas chamadas, cancelamento no
   meio, 429), `test/aiGatewayApi.test.ts` (uma ferramenta fora da decisão nunca é declarada ao
   modelo). Docs: `docs/harness.md`, `docs/mcp.md`.
