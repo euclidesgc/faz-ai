@@ -10,6 +10,7 @@ import {
   type ExecutorCapability,
 } from './executionAdmission';
 import type { AdmissionRegime } from './runner';
+import type { ToolMode } from './aiTools';
 
 /**
  * Os passos, na ordem: `locate` (o binário e a versão), `signIn` (a chave de API no cofre e o `authenticate`
@@ -19,12 +20,26 @@ import type { AdmissionRegime } from './runner';
 export const CONNECT_STEPS = ['locate', 'signIn', 'verify', 'review', 'models'] as const;
 export type ConnectStep = (typeof CONNECT_STEPS)[number];
 
+/**
+ * O que a tela manda junto do Conectar: a chave colada no campo, o clique na ciência do regime e o modo do
+ * cartão (um perfil por ferramenta, com o modo trocável; sem ele, o modo atual do perfil).
+ */
+export interface ConnectInput {
+  apiKey?: string;
+  acknowledge?: boolean;
+  mode?: ToolMode;
+}
+
 /** O que a conexão já sabe, passo a passo; é também o que fica gravado depois de "Conectada". */
 export interface ConnectSummary {
-  /** a versão da ferramenta; null quando ela não diz */
+  /** a versão da ferramenta; null quando ela não diz (e no modo API, que não tem binário) */
   version: string | null;
-  /** `api-key`: a chave está no cofre e o agente a aceitou; `signed-in`: a sonda confirmou o login; `unverified`: sem sonda */
-  signIn: 'api-key' | 'signed-in' | 'unverified';
+  /**
+   * `api-key`: a chave está no cofre e o agente a aceitou no login (sem conferir com a rede); `api-key-checked`:
+   * a chave foi conferida na hora com a API (o modo API lê os modelos da conta com ela); `signed-in`: a sonda
+   * confirmou o login; `unverified`: sem sonda
+   */
+  signIn: 'api-key' | 'api-key-checked' | 'signed-in' | 'unverified';
   /** o regime que as provas permitem; null quando o perfil não tem sonda de capacidades (Cursor, Kimi Code) */
   regime: AdmissionRegime | null;
   /** a revisão da ciência do perfil (só no regime compatível) */
@@ -41,6 +56,8 @@ export interface ConnectSummary {
  */
 export interface ConnectState {
   profileId: string;
+  /** o modo que esta conexão conecta (o cartão em que a pessoa clicou); ausente nas gravadas antes da história 10 */
+  mode?: ToolMode;
   step: ConnectStep;
   status: 'running' | 'waiting' | 'failed' | 'connected';
   /** o que o passo espera (`waiting`): a chave de API ou a ciência do regime compatível */

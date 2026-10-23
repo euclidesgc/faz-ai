@@ -29,9 +29,12 @@ the ready-made ACP agent in ACP, a copy of a ready-made CLI stays the base tool 
 stay in the local vault, as they were), and a custom profile is its own tool, in ACP when it points to
 an ACP agent and in CLI otherwise. The tool used by model fields, policies and Usage does not change
 for any profile. A custom profile imported from another machine, without its configuration in the
-local vault, stays in CLI until it is saved again. Earlier runs have no mode recorded. API mode is
-already a known value of the format (in the log and in the exported file), with no new migration, but
-no profile runs in it yet: importing a profile in API mode is refused.
+local vault, stays in CLI until it is saved again. Earlier runs have no mode recorded. API mode is a
+value of the same format (in the log and in the exported file), with no new migration: only the
+ready-made Gemini runs in it, and importing accepts Gemini in API and refuses the mode for any other
+profile. The API key never goes into the exported file; on the importing computer, connect Gemini
+again. Taking the database back to format 47 (the support procedure for an earlier version) leaves
+Gemini in ACP, the only mode that version knows.
 
 ## Board backup
 

@@ -9,6 +9,7 @@ import { cliExecutor } from './cli';
 import { claudeCliDriver } from './claude/cli';
 import { cursorCliDriver } from './cursor/cli';
 import { geminiAcpDriver } from './gemini/acp';
+import { geminiApiDriver } from './gemini/api';
 import { kimiCliDriver } from './kimi/cli';
 import type { Executor, ToolDriver } from './types';
 
@@ -32,6 +33,7 @@ const DRIVERS = new Map<string, ToolDriver>(
     cursorCliDriver,
     kimiCliDriver,
     geminiAcpDriver,
+    geminiApiDriver,
     // os demais agentes do catálogo ACP, inclusive os que ainda não são perfil pronto (Cursor e Kimi
     // Code pelo ACP rodam hoje só por um perfil personalizado com `acpAgent`)
     ...ACP_AGENTS.filter((a) => a.id !== geminiAcpDriver.tool).map(acpDriver),
@@ -59,8 +61,9 @@ export function driverOf(profile: Pick<AiProfile, 'kind' | 'tool' | 'mode'> & { 
  * o comando e a leitura da saída vêm do provider do perfil.
  */
 export function executorOf(profile: AiProfile): Executor {
-  // o modo API só roda pelo driver dele: sem driver (a extensão ainda não traz o laço, ou o perfil veio de
-  // uma versão mais nova), recusa com a causa, em vez de cair no executor de CLI ou no agente ACP
+  // o modo API só roda pelo driver dele (o Gemini desde a história 10): sem driver (uma ferramenta que ainda
+  // não traz o laço, ou o perfil veio de uma versão mais nova), recusa com a causa, em vez de cair no
+  // executor de CLI ou no agente ACP
   if (profile.mode === 'api') {
     const driver = driverOf(profile);
     if (driver?.transport !== 'api') throw new Error(`O modo API de ${toolLabel(profile.tool)} ainda não roda nesta versão da extensão.`);

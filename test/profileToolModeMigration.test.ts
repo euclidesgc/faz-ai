@@ -187,6 +187,20 @@ it('agente ACP pronto que saiu do catálogo continua a própria ferramenta em ac
   expect(all(db, 'SELECT * FROM ai_profiles ORDER BY id')).toEqual(before);
 });
 
+it('o Gemini pronto no modo API (história 10) volta ao 47 como o agente ACP pronto que ele era', () => {
+  migrate(db);
+  new AiProfileRepo(db).list(BOARD);
+  // a linha como o Conectar a deixaria ao escolher o modo API (história 7)
+  run(db, "UPDATE ai_profiles SET mode = 'api' WHERE board_id = ? AND id = 'gemini'", [BOARD]);
+  expect(one(db, "SELECT kind, tool FROM ai_profiles WHERE id = 'gemini'")).toEqual({ kind: 'catalog', tool: 'gemini' });
+  expect(new AiProfileRepo(db).list(BOARD).find((p) => p.id === 'gemini')).toMatchObject({ mode: 'api', kind: 'catalog' });
+  migrateDown(db, 47);
+  // a versão anterior só conhece o Gemini em ACP: a escolha da API se perde com a coluna, nunca vira CLI pronta
+  expect(one(db, "SELECT kind, base FROM ai_profiles WHERE id = 'gemini'")).toEqual({ kind: 'acp', base: 'generic' });
+  migrate(db);
+  expect(new AiProfileRepo(db).list(BOARD).find((p) => p.id === 'gemini')).toMatchObject({ mode: 'acp', kind: 'catalog' });
+});
+
 it('modo de execução fora dos conhecidos lê como não registrado', () => {
   migrate(db);
   run(db, "UPDATE ai_runs SET mode = 'xyz' WHERE id = 'r1'");

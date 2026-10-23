@@ -32,7 +32,9 @@ import { columnsOf } from '../../shared/selectors';
 import type { AttachmentStore } from '../attachments';
 import { headlessUnsupported } from '../headless';
 import { activeProfile, isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
-import type { ConnectState, ConnectSummary } from '../../shared/connect';
+import type { ConnectInput, ConnectState, ConnectSummary } from '../../shared/connect';
+import type { ToolMode } from '../../shared/aiTools';
+import { AiProfileRepo } from '../repositories/aiProfileRepo';
 
 /** As conexões concluídas por perfil (o resumo do Conectar), na tabela `meta`: fora da exportação do board. */
 const CONNECTIONS_META_KEY = 'ai_connections';
@@ -282,14 +284,14 @@ export class MessageRouter {
     if (!this.acpModelsReader) throw new Error('Leitura de modelos do agente ACP indisponível neste host.');
     await this.acpModelsReader(profile);
   }
-  private connector: ((id: string, input: { apiKey?: string; acknowledge?: boolean }) => Promise<unknown>) | null = null;
+  private connector: ((id: string, input: ConnectInput) => Promise<unknown>) | null = null;
   private connections: Record<string, ConnectState> | undefined;
   /** Quem conduz o Conectar de um perfil (o `Connector` do host). */
-  onConnect(fn: (id: string, input: { apiKey?: string; acknowledge?: boolean }) => Promise<unknown>): void {
+  onConnect(fn: (id: string, input: ConnectInput) => Promise<unknown>): void {
     this.connector = fn;
   }
   /** O Conectar pela tela: o `done` sai quando o fluxo para (conectada, à espera da pessoa ou com o erro no passo). */
-  async connectProfile(id: string, input: { apiKey?: string; acknowledge?: boolean }): Promise<void> {
+  async connectProfile(id: string, input: ConnectInput): Promise<void> {
     if (!this.connector) throw new Error('O Conectar não está disponível neste host.');
     await this.connector(id, input);
   }
@@ -304,6 +306,14 @@ export class MessageRouter {
     const revision = this.ctx.boards.recordCompatibilityReview(this.boardId, profileId);
     this.changed();
     return revision;
+  }
+  /**
+   * Troca o modo do perfil pronto: só o Conectar chama, depois de o login no modo novo ter dado certo (o clique
+   * da pessoa no cartão daquele modo). Não passa por `handle`, como a ciência: a IA e o MCP não têm caminho até aqui.
+   */
+  setProfileMode(profileId: string, mode: ToolMode): void {
+    new AiProfileRepo(this.ctx.dbHandle.db).setMode(this.boardId, profileId, mode, 'person');
+    this.changed();
   }
   /** Tira a ciência do perfil: o Conectar provou o exclusivo. A revogação pela pessoa vem por `settings.aiProfiles.review`. */
   revokeCompatibilityReview(profileId: string): void {

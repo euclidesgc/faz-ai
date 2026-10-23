@@ -25,6 +25,8 @@ const CLIENT_NAMES: Record<string, string> = {
   // o nome que a CLI do Kimi Code manda no clientInfo; a calibrar se uma versão nova usar outro
   'kimi-code': 'Kimi Code',
   kimi: 'Kimi Code',
+  // o próprio board no modo API (`drivers/gemini/api.ts`): quem escreve na conversa é o Gemini
+  'faz-ai-gemini-api': 'Gemini',
 };
 
 /**

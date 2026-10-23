@@ -55,12 +55,16 @@ describe('catálogo de ferramentas (TOOLS) e drivers de conexão', () => {
       }
   });
 
-  it('o Gemini recomenda a API, ainda planejada: sem selo até a história do modo API; o Claude só tem a CLI', () => {
+  it('o Gemini oferece a API desde a história 10, e o selo Recomendado acende nela; o Claude só tem a CLI', () => {
     const gemini = TOOLS.find((t) => t.id === 'gemini')!;
-    expect(gemini.modes.map((m) => m.mode)).toEqual(['acp']);
-    expect(gemini.planned.map((p) => p.mode).sort()).toEqual(['api', 'cli']);
+    expect(gemini.modes.map((m) => m.mode)).toEqual(['acp', 'api']);
+    expect(gemini.planned.map((p) => p.mode)).toEqual(['cli']);
     expect(gemini.recommended.mode).toBe('api');
-    expect(recommendedOffered(gemini)).toBeNull();
+    expect(recommendedOffered(gemini)).toBe('api');
+    // até a história 11 o modo serve a Refinar, Resumir e Trabalhar com a permissão board: a ficha diz
+    const api = gemini.modes.find((m) => m.mode === 'api')!;
+    expect(api.sheet.whenToChoose).toMatch(/Refinar, Resumir e Trabalhar na fase com a permissão "Só o board"/);
+    expect(api.enforcement).toEqual({ agent: 'advised', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced' });
     const claude = TOOLS.find((t) => t.id === 'claude')!;
     expect(claude.modes.map((m) => m.mode)).toEqual(['cli']);
     expect(recommendedOffered(claude)).toBe('cli');
@@ -222,10 +226,14 @@ describe('executorOf: quem executa cada perfil (contrato de execução, históri
     for (const p of examples()) expect(executorOf(p).transport, p.id).toBe(admissionTransport(p));
   });
 
-  it('a admissão do modo API (história 9) não traz driver dele: o perfil API é recusado com a causa', () => {
-    expect(allDrivers().filter((d) => d.mode === 'api' || d.transport === 'api')).toEqual([]);
+  it('o modo API do Gemini roda pelo driver dele (história 10); sem driver da API, o perfil é recusado com a causa', () => {
+    expect(allDrivers().filter((d) => d.mode === 'api' || d.transport === 'api')).toEqual([driverFor('gemini', 'api')]);
     const api = profile({ id: 'gemini', kind: 'catalog', tool: 'gemini', mode: 'api' });
     expect(admissionTransport(api)).toBe('api');
-    expect(() => executorOf(api)).toThrow('O modo API de Gemini ainda não roda nesta versão da extensão.');
+    expect(executorOf(api)).toBe(driverFor('gemini', 'api'));
+    expect(driverFor('gemini', 'api')).toMatchObject({ measure: 'tokens', command: '', auth: { kind: 'api-key' } });
+    // uma ferramenta sem o laço da API não cai na CLI nem no ACP
+    const other = profile({ id: 'claude', kind: 'catalog', tool: 'claude', mode: 'api', base: 'claude' });
+    expect(() => executorOf(other)).toThrow('O modo API de Claude Code ainda não roda nesta versão da extensão.');
   });
 });

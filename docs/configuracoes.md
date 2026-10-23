@@ -36,28 +36,37 @@ entra, a cobrança e quando escolher. Os modos ainda não oferecidos aparecem s�
 **Recomendado** é o modo em que o board controla mais do que o agente acessa e mede o que ele gasta;
 empate se desfaz pelo que a ferramenta carrega por conta própria (menos é melhor). O selo aparece só
 quando o modo recomendado é oferecido, com o motivo em uma frase. Para o Gemini, o recomendado é a
-API, que chega numa versão seguinte: por ora o Gemini oferece só o ACP e sai sem selo. O Claude Code
+**API**, e o selo fica no cartão dela; o cartão **ACP** segue ao lado. O Claude Code
 mostra a CLI com o selo e o porquê de ser a única (o ACP dele exige cobrança por API, fora da
 assinatura).
 
-O botão **Conectar** de um cartão leva o perfil do catálogo daquele modo por estes passos, com o
-progresso na tela:
+O botão **Conectar** de um cartão leva o perfil do catálogo da ferramenta, naquele modo, por estes
+passos, com o progresso na tela. É um perfil por ferramenta, com o modo trocável: no Gemini, os cartões
+**ACP** e **API** conectam o mesmo perfil (o mesmo id, as mesmas políticas, o mesmo catálogo de modelos
+e a mesma chave), e ele passa para o modo do cartão quando o login dá certo; o cartão do modo em que o
+perfil roda mostra **Modo em uso**.
 
-1. **Achar a ferramenta**: o comando no PATH do terminal e a versão; sem ele, o link **Instalar**.
+1. **Achar a ferramenta**: o comando no PATH do terminal e a versão; sem ele, o link **Instalar**. No
+   modo API não há o que achar: quem fala com a API é a extensão.
 2. **Entrar na conta**: no Gemini, o campo da **chave de API** (de senha). A chave fica guardada no
-   cofre deste computador e, a cada processo, vai para o login do agente pelo protocolo; ela não volta
-   para a tela e não entra no log, no registro das execuções nem na exportação do board. É a mesma em
-   todas as pastas. O Gemini CLI aceita a chave no login sem consultar a API: ela é conferida de fato
-   na primeira execução, e uma chave errada aparece ali, com a mensagem do Gemini. O perfil só é ligado
-   depois deste passo. Nas CLIs prontas, a sonda de login, com o comando para o terminal quando falta.
+   cofre deste computador, a mesma em todas as pastas e nos dois modos; ela não volta para a tela e não
+   entra no log, no registro das execuções nem na exportação do board. No **ACP** ela vai, a cada
+   processo, para o login do agente pelo protocolo, e o Gemini CLI a aceita sem consultar a API: ela é
+   conferida de fato na primeira execução, e uma chave errada aparece ali, com a mensagem do Gemini. Na
+   **API** ela é **conferida na hora**: o board lê a lista de modelos da conta com ela (não gasta a
+   conta), e a tela diz "chave de API conferida". Nos dois, a chave nova só substitui a guardada depois
+   de aceita; recusada, a anterior continua. O perfil só é ligado (e só muda de modo) depois deste
+   passo. Nas CLIs prontas, a sonda de login, com o comando para o terminal quando falta.
 3. **Verificar as capacidades**: as sondas do verificador gravam as provas do perfil, e o regime sai
    delas, sem pergunta: as cinco capacidades provadas dão o regime exclusivo; permissões, MCP e
    delegação provadas, o compatível. Um agente ACP é sempre compatível (os arquivos de contexto que
-   ele lê sozinho não têm prova pelo protocolo).
+   ele lê sozinho não têm prova pelo protocolo). O modo API é exclusivo por construção, sem sonda: o
+   board afirma a prova na primeira execução, para o modelo do card; a ciência do ACP, se havia, sai.
 4. **Ciência do regime** (só no compatível): um botão à parte, **Entendo o que a ferramenta carrega**,
    grava a sua ciência para aquele perfil. O regime vale por perfil: o Gemini pode rodar no compatível
    enquanto o Claude Code segue no exclusivo.
-5. **Ler os modelos**: os modelos que a ferramenta anuncia entram no catálogo, em todo campo de modelo.
+5. **Ler os modelos**: os modelos que a ferramenta anuncia entram no catálogo, em todo campo de modelo
+   (na API, os modelos da conta que respondem ao `generateContent`).
 
 No fim, **Conectada** com a versão, o login, o regime, quantos modelos e a data, e as ações **Trocar a
 chave** e **Revogar ciência**. Um erro fica preso ao passo em que ocorreu, com **Tentar de novo**, que
@@ -71,8 +80,9 @@ a tira sozinho; e **importar um board não traz a ciência dos perfis**: quem im
 máquina em que o perfil roda. Os perfis que não passam pelo Conectar (cópias e personalizados) dão e
 revogam a ciência na lista, com **Dar ciência do regime compatível** e o mesmo texto do Conectar.
 Uma política de execução não troca o perfil por outro com regime diferente (`constraints-changed`). A faixa de requisitos continua
-conferindo a ferramenta e o login: no Gemini, sem a chave no cofre o login fica "não verificado" (ele
-pode ter a sua `GEMINI_API_KEY`), e o aviso de login leva ao Conectar.
+conferindo a ferramenta e o login: no Gemini pelo ACP, sem a chave no cofre o login fica "não
+verificado" (ele pode ter a sua `GEMINI_API_KEY`); pela API, sem a chave no cofre falta o login (não há
+outro), e o aviso de login leva ao Conectar.
 
 A opção **Regime de admissão** saiu de Harness › Ferramenta e execução. Quem tinha ligado o regime
 compatível para o board inteiro numa versão anterior continua com ele (e vê o aviso com o botão

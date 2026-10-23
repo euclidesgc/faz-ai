@@ -108,6 +108,19 @@ describe('o repositório sobe a revisão quando a pessoa liga o compatível', ()
     expect(runner().admissionRegime).toBe('exclusive');
   });
 
+  it('a revisão da ciência é monotônica: revogar e dar de novo nunca volta a 1', () => {
+    expect(ctx.boards.recordCompatibilityReview(ctx.boardId, 'gemini')).toBe(1);
+    expect(ctx.boards.recordCompatibilityReview(ctx.boardId, 'gemini')).toBe(2);
+    expect(ctx.boards.revokeCompatibilityReview(ctx.boardId, 'gemini')).toBe(true);
+    expect(runner().compatibilityReviews).toEqual({});
+    expect(ctx.boards.recordCompatibilityReview(ctx.boardId, 'gemini')).toBe(3);
+    expect(ctx.boards.revokeCompatibilityReview(ctx.boardId, 'gemini')).toBe(true);
+    expect(ctx.boards.recordCompatibilityReview(ctx.boardId, 'gemini')).toBe(4);
+    // cada perfil tem o seu contador
+    expect(ctx.boards.recordCompatibilityReview(ctx.boardId, 'codex-acp')).toBe(1);
+    expect(runner().compatibilityReviews).toEqual({ gemini: 4, 'codex-acp': 1 });
+  });
+
   it('a pessoa dá e revoga a ciência de um perfil (a ação de quem não passa pelo Conectar)', () => {
     const review = aiProfileHandlers['settings.aiProfiles.review'];
     const person = { byAi: false } as Parameters<typeof review>[2];

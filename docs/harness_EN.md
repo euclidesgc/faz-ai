@@ -106,6 +106,38 @@ registrations the editor cannot find. The path is found at that moment, on the m
 extension runs, and the file stays out of git (`.git/info/exclude`). If the project MCP file is
 versioned, the board does not write to it.
 
+### Gemini through the API
+
+Gemini has three modes in the extension catalog; **API** is the recommended one, because it is the
+only mode in which the board knows in advance everything the model can access and pays only for what
+it asked. There is no CLI to install and no tool process: the board calls the Gemini API's
+`generateContent` with the API key kept in the local vault and runs the function-calling loop itself.
+To use it, click **Connect** on Gemini's **API** card in AI tools › Connect a tool (see
+[Settings](configuracoes_EN.md#ai-tools-connect-a-tool)): the Gemini profile switches to API mode with
+the same key as ACP, checked right away with the API.
+
+- **What the model receives**: the board's request (with the phase agent, the indicated rules and
+  skills), the conversation the board builds on every request and, as functions, only the tools of
+  the board server and of the MCPs the card allows. A tool the card does not allow is never declared
+  to the model, and a call to it is refused without running. The model reads no file on its own.
+- **Regime**: exclusive, by construction. The board asserts and signs the proof of the five
+  capabilities on the first run (and again when the model, the key or the extension version
+  changes), with no probe and without spending the account. The card's admission preview evaluates
+  the proof for the card's model.
+- **Usage and review**: the tokens of each request (`usageMetadata`) are summed over the run; the
+  inventory is the list of calls the board executed, and the run review compares it with the card as
+  in the other modes.
+- **Stop** cancels the request in flight and sends no further request. Each request has 2 minutes;
+  the run fails after 40 requests without finishing. A 429 (usage limit) ends the run with the API's
+  message and the wait time, when given; the automatic pause by quota comes in a later version.
+- **For now** the mode serves **Refinar** (refine), **Resumir** (summarize) and **Trabalhar na
+  fase** (work on the phase) with the **Só o board** (board only) permission: the model reads and
+  answers the card through the board server. Editing files and running commands come in a later
+  version; with another permission the run is refused with the reason, and Gemini over ACP is still
+  available. The model must come from the card's **Modelo** (model) field.
+- The key never goes to the log, the usage record, the screen or the export, and it goes to the API
+  only in the `x-goog-api-key` header, never in the URL.
+
 ## Environment check
 
 ### The warning icon

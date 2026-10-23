@@ -12,7 +12,7 @@ import {
   isReadyAcp,
   isReadyCli,
 } from '../../shared/aiProfiles';
-import { admissionProfileOf } from '../../shared/contextAdmissionPreview';
+import { admissionModelOf, admissionProfileOf } from '../../shared/contextAdmissionPreview';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
 import { profileCanProbe, profileSignedIn, profileVersion } from '../cliProbe';
@@ -77,6 +77,7 @@ import { Connector } from '../ai/connect';
 import { acpSignIn } from '../ai/acp/signIn';
 import type { AcpAuth } from '../ai/acp/provider';
 import { ToolKeys } from '../toolKeys';
+import { profileApiKey } from '../ai/apiKey';
 import { credentialsFor } from '../credentials';
 import { recoverProjectServers } from '../mcp/projectServerLease';
 import { loginShellPath, spawnAcpProcess, spawnHeadless } from '../spawn';
@@ -241,8 +242,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   /** A chave do cofre para o agente do perfil que entra por chave, no formato do `authenticate`; undefined nos outros. */
   const acpAuthOf = (profile: AiProfile): AcpAuth | undefined => {
     const auth = driverOf(profile)?.auth;
-    const apiKey = auth?.kind === 'api-key' ? toolKeys.get(driverOf(profile)!.tool) : null;
-    return auth?.kind === 'api-key' && apiKey ? { methodId: auth.methodId, apiKey } : undefined;
+    const apiKey = profileApiKey(toolKeys, profile);
+    // só o agente ACP tem `methodId`: no modo API a chave não vai a agente nenhum (ver `profileApiKey`)
+    return auth?.kind === 'api-key' && auth.methodId && apiKey ? { methodId: auth.methodId, apiKey } : undefined;
   };
   // a única porta para chamar a IA: o executor de cards e o chat passam por ela, e é ela que escreve o log de uso
   const evidenceStore = new CapabilityEvidenceStore(path.join(o.storageDir, 'capability-evidence'));
@@ -251,6 +253,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     homeDir,
     evidence: evidenceStore,
     environmentEvidence: () => collectClaudeEnvironment(),
+    // o vínculo do modo API leva o digest da chave do cofre (a mesma da execução)
+    apiKey: (profile) => profileApiKey(toolKeys, profile),
   });
   const gateway = new AiGateway({
     resolveProfile: (id) => new AiProfileRepo(handle.db).resolveProfile(router.boardId, id),
@@ -268,7 +272,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     },
     spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
     spawnAcp: (command, cwd, out) => spawnAcpProcess({ ...command, format: 'text' }, cwd, out, pathEnv),
-    apiKey: (profile) => acpAuthOf(profile)?.apiKey ?? null,
+    // a chave do cofre para o driver que entra por chave: o agente ACP (no `authenticate`) e o modo API
+    apiKey: (profile) => profileApiKey(toolKeys, profile),
     // a ciência do perfil no Conectar vale para ele; sem ela, o regime do board
     regimeOf: (profileId) => admissionRegimeOf(router.snapshot().board.runner, profileId),
   });
@@ -281,7 +286,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       // o mesmo regime que o gateway aplica: a ciência do perfil, ou o regime do board
       const { regime: _regime, compatibilityReview: _review, ...rest } = request;
       const strict = { ...rest, ...admissionRegimeOf(router.snapshot().board.runner, profileId) };
-      return admission.preview(profile, profile.id, strict, o.folderPath);
+      // no modo API a prova é do modelo da execução: a prévia avalia a do modelo do alvo do card
+      return admission.preview(profile, profile.id, strict, o.folderPath, admissionModelOf(router.snapshot(), target));
     } catch {
       return null;
     }
@@ -353,6 +359,13 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         }),
       );
     },
+    // o modo API confere a chave na hora, pela lista de modelos da conta (não gasta a conta)
+    checkApiKey: async (profile, apiKey) => {
+      const driver = driverOf(profile);
+      if (!driver?.apiModels) throw new Error(`${profile.name}: o modo não confere a chave pela API.`);
+      return (await driver.apiModels(apiKey)).length;
+    },
+    setMode: (id, mode) => router.setProfileMode(id, mode),
     verify: async (profileId) => (await verifyDetailed(profileId)).result,
     reviewOf: (id) => router.snapshot().board.runner.compatibilityReviews[id] ?? null,
     recordReview: (id) => router.recordCompatibilityReview(id),
@@ -363,7 +376,15 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       const tool = catalogTool(profile);
       let count: number;
       if (isAcpProfile(profile)) count = await readAcpModels(profile);
-      else {
+      else if (profile.mode === 'api') {
+        // pela API, com a chave do cofre (a mesma que o login acabou de conferir)
+        const driver = driverOf(profile);
+        const apiKey = profileApiKey(toolKeys, profile);
+        if (!driver?.apiModels || !apiKey) return null;
+        const found = await driver.apiModels(apiKey);
+        rememberModels(tool, found);
+        count = found.length;
+      } else {
         const driver = driverOf(profile);
         if (!driver?.listModels) return null;
         const found = await driver.listModels(exe, pathEnv);

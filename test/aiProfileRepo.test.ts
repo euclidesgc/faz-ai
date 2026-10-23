@@ -372,10 +372,12 @@ it('a importação aceita os dois conjuntos de valores e recusa ferramenta ou mo
   bad({ kind: 'catalog', tool: 'cursor' });
   bad({ kind: 'catalog', tool: 'claude', mode: 'acp' });
   bad({ kind: 'catalog', tool: 'claude', mode: 'api' });
-  // `api` é um modo conhecido desde a história 9, mas nenhum perfil roda nele ainda: nem pronto, nem
-  // personalizado (que tem comando próprio ou agente ACP)
+  // `api` só no pronto cuja ferramenta o oferece (o Gemini, desde a história 10): nem a cópia, nem o
+  // personalizado (que tem comando próprio ou agente ACP), nem um pronto sem o modo
   bad({ id: 'meu', kind: 'custom', base: 'generic', tool: 'meu', mode: 'api' });
-  bad({ id: 'gemini', kind: 'catalog', base: 'generic', tool: 'gemini', mode: 'api' });
+  ok({ id: 'gemini', kind: 'catalog', base: 'generic', tool: 'gemini', mode: 'api' });
+  bad({ id: 'gemini', kind: 'catalog', base: 'generic', tool: 'gemini', mode: 'api', secret_ref: 'a'.repeat(64) });
+  bad({ id: 'codex-acp', kind: 'catalog', base: 'generic', tool: 'codex-acp', mode: 'api' });
   // a linha ainda sem ferramenta (legada ou não preenchida) também não escapa do modo do pronto
   bad({ id: 'claude', kind: 'builtin', tool: '', mode: 'api' });
   bad({ id: 'claude', kind: 'builtin', tool: '', mode: 'acp' });
@@ -390,4 +392,19 @@ it('a importação aceita os dois conjuntos de valores e recusa ferramenta ou mo
   bad({ id: 'meu', kind: 'custom', base: 'generic', tool: 'outro' });
   bad({ id: 'claude', kind: 'acp' });
   bad({ id: 'gemini', kind: 'catalog', base: 'generic', tool: 'gemini', mode: 'cli' });
+});
+it('o pronto lê o modo gravado quando a ferramenta o oferece (o Gemini pela API, história 10); senão, o do código', () => {
+  repo.setEnabled(boardId, 'gemini', true, 'person');
+  const modeOf = (id: string) => repo.list(boardId).find((p) => p.id === id)!.mode;
+  expect(modeOf('gemini')).toBe('acp');
+  // quem grava é o Conectar (história 7): aqui, a linha como ele a deixaria
+  run(db, "UPDATE ai_profiles SET mode = 'api' WHERE board_id = ? AND id = 'gemini'", [boardId]);
+  expect(modeOf('gemini')).toBe('api');
+  expect(repo.resolveProfile(boardId, 'gemini')).toMatchObject({ mode: 'api', tool: 'gemini', kind: 'catalog' });
+  // um modo que a extensão não oferece para a ferramenta (o CLI do Gemini ainda é planejado) volta ao do código
+  run(db, "UPDATE ai_profiles SET mode = 'cli' WHERE board_id = ? AND id = 'gemini'", [boardId]);
+  expect(modeOf('gemini')).toBe('acp');
+  repo.setEnabled(boardId, 'claude', true, 'person');
+  run(db, "UPDATE ai_profiles SET mode = 'api' WHERE board_id = ? AND id = 'claude'", [boardId]);
+  expect(modeOf('claude')).toBe('cli');
 });

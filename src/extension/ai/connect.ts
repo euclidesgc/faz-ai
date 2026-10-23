@@ -9,20 +9,17 @@
 // para toda ferramenta, e a diferença entre elas é o `auth` do driver. Um passo que espera a pessoa (a chave,
 // a ciência) para o fluxo com `waiting`; um erro fica preso ao passo (`failed`), e "Tentar de novo" chama
 // `connect` outra vez. A chave nunca volta: nem no estado publicado, nem no erro (que passa por `redact`).
-import { isAcpProfile, isReadyProfile, verifiableProfile, type AiProfile } from '../../shared/aiProfiles';
-import { regimeFromEvidence, type ConnectState, type ConnectStep, type ConnectSummary } from '../../shared/connect';
+import { isAcpProfile, isReadyProfile, modeLabel, verifiableProfile, type AiProfile } from '../../shared/aiProfiles';
+import { toolModeEntry, type ToolMode } from '../../shared/aiTools';
+import { regimeFromEvidence, type ConnectInput, type ConnectState, type ConnectStep, type ConnectSummary } from '../../shared/connect';
 import type { CapabilityEvidence } from '../../shared/executionAdmission';
-import { parseApiKey } from '../toolKeys';
+import { maskApiKey, parseApiKey } from '../toolKeys';
 import type { AcpAuth } from './acp/provider';
 import { acpLoginHint } from './acp/provider';
 import { acpAgent } from './acp/agents';
-import { driverOf, type ToolDriver } from './drivers';
+import { driverFor, type ToolDriver } from './drivers';
 
-/** O que a tela manda junto do Conectar: a chave colada no campo, ou o clique na ciência do regime. */
-export interface ConnectInput {
-  apiKey?: string;
-  acknowledge?: boolean;
-}
+export type { ConnectInput } from '../../shared/connect';
 
 export interface ConnectorDeps {
   /** o perfil público (sem o cofre) */
@@ -36,10 +33,17 @@ export interface ConnectorDeps {
   version(profile: AiProfile, executable: string): Promise<string | null>;
   /** a sonda de login da CLI (`login-command`) */
   signedIn(profile: AiProfile, executable: string): Promise<boolean | null>;
-  /** o cofre das chaves por ferramenta (`ToolKeys`) */
-  keys: { get(tool: string): string | null; set(tool: string, apiKey: string): void };
+  /** o cofre das chaves por ferramenta (`ToolKeys`): a chave nova só entra depois de aceita (`replace`) */
+  keys: { get(tool: string): string | null; replace(tool: string, apiKey: string, accept: (key: string) => Promise<void>): Promise<void> };
   /** entrega a chave ao agente pelo `authenticate` (`acpSignIn`); lança com o motivo quando ele recusa */
   authenticate(profile: AiProfile, executable: string, auth: AcpAuth): Promise<void>;
+  /**
+   * No modo API (história 10): confere a chave na hora com a API, por uma chamada que não gasta a conta (a
+   * lista de modelos); devolve quantos modelos a conta tem. Lança com o motivo quando a API recusa.
+   */
+  checkApiKey(profile: AiProfile, apiKey: string): Promise<number>;
+  /** grava o modo do perfil pronto (o cartão escolhido: um perfil por ferramenta, com o modo trocável) */
+  setMode(profileId: string, mode: ToolMode): void;
   /** as sondas de capacidade do perfil, gravando as provas no vínculo dele (`BoardHost.verifyExecutor`) */
   verify(profileId: string): Promise<{ evidence: CapabilityEvidence[]; authRequired?: boolean }>;
   /** a revisão da ciência já gravada para o perfil, ou null */
@@ -119,13 +123,20 @@ export class Connector {
     const { deps } = this;
     const meta = deps.profile(profileId);
     if (!meta) throw new Error(`Perfil indisponível neste board: ${profileId}.`);
-    const driver = driverOf(meta);
     // o Conectar é do perfil pronto do catálogo (o id é a ferramenta); cópias e personalizados seguem pelo formulário
-    if (!driver || !isReadyProfile(meta))
+    if (!isReadyProfile(meta))
       throw new Error(`${meta.name}: o Conectar é das ferramentas do catálogo; o perfil personalizado segue pelo formulário.`);
-    const resume = this.resumeFrom(this.states.get(profileId), input);
+    // o modo é o do cartão em que a pessoa clicou (um perfil por ferramenta, com o modo trocável): só um que a
+    // extensão oferece para a ferramenta, e o perfil só passa a ele depois de o login ter dado certo
+    const mode = input.mode ?? meta.mode;
+    if (!toolModeEntry(meta.tool, mode)) throw new Error(`${meta.name}: o modo ${modeLabel(mode)} não é oferecido nesta versão.`);
+    const driver = driverFor(meta.tool, mode);
+    if (!driver) throw new Error(`${meta.name}: o Conectar é das ferramentas do catálogo; o perfil personalizado segue pelo formulário.`);
+    // trocar de modo recomeça do início: o login e a verificação do outro modo não valem para este
+    const resume = mode === meta.mode ? this.resumeFrom(this.states.get(profileId), input) : null;
     const state: ConnectState = {
       profileId,
+      mode,
       step: 'locate',
       status: 'running',
       summary: resume ? { ...this.states.get(profileId)!.summary } : {},
@@ -154,19 +165,22 @@ export class Connector {
       // o perfil pronto vem do código (a configuração dele é a do catálogo): as sondas rodam nele como se ligado,
       // e ele só é ligado de fato depois de a ferramenta ser achada e de o login ter o que precisa (a chave no
       // cofre). Ligar antes faria a verificação automática do host correr sem a chave
-      const probe: AiProfile = { ...meta, enabled: true };
+      const probe: AiProfile = { ...meta, enabled: true, mode };
       enter('locate');
-      const executable = deps.locate(probe);
-      if (!executable)
+      // o modo API não tem binário: quem fala com a rede é a extensão, e não há versão da ferramenta a ler
+      const api = driver.transport === 'api';
+      const executable = api ? '' : deps.locate(probe);
+      if (!api && !executable)
         return stop('failed', {
           error: `O comando \`${driver.command}\` do ${meta.name} não está no PATH. Instale pela página oficial e tente de novo.`,
           docs: driver.docs,
         });
       if (!resume) {
-        state.summary.version = await deps.version(probe, executable);
+        state.summary.version = api ? null : await deps.version(probe, executable!);
         const step = { state, enter, stop };
-        const signIn = await this.signIn(driver, probe, executable, input, step);
+        const signIn = await this.signIn(driver, probe, executable!, input, step);
         if (signIn) return signIn;
+        if (mode !== meta.mode) deps.setMode(profileId, mode);
         if (!deps.profile(profileId)?.enabled) deps.enable(profileId);
         enter('verify');
         const verified = await this.verify(driver, deps.resolve(profileId), step);
@@ -188,7 +202,7 @@ export class Connector {
         }
       }
       enter('models');
-      state.summary.models = await deps.listModels(profile, executable);
+      state.summary.models = await deps.listModels(profile, executable!);
       const summary: ConnectSummary = {
         version: state.summary.version ?? null,
         signIn: state.summary.signIn ?? 'unverified',
@@ -220,20 +234,36 @@ export class Connector {
     enter('signIn');
     const auth = driver.auth;
     if (auth.kind === 'api-key') {
-      if (input.apiKey !== undefined) {
-        const parsed = parseApiKey(input.apiKey);
-        if ('error' in parsed) return stop('waiting', { needs: 'api-key', error: parsed.error });
-        deps.keys.set(driver.tool, parsed.key);
-      }
-      const apiKey = deps.keys.get(driver.tool);
-      if (!apiKey) return stop('waiting', { needs: 'api-key' });
+      // quem aceita a chave: no ACP, o `authenticate` do agente (que não consulta a rede); no modo API, a
+      // própria API, numa chamada que não gasta a conta (a lista de modelos), então a chave fica conferida
+      const methodId = auth.methodId;
+      const accept = async (apiKey: string): Promise<void> => {
+        try {
+          if (driver.transport === 'api') await deps.checkApiKey(profile, apiKey);
+          else if (methodId) await deps.authenticate(profile, executable, { methodId, apiKey });
+          else throw new Error(`${profile.name}: o login por chave não tem método neste modo.`);
+        } catch (e) {
+          // a chave recusada não chega ao cofre, então a ocultação dele não a conhece: mascara aqui
+          // inclusive o começo dela, se outra camada cortou a mensagem no meio da chave
+          throw new Error(maskApiKey(message(e), apiKey));
+        }
+      };
       try {
-        await deps.authenticate(profile, executable, { methodId: auth.methodId, apiKey });
+        if (input.apiKey !== undefined) {
+          const parsed = parseApiKey(input.apiKey);
+          if ('error' in parsed) return stop('waiting', { needs: 'api-key', error: parsed.error });
+          // a chave nova só entra no cofre depois de aceita: recusada, a anterior continua como estava
+          await deps.keys.replace(driver.tool, parsed.key, accept);
+        } else {
+          const stored = deps.keys.get(driver.tool);
+          if (!stored) return stop('waiting', { needs: 'api-key' });
+          await accept(stored);
+        }
       } catch (e) {
-        // a chave fica no cofre (pode ter sido a rede); o campo volta para a pessoa trocar se quiser
+        // a recusa (ou a rede fora do ar): o campo volta para a pessoa conferir ou trocar a chave
         return stop('waiting', { needs: 'api-key', error: message(e) });
       }
-      state.summary.signIn = 'api-key';
+      state.summary.signIn = driver.transport === 'api' ? 'api-key-checked' : 'api-key';
       return null;
     }
     if (auth.kind === 'login-command') {
@@ -254,6 +284,12 @@ export class Connector {
   /** O passo da verificação: grava as provas e tira o regime delas; devolve o estado quando o fluxo para aqui. */
   private async verify(driver: ToolDriver, profile: AiProfile, { state, enter, stop }: Step): Promise<ConnectState | null> {
     const summary = state.summary;
+    // o modo API é exclusivo por construção: não há processo da ferramenta a sondar. A prova é de um modelo
+    // (o do card), e o host a afirma e assina na primeira execução com ele (`ExecutionAdmission.prepare`)
+    if (driver.transport === 'api') {
+      summary.regime = 'exclusive';
+      return null;
+    }
     // sem sonda de capacidades (Cursor, Kimi Code): o regime não se aplica, e a ciência também não
     if (!verifiableProfile(profile)) {
       summary.regime = null;

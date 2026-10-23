@@ -26,6 +26,23 @@ export function parseApiKey(raw: unknown): { key: string } | { error: string } {
   return { key };
 }
 
+/**
+ * Mascara a chave num texto que pode ter vindo de fora (o erro de um servidor que a ecoa). Além da chave
+ * inteira, o começo dela cortado no fim do texto ou antes de "…" (o corte de uma mensagem longa feito antes
+ * de chegar aqui): um pedaço da chave já identifica a conta. Quem corta mensagens mascara antes de cortar;
+ * isto é a defesa para o corte que não é nosso (o de outra camada).
+ */
+export function maskApiKey(text: string, key: string, mask = '[credencial local]'): string {
+  if (!key) return text;
+  let out = text.split(key).join(mask);
+  for (let len = key.length - 1; len >= 8; len--) {
+    const prefix = key.slice(0, len);
+    out = out.split(`${prefix}…`).join(`${mask}…`);
+    if (out.endsWith(prefix)) out = out.slice(0, -prefix.length) + mask;
+  }
+  return out;
+}
+
 export class ToolKeys {
   constructor(
     private readonly store: CredentialStore,
@@ -72,7 +89,10 @@ export class ToolKeys {
     }
   }
 
-  /** Guarda (ou troca) a chave da ferramenta. O cofre grava antes de o índice apontar para ela. */
+  /**
+   * Guarda (ou troca) a chave da ferramenta, sem conferir. O cofre grava antes de o índice apontar para ela.
+   * Quem tem como conferir a chave (o Conectar) usa `replace`, para a anterior só sair depois de a nova passar.
+   */
   set(tool: string, apiKey: string): void {
     if (!TOOL_ID.test(tool)) throw new Error(`Ferramenta inválida: ${tool}.`);
     const parsed = parseApiKey(apiKey);
@@ -83,6 +103,19 @@ export class ToolKeys {
     this.write({ ...index, [tool]: ref });
     // o índice já aponta para a nova: a cifrada antiga sai do disco
     if (old && old !== ref) this.store.delete(ownerOf(tool), old);
+  }
+
+  /**
+   * Troca a chave só depois que a nova é aceita (`accept`: no ACP, o `authenticate` do agente; no modo API, a
+   * conferência com a API). Enquanto ela não passa, nada muda no cofre nem no índice: uma chave recusada (ou
+   * uma rede fora do ar) deixa a anterior funcionando. Aceita, grava a nova e só então apaga a cifrada antiga.
+   */
+  async replace(tool: string, apiKey: string, accept: (key: string) => Promise<void>): Promise<void> {
+    if (!TOOL_ID.test(tool)) throw new Error(`Ferramenta inválida: ${tool}.`);
+    const parsed = parseApiKey(apiKey);
+    if ('error' in parsed) throw new Error(parsed.error);
+    await accept(parsed.key);
+    this.set(tool, parsed.key);
   }
 
   /** Esquece a chave da ferramenta: o índice deixa de apontar para ela e o arquivo cifrado sai do disco. */

@@ -5,7 +5,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import {
+  API_CAPABILITY_CHECKS,
+  EXECUTOR_CAPABILITIES,
   admitExecution,
+  assessCapability,
+  evidenceSource,
+  type CapabilityEvidence,
   type ExecutionTransport,
   type StrictExecutionRequest,
   type ExecutionAdmissionDecision,
@@ -17,7 +22,7 @@ import { acpCommand, acpSessionMode, type AcpAgent } from './acp/provider';
 import { executorOf, type ApiInvocation, type Executor } from './drivers';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import { boardOnlyMcpConfig } from '../execution';
-import { canonical, CapabilityEvidenceStore } from './capabilityEvidence';
+import { canonical, constructionEvidence, CapabilityEvidenceStore } from './capabilityEvidence';
 import { INHERITED_SESSION_ENV } from '../spawn';
 
 type ExecModel = NonNullable<HeadlessInput['exec']>['model'];
@@ -43,8 +48,10 @@ interface AdmissionOptions {
   /** Hash de políticas gerenciadas e de fontes relevantes, coletado pelo verificador. Ausência não é prova. */
   environmentEvidence(): { state: 'complete'; digest: string } | { state: 'unknown' };
   now?(): number;
-  /** quem executa o perfil; o registro dos drivers por padrão (o teste troca, enquanto não há driver da API) */
+  /** quem executa o perfil; o registro dos drivers por padrão (o teste e o cenário trocam pelo driver da API apontado para o servidor falso) */
   executorOf?(profile: AiProfile): Executor;
+  /** a chave do cofre por ferramenta (`profileApiKey`), para o vínculo do modo API; null sem chave */
+  apiKey?(profile: AiProfile): string | null;
 }
 /** O comando de um agente ACP como o gateway o inicia. */
 export interface AcpBuiltCommand {
@@ -60,6 +67,11 @@ export interface AdmittedExecution {
   command(command: HeadlessCommand): HeadlessCommand;
   /** O mesmo para o agente ACP: o comando e os argumentos do catálogo, sem arquivo temporário nem formato. */
   acpCommand(command: AcpBuiltCommand): AcpBuiltCommand;
+  /**
+   * O do modo API, antes de cada pedido ao modelo e de cada chamada de função: o vínculo admitido (endpoint,
+   * modelo, versão da extensão, digest da chave, pasta) não mudou. Não há comando a comparar.
+   */
+  api(): void;
 }
 /** O agente do catálogo de um perfil ACP; lança se o id não existe (o gateway recusa pelo mesmo motivo). */
 export function admissionAgent(profile: AiProfile): AcpAgent | null {
@@ -202,7 +214,13 @@ export class ExecutionAdmission {
     // a parte da ferramenta (o que a linha de comando fixa e qual executável) vem do driver; o resto do
     // contexto é o mesmo para toda ferramenta e fica aqui, onde é canonizado e vira o hash
     const driver = (this.options.executorOf ?? executorOf)(profile);
-    const tool = driver.bindingContext({ ...input, prompt: '<prompt-da-execucao>' }, { profile, cwd });
+    // só o modo API recebe a chave (o cofre por ferramenta): o vínculo dele leva o digest dela. Na CLI e no
+    // ACP a chave não entra no vínculo, e trocá-la não invalida as provas (história 7)
+    const apiKey = driver.transport === 'api' ? (this.options.apiKey?.(profile) ?? null) : undefined;
+    const tool = driver.bindingContext(
+      { ...input, prompt: '<prompt-da-execucao>' },
+      { profile, cwd, ...(apiKey !== undefined ? { apiKey } : {}) },
+    );
     // o modo API não tem executável: o vínculo é outro formato, e um driver que mistura os dois é recusado
     if ('api' in tool !== (driver.transport === 'api')) throw new Error('Vínculo do executor incoerente com o transporte.');
     if ('api' in tool) return this.apiBinding(profile, profileId, tool.api, input, cwd);
@@ -305,10 +323,45 @@ export class ExecutionAdmission {
     return e.state === 'complete' ? e.digest : '';
   }
   /**
-   * Só leitura para a prévia: mesma decisão pura e mesmas evidências locais, sem exigir as definições MCP
-   * nem lançar. O vínculo é o de um comando sem MCP; com MCP ativo ele não coincide e a razão aparece.
+   * O vínculo do modo API está sem prova em vigor (nunca afirmada nesta versão, endpoint, modelo e chave, ou
+   * vencida): é quando o host afirma de novo. Uma prova incompleta não é refeita sozinha: ela diz que o laço
+   * não cumpre algum check, e afirmar de novo daria o mesmo.
    */
-  preview(executor: AiExecutor, profileId: string, request: StrictExecutionRequest, _cwd: string): ExecutionAdmissionDecision {
+  private constructionPending(binding: string, evidence: readonly CapabilityEvidence[], now: number): boolean {
+    return EXECUTOR_CAPABILITIES.some((c) =>
+      ['no-evidence', 'expired', 'changed-binding'].includes(
+        assessCapability(c, binding, evidence, now, API_CAPABILITY_CHECKS, evidenceSource('api')).reason,
+      ),
+    );
+  }
+  /** Os checks que o laço do driver do perfil cumpre para a entrada (vazio: o driver não afirma nada). */
+  private guaranteed(profile: AiProfile, input: HeadlessInput): readonly string[] {
+    return (this.options.executorOf ?? executorOf)(profile).guarantees?.(input) ?? [];
+  }
+  /**
+   * A afirmação por construção do modo API (história 10), antes da decisão da execução: sem prova em vigor
+   * para o vínculo de isolamento atual, o host assina os checks que o driver garante. Quem afirma é o host
+   * (a chave local das provas), nunca a decisão pura nem a IA: um perfil cujo driver não garante nada segue
+   * sem prova e é bloqueado como qualquer outro.
+   */
+  private affirmConstruction(profile: AiProfile, binding: string, input: HeadlessInput, now: number): void {
+    const guaranteed = this.guaranteed(profile, input);
+    if (guaranteed.length && this.constructionPending(binding, this.options.evidence.load(binding), now))
+      this.options.evidence.recordByConstruction(binding, now, undefined, guaranteed);
+  }
+  /**
+   * Só leitura para a prévia: mesma decisão pura e mesmas evidências locais, sem exigir as definições MCP
+   * nem lançar. O vínculo é o de um comando sem MCP; com MCP ativo ele não coincide e a razão aparece. No
+   * modo API a prova é de um modelo: a prévia usa o do alvo do card (`model`), e, sem prova em vigor, avalia
+   * a que o host afirmaria na execução, sem gravar nada.
+   */
+  preview(
+    executor: AiExecutor,
+    profileId: string,
+    request: StrictExecutionRequest,
+    _cwd: string,
+    model: string | null = null,
+  ): ExecutionAdmissionDecision {
     const now = this.options.now?.() ?? Date.now();
     const permission = 'board' as const;
     const profile = executorProfile(executor);
@@ -317,8 +370,14 @@ export class ExecutionAdmission {
     const preliminary = admitExecution(tool, permission, request, '', [], now, transport);
     try {
       if (preliminary.reasons.some((r) => r.code !== 'capability-not-verified')) return preliminary;
-      const bound = this.isolationBinding(executor, profileId, permission);
-      const decision = admitExecution(tool, permission, request, bound.binding, this.options.evidence.load(bound.binding), now, transport);
+      const execModel = transport === 'api' && model ? { name: model, effort: null } : null;
+      const bound = this.isolationBinding(executor, profileId, permission, execModel);
+      let evidence = this.options.evidence.load(bound.binding);
+      if (transport === 'api' && this.constructionPending(bound.binding, evidence, now)) {
+        const guaranteed = this.guaranteed(profile, isolationInput(permission, execModel));
+        if (guaranteed.length) evidence = constructionEvidence(bound.binding, now, undefined, guaranteed);
+      }
+      const decision = admitExecution(tool, permission, request, bound.binding, evidence, now, transport);
       if (!bound.environmentComplete) {
         decision.state = 'blocked';
         decision.reasons.push({ code: 'environment-not-verified' });
@@ -342,8 +401,9 @@ export class ExecutionAdmission {
     ) as { mcpServers?: Record<string, unknown> };
     const names = request.mcpServers.filter((s) => preliminary.activeMcpIds.includes(s.artifactId)).map((s) => s.name);
     // no ACP o servidor do board é o canal por onde o card responde cada pedido de permissão: não é
-    // uma ferramenta nativa (o agente não tem lista de allow), então entra sempre que a execução o traz
-    if (preliminary.mcpTools.some((name) => name.startsWith('mcp__faz-ai__')) || (transport === 'acp' && source.mcpServers?.['faz-ai']))
+    // uma ferramenta nativa (o agente não tem lista de allow), então entra sempre que a execução o traz.
+    // No modo API ele é o próprio board, como cliente de si mesmo: é por ele que o card lê e responde
+    if (preliminary.mcpTools.some((name) => name.startsWith('mcp__faz-ai__')) || (transport !== 'cli' && source.mcpServers?.['faz-ai']))
       names.unshift('faz-ai');
     const servers: Record<string, unknown> = {};
     for (const name of names) {
@@ -397,13 +457,15 @@ export class ExecutionAdmission {
       input.permission,
       transport === 'api' ? (effective.exec?.model ?? null) : null,
     );
+    const now = this.options.now?.() ?? Date.now();
+    if (transport === 'api') this.affirmConstruction(profile, isolation.binding, effective, now);
     const decision = admitExecution(
       tool,
       input.permission,
       request,
       isolation.binding,
       this.options.evidence.load(isolation.binding),
-      this.options.now?.() ?? Date.now(),
+      now,
       transport,
     );
     if (!bound.environmentComplete) {
@@ -422,6 +484,23 @@ export class ExecutionAdmission {
       input: effective,
       decision,
       transport,
+      api: () => {
+        if (transport !== 'api') throw new Error(`A admissão é ${TRANSPORT_OF[transport]}, não do modo API.`);
+        rebound();
+        // a prova que admitiu a execução ainda vale: removida, alterada ou vencida no meio do laço, o próximo
+        // pedido não sai (a execução seguinte afirma de novo, na admissão). `load` lança na prova alterada
+        const evidence = this.options.evidence.load(isolation.binding);
+        const at = this.options.now?.() ?? Date.now();
+        const lost = decision.capabilities
+          .filter((c) => c.state === 'verified')
+          .filter(
+            (c) =>
+              assessCapability(c.capability, isolation.binding, evidence, at, API_CAPABILITY_CHECKS, evidenceSource('api')).state !==
+              'verified',
+          );
+        if (lost.length)
+          throw new Error(`A prova do modo API perdeu a validade durante a execução (${lost.map((c) => c.capability).join(', ')}).`);
+      },
       acpCommand: (command) => {
         if (transport !== 'acp') throw new Error(`A admissão é ${TRANSPORT_OF[transport]}, não de um agente ACP.`);
         rebound();

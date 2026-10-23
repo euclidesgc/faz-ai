@@ -50,8 +50,23 @@ function host(over: Partial<ConnectorDeps> = {}) {
     locate: () => '/usr/local/bin/gemini',
     version: async () => '0.65.0',
     signedIn: async () => true,
-    keys: { get: (tool) => keys.get(tool) ?? null, set: (tool, key) => void keys.set(tool, key) },
+    // como o `ToolKeys.replace`: a chave nova só entra depois de aceita
+    keys: {
+      get: (tool) => keys.get(tool) ?? null,
+      replace: async (tool, key, accept) => {
+        await accept(key);
+        keys.set(tool, key);
+      },
+    },
     authenticate: async (_p, _exe, auth) => void calls.push(`authenticate:${auth.methodId}:${auth.apiKey}`),
+    checkApiKey: async (_p, key) => {
+      calls.push(`check:${key}`);
+      return 4;
+    },
+    setMode: (id, mode) => {
+      calls.push(`mode:${id}:${mode}`);
+      profiles.get(id)!.mode = mode;
+    },
     verify: async (id) => {
       calls.push(`verify:${id}`);
       return { evidence: ACP_PROVEN() };
@@ -206,6 +221,23 @@ describe('Conectar: o erro fica preso ao passo, com "Tentar de novo"', () => {
     expect(JSON.stringify(h.published)).not.toContain(KEY);
   });
 
+  it('trocar a chave: a nova recusada não substitui a guardada (só sai a antiga depois de a nova passar)', async () => {
+    let accepted = KEY;
+    const h = host({
+      authenticate: async (_p, _e, auth) => {
+        if (auth.apiKey !== accepted) throw new Error('chave recusada');
+      },
+    });
+    expect(await h.connector.connect('gemini', { apiKey: KEY })).toMatchObject({ summary: { signIn: 'api-key' } });
+    const other = 'AIzaSy-outra-chave-recusada-99';
+    expect(await h.connector.connect('gemini', { apiKey: other })).toMatchObject({ step: 'signIn', status: 'waiting', needs: 'api-key' });
+    expect(h.keys.get('gemini')).toBe(KEY);
+    // aceita, ela entra no lugar da antiga
+    accepted = other;
+    await h.connector.connect('gemini', { apiKey: other });
+    expect(h.keys.get('gemini')).toBe(other);
+  });
+
   it('verify: o agente recusou a sessão com a chave guardada → de volta ao campo da chave', async () => {
     const h = host({ verify: async () => ({ evidence: evidence('acp', { 'conversation/fresh-session': 'failed' }), authRequired: true }) });
     h.keys.set('gemini', KEY);
@@ -308,6 +340,92 @@ describe('Conectar as outras ferramentas: o mesmo fluxo, pelo auth de cada drive
 
   it('perfil personalizado: fora do Conectar', async () => {
     await expect(host().connector.connect('pessoal')).rejects.toThrow(/perfil personalizado segue pelo formulário/);
+  });
+});
+
+describe('Conectar o Gemini pelo cartão API (história 10): o mesmo perfil, o modo trocável, a chave conferida', () => {
+  it('sem binário: pede a chave, confere com a API, grava o modo api, liga o perfil, exclusivo sem ciência, modelos', async () => {
+    const h = host({ locate: () => null });
+    // o perfil está no ACP; o cartão é o da API
+    expect(await h.connector.connect('gemini', { mode: 'api' })).toMatchObject({
+      mode: 'api',
+      step: 'signIn',
+      status: 'waiting',
+      needs: 'api-key',
+      summary: { version: null },
+    });
+    expect(h.profiles.get('gemini')!.mode).toBe('acp');
+    const done = await h.connector.connect('gemini', { mode: 'api', apiKey: KEY });
+    expect(h.calls).toEqual([`check:${KEY}`, 'mode:gemini:api', 'enable:gemini', 'models']);
+    expect(done).toMatchObject({
+      mode: 'api',
+      status: 'connected',
+      summary: { signIn: 'api-key-checked', regime: 'exclusive', reviewed: null },
+    });
+    expect(h.profiles.get('gemini')!.mode).toBe('api');
+    expect(h.keys.get('gemini')).toBe(KEY);
+    expect(JSON.stringify(h.published)).not.toContain(KEY);
+  });
+
+  it('a mesma chave do ACP serve à API, e a conferência acontece sem pedir a chave de novo', async () => {
+    const h = host({ locate: () => null });
+    h.keys.set('gemini', KEY);
+    expect(await h.connector.connect('gemini', { mode: 'api' })).toMatchObject({ status: 'connected' });
+    expect(h.calls[0]).toBe(`check:${KEY}`);
+  });
+
+  it('a API recusa a chave: o modo e a chave guardada não mudam, e o erro não repete a chave', async () => {
+    const h = host({
+      locate: () => null,
+      checkApiKey: async (_p, key) => {
+        throw new Error(`A API do Gemini recusou a chave (HTTP 400, INVALID_ARGUMENT): API key ${key} not valid`);
+      },
+    });
+    h.keys.set('gemini', 'AIzaSy-a-chave-que-ja-funciona');
+    const state = await h.connector.connect('gemini', { mode: 'api', apiKey: KEY });
+    expect(state).toMatchObject({ step: 'signIn', status: 'waiting', needs: 'api-key' });
+    expect(state.error).toBe('A API do Gemini recusou a chave (HTTP 400, INVALID_ARGUMENT): API key [credencial local] not valid');
+    expect(h.keys.get('gemini')).toBe('AIzaSy-a-chave-que-ja-funciona');
+    expect(h.profiles.get('gemini')!.mode).toBe('acp');
+    expect(JSON.stringify(h.published)).not.toContain(KEY);
+  });
+
+  it('a ciência do ACP sai ao conectar a API (exclusivo); o cartão ACP volta o perfil ao ACP', async () => {
+    const h = host({ locate: (p) => (p.mode === 'api' ? null : '/usr/local/bin/gemini') });
+    h.keys.set('gemini', KEY);
+    h.reviews.gemini = 2;
+    await h.connector.connect('gemini', { mode: 'api' });
+    expect(h.reviews.gemini).toBeUndefined();
+    const back = await h.connector.connect('gemini', { mode: 'acp' });
+    expect(back).toMatchObject({ mode: 'acp', step: 'review', needs: 'review' });
+    expect(h.profiles.get('gemini')!.mode).toBe('acp');
+  });
+
+  it('a recusa que outra camada cortou no meio da chave sai sem pedaço dela (no ACP e na API)', async () => {
+    // o erro já chega cortado com reticências, no meio da chave: o Conectar mascara também o começo dela
+    const cutAt = (key: string) => `${'w'.repeat(280)} ${key.slice(0, 14)}…`;
+    const acp = host({
+      authenticate: async (_p, _e, auth) => {
+        throw new Error(cutAt(auth.apiKey));
+      },
+    });
+    const viaAcp = await acp.connector.connect('gemini', { apiKey: KEY });
+    expect(viaAcp.error).toMatch(/\[credencial local\]…$/);
+    expect(viaAcp.error).not.toContain(KEY.slice(0, 8));
+    const api = host({
+      locate: () => null,
+      checkApiKey: async (_p, key) => {
+        throw new Error(cutAt(key));
+      },
+    });
+    const viaApi = await api.connector.connect('gemini', { mode: 'api', apiKey: KEY });
+    expect(viaApi.error).not.toContain(KEY.slice(0, 8));
+    expect(JSON.stringify([...acp.published, ...api.published])).not.toContain(KEY.slice(0, 8));
+  });
+
+  it('um modo que a ferramenta não oferece é recusado', async () => {
+    await expect(host().connector.connect('gemini', { mode: 'cli' })).rejects.toThrow('o modo CLI não é oferecido');
+    await expect(host().connector.connect('claude', { mode: 'api' })).rejects.toThrow('o modo API não é oferecido');
   });
 });
 
