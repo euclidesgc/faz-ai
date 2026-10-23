@@ -178,9 +178,10 @@ ativa o plano v1 nem valida CLIs reais de IA.
 A base de admissão v1 no gateway distingue conversa, artefatos, permissões, MCP e delegação e exige
 recibos locais vinculados à configuração atual. A decisão fica no histórico (schema 36), sem virar
 autorização ao exportar/importar. Lista vazia significa nenhuma ferramenta; o mapeamento estrito do
-Claude usa ferramentas e operações MCP exatas, sem pular permissões. O comando **Faz AI: Verificar o
-isolamento da CLI de IA** roda a CLI do Claude numa fixture descartável contra uma API local e grava
-os recibos (validade de 14 dias); nenhum executor é verificado automaticamente. A configuração
+Claude usa ferramentas e operações MCP exatas, sem pular permissões. A verificação de capacidades (no
+**Conectar** e no **Reconectar** do perfil, ou em **Verificar capacidades**, na cópia) roda a CLI do
+Claude numa fixture descartável contra uma API local e grava os recibos (validade de 14 dias); só o
+agente ACP é verificado automaticamente, ao ser ligado. A configuração
 resolvida da atividade é validada antes de abrir o processo e congelada no snapshot da execução
 (`manifest.context`): editar a biblioteca depois não muda uma execução em curso, e um MCP fora da
 configuração da atividade é recusado. O plano só governa as execuções com o runtime v1, que é
@@ -189,7 +190,8 @@ opcional; sem ele, a execução continua legada.
 **Runtime v1 (opcional).** Com `FAZ_AI_CONTEXT_RUNTIME=v1` no ambiente que abre o editor, o gateway
 só executa com a configuração resolvida e a admissão por capacidades: runner (fase, refinar, resumo,
 conflito), chat, assistentes do Harness e teste do perfil. Sem agente com contrato válido ou sem
-recibos (comando **Faz AI: Verificar o isolamento da CLI de IA**, validade de 14 dias), o processo
+recibos (gravados no **Conectar** do perfil, ou em **Verificar capacidades** em Ferramentas de IA,
+validade de 14 dias), o processo
 não abre. O legado continua o padrão.
 
 ## Aba Consumo do card

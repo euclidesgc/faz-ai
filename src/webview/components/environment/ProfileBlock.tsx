@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { PROFILE_CAPABILITIES, type ProfileCapability, isReadyCli, modeLabel } from '../../../shared/aiProfiles';
+import { PROFILE_CAPABILITIES, type ProfileCapability, isReadyCli, isReadyProfile, modeLabel } from '../../../shared/aiProfiles';
 import type { CapabilityState } from '../../../shared/executionAdmission';
-import { baseValue } from '../../../shared/harness';
+import { toolModeEntry, toolModeOf } from '../../../shared/aiTools';
 import { leaksList } from '../../isolation';
 import { onHostMessage } from '../../vscode';
 import { useAction } from '../../useAction';
 import type { ProfileHealth } from '../../../shared/profileHealth';
-import { LOGIN_COMMAND } from '../../../shared/requirements';
 import { t } from '../../i18n';
 import { settings, ui } from '../../commands';
 import { isWeb } from '../../vscode';
@@ -68,13 +67,18 @@ function Capabilities({ health }: { health: ProfileHealth }) {
           </Line>
         );
       })}
-      {health.verifiable && !isWeb && health.capabilities.every((c) => c === 'unknown') && (
+      {/* a verificação é do Conectar (o perfil do catálogo) ou do "Verificar capacidades" (a cópia, o personalizado
+          ACP), os dois em Ferramentas de IA, que existe também no navegador: a paleta de comandos não tem mais o comando */}
+      {health.verifiable && health.capabilities.every((c) => c === 'unknown') && (
         <li className="env-item skipped">
           <p className="small muted">
-            {t(
-              'Sem recibos de capacidade deste perfil: rode "Faz AI: Verificar o isolamento da CLI de IA" na paleta de comandos e escolha {name}.',
-              { name: health.name },
-            )}
+            {isReadyProfile(health)
+              ? t('Sem recibos de capacidade deste perfil: conecte {name} em Ferramentas de IA; a verificação faz parte do Conectar.', {
+                  name: health.name,
+                })
+              : t('Sem recibos de capacidade deste perfil: clique em Verificar capacidades em {name}, em Ferramentas de IA.', {
+                  name: health.name,
+                })}
           </p>
         </li>
       )}
@@ -163,7 +167,9 @@ export function ProfileBlock({ health, focused }: { health: ProfileHealth; focus
   }, [focused]);
   const id = `env-profile-${health.id}`;
   const probe = health.probe;
-  const login = baseValue(LOGIN_COMMAND, health.base);
+  // o login no terminal é o da linha do driver no catálogo (a CLI pronta e a cópia dela); o personalizado não tem
+  const tool = toolModeOf(health);
+  const login = tool ? toolModeEntry(tool.tool, tool.mode)?.cli?.login : undefined;
   const pending = health.registration === 'pending-review';
   return (
     <section ref={ref} aria-labelledby={id} className={`env-profile${focused ? ' focused' : ''}`}>

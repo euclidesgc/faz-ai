@@ -103,7 +103,7 @@ describe('faixa de requisitos do board', () => {
     expect(useBoardStore.getState()).toMatchObject({ view: 'environment', environmentProfile: 'cursor' });
   });
 
-  it('a prova de capacidades invalidada avisa sem bloquear e diz como ela é refeita', () => {
+  it('a prova de capacidades invalidada avisa sem bloquear e diz como ela é refeita', async () => {
     set([
       {
         id: 'profile',
@@ -111,7 +111,15 @@ describe('faixa de requisitos do board', () => {
         name: 'Claude Code',
         problem: 'evidence-invalidated',
         optional: true,
-        action: { kind: 'diagnostic', profile: 'claude' },
+        action: { kind: 'connect', profile: 'claude' },
+      },
+      {
+        id: 'profile',
+        profile: 'claude-trabalho',
+        name: 'Claude trabalho',
+        problem: 'evidence-invalidated',
+        optional: true,
+        action: { kind: 'aiTools', profile: 'claude-trabalho' },
       },
       {
         id: 'profile',
@@ -124,16 +132,22 @@ describe('faixa de requisitos do board', () => {
       },
     ]);
     renderThemed(<RequirementsBanner />);
-    expect(screen.getByText('2 perfis de CLI precisam de atenção')).toBeInTheDocument();
+    expect(screen.getByText('3 perfis de CLI precisam de atenção')).toBeInTheDocument();
     expect(screen.getByText('Claude Code: a verificação de capacidades perdeu a validade')).toBeInTheDocument();
     expect(screen.getByText('Gemini CLI: a verificação de capacidades perdeu a validade')).toBeInTheDocument();
-    expect(
-      screen.getByText(/Rode "Faz AI: Verificar o isolamento da CLI de IA" na paleta de comandos e escolha este perfil/),
-    ).toBeInTheDocument();
+    // o comando da paleta saiu (história 13): o pronto refaz no Reconectar, a cópia no "Verificar capacidades"
+    expect(screen.queryByText(/Verificar o isolamento da CLI de IA/)).toBeNull();
+    // o texto diz o mesmo que o botão ao lado, "Abrir o Conectar"
+    expect(screen.getByText(/Abra o Conectar e conecte este perfil de novo/)).toBeInTheDocument();
+    expect(screen.getByText(/Clique em Verificar capacidades neste perfil, em Ferramentas de IA/)).toBeInTheDocument();
     expect(screen.getByText(/O board já está verificando de novo, sem gastar a sua conta/)).toBeInTheDocument();
     expect(region()).toHaveClass('warn');
     expect(region()).not.toHaveClass('error');
     expect(aiBlockedReason(useBoardStore.getState().state!)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir Ferramentas de IA' }));
+    expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'aiTools' });
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir o Conectar' }));
+    expect(useBoardStore.getState()).toMatchObject({ settingsTab: 'aiTools', connectTool: 'claude' });
   });
 
   it('o login de um perfil pronto traz o comando de login e o "Abrir no terminal"', async () => {

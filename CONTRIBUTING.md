@@ -56,9 +56,11 @@ num driver; o board, as telas e a admissão só falam com o contrato.
 1. **O driver**: `src/extension/ai/drivers/<ferramenta>/<modo>.ts`, com o contrato de conexão
    (`ConnectionDriver`, em `drivers/types.ts`): comando, `locate`, argumentos de versão, página e
    comandos de instalação, como se entra (`auth`), a sonda de login (`signedIn`), a lista de modelos
-   quando a ferramenta a dá por comando (`listModels`), o que o gateway mede (`measure`) e o que o
-   board impõe (`enforcement`). Uma CLI pronta envolve o provider dela (`ai/providers/`, com o leitor
-   em `aiOutput/`) por `cliDriver`; um agente ACP é uma entrada de `ACP_AGENTS` (`ai/acp/agents.ts`),
+   quando a ferramenta a dá por comando (`listModels`), o que o gateway mede (`measure`), o que o
+   board impõe (`enforcement`) e, na CLI que fala MCP fora do board, como registrar e onde ela lê o
+   servidor do board (`boardServer`, em `mcp/clientConfig.ts`; o despacho é `mcp/boardServer.ts`).
+   Uma CLI pronta envolve o provider dela (`ai/providers/`, com o leitor em `aiOutput/`) por
+   `cliDriver`, que tira o comando e o login da linha da ferramenta em `TOOLS` (`cli`); um agente ACP é uma entrada de `ACP_AGENTS` (`ai/acp/agents.ts`),
    que `acpDriver` transforma em driver. Registre o driver em `drivers/index.ts` (`driverFor`).
    O mesmo driver cumpre o contrato de execução (`Executor`): `transport`, `run(input, ctx)`, que
    devolve o `Measured` (o processo, o relatório e a falha da medição), e `bindingContext(input, ctx)`,

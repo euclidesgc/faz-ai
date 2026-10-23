@@ -213,15 +213,6 @@ export const isGeminiCli = (profile: ProfileIdentity): boolean => isReadyCli(pro
  */
 export const verifiableProfile = (profile: AiProfile): boolean =>
   profile.base === 'claude' || isAcpProfile(profile) || isGeminiCli(profile);
-/**
- * Os perfis que a verificação oferece: ligados, revisados e verificáveis, com o padrão do board primeiro
- * (é o que a pessoa mais provavelmente quer verificar). O pendente de revisão não roda comando nenhum.
- */
-export function verifiableProfiles(board: { aiTool: string; aiProfiles: readonly AiProfile[] }): AiProfile[] {
-  return board.aiProfiles
-    .filter((p) => p.enabled && p.credentials?.review !== 'pending' && verifiableProfile(p))
-    .sort((a, b) => Number(b.id === board.aiTool) - Number(a.id === board.aiTool));
-}
 /** Compatibilidade do seletor legado. A admissão v1 resolve o alvo explícito sem este fallback. */
 export function activeProfile(board: { aiTool: string; aiProfiles: readonly AiProfile[] }): AiProfile {
   return (

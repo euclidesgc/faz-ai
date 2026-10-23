@@ -10,7 +10,7 @@ import { acpSessionModels, modelConfigOption, parseAcpSessionModels } from '../s
 import type { AcpSpawnFn } from '../src/extension/ai/acp/provider';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import type { AiProfile } from '../src/shared/aiProfiles';
+import type { AiProfileDraft } from '../src/shared/aiProfiles';
 
 const gemini = acpAgent('gemini')!;
 
@@ -166,17 +166,8 @@ describe('readAcpModels no router', () => {
   const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
   let dir: string;
   let router: MessageRouter;
-  const acp: AiProfile = {
-    id: 'gemini-acp',
-    name: 'Gemini ACP',
-    enabled: true,
-    kind: 'custom',
-    tool: 'gemini-acp',
-    mode: 'acp',
-    base: 'generic',
-    config: { acpAgent: 'gemini' },
-    position: 9,
-  };
+  /** o id do personalizado ACP, que nasce da cópia do agente pronto (o formulário novo é só de CLI, história 13) */
+  let acpId: string;
   beforeEach(async () => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-acp-models-'));
     const db = await openInMemory(WASM_DIR);
@@ -188,17 +179,21 @@ describe('readAcpModels no router', () => {
       workspaceDir: dir,
       homeDir: path.join(dir, 'home'),
     });
-    router.handle({ type: 'settings.aiProfiles.save', profile: acp } as never);
+    const before = router.snapshot().board.aiProfiles.map((p) => p.id);
+    router.handle({ type: 'settings.aiProfiles.duplicate', id: 'gemini' });
+    acpId = router.snapshot().board.aiProfiles.find((p) => !before.includes(p.id))!.id;
+    const acp: AiProfileDraft = { id: acpId, name: 'Gemini ACP', enabled: true, kind: 'custom', base: 'generic', config: {}, position: 9 };
+    router.handle({ type: 'settings.aiProfiles.save', profile: acp });
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
   it('chama o gancho do host só para um perfil ACP; sem gancho, avisa que o host não lê', async () => {
     await expect(router.readAcpModels('claude')).resolves.toBeUndefined();
-    await expect(router.readAcpModels('gemini-acp')).rejects.toThrow('indisponível neste host');
+    await expect(router.readAcpModels(acpId)).rejects.toThrow('indisponível neste host');
     const read: string[] = [];
     router.onAcpModels(async (profile) => void read.push(profile.id));
-    await router.readAcpModels('gemini-acp');
+    await router.readAcpModels(acpId);
     await router.readAcpModels('claude');
-    expect(read).toEqual(['gemini-acp']);
+    expect(read).toEqual([acpId]);
   });
 });

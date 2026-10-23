@@ -51,7 +51,8 @@ export class Verifications<R> {
 
   /**
    * A verificação que o host dispara sozinho, em segundo plano, com o resultado no log. Só o agente ACP (dois
-   * handshakes, sem gastar a conta); o Claude fica no comando da paleta. Não roda com a prova em vigor, com outra
+   * handshakes, sem gastar a conta); o Claude verifica no Conectar e no Reconectar (a cópia, por "Verificar
+   * capacidades" em Ferramentas de IA), porque a sonda dele roda a CLI quatro vezes. Não roda com a prova em vigor, com outra
    * verificação do perfil em andamento nem durante o Conectar dele.
    */
   inBackground(id: string, why: string): void {

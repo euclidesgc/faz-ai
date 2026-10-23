@@ -1,4 +1,5 @@
-import { choose, confirmLast, lastSent, renderThemed, seedBoard, syncStore, type SeededBoard } from './setup';
+import { choose, confirmLast, lastSent, renderThemed, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import type { AiProfile } from '../../src/shared/aiProfiles';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -11,6 +12,11 @@ beforeAll(async () => {
   board = await seedBoard();
 });
 const profileCard = (name: string) => screen.getByLabelText(name);
+/** O formulário do personalizado abre por "Avançado" (história 13). */
+const openNewProfile = async () => {
+  await userEvent.click(screen.getByText('Avançado'));
+  await userEvent.click(screen.getByRole('button', { name: 'Novo perfil de CLI personalizado' }));
+};
 const show = () => {
   syncStore(board.router);
   renderThemed(
@@ -85,9 +91,26 @@ describe('Ferramentas de IA', () => {
     confirmLast();
   });
 
+  it('o perfil personalizado fica atrás de "Avançado", fora do caminho normal (história 13)', async () => {
+    show();
+    // o topo da aba só consulta a situação: o caminho normal é o Conectar ferramenta
+    expect(screen.queryByRole('button', { name: 'Novo perfil' })).toBeNull();
+    const advanced = screen.getByText('Avançado').closest('details')!;
+    expect(advanced).not.toHaveAttribute('open');
+    expect(
+      within(advanced).getByText(/Perfil de CLI personalizado, para uma linha de comando que o catálogo não traz/),
+    ).toBeInTheDocument();
+    await openNewProfile();
+    // o personalizado novo é só de CLI: sem o campo do agente ACP, com o campo do comando
+    const form = within(screen.getByLabelText('Novo perfil de CLI'));
+    expect(form.queryByRole('textbox', { name: 'Agente ACP' })).toBeNull();
+    expect(form.getByRole('textbox', { name: 'Comando' })).toBeInTheDocument();
+    expect(form.queryByText(/Personalizado pelo ACP/)).toBeNull();
+  });
+
   it('formulário novo exige nome e comando e mostra avisos de argumento no Windows e MCP nenhum', async () => {
     show();
-    await userEvent.click(screen.getByRole('button', { name: 'Novo perfil' }));
+    await openNewProfile();
     const form = within(screen.getByLabelText('Novo perfil de CLI'));
     const save = form.getByRole('button', { name: 'Salvar perfil' });
     expect(save).toBeDisabled();
@@ -202,13 +225,156 @@ describe('Ferramentas de IA', () => {
     expect(within(profileCard('Cursor')).getByText('Carrega por conta própria')).toBeInTheDocument();
     await userEvent.click(claude.getByText('Capacidades e evidências'));
     expect(claude.getByText(/Conferido na documentação em 2026-10-16 · versão Claude Code/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Novo perfil' }));
+    await openNewProfile();
     const form = within(screen.getByLabelText('Novo perfil de CLI'));
     await userEvent.type(form.getByRole('textbox', { name: 'Nome' }), 'Outra CLI');
     await userEvent.type(form.getByRole('textbox', { name: 'Comando' }), 'outra-cli');
     await userEvent.click(form.getByRole('checkbox', { name: 'Hooks · Usuário' }));
     await userEvent.click(form.getByRole('button', { name: 'Salvar perfil' }));
     expect(lastSent('settings.aiProfiles.save').profile.config.isolation).toEqual({ loads: [{ kind: 'hook', scope: 'user' }] });
+    confirmLast();
+  });
+
+  it('o personalizado ACP segue rodando, com o aviso, o caminho do Conectar e a verificação', async () => {
+    // a cópia de um agente pronto é o personalizado ACP que versões anteriores também criavam pelo formulário
+    const before = board.router.snapshot().board.aiProfiles.map((p) => p.id);
+    board.router.handle({ type: 'settings.aiProfiles.duplicate', id: 'gemini' });
+    const legacy = board.router.snapshot().board.aiProfiles.find((p) => !before.includes(p.id))!;
+    board.router.handle({
+      type: 'settings.aiProfiles.save',
+      profile: { id: legacy.id, name: 'Gemini antigo', kind: 'custom', base: 'generic', enabled: true, position: 5, config: {} },
+    });
+    show();
+    const card = within(profileCard('Gemini antigo'));
+    expect(card.getByText('Personalizado · ACP')).toBeInTheDocument();
+    expect(card.getByRole('note')).toHaveTextContent('Personalizado pelo ACP: continua rodando como está');
+    // o caminho normal: o Conectar no agente do perfil
+    await userEvent.click(card.getByRole('button', { name: 'Abrir o Conectar' }));
+    expect(useBoardStore.getState().connectTool).toBe('gemini');
+    // sem Conectar, a verificação de capacidades é pedida daqui (o comando da paleta saiu)
+    await userEvent.click(card.getByRole('button', { name: 'Verificar capacidades' }));
+    expect(lastSent('settings.aiProfiles.verify')).toMatchObject({ id: legacy.id });
+    confirmLast();
+    // editar mantém o agente e avisa; o campo do agente só existe nele
+    await userEvent.click(card.getByRole('button', { name: 'Editar' }));
+    const form = within(screen.getByLabelText('Editar perfil Gemini antigo'));
+    expect(form.getByText(/Personalizado pelo ACP: continua rodando como está/)).toBeInTheDocument();
+    expect(form.getByRole('textbox', { name: 'Agente ACP' })).toBeInTheDocument();
+    expect(form.queryByRole('textbox', { name: 'Comando' })).toBeNull();
+    await userEvent.click(form.getByRole('button', { name: 'Salvar perfil' }));
+    expect(lastSent('settings.aiProfiles.save').profile).toMatchObject({ id: legacy.id, kind: 'custom', config: {} });
+    confirmLast();
+  });
+
+  it('só o perfil verificável sem Conectar ganha "Verificar capacidades": a cópia do Claude sim, o pronto e o Cursor não', async () => {
+    const before = board.router.snapshot().board.aiProfiles.map((p) => p.id);
+    board.router.handle({ type: 'settings.aiProfiles.duplicate', id: 'claude' });
+    const copy = board.router.snapshot().board.aiProfiles.find((p) => !before.includes(p.id))!;
+    show();
+    // o pronto verifica pelo Conectar e o Cursor não tem sonda
+    expect(within(profileCard('Claude Code')).queryByRole('button', { name: 'Verificar capacidades' })).toBeNull();
+    expect(within(profileCard('Cursor')).queryByRole('button', { name: 'Verificar capacidades' })).toBeNull();
+    // a cópia nasce desligada e pendente de revisão: o botão espera
+    const card = within(profileCard(copy.name));
+    expect(card.getByRole('button', { name: 'Verificar capacidades' })).toBeDisabled();
+    expect(card.queryByRole('note')).toBeNull();
+  });
+
+  /** Põe na tela perfis que o formulário novo não cria mais (o personalizado ACP de antes, o importado). */
+  const withProfiles = (extra: AiProfile[]) => {
+    const current = useBoardStore.getState().state!;
+    act(() =>
+      useBoardStore.setState({ state: { ...current, board: { ...current.board, aiProfiles: [...current.board.aiProfiles, ...extra] } } }),
+    );
+  };
+  const custom = (id: string, over: Partial<AiProfile> = {}): AiProfile => ({
+    id,
+    name: id,
+    kind: 'custom',
+    tool: id,
+    mode: 'acp',
+    base: 'generic',
+    enabled: true,
+    position: 20,
+    config: {},
+    credentials: { secretRef: 'x', review: 'reviewed', available: true },
+    ...over,
+  });
+
+  it('cada perfil trava só a própria verificação; o motivo do botão desligado diz o caso', async () => {
+    show();
+    withProfiles([
+      custom('acp-um', { config: { acpAgent: 'gemini' } }),
+      custom('acp-dois', { config: { acpAgent: 'opencode' } }),
+      custom('acp-desligado', { config: { acpAgent: 'gemini' }, enabled: false }),
+      custom('acp-pendente', { config: { acpAgent: 'gemini' }, credentials: { secretRef: 'x', review: 'pending', available: true } }),
+    ]);
+    const button = (name: string) => within(profileCard(name)).getByRole('button', { name: 'Verificar capacidades' });
+    await userEvent.click(button('acp-um'));
+    // o primeiro espera o host; o segundo continua verificável ao mesmo tempo
+    expect(button('acp-um')).toBeDisabled();
+    expect(button('acp-um')).toHaveAttribute('aria-busy', 'true');
+    expect(button('acp-dois')).toBeEnabled();
+    await userEvent.click(button('acp-dois'));
+    expect(
+      sentOf('settings.aiProfiles.verify')
+        .slice(-2)
+        .map((m) => m.id),
+    ).toEqual(['acp-um', 'acp-dois']);
+    confirmLast();
+    await waitFor(() => expect(button('acp-dois')).toBeEnabled());
+    expect(button('acp-um')).toBeDisabled();
+    // desligado e pendente de revisão: cada um com o próprio motivo
+    expect(button('acp-desligado')).toBeDisabled();
+    expect(button('acp-pendente')).toBeDisabled();
+    await userEvent.hover(button('acp-desligado').parentElement!);
+    expect(await screen.findByText('Ligue o perfil antes.')).toBeInTheDocument();
+    await userEvent.hover(button('acp-pendente').parentElement!);
+    expect(await screen.findByText('Revise o perfil antes: salve a configuração dele no formulário.')).toBeInTheDocument();
+  });
+
+  it('sem o modo ACP no catálogo (Cursor, Kimi Code), o aviso vem sem o botão do Conectar', () => {
+    show();
+    withProfiles([custom('cursor-acp', { config: { acpAgent: 'cursor' } }), custom('kimi-acp', { config: { acpAgent: 'kimi' } })]);
+    for (const name of ['cursor-acp', 'kimi-acp']) {
+      const card = within(profileCard(name));
+      expect(card.getByRole('note')).toHaveTextContent('Personalizado pelo ACP');
+      expect(card.queryByRole('button', { name: 'Abrir o Conectar' })).toBeNull();
+    }
+  });
+
+  it('o formulário exige o agente do personalizado ACP sem configuração nesta máquina, e oferece o campo ao importado sem ela', async () => {
+    show();
+    withProfiles([
+      custom('acp-sem-cofre', {
+        name: 'ACP sem cofre',
+        config: { acpAgent: 'gemini' },
+        credentials: { secretRef: 'x', review: 'reviewed', available: false },
+      }),
+      custom('importado-antigo', {
+        name: 'Importado antigo',
+        mode: 'cli',
+        enabled: false,
+        credentials: { secretRef: 'x', review: 'pending', available: false },
+      }),
+    ]);
+    await userEvent.click(within(profileCard('ACP sem cofre')).getByRole('button', { name: 'Editar' }));
+    let form = within(screen.getByLabelText('Editar perfil ACP sem cofre'));
+    expect(form.getByText('Informe o agente ACP do perfil: a configuração dele não está nesta máquina.')).toBeInTheDocument();
+    expect(form.getByRole('button', { name: 'Salvar perfil' })).toBeDisabled();
+    await userEvent.type(form.getByRole('textbox', { name: 'Agente ACP' }), 'gemini');
+    expect(form.getByRole('button', { name: 'Salvar perfil' })).toBeEnabled();
+    await userEvent.click(form.getByRole('button', { name: 'Cancelar' }));
+    // o importado de um backup antigo não diz se era ACP: o campo é opcional, e com ele o comando sai
+    await userEvent.click(within(profileCard('Importado antigo')).getByRole('button', { name: 'Editar' }));
+    form = within(screen.getByLabelText('Editar perfil Importado antigo'));
+    expect(form.getByText(/se o perfil era de um agente ACP no board de origem/)).toBeInTheDocument();
+    expect(form.getByRole('textbox', { name: 'Comando' })).toBeInTheDocument();
+    await userEvent.type(form.getByRole('textbox', { name: 'Agente ACP' }), 'gemini');
+    expect(form.queryByRole('textbox', { name: 'Comando' })).toBeNull();
+    await userEvent.type(form.getByRole('textbox', { name: 'Nome' }), ' revisado');
+    await userEvent.click(form.getByRole('button', { name: 'Salvar perfil' }));
+    expect(lastSent('settings.aiProfiles.save').profile).toMatchObject({ id: 'importado-antigo', config: { acpAgent: 'gemini' } });
     confirmLast();
   });
 });

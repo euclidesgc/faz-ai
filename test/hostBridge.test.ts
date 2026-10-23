@@ -82,6 +82,30 @@ describe('HostBridge: preferências da pessoa', () => {
     await bridge.handle({ type: 'settings.aiProfiles.test', id: 'cli', requestId: 'b' });
     expect(checks).toBe(2);
   });
+  it('"Verificar capacidades" chama o verificador do host e publica a frase do resultado, sem o "Verificar de novo" (história 13)', async () => {
+    let checks = 0;
+    router.onRequirementsCheck(async () => void checks++);
+    const asked: string[] = [];
+    // sem verificador (um host sem o verificador), a recusa volta no `done`
+    await bridge.handle({ type: 'settings.aiProfiles.verify', id: 'claude-trabalho', requestId: 'sem' });
+    expect(sent).toContainEqual(expect.objectContaining({ type: 'done', requestId: 'sem', ok: false }));
+    router.onVerify(async (id) => {
+      asked.push(id);
+      return `${id}: isolamento verificado; as cinco capacidades têm recibos válidos.`;
+    });
+    await bridge.handle({ type: 'settings.aiProfiles.verify', id: 'claude-trabalho', requestId: 'v' });
+    expect(asked).toEqual(['claude-trabalho']);
+    expect(sent).toContainEqual({
+      type: 'notice',
+      message: 'claude-trabalho: isolamento verificado; as cinco capacidades têm recibos válidos.',
+    });
+    expect(sent).toContainEqual({ type: 'done', requestId: 'v', ok: true });
+    // a conferência do ambiente é do host, ao fim de toda verificação; a ponte não relê o PATH nem o login
+    expect(checks).toBe(0);
+    // pelo `handle` do router (o caminho da IA e do MCP) a mensagem não chega ao verificador
+    router.handle({ type: 'settings.aiProfiles.verify', id: 'claude' });
+    expect(asked).toEqual(['claude-trabalho']);
+  });
   it('o ready devolve as preferências guardadas e prefs.set grava no host, para o aviso dispensado não voltar', async () => {
     const data = new Map<string, unknown>();
     const prefs = new PrefsStore({ get: <T>(k: string) => data.get(k) as T | undefined, update: (k, v) => data.set(k, v) });

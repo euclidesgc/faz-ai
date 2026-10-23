@@ -1,4 +1,3 @@
-import type { AiBase } from './aiProfiles';
 import type { AiTool } from './harness';
 import type { HarnessIssue } from './harnessStatus';
 import type { BoardState, Card } from './model';
@@ -20,8 +19,13 @@ export type RequirementAction =
   | { kind: 'diagnostic'; profile?: AiTool }
   /** a tela de Configurações → Harness */
   | { kind: 'settings' }
-  /** Ferramentas de IA › Conectar ferramenta: o login da ferramenta que entra por chave de API (história 7) */
-  | { kind: 'connect'; profile: AiTool };
+  /**
+   * Ferramentas de IA › Conectar ferramenta: o login da ferramenta que entra por chave de API (história 7) e o
+   * Reconectar do perfil do catálogo cuja prova perdeu a validade (história 13)
+   */
+  | { kind: 'connect'; profile: AiTool }
+  /** Ferramentas de IA, na lista de perfis: o "Verificar capacidades" do perfil verificável sem Conectar (história 13) */
+  | { kind: 'aiTools'; profile: AiTool };
 
 /**
  * Um requisito que falta. O texto é montado na interface a partir do `id` e dos valores, para sair
@@ -38,7 +42,10 @@ export interface BoardRequirement {
    * deixou de valer porque o vínculo de isolamento mudou (binário, ambiente, extensão) e precisa ser refeita
    */
   problem?: ProfileProblem | 'evidence-invalidated';
-  /** em `evidence-invalidated`: o board refaz a verificação sozinho (agente ACP); sem isso, pelo comando da paleta */
+  /**
+   * em `evidence-invalidated`: o board refaz a verificação sozinho (agente ACP); sem isso, a pessoa refaz em
+   * Ferramentas de IA (o Reconectar, ou o "Verificar capacidades" do perfil sem Conectar), pela `action`
+   */
   automatic?: true;
   /** só o login que venceu numa execução (o probe não confirmou a saída): uma execução manual ainda pode limpar */
   expired?: true;
@@ -50,12 +57,6 @@ export interface BoardRequirement {
   optional?: true;
   action: RequirementAction | null;
 }
-
-/** O comando da CLI de cada ferramenta. */
-export const CLI_COMMAND: Record<AiBase, string> = { claude: 'claude', cursor: 'cursor-agent', kimi: 'kimi' };
-
-/** O comando que faz o login na CLI de cada ferramenta (conferido nas CLIs em 2026-10-13). */
-export const LOGIN_COMMAND: Record<AiBase, string> = { claude: 'claude auth login', cursor: 'cursor-agent login', kimi: 'kimi login' };
 
 /** O problema de um perfil de CLI que impede a execução: CLI ausente, sem login (probe) ou login vencido (falha numa execução). */
 export type CliProblem = 'cli' | 'signin' | 'expired';

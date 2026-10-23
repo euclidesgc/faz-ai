@@ -194,14 +194,12 @@ it('duplicar um pronto copia a lista de itens carregados; salvar grava o isolame
   expect(repo.list(boardId).find((p) => p.id === copy.id)!.config).toEqual(saved.config);
   const custom = repo.save(boardId, draft(), 'person');
   expect(custom.config).toEqual({});
-  // o agente ACP é o id do catálogo, não segredo: volta na leitura pública para o board reconhecer o perfil
-  const acp = repo.save(
-    boardId,
-    draft({ id: 'gemini-acp', name: 'Gemini ACP', config: { acpAgent: 'gemini', env: { X: '1' } } }),
-    'person',
-  );
+  // o agente ACP é o id do catálogo, não segredo: volta na leitura pública para o board reconhecer o perfil. O
+  // personalizado ACP nasce da cópia de um agente pronto (o formulário novo é só de CLI, história 13) e segue editável
+  const copyOfAgent = repo.duplicate(boardId, 'gemini', 'person');
+  const acp = repo.save(boardId, draft({ id: copyOfAgent.id, name: 'Gemini ACP', config: { env: { X: '1' } } }), 'person');
   expect(acp.config).toEqual({ acpAgent: 'gemini' });
-  expect(repo.list(boardId).find((p) => p.id === 'gemini-acp')!.config).toEqual({ acpAgent: 'gemini' });
+  expect(repo.list(boardId).find((p) => p.id === copyOfAgent.id)!.config).toEqual({ acpAgent: 'gemini' });
   expect(JSON.stringify(repo.list(boardId))).not.toContain('private-command-sentinel');
   expect(() =>
     repo.save(boardId, draft({ config: { command: 'x', isolation: { loads: [{ kind: 'x', scope: 'user' }] } as never } }), 'person'),
@@ -281,8 +279,16 @@ it('agente ACP pronto: desligado até a pessoa ligar, sem edição nem exclusão
 it('salvar e duplicar gravam a ferramenta e o modo pelo tipo e pelo agente, nunca pelo rascunho', () => {
   const cli = repo.save(boardId, draft({ tool: 'claude', mode: 'acp' }), 'person');
   expect(cli).toMatchObject({ kind: 'custom', tool: cli.id, mode: 'cli' });
-  const acp = repo.save(boardId, draft({ name: 'Meu Gemini', config: { acpAgent: 'gemini' } }), 'person');
-  expect(acp).toMatchObject({ kind: 'custom', tool: acp.id, mode: 'acp' });
+  // o personalizado novo é só de CLI (história 13): nem criar com o agente ACP, nem transformar um CLI em ACP
+  expect(() => repo.save(boardId, draft({ name: 'Meu Gemini', config: { acpAgent: 'gemini' } }), 'person')).toThrow(
+    'O perfil personalizado novo é só de CLI',
+  );
+  expect(() => repo.save(boardId, draft({ id: cli.id, name: cli.name, config: { acpAgent: 'gemini' } }), 'person')).toThrow('só de CLI');
+  // o personalizado ACP de antes (aqui, a cópia de um agente pronto) continua editável e no modo ACP
+  const legacy = repo.duplicate(boardId, 'gemini', 'person');
+  const acp = repo.save(boardId, draft({ id: legacy.id, name: 'Meu Gemini', config: {} }), 'person');
+  expect(acp).toMatchObject({ kind: 'custom', tool: acp.id, mode: 'acp', config: { acpAgent: 'gemini' } });
+  expect(all(db, 'SELECT id FROM ai_profiles WHERE board_id = ? AND name = ?', [boardId, 'Meu Gemini'])).toHaveLength(1);
   const copy = repo.duplicate(boardId, 'claude', 'person');
   expect(copy).toMatchObject({ kind: 'catalog', tool: 'claude', mode: 'cli', base: 'claude' });
   const copyOfCopy = repo.duplicate(boardId, copy.id, 'person');
@@ -297,6 +303,36 @@ it('salvar e duplicar gravam a ferramenta e o modo pelo tipo e pelo agente, nunc
   // o tipo não muda numa edição, nem passando pelo valor antigo
   expect(() => repo.save(boardId, { ...draft({ id: copy.id, base: 'claude' }), config: {} }, 'person')).toThrow('tipo');
   expect(all(db, 'SELECT id, kind, tool, mode FROM ai_profiles WHERE board_id = ? AND tool = ?', [boardId, ''])).toEqual([]);
+});
+
+it('o agente ACP é aceito no personalizado que já era ACP pelo cofre e no importado pendente anterior ao formato 48', () => {
+  const put = (id: string, config: Record<string, unknown>) => credentialsFor(db).put(JSON.stringify(['profile', boardId, id]), config);
+  // a linha diz CLI, mas o cofre traz o agente (o modo gravado ficou para trás): continua sendo um personalizado ACP
+  run(
+    db,
+    "INSERT INTO ai_profiles(board_id,id,name,enabled,kind,tool,mode,base,position,secret_ref,review_state) VALUES (?,?,?,1,'custom',?,'cli','generic',7,?,'reviewed')",
+    [boardId, 'agente-no-cofre', 'Agente no cofre', 'agente-no-cofre', put('agente-no-cofre', { acpAgent: 'gemini' })],
+  );
+  expect(
+    repo.save(boardId, draft({ id: 'agente-no-cofre', name: 'Agente no cofre', config: { acpAgent: 'opencode' } }), 'person'),
+  ).toMatchObject({ mode: 'acp', config: { acpAgent: 'opencode' } });
+  // o importado de um backup antigo: `tool` vazio, pendente e sem o cofre nesta máquina; a revisão diz se era ACP
+  run(
+    db,
+    "INSERT INTO ai_profiles(board_id,id,name,enabled,kind,tool,mode,base,position,secret_ref,review_state) VALUES (?,?,?,0,'custom','','cli','generic',8,?,'pending')",
+    [boardId, 'backup-antigo', 'Backup antigo', 'f'.repeat(64)],
+  );
+  expect(repo.list(boardId).find((p) => p.id === 'backup-antigo')).toMatchObject({ mode: 'cli', credentials: { available: false } });
+  expect(repo.save(boardId, draft({ id: 'backup-antigo', name: 'Backup antigo', config: { acpAgent: 'gemini' } }), 'person')).toMatchObject(
+    {
+      kind: 'custom',
+      mode: 'acp',
+      config: { acpAgent: 'gemini' },
+    },
+  );
+  // já revisado no formato 48, um personalizado CLI continua sem virar ACP
+  const cli = repo.save(boardId, draft({ name: 'Só CLI' }), 'person');
+  expect(() => repo.save(boardId, draft({ id: cli.id, name: cli.name, config: { acpAgent: 'gemini' } }), 'person')).toThrow('só de CLI');
 });
 
 it('linhas do schema 47 viram ferramenta × modo na leitura, gravam uma vez e não mudam a ferramenta do catálogo', () => {

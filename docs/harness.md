@@ -248,12 +248,14 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   cópias dela) e para os agentes ACP. Num agente ACP, ela roda sozinha quando você o liga, ao
   conectar a ferramenta dele ao board e, com o agente ligado, quando a conferência do ambiente acha o
   vínculo dele sem prova em vigor (uma vez por vínculo), a menos que a prova do vínculo atual ainda
-  valha (o resultado vai para Saída › Faz AI). Em qualquer perfil verificável, ela roda pelo comando **Faz AI: Verificar o
-  isolamento da CLI de IA**, que pergunta qual dos perfis ligados verificar (o padrão do board vem
-  primeiro). No Claude Code, a CLI roda numa pasta descartável contra uma API local, com uma chave
-  falsa; num agente ACP, são dois handshakes numa pasta descartável. Nenhuma das duas gasta a sua
-  conta. Enquanto um perfil verificável não tem recibos, o bloco dele diz como verificá-lo pela
-  paleta. No agente ACP, a capacidade de artefatos fica parcial de propósito, porque o agente lê os
+  valha (o resultado vai para Saída › Faz AI). Nos perfis do catálogo (o Claude Code, o Gemini pela CLI
+  e os agentes ACP prontos), ela é um passo do **Conectar** e do **Reconectar**, em Ferramentas de IA;
+  nos verificáveis que não passam pelo Conectar (a cópia do Claude Code e o personalizado ACP de uma
+  versão anterior), roda pelo botão **Verificar capacidades** do perfil, na mesma tela. O comando da
+  paleta "Verificar o isolamento da CLI de IA" saiu. No Claude Code, a CLI roda numa pasta descartável
+  contra uma API local, com uma chave falsa; num agente ACP, são dois handshakes numa pasta
+  descartável. Nenhuma das duas gasta a sua conta. Enquanto um perfil verificável não tem recibos, o
+  bloco dele diz onde verificá-lo. No agente ACP, a capacidade de artefatos fica parcial de propósito, porque o agente lê os
   próprios arquivos de contexto, e o perfil é admissível só no regime compatível. A prova vale para
   as três permissões (**Só o board**, **Board e arquivos** e **Sem restrições**) e sobrevive ao
   reinício do editor: o vínculo dela é o binário, os argumentos de isolamento, as políticas
@@ -264,7 +266,8 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   agente: ele não pede o modo sem perguntas, em que as negações do card deixariam de valer. Quando o vínculo muda depois da última
   prova (a ferramenta foi atualizada, uma dessas variáveis mudou ou o formato do vínculo mudou numa
   versão nova), o aviso do topo diz que a verificação perdeu a validade, sem bloquear o board: num
-  agente ACP o board já refaz sozinho; no Claude Code, rode o comando de novo. A prévia da
+  agente ACP o board já refaz sozinho; no Claude Code, clique em **Reconectar** (na cópia, em
+  **Verificar capacidades**). A prévia da
   admissão no card avalia o perfil que vai executar o card (o do modelo do card, do agente ou da
   regra), não o padrão do board.
 - **Próxima execução e limites:** mostra o regime escolhido em Harness › Ferramenta e execução, o

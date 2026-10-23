@@ -1,8 +1,8 @@
 import { ALL_AI_BASES, type AiTool } from '../../shared/harness';
 import { runCli } from '../cliProbe';
 import { resolveCommand } from '../cliResolve';
-import { registeredServer } from '../requirements';
-import { isBoardBridge, registerClients, type RegisterOptions, type Registration } from './clientConfig';
+import { registerClients, registeredServer } from './boardServer';
+import { isBoardBridge, type RegisterOptions, type Registration } from './clientConfig';
 
 /**
  * Roda os comandos de CLI que um registro pede (`Registration.run`), em ordem. Um passo marcado com

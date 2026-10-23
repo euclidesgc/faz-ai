@@ -1401,7 +1401,7 @@ describe('ferramentas de IA', () => {
   });
 
   it('registra o servidor MCP no formato de cada ferramenta: o Claude Code no global, o Cursor no projeto', async () => {
-    const { registerClients } = await import('../src/extension/mcp/clientConfig');
+    const { registerClients } = await import('../src/extension/mcp/boardServer');
     const home = path.join(dir, 'home');
     fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
     fs.writeFileSync(path.join(home, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
@@ -1419,7 +1419,7 @@ describe('ferramentas de IA', () => {
   });
 
   it('registra o servidor no global do Claude Code, sem a pasta do projeto', async () => {
-    const { registerClients } = await import('../src/extension/mcp/clientConfig');
+    const { registerClients } = await import('../src/extension/mcp/boardServer');
     const home = path.join(dir, 'home-global');
     const project = path.join(dir, 'projeto-global');
     fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
@@ -1473,7 +1473,8 @@ describe('ferramentas de IA', () => {
   });
 
   it('tira só o registro do board do arquivo do projeto, em JSON', async () => {
-    const { removeProjectServer, registerClients } = await import('../src/extension/mcp/clientConfig');
+    const { removeProjectServer } = await import('../src/extension/mcp/clientConfig');
+    const { registerClients } = await import('../src/extension/mcp/boardServer');
     const project = path.join(dir, 'proj-remove');
     fs.mkdirSync(path.join(project, '.cursor'), { recursive: true });
     fs.writeFileSync(path.join(project, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));

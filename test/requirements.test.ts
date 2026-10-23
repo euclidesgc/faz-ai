@@ -3,7 +3,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { checkRequirements, profileInstallUrl, registeredServer } from '../src/extension/requirements';
-import { registerClients } from '../src/extension/mcp/clientConfig';
+import { registerClients } from '../src/extension/mcp/boardServer';
+import { allDrivers, driverFor } from '../src/extension/ai/drivers';
 import { BUILTIN_PROFILES, type AiProfile } from '../src/shared/aiProfiles';
 import type { ExecutionAdmissionDecision } from '../src/shared/executionAdmission';
 import { profileHealth, type ProfileHealth } from '../src/shared/profileHealth';
@@ -164,11 +165,13 @@ describe('requisitos do board', () => {
     expect(list).toEqual([]);
   });
 
-  it('prova de capacidades invalidada: aviso que não bloqueia, dizendo se o board refaz sozinho', () => {
+  it('prova de capacidades invalidada: aviso que não bloqueia, dizendo se o board refaz sozinho e onde a pessoa refaz', () => {
     const list = checkRequirements({
       nodePath: process.execPath,
       health: [
+        // sem o comando da paleta (história 13): o Claude pronto refaz no Reconectar; a cópia, no "Verificar capacidades"
         health('claude', { evidenceInvalidated: 'command' }),
+        health('claude', { id: 'claude-trabalho', name: 'Claude trabalho', evidenceInvalidated: 'command' }, { id: 'claude-trabalho' }),
         health('gemini', { registration: 'enabled', evidenceInvalidated: 'automatic' }),
         // com outro problema, o aviso é o do problema; desligado, nenhum
         health('cursor', { evidenceInvalidated: 'command', probe: { id: 'cursor', found: false, login: 'unchecked' }, problem: 'cli' }),
@@ -190,7 +193,15 @@ describe('requisitos do board', () => {
         name: 'Claude Code',
         problem: 'evidence-invalidated',
         optional: true,
-        action: { kind: 'diagnostic', profile: 'claude' },
+        action: { kind: 'connect', profile: 'claude' },
+      },
+      {
+        id: 'profile',
+        profile: 'claude-trabalho',
+        name: 'Claude trabalho',
+        problem: 'evidence-invalidated',
+        optional: true,
+        action: { kind: 'aiTools', profile: 'claude-trabalho' },
       },
       {
         id: 'profile',
@@ -242,6 +253,24 @@ describe('blocksExecution', () => {
 });
 
 describe('o servidor do board registrado em cada ferramenta (usado pela reinstalação)', () => {
+  it('quem registra e lê o servidor é o driver da CLI de cada ferramenta, sem `switch` por AiBase (história 13)', () => {
+    // as mesmas três ferramentas de antes; o Gemini (servidores na home isolada da execução) e os agentes ACP
+    // (servidores no `session/new`) não registram nada, como antes
+    expect(
+      allDrivers()
+        .filter((d) => d.boardServer)
+        .map((d) => `${d.tool}/${d.mode}`),
+    ).toEqual(['claude/cli', 'cursor/cli', 'kimi/cli']);
+    for (const tool of ['gemini', 'opencode', 'minha-cli']) {
+      expect(registerClients([tool], { bridgePath: BRIDGE, workspaceDir: project, homeDir: home })).toEqual([]);
+      expect(registeredServer(tool, project, home)).toBeNull();
+    }
+    expect(driverFor('claude', 'cli')!.boardServer!.registered(project, home)).toBeNull();
+    connect('claude');
+    expect(registeredServer('claude', project, home)).toEqual(driverFor('claude', 'cli')!.boardServer!.registered(project, home));
+    expect(fs.readdirSync(project)).toEqual([]);
+  });
+
   it('acha o registro onde cada ferramenta o lê', () => {
     for (const tool of ['claude', 'cursor'] as const) {
       expect(registeredServer(tool, project, home)).toBeNull();

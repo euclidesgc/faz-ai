@@ -10,7 +10,6 @@ import { readBridgeVersion, socketPath, stableBridgePath, workspaceKey, writeBri
 import { registerCursorProject } from './mcp/clientConfig';
 import { installCursorHook } from './mcp/cursorHooks';
 import { baseInfo, type AiTool } from '../shared/harness';
-import { isAcpProfile, profileLabel, verifiableProfiles } from '../shared/aiProfiles';
 import { ensureUserServers } from './mcp/reinstall';
 import { resolveCommand } from './cliResolve';
 import { loginShellPath } from './spawn';
@@ -341,46 +340,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.fixProjectMcp', async (file: string) => {
       if (!(await getRouter()) || !host) throw new Error('Abra uma pasta para conectar uma IA ao board.');
       return host.fixProjectServer(file);
-    }),
-    // o perfil vem do argumento (quem chama o comando já sabe qual) ou da escolha da pessoa entre os verificáveis
-    vscode.commands.registerCommand('fazai.verifyExecutor', async (profileId?: unknown) => {
-      const router = await getRouter();
-      if (!router || !host) return void vscode.window.showWarningMessage('Abra uma pasta para verificar o isolamento da IA.');
-      const board = router.snapshot().board;
-      let id = typeof profileId === 'string' ? profileId : undefined;
-      if (!id) {
-        const profiles = verifiableProfiles(board);
-        if (!profiles.length)
-          return void vscode.window.showWarningMessage(
-            'Faz AI: nenhum perfil ligado tem verificação de capacidades. Ligue o Claude Code ou um agente ACP em Ferramentas de IA.',
-          );
-        const picked = await vscode.window.showQuickPick(
-          profiles.map((p) => ({
-            label: p.name,
-            description: [isAcpProfile(p) ? 'agente ACP' : 'CLI do Claude', p.id === board.aiTool ? 'padrão do board' : '']
-              .filter(Boolean)
-              .join(' · '),
-            id: p.id,
-          })),
-          { title: 'Faz AI: verificar o isolamento de qual perfil?', placeHolder: 'Escolha o perfil ligado a verificar' },
-        );
-        if (!picked) return;
-        id = picked.id;
-      }
-      const target = id;
-      try {
-        void vscode.window.showInformationMessage(
-          await vscode.window.withProgress(
-            {
-              location: vscode.ProgressLocation.Notification,
-              title: `Faz AI: verificando o isolamento de ${profileLabel(board, target)}…`,
-            },
-            () => host!.verifyExecutor(target),
-          ),
-        );
-      } catch (e) {
-        void vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
-      }
     }),
     output,
     vscode.commands.registerCommand('fazai.ai.run', aiCommand('start')),

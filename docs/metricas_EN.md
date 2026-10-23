@@ -180,9 +180,9 @@ The v1 gateway admission foundation distinguishes conversation, artifacts, permi
 delegation, requiring local receipts bound to the current configuration. Decisions are recorded in
 history (schema 36), and export/import does not turn them into authorization. An empty list means no
 tools; strict Claude mapping uses exact tools and MCP operations without bypassing permissions. The
-**Faz AI: Verificar o isolamento da CLI de IA** (verify AI CLI isolation) command runs the Claude
-CLI in a disposable fixture against a local API and records the receipts (valid for 14 days); no
-executor is verified automatically. The activity's resolved configuration is validated before the
+capability check (in the profile's **Connect** and **Reconnect**, or **Verificar capacidades**, check
+capabilities, for a copy) runs the Claude CLI in a disposable fixture against a local API and records
+the receipts (valid for 14 days); only an ACP agent is verified automatically, when turned on. The activity's resolved configuration is validated before the
 process opens and frozen in the run snapshot (`manifest.context`): editing the library later does
 not change a run in progress, and an MCP outside the activity's configuration is refused. The plan
 governs executions only with the v1 runtime, which is opt-in; without it, execution stays legacy.
@@ -190,8 +190,8 @@ governs executions only with the v1 runtime, which is opt-in; without it, execut
 **v1 runtime (opt-in).** With `FAZ_AI_CONTEXT_RUNTIME=v1` in the environment that opens the editor,
 the gateway only runs with the resolved configuration and capability admission: runner (phase,
 refine, summary, conflict), chat, Harness assistants and profile test. Without an agent with a valid
-contract or without receipts (command **Faz AI: Verificar o isolamento da CLI de IA**, valid for 14
-days), the process does not start. The legacy runtime remains the default.
+contract or without receipts (recorded by the profile's **Connect**, or by **Verificar capacidades**,
+check capabilities, in AI tools; valid for 14 days), the process does not start. The legacy runtime remains the default.
 
 ## Card Usage tab
 

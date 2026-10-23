@@ -190,6 +190,16 @@ export const connect: Record<string, string> = {
     '{name} refused the session with the stored key. Check the key and try again.',
   '{name}: a verificação de capacidades não passou. Pendentes: {pending}.':
     '{name}: the capability check did not pass. Pending: {pending}.',
+  // o resultado do "Verificar capacidades" (história 13), que antes saía só na notificação do comando da paleta
+  '{name}: isolamento verificado; as cinco capacidades têm recibos válidos.':
+    '{name}: isolation verified; all five capabilities have valid receipts.',
+  '{name}: handshake do agente verificado. Os arquivos de contexto que ele lê por conta própria não têm prova: o perfil é admissível só no regime compatível.':
+    '{name}: agent handshake verified. The context files it reads on its own have no proof: the profile is admissible only in the compatible regime.',
+  '{name}: isolamento não verificado. Pendentes: {pending}.': '{name}: isolation not verified. Pending: {pending}.',
+  '{name}: a verificação de capacidades só existe para a CLI do Claude, o Gemini pela CLI e os agentes ACP.':
+    '{name}: the capability check exists only for the Claude CLI, Gemini over the CLI and the ACP agents.',
+  '{name} está desligado ou espera revisão: ligue e revise o perfil antes de verificar.':
+    '{name} is disabled or pending review: enable and review the profile before checking it.',
   '{name} recusou a chave de API: {reason}': '{name} refused the API key: {reason}',
   'A versão instalada do {name} não oferece o login por chave de API pelo ACP ({method}). Atualize a ferramenta e tente de novo.':
     'The installed version of {name} does not offer API key sign-in over ACP ({method}). Update the tool and try again.',

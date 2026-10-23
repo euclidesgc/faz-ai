@@ -74,6 +74,14 @@ retoma desse passo (a ciência e os modelos não refazem o login nem as sondas);
 chave no login, o campo volta com o que você colou. Cada perfil do catálogo, na lista abaixo, mostra o
 estado da conexão (inclusive quando o Conectar espera você) e **Reconectar**.
 
+A verificação de capacidades não tem mais comando à parte: o comando da paleta **Faz AI: Verificar o
+isolamento da CLI de IA** saiu. Ela roda no **Conectar** e no **Reconectar** (o Claude Code e o Gemini
+pela CLI entram aqui), sozinha quando você liga um agente ACP, e, nos perfis verificáveis que não passam
+pelo Conectar (a cópia do Claude Code e o personalizado ACP de uma versão anterior), pelo botão
+**Verificar capacidades** do perfil na lista. Nenhuma das sondas gasta a sua conta. Quando uma prova
+perde a validade (a CLI, o ambiente ou a extensão mudou), a faixa de requisitos diz onde refazer:
+**Abrir o Conectar** no perfil do catálogo, **Abrir Ferramentas de IA** na cópia.
+
 A ciência é de cada perfil e pode sair: **Revogar ciência** a tira (o perfil deixa de rodar no
 compatível até você dar a ciência de novo); reconectar um perfil que passa a provar o regime exclusivo
 a tira sozinho; e **importar um board não traz a ciência dos perfis**: quem importa dá a própria, na
@@ -133,7 +141,15 @@ com a chave no cofre, pelo [Conectar](#ferramentas-de-ia-conectar-ferramenta)), 
 abre a página oficial do modo ACP do agente. Cursor e Kimi Code ficam nas CLIs
 prontas de uma passada, que medem tokens; o Claude Code segue pela CLI `claude`.
 
-### Perfil personalizado
+### Perfil personalizado (Avançado)
+
+O personalizado é o caminho avançado, para uma linha de comando que o catálogo não traz: as
+ferramentas do catálogo entram pelo **Conectar ferramenta**. O formulário fica em **Avançado**, abaixo
+da lista de perfis, no botão **Novo perfil de CLI personalizado**. O personalizado novo é **só de
+CLI**: o campo **Agente ACP** saiu do formulário novo, e o board recusa transformar uma CLI
+personalizada em agente ACP. Os personalizados ACP criados numa versão anterior (e a cópia de um agente
+ACP pronto) **continuam rodando como estão**: a lista mostra o aviso, com **Abrir o Conectar** no
+agente deles, e **Verificar capacidades**; editar mostra o mesmo aviso e mantém o agente salvo.
 
 Para criar um personalizado, informe o comando e um argumento por linha. Os marcadores `{prompt}`,
 `{model}`, `{effort}`, `{mcpConfig}` e `{addDir}` inserem, respectivamente, o pedido, o modelo, o

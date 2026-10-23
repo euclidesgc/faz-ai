@@ -1,7 +1,6 @@
 import { isAcpProfile, isReadyProfile, type AiProfile, isReadyCli } from '../shared/aiProfiles';
 import { acpAgent } from './ai/acp/agents';
-import { CLI_COMMAND } from '../shared/requirements';
-import { baseValue } from '../shared/harness';
+import { toolModeEntry, toolModeOf } from '../shared/aiTools';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -169,7 +168,10 @@ export function commandNotFound(command: string): string {
 
 /** O comando privado do perfil nunca vira rótulo de requisito nem argumento de shell. */
 export function profileCommand(profile: AiProfile): string {
-  const standard = baseValue(CLI_COMMAND, profile.base) ?? '';
+  // o comando da CLI pronta (e da cópia dela) é o da linha do driver no catálogo, pela mesma consulta de `driverOf`;
+  // o driver não é importado aqui porque os drivers usam `resolveCommand` deste arquivo
+  const tm = toolModeOf(profile);
+  const standard = (tm && toolModeEntry(tm.tool, tm.mode)?.cli?.command) || '';
   if (isReadyCli(profile) && standard) return standard;
   if (!isReadyProfile(profile) && typeof profile.config.command === 'string' && profile.config.command.trim())
     return profile.config.command;

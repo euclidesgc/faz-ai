@@ -4856,6 +4856,31 @@ div.metrics-breakdown {
   border: 1px solid var(--warn-border);
   border-radius: var(--radius);
 }
+.ai-profile-legacy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+  margin-top: var(--sp-12);
+}
+.ai-profile-legacy p {
+  flex: 1 1 16rem;
+  margin: 0;
+}
+.ai-tools-advanced {
+  margin: var(--sp-16) 0;
+  padding: var(--sp-12);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.ai-tools-advanced > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.ai-tools-advanced > p {
+  margin: var(--sp-8) 0;
+  font-size: var(--fs-sm);
+}
 .ai-profile-error {
   padding: var(--sp-8);
   color: var(--error);
