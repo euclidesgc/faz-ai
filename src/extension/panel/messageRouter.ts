@@ -440,6 +440,12 @@ export class MessageRouter {
       throw new Error('Perfis executáveis exigem revisão humana.');
     const handler = HANDLERS[msg.type] as Handler<MessageType>;
     const actor = this.actorOf(ctx);
+    // o aviso de perfil ligado é da transição desligado → ligado; religar o que já está ligado não avisa
+    const turnedOn =
+      msg.type === 'settings.aiProfiles.setEnabled' &&
+      msg.enabled &&
+      this.profileEnabledListeners.length > 0 &&
+      !this.snapshot().board.aiProfiles.find((p) => p.id === msg.id)?.enabled;
     // o log: sonda antes, registro depois — só quando o handler diz que o board mudou (o que não aconteceu não entra)
     const probe = this.ctx.log.probe(msg);
     const startedAt = performance.now();
@@ -454,7 +460,7 @@ export class MessageRouter {
       const column = result.columns.find((c) => c.id === msg.columnId);
       if (column?.category === 'cancelled') this.cancelListeners.forEach((fn) => fn([msg.cardId]));
     }
-    if (changed && msg.type === 'settings.aiProfiles.setEnabled' && msg.enabled) this.profileEnabledListeners.forEach((fn) => fn(msg.id));
+    if (changed && turnedOn) this.profileEnabledListeners.forEach((fn) => fn(msg.id));
     return result;
   }
 

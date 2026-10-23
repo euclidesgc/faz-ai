@@ -148,6 +148,23 @@ export function evidenceCapabilities(
   );
 }
 
+/**
+ * Há prova em vigor para o vínculo atual: toda capacidade tem evidência dele, dentro da validade e sem
+ * check falho (a parcial por check indisponível, como os arquivos do agente ACP, conta como em vigor).
+ * É o que deixa o host pular a verificação automática; vínculo mudado, prova vencida ou falha refazem.
+ */
+export function evidenceCurrent(
+  binding: string,
+  evidence: readonly CapabilityEvidence[],
+  now: number,
+  transport: ExecutionTransport,
+): boolean {
+  const checks = capabilityChecks(transport);
+  return EXECUTOR_CAPABILITIES.every((c) =>
+    ['verified', 'incomplete'].includes(assessCapability(c, binding, evidence, now, checks).reason),
+  );
+}
+
 /** Disponível: CLI achada, login conectado ou não conferível, evidência válida e admissível. */
 export const profileAvailable = (h: ProfileHealth): boolean => h.problem === null;
 

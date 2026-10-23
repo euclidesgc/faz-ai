@@ -14,7 +14,7 @@ import {
 } from '../src/extension/ai/capabilityVerifier';
 import { ACP_CAPABILITY_CHECKS, CAPABILITY_CHECKS, assessCapability, type StrictExecutionRequest } from '../src/shared/executionAdmission';
 import { BUILTIN_PROFILES, verifiableProfile, verifiableProfiles, type AiProfile } from '../src/shared/aiProfiles';
-import { evidenceCapabilities } from '../src/shared/profileHealth';
+import { evidenceCapabilities, evidenceCurrent } from '../src/shared/profileHealth';
 
 const obs = (o: Partial<ProbeObservation> = {}): ProbeObservation => ({
   code: 0,
@@ -363,6 +363,20 @@ describe('verificação por perfil', () => {
     const claude = admission.isolationBinding(builtin('claude'), 'claude', 'board').binding;
     expect(claude).not.toBe(result.binding);
     expect(evidenceCapabilities(claude, store.load(claude), 1000, 'cli').every((c) => c === 'unknown')).toBe(true);
+  });
+
+  it('a prova em vigor deixa pular a verificação automática; vencida, falha ou de outro vínculo, não', async () => {
+    const { store, admission } = make();
+    const gemini = builtin('gemini', { enabled: true });
+    const result = await verifyExecutor(deps(gemini, store, admission));
+    // a parcial dos arquivos do agente (check indisponível) conta como prova em vigor
+    expect(evidenceCurrent(result.binding, store.load(result.binding), 1000, 'acp')).toBe(true);
+    expect(evidenceCurrent(result.binding, store.load(result.binding), 900 + 15 * 24 * 3600_000, 'acp')).toBe(false);
+    expect(evidenceCurrent('c'.repeat(64), store.load(result.binding), 1000, 'acp')).toBe(false);
+    const noMcp = acpGood();
+    noMcp.mcpConnected = false;
+    const failed = await verifyExecutor({ ...deps(gemini, store, admission), now: () => 950, probeAcp: async () => noMcp });
+    expect(evidenceCurrent(failed.binding, store.load(failed.binding), 1000, 'acp')).toBe(false);
   });
 
   it('o comando oferece só os perfis ligados, revisados e verificáveis, com o padrão primeiro', () => {

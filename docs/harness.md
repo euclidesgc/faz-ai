@@ -176,8 +176,9 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   2 minutos, e o aviso do topo se atualiza sozinho ao fim. As capacidades vêm dos recibos do
   **próprio perfil**: a prova de um perfil nunca vale para outro, e a cópia não herda a do original.
   Os recibos vêm da verificação de capacidades, que existe para o Claude Code (a CLI pronta e as
-  cópias dela) e para os agentes ACP. Ela roda sozinha ao ligar um agente ACP e ao conectar a
-  ferramenta ao board (o resultado vai para Saída › Faz AI), e pelo comando **Faz AI: Verificar o
+  cópias dela) e para os agentes ACP. Num agente ACP, ela roda sozinha quando você o liga e ao
+  conectar a ferramenta dele ao board, a menos que a prova do vínculo atual ainda valha (o resultado
+  vai para Saída › Faz AI). Em qualquer perfil verificável, ela roda pelo comando **Faz AI: Verificar o
   isolamento da CLI de IA**, que pergunta qual dos perfis ligados verificar (o padrão do board vem
   primeiro). No Claude Code, a CLI roda numa pasta descartável contra uma API local, com uma chave
   falsa; num agente ACP, são dois handshakes numa pasta descartável. Nenhuma das duas gasta a sua

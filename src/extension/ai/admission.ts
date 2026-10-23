@@ -57,7 +57,7 @@ export function admissionAgent(profile: AiProfile): AcpAgent | null {
   return agent;
 }
 export const admissionTransport = (profile: AiProfile): ExecutionTransport => (isAcpProfile(profile) ? 'acp' : 'cli');
-function digestFile(file: string): string {
+function digestFile(file: string): { digest: string; stat: fs.Stats } {
   const hash = createHash('sha256');
   const fd = fs.openSync(file, 'r');
   try {
@@ -68,7 +68,7 @@ function digestFile(file: string): string {
     const after = fs.fstatSync(fd);
     if (before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ino !== after.ino)
       throw new Error('Binário alterado durante a conferência.');
-    return hash.digest('hex');
+    return { digest: hash.digest('hex'), stat: after };
   } finally {
     fs.closeSync(fd);
   }
@@ -97,7 +97,23 @@ export function isolationInput(permission: RunnerPermission): HeadlessInput {
 
 /** Uma fonte de decisão para o gateway; não transforma metadados recebidos do cliente em prova. */
 export class ExecutionAdmission {
+  /**
+   * Digest do binário por caminho real, guardado com o tamanho, o mtime e o inode lidos: a CLI tem centenas
+   * de MB e o vínculo é calculado na prévia, em cada execução e a cada conferência do Diagnóstico (que
+   * repete a cada 10 s enquanto falta login). Trocar o binário (atualização, reinstalação) muda pelo menos
+   * um dos três e força a releitura.
+   */
+  private readonly digests = new Map<string, { size: number; mtimeMs: number; ino: number; digest: string }>();
   constructor(private readonly options: AdmissionOptions) {}
+  private binaryDigest(file: string): string {
+    const st = fs.statSync(file);
+    const cached = this.digests.get(file);
+    if (cached && cached.size === st.size && cached.mtimeMs === st.mtimeMs && cached.ino === st.ino) return cached.digest;
+    // a chave guardada é a do arquivo que foi de fato lido (o `digestFile` recusa o que mudou durante a leitura)
+    const { digest, stat } = digestFile(file);
+    this.digests.set(file, { size: stat.size, mtimeMs: stat.mtimeMs, ino: stat.ino, digest });
+    return digest;
+  }
   binding(
     executor: AiExecutor,
     profileId: string,
@@ -130,7 +146,7 @@ export class ExecutionAdmission {
       tool: profile.base,
       ...(profile.kind !== 'builtin' ? { profileConfig: profile.config } : {}),
       executable: real,
-      binary: digestFile(real),
+      binary: this.binaryDigest(real),
       permission: input.permission,
       invocation: template,
       // cwd nulo = vínculo de isolamento: a prova roda numa fixture e vale para qualquer pasta de projeto

@@ -202,6 +202,27 @@ describe('prévia da admissão (E3)', () => {
   });
 });
 
+describe('digest do binário no vínculo', () => {
+  it('não relê o binário com o mesmo tamanho, mtime e inode; tamanho ou mtime diferente relê', () => {
+    const i = input();
+    // mtime redondo: o utimes só grava milissegundos, e a chave do cache compara o mtime exato
+    fs.utimesSync(exe, 1000, 1000);
+    const first = admission.binding('claude', 'claude', i, dir).binding;
+    // mesmo tamanho e mesmo mtime com outro conteúdo: só um vínculo vindo do cache continua igual
+    fs.writeFileSync(exe, 'binário de teste; NUNCA executar');
+    fs.utimesSync(exe, 1000, 1000);
+    expect(admission.binding('claude', 'claude', i, dir).binding).toBe(first);
+    // outro mtime: relê e o vínculo muda
+    fs.utimesSync(exe, 2000, 2000);
+    const touched = admission.binding('claude', 'claude', i, dir).binding;
+    expect(touched).not.toBe(first);
+    // outro tamanho com o mtime de antes: relê de novo
+    fs.writeFileSync(exe, 'binário de teste maior; nunca executar');
+    fs.utimesSync(exe, 2000, 2000);
+    expect(admission.binding('claude', 'claude', i, dir).binding).not.toBe(touched);
+  });
+});
+
 describe('prévia da admissão pelo perfil do alvo do card', () => {
   const gemini: AiProfile = {
     ...BUILTIN_PROFILES.find((p) => p.id === 'gemini')!,

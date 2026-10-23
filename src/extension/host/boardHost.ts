@@ -57,7 +57,7 @@ import { checkRequirements, profileInstallUrl } from '../requirements';
 import { CLI_COMMAND } from '../../shared/requirements';
 import { checkEnvironment, linuxFamily } from '../environment';
 import { isPendingReview, probeProfiles } from '../profileProbe';
-import { evidenceCapabilities, profileHealth, profilesInUse, type ProfileHealth } from '../../shared/profileHealth';
+import { evidenceCapabilities, evidenceCurrent, profileHealth, profilesInUse, type ProfileHealth } from '../../shared/profileHealth';
 import { editorMcpFiles, pinEditorCommands } from '../mcp/pinCommands';
 import { harnessIssues } from '../../shared/harnessStatus';
 import { findFlowSkillCopies } from '../flowSkillCopies';
@@ -914,23 +914,32 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return `${meta.name}: handshake do agente verificado. Os arquivos de contexto que ele lê por conta própria não têm prova: o perfil é admissível só no regime compatível.`;
     return `${meta.name}: isolamento não verificado. Pendentes: ${failed.join(', ') || 'checks ausentes'}.`;
   };
+  /** A prova gravada ainda vale para o vínculo atual do perfil (o digest do binário fica em cache na admissão). */
+  const hasCurrentEvidence = (profileId: string): boolean => {
+    try {
+      const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, profileId);
+      const bound = admission.isolationBinding(profile, profile.id, 'board');
+      return evidenceCurrent(bound.binding, evidenceStore.load(bound.binding), Date.now(), admissionTransport(profile));
+    } catch {
+      return false;
+    }
+  };
   /**
-   * A verificação que o host dispara sozinho (ao ligar um perfil ACP, ao conectar a ferramenta): em segundo
-   * plano, sem gastar a conta da pessoa, com o resultado no log. Um perfil sem sonda ou sem a CLI só é pulado.
+   * A verificação que o host dispara sozinho (ao ligar um agente ACP, ao conectar a ferramenta dele): em
+   * segundo plano, sem gastar a conta da pessoa, com o resultado no log. Só o ACP, como pede a épica: a CLI
+   * do Claude roda quatro vezes na fixture e fica no comando da paleta. Com a prova em vigor para o vínculo
+   * atual, não refaz o handshake.
    */
   const verifyInBackground = (profileId: string, why: string): void => {
     const meta = router.snapshot().board.aiProfiles.find((p) => p.id === profileId);
-    if (!meta || !meta.enabled || !verifiableProfile(meta)) return;
+    if (disposed || !meta || !meta.enabled || !isAcpProfile(meta) || hasCurrentEvidence(profileId)) return;
     api
       .verifyExecutor(profileId)
       .then((message) => o.log(`Verificação de capacidades (${why}): ${message}`))
       .catch((e: unknown) => o.log(`Verificação de capacidades de ${meta.name} (${why}): ${e instanceof Error ? e.message : String(e)}`));
   };
   // ligar um agente ACP já prova o handshake dele: sem isso o perfil ficaria com as capacidades sem prova
-  router.onProfileEnabled((profileId) => {
-    const meta = router.snapshot().board.aiProfiles.find((p) => p.id === profileId);
-    if (meta && isAcpProfile(meta) && !disposed) verifyInBackground(profileId, 'perfil ligado');
-  });
+  router.onProfileEnabled((profileId) => verifyInBackground(profileId, 'perfil ligado'));
 
   const api: BoardHost = {
     router,
@@ -983,7 +992,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       router.handle({ type: 'harness.refresh' });
       const files = done.map((d) => d.projectFile ?? d.file.replace(homeDir, '~')).join(', ');
       void checkNow();
-      // conectar a ferramenta também prova as capacidades do perfil dela (Claude ou agente ACP)
+      // conectar a ferramenta de um agente ACP também prova o handshake dele (o Claude fica no comando)
       verifyInBackground(tool, 'ferramenta conectada');
       return { message: `Servidor "faz-ai" registrado em: ${files}. ${[...new Set(done.map((d) => d.next))].join(' ')}` };
     },

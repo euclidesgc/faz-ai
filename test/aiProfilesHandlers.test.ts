@@ -153,11 +153,16 @@ it('Testar perfil custom envia contrato mínimo à admissão e oculta valores pr
   expect(run).toHaveBeenCalledTimes(1);
 });
 
-it('ligar um perfil avisa o host (que verifica o agente ACP); desligar não avisa', () => {
+it('só a transição desligado → ligado avisa o host (que verifica o agente ACP)', () => {
   const enabled = vi.fn();
   router.onProfileEnabled(enabled);
   router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: true });
   expect(enabled).toHaveBeenCalledWith('gemini');
+  // religar o que já está ligado (e o Claude, que nasce ligado) não avisa de novo
+  router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: true });
+  router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'claude', enabled: true });
   router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: false });
   expect(enabled).toHaveBeenCalledTimes(1);
+  router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: true });
+  expect(enabled).toHaveBeenCalledTimes(2);
 });

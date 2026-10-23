@@ -184,9 +184,10 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   attempt of up to 2 minutes, and the top warning updates itself at the end. The capabilities come
   from the receipts of **the profile itself**: one profile's proof never counts for another, and a
   copy does not inherit the original's. The receipts come from the capability check, which exists
-  for Claude Code (the built-in CLI and its copies) and for ACP agents. It runs on its own when you
-  turn on an ACP agent and when you connect the tool to the board (the result goes to Output › Faz
-  AI), and through the **Faz AI: Verify the AI CLI isolation** command, which asks which of the
+  for Claude Code (the built-in CLI and its copies) and for ACP agents. For an ACP agent it runs on
+  its own when you turn it on and when you connect its tool to the board, unless the proof for the
+  current binding is still valid (the result goes to Output › Faz AI). For any checkable profile it
+  runs through the **Faz AI: Verify the AI CLI isolation** command, which asks which of the
   enabled profiles to check (the board default comes first). For Claude Code, the CLI runs in a
   throwaway folder against a local API with a fake key; for an ACP agent, it is two handshakes in a
   throwaway folder. Neither spends your account. While a checkable profile has no receipts, its
