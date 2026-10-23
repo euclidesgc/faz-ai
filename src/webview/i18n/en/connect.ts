@@ -134,11 +134,11 @@ export const connect: Record<string, string> = {
   'exata: o inventário é a lista de chamadas que o board executou': 'exact: the inventory is the list of calls the board executed',
   'tokens por chamada (`usageMetadata`); nada gasto com contexto que o board não pediu':
     'tokens per call (`usageMetadata`); nothing spent on context the board did not ask for',
-  'só o modelo: as ferramentas são as do board e as dos MCPs do card':
-    'only the model: the tools are the board’s and those of the card’s MCPs',
+  'só o modelo: ler, editar arquivos e rodar comandos são ferramentas do board, liberadas pela permissão do card e confinadas às pastas dele, mais as dos MCPs do card':
+    'only the model: reading, editing files and running commands are board tools, allowed by the card’s permission and confined to its folders, plus those of the card’s MCPs',
   'chave de API do Gemini, guardada no cofre local': 'Gemini API key, kept in the local vault',
-  'para a finalidade do board: prever o acesso e gastar só o pedido. Por enquanto serve a Refinar, Resumir e Trabalhar na fase com a permissão "Só o board"; arquivos e comandos chegam numa próxima versão':
-    'for the board’s purpose: knowing the access in advance and spending only on the request. For now it serves refine, summarize and work on the phase with the "board only" permission; files and commands come in a later version',
+  'para a finalidade do board: prever o acesso e gastar só o pedido, em Refinar, Resumir e Trabalhar na fase, com qualquer permissão':
+    'for the board’s purpose: knowing the access in advance and spending only on the request, in refine, summarize and work on the phase, with any permission',
   'Assinatura do Claude pela CLI; uma chave de API da Anthropic é cobrança por token, fora da assinatura.':
     'Claude subscription through the CLI; an Anthropic API key is billed per token, outside the subscription.',
   'É o único modo que usa a assinatura: o ACP do Claude exige cobrança por API.':

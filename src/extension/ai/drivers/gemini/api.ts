@@ -11,6 +11,9 @@
 //   decisão recusa nunca é declarada; uma chamada a uma função não declarada é recusada sem rodar;
 // - o board é o cliente MCP: do próprio servidor que atende a pasta (pelo socket dele, `selfClient.ts`,
 //   sem abrir um segundo servidor) e dos MCPs do card (stdio ou HTTP, como o `call_board_mcp_tool`);
+// - e é quem executa as ferramentas locais (história 11, `ai/apiTools.ts`): `read_file`, `glob` e `grep` em
+//   `board`, mais `write_file` e `edit_file` em `edits`, mais `run_command` em `full`, só as que a lista
+//   admitida traz e o card não nega (`apiLocalTools`), confinadas às pastas da execução;
 // - a parte do modelo volta inalterada no pedido seguinte, com o `thoughtSignature` que vier nela, e as
 //   respostas das funções vão numa parte `user` com `functionResponse { id, name, response }`;
 // - o ciclo acaba quando o modelo responde só com texto, no limite de pedidos, num erro ou ao Parar.
@@ -18,6 +21,8 @@
 // O `Measured` é construído aqui, sem JSONL falso: `onExit(0)` no fim, `kill()` aborta o pedido em curso
 // e impede o próximo, `report()` soma o `usageMetadata` de cada pedido, e o inventário é a lista das
 // chamadas que o board executou. A chave vai só no cabeçalho `x-goog-api-key`, nunca na URL nem no log.
+import type { ChildProcess } from 'node:child_process';
+import * as os from 'node:os';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -36,6 +41,9 @@ import { boardDecision, type AcpDecision } from '../../acp/run';
 import { apiBinding, apiEndpoint } from '../../apiBinding';
 import type { ModelOption } from '../../../../shared/models';
 import { maskApiKey } from '../../../toolKeys';
+import { loginShellPath } from '../../../spawn';
+import { apiLocalTools, type ApiLocalTool } from '../../../../shared/apiTools';
+import { localDeclaration, processGone, realLocalRoots, runLocalTool, type LocalToolLimits, type LocalToolResult } from '../../apiTools';
 import type { ExecutorContext, ToolDriver } from '../types';
 
 /** A raiz da API do Gemini (a versão `v1beta`, a que tem `systemInstruction`, ferramentas e o pensamento). */
@@ -63,10 +71,6 @@ const FUNCTION_NAME = /^[A-Za-z_][A-Za-z0-9_.:-]{0,63}$/;
 /** A causa, quando o perfil no modo API não tem chave no cofre: o que a pessoa faz para resolver. */
 export const MISSING_API_KEY =
   'Falta a chave de API do Gemini: conecte o Gemini pelo cartão API em Configurações › Ferramentas de IA › Conectar ferramenta.';
-
-/** Até a história 11 o laço só tem as ferramentas MCP: arquivo e comando ainda não existem nele. */
-export const API_BOARD_ONLY =
-  'O Gemini pela API ainda roda só com a permissão "Só o board" (Refinar, Resumir e Trabalhar na fase sem arquivos nem comandos). Para editar arquivos ou rodar comandos, use o Gemini pelo ACP.';
 
 /** Uma ferramenta que um servidor MCP lista. */
 export interface McpTool {
@@ -98,6 +102,14 @@ export interface GeminiApiOptions {
   requestTimeoutMs?: number;
   maxTurns?: number;
   connect?: McpConnect;
+  /** o PATH com que `run_command` procura e roda o programa: o do shell de login, como as CLIs */
+  pathEnv?: () => Promise<string | undefined>;
+  /** a pasta da pessoa (os segredos do host que as ferramentas locais nunca tocam) */
+  homeDir?: string;
+  /** o ambiente de onde sai o do comando, filtrado */
+  baseEnv?: NodeJS.ProcessEnv;
+  /** os limites das ferramentas locais; os testes os diminuem */
+  localLimits?: Partial<LocalToolLimits>;
 }
 
 /** O nome da operação MCP como a admissão e a sessão MCP o escrevem (`mcp__servidor__ferramenta`). */
@@ -170,12 +182,16 @@ export const defaultConnect: McpConnect = (server, definition, cwd) => {
   return clientConnection(server === BOARD_SERVER ? boardSelfTransport(cwd, token) : libraryMcpTransport(definition, cwd));
 };
 
-interface Declared {
-  name: string;
-  server: string;
-  tool: string;
-  connection: McpConnection;
-  declaration: Json;
+/** Uma função declarada ao modelo: uma ferramenta MCP (servidor e conexão) ou uma ferramenta local do board. */
+type Declared = { name: string; declaration: Json } & (
+  { kind: 'mcp'; server: string; tool: string; connection: McpConnection } | { kind: 'local'; local: ApiLocalTool }
+);
+
+/** Tira a chave de todo texto de uma resposta local antes de ela voltar ao modelo (um arquivo, uma saída). */
+function scrubJson(value: Json, scrub: (text: string) => string): Json {
+  const out: Json = {};
+  for (const [k, v] of Object.entries(value)) out[k] = typeof v === 'string' ? scrub(v) : v;
+  return out;
 }
 
 /** O esquema dos argumentos como o Gemini aceita (`parametersJsonSchema`): o JSON Schema do MCP, sem o `$schema`. */
@@ -216,7 +232,6 @@ class Stopped extends Error {}
 
 function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<GeminiApiOptions>): Measured {
   // as recusas antes de qualquer pedido: o gateway fecha a linha do log como "não suportada"
-  if (input.permission !== 'board') throw new Error(API_BOARD_ONLY);
   // a chave da ferramenta, do cofre (`ToolKeys`), que o gateway entrega e mascara em toda linha do log
   const key = ctx.apiKey;
   if (!key) throw new Error(MISSING_API_KEY);
@@ -225,6 +240,14 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
   const url = `${endpoint}/models/${encodeURIComponent(model)}:generateContent`;
   /** nenhuma mensagem que sai daqui repete a chave, nem a que veio de fora (rede, servidor MCP) */
   const scrub = (text: string): string => maskApiKey(text, key, '[chave da API]');
+  // as ferramentas locais que a execução admitida libera (história 11): as do nível que a decisão listou,
+  // menos as que o card nega. As pastas são as reais da execução: a do card e as adicionais vinculadas
+  const localOf = () => apiLocalTools(input.permission, input.exec);
+  const local = localOf();
+  const roots = local.length ? realLocalRoots(ctx.cwd, input.addDirs ?? []) : [];
+  /** os comandos em curso: `terminationConfirmed` só diz "acabou" com a árvore de cada um encerrada */
+  const processes = new Set<ChildProcess>();
+  const commands = new Map<string, { calls: number; failed: number }>();
 
   const listeners: ((code: number | null, error?: Error) => void)[] = [];
   const stop = new AbortController();
@@ -282,8 +305,26 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
     const names = Object.keys(servers);
     const connections: McpConnection[] = [];
     try {
-      const declared: Declared[] = [];
+      // as locais primeiro, com o nome fixo: os nomes MCP começam por `mcp` e nunca colidem com eles
+      const declared: Declared[] = local.map((tool) => ({
+        kind: 'local',
+        name: tool.fn,
+        local: tool,
+        declaration: localDeclaration(tool),
+      }));
       const instructions: string[] = [];
+      if (local.length)
+        instructions.push(
+          [
+            // o nome do card ao lado: é nele que o pedido fala das ferramentas ("use só Read, Grep…")
+            `Ferramentas locais do board: ${local.map((t) => `${t.fn} (${t.card})`).join(', ')}. Os caminhos relativos partem da pasta do card (${roots[0]}).`,
+            roots.length > 1 ? `Pastas adicionais do card: ${roots.slice(1).join(', ')}.` : '',
+            'Fora dessas pastas, no .git e nos arquivos do board, o board recusa a chamada.',
+          ]
+            .filter(Boolean)
+            .join(' '),
+        );
+      const pathEnv = local.some((t) => t.fn === 'run_command') ? await o.pathEnv() : undefined;
       for (const [server, definition] of Object.entries(servers)) {
         stopped();
         let connection: McpConnection;
@@ -319,6 +360,7 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
           const wanted = mcpOperation(server, tool.name);
           const name = FUNCTION_NAME.test(wanted) && !declared.some((d) => d.name === wanted) ? wanted : `mcp_fn_${declared.length + 1}`;
           declared.push({
+            kind: 'mcp',
             name,
             server,
             tool: tool.name,
@@ -332,7 +374,7 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
         }
       }
       ctx.log(
-        `Chamando ${LABEL}: modelo ${model} em ${new URL(endpoint).host}, ${declared.length} função(ões) de ${names.length ? names.join(', ') : 'nenhum servidor MCP'}.`,
+        `Chamando ${LABEL}: modelo ${model} em ${new URL(endpoint).host}, ${declared.length} função(ões) de ${names.length ? names.join(', ') : 'nenhum servidor MCP'}${local.length ? ` e locais (${local.map((t) => t.card).join(', ')})` : ''}.`,
       );
       const byName = new Map(declared.map((d) => [d.name, d]));
       const systemInstruction = { parts: [input.prompt, ...instructions].map((text) => ({ text })) };
@@ -414,6 +456,44 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
           if (!target) {
             ctx.log(`${LABEL} chamou ${cut(scrub(name), 120)}: negado (a função não foi declarada pelo board).`);
             response = { error: `A função ${name} não existe nesta execução.` };
+          } else if (target.kind === 'local') {
+            const tool = target.local;
+            // a mesma decisão da declaração, de novo na hora (nível, lista admitida, negadas do card)
+            if (!localOf().some((t) => t.fn === tool.fn)) {
+              ctx.log(`${LABEL} chamou ${tool.fn}: negado pelo board (nível ${input.permission}).`);
+              response = { error: `O board negou a chamada: ${tool.card} não é admitida nesta execução.` };
+            } else {
+              ctx.beforeRequest?.();
+              inventory.set(`tool\0${tool.card}`, (inventory.get(`tool\0${tool.card}`) ?? 0) + 1);
+              const args = asObject(call.args) ?? {};
+              const shown = asText(args.path) ?? asText(args.pattern) ?? asText(args.command) ?? '';
+              // no canal só o nome e o caminho (ou o programa), nunca o conteúdo nem os argumentos do comando
+              ctx.log(`→ ${tool.card}${shown ? ` ${cut(scrub(shown), 160)}` : ''}`);
+              let result: LocalToolResult;
+              try {
+                result = await runLocalTool(tool, args, {
+                  roots,
+                  signal: stop.signal,
+                  apiKey: key,
+                  pathEnv,
+                  homeDir: o.homeDir,
+                  baseEnv: o.baseEnv,
+                  limits: o.localLimits,
+                  processes,
+                });
+              } catch (e) {
+                stopped();
+                throw e;
+              }
+              if (result.command) {
+                const known = commands.get(result.command) ?? { calls: 0, failed: 0 };
+                known.calls++;
+                if (result.failed) known.failed++;
+                commands.set(result.command, known);
+              }
+              if (typeof result.response.error === 'string') ctx.log(cut(scrub(`${tool.card}: ${result.response.error}`), 300));
+              response = scrubJson(result.response, scrub);
+            }
           } else {
             // a mesma decisão da declaração, de novo na hora: nada muda no meio da execução sem passar por ela
             const decision = apiCallDecision(input, names, target.server, target.tool);
@@ -425,7 +505,7 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
             } else {
               ctx.beforeRequest?.();
               const item = `${target.server}/${target.tool}`;
-              inventory.set(item, (inventory.get(item) ?? 0) + 1);
+              inventory.set(`mcp_tool\0${item}`, (inventory.get(`mcp_tool\0${item}`) ?? 0) + 1);
               ctx.log(`→ ${item}`);
               try {
                 response = functionResponseOf(await target.connection.callTool(target.tool, asObject(call.args) ?? {}, stop.signal));
@@ -459,8 +539,20 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
   );
 
   const report = (): RunReport => {
-    const items: InventoryItem[] = [...inventory.entries()].map(([name, calls]) => ({ kind: 'mcp_tool', name, calls }));
-    const base = { inventory: items, answer: answer.join(''), reason: null, usageLimitReached: false };
+    // o inventário é a lista exata das chamadas executadas: as MCP por `servidor/ferramenta` e as locais pelo
+    // nome do card (`Read`, `Write`, `Bash`), que é o vocabulário que a conferência compara com o card
+    const items: InventoryItem[] = [...inventory.entries()].map(([id, calls]) => {
+      const [kind, name] = id.split('\0') as ['mcp_tool' | 'tool', string];
+      return { kind, name, calls };
+    });
+    const bashCommands = [...commands.entries()].map(([command, c]) => ({ command, calls: c.calls, failed: c.failed }));
+    const base = {
+      inventory: items,
+      ...(bashCommands.length ? { bashCommands } : {}),
+      answer: answer.join(''),
+      reason: null,
+      usageLimitReached: false,
+    };
     if (measured)
       return {
         ...base,
@@ -486,9 +578,10 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
         listeners.push(fn);
         if (exit) fn(exit.code, exit.error);
       },
+      // Parar aborta o pedido em curso, a chamada MCP em curso e o comando em curso (a árvore dele inteira)
       kill: () => stop.abort(),
-      // não há árvore de processos: terminado o ciclo, nada da execução segue rodando
-      terminationConfirmed: () => exit !== null,
+      // terminado o ciclo, só os comandos podiam seguir rodando: confirmado quando a árvore de cada um acabou
+      terminationConfirmed: () => exit !== null && [...processes].every(processGone),
     },
     report,
     failure: () => (measured ? null : new MeasureEndedError()),
@@ -562,6 +655,10 @@ export function createGeminiApiDriver(options: GeminiApiOptions = {}): ToolDrive
     requestTimeoutMs: options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS,
     maxTurns: options.maxTurns ?? MAX_TURNS,
     connect: options.connect ?? defaultConnect,
+    pathEnv: options.pathEnv ?? (() => loginShellPath()),
+    homeDir: options.homeDir ?? os.homedir(),
+    baseEnv: options.baseEnv ?? process.env,
+    localLimits: options.localLimits ?? {},
   };
   return {
     tool: 'gemini',
@@ -588,7 +685,8 @@ export function createGeminiApiDriver(options: GeminiApiOptions = {}): ToolDrive
     },
     // o que o laço acima cumpre, check a check: monta a conversa inteira em cada pedido, sem sessão no
     // servidor (`board-built-request`); o modelo só recebe o que está no pedido (`no-own-context-files`);
-    // só declara e só executa o que `apiCallDecision` admite (`declared-functions`); é o cliente MCP de
+    // só declara e só executa o que `apiCallDecision` admite e, das ferramentas locais, o que `apiLocalTools`
+    // admite, confinado às pastas da execução (`declared-functions`); é o cliente MCP de
     // cada servidor da execução admitida (`board-mcp-client`); e não há função de delegação nem subagente
     // nativo (`no-native-delegation`, e `boardDecision` nega a delegação)
     guarantees: () => Object.values(API_CAPABILITY_CHECKS).flat(),

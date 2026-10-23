@@ -111,8 +111,9 @@ o modo API com a mesma chave do ACP, conferida na hora com a API.
 
 - **O que o modelo recebe**: o pedido do board (com o agente da fase, as rules e as skills indicadas),
   a conversa montada pelo board a cada pedido e, como funções, só as ferramentas do servidor do board e
-  dos MCPs que o card libera. Uma ferramenta que o card não libera nunca é declarada ao modelo, e uma
-  chamada a ela é recusada sem rodar. O modelo não lê arquivo nenhum por conta própria.
+  dos MCPs que o card libera, mais as ferramentas locais do nível de permissão. Uma ferramenta que o
+  card não libera nunca é declarada ao modelo, e uma chamada a ela é recusada sem rodar. O modelo não
+  lê arquivo nenhum por conta própria: quem lê é o board, quando o modelo pede.
 - **Regime**: exclusivo, por construção. O board afirma e assina a prova das cinco capacidades na
   primeira execução (e de novo quando o modelo, a chave ou a versão da extensão mudam), sem sonda e
   sem gastar a conta. A prévia de admissão do card avalia a prova do modelo do card.
@@ -123,10 +124,12 @@ o modo API com a mesma chave do ACP, conferida na hora com a API.
   para com falha depois de 40 pedidos sem terminar. Um 429 (limite de uso) encerra a execução com a
   mensagem da API e o tempo de espera, quando vem; a pausa automática por cota é de uma versão
   seguinte.
-- **Por enquanto** o modo serve a **Refinar**, **Resumir** e **Trabalhar na fase** com a permissão
-  **Só o board**: o modelo lê e responde o card pelo servidor do board. Editar arquivos e rodar
-  comandos chegam numa próxima versão; com outra permissão, a execução é recusada com a causa, e o
-  Gemini pelo ACP continua disponível. O modelo precisa vir do campo **Modelo** do card.
+- O modo serve a **Refinar**, **Resumir** e **Trabalhar na fase** com qualquer permissão. Ler,
+  buscar, editar arquivos e rodar comandos são ferramentas do board, por nível: leitura em **Só o
+  board**, arquivos em **Board e arquivos**, comandos em **Sem restrições**, sempre confinadas às
+  pastas do card e sem as ferramentas que o card nega
+  ([detalhes](fluxo.md#trabalhar-na-fase-pela-api)). O inventário traz essas chamadas pelos nomes do
+  card (`Read`, `Write`, `Bash`…). O modelo precisa vir do campo **Modelo** do card.
 - A chave nunca vai para o log, para o registro de uso, para a tela nem para a exportação, e vai à
   API só no cabeçalho `x-goog-api-key`, nunca na URL.
 

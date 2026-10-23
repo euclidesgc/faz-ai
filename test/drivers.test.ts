@@ -69,10 +69,13 @@ describe('catálogo de ferramentas (TOOLS) e drivers de conexão', () => {
     });
     expect(gemini.recommended.mode).toBe('api');
     expect(recommendedOffered(gemini)).toBe('api');
-    // até a história 11 o modo serve a Refinar, Resumir e Trabalhar com a permissão board: a ficha diz
+    // desde a história 11 o modo serve a toda permissão, com as ferramentas locais do board: a ficha diz
     const api = gemini.modes.find((m) => m.mode === 'api')!;
-    expect(api.sheet.whenToChoose).toMatch(/Refinar, Resumir e Trabalhar na fase com a permissão "Só o board"/);
-    expect(api.enforcement).toEqual({ agent: 'advised', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced' });
+    expect(api.sheet.whenToChoose).toMatch(/Refinar, Resumir e Trabalhar na fase, com qualquer permissão/);
+    expect(api.sheet.whenToChoose).not.toMatch(/Só o board|próxima versão/);
+    expect(api.sheet.brings).toMatch(/confinadas às pastas dele/);
+    // a lista de ferramentas do card vai pelo pedido e pela conferência; o nível e as negadas o board impõe
+    expect(api.enforcement).toEqual({ agent: 'advised', skills: 'advised', mcp: 'enforced', tools: 'advised', model: 'enforced' });
     const claude = TOOLS.find((t) => t.id === 'claude')!;
     expect(claude.modes.map((m) => m.mode)).toEqual(['cli']);
     expect(recommendedOffered(claude)).toBe('cli');

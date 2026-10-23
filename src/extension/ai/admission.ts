@@ -22,6 +22,7 @@ import { acpCommand, acpSessionMode, type AcpAgent } from './acp/provider';
 import { executorOf, type ApiInvocation, type Executor } from './drivers';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import { boardOnlyMcpConfig } from '../execution';
+import { deniesTool } from '../../shared/apiTools';
 import { canonical, constructionEvidence, CapabilityEvidenceStore } from './capabilityEvidence';
 import { INHERITED_SESSION_ENV } from '../spawn';
 
@@ -431,6 +432,18 @@ export class ExecutionAdmission {
     });
     // o ACP e o modo API não têm descoberta nativa de agente: o agente já segue pelo pedido
     if (transport !== 'cli') effective.exec!.agent = '';
+    // No modo API quem executa as ferramentas locais é o board, pela lista admitida: as que o card nega
+    // (`deniedTools` do manifesto, no vocabulário do card) saem dela e entram nas negadas, só restringindo.
+    // O pedido legado não as leva à decisão (`native.deny` exige a tabela de uma CLI), e sem isto um `Bash`
+    // negado no card voltaria a valer pelo nível. No ACP a execução admitida também fica sem as negadas do
+    // card, mas lá o `boardDecision` as compara com o título do pedido do agente, no vocabulário dele (o
+    // `Bash` do card não casa com o `Shell` do Gemini): levá-las sem traduzir os nomes daria uma garantia
+    // aparente. A diferença fica aqui, explícita, como pendência do ACP (registro da história 11).
+    if (transport === 'api') {
+      const cardDenied = (input.exec?.deniedTools ?? []).filter((t) => typeof t === 'string' && t && !t.includes('\0'));
+      effective.exec!.tools = preliminary.tools.filter((name) => !cardDenied.some((entry) => deniesTool(entry, name)));
+      effective.exec!.deniedTools = [...new Set([...preliminary.deniedTools, ...cardDenied])];
+    }
     // defesa: a execução admitida roda no modo padrão do agente, em que o board decide cada pedido; o
     // modo sem perguntas desligaria as negações do card e não é o modo que a prova cobriu
     if (transport === 'acp' && acpSessionMode(admissionAgent(profile)!, effective))
@@ -477,6 +490,11 @@ export class ExecutionAdmission {
       );
     }
     if (decision.state !== 'admitted') throw new AdmissionBlockedError(decision);
+    // o registro da admissão diz o que o laço do modo API de fato declara: a lista já sem as negadas do card
+    if (transport === 'api') {
+      decision.tools = [...effective.exec!.tools];
+      decision.deniedTools = [...effective.exec!.deniedTools];
+    }
     const rebound = () => {
       if (this.binding(profile, profileId, effective, cwd).binding !== bound.binding)
         throw new Error('O executor ou o ambiente mudou após a admissão.');
