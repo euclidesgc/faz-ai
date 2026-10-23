@@ -453,8 +453,8 @@ export const board: Record<string, string> = {
   '{name}: a verificação de capacidades perdeu a validade': '{name}: the capability check is no longer valid',
   'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. O board já está verificando de novo, sem gastar a sua conta; o resultado fica em Saída › Faz AI.':
     'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. The board is already checking again, without using your account; the result goes to Output › Faz AI.',
-  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Reconectar neste perfil, em Ferramentas de IA: a verificação faz parte do Conectar.':
-    'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Click Reconnect on this profile, in AI tools: the check is part of Connect.',
+  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Abra o Conectar e conecte este perfil de novo: a verificação faz parte do Conectar.':
+    'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Open Connect and connect this profile again: the check is part of Connect.',
   'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Verificar capacidades neste perfil, em Ferramentas de IA.':
     'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Click Check capabilities on this profile, in AI tools.',
   'Abrir Ferramentas de IA': 'Open AI tools',

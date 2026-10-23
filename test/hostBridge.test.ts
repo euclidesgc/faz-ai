@@ -82,7 +82,7 @@ describe('HostBridge: preferências da pessoa', () => {
     await bridge.handle({ type: 'settings.aiProfiles.test', id: 'cli', requestId: 'b' });
     expect(checks).toBe(2);
   });
-  it('"Verificar capacidades" chama o verificador do host, publica a frase do resultado e confere os requisitos (história 13)', async () => {
+  it('"Verificar capacidades" chama o verificador do host e publica a frase do resultado, sem o "Verificar de novo" (história 13)', async () => {
     let checks = 0;
     router.onRequirementsCheck(async () => void checks++);
     const asked: string[] = [];
@@ -100,7 +100,8 @@ describe('HostBridge: preferências da pessoa', () => {
       message: 'claude-trabalho: isolamento verificado; as cinco capacidades têm recibos válidos.',
     });
     expect(sent).toContainEqual({ type: 'done', requestId: 'v', ok: true });
-    expect(checks).toBe(1);
+    // a conferência do ambiente é do host, ao fim de toda verificação; a ponte não relê o PATH nem o login
+    expect(checks).toBe(0);
     // pelo `handle` do router (o caminho da IA e do MCP) a mensagem não chega ao verificador
     router.handle({ type: 'settings.aiProfiles.verify', id: 'claude' });
     expect(asked).toEqual(['claude-trabalho']);

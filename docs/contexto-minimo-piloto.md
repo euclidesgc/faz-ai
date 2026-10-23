@@ -1,6 +1,6 @@
 # Contexto mínimo: piloto de consumo e qualidade (E7.2, #997)
 
-**Estado: protocolo e linha de base prontos; a medição ainda não foi feita.** Medir exige executar tarefas reais com as duas configurações (a atual e a revisada em #1003, `docs/contexto-minimo-revisao-do-harness.md`), e isso depende de duas decisões da pessoa que o modo autônomo não toma: aprovar as propostas do #1003 e ligar o runtime v1 (`FAZ_AI_CONTEXT_RUNTIME=v1`) numa máquina com os recibos de `fazai.verifyExecutor` válidos. Não há resultado a registrar; reduzir tokens sem a prova de qualidade não encerra o piloto.
+**Estado: protocolo e linha de base prontos; a medição ainda não foi feita.** Medir exige executar tarefas reais com as duas configurações (a atual e a revisada em #1003, `docs/contexto-minimo-revisao-do-harness.md`), e isso depende de duas decisões da pessoa que o modo autônomo não toma: aprovar as propostas do #1003 e ligar o runtime v1 (`FAZ_AI_CONTEXT_RUNTIME=v1`) numa máquina com os recibos de capacidade válidos (os do comando `fazai.verifyExecutor`, que saiu na história 13 da épica "ferramenta por modo"; hoje gravados pelo Conectar ou pelo "Verificar capacidades" de Ferramentas de IA). Não há resultado a registrar; reduzir tokens sem a prova de qualidade não encerra o piloto.
 
 ## Linha de base (antes de qualquer revisão)
 

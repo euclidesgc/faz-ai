@@ -63,14 +63,20 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
     setTouched((before) => new Set(before).add(key));
   };
   // o personalizado novo é só de CLI (história 13): o agente ACP entra pelo Conectar ferramenta. O campo do agente
-  // só aparece no personalizado ACP de uma versão anterior, que continua editável e rodando como está
-  const legacyAcp = kind === 'custom' && profile?.mode === 'acp';
+  // só aparece no personalizado ACP, que continua editável e rodando como está, e no importado pendente sem a
+  // configuração nesta máquina (um backup anterior ao formato 48 não diz se ele era ACP: a pessoa diz, e o host
+  // aceita o agente nessa linha, `AiProfileRepo.save`)
+  const customAcp = kind === 'custom' && profile?.mode === 'acp';
+  const importedUnknown = kind === 'custom' && !customAcp && profile?.credentials?.review === 'pending' && !profile.credentials.available;
+  const agentField = customAcp || importedUnknown;
   // com um agente ACP o comando é o do catálogo: o campo de comando deixa de ser obrigatório
-  const acp = legacyAcp;
+  const acp = customAcp || (importedUnknown && !!value('acpAgent').trim());
+  // o personalizado ACP sem a configuração nesta máquina não tem agente salvo para manter: o agente é obrigatório
+  const agentMissing = customAcp && !profile?.credentials?.available && !value('acpAgent').trim();
   const commandMissing = kind === 'custom' && !acp && !value('command').trim() && (!profile || !profile.credentials?.available);
   const projectPathMissing = boardServer === 'project' && !value('mcpProjectFile').trim();
   const nameMissing = !name.trim();
-  const valid = !nameMissing && !commandMissing && !projectPathMissing && !save.busy;
+  const valid = !nameMissing && !commandMissing && !agentMissing && !projectPathMissing && !save.busy;
 
   const submit = async () => {
     if (!valid) return;
@@ -133,18 +139,22 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
         <FormField label={t('Nome')} hint={nameMissing ? t('Informe o nome do perfil.') : undefined}>
           {(id) => <TextField.Root id={id} autoFocus value={name} onChange={(e) => setName(e.target.value)} />}
         </FormField>
-        {legacyAcp && (
+        {customAcp && (
           <p className="ai-profile-notice">
             {t(
-              'Perfil personalizado pelo ACP, de uma versão anterior: continua rodando como está. O caminho normal agora é Conectar ferramenta, com o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.',
+              'Personalizado pelo ACP: continua rodando como está. O caminho normal é Conectar ferramenta, com o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.',
             )}
           </p>
         )}
-        {legacyAcp &&
+        {agentField &&
           field(
             'acpAgent',
             'Agente ACP',
-            'Id do agente no catálogo ACP (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio mantém o agente salvo.',
+            agentMissing
+              ? 'Informe o agente ACP do perfil: a configuração dele não está nesta máquina.'
+              : importedUnknown
+                ? 'Id do agente no catálogo ACP, se o perfil era de um agente ACP no board de origem (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio: CLI de uma passada.'
+                : 'Id do agente no catálogo ACP (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio mantém o agente salvo.',
           )}
         {!acp && (
           <FormField

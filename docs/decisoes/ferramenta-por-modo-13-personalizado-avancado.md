@@ -95,6 +95,26 @@ deixou só para o ACP). Sem um caminho equivalente, ela ficaria sem forma de pro
   o `.cursor/mcp.json` do projeto, todos já documentados no código), por isso não houve nova leitura da
   documentação das ferramentas.
 
+### Depois da revisão do #378
+
+- **Abrir o Conectar só com o modo ACP no catálogo** (`toolModeEntry(agente, 'acp')`): o Cursor e o Kimi Code
+  têm entrada em `TOOLS` só com a CLI, e o botão levaria ao cartão de outro modo. Sem o modo ACP, o aviso vem
+  sem o botão.
+- **O importado pendente anterior ao formato 48 aceita o agente.** Uma linha personalizada com `tool` vazio e
+  pendente de revisão (o cofre não está nesta máquina, então o preenchimento da migração 48 não diz se era ACP)
+  aceita `acpAgent` no `save`, e o formulário mostra o campo como opcional ("se o perfil era de um agente ACP
+  no board de origem"): o backup antigo não perde o caminho ACP. O personalizado ACP sem a configuração nesta
+  máquina exige o agente no formulário, porque não há agente salvo para manter.
+- **Texto neutro**: o aviso diz "Personalizado pelo ACP: continua rodando como está…", porque vale também para
+  a cópia de um agente pronto e para o importado, não só para o de uma versão anterior.
+- **Verificar capacidades trava só o próprio perfil**, com o motivo por caso (desligado; pendente de revisão);
+  outro perfil pode ser verificado ao mesmo tempo (o host já coordena uma verificação por perfil).
+- **Sem "Verificar de novo" na ponte**: a HostBridge não chama mais `recheckRequirements` depois da
+  verificação. O host já confere o ambiente ao fim de toda verificação (`Verifications.done`), e o "Verificar
+  de novo" ainda relê o PATH, pula o cache do login e reabre as provas automáticas do ACP, o que não cabe aqui.
+- A recusa do verificador do host cita também o Gemini pela CLI; `test/verifyProfile.test.ts` passa a
+  mensagem pelo `BoardHost` de verdade (perfil inexistente, sem sonda, desligado, pendente).
+
 ## Onde a especificação não cabia no código
 
 - **"A opção de regime sai"** (a tabela da épica): a opção da tela já saiu na história 7. O campo do board

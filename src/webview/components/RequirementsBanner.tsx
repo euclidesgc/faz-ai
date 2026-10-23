@@ -85,7 +85,7 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
                       )
                     : r.action?.kind === 'connect'
                       ? t(
-                          'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Reconectar neste perfil, em Ferramentas de IA: a verificação faz parte do Conectar.',
+                          'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Abra o Conectar e conecte este perfil de novo: a verificação faz parte do Conectar.',
                         )
                       : t(
                           'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Verificar capacidades neste perfil, em Ferramentas de IA.',

@@ -200,7 +200,10 @@ export class AiProfileRepo {
       // o personalizado novo é só de CLI (épica "ferramenta por modo", história 13): o agente ACP entra pelo
       // Conectar ferramenta. O personalizado ACP de uma versão anterior (e a cópia de um agente ACP, que já nasce
       // ACP) continua editável e rodando como está; o que não se faz é transformar um CLI em ACP pelo formulário
-      const wasAcp = !!old && (old.mode === 'acp' || typeof saved?.acpAgent === 'string');
+      // o importado pendente de uma linha anterior ao formato 48 (`tool` vazio, sem o cofre nesta máquina) não diz se
+      // era ACP: a revisão da pessoa decide, para o backup antigo não perder o caminho do agente
+      const legacyPending = !!old && str(old.tool) === '' && old.review_state !== 'reviewed';
+      const wasAcp = !!old && (old.mode === 'acp' || typeof saved?.acpAgent === 'string' || legacyPending);
       if (kind === 'custom' && typeof config.acpAgent === 'string' && !wasAcp)
         throw new Error('O perfil personalizado novo é só de CLI. Para um agente ACP, use Conectar ferramenta em Ferramentas de IA.');
       // a ferramenta e o modo saem do tipo e da configuração, nunca do rascunho: a cópia é a ferramenta da base

@@ -137,7 +137,8 @@ describe('faixa de requisitos do board', () => {
     expect(screen.getByText('Gemini CLI: a verificação de capacidades perdeu a validade')).toBeInTheDocument();
     // o comando da paleta saiu (história 13): o pronto refaz no Reconectar, a cópia no "Verificar capacidades"
     expect(screen.queryByText(/Verificar o isolamento da CLI de IA/)).toBeNull();
-    expect(screen.getByText(/Clique em Reconectar neste perfil, em Ferramentas de IA/)).toBeInTheDocument();
+    // o texto diz o mesmo que o botão ao lado, "Abrir o Conectar"
+    expect(screen.getByText(/Abra o Conectar e conecte este perfil de novo/)).toBeInTheDocument();
     expect(screen.getByText(/Clique em Verificar capacidades neste perfil, em Ferramentas de IA/)).toBeInTheDocument();
     expect(screen.getByText(/O board já está verificando de novo, sem gastar a sua conta/)).toBeInTheDocument();
     expect(region()).toHaveClass('warn');

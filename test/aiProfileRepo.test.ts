@@ -305,6 +305,36 @@ it('salvar e duplicar gravam a ferramenta e o modo pelo tipo e pelo agente, nunc
   expect(all(db, 'SELECT id, kind, tool, mode FROM ai_profiles WHERE board_id = ? AND tool = ?', [boardId, ''])).toEqual([]);
 });
 
+it('o agente ACP é aceito no personalizado que já era ACP pelo cofre e no importado pendente anterior ao formato 48', () => {
+  const put = (id: string, config: Record<string, unknown>) => credentialsFor(db).put(JSON.stringify(['profile', boardId, id]), config);
+  // a linha diz CLI, mas o cofre traz o agente (o modo gravado ficou para trás): continua sendo um personalizado ACP
+  run(
+    db,
+    "INSERT INTO ai_profiles(board_id,id,name,enabled,kind,tool,mode,base,position,secret_ref,review_state) VALUES (?,?,?,1,'custom',?,'cli','generic',7,?,'reviewed')",
+    [boardId, 'agente-no-cofre', 'Agente no cofre', 'agente-no-cofre', put('agente-no-cofre', { acpAgent: 'gemini' })],
+  );
+  expect(
+    repo.save(boardId, draft({ id: 'agente-no-cofre', name: 'Agente no cofre', config: { acpAgent: 'opencode' } }), 'person'),
+  ).toMatchObject({ mode: 'acp', config: { acpAgent: 'opencode' } });
+  // o importado de um backup antigo: `tool` vazio, pendente e sem o cofre nesta máquina; a revisão diz se era ACP
+  run(
+    db,
+    "INSERT INTO ai_profiles(board_id,id,name,enabled,kind,tool,mode,base,position,secret_ref,review_state) VALUES (?,?,?,0,'custom','','cli','generic',8,?,'pending')",
+    [boardId, 'backup-antigo', 'Backup antigo', 'f'.repeat(64)],
+  );
+  expect(repo.list(boardId).find((p) => p.id === 'backup-antigo')).toMatchObject({ mode: 'cli', credentials: { available: false } });
+  expect(repo.save(boardId, draft({ id: 'backup-antigo', name: 'Backup antigo', config: { acpAgent: 'gemini' } }), 'person')).toMatchObject(
+    {
+      kind: 'custom',
+      mode: 'acp',
+      config: { acpAgent: 'gemini' },
+    },
+  );
+  // já revisado no formato 48, um personalizado CLI continua sem virar ACP
+  const cli = repo.save(boardId, draft({ name: 'Só CLI' }), 'person');
+  expect(() => repo.save(boardId, draft({ id: cli.id, name: cli.name, config: { acpAgent: 'gemini' } }), 'person')).toThrow('só de CLI');
+});
+
 it('linhas do schema 47 viram ferramenta × modo na leitura, gravam uma vez e não mudam a ferramenta do catálogo', () => {
   const put = (id: string, config: Record<string, unknown>) => credentialsFor(db).put(JSON.stringify(['profile', boardId, id]), config);
   // o formato antigo, como uma versão anterior gravava: kind antigo e a ferramenta vazia (o padrão da migração)

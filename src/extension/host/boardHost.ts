@@ -1033,7 +1033,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     const meta = router.snapshot().board.aiProfiles.find((p) => p.id === profileId);
     if (!meta) throw new Error(`Perfil indisponível neste board: ${profileId}.`);
     if (!verifiableProfile(meta))
-      throw new Error(`${meta.name}: a verificação de capacidades só existe para a CLI do Claude e os agentes ACP.`);
+      throw new Error(`${meta.name}: a verificação de capacidades só existe para a CLI do Claude, o Gemini pela CLI e os agentes ACP.`);
     const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, profileId);
     if (!profileCanProbe(profile))
       throw new Error(`${meta.name} está desligado ou espera revisão: ligue e revise o perfil antes de verificar.`);

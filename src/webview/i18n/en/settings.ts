@@ -89,8 +89,13 @@ export const settings: Record<string, string> = {
   'Agente ACP': 'ACP agent',
   'Id do agente no catálogo ACP (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio mantém o agente salvo.':
     'Agent id in the ACP catalog (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Blank keeps the saved agent.',
-  'Perfil personalizado pelo ACP, de uma versão anterior: continua rodando como está. O caminho normal agora é Conectar ferramenta, com o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.':
-    'Custom ACP profile from an earlier version: it keeps running as it is. The usual path is now Connect a tool, with the catalog agent in ACP mode; new custom profiles are CLI only.',
+  'Personalizado pelo ACP: continua rodando como está. O caminho normal é Conectar ferramenta, com o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.':
+    'Custom over ACP: it keeps running as it is. The usual path is Connect a tool, with the catalog agent in ACP mode; new custom profiles are CLI only.',
+  'Informe o agente ACP do perfil: a configuração dele não está nesta máquina.':
+    'Enter the profile’s ACP agent: its configuration is not on this machine.',
+  'Id do agente no catálogo ACP, se o perfil era de um agente ACP no board de origem (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio: CLI de uma passada.':
+    'Agent id in the ACP catalog, if the profile was an ACP agent in the source board (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Empty: one-shot CLI.',
+  'Revise o perfil antes: salve a configuração dele no formulário.': 'Review the profile first: save its configuration in the form.',
   'Abre o Conectar ferramenta no agente deste perfil.': 'Opens Connect a tool on this profile’s agent.',
   'Refaz as sondas de capacidade deste perfil numa pasta descartável e grava as provas, sem gastar a sua conta.':
     'Reruns this profile’s capability probes in a throwaway folder and records the proofs, without spending your account.',

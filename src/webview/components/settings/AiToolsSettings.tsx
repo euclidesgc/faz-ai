@@ -21,7 +21,7 @@ import { ActionButton, DeleteButton, IconPlus, SwitchField } from '../ui';
 import { AiProfileForm } from './AiProfileForm';
 import { ConnectTool, STEP_NAMES, connectionSummary, reviewText } from './ConnectTool';
 import { SectionHeader } from './SectionHeader';
-import { toolEntry, toolModeEntry } from '../../../shared/aiTools';
+import { toolModeEntry } from '../../../shared/aiTools';
 import { ExecutionPoliciesSettings } from './policies/ExecutionPoliciesSettings';
 import { PageHeader } from './PageHeader';
 import { SettingsCard } from './SettingsCard';
@@ -54,11 +54,30 @@ export function AiToolsSettings() {
   const test = useAction((id: string) => settings.testAiProfile(id));
   const reconnect = useAction((id: string) => settings.connectAiProfile(id));
   const [reconnectingId, setReconnectingId] = useState<string | null>(null);
-  const verify = useAction((id: string) => settings.verifyAiProfile(id));
-  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  // os perfis em verificação, cada um com o próprio estado: verificar um não trava o botão dos outros (o host
+  // coordena uma verificação por perfil). O erro chega pelo aviso do host, como nas outras ações
+  const [verifying, setVerifying] = useState<ReadonlySet<string>>(new Set());
+  const runVerify = async (id: string) => {
+    if (verifying.has(id)) return;
+    setVerifying((before) => new Set(before).add(id));
+    try {
+      await settings.verifyAiProfile(id);
+    } catch {
+      // a recusa já virou aviso na tela
+    } finally {
+      setVerifying((before) => {
+        const next = new Set(before);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
   const openConnect = useBoardStore((s) => s.openConnect);
-  /** O personalizado pelo ACP, que só uma versão anterior criava: segue rodando, com o aviso e o caminho do Conectar. */
-  const legacyAcp = (p: AiProfile) => p.kind === 'custom' && p.mode === 'acp';
+  /**
+   * O personalizado pelo ACP (o de uma versão anterior, a cópia de um agente pronto, o importado): segue rodando,
+   * com o aviso e o caminho do Conectar; o formulário novo é só de CLI.
+   */
+  const customAcp = (p: AiProfile) => p.kind === 'custom' && p.mode === 'acp';
   /** O perfil pronto de um modo que o catálogo oferece: é ele que o Conectar conduz. */
   const connectable = (p: AiProfile) => isReadyProfile(p) && !!toolModeEntry(p.tool, p.mode);
   /** O estado do Conectar do perfil: versão, login, regime, modelos e data, ou o passo em que parou. */
@@ -287,13 +306,15 @@ export function AiToolsSettings() {
                         hint={t(
                           'Refaz as sondas de capacidade deste perfil numa pasta descartável e grava as provas, sem gastar a sua conta.',
                         )}
-                        disabled={!profile.enabled || profile.credentials?.review === 'pending' || verify.busy}
-                        disabledReason={t('Ligue o perfil antes.')}
-                        loading={verify.busy && verifyingId === profile.id}
-                        onClick={() => {
-                          setVerifyingId(profile.id);
-                          void verify.run(profile.id);
-                        }}
+                        disabled={!profile.enabled || profile.credentials?.review === 'pending'}
+                        disabledReason={
+                          profile.credentials?.review === 'pending'
+                            ? t('Revise o perfil antes: salve a configuração dele no formulário.')
+                            : t('Ligue o perfil antes.')
+                        }
+                        // trava só o perfil em verificação: os outros seguem verificáveis ao mesmo tempo
+                        loading={verifying.has(profile.id)}
+                        onClick={() => void runVerify(profile.id)}
                       >
                         {t('Verificar capacidades')}
                       </ActionButton>
@@ -319,14 +340,16 @@ export function AiToolsSettings() {
                       );
                     })()}
                   </div>
-                  {legacyAcp(profile) && (
+                  {customAcp(profile) && (
                     <div className="ai-profile-notice ai-profile-legacy" role="note">
                       <p>
                         {t(
-                          'Perfil personalizado pelo ACP, de uma versão anterior: continua rodando como está. O caminho normal agora é Conectar ferramenta, com o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.',
+                          'Personalizado pelo ACP: continua rodando como está. O caminho normal é Conectar ferramenta, com o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.',
                         )}
                       </p>
-                      {toolEntry(String(profile.config.acpAgent)) && (
+                      {/* só quando o catálogo oferece o modo ACP do agente: o Cursor e o Kimi Code têm só o cartão da
+                          CLI, e o botão levaria a pessoa a outro modo */}
+                      {toolModeEntry(String(profile.config.acpAgent), 'acp') && (
                         <ActionButton
                           size="1"
                           variant="soft"

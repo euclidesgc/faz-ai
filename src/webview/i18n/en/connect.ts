@@ -196,8 +196,8 @@ export const connect: Record<string, string> = {
   '{name}: handshake do agente verificado. Os arquivos de contexto que ele lê por conta própria não têm prova: o perfil é admissível só no regime compatível.':
     '{name}: agent handshake verified. The context files it reads on its own have no proof: the profile is admissible only in the compatible regime.',
   '{name}: isolamento não verificado. Pendentes: {pending}.': '{name}: isolation not verified. Pending: {pending}.',
-  '{name}: a verificação de capacidades só existe para a CLI do Claude e os agentes ACP.':
-    '{name}: the capability check exists only for the Claude CLI and the ACP agents.',
+  '{name}: a verificação de capacidades só existe para a CLI do Claude, o Gemini pela CLI e os agentes ACP.':
+    '{name}: the capability check exists only for the Claude CLI, Gemini over the CLI and the ACP agents.',
   '{name} está desligado ou espera revisão: ligue e revise o perfil antes de verificar.':
     '{name} is disabled or pending review: enable and review the profile before checking it.',
   '{name} recusou a chave de API: {reason}': '{name} refused the API key: {reason}',
