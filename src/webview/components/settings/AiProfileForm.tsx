@@ -34,7 +34,8 @@ const lines = (value: string) =>
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
-type TextKey = 'command' | 'extraArgs' | 'args' | 'versionArgs' | 'statusArgs' | 'authPatterns' | 'installUrl' | 'mcpProjectFile';
+type TextKey =
+  'command' | 'extraArgs' | 'args' | 'versionArgs' | 'statusArgs' | 'authPatterns' | 'installUrl' | 'mcpProjectFile' | 'acpAgent';
 
 /** O host não devolve configuração privada. Campos vazios numa edição mantêm o valor salvo. */
 export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfile; onClose: () => void; onSaved: () => void }) {
@@ -60,7 +61,9 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
     setValues((before) => ({ ...before, [key]: text }));
     setTouched((before) => new Set(before).add(key));
   };
-  const commandMissing = kind === 'custom' && !value('command').trim() && (!profile || !profile.credentials?.available);
+  // com um agente ACP o comando é o do catálogo: o campo de comando deixa de ser obrigatório
+  const acp = kind === 'custom' && !!value('acpAgent').trim();
+  const commandMissing = kind === 'custom' && !acp && !value('command').trim() && (!profile || !profile.credentials?.available);
   const projectPathMissing = boardServer === 'project' && !value('mcpProjectFile').trim();
   const nameMissing = !name.trim();
   const valid = !nameMissing && !commandMissing && !projectPathMissing && !save.busy;
@@ -126,15 +129,32 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
         <FormField label={t('Nome')} hint={nameMissing ? t('Informe o nome do perfil.') : undefined}>
           {(id) => <TextField.Root id={id} autoFocus value={name} onChange={(e) => setName(e.target.value)} />}
         </FormField>
-        <FormField
-          label={t('Comando')}
-          hint={commandMissing ? t('Informe o comando do perfil personalizado.') : profile ? t('Vazio mantém o comando salvo.') : undefined}
-        >
-          {(id) => <TextField.Root id={id} value={value('command')} onChange={(e) => set('command', e.target.value)} />}
-        </FormField>
+        {kind === 'custom' &&
+          field(
+            'acpAgent',
+            'Agente ACP',
+            'Id do agente no catálogo ACP (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio: CLI de uma passada.',
+          )}
+        {!acp && (
+          <FormField
+            label={t('Comando')}
+            hint={
+              commandMissing ? t('Informe o comando do perfil personalizado.') : profile ? t('Vazio mantém o comando salvo.') : undefined
+            }
+          >
+            {(id) => <TextField.Root id={id} value={value('command')} onChange={(e) => set('command', e.target.value)} />}
+          </FormField>
+        )}
+        {acp && (
+          <p className="ai-profile-notice">
+            {t(
+              'O perfil roda pelo Agent Client Protocol: o comando, os argumentos e as permissões são os do agente, respondidas pelo card.',
+            )}
+          </p>
+        )}
         {kind === 'copy' ? (
           field('extraArgs', 'Argumentos extras', 'Um argumento por linha.', true)
-        ) : (
+        ) : acp ? null : (
           <>
             {field(
               'args',

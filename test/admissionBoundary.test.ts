@@ -5,7 +5,12 @@ import * as path from 'node:path';
 import { AdmissionBlockedError, ExecutionAdmission } from '../src/extension/ai/admission';
 import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
 import type { AiProfile } from '../src/shared/aiProfiles';
-import { CAPABILITY_CHECKS, EXECUTOR_CAPABILITIES, type StrictExecutionRequest } from '../src/shared/executionAdmission';
+import {
+  ACP_CAPABILITY_CHECKS,
+  CAPABILITY_CHECKS,
+  EXECUTOR_CAPABILITIES,
+  type StrictExecutionRequest,
+} from '../src/shared/executionAdmission';
 import type { HeadlessInput } from '../src/extension/headless';
 
 // Fixtures de teste: nenhum recibo aqui representa verificação de uma CLI real.
@@ -92,6 +97,43 @@ describe('fronteira da admissão do board', () => {
       config: { command: exe('custom-cli', 'x'), permissionArgs: { board: ['--read-only'] } },
     });
     expect(blocked(custom).decision.reasons.map((r) => r.code)).toContain('tool-mapping-unavailable');
+  });
+  it('perfil ACP: o vínculo é o comando do agente do catálogo e o perfil vale só no regime compatível', () => {
+    exe('gemini', 'agente de teste');
+    const acp = profile({ kind: 'custom', base: 'generic', config: { acpAgent: 'gemini' } });
+    const exclusive = blocked(acp);
+    expect(exclusive.decision.reasons.map((r) => r.code)).not.toContain('tool-mapping-unavailable');
+    for (const capability of EXECUTOR_CAPABILITIES)
+      store.record({
+        version: 1,
+        capability,
+        binding: exclusive.decision.binding,
+        source: 'host-probe',
+        checkedAt: now - 10,
+        expiresAt: now + 1000,
+        checks: ACP_CAPABILITY_CHECKS[capability].map((id) => ({
+          id,
+          outcome: id === 'own-context-files' ? 'unavailable' : 'passed',
+          receipt: 'a'.repeat(64),
+        })),
+      });
+    expect(blocked(acp).decision.reasons).toEqual([{ code: 'capability-not-verified', capability: 'artifacts' }]);
+    const reviewed = request({ regime: 'compatible', compatibilityReview: { actor: 'person', revision: 1 } });
+    const admitted = admission.prepare(acp, acp.id, input(), dir, reviewed);
+    expect(admitted.transport).toBe('acp');
+    expect(admitted.acpCommand({ command: 'gemini', args: ['--acp', '--skip-trust'] }).command).toBe(
+      fs.realpathSync(path.join(dir, 'gemini')),
+    );
+    expect(() => admitted.acpCommand({ command: 'gemini', args: ['--acp'] })).toThrow('mudou');
+    expect(() => admitted.acpCommand({ command: 'gemini', args: ['--acp', '--skip-trust'], env: { X: '1' } })).toThrow('mudou');
+    expect(() => admitted.command({ command: 'gemini', args: [], format: 'text' })).toThrow('agente ACP');
+    // outro agente do catálogo (outro comando) não herda os recibos deste
+    exe('opencode', 'outro agente');
+    const other = profile({ kind: 'custom', base: 'generic', config: { acpAgent: 'opencode' } });
+    expect(blocked(other, reviewed).decision.reasons).toContainEqual({ code: 'capability-not-verified', capability: 'permissions' });
+    // agente fora do catálogo não é vinculado
+    const unknown = profile({ kind: 'custom', base: 'generic', config: { acpAgent: 'nao-existe' } });
+    expect(() => admission.prepare(unknown, unknown.id, input(), dir, reviewed)).toThrow(/desconhecido/);
   });
   it('cópia que troca o binário não herda a verificação da cópia anterior', () => {
     const first = profile({ config: { command: exe('claude-a', 'binário A') } });

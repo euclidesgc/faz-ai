@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ACP_CAPABILITY_CHECKS,
   admitExecution,
   assessCapability,
   CAPABILITY_CHECKS,
@@ -158,6 +159,38 @@ describe('admissão por capacidades', () => {
   });
   it('outro provider não recebe tradução detalhada por usar evidências de teste completas', () => {
     expect(admitExecution('cursor', 'full', request(), BINDING, evidence(), NOW).reasons).toContainEqual({
+      code: 'tool-mapping-unavailable',
+    });
+  });
+  it('no transporte ACP a tradução é a do protocolo: sem ferramentas nativas, com os checks do handshake', () => {
+    const acp = (binding = BINDING): CapabilityEvidence[] =>
+      EXECUTOR_CAPABILITIES.map((capability) => ({
+        version: 1,
+        capability,
+        binding,
+        source: 'host-probe',
+        checkedAt: NOW - 100,
+        expiresAt: NOW + 1000,
+        checks: ACP_CAPABILITY_CHECKS[capability].map((id) => ({
+          id,
+          // os arquivos de contexto do agente nunca têm prova no ACP
+          outcome: id === 'own-context-files' ? 'unavailable' : 'passed',
+          receipt: 'a'.repeat(64),
+        })),
+      }));
+    const exclusive = admitExecution('generic', 'full', request(), BINDING, acp(), NOW, 'acp');
+    expect(exclusive.state).toBe('blocked');
+    expect(exclusive.reasons).toEqual([{ code: 'capability-not-verified', capability: 'artifacts' }]);
+    const reviewed = request({ regime: 'compatible', compatibilityReview: { actor: 'person', revision: 1 } });
+    const compatible = admitExecution('generic', 'full', reviewed, BINDING, acp(), NOW, 'acp');
+    expect(compatible.state).toBe('admitted');
+    expect(compatible.tools).toEqual([]);
+    expect(compatible.deniedTools).toEqual(['Agent', 'Task', 'SendMessage', 'ListAgents']);
+    // os recibos da CLI (outros ids) não servem para o ACP, nem os do ACP para a CLI
+    expect(admitExecution('generic', 'full', reviewed, BINDING, evidence(), NOW, 'acp').state).toBe('blocked');
+    expect(admitExecution('claude', 'full', reviewed, BINDING, acp(), NOW, 'cli').state).toBe('blocked');
+    // o genérico pela CLI continua sem tradução
+    expect(admitExecution('generic', 'full', reviewed, BINDING, evidence(), NOW, 'cli').reasons).toContainEqual({
       code: 'tool-mapping-unavailable',
     });
   });

@@ -16,6 +16,24 @@ export const CAPABILITY_CHECKS: Record<ExecutorCapability, readonly string[]> = 
   mcp: ['allowed-server', 'forbidden-server', 'operation-scope'],
   delegation: ['native-delegation-denied'],
 };
+/** Como o executor é chamado: a CLI de uma passada (flags de isolamento) ou um agente pelo ACP (sessão). */
+export type ExecutionTransport = 'cli' | 'acp';
+/**
+ * Os checks do transporte ACP: o que o handshake do agente deixa observável. Permissões e delegação
+ * são respondidas pelo board a cada `session/request_permission`, na versão 1 do protocolo; os
+ * servidores MCP vão só no `session/new` (o verificador observa o agente conectar ao dele). Os arquivos
+ * de contexto que o agente lê por conta própria não têm flag no protocolo: ficam `unavailable`, e por
+ * isso um agente ACP só é admissível no regime compatível, revisado pela pessoa.
+ */
+export const ACP_CAPABILITY_CHECKS: Record<ExecutorCapability, readonly string[]> = {
+  conversation: ['fresh-session'],
+  artifacts: ['own-context-files', 'managed-settings'],
+  permissions: ['protocol-version'],
+  mcp: ['session-servers'],
+  delegation: ['protocol-version'],
+};
+export const capabilityChecks = (transport: ExecutionTransport): Record<ExecutorCapability, readonly string[]> =>
+  transport === 'acp' ? ACP_CAPABILITY_CHECKS : CAPABILITY_CHECKS;
 /** Produzida pelo verificador do host. Nenhum protocolo de escrita aceita esta estrutura da IA/UI. */
 export interface CapabilityEvidence {
   version: 1;
@@ -76,6 +94,7 @@ export function assessCapability(
   binding: string,
   evidence: readonly CapabilityEvidence[],
   now: number,
+  checks: Record<ExecutorCapability, readonly string[]> = CAPABILITY_CHECKS,
 ): CapabilityAssessment {
   const result = (state: CapabilityState, reason: CapabilityAssessment['reason']): CapabilityAssessment => ({ capability, state, reason });
   if (!Number.isSafeInteger(now) || now < 0) return result('unknown', 'invalid');
@@ -111,7 +130,7 @@ export function assessCapability(
     if (row.checks.some((c) => c.outcome === 'failed')) return result('partial', 'failed');
     if (
       row.checks.some((c) => c.outcome === 'unavailable') ||
-      CAPABILITY_CHECKS[capability].some((id) => !row.checks.some((c) => c.id === id && c.outcome === 'passed'))
+      checks[capability].some((id) => !row.checks.some((c) => c.id === id && c.outcome === 'passed'))
     )
       final = result('partial', 'incomplete');
   }
@@ -126,12 +145,14 @@ export function admitExecution(
   binding: string,
   evidence: readonly CapabilityEvidence[],
   now: number,
+  transport: ExecutionTransport = 'cli',
 ): ExecutionAdmissionDecision {
+  const checks = capabilityChecks(transport);
   const decision: ExecutionAdmissionDecision = {
     version: 1,
     regime: request.regime,
     state: 'blocked',
-    capabilities: EXECUTOR_CAPABILITIES.map((c) => assessCapability(c, binding, evidence, now)),
+    capabilities: EXECUTOR_CAPABILITIES.map((c) => assessCapability(c, binding, evidence, now, checks)),
     reasons: [],
     tools: [],
     deniedTools: [...NO_DELEGATION],
@@ -226,7 +247,9 @@ export function admitExecution(
     else decision.mcpTools.push(name);
   }
   // Um executor ainda sem tradução detalhada não recebe selo por ter evidência de outra integração.
-  if (tool !== 'claude') reason('tool-mapping-unavailable');
+  // No ACP a tradução é a do protocolo: nenhuma ferramenta nativa (o board responde cada pedido pelo
+  // nível e pelo manifesto do card), delegação negada e MCP só do `session/new`.
+  if (transport === 'cli' && tool !== 'claude') reason('tool-mapping-unavailable');
   decision.state = decision.reasons.length ? 'blocked' : 'admitted';
   return decision;
 }

@@ -9,6 +9,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import {
+  ACP_CAPABILITY_CHECKS,
   CAPABILITY_CHECKS,
   EXECUTOR_CAPABILITIES,
   type CapabilityEvidence,
@@ -16,10 +17,16 @@ import {
 } from '../../shared/executionAdmission';
 import { headlessCommand, type HeadlessCommand, type HeadlessInput } from '../headless';
 import { materialize } from '../aiOutput/measured';
+import { asObject, asText, type Json } from '../aiOutput/json';
+import { lineSplitter } from '../aiOutput/lines';
 import type { RunningProcess } from '../runner';
-import type { AiExecutor } from './providers';
-import type { ExecutionAdmission } from './admission';
+import { executorProfile, type AiExecutor } from './providers';
+import { admissionAgent, type ExecutionAdmission } from './admission';
 import { canonical, type CapabilityEvidenceStore } from './capabilityEvidence';
+import { ACP_PROTOCOL_VERSION } from './acp/run';
+import { AUTH_REQUIRED, RpcError, rpcConnection } from './acp/connection';
+import { acpCommand, type AcpAgent, type AcpSpawnFn } from './acp/provider';
+import { version as EXTENSION_VERSION } from '../../../package.json';
 
 const API_KEY = 'fazai-local-verification-only';
 const NO_DELEGATION = ['Agent', 'Task', 'SendMessage', 'ListAgents'];
@@ -125,6 +132,7 @@ export function buildEvidence(
   checks: Record<ExecutorCapability, Check[]>,
   now: number,
   ttlMs = 14 * DAY,
+  expected: Record<ExecutorCapability, readonly string[]> = CAPABILITY_CHECKS,
 ): CapabilityEvidence[] {
   return EXECUTOR_CAPABILITIES.map((capability) => ({
     version: 1,
@@ -134,8 +142,60 @@ export function buildEvidence(
     checkedAt: now,
     expiresAt: now + ttlMs,
     // só os checks previstos para a capacidade; um check ausente deixa a capacidade parcial
-    checks: checks[capability].filter((c) => CAPABILITY_CHECKS[capability].includes(c.id)),
+    checks: checks[capability].filter((c) => expected[capability].includes(c.id)),
   }));
+}
+
+/** O que um handshake do agente ACP deixou observável. */
+export interface AcpHandshake {
+  /** `protocolVersion` do `initialize`; null se o agente não respondeu ou saiu antes */
+  protocolVersion: number | null;
+  agentCapabilities: Json | null;
+  /** id do `session/new`; null se a sessão não abriu */
+  sessionId: string | null;
+  /** o agente respondeu `auth_required`: sem login não há sessão */
+  authRequired: boolean;
+  error: string | null;
+}
+export interface AcpProbeRun {
+  /** dois processos seguidos: cada um precisa abrir a própria sessão */
+  first: AcpHandshake;
+  second: AcpHandshake;
+  /** o servidor MCP passado no `session/new` recebeu o `initialize` do agente */
+  mcpConnected: boolean;
+  environmentDigest: string;
+}
+
+/**
+ * Decisão pura sobre o handshake. O que o protocolo não deixa observar (os arquivos de contexto que o
+ * agente lê sozinho) fica `unavailable`, de propósito: a capacidade de artefatos nunca é verificada no ACP.
+ */
+export function evaluateAcpProbes(binding: string, run: AcpProbeRun): Record<ExecutorCapability, Check[]> {
+  const check = (id: string, ok: boolean | null, facts: unknown): Check => ({
+    id,
+    outcome: ok === null ? 'unavailable' : ok ? 'passed' : 'failed',
+    receipt: sha({ binding, id, ok, facts }),
+  });
+  const opened = run.first.sessionId !== null && run.second.sessionId !== null;
+  const speaks = run.first.protocolVersion === ACP_PROTOCOL_VERSION && run.second.protocolVersion === ACP_PROTOCOL_VERSION;
+  const protocol = check('protocol-version', opened && speaks, {
+    version: run.first.protocolVersion,
+    capabilities: run.first.agentCapabilities,
+  });
+  return {
+    conversation: [
+      check('fresh-session', opened && run.first.sessionId !== run.second.sessionId, {
+        distinct: run.first.sessionId !== run.second.sessionId,
+      }),
+    ],
+    artifacts: [
+      check('own-context-files', null, {}),
+      check('managed-settings', /^[a-f0-9]{64}$/.test(run.environmentDigest), { digest: run.environmentDigest }),
+    ],
+    permissions: [protocol],
+    mcp: [check('session-servers', opened && run.mcpConnected, { connected: run.mcpConnected })],
+    delegation: [protocol],
+  };
 }
 
 interface Attempt {
@@ -216,6 +276,10 @@ export interface VerifierDeps {
   timeoutMs?: number;
   /** substituível em testes: roda as sondagens e devolve as observações */
   probe?(binding: string): Promise<ProbeRun>;
+  /** quem inicia o agente ACP é o host; sem ele, um perfil ACP não é verificado */
+  spawnAgent?: AcpSpawnFn;
+  /** substituível em testes: o handshake do agente ACP */
+  probeAcp?(binding: string): Promise<AcpProbeRun>;
 }
 export interface VerifierResult {
   binding: string;
@@ -226,14 +290,22 @@ export interface VerifierResult {
 
 /** Executa as sondagens e grava as evidências. Recusa quando o ambiente gerenciado não pôde ser lido. */
 export async function verifyExecutor(deps: VerifierDeps): Promise<VerifierResult> {
-  if (deps.executor !== 'claude') throw new Error('O verificador de isolamento só existe para a CLI do Claude.');
+  const agent = typeof deps.executor === 'string' ? null : admissionAgent(executorProfile(deps.executor));
+  if (!agent && deps.executor !== 'claude') throw new Error('O verificador de isolamento só existe para a CLI do Claude e os agentes ACP.');
   const bound = deps.admission.isolationBinding(deps.executor, deps.profileId, 'board');
   if (!bound.environmentComplete) throw new Error('Ambiente gerenciado não verificado; recibos não são gravados.');
-  const run = await (deps.probe ?? ((binding) => runClaudeProbes(deps, bound.executable, binding)))(bound.binding);
-  const evidence = buildEvidence(bound.binding, evaluateProbes(bound.binding, run), deps.now?.() ?? Date.now());
-  const verified = evidence.every((e) =>
-    CAPABILITY_CHECKS[e.capability].every((id) => e.checks.some((c) => c.id === id && c.outcome === 'passed')),
-  );
+  const now = deps.now?.() ?? Date.now();
+  const expected = agent ? ACP_CAPABILITY_CHECKS : CAPABILITY_CHECKS;
+  let evidence: CapabilityEvidence[];
+  if (agent) {
+    if (!deps.spawnAgent && !deps.probeAcp) throw new Error('Transporte ACP indisponível neste host.');
+    const run = await (deps.probeAcp ?? (() => runAcpProbes(deps, agent, bound.executable)))(bound.binding);
+    evidence = buildEvidence(bound.binding, evaluateAcpProbes(bound.binding, run), now, undefined, expected);
+  } else {
+    const run = await (deps.probe ?? ((binding) => runClaudeProbes(deps, bound.executable, binding)))(bound.binding);
+    evidence = buildEvidence(bound.binding, evaluateProbes(bound.binding, run), now);
+  }
+  const verified = evidence.every((e) => expected[e.capability].every((id) => e.checks.some((c) => c.id === id && c.outcome === 'passed')));
   // Também grava falhas: uma falha mais nova nunca recorre ao sucesso antigo.
   for (const e of evidence) deps.store.record(e);
   return { binding: bound.binding, evidence, verified };
@@ -446,6 +518,112 @@ async function runClaudeProbes(deps: VerifierDeps, executable: string, _binding:
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+/** Um servidor MCP stdio mínimo, escrito na fixture: responde ao `initialize` e deixa um marcador quando o agente o chama. */
+const MCP_PROBE_SERVER = `
+const fs = require('node:fs');
+const marker = process.argv[2];
+let buffer = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (chunk) => {
+  buffer += chunk;
+  let i;
+  while ((i = buffer.indexOf('\\n')) >= 0) {
+    const line = buffer.slice(0, i).trim();
+    buffer = buffer.slice(i + 1);
+    if (!line) continue;
+    let msg;
+    try { msg = JSON.parse(line); } catch { continue; }
+    if (msg.method === 'initialize') fs.writeFileSync(marker, 'conectado');
+    if (msg.id === undefined) continue;
+    const result =
+      msg.method === 'initialize'
+        ? { protocolVersion: msg.params?.protocolVersion ?? '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'allowed', version: '1' } }
+        : msg.method === 'tools/list'
+          ? { tools: [{ name: 'allowed', description: 'Operação de teste', inputSchema: { type: 'object', properties: {} } }] }
+          : {};
+    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result }) + '\\n');
+  }
+});
+process.stdin.on('end', () => process.exit(0));
+`;
+
+/** Abre o agente uma vez: `initialize`, `session/new` com o servidor de teste, e fecha. Nada de `session/prompt`: não gasta a conta da pessoa. */
+async function acpHandshake(
+  deps: VerifierDeps,
+  agent: AcpAgent,
+  executable: string,
+  cwd: string,
+  server: { command: string; args: string[] },
+): Promise<AcpHandshake> {
+  const result: AcpHandshake = { protocolVersion: null, agentCapabilities: null, sessionId: null, authRequired: false, error: null };
+  const built = acpCommand(agent, { prompt: '', permission: 'board' });
+  const stdout = lineSplitter();
+  let proc = null as ReturnType<AcpSpawnFn> | null;
+  let exited = false;
+  const rpc = rpcConnection({
+    send: (line) => proc?.write(`${line}\n`),
+    onNotification: () => {},
+    // a sondagem não pede trabalho: qualquer pedido do agente é recusado
+    onRequest: () => ({ outcome: { outcome: 'cancelled' } }),
+  });
+  const done = new Promise<void>((resolve) => {
+    proc = deps.spawnAgent!({ ...built, command: executable }, cwd, (text, stream) => {
+      if (stream !== 'stdout') return;
+      for (const line of stdout.push(text)) if (line) rpc.receive(line);
+    });
+    proc.onExit((code, error) => {
+      exited = true;
+      rpc.close(error ?? new Error(`${agent.label} saiu (código ${code}) durante a sondagem.`));
+      resolve();
+    });
+  });
+  const timer = setTimeout(() => proc?.kill(), deps.timeoutMs ?? 90_000);
+  try {
+    const init = await rpc.request('initialize', {
+      protocolVersion: ACP_PROTOCOL_VERSION,
+      clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+      clientInfo: { name: 'faz-ai', title: 'Faz AI Kanban (sondagem)', version: EXTENSION_VERSION },
+    });
+    result.protocolVersion = typeof init.protocolVersion === 'number' ? init.protocolVersion : null;
+    result.agentCapabilities = asObject(init.agentCapabilities) ?? null;
+    const session = await rpc.request('session/new', {
+      cwd,
+      mcpServers: [{ name: 'allowed', command: server.command, args: server.args, env: [] }],
+    });
+    result.sessionId = asText(session.sessionId);
+  } catch (e) {
+    if (e instanceof RpcError && e.code === AUTH_REQUIRED) result.authRequired = true;
+    result.error = e instanceof Error ? e.message : String(e);
+  } finally {
+    clearTimeout(timer);
+    proc?.end();
+    setTimeout(() => {
+      if (!exited) proc?.kill();
+    }, 5_000).unref?.();
+    await done;
+  }
+  return result;
+}
+
+/** A sondagem do agente ACP numa fixture descartável: dois handshakes e o servidor MCP de teste. */
+async function runAcpProbes(deps: VerifierDeps, agent: AcpAgent, executable: string): Promise<AcpProbeRun> {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-verify-acp-'));
+  fs.chmodSync(root, 0o700);
+  const project = path.join(root, 'project');
+  const script = path.join(root, 'mcp-probe.cjs');
+  const marker = path.join(root, 'mcp-connected');
+  fs.mkdirSync(project, { recursive: true, mode: 0o700 });
+  write(script, MCP_PROBE_SERVER);
+  const server = { command: process.execPath, args: [script, marker] };
+  try {
+    const first = await acpHandshake(deps, agent, executable, project, server);
+    const second = await acpHandshake(deps, agent, executable, project, server);
+    return { first, second, mcpConnected: fs.existsSync(marker), environmentDigest: deps.admission.environmentDigest() };
+  } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 }

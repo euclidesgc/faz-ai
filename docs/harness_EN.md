@@ -180,7 +180,11 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   ("Admissible under the exclusive/compatible regime" or "Not admissible", with one reason per
   requirement). In the compatible regime it lists what the CLI may load on its own. The **Testar**
   (Test) button runs the tool (it uses your subscription, and the warning stays on screen), one
-  attempt of up to 2 minutes, and the top warning updates itself at the end.
+  attempt of up to 2 minutes, and the top warning updates itself at the end. In a profile with an
+  **ACP agent**, the receipts come from the **Faz AI: Verify the AI CLI isolation** command (with
+  the profile as the board default): two agent handshakes in a throwaway folder, without spending
+  your account. The artifacts capability stays partial on purpose, because the agent reads its own
+  context files, and the profile is admissible only in the compatible regime.
 - **Next run and limits:** shows the regime, the default target (with the rule and version, or the
   block), the cards whose target is unavailable and the limits table with requested, effective and
   reason. It comes from the policy simulator and the effective limits; without them it shows
