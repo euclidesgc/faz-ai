@@ -166,6 +166,19 @@ Gemini aplica nesse modo:
   endereço da API, a credencial, os cabeçalhos nem o proxy: essas variáveis vão fixadas pelo board. E
   os comandos de shell que o modelo roda não recebem a chave.
 
+### Teste real do Gemini
+
+O teste real roda um card mínimo pelo caminho do board nos três modos (CLI, ACP e API), com o binário
+e a API do Google de verdade. **Gasta cota da sua conta**, por isso fica fora do `npm test` e só roda
+com confirmação explícita, dada só pelo roteiro: `node scripts/gemini-real.mjs --sim` (ou
+`FAZAI_REAL_CONFIRM=1` ao chamar o roteiro). Sem a confirmação, o roteiro recusa e o teste pula cada modo
+com o motivo (sem binário `gemini` ou sem `GEMINI_API_KEY` também); no roteiro, modo pedido e pulado
+é falha. Atenção ao ACP sem `GEMINI_API_KEY` (login OAuth): ele usa e pode alterar a sua `~/.gemini`
+(credenciais renovadas, histórico), e as suas settings, GEMINI.md e extensões podem gerar desvio na
+conferência. O que cada modo
+tem de verificado e de não validado, e como conferir o consumo contra o painel do AI Studio, está em
+`docs/decisoes/ferramenta-por-modo-14-teste-real-gemini.md`.
+
 ## Diagnóstico do ambiente
 
 ### O aviso de atenção

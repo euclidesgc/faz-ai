@@ -39,6 +39,16 @@ cancellation, forced termination, failure before release, no retry and private f
 not enable a production profile: managed policies, the real authentication/API environment,
 Cursor/Kimi and accepted-task consumption still need validation.
 
+`test/cli-real/gemini.real.ts` (also under `npm run test:cli-real`) is different: it runs a minimal
+card through the board in Gemini's three modes (CLI, ACP and API) with the real binary and API, and
+**spends your account's quota**. So only the `node scripts/gemini-real.mjs --sim` script turns it on
+(it sets its own variable, `FAZAI_REAL_CONFIRMED_BY_SCRIPT`, and explains the spend); exporting
+`FAZAI_REAL_CONFIRM=1` in the shell does not enable the test. On a bare `npm run test:cli-real`, without
+the confirmation, the `gemini` binary or `GEMINI_API_KEY`, each mode is **skipped** with the reason; the
+script, on the contrary, treats a requested but skipped mode as a **failure** (exit code 1). ACP without a
+key uses the login and the real home (`~/.gemini`), which Gemini may change. The verified and not-validated labels are in
+`docs/decisoes/ferramenta-por-modo-14-teste-real-gemini.md` (Portuguese).
+
 ## Workflow
 
 New features are integrated into `develop`. Each change is a story on Faz AI's own board: the card
