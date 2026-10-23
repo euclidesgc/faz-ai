@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ACP_AGENTS } from '../src/extension/ai/acp/agents';
 import { acpMeasure } from '../src/extension/ai/acp/provider';
-import { allDrivers, driverFor, driverOf } from '../src/extension/ai/drivers';
+import { allDrivers, driverFor, driverOf, executorOf } from '../src/extension/ai/drivers';
+import { cliExecutor } from '../src/extension/ai/drivers/cli';
+import { admissionTransport } from '../src/extension/ai/admission';
 import { claudeProvider } from '../src/extension/ai/providers/claude';
 import { cursorProvider } from '../src/extension/ai/providers/cursor';
 import { kimiProvider } from '../src/extension/ai/providers/kimi';
@@ -154,5 +156,53 @@ describe('toolModeOf: o perfil para (ferramenta, modo) do driver, pelos campos d
       tools: 'advised',
       model: 'advised',
     });
+  });
+});
+
+describe('executorOf: quem executa cada perfil (contrato de execução, história 6)', () => {
+  const profile = (p: Partial<AiProfile>): AiProfile => ({
+    id: 'x',
+    name: 'X',
+    enabled: true,
+    kind: 'custom',
+    tool: 'x',
+    mode: 'cli',
+    base: 'generic',
+    config: {},
+    position: 9,
+    ...p,
+  });
+  const examples = (): AiProfile[] => [
+    ...BUILTIN_PROFILES,
+    profile({ id: 'copia', kind: 'catalog', tool: 'claude', base: 'claude' }),
+    profile({ config: { command: 'minha-cli' } }),
+    ...ACP_AGENTS.map((a) => profile({ id: `p-${a.id}`, tool: `p-${a.id}`, mode: 'acp', config: { acpAgent: a.id } })),
+  ];
+
+  it('todo driver registrado executa pelo transporte do seu modo', () => {
+    for (const d of allDrivers()) expect(d.transport, `${d.tool}/${d.mode}`).toBe(d.mode);
+  });
+
+  it('pronto e cópia: o driver da ferramenta; agente ACP: o driver do agente do catálogo', () => {
+    expect(executorOf(BUILTIN_PROFILES.find((p) => p.id === 'claude')!)).toBe(driverFor('claude', 'cli'));
+    expect(executorOf(profile({ id: 'copia', kind: 'catalog', tool: 'claude', base: 'claude' }))).toBe(driverFor('claude', 'cli'));
+    expect(executorOf(BUILTIN_PROFILES.find((p) => p.id === 'gemini')!)).toBe(driverFor('gemini', 'acp'));
+    expect(executorOf(profile({ mode: 'acp', config: { acpAgent: 'cursor' } }))).toBe(driverFor('cursor', 'acp'));
+  });
+
+  it('CLI personalizada, sem driver de conexão: o executor genérico de CLI, o mesmo dos drivers de CLI', () => {
+    const custom = profile({ config: { command: 'minha-cli' } });
+    expect(driverOf(custom)).toBeUndefined();
+    expect(executorOf(custom)).toBe(cliExecutor);
+    expect(driverFor('claude', 'cli')!.run).toBe(cliExecutor.run);
+    expect(driverFor('claude', 'cli')!.bindingContext).toBe(cliExecutor.bindingContext);
+  });
+
+  it('agente ACP desconhecido é recusado, com a mesma mensagem de antes', () => {
+    expect(() => executorOf(profile({ mode: 'acp', config: { acpAgent: 'nao-existe' } }))).toThrow('Agente ACP desconhecido: nao-existe.');
+  });
+
+  it('o transporte do executor é o mesmo que a admissão confere', () => {
+    for (const p of examples()) expect(executorOf(p).transport, p.id).toBe(admissionTransport(p));
   });
 });

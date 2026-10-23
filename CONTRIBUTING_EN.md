@@ -60,6 +60,19 @@ board, the screens and the admission only talk to the contract.
    enforces (`enforcement`). A ready CLI wraps its provider (`ai/providers/`, with the reader in
    `aiOutput/`) through `cliDriver`; an ACP agent is an entry in `ACP_AGENTS` (`ai/acp/agents.ts`),
    which `acpDriver` turns into a driver. Register the driver in `drivers/index.ts` (`driverFor`).
+   The same driver fulfills the execution contract (`Executor`): `transport`, `run(input, ctx)`, which
+   returns the `Measured` (the process, the report and the measurement failure), and
+   `bindingContext(input, ctx)`, the tool's part of the isolation binding (the invocation and which
+   executable to resolve). The gateway only calls `executorOf(profile).run` and hands over in `ctx`
+   both `spawn` functions already wrapped with its checks (the admission revalidates the command before
+   each attempt); the driver uses the one for its transport and never starts a process on its own. The
+   admission adds to `bindingContext` what is the same for every tool (the binary digest, the filtered
+   environment, the managed policies, the folder), canonicalizes it and hashes it. Changing what
+   `bindingContext` returns changes the binding and invalidates the recorded proofs: only with a
+   deliberate format change (the context `version`) and a decision record;
+   `test/admissionBoundary.test.ts` compares the bindings against the reference in
+   `test/helpers/bindingReference.ts`. A custom CLI has no driver and runs through the generic CLI
+   executor (`cliExecutor`), the same one the ready CLIs use.
 2. **The catalog row**: the tool's entry in `TOOLS` (`src/shared/aiTools.ts`), with the page, the
    billing note, the offered modes (only the ones with a driver), the planned ones (with the story
    that delivers them), the recommended mode with the reason and each mode's sheet, with the eight
@@ -75,9 +88,9 @@ what the tool loads on its own (less is better). The recommended mode may still 
 screen's badge only shows when it is offered (`recommendedOffered`). For Gemini it is the API; for
 Claude Code, the CLI, the only mode that uses the subscription.
 
-Until the profile has the `tool` and `mode` fields, `toolModeOf` (in `aiTools.ts`) derives them from
-the current fields (`base` and `acpAgent`); always use `driverOf(profile)`, never `base` directly, so
-the code does not change when the profile gets the fields. Before coding anything tool-specific, read
+`toolModeOf` (in `aiTools.ts`) maps the profile to the driver's pair through the `tool` and `mode`
+fields (for a custom ACP profile, the catalog agent); always use `driverOf(profile)` for the
+connection and `executorOf(profile)` for the execution, never `base` directly. Before coding anything tool-specific, read
 the tool's current official documentation and cite the source in the comment.
 
 ## Changelog

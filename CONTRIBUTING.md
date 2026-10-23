@@ -60,6 +60,18 @@ num driver; o board, as telas e a admissão só falam com o contrato.
    board impõe (`enforcement`). Uma CLI pronta envolve o provider dela (`ai/providers/`, com o leitor
    em `aiOutput/`) por `cliDriver`; um agente ACP é uma entrada de `ACP_AGENTS` (`ai/acp/agents.ts`),
    que `acpDriver` transforma em driver. Registre o driver em `drivers/index.ts` (`driverFor`).
+   O mesmo driver cumpre o contrato de execução (`Executor`): `transport`, `run(input, ctx)`, que
+   devolve o `Measured` (o processo, o relatório e a falha da medição), e `bindingContext(input, ctx)`,
+   a parte da ferramenta no vínculo de isolamento (a invocação e qual executável resolver). O gateway
+   só chama `executorOf(perfil).run` e entrega em `ctx` os dois `spawn` já com as conferências dele (a
+   admissão revalida o comando antes de cada tentativa); o driver usa o do transporte dele e nunca
+   inicia um processo por conta própria. A admissão acrescenta ao `bindingContext` o que é igual para
+   toda ferramenta (o digest do binário, o ambiente filtrado, as políticas gerenciadas, a pasta),
+   canoniza e faz o hash. Mudar o que `bindingContext` devolve muda o vínculo e invalida as provas
+   gravadas: só com uma mudança de formato deliberada (o `version` do contexto) e um registro de
+   decisão; `test/admissionBoundary.test.ts` compara os vínculos com a régua de
+   `test/helpers/bindingReference.ts`. A CLI personalizada não tem driver e roda pelo executor genérico
+   de CLI (`cliExecutor`), o mesmo das CLIs prontas.
 2. **A linha do catálogo**: a entrada da ferramenta em `TOOLS` (`src/shared/aiTools.ts`), com a
    página, a nota de cobrança, os modos oferecidos (só os que têm driver), os planejados (com a
    história que os entrega), o modo recomendado com o motivo e a ficha de cada modo, com as oito
@@ -75,9 +87,9 @@ carrega por conta própria (menos é melhor). O recomendado pode ser um modo ain
 tela só aparece quando ele é oferecido (`recommendedOffered`). Para o Gemini é a API; para o Claude
 Code, a CLI, o único modo que usa a assinatura.
 
-Enquanto o perfil não tem os campos `tool` e `mode`, `toolModeOf` (em `aiTools.ts`) os deriva dos
-campos atuais (`base` e `acpAgent`); use sempre `driverOf(perfil)`, nunca `base` direto, para o
-código não mudar quando o perfil ganhar os campos. Antes de codificar algo de uma ferramenta, leia a
+`toolModeOf` (em `aiTools.ts`) leva o perfil ao par do driver pelos campos `tool` e `mode` (no
+personalizado ACP, o agente do catálogo); use sempre `driverOf(perfil)` para a conexão e
+`executorOf(perfil)` para a execução, nunca `base` direto. Antes de codificar algo de uma ferramenta, leia a
 documentação oficial atual dela e cite a fonte no comentário.
 
 ## Changelog

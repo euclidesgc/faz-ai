@@ -2,12 +2,18 @@
 // Diagnóstico e a leitura de modelos precisam saber de uma ferramenta num modo, sem executar nada. Há
 // um driver por (ferramenta, modo), em `drivers/<ferramenta>/<modo>.ts`, e o registro `driverFor` em
 // `drivers/index.ts`; o catálogo da tela é `TOOLS` (`src/shared/aiTools.ts`). A execução (`run`,
-// `bindingContext`) é o outro contrato, o `Executor`, da história 6. A verificação de capacidades
-// (`verify`) e a classificação de falhas (`classifyFailure`) entram no driver nas histórias 7 e 12.
+// `bindingContext`) é o outro contrato, o `Executor` (história 6), que todo driver também cumpre. A
+// verificação de capacidades (`verify`) e a classificação de falhas (`classifyFailure`) entram no driver
+// nas histórias 7 e 12.
 import type { InstallStep } from '../../../shared/environment';
 import type { ModeEnforcement, ToolMode } from '../../../shared/aiTools';
+import type { AiProfile } from '../../../shared/aiProfiles';
+import type { ExecutionTransport } from '../../../shared/executionAdmission';
 import type { ModelOption } from '../../../shared/models';
 import type { CliRun } from '../../cliRun';
+import type { HeadlessCommand, HeadlessInput } from '../../headless';
+import type { Measured, MeasuredDeps } from '../../aiOutput/measured';
+import type { AcpSpawnFn } from '../acp/provider';
 import type { AiMeasure } from '../provider';
 
 /**
@@ -49,3 +55,56 @@ export interface ConnectionDriver {
   /** o que o board impõe neste modo: a linha do catálogo (`TOOLS`) */
   readonly enforcement: ModeEnforcement;
 }
+
+/**
+ * O que o gateway entrega ao driver para uma execução. Os dois `spawn` já vêm com as conferências do
+ * gateway (a admissão revalida o comando, o snapshot e a sessão MCP antes de cada tentativa): o driver
+ * escolhe o do seu transporte e nunca inicia um processo por conta própria.
+ */
+export interface ExecutorContext extends Pick<MeasuredDeps, 'log' | 'runId' | 'leaseCoordinationDir' | 'execManifest'> {
+  /** o perfil resolvido, com o cofre aplicado */
+  profile: AiProfile;
+  cwd: string;
+  /** inicia o comando de uma CLI de uma passada */
+  spawn: MeasuredDeps['spawn'];
+  /** inicia um agente ACP com a entrada aberta; ausente no host sem o transporte */
+  spawnAcp?: AcpSpawnFn;
+}
+
+/**
+ * A parte do vínculo de isolamento que é da ferramenta: o que a linha de comando fixa e qual executável
+ * resolver. O resto do vínculo (a identidade do host, o digest do binário, o ambiente filtrado, as
+ * políticas gerenciadas, a pasta) é o mesmo para toda ferramenta e fica na admissão, que canoniza e faz o
+ * hash: um driver não tem como esquecer o binário e enfraquecer a prova.
+ */
+export interface BindingInvocation {
+  /** entra no vínculo como `invocation`, exatamente como é */
+  invocation: object;
+  /** o comando a resolver no PATH (o executável real e o digest dele entram no vínculo) */
+  command: string;
+  /** o PATH próprio do comando, quando o perfil o define; senão o do host */
+  pathEnv?: string;
+  /** onde mais procurar o executável (o mesmo `lookup` do comando) */
+  lookup?: HeadlessCommand['lookup'];
+  /** as variáveis próprias do comando, que entram no ambiente do vínculo mesmo fora da lista relevante */
+  env?: Record<string, string>;
+}
+
+/**
+ * O contrato de execução: como a ferramenta roda num modo e o que, nesse modo, prende uma prova de
+ * capacidade. O gateway chama `run` (o ciclo do log, a admissão e o cancelamento são dele); a admissão
+ * chama `bindingContext`.
+ */
+export interface Executor {
+  /** o transporte que roda de fato, o mesmo que a admissão confere */
+  readonly transport: ExecutionTransport;
+  run(input: HeadlessInput, ctx: ExecutorContext): Measured;
+  /**
+   * A parte da ferramenta no vínculo, para uma entrada (o prompt já vem trocado pelo marcador) e uma
+   * pasta (null no vínculo de isolamento, que vale para qualquer pasta de projeto).
+   */
+  bindingContext(input: HeadlessInput, ctx: { profile: AiProfile; cwd: string | null }): BindingInvocation;
+}
+
+/** Um driver: a conexão e a execução de uma ferramenta num modo. */
+export interface ToolDriver extends ConnectionDriver, Executor {}

@@ -483,12 +483,27 @@ describe('estrutura: só o gateway chama a IA e escreve o log de uso', () => {
       .filter((f) => pattern.test(f.text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')))
       .map((f) => f.rel);
 
-  it('o transporte medido (spawnMeasured) só é chamado pelo gateway', () => {
-    expect(offenders(/\bspawnMeasured\b/, ['extension/ai/gateway.ts', 'extension/aiOutput/measured.ts'])).toEqual([]);
+  // desde a história 6 da épica "ferramenta por modo", o gateway roda pelo driver (`executorOf(...).run`):
+  // o transporte é chamado só pelo executor do driver, e o executor só pelo gateway
+  it('o transporte medido (spawnMeasured) só é chamado pelo executor de CLI dos drivers', () => {
+    expect(offenders(/\bspawnMeasured\b/, ['extension/ai/drivers/cli.ts', 'extension/aiOutput/measured.ts'])).toEqual([]);
   });
 
-  it('o transporte ACP (spawnAcp) só é chamado pelo gateway; o host só entrega o spawn', () => {
-    expect(offenders(/\bspawnAcp\b/, ['extension/ai/gateway.ts', 'extension/ai/acp/run.ts', 'extension/host/boardHost.ts'])).toEqual([]);
+  it('o transporte ACP (spawnAcp) só é chamado pelo driver ACP; o host entrega o spawn, e o gateway o repassa', () => {
+    // o nome também é o da dependência que o host entrega (`AiGatewayDeps.spawnAcp`, `ExecutorContext.spawnAcp`):
+    // o que se confere é a chamada do transporte
+    expect(offenders(/\bspawnAcp\(/, ['extension/ai/drivers/acp.ts', 'extension/ai/acp/run.ts'])).toEqual([]);
+    expect(offenders(/import\s*\{[^}]*\bspawnAcp\b[^}]*\}\s*from/, ['extension/ai/drivers/acp.ts'])).toEqual([]);
+  });
+
+  it('o executor do driver só é pedido pelo gateway (que roda) e pela admissão (que vincula)', () => {
+    expect(offenders(/\bexecutorOf\b/, ['extension/ai/gateway.ts', 'extension/ai/admission.ts', 'extension/ai/drivers/index.ts'])).toEqual(
+      [],
+    );
+  });
+
+  it('a execução de um driver (`.run(input, {...})`) só parte do gateway', () => {
+    expect(offenders(/\bexecutor\.run\(/, ['extension/ai/gateway.ts'])).toEqual([]);
   });
 
   it('o processo da CLI só é iniciado pelo host, e só para entregá-lo ao gateway', () => {

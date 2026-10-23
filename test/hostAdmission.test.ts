@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ExecutionAdmission, AdmissionBlockedError } from '../src/extension/ai/admission';
+import { ExecutionAdmission, AdmissionBlockedError, isolationInput as isolationOf } from '../src/extension/ai/admission';
 import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
 import { CAPABILITY_CHECKS, EXECUTOR_CAPABILITIES, type StrictExecutionRequest } from '../src/shared/executionAdmission';
 import { headlessCommand, type HeadlessInput } from '../src/extension/headless';
@@ -12,6 +12,7 @@ import { admissionProfileOf } from '../src/shared/contextAdmissionPreview';
 import { BUILTIN_PROFILES, type AiProfile } from '../src/shared/aiProfiles';
 import type { ContextActivityTarget } from '../src/shared/contextPlanning';
 import type { BoardState } from '../src/shared/model';
+import { referenceBinding } from './helpers/bindingReference';
 let dir: string;
 let exe: string;
 let store: CapabilityEvidenceStore;
@@ -68,6 +69,15 @@ function approve(i = input(), r = request(), profile = 'claude') {
   return admission.prepare('claude', profile, i, dir, r);
 }
 describe('admissão no host', () => {
+  it('o vínculo da execução admitida e o de isolamento são os de antes do contrato de execução (história 6)', () => {
+    const options = { pathEnv: dir, homeDir: dir, environmentEvidence: { state: 'complete' as const, digest: 'a'.repeat(64) } };
+    const admitted = approve();
+    // a prova foi gravada no vínculo de isolamento calculado como antes; a execução admitida fica presa a ele
+    expect(admitted.decision.binding).toBe(referenceBinding('claude', 'claude', isolationOf('full'), null, options));
+    expect(admission.binding('claude', 'claude', admitted.input, dir).binding).toBe(
+      referenceBinding('claude', 'claude', admitted.input, dir, options),
+    );
+  });
   it('sem evidências, bloqueia e não inventa verificação ou inicia processo', () => {
     expect(() => admission.prepare('claude', 'claude', input(), dir, request())).toThrow(AdmissionBlockedError);
     expect(fs.existsSync(path.join(dir, 'evidence'))).toBe(false);
