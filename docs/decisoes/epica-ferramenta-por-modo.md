@@ -178,15 +178,16 @@ flowchart LR
   com a nota de cobrança) e, escolhida a ferramenta, um cartão por modo oferecido com a mesma ficha
   (o que o board controla, regime esperado, precisão, consumo, o que a ferramenta traz, como se
   entra, cobrança, quando escolher), o selo **Recomendado** com o motivo em uma frase, e o botão
-  Conectar em cada cartão. Nesta história o Gemini oferece só o ACP (o selo fica nele até a 10); o
-  Claude Code mostra a CLI com o porquê de ser a única. Depois: o estado de cada perfil do catálogo
+  Conectar em cada cartão. O selo só aparece quando o modo recomendado está entre os oferecidos:
+  nesta história o Gemini oferece só o ACP e sai sem selo; o Claude Code mostra a CLI com o porquê
+  de ser a única. Depois: o estado de cada perfil do catálogo
   (versão, login, regime, modelos, data) e **Reconectar**. A opção "Regime de admissão" sai de
   Harness › Ferramenta e execução; a faixa de requisitos reconfere `signedIn` e `locate`.
 - Dividir se passar de ~600 linhas: 7a (host, handlers, mensagens) e 7b (tela).
 - Testes: `test/connect.test.ts` (fluxo com driver falso, passo a passo e erro em cada passo),
   `test/acpTransport.test.ts` (`authenticate` com `_meta`), `test/ui/connect.test.tsx` (a lista
-  fixa, um cartão por modo oferecido, o selo no modo recomendado, nenhum cartão para modo sem
-  driver), `test/ui/aiToolsSettings.test.tsx`, i18n. Docs: `docs/configuracoes.md` (a comparação
+  fixa, um cartão por modo oferecido, o selo só quando o modo recomendado é oferecido, nenhum
+  cartão para modo sem driver), `test/ui/aiToolsSettings.test.tsx`, i18n. Docs: `docs/configuracoes.md` (a comparação
   dos modos e a recomendação, em pt e en), README (recurso), CHANGELOG.
 
 ### 8. Gemini pela CLI
@@ -220,8 +221,8 @@ flowchart LR
 - `Measured` sem processo: `onExit(0)` no fim, `kill()` aborta e impede a próxima iteração,
   `report()` soma `usageMetadata` (`measure: 'tokens'`), inventário = chamadas executadas. Um só
   servidor do board por pasta (o board é cliente de si mesmo). O Conectar passa a oferecer o modo
-  API, e o selo **Recomendado** do Gemini vai para ele, com a ficha dizendo que até a 11 o modo serve
-  a Refinar, Resumir e Trabalhar com permissão `board`.
+  API, e o selo **Recomendado** do Gemini acende nele pela regra da 7, com a ficha dizendo que até a
+  11 o modo serve a Refinar, Resumir e Trabalhar com permissão `board`.
 - Testes: `test/geminiApi.test.ts` (servidor HTTP falso: ciclo de duas chamadas, cancelamento no
   meio, 429), `test/aiGatewayApi.test.ts` (uma ferramenta fora da decisão nunca é declarada ao
   modelo). Docs: `docs/harness.md`, `docs/mcp.md`.

@@ -194,10 +194,11 @@ mesma ficha em cada cartão, para a comparação ser por linha:
 | Quando escolher                     | para a finalidade do board: prever o acesso e gastar só o pedido                       | quando se quer o agente da própria ferramenta decidindo como trabalhar                    | quando o ACP não está disponível na versão instalada                             |
 
 Para o Gemini, a recomendação é a **API**: é o único modo em que o board sabe de antemão tudo o que o
-agente pode acessar e paga só pelo que pediu. Até a história 10 entregar o modo API, a tela não o
-lista (um modo só aparece com driver) e o selo fica no **ACP**, que já roda de ponta a ponta. Para o
-Claude Code só há a CLI, e o cartão diz o porquê (assinatura; o ACP exige cobrança por API). A
-recomendação nunca esconde os outros modos nem escolhe por ninguém: é um selo e uma frase.
+agente pode acessar e paga só pelo que pediu. O selo só aparece quando o modo recomendado está
+entre os oferecidos (um modo só aparece com driver): até a história 10 entregar o modo API, os
+cartões do Gemini saem sem selo, e na 10 ele acende sozinho, sem regra provisória. Para o Claude
+Code só há a CLI, e o cartão diz o porquê (assinatura; o ACP exige cobrança por API). A recomendação
+nunca esconde os outros modos nem escolhe por ninguém: é um selo e uma frase.
 
 ```mermaid
 flowchart TD
