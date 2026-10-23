@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checkRun, type RunCheckManifest } from '../src/shared/runCheck';
 import type { InventoryItem, RunReport } from '../src/shared/log';
+import { AGENT_TOOLS, GEMINI_TOOL_EQUIVALENTS, geminiToolsFor } from '../src/shared/agentTools';
 
 const manifest = (over: Partial<RunCheckManifest> = {}): RunCheckManifest => ({
   skills: ['revisar'],
@@ -75,6 +76,45 @@ describe('checkRun', () => {
       status: 'deviation',
       deviations: [{ kind: 'tool', name: 'Bash', calls: 1 }],
     });
+  });
+});
+
+describe('checkRun com inventário do Gemini pela CLI (nomes do Gemini, história 8)', () => {
+  it('os nomes do Gemini são lidos no vocabulário do card: dentro das tools, sem desvio; fora, ou negados, com desvio', () => {
+    const card = manifest({ tools: ['Read', 'Grep', 'Glob'], deniedTools: ['Bash'] });
+    expect(
+      check(
+        [
+          { kind: 'tool', name: 'read_file', calls: 2 },
+          { kind: 'tool', name: 'grep_search', calls: 1 },
+          { kind: 'tool', name: 'list_directory', calls: 1 },
+          { kind: 'tool', name: 'update_topic', calls: 1 },
+          { kind: 'mcp_tool', name: 'faz-ai/get_card', calls: 1 },
+        ],
+        card,
+      ),
+    ).toEqual({ status: 'ok' });
+    expect(check([{ kind: 'tool', name: 'run_shell_command', calls: 1 }], card)).toEqual({
+      status: 'deviation',
+      deviations: [{ kind: 'tool', name: 'run_shell_command', calls: 1 }],
+    });
+    expect(check([{ kind: 'tool', name: 'write_file', calls: 1 }], card)).toMatchObject({ status: 'deviation' });
+    // sem lista de tools no card, só o negado é desvio
+    expect(check([{ kind: 'tool', name: 'replace', calls: 1 }], manifest({ tools: [], deniedTools: ['Bash'] }))).toEqual({ status: 'ok' });
+    expect(check([{ kind: 'tool', name: 'run_shell_command', calls: 1 }], manifest({ tools: [], deniedTools: ['Bash'] }))).toMatchObject({
+      status: 'deviation',
+    });
+  });
+  it('os três vocabulários não colidem: nenhum nome do Gemini é kind ACP nem nome do card', () => {
+    const acp = ['think', 'switch_mode', 'other', 'read', 'search', 'edit', 'delete', 'move', 'execute', 'fetch'];
+    for (const name of Object.keys(GEMINI_TOOL_EQUIVALENTS)) {
+      expect(acp).not.toContain(name);
+      // minúsculos: nenhum nome do card (capitalizado) cai aqui
+      expect(name).toMatch(/^[a-z_]+$/);
+    }
+    // e toda ferramenta da tabela do Gemini tem equivalente (a conferência não cai no caminho do nome do card)
+    for (const name of AGENT_TOOLS.gemini.flatMap((g) => g.tools.map((t) => t.name))) expect(GEMINI_TOOL_EQUIVALENTS).toHaveProperty(name);
+    expect(geminiToolsFor(['Read', 'Bash'])).toEqual(['read_file', 'read_many_files', 'list_directory', 'run_shell_command']);
   });
 });
 

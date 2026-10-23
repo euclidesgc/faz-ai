@@ -15,7 +15,7 @@ import {
   type StrictExecutionRequest,
   type ExecutionAdmissionDecision,
 } from '../../shared/executionAdmission';
-import { isAcpProfile, isReadyCli } from '../../shared/aiProfiles';
+import { executorToolOf, isAcpProfile, isReadyCli } from '../../shared/aiProfiles';
 import { resolveCommand } from '../cliResolve';
 import { acpAgent } from './acp/agents';
 import { acpCommand, acpSessionMode, type AcpAgent } from './acp/provider';
@@ -365,7 +365,8 @@ export class ExecutionAdmission {
     const now = this.options.now?.() ?? Date.now();
     const permission = 'board' as const;
     const profile = executorProfile(executor);
-    const tool = profile.base;
+    // a tabela de ferramentas é a do executor: a base, e na CLI do catálogo a ferramenta (o Gemini pela CLI)
+    const tool = executorToolOf(profile);
     const transport = admissionTransport(profile);
     const preliminary = admitExecution(tool, permission, request, '', [], now, transport);
     try {
@@ -391,7 +392,7 @@ export class ExecutionAdmission {
   prepare(executor: AiExecutor, profileId: string, input: HeadlessInput, cwd: string, request: StrictExecutionRequest): AdmittedExecution {
     if (!profileId.trim() || profileId.length > 240 || profileId.includes('\0')) throw new Error('Identidade de perfil inválida.');
     const profile = structuredClone(executorProfile(executor));
-    const tool = profile.base;
+    const tool = executorToolOf(profile);
     const transport = admissionTransport(profile);
     const preliminary = admitExecution(tool, input.permission, request, '', [], this.options.now?.() ?? Date.now(), transport);
     if (preliminary.reasons.some((r) => r.code !== 'capability-not-verified')) throw new AdmissionBlockedError(preliminary);
@@ -518,10 +519,22 @@ export class ExecutionAdmission {
         if (this.binding(profile, profileId, effective, cwd).binding !== bound.binding)
           throw new Error('O executor ou o ambiente mudou após a admissão.');
         const expected = headlessCommand(profile, { ...effective, structured: command.format !== 'text' });
+        // a home temporária entra no ambiente só na hora de rodar (`materialize`): a variável dela fica fora da
+        // comparação do ambiente, e o que vale é o conteúdo gravado nela, conferido abaixo como o dos `tempFiles`
+        const homeEnv = expected.tempHome?.env;
+        const envOf = (env: Record<string, string> | undefined) => {
+          if (!homeEnv || !env) return env;
+          const { [homeEnv]: _home, ...rest } = env;
+          return Object.keys(rest).length ? rest : undefined;
+        };
         if (
           (command.command !== expected.command && command.command !== bound.executable) ||
           command.args.length !== expected.args.length ||
-          canonical(command.env) !== canonical(expected.env) ||
+          canonical(envOf(command.env)) !== canonical(envOf(expected.env)) ||
+          canonical(command.tempHome) !== canonical(expected.tempHome) ||
+          command.apiKeyEnv !== expected.apiKeyEnv ||
+          // o valor da chave só vai para a variável que o provider declarou
+          (command.apiKey !== undefined && !expected.apiKeyEnv) ||
           command.stdin !== expected.stdin ||
           command.format !== expected.format ||
           canonical(command.projectMcp) !== canonical(expected.projectMcp) ||
@@ -536,6 +549,19 @@ export class ExecutionAdmission {
           const file = Object.keys(expected.tempFiles ?? {}).find((name) => wanted === tmpArg(name));
           if (file ? fs.readFileSync(actual, 'utf8') !== expected.tempFiles![file] : wanted !== actual)
             throw new Error('Uma restrição obrigatória mudou após a admissão.');
+        }
+        if (expected.tempHome) {
+          const home = command.env?.[expected.tempHome.env];
+          if (!home) throw new Error('Uma restrição obrigatória mudou após a admissão.');
+          for (const [rel, content] of Object.entries(expected.tempHome.files)) {
+            let actual: string | null;
+            try {
+              actual = fs.readFileSync(path.join(home, ...rel.split('/')), 'utf8');
+            } catch {
+              actual = null;
+            }
+            if (actual !== content) throw new Error('Uma restrição obrigatória mudou após a admissão.');
+          }
         }
         return { ...command, command: bound.executable };
       },

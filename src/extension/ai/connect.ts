@@ -180,7 +180,12 @@ export class Connector {
         const step = { state, enter, stop };
         const signIn = await this.signIn(driver, probe, executable!, input, step);
         if (signIn) return signIn;
-        if (mode !== meta.mode) deps.setMode(profileId, mode);
+        if (mode !== meta.mode) {
+          deps.setMode(profileId, mode);
+          // o modo novo carrega outra coisa por conta própria (no ACP e na CLI do Gemini, coisas diferentes): a
+          // ciência dada para o anterior não vale para ele
+          if (deps.reviewOf(profileId)) deps.revokeReview(profileId);
+        }
         if (!deps.profile(profileId)?.enabled) deps.enable(profileId);
         enter('verify');
         const verified = await this.verify(driver, deps.resolve(profileId), step);
@@ -239,7 +244,9 @@ export class Connector {
       const methodId = auth.methodId;
       const accept = async (apiKey: string): Promise<void> => {
         try {
-          if (driver.transport === 'api') await deps.checkApiKey(profile, apiKey);
+          // o modo que lista os modelos pela API (o API e o Gemini pela CLI, que leva a chave no ambiente de cada
+          // execução) confere a chave por ela; o ACP, pelo `authenticate`
+          if (driver.apiModels) await deps.checkApiKey(profile, apiKey);
           else if (methodId) await deps.authenticate(profile, executable, { methodId, apiKey });
           else throw new Error(`${profile.name}: o login por chave não tem método neste modo.`);
         } catch (e) {
@@ -263,7 +270,7 @@ export class Connector {
         // a recusa (ou a rede fora do ar): o campo volta para a pessoa conferir ou trocar a chave
         return stop('waiting', { needs: 'api-key', error: message(e) });
       }
-      state.summary.signIn = driver.transport === 'api' ? 'api-key-checked' : 'api-key';
+      state.summary.signIn = driver.apiModels ? 'api-key-checked' : 'api-key';
       return null;
     }
     if (auth.kind === 'login-command') {

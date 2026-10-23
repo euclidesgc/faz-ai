@@ -391,7 +391,16 @@ it('a importação aceita os dois conjuntos de valores e recusa ferramenta ou mo
   bad({ kind: 'builtin' });
   bad({ id: 'meu', kind: 'custom', base: 'generic', tool: 'outro' });
   bad({ id: 'claude', kind: 'acp' });
-  bad({ id: 'gemini', kind: 'catalog', base: 'generic', tool: 'gemini', mode: 'cli' });
+  // o Gemini pela CLI é um modo oferecido desde a história 8; outro agente ACP pronto em `cli`, não
+  ok({ id: 'gemini', kind: 'catalog', base: 'generic', tool: 'gemini', mode: 'cli' });
+  bad({ id: 'codex-acp', kind: 'catalog', base: 'generic', tool: 'codex-acp', mode: 'cli' });
+});
+
+it('a cópia do Gemini pela CLI é o personalizado com o agente, em acp (a CLI dele não tem cópia de catálogo)', () => {
+  repo.setEnabled(boardId, 'gemini', true, 'person');
+  repo.setMode(boardId, 'gemini', 'cli', 'person');
+  const copy = repo.duplicate(boardId, 'gemini', 'person');
+  expect(copy).toMatchObject({ kind: 'custom', mode: 'acp', base: 'generic' });
 });
 it('o pronto lê o modo gravado quando a ferramenta o oferece (o Gemini pela API, história 10); senão, o do código', () => {
   repo.setEnabled(boardId, 'gemini', true, 'person');
@@ -401,9 +410,11 @@ it('o pronto lê o modo gravado quando a ferramenta o oferece (o Gemini pela API
   run(db, "UPDATE ai_profiles SET mode = 'api' WHERE board_id = ? AND id = 'gemini'", [boardId]);
   expect(modeOf('gemini')).toBe('api');
   expect(repo.resolveProfile(boardId, 'gemini')).toMatchObject({ mode: 'api', tool: 'gemini', kind: 'catalog' });
-  // um modo que a extensão não oferece para a ferramenta (o CLI do Gemini ainda é planejado) volta ao do código
+  // o Gemini pela CLI (história 8) também é oferecido
   run(db, "UPDATE ai_profiles SET mode = 'cli' WHERE board_id = ? AND id = 'gemini'", [boardId]);
-  expect(modeOf('gemini')).toBe('acp');
+  expect(modeOf('gemini')).toBe('cli');
+  expect(repo.resolveProfile(boardId, 'gemini')).toMatchObject({ mode: 'cli', tool: 'gemini', kind: 'catalog' });
+  // um modo que a extensão não oferece para a ferramenta volta ao do código
   repo.setEnabled(boardId, 'claude', true, 'person');
   run(db, "UPDATE ai_profiles SET mode = 'api' WHERE board_id = ? AND id = 'claude'", [boardId]);
   expect(modeOf('claude')).toBe('cli');

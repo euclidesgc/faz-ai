@@ -83,6 +83,35 @@ it('não deixa arquivos temporários se a materialização falha depois de grava
   }
 });
 
+it('a home temporária (Gemini pela CLI): arquivos em subpastas, a variável apontando para ela, tudo apagado no fim', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-materialize-test-'));
+  try {
+    const command: HeadlessCommand = {
+      command: 'gemini',
+      args: ['-p', ''],
+      format: 'gemini-stream-json',
+      env: { NO_COLOR: '1' },
+      tempHome: { env: 'GEMINI_CLI_HOME', files: { '.gemini/settings.json': '{"mcpServers":{}}' } },
+    };
+    const { command: built, cleanup } = materialize(command, root);
+    const home = built.env!.GEMINI_CLI_HOME!;
+    expect(built.env!.NO_COLOR).toBe('1');
+    expect(fs.readFileSync(path.join(home, '.gemini', 'settings.json'), 'utf8')).toBe('{"mcpServers":{}}');
+    // pode ter credenciais dos servidores MCP: só o dono lê
+    expect(fs.statSync(path.join(home, '.gemini', 'settings.json')).mode & 0o077).toBe(0);
+    fs.writeFileSync(path.join(home, '.gemini', 'historico.json'), 'o que a CLI gravou');
+    cleanup();
+    expect(fs.readdirSync(root)).toEqual([]);
+    // caminho que sai da home, ou variável inválida, nem começa
+    for (const bad of ['../fora', '/abs', 'a/../../b'].map((rel): Record<string, string> => ({ [rel]: 'x' })))
+      expect(() => materialize({ ...command, tempHome: { env: 'GEMINI_CLI_HOME', files: bad } }, root)).toThrow('Home temporária inválida');
+    expect(() => materialize({ ...command, tempHome: { env: 'A B', files: {} } }, root)).toThrow('Home temporária inválida');
+    expect(fs.readdirSync(root)).toEqual([]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 describe('o comando do modo estruturado, por ferramenta', () => {
   it('o Claude Code vai com `--output-format stream-json` E `--verbose`, que é obrigatório junto', () => {
     run();

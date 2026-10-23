@@ -21,6 +21,23 @@ export interface HeadlessCommand {
   env?: Record<string, string>;
   /** arquivos temporários da execução (nome → conteúdo), referidos nos argumentos por `tmpArg` */
   tempFiles?: Record<string, string>;
+  /**
+   * Uma pasta temporária da execução, com arquivos em subpastas (caminho relativo → conteúdo), entregue à
+   * ferramenta pela variável `env`: a home isolada do Gemini CLI (`GEMINI_CLI_HOME`, com o
+   * `.gemini/settings.json` do board). O transporte a cria antes de rodar, põe o caminho na variável e a
+   * apaga ao terminar, junto dos `tempFiles`; a admissão confere o conteúdo gravado, como o dos `tempFiles`.
+   */
+  tempHome?: { env: string; files: Record<string, string> };
+  /**
+   * O nome da variável em que o host entrega a chave de API da ferramenta, lida do cofre (`GEMINI_API_KEY`).
+   * O comando só declara o nome: o valor nunca está nos argumentos, no `env` nem nos arquivos temporários.
+   */
+  apiKeyEnv?: string;
+  /**
+   * O valor da chave, posto pelo driver só na hora do `spawn` (depois de o comando ser montado e conferido
+   * pela admissão) e aplicado por cima do ambiente do processo em `apiKeyEnv`. Nunca entra no vínculo nem no log.
+   */
+  apiKey?: string;
   /** o que este comando vai escrever na saída, e portanto qual leitor a interpreta */
   format: OutputFormat;
   /**

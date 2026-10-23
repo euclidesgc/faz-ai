@@ -46,6 +46,19 @@ export const connect: Record<string, string> = {
   'Modo em uso': 'Mode in use',
   'Passa o perfil da ferramenta para este modo quando o login der certo, com a mesma chave e os mesmos modelos.':
     'Switches the tool’s profile to this mode once the sign-in succeeds, with the same key and the same models.',
+  'O board confere a chave agora, lendo a lista de modelos da conta pela API do Gemini (não gasta a conta). Aceita, ela fica guardada no cofre deste computador, a mesma para todos os modos, e vai para a CLI só no ambiente de cada execução; ela não volta para esta tela. Recusada, a chave guardada antes continua.':
+    'The board checks the key now, by reading your account’s model list through the Gemini API (it does not spend your quota). Once accepted, it is stored in this computer’s vault, the same for every mode, and reaches the CLI only in the environment of each run; it never comes back to this screen. If refused, the previously stored key stays.',
+  'MCP e ferramentas pelo settings da home isolada; a aprovação por nível; o contexto do projeto o Gemini carrega':
+    'MCP and tools through the isolated home’s settings; approval by level; Gemini loads the project context',
+  'exclusivo se as sondas passarem; senão compatível (a 0.65.0 lê o GEMINI.md do projeto)':
+    'exclusive if the probes pass; otherwise compatible (0.65.0 reads the project’s GEMINI.md)',
+  'boa: `tool_use` e `tool_result` no `stream-json`': 'good: `tool_use` and `tool_result` in the `stream-json`',
+  'tokens por modelo (`result.stats`); o contexto próprio do projeto conta':
+    'tokens per model (`result.stats`); the project’s own context counts',
+  'o agente completo do Gemini CLI, numa passada': 'the full Gemini CLI agent, in a single pass',
+  'chave de API do Gemini (cofre, no ambiente da execução)': 'Gemini API key (vault, in the run’s environment)',
+  'quando se quer o Gemini CLI numa passada, com o board fixando as ferramentas e os servidores MCP':
+    'when you want Gemini CLI in a single pass, with the board fixing the tools and MCP servers',
   'O board confere a chave agora, lendo a lista de modelos da conta pela API do Gemini (não gasta a conta). Aceita, ela fica guardada no cofre deste computador, a mesma para todos os modos, e vai à API só no cabeçalho; ela não volta para esta tela. Recusada, a chave guardada antes continua.':
     'The board checks the key now, by reading the account’s model list through the Gemini API (it does not spend the account). Once accepted, it is stored in this computer’s vault, the same for every mode, and goes to the API only in the header; it never comes back to this screen. If refused, the key stored before stays.',
   'Confere a chave com a API, guarda no cofre e continua o Conectar.':

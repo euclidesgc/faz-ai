@@ -60,8 +60,9 @@ export interface ConnectionDriver {
   /** os modelos da conta, quando a ferramenta os lista por comando; ausente quando não lista */
   listModels?(executable: string, pathEnv: string | undefined): Promise<ModelOption[]>;
   /**
-   * Só no modo API: os modelos da conta pela API, com a chave. É também a conferência da chave no Conectar
-   * (uma chamada que não gasta a conta); lança com o motivo quando a API recusa.
+   * Os modelos da conta pela API, com a chave: o modo API e o Gemini pela CLI (que não tem comando que liste
+   * modelos). É também a conferência da chave no Conectar (uma chamada que não gasta a conta); lança com o
+   * motivo quando a API recusa.
    */
   apiModels?(apiKey: string): Promise<ModelOption[]>;
   /** o que o gateway promete medir: custo, tokens ou nada */

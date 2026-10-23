@@ -28,6 +28,8 @@ import type { HeadlessInput } from '../src/extension/headless';
 import { ACP_AGENTS } from '../src/extension/ai/acp/agents';
 import { BUILTIN_PROFILES } from '../src/shared/aiProfiles';
 import { referenceBinding } from './helpers/bindingReference';
+import { materialize } from '../src/extension/aiOutput/measured';
+import { headlessCommand } from '../src/extension/headless';
 
 // Fixtures de teste: nenhum recibo aqui representa verificação de uma CLI real.
 let dir: string;
@@ -770,5 +772,84 @@ describe('admissão do modo API (história 9)', () => {
     );
     // e o executor injetado não muda nada fora do modo API
     expect(admissionWith(apiExecutor()).isolationBinding(claude, claude.id, 'board').binding).toBe(isolation);
+  });
+});
+
+describe('admissão do Gemini pela CLI (história 8)', () => {
+  const geminiCli = (): AiProfile => ({ ...structuredClone(BUILTIN_PROFILES.find((p) => p.id === 'gemini')!), mode: 'cli', enabled: true });
+  const KEY = 'AIzaChaveDaAdmissao-000999';
+
+  it('a tabela de ferramentas é a do Gemini: a decisão lista os nomes dele, e o comando os fixa no settings', () => {
+    exe('gemini', 'gemini 0.65.0');
+    const p = geminiCli();
+    expect(isAcpProfile(p)).toBe(false);
+    expect(admissionTransport(p)).toBe('cli');
+    authorize(admission.isolationBinding(p, p.id, 'board').binding);
+    const admitted = admission.prepare(p, p.id, input(), dir, request());
+    expect(admitted.decision.state).toBe('admitted');
+    expect(admitted.decision.tools).toEqual([
+      'read_file',
+      'read_many_files',
+      'list_directory',
+      'glob',
+      'grep_search',
+      'list_mcp_resources',
+      'read_mcp_resource',
+    ]);
+    // o comando que a CLI recebe, com a home materializada, passa pela conferência; a chave só por cima
+    const built = headlessCommand(p, { ...admitted.input, structured: true });
+    const { command, cleanup } = materialize(built, dir);
+    try {
+      const checked = admitted.command({ ...command, apiKey: KEY });
+      expect(checked.apiKey).toBe(KEY);
+      expect(checked.env!.GEMINI_CLI_HOME).toBe(command.env!.GEMINI_CLI_HOME);
+      // a chave noutra variável que não a declarada, ou num comando que não a declara, é recusada
+      expect(() => admitted.command({ ...command, apiKeyEnv: 'PATH', apiKey: KEY })).toThrow('O comando mudou');
+      // o settings da home trocado depois da admissão (um servidor a mais) é recusado
+      const settings = path.join(command.env!.GEMINI_CLI_HOME!, '.gemini', 'settings.json');
+      fs.writeFileSync(settings, fs.readFileSync(settings, 'utf8').replace('"mcpServers": {}', '"mcpServers": {"x": {"command": "x"}}'));
+      expect(() => admitted.command(command)).toThrow('restrição obrigatória');
+      // e outra home (outra variável) também
+      expect(() => admitted.command({ ...command, env: { ...command.env, GEMINI_CLI_HOME: dir } })).toThrow('restrição obrigatória');
+    } finally {
+      cleanup();
+    }
+    expect(fs.existsSync(command.env!.GEMINI_CLI_HOME!)).toBe(false);
+  });
+
+  it('o vínculo não vê a chave, muda com a configuração gerenciada do sistema e não muda os de Claude e ACP', () => {
+    exe('gemini', 'gemini 0.65.0');
+    const p = geminiCli();
+    const before = admission.isolationBinding(p, p.id, 'board').binding;
+    // com a chave no cofre, o mesmo vínculo: trocar a chave não invalida as provas (como no ACP)
+    const withKey = new ExecutionAdmission({
+      pathEnv: () => dir,
+      homeDir: dir,
+      evidence: store,
+      now: () => now,
+      environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
+      apiKey: () => KEY,
+    });
+    expect(withKey.isolationBinding(p, p.id, 'board').binding).toBe(before);
+    // o modo é outro vínculo: a prova do ACP não vale para a CLI
+    const acp = { ...p, mode: 'acp' as const };
+    expect(admission.isolationBinding(acp, acp.id, 'board').binding).not.toBe(before);
+    const systemSettings = path.join(dir, 'gemini-system.json');
+    const old = process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
+    process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH = systemSettings;
+    try {
+      const pointed = admission.isolationBinding(p, p.id, 'board').binding;
+      fs.writeFileSync(systemSettings, '{"tools":{"core":["run_shell_command"]}}');
+      expect(admission.isolationBinding(p, p.id, 'board').binding).not.toBe(pointed);
+    } finally {
+      if (old === undefined) delete process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
+      else process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH = old;
+    }
+    expect(admission.isolationBinding(p, p.id, 'board').binding).toBe(before);
+    // o ACP pronto do Gemini segue na régua da história 6
+    const options = { pathEnv: dir, homeDir: dir, environmentEvidence: { state: 'complete' as const, digest: 'a'.repeat(64) } };
+    expect(admission.isolationBinding(acp, acp.id, 'board').binding).toBe(
+      referenceBinding(acp, acp.id, isolationInputOf('board'), null, options),
+    );
   });
 });

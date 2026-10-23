@@ -1,3 +1,4 @@
+import { GEMINI_TOOL_EQUIVALENTS } from './agentTools';
 import type { ExecManifest } from './execution';
 import { splitMcpName, type RunReport } from './log';
 
@@ -41,11 +42,23 @@ const ACP_KIND_EQUIVALENTS: Record<string, string[]> = {
 };
 
 /**
- * Desvio de uma ferramenta nativa. Nome do card: negada, ou fora de `tools` (lista não vazia). Kind ACP: desvio
- * quando algum equivalente está em `deniedTools`, ou quando nenhum está em `tools` (lista não vazia).
+ * O vocabulário de cada inventário: o do card (Claude Code, Cursor, Kimi Code), os kinds do ACP e os nomes do
+ * Gemini pela CLI (`GEMINI_TOOL_EQUIVALENTS`). Os três não colidem, então um nome basta para saber de qual é.
+ */
+const equivalentsOf = (name: string): string[] | null =>
+  Object.hasOwn(ACP_KIND_EQUIVALENTS, name)
+    ? ACP_KIND_EQUIVALENTS[name]!
+    : Object.hasOwn(GEMINI_TOOL_EQUIVALENTS, name)
+      ? GEMINI_TOOL_EQUIVALENTS[name]!
+      : null;
+
+/**
+ * Desvio de uma ferramenta nativa. Nome do card: negada, ou fora de `tools` (lista não vazia). Kind ACP ou nome
+ * do Gemini: desvio quando algum equivalente está em `deniedTools`, ou quando nenhum está em `tools` (lista
+ * não vazia).
  */
 function toolDeviates(name: string, manifest: RunCheckManifest): boolean {
-  const equivalents = Object.hasOwn(ACP_KIND_EQUIVALENTS, name) ? ACP_KIND_EQUIVALENTS[name]! : null;
+  const equivalents = equivalentsOf(name);
   if (!equivalents) return manifest.deniedTools.includes(name) || (manifest.tools.length > 0 && !manifest.tools.includes(name));
   if (equivalents.length === 0) return false;
   if (equivalents.some((e) => manifest.deniedTools.includes(e))) return true;

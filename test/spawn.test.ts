@@ -55,6 +55,24 @@ it('a confirmação de término só aparece após o fechamento real do processo'
   expect(proc.terminationConfirmed?.()).toBe(process.platform !== 'win32');
 });
 
+it('a chave do cofre chega ao processo só no ambiente, na variável que o comando declara', async () => {
+  let out = '';
+  const proc = spawnHeadless(
+    {
+      command: process.execPath,
+      args: ['-e', 'process.stdout.write(String(process.env.GEMINI_API_KEY) + "|" + process.argv.slice(1).join(","))'],
+      format: 'text',
+      apiKeyEnv: 'GEMINI_API_KEY',
+      apiKey: 'chave-do-cofre',
+    },
+    process.cwd(),
+    (text) => (out += text),
+    undefined,
+  );
+  await new Promise<void>((resolve) => proc.onExit(() => resolve()));
+  expect(out).toBe('chave-do-cofre|');
+});
+
 describe('linha de comando do Windows', () => {
   it('um .exe roda direto, sem shell e sem escape', () => {
     expect(launchSpec('C:\\bin\\claude.exe', ['-p', 'a & b'], 'win32')).toEqual({

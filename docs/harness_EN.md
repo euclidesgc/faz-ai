@@ -138,6 +138,38 @@ the same key as ACP, checked right away with the API.
 - The key never goes to the log, the usage record, the screen or the export, and it goes to the API
   only in the `x-goog-api-key` header, never in the URL.
 
+### Gemini through the CLI
+
+The third mode is the one-shot CLI (`gemini -p`), with Gemini CLI installed (checked on 0.65.0). Click
+**Conectar** (connect) on Gemini's **CLI** card: the Gemini profile switches to CLI mode with the same
+key from the vault, checked right away through the API's model list (the models go into the catalog).
+What Gemini enforces in this mode:
+
+- **The isolated home**: each run starts with `GEMINI_CLI_HOME` pointing to a temporary folder holding
+  only the board's `settings.json`, deleted at the end (with whatever the CLI wrote there). Your
+  account's configuration, `GEMINI.md`, extensions, skills, commands and hooks do not come in;
+  extensions are off (`-e none`), so is delegation (`experimental.enableAgents`), and the `GEMINI.md`
+  of folders above the project is not read.
+- **Tools and MCP**: the settings fix the exact list of tools the CLI registers (`tools.core`) and the
+  card's MCP servers, each with only the admitted operations; whatever is left out never reaches the
+  model, and a call to it comes back refused without running. `--allowed-mcp-server-names` repeats the
+  list. Approval follows the level (`default` for board only, `auto_edit` for board and files, `yolo`
+  for no restrictions), but the real restriction is the registry.
+- **What the home does not isolate**: the `GEMINI.md` of the project folder and of the additional
+  folders. That is why the verifier probes (sentinels in the project's, the home's and the ancestors'
+  `GEMINI.md`, a forbidden extension and a forbidden MCP server, against a local API, without spending
+  your quota) prove permissions, MCP, delegation and fresh conversation, and the profile runs in the
+  **compatible regime**, after your acknowledgment. The acknowledgment given for ACP does not carry over
+  to the CLI: switching modes asks again. The system's managed settings (the administrator's) still
+  apply on top of the board's home and are part of the proof binding.
+- **Usage and the run check**: tokens per model from the `stream-json` `result.stats` (thinking counts
+  as output); the inventory is the `tool_use` calls that ran, in Gemini's names (`read_file`,
+  `run_shell_command`…), and the run check reads them in the card's vocabulary (`Read`, `Bash`…). An
+  exhausted quota sets the usage limit; a rejected key marks the profile's sign-in as expired.
+- The key goes only into the process environment (`GEMINI_API_KEY`), never into the arguments, the
+  settings, the log, the usage record or the export. With no key in the vault, the `GEMINI_API_KEY` of
+  your environment applies.
+
 ## Environment check
 
 ### The warning icon

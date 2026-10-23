@@ -424,8 +424,55 @@ describe('Conectar o Gemini pelo cartão API (história 10): o mesmo perfil, o m
   });
 
   it('um modo que a ferramenta não oferece é recusado', async () => {
-    await expect(host().connector.connect('gemini', { mode: 'cli' })).rejects.toThrow('o modo CLI não é oferecido');
     await expect(host().connector.connect('claude', { mode: 'api' })).rejects.toThrow('o modo API não é oferecido');
+    await expect(host().connector.connect('cursor', { mode: 'acp' })).rejects.toThrow('o modo ACP não é oferecido');
+  });
+});
+
+describe('Conectar o Gemini pelo cartão CLI (história 8): o mesmo perfil, a chave conferida pela API, o regime das sondas', () => {
+  /** o que o binário real 0.65.0 provou contra a API local: o GEMINI.md do projeto e o da pasta adicional vazam */
+  const GEMINI_CLI_PROVEN = () =>
+    evidence('cli', { 'artifacts/project-sentinel': 'failed', 'artifacts/additional-directory-sentinel': 'failed' });
+
+  it('acha o binário, confere a chave pela API (sem authenticate), troca o modo, verifica e pede a ciência', async () => {
+    const h = host({
+      verify: async (id) => {
+        h.calls.push(`verify:${id}`);
+        return { evidence: GEMINI_CLI_PROVEN() };
+      },
+    });
+    const first = await h.connector.connect('gemini', { mode: 'cli' });
+    expect(first).toMatchObject({ mode: 'cli', step: 'signIn', status: 'waiting', needs: 'api-key', summary: { version: '0.65.0' } });
+    const second = await h.connector.connect('gemini', { mode: 'cli', apiKey: KEY });
+    // a chave vai à API (a lista de modelos), nunca ao `authenticate` do ACP; o modo muda depois de aceita
+    expect(h.calls).toEqual([`check:${KEY}`, 'mode:gemini:cli', 'enable:gemini', 'verify:gemini']);
+    expect(second).toMatchObject({ step: 'review', needs: 'review', summary: { signIn: 'api-key-checked', regime: 'compatible' } });
+    const done = await h.connector.connect('gemini', { mode: 'cli', acknowledge: true });
+    expect(done).toMatchObject({ mode: 'cli', status: 'connected', summary: { regime: 'compatible', reviewed: 1, models: 6 } });
+    expect(h.profiles.get('gemini')!.mode).toBe('cli');
+    expect(JSON.stringify(h.published)).not.toContain(KEY);
+  });
+
+  it('a ciência dada no ACP não vale para a CLI: trocar o modo a revoga, e a pessoa a dá de novo', async () => {
+    const h = host({ verify: async () => ({ evidence: GEMINI_CLI_PROVEN() }) });
+    h.keys.set('gemini', KEY);
+    h.reviews.gemini = 2;
+    const state = await h.connector.connect('gemini', { mode: 'cli' });
+    expect(h.calls).toContain('revoke:gemini');
+    expect(state).toMatchObject({ step: 'review', status: 'waiting', needs: 'review' });
+  });
+
+  it('a API recusa a chave: o perfil fica no modo anterior, e a mensagem não repete a chave', async () => {
+    const h = host({
+      checkApiKey: async () => {
+        throw new Error(`A API do Gemini recusou a chave (HTTP 400): ${KEY} inválida`);
+      },
+    });
+    const state = await h.connector.connect('gemini', { mode: 'cli', apiKey: KEY });
+    expect(state).toMatchObject({ step: 'signIn', status: 'waiting', needs: 'api-key' });
+    expect(state.error).not.toContain(KEY);
+    expect(h.profiles.get('gemini')!.mode).toBe('acp');
+    expect(h.keys.has('gemini')).toBe(false);
   });
 });
 

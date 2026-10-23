@@ -164,6 +164,12 @@ export function assessCapability(
   return final;
 }
 
+/**
+ * As CLIs de uma passada com a tradução detalhada do contrato (as ferramentas da decisão viram a lista exata
+ * que a CLI registra). O Gemini entrou com o modo CLI (épica "ferramenta por modo", história 8).
+ */
+export const CLI_TOOL_MAPPING: readonly string[] = ['claude', 'gemini'];
+
 /** A mesma decisão pode ser usada em simulação e no gateway. Não consulta arquivos nem executa probes. */
 export function admitExecution(
   tool: AiTool,
@@ -277,8 +283,10 @@ export function admitExecution(
   // Um executor ainda sem tradução detalhada não recebe selo por ter evidência de outra integração.
   // No ACP a tradução é a do protocolo: nenhuma ferramenta nativa (o board responde cada pedido pelo
   // nível e pelo manifesto do card), delegação negada e MCP só do `session/new`. No modo API a tradução é
-  // do próprio board: ele declara ao modelo só o que a decisão lista e executa cada chamada.
-  if (transport === 'cli' && tool !== 'claude') reason('tool-mapping-unavailable');
+  // do próprio board: ele declara ao modelo só o que a decisão lista e executa cada chamada. Na CLI, só as
+  // ferramentas cuja linha de comando o provider traduz por inteiro: o Claude Code (`--tools`,
+  // `--allowedTools`) e o Gemini CLI (o `tools.core` e o `includeTools` do settings da home isolada)
+  if (transport === 'cli' && !CLI_TOOL_MAPPING.includes(tool)) reason('tool-mapping-unavailable');
   decision.state = decision.reasons.length ? 'blocked' : 'admitted';
   return decision;
 }

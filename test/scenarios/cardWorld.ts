@@ -30,7 +30,8 @@ import { AiRunRepo } from '../../src/extension/log/aiRunRepo';
 import { MessageRouter } from '../../src/extension/panel/messageRouter';
 import { AiRunner } from '../../src/extension/runner';
 import type { AiRunEnd } from '../../src/extension/ai/gateway';
-import { ACP_CAPABILITY_CHECKS, EXECUTOR_CAPABILITIES } from '../../src/shared/executionAdmission';
+import { ACP_CAPABILITY_CHECKS, CAPABILITY_CHECKS, EXECUTOR_CAPABILITIES } from '../../src/shared/executionAdmission';
+import type { SpawnFn } from '../../src/extension/aiOutput/measured';
 import { admissionRegimeOf, type RunnerPermission } from '../../src/shared/runner';
 import type { AiProfile } from '../../src/shared/aiProfiles';
 import { ToolKeys } from '../../src/extension/toolKeys';
@@ -87,7 +88,12 @@ export interface CardWorldOptions {
    * o perfil de CLI do card: `gemini` (agente ACP pronto do catálogo, pelo campo Modelo), `gemini-api` (o
    * mesmo perfil no modo API, contra o servidor HTTP falso de `api`) ou `claude` (o padrão do board)
    */
-  profile: 'gemini' | 'gemini-api' | 'claude';
+  profile: 'gemini' | 'gemini-api' | 'gemini-cli' | 'claude';
+  /**
+   * `gemini-cli` (história 8): o mesmo perfil no modo CLI. O processo da CLI é este `spawn` (o falso que emite o
+   * `stream-json` gravado da 0.65.0); sem ele, o de sempre, que só guarda o comando
+   */
+  spawn?: SpawnFn;
   /**
    * o modo API: a raiz do servidor falso. O perfil chega pelo Conectar de verdade (o cenário o conecta pelo
    * cartão API, com a chave no cofre `keys`), e o servidor MCP do board roda de verdade, em memória, ligado ao
@@ -160,6 +166,8 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
       catalog: [...router.snapshot().board.modelCatalog, GEMINI_MODEL],
     });
   }
+  // o cartão CLI do Conectar troca o modo do mesmo perfil (o atalho do teste faz o que o Conectar faria)
+  if (options.profile === 'gemini-cli') router.setProfileMode('gemini', 'cli');
   router.handle({
     type: 'settings.board.update',
     patch: {
@@ -167,7 +175,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
       runner: {
         defaultAgent: 'condutor-do-board',
         permission: options.permission ?? 'full',
-        ...(options.profile === 'gemini' && !connect ? { admissionRegime: 'compatible' } : {}),
+        ...((options.profile === 'gemini' || options.profile === 'gemini-cli') && !connect ? { admissionRegime: 'compatible' } : {}),
       },
     },
   } as never);
@@ -227,6 +235,27 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
         })),
       });
   }
+  if (options.profile === 'gemini-cli') {
+    // os recibos que o verificador gravou com o binário real 0.65.0 contra a API local: o GEMINI.md do projeto e
+    // o da pasta adicional vazam (por isso o regime compatível); permissões, MCP e delegação provadas
+    const resolved = profiles.resolveProfile(router.boardId, 'gemini');
+    const { binding } = admission.isolationBinding(resolved, 'gemini', 'board');
+    const now = Date.now();
+    for (const capability of EXECUTOR_CAPABILITIES)
+      evidence.record({
+        version: 1,
+        capability,
+        binding,
+        source: 'host-probe',
+        checkedAt: now - 1000,
+        expiresAt: now + 3_600_000,
+        checks: CAPABILITY_CHECKS[capability].map((id) => ({
+          id,
+          outcome: id === 'project-sentinel' || id === 'additional-directory-sentinel' ? 'failed' : 'passed',
+          receipt: 'a'.repeat(64),
+        })),
+      });
+  }
 
   const lines: string[] = [];
   const cliCommands: HeadlessCommand[] = [];
@@ -240,8 +269,9 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
     redact: (text) => router.redactCredentials(text),
     admission,
     // a CLI de uma passada: guarda o comando montado e termina sem saída (o Claude Code real não roda aqui)
-    spawn: (command) => {
+    spawn: (command, cwd, out, control) => {
       cliCommands.push(command);
+      if (options.spawn) return options.spawn(command, cwd, out, control);
       let exit: (code: number | null) => void = () => {};
       queueMicrotask(() => exit(0));
       return { kill: () => exit(143), onExit: (fn) => (exit = fn) };
@@ -253,7 +283,9 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
           apiKey: (profile: AiProfile) => profileApiKey(keys, profile),
           regimeOf: (profileId: string) => admissionRegimeOf(router.snapshot().board.runner, profileId),
         }
-      : {}),
+      : options.profile === 'gemini-cli'
+        ? { apiKey: (profile: AiProfile) => profileApiKey(keys, profile) }
+        : {}),
   });
   const runner = new AiRunner(router, {
     gateway,

@@ -282,6 +282,28 @@ describe('manifesto e plano pelo alvo da execução', () => {
     expect(plan.summary).toContain('Servidores MCP: faz-ai (imposto pela CLI)');
   });
 
+  it('Gemini pela CLI (história 8): os servidores do card no settings, MCP, ferramentas e modelo impostos, o agente pelo pedido', () => {
+    const { s, c } = cenario('gemini:gemini-2.5-pro', ['claude', 'gemini']);
+    s.board.aiProfiles = s.board.aiProfiles.map((p) => (p.id === 'gemini' ? { ...p, mode: 'cli' } : p));
+    s.board.modelCatalog = [...s.board.modelCatalog, opt('gemini', 'gemini-2.5-pro')];
+    const plan = executionPlan(s, c, {}, { command: 'node', args: ['bridge.js'] });
+    expect(plan.manifest.target.cli).toMatchObject({ id: 'gemini', mode: 'cli' });
+    // o mesmo arquivo de servidores que o Claude e o ACP recebem: vira o `mcpServers` da home isolada
+    expect(JSON.parse(plan.input.mcpConfig!)).toEqual({
+      mcpServers: { 'faz-ai': { type: 'stdio', command: 'node', args: ['bridge.js'] } },
+    });
+    expect(plan.summary).toContain('Servidores MCP: faz-ai (imposto pela CLI)');
+    expect(plan.summary.some((l) => l.startsWith('Modelo: gemini-2.5-pro') && l.endsWith('(imposto pela CLI)'))).toBe(true);
+    // sem agente inline na CLI do Gemini: o nome nunca vai sozinho (seria descoberta nativa)
+    expect(plan.input.agent).toBe('');
+    expect(plan.input.agentDefinition).toBeNull();
+    // o comando que sai do plano é a CLI de uma passada, não o ACP
+    const built = headlessCommand(plan.manifest.target.cli, { prompt: 'P', permission: 'board', exec: plan.input, structured: true });
+    expect(built.command).toBe('gemini');
+    expect(built.args).not.toContain('--acp');
+    expect(built.format).toBe('gemini-stream-json');
+  });
+
   it('a janela de contexto e a ferramenta da estimativa são as do perfil do alvo', () => {
     const { s, c } = cenario('cursor:composer-2.5');
     const e = estimateContext(s as BoardState, c);

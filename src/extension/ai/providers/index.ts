@@ -7,6 +7,7 @@ import { isAiBase, type AiTool } from '../../../shared/harness';
 import type { AiProvider } from '../provider';
 import { claudeProvider } from './claude';
 import { cursorProvider } from './cursor';
+import { geminiCliProvider } from './gemini';
 import { kimiProvider } from './kimi';
 
 const PROVIDERS: Record<AiBase, AiProvider> = {
@@ -14,6 +15,13 @@ const PROVIDERS: Record<AiBase, AiProvider> = {
   cursor: cursorProvider,
   kimi: kimiProvider,
 };
+/**
+ * As CLIs do catálogo que não são `AiBase`: o Gemini pela CLI (história 8). O perfil pronto do Gemini tem a
+ * base `generic` (é a de compatibilidade do agente ACP pronto) e roda por aqui quando o modo dele é `cli`.
+ * Fica fora de `PROVIDERS` de propósito: `AiBase` é "CLI pronta que imita uma base" em dezenas de pontos
+ * (pastas do harness, formato de agente, cópias), e o Gemini não tem cópia nem pasta do harness.
+ */
+const CATALOG_CLI_PROVIDERS: Record<string, AiProvider> = { gemini: geminiCliProvider };
 
 export type AiExecutor = AiTool | AiProfile;
 /** Compatibilidade dos chamadores nativos; um ID desconhecido nunca vira outro executor. */
@@ -29,6 +37,7 @@ export function executorProfile(executor: AiExecutor): AiProfile {
 export function providerFor(executor: AiExecutor): AiProvider {
   const profile = executorProfile(executor);
   if (isReadyCli(profile)) {
+    if (profile.base === 'generic' && Object.hasOwn(CATALOG_CLI_PROVIDERS, profile.id)) return CATALOG_CLI_PROVIDERS[profile.id]!;
     if (!isAiBase(profile.id) || profile.base !== profile.id) throw new Error('Perfil pronto inválido.');
     return PROVIDERS[profile.id];
   }
