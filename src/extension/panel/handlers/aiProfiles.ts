@@ -1,6 +1,7 @@
 import type { AiProfile } from '../../../shared/aiProfiles';
 import type { HostToWebview } from '../../../shared/messages';
 import type { StrictExecutionRequest } from '../../../shared/executionAdmission';
+import { admissionRegimeOf, DEFAULT_RUNNER, type RunnerConfig } from '../../../shared/runner';
 import type { AiGateway, ContextRuntime } from '../../ai/gateway';
 import { NO_CARD } from '../../ai/gateway';
 import { closedV1 } from '../../ai/v1Prepare';
@@ -43,6 +44,8 @@ export interface AiProfileRuntimeDeps {
   cwd: string;
   homeDir: string;
   pathEnv: () => string | undefined;
+  /** a configuração do runner do board: o regime de admissão do teste é o escolhido pela pessoa (#1091) */
+  runner?: () => RunnerConfig;
   resolve?: typeof resolveProfileCommand;
   version?: typeof profileVersion;
   signedIn?: typeof profileSignedIn;
@@ -98,9 +101,10 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
       const tail: string[] = [];
       try {
         profile = deps.repo.resolveProfile(deps.boardId(), id);
+        const runner = deps.runner?.() ?? DEFAULT_RUNNER;
         const strict: StrictExecutionRequest = {
           version: 1,
-          regime: 'exclusive',
+          ...admissionRegimeOf(runner),
           agentTools: { categories: [], native: { tool: '', allow: [], deny: [] } },
           boardTools: { mode: 'explicit', value: [] },
           activeMcpIds: [],
@@ -121,7 +125,7 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
           prepare: () => ({
             ...(profile!.kind === 'builtin' ? {} : { strict: { profileId: id, request: strict } }),
             // runtime v1: o teste do perfil também passa pelo contrato (fechado, sem MCP)
-            ...(deps.gateway.runtime === 'v1' ? closedV1(id, 'chat') : {}),
+            ...(deps.gateway.runtime === 'v1' ? closedV1(id, 'chat', runner) : {}),
             config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: true, skills: [], mcp: [] },
             input: { prompt: 'Responda apenas com a palavra OK.', permission: 'board', structured: true },
           }),

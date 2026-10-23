@@ -24,7 +24,7 @@ import { SHOW_COST } from '../shared/metrics';
 import { exceedsRunLimit, RUN_CACHE_READ_LIMIT } from '../shared/runLimit';
 import { columnOf, isLive } from '../shared/selectors';
 import { isAtYoloStop, isWithHuman, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../shared/story';
-import type { AiRunMode, RunnerPermission } from '../shared/runner';
+import { admissionRegimeOf, type AiRunMode, type RunnerPermission } from '../shared/runner';
 import type { CardStatus } from '../shared/status';
 import { BOARD_SERVER, executionPlan } from './execution';
 import { runCheckLine, runCheckNotice } from '../shared/runCheck';
@@ -488,7 +488,7 @@ export class AiRunner {
           // o que a troca por política precisa preservar: permissão, regime e o escopo (agente, skills, MCPs, ferramentas)
           policy.constraints = {
             permission,
-            regime: 'exclusive',
+            regime: admissionRegimeOf(state.board.runner).regime,
             agentId: policy.agentId,
             scopeDigest: scopeDigest([
               plan.manifest.agent,

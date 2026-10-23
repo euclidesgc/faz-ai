@@ -12,7 +12,7 @@ import type { ContextActivityTarget } from '../shared/contextPlanning';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { MAX_CHAT_MESSAGES, type ChatMessage } from '../shared/chat';
-import type { RunnerPermission } from '../shared/runner';
+import { admissionRegimeOf, type RunnerPermission } from '../shared/runner';
 import { effortToRun } from '../shared/execution';
 import type { BoardState } from '../shared/model';
 import { NO_CARD, type AiExecution } from './ai/gateway';
@@ -319,7 +319,7 @@ export class ChatSession {
     let execution: AiExecution;
     const constraints = {
       permission,
-      regime: 'exclusive' as const,
+      regime: admissionRegimeOf(state.board.runner).regime,
       agentId: null,
       scopeDigest: scopeDigest([plan.tools, plan.deniedTools, plan.mcpAllowed, !!hooks.draftOnly]),
     };
@@ -336,7 +336,7 @@ export class ChatSession {
         // no chat não há agente do board nem subagente escolhido: `null` é "não definido", não "vazio"
         prepare: () => ({
           // runtime v1: contexto fechado, sem agente nem MCP além do contrato vazio (o chat não tem card)
-          ...(this.deps.gateway.runtime === 'v1' ? closedV1(target.cli.id, action, !!hooks.draftOnly) : {}),
+          ...(this.deps.gateway.runtime === 'v1' ? closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly) : {}),
           artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state) : undefined,
           config: {
             model: plan.model?.name ?? null,

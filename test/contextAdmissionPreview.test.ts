@@ -93,6 +93,14 @@ describe('prévia com a admissão real (#729)', () => {
     expect(out.diagnostics).toContainEqual({ code: 'admission-blocked', reason: 'capability-not-verified', capability: 'mcp' });
   });
 
+  it('o regime do pedido é o escolhido pela pessoa no board, com a revisão dela (#1091)', () => {
+    const s = state();
+    s.board = { ...s.board, runner: { ...s.board.runner, admissionRegime: 'compatible', compatibilityReviewRevision: 3 } };
+    const request = strictRequestFromDraft(s, resolveContextDraft(s, target))!;
+    expect(request.regime).toBe('compatible');
+    expect(request.compatibilityReview).toEqual({ actor: 'person', revision: 3 });
+  });
+
   it('MCP fora do limite do agente aponta o recurso', () => {
     const s = state();
     s.contextPlanning!.agents[0]!.contract.allowedMcpIds = [];

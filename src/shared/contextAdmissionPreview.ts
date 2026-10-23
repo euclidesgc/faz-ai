@@ -2,9 +2,10 @@
 import type { ContextDraftResolution } from './contextDraftResolution';
 import type { ExecutionAdmissionDecision, StrictExecutionRequest } from './executionAdmission';
 import type { BoardState } from './model';
+import { admissionRegimeOf } from './runner';
 
 /**
- * Pedido de admissão equivalente ao rascunho resolvido: regime exclusivo, ferramentas do contrato do agente
+ * Pedido de admissão equivalente ao rascunho resolvido: o regime escolhido pela pessoa, ferramentas do contrato do agente
  * e só os MCPs já selecionados. Sem agente ou contrato válido não há pedido (a prévia já explica o motivo).
  */
 export function strictRequestFromDraft(s: BoardState, resolved: ContextDraftResolution): StrictExecutionRequest | null {
@@ -15,7 +16,7 @@ export function strictRequestFromDraft(s: BoardState, resolved: ContextDraftReso
   const active = resolved.items.filter((i) => i.kind === 'mcp');
   return {
     version: 1,
-    regime: 'exclusive',
+    ...admissionRegimeOf(s.board.runner),
     agentTools: resolved.requestedTools,
     boardTools: { mode: 'inherit' },
     activeMcpIds: active.map((i) => i.artifactId),

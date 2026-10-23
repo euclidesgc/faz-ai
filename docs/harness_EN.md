@@ -185,8 +185,8 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   the profile as the board default): two agent handshakes in a throwaway folder, without spending
   your account. The artifacts capability stays partial on purpose, because the agent reads its own
   context files, and the profile is admissible only in the compatible regime.
-- **Next run and limits:** shows the regime, the default target (with the rule and version, or the
-  block), the cards whose target is unavailable and the limits table with requested, effective and
+- **Next run and limits:** shows the regime chosen in Harness › Ferramenta e execução, the default
+  target (with the rule and version, or the block), the cards whose target is unavailable and the limits table with requested, effective and
   reason. It comes from the policy simulator and the effective limits; without them it shows
   "Unavailable in this version".
 - **Artifact bank** (formerly the "harness definition"): a recommendation, not a blocker. The board
@@ -224,9 +224,17 @@ terminal.
 The board manages a **private library**, independent of the AI tool. Under **Configurações →
 Harness** (Settings → Harness), the **Biblioteca do board** (Board library) tab provides CRUD for
 **Regras** (Rules), **Skills**, **Sub-agentes** (Sub-agents) and **MCPs**. **Ferramenta e
-execução** (Tool and execution) selects the AI, models, permissions, default agent and heartbeat,
-and connects the tool to the board's MCP server. Switching tools preserves artifacts and their
-selections.
+execução** (Tool and execution) selects the AI, models, permissions, the **admission regime**, the
+default agent and heartbeat, and connects the tool to the board's MCP server. Switching tools
+preserves artifacts and their selections.
+
+The **admission regime** is the yardstick the board uses to decide whether the tool may run a card.
+**Exclusive** (the default) requires all five capabilities verified: the AI sees exactly the context
+the board built. **Compatible** accepts that the tool loads its own context files, what the profile
+declares under **O que a CLI carrega por conta própria** (what the CLI loads on its own);
+permissions, MCP and delegation are still required. Turning compatible on is your review: the board
+counts a review each time you turn it on and shows it in the option's notice. It is the only regime
+in which an ACP agent runs.
 
 Runs use only the copies stored in the board's database. An item marked in **Configurações →
 Harness** that exists only in the tool's folder and was never copied appears as missing and does not

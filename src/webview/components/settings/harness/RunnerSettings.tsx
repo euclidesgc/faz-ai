@@ -1,5 +1,12 @@
 import { Callout, Card, Text } from '@radix-ui/themes';
-import { HEARTBEAT_RANGE, PARALLEL_RANGE, RUNNER_PERMISSIONS, SUBTASK_PARALLEL_RANGE, TIMEOUT_RANGE } from '../../../../shared/runner';
+import {
+  ADMISSION_REGIMES,
+  HEARTBEAT_RANGE,
+  PARALLEL_RANGE,
+  RUNNER_PERMISSIONS,
+  SUBTASK_PARALLEL_RANGE,
+  TIMEOUT_RANGE,
+} from '../../../../shared/runner';
 import { effectiveLimits } from '../../../../shared/orchestration';
 import type { AiToolInfo } from '../../../../shared/harnessProject';
 import { useBoardStore } from '../../../store/boardStore';
@@ -15,6 +22,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
   const unsupported = useBoardStore((s) => s.state!.aiRunUnsupported);
   const runner = board.runner;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === runner.permission)!;
+  const regime = ADMISSION_REGIMES.find((r) => r.value === runner.admissionRegime)!;
   const worktree = board.git.mode === 'worktree';
   const subtasks = effectiveLimits(runner, board.git.mode).subtasks;
   const hasAvailableAgent = board.execProfiles.some((p) => p.scope !== 'builtin');
@@ -72,6 +80,30 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
                 <IconWarning />
               </Callout.Icon>
               <Callout.Text>{t(permission.hint)}</Callout.Text>
+            </Callout.Root>
+          )}
+          <FormField label={t('Regime de admissão')} hint={t(regime.hint)}>
+            {(id) => (
+              <SelectField
+                id={id}
+                aria-label={t('Regime de admissão')}
+                options={ADMISSION_REGIMES.map((r) => ({ ...r, label: t(r.label) }))}
+                value={runner.admissionRegime}
+                onChange={(admissionRegime) => settings.updateBoard({ runner: { admissionRegime } })}
+              />
+            )}
+          </FormField>
+          {runner.admissionRegime === 'compatible' && (
+            <Callout.Root color="amber" size="1">
+              <Callout.Icon>
+                <IconWarning />
+              </Callout.Icon>
+              <Callout.Text>
+                {t(
+                  'Regime compatível ligado por você (revisão {n}). O contexto de cada execução pode ir além do que o board montou: confira em Ferramentas de IA o que o perfil padrão declara em "O que a CLI carrega por conta própria".',
+                  { n: runner.compatibilityReviewRevision },
+                )}
+              </Callout.Text>
             </Callout.Root>
           )}
           <FormField

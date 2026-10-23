@@ -46,7 +46,7 @@ Entregar a forma de uso em histórias derivadas, empilhadas na `develop`, nesta 
 | # | História | Depende de | Resultado |
 | --- | --- | --- | --- |
 | 1 | Admissão por capacidades cobre o transporte ACP (`#1090`, entregue) | — | um perfil ACP é admitido pelo gateway, só no regime compatível |
-| 2 | Regime compatível escolhido pela pessoa | 1 | o board roda no regime compatível, com a revisão do que a CLI carrega |
+| 2 | Regime compatível escolhido pela pessoa (`#1091`, entregue) | 1 | o board roda no regime compatível, com a revisão do que a CLI carrega |
 | 3 | Agente ACP como perfil pronto do catálogo | 2 | o agente aparece em Ferramentas de IA sem perfil personalizado |
 | 4 | Conectar ferramenta: login pela tela | 3 | botão Conectar, estado "conectada", login pelo agente |
 | 5 | Modelos descobertos na conexão | 4 | lista de modelos por ferramenta, em todo campo de modelo e nas políticas |

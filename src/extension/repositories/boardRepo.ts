@@ -159,8 +159,14 @@ export class BoardRepo {
     }
     if (patch.runner !== undefined) {
       const current = parseRunner(str(one(this.db, 'SELECT runner_json FROM boards WHERE id = ?', [boardId])?.runner_json));
+      // ligar o regime compatível é a revisão da pessoa: a revisão sobe aqui, nunca pelo número que a tela mandar
+      const { compatibilityReviewRevision: _ignored, ...runner } = patch.runner;
+      const review =
+        runner.admissionRegime === 'compatible' && current.admissionRegime !== 'compatible'
+          ? { compatibilityReviewRevision: current.compatibilityReviewRevision + 1 }
+          : {};
       run(this.db, 'UPDATE boards SET runner_json = ? WHERE id = ?', [
-        JSON.stringify(parseRunner(JSON.stringify({ ...current, ...patch.runner }))),
+        JSON.stringify(parseRunner(JSON.stringify({ ...current, ...runner, ...review }))),
         boardId,
       ]);
     }

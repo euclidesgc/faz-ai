@@ -42,4 +42,20 @@ describe('RunnerSettings dentro do editor', () => {
     await userEvent.type(field, '3{Enter}');
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { parallelStories: 3 } });
   });
+
+  it('o regime de admissão nasce exclusivo; escolher compatível grava a opção e mostra o aviso com a revisão (#1091)', async () => {
+    show();
+    const select = screen.getByRole('combobox', { name: 'Regime de admissão' });
+    expect(select).toHaveTextContent('Exclusivo');
+    expect(screen.queryByText(/Regime compatível ligado por você/)).toBeNull();
+    await userEvent.click(select);
+    await userEvent.click(screen.getByRole('option', { name: 'Compatível' }));
+    expect(lastSent('settings.board.update').patch).toEqual({ runner: { admissionRegime: 'compatible' } });
+    await board.router.handle({ type: 'settings.board.update', patch: { runner: { admissionRegime: 'compatible' } } } as never);
+    syncStore(board.router);
+    cleanup();
+    show();
+    expect(screen.getByRole('combobox', { name: 'Regime de admissão' })).toHaveTextContent('Compatível');
+    expect(screen.getByText(/Regime compatível ligado por você \(revisão 1\)/)).toBeInTheDocument();
+  });
 });

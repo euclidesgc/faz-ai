@@ -227,6 +227,8 @@ describe('i18n do host: mensagens preenchidas', () => {
         parallelSubtasks: 2,
         autopilotPaused: false,
         defaultAgent: '',
+        admissionRegime: 'exclusive',
+        compatibilityReviewRevision: 0,
       },
       { offline: true, unsupported: null },
     );
