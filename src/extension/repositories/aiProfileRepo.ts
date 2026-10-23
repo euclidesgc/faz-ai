@@ -355,14 +355,19 @@ export function validateProfileRows(rows: Row[], boardId: string): void {
       (row.kind !== 'catalog' && row.kind !== legacy) ||
       (row.kind === 'catalog' && !tool) ||
       !PROFILE_MODES.some((m) => m === mode) ||
+      // `api` é um modo conhecido desde a história 9, mas nenhum perfil roda nele ainda: nem pronto, nem
+      // cópia, nem personalizado (que tem comando próprio ou agente ACP), com ou sem a ferramenta gravada
+      mode === 'api' ||
       (builtin
-        ? row.base !== builtin.base || row.secret_ref !== null || (tool !== '' && (tool !== builtin.tool || mode !== builtin.mode))
+        ? row.base !== builtin.base ||
+          row.secret_ref !== null ||
+          // sem a ferramenta (linha ainda não preenchida), o modo é o do pronto ou o padrão da coluna (`cli`);
+          // um pronto de CLI em `acp` não passa por estar sem ferramenta
+          (tool === '' ? mode !== builtin.mode && mode !== 'cli' : tool !== builtin.tool || mode !== builtin.mode)
         : (kind === 'custom') !== (row.base === 'generic') ||
           !['claude', 'cursor', 'kimi', 'generic'].includes(str(row.base)) ||
           (tool !== '' && tool !== (kind === 'catalog' ? str(row.base) : id)) ||
-          (kind === 'catalog' && mode !== 'cli') ||
-          // o personalizado tem comando próprio (CLI) ou um agente ACP: não há personalizado pela API
-          (kind === 'custom' && mode === 'api'))
+          (kind === 'catalog' && mode !== 'cli'))
     )
       throw new Error('Tipo ou base do perfil importado inválido.');
     if (

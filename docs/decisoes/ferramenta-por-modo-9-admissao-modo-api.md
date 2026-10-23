@@ -60,8 +60,10 @@ Esta história é a parte pura da admissão do modo API, testável sem rede; o l
 - **`PROFILE_MODES` aceita `api`, sem migração.** As colunas da 48 (`ai_profiles.mode`, `ai_runs.mode`)
   são `TEXT` sem `CHECK` (conferido no `schema.ts`), como a história 4 deixou de propósito. O log lê
   `api` como gravado e a importação aceita execuções em `api`. Nenhum perfil roda no modo ainda: a
-  importação continua recusando perfil em `api` pelas regras de coerência (pronto em outro modo, cópia
-  fora de `cli`) e agora também o personalizado em `api`, que tem comando próprio ou agente ACP.
+  importação recusa `api` em qualquer linha de perfil (pronta, cópia ou personalizada, com ou sem a
+  ferramenta gravada). A linha do pronto ainda sem ferramenta (legada ou não preenchida) também passou a
+  ter o modo conferido: vale o modo do pronto ou o padrão da coluna (`cli`), então um pronto de CLI em
+  `acp` é recusado; até aqui o modo só era comparado quando a ferramenta vinha gravada.
 - **Sem driver da API, o perfil no modo API é recusado com a causa.** `admissionTransport` e o modo
   gravado pelo gateway leem o modo declarado (`api` antes do resto); `isAcpProfile` nunca diz ACP para
   um perfil em `api` (o Gemini pronto traz o agente ACP do código); `executorOf` só devolve o driver de

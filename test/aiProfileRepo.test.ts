@@ -376,6 +376,16 @@ it('a importação aceita os dois conjuntos de valores e recusa ferramenta ou mo
   // personalizado (que tem comando próprio ou agente ACP)
   bad({ id: 'meu', kind: 'custom', base: 'generic', tool: 'meu', mode: 'api' });
   bad({ id: 'gemini', kind: 'catalog', base: 'generic', tool: 'gemini', mode: 'api' });
+  // a linha ainda sem ferramenta (legada ou não preenchida) também não escapa do modo do pronto
+  bad({ id: 'claude', kind: 'builtin', tool: '', mode: 'api' });
+  bad({ id: 'claude', kind: 'builtin', tool: '', mode: 'acp' });
+  bad({ id: 'gemini', kind: 'acp', base: 'generic', tool: '', mode: 'api' });
+  bad({ kind: 'copy', tool: '', mode: 'api' });
+  bad({ id: 'meu', kind: 'custom', base: 'generic', tool: '', mode: 'api' });
+  // o modo do pronto, ou o padrão da coluna numa linha não preenchida, passa; e o arquivo sem a coluna (47)
+  ok({ id: 'gemini', kind: 'acp', base: 'generic', tool: '', mode: 'acp' });
+  ok({ id: 'gemini', kind: 'acp', base: 'generic', tool: '', mode: 'cli' });
+  ok({ id: 'gemini', kind: 'acp', base: 'generic', tool: undefined, mode: undefined });
   bad({ kind: 'builtin' });
   bad({ id: 'meu', kind: 'custom', base: 'generic', tool: 'outro' });
   bad({ id: 'claude', kind: 'acp' });
