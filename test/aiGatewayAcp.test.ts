@@ -12,7 +12,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { isAcpProfile, type AiProfile } from '../src/shared/aiProfiles';
+import { BUILTIN_PROFILES, isAcpProfile, type AiProfile } from '../src/shared/aiProfiles';
 import { monthOf } from '../src/shared/log';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -142,6 +142,42 @@ describe('transporte escolhido pelo perfil', () => {
     expect(validated).toEqual([{ command: 'gemini', args: ['--acp', '--skip-trust'] }]);
     expect(acp[0]).toMatchObject({ command: '/bin/gemini-vinculado', args: ['--acp', '--skip-trust'] });
     expect(describeRequired).toHaveLength(1);
+  });
+
+  it('agente ACP pronto do catálogo (#1095) roda pelo transporte ACP como o personalizado, com a admissão estrita', () => {
+    const acp: { command: string; args: string[] }[] = [];
+    const spawnAcp: AcpSpawnFn = (command) => {
+      acp.push(command);
+      return { write: () => {}, end: () => {}, onExit: () => {}, kill: () => {} };
+    };
+    const spawn: SpawnFn = () => {
+      throw new Error('não é CLI');
+    };
+    // o perfil pronto, ligado pela pessoa: a linha no banco traz a revisão, e a configuração é a do catálogo
+    const ready: AiProfile = {
+      ...BUILTIN_PROFILES.find((p) => p.id === 'gemini')!,
+      enabled: true,
+      credentials: { secretRef: '', review: 'reviewed', available: true },
+    };
+    expect(ready.kind).toBe('acp');
+    const admission = {
+      prepare: (_p: unknown, _id: string, input: unknown) => ({
+        input,
+        decision: { state: 'admitted' },
+        transport: 'acp',
+        command: () => {
+          throw new Error('não é CLI');
+        },
+        acpCommand: (c: { command: string; args: string[] }) => ({ ...c, command: '/bin/gemini-vinculado' }),
+      }),
+    } as never;
+    const runLog = { ...createRunLog(db), describeRequired: () => {} };
+    const gw = new AiGateway({ boardId: router.boardId, runLog, spawn, spawnAcp, admission });
+    const base = call(ready);
+    gw.run({ ...base, prepare: () => ({ ...base.prepare(), strict: { profileId: 'gemini', request: { activeMcpIds: [] } as never } }) });
+    expect(acp[0]).toMatchObject({ command: '/bin/gemini-vinculado', args: ['--acp', '--skip-trust'] });
+    // sem a admissão estrita o pronto ACP é recusado como qualquer perfil que não é CLI pronta
+    expect(() => gw.run(call(ready))).toThrow(/admissão/);
   });
 
   it('perfil ACP admitido como CLI (e vice-versa) é recusado antes de iniciar', () => {

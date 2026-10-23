@@ -53,6 +53,8 @@ it('gera identificadores limitados, sem reservados, colisões ou delimitadores d
   expect(newProfileId('', [])).toBe('perfil');
   expect(newProfileId('Claude', [])).toBe('claude-2');
   expect(newProfileId('Claude', ['claude-2'])).toBe('claude-3');
+  // os ids dos agentes ACP prontos também são do catálogo
+  expect(newProfileId('gemini', [])).toBe('gemini-2');
   const name = 'Á @: '.repeat(50),
     first = newProfileId(name, []),
     next = newProfileId(name, [first]);
@@ -61,6 +63,11 @@ it('gera identificadores limitados, sem reservados, colisões ou delimitadores d
 });
 it('valida configuração sem presumir permissões e devolve metadados neutros', () => {
   expect(validateProfile(custom)).toEqual([]);
+  // o agente ACP pronto é generic com o agente do catálogo; sem o agente, ou com base de CLI, é inválido
+  const acp = { ...custom, kind: 'acp' as const, config: { acpAgent: 'gemini' } };
+  expect(validateProfile(acp)).toEqual([]);
+  expect(validateProfile({ ...acp, config: {} })).toEqual(['Agente ACP inválido.']);
+  expect(validateProfile({ ...acp, base: 'claude' })).toContain('Tipo ou base do perfil inválido.');
   expect(validateProfile({ ...custom, config: { boardServer: 'project' } })).toHaveLength(2);
   expect(validateProfile({ ...custom, config: { command: 'cli', permissionArgs: { board: ['--readonly'] } } })).toEqual([]);
   // com agente ACP o comando é o do catálogo; o id tem o formato do registro do ACP

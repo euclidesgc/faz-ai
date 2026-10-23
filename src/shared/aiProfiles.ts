@@ -28,7 +28,8 @@ export interface ProfileIsolation {
 }
 export type AiBase = 'claude' | 'cursor' | 'kimi';
 export type ProviderBase = AiBase | 'generic';
-export type AiProfileKind = 'builtin' | 'copy' | 'custom';
+/** `acp`: perfil pronto de um agente do catálogo ACP (#1095); como o `builtin`, não é editado nem apagado. */
+export type AiProfileKind = 'builtin' | 'acp' | 'copy' | 'custom';
 export type PromptVia = 'stdin' | 'arg';
 export type BoardServerVia = 'cli' | 'project' | 'none';
 export type ProfileCapability = ExecutorCapability | 'cancellation' | 'output';
@@ -87,17 +88,55 @@ export interface AiProfile {
   capabilities?: Partial<Record<ProfileCapability, CapabilityState>>;
 }
 export type AiProfileDraft = Omit<AiProfile, 'id' | 'credentials' | 'capabilities'> & { id?: string };
-export const BUILTIN_PROFILES: readonly AiProfile[] = AI_BASES.map((tool, position) =>
-  Object.freeze({
-    id: tool.id,
-    name: tool.label,
-    enabled: true,
-    kind: 'builtin' as const,
-    base: tool.id,
-    config: Object.freeze({}),
-    position,
-  }),
-);
+/**
+ * Os agentes do catálogo ACP (`extension/ai/acp/agents.ts`) que viram perfil pronto, com o id, o nome e a
+ * página oficial de cada um (o teste confere com o catálogo). Fora: o Claude (segue pela CLI `claude`), o
+ * Cursor e o Kimi Code (os ids são das CLIs prontas, que medem tokens; a entrada ACP deles fica para o
+ * teste real da épica).
+ */
+export const ACP_READY_AGENTS: readonly { id: string; label: string; docs: string }[] = [
+  { id: 'gemini', label: 'Gemini CLI', docs: 'https://geminicli.com/docs/cli/acp-mode' },
+  { id: 'codex-acp', label: 'Codex', docs: 'https://github.com/agentclientprotocol/codex-acp' },
+  { id: 'opencode', label: 'OpenCode', docs: 'https://opencode.ai/v2/docs/cli/acp/' },
+  {
+    id: 'github-copilot-cli',
+    label: 'GitHub Copilot CLI',
+    docs: 'https://github.blog/changelog/2026-01-28-acp-support-in-copilot-cli-is-now-in-public-preview/',
+  },
+  { id: 'qwen-code', label: 'Qwen Code', docs: 'https://qwenlm.github.io/qwen-code-docs/' },
+  { id: 'goose', label: 'goose', docs: 'https://block.github.io/goose/docs/guides/acp-clients' },
+  { id: 'antigravity-acp', label: 'Google Antigravity', docs: 'https://antigravity.google/docs/ide/extensions' },
+];
+/**
+ * Os perfis do catálogo: as três CLIs prontas, ligadas, e os agentes ACP, desligados até a pessoa ligar
+ * (a linha no banco nasce aí). Nenhum é editado ou apagado; o id é a ferramenta do catálogo de modelos.
+ */
+export const BUILTIN_PROFILES: readonly AiProfile[] = [
+  ...AI_BASES.map((tool, position) =>
+    Object.freeze({
+      id: tool.id,
+      name: tool.label,
+      enabled: true,
+      kind: 'builtin' as const,
+      base: tool.id,
+      config: Object.freeze({}),
+      position,
+    }),
+  ),
+  ...ACP_READY_AGENTS.map((agent, position) =>
+    Object.freeze({
+      id: agent.id,
+      name: agent.label,
+      enabled: false,
+      kind: 'acp' as const,
+      base: 'generic' as const,
+      config: Object.freeze({ acpAgent: agent.id, installUrl: agent.docs }),
+      position: AI_BASES.length + position,
+    }),
+  ),
+];
+/** Perfil do catálogo (CLI pronta ou agente ACP pronto): vem do código, não do formulário. */
+export const isCatalogProfile = (profile: Pick<AiProfile, 'kind'>): boolean => profile.kind === 'builtin' || profile.kind === 'acp';
 export const PROFILE_MARKERS = ['prompt', 'model', 'effort', 'mcpConfig', 'addDir'] as const;
 export const unknownProfileCapabilities = (): Record<ProfileCapability, CapabilityState> =>
   Object.fromEntries(PROFILE_CAPABILITIES.map((c) => [c, 'unknown'])) as Record<ProfileCapability, CapabilityState>;
@@ -117,7 +156,7 @@ export const profileLabel = (board: { aiProfiles: readonly AiProfile[] }, id: st
   board.aiProfiles.find((p) => p.id === id)?.name ?? id;
 export function newProfileId(name: string, taken: readonly string[]): string {
   const base = slug(name, 32) || 'perfil';
-  const reserved = new Set([...taken, 'claude', 'cursor', 'kimi', 'generic']);
+  const reserved = new Set([...taken, ...BUILTIN_PROFILES.map((p) => p.id), 'generic']);
   if (!reserved.has(base)) return base;
   for (let n = 2; ; n++) {
     const suffix = `-${n}`,
@@ -129,9 +168,9 @@ export function validateProfile(p: AiProfileDraft): string[] {
   const errors: string[] = [];
   if (typeof p.name !== 'string' || !p.name.trim() || p.name.length > 240 || p.name.includes('\0')) errors.push('Nome do perfil inválido.');
   if (
-    !['builtin', 'copy', 'custom'].includes(p.kind) ||
+    !['builtin', 'acp', 'copy', 'custom'].includes(p.kind) ||
     !['claude', 'cursor', 'kimi', 'generic'].includes(p.base) ||
-    (p.kind === 'custom') !== (p.base === 'generic')
+    (p.kind === 'custom' || p.kind === 'acp') !== (p.base === 'generic')
   )
     errors.push('Tipo ou base do perfil inválido.');
   if (typeof p.enabled !== 'boolean' || !Number.isSafeInteger(p.position) || p.position < 0 || p.position > 1000000)
@@ -143,6 +182,7 @@ export function validateProfile(p: AiProfileDraft): string[] {
     errors.push('Agente ACP inválido.');
   if (p.kind === 'custom' && (typeof c.command !== 'string' || !c.command.trim()) && typeof c.acpAgent !== 'string')
     errors.push('Informe o comando do perfil personalizado.');
+  if (p.kind === 'acp' && typeof c.acpAgent !== 'string') errors.push('Agente ACP inválido.');
   if (c.boardServer === 'project' && (typeof c.mcpProjectFile !== 'string' || !c.mcpProjectFile.trim()))
     errors.push('Informe o arquivo MCP do projeto.');
   const string = (v: unknown) => typeof v === 'string' && !v.includes('\0') && v.length <= 100000;
