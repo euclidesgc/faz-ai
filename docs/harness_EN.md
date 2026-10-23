@@ -196,10 +196,12 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   stays partial on purpose, because the agent reads its own context files, and the profile is
   admissible only in the compatible regime. The proof counts for all three permissions (**Só o
   board**, **Board e arquivos** and **Sem restrições**) and survives an editor restart: its binding
-  is the binary, the isolation arguments, the managed policies and only the environment variables
-  that change what the tool loads (PATH, the configuration folders, the provider's and the
-  profile's; those holding secrets enter only as a digest, and none of it is stored: the receipt
-  keeps only the binding's hash). When the binding changes after the last proof (the tool was
+  is the binary, the isolation arguments, the managed policies, the ACP agent's session mode and
+  only the environment variables that change what the tool does (PATH, the person's folders, proxy
+  and certificates, the provider's and the profile's; for those holding credentials only their
+  presence enters, and none of it is stored: the receipt keeps only the binding's hash). For an ACP
+  agent, even under **Sem restrições**, the board answers every request from the agent: it does not
+  ask for the no-questions mode, in which the card's denials would not apply. When the binding changes after the last proof (the tool was
   updated, one of those variables changed or the binding format changed in a new version), the top
   warning says the check is no longer valid, without blocking the board: for an ACP agent the board
   already redoes it on its own; for Claude Code, run the command again. The admission preview on the card evaluates the profile

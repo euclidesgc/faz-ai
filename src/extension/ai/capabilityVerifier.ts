@@ -286,6 +286,8 @@ export interface VerifierResult {
   evidence: CapabilityEvidence[];
   /** nenhuma capacidade verificada de fato quando há check falho ou indisponível */
   verified: boolean;
+  /** o índice do vínculo da última prova por perfil não foi gravado; os recibos foram */
+  indexError?: string;
 }
 
 /** Executa as sondagens e grava as evidências. Recusa quando o ambiente gerenciado não pôde ser lido. */
@@ -310,9 +312,15 @@ export async function verifyExecutor(deps: VerifierDeps): Promise<VerifierResult
   const verified = evidence.every((e) => expected[e.capability].every((id) => e.checks.some((c) => c.id === id && c.outcome === 'passed')));
   // Também grava falhas: uma falha mais nova nunca recorre ao sucesso antigo.
   for (const e of evidence) deps.store.record(e);
-  // a partir daqui o host sabe que este perfil tem prova neste vínculo, e avisa quando o vínculo mudar
-  deps.store.remember(deps.profileId, bound.binding);
-  return { binding: bound.binding, evidence, verified };
+  // a partir daqui o host sabe que este perfil tem prova neste vínculo, e avisa quando o vínculo mudar.
+  // O índice só serve ao aviso: uma falha nele não perde os recibos já gravados nem o resultado
+  let indexError: string | undefined;
+  try {
+    deps.store.remember(deps.profileId, bound.binding);
+  } catch (e) {
+    indexError = `O índice das provas por perfil não foi gravado (${e instanceof Error ? e.message : String(e)}); os recibos valem, mas o aviso de prova invalidada não aparece para este perfil.`;
+  }
+  return { binding: bound.binding, evidence, verified, ...(indexError ? { indexError } : {}) };
 }
 
 /** A fixture neutraliza provedores/chaves: nunca usa nem reencaminha a autenticação da pessoa. */

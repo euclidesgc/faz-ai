@@ -188,9 +188,11 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   próprios arquivos de contexto, e o perfil é admissível só no regime compatível. A prova vale para
   as três permissões (**Só o board**, **Board e arquivos** e **Sem restrições**) e sobrevive ao
   reinício do editor: o vínculo dela é o binário, os argumentos de isolamento, as políticas
-  gerenciadas e só as variáveis de ambiente que mudam o que a ferramenta carrega (o PATH, as pastas
-  de configuração, as do provedor e as do perfil; as que guardam segredo entram só por digest, e nada
-  disso é gravado: o recibo guarda só o hash do vínculo). Quando o vínculo muda depois da última
+  gerenciadas, o modo da sessão do agente ACP e só as variáveis de ambiente que mudam o que a
+  ferramenta faz (o PATH, as pastas da pessoa, o proxy e os certificados, as do provedor e as do
+  perfil; das que guardam credencial entra só a presença, e nada disso é gravado: o recibo guarda só
+  o hash do vínculo). Num agente ACP, mesmo em **Sem restrições**, o board responde cada pedido do
+  agente: ele não pede o modo sem perguntas, em que as negações do card deixariam de valer. Quando o vínculo muda depois da última
   prova (a ferramenta foi atualizada, uma dessas variáveis mudou ou o formato do vínculo mudou numa
   versão nova), o aviso do topo diz que a verificação perdeu a validade, sem bloquear o board: num
   agente ACP o board já refaz sozinho; no Claude Code, rode o comando de novo. A prévia da

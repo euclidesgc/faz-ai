@@ -3,6 +3,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { AdmissionBlockedError, ExecutionAdmission, bindingEnvironment } from '../src/extension/ai/admission';
+import { acpSessionMode } from '../src/extension/ai/acp/provider';
+import { acpAgent } from '../src/extension/ai/acp/agents';
 import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
 import type { AiProfile } from '../src/shared/aiProfiles';
 import {
@@ -234,6 +236,46 @@ describe('vínculo de isolamento saneado', () => {
     expect(admission.isolationBinding(acp, acp.id, 'edits').binding).toBe(board);
     expect(admission.isolationBinding(acp, acp.id, 'full').binding).toBe(board);
   });
+  it('ACP: o modo sem perguntas (yolo) entra no vínculo e nunca vale numa execução admitida', () => {
+    exe('gemini', 'agente de teste');
+    const gemini = acpAgent('gemini')!;
+    // fora da admissão (sem restrição declarada) o full pede o yolo; com o conjunto explícito ou uma negação, não
+    expect(acpSessionMode(gemini, { permission: 'full' })).toBe('yolo');
+    expect(acpSessionMode(gemini, { permission: 'full', exec: { deniedTools: ['Agent'] } as HeadlessInput['exec'] })).toBeUndefined();
+    expect(acpSessionMode(gemini, { permission: 'full', exec: { toolSet: 'explicit', deniedTools: [] } as never })).toBeUndefined();
+    expect(acpSessionMode(gemini, { permission: 'edits' })).toBeUndefined();
+    const acp = profile({ kind: 'custom', base: 'generic', config: { acpAgent: 'gemini' } });
+    const board = admission.isolationBinding(acp, acp.id, 'board').binding;
+    // uma sessão em yolo é outro vínculo: a prova feita no modo padrão não a cobre
+    expect(admission.binding(acp, acp.id, { prompt: '', permission: 'full' }, null).binding).not.toBe(board);
+    expect(admission.binding(acp, acp.id, { prompt: '', permission: 'edits' }, null).binding).toBe(
+      admission.binding(acp, acp.id, { prompt: '', permission: 'board' }, null).binding,
+    );
+    // o card em full, admitido com a prova de board, roda no modo padrão: o board segue decidindo cada pedido
+    for (const capability of EXECUTOR_CAPABILITIES)
+      store.record({
+        version: 1,
+        capability,
+        binding: board,
+        source: 'host-probe',
+        checkedAt: now - 10,
+        expiresAt: now + 1000,
+        checks: ACP_CAPABILITY_CHECKS[capability].map((id) => ({
+          id,
+          outcome: id === 'own-context-files' ? 'unavailable' : 'passed',
+          receipt: 'a'.repeat(64),
+        })),
+      });
+    const reviewed = request({
+      regime: 'compatible',
+      compatibilityReview: { actor: 'person', revision: 1 },
+      mcpLevel: { permission: 'full', tools: [] },
+    });
+    const admitted = admission.prepare(acp, acp.id, { prompt: 'objetivo', permission: 'full' }, dir, reviewed);
+    expect(admitted.decision.binding).toBe(board);
+    expect(admitted.input.exec?.deniedTools).toContain('Agent');
+    expect(acpSessionMode(gemini, admitted.input)).toBeUndefined();
+  });
   it('variável volátil e as da sessão do Claude Code não mudam o vínculo; as que a ferramenta lê, mudam', () => {
     const claude = profile({ config: { command: exe('claude-g', 'binário G') } });
     const bind = () => admission.isolationBinding(claude, claude.id, 'board').binding;
@@ -244,8 +286,20 @@ describe('vínculo de isolamento saneado', () => {
     // a pasta de configuração e a pré-carga do Node mudam o que a CLI carrega
     expect(withEnv({ CLAUDE_CONFIG_DIR: '/outra/config' }, bind)).not.toBe(base);
     expect(withEnv({ NODE_OPTIONS: '--require /x.js' }, bind)).not.toBe(base);
+    // proxy e certificados mudam com quem a ferramenta fala
+    expect(withEnv({ HTTPS_PROXY: 'http://proxy.local:3128' }, bind)).not.toBe(base);
+    expect(withEnv({ https_proxy: 'http://proxy.local:3128' }, bind)).not.toBe(base);
+    expect(withEnv({ NODE_EXTRA_CA_CERTS: '/etc/ca.pem' }, bind)).not.toBe(base);
+    // as CLAUDE_CODE_* da sessão que abriu o editor mudam a cada sessão; as de comportamento contam
+    expect(
+      withEnv({ CLAUDE_CODE_SSE_PORT: String(40000 + Math.floor(Math.random() * 1000)), CLAUDE_CODE_EXECPATH: '/x/claude' }, bind),
+    ).toBe(base);
+    expect(withEnv({ CLAUDE_CODE_USE_BEDROCK: '1' }, bind)).not.toBe(base);
+    // credencial que gira (token de sessão) não derruba a prova: só a presença conta
+    const withToken = withEnv({ AWS_SESSION_TOKEN: 'token-1' }, bind);
+    expect(withEnv({ AWS_SESSION_TOKEN: 'token-2' }, bind)).toBe(withToken);
   });
-  it('o ambiente do vínculo: PATH, pastas de configuração, as observadas e as do perfil; segredo só por digest', () => {
+  it('o ambiente do vínculo: PATH, pastas de configuração, as observadas e as do perfil; de segredo, só a presença', () => {
     const env = bindingEnvironment(
       {
         PATH: '/usr/bin',
@@ -266,7 +320,7 @@ describe('vínculo de isolamento saneado', () => {
     expect(env.PATH).toBe('/opt/bin:/usr/bin');
     expect(env.ANTHROPIC_BASE_URL).toBe('https://api.local');
     expect(env.MINHA_VAR).toBe('do-perfil');
-    for (const k of ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'MEU_TOKEN']) expect(env[k]).toMatch(/^sha256:[a-f0-9]{64}$/);
+    for (const k of ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'MEU_TOKEN']) expect(env[k]).toBe('<definida>');
     expect(JSON.stringify(env)).not.toMatch(/segredo|chave-gemini/);
   });
 });

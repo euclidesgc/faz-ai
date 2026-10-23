@@ -393,6 +393,17 @@ describe('verificação por perfil', () => {
     expect(store.lastBinding('claude')).toBe(result.binding);
   });
 
+  it('falha ao gravar o índice por perfil não perde os recibos nem o resultado', async () => {
+    const { store, admission } = make();
+    store.remember = () => {
+      throw new Error('disco cheio');
+    };
+    const result = await verifyExecutor(deps(builtin('claude'), store, admission));
+    expect(result.verified).toBe(true);
+    expect(result.indexError).toMatch(/disco cheio/);
+    expect(store.load(result.binding)).toHaveLength(5);
+  });
+
   it('binário trocado depois da prova: o vínculo atual não é mais o da última prova', async () => {
     const { store, admission } = make();
     const gemini = builtin('gemini', { enabled: true });

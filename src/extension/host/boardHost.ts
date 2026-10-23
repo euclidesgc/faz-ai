@@ -572,6 +572,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   router.onRequirementsCheck(async () => {
     forceSigninCheck = true;
     requestedCheck = true;
+    // é também o clique depois de entrar na conta do agente ACP: a prova que falhou sem login (authRequired
+    // no handshake) é refeita; a que está em vigor continua pulada (hasCurrentEvidence)
+    attempted.clear();
     try {
       pathEnv = (await loginShellPath(true)) ?? pathEnv;
       await checkNow();
@@ -927,6 +930,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
       spawnAgent: (command, cwd, out) => spawnAcpProcess({ ...command, format: 'text' }, cwd, out, pathEnv),
     });
+    if (result.indexError) o.log(`${meta.name}: ${result.indexError}`);
     const failed = result.evidence.flatMap((e) => e.checks.filter((c) => c.outcome !== 'passed').map((c) => `${e.capability}/${c.id}`));
     if (result.verified) return `${meta.name}: isolamento verificado; as cinco capacidades têm recibos válidos.`;
     // no ACP os arquivos de contexto do agente ficam sem prova de propósito: o perfil vale no regime compatível
@@ -952,7 +956,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
    */
   const verifyInBackground = (profileId: string, why: string): void => {
     const meta = router.snapshot().board.aiProfiles.find((p) => p.id === profileId);
-    if (disposed || !meta || !meta.enabled || !isAcpProfile(meta) || hasCurrentEvidence(profileId)) return;
+    // uma verificação deste perfil já em andamento (ligar e conferir ao mesmo tempo) não abre outro handshake
+    if (disposed || !meta || !meta.enabled || !isAcpProfile(meta) || verifying.has(profileId) || hasCurrentEvidence(profileId)) return;
     api
       .verifyExecutor(profileId)
       .then((message) => o.log(`Verificação de capacidades (${why}): ${message}`))
@@ -960,7 +965,10 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   };
   /** Prova o agente ACP no vínculo atual se ainda não tentou nele; sem executável (CLI ausente), nada a provar. */
   const verifyOncePerBinding = (profileId: string, health: ProfileHealth | undefined): void => {
-    if (health?.problem) return;
+    // sem login (ou com o login vencido) a tentativa deste vínculo fica esquecida: quando o login voltar,
+    // a prova (que pode ter falhado por falta dele, como o authRequired do handshake) é refeita
+    if (health?.problem === 'signin' || health?.authExpired) attempted.delete(profileId);
+    if (health?.problem || health?.authExpired) return;
     let binding: string;
     try {
       const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, profileId);
