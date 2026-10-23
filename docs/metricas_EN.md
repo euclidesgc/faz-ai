@@ -247,6 +247,14 @@ with the number of calls.
   failing, and repeating would duplicate the effect and the usage. The blocked card and the chat error
   say the run was not repeated, and the "Chamando…" line in the channel shows the attempt and the run
   id.
+- **Gemini in the three modes.** Each run records the mode it ran in (CLI, ACP or API), and Consumo
+  (usage) separates the three through the **Modo da ferramenta** (tool mode) cut. In the CLI the tokens
+  come from `stream-json`, per model; in ACP, from the `usage` the agent reports each turn; in the API,
+  from each request's `usageMetadata`, summed over the run. None of the three reports a dollar cost.
+  When the Gemini API quota runs out, in any of the three modes, the run ends with the usage limit: the
+  board does not blindly repeat it, and the profile pause (or the execution policy with the _quota_
+  failure) decides what comes next, as with Claude Code (see [automation](automacao_EN.md)). A run that
+  hit the limit before answering is "não medido" (not measured).
 - **Questions in the board chat** are recorded too, with no card attached.
 - **The detail of each run is kept for a window you configure**, from 1 to 24 months (the current
   month plus the earlier ones). The default is 6 months. After the window the detail is discarded,
@@ -288,9 +296,12 @@ and also in the board opened in the browser.
   not a zero-height bar. Below the chart a table has the same numbers and a notes column (partial,
   no data, monthly total only).
 - **Where the usage happened** ("Onde o consumo aconteceu"). The period's usage split by **phase,
-  card type, model, AI tool, effort or profile** (the **Recortar por** / break down by selector), as
-  horizontal bars in the measure chosen in **Medida da barra** (bar measure): tokens, runs or AI
-  time. The table with the three measures sits beside it. Categories past the limit add up in an
+  card type, model, AI tool, tool mode, effort or profile** (the **Recortar por** / break down by
+  selector), as horizontal bars in the measure chosen in **Medida da barra** (bar measure): tokens,
+  runs or AI time. The **tool mode** ("Modo da ferramenta") is how the board talked to the tool (CLI,
+  ACP or API): the same Gemini measures differently in each mode, and the tool row adds the three up.
+  Runs from before the mode was recorded (and months archived before it) show as "não definido" (not
+  defined). The table with the three measures sits beside it. Categories past the limit add up in an
   "others" row. It reaches the whole series of the period, including months already archived.
 - **Most expensive phases and Most expensive cards** ("Fases mais caras" / "Cards mais caros"). Two
   rankings side by side, in tables you sort by tokens, runs or AI time by clicking the header
@@ -346,8 +357,9 @@ natural language: "how much AI time did card #72 use?", "which card type uses th
 month?", "which agent was used most?". The tool replies with a compact table, optimized to save
 tokens.
 
-- The aggregation can group by phase (`phase`), card type (`card_type`), AI tool (`tool`), model
-  (`model`), effort (`effort`), profile (`profile`), card (`card`), agent (`agent`), skill (`skill`),
+- The aggregation can group by phase (`phase`), card type (`card_type`), AI tool (`tool`), tool mode
+  (`mode`: `cli`, `acp` or `api`), model (`model`), effort (`effort`), profile (`profile`), card
+  (`card`), agent (`agent`), skill (`skill`),
   used tool (`used_tool`), MCP tool (`mcp_tool`) or Bash command (`bash_command`). Omit to get only
   the period's total.
 - `tool` and `used_tool` are not the same thing: `tool` is the AI tool that ran (claude, cursor);
@@ -359,7 +371,7 @@ tokens.
   (e.g. phase, model, card type).
 - On the **agent**, **skill**, **used_tool**, **mcp_tool** and **bash_command** dimensions the table
   shows only the count of runs and uses (no tokens, which cannot be split among a run's components).
-  `effort` and `profile` have tokens.
+  `effort`, `profile` and `mode` have tokens.
 - Tokens count in every measured run, from Claude Code and from Cursor. The table has no dollar cost.
 - The panel's times (permanence per phase and lead time) are not in `get_metrics`. Rework is: with
   `rework: true` (and, if you want, `start_date` and `end_date`), the answer brings the reviews, the

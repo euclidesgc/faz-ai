@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { PROFILE_CAPABILITIES, type ProfileCapability, isReadyCli } from '../../../shared/aiProfiles';
+import { PROFILE_CAPABILITIES, type ProfileCapability, isReadyCli, modeLabel } from '../../../shared/aiProfiles';
 import type { CapabilityState } from '../../../shared/executionAdmission';
 import { baseValue } from '../../../shared/harness';
 import { leaksList } from '../../isolation';
@@ -169,6 +169,8 @@ export function ProfileBlock({ health, focused }: { health: ProfileHealth; focus
     <section ref={ref} aria-labelledby={id} className={`env-profile${focused ? ' focused' : ''}`}>
       <h4 id={id}>
         {health.name}
+        {/* o modo em que o perfil roda (história 12): o mesmo Gemini tem requisitos diferentes na CLI, no ACP e na API */}
+        {health.mode && <span className="muted"> · {modeLabel(health.mode)}</span>}
         {health.isDefault && <span className="muted"> · {t('Padrão')}</span>}
       </h4>
       <ul className="env-list">

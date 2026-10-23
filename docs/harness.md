@@ -184,7 +184,9 @@ parados) quando **nenhum** perfil ligado está disponível. Um perfil com proble
 pronto, vira só um aviso dele, com o link para o bloco dele no Diagnóstico: com o Claude Code
 instalado e logado e o Cursor ausente, o board trabalha e o Cursor aparece como não encontrado. Os
 perfis desligados e os pendentes de revisão nunca geram aviso. O ícone some sozinho quando o último
-item é resolvido.
+item é resolvido. O bloco de cada perfil diz o modo no título ("Gemini CLI · API", "Claude Code ·
+CLI"): o mesmo Gemini tem requisitos diferentes na CLI (o binário), no ACP (o agente) e na API (só a
+chave no cofre).
 
 A conferência roda ao abrir o board, quando a ferramenta ou a permissão mudam, a cada 5 minutos e em
 **Verificar de novo**, que relê também o PATH do terminal (um node instalado com o board aberto é

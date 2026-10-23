@@ -30,6 +30,8 @@ export interface PolicyProfile {
   tool: AiTool;
   enabled: boolean;
   modelIds: string[];
+  /** o rótulo do perfil com o modo ("Gemini · API"), para a tela das políticas; ausente no catálogo antigo */
+  label?: string;
 }
 export type TargetSource = 'card' | 'activity' | 'chat' | 'agent' | 'phase' | 'rule' | 'board';
 export type TargetResolution =

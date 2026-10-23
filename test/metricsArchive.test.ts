@@ -167,7 +167,8 @@ describe('getMetrics: mês arquivado com tokens e custo', () => {
     });
   }
 
-  const DIMS: (MetricsDim | undefined)[] = [undefined, 'phase', 'card_type', 'model', 'tool', 'effort', 'profile'];
+  // `mode` (história 12) no fim, para os índices das conferências à mão não mudarem
+  const DIMS: (MetricsDim | undefined)[] = [undefined, 'phase', 'card_type', 'model', 'tool', 'effort', 'profile', 'mode'];
 
   it('regressão das seis dimensões (RF-08): execuções, duração, tokens e custo iguais antes e depois de consolidar', () => {
     seedMixedMonth(2024, 3);

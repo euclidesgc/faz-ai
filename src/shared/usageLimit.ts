@@ -11,6 +11,39 @@ export interface UsageLimitHint {
   resetsAt: number | null;
   /** a linha de texto com o limite, para ler "resets 1:50pm (America/Sao_Paulo)" */
   text: string | null;
+  /**
+   * A espera que a própria API pediu, em ms a partir do fim da execução: o `retryDelay` do `google.rpc.RetryInfo`
+   * do 429 do Gemini (`RESOURCE_EXHAUSTED`), ou o "Please retry in 41s" da mensagem. É a pausa curta do limite por
+   * minuto; o leitor não tem relógio, então guarda a duração, e não o instante.
+   */
+  retryAfterMs?: number | null;
+  /**
+   * A cota é diária e renova à meia-noite deste fuso (a do Gemini: "RPD quotas reset at midnight Pacific time",
+   * ai.google.dev/gemini-api/docs/rate-limits). Vence o `retryAfterMs`: na cota diária a API pode mandar um
+   * `retryDelay` curto, e a fila voltaria a esbarrar no limite a cada poucos minutos até a meia-noite.
+   */
+  dailyResetZone?: string | null;
+}
+
+/**
+ * Uma falha da ferramenta como o transporte a viu (o erro do `result` da CLI, o erro JSON-RPC do `session/prompt`
+ * no ACP, a resposta HTTP da API), para a classificação de cada ferramenta (`classifyFailure` do driver).
+ */
+export interface ToolFailure {
+  /** a mensagem, como veio (pode trazer o JSON do erro da API embutido) */
+  message: string;
+  /** o status HTTP, ou o código JSON-RPC no ACP (o Gemini CLI devolve 429 no `session/prompt`) */
+  code?: number | null;
+  /** o status do `google.rpc.Status` (`RESOURCE_EXHAUSTED`) */
+  status?: string | null;
+  /** o corpo do erro, quando veio estruturado (`{ error: { code, status, message, details } }` ou o `data` do JSON-RPC) */
+  body?: unknown;
+}
+
+/** O que a classificação diz da falha: se foi o limite de uso e, quando a falha diz, até quando. */
+export interface FailureClass {
+  usageLimitReached: boolean;
+  usageLimitHint?: UsageLimitHint;
 }
 
 /** A pausa por limite de uso de um perfil de CLI, como fica gravada. */
@@ -111,12 +144,23 @@ export function nextWallTime(hour: number, minute: number, zone: string | null, 
 
 const plausible = (at: number, now: number): boolean => Number.isFinite(at) && at > now && at - now <= RESET_MAX_AHEAD_MS;
 
-/** O instante da renovação (ms), ou null quando a dica não tem horário legível. Ordem: `resetsAt` → texto com fuso → texto no fuso local. */
+/**
+ * O instante da renovação (ms), ou null quando a dica não tem horário legível. Ordem: `resetsAt` → cota diária
+ * (a próxima meia-noite do fuso dela) → espera pedida pela API → texto com fuso → texto no fuso local.
+ */
 export function resetAtOf(hint: UsageLimitHint | null | undefined, now: number, localZone?: string): number | null {
   if (!hint) return null;
   if (typeof hint.resetsAt === 'number' && hint.resetsAt > 0) {
     // a documentação do SDK não diz a unidade; a CLI gravou segundos. Abaixo de 10^12 só pode ser segundo
     const at = hint.resetsAt < 1e12 ? hint.resetsAt * 1000 : hint.resetsAt;
+    if (plausible(at, now)) return at;
+  }
+  if (hint.dailyResetZone) {
+    const at = nextWallTime(0, 0, validZone(hint.dailyResetZone) ?? localZone ?? null, now);
+    if (plausible(at, now)) return at;
+  }
+  if (typeof hint.retryAfterMs === 'number' && hint.retryAfterMs > 0) {
+    const at = now + hint.retryAfterMs;
     if (plausible(at, now)) return at;
   }
   const parsed = hint.text ? parseResetText(hint.text) : null;

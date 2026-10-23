@@ -78,6 +78,14 @@ export class FakeAgent {
     this.send({ id: this.promptId, result });
   }
 
+  /**
+   * Responde o `session/prompt` com um erro JSON-RPC, como o Gemini CLI 0.65.0 faz quando o turno falha
+   * (`RequestError(status, mensagem).toResult()`: o status HTTP no `code`, 429 na cota).
+   */
+  rejectPrompt(error: { code: number; message: string; data?: unknown }): void {
+    this.send({ id: this.promptId, error });
+  }
+
   stderr(text: string): void {
     this.out(text, 'stderr');
   }

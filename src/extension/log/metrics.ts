@@ -52,7 +52,19 @@ import {
  * não se repete — a mesma palavra significaria duas coisas em dois lugares.
  */
 export type MetricsDim =
-  'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile' | 'card' | 'agent' | 'skill' | 'used_tool' | 'mcp_tool' | 'bash_command';
+  | 'phase'
+  | 'card_type'
+  | 'model'
+  | 'tool'
+  | 'mode'
+  | 'effort'
+  | 'profile'
+  | 'card'
+  | 'agent'
+  | 'skill'
+  | 'used_tool'
+  | 'mcp_tool'
+  | 'bash_command';
 
 /**
  * As dimensões de inventário e o `kind` de `ai_run_usage` que cada uma lê (o CHECK da tabela).
@@ -67,17 +79,19 @@ const INVENTORY_KIND: Partial<Record<MetricsDim, InventoryKind | 'bash'>> = {
 };
 
 /**
- * As seis dimensões que `log_months` também guarda (ver RUN_DIMS de rollup.ts), em `runs`, `tokens` e
- * `cost`. As outras — `card` e as quatro de inventário — só existem no detalhe.
+ * As dimensões que `log_months` também guarda (ver RUN_DIMS de rollup.ts), em `runs`, `tokens` e `cost`. As
+ * outras — `card` e as de inventário — só existem no detalhe. O `mode` entrou na história 12: um mês arquivado
+ * antes dela não tem o corte, e as execuções dele ficam de fora do recorte por modo (nenhuma tinha modo gravado).
  */
-const ARCHIVE_DIMS = new Set<MetricsDim>(['phase', 'card_type', 'model', 'tool', 'effort', 'profile']);
+const ARCHIVE_DIMS = new Set<MetricsDim>(['phase', 'card_type', 'model', 'tool', 'mode', 'effort', 'profile']);
 
 /** Coluna de `ai_runs` por dimensão, para as que vêm direto de lá (não de `ai_run_usage`). */
-const RUN_COLUMN: Record<'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile', string> = {
+const RUN_COLUMN: Record<MetricsBreakdownDim, string> = {
   phase: 'phase',
   card_type: 'card_type',
   model: 'model',
   tool: 'tool',
+  mode: 'mode',
   effort: 'effort',
   profile: 'profile',
 };
@@ -1126,13 +1140,13 @@ function panelBreakdowns(db: Database, boardId: string, q: MetricsQuery, archive
   const workflowsByPhase = new Map<string, Set<string>>();
   for (const r of all(
     db,
-    `SELECT workflow, phase, card_type, model, tool, effort, profile,
+    `SELECT workflow, phase, card_type, model, tool, mode, effort, profile,
             COUNT(*) AS n, SUM(COALESCE(duration_ms,0)) AS ms,
             ${MEASURED_SUMS},
             ${TOKENS_SUM} AS tok,
             SUM(COALESCE(cost_usd,0)) AS cost, ${ESTIMATED_SUMS}
      FROM ai_runs WHERE ${where}
-     GROUP BY workflow, phase, card_type, model, tool, effort, profile`,
+     GROUP BY workflow, phase, card_type, model, tool, mode, effort, profile`,
     params,
   )) {
     const patch: Partial<Accumulator> = {

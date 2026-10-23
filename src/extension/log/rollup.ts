@@ -29,6 +29,8 @@ const RUN_DIMS: [dim: string, column: string][] = [
   ['card_type', 'card_type'],
   ['model', 'model'],
   ['tool', 'tool'],
+  // o modo em que a ferramenta rodou (história 12); a execução anterior à migração 48 arquiva com ''
+  ['mode', 'mode'],
   ['effort', 'effort'],
   ['profile', 'profile'],
 ];
@@ -124,7 +126,7 @@ function totalsFromDetail(db: Database, boardId: string, month: string): LogMetr
   // existe; só o 0 conta como informado — na dúvida, "estimado" é a afirmação mais fraca
   for (const r of all(
     db,
-    `SELECT workflow, outcome, phase, card_type, model, tool, effort, profile,
+    `SELECT workflow, outcome, phase, card_type, model, tool, mode, effort, profile,
             COUNT(*) AS n, SUM(COALESCE(duration_ms, 0)) AS ms,
             SUM(CASE WHEN measure <> 'none' THEN 1 ELSE 0 END) AS measured,
             SUM(CASE WHEN measure <> 'none' THEN COALESCE(input_tokens, 0) ELSE 0 END) AS input,
@@ -137,7 +139,7 @@ function totalsFromDetail(db: Database, boardId: string, month: string): LogMetr
             SUM(CASE WHEN cost_usd IS NOT NULL AND COALESCE(cost_estimated, 1) <> 0 THEN cost_usd ELSE 0 END) AS estimated
      FROM ai_runs
      WHERE board_id = ? AND month = ?
-     GROUP BY workflow, outcome, phase, card_type, model, tool, effort, profile`,
+     GROUP BY workflow, outcome, phase, card_type, model, tool, mode, effort, profile`,
     [boardId, month],
   )) {
     const n = num(r.n);

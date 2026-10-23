@@ -56,6 +56,8 @@ export const REASON_LABELS: Record<string, string> = {
 };
 export const profileLabel = (library: PolicyLibrary, id: string): string => {
   const p = library.profiles.find((p) => p.id === id);
+  // o catálogo monta o rótulo com o modo a partir dos perfis do board ("Gemini · API")
+  if (p?.label) return p.label;
   const name = AI_BASES.find((tool) => tool.id === p?.tool)?.label;
   return name ? (id === p?.tool ? name : `${id} (${name})`) : t('Ausente: {name}', { name: id });
 };

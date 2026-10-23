@@ -1,4 +1,5 @@
-import { ALL_AI_BASES } from './harness';
+import { catalogTool, isReadyProfile, modeLabel, toolLabel } from './aiProfiles';
+import { ALL_AI_BASES, baseInfo } from './harness';
 import type { BoardState } from './model';
 import type { ModelOption } from './models';
 import { CONTEXT_ACTIONS } from './contextPlanning';
@@ -52,7 +53,14 @@ export interface PolicyReply {
   assistance?: import('./policyAssistant').PolicyAssistResult;
   error?: string;
 }
-/** Catálogo dos providers integrados. Não representa instalação, login ou admissão da CLI. */
+/**
+ * O catálogo das políticas: os perfis do board (os do catálogo da extensão, as cópias e os personalizados, com a
+ * ferramenta do catálogo de modelos de cada um) e os modelos do catálogo do board. Antes da história 12 era a
+ * lista fixa das três CLIs prontas, e um perfil como o do Gemini (em qualquer modo) não podia ser destino nem
+ * origem de uma política: a regra salva com ele saía como "Destino inválido". Não representa instalação, login
+ * nem admissão: todo perfil entra como ligado, e quem confere se o destino roda de fato é a execução
+ * (`runTargetOfPolicy`, só perfil ligado e modelo no catálogo dele).
+ */
 export function builtinPolicyCatalog(state: BoardState): { profiles: PolicyProfile[]; models: ModelOption[] } {
   const models = state.board.modelCatalog.map(({ id, tool, model, label, efforts, defaultEffort }) => ({
     id,
@@ -62,15 +70,21 @@ export function builtinPolicyCatalog(state: BoardState): { profiles: PolicyProfi
     efforts,
     defaultEffort,
   }));
-  return {
-    models,
-    profiles: ALL_AI_BASES.map((tool) => ({
-      id: tool,
-      tool,
-      enabled: true,
-      modelIds: models.filter((m) => m.tool === tool).map((m) => m.id),
-    })),
-  };
+  // um board sem perfis gravados (o estado de teste mais antigo) ainda vê as CLIs prontas
+  const source: { id: string; tool: string; label: string }[] = state.board.aiProfiles.length
+    ? state.board.aiProfiles.map((p) => ({
+        id: p.id,
+        tool: catalogTool(p),
+        // o rótulo da lista dos perfis ("Gemini · API"); a cópia e o personalizado, pelo nome que a pessoa deu
+        label: `${isReadyProfile(p) ? toolLabel(p.tool) : p.name} · ${modeLabel(p.mode)}`,
+      }))
+    : ALL_AI_BASES.map((tool) => ({ id: tool, tool, label: baseInfo(tool).label }));
+  // um id repetido tornaria toda resolução ambígua (`profile-ambiguous`): vale o primeiro
+  const profiles: PolicyProfile[] = [];
+  for (const p of source)
+    if (!profiles.some((x) => x.id === p.id))
+      profiles.push({ ...p, enabled: true, modelIds: models.filter((m) => m.tool === p.tool).map((m) => m.id) });
+  return { models, profiles };
 }
 /** Cenário hipotético: nunca recebe recibos nem é usado para autorizar uma execução. */
 export function simulatePolicyScenario(state: BoardState, snapshot: ExecutionPolicySnapshot, scenario: PolicyScenario): PolicySimulation {

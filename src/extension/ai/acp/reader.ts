@@ -12,6 +12,7 @@
 //   Lido se vier; nenhum agente é obrigado a mandar, e o rascunho ainda pode mudar de nome.
 // Sem nenhum dos dois, sobra o inventário de ferramentas: `partial`, como o Cursor sem `usage`.
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../../shared/log';
+import type { FailureClass, ToolFailure, UsageLimitHint } from '../../../shared/usageLimit';
 import { asNumber, asObject, asText, cut, type Json } from '../../aiOutput/json';
 import type { AcpToolCall } from './provider';
 
@@ -26,6 +27,8 @@ export interface AcpReaderOptions {
    * gravado, para o painel não mostrar menos do que foi gasto. O nome vai na linha que explica.
    */
   undercounts?: string;
+  /** o limite de uso no erro do `session/prompt`, como o agente o escreve (`AcpAgent.classifyFailure`) */
+  classifyFailure?(failure: ToolFailure): FailureClass;
 }
 
 const LINE_MAX = 300;
@@ -37,6 +40,8 @@ export interface AcpReader {
   finish(result: Json): string[];
   /** O texto que ficou sem quebra de linha, no fim. */
   flush(): string[];
+  /** O erro JSON-RPC do `session/prompt` (o turno falhou): o agente que sabe dizer o limite de uso o classifica. */
+  fail(failure: ToolFailure): void;
   report(sessionId: string | null): RunReport;
   readonly sawEvent: boolean;
 }
@@ -56,6 +61,8 @@ export function acpReader(opts: AcpReaderOptions): AcpReader {
   let tokens: AiRunTokens | null = null;
   let costUsd: number | null = null;
   let otherCurrency: string | null = null;
+  let usageLimitReached = false;
+  let usageLimitHint: UsageLimitHint | undefined;
 
   const count = (kind: InventoryKind, name: string): void => {
     const key = `${kind}\u0000${name}`;
@@ -149,12 +156,25 @@ export function acpReader(opts: AcpReaderOptions): AcpReader {
 
     flush: () => drain(true),
 
+    fail(failure) {
+      const found = opts.classifyFailure?.(failure);
+      if (!found?.usageLimitReached) return;
+      usageLimitReached = true;
+      usageLimitHint = found.usageLimitHint ?? usageLimitHint;
+    },
+
     report(sessionId) {
       const items: InventoryItem[] = [...inventory.entries()].map(([key, calls]) => {
         const [kind, name] = key.split('\u0000');
         return { kind: kind as InventoryKind, name: name!, calls };
       });
-      const base = { inventory: items, answer: answer.join(''), reason: null, usageLimitReached: false };
+      const base = {
+        inventory: items,
+        answer: answer.join(''),
+        reason: null,
+        usageLimitReached,
+        ...(usageLimitHint ? { usageLimitHint } : {}),
+      };
       if (tokens) return { ...base, measure: 'full', consumption: { ...tokens, turns: null, sessionId, costUsd } };
       // sem tokens não há `consumption` (o tipo exige os quatro contadores): o custo sozinho fica de fora
       if (items.length) return { ...base, measure: 'partial', consumption: null };

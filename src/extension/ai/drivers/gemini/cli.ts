@@ -7,6 +7,7 @@ import { geminiCliProvider } from '../../providers/gemini';
 import { cliExecutor, installSteps } from '../cli';
 import type { ProcessBinding, ToolDriver } from '../types';
 import { geminiApiDriver } from './api';
+import { classifyGeminiFailure } from './limit';
 
 /**
  * Os arquivos de configuração gerenciada do Gemini CLI (geminicli.com/docs/reference/configuration): as
@@ -80,6 +81,8 @@ export const geminiCliDriver: ToolDriver = {
   measure: geminiCliProvider.measure,
   enforcement: toolModeEntry('gemini', 'cli')!.enforcement,
   transport: 'cli',
+  // a cota da API, como nos outros dois modos; o leitor `gemini-stream-json` usa a mesma função
+  classifyFailure: classifyGeminiFailure,
   // o executor de CLI de sempre (o comando e o leitor vêm do provider do perfil); a diferença é a chave, que
   // entra no comando só depois de montado: o gateway confere o comando (sem ela) e o `spawn` do host a põe no
   // ambiente do processo, na variável que o provider declarou. Sem chave no cofre, vale a do ambiente da pessoa

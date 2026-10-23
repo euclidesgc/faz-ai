@@ -171,6 +171,11 @@ do card vai pelo seletor da sessão (`session/set_config_option`) quando o agent
 linha de comando (`--model`) onde o agente aceita; o agente que não aceita nenhum dos dois segue com
 o modelo dele, e o log da execução diz qual.
 
+Cada modelo lido da ferramenta (pelo **Detectar modelos** ou pelo **Conectar**) guarda a data da
+leitura, e o bloco da ferramenta diz "lista lida da ferramenta em …" com a mais recente. Sem essa
+linha, a lista é a embutida ou a que você montou à mão. Uma lista velha (a conta mudou de plano, a
+ferramenta tirou um modelo) se corrige detectando de novo ou reconectando.
+
 No Cursor, a lista traz uma linha por nível de cada modelo (`claude-opus-5-5-low`, `-medium`,
 `-high`…); o board junta as variantes num modelo com os níveis dele. As versões rápidas (`-fast`,
 respondem mais depressa e cobram mais pelos mesmos tokens) ficam de fora até você ligar **Incluir
@@ -201,6 +206,12 @@ autoriza execução. Conflitos de versão preservam o rascunho e permitem recarr
 revisar novamente. O simulador do host usa o mesmo avaliador, sem IA, e identifica
 credenciais/admissão como hipóteses do cenário. Mudanças nas políticas salvas ou no contexto
 invalidam o resultado exibido.
+
+Os perfis que as políticas e o simulador conhecem são os perfis do board (os da extensão, as cópias e
+os personalizados), com o modo no nome ("Gemini · API", "Claude Code · CLI"), e os modelos de cada um
+são os do catálogo do board. Assim um perfil do Gemini, em qualquer modo, pode ser origem e destino
+de uma política: com a falha _quota_, a cota esgotada do Pro pode seguir no Flash, por exemplo. O
+modo não entra na política: trocar o Gemini de modo no **Conectar** mantém as políticas dele.
 
 Runner, chat e assistentes ("Sugerir agentes, regras ou skills", "Indicar artefatos") decidem a
 troca de alvo por esse mesmo avaliador: com política ligada e aplicável a execução segue no destino

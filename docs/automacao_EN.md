@@ -28,7 +28,10 @@ does.
   resumes at 1:53 PM."). Once the pause expires, the profile's first automatic run is the test. With
   a fallback policy, the run continues on its destination. The pause is saved in the board (it
   survives reopening the editor); a run you start by hand stays allowed and, when it finishes well,
-  ends the pause.
+  ends the pause. With Gemini, in the CLI, ACP and API modes, the renewal comes from the API error:
+  the daily quota renews at midnight Pacific time (the Gemini API rule), and the per-minute limit
+  (429 `RESOURCE_EXHAUSTED`) brings the wait in `retryDelay`, a short pause; with neither, the
+  backoff applies.
 - **Checks the pull requests** of every story that has one (automatic merge detection) and cleans up
   leftover branches and worktrees (orphan branches and worktrees).
 - **Syncs the local branches** the board knows about (the main branch, `develop` and the branch of

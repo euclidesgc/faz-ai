@@ -240,7 +240,7 @@ describe('Gemini pela API: o ciclo de chamadas de função', () => {
     expect(server.requests).toHaveLength(1);
   });
 
-  it('429: falha com o limite de uso e o retryDelay, sem consumo medido e sem tentar de novo', async () => {
+  it('429: falha com o limite de uso e o retryDelay (a pausa curta, história 12), sem consumo medido e sem tentar de novo', async () => {
     server = await fakeGemini([
       {
         status: 429,
@@ -263,7 +263,12 @@ describe('Gemini pela API: o ciclo de chamadas de função', () => {
     );
     expect(server.requests).toHaveLength(1);
     expect(lines).toContain(end.error!.message);
-    expect(measured.report()).toMatchObject({ measure: 'none', consumption: null, usageLimitReached: false });
+    expect(measured.report()).toMatchObject({
+      measure: 'none',
+      consumption: null,
+      usageLimitReached: true,
+      usageLimitHint: { retryAfterMs: 37_000 },
+    });
     expect(measured.failure()).toBeInstanceOf(MeasureEndedError);
   });
 

@@ -14,6 +14,8 @@
 //   home do board; `policy_violation`; parâmetros inválidos) não entra no inventário: nada rodou, e contá-la
 //   faria a conferência acusar um desvio que não houve.
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
+import type { ToolFailure, UsageLimitHint } from '../../shared/usageLimit';
+import { classifyGeminiFailure } from '../ai/drivers/gemini/limit';
 import { asNumber, asObject, asText, cut, type Json } from './json';
 import type { OutputReader, OutputStream, ReaderDeps } from './reader';
 
@@ -23,12 +25,8 @@ const RAW_MAX = 300;
 /** Os tipos de erro da CLI que recusam a chamada antes de a ferramenta rodar (`ToolErrorType` da 0.65.0). */
 const REFUSED = new Set(['tool_not_registered', 'policy_violation', 'invalid_tool_params']);
 
-/**
- * A cota esgotada, como a CLI a descreve (`TerminalQuotaError`, `RetryableQuotaError` depois das tentativas
- * dela, o 429 da API com `RESOURCE_EXHAUSTED`). Vale no erro do `result` e nos avisos (`error`).
- */
-const USAGE_LIMIT =
-  /exhausted your (daily )?quota|exhausted your capacity|quota exceeded|RESOURCE_EXHAUSTED|INSUFFICIENT_G1_CREDITS_BALANCE|\b429\b/i;
+/** A linha solta (o `stderr`, o que não é JSON) só conta como cota quando fala de cota, não de um 429 qualquer. */
+const QUOTA_LINE = /quota|RESOURCE_EXHAUSTED/i;
 
 /** `mcp_<servidor>_<operação>` → `servidor/operação`, pelo servidor conhecido mais longo; sem ele, o primeiro `_`. */
 export function geminiMcpName(name: string, servers: readonly string[] = []): string | null {
@@ -70,6 +68,18 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
   let sawEvent = false;
   let sessionId: string | null = null;
   let usageLimitReached = false;
+  let usageLimitHint: UsageLimitHint | undefined;
+  /**
+   * A cota esgotada, como a CLI a descreve (`TerminalQuotaError`, `RetryableQuotaError` depois das tentativas
+   * dela, o 429 da API com `RESOURCE_EXHAUSTED`), pela mesma classificação dos modos ACP e API. Vale no erro do
+   * `result`, nos avisos (`error`) e no `stderr`; a dica mais recente com horário vence.
+   */
+  const limit = (failure: ToolFailure): void => {
+    const found = classifyGeminiFailure(failure);
+    if (!found.usageLimitReached) return;
+    usageLimitReached = true;
+    usageLimitHint = found.usageLimitHint ?? usageLimitHint;
+  };
   /** `kind\0name` → chamadas */
   const inventory = new Map<string, number>();
   /** as chamadas anunciadas que ainda não tiveram resultado: `tool_id` → (kind, nome) */
@@ -129,7 +139,7 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
   const onError = (o: Json): string[] => {
     const message = asText(o.message);
     if (!message) return [];
-    if (USAGE_LIMIT.test(message)) usageLimitReached = true;
+    limit({ message });
     return [...flushText(), cut(`Aviso do Gemini: ${message}`, RAW_MAX)];
   };
 
@@ -147,7 +157,7 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
     const lines = flushText();
     if (asText(o.status) === 'error') {
       const message = asText(asObject(o.error)?.message) ?? 'erro sem mensagem';
-      if (USAGE_LIMIT.test(message)) usageLimitReached = true;
+      limit({ message });
       lines.push(cut(`Terminou com erro: ${message}`, RAW_MAX));
     } else lines.push('Pronto');
     return lines;
@@ -155,17 +165,20 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
 
   return {
     push(line: string, stream: OutputStream): string[] {
-      // a cota esgotada também aparece no `stderr` (o relatório de erro da CLI): vale nos dois
-      if (USAGE_LIMIT.test(line) && /quota|RESOURCE_EXHAUSTED/i.test(line)) usageLimitReached = true;
+      // a cota esgotada também aparece no `stderr` (o relatório de erro da CLI) e em linha que não é evento
+      const loose = (): string[] => {
+        if (QUOTA_LINE.test(line)) limit({ message: line });
+        return line ? [cut(line, RAW_MAX)] : [];
+      };
       // stderr é texto de gente, nunca passa pelo interpretador
-      if (stream === 'stderr') return line ? [cut(line, RAW_MAX)] : [];
+      if (stream === 'stderr') return loose();
       if (!line.trim()) return [];
       let parsed: unknown;
       try {
         parsed = JSON.parse(line);
       } catch {
         // uma linha ruim não invalida as outras: vai para o canal como texto e a leitura segue
-        return [cut(line, RAW_MAX)];
+        return loose();
       }
       const o = asObject(parsed);
       const type = o && asText(o.type);
@@ -198,6 +211,7 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
         return { kind: kind as InventoryKind, name: name!, calls };
       });
       const answer = (segments.filter((s) => s.trim()).at(-1) ?? '').trim();
+      const limited = { usageLimitReached, ...(usageLimitHint ? { usageLimitHint } : {}) };
       if (tokens)
         return {
           measure: 'full',
@@ -205,11 +219,11 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
           inventory: items,
           answer,
           reason: null,
-          usageLimitReached,
+          ...limited,
         };
       // sem `result` com `stats` (a CLI caiu antes): o inventário lido vale, sem consumo (ver o leitor do Cursor)
-      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, usageLimitReached };
-      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached };
+      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, ...limited };
+      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, ...limited };
     },
 
     get sawEvent(): boolean {

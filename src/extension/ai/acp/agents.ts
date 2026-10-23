@@ -10,6 +10,7 @@
 // De fora, de propósito: o Claude (`claude-agent-acp`, o adaptador do Zed sobre o Agent SDK) — o
 // Claude segue pela CLI `claude`, a única que pode usar a assinatura da pessoa.
 import { asNumber, asObject } from '../../aiOutput/json';
+import { classifyGeminiFailure } from '../drivers/gemini/limit';
 import type { AcpAgent } from './provider';
 
 /** `--model <nome>`: o esforço não tem flag nesses agentes. */
@@ -51,6 +52,9 @@ export const ACP_AGENTS: readonly AcpAgent[] = [
     // agente (execução, sondagem, leitura de modelos) autentica de novo. Desde 18/06/2026 a conta individual
     // Google entra pelo Antigravity; o Gemini CLI segue com chave de API (docs/decisoes/ferramenta-por-modo-gemini.md)
     apiKeyAuth: { methodId: 'gemini-api-key' },
+    // o erro do turno volta no `session/prompt` com o status HTTP no código JSON-RPC (429 na cota): a mesma
+    // classificação da CLI e da API do Gemini (`drivers/gemini/limit.ts`)
+    classifyFailure: classifyGeminiFailure,
   },
   {
     id: 'antigravity-acp',

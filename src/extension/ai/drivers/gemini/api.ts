@@ -44,7 +44,9 @@ import { maskApiKey } from '../../../toolKeys';
 import { loginShellPath } from '../../../spawn';
 import { apiLocalTools, type ApiLocalTool } from '../../../../shared/apiTools';
 import { localDeclaration, processGone, realLocalRoots, runLocalTool, type LocalToolLimits, type LocalToolResult } from '../../apiTools';
+import type { FailureClass } from '../../../../shared/usageLimit';
 import type { ExecutorContext, ToolDriver } from '../types';
+import { classifyGeminiFailure } from './limit';
 
 /** A raiz da API do Gemini (a versão `v1beta`, a que tem `systemInstruction`, ferramentas e o pensamento). */
 export const GEMINI_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta';
@@ -258,6 +260,8 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
   const tokens = { input: 0, output: 0, cacheRead: 0 };
   let measured = false;
   let requests = 0;
+  /** o limite de uso que a API devolveu (história 12); null quando a execução não esbarrou nele */
+  let limit: FailureClass | null = null;
 
   const fail = (message: string): number => {
     const safe = scrub(message);
@@ -395,6 +399,16 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
         stopped();
         if (res.status < 200 || res.status >= 300) {
           const err = apiError(res.text);
+          // a cota (o 429 `RESOURCE_EXHAUSTED`, com o `QuotaFailure` e o `RetryInfo`), pela mesma classificação da
+          // CLI e do ACP: liga o limite de uso e a dica de quando a fila tenta de novo. Sem nova tentativa aqui
+          let body: unknown = null;
+          try {
+            body = JSON.parse(res.text) as unknown;
+          } catch {
+            // corpo que não é JSON: a classificação lê o status e o texto
+          }
+          const found = classifyGeminiFailure({ message: err?.message || res.text, code: res.status, status: err?.status, body });
+          if (found.usageLimitReached) limit = found;
           if (res.status === 429)
             return fail(
               `A API do Gemini recusou o pedido por limite de uso (HTTP 429${err?.status ? `, ${err.status}` : ''})${err?.retryDelay ? `; tente de novo em ${err.retryDelay}` : ''}.`,
@@ -551,7 +565,8 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
       ...(bashCommands.length ? { bashCommands } : {}),
       answer: answer.join(''),
       reason: null,
-      usageLimitReached: false,
+      usageLimitReached: !!limit,
+      ...(limit?.usageLimitHint ? { usageLimitHint: limit.usageLimitHint } : {}),
     };
     if (measured)
       return {
@@ -677,6 +692,8 @@ export function createGeminiApiDriver(options: GeminiApiOptions = {}): ToolDrive
     measure: 'tokens',
     enforcement: toolModeEntry('gemini', 'api')!.enforcement,
     transport: 'api',
+    // a cota da API, a mesma da CLI e do ACP; o laço a usa na resposta HTTP de erro
+    classifyFailure: classifyGeminiFailure,
     run: (input, ctx) => runGeminiApi(input, ctx, o),
     // a admissão entrega a chave do mesmo cofre: do vínculo só sai o digest dela
     bindingContext: (input, { apiKey }) => {

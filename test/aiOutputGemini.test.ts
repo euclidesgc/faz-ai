@@ -54,6 +54,8 @@ describe('leitor do stream-json do Gemini CLI 0.65.0 (saída real)', () => {
   it('cota diária esgotada: o result de erro liga o limite de uso', () => {
     const { lines, report } = read('gemini-stream-json-quota.jsonl');
     expect(report.usageLimitReached).toBe(true);
+    // a cota diária renova à meia-noite do Pacífico (história 12): a pausa do perfil vai até lá
+    expect(report.usageLimitHint).toEqual({ resetsAt: null, text: null, dailyResetZone: 'America/Los_Angeles' });
     expect(lines.at(-1)).toMatch(/^Terminou com erro: \[API Error: You have exhausted your daily quota/);
     // os zeros do result de erro são o que a CLI informa: nada foi gasto
     expect(report.consumption).toMatchObject({ inputTokens: 0, outputTokens: 0 });
@@ -89,6 +91,13 @@ describe('leitor do Gemini: casos de borda', () => {
     expect(reader.push('não é json', 'stdout')).toEqual(['não é json']);
     expect(reader.push('{"type":"result"}', 'stderr')).toEqual(['{"type":"result"}']);
     expect(reader.report().usageLimitReached).toBe(true);
+  });
+  it('o 429 por minuto no stderr traz a espera da API; o texto do assistente que fala de cota não liga o limite', () => {
+    const reader = geminiReader();
+    reader.push(ev({ type: 'message', role: 'assistant', content: 'O README explica a quota exceeded do projeto.\n' }), 'stdout');
+    expect(reader.report().usageLimitReached).toBe(false);
+    reader.push('Attempt 3 failed: You exceeded your current quota. Quota exceeded for metric x. Please retry in 41s.', 'stderr');
+    expect(reader.report()).toMatchObject({ usageLimitReached: true, usageLimitHint: { retryAfterMs: 41_000 } });
   });
   it('sem nada lido: não medido', () => {
     expect(geminiReader().report()).toMatchObject({ measure: 'none', consumption: null, inventory: [] });
