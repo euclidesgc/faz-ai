@@ -84,7 +84,15 @@ validado em ambiente local controlado; Cursor e Kimi Code **não validados**).
 
 **Detectar modelos** lê a lista da ferramenta: no Cursor, dos modelos da sua conta, pelo comando
 `cursor-agent models`, lido ao abrir o board com a CLI autenticada, e a primeira lista lida
-substitui a embutida uma vez só; no Claude Code, uma lista embutida que pode ser editada.
+substitui a embutida uma vez só; no Claude Code, uma lista embutida que pode ser editada. Num perfil
+com **Agente ACP**, o botão abre uma sessão com o agente (`initialize` e `session/new`, sem pedido,
+então sem gastar a sua conta) e lê os modelos que ele anuncia: o seletor de modelo das opções da
+sessão, no esquema atual do protocolo, ou o bloco `models` da forma anterior, que o Gemini CLI ainda
+usa. O modelo atual do agente fica em primeiro. Um agente que não anuncia modelos deixa o catálogo
+como está, com o aviso; aí vale **Novo modelo** ou **Outro modelo…** no card. Na execução, o modelo
+do card vai pelo seletor da sessão (`session/set_config_option`) quando o agente o expõe, e pela
+linha de comando (`--model`) onde o agente aceita; o agente que não aceita nenhum dos dois segue com
+o modelo dele, e o log da execução diz qual.
 
 No Cursor, a lista traz uma linha por nível de cada modelo (`claude-opus-5-5-low`, `-medium`,
 `-high`…); o board junta as variantes num modelo com os níveis dele. As versões rápidas (`-fast`,

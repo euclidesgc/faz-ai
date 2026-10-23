@@ -87,6 +87,15 @@ environment; Cursor and Kimi Code **not validated**).
 **Detectar modelos** (detect models) reads the tool's list: for Cursor, the models of your account,
 through the `cursor-agent models` command, read when the board opens with the CLI signed in, and the
 first list read replaces the built-in one only once; for Claude Code, a built-in list you can edit.
+In a profile with **Agente ACP** (ACP agent), the button opens a session with the agent (`initialize`
+and `session/new`, with no prompt, so it does not spend your account) and reads the models it
+announces: the model selector among the session config options, in the protocol's current schema, or
+the `models` block of the earlier form, which Gemini CLI still uses. The agent's current model comes
+first. An agent that announces no models leaves the catalog as it is, with a warning; then **Novo
+modelo** (new model) or **Outro modelo…** (other model) in the card apply. When running, the card's
+model goes through the session selector (`session/set_config_option`) when the agent exposes it, and
+through the command line (`--model`) where the agent accepts it; an agent that takes neither keeps
+its own model, and the run log says which.
 
 For Cursor, the list has one line per level of each model (`claude-opus-5-5-low`, `-medium`,
 `-high`…); the board groups the variants into one model with its levels. The fast versions (`-fast`,

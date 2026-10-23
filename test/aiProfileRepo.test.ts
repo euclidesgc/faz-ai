@@ -183,6 +183,14 @@ it('duplicar um pronto copia a lista de itens carregados; salvar grava o isolame
   expect(repo.list(boardId).find((p) => p.id === copy.id)!.config).toEqual(saved.config);
   const custom = repo.save(boardId, draft(), 'person');
   expect(custom.config).toEqual({});
+  // o agente ACP é o id do catálogo, não segredo: volta na leitura pública para o board reconhecer o perfil
+  const acp = repo.save(
+    boardId,
+    draft({ id: 'gemini-acp', name: 'Gemini ACP', config: { acpAgent: 'gemini', env: { X: '1' } } }),
+    'person',
+  );
+  expect(acp.config).toEqual({ acpAgent: 'gemini' });
+  expect(repo.list(boardId).find((p) => p.id === 'gemini-acp')!.config).toEqual({ acpAgent: 'gemini' });
   expect(JSON.stringify(repo.list(boardId))).not.toContain('private-command-sentinel');
   expect(() =>
     repo.save(boardId, draft({ config: { command: 'x', isolation: { loads: [{ kind: 'x', scope: 'user' }] } as never } }), 'person'),

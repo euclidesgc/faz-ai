@@ -31,7 +31,7 @@ import { agentProfiles } from '../../shared/execution';
 import { columnsOf } from '../../shared/selectors';
 import type { AttachmentStore } from '../attachments';
 import { headlessUnsupported } from '../headless';
-import { activeProfile } from '../../shared/aiProfiles';
+import { activeProfile, isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
 import { boardServerFootprint } from '../mcp/footprint';
 import type { RunResolver } from '../log/eventLog';
 import { getMetrics, getPanelMetrics, type MetricsQuery, type MetricsResult } from '../log/metrics';
@@ -252,6 +252,18 @@ export class MessageRouter {
   }
   setAiProfileRuntime(runtime: AiProfileRuntime): void {
     this.aiProfileRuntime = runtime;
+  }
+  private acpModelsReader: ((profile: AiProfile) => Promise<void>) | null = null;
+  /** Quem abre a sessão do agente ACP e guarda os modelos que ele anuncia (`rememberModels`), para o "Detectar" juntar ao catálogo. */
+  onAcpModels(fn: (profile: AiProfile) => Promise<void>): void {
+    this.acpModelsReader = fn;
+  }
+  /** Lê os modelos do agente quando `tool` é um perfil ACP; nos outros perfis não faz nada (a lista já vem da CLI ou é embutida). */
+  async readAcpModels(tool: string): Promise<void> {
+    const profile = this.snapshot().board.aiProfiles.find((p) => p.id === tool);
+    if (!profile || !isAcpProfile(profile)) return;
+    if (!this.acpModelsReader) throw new Error('Leitura de modelos do agente ACP indisponível neste host.');
+    await this.acpModelsReader(profile);
   }
   probeAiProfiles() {
     if (!this.aiProfileRuntime) throw new Error('Situação dos perfis indisponível neste host.');

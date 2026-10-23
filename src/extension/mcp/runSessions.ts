@@ -242,6 +242,8 @@ export class RunMcpSessions {
       'previewContextDraft',
       'readLibraryArtifact',
       'libraryMcpDefinitions',
+      // o detect_models de um perfil ACP abre a sessão do agente antes de juntar ao catálogo
+      'readAcpModels',
       'metrics',
       'panelMetrics',
       'mcpAccess',

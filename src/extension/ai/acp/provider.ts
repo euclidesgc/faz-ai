@@ -12,6 +12,9 @@ import type { OutputStream } from '../../aiOutput/reader';
 import type { RunningProcess } from '../../runner';
 import type { AiMeasure, HeadlessInput } from '../provider';
 
+/** A versão do protocolo que o board fala; o `initialize` confere a do agente. */
+export const ACP_PROTOCOL_VERSION = 1;
+
 /** Um servidor MCP stdio como o ACP o recebe em `session/new` (o `env` é lista, não mapa). */
 export interface AcpMcpServer {
   name: string;

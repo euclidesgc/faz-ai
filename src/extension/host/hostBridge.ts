@@ -315,6 +315,11 @@ export class HostBridge {
       case 'harness.import.scan':
         await this.router.scanImport(msg.source);
         return;
+      case 'settings.models.detect':
+        // num perfil ACP a lista vem do agente, por uma sessão aberta agora; nos outros, da última leitura da CLI
+        if (!msg.fastOnly) await this.router.readAcpModels(msg.tool);
+        this.router.handle(msg);
+        return;
       case 'harness.import.apply': {
         this.router.handle(msg);
         const notice = this.router.takeImportNotice();
