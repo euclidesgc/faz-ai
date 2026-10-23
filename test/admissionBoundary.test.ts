@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { AdmissionBlockedError, ExecutionAdmission, bindingEnvironment } from '../src/extension/ai/admission';
+import {
+  AdmissionBlockedError,
+  ExecutionAdmission,
+  bindingEnvironment,
+  isolationInput as isolationInputOf,
+} from '../src/extension/ai/admission';
 import { acpSessionMode } from '../src/extension/ai/acp/provider';
 import { acpAgent } from '../src/extension/ai/acp/agents';
 import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
@@ -14,6 +19,9 @@ import {
   type StrictExecutionRequest,
 } from '../src/shared/executionAdmission';
 import type { HeadlessInput } from '../src/extension/headless';
+import { ACP_AGENTS } from '../src/extension/ai/acp/agents';
+import { BUILTIN_PROFILES } from '../src/shared/aiProfiles';
+import { referenceBinding } from './helpers/bindingReference';
 
 // Fixtures de teste: nenhum recibo aqui representa verificação de uma CLI real.
 let dir: string;
@@ -326,5 +334,124 @@ describe('vínculo de isolamento saneado', () => {
     expect(env.MINHA_VAR).toBe('do-perfil');
     for (const k of ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'MEU_TOKEN']) expect(env[k]).toBe('<definida>');
     expect(JSON.stringify(env)).not.toMatch(/segredo|chave-gemini/);
+  });
+});
+
+describe('os mesmos vínculos com o contrato de execução (história 6)', () => {
+  // O vínculo é o hash a que cada prova gravada está presa: se a parte da ferramenta, que agora vem do
+  // driver (`bindingContext`), mudasse uma vírgula, toda prova perderia a validade. A régua é o cálculo da
+  // admissão antes do driver, congelado em `helpers/bindingReference.ts`.
+  const options = () => ({ pathEnv: dir, homeDir: dir, environmentEvidence: { state: 'complete' as const, digest: 'a'.repeat(64) } });
+  const ready = (id: string) => ({ ...BUILTIN_PROFILES.find((p) => p.id === id)!, enabled: true });
+  const exec = (over: Partial<NonNullable<HeadlessInput['exec']>> = {}): HeadlessInput['exec'] => ({
+    agent: '',
+    agentDefinition: null,
+    mcpBlocked: [],
+    model: { name: 'modelo-x', effort: null },
+    tools: ['Read', 'Grep'],
+    deniedTools: ['Agent'],
+    toolSet: 'explicit',
+    mcpTools: ['mcp__faz-ai__get_card'],
+    mcpAllowed: [],
+    mcpConfig: '{"mcpServers":{"faz-ai":{"command":"node","args":["mcp.js"]}}}',
+    ...over,
+  });
+  const inputs = (): HeadlessInput[] => [
+    { prompt: 'objetivo', permission: 'board' },
+    { prompt: 'outro objetivo', permission: 'edits', exec: exec() },
+    { prompt: 'objetivo', permission: 'full', exec: exec({ deniedTools: [], toolSet: undefined }), addDirs: ['extra'] },
+    // fora da admissão: no ACP, o modo sem perguntas
+    { prompt: 'objetivo', permission: 'full' },
+  ];
+  beforeEach(() => {
+    for (const name of ['claude', 'cursor-agent', 'kimi', ...ACP_AGENTS.map((a) => a.command)]) exe(name, `binário ${name}`);
+    fs.mkdirSync(path.join(dir, 'extra'));
+  });
+  const cases = (): [string, Parameters<ExecutionAdmission['binding']>[0], string][] => [
+    ['Claude Code pronto (pelo id)', 'claude', 'claude'],
+    ['Claude Code pronto (pelo perfil)', ready('claude'), 'claude'],
+    ['Cursor pronto', ready('cursor'), 'cursor'],
+    ['Kimi Code pronto', ready('kimi'), 'kimi'],
+    [
+      'cópia do Claude Code com comando, ambiente e PATH próprios',
+      profile({
+        id: 'copia',
+        config: { command: exe('claude-copia', 'cópia'), env: { PATH: dir, MINHA_VAR: 'x' }, extraArgs: ['--verbose'] },
+      }),
+      'copia',
+    ],
+    [
+      'CLI personalizada (sem driver)',
+      profile({
+        id: 'pers',
+        kind: 'custom',
+        tool: 'pers',
+        mode: 'cli',
+        base: 'generic',
+        config: {
+          command: exe('minha-cli', 'pers'),
+          args: ['--prompt', '{prompt}'],
+          permissionArgs: { board: ['--somente-leitura'], edits: ['--editar'] },
+          env: { X_PERFIL: '1' },
+        },
+      }),
+      'pers',
+    ],
+    ...ACP_AGENTS.map((a): [string, AiProfile, string] => [
+      `agente ACP ${a.id} como personalizado`,
+      profile({ id: `acp-${a.id}`, kind: 'custom', tool: `acp-${a.id}`, mode: 'acp', base: 'generic', config: { acpAgent: a.id } }),
+      `acp-${a.id}`,
+    ]),
+    ['Gemini pronto (ACP)', ready('gemini'), 'gemini'],
+    // o comando do agente não leva o ambiente do perfil: o PATH que resolve o executável é o do host,
+    // mesmo com outro PATH no perfil (é o que o vínculo fazia antes, e o que a régua repete)
+    [
+      'agente ACP personalizado com PATH e variável próprios no perfil',
+      profile({
+        id: 'acp-path',
+        kind: 'custom',
+        tool: 'acp-path',
+        mode: 'acp',
+        base: 'generic',
+        config: { acpAgent: 'gemini', env: { PATH: '/caminho/que/nao/existe', MINHA_VAR: 'x' } },
+      }),
+      'acp-path',
+    ],
+  ];
+  it('Claude, as outras CLIs, a CLI personalizada e os agentes ACP: vínculo de isolamento e de execução iguais aos de antes', () => {
+    let compared = 0;
+    for (const [label, executor, profileId] of cases()) {
+      for (const i of inputs()) {
+        for (const cwd of [null, dir]) {
+          // a recusa também conta: o que a régua recusava (CLI personalizada no modo estrito) segue recusado
+          const outcome = (fn: () => string) => {
+            try {
+              return { binding: fn() };
+            } catch (e) {
+              return { error: (e as Error).message };
+            }
+          };
+          const now = outcome(() => admission.binding(executor, profileId, i, cwd).binding);
+          expect(now, `${label}, ${i.permission}, ${cwd ?? 'isolamento'}`).toEqual(
+            outcome(() => referenceBinding(executor, profileId, i, cwd, options())),
+          );
+          if ('binding' in now) compared++;
+        }
+      }
+    }
+    // a maior parte das combinações dá vínculo; só a CLI personalizada no modo estrito é recusada
+    expect(compared).toBeGreaterThan(cases().length * inputs().length);
+  });
+  it('a execução admitida (Claude e ACP) fica presa ao mesmo vínculo de isolamento de antes', () => {
+    const claude = profile({ config: { command: exe('claude-h6', 'binário H6') } });
+    const isolation = referenceBinding(claude, claude.id, isolationInputOf('board'), null, options());
+    authorize(isolation);
+    expect(admission.prepare(claude, claude.id, input(), dir, request()).decision.binding).toBe(isolation);
+    const acp = profile({ kind: 'custom', tool: 'perfil', mode: 'acp', base: 'generic', config: { acpAgent: 'gemini' } });
+    const acpIsolation = referenceBinding(acp, acp.id, isolationInputOf('board'), null, options());
+    expect(admission.isolationBinding(acp, acp.id, 'edits').binding).toBe(acpIsolation);
+    // o PATH do perfil não entra no ACP: o executável sai do PATH do host e o vínculo é o mesmo de sem ele
+    const withPath = profile({ ...acp, config: { acpAgent: 'gemini', env: { PATH: '/caminho/que/nao/existe' } } });
+    expect(admission.binding(withPath, acp.id, isolationInputOf('board'), null).executable).toBe(fs.realpathSync(path.join(dir, 'gemini')));
   });
 });

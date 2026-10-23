@@ -14,6 +14,7 @@ import { isAcpProfile, isReadyCli } from '../../shared/aiProfiles';
 import { resolveCommand } from '../cliResolve';
 import { acpAgent } from './acp/agents';
 import { acpCommand, acpSessionMode, type AcpAgent } from './acp/provider';
+import { executorOf } from './drivers';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import { boardOnlyMcpConfig } from '../execution';
 import { canonical, CapabilityEvidenceStore } from './capabilityEvidence';
@@ -57,6 +58,11 @@ export function admissionAgent(profile: AiProfile): AcpAgent | null {
   if (!agent) throw new Error(`Agente ACP desconhecido: ${String(profile.config.acpAgent)}.`);
   return agent;
 }
+/**
+ * O transporte que o perfil roda de fato: a mesma regra de `executorOf` (o transporte do executor), sem
+ * lançar pelo agente desconhecido, porque a prévia e o Diagnóstico leem o transporte antes de montar o
+ * vínculo (e é o vínculo que recusa o agente).
+ */
 export const admissionTransport = (profile: AiProfile): ExecutionTransport => (isAcpProfile(profile) ? 'acp' : 'cli');
 function digestFile(file: string): { digest: string; stat: fs.Stats } {
   const hash = createHash('sha256');
@@ -178,25 +184,10 @@ export class ExecutionAdmission {
     cwd: string | null,
   ): { binding: string; executable: string; environmentComplete: boolean } {
     const profile = executorProfile(executor);
-    const agent = admissionAgent(profile);
-    // no ACP o vínculo é o comando e os argumentos do agente do catálogo: não há flags de isolamento,
-    // arquivo temporário nem formato de saída; o modelo do card entra nos argumentos quando o agente aceita.
-    // O modo da sessão também entra: no modo sem perguntas (`fullMode`) o board não decide mais cada
-    // pedido, então uma prova feita no modo padrão nunca pode valer para ele
-    const template = agent
-      ? {
-          transport: 'acp' as const,
-          agent: agent.id,
-          ...acpCommand(agent, { ...input, prompt: '<prompt-da-execucao>' }),
-          sessionMode: acpSessionMode(agent, input) ?? 'padrao',
-        }
-      : headlessCommand(profile, { ...input, prompt: '<prompt-da-execucao>', structured: true });
-    const executable = resolveCommand(
-      template.command,
-      ('env' in template ? template.env?.PATH : undefined) ?? this.options.pathEnv(),
-      this.options.homeDir,
-      'lookup' in template ? template.lookup : undefined,
-    );
+    // a parte da ferramenta (o que a linha de comando fixa e qual executável) vem do driver; o resto do
+    // contexto é o mesmo para toda ferramenta e fica aqui, onde é canonizado e vira o hash
+    const tool = executorOf(profile).bindingContext({ ...input, prompt: '<prompt-da-execucao>' }, { profile, cwd });
+    const executable = resolveCommand(tool.command, tool.pathEnv ?? this.options.pathEnv(), this.options.homeDir, tool.lookup);
     if (!executable) throw new Error('Executor indisponível para admissão.');
     const real = fs.realpathSync(executable);
     const environment = this.options.environmentEvidence();
@@ -215,7 +206,7 @@ export class ExecutionAdmission {
       // a permissão não entra por si: no modo estrito a invocação do Claude é a mesma nos três níveis
       // (o conjunto exato de ferramentas é a execução que fixa, no vínculo dela) e no ACP o comando não
       // a carrega; onde ela muda a linha de comando (perfil personalizado), entra pela invocação
-      invocation: template,
+      invocation: tool.invocation,
       // cwd nulo = vínculo de isolamento: a prova roda numa fixture e vale para qualquer pasta de projeto
       ...(cwd === null
         ? { scope: 'isolation' }
@@ -223,7 +214,7 @@ export class ExecutionAdmission {
             cwd: fs.realpathSync(cwd),
             additionalDirectories: (input.addDirs ?? []).map((d) => fs.realpathSync(path.resolve(cwd, d))),
           }),
-      environment: bindingEnvironment(process.env, this.options.pathEnv(), 'env' in template ? template.env : undefined),
+      environment: bindingEnvironment(process.env, this.options.pathEnv(), tool.env),
       environmentEvidence: environment,
     };
     return {

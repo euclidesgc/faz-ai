@@ -1,7 +1,8 @@
 // O transporte ACP: uma execução do board = um processo do agente, uma sessão, um `session/prompt`.
 // Devolve o mesmo `Measured` do transporte das CLIs (`aiOutput/measured.ts`) — `proc.onExit` uma vez,
 // `proc.kill`, `report()` no fim —, e é isso que faz o desenho caber no gateway sem mexer no ciclo do
-// log de uso: o gateway escolhe `spawnMeasured` ou `spawnAcp` pela ferramenta e o resto é o mesmo.
+// log de uso: o gateway roda pelo driver do perfil (`executorOf`), que chama `spawnMeasured` ou
+// `spawnAcp`, e o resto é o mesmo.
 // Um transporte para todos os agentes ACP; o que muda de um para outro é dado (`acp/agents.ts`).
 //
 // O que muda em relação ao `-p`:

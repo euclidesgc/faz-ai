@@ -1,7 +1,6 @@
 import type { ContextDraftResolution } from '../../shared/contextDraftResolution';
 import type { AcpSpawnFn } from './acp/provider';
-import { acpAgent } from './acp/agents';
-import { spawnAcp } from './acp/run';
+import { executorOf } from './drivers';
 import { executorProfile } from './providers';
 import { redactCredentialValues } from '../credentials';
 import { authFailed } from './profileAuth';
@@ -22,7 +21,7 @@ import { cursorToolNames, type CursorManifest } from './cursorManifest';
 import type { AiTool } from '../../shared/harness';
 import type { AiRunConfig, AiRunOrigin, AiRunOutcome, AiRunStart, RunReport } from '../../shared/log';
 import type { MeasureError } from '../aiOutput/errors';
-import { spawnMeasured, type Measured, type SpawnFn } from '../aiOutput/measured';
+import type { Measured, SpawnFn } from '../aiOutput/measured';
 import type { OutputFormat } from '../aiOutput/reader';
 import { headlessUnsupported, type HeadlessCommand, type HeadlessInput } from '../headless';
 import type { RunLog } from '../log/runLog';
@@ -326,14 +325,13 @@ export class AiGateway {
         input = admitted.input;
       }
       // a ferramenta sem suporte para esta permissão nem começa: confere antes de gravar a configuração
-      const agent = isAcpProfile(profile) ? acpAgent(String(profile.config.acpAgent)) : undefined;
-      if (isAcpProfile(profile)) {
-        if (!agent) throw new Error(`Agente ACP desconhecido: ${String(profile.config.acpAgent)}.`);
+      const executor = executorOf(profile);
+      if (executor.transport === 'acp') {
         if (!this.deps.spawnAcp) throw new Error('Transporte ACP indisponível neste host.');
         // a admissão vinculou o comando do agente, não o de uma CLI: o validador certo é o do transporte
         if (admitted && admitted.transport !== 'acp') throw new Error('A admissão não é do transporte ACP; o perfil não roda.');
       } else if (admitted && admitted.transport !== 'cli') throw new Error('A admissão é de um agente ACP; o perfil não roda pela CLI.');
-      const unsupported = admitted || agent ? null : headlessUnsupported(profile, input.permission);
+      const unsupported = admitted || executor.transport === 'acp' ? null : headlessUnsupported(profile, input.permission);
       if (unsupported) throw new Error(unsupported);
       if (admitted) {
         if (!runLog.describeRequired) throw new Error('Registro obrigatório da admissão indisponível.');
@@ -348,11 +346,15 @@ export class AiGateway {
           privateAuthFailed ||= authFailed(profile!, Object.values(authTails), false);
         }
       };
-      // o transporte é a única diferença: o ciclo do log, a admissão e o cancelamento seguem iguais
-      if (agent) {
-        const spawnProcess = this.deps.spawnAcp!;
-        measured = spawnAcp(agent, input, call.cwd, {
-          spawn: (command, cwd, out) => {
+      // o driver é a única diferença: o ciclo do log, a admissão e o cancelamento seguem iguais. Os dois
+      // `spawn` levam as conferências do gateway; o driver usa o do transporte dele
+      const spawnProcess = this.deps.spawnAcp;
+      measured = executor.run(input, {
+        profile,
+        cwd: call.cwd,
+        spawnAcp:
+          spawnProcess &&
+          ((command, cwd, out) => {
             attempts++;
             format = 'text';
             snapshot?.validate();
@@ -363,54 +365,49 @@ export class AiGateway {
               watch(text, stream);
               out(text, stream);
             });
-          },
-          log: (line) => call.log(redact(line)),
-          runId,
-          leaseCoordinationDir: this.deps.leaseCoordinationDir,
-        });
-      } else
-        measured = spawnMeasured(profile, input, call.cwd, {
-          spawn: (command, cwd, out, control) => {
-            attempts++;
-            format = command.format;
-            call.onAttempt?.(command);
+          }),
+        spawn: (command, cwd, out, control) => {
+          attempts++;
+          format = command.format;
+          call.onAttempt?.(command);
+          snapshot?.validate();
+          const checked = admitted?.command(command) ?? command;
+          const validate = () => {
+            if (workToken !== undefined) this.deps.sessions!.assert(workToken);
             snapshot?.validate();
-            const checked = admitted?.command(command) ?? command;
-            const validate = () => {
-              if (workToken !== undefined) this.deps.sessions!.assert(workToken);
-              snapshot?.validate();
-              admitted?.command(checked);
-            };
-            return this.deps.spawn(
-              checked,
-              cwd,
-              (text, stream) => {
-                watch(text, stream);
-                out(text, stream);
-              },
-              control && (admitted || snapshot || call.beforeStart)
-                ? {
-                    beforePreparation: () => {
-                      validate();
-                      control.beforePreparation();
-                    },
-                    beforeStart: (identity) => {
-                      validate();
-                      const previous = control.beforeStart(identity);
-                      const record = () => call.beforeStart?.(identity);
-                      const ready = previous ? previous.then(record) : record();
-                      if (ready) return ready.then(validate);
-                      validate();
-                    },
-                  }
-                : control,
-            );
-          },
-          log: (line) => call.log(redact(line)),
-          runId,
-          leaseCoordinationDir: this.deps.leaseCoordinationDir,
-          execManifest: this.cursorManifestFor(profile, runId, conference, call.log),
-        });
+            admitted?.command(checked);
+          };
+          return this.deps.spawn(
+            checked,
+            cwd,
+            (text, stream) => {
+              watch(text, stream);
+              out(text, stream);
+            },
+            control && (admitted || snapshot || call.beforeStart)
+              ? {
+                  beforePreparation: () => {
+                    validate();
+                    control.beforePreparation();
+                  },
+                  beforeStart: (identity) => {
+                    validate();
+                    const previous = control.beforeStart(identity);
+                    const record = () => call.beforeStart?.(identity);
+                    const ready = previous ? previous.then(record) : record();
+                    if (ready) return ready.then(validate);
+                    validate();
+                  },
+                }
+              : control,
+          );
+        },
+        log: (line) => call.log(redact(line)),
+        runId,
+        leaseCoordinationDir: this.deps.leaseCoordinationDir,
+        // o manifesto do hook só existe no Cursor; o executor de ACP não o lê
+        execManifest: executor.transport === 'cli' ? this.cursorManifestFor(profile, runId, conference, call.log) : undefined,
+      });
     } catch (e) {
       revoke();
       if (e instanceof Error) {
