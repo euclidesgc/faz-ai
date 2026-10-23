@@ -78,6 +78,60 @@ describe('checkRun', () => {
   });
 });
 
+describe('checkRun com inventário ACP (kind do protocolo)', () => {
+  const condutor = manifest({ tools: ['Read', 'Grep', 'Glob', 'Agent', 'Bash'], deniedTools: [] });
+  it('think e other com as tools do condutor não são desvio', () => {
+    expect(
+      check(
+        [
+          { kind: 'tool', name: 'think', calls: 3 },
+          { kind: 'tool', name: 'other', calls: 2 },
+          { kind: 'tool', name: 'switch_mode', calls: 1 },
+        ],
+        condutor,
+      ),
+    ).toEqual({ status: 'ok' });
+  });
+  it('read, search e execute dentro das tools do card não são desvio', () => {
+    expect(
+      check(
+        [
+          { kind: 'tool', name: 'read', calls: 1 },
+          { kind: 'tool', name: 'search', calls: 1 },
+          { kind: 'tool', name: 'execute', calls: 1 },
+        ],
+        condutor,
+      ),
+    ).toEqual({ status: 'ok' });
+  });
+  it('execute com Bash fora de tools é desvio', () => {
+    expect(check([{ kind: 'tool', name: 'execute', calls: 2 }], manifest({ tools: ['Read'], deniedTools: [] }))).toEqual({
+      status: 'deviation',
+      deviations: [{ kind: 'tool', name: 'execute', calls: 2 }],
+    });
+  });
+  it('edit com Edit em deniedTools é desvio', () => {
+    expect(check([{ kind: 'tool', name: 'edit', calls: 1 }], manifest({ tools: [], deniedTools: ['Edit'] }))).toEqual({
+      status: 'deviation',
+      deviations: [{ kind: 'tool', name: 'edit', calls: 1 }],
+    });
+  });
+  it('edit passa se qualquer equivalente está em tools e nenhum negado; delete aceita Bash', () => {
+    expect(check([{ kind: 'tool', name: 'edit', calls: 1 }], manifest({ tools: ['Write'], deniedTools: [] }))).toEqual({ status: 'ok' });
+    expect(check([{ kind: 'tool', name: 'delete', calls: 1 }], manifest({ tools: ['Bash'], deniedTools: [] }))).toEqual({ status: 'ok' });
+  });
+  it('o inventário do Claude continua igual: nomes do card contra tools e deniedTools', () => {
+    expect(check([{ kind: 'tool', name: 'Bash', calls: 1 }], manifest({ tools: ['Read'], deniedTools: [] }))).toEqual({
+      status: 'deviation',
+      deviations: [{ kind: 'tool', name: 'Bash', calls: 1 }],
+    });
+    expect(check([{ kind: 'tool', name: 'Agent', calls: 1 }], manifest({ tools: [] }))).toEqual({
+      status: 'deviation',
+      deviations: [{ kind: 'tool', name: 'Agent', calls: 1 }],
+    });
+  });
+});
+
 import { runCheckLine, runCheckNotice, type RunCheck } from '../src/shared/runCheck';
 
 describe('runCheckLine e runCheckNotice', () => {
