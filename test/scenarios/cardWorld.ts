@@ -69,6 +69,8 @@ export interface CardWorldOptions {
   /** as ferramentas do agente da fase */
   tools: string[];
   permission?: RunnerPermission;
+  /** com `profile: 'gemini'`: o Gemini é o perfil padrão do board (`board.aiTool`) e o card não escolhe modelo */
+  boardDefault?: boolean;
   /** o processo do agente ACP; obrigatório no perfil ACP */
   spawnAcp?: AcpSpawnFn;
 }
@@ -118,6 +120,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   router.handle({
     type: 'settings.board.update',
     patch: {
+      ...(options.profile === 'gemini' && options.boardDefault ? { aiTool: 'gemini' } : {}),
       runner: {
         defaultAgent: 'condutor-do-board',
         permission: options.permission ?? 'full',
@@ -189,7 +192,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   const story = s.workflows.find((w) => w.kind === 'parent')!;
   const phase = s.columns.filter((c) => c.workflowId === story.id && c.aiActive).sort((a, b) => a.position - b.position)[0]!;
   const cardId = router.createCard({ typeId: s.cardTypes[0]!.id, columnId: phase.id, parentId: null, title: 'Card do cenário' });
-  if (options.profile === 'gemini') {
+  if (options.profile === 'gemini' && !options.boardDefault) {
     const field = s.fieldDefs.find((f) => f.kind === 'model')!;
     router.handle({ type: 'field.setValue', cardId, fieldId: field.id, value: GEMINI_MODEL.id });
   }

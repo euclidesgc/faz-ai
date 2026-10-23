@@ -121,6 +121,16 @@ describe('identidade e conversões', () => {
     });
   });
 
+  it('perfil ACP/genérico (sem tabela em AGENT_TOOLS) mantém as ferramentas do card, sem traduzir', () => {
+    for (const tool of ['gemini', 'codex-acp', 'meu-perfil-generico'])
+      expect(agentOfArtifact(agent, tool)).toMatchObject({ tools: ['Read'], deniedTools: ['Bash'], modelValue: '' });
+  });
+
+  it('cursor e kimi seguem traduzindo pela tabela (o agente do Claude vira o vocabulário deles)', () => {
+    expect(agentOfArtifact(agent, 'cursor')).toMatchObject({ tools: [], deniedTools: [] });
+    expect(agentOfArtifact(agent, 'kimi').tools).toEqual([]);
+  });
+
   it('agente sem meta usa valores vazios', () => {
     expect(profileOfArtifact(base({ kind: 'agent' }), false)).toMatchObject({
       tools: [],

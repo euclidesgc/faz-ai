@@ -107,3 +107,36 @@ describe('cenário: o mesmo card no perfil Claude CLI padrão', () => {
     expect(end.code).toBe(0);
   });
 });
+
+describe('cenário: Gemini ACP como perfil padrão do board (o agente criado para o Claude)', () => {
+  it('D: o desvio real (execute sem Bash) é pego e think/other/read continuam sem desvio', async () => {
+    const agent = new FakeAgent({ onPrompt: workingTurn(() => world!) });
+    world = await cardWorld({
+      profile: 'gemini',
+      boardDefault: true,
+      tools: CONDUTOR_TOOLS.filter((t) => t !== 'Bash'),
+      spawnAcp: agent.spawn,
+    });
+    expect(world.router.snapshot().board.aiTool).toBe('gemini');
+
+    const end = await world.run();
+
+    expect(world.aiRun()).toMatchObject({ tool: 'gemini', outcome: 'done' });
+    // só o execute desvia; think, other e read não
+    expect(end.check).toEqual({ status: 'deviation', deviations: [{ kind: 'tool', name: 'execute', calls: 1 }] });
+    expect(world.comments()).toContain(`${DEVIATION} do que o card liberou (ferramenta execute).`);
+  });
+
+  it('E: com Bash liberado não há desvio, e a linha de log mostra gemini sem máscara', async () => {
+    const agent = new FakeAgent({ onPrompt: workingTurn(() => world!) });
+    world = await cardWorld({ profile: 'gemini', boardDefault: true, tools: CONDUTOR_TOOLS, spawnAcp: agent.spawn });
+
+    const end = await world.run();
+
+    expect(end.check).toEqual({ status: 'ok' });
+    const call = world.lines.find((l) => l.includes('Chamando Gemini CLI (ACP)'))!;
+    expect(call).toContain('gemini');
+    expect(call).toBe('[#1] Chamando Gemini CLI (ACP): gemini --acp --skip-trust');
+    expect(call).not.toContain('[credencial local]');
+  });
+});

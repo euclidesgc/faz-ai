@@ -36,10 +36,31 @@ class PrivateValues {
     }
   }
 }
+/**
+ * Campos da configuração do perfil que descrevem como chamar a ferramenta e nunca guardam segredo (nome do agente
+ * ACP, comando, formato do prompt, onde fica o servidor do board...). Mascará-los trocaria
+ * "gemini" por "[credencial local]" no log. `args`, `extraArgs`, `env` e qualquer outro campo continuam mascarados.
+ */
+const NON_SECRET_CONFIG_KEYS = new Set([
+  'acpAgent',
+  'command',
+  'promptVia',
+  'boardServer',
+  'mcpProjectFile',
+  'installUrl',
+  'versionArgs',
+  'statusArgs',
+  'isolation',
+]);
+
 /** Saídas de sondas usam a mesma ocultação de valores dos comandos de execução. */
 export function redactCredentialValues(text: string, value: unknown): string {
   const privateValues = new PrivateValues();
-  privateValues.remember(value);
+  if (value && typeof value === 'object' && !Array.isArray(value))
+    for (const [key, item] of Object.entries(value)) {
+      if (!NON_SECRET_CONFIG_KEYS.has(key)) privateValues.remember(item);
+    }
+  else privateValues.remember(value);
   return privateValues.redact(text);
 }
 
