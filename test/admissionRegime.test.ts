@@ -7,6 +7,7 @@ import { openInMemory, type DbHandle } from '../src/extension/db/database';
 import { BoardContext } from '../src/extension/panel/handlers/context';
 import { admissionRegimeOf, DEFAULT_RUNNER, parseRunner } from '../src/shared/runner';
 import { admitExecution } from '../src/shared/executionAdmission';
+import { legacyStrictRequest } from '../src/extension/ai/v1Prepare';
 import type { StrictExecutionRequest } from '../src/shared/executionAdmission';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -93,5 +94,24 @@ describe('o repositório sobe a revisão quando a pessoa liga o compatível', ()
     expect(runner()).toMatchObject({ admissionRegime: 'exclusive', compatibilityReviewRevision: 1 });
     ctx.boards.updateBoard(ctx.boardId, { runner: { admissionRegime: 'compatible' } });
     expect(runner().compatibilityReviewRevision).toBe(2);
+  });
+});
+
+describe('pedido de admissão do runtime legado para um perfil personalizado', () => {
+  it('leva o regime do board, as categorias do nível e os MCPs do plano pelo nome; a admissão o aceita', () => {
+    const runner = { ...DEFAULT_RUNNER, admissionRegime: 'compatible' as const, compatibilityReviewRevision: 1 };
+    const request = legacyStrictRequest(runner, 'edits', ['memoria', 'memoria']);
+    expect(request).toMatchObject({
+      regime: 'compatible',
+      compatibilityReview: { actor: 'person', revision: 1 },
+      agentTools: { categories: ['read', 'edit'] },
+      activeMcpIds: ['memoria'],
+      mcpServers: [{ artifactId: 'memoria', name: 'memoria' }],
+      mcpLevel: { permission: 'edits' },
+    });
+    const decision = admitExecution('generic', 'edits', request, 'a'.repeat(64), [], 1000, 'acp');
+    expect(decision.reasons.map((r) => r.code)).not.toContain('invalid-request');
+    expect(decision.reasons.map((r) => r.code)).not.toContain('mcp-outside-boundary');
+    expect(legacyStrictRequest(DEFAULT_RUNNER, 'full', []).agentTools.categories).toEqual(['read', 'edit', 'run', 'net']);
   });
 });

@@ -336,7 +336,12 @@ export class ChatSession {
         // no chat não há agente do board nem subagente escolhido: `null` é "não definido", não "vazio"
         prepare: () => ({
           // runtime v1: contexto fechado, sem agente nem MCP além do contrato vazio (o chat não tem card)
-          ...(this.deps.gateway.runtime === 'v1' ? closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly) : {}),
+          ...(this.deps.gateway.runtime === 'v1'
+            ? closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly)
+            : // runtime legado: o perfil personalizado precisa da admissão; só o pedido, sem a configuração v1
+              target.cli.kind !== 'builtin'
+              ? { strict: closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly).strict }
+              : {}),
           artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state) : undefined,
           config: {
             model: plan.model?.name ?? null,
