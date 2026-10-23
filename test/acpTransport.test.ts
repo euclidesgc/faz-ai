@@ -9,8 +9,12 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { ACP_AGENTS, acpAgent } from '../src/extension/ai/acp/agents';
 import type { AcpAgent } from '../src/extension/ai/acp/provider';
-import { FakeAgent } from './fakes/acpAgent';
+import { FakeAgent, GEMINI_INITIALIZE } from './fakes/acpAgent';
 import { acpMcpServers, spawnAcp } from '../src/extension/ai/acp/run';
+import { acpSessionModels } from '../src/extension/ai/acp/models';
+import { acpSignIn } from '../src/extension/ai/acp/signIn';
+import { driverFor } from '../src/extension/ai/drivers';
+import { BUILTIN_PROFILES } from '../src/shared/aiProfiles';
 import type { HeadlessInput } from '../src/extension/ai/provider';
 import type { RunReport } from '../src/shared/log';
 
@@ -280,8 +284,15 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
     const end = await ended;
     expect(agent.methods()).toEqual(['initialize', 'session/new']);
     expect(end.code).toBe(1);
-    expect(lines).toContain('Gemini CLI pede login. Rode `gemini` no terminal uma vez e entre com a sua conta.');
+    // o Gemini entra pela chave de API na tela do Conectar (história 7); os outros agentes, pelo terminal
+    expect(lines).toContain(
+      'Gemini CLI pede login. Conecte em Configurações › Ferramentas de IA › Conectar ferramenta, com a chave de API.',
+    );
     expect(end.error?.message).toMatch(/pede login/);
+    const opencode = new FakeAgent({ sessionNew: () => ({ error: { code: -32000, message: 'Authentication required' } }) });
+    const other = run(opencode, {}, acpAgent('opencode')!);
+    await other.ended;
+    expect(other.lines).toContain('OpenCode pede login. Rode `opencode auth login` no terminal uma vez e entre com a sua conta.');
   });
 
   it('versão do protocolo diferente: não abre sessão', async () => {
@@ -513,5 +524,127 @@ describe('catálogo do conector ACP', () => {
     const { ended, lines } = run(agent, { permission: 'full' });
     expect((await ended).code).toBe(0);
     expect(lines).toContain('Modo yolo recusado: modo inválido');
+  });
+});
+
+describe('login por chave de API pelo ACP (história 7)', () => {
+  const KEY = 'AIzaSy-chave-de-teste-123456';
+  const auth = { methodId: 'gemini-api-key', apiKey: KEY };
+
+  /** Como `run`, com a chave do cofre no `authenticate`. */
+  function runWithKey(agent: FakeAgent, withAuth: typeof auth | null = auth) {
+    const lines: string[] = [];
+    const measured = spawnAcp(gemini, { prompt: 'Trabalhe o card #12', permission: 'board', boardServer: BOARD }, dir, {
+      spawn: agent.spawn,
+      log: (l) => lines.push(l),
+      graceMs: 10,
+      homeDir: home,
+      ...(withAuth ? { auth: withAuth } : {}),
+    });
+    const ended = new Promise<{ code: number | null; error?: Error }>((resolve) =>
+      measured.proc.onExit((code, error) => resolve({ code, error })),
+    );
+    return { lines, ended };
+  }
+
+  it('o Gemini do catálogo entra pelo método gemini-api-key, lido do pacote 0.65.0', () => {
+    expect(gemini.apiKeyAuth).toEqual({ methodId: 'gemini-api-key' });
+    // simetria: nenhum outro agente do catálogo recebe chave pelo protocolo nesta história
+    expect(ACP_AGENTS.filter((a) => a.apiKeyAuth).map((a) => a.id)).toEqual(['gemini']);
+  });
+
+  it('authenticate com _meta["api-key"] logo depois do initialize, e a chave nunca no canal', async () => {
+    const agent = new FakeAgent({ initialize: () => GEMINI_INITIALIZE, onPrompt: () => ({ stopReason: 'end_turn' }) });
+    const { lines, ended } = runWithKey(agent);
+    expect((await ended).code).toBe(0);
+    expect(agent.methods()).toEqual(['initialize', 'authenticate', 'session/new', 'session/prompt']);
+    const sent = agent.received.find((m) => m.method === 'authenticate')!;
+    expect(sent.params).toEqual({ methodId: 'gemini-api-key', _meta: { 'api-key': KEY } });
+    expect(agent.apiKey).toBe(KEY);
+    expect(lines).toContain('Login no Gemini CLI pela chave de API do cofre do board.');
+    expect(lines.join('\n')).not.toContain(KEY);
+  });
+
+  it('sem chave no cofre, nada de authenticate: vale o login que o agente já tiver, como antes', async () => {
+    const agent = new FakeAgent({ initialize: () => GEMINI_INITIALIZE, onPrompt: () => ({ stopReason: 'end_turn' }) });
+    const { ended } = runWithKey(agent, null);
+    expect((await ended).code).toBe(0);
+    expect(agent.methods()).toEqual(['initialize', 'session/new', 'session/prompt']);
+  });
+
+  it('versão que não anuncia o método: a chave não é entregue e a execução segue com o login do agente', async () => {
+    const agent = new FakeAgent({ onPrompt: () => ({ stopReason: 'end_turn' }) });
+    const { lines, ended } = runWithKey(agent);
+    expect((await ended).code).toBe(0);
+    expect(agent.methods()).not.toContain('authenticate');
+    expect(agent.stdin()).not.toContain(KEY);
+    expect(lines).toContain('Gemini CLI não oferece o login por chave pelo ACP; segue com o login dele.');
+  });
+
+  it('chave recusada: a execução para no login, com o caminho do Conectar e sem a chave na mensagem', async () => {
+    const agent = new FakeAgent({
+      initialize: () => GEMINI_INITIALIZE,
+      authenticate: () => ({ error: { code: -32000, message: 'API key not valid. Please pass a valid API key.' } }),
+    });
+    const { lines, ended } = runWithKey(agent);
+    const end = await ended;
+    expect(end.code).toBe(1);
+    expect(agent.methods()).toEqual(['initialize', 'authenticate']);
+    expect(end.error?.message).toMatch(/Conectar ferramenta/);
+    expect([...lines, end.error?.message].join('\n')).not.toContain(KEY);
+  });
+
+  it('o driver gemini/acp leva a chave do contexto do gateway ao authenticate', async () => {
+    const agent = new FakeAgent({ initialize: () => GEMINI_INITIALIZE, onPrompt: () => ({ stopReason: 'end_turn' }) });
+    const lines: string[] = [];
+    const measured = driverFor('gemini', 'acp')!.run(
+      { prompt: 'Trabalhe o card', permission: 'board' },
+      {
+        profile: { ...BUILTIN_PROFILES.find((p) => p.id === 'gemini')!, enabled: true },
+        cwd: dir,
+        spawn: () => {
+          throw new Error('o Gemini pelo ACP não usa o spawn da CLI');
+        },
+        spawnAcp: agent.spawn,
+        log: (l) => lines.push(l),
+        runId: 'r1',
+        apiKey: KEY,
+      },
+    );
+    await new Promise((resolve) => measured.proc.onExit(resolve));
+    expect(agent.received.find((m) => m.method === 'authenticate')?.params._meta['api-key']).toBe(KEY);
+  });
+
+  it('a leitura de modelos e a sondagem de login autenticam antes do session/new', async () => {
+    const models = new FakeAgent({
+      initialize: () => GEMINI_INITIALIZE,
+      sessionNew: () => ({
+        sessionId: 's',
+        models: { currentModelId: 'gemini-2.5-pro', availableModels: [{ modelId: 'gemini-2.5-pro' }] },
+      }),
+    });
+    const found = await acpSessionModels(gemini, 'gemini', dir, { spawn: models.spawn, executable: '/bin/gemini', auth });
+    expect(models.methods()).toEqual(['initialize', 'authenticate', 'session/new']);
+    expect(found.options.map((o) => o.model)).toEqual(['gemini-2.5-pro']);
+
+    const signIn = new FakeAgent({ initialize: () => GEMINI_INITIALIZE });
+    await acpSignIn(gemini, auth, { spawn: signIn.spawn, executable: '/bin/gemini', cwd: dir });
+    // o login não abre sessão nem pede trabalho: não gasta a conta
+    expect(signIn.methods()).toEqual(['initialize', 'authenticate']);
+  });
+
+  it('sondagem de login: a recusa e a versão sem o método viram o motivo, sem a chave', async () => {
+    const refused = new FakeAgent({
+      initialize: () => GEMINI_INITIALIZE,
+      authenticate: () => ({ error: { code: -32000, message: 'API key not valid. Please pass a valid API key.' } }),
+    });
+    await expect(acpSignIn(gemini, auth, { spawn: refused.spawn, executable: '/bin/gemini', cwd: dir })).rejects.toThrow(
+      'Gemini CLI recusou a chave de API: API key not valid. Please pass a valid API key.',
+    );
+    const old = new FakeAgent();
+    await expect(acpSignIn(gemini, auth, { spawn: old.spawn, executable: '/bin/gemini', cwd: dir })).rejects.toThrow(
+      /não oferece o login por chave de API pelo ACP \(gemini-api-key\)/,
+    );
+    expect(old.stdin()).not.toContain(KEY);
   });
 });

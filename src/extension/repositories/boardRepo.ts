@@ -62,6 +62,33 @@ export class BoardRepo {
     return row ? str(row.value) : undefined;
   }
 
+  /**
+   * A ciência do regime compatível de um perfil, no passo do Conectar: sobe a revisão daquele perfil e
+   * devolve a nova. É um ato da pessoa na tela, que o host grava; não há mensagem da tela que a escreva.
+   */
+  recordCompatibilityReview(boardId: string, profileId: string): number {
+    const current = parseRunner(str(one(this.db, 'SELECT runner_json FROM boards WHERE id = ?', [boardId])?.runner_json));
+    const revision = (current.compatibilityReviews[profileId] ?? 0) + 1;
+    const next = { ...current, compatibilityReviews: { ...current.compatibilityReviews, [profileId]: revision } };
+    run(this.db, 'UPDATE boards SET runner_json = ? WHERE id = ?', [JSON.stringify(parseRunner(JSON.stringify(next))), boardId]);
+    return revision;
+  }
+
+  /**
+   * Tira a ciência do regime compatível de um perfil: a pessoa a revogou, ou o perfil passou a provar o
+   * exclusivo no Conectar. Devolve se havia ciência.
+   */
+  revokeCompatibilityReview(boardId: string, profileId: string): boolean {
+    const current = parseRunner(str(one(this.db, 'SELECT runner_json FROM boards WHERE id = ?', [boardId])?.runner_json));
+    if (!(profileId in current.compatibilityReviews)) return false;
+    const { [profileId]: _gone, ...rest } = current.compatibilityReviews;
+    run(this.db, 'UPDATE boards SET runner_json = ? WHERE id = ?', [
+      JSON.stringify(parseRunner(JSON.stringify({ ...current, compatibilityReviews: rest }))),
+      boardId,
+    ]);
+    return true;
+  }
+
   /** Grava um valor na tabela meta, substituindo o existente. */
   setMeta(key: string, value: string): void {
     run(this.db, 'INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', [key, value]);
@@ -159,8 +186,9 @@ export class BoardRepo {
     }
     if (patch.runner !== undefined) {
       const current = parseRunner(str(one(this.db, 'SELECT runner_json FROM boards WHERE id = ?', [boardId])?.runner_json));
-      // ligar o regime compatível é a revisão da pessoa: a revisão sobe aqui, nunca pelo número que a tela mandar
-      const { compatibilityReviewRevision: _ignored, ...runner } = patch.runner;
+      // ligar o regime compatível é a revisão da pessoa: a revisão sobe aqui, nunca pelo número que a tela mandar.
+      // A ciência por perfil só o host grava, no Conectar (`recordCompatibilityReview`)
+      const { compatibilityReviewRevision: _ignored, compatibilityReviews: _host, ...runner } = patch.runner;
       const review =
         runner.admissionRegime === 'compatible' && current.admissionRegime !== 'compatible'
           ? { compatibilityReviewRevision: current.compatibilityReviewRevision + 1 }

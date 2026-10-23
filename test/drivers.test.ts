@@ -108,10 +108,26 @@ describe('drivers ACP: envolvem ACP_AGENTS', () => {
   it.each(ACP_AGENTS.map((a) => [a.id, a] as const))('%s/acp tem o comando, a página e a medição do agente', async (id, agent) => {
     const driver = driverFor(id, 'acp')!;
     expect(driver).toMatchObject({ tool: id, mode: 'acp', command: agent.command, docs: agent.docs, measure: acpMeasure(agent) });
-    expect(driver.auth).toEqual({ kind: 'acp-authenticate', terminal: agent.login });
+    // o agente com login por chave (o Gemini) entra pela tela; os outros, pelo terminal
+    expect(driver.auth).toEqual(
+      agent.apiKeyAuth
+        ? { kind: 'api-key', methodId: agent.apiKeyAuth.methodId, terminal: agent.login }
+        : { kind: 'acp-authenticate', terminal: agent.login },
+    );
     expect(driver.install('unix')).toEqual([]);
     // o agente não tem comando de status: a sonda não roda nada
     expect(await driver.signedIn({ homeDir: '/home', query: () => Promise.reject(new Error('não deveria consultar')) })).toBeNull();
+  });
+
+  it('o Gemini entra por chave de API pelo protocolo, e a chave no cofre conta como login', async () => {
+    const gemini = driverFor('gemini', 'acp')!;
+    expect(gemini.auth).toEqual({ kind: 'api-key', methodId: 'gemini-api-key', terminal: 'gemini' });
+    const query = () => Promise.reject(new Error('não deveria consultar'));
+    expect(await gemini.signedIn({ homeDir: '/home', query, hasApiKey: true })).toBe(true);
+    // sem a chave do board, "não verificado": o agente pode ter o login próprio (GEMINI_API_KEY)
+    expect(await gemini.signedIn({ homeDir: '/home', query, hasApiKey: false })).toBeNull();
+    // simetria: um agente sem login por chave não vira "conectado" por uma chave
+    expect(await driverFor('opencode', 'acp')!.signedIn({ homeDir: '/home', query, hasApiKey: true })).toBeNull();
   });
 });
 

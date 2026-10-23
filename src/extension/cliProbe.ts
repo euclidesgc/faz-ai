@@ -13,6 +13,8 @@ export { kimiModels, kimiSignedIn } from './ai/drivers/kimi/cli';
 export interface ProfileProbeOptions {
   pathEnv?: string;
   cwd?: string;
+  /** a chave da ferramenta está no cofre do board (o login das ferramentas que entram por chave de API) */
+  hasApiKey?: (tool: string) => boolean;
 }
 /** Referências importadas ou cópias sem revisão nunca iniciam consultas. */
 export function profileCanProbe(profile: AiProfile): boolean {
@@ -55,12 +57,13 @@ export async function profileSignedIn(
     return result.code === null ? null : result.code === 0;
   }
   // a CLI pronta, a cópia dela e o agente ACP pronto: a sonda é a do driver da ferramenta no modo do
-  // perfil (o agente ACP não tem comando de status e responde null; o login pela tela é a história 7)
+  // perfil (o agente ACP não tem comando de status; o que entra por chave diz se ela está no cofre)
   const driver = driverOf(profile);
   if (!driver) return null;
   return driver.signedIn({
     homeDir,
     query: (args) => runProfileQuery(profile, executable, args, options),
     ...(isCatalogCopy(profile) && profile.config.env ? { env: profile.config.env } : {}),
+    ...(driver.auth.kind === 'api-key' && options.hasApiKey ? { hasApiKey: options.hasApiKey(driver.tool) } : {}),
   });
 }

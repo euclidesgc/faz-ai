@@ -488,7 +488,8 @@ export class AiRunner {
           // o que a troca por política precisa preservar: permissão, regime e o escopo (agente, skills, MCPs, ferramentas)
           policy.constraints = {
             permission,
-            regime: admissionRegimeOf(state.board.runner).regime,
+            // o regime do perfil que roda esta tentativa (a ciência dele no Conectar, ou o do board)
+            regime: admissionRegimeOf(state.board.runner, target.cli.id).regime,
             agentId: policy.agentId,
             scopeDigest: scopeDigest([
               plan.manifest.agent,

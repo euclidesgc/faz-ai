@@ -7,8 +7,8 @@ import { modelId, type ModelOption } from '../../../shared/models';
 import { asList, asObject, asText, type Json } from '../../aiOutput/json';
 import { lineSplitter } from '../../aiOutput/lines';
 import { version as EXTENSION_VERSION } from '../../../../package.json';
-import { AUTH_REQUIRED, RpcError, rpcConnection } from './connection';
-import { ACP_PROTOCOL_VERSION, acpCommand, type AcpAgent, type AcpSpawnFn } from './provider';
+import { AUTH_REQUIRED, RpcError, acpAuthenticate, rpcConnection } from './connection';
+import { ACP_PROTOCOL_VERSION, acpCommand, acpLoginHint, type AcpAgent, type AcpAuth, type AcpSpawnFn } from './provider';
 
 /**
  * O que o board anuncia ao agente: não empresta o editor (sem `fs/*` nem `terminal/*`, cada escrita ou
@@ -110,6 +110,8 @@ export interface AcpModelsDeps {
   /** o executável do agente já resolvido no PATH; sem ele, vale o comando do catálogo */
   executable?: string;
   timeoutMs?: number;
+  /** a chave do cofre para o `authenticate`: o agente com chave não abre a sessão sem ela */
+  auth?: AcpAuth;
 }
 
 /**
@@ -147,11 +149,11 @@ export async function acpSessionModels(agent: AcpAgent, tool: string, cwd: strin
     });
     if (init.protocolVersion !== ACP_PROTOCOL_VERSION)
       throw new Error(`${agent.label} fala a versão ${String(init.protocolVersion)} do ACP; o board fala a ${ACP_PROTOCOL_VERSION}.`);
+    await acpAuthenticate(rpc, init, deps.auth);
     const session = await rpc.request('session/new', { cwd, mcpServers: [] });
     return parseAcpSessionModels(session, tool);
   } catch (e) {
-    if (e instanceof RpcError && e.code === AUTH_REQUIRED)
-      throw new Error(`${agent.label} pede login. Rode \`${agent.login}\` no terminal uma vez e entre com a sua conta.`);
+    if (e instanceof RpcError && e.code === AUTH_REQUIRED) throw new Error(acpLoginHint(agent));
     throw e;
   } finally {
     clearTimeout(timer);

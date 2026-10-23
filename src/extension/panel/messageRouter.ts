@@ -32,6 +32,10 @@ import { columnsOf } from '../../shared/selectors';
 import type { AttachmentStore } from '../attachments';
 import { headlessUnsupported } from '../headless';
 import { activeProfile, isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
+import type { ConnectState, ConnectSummary } from '../../shared/connect';
+
+/** As conexões concluídas por perfil (o resumo do Conectar), na tabela `meta`: fora da exportação do board. */
+const CONNECTIONS_META_KEY = 'ai_connections';
 import { boardServerFootprint } from '../mcp/footprint';
 import type { RunResolver } from '../log/eventLog';
 import { getMetrics, getPanelMetrics, type MetricsQuery, type MetricsResult } from '../log/metrics';
@@ -167,6 +171,8 @@ const bridgeOnly = {
   'backup.import.cancel': viaBridge,
   'settings.aiProfiles.probe': viaBridge,
   'settings.aiProfiles.test': viaBridge,
+  // a chave colada vai direto da HostBridge ao Conectar do host: nunca passa por `handle` nem pelo log de eventos
+  'settings.aiProfiles.connect': viaBridge,
 } satisfies Partial<HandlerMap>;
 
 /** Um handler por tipo de mensagem, agrupados por domínio em ./handlers. */
@@ -275,6 +281,46 @@ export class MessageRouter {
     if (!profile || !isAcpProfile(profile)) return;
     if (!this.acpModelsReader) throw new Error('Leitura de modelos do agente ACP indisponível neste host.');
     await this.acpModelsReader(profile);
+  }
+  private connector: ((id: string, input: { apiKey?: string; acknowledge?: boolean }) => Promise<unknown>) | null = null;
+  private connections: Record<string, ConnectState> | undefined;
+  /** Quem conduz o Conectar de um perfil (o `Connector` do host). */
+  onConnect(fn: (id: string, input: { apiKey?: string; acknowledge?: boolean }) => Promise<unknown>): void {
+    this.connector = fn;
+  }
+  /** O Conectar pela tela: o `done` sai quando o fluxo para (conectada, à espera da pessoa ou com o erro no passo). */
+  async connectProfile(id: string, input: { apiKey?: string; acknowledge?: boolean }): Promise<void> {
+    if (!this.connector) throw new Error('O Conectar não está disponível neste host.');
+    await this.connector(id, input);
+  }
+  /** O estado do Conectar de cada perfil, publicado a cada passo; nunca carrega a chave. */
+  setConnections(states: Record<string, ConnectState>): void {
+    if (JSON.stringify(states) === JSON.stringify(this.connections)) return;
+    this.connections = states;
+    this.notify();
+  }
+  /** A ciência do regime compatível de um perfil, no Conectar: só o host chama, depois do clique da pessoa. */
+  recordCompatibilityReview(profileId: string): number {
+    const revision = this.ctx.boards.recordCompatibilityReview(this.boardId, profileId);
+    this.changed();
+    return revision;
+  }
+  /** Tira a ciência do perfil: o Conectar provou o exclusivo. A revogação pela pessoa vem por `settings.aiProfiles.review`. */
+  revokeCompatibilityReview(profileId: string): void {
+    if (this.ctx.boards.revokeCompatibilityReview(this.boardId, profileId)) this.changed();
+  }
+  /** As conexões concluídas, gravadas no banco do board (sem segredo: versão, login, regime, modelos e data). */
+  savedConnections(): Record<string, ConnectSummary> {
+    try {
+      const raw: unknown = JSON.parse(this.ctx.boards.getMeta(CONNECTIONS_META_KEY) ?? '{}');
+      return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, ConnectSummary>) : {};
+    } catch {
+      return {};
+    }
+  }
+  saveConnection(profileId: string, summary: ConnectSummary): void {
+    this.ctx.boards.setMeta(CONNECTIONS_META_KEY, JSON.stringify({ ...this.savedConnections(), [profileId]: summary }));
+    this.ctx.dbHandle.scheduleSave();
   }
   probeAiProfiles() {
     if (!this.aiProfileRuntime) throw new Error('Situação dos perfis indisponível neste host.');
@@ -418,6 +464,7 @@ export class MessageRouter {
       authExpired: this.authExpired,
       usageLimit: this.usageLimit,
       environment: this.environment,
+      ...(this.connections ? { connections: this.connections } : {}),
       environmentFirstRun: this.environmentFirstRun,
       artifactImport: this.ctx.importer.current,
       mainBranch: this.ctx.mainBranch(),

@@ -8,6 +8,7 @@ import { BoardContext } from '../src/extension/panel/handlers/context';
 import { admissionRegimeOf, DEFAULT_RUNNER, parseRunner } from '../src/shared/runner';
 import { admitExecution } from '../src/shared/executionAdmission';
 import { legacyStrictRequest } from '../src/extension/ai/v1Prepare';
+import { aiProfileHandlers } from '../src/extension/panel/handlers/aiProfiles';
 import type { StrictExecutionRequest } from '../src/shared/executionAdmission';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -94,6 +95,55 @@ describe('o repositório sobe a revisão quando a pessoa liga o compatível', ()
     expect(runner()).toMatchObject({ admissionRegime: 'exclusive', compatibilityReviewRevision: 1 });
     ctx.boards.updateBoard(ctx.boardId, { runner: { admissionRegime: 'compatible' } });
     expect(runner().compatibilityReviewRevision).toBe(2);
+  });
+
+  it('a ciência por perfil do Conectar: só o host grava, e a tela não a escreve (história 7)', () => {
+    expect(ctx.boards.recordCompatibilityReview(ctx.boardId, 'gemini')).toBe(1);
+    expect(ctx.boards.recordCompatibilityReview(ctx.boardId, 'gemini')).toBe(2);
+    expect(runner().compatibilityReviews).toEqual({ gemini: 2 });
+    // o mesmo pedido de atualização que a tela manda não muda a ciência de ninguém
+    ctx.boards.updateBoard(ctx.boardId, { runner: { compatibilityReviews: { gemini: 99, claude: 1 }, heartbeat: true } });
+    expect(runner().compatibilityReviews).toEqual({ gemini: 2 });
+    // e o regime do board segue o que era
+    expect(runner().admissionRegime).toBe('exclusive');
+  });
+
+  it('a pessoa dá e revoga a ciência de um perfil (a ação de quem não passa pelo Conectar)', () => {
+    const review = aiProfileHandlers['settings.aiProfiles.review'];
+    const person = { byAi: false } as Parameters<typeof review>[2];
+    expect(review({ type: 'settings.aiProfiles.review', id: 'claude', accept: true }, ctx, person)).toBe(true);
+    expect(runner().compatibilityReviews).toEqual({ claude: 1 });
+    expect(admissionRegimeOf(runner(), 'claude')).toMatchObject({ regime: 'compatible' });
+    expect(review({ type: 'settings.aiProfiles.review', id: 'claude', accept: false }, ctx, person)).toBe(true);
+    expect(runner().compatibilityReviews).toEqual({});
+    expect(admissionRegimeOf(runner(), 'claude')).toEqual({ regime: 'exclusive' });
+    // revogar o que não há não muda o board
+    expect(review({ type: 'settings.aiProfiles.review', id: 'claude', accept: false }, ctx, person)).toBe(false);
+    // a IA não dá ciência, e perfil desconhecido é recusado
+    expect(() => review({ type: 'settings.aiProfiles.review', id: 'claude', accept: true }, ctx, { byAi: true } as typeof person)).toThrow(
+      /ato da pessoa/,
+    );
+    expect(() => review({ type: 'settings.aiProfiles.review', id: 'nada', accept: true }, ctx, person)).toThrow(/indisponível/);
+  });
+});
+
+describe('regime por perfil (história 7)', () => {
+  it('a ciência do perfil vale para ele; os outros seguem o regime do board', () => {
+    const runner = { ...DEFAULT_RUNNER, compatibilityReviews: { gemini: 3 } };
+    expect(admissionRegimeOf(runner, 'gemini')).toEqual({ regime: 'compatible', compatibilityReview: { actor: 'person', revision: 3 } });
+    expect(admissionRegimeOf(runner, 'claude')).toEqual({ regime: 'exclusive' });
+    expect(admissionRegimeOf(runner)).toEqual({ regime: 'exclusive' });
+    // quem ligou o compatível do board antes da história 7 continua com ele em todo perfil
+    const legacy = { ...runner, admissionRegime: 'compatible' as const, compatibilityReviewRevision: 2 };
+    expect(admissionRegimeOf(legacy, 'claude')).toEqual({ regime: 'compatible', compatibilityReview: { actor: 'person', revision: 2 } });
+  });
+  it('a leitura descarta id inválido e revisão que não é inteiro positivo', () => {
+    expect(
+      parseRunner('{"compatibilityReviews":{"gemini":2,"Nome Ruim":1,"claude":0,"kimi":1.5,"codex-acp":"3"}}').compatibilityReviews,
+    ).toEqual({
+      gemini: 2,
+    });
+    expect(parseRunner('{"compatibilityReviews":[1]}').compatibilityReviews).toEqual({});
   });
 });
 

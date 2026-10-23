@@ -1,5 +1,6 @@
 // Compartilhado pelo teste do transporte (acpTransport) e pelos cenários de ponta a ponta
 // (test/scenarios), que trocam só esta ponta do caminho do card.
+import { spawn as spawnChild } from 'node:child_process';
 import type { AcpSpawnFn } from '../../src/extension/ai/acp/provider';
 
 export type Msg = { jsonrpc: '2.0'; id?: number | string; method?: string; params?: any; result?: any; error?: any };
@@ -20,11 +21,15 @@ export class FakeAgent {
   private waiting = new Map<number, (result: any) => void>();
   private promptId: number | string | undefined;
   command: { command: string; args: string[] } | null = null;
+  /** a chave que o board entregou no `authenticate` (o Gemini guarda só na memória do processo) */
+  apiKey: string | null = null;
 
   constructor(
     private script: {
       initialize?: (params: any) => any;
-      sessionNew?: (params: any) => any;
+      /** a resposta do `authenticate`; `{ error }` recusa. Sem roteiro, aceita qualquer chave */
+      authenticate?: (params: any) => any;
+      sessionNew?: (params: any) => Promise<any> | any;
       onPrompt?: (agent: FakeAgent, params: any) => Promise<any> | any;
       onCancel?: (agent: FakeAgent) => void;
     } = {},
@@ -85,6 +90,9 @@ export class FakeAgent {
 
   methods = () => this.received.filter((m) => m.method).map((m) => m.method);
 
+  /** Tudo o que o board escreveu no `stdin` deste processo, como texto (para conferir onde a chave foi). */
+  stdin = () => this.received.map((m) => JSON.stringify(m)).join('\n');
+
   private onStdin(text: string): void {
     this.buffer += text;
     let at: number;
@@ -109,8 +117,14 @@ export class FakeAgent {
             authMethods: [],
           },
         });
+      case 'authenticate': {
+        const result = this.script.authenticate?.(msg.params) ?? {};
+        if (result.error) return this.send({ id: msg.id, error: result.error });
+        this.apiKey = msg.params?._meta?.['api-key'] ?? null;
+        return this.send({ id: msg.id, result });
+      }
       case 'session/new': {
-        const result = this.script.sessionNew?.(msg.params) ?? {
+        const result = (await this.script.sessionNew?.(msg.params)) ?? {
           sessionId: 'sess-1',
           modes: { currentModeId: 'default', availableModes: [{ id: 'default' }, { id: 'autoEdit' }, { id: 'yolo' }] },
         };
@@ -131,4 +145,90 @@ export class FakeAgent {
         return this.script.onCancel?.(this);
     }
   }
+}
+
+/**
+ * O `initialize` do Gemini CLI 0.65.0 (lido no pacote instalado, `GeminiAgent.initialize`): os quatro métodos
+ * de login, o de chave com o `_meta` que diz que ela vai em `_meta["api-key"]` do `authenticate`.
+ */
+export const GEMINI_INITIALIZE = {
+  protocolVersion: 1,
+  agentInfo: { name: 'gemini-cli', title: 'Gemini CLI', version: '0.65.0' },
+  agentCapabilities: { loadSession: true, mcpCapabilities: { http: true, sse: true } },
+  authMethods: [
+    { id: 'oauth-personal', name: 'Log in with Google', description: 'Log in with your Google account' },
+    {
+      id: 'gemini-api-key',
+      name: 'Gemini API key',
+      description: 'Use an API key with Gemini Developer API',
+      _meta: { 'api-key': { provider: 'google' } },
+    },
+    { id: 'vertex-ai', name: 'Vertex AI', description: 'Use an API key with Vertex AI GenAI API' },
+    {
+      id: 'gateway',
+      name: 'AI API Gateway',
+      description: 'Use a custom AI API Gateway',
+      _meta: { gateway: { protocol: 'google', restartRequired: 'false' } },
+    },
+  ],
+};
+
+/** Inicia um servidor MCP stdio e manda o `initialize`, como o agente faz com os servidores do `session/new`. */
+function mcpInitialize(server: { command: string; args: string[] }): Promise<void> {
+  return new Promise((resolve) => {
+    const child = spawnChild(server.command, server.args, { stdio: ['pipe', 'pipe', 'ignore'] });
+    child.stdout.once('data', () => child.stdin.end());
+    child.on('exit', () => resolve());
+    child.on('error', () => resolve());
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } })}\n`);
+  });
+}
+
+/**
+ * Uma fábrica de processos do Gemini CLI falso, um `FakeAgent` por processo. Como o de verdade (0.65.0), cada
+ * processo guarda a chave do `authenticate` só na memória: sem a chave aceita, o `session/new` recusa com
+ * `-32000`. A sessão anuncia os modelos na forma anterior do protocolo (`models.availableModels`).
+ */
+export class FakeGemini {
+  processes: FakeAgent[] = [];
+  constructor(
+    private options: {
+      /** a chave que o agente aceita; outra é recusada no `authenticate` */
+      validKey: string;
+      onPrompt?: (agent: FakeAgent, params: any) => Promise<any> | any;
+      models?: { modelId: string; name: string }[];
+    },
+  ) {}
+
+  spawn: AcpSpawnFn = (command, cwd, out) => {
+    const models = this.options.models ?? [
+      { modelId: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+      { modelId: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+    ];
+    const agent: FakeAgent = new FakeAgent({
+      initialize: () => GEMINI_INITIALIZE,
+      authenticate: (params) =>
+        params?._meta?.['api-key'] === this.options.validKey
+          ? {}
+          : { error: { code: -32000, message: 'API key not valid. Please pass a valid API key.' } },
+      sessionNew: async (params) => {
+        if (agent.apiKey !== this.options.validKey)
+          return { error: { code: -32000, message: 'Gemini API key is missing or not configured.' } };
+        // o servidor MCP de teste do verificador (`allowed`): o agente de verdade o inicia e manda o
+        // `initialize`, e é isso que a sondagem observa. Os do card (o do board) não rodam no teste
+        for (const server of (params?.mcpServers ?? []).filter((s: any) => s.name === 'allowed')) await mcpInitialize(server);
+        return {
+          sessionId: `sess-${this.processes.indexOf(agent)}`,
+          modes: { currentModeId: 'default', availableModes: [{ id: 'default' }, { id: 'autoEdit' }, { id: 'yolo' }] },
+          models: { currentModelId: models[0]!.modelId, availableModels: models },
+        };
+      },
+      onPrompt: this.options.onPrompt,
+    });
+    this.processes.push(agent);
+    return agent.spawn(command, cwd, out);
+  };
+
+  /** Os métodos de cada processo, na ordem em que abriram. */
+  methods = () => this.processes.map((p) => p.methods());
 }

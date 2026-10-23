@@ -19,6 +19,7 @@ import type { AiRunOrigin } from '../shared/log';
 import type { BoardState } from '../shared/model';
 import { modelValue } from '../shared/models';
 import { cliProblem } from '../shared/requirements';
+import { admissionRegimeOf } from '../shared/runner';
 import type { RunTarget, RunTargetSource } from '../shared/runTarget';
 import type { AiRunEnd } from './ai/gateway';
 
@@ -167,7 +168,9 @@ export function evaluateRunPolicy(input: GateInput): { decision: PolicyDecision;
                 ? ('missing' as const)
                 : ('reviewed' as const),
           admission: 'admitted' as const,
-          constraints,
+          // o regime é de cada perfil (a ciência no Conectar, história 7): trocar para um perfil com outro regime
+          // muda o que a execução pode carregar, e a política recusa (`constraints-changed`)
+          constraints: { ...constraints, regime: admissionRegimeOf(state.board.runner, target.profileId).regime },
         };
       }),
       trace: { startedAt: chain.startedAt, attempts: [...chain.attempts, attempt], budget: chain.budget },

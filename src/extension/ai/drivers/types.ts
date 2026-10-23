@@ -3,8 +3,8 @@
 // um driver por (ferramenta, modo), em `drivers/<ferramenta>/<modo>.ts`, e o registro `driverFor` em
 // `drivers/index.ts`; o catálogo da tela é `TOOLS` (`src/shared/aiTools.ts`). A execução (`run`,
 // `bindingContext`) é o outro contrato, o `Executor` (história 6), que todo driver também cumpre. A
-// verificação de capacidades (`verify`) e a classificação de falhas (`classifyFailure`) entram no driver
-// nas histórias 7 e 12.
+// verificação de capacidades segue no verificador do host (`capabilityVerifier.ts`), chamado pelo Conectar
+// (`ai/connect.ts`, história 7); a classificação de falhas (`classifyFailure`) entra na história 12.
 import type { InstallStep } from '../../../shared/environment';
 import type { ModeEnforcement, ToolMode } from '../../../shared/aiTools';
 import type { AiProfile } from '../../../shared/aiProfiles';
@@ -17,11 +17,15 @@ import type { AcpSpawnFn } from '../acp/provider';
 import type { AiMeasure } from '../provider';
 
 /**
- * Como se entra na conta da ferramenta: um comando no terminal (as CLIs prontas) ou o `authenticate` do
- * ACP, que nesta história ainda é o comando de login da própria ferramenta, no terminal (o login pela
- * tela é a história 7). A chave de API no cofre (`api-key`) entra com o Conectar.
+ * Como se entra na conta da ferramenta: um comando no terminal (as CLIs prontas), o login do agente ACP no
+ * terminal (`acp-authenticate`, os agentes sem login por chave) ou a chave de API (`api-key`): a pessoa a
+ * cola na tela do Conectar, o host a guarda no cofre (`ToolKeys`, por ferramenta) e a entrega ao agente no
+ * `authenticate` do protocolo (`methodId`), em cada processo. O `terminal` é o login alternativo da ferramenta.
  */
-export type DriverAuth = { kind: 'login-command'; command: string } | { kind: 'acp-authenticate'; terminal: string };
+export type DriverAuth =
+  | { kind: 'login-command'; command: string }
+  | { kind: 'acp-authenticate'; terminal: string }
+  | { kind: 'api-key'; methodId: string; terminal: string };
 
 /** O que a sonda de login recebe do host: tudo já com o perfil aplicado, para o driver não ver segredos à toa. */
 export interface SignInProbe {
@@ -30,6 +34,8 @@ export interface SignInProbe {
   query(args: string[]): Promise<CliRun>;
   /** o ambiente próprio do perfil (só a cópia de uma CLI pronta), para a ferramenta que lê uma pasta de dados */
   env?: Record<string, string>;
+  /** a chave da ferramenta está no cofre (só a presença; o valor nunca chega à sonda) */
+  hasApiKey?: boolean;
 }
 
 export interface ConnectionDriver {
@@ -69,6 +75,11 @@ export interface ExecutorContext extends Pick<MeasuredDeps, 'log' | 'runId' | 'l
   spawn: MeasuredDeps['spawn'];
   /** inicia um agente ACP com a entrada aberta; ausente no host sem o transporte */
   spawnAcp?: AcpSpawnFn;
+  /**
+   * A chave de API da ferramenta, lida do cofre pelo gateway, para o driver com `auth.kind === 'api-key'`.
+   * Não entra no vínculo (`bindingContext` não a vê) nem no log: o gateway a mascara em toda linha.
+   */
+  apiKey?: string;
 }
 
 /**

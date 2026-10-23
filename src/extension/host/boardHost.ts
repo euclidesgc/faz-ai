@@ -3,6 +3,7 @@ import { defaultManifestDir } from '../ai/cursorManifest';
 import { cursorHookStatus } from '../mcp/cursorHooks';
 import {
   PROFILE_CAPABILITIES,
+  catalogTool,
   isAcpProfile,
   profileIsolation,
   profileLabel,
@@ -18,6 +19,8 @@ import { profileCanProbe, profileSignedIn, profileVersion } from '../cliProbe';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
+import { createHash } from 'node:crypto';
+import { Verifications } from '../ai/verifications';
 import * as path from 'node:path';
 import { openFile, type DbHandle } from '../db/database';
 import { dayOf } from '../../shared/log';
@@ -52,7 +55,7 @@ import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner } from '../runner';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
-import { driverFor } from '../ai/drivers';
+import { driverFor, driverOf } from '../ai/drivers';
 import { baseInfo, type AiTool } from '../../shared/harness';
 import { checkRequirements, profileInstallUrl } from '../requirements';
 import { checkEnvironment, linuxFamily } from '../environment';
@@ -69,7 +72,12 @@ import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../model
 import { cleanStaleTemp } from '../aiOutput/measured';
 import { ExecutionAdmission, admissionTransport } from '../ai/admission';
 import { CapabilityEvidenceStore } from '../ai/capabilityEvidence';
-import { verifyExecutor } from '../ai/capabilityVerifier';
+import { verifyExecutor, type VerifierResult } from '../ai/capabilityVerifier';
+import { Connector } from '../ai/connect';
+import { acpSignIn } from '../ai/acp/signIn';
+import type { AcpAuth } from '../ai/acp/provider';
+import { ToolKeys } from '../toolKeys';
+import { credentialsFor } from '../credentials';
 import { recoverProjectServers } from '../mcp/projectServerLease';
 import { loginShellPath, spawnAcpProcess, spawnHeadless } from '../spawn';
 
@@ -227,6 +235,15 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // o node do PATH do terminal, com caminho absoluto: é ele que a ferramenta usa para iniciar o servidor do board.
   // Procurado de novo a cada conferência dos requisitos: a pessoa pode instalar o node com o board aberto
   let nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
+  // a chave de API de cada ferramenta (o Gemini entra por ela), no cofre local: o mesmo cofre do banco, para a
+  // ocultação das credenciais (`redactCredentials`) conhecê-la. O índice fica na pasta de dados, fora do banco
+  const toolKeys = new ToolKeys(credentialsFor(handle.db), path.join(o.storageDir, 'tool-keys.json'));
+  /** A chave do cofre para o agente do perfil que entra por chave, no formato do `authenticate`; undefined nos outros. */
+  const acpAuthOf = (profile: AiProfile): AcpAuth | undefined => {
+    const auth = driverOf(profile)?.auth;
+    const apiKey = auth?.kind === 'api-key' ? toolKeys.get(driverOf(profile)!.tool) : null;
+    return auth?.kind === 'api-key' && apiKey ? { methodId: auth.methodId, apiKey } : undefined;
+  };
   // a única porta para chamar a IA: o executor de cards e o chat passam por ela, e é ela que escreve o log de uso
   const evidenceStore = new CapabilityEvidenceStore(path.join(o.storageDir, 'capability-evidence'));
   const admission = new ExecutionAdmission({
@@ -251,6 +268,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     },
     spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
     spawnAcp: (command, cwd, out) => spawnAcpProcess({ ...command, format: 'text' }, cwd, out, pathEnv),
+    apiKey: (profile) => acpAuthOf(profile)?.apiKey ?? null,
+    // a ciência do perfil no Conectar vale para ele; sem ela, o regime do board
+    regimeOf: (profileId) => admissionRegimeOf(router.snapshot().board.runner, profileId),
   });
   router.setAdmissionReader((request, target) => {
     try {
@@ -258,7 +278,10 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       const profileId = admissionProfileOf(router.snapshot(), target);
       if (!profileId) return null;
       const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, profileId);
-      return admission.preview(profile, profile.id, request, o.folderPath);
+      // o mesmo regime que o gateway aplica: a ciência do perfil, ou o regime do board
+      const { regime: _regime, compatibilityReview: _review, ...rest } = request;
+      const strict = { ...rest, ...admissionRegimeOf(router.snapshot().board.runner, profileId) };
+      return admission.preview(profile, profile.id, strict, o.folderPath);
     } catch {
       return null;
     }
@@ -272,20 +295,30 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       homeDir,
       pathEnv: () => pathEnv,
       runner: () => router.snapshot().board.runner,
+      hasApiKey: (tool) => toolKeys.has(tool),
     }),
   );
+  /** Abre o agente ACP numa pasta descartável (`fazai-<o quê>-`), roda `fn` e apaga a pasta. */
+  const inScratch = async <T>(what: string, fn: (dir: string) => Promise<T>): Promise<T> => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), `fazai-${what}-`));
+    try {
+      return await fn(dir);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  };
   // os modelos de um agente ACP vêm da sessão que ele abre (`session/new`), lidos numa pasta descartável
   // para não tocar o projeto; a lista fica guardada para o "Detectar modelos" juntar ao catálogo
-  router.onAcpModels(async (profile) => {
+  const readAcpModels = async (profile: AiProfile): Promise<number> => {
     const agent = acpAgent(String(profile.config.acpAgent));
     if (!agent) throw new Error(`Agente ACP desconhecido: ${String(profile.config.acpAgent)}.`);
     const executable = resolveProfileCommand(profile, pathEnv, homeDir);
     if (!executable) throw new Error(commandNotFound(profileCommand(profile)));
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-acp-models-'));
-    try {
+    return inScratch('acp-models', async (dir) => {
       const found = await acpSessionModels(agent, profile.id, dir, {
         executable,
         spawn: (command, cwd, out) => spawnAcpProcess({ ...command, env: profile.config.env, format: 'text' }, cwd, out, pathEnv),
+        auth: acpAuthOf(profile),
       });
       if (!found.options.length)
         throw new Error(
@@ -295,10 +328,60 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       o.log(
         `${agent.label}: ${found.options.length} modelo(s) lidos da sessão (${found.source === 'models' ? 'forma anterior do protocolo' : 'opções da sessão'}).`,
       );
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+      return found.options.length;
+    });
+  };
+  router.onAcpModels(async (profile) => void (await readAcpModels(profile)));
+  // o Conectar (história 7): do binário a "Conectada", pelo driver do perfil. O estado de cada passo vai para
+  // a tela pelo `connections` do board; a chave colada vai só para o cofre (`toolKeys`)
+  const connector: Connector = new Connector({
+    profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
+    enable: (id) => void router.handle({ type: 'settings.aiProfiles.setEnabled', id, enabled: true }),
+    resolve: (id) => new AiProfileRepo(handle.db).resolveProfile(router.boardId, id),
+    locate: (profile) => resolveProfileCommand(profile, pathEnv, homeDir),
+    version: (profile, exe) => profileVersion(profile, exe, { pathEnv }),
+    signedIn: (profile, exe) => profileSignedIn(profile, exe, homeDir, { pathEnv, hasApiKey: (tool) => toolKeys.has(tool) }),
+    keys: toolKeys,
+    authenticate: (profile, executable, auth) => {
+      const agent = acpAgent(String(profile.config.acpAgent));
+      if (!agent) return Promise.reject(new Error(`Agente ACP desconhecido: ${String(profile.config.acpAgent)}.`));
+      return inScratch('acp-signin', (cwd) =>
+        acpSignIn(agent, auth, {
+          executable,
+          cwd,
+          spawn: (command, dir, out) => spawnAcpProcess({ ...command, format: 'text' }, dir, out, pathEnv),
+        }),
+      );
+    },
+    verify: async (profileId) => (await verifyDetailed(profileId)).result,
+    reviewOf: (id) => router.snapshot().board.runner.compatibilityReviews[id] ?? null,
+    recordReview: (id) => router.recordCompatibilityReview(id),
+    revokeReview: (id) => router.revokeCompatibilityReview(id),
+    // os modelos entram no catálogo do board, como o "Detectar modelos": ficam em todo campo de modelo
+    listModels: async (profile, exe) => {
+      // a chave do catálogo de modelos: o id do agente ACP; na CLI, a ferramenta (a da base, numa cópia)
+      const tool = catalogTool(profile);
+      let count: number;
+      if (isAcpProfile(profile)) count = await readAcpModels(profile);
+      else {
+        const driver = driverOf(profile);
+        if (!driver?.listModels) return null;
+        const found = await driver.listModels(exe, pathEnv);
+        rememberModels(tool, found);
+        count = found.length;
+      }
+      router.handle({ type: 'settings.models.detect', tool });
+      return count;
+    },
+    save: (id, summary) => router.saveConnection(id, summary),
+    saved: (id) => router.savedConnections()[id] ?? null,
+    publish: () => router.setConnections(connector.snapshot(router.snapshot().board.aiProfiles.map((p) => p.id))),
+    redact: (text) => router.redactCredentials(text),
+    log: o.log,
   });
+  // o fim do Conectar muda o login, a prova e os modelos do perfil: a faixa de requisitos confere de novo
+  router.onConnect((id, input) => connector.connect(id, input).finally(() => void checkNow()));
+  router.setConnections(connector.snapshot(router.snapshot().board.aiProfiles.map((p) => p.id)));
   const runner = new AiRunner(router, {
     gateway,
     cwd: o.folderPath,
@@ -417,10 +500,12 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // o probe de login é o do perfil (o do Kimi Code não usa o executável: lê a pasta de credenciais);
   // quando ele não sabe dizer (`null`), vale só o sinal reativo de falha na execução
   const probeSignedIn = async (exe: string, force: boolean, profile: AiProfile): Promise<boolean | null> => {
-    const binding = JSON.stringify([exe, profile.credentials?.secretRef || 'builtin']);
+    // a chave do cofre (só a presença) também prende o cache: guardar ou trocar a chave no Conectar vale na hora
+    const hasApiKey = (tool: string) => toolKeys.has(tool);
+    const binding = JSON.stringify([exe, profile.credentials?.secretRef || 'builtin', hasApiKey(driverOf(profile)?.tool ?? '')]);
     const cached = !force && signinCache.get(profile.id);
     if (cached && cached.binding === binding && Date.now() - cached.at < SIGNIN_CACHE_MS) return cached.value;
-    const value = await profileSignedIn(profile, exe, homeDir, { pathEnv });
+    const value = await profileSignedIn(profile, exe, homeDir, { pathEnv, hasApiKey });
     signinCache.set(profile.id, { at: Date.now(), value, binding });
     return value;
   };
@@ -658,7 +743,11 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
               return null;
             }
           },
-          regime: () => admissionRegimeOf(router.snapshot().board.runner).regime,
+          // o regime do perfil padrão: a ciência dele no Conectar, ou o regime do board
+          regime: () => {
+            const { board } = router.snapshot();
+            return admissionRegimeOf(board.runner, board.aiTool).regime;
+          },
           effectiveLimits: () => {
             try {
               return effectiveLimits(s.board.runner, s.board.git.mode);
@@ -916,9 +1005,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // a varredura da abertura: só a janela dona limpa sozinha (o botão da tela age onde foi clicado)
   if (ownsBoard) void orphanSweeper.sweep();
 
-  const verifying = new Map<string, Promise<string>>();
   /** A verificação de um perfil: recusa com uma mensagem clara o que não está ligado ou não tem sonda. */
-  const verifyProfile = async (profileId: string): Promise<string> => {
+  const verifyProfile = async (profileId: string): Promise<{ message: string; result: VerifierResult }> => {
     const meta = router.snapshot().board.aiProfiles.find((p) => p.id === profileId);
     if (!meta) throw new Error(`Perfil indisponível neste board: ${profileId}.`);
     if (!verifiableProfile(meta))
@@ -934,14 +1022,19 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       pathEnv,
       spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
       spawnAgent: (command, cwd, out) => spawnAcpProcess({ ...command, format: 'text' }, cwd, out, pathEnv),
+      // o agente que entra por chave (o Gemini) só abre a sessão com ela: a do cofre vai em cada handshake
+      acpAuth: acpAuthOf(profile),
     });
     if (result.indexError) o.log(`${meta.name}: ${result.indexError}`);
     const failed = result.evidence.flatMap((e) => e.checks.filter((c) => c.outcome !== 'passed').map((c) => `${e.capability}/${c.id}`));
-    if (result.verified) return `${meta.name}: isolamento verificado; as cinco capacidades têm recibos válidos.`;
+    if (result.verified) return { result, message: `${meta.name}: isolamento verificado; as cinco capacidades têm recibos válidos.` };
     // no ACP os arquivos de contexto do agente ficam sem prova de propósito: o perfil vale no regime compatível
     if (isAcpProfile(profile) && failed.join(',') === 'artifacts/own-context-files')
-      return `${meta.name}: handshake do agente verificado. Os arquivos de contexto que ele lê por conta própria não têm prova: o perfil é admissível só no regime compatível.`;
-    return `${meta.name}: isolamento não verificado. Pendentes: ${failed.join(', ') || 'checks ausentes'}.`;
+      return {
+        result,
+        message: `${meta.name}: handshake do agente verificado. Os arquivos de contexto que ele lê por conta própria não têm prova: o perfil é admissível só no regime compatível.`,
+      };
+    return { result, message: `${meta.name}: isolamento não verificado. Pendentes: ${failed.join(', ') || 'checks ausentes'}.` };
   };
   /** A prova gravada ainda vale para o vínculo atual do perfil (o digest do binário fica em cache na admissão). */
   const hasCurrentEvidence = (profileId: string): boolean => {
@@ -953,21 +1046,31 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return false;
     }
   };
-  /**
-   * A verificação que o host dispara sozinho (ao ligar um agente ACP, ao conectar a ferramenta dele): em
-   * segundo plano, sem gastar a conta da pessoa, com o resultado no log. Só o ACP, como pede a épica: a CLI
-   * do Claude roda quatro vezes na fixture e fica no comando da paleta. Com a prova em vigor para o vínculo
-   * atual, não refaz o handshake.
-   */
-  const verifyInBackground = (profileId: string, why: string): void => {
-    const meta = router.snapshot().board.aiProfiles.find((p) => p.id === profileId);
-    // uma verificação deste perfil já em andamento (ligar e conferir ao mesmo tempo) não abre outro handshake
-    if (disposed || !meta || !meta.enabled || !isAcpProfile(meta) || verifying.has(profileId) || hasCurrentEvidence(profileId)) return;
-    api
-      .verifyExecutor(profileId)
-      .then((message) => o.log(`Verificação de capacidades (${why}): ${message}`))
-      .catch((e: unknown) => o.log(`Verificação de capacidades de ${meta.name} (${why}): ${e instanceof Error ? e.message : String(e)}`));
+  /** O estado da chave do cofre com que a verificação do perfil roda: o digest dela, ou `''` sem chave. */
+  const keyStateOf = (profileId: string): string => {
+    try {
+      const apiKey = acpAuthOf(new AiProfileRepo(handle.db).resolveProfile(router.boardId, profileId))?.apiKey;
+      return apiKey ? createHash('sha256').update(apiKey).digest('hex') : '';
+    } catch {
+      return '';
+    }
   };
+  // a verificação por perfil (uma de cada vez por estado da chave) e a automática em segundo plano, que não
+  // corre por cima do Conectar (ver `ai/verifications.ts`)
+  const verifications = new Verifications<{ message: string; result: VerifierResult }>({
+    profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
+    run: verifyProfile,
+    keyState: keyStateOf,
+    current: hasCurrentEvidence,
+    busy: (id) => connector.active(id),
+    message: (r) => r.message,
+    log: o.log,
+    // o Diagnóstico mostra as capacidades lidas das provas: confere de novo com as novas
+    done: () => void checkNow(),
+    disposed: () => disposed,
+  });
+  const verifyDetailed = (profileId: string) => verifications.detailed(profileId);
+  const verifyInBackground = (profileId: string, why: string): void => verifications.inBackground(profileId, why);
   /** Prova o agente ACP no vínculo atual se ainda não tentou nele; sem executável (CLI ausente), nada a provar. */
   const verifyOncePerBinding = (profileId: string, health: ProfileHealth | undefined): void => {
     // sem login (ou com o login vencido) a tentativa deste vínculo fica esquecida: quando o login voltar,
@@ -1017,15 +1120,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     autopilot,
     verifyExecutor(profileId) {
       // a mesma verificação pedida duas vezes (ligar o perfil e o comando, por exemplo) roda uma vez só
-      const running = verifying.get(profileId);
-      if (running) return running;
-      const done = verifyProfile(profileId).finally(() => {
-        verifying.delete(profileId);
-        // o Diagnóstico mostra as capacidades lidas das provas: confere de novo com as novas
-        void checkNow();
-      });
-      verifying.set(profileId, done);
-      return done;
+      return verifyDetailed(profileId).then((r) => r.message);
     },
     async connectAI(target = {}) {
       const tool = target.tool ?? router.snapshot().board.aiTool;

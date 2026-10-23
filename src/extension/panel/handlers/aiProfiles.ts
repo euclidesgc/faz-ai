@@ -31,6 +31,19 @@ export const aiProfileHandlers = {
     new AiProfileRepo(ctx.dbHandle.db).remove(ctx.boardId, msg.id, actor.byAi ? 'ai' : 'person');
     return true;
   },
+  /**
+   * A ciência do regime compatível de um perfil, dada ou revogada pela pessoa (história 7). É o caminho dos
+   * perfis sem Conectar (cópias, personalizados) e a revogação de qualquer um. O router já recusa a IA e o MCP
+   * em `settings.aiProfiles.*`; aqui a regra é a mesma do repositório de perfis.
+   */
+  'settings.aiProfiles.review': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('A ciência do regime compatível é um ato da pessoa.');
+    if (!new AiProfileRepo(ctx.dbHandle.db).list(ctx.boardId).some((p) => p.id === msg.id))
+      throw new Error(`Perfil indisponível neste board: ${msg.id}.`);
+    if (msg.accept) ctx.boards.recordCompatibilityReview(ctx.boardId, msg.id);
+    else return ctx.boards.revokeCompatibilityReview(ctx.boardId, msg.id);
+    return true;
+  },
 } satisfies Partial<HandlerMap>;
 
 export interface AiProfileRuntime {
@@ -50,6 +63,8 @@ export interface AiProfileRuntimeDeps {
   resolve?: typeof resolveProfileCommand;
   version?: typeof profileVersion;
   signedIn?: typeof profileSignedIn;
+  /** a chave da ferramenta está no cofre: é o login de quem entra por chave de API (o Gemini) */
+  hasApiKey?: (tool: string) => boolean;
 }
 
 /** Sondas e teste são assíncronos, portanto a HostBridge publica suas respostas; o router fica síncrono. */
@@ -73,7 +88,11 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
                 found = true;
                 [version, signedIn] = await Promise.all([
                   (deps.version ?? profileVersion)(profile, exe, { pathEnv: deps.pathEnv(), cwd: deps.cwd }),
-                  (deps.signedIn ?? profileSignedIn)(profile, exe, deps.homeDir, { pathEnv: deps.pathEnv(), cwd: deps.cwd }),
+                  (deps.signedIn ?? profileSignedIn)(profile, exe, deps.homeDir, {
+                    pathEnv: deps.pathEnv(),
+                    cwd: deps.cwd,
+                    ...(deps.hasApiKey ? { hasApiKey: deps.hasApiKey } : {}),
+                  }),
                 ]);
               }
             } catch {

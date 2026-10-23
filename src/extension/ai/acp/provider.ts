@@ -90,6 +90,28 @@ export interface AcpAgent {
   readonly inputIncludesCache?: boolean;
   /** tokens num formato próprio da resposta do prompt, para versões que não mandam o `usage` do protocolo */
   quota?(result: Json): AiRunTokens | null;
+  /**
+   * O login por chave de API pelo próprio protocolo: o método do `authenticate` que recebe a chave em
+   * `_meta["api-key"]`. Com ele, a pessoa entra pela tela do Conectar (a chave fica no cofre do board) em vez
+   * do terminal. Ausente: o login é o da própria ferramenta (`login`).
+   */
+  readonly apiKeyAuth?: { methodId: string };
+}
+
+/**
+ * A chave de API que o board entrega ao agente pelo `authenticate`, logo depois do `initialize`. Só existe
+ * em memória, entre o cofre e o `stdin` do agente: nunca vai para o log, a tela, a exportação nem o vínculo.
+ */
+export interface AcpAuth {
+  methodId: string;
+  apiKey: string;
+}
+
+/** O que dizer quando o agente recusa a sessão sem login: a tela do Conectar no agente com chave, o terminal nos demais. */
+export function acpLoginHint(agent: AcpAgent): string {
+  return agent.apiKeyAuth
+    ? `${agent.label} pede login. Conecte em Configurações › Ferramentas de IA › Conectar ferramenta, com a chave de API.`
+    : `${agent.label} pede login. Rode \`${agent.login}\` no terminal uma vez e entre com a sua conta.`;
 }
 
 /** O que o gateway promete medir do agente: o custo, se ele manda; senão, "tokens", a menor promessa. */

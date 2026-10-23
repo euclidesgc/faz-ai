@@ -23,14 +23,16 @@ import type { ExecInput } from '../../execution';
 import { BOARD_SERVER, SUBAGENT_TOOLS } from '../../execution';
 import { ensureProjectServer } from '../../mcp/clientConfig';
 import type { HeadlessInput } from '../provider';
-import { AUTH_REQUIRED, RpcError, rpcConnection } from './connection';
+import { AUTH_REQUIRED, RpcError, acpAuthenticate, rpcConnection } from './connection';
 import { version as EXTENSION_VERSION } from '../../../../package.json';
 import {
   ACP_PROTOCOL_VERSION,
   acpCommand,
+  acpLoginHint,
   acpMcpToolOf,
   acpSessionMode,
   type AcpAgent,
+  type AcpAuth,
   type AcpMcpServer,
   type AcpProcess,
   type AcpSpawnFn,
@@ -50,6 +52,8 @@ export interface AcpDeps extends Omit<MeasuredDeps, 'spawn'> {
   graceMs?: number;
   /** a pasta do usuário, onde fica o registro global do servidor do board; nos testes, uma temporária */
   homeDir?: string;
+  /** a chave do cofre para o `authenticate` do agente; ausente, vale o login que o agente já tiver */
+  auth?: AcpAuth;
 }
 
 /** Os servidores MCP da execução no formato do `session/new`. */
@@ -241,6 +245,11 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
     const version = init.protocolVersion;
     if (version !== ACP_PROTOCOL_VERSION)
       throw new Error(`${agent.label} fala a versão ${String(version)} do ACP; o board fala a ${ACP_PROTOCOL_VERSION}.`);
+    // a chave guardada no Conectar: o agente a guarda só na memória deste processo, então cada execução
+    // autentica. Sem o método anunciado (versão antiga), segue com o login que o agente já tiver
+    const auth = await acpAuthenticate(rpc, init, deps.auth);
+    if (auth === 'authenticated') deps.log(`Login no ${agent.label} pela chave de API do cofre do board.`);
+    if (auth === 'not-offered') deps.log(`${agent.label} não oferece o login por chave pelo ACP; segue com o login dele.`);
 
     const session = await rpc.request('session/new', { cwd, mcpServers: servers });
     sessionId = asText(session.sessionId);
@@ -286,10 +295,7 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
       if (done) return;
       const err = e instanceof Error ? e : new Error(String(e));
       // sem login o agente recusa a sessão; o board não abre o navegador da pessoa sozinho
-      const msg =
-        err instanceof RpcError && err.code === AUTH_REQUIRED
-          ? `${agent.label} pede login. Rode \`${agent.login}\` no terminal uma vez e entre com a sua conta.`
-          : err.message;
+      const msg = err instanceof RpcError && err.code === AUTH_REQUIRED ? acpLoginHint(agent) : err.message;
       deps.log(msg);
       failure = new Error(msg);
       result = 1;
