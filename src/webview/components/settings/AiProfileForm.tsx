@@ -62,8 +62,11 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
     setValues((before) => ({ ...before, [key]: text }));
     setTouched((before) => new Set(before).add(key));
   };
+  // o personalizado novo é só de CLI (história 13): o agente ACP entra pelo Conectar ferramenta. O campo do agente
+  // só aparece no personalizado ACP de uma versão anterior, que continua editável e rodando como está
+  const legacyAcp = kind === 'custom' && profile?.mode === 'acp';
   // com um agente ACP o comando é o do catálogo: o campo de comando deixa de ser obrigatório
-  const acp = kind === 'custom' && !!value('acpAgent').trim();
+  const acp = legacyAcp;
   const commandMissing = kind === 'custom' && !acp && !value('command').trim() && (!profile || !profile.credentials?.available);
   const projectPathMissing = boardServer === 'project' && !value('mcpProjectFile').trim();
   const nameMissing = !name.trim();
@@ -130,11 +133,18 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
         <FormField label={t('Nome')} hint={nameMissing ? t('Informe o nome do perfil.') : undefined}>
           {(id) => <TextField.Root id={id} autoFocus value={name} onChange={(e) => setName(e.target.value)} />}
         </FormField>
-        {kind === 'custom' &&
+        {legacyAcp && (
+          <p className="ai-profile-notice">
+            {t(
+              'Perfil personalizado pelo ACP, de uma versão anterior: continua rodando como está. O caminho normal agora é Conectar ferramenta, com o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.',
+            )}
+          </p>
+        )}
+        {legacyAcp &&
           field(
             'acpAgent',
             'Agente ACP',
-            'Id do agente no catálogo ACP (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio: CLI de uma passada.',
+            'Id do agente no catálogo ACP (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio mantém o agente salvo.',
           )}
         {!acp && (
           <FormField

@@ -175,6 +175,8 @@ const bridgeOnly = {
   'settings.aiProfiles.test': viaBridge,
   // a chave colada vai direto da HostBridge ao Conectar do host: nunca passa por `handle` nem pelo log de eventos
   'settings.aiProfiles.connect': viaBridge,
+  // as sondas demoram (a CLI do Claude roda quatro vezes na fixture): a HostBridge espera e publica o resultado
+  'settings.aiProfiles.verify': viaBridge,
 } satisfies Partial<HandlerMap>;
 
 /** Um handler por tipo de mensagem, agrupados por domínio em ./handlers. */
@@ -294,6 +296,16 @@ export class MessageRouter {
   async connectProfile(id: string, input: ConnectInput): Promise<void> {
     if (!this.connector) throw new Error('O Conectar não está disponível neste host.');
     await this.connector(id, input);
+  }
+  private verifier: ((id: string) => Promise<string>) | null = null;
+  /** Quem verifica as capacidades de um perfil (o verificador do host, o mesmo que o Conectar usa). */
+  onVerify(fn: (id: string) => Promise<string>): void {
+    this.verifier = fn;
+  }
+  /** A verificação pedida pela tela, para o perfil sem Conectar; devolve a frase do resultado. */
+  async verifyProfile(id: string): Promise<string> {
+    if (!this.verifier) throw new Error('A verificação de capacidades não está disponível neste host.');
+    return this.verifier(id);
   }
   /** O estado do Conectar de cada perfil, publicado a cada passo; nunca carrega a chave. */
   setConnections(states: Record<string, ConnectState>): void {

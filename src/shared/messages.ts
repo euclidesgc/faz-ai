@@ -277,6 +277,12 @@ export type WebviewToHost =
    */
   | { type: 'settings.aiProfiles.connect'; id: string; apiKey?: string; acknowledge?: boolean; mode?: ToolMode }
   /**
+   * Refaz as sondas de capacidade de um perfil verificável que não passa pelo Conectar (a cópia do Claude Code,
+   * o personalizado ACP de versões anteriores) e grava as provas no vínculo dele. É o caminho que ficou no lugar
+   * do comando da paleta "Verificar o isolamento da CLI de IA" (história 13); o resultado volta num `notice`.
+   */
+  | { type: 'settings.aiProfiles.verify'; id: string }
+  /**
    * Dá (`accept: true`) ou revoga a ciência do regime compatível de um perfil (história 7): o perfil com ciência
    * roda no compatível; sem ela, no regime do board.
    */

@@ -1,4 +1,5 @@
 import { runCli } from '../../../cliRun';
+import { CLAUDE_BOARD_SERVER } from '../../../mcp/clientConfig';
 import { claudeProvider } from '../../providers/claude';
 import { cliDriver, installSteps, jsonStatus, statusField } from '../cli';
 
@@ -20,4 +21,5 @@ export const claudeCliDriver = cliDriver({
     windows: installSteps('irm https://claude.ai/install.ps1 | iex'),
   },
   signedIn: jsonStatus(STATUS, 'loggedIn'),
+  boardServer: CLAUDE_BOARD_SERVER,
 });

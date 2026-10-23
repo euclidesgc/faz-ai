@@ -465,7 +465,7 @@ describe('Diagnóstico do ambiente', () => {
       expect(b.getByText('Permissões: Desconhecida').closest('li')).not.toHaveClass('ok');
       expect(b.queryByText('Permissões: Verificada')).not.toBeInTheDocument();
     });
-    it('cada perfil mostra as próprias capacidades e, sem recibos, como verificá-lo pela paleta', () => {
+    it('cada perfil mostra as próprias capacidades e, sem recibos, como verificá-lo em Ferramentas de IA', () => {
       syncStore(router);
       renderThemed(<EnvironmentView />);
       const unknown = Array(7).fill('unknown');
@@ -483,12 +483,24 @@ describe('Diagnóstico do ambiente', () => {
               capabilities: ['verified', 'partial', 'verified', 'verified', 'verified', 'unknown', 'unknown'],
             }),
             profile('cursor', { capabilities: unknown, isDefault: false }),
+            profile('claude', {
+              id: 'claude-trabalho',
+              name: 'Claude trabalho',
+              verifiable: true,
+              capabilities: unknown,
+              isDefault: false,
+            }),
           ],
         }),
       );
-      const hint = /Sem recibos de capacidade deste perfil: rode "Faz AI: Verificar o isolamento da CLI de IA"/;
+      // o comando da paleta saiu (história 13): o pronto verifica no Conectar, a cópia no "Verificar capacidades"
+      const hint = /Sem recibos de capacidade deste perfil/;
       const claude = within(block('Claude Code'));
-      expect(claude.getByText(hint)).toHaveTextContent('escolha Claude Code.');
+      expect(claude.getByText(hint)).toHaveTextContent('conecte Claude Code em Ferramentas de IA; a verificação faz parte do Conectar.');
+      expect(within(block('Claude trabalho')).getByText(hint)).toHaveTextContent(
+        'clique em Verificar capacidades em Claude trabalho, em Ferramentas de IA.',
+      );
+      expect(screen.queryByText(/paleta de comandos/)).toBeNull();
       expect(claude.getByText('MCP: Desconhecida')).toBeInTheDocument();
       const gemini = within(block('Gemini CLI'));
       expect(gemini.getByText('MCP: Verificada').closest('li')).toHaveClass('ok');

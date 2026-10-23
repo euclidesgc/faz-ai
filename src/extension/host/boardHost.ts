@@ -40,7 +40,8 @@ import { ArtifactRepo } from '../repositories/artifactRepo';
 import { createRunLog } from '../log/runLog';
 import { consolidate } from '../log/rollup';
 import { BoardRepo } from '../repositories/boardRepo';
-import { registerClients, removeProjectServer } from '../mcp/clientConfig';
+import { removeProjectServer } from '../mcp/clientConfig';
+import { registerClients } from '../mcp/boardServer';
 import { runRegistrationSteps } from '../mcp/reinstall';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
@@ -1112,6 +1113,9 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   };
   // ligar um agente ACP já prova o handshake dele: sem isso o perfil ficaria com as capacidades sem prova
   router.onProfileEnabled((profileId) => verifyInBackground(profileId, 'perfil ligado'));
+  // "Verificar capacidades" em Ferramentas de IA (história 13): o perfil verificável sem Conectar (a cópia do
+  // Claude Code, o personalizado ACP) refaz as provas por aqui, no lugar do comando que saiu da paleta
+  router.onVerify((profileId) => verifyDetailed(profileId).then((r) => r.message));
 
   const api: BoardHost = {
     router,
@@ -1156,7 +1160,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       router.handle({ type: 'harness.refresh' });
       const files = done.map((d) => d.projectFile ?? d.file.replace(homeDir, '~')).join(', ');
       void checkNow();
-      // conectar a ferramenta de um agente ACP também prova o handshake dele (o Claude fica no comando)
+      // conectar a ferramenta de um agente ACP também prova o handshake dele (o Claude verifica no Conectar)
       verifyInBackground(tool, 'ferramenta conectada');
       return { message: `Servidor "faz-ai" registrado em: ${files}. ${[...new Set(done.map((d) => d.next))].join(' ')}` };
     },

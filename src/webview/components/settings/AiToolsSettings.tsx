@@ -21,7 +21,7 @@ import { ActionButton, DeleteButton, IconPlus, SwitchField } from '../ui';
 import { AiProfileForm } from './AiProfileForm';
 import { ConnectTool, STEP_NAMES, connectionSummary, reviewText } from './ConnectTool';
 import { SectionHeader } from './SectionHeader';
-import { toolModeEntry } from '../../../shared/aiTools';
+import { toolEntry, toolModeEntry } from '../../../shared/aiTools';
 import { ExecutionPoliciesSettings } from './policies/ExecutionPoliciesSettings';
 import { PageHeader } from './PageHeader';
 import { SettingsCard } from './SettingsCard';
@@ -54,6 +54,11 @@ export function AiToolsSettings() {
   const test = useAction((id: string) => settings.testAiProfile(id));
   const reconnect = useAction((id: string) => settings.connectAiProfile(id));
   const [reconnectingId, setReconnectingId] = useState<string | null>(null);
+  const verify = useAction((id: string) => settings.verifyAiProfile(id));
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const openConnect = useBoardStore((s) => s.openConnect);
+  /** O personalizado pelo ACP, que só uma versão anterior criava: segue rodando, com o aviso e o caminho do Conectar. */
+  const legacyAcp = (p: AiProfile) => p.kind === 'custom' && p.mode === 'acp';
   /** O perfil pronto de um modo que o catálogo oferece: é ele que o Conectar conduz. */
   const connectable = (p: AiProfile) => isReadyProfile(p) && !!toolModeEntry(p.tool, p.mode);
   /** O estado do Conectar do perfil: versão, login, regime, modelos e data, ou o passo em que parou. */
@@ -127,13 +132,6 @@ export function AiToolsSettings() {
               onClick={() => void probe.run()}
             >
               {t('Verificar situação')}
-            </ActionButton>
-            <ActionButton
-              hint={t('Abre o formulário de um perfil de CLI personalizado.')}
-              disabled={editor !== null}
-              onClick={() => setEditor('new')}
-            >
-              <IconPlus /> {t('Novo perfil')}
             </ActionButton>
           </>
         }
@@ -279,6 +277,27 @@ export function AiToolsSettings() {
                         </ActionButton>
                       </>
                     )}
+                    {/* o perfil verificável sem Conectar (a cópia do Claude Code, o personalizado ACP) refaz as provas
+                        por aqui: é o caminho que ficou no lugar do comando da paleta (história 13) */}
+                    {!connectable(profile) && verifiableProfile(profile) && (
+                      <ActionButton
+                        size="1"
+                        variant="soft"
+                        color="gray"
+                        hint={t(
+                          'Refaz as sondas de capacidade deste perfil numa pasta descartável e grava as provas, sem gastar a sua conta.',
+                        )}
+                        disabled={!profile.enabled || profile.credentials?.review === 'pending' || verify.busy}
+                        disabledReason={t('Ligue o perfil antes.')}
+                        loading={verify.busy && verifyingId === profile.id}
+                        onClick={() => {
+                          setVerifyingId(profile.id);
+                          void verify.run(profile.id);
+                        }}
+                      >
+                        {t('Verificar capacidades')}
+                      </ActionButton>
+                    )}
                     {status && !status.found && status.installUrl && (
                       <a href={status.installUrl} target="_blank" rel="noopener noreferrer">
                         {t('Instalar')}
@@ -300,6 +319,25 @@ export function AiToolsSettings() {
                       );
                     })()}
                   </div>
+                  {legacyAcp(profile) && (
+                    <div className="ai-profile-notice ai-profile-legacy" role="note">
+                      <p>
+                        {t(
+                          'Perfil personalizado pelo ACP, de uma versão anterior: continua rodando como está. O caminho normal agora é Conectar ferramenta, com o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.',
+                        )}
+                      </p>
+                      {toolEntry(String(profile.config.acpAgent)) && (
+                        <ActionButton
+                          size="1"
+                          variant="soft"
+                          hint={t('Abre o Conectar ferramenta no agente deste perfil.')}
+                          onClick={() => openConnect(String(profile.config.acpAgent))}
+                        >
+                          {t('Abrir o Conectar')}
+                        </ActionButton>
+                      )}
+                    </div>
+                  )}
                   <details className="ai-profile-evidence">
                     <summary>{t('Capacidades e evidências')}</summary>
                     <div className="ai-profile-capabilities">
@@ -355,6 +393,23 @@ export function AiToolsSettings() {
             })}
           </RadioGroup.Root>
           {profiles.length === 0 && <p className="muted">{t('Nenhum perfil cadastrado.')}</p>}
+          {/* o perfil personalizado saiu do caminho normal (história 13): as ferramentas do catálogo entram pelo
+              Conectar, e o formulário fica atrás de "Avançado", só para uma CLI que o catálogo não traz */}
+          <details className="ai-tools-advanced">
+            <summary>{t('Avançado')}</summary>
+            <p className="muted">
+              {t(
+                'Perfil de CLI personalizado, para uma linha de comando que o catálogo não traz. Ele roda pela CLI de uma passada: o board não mede tokens nem custo, não verifica as capacidades e só orienta pelo pedido o agente, as skills, o MCP e as ferramentas. Para as ferramentas do catálogo, use Conectar ferramenta, acima.',
+              )}
+            </p>
+            <ActionButton
+              hint={t('Abre o formulário de um perfil de CLI personalizado.')}
+              disabled={editor !== null}
+              onClick={() => setEditor('new')}
+            >
+              <IconPlus /> {t('Novo perfil de CLI personalizado')}
+            </ActionButton>
+          </details>
           <ExecutionPoliciesSettings />
         </div>
         {editor && (

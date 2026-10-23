@@ -30,6 +30,13 @@ export interface ToolModeEntry {
   mode: ToolMode;
   sheet: ModeSheet;
   enforcement: ModeEnforcement;
+  /**
+   * Na CLI que entra por um comando de login no terminal (Claude Code, Cursor, Kimi Code): o comando que a
+   * instalação deixa no PATH e o do login (conferidos nas CLIs em 2026-10-13). Moram aqui, e não numa tabela
+   * por `AiBase`, pelo mesmo motivo do `enforcement`: o driver os usa e a webview (o Diagnóstico) também os lê.
+   * O Gemini não tem: o comando dele é o do agente do catálogo ACP, e o login é a chave de API.
+   */
+  cli?: { command: string; login: string };
 }
 
 /** Um modo que a épica prevê e que ainda não tem driver: a tela não mostra cartão para ele. */
@@ -127,6 +134,10 @@ function acpSheet(o: { name: string; consumption: string; signIn: string; billin
 const ACP_ONLY = 'É o único modo que a extensão oferece para esta ferramenta.';
 const NO_USAGE = 'não medido: o agente não informa os tokens pelo ACP';
 const TERMINAL_LOGIN = (command: string) => `login da própria ferramenta, no terminal (\`${command}\`)`;
+// o comando e o login das CLIs prontas (eram `CLI_COMMAND` e `LOGIN_COMMAND`, por `AiBase`, até a história 13)
+const CLAUDE_COMMANDS = { command: 'claude', login: 'claude auth login' };
+const CURSOR_COMMANDS = { command: 'cursor-agent', login: 'cursor-agent login' };
+const KIMI_COMMANDS = { command: 'kimi', login: 'kimi login' };
 
 /**
  * As ferramentas, na ordem da tela: o Gemini primeiro (a épica começa por ele), as CLIs prontas e os
@@ -205,11 +216,12 @@ export const TOOLS: readonly AiToolEntry[] = [
           precision: 'boa: cada ferramenta e MCP no `stream-json` da CLI',
           consumption: 'custo e tokens por execução, informados pela CLI',
           brings: 'o agente completo do Claude Code, numa passada',
-          signIn: TERMINAL_LOGIN('claude auth login'),
+          signIn: TERMINAL_LOGIN(CLAUDE_COMMANDS.login),
           billing: 'assinatura do Claude',
           whenToChoose: 'é o único modo do Claude Code: o ACP dele exige cobrança por API, fora da assinatura',
         },
         enforcement: CLAUDE_CLI,
+        cli: CLAUDE_COMMANDS,
       },
     ],
     planned: [],
@@ -229,11 +241,12 @@ export const TOOLS: readonly AiToolEntry[] = [
           precision: 'boa: ferramentas e MCP no `stream-json` da CLI',
           consumption: 'tokens por execução, informados pela CLI',
           brings: 'o agente completo do Cursor, numa passada',
-          signIn: TERMINAL_LOGIN('cursor-agent login'),
+          signIn: TERMINAL_LOGIN(CURSOR_COMMANDS.login),
           billing: 'plano do Cursor',
           whenToChoose: 'é o modo pronto do Cursor; o ACP dele fica para depois do teste real',
         },
         enforcement: CURSOR_CLI,
+        cli: CURSOR_COMMANDS,
       },
     ],
     planned: [],
@@ -253,11 +266,12 @@ export const TOOLS: readonly AiToolEntry[] = [
           precision: 'boa: ferramentas e MCP na saída `stream-json` da CLI',
           consumption: 'tokens por execução, informados pela CLI',
           brings: 'o agente completo do Kimi Code, numa passada, com a permissão sempre automática',
-          signIn: TERMINAL_LOGIN('kimi login'),
+          signIn: TERMINAL_LOGIN(KIMI_COMMANDS.login),
           billing: 'conta do Kimi Code',
           whenToChoose: 'é o modo pronto do Kimi Code; o ACP dele fica para depois do teste real',
         },
         enforcement: KIMI_CLI,
+        cli: KIMI_COMMANDS,
       },
     ],
     planned: [],

@@ -8,10 +8,9 @@ import { claudeProvider } from '../src/extension/ai/providers/claude';
 import { cursorProvider } from '../src/extension/ai/providers/cursor';
 import { kimiProvider } from '../src/extension/ai/providers/kimi';
 import { ACP_READY_AGENTS, BUILTIN_PROFILES, type AiProfile } from '../src/shared/aiProfiles';
-import { MODE_SHEET_LINES, TOOLS, recommendedOffered, toolModeOf } from '../src/shared/aiTools';
+import { MODE_SHEET_LINES, TOOLS, recommendedOffered, toolModeEntry, toolModeOf } from '../src/shared/aiTools';
 import { EXEC_ENFORCEMENT, enforcementOf } from '../src/shared/execution';
 import { ALL_AI_BASES } from '../src/shared/harness';
-import { CLI_COMMAND, LOGIN_COMMAND } from '../src/shared/requirements';
 
 describe('catálogo de ferramentas (TOOLS) e drivers de conexão', () => {
   it('o Gemini vem primeiro, e todo perfil do catálogo tem a sua ferramenta em TOOLS', () => {
@@ -94,14 +93,16 @@ describe('catálogo de ferramentas (TOOLS) e drivers de conexão', () => {
 
 describe('drivers das CLIs prontas: envolvem os providers atuais', () => {
   it.each([
-    ['claude', claudeProvider],
-    ['cursor', cursorProvider],
-    ['kimi', kimiProvider],
-  ] as const)('%s/cli mede o mesmo que o provider e usa o comando e o login de sempre', (tool, provider) => {
+    ['claude', claudeProvider, 'claude', 'claude auth login'],
+    ['cursor', cursorProvider, 'cursor-agent', 'cursor-agent login'],
+    ['kimi', kimiProvider, 'kimi', 'kimi login'],
+  ] as const)('%s/cli mede o mesmo que o provider e usa o comando e o login de sempre', (tool, provider, command, login) => {
     const driver = driverFor(tool, 'cli')!;
     expect(driver.measure).toBe(provider.measure);
-    expect(driver.command).toBe(CLI_COMMAND[tool]);
-    expect(driver.auth).toEqual({ kind: 'login-command', command: LOGIN_COMMAND[tool] });
+    // os valores das antigas tabelas por `AiBase` (CLI_COMMAND e LOGIN_COMMAND), agora na linha do catálogo
+    expect(driver.command).toBe(command);
+    expect(driver.auth).toEqual({ kind: 'login-command', command: login });
+    expect(toolModeEntry(tool, 'cli')!.cli).toEqual({ command, login });
     expect(driver.versionArgs).toEqual(['--version']);
     expect(driver.install('unix').length).toBeGreaterThan(0);
     expect(driver.install('windows').length).toBeGreaterThan(0);

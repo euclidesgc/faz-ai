@@ -157,6 +157,8 @@ export const host: Record<string, string> = {
   'Perfis executáveis exigem revisão humana.': 'Executable profiles require human review.',
   'Os perfis prontos não são editados: duplique para mudar.': 'Builtin profiles cannot be edited: duplicate one to change it.',
   'Os perfis prontos não são apagados: desligue.': 'Builtin profiles cannot be deleted: disable them instead.',
+  'O perfil personalizado novo é só de CLI. Para um agente ACP, use Conectar ferramenta em Ferramentas de IA.':
+    'A new custom profile is CLI only. For an ACP agent, use Connect a tool in AI tools.',
   'Nome do perfil inválido.': 'Invalid profile name.',
   'Tipo ou base do perfil inválido.': 'Invalid profile type or base.',
   'Posição ou estado do perfil inválido.': 'Invalid profile position or state.',

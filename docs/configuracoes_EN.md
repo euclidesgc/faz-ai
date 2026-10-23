@@ -77,6 +77,15 @@ redo the sign-in or the probes); if the agent refuses the key at sign-in, the fi
 what you pasted. Each catalog profile, in the list below, shows its connection state (including when
 Connect is waiting for you) and **Reconnect**.
 
+The capability check no longer has a command of its own: the **Faz AI: Verify the AI CLI isolation**
+palette command is gone. The check runs in **Connect** and **Reconnect** (Claude Code and Gemini over
+the CLI go through here), on its own when you turn on an ACP agent, and, for the verifiable profiles
+that do not go through Connect (a copy of Claude Code and a custom ACP profile from an earlier
+version), through the profile's **Verificar capacidades** (check capabilities) button in the list. None
+of the probes spends your account. When a proof stops being valid (the CLI, the environment or the
+extension changed), the requirements banner says where to redo it: **Open Connect** for a catalog
+profile, **Open AI tools** for a copy.
+
 The acknowledgment is per profile and can go away: **Revoke acknowledgment** removes it (the profile
 stops running in the compatible regime until you acknowledge it again); reconnecting a profile that now
 proves the exclusive regime removes it on its own; and **importing a board does not bring the profiles'
@@ -138,7 +147,16 @@ is on the PATH and its version; the login stays "not verified" (for Gemini, "con
 in the vault, through [Connect](#ai-tools-connect-a-tool)), and the **Instalar** (install) link opens the agent's official ACP mode page. Cursor and Kimi Code stay on
 the ready one-shot CLIs, which measure tokens; Claude Code keeps running through the `claude` CLI.
 
-### Custom profile
+### Custom profile (Advanced)
+
+The custom profile is the advanced path, for a command line the catalog does not include: the catalog
+tools come in through **Connect a tool**. The form sits under **Avançado** (advanced), below the
+profile list, in the **Novo perfil de CLI personalizado** (new custom CLI profile) button. A new custom
+profile is **CLI only**: the **Agente ACP** (ACP agent) field left the new form, and the board refuses
+to turn a custom CLI into an ACP agent. Custom ACP profiles created in an earlier version (and a copy
+of a ready ACP agent) **keep running as they are**: the list shows a notice, with **Open Connect** on
+their agent, and **Verificar capacidades** (check capabilities); editing shows the same notice and
+keeps the saved agent.
 
 To create a custom profile, enter the command and one argument per line. The markers `{prompt}`,
 `{model}`, `{effort}`, `{mcpConfig}` and `{addDir}` insert, respectively, the request, the model,

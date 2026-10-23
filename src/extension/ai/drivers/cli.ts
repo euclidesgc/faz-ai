@@ -1,8 +1,7 @@
 import { toolModeEntry } from '../../../shared/aiTools';
 import type { InstallStep } from '../../../shared/environment';
-import type { AiBase } from '../../../shared/aiProfiles';
-import { CLI_COMMAND, LOGIN_COMMAND } from '../../../shared/requirements';
 import { resolveCommand } from '../../cliResolve';
+import type { BoardServerSupport } from '../../mcp/clientConfig';
 import { spawnMeasured } from '../../aiOutput/measured';
 import { headlessCommand } from '../../headless';
 import type { AiProvider } from '../provider';
@@ -36,18 +35,22 @@ export const cliExecutor: Executor = {
 export const installSteps = (...commands: string[]): InstallStep[] => commands.map((command) => ({ command }));
 
 /**
- * O driver de uma CLI pronta: envolve o provider dela (o que a execução usa) e completa com o que só a
- * conexão precisa. O comando e o login vêm de `CLI_COMMAND` e `LOGIN_COMMAND`, que a webview também lê.
+ * O driver de uma CLI pronta que entra por um comando de login: envolve o provider dela (o que a execução usa)
+ * e completa com o que só a conexão precisa. O comando e o login vêm da linha da ferramenta no catálogo
+ * (`TOOLS`, `cli`), que a webview também lê; `boardServer` é onde a ferramenta lê o servidor MCP do board.
  */
 export function cliDriver(o: {
-  tool: AiBase;
+  tool: string;
   provider: AiProvider;
   docs: string;
   install: Record<'unix' | 'windows', InstallStep[]>;
   signedIn(probe: SignInProbe): Promise<boolean | null>;
   listModels?: ConnectionDriver['listModels'];
+  boardServer?: BoardServerSupport;
 }): ToolDriver {
-  const command = CLI_COMMAND[o.tool];
+  const entry = toolModeEntry(o.tool, 'cli');
+  if (!entry?.cli) throw new Error(`A CLI ${o.tool} não tem comando e login no catálogo de ferramentas.`);
+  const { command, login } = entry.cli;
   return {
     tool: o.tool,
     mode: 'cli',
@@ -56,11 +59,12 @@ export function cliDriver(o: {
     versionArgs: ['--version'],
     docs: o.docs,
     install: (platform) => o.install[platform],
-    auth: { kind: 'login-command', command: LOGIN_COMMAND[o.tool] },
+    auth: { kind: 'login-command', command: login },
     signedIn: o.signedIn,
     ...(o.listModels ? { listModels: o.listModels } : {}),
+    ...(o.boardServer ? { boardServer: o.boardServer } : {}),
     measure: o.provider.measure,
-    enforcement: toolModeEntry(o.tool, 'cli')!.enforcement,
+    enforcement: entry.enforcement,
     ...cliExecutor,
   };
 }

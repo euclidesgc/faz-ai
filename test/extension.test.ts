@@ -84,9 +84,11 @@ it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serv
     'fazai.autopilot.resume',
     'fazai.upgradeBoard',
     'fazai.showLog',
-    'fazai.verifyExecutor',
   ])
     expect(fake.commands.has(id), id).toBe(true);
+  // a verificação de capacidades saiu da paleta (história 13 da épica "ferramenta por modo"): ela roda no
+  // Conectar e no Reconectar, ao ligar um agente ACP e por "Verificar capacidades" em Ferramentas de IA
+  expect(fake.commands.has('fazai.verifyExecutor')).toBe(false);
   // o atalho de terminal aponta para esta versão e para os mesmos dados
   const launcher = fs.readFileSync(path.join(home, '.faz-ai', 'bin', 'faz-ai'), 'utf8');
   expect(launcher).toContain(path.join(extensionDir, 'dist', 'cli.js'));

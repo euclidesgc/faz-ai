@@ -225,6 +225,12 @@ export class HostBridge {
           ...(typeof msg.mode === 'string' ? { mode: msg.mode } : {}),
         });
         return;
+      // a verificação do perfil que não passa pelo Conectar (a cópia do Claude, o personalizado ACP): o `done`
+      // sai no fim das sondas, e a frase do resultado vira aviso; a faixa de requisitos lê as provas novas
+      case 'settings.aiProfiles.verify':
+        this.post({ type: 'notice', message: await this.router.verifyProfile(msg.id) });
+        await this.router.recheckRequirements();
+        return;
       case 'settings.aiProfiles.test':
         this.post(await this.router.testAiProfile(msg.id));
         // o teste muda a evidência do perfil: o aviso do topo reflete o resultado sem recarregar

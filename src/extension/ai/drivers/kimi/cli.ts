@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ModelOption } from '../../../../shared/models';
 import { runCli } from '../../../cliRun';
-import { kimiHome } from '../../../mcp/clientConfig';
+import { KIMI_BOARD_SERVER, kimiHome } from '../../../mcp/clientConfig';
 import { parseKimiModels } from '../../../models';
 import { kimiProvider } from '../../providers/kimi';
 import { cliDriver, installSteps } from '../cli';
@@ -37,4 +37,5 @@ export const kimiCliDriver = cliDriver({
   // a cópia do perfil pode apontar outra pasta de dados pelo próprio ambiente
   signedIn: async (probe) => kimiSignedIn(probe.homeDir, probe.env?.KIMI_CODE_HOME),
   listModels: kimiModels,
+  boardServer: KIMI_BOARD_SERVER,
 });

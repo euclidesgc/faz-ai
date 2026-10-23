@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { checkEnvironment, linuxFamily, type EnvironmentProbe, type LinuxFamily } from '../src/extension/environment';
+import { driverFor } from '../src/extension/ai/drivers';
 import { BUILTIN_PROFILES } from '../src/shared/aiProfiles';
 import { profileHealth, type ProfileHealth } from '../src/shared/profileHealth';
 import { missingCount, type EnvCheck, type EnvCheckId, type EnvironmentReport } from '../src/shared/environment';
@@ -332,6 +333,21 @@ describe('Diagnóstico do ambiente', () => {
     );
     // no modo API não há binário: nada para instalar
     expect(r.profiles[2]!.install).toBeNull();
+  });
+
+  it('a instalação e a página de toda CLI do catálogo vêm do driver dela, sem tabela por AiBase (história 13)', async () => {
+    // o Gemini pronto no modo CLI não é uma `AiBase`: só a consulta ao driver o cobre, como cobre as três CLIs prontas
+    const geminiCli: ProfileHealth = { ...health('gemini', false), mode: 'cli' };
+    const missing = [health('claude', false), health('cursor', false), health('kimi', false), geminiCli];
+    for (const platform of ['darwin', 'win32'] as const) {
+      const r = await checkEnvironment(probe({ health: missing, platform, pathDirs: ['/home/me/.local/bin'] }));
+      for (const h of r.profiles) {
+        const driver = driverFor(h.tool, 'cli')!;
+        const steps = driver.install(platform === 'win32' ? 'windows' : 'unix');
+        expect(h.install, h.id).toMatchObject({ docs: driver.docs });
+        expect(h.install && 'steps' in h.install && h.install.steps.slice(0, steps.length), h.id).toEqual(steps);
+      }
+    }
   });
 
   it('perfil com a CLI achada não sugere instalar; o que já traz um link (cópia ou personalizado) fica como veio', async () => {

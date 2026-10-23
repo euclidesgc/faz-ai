@@ -453,8 +453,11 @@ export const board: Record<string, string> = {
   '{name}: a verificação de capacidades perdeu a validade': '{name}: the capability check is no longer valid',
   'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. O board já está verificando de novo, sem gastar a sua conta; o resultado fica em Saída › Faz AI.':
     'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. The board is already checking again, without using your account; the result goes to Output › Faz AI.',
-  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Rode "Faz AI: Verificar o isolamento da CLI de IA" na paleta de comandos e escolha este perfil.':
-    'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Run "Faz AI: Verify the AI CLI isolation" from the Command Palette and pick this profile.',
+  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Reconectar neste perfil, em Ferramentas de IA: a verificação faz parte do Conectar.':
+    'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Click Reconnect on this profile, in AI tools: the check is part of Connect.',
+  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Verificar capacidades neste perfil, em Ferramentas de IA.':
+    'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Click Check capabilities on this profile, in AI tools.',
+  'Abrir Ferramentas de IA': 'Open AI tools',
   '{name}: pendente de revisão': '{name}: pending review',
   'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 22 ou mais novo, e ele não está no PATH do terminal. Sem ele, a IA não alcança o board. Instale o Node.js e clique em Verificar de novo.':
     "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 22 or newer, and it is not on the terminal's PATH. Without it, the AI cannot reach the board. Install Node.js and click Check again.",

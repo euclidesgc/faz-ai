@@ -12,6 +12,7 @@ import type { ExecutionTransport } from '../../../shared/executionAdmission';
 import type { ModelOption } from '../../../shared/models';
 import type { FailureClass, ToolFailure } from '../../../shared/usageLimit';
 import type { CliRun } from '../../cliRun';
+import type { BoardServerSupport } from '../../mcp/clientConfig';
 import type { HeadlessCommand, HeadlessInput } from '../../headless';
 import type { Measured, MeasuredDeps } from '../../aiOutput/measured';
 import type { AcpSpawnFn } from '../acp/provider';
@@ -66,6 +67,13 @@ export interface ConnectionDriver {
    * motivo quando a API recusa.
    */
   apiModels?(apiKey: string): Promise<ModelOption[]>;
+  /**
+   * O servidor MCP do board na ferramenta, para a conversa da pessoa fora do board ("Conectar ao board"): como
+   * registrar e onde ela lê (história 13; era um `switch` por ferramenta em `clientConfig.ts` e nos requisitos).
+   * Ausente quando o board não registra nada nela (o Gemini recebe os servidores na home isolada da execução, e o
+   * agente ACP, no `session/new`).
+   */
+  readonly boardServer?: BoardServerSupport;
   /** o que o gateway promete medir: custo, tokens ou nada */
   readonly measure: AiMeasure;
   /** o que o board impõe neste modo: a linha do catálogo (`TOOLS`) */

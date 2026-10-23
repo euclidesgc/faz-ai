@@ -1,5 +1,6 @@
 import type { ModelOption } from '../../../../shared/models';
 import { runCli } from '../../../cliRun';
+import { CURSOR_BOARD_SERVER } from '../../../mcp/clientConfig';
 import { parseCursorModels } from '../../../models';
 import { cursorProvider } from '../../providers/cursor';
 import { cliDriver, installSteps, jsonStatus, statusField } from '../cli';
@@ -28,4 +29,5 @@ export const cursorCliDriver = cliDriver({
   },
   signedIn: jsonStatus(STATUS, 'isAuthenticated'),
   listModels: cursorModels,
+  boardServer: CURSOR_BOARD_SERVER,
 });

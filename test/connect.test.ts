@@ -164,9 +164,17 @@ describe('Conectar o Gemini em ACP, passo a passo', () => {
   });
 
   it('o perfil que passa a provar o exclusivo perde a ciência antiga', async () => {
-    const h = host({ verify: async () => ({ evidence: evidence('cli') }) });
+    const verified: string[] = [];
+    const h = host({
+      verify: async (id) => {
+        verified.push(id);
+        return { evidence: evidence('cli') };
+      },
+    });
     h.reviews.claude = 2;
     expect(await h.connector.connect('claude')).toMatchObject({ status: 'connected', summary: { regime: 'exclusive', reviewed: null } });
+    // o Conectar (e o Reconectar) do Claude Code roda as sondas dele: é a verificação que saiu da paleta (história 13)
+    expect(verified).toEqual(['claude']);
     expect(h.calls).toContain('revoke:claude');
     expect(h.reviews).toEqual({});
   });

@@ -258,12 +258,14 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   for Claude Code (the built-in CLI and its copies) and for ACP agents. For an ACP agent it runs on
   its own when you turn it on, when you connect its tool to the board and, with the agent on, when
   the environment check finds its binding without a valid proof (once per binding), unless the
-  proof for the current binding is still valid (the result goes to Output › Faz AI). For any checkable profile it
-  runs through the **Faz AI: Verify the AI CLI isolation** command, which asks which of the
-  enabled profiles to check (the board default comes first). For Claude Code, the CLI runs in a
-  throwaway folder against a local API with a fake key; for an ACP agent, it is two handshakes in a
-  throwaway folder. Neither spends your account. While a checkable profile has no receipts, its
-  block says how to check it from the Command Palette. For an ACP agent the artifacts capability
+  proof for the current binding is still valid (the result goes to Output › Faz AI). For the catalog
+  profiles (Claude Code, Gemini over the CLI and the ready ACP agents) it is a step of **Connect** and
+  **Reconnect**, in AI tools; for the checkable profiles that do not go through Connect (a copy of
+  Claude Code and a custom ACP profile from an earlier version), it runs through the profile's
+  **Verificar capacidades** (check capabilities) button, on the same screen. The "Verify the AI CLI
+  isolation" palette command is gone. For Claude Code, the CLI runs in a throwaway folder against a
+  local API with a fake key; for an ACP agent, it is two handshakes in a throwaway folder. Neither
+  spends your account. While a checkable profile has no receipts, its block says where to check it. For an ACP agent the artifacts capability
   stays partial on purpose, because the agent reads its own context files, and the profile is
   admissible only in the compatible regime. The proof counts for all three permissions (**Só o
   board**, **Board e arquivos** and **Sem restrições**) and survives an editor restart: its binding
@@ -275,7 +277,8 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   ask for the no-questions mode, in which the card's denials would not apply. When the binding changes after the last proof (the tool was
   updated, one of those variables changed or the binding format changed in a new version), the top
   warning says the check is no longer valid, without blocking the board: for an ACP agent the board
-  already redoes it on its own; for Claude Code, run the command again. The admission preview on the card evaluates the profile
+  already redoes it on its own; for Claude Code, click **Reconnect** (on a copy, **Verificar
+  capacidades**). The admission preview on the card evaluates the profile
   that will run the card (the one from the card's model, the agent or the rule), not the board
   default.
 - **Next run and limits:** shows the regime chosen in Harness › Ferramenta e execução, the default

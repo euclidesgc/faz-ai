@@ -14,7 +14,7 @@ import {
   type ProbeRun,
 } from '../src/extension/ai/capabilityVerifier';
 import { ACP_CAPABILITY_CHECKS, CAPABILITY_CHECKS, assessCapability, type StrictExecutionRequest } from '../src/shared/executionAdmission';
-import { BUILTIN_PROFILES, verifiableProfile, verifiableProfiles, type AiProfile } from '../src/shared/aiProfiles';
+import { BUILTIN_PROFILES, verifiableProfile, type AiProfile } from '../src/shared/aiProfiles';
 import { evidenceCapabilities, evidenceCurrent } from '../src/shared/profileHealth';
 import { regimeFromEvidence } from '../src/shared/connect';
 import { spawnHeadless } from '../src/extension/spawn';
@@ -446,23 +446,10 @@ describe('verificação por perfil', () => {
     }
   });
 
-  it('o comando oferece só os perfis ligados, revisados e verificáveis, com o padrão primeiro', () => {
-    const board = {
-      aiTool: 'gemini',
-      aiProfiles: [
-        builtin('claude'),
-        builtin('cursor'),
-        builtin('gemini', { enabled: true }),
-        builtin('opencode'),
-        {
-          ...builtin('claude'),
-          id: 'claude-copia',
-          kind: 'catalog' as const,
-          credentials: { secretRef: 'x', review: 'pending' as const, available: true },
-        },
-      ],
-    };
-    expect(verifiableProfiles(board).map((p) => p.id)).toEqual(['gemini', 'claude']);
+  it('verificáveis são o Claude (pronto e cópia) e os agentes ACP; Cursor e Kimi não têm sonda', () => {
+    expect(verifiableProfile(builtin('claude'))).toBe(true);
+    expect(verifiableProfile({ ...builtin('claude'), id: 'claude-copia', kind: 'catalog' })).toBe(true);
+    expect(verifiableProfile(builtin('cursor'))).toBe(false);
     expect(verifiableProfile(builtin('kimi'))).toBe(false);
     expect(verifiableProfile(builtin('opencode'))).toBe(true);
   });

@@ -70,13 +70,16 @@ export interface ProfileHealth {
    * bloqueia o board.
    */
   validationRequired: boolean;
-  /** o host sabe provar as capacidades deste perfil (Claude ou agente ACP): o comando de verificação o oferece */
+  /**
+   * o host sabe provar as capacidades deste perfil (Claude, agente ACP, Gemini pela CLI): o Conectar o verifica,
+   * e o perfil sem Conectar, pelo "Verificar capacidades" de Ferramentas de IA
+   */
   verifiable?: boolean;
   /**
    * a última prova gravada para o perfil foi feita num vínculo de isolamento que não é mais o atual (o
    * binário, o ambiente relevante ou o formato do vínculo mudou): ela não vale mais e precisa ser refeita.
    * Não bloqueia; vira aviso na faixa de requisitos. `automatic`: o board refaz sozinho (agente ACP);
-   * `command`: pelo comando da paleta (Claude Code).
+   * `command`: pela pessoa, em Ferramentas de IA (Reconectar, ou "Verificar capacidades" no perfil sem Conectar).
    */
   evidenceInvalidated?: 'automatic' | 'command';
   problem: ProfileProblem | null;

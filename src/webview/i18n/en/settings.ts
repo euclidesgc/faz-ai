@@ -10,7 +10,6 @@ export const settings: Record<string, string> = {
   'Consulta instalação, versão e login de cada perfil.': 'Checks installation, version, and sign-in for each profile.',
   'Verificar situação': 'Check status',
   'Abre o formulário de um perfil de CLI personalizado.': 'Opens the form for a custom CLI profile.',
-  'Novo perfil': 'New profile',
   'Os perfis de CLI são dados do board. Configuração não comprova isolamento, permissões ou acesso ao MCP.':
     'CLI profiles are board data. Configuration does not prove isolation, permissions, or MCP access.',
   'Perfil padrão': 'Default profile',
@@ -88,8 +87,18 @@ export const settings: Record<string, string> = {
   'Argumentos de versão': 'Version arguments',
   'Argumentos do status do login': 'Sign-in status arguments',
   'Agente ACP': 'ACP agent',
-  'Id do agente no catálogo ACP (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio: CLI de uma passada.':
-    'Agent id in the ACP catalog (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Empty: one-shot CLI.',
+  'Id do agente no catálogo ACP (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio mantém o agente salvo.':
+    'Agent id in the ACP catalog (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Blank keeps the saved agent.',
+  'Perfil personalizado pelo ACP, de uma versão anterior: continua rodando como está. O caminho normal agora é Conectar ferramenta, com o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.':
+    'Custom ACP profile from an earlier version: it keeps running as it is. The usual path is now Connect a tool, with the catalog agent in ACP mode; new custom profiles are CLI only.',
+  'Abre o Conectar ferramenta no agente deste perfil.': 'Opens Connect a tool on this profile’s agent.',
+  'Refaz as sondas de capacidade deste perfil numa pasta descartável e grava as provas, sem gastar a sua conta.':
+    'Reruns this profile’s capability probes in a throwaway folder and records the proofs, without spending your account.',
+  'Verificar capacidades': 'Check capabilities',
+  Avançado: 'Advanced',
+  'Perfil de CLI personalizado, para uma linha de comando que o catálogo não traz. Ele roda pela CLI de uma passada: o board não mede tokens nem custo, não verifica as capacidades e só orienta pelo pedido o agente, as skills, o MCP e as ferramentas. Para as ferramentas do catálogo, use Conectar ferramenta, acima.':
+    'Custom CLI profile, for a command line the catalog does not include. It runs as a one-shot CLI: the board does not measure tokens or cost, does not check its capabilities, and only guides the agent, skills, MCP and tools through the prompt. For the catalog tools, use Connect a tool, above.',
+  'Novo perfil de CLI personalizado': 'New custom CLI profile',
   'O perfil roda pelo Agent Client Protocol: o comando, os argumentos e as permissões são os do agente, respondidas pelo card.':
     'The profile runs over the Agent Client Protocol: the command, arguments and permissions are the agent’s, answered by the card.',
   'Frases de login vencido': 'Expired sign-in phrases',

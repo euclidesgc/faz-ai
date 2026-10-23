@@ -197,6 +197,12 @@ export class AiProfileRepo {
       }
       const errors = validateProfile({ ...draft, kind, config });
       if (errors.length) throw new Error(errors.join(' '));
+      // o personalizado novo é só de CLI (épica "ferramenta por modo", história 13): o agente ACP entra pelo
+      // Conectar ferramenta. O personalizado ACP de uma versão anterior (e a cópia de um agente ACP, que já nasce
+      // ACP) continua editável e rodando como está; o que não se faz é transformar um CLI em ACP pelo formulário
+      const wasAcp = !!old && (old.mode === 'acp' || typeof saved?.acpAgent === 'string');
+      if (kind === 'custom' && typeof config.acpAgent === 'string' && !wasAcp)
+        throw new Error('O perfil personalizado novo é só de CLI. Para um agente ACP, use Conectar ferramenta em Ferramentas de IA.');
       // a ferramenta e o modo saem do tipo e da configuração, nunca do rascunho: a cópia é a ferramenta da base
       // em cli; o personalizado é a própria ferramenta, em acp quando aponta um agente do catálogo ACP
       const tool = kind === 'catalog' ? draft.base : id,

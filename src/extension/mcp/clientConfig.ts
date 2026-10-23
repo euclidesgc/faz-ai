@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { samePath } from '../samePath';
+import { byPath, samePath } from '../samePath';
 import type { AiTool } from '../../shared/harness';
 import { excludeLocally } from './pinCommands';
 
@@ -142,68 +142,132 @@ function coveredByGlobal(file: string, runDir: string, entryArgs: string[]): boo
   return folder ? samePath(folder, board) : within(runDir, board);
 }
 
-/**
- * Registra o servidor MCP do board na configuração global de cada ferramenta, sem a pasta fixa: a
- * ponte descobre o board pelo diretório em que a ferramenta foi aberta, e o mesmo registro serve a
- * todos os projetos. Nada entra na pasta do projeto, que pode ser compartilhada com quem não tem a
- * extensão (veja `registerUser`). O Cursor é a exceção documentada: o global dele não funciona, e o
- * registro vai para o `.cursor/mcp.json` do projeto, fora do git (`registerCursorProject`).
- */
-export function registerClients(tools: AiTool[], o: RegisterOptions): Registration[] {
-  return tools.flatMap((tool) => registerUser(tool, o));
+/** Onde a ferramenta lê o servidor do board, e o que está registrado lá. */
+export interface Registered {
+  /** o arquivo, como a pessoa o reconhece (relativo ao projeto ou com `~`) */
+  file: string;
+  /** o arquivo, com o caminho completo */
+  path: string;
+  /** do projeto (vale sobre o global na ferramenta) ou do usuário */
+  scope: 'project' | 'user';
+  command: string;
+  args: string[];
 }
 
 /**
- * Registro global (escopo do usuário), o padrão de cada ferramenta para um servidor que vale em
- * qualquer projeto. Sem pasta fixa: cada ferramenta diz ao servidor onde está o projeto do jeito que
- * tem, e a ponte, na falta disso, sobe a partir do diretório em que a ferramenta foi aberta.
- * - Claude Code: `claude mcp add-json --scope user` (o `~/.claude.json` é reescrito pela ferramenta o
- *   tempo todo; gravar nele por fora arrisca perder a mudança ou a dela). A pasta chega pela variável
- *   `CLAUDE_PROJECT_DIR`, que o Claude Code passa ao servidor.
- * - Cursor: nenhum; o registro dele é sempre o do projeto (veja `registerCursorProject`)
- * - Kimi Code: `~/.kimi-code/mcp.json` ($KIMI_CODE_HOME/mcp.json), um JSON só de servidores que a
- *   ferramenta não regrava: a escrita direta é segura
+ * O servidor do board numa ferramenta (épica "ferramenta por modo", história 13): como registrá-lo e onde ela o
+ * lê. Cada driver de CLI que fala MCP traz o dele (`ConnectionDriver.boardServer`), no lugar dos `switch` por
+ * ferramenta que `registerClients` e `registeredServer` tinham; o despacho fica em `mcp/boardServer.ts`.
  */
-function registerUser(tool: AiTool, o: RegisterOptions): Registration[] {
-  const node = o.nodeCommand ?? 'node';
-  const args = [o.bridgePath];
-  const home = (...p: string[]) => path.join(o.homeDir, ...p);
-  switch (tool) {
-    case 'claude': {
-      const entry = JSON.stringify({ type: 'stdio', command: node, args });
-      return [
-        {
-          tool,
-          file: home('.claude.json'),
-          projectFile: null,
-          next: 'Claude Code: abra uma sessão nova em qualquer projeto com o board aberto (/mcp mostra o estado).',
-          run: [
-            { command: 'claude', args: ['mcp', 'remove', '--scope', 'user', SERVER], mayFail: true },
-            { command: 'claude', args: ['mcp', 'add-json', '--scope', 'user', SERVER, entry] },
-          ],
-        },
-      ];
-    }
-    // no Cursor o global não funciona: é um processo só para todas as janelas, que não sabe qual board
-    // atender. O registro do Cursor é sempre o do projeto.
-    case 'cursor':
-      return [registerCursorProject(o)];
-    case 'kimi': {
-      const file = path.join(kimiHome(o.homeDir), 'mcp.json');
-      // a entrada do Kimi Code não leva o campo `type` (documentação da CLI 2.1.1)
-      mergeJson(file, { command: node, args });
-      return [
-        {
-          tool,
-          file,
-          projectFile: null,
-          next: 'Kimi Code: abra uma sessão nova em qualquer projeto com o board aberto.',
-        },
-      ];
-    }
-  }
-  return [];
+export interface BoardServerSupport {
+  /**
+   * Registra o servidor MCP do board, sem a pasta fixa: a ponte descobre o board pelo diretório em que a
+   * ferramenta foi aberta, e o mesmo registro serve a todos os projetos. Nada entra na pasta do projeto,
+   * que pode ser compartilhada com quem não tem a extensão; o Cursor é a exceção documentada.
+   */
+  register(o: RegisterOptions): Registration[];
+  /**
+   * O servidor (por padrão, o do board) no arquivo que a ferramenta lê nas conversas da pessoa (fora do
+   * board), nos mesmos lugares em que `register` grava: primeiro o do projeto, que vale sobre o global
+   * nas ferramentas, e depois o global. null quando não está registrado.
+   */
+  registered(workspaceDir: string, homeDir: string, server?: string): Registered | null;
 }
+
+const readJson = (file: string): Record<string, unknown> | null => {
+  try {
+    const v: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+};
+
+/** O arquivo mostrado com `~` é do usuário; o relativo é do projeto. */
+const scopeOf = (shown: string): Registered['scope'] => (shown.startsWith('~') ? 'user' : 'project');
+
+/** O registro de um servidor (por padrão, o do board) num JSON (`mcpServers`). */
+function fromJson(file: string, shown: string, server = SERVER): Registered | null {
+  const section = readJson(file)?.mcpServers as Record<string, { command?: unknown; args?: unknown }> | undefined;
+  const entry = section?.[server];
+  if (!entry || typeof entry.command !== 'string') return null;
+  return {
+    file: shown,
+    path: file,
+    scope: scopeOf(shown),
+    command: entry.command,
+    args: Array.isArray(entry.args) ? entry.args.map(String) : [],
+  };
+}
+
+/**
+ * Claude Code: `claude mcp add-json --scope user` (o `~/.claude.json` é reescrito pela ferramenta o tempo
+ * todo; gravar nele por fora arrisca perder a mudança ou a dela). A pasta chega pela variável
+ * `CLAUDE_PROJECT_DIR`, que o Claude Code passa ao servidor.
+ */
+export const CLAUDE_BOARD_SERVER: BoardServerSupport = {
+  register(o) {
+    const entry = JSON.stringify({ type: 'stdio', command: o.nodeCommand ?? 'node', args: [o.bridgePath] });
+    return [
+      {
+        tool: 'claude',
+        file: path.join(o.homeDir, '.claude.json'),
+        projectFile: null,
+        next: 'Claude Code: abra uma sessão nova em qualquer projeto com o board aberto (/mcp mostra o estado).',
+        run: [
+          { command: 'claude', args: ['mcp', 'remove', '--scope', 'user', SERVER], mayFail: true },
+          { command: 'claude', args: ['mcp', 'add-json', '--scope', 'user', SERVER, entry] },
+        ],
+      },
+    ];
+  },
+  // `claude mcp add` grava no projeto (.mcp.json) ou no ~/.claude.json: para o usuário inteiro, ou só para
+  // esta pasta (escopo "local", dentro de `projects`)
+  registered(workspaceDir, homeDir, server = SERVER) {
+    const found = fromJson(path.join(workspaceDir, '.mcp.json'), '.mcp.json', server);
+    if (found) return found;
+    const user = readJson(path.join(homeDir, '.claude.json'));
+    const local = byPath(user?.projects as Record<string, Record<string, unknown>> | undefined, workspaceDir);
+    for (const section of [local?.mcpServers, user?.mcpServers]) {
+      const entry = (section as Record<string, { command?: unknown; args?: unknown }> | undefined)?.[server];
+      if (entry && typeof entry.command === 'string')
+        return {
+          file: '~/.claude.json',
+          path: path.join(homeDir, '.claude.json'),
+          scope: 'user',
+          command: entry.command,
+          args: Array.isArray(entry.args) ? entry.args.map(String) : [],
+        };
+    }
+    return null;
+  },
+};
+
+/**
+ * Cursor: no global não funciona (é um processo só para todas as janelas, que não sabe qual board atender);
+ * o registro dele é sempre o do projeto (`registerCursorProject`), e o global não conta na leitura.
+ */
+export const CURSOR_BOARD_SERVER: BoardServerSupport = {
+  register: (o) => [registerCursorProject(o)],
+  registered: (workspaceDir, _homeDir, server = SERVER) =>
+    fromJson(path.join(workspaceDir, '.cursor/mcp.json'), '.cursor/mcp.json', server),
+};
+
+/**
+ * Kimi Code: `~/.kimi-code/mcp.json` ($KIMI_CODE_HOME/mcp.json), um JSON só de servidores que a ferramenta
+ * não regrava: a escrita direta é segura. Na leitura, primeiro o do projeto (que vale sobre o global).
+ */
+export const KIMI_BOARD_SERVER: BoardServerSupport = {
+  register(o) {
+    const file = path.join(kimiHome(o.homeDir), 'mcp.json');
+    // a entrada do Kimi Code não leva o campo `type` (documentação da CLI 2.1.1)
+    mergeJson(file, { command: o.nodeCommand ?? 'node', args: [o.bridgePath] });
+    return [{ tool: 'kimi', file, projectFile: null, next: 'Kimi Code: abra uma sessão nova em qualquer projeto com o board aberto.' }];
+  },
+  registered: (workspaceDir, homeDir, server = SERVER) =>
+    fromJson(path.join(workspaceDir, '.kimi-code/mcp.json'), '.kimi-code/mcp.json', server) ??
+    fromJson(path.join(kimiHome(homeDir), 'mcp.json'), '~/.kimi-code/mcp.json', server),
+};
 
 /**
  * Tira o registro do board do arquivo de configuração do projeto, deixando o resto como está. O

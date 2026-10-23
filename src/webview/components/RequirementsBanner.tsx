@@ -83,9 +83,13 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
                     ? t(
                         'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. O board já está verificando de novo, sem gastar a sua conta; o resultado fica em Saída › Faz AI.',
                       )
-                    : t(
-                        'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Rode "Faz AI: Verificar o isolamento da CLI de IA" na paleta de comandos e escolha este perfil.',
-                      )
+                    : r.action?.kind === 'connect'
+                      ? t(
+                          'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Reconectar neste perfil, em Ferramentas de IA: a verificação faz parte do Conectar.',
+                        )
+                      : t(
+                          'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Verificar capacidades neste perfil, em Ferramentas de IA.',
+                        )
                   : r.problem === 'not-admissible'
                     ? t('O regime em vigor não admite este perfil. Veja o motivo no Diagnóstico do ambiente.')
                     : t('Este perfil foi importado e espera revisão. O board não roda nenhum comando dele enquanto isso.'),
@@ -180,7 +184,7 @@ export function cardToolLabel(state: BoardState, card: Card): string {
 function actionable(r: BoardRequirement, compact: boolean): boolean {
   const kind = r.action?.kind;
   // o Diagnóstico e as Configurações não existem no chat compacto
-  if (kind === 'settings' || kind === 'diagnostic' || kind === 'connect') return !compact;
+  if (kind === 'settings' || kind === 'diagnostic' || kind === 'connect' || kind === 'aiTools') return !compact;
   return kind === 'command';
 }
 
@@ -229,6 +233,13 @@ export function RequirementFix({
       return (
         <Button size="small" variant={variant} onClick={() => openConnect(action.profile)}>
           {t('Abrir o Conectar')}
+        </Button>
+      );
+    // o perfil verificável sem Conectar (a cópia do Claude Code): o "Verificar capacidades" fica na lista de perfis
+    case 'aiTools':
+      return (
+        <Button size="small" variant={variant} onClick={() => openSettings('aiTools')}>
+          {t('Abrir Ferramentas de IA')}
         </Button>
       );
   }

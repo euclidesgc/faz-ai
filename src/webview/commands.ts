@@ -170,6 +170,8 @@ export const settings = {
   reviewAiProfile: (id: string, accept: boolean) => req({ type: 'settings.aiProfiles.review', id, accept }),
   connectAiProfile: (id: string, input: ConnectInput = {}) =>
     request({ type: 'settings.aiProfiles.connect', id, ...input }, { timeout: 600_000 }),
+  /** As sondas de capacidade do perfil sem Conectar (a cópia do Claude, o personalizado ACP); a do Claude leva minutos. */
+  verifyAiProfile: (id: string) => request({ type: 'settings.aiProfiles.verify', id }, { timeout: 600_000 }),
   updateBoard: (patch: BoardPatch) => req({ type: 'settings.board.update', patch }),
   resetBoard: () => req({ type: 'settings.board.reset' }),
   upgradeBoard: () => req({ type: 'settings.board.upgrade' }),
