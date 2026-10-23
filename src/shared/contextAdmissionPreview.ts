@@ -1,8 +1,11 @@
 // Liga a leitura da admissão do host (#729) à prévia do resolvedor. Não executa probes nem autoriza nada.
 import type { ContextDraftResolution } from './contextDraftResolution';
 import type { ExecutionAdmissionDecision, StrictExecutionRequest } from './executionAdmission';
+import type { ContextActivityTarget } from './contextPlanning';
 import type { BoardState } from './model';
+import { activeProfile } from './aiProfiles';
 import { admissionRegimeOf } from './runner';
+import { runTargetOf } from './runTarget';
 
 /**
  * Pedido de admissão equivalente ao rascunho resolvido: o regime escolhido pela pessoa, ferramentas do contrato do agente
@@ -28,6 +31,17 @@ export function strictRequestFromDraft(s: BoardState, resolved: ContextDraftReso
     boardMcpTools: [],
     mcpLevel: { permission: 'board', tools: [] },
   };
+}
+
+/**
+ * O perfil que a admissão da prévia avalia: o do alvo da execução do card (modelo do card, do agente ou da
+ * regra), o mesmo que o runner usa, e não o padrão do board. Sem card (ação do fluxo ou do board) vale o
+ * padrão. Null quando a escolha explícita do card está bloqueada: a prévia não finge avaliar outro perfil.
+ */
+export function admissionProfileOf(s: BoardState, target: ContextActivityTarget): string | null {
+  const card = target.cardId ? s.cards.find((c) => c.id === target.cardId) : undefined;
+  if (!card) return activeProfile(s.board).id;
+  return runTargetOf(s, card)?.cli.id ?? null;
 }
 
 /** Troca "admissão indisponível" pela decisão do host, explicando cada razão (com o recurso, quando há). */

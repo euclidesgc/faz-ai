@@ -1,7 +1,15 @@
 import { collectClaudeEnvironment } from '../ai/environmentEvidence';
 import { defaultManifestDir } from '../ai/cursorManifest';
 import { cursorHookStatus } from '../mcp/cursorHooks';
-import { PROFILE_CAPABILITIES, activeProfile, isAcpProfile, profileIsolation, profileLabel, type AiProfile } from '../../shared/aiProfiles';
+import {
+  PROFILE_CAPABILITIES,
+  isAcpProfile,
+  profileIsolation,
+  profileLabel,
+  verifiableProfile,
+  type AiProfile,
+} from '../../shared/aiProfiles';
+import { admissionProfileOf } from '../../shared/contextAdmissionPreview';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
 import { profileCanProbe, profileSignedIn, profileVersion } from '../cliProbe';
@@ -49,7 +57,7 @@ import { checkRequirements, profileInstallUrl } from '../requirements';
 import { CLI_COMMAND } from '../../shared/requirements';
 import { checkEnvironment, linuxFamily } from '../environment';
 import { isPendingReview, probeProfiles } from '../profileProbe';
-import { profileHealth, profilesInUse, type ProfileHealth } from '../../shared/profileHealth';
+import { evidenceCapabilities, evidenceCurrent, profileHealth, profilesInUse, type ProfileHealth } from '../../shared/profileHealth';
 import { editorMcpFiles, pinEditorCommands } from '../mcp/pinCommands';
 import { harnessIssues } from '../../shared/harnessStatus';
 import { findFlowSkillCopies } from '../flowSkillCopies';
@@ -59,7 +67,7 @@ import { acpAgent } from '../ai/acp/agents';
 import { acpSessionModels } from '../ai/acp/models';
 import { fastBaseId, isFastVariant, onlyBuiltin, rememberModels } from '../models';
 import { cleanStaleTemp } from '../aiOutput/measured';
-import { ExecutionAdmission } from '../ai/admission';
+import { ExecutionAdmission, admissionTransport } from '../ai/admission';
 import { CapabilityEvidenceStore } from '../ai/capabilityEvidence';
 import { verifyExecutor } from '../ai/capabilityVerifier';
 import { recoverProjectServers } from '../mcp/projectServerLease';
@@ -124,10 +132,11 @@ export interface BoardHost {
    */
   fixProjectServer(file: string): Promise<string>;
   /**
-   * Roda a CLI do Claude numa fixture, contra uma API local, e grava os recibos assinados de isolamento.
-   * Só o host chama: não há caminho de escrita pela tela nem pelo MCP. Devolve o resumo do resultado.
+   * Verifica as capacidades de um perfil ligado (a CLI do Claude numa fixture, contra uma API local, ou o
+   * handshake de um agente ACP numa pasta descartável) e grava os recibos assinados no vínculo dele. Só o
+   * host chama: não há caminho de escrita pela tela nem pelo MCP. Devolve o resumo do resultado.
    */
-  verifyExecutor(): Promise<string>;
+  verifyExecutor(profileId: string): Promise<string>;
   dispose(): Promise<void>;
 }
 
@@ -243,10 +252,12 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
     spawnAcp: (command, cwd, out) => spawnAcpProcess({ ...command, format: 'text' }, cwd, out, pathEnv),
   });
-  router.setAdmissionReader((request) => {
+  router.setAdmissionReader((request, target) => {
     try {
-      const board = router.snapshot().board;
-      const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, activeProfile(board).id);
+      // o perfil que vai executar o card: as evidências de cada perfil ficam no vínculo dele
+      const profileId = admissionProfileOf(router.snapshot(), target);
+      if (!profileId) return null;
+      const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, profileId);
       return admission.preview(profile, profile.id, request, o.folderPath);
     } catch {
       return null;
@@ -423,6 +434,21 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     }
   };
   /**
+   * As capacidades que o Diagnóstico mostra: as provas gravadas no vínculo de isolamento do próprio perfil.
+   * Só o perfil verificável e liberado para rodar comando tem vínculo; os outros ficam como vieram.
+   */
+  const capabilitiesOf = (meta: AiProfile, profile: AiProfile) => {
+    const declared = PROFILE_CAPABILITIES.map((c) => meta.capabilities?.[c] ?? 'unknown');
+    if (!verifiableProfile(meta) || !profileCanProbe(profile)) return declared;
+    try {
+      const bound = admission.isolationBinding(profile, profile.id, 'board');
+      return evidenceCapabilities(bound.binding, evidenceStore.load(bound.binding), Date.now(), admissionTransport(profile));
+    } catch {
+      // sem o executável não há vínculo: nada foi provado
+      return declared;
+    }
+  };
+  /**
    * A saúde de cada perfil de CLI, com o padrão primeiro, depois os ligados e por fim os desligados e
    * pendentes. Sem `all`, só os ligados rodam os probes (o aviso do topo roda a cada 5 minutos); o
    * Diagnóstico roda todos. O perfil pendente de revisão nunca roda nada. Nada aqui chama a IA.
@@ -452,11 +478,12 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
           // sem verificador de capacidades na base, a validação ainda não é requisito (ver profileHealth)
           validationRequired: false,
           credentials: meta.credentials ? [{ name: meta.credentials.secretRef, filled: meta.credentials.available }] : [],
-          capabilities: PROFILE_CAPABILITIES.map((c) => meta.capabilities?.[c] ?? 'unknown'),
+          capabilities: capabilitiesOf(meta, resolved.get(meta.id)!),
           admission: null,
           isolation: profileIsolation(resolved.get(meta.id)!),
           evidence: { state: 'never' },
           install: url ? { url } : null,
+          verifiable: verifiableProfile(meta),
         });
       })
       .sort((a, b) => rank(a) - rank(b));
@@ -861,6 +888,59 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // a varredura da abertura: só a janela dona limpa sozinha (o botão da tela age onde foi clicado)
   if (ownsBoard) void orphanSweeper.sweep();
 
+  const verifying = new Map<string, Promise<string>>();
+  /** A verificação de um perfil: recusa com uma mensagem clara o que não está ligado ou não tem sonda. */
+  const verifyProfile = async (profileId: string): Promise<string> => {
+    const meta = router.snapshot().board.aiProfiles.find((p) => p.id === profileId);
+    if (!meta) throw new Error(`Perfil indisponível neste board: ${profileId}.`);
+    if (!verifiableProfile(meta))
+      throw new Error(`${meta.name}: a verificação de capacidades só existe para a CLI do Claude e os agentes ACP.`);
+    const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, profileId);
+    if (!profileCanProbe(profile))
+      throw new Error(`${meta.name} está desligado ou espera revisão: ligue e revise o perfil antes de verificar.`);
+    const result = await verifyExecutor({
+      executor: profile,
+      profileId: profile.id,
+      admission,
+      store: evidenceStore,
+      pathEnv,
+      spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
+      spawnAgent: (command, cwd, out) => spawnAcpProcess({ ...command, format: 'text' }, cwd, out, pathEnv),
+    });
+    const failed = result.evidence.flatMap((e) => e.checks.filter((c) => c.outcome !== 'passed').map((c) => `${e.capability}/${c.id}`));
+    if (result.verified) return `${meta.name}: isolamento verificado; as cinco capacidades têm recibos válidos.`;
+    // no ACP os arquivos de contexto do agente ficam sem prova de propósito: o perfil vale no regime compatível
+    if (isAcpProfile(profile) && failed.join(',') === 'artifacts/own-context-files')
+      return `${meta.name}: handshake do agente verificado. Os arquivos de contexto que ele lê por conta própria não têm prova: o perfil é admissível só no regime compatível.`;
+    return `${meta.name}: isolamento não verificado. Pendentes: ${failed.join(', ') || 'checks ausentes'}.`;
+  };
+  /** A prova gravada ainda vale para o vínculo atual do perfil (o digest do binário fica em cache na admissão). */
+  const hasCurrentEvidence = (profileId: string): boolean => {
+    try {
+      const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, profileId);
+      const bound = admission.isolationBinding(profile, profile.id, 'board');
+      return evidenceCurrent(bound.binding, evidenceStore.load(bound.binding), Date.now(), admissionTransport(profile));
+    } catch {
+      return false;
+    }
+  };
+  /**
+   * A verificação que o host dispara sozinho (ao ligar um agente ACP, ao conectar a ferramenta dele): em
+   * segundo plano, sem gastar a conta da pessoa, com o resultado no log. Só o ACP, como pede a épica: a CLI
+   * do Claude roda quatro vezes na fixture e fica no comando da paleta. Com a prova em vigor para o vínculo
+   * atual, não refaz o handshake.
+   */
+  const verifyInBackground = (profileId: string, why: string): void => {
+    const meta = router.snapshot().board.aiProfiles.find((p) => p.id === profileId);
+    if (disposed || !meta || !meta.enabled || !isAcpProfile(meta) || hasCurrentEvidence(profileId)) return;
+    api
+      .verifyExecutor(profileId)
+      .then((message) => o.log(`Verificação de capacidades (${why}): ${message}`))
+      .catch((e: unknown) => o.log(`Verificação de capacidades de ${meta.name} (${why}): ${e instanceof Error ? e.message : String(e)}`));
+  };
+  // ligar um agente ACP já prova o handshake dele: sem isso o perfil ficaria com as capacidades sem prova
+  router.onProfileEnabled((profileId) => verifyInBackground(profileId, 'perfil ligado'));
+
   const api: BoardHost = {
     router,
     runner,
@@ -888,23 +968,17 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     mergeWatcher,
     chat,
     autopilot,
-    async verifyExecutor() {
-      const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, activeProfile(router.snapshot().board).id);
-      const result = await verifyExecutor({
-        executor: profile,
-        profileId: profile.id,
-        admission,
-        store: evidenceStore,
-        pathEnv,
-        spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
-        spawnAgent: (command, cwd, out) => spawnAcpProcess({ ...command, format: 'text' }, cwd, out, pathEnv),
+    verifyExecutor(profileId) {
+      // a mesma verificação pedida duas vezes (ligar o perfil e o comando, por exemplo) roda uma vez só
+      const running = verifying.get(profileId);
+      if (running) return running;
+      const done = verifyProfile(profileId).finally(() => {
+        verifying.delete(profileId);
+        // o Diagnóstico mostra as capacidades lidas das provas: confere de novo com as novas
+        void checkNow();
       });
-      const failed = result.evidence.flatMap((e) => e.checks.filter((c) => c.outcome !== 'passed').map((c) => `${e.capability}/${c.id}`));
-      if (result.verified) return 'Isolamento verificado: as cinco capacidades têm recibos válidos.';
-      // no ACP os arquivos de contexto do agente ficam sem prova de propósito: o perfil vale no regime compatível
-      if (isAcpProfile(profile) && failed.join(',') === 'artifacts/own-context-files')
-        return 'Handshake do agente verificado. Os arquivos de contexto que ele lê por conta própria não têm prova: o perfil é admissível só no regime compatível.';
-      return `Isolamento não verificado. Pendentes: ${failed.join(', ') || 'checks ausentes'}.`;
+      verifying.set(profileId, done);
+      return done;
     },
     async connectAI(target = {}) {
       const tool = target.tool ?? router.snapshot().board.aiTool;
@@ -918,6 +992,8 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       router.handle({ type: 'harness.refresh' });
       const files = done.map((d) => d.projectFile ?? d.file.replace(homeDir, '~')).join(', ');
       void checkNow();
+      // conectar a ferramenta de um agente ACP também prova o handshake dele (o Claude fica no comando)
+      verifyInBackground(tool, 'ferramenta conectada');
       return { message: `Servidor "faz-ai" registrado em: ${files}. ${[...new Set(done.map((d) => d.next))].join(' ')}` };
     },
     async fixProjectServer(file) {

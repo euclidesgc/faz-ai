@@ -7,6 +7,11 @@ import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence'
 import { CAPABILITY_CHECKS, EXECUTOR_CAPABILITIES, type StrictExecutionRequest } from '../src/shared/executionAdmission';
 import { headlessCommand, type HeadlessInput } from '../src/extension/headless';
 import { materialize } from '../src/extension/aiOutput/measured';
+import { verifyExecutor } from '../src/extension/ai/capabilityVerifier';
+import { admissionProfileOf } from '../src/shared/contextAdmissionPreview';
+import { BUILTIN_PROFILES, type AiProfile } from '../src/shared/aiProfiles';
+import type { ContextActivityTarget } from '../src/shared/contextPlanning';
+import type { BoardState } from '../src/shared/model';
 let dir: string;
 let exe: string;
 let store: CapabilityEvidenceStore;
@@ -194,5 +199,98 @@ describe('prévia da admissão (E3)', () => {
     const decision = admission.preview('claude', 'claude', { ...request(), mcpLevel: { permission: 'board', tools: [] } }, dir);
     expect(decision.state).toBe('blocked');
     expect(decision.reasons.map((r) => r.code)).toContain('capability-not-verified');
+  });
+});
+
+describe('digest do binário no vínculo', () => {
+  it('não relê o binário com o mesmo tamanho, mtime e inode; tamanho ou mtime diferente relê', () => {
+    const i = input();
+    // mtime redondo: o utimes só grava milissegundos, e a chave do cache compara o mtime exato
+    fs.utimesSync(exe, 1000, 1000);
+    const first = admission.binding('claude', 'claude', i, dir).binding;
+    // mesmo tamanho e mesmo mtime com outro conteúdo: só um vínculo vindo do cache continua igual
+    fs.writeFileSync(exe, 'binário de teste; NUNCA executar');
+    fs.utimesSync(exe, 1000, 1000);
+    expect(admission.binding('claude', 'claude', i, dir).binding).toBe(first);
+    // outro mtime: relê e o vínculo muda
+    fs.utimesSync(exe, 2000, 2000);
+    const touched = admission.binding('claude', 'claude', i, dir).binding;
+    expect(touched).not.toBe(first);
+    // outro tamanho com o mtime de antes: relê de novo
+    fs.writeFileSync(exe, 'binário de teste maior; nunca executar');
+    fs.utimesSync(exe, 2000, 2000);
+    expect(admission.binding('claude', 'claude', i, dir).binding).not.toBe(touched);
+  });
+});
+
+describe('prévia da admissão pelo perfil do alvo do card', () => {
+  const gemini: AiProfile = {
+    ...BUILTIN_PROFILES.find((p) => p.id === 'gemini')!,
+    enabled: true,
+  };
+  const claude: AiProfile = { ...BUILTIN_PROFILES.find((p) => p.id === 'claude')! };
+  const option = (tool: string, model: string) => ({ id: `${tool}:${model}`, tool, model, label: model, efforts: [], defaultEffort: null });
+  const state = (cards: { id: string; model?: string }[]) =>
+    ({
+      board: {
+        aiTool: 'claude',
+        aiProfiles: [claude, gemini],
+        modelCatalog: [option('claude', 'opus'), option('gemini', 'gemini-2.5-pro')],
+        modelRules: [],
+        execProfiles: [],
+      },
+      workflows: [],
+      columns: [{ id: 'col', category: 'open', execProfile: null }],
+      cardTypes: [{ id: 't', name: 'Tarefa' }],
+      cards: cards.map((c) => ({ id: c.id, typeId: 't', columnId: 'col', parentId: null, execProfile: null, status: 'ready' })),
+      fieldDefs: [{ id: 'modelo', kind: 'model', appliesToTypes: null }],
+      fieldValues: cards.filter((c) => c.model).map((c) => ({ cardId: c.id, fieldId: 'modelo', value: c.model })),
+      links: [],
+      comments: [],
+    }) as unknown as BoardState;
+  const target = (cardId: string | null): ContextActivityTarget => ({ cardId, workflowId: null, phaseId: 'col', action: 'work' });
+  const compatible = (): StrictExecutionRequest => ({
+    ...request(),
+    regime: 'compatible',
+    compatibilityReview: { actor: 'person', revision: 1 },
+    mcpLevel: { permission: 'board', tools: [] },
+  });
+
+  it('o card com modelo de outro perfil é avaliado por esse perfil; sem card ou sem modelo, pelo padrão', () => {
+    const s = state([{ id: 'acp', model: 'gemini:gemini-2.5-pro' }, { id: 'livre' }, { id: 'quebrado', model: 'kimi:k3' }]);
+    expect(admissionProfileOf(s, target('acp'))).toBe('gemini');
+    expect(admissionProfileOf(s, target('livre'))).toBe('claude');
+    expect(admissionProfileOf(s, target(null))).toBe('claude');
+    // a escolha explícita bloqueada não vira o padrão: a prévia não finge avaliar outro perfil
+    expect(admissionProfileOf(s, target('quebrado'))).toBeNull();
+  });
+
+  it('os recibos do perfil do card valem para a prévia dele, não para o padrão do board', async () => {
+    fs.writeFileSync(path.join(dir, 'gemini'), 'agente de teste; nunca executar', { mode: 0o755 });
+    await verifyExecutor({
+      executor: gemini,
+      profileId: gemini.id,
+      admission,
+      store,
+      pathEnv: dir,
+      now: () => now - 10,
+      spawn: () => {
+        throw new Error('sem CLI');
+      },
+      probeAcp: async () => ({
+        first: { protocolVersion: 1, agentCapabilities: { loadSession: false }, sessionId: 's1', authRequired: false, error: null },
+        second: { protocolVersion: 1, agentCapabilities: { loadSession: false }, sessionId: 's2', authRequired: false, error: null },
+        mcpConnected: true,
+        environmentDigest: 'a'.repeat(64),
+      }),
+    });
+    const s = state([{ id: 'acp', model: 'gemini:gemini-2.5-pro' }]);
+    const id = admissionProfileOf(s, target('acp'))!;
+    const profile = s.board.aiProfiles.find((p) => p.id === id)!;
+    expect(admission.preview(profile, id, compatible(), dir).state).toBe('admitted');
+    // o padrão (Claude) não herda a prova do agente
+    const standard = admission.preview('claude', 'claude', compatible(), dir);
+    expect(standard.state).toBe('blocked');
+    expect(standard.reasons.map((r) => r.code)).toContain('capability-not-verified');
   });
 });

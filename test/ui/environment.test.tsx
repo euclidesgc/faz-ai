@@ -441,6 +441,37 @@ describe('Diagnóstico do ambiente', () => {
       expect(b.getByText('Permissões: Desconhecida').closest('li')).not.toHaveClass('ok');
       expect(b.queryByText('Permissões: Verificada')).not.toBeInTheDocument();
     });
+    it('cada perfil mostra as próprias capacidades e, sem recibos, como verificá-lo pela paleta', () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      const unknown = Array(7).fill('unknown');
+      show(
+        report({
+          profiles: [
+            profile('claude', { verifiable: true, capabilities: unknown }),
+            profile('gemini', {
+              name: 'Gemini CLI',
+              kind: 'acp',
+              base: 'generic',
+              isDefault: false,
+              verifiable: true,
+              capabilities: ['verified', 'partial', 'verified', 'verified', 'verified', 'unknown', 'unknown'],
+            }),
+            profile('cursor', { capabilities: unknown, isDefault: false }),
+          ],
+        }),
+      );
+      const hint = /Sem recibos de capacidade deste perfil: rode "Faz AI: Verificar o isolamento da CLI de IA"/;
+      const claude = within(block('Claude Code'));
+      expect(claude.getByText(hint)).toHaveTextContent('escolha Claude Code.');
+      expect(claude.getByText('MCP: Desconhecida')).toBeInTheDocument();
+      const gemini = within(block('Gemini CLI'));
+      expect(gemini.getByText('MCP: Verificada').closest('li')).toHaveClass('ok');
+      expect(gemini.getByText('Controle de artefatos: Parcial')).toBeInTheDocument();
+      expect(gemini.queryByText(hint)).not.toBeInTheDocument();
+      // o Cursor não tem sonda de capacidades: nada de mandar a pessoa rodar o comando para ele
+      expect(within(block('Cursor')).queryByText(hint)).not.toBeInTheDocument();
+    });
     it('admissão não admissível lista os motivos, um por exigência', () => {
       syncStore(router);
       renderThemed(<EnvironmentView />);

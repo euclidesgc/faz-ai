@@ -181,11 +181,21 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   ("Admissible under the exclusive/compatible regime" or "Not admissible", with one reason per
   requirement). In the compatible regime it lists what the CLI may load on its own. The **Testar**
   (Test) button runs the tool (it uses your subscription, and the warning stays on screen), one
-  attempt of up to 2 minutes, and the top warning updates itself at the end. In a profile with an
-  **ACP agent**, the receipts come from the **Faz AI: Verify the AI CLI isolation** command (with
-  the profile as the board default): two agent handshakes in a throwaway folder, without spending
-  your account. The artifacts capability stays partial on purpose, because the agent reads its own
-  context files, and the profile is admissible only in the compatible regime.
+  attempt of up to 2 minutes, and the top warning updates itself at the end. The capabilities come
+  from the receipts of **the profile itself**: one profile's proof never counts for another, and a
+  copy does not inherit the original's. The receipts come from the capability check, which exists
+  for Claude Code (the built-in CLI and its copies) and for ACP agents. For an ACP agent it runs on
+  its own when you turn it on and when you connect its tool to the board, unless the proof for the
+  current binding is still valid (the result goes to Output › Faz AI). For any checkable profile it
+  runs through the **Faz AI: Verify the AI CLI isolation** command, which asks which of the
+  enabled profiles to check (the board default comes first). For Claude Code, the CLI runs in a
+  throwaway folder against a local API with a fake key; for an ACP agent, it is two handshakes in a
+  throwaway folder. Neither spends your account. While a checkable profile has no receipts, its
+  block says how to check it from the Command Palette. For an ACP agent the artifacts capability
+  stays partial on purpose, because the agent reads its own context files, and the profile is
+  admissible only in the compatible regime. The admission preview on the card evaluates the profile
+  that will run the card (the one from the card's model, the agent or the rule), not the board
+  default.
 - **Next run and limits:** shows the regime chosen in Harness › Ferramenta e execução, the default
   target (with the rule and version, or the block), the cards whose target is unavailable and the limits table with requested, effective and
   reason. It comes from the policy simulator and the effective limits; without them it shows

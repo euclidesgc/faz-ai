@@ -290,8 +290,10 @@ export interface VerifierResult {
 
 /** Executa as sondagens e grava as evidências. Recusa quando o ambiente gerenciado não pôde ser lido. */
 export async function verifyExecutor(deps: VerifierDeps): Promise<VerifierResult> {
-  const agent = typeof deps.executor === 'string' ? null : admissionAgent(executorProfile(deps.executor));
-  if (!agent && deps.executor !== 'claude') throw new Error('O verificador de isolamento só existe para a CLI do Claude e os agentes ACP.');
+  const profile = executorProfile(deps.executor);
+  const agent = admissionAgent(profile);
+  // o host entrega o perfil resolvido (pronto ou cópia do Claude), não só o id 'claude'
+  if (!agent && profile.base !== 'claude') throw new Error('O verificador de isolamento só existe para a CLI do Claude e os agentes ACP.');
   const bound = deps.admission.isolationBinding(deps.executor, deps.profileId, 'board');
   if (!bound.environmentComplete) throw new Error('Ambiente gerenciado não verificado; recibos não são gravados.');
   const now = deps.now?.() ?? Date.now();

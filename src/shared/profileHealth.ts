@@ -1,8 +1,17 @@
 // Regras puras da saúde de cada perfil de CLI: o que o Diagnóstico e o aviso do topo mostram.
 // Não consulta banco, arquivo nem processo: recebe os probes, as capacidades e a decisão de admissão
 // já prontas e só as junta. Quem decide a admissão é `admitExecution` (executionAdmission.ts).
-import type { AiProfile, ProfileIsolation } from './aiProfiles';
-import type { CapabilityState, ExecutionAdmissionDecision } from './executionAdmission';
+import { PROFILE_CAPABILITIES, type AiProfile, type ProfileIsolation } from './aiProfiles';
+import {
+  EXECUTOR_CAPABILITIES,
+  assessCapability,
+  capabilityChecks,
+  type CapabilityEvidence,
+  type CapabilityState,
+  type ExecutionAdmissionDecision,
+  type ExecutionTransport,
+  type ExecutorCapability,
+} from './executionAdmission';
 import type { AiTool } from './harness';
 import type { InstallStep } from './environment';
 import type { Board } from './model';
@@ -58,6 +67,8 @@ export interface ProfileHealth {
    * bloqueia o board.
    */
   validationRequired: boolean;
+  /** o host sabe provar as capacidades deste perfil (Claude ou agente ACP): o comando de verificação o oferece */
+  verifiable?: boolean;
   problem: ProfileProblem | null;
 }
 
@@ -74,6 +85,7 @@ export interface ProfileHealthInput {
   isolation?: ProfileIsolation;
   evidence: ProfileHealth['evidence'];
   install: ProfileHealth['install'];
+  verifiable?: boolean;
 }
 
 /**
@@ -112,8 +124,45 @@ export function profileHealth(i: ProfileHealthInput): ProfileHealth {
     install: i.install,
     authExpired: i.authExpired,
     validationRequired: i.validationRequired,
+    ...(i.verifiable ? { verifiable: true } : {}),
   };
   return { ...base, problem: profileProblem(base) };
+}
+
+/**
+ * O estado de cada capacidade do perfil (na ordem de `PROFILE_CAPABILITIES`) lido das evidências gravadas
+ * para o vínculo de isolamento dele. Cada perfil tem o próprio vínculo, então a prova de um nunca vale para
+ * outro. Cancelamento e saída não têm sonda: ficam desconhecidos.
+ */
+export function evidenceCapabilities(
+  binding: string,
+  evidence: readonly CapabilityEvidence[],
+  now: number,
+  transport: ExecutionTransport,
+): CapabilityState[] {
+  const checks = capabilityChecks(transport);
+  return PROFILE_CAPABILITIES.map((c) =>
+    (EXECUTOR_CAPABILITIES as readonly string[]).includes(c)
+      ? assessCapability(c as ExecutorCapability, binding, evidence, now, checks).state
+      : 'unknown',
+  );
+}
+
+/**
+ * Há prova em vigor para o vínculo atual: toda capacidade tem evidência dele, dentro da validade e sem
+ * check falho (a parcial por check indisponível, como os arquivos do agente ACP, conta como em vigor).
+ * É o que deixa o host pular a verificação automática; vínculo mudado, prova vencida ou falha refazem.
+ */
+export function evidenceCurrent(
+  binding: string,
+  evidence: readonly CapabilityEvidence[],
+  now: number,
+  transport: ExecutionTransport,
+): boolean {
+  const checks = capabilityChecks(transport);
+  return EXECUTOR_CAPABILITIES.every((c) =>
+    ['verified', 'incomplete'].includes(assessCapability(c, binding, evidence, now, checks).reason),
+  );
 }
 
 /** Disponível: CLI achada, login conectado ou não conferível, evidência válida e admissível. */
