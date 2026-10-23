@@ -5,6 +5,12 @@
 > outra. Cada história ganha o próprio registro quando for entregue. Escrito em 2026-10-22; a
 > história 2 entrou em 2026-10-23, depois da entrega da 1, e a 9 no mesmo dia, depois da
 > homologação da 5.
+>
+> **2026-10-23, continuação**: as histórias 4 e 9 passam para a épica
+> [Ferramenta por modo](epica-ferramenta-por-modo.md) (o Conectar de lá absorve o login pela tela e
+> os modelos na conexão), e a 6 e a 7 ficam cobertas pelas histórias de limite de uso e de teste real
+> de lá. A 8 continua aqui. O desenho está em
+> [`ferramenta-por-modo-gemini.md`](ferramenta-por-modo-gemini.md).
 
 ## Contexto
 
@@ -115,6 +121,10 @@ recusado, e os perfis prontos da 3 nasceriam sem poder rodar.
 
 ### 4. Conectar ferramenta: login pela tela
 
+> Absorvida pela história 7 da épica [Ferramenta por modo](epica-ferramenta-por-modo.md): o Conectar
+> de lá faz o `authenticate` (no Gemini, com a chave de API pelo `_meta`), a verificação e a leitura
+> de modelos num passo só.
+
 - Botão **Conectar** no perfil do agente. O host abre o agente, chama `initialize`, lê `authMethods`
   e, se houver, `authenticate` com o primeiro método; o agente abre o navegador ou mostra o código.
   O board nunca vê credencial: a sessão fica na conta da ferramenta, como hoje com as CLIs.
@@ -146,6 +156,9 @@ recusado, e os perfis prontos da 3 nasceriam sem poder rodar.
 
 ### 6. Limite de uso por agente
 
+> Coberta pela história 12 da épica [Ferramenta por modo](epica-ferramenta-por-modo.md)
+> (`classifyFailure` por driver), começando pelo Gemini.
+
 - O catálogo ganha, por agente, os padrões do erro de cota (texto do `session/prompt` que falha ou
   do `stderr`), conferidos na 7. O leitor ACP marca `usageLimitReached` como o leitor do Claude faz.
 - A pausa por perfil (`usageLimit.ts`) e a falha `quota` das políticas passam a valer para o agente;
@@ -153,6 +166,9 @@ recusado, e os perfis prontos da 3 nasceriam sem poder rodar.
 - Testes: `test/acpTransport.test.ts`, `test/usageLimit.test.ts`, `test/runner.test.ts`.
 
 ### 7. Teste real do transporte
+
+> O handshake com as cinco CLIs foi feito na `#988` (segunda rodada); o card inteiro pelo Gemini é a
+> história 14 da épica [Ferramenta por modo](epica-ferramenta-por-modo.md).
 
 - Roda `scripts/acp-real/ROTEIRO.md` com cada CLI instalada e logada nesta máquina (Kimi hoje;
   Gemini e Codex depois de instalados) e grava uma fixture real por agente, como a do Cursor.
@@ -166,6 +182,9 @@ recusado, e os perfis prontos da 3 nasceriam sem poder rodar.
   agente mede continua declarado à mão. Entra quando houver dois agentes validados.
 
 ### 9. Catálogo de modelos acompanha o agente
+
+> Absorvida pelas histórias 7 (leitura na conexão, com a data) e 12 (data da leitura no catálogo e
+> aviso no ambiente) da épica [Ferramenta por modo](epica-ferramenta-por-modo.md).
 
 > Pedida na homologação da 5 (2026-10-23): a lista do agente muda com o tempo, modelos novos
 > surgem e outros saem, e a pessoa não deve depender de lembrar de clicar em Detectar modelos.
