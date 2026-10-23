@@ -11,6 +11,7 @@ import { metrics } from './metrics';
 import { settings } from './settings';
 import { shared } from './shared';
 import { workflows } from './workflows';
+import { connect } from './connect';
 
 export const EN: Record<string, string> = {
   ...library,
@@ -24,6 +25,7 @@ export const EN: Record<string, string> = {
   ...harness,
   ...metrics,
   ...environment,
+  ...connect,
 };
 
 /** Nomes do board padrão em inglês (ver ./defaults). */

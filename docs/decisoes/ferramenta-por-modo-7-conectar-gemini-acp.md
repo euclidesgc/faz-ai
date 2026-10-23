@@ -102,6 +102,43 @@ verificador, a leitura de modelos) precisa autenticar de novo.
   a revisão). Uma chave nova colada recomeça do login.
 - **Trocar ou esquecer a chave apaga a cifrada antiga** (`CredentialStore.delete`, só do mesmo dono).
 
+### Tela (7b)
+
+- **Conectar ferramenta** (`components/settings/ConnectTool.tsx`), no topo de Ferramentas de IA: a lista fixa de
+  `TOOLS`, na ordem do catálogo (Gemini primeiro), com a nota de cobrança; escolhida a ferramenta, um cartão
+  por modo de `modes` (nunca de `planned`, que só aparece pelo nome), com as oito linhas da ficha
+  (`MODE_SHEET_LINES`) e o selo Recomendado só quando `recommendedOffered` devolve o modo. O Conectar de um
+  cartão é o do perfil pronto daquele modo (`isReadyProfile`, `tool`, `mode`).
+- **Progresso do host, sem estado próprio da tela**: os passos vêm de `BoardState.connections`. O campo da chave
+  é de senha, controlado, e só limpa quando o host confirma; a chave não fica no DOM depois disso (o teste
+  confere). A ciência é um botão à parte do campo da chave, com o que a ferramenta traz (a linha `brings` da
+  ficha). O erro aparece no passo, com "Tentar de novo", o comando de login (e "Abrir no terminal") ou o link
+  de instalação.
+- **O estado de cada perfil do catálogo** (versão, login, regime, modelos e data) e **Reconectar** em cada perfil
+  pronto de um modo oferecido, na lista de perfis.
+- **"Regime de admissão" saiu de Harness › Ferramenta e execução.** O campo do board continua lido (fallback de
+  `admissionRegimeOf`), para não mudar o que roda de quem o ligou; a tela só mostra o aviso com "Voltar ao
+  exclusivo" quando ele está ligado. A remoção do campo é da história 13.
+- **Faixa de requisitos**: o aviso de login de uma ferramenta que entra por chave leva ao Conectar
+  (`RequirementAction { kind: 'connect' }`), e não ao terminal nem ao Diagnóstico.
+- **i18n**: as fichas de `TOOLS` ganharam a tradução que a história 5 deixou para cá, em `i18n/en/connect.ts`,
+  com moldes (`{name}`, `{command}`) para as linhas que se repetem por agente; o teste de i18n percorre `TOOLS`.
+- O console de desenvolvimento (a tela fora do editor e do navegador) mascara a chave na mensagem.
+- **Depois da revisão do #374**:
+  - **Ciência para quem não passa pelo Conectar.** Cópias e personalizados verificáveis ganham, na lista de
+    Ferramentas de IA, **Dar ciência do regime compatível** (com o mesmo texto da ciência do Conectar, numa
+    confirmação) e **Revogar ciência**, pela mensagem `settings.aiProfiles.review` da 7a. Sem isso, "Voltar ao
+    exclusivo" os deixava sem caminho de volta ao compatível; o hint do botão diz onde dar a ciência. O cartão
+    conectado e a lista também revogam a ciência dos perfis do Conectar, e o resumo da conexão usa a ciência de
+    agora (revogada, diz que o perfil não roda até a ciência voltar).
+  - **A chave não é validada no Conectar**: os textos dizem que ela fica guardada e é conferida na primeira
+    execução; o cartão conectado tem **Trocar a chave** (com Cancelar).
+  - **O campo da chave só limpa quando o fluxo passa do login** (a chave aceita) ou termina: na recusa, o que a
+    pessoa colou continua no campo.
+  - **A lista diz quando o Conectar espera você** e aponta para o cartão.
+  - **O aviso do topo abre o Conectar já na ferramenta do perfil** (`openConnect`, `connectTool` na store).
+  - "Tentar de novo" diz que retoma do passo em que parou (o host retoma, ver 7a).
+
 ## Onde a especificação não cabia no código
 
 - **"Cofre (`SecretStorage`)"**: o host do board não depende do `vscode` (roda também no `faz-ai` pelo

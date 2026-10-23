@@ -120,6 +120,20 @@ describe('requisitos do board', () => {
     });
   });
 
+  it('o Gemini pelo ACP entra por chave de API: o aviso de login leva ao Conectar, não ao terminal (história 7)', () => {
+    const gemini = health('gemini', { problem: 'signin', authExpired: true, isDefault: false, registration: 'enabled' }, { enabled: true });
+    expect(checkRequirements({ nodePath: process.execPath, health: [health('claude'), gemini] })[0]).toMatchObject({
+      profile: 'gemini',
+      problem: 'signin',
+      action: { kind: 'connect', profile: 'gemini' },
+    });
+    // um agente ACP sem login por chave segue no Diagnóstico
+    const opencode = health('opencode', { problem: 'signin', isDefault: false, registration: 'enabled' }, { enabled: true });
+    expect(checkRequirements({ nodePath: process.execPath, health: [health('claude'), opencode] })[0]).toMatchObject({
+      action: { kind: 'diagnostic', profile: 'opencode' },
+    });
+  });
+
   it('o login vencido numa execução (sem o probe confirmar a saída) vem marcado como expirado', () => {
     const list = checkRequirements({
       nodePath: process.execPath,

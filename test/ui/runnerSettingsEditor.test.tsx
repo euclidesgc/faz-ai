@@ -43,19 +43,22 @@ describe('RunnerSettings dentro do editor', () => {
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { parallelStories: 3 } });
   });
 
-  it('o regime de admissão nasce exclusivo; escolher compatível grava a opção e mostra o aviso com a revisão (#1091)', async () => {
+  it('o regime de admissão saiu daqui: é de cada perfil, com a ciência no Conectar (história 7)', () => {
     show();
-    const select = screen.getByRole('combobox', { name: 'Regime de admissão' });
-    expect(select).toHaveTextContent('Exclusivo');
-    expect(screen.queryByText(/Regime compatível ligado por você/)).toBeNull();
-    await userEvent.click(select);
-    await userEvent.click(screen.getByRole('option', { name: 'Compatível' }));
-    expect(lastSent('settings.board.update').patch).toEqual({ runner: { admissionRegime: 'compatible' } });
+    expect(screen.queryByRole('combobox', { name: 'Regime de admissão' })).toBeNull();
+    expect(screen.queryByText(/Regime compatível ligado para o board inteiro/)).toBeNull();
+  });
+
+  it('o compatível do board ligado numa versão anterior aparece com a revisão, e só dá para voltar ao exclusivo', async () => {
     await board.router.handle({ type: 'settings.board.update', patch: { runner: { admissionRegime: 'compatible' } } } as never);
+    show();
+    expect(screen.getByText(/Regime compatível ligado para o board inteiro \(revisão 1\)/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Voltar ao exclusivo' }));
+    expect(lastSent('settings.board.update').patch).toEqual({ runner: { admissionRegime: 'exclusive' } });
+    await board.router.handle({ type: 'settings.board.update', patch: { runner: { admissionRegime: 'exclusive' } } } as never);
     syncStore(board.router);
     cleanup();
     show();
-    expect(screen.getByRole('combobox', { name: 'Regime de admissão' })).toHaveTextContent('Compatível');
-    expect(screen.getByText(/Regime compatível ligado por você \(revisão 1\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/Regime compatível ligado para o board inteiro/)).toBeNull();
   });
 });

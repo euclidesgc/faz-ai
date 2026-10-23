@@ -7,6 +7,7 @@ import {
   modeLabel,
   profileIsolation,
   toolLabel,
+  verifiableProfile,
   type AiProfile,
 } from '../../../shared/aiProfiles';
 import type { HostToWebview } from '../../../shared/messages';
@@ -18,6 +19,9 @@ import { useAction } from '../../useAction';
 import { onHostMessage } from '../../vscode';
 import { ActionButton, DeleteButton, IconPlus, SwitchField } from '../ui';
 import { AiProfileForm } from './AiProfileForm';
+import { ConnectTool, STEP_NAMES, connectionSummary, reviewText } from './ConnectTool';
+import { SectionHeader } from './SectionHeader';
+import { toolModeEntry } from '../../../shared/aiTools';
 import { ExecutionPoliciesSettings } from './policies/ExecutionPoliciesSettings';
 import { PageHeader } from './PageHeader';
 import { SettingsCard } from './SettingsCard';
@@ -48,6 +52,23 @@ export function AiToolsSettings() {
   const duplicate = useAction((id: string) => settings.duplicateAiProfile(id));
   const remove = useAction((id: string) => settings.removeAiProfile(id));
   const test = useAction((id: string) => settings.testAiProfile(id));
+  const reconnect = useAction((id: string) => settings.connectAiProfile(id));
+  const [reconnectingId, setReconnectingId] = useState<string | null>(null);
+  /** O perfil pronto de um modo que o catálogo oferece: é ele que o Conectar conduz. */
+  const connectable = (p: AiProfile) => isReadyProfile(p) && !!toolModeEntry(p.tool, p.mode);
+  /** O estado do Conectar do perfil: versão, login, regime, modelos e data, ou o passo em que parou. */
+  const connectionLine = (p: AiProfile): string => {
+    const c = state.connections?.[p.id];
+    if (!c) return t('Não conectada pelo Conectar');
+    if (c.status === 'connected') return `${t('Conectada')} · ${connectionSummary(c.summary, reviewOf(p))}`;
+    const step = t(STEP_NAMES[c.step]);
+    if (c.status === 'waiting')
+      return t('O Conectar espera você no passo "{step}": continue no cartão em Conectar ferramenta, acima.', { step });
+    return t(c.status === 'failed' ? 'Conectar parou com erro no passo "{step}"' : 'Conectar em andamento: "{step}"', { step });
+  };
+  const review = useAction((id: string, accept: boolean) => settings.reviewAiProfile(id, accept));
+  /** A ciência do regime compatível do perfil, a de agora (o runner do board), ou null. */
+  const reviewOf = (p: AiProfile): number | null => state.board.runner.compatibilityReviews?.[p.id] ?? null;
   useEffect(() => {
     const off = onHostMessage((msg) => {
       if (msg.type === 'aiProfiles.status') setStatuses(msg.profiles);
@@ -119,8 +140,10 @@ export function AiToolsSettings() {
       >
         {t('Os perfis de CLI são dados do board. Configuração não comprova isolamento, permissões ou acesso ao MCP.')}
       </PageHeader>
+      <ConnectTool />
       <div className="ai-tools-layout">
         <div>
+          <SectionHeader title={t('Perfis')} count={profiles.length} />
           <RadioGroup.Root value={state.board.aiTool} onValueChange={(id) => void selectDefault.run(id)} aria-label={t('Perfil padrão')}>
             {profiles.map((profile) => {
               const standard = state.board.aiTool === profile.id;
@@ -200,6 +223,62 @@ export function AiToolsSettings() {
                       <RadioGroup.Item value={profile.id} disabled={!profile.enabled || selectDefault.busy} /> {t('Padrão')}
                     </label>
                     <span className="muted">{statusOf(profile)}</span>
+                    {connectable(profile) && (
+                      <>
+                        <span className="muted" data-testid={`connection-${profile.id}`}>
+                          {connectionLine(profile)}
+                        </span>
+                        <ActionButton
+                          size="1"
+                          variant="soft"
+                          color="gray"
+                          hint={t('Refaz o login, a verificação e a leitura dos modelos deste perfil.')}
+                          disabled={state.connections?.[profile.id]?.status === 'running'}
+                          loading={reconnect.busy && reconnectingId === profile.id}
+                          onClick={() => {
+                            setReconnectingId(profile.id);
+                            void reconnect.run(profile.id);
+                          }}
+                        >
+                          {t(state.connections?.[profile.id] ? 'Reconectar' : 'Conectar')}
+                        </ActionButton>
+                      </>
+                    )}
+                    {/* quem não passa pelo Conectar (cópias, personalizados) dá ou revoga a ciência aqui; o
+                        perfil do Conectar com ciência também a revoga daqui */}
+                    {(reviewOf(profile) !== null || (!connectable(profile) && verifiableProfile(profile))) && (
+                      <>
+                        <span className="muted" data-testid={`review-${profile.id}`}>
+                          {reviewOf(profile) !== null
+                            ? t('Regime compatível com a sua ciência (revisão {n})', { n: reviewOf(profile)! })
+                            : t('Sem ciência do regime compatível')}
+                        </span>
+                        <ActionButton
+                          size="1"
+                          variant="soft"
+                          color="gray"
+                          hint={
+                            reviewOf(profile) !== null
+                              ? t('Tira a sua ciência do regime compatível: o perfil deixa de rodar até você dar a ciência de novo.')
+                              : t('Grava a sua ciência do regime compatível para este perfil, depois de ler o que ele carrega.')
+                          }
+                          disabled={!profile.enabled || review.busy}
+                          disabledReason={t('Ligue o perfil antes.')}
+                          onClick={() =>
+                            reviewOf(profile) !== null
+                              ? void review.run(profile.id, false)
+                              : ask({
+                                  title: t('Dar ciência do regime compatível ao perfil "{name}"?', { name: profile.name }),
+                                  message: reviewText(profile.name),
+                                  confirmLabel: t('Entendo o que a ferramenta carrega'),
+                                  onConfirm: () => review.run(profile.id, true),
+                                })
+                          }
+                        >
+                          {t(reviewOf(profile) !== null ? 'Revogar ciência' : 'Dar ciência do regime compatível')}
+                        </ActionButton>
+                      </>
+                    )}
                     {status && !status.found && status.installUrl && (
                       <a href={status.installUrl} target="_blank" rel="noopener noreferrer">
                         {t('Instalar')}

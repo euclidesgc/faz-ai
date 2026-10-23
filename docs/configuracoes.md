@@ -17,12 +17,66 @@ fallback. O Harness, os agentes e a conexão da ferramenta de IA estão em
 | Tipos de card         | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria                                                 |
 | Regras do board       | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido, trilha curta para histórias pequenas (esforço Baixo ou tipo Bug pula o PRD e a Spec)                                                                                                                                                                                                                                                                                                              |
-| Harness               | Biblioteca única de regras, skills, subagentes e MCPs, com importação por tipo, CRUD e assistentes; ferramenta, permissão, regime de admissão (exclusivo ou compatível), agente padrão e heartbeat (ver [Harness](harness.md#harness) e [Agentes](harness.md#agentes))                                                                                                                                                                                                                                                                     |
-| Ferramentas de IA     | Perfis de CLI: ligar, escolher o padrão, duplicar, criar e testar                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Harness               | Biblioteca única de regras, skills, subagentes e MCPs, com importação por tipo, CRUD e assistentes; ferramenta, permissão, agente padrão e heartbeat (ver [Harness](harness.md#harness) e [Agentes](harness.md#agentes))                                                                                                                                                                                                                                                                     |
+| Ferramentas de IA     | **Conectar ferramenta** (escolher a ferramenta e o modo e conectar); perfis de CLI: ligar, escolher o padrão, duplicar, criar e testar                                                                                                                                                                                                                                                                                                                                                       |
 | Modelos de IA         | Modelos e níveis de esforço por perfil; regras que sugerem o modelo de cada card                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Git                   | Modo, gitflow, nome e prefixos das branches, worktrees, merge automático e registros de decisão; editável no editor e no navegador. "Tocar histórias em paralelo" fica em Harness de IA › Ferramenta e execução                                                                                                                                                                                                                                                                              |
 | Aparência             | **Idioma** (automático, Português (Brasil) ou English), tema, fonte e tamanho, por board, no editor e no navegador; status (nome e cor, na aba Fluxos; aqui só no modo navegador)                                                                                                                                                                                                                                                                                                           |
 | Backup                | Exportar e importar o board, na aba Backup, no editor e no navegador (no editor, também pela paleta de comandos: `fazai.exportBoard`, `fazai.importBoard`)                                                                                                                                                                                                                                                                                                                                 |
+
+## Ferramentas de IA: Conectar ferramenta
+
+No topo de **Configurações → Ferramentas de IA**, **Conectar ferramenta** mostra a lista fixa das
+ferramentas que a extensão traz (o Gemini primeiro, cada uma com a nota de cobrança). Escolhida a
+ferramenta, cada modo que a extensão oferece para ela (CLI, ACP ou API; nunca um que não funciona)
+vira um cartão com a mesma ficha, para comparar linha a linha: o que o board controla, o regime
+esperado, a precisão do que foi usado, o consumo, o que a ferramenta traz por conta própria, como se
+entra, a cobrança e quando escolher. Os modos ainda não oferecidos aparecem só pelo nome, sem cartão.
+
+**Recomendado** é o modo em que o board controla mais do que o agente acessa e mede o que ele gasta;
+empate se desfaz pelo que a ferramenta carrega por conta própria (menos é melhor). O selo aparece só
+quando o modo recomendado é oferecido, com o motivo em uma frase. Para o Gemini, o recomendado é a
+API, que chega numa versão seguinte: por ora o Gemini oferece só o ACP e sai sem selo. O Claude Code
+mostra a CLI com o selo e o porquê de ser a única (o ACP dele exige cobrança por API, fora da
+assinatura).
+
+O botão **Conectar** de um cartão leva o perfil do catálogo daquele modo por estes passos, com o
+progresso na tela:
+
+1. **Achar a ferramenta**: o comando no PATH do terminal e a versão; sem ele, o link **Instalar**.
+2. **Entrar na conta**: no Gemini, o campo da **chave de API** (de senha). A chave fica guardada no
+   cofre deste computador e, a cada processo, vai para o login do agente pelo protocolo; ela não volta
+   para a tela e não entra no log, no registro das execuções nem na exportação do board. É a mesma em
+   todas as pastas. O Gemini CLI aceita a chave no login sem consultar a API: ela é conferida de fato
+   na primeira execução, e uma chave errada aparece ali, com a mensagem do Gemini. O perfil só é ligado
+   depois deste passo. Nas CLIs prontas, a sonda de login, com o comando para o terminal quando falta.
+3. **Verificar as capacidades**: as sondas do verificador gravam as provas do perfil, e o regime sai
+   delas, sem pergunta: as cinco capacidades provadas dão o regime exclusivo; permissões, MCP e
+   delegação provadas, o compatível. Um agente ACP é sempre compatível (os arquivos de contexto que
+   ele lê sozinho não têm prova pelo protocolo).
+4. **Ciência do regime** (só no compatível): um botão à parte, **Entendo o que a ferramenta carrega**,
+   grava a sua ciência para aquele perfil. O regime vale por perfil: o Gemini pode rodar no compatível
+   enquanto o Claude Code segue no exclusivo.
+5. **Ler os modelos**: os modelos que a ferramenta anuncia entram no catálogo, em todo campo de modelo.
+
+No fim, **Conectada** com a versão, o login, o regime, quantos modelos e a data, e as ações **Trocar a
+chave** e **Revogar ciência**. Um erro fica preso ao passo em que ocorreu, com **Tentar de novo**, que
+retoma desse passo (a ciência e os modelos não refazem o login nem as sondas); se o agente recusar a
+chave no login, o campo volta com o que você colou. Cada perfil do catálogo, na lista abaixo, mostra o
+estado da conexão (inclusive quando o Conectar espera você) e **Reconectar**.
+
+A ciência é de cada perfil e pode sair: **Revogar ciência** a tira (o perfil deixa de rodar no
+compatível até você dar a ciência de novo); reconectar um perfil que passa a provar o regime exclusivo
+a tira sozinho; e **importar um board não traz a ciência dos perfis**: quem importa dá a própria, na
+máquina em que o perfil roda. Os perfis que não passam pelo Conectar (cópias e personalizados) dão e
+revogam a ciência na lista, com **Dar ciência do regime compatível** e o mesmo texto do Conectar.
+Uma política de execução não troca o perfil por outro com regime diferente (`constraints-changed`). A faixa de requisitos continua
+conferindo a ferramenta e o login: no Gemini, sem a chave no cofre o login fica "não verificado" (ele
+pode ter a sua `GEMINI_API_KEY`), e o aviso de login leva ao Conectar.
+
+A opção **Regime de admissão** saiu de Harness › Ferramenta e execução. Quem tinha ligado o regime
+compatível para o board inteiro numa versão anterior continua com ele (e vê o aviso com o botão
+**Voltar ao exclusivo**); os perfis com ciência no Conectar seguem no compatível.
 
 ## Ferramentas de IA: perfis de CLI
 
@@ -64,8 +118,9 @@ Antigravity. Eles aparecem desligados em **Ferramentas de IA**; ligue o que voc�
 prontos, não têm Editar nem Apagar: **Duplicar** cria um perfil personalizado com o mesmo agente, para
 mudar o ambiente ou o nome. O id do perfil (`gemini`, `codex-acp`…) é a ferramenta do catálogo de
 modelos, e **Detectar modelos** lê os modelos do agente nele. **Verificar situação** confere se o
-comando do agente está no PATH e a versão; o login fica "não verificado" até a história do Conectar,
-e o link **Instalar** abre a página oficial do modo ACP do agente. Cursor e Kimi Code ficam nas CLIs
+comando do agente está no PATH e a versão; o login fica "não verificado" (no Gemini, "conectado"
+com a chave no cofre, pelo [Conectar](#ferramentas-de-ia-conectar-ferramenta)), e o link **Instalar**
+abre a página oficial do modo ACP do agente. Cursor e Kimi Code ficam nas CLIs
 prontas de uma passada, que medem tokens; o Claude Code segue pela CLI `claude`.
 
 ### Perfil personalizado

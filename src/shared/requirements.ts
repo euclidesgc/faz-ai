@@ -19,7 +19,9 @@ export type RequirementAction =
   /** abre o Diagnóstico, no bloco do perfil quando há um */
   | { kind: 'diagnostic'; profile?: AiTool }
   /** a tela de Configurações → Harness */
-  | { kind: 'settings' };
+  | { kind: 'settings' }
+  /** Ferramentas de IA › Conectar ferramenta: o login da ferramenta que entra por chave de API (história 7) */
+  | { kind: 'connect'; profile: AiTool };
 
 /**
  * Um requisito que falta. O texto é montado na interface a partir do `id` e dos valores, para sair
