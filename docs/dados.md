@@ -29,7 +29,9 @@ agente ACP pronto em ACP, a cópia de uma CLI pronta continua a ferramenta da ba
 seguem no cofre local, como estavam) e o personalizado é a própria ferramenta, em ACP quando aponta um
 agente ACP e em CLI quando não. A ferramenta usada nos campos de modelo, nas políticas e no Consumo não
 muda para nenhum perfil. O personalizado importado de outra máquina, sem a configuração no cofre local,
-fica em CLI até ser salvo de novo. As execuções anteriores ficam sem modo registrado.
+fica em CLI até ser salvo de novo. As execuções anteriores ficam sem modo registrado. O modo API já é
+um valor conhecido do formato (no log e no arquivo exportado), sem migração nova, mas nenhum perfil roda
+nele ainda: a importação recusa um perfil em API.
 
 ## Backup do board
 

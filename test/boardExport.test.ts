@@ -431,6 +431,8 @@ describe('importBoard', () => {
     expect(file.tables.ai_runs!.length).toBeGreaterThan(0);
     expect(() => parseExportFile(JSON.stringify(withRun('xyz')))).toThrow('modo de execução inválido');
     expect(() => parseExportFile(JSON.stringify(withRun('acp')))).not.toThrow();
+    // o modo API entrou com a admissão dele (história 9), sem migração: a coluna é texto sem CHECK
+    expect(() => parseExportFile(JSON.stringify(withRun('api')))).not.toThrow();
     expect(() => parseExportFile(JSON.stringify(withRun(null)))).not.toThrow();
   });
 

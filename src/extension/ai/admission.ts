@@ -14,11 +14,19 @@ import { isAcpProfile, isReadyCli } from '../../shared/aiProfiles';
 import { resolveCommand } from '../cliResolve';
 import { acpAgent } from './acp/agents';
 import { acpCommand, acpSessionMode, type AcpAgent } from './acp/provider';
-import { executorOf } from './drivers';
+import { executorOf, type ApiInvocation, type Executor } from './drivers';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import { boardOnlyMcpConfig } from '../execution';
 import { canonical, CapabilityEvidenceStore } from './capabilityEvidence';
 import { INHERITED_SESSION_ENV } from '../spawn';
+
+type ExecModel = NonNullable<HeadlessInput['exec']>['model'];
+/** O transporte na mensagem de um validador chamado pelo transporte errado. */
+const TRANSPORT_OF: Record<ExecutionTransport, string> = {
+  cli: 'de uma CLI de uma passada',
+  acp: 'de um agente ACP',
+  api: 'do modo API',
+};
 
 export class AdmissionBlockedError extends Error {
   constructor(readonly decision: ExecutionAdmissionDecision) {
@@ -35,6 +43,8 @@ interface AdmissionOptions {
   /** Hash de políticas gerenciadas e de fontes relevantes, coletado pelo verificador. Ausência não é prova. */
   environmentEvidence(): { state: 'complete'; digest: string } | { state: 'unknown' };
   now?(): number;
+  /** quem executa o perfil; o registro dos drivers por padrão (o teste troca, enquanto não há driver da API) */
+  executorOf?(profile: AiProfile): Executor;
 }
 /** O comando de um agente ACP como o gateway o inicia. */
 export interface AcpBuiltCommand {
@@ -61,9 +71,11 @@ export function admissionAgent(profile: AiProfile): AcpAgent | null {
 /**
  * O transporte que o perfil roda de fato: a mesma regra de `executorOf` (o transporte do executor), sem
  * lançar pelo agente desconhecido, porque a prévia e o Diagnóstico leem o transporte antes de montar o
- * vínculo (e é o vínculo que recusa o agente).
+ * vínculo (e é o vínculo que recusa o agente). O modo API vem do modo declarado: não há outro sinal no
+ * perfil, e `isAcpProfile` nunca diz ACP para ele.
  */
-export const admissionTransport = (profile: AiProfile): ExecutionTransport => (isAcpProfile(profile) ? 'acp' : 'cli');
+export const admissionTransport = (profile: AiProfile): ExecutionTransport =>
+  profile.mode === 'api' ? 'api' : isAcpProfile(profile) ? 'acp' : 'cli';
 function digestFile(file: string): { digest: string; stat: fs.Stats } {
   const hash = createHash('sha256');
   const fd = fs.openSync(file, 'r');
@@ -137,8 +149,11 @@ export function bindingEnvironment(
   return out;
 }
 
-/** Entrada canônica do vínculo de isolamento: as flags de isolamento não dependem do conteúdo por execução. */
-export function isolationInput(permission: RunnerPermission): HeadlessInput {
+/**
+ * Entrada canônica do vínculo de isolamento: as flags de isolamento não dependem do conteúdo por execução.
+ * O modelo só entra no modo API, em que a prova é de um modelo (o vínculo da CLI e do ACP é sem ele).
+ */
+export function isolationInput(permission: RunnerPermission, model: ExecModel = null): HeadlessInput {
   return {
     prompt: '',
     permission,
@@ -147,7 +162,7 @@ export function isolationInput(permission: RunnerPermission): HeadlessInput {
       agent: '',
       agentDefinition: null,
       mcpBlocked: [],
-      model: null,
+      model,
       tools: ['Read'],
       deniedTools: ['Agent', 'Task', 'SendMessage', 'ListAgents'],
       toolSet: 'explicit',
@@ -186,7 +201,11 @@ export class ExecutionAdmission {
     const profile = executorProfile(executor);
     // a parte da ferramenta (o que a linha de comando fixa e qual executável) vem do driver; o resto do
     // contexto é o mesmo para toda ferramenta e fica aqui, onde é canonizado e vira o hash
-    const tool = executorOf(profile).bindingContext({ ...input, prompt: '<prompt-da-execucao>' }, { profile, cwd });
+    const driver = (this.options.executorOf ?? executorOf)(profile);
+    const tool = driver.bindingContext({ ...input, prompt: '<prompt-da-execucao>' }, { profile, cwd });
+    // o modo API não tem executável: o vínculo é outro formato, e um driver que mistura os dois é recusado
+    if ('api' in tool !== (driver.transport === 'api')) throw new Error('Vínculo do executor incoerente com o transporte.');
+    if ('api' in tool) return this.apiBinding(profile, profileId, tool.api, input, cwd);
     const executable = resolveCommand(tool.command, tool.pathEnv ?? this.options.pathEnv(), this.options.homeDir, tool.lookup);
     if (!executable) throw new Error('Executor indisponível para admissão.');
     const real = fs.realpathSync(executable);
@@ -224,13 +243,61 @@ export class ExecutionAdmission {
     };
   }
   /**
+   * O vínculo do modo API: o que o driver devolve (endpoint, modelo, versão da extensão e digest da chave)
+   * com a identidade do host, do perfil e da pasta. Fica fora o que só existe com um processo da
+   * ferramenta: executável, binário, ambiente e políticas gerenciadas (não há ferramenta que leia
+   * configuração, arquivo de contexto ou variável; quem fala com a rede e executa cada chamada é o código
+   * da extensão, preso pela versão). Fica fora também a configuração do perfil, onde a chave mora no
+   * cofre: dela só o digest entra, pelo driver. Sem políticas a conferir, o ambiente é completo por
+   * construção. `executable` vazio: os validadores de comando recusam o modo API.
+   */
+  private apiBinding(
+    profile: AiProfile,
+    profileId: string,
+    api: ApiInvocation,
+    input: HeadlessInput,
+    cwd: string | null,
+  ): { binding: string; executable: string; environmentComplete: boolean } {
+    if (
+      api.transport !== 'api' ||
+      ![api.endpoint, api.model, api.extensionVersion].every((v) => typeof v === 'string' && v) ||
+      !/^[a-f0-9]{64}$/.test(api.keyDigest)
+    )
+      throw new Error('Vínculo do modo API incompleto.');
+    const context = {
+      version: 2,
+      transport: 'api',
+      providerRevision: 1,
+      platform: process.platform,
+      arch: process.arch,
+      hostRuntime: process.versions.node,
+      profileId,
+      tool: profile.tool,
+      invocation: {
+        transport: 'api',
+        endpoint: api.endpoint,
+        model: api.model,
+        extensionVersion: api.extensionVersion,
+        keyDigest: api.keyDigest,
+      },
+      ...(cwd === null
+        ? { scope: 'isolation' }
+        : {
+            cwd: fs.realpathSync(cwd),
+            additionalDirectories: (input.addDirs ?? []).map((d) => fs.realpathSync(path.resolve(cwd, d))),
+          }),
+    };
+    return { executable: '', binding: createHash('sha256').update(canonical(context)).digest('hex'), environmentComplete: true };
+  }
+  /**
    * Vínculo das evidências de isolamento: identidade do executor, binário, flags de isolamento, ambiente e
    * políticas gerenciadas, sem pasta de projeto nem listas por execução (ferramentas, MCP, diretórios).
    * Os recibos são produzidos pelo verificador numa fixture com este mesmo vínculo. A permissão não muda o
-   * vínculo (ver `binding`): a prova feita em `board` vale para `edits` e `full`.
+   * vínculo (ver `binding`): a prova feita em `board` vale para `edits` e `full`. O modelo só é passado
+   * no modo API, onde a prova é de um modelo; na CLI e no ACP o vínculo continua sem ele.
    */
-  isolationBinding(executor: AiExecutor, profileId: string, permission: RunnerPermission) {
-    return this.binding(executor, profileId, isolationInput(permission), null);
+  isolationBinding(executor: AiExecutor, profileId: string, permission: RunnerPermission, model: ExecModel = null) {
+    return this.binding(executor, profileId, isolationInput(permission, model), null);
   }
   /** Digest das políticas gerenciadas lidas pelo host; vazio quando a leitura não foi completa. */
   environmentDigest(): string {
@@ -301,8 +368,8 @@ export class ExecutionAdmission {
         mcpConfig: JSON.stringify({ mcpServers: servers }),
       },
     });
-    // o transporte ACP não tem descoberta nativa de agente: o agente já segue pelo pedido
-    if (transport === 'acp') effective.exec!.agent = '';
+    // o ACP e o modo API não têm descoberta nativa de agente: o agente já segue pelo pedido
+    if (transport !== 'cli') effective.exec!.agent = '';
     // defesa: a execução admitida roda no modo padrão do agente, em que o board decide cada pedido; o
     // modo sem perguntas desligaria as negações do card e não é o modo que a prova cobriu
     if (transport === 'acp' && acpSessionMode(admissionAgent(profile)!, effective))
@@ -323,7 +390,13 @@ export class ExecutionAdmission {
       };
     }
     const bound = this.binding(profile, profileId, effective, cwd);
-    const isolation = this.isolationBinding(profile, profileId, input.permission);
+    // no modo API a prova é do modelo da execução; na CLI e no ACP o vínculo de isolamento é sem modelo
+    const isolation = this.isolationBinding(
+      profile,
+      profileId,
+      input.permission,
+      transport === 'api' ? (effective.exec?.model ?? null) : null,
+    );
     const decision = admitExecution(
       tool,
       input.permission,
@@ -350,7 +423,7 @@ export class ExecutionAdmission {
       decision,
       transport,
       acpCommand: (command) => {
-        if (transport !== 'acp') throw new Error('A admissão é de uma CLI de uma passada, não de um agente ACP.');
+        if (transport !== 'acp') throw new Error(`A admissão é ${TRANSPORT_OF[transport]}, não de um agente ACP.`);
         rebound();
         const expected = acpCommand(admissionAgent(profile)!, effective);
         if (
@@ -362,7 +435,7 @@ export class ExecutionAdmission {
         return { ...command, command: bound.executable };
       },
       command: (command) => {
-        if (transport !== 'cli') throw new Error('A admissão é de um agente ACP, não de uma CLI de uma passada.');
+        if (transport !== 'cli') throw new Error(`A admissão é ${TRANSPORT_OF[transport]}, não de uma CLI de uma passada.`);
         if (this.binding(profile, profileId, effective, cwd).binding !== bound.binding)
           throw new Error('O executor ou o ambiente mudou após a admissão.');
         const expected = headlessCommand(profile, { ...effective, structured: command.format !== 'text' });

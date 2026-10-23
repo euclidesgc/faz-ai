@@ -15,8 +15,11 @@ export const CAPABILITY_CHECKS: Record<ExecutorCapability, readonly string[]> = 
   mcp: ['allowed-server', 'forbidden-server', 'operation-scope'],
   delegation: ['native-delegation-denied'],
 };
-/** Como o executor é chamado: a CLI de uma passada (flags de isolamento) ou um agente pelo ACP (sessão). */
-export type ExecutionTransport = 'cli' | 'acp';
+/**
+ * Como o executor é chamado: a CLI de uma passada (flags de isolamento), um agente pelo ACP (sessão) ou a
+ * API do modelo (`api`), em que o próprio board faz o laço de chamadas de função e executa cada uma.
+ */
+export type ExecutionTransport = 'cli' | 'acp' | 'api';
 /**
  * Os checks do transporte ACP: o que o handshake do agente deixa observável. Permissões e delegação
  * são respondidas pelo board a cada `session/request_permission`, na versão 1 do protocolo; os
@@ -31,13 +34,36 @@ export const ACP_CAPABILITY_CHECKS: Record<ExecutorCapability, readonly string[]
   mcp: ['session-servers'],
   delegation: ['protocol-version'],
 };
+/**
+ * Os checks do modo API, que valem por construção: não há processo da ferramenta para sondar. O board
+ * monta cada pedido (a conversa inteira vai nele, sem sessão no servidor), o modelo não lê arquivo nenhum
+ * por conta própria (só recebe o que o board manda), só as funções que a decisão admite são declaradas e
+ * cada chamada passa pela decisão do card antes de rodar, o board é o cliente MCP (só os servidores e as
+ * operações admitidos) e não existe delegação nativa. Quem cumpre isso é o laço do board (épica
+ * "ferramenta por modo", histórias 10 e 11), com teste unitário; a evidência só registra a afirmação,
+ * assinada pelo host e presa à versão da extensão, ao endpoint e ao modelo.
+ */
+export const API_CAPABILITY_CHECKS: Record<ExecutorCapability, readonly string[]> = {
+  conversation: ['board-built-request'],
+  artifacts: ['no-own-context-files'],
+  permissions: ['declared-functions'],
+  mcp: ['board-mcp-client'],
+  delegation: ['no-native-delegation'],
+};
 export const capabilityChecks = (transport: ExecutionTransport): Record<ExecutorCapability, readonly string[]> =>
-  transport === 'acp' ? ACP_CAPABILITY_CHECKS : CAPABILITY_CHECKS;
-/** Produzida pelo verificador do host. Nenhum protocolo de escrita aceita esta estrutura da IA/UI. */
+  transport === 'acp' ? ACP_CAPABILITY_CHECKS : transport === 'api' ? API_CAPABILITY_CHECKS : CAPABILITY_CHECKS;
+/**
+ * De onde vem a prova: a sonda do host (`host-probe`, a CLI e o ACP, que rodam um processo da ferramenta)
+ * ou a construção do próprio board (`by-construction`, o modo API). Cada transporte só aceita a sua: uma
+ * evidência sintética nunca prova uma CLI, e uma sonda não tem o que provar no modo API.
+ */
+export type EvidenceSource = 'host-probe' | 'by-construction';
+export const evidenceSource = (transport: ExecutionTransport): EvidenceSource => (transport === 'api' ? 'by-construction' : 'host-probe');
+/** Produzida pelo host (verificador ou construção). Nenhum protocolo de escrita aceita esta estrutura da IA/UI. */
 export interface CapabilityEvidence {
   version: 1;
   capability: ExecutorCapability;
-  source: 'host-probe';
+  source: EvidenceSource;
   binding: string;
   checkedAt: number;
   expiresAt: number;
@@ -94,6 +120,7 @@ export function assessCapability(
   evidence: readonly CapabilityEvidence[],
   now: number,
   checks: Record<ExecutorCapability, readonly string[]> = CAPABILITY_CHECKS,
+  source: EvidenceSource = 'host-probe',
 ): CapabilityAssessment {
   const result = (state: CapabilityState, reason: CapabilityAssessment['reason']): CapabilityAssessment => ({ capability, state, reason });
   if (!Number.isSafeInteger(now) || now < 0) return result('unknown', 'invalid');
@@ -108,7 +135,8 @@ export function assessCapability(
   for (const row of matching.filter((e) => e.checkedAt === newest)) {
     if (
       row.version !== 1 ||
-      row.source !== 'host-probe' ||
+      // a fonte errada para o transporte é inválida, não parcial: nunca recorre a outra prova
+      row.source !== source ||
       row.checkedAt < 0 ||
       !Number.isSafeInteger(row.expiresAt) ||
       row.checkedAt > now ||
@@ -147,11 +175,12 @@ export function admitExecution(
   transport: ExecutionTransport = 'cli',
 ): ExecutionAdmissionDecision {
   const checks = capabilityChecks(transport);
+  const source = evidenceSource(transport);
   const decision: ExecutionAdmissionDecision = {
     version: 1,
     regime: request.regime,
     state: 'blocked',
-    capabilities: EXECUTOR_CAPABILITIES.map((c) => assessCapability(c, binding, evidence, now, checks)),
+    capabilities: EXECUTOR_CAPABILITIES.map((c) => assessCapability(c, binding, evidence, now, checks, source)),
     reasons: [],
     tools: [],
     deniedTools: [...NO_DELEGATION],
@@ -247,7 +276,8 @@ export function admitExecution(
   }
   // Um executor ainda sem tradução detalhada não recebe selo por ter evidência de outra integração.
   // No ACP a tradução é a do protocolo: nenhuma ferramenta nativa (o board responde cada pedido pelo
-  // nível e pelo manifesto do card), delegação negada e MCP só do `session/new`.
+  // nível e pelo manifesto do card), delegação negada e MCP só do `session/new`. No modo API a tradução é
+  // do próprio board: ele declara ao modelo só o que a decisão lista e executa cada chamada.
   if (transport === 'cli' && tool !== 'claude') reason('tool-mapping-unavailable');
   decision.state = decision.reasons.length ? 'blocked' : 'admitted';
   return decision;

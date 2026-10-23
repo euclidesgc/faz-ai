@@ -72,7 +72,11 @@ board, the screens and the admission only talk to the contract.
    deliberate format change (the context `version`) and a decision record;
    `test/admissionBoundary.test.ts` compares the bindings against the reference in
    `test/helpers/bindingReference.ts`. A custom CLI has no driver and runs through the generic CLI
-   executor (`cliExecutor`), the same one the ready CLIs use.
+   executor (`cliExecutor`), the same one the ready CLIs use. In API mode (`transport: 'api'`) there
+   is no process: `bindingContext` returns `apiBinding(...)` (`ai/apiBinding.ts`: endpoint, model,
+   extension version and the key digest, never the key), and the proof does not come from a probe but
+   from the by-construction evidence the host signs (`recordByConstruction`, with the checks in
+   `API_CAPABILITY_CHECKS`); the driver's loop is what fulfills those checks, with tests.
 2. **The catalog row**: the tool's entry in `TOOLS` (`src/shared/aiTools.ts`), with the page, the
    billing note, the offered modes (only the ones with a driver), the planned ones (with the story
    that delivers them), the recommended mode with the reason and each mode's sheet, with the eight

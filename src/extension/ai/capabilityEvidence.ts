@@ -1,8 +1,8 @@
 // Evidência local do host: não pertence ao export do board nem possui endpoint de escrita na UI/MCP.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import type { CapabilityEvidence } from '../../shared/executionAdmission';
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { API_CAPABILITY_CHECKS, EXECUTOR_CAPABILITIES, type CapabilityEvidence } from '../../shared/executionAdmission';
 
 export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -13,6 +13,33 @@ export function canonical(value: unknown): string {
       .map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`)
       .join(',')}}`;
   return JSON.stringify(value) ?? 'null';
+}
+const DAY = 24 * 60 * 60 * 1000;
+/**
+ * A evidência por construção do modo API: um recibo por check de `API_CAPABILITY_CHECKS`, todos
+ * `passed`, para um vínculo (que já prende a versão da extensão, o endpoint, o modelo e o digest da
+ * chave). Não sonda nada: o recibo é o digest da afirmação (fonte, capacidade, check e vínculo), e quem
+ * dá valor a ela é a assinatura do host, feita por `recordByConstruction` com a mesma chave local das
+ * provas das sondas. A validade é a mesma das sondas; como refazer não custa nada, vencer só obriga o
+ * host a afirmar de novo para o vínculo atual.
+ */
+export function constructionEvidence(binding: string, now: number, ttlMs = 14 * DAY): CapabilityEvidence[] {
+  if (!/^[a-f0-9]{64}$/.test(binding)) throw new Error('Vínculo de evidência inválido.');
+  return EXECUTOR_CAPABILITIES.map((capability) => ({
+    version: 1,
+    capability,
+    source: 'by-construction',
+    binding,
+    checkedAt: now,
+    expiresAt: now + ttlMs,
+    checks: API_CAPABILITY_CHECKS[capability].map((id) => ({
+      id,
+      outcome: 'passed' as const,
+      receipt: createHash('sha256')
+        .update(canonical({ source: 'by-construction', capability, check: id, binding }))
+        .digest('hex'),
+    })),
+  }));
 }
 /** O índice do vínculo da última prova por perfil (não começa com um hash, então `load` nunca o lê como evidência). */
 const PROFILES_FILE = 'profiles.json';
@@ -33,9 +60,10 @@ export class CapabilityEvidenceStore {
     if (key.length !== 32) throw new Error('Chave local das evidências inválida.');
     return key;
   }
-  /** Usado somente pelo verificador do host após coletar os recibos dos probes. */
+  /** Usado somente pelo host: o verificador, após coletar os recibos dos probes, e `recordByConstruction`. */
   record(evidence: CapabilityEvidence): void {
     if (!/^[a-f0-9]{64}$/.test(evidence.binding)) throw new Error('Vínculo de evidência inválido.');
+    if (evidence.source !== 'host-probe' && evidence.source !== 'by-construction') throw new Error('Fonte de evidência inválida.');
     const key = this.key(true);
     const signature = createHmac('sha256', key).update(canonical(evidence)).digest('hex');
     const file = path.join(this.directory, `${evidence.binding}-${randomUUID()}.json`);
@@ -52,6 +80,16 @@ export class CapabilityEvidenceStore {
     } finally {
       fs.rmSync(temp, { force: true });
     }
+  }
+  /**
+   * Afirma e assina a evidência por construção de um vínculo do modo API. Só o host chama (o driver da
+   * API, quando a execução ou o Conectar não acham prova em vigor para o vínculo atual); a IA e a tela não
+   * têm caminho até aqui, e a evidência só vale para o transporte `api` (`evidenceSource`).
+   */
+  recordByConstruction(binding: string, now: number, ttlMs?: number): CapabilityEvidence[] {
+    const rows = constructionEvidence(binding, now, ttlMs);
+    for (const row of rows) this.record(row);
+    return rows;
   }
   /**
    * Guarda o vínculo da última prova de cada perfil, para o host saber quando ela perdeu a validade (o

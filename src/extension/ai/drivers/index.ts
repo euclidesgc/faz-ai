@@ -2,7 +2,7 @@
 // `drivers/<ferramenta>/<modo>.ts`, registrar aqui e pôr a linha dela em `TOOLS` (`shared/aiTools.ts`);
 // `test/drivers.test.ts` confere que todo modo oferecido no catálogo tem driver.
 import { toolModeOf, type ToolMode } from '../../../shared/aiTools';
-import { isAcpProfile, type AiProfile, type AiProfileConfig } from '../../../shared/aiProfiles';
+import { isAcpProfile, toolLabel, type AiProfile, type AiProfileConfig } from '../../../shared/aiProfiles';
 import { ACP_AGENTS, acpAgent } from '../acp/agents';
 import { acpDriver } from './acp';
 import { cliExecutor } from './cli';
@@ -12,7 +12,18 @@ import { geminiAcpDriver } from './gemini/acp';
 import { kimiCliDriver } from './kimi/cli';
 import type { Executor, ToolDriver } from './types';
 
-export type { BindingInvocation, ConnectionDriver, DriverAuth, Executor, ExecutorContext, SignInProbe, ToolDriver } from './types';
+export type {
+  ApiBinding,
+  ApiInvocation,
+  BindingInvocation,
+  ProcessBinding,
+  ConnectionDriver,
+  DriverAuth,
+  Executor,
+  ExecutorContext,
+  SignInProbe,
+  ToolDriver,
+} from './types';
 
 const key = (tool: string, mode: ToolMode) => `${tool}/${mode}`;
 const DRIVERS = new Map<string, ToolDriver>(
@@ -48,6 +59,13 @@ export function driverOf(profile: Pick<AiProfile, 'kind' | 'tool' | 'mode'> & { 
  * o comando e a leitura da saída vêm do provider do perfil.
  */
 export function executorOf(profile: AiProfile): Executor {
+  // o modo API só roda pelo driver dele: sem driver (a extensão ainda não traz o laço, ou o perfil veio de
+  // uma versão mais nova), recusa com a causa, em vez de cair no executor de CLI ou no agente ACP
+  if (profile.mode === 'api') {
+    const driver = driverOf(profile);
+    if (driver?.transport !== 'api') throw new Error(`O modo API de ${toolLabel(profile.tool)} ainda não roda nesta versão da extensão.`);
+    return driver;
+  }
   if (isAcpProfile(profile)) {
     const agent = acpAgent(String(profile.config.acpAgent));
     const driver = agent && driverFor(agent.id, 'acp');

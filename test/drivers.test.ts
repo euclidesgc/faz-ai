@@ -205,4 +205,11 @@ describe('executorOf: quem executa cada perfil (contrato de execução, históri
   it('o transporte do executor é o mesmo que a admissão confere', () => {
     for (const p of examples()) expect(executorOf(p).transport, p.id).toBe(admissionTransport(p));
   });
+
+  it('a admissão do modo API (história 9) não traz driver dele: o perfil API é recusado com a causa', () => {
+    expect(allDrivers().filter((d) => d.mode === 'api' || d.transport === 'api')).toEqual([]);
+    const api = profile({ id: 'gemini', kind: 'catalog', tool: 'gemini', mode: 'api' });
+    expect(admissionTransport(api)).toBe('api');
+    expect(() => executorOf(api)).toThrow('O modo API de Gemini ainda não roda nesta versão da extensão.');
+  });
 });

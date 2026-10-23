@@ -37,7 +37,7 @@ import { SpawnNotStartedError, type ProcessIdentity } from '../processIdentity';
  * O modo que vai para o log: o do transporte que de fato roda (o gateway escolhe o ACP pelo agente do perfil),
  * não só o declarado, para o Consumo nunca atribuir a um modo uma execução que rodou em outro.
  */
-const runMode = (profile: AiProfile): ProfileMode => (isAcpProfile(profile) ? 'acp' : 'cli');
+const runMode = (profile: AiProfile): ProfileMode => (profile.mode === 'api' ? 'api' : isAcpProfile(profile) ? 'acp' : 'cli');
 export function missingProfileCommand(error: Error, profile: AiProfile | undefined): Error {
   if (!(error instanceof SpawnNotStartedError) || !error.message.startsWith('comando "') || profile?.kind !== 'custom') return error;
   const installUrl = profileInstallUrl(profile);

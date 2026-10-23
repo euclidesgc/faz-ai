@@ -35,8 +35,12 @@ export type ProviderBase = AiBase | 'generic';
  */
 export type AiProfileKind = 'catalog' | 'custom';
 export type LegacyProfileKind = 'builtin' | 'acp' | 'copy';
-/** Os modos de uma ferramenta que o board sabe rodar hoje; `api` entra com a admissão do modo API. */
-export const PROFILE_MODES = ['cli', 'acp'] as const;
+/**
+ * Os modos que o perfil e o log de execuções gravam. `api` entrou com a admissão do modo API (épica
+ * "ferramenta por modo", história 9), antes de existir perfil ou driver nele: o valor é aceito na leitura
+ * e no arquivo, e quem decide se um perfil nesse modo roda é o driver (`executorOf` recusa sem ele).
+ */
+export const PROFILE_MODES = ['cli', 'acp', 'api'] as const;
 export type ProfileMode = (typeof PROFILE_MODES)[number];
 /** O `kind` gravado (novo ou antigo) no conjunto atual; `null` para o que nenhuma versão gravou. */
 export function normalizeProfileKind(kind: unknown): AiProfileKind | null {
@@ -184,8 +188,13 @@ export const modeLabel = (mode: ProfileMode): string => mode.toUpperCase();
 export const PROFILE_MARKERS = ['prompt', 'model', 'effort', 'mcpConfig', 'addDir'] as const;
 export const unknownProfileCapabilities = (): Record<ProfileCapability, CapabilityState> =>
   Object.fromEntries(PROFILE_CAPABILITIES.map((c) => [c, 'unknown'])) as Record<ProfileCapability, CapabilityState>;
-/** Perfil executado pelo transporte ACP (a CLI do agente fala o Agent Client Protocol), e não pela CLI one-shot. */
-export const isAcpProfile = (profile: AiProfile): boolean => profile.base === 'generic' && typeof profile.config.acpAgent === 'string';
+/**
+ * Perfil executado pelo transporte ACP (a CLI do agente fala o Agent Client Protocol), e não pela CLI
+ * one-shot. Um perfil no modo API nunca é ACP, mesmo com o agente no cofre (o Gemini pronto traz o dele
+ * do código): o modo declarado vence, para a execução nunca cair noutro transporte sem aviso.
+ */
+export const isAcpProfile = (profile: AiProfile): boolean =>
+  profile.mode !== 'api' && profile.base === 'generic' && typeof profile.config.acpAgent === 'string';
 export const profileBase = (profile: AiProfile): AiBase | null => (profile.base === 'generic' ? null : profile.base);
 /**
  * Perfil cujas capacidades o host sabe provar: a CLI do Claude (a pronta ou uma cópia, que roda o mesmo

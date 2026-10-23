@@ -77,7 +77,10 @@ export interface ExecutorContext extends Pick<MeasuredDeps, 'log' | 'runId' | 'l
  * políticas gerenciadas, a pasta) é o mesmo para toda ferramenta e fica na admissão, que canoniza e faz o
  * hash: um driver não tem como esquecer o binário e enfraquecer a prova.
  */
-export interface BindingInvocation {
+export type BindingInvocation = ProcessBinding | ApiBinding;
+
+/** O vínculo de quem roda um processo da ferramenta (a CLI e o agente ACP). */
+export interface ProcessBinding {
   /** entra no vínculo como `invocation`, exatamente como é */
   invocation: object;
   /** o comando a resolver no PATH (o executável real e o digest dele entram no vínculo) */
@@ -88,6 +91,24 @@ export interface BindingInvocation {
   lookup?: HeadlessCommand['lookup'];
   /** as variáveis próprias do comando, que entram no ambiente do vínculo mesmo fora da lista relevante */
   env?: Record<string, string>;
+}
+
+/**
+ * O vínculo do modo API, sem executável: não há processo da ferramenta, binário nem linha de comando. O
+ * que prende a prova é para onde o board fala e com que código: o endpoint, o modelo, a versão da
+ * extensão (é o laço dela que cumpre os checks por construção) e o digest da chave. Montado por
+ * `apiBinding` (`ai/apiBinding.ts`), que nunca guarda a chave.
+ */
+export interface ApiBinding {
+  api: ApiInvocation;
+}
+export interface ApiInvocation {
+  transport: 'api';
+  endpoint: string;
+  model: string;
+  extensionVersion: string;
+  /** HMAC da chave com um rótulo fixo; a chave em si nunca entra */
+  keyDigest: string;
 }
 
 /**
