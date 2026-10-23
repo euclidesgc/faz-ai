@@ -1,4 +1,4 @@
-import { baseValue } from './harness';
+import { baseValue, isAiBase } from './harness';
 // Artefatos do board (#615): regras, skills, agentes e servidores MCP guardados pelo próprio board, num
 // formato neutro. Só tipos e funções puras: sem banco, sem `vscode`.
 import { AGENT_TOOLS } from './agentTools';
@@ -121,6 +121,9 @@ export type AgentArtifact = Pick<BoardArtifact, 'name' | 'description' | 'body' 
 export function agentOfArtifact(a: AgentArtifact, tool?: AiTool): Agent {
   const m = a.agent;
   const foreign = !!tool && m?.tools.native.tool !== tool;
+  // só as bases com tabela (claude, cursor, kimi) traduzem; perfil ACP/genérico/cópia não tem entrada em
+  // AGENT_TOOLS e mantém as ferramentas do card, no vocabulário do card (o que a conferência e o `decide` do ACP esperam)
+  const translated = foreign && isAiBase(tool);
   const translate = (categories: ToolCategory[]) =>
     tool
       ? (baseValue(AGENT_TOOLS, tool) ?? [])
@@ -140,8 +143,8 @@ export function agentOfArtifact(a: AgentArtifact, tool?: AiTool): Agent {
       m?.tools.native.tool === '' && m.tools.categories.length
         ? `${a.body}\n\nEscopo permitido deste agente: ${m.tools.categories.join(', ')}. Respeite apenas estas categorias (read: ler; edit: editar; run: executar comandos; net: rede; agents: delegar).`
         : a.body,
-    tools: foreign ? translate(m?.readonly ? ['read'] : (m?.tools.categories ?? [])) : (m?.tools.native.allow ?? []),
-    deniedTools: foreign
+    tools: translated ? translate(m?.readonly ? ['read'] : (m?.tools.categories ?? [])) : (m?.tools.native.allow ?? []),
+    deniedTools: translated
       ? translate(m?.readonly ? ['edit', 'run'] : toolCategories(m?.tools.native.tool ?? '', m?.tools.native.deny ?? []))
       : (m?.tools.native.deny ?? []),
     skills: m?.skills ?? [],

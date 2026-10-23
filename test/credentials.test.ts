@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { LocalCredentials, bindCredentials, credentialsFor } from '../src/extension/credentials';
+import { LocalCredentials, bindCredentials, credentialsFor, redactCredentialValues } from '../src/extension/credentials';
 import { openFile, openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { ArtifactRepo } from '../src/extension/repositories/artifactRepo';
@@ -216,5 +216,19 @@ describe('credenciais locais e referências MCP', () => {
     expect(credentialsFor(fresh).has(JSON.stringify(['mcp', router.boardId, artifact.id]), artifact.mcpCredential!.secretRef)).toBe(false);
     fresh.close();
     db.close();
+  });
+});
+
+describe('redactCredentialValues com a configuração do perfil', () => {
+  it('não mascara o nome do agente ACP nem o comando, que não são segredo', () => {
+    const config = { acpAgent: 'gemini', command: 'gemini', promptVia: 'stdin', boardServer: 'cli' };
+    const line = 'Chamando Gemini CLI (ACP): gemini --acp --skip-trust --model gemini-2.5-pro';
+    expect(redactCredentialValues(line, config)).toBe(line);
+  });
+
+  it('continua mascarando chaves, tokens, argumentos e variáveis de ambiente', () => {
+    const config = { acpAgent: 'gemini', args: [`--token=${sentinel}`], env: { API_KEY: 'chave-secreta-1' }, apiKey: 'outra-chave-2' };
+    const out = redactCredentialValues(`gemini ${sentinel} chave-secreta-1 outra-chave-2`, config);
+    expect(out).toBe('gemini [credencial local] [credencial local] [credencial local]');
   });
 });
