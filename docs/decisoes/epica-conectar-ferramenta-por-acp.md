@@ -2,7 +2,8 @@
 
 > Registro de uma épica proposta, ainda não decidida no board. Ele parte do que a develop já tem
 > (`#983`, `#977`, `#988`, `#1055`) e desenha as histórias derivadas na ordem em que uma depende da
-> outra. Cada história ganha o próprio registro quando for entregue. Escrito em 2026-10-22.
+> outra. Cada história ganha o próprio registro quando for entregue. Escrito em 2026-10-22; a
+> história 2 entrou em 2026-10-23, depois da entrega da 1.
 
 ## Contexto
 
@@ -44,16 +45,22 @@ Entregar a forma de uso em histórias derivadas, empilhadas na `develop`, nesta 
 
 | # | História | Depende de | Resultado |
 | --- | --- | --- | --- |
-| 1 | Admissão por capacidades cobre o transporte ACP | — | um perfil ACP roda pelo gateway |
-| 2 | Agente ACP como perfil pronto do catálogo | 1 | o agente aparece em Ferramentas de IA sem perfil personalizado |
-| 3 | Conectar ferramenta: login pela tela | 2 | botão Conectar, estado "conectada", login pelo agente |
-| 4 | Modelos descobertos na conexão | 3 | lista de modelos por ferramenta, em todo campo de modelo e nas políticas |
-| 5 | Limite de uso por agente | 2 | a pausa e o fallback das políticas valem para os agentes ACP |
-| 6 | Teste real do transporte (reabre a `#988`) | 2 | cada agente validado com a CLI, fixture gravada |
-| 7 | Catálogo lido do registro do ACP | 2 | agente novo sem versão nova da extensão (opcional) |
+| 1 | Admissão por capacidades cobre o transporte ACP (`#1090`, entregue) | — | um perfil ACP é admitido pelo gateway, só no regime compatível |
+| 2 | Regime compatível escolhido pela pessoa | 1 | o board roda no regime compatível, com a revisão do que a CLI carrega |
+| 3 | Agente ACP como perfil pronto do catálogo | 2 | o agente aparece em Ferramentas de IA sem perfil personalizado |
+| 4 | Conectar ferramenta: login pela tela | 3 | botão Conectar, estado "conectada", login pelo agente |
+| 5 | Modelos descobertos na conexão | 4 | lista de modelos por ferramenta, em todo campo de modelo e nas políticas |
+| 6 | Limite de uso por agente | 3 | a pausa e o fallback das políticas valem para os agentes ACP |
+| 7 | Teste real do transporte (reabre a `#988`) | 3 | cada agente validado com a CLI, fixture gravada |
+| 8 | Catálogo lido do registro do ACP | 3 | agente novo sem versão nova da extensão (opcional) |
 
-A 5 e a 6 podem andar em paralelo com a 3 e a 4. A 7 fica para depois de haver dois agentes
+A 6 e a 7 podem andar em paralelo com a 4 e a 5. A 8 fica para depois de haver dois agentes
 validados.
+
+A história 2 não estava no desenho original: a 1 provou que um agente ACP só é admissível no
+regime compatível, e o regime está fixo em `exclusive` no host desde a `#880` ("até o host preparar
+execuções compatíveis"). Sem ela, a verificação do perfil passa, mas todo card com o perfil ACP é
+recusado, e os perfis prontos da 3 nasceriam sem poder rodar.
 
 ### 1. Admissão por capacidades cobre o transporte ACP
 
@@ -68,7 +75,26 @@ validados.
 - Testes: `test/aiGatewayAcp.test.ts` (o caso "admitido é recusado" vira "admitido roda"),
   `test/executionAdmission.test.ts`.
 
-### 2. Agente ACP como perfil pronto do catálogo
+### 2. Regime compatível escolhido pela pessoa
+
+- O regime deixa de ser fixo: uma opção do board em Harness › Ferramenta e execução, **Regime de
+  admissão** (exclusivo, o padrão, ou compatível), gravada como configuração do board, sem
+  migração de esquema. Os quatro pontos que hoje escrevem `regime: 'exclusive'` (`environment.ts`,
+  `v1Prepare.ts`, `runner.ts` e `contextAdmissionPreview.ts`) passam a ler essa opção.
+- No compatível a admissão exige só permissões, MCP e delegação (`executionAdmission.ts` já faz
+  isso); a revisão da pessoa é a seção **O que a CLI carrega por conta própria** do perfil, que a
+  tela já mostra nesse regime. Trocar para compatível com um perfil padrão que não declara nada
+  mostra o aviso "Sem prova de isolamento", sem bloquear.
+- A troca de regime invalida a prévia de admissão dos cards (Próxima execução) e o relatório do
+  ambiente, que são recalculados; o resumo de cada execução grava o regime em vigor, como já grava
+  a permissão.
+- O perfil ACP da 1 passa a rodar um card de verdade; é a homologação que a 1 não tinha como fazer.
+- Fica fora: regime por card ou por perfil (uma opção só, do board; afinar depois se a prática
+  pedir).
+- Testes: `test/executionAdmission.test.ts`, `test/environment.test.ts`, `test/runner.test.ts`,
+  `test/ui/...` (a opção na tela), `docs/configuracoes.md` e `docs/harness.md`.
+
+### 3. Agente ACP como perfil pronto do catálogo
 
 - Cada entrada de `ACP_AGENTS` vira um perfil do board com `kind: 'builtin'` (ou um `kind` novo,
   `acp`, se o `builtin` carregar regras demais das três CLIs) e `base: 'generic'` com `acpAgent`
@@ -77,11 +103,11 @@ validados.
 - Ferramentas de IA lista os agentes com a situação da CLI (`cliProbe.ts` passa a conhecer o comando
   de versão e o `login` do catálogo) e o botão **Instalar** com a página oficial.
 - Fica fora: o Claude (segue pela CLI `claude`, pelos termos da Anthropic) e, por ora, o Cursor
-  (fica na CLI de uma passada, que mede tokens; a entrada ACP dele continua no catálogo para a 6).
+  (fica na CLI de uma passada, que mede tokens; a entrada ACP dele continua no catálogo para a 7).
 - Migração: nenhuma; perfis prontos não vão ao banco. `newProfileId` reserva os ids do catálogo.
 - Testes: `test/aiProfiles.test.ts`, `test/cliProbe.test.ts`, `test/ui/aiToolsSettings.test.tsx`.
 
-### 3. Conectar ferramenta: login pela tela
+### 4. Conectar ferramenta: login pela tela
 
 - Botão **Conectar** no perfil do agente. O host abre o agente, chama `initialize`, lê `authMethods`
   e, se houver, `authenticate` com o primeiro método; o agente abre o navegador ou mostra o código.
@@ -93,7 +119,7 @@ validados.
 - Nada de `fs/*` nem `terminal/*`: o cliente segue sem emprestar o editor ao agente.
 - Testes: `test/acpTransport.test.ts` (agente falso com `authMethods`), `test/ui/...`.
 
-### 4. Modelos descobertos na conexão
+### 5. Modelos descobertos na conexão
 
 - Ao conectar (e em **Detectar modelos**), o host abre uma sessão, lê `models.availableModels` e
   grava no `modelCatalog` com `tool` igual ao id do agente; `currentModelId` vira o padrão. Agente que
@@ -105,23 +131,23 @@ validados.
   escolhas feitas para as outras.
 - Testes: `test/models.test.ts`, `test/acpTransport.test.ts`, `test/ui/...`.
 
-### 5. Limite de uso por agente
+### 6. Limite de uso por agente
 
 - O catálogo ganha, por agente, os padrões do erro de cota (texto do `session/prompt` que falha ou
-  do `stderr`), conferidos na 6. O leitor ACP marca `usageLimitReached` como o leitor do Claude faz.
+  do `stderr`), conferidos na 7. O leitor ACP marca `usageLimitReached` como o leitor do Claude faz.
 - A pausa por perfil (`usageLimit.ts`) e a falha `quota` das políticas passam a valer para o agente;
   o autopiloto retoma depois do reset, quando o agente informa a hora, ou pela folga padrão.
 - Testes: `test/acpTransport.test.ts`, `test/usageLimit.test.ts`, `test/runner.test.ts`.
 
-### 6. Teste real do transporte
+### 7. Teste real do transporte
 
 - Roda `scripts/acp-real/ROTEIRO.md` com cada CLI instalada e logada nesta máquina (Kimi hoje;
   Gemini e Codex depois de instalados) e grava uma fixture real por agente, como a do Cursor.
-- Confere o que a 3, a 4 e a 5 dependem: `authMethods`, `models` no `session/new`, o título das
+- Confere o que a 4, a 5 e a 6 dependem: `authMethods`, `models` no `session/new`, o título das
   ferramentas MCP, o `usage` e o erro de cota.
 - Resultado por agente em `docs/decisoes/0988-...`: passou, falhou ou não validado.
 
-### 7. Catálogo lido do registro do ACP (opcional)
+### 8. Catálogo lido do registro do ACP (opcional)
 
 - Ler `registry.json` do ACP com cache, só para comando, argumentos e distribuição; o que cada
   agente mede continua declarado à mão. Entra quando houver dois agentes validados.
@@ -137,7 +163,7 @@ validados.
 - **Sessão ACP longa, reaproveitada entre execuções, para listar modelos sem reabrir o agente**:
   quebraria a regra de uma execução por linha do log; listar modelos abre uma sessão própria e
   fecha.
-- **Uma única história grande**: a admissão (1) e a interface (3, 4) têm revisores diferentes e a 6
+- **Uma única história grande**: a admissão (1) e a interface (4, 5) têm revisores diferentes e a 7
   depende de CLI instalada; empilhadas, cada uma fecha com teste próprio.
 
 ## Consequências
@@ -154,12 +180,13 @@ validados.
 
 ```mermaid
 flowchart LR
-  H1[1 Admissão cobre ACP] --> H2[2 Agente como perfil pronto]
-  H2 --> H3[3 Conectar: login pela tela]
-  H3 --> H4[4 Modelos na conexão]
-  H2 --> H5[5 Limite de uso por agente]
-  H2 --> H6[6 Teste real]
-  H2 -.-> H7[7 Catálogo do registro]
+  H1[1 Admissão cobre ACP] --> H2[2 Regime compatível pela pessoa]
+  H2 --> H3[3 Agente como perfil pronto]
+  H3 --> H4[4 Conectar: login pela tela]
+  H4 --> H5[5 Modelos na conexão]
+  H3 --> H6[6 Limite de uso por agente]
+  H3 --> H7[7 Teste real]
+  H3 -.-> H8[8 Catálogo do registro]
 ```
 
 ```mermaid

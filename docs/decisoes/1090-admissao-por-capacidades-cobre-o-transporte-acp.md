@@ -49,8 +49,9 @@ de comando.
 
 ## Consequências
 
-- Um perfil ACP só roda em regime compatível. A história 2 (agente como perfil pronto) e a 3
-  (Conectar pela tela) partem disso.
+- Um perfil ACP só roda em regime compatível, e o regime está fixo em `exclusive` no host: a
+  história 2 da épica (regime compatível escolhido pela pessoa) destrava a execução; a 3 (agente
+  como perfil pronto) e a 4 (Conectar pela tela) partem disso.
 - O verificador do host passa a existir para dois executores (Claude pela CLI e qualquer agente do
   catálogo); o comando continua sendo o do perfil padrão do board.
 - `session-servers` depende de o agente conectar ao servidor MCP já no `session/new`. Um agente
