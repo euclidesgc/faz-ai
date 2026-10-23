@@ -25,7 +25,12 @@ export const GEMINI_DAILY_RESET_ZONE = 'America/Los_Angeles';
 
 /** As mensagens de cota da API e da CLI (as das classes `TerminalQuotaError` e `RetryableQuotaError` da 0.65.0). */
 const LIMIT_TEXT =
-  /exhausted your (daily )?quota|exhausted your capacity|capacity exceeded|quota exceeded|exceeded your current quota|RESOURCE_EXHAUSTED|rate limit exceeded|INSUFFICIENT_G1_CREDITS_BALANCE|MODEL_CAPACITY_EXHAUSTED|\b429\b/i;
+  /exhausted your (daily )?quota|exhausted your capacity|capacity exceeded|quota exceeded|exceeded your current quota|RESOURCE_EXHAUSTED|rate limit exceeded|INSUFFICIENT_G1_CREDITS_BALANCE|MODEL_CAPACITY_EXHAUSTED/i;
+/**
+ * O 429 escrito no texto só vale como status ("status 429", "HTTP 429", "code: 429", "429 Too Many Requests"): um
+ * número solto ("Lines 1-429 processed") não é limite. No ACP e na API o código numérico vem à parte (`code`).
+ */
+const STATUS_429 = /\b(?:status|code|HTTP|error)\W{0,3}429\b|\b429\W{0,3}(?:Too Many Requests|RESOURCE_EXHAUSTED)/i;
 /** A cota diária pelo texto: a frase da CLI ou o `quotaId` embutido na mensagem. */
 const DAILY_TEXT = /daily quota|PerDay|per[ _-]day\b/i;
 /** Os motivos do `google.rpc.ErrorInfo` que a CLI trata como cota esgotada. */
@@ -92,7 +97,8 @@ export function classifyGeminiFailure(failure: ToolFailure): FailureClass {
     rpcStatus === 'RESOURCE_EXHAUSTED' ||
     reasons.some((r) => LIMIT_REASONS.has(r)) ||
     ofType('QuotaFailure').length > 0 ||
-    LIMIT_TEXT.test(text);
+    LIMIT_TEXT.test(text) ||
+    STATUS_429.test(text);
   if (!limited) return { usageLimitReached: false };
 
   const daily = quotaIds.some((id) => /PerDay|Daily/.test(id)) || DAILY_TEXT.test(text);

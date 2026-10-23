@@ -6,9 +6,9 @@
 // ACP no ACP e o processo da CLI, que emite o `stream-json` gravado da 0.65.0, na CLI.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SpawnFn } from '../../src/extension/aiOutput/measured';
-import { LIMIT_SLACK_MS, limitClock, nextWallTime, pauseOf } from '../../src/shared/usageLimit';
+import { LIMIT_SLACK_MS, canDispatch, limitClock, limitHolds, nextWallTime, pauseOf } from '../../src/shared/usageLimit';
 import { FakeAgent } from '../fakes/acpAgent';
 import { fakeGemini, type FakeGemini } from '../fakes/geminiServer';
 import { cardWorld, CONDUTOR_TOOLS, GEMINI_MODEL, type CardWorld } from './cardWorld';
@@ -17,17 +17,35 @@ const KEY = 'AIzaChaveDoCenarioLimite-nunca-no-board-444555';
 const FIXTURES = path.join(__dirname, '..', 'fixtures');
 const LIMIT = 'O limite de uso do plano do';
 
+/**
+ * O relógio do cenário, congelado (só o `Date`; os temporizadores seguem reais, que o servidor HTTP e o agente
+ * falso usam): 1º/11/2026 10:00 no Pacífico, o dia de 25 h do fim do horário de verão, em que a meia-noite seguinte
+ * calculada por "+24 h" caía no passado. A renovação da cota diária é a meia-noite de 2/11 PST (08:00 UTC).
+ */
+const NOW = Date.UTC(2026, 10, 1, 18, 0);
+const PACIFIC_MIDNIGHT = Date.UTC(2026, 10, 2, 8, 0);
+
 let world: CardWorld | undefined;
 let server: FakeGemini | undefined;
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW);
+});
 afterEach(async () => {
   world?.dispose();
   world = undefined;
   await server?.close();
   server = undefined;
+  vi.useRealTimers();
 });
 
 /** A próxima meia-noite do Pacífico depois de `now`: quando a cota diária do Gemini renova. */
-const nextPacificMidnight = (now: number) => nextWallTime(0, 0, 'America/Los_Angeles', now);
+const nextPacificMidnight = (now: number) => {
+  const at = nextWallTime(0, 0, 'America/Los_Angeles', now);
+  // o relógio congelado: a conta do código e a esperada à mão têm de bater
+  expect(at).toBe(PACIFIC_MIDNIGHT);
+  return at;
+};
 
 /** O desfecho que o runner aplica no limite, o mesmo nos três modos. */
 function expectPaused(w: CardWorld, statusBefore: string | null, resumeAt: { min: number; max: number }) {
@@ -150,6 +168,37 @@ describe('cenário: o Gemini esgota o limite de uso, nos três modos', () => {
     expect(world.aiRun()).toMatchObject({ tool: 'gemini', mode: 'cli' });
     const midnight = nextPacificMidnight(started) + LIMIT_SLACK_MS;
     expectPaused(world, before, { min: midnight, max: midnight });
+    // a pausa é do perfil: o Claude Code segue despachável pelo heartbeat e pelo autopiloto, o Gemini espera
+    const state = world.router.snapshot();
+    expect(canDispatch(state, 'gemini', Date.now())).toBe(false);
+    expect(canDispatch(state, 'claude', Date.now())).toBe(true);
+    expect(limitHolds(state, 'claude', Date.now())).toBe(false);
+  });
+
+  it('CLI: o aviso de nova tentativa da CLI numa execução que terminou bem não pausa, e encerra a pausa anterior', async () => {
+    const lines = fs.readFileSync(path.join(FIXTURES, 'gemini-stream-json.jsonl'), 'utf8');
+    // a CLI avisa a tentativa que esbarrou no 429 e, na seguinte, termina bem (a fixture gravada de sucesso)
+    const spawn: SpawnFn = (_command, _cwd, out) => {
+      let exit: (code: number | null) => void = () => {};
+      setTimeout(() => {
+        out('Attempt 1 failed with status 429. Quota exceeded for metric x. Please retry in 2s. Retrying with backoff...\n', 'stderr');
+        for (let i = 0; i < lines.length; i += 97) out(lines.slice(i, i + 97), 'stdout');
+        exit(0);
+      }, 5);
+      return { kill: () => exit(143), onExit: (fn) => (exit = fn) };
+    };
+    world = await cardWorld({ profile: 'gemini-cli', tools: ['Read', 'Grep', 'Glob'], permission: 'board', spawn });
+    world.keys.set('gemini', KEY);
+    // uma pausa de antes (a execução de teste depois do vencimento é esta)
+    world.router.recordUsageLimit('gemini', null, Date.now() - 10 * 60_000);
+    expect(pauseOf(world.router.snapshot(), 'gemini')).not.toBeNull();
+
+    const end = await world.run();
+
+    expect(end.code).toBe(0);
+    expect(end.report.usageLimitReached).toBe(false);
+    expect(pauseOf(world.router.snapshot(), 'gemini')).toBeNull();
+    expect(world.comments().some((b) => b.startsWith(LIMIT))).toBe(false);
   });
 
   it('API com política de quota: o Pro esgota e a execução segue no Flash, sem pausar o perfil', async () => {

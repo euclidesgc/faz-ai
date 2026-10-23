@@ -213,6 +213,13 @@ são os do catálogo do board. Assim um perfil do Gemini, em qualquer modo, pode
 de uma política: com a falha _quota_, a cota esgotada do Pro pode seguir no Flash, por exemplo. O
 modo não entra na política: trocar o Gemini de modo no **Conectar** mantém as políticas dele.
 
+A cota do Gemini é **por modelo** (o Pro pode esgotar enquanto o Flash ainda tem cota), mas a pausa pelo
+limite de uso é **por perfil**: sem política, o perfil do Gemini inteiro espera a renovação. Para seguir
+com outro modelo quando um esgota, crie uma política com a falha _quota_ e o destino no outro modelo
+(Pro → Flash): a troca acontece na hora, e o perfil não fica pausado. Um destino num perfil desligado
+aparece com um aviso no editor, no resumo e no simulador; a política salva, mas a execução só troca para
+ele depois de você ligar o perfil.
+
 Runner, chat e assistentes ("Sugerir agentes, regras ou skills", "Indicar artefatos") decidem a
 troca de alvo por esse mesmo avaliador: com política ligada e aplicável a execução segue no destino
 dela; sem política, a falha bloqueia e nada roda noutro alvo. Em **Próxima execução**, a simulação

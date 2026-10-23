@@ -71,12 +71,14 @@ export function builtinPolicyCatalog(state: BoardState): { profiles: PolicyProfi
     defaultEffort,
   }));
   // um board sem perfis gravados (o estado de teste mais antigo) ainda vê as CLIs prontas
-  const source: { id: string; tool: string; label: string }[] = state.board.aiProfiles.length
+  const source: { id: string; tool: string; label: string; off?: true }[] = state.board.aiProfiles.length
     ? state.board.aiProfiles.map((p) => ({
         id: p.id,
         tool: catalogTool(p),
         // o rótulo da lista dos perfis ("Gemini · API"); a cópia e o personalizado, pelo nome que a pessoa deu
         label: `${isReadyProfile(p) ? toolLabel(p.tool) : p.name} · ${modeLabel(p.mode)}`,
+        // a tela avisa o destino desligado; o catálogo não o recusa (ver `PolicyProfile.off`)
+        ...(p.enabled ? {} : { off: true as const }),
       }))
     : ALL_AI_BASES.map((tool) => ({ id: tool, tool, label: baseInfo(tool).label }));
   // um id repetido tornaria toda resolução ambígua (`profile-ambiguous`): vale o primeiro

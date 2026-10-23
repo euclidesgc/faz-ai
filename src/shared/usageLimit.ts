@@ -40,6 +40,17 @@ export interface ToolFailure {
   body?: unknown;
 }
 
+/**
+ * Junta a dica que já havia com uma nova da mesma execução, ficando com a mais restritiva: a cota diária nunca é
+ * trocada por uma espera curta que veio depois (a fila voltaria a esbarrar no limite até a meia-noite); entre duas
+ * do mesmo tipo, vale a mais recente.
+ */
+export function stricterHint(prev: UsageLimitHint | undefined, next: UsageLimitHint | undefined): UsageLimitHint | undefined {
+  if (!prev || !next) return next ?? prev;
+  if (prev.dailyResetZone && !next.dailyResetZone) return prev;
+  return next;
+}
+
 /** O que a classificação diz da falha: se foi o limite de uso e, quando a falha diz, até quando. */
 export interface FailureClass {
   usageLimitReached: boolean;
@@ -70,8 +81,6 @@ export const BACKOFF_MAX_MS = 60 * 60_000;
 /** Horário mais longe que isso é tratado como ilegível (backoff): nenhum limite conhecido renova depois de uma semana. */
 export const RESET_MAX_AHEAD_MS = 8 * 24 * 60 * 60_000;
 export const USAGE_LIMIT_META_KEY = 'usage_limit_pause';
-
-const DAY_MS = 24 * 60 * 60_000;
 
 /** O fuso, se o `Intl` o reconhece; senão null (quem chama cai no fuso local). */
 function validZone(zone: string | null | undefined): string | undefined {
@@ -138,8 +147,10 @@ export function nextWallTime(hour: number, minute: number, zone: string | null, 
   const at = wallToInstant(today.year, today.month, today.day, hour, minute, tz);
   // "resets 1:50am" lido às 23:00 é a 1:50 de amanhã
   if (at > now) return at;
-  const tomorrow = wallParts(at + DAY_MS, tz);
-  return wallToInstant(tomorrow.year, tomorrow.month, tomorrow.day, hour, minute, tz);
+  // o dia seguinte pelo calendário, a partir da data de parede: somar 24 h ao instante erra no dia de 25 h do fim
+  // do horário de verão (a meia-noite de 1º/11 no Pacífico + 24 h ainda é 1º/11, e a pausa cairia no passado)
+  const next = new Date(Date.UTC(today.year, today.month - 1, today.day + 1));
+  return wallToInstant(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(), hour, minute, tz);
 }
 
 const plausible = (at: number, now: number): boolean => Number.isFinite(at) && at > now && at - now <= RESET_MAX_AHEAD_MS;

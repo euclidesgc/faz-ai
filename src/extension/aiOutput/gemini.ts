@@ -14,7 +14,7 @@
 //   home do board; `policy_violation`; parâmetros inválidos) não entra no inventário: nada rodou, e contá-la
 //   faria a conferência acusar um desvio que não houve.
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
-import type { ToolFailure, UsageLimitHint } from '../../shared/usageLimit';
+import { stricterHint, type ToolFailure, type UsageLimitHint } from '../../shared/usageLimit';
 import { classifyGeminiFailure } from '../ai/drivers/gemini/limit';
 import { asNumber, asObject, asText, cut, type Json } from './json';
 import type { OutputReader, OutputStream, ReaderDeps } from './reader';
@@ -69,16 +69,20 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
   let sessionId: string | null = null;
   let usageLimitReached = false;
   let usageLimitHint: UsageLimitHint | undefined;
+  /** como o `result` terminou: null enquanto não chegou (a CLI pode cair antes) */
+  let resultOk: boolean | null = null;
   /**
    * A cota esgotada, como a CLI a descreve (`TerminalQuotaError`, `RetryableQuotaError` depois das tentativas
    * dela, o 429 da API com `RESOURCE_EXHAUSTED`), pela mesma classificação dos modos ACP e API. Vale no erro do
-   * `result`, nos avisos (`error`) e no `stderr`; a dica mais recente com horário vence.
+   * `result`, nos avisos (`error`) e no `stderr`; entre as dicas, a mais restritiva (a diária vence a curta). Um
+   * aviso sozinho (a CLI avisa "Attempt 1 failed … retrying" e tenta de novo) só conta se a execução não terminou
+   * bem: com o `result` de sucesso, a cota não esgotou (ver `report`).
    */
   const limit = (failure: ToolFailure): void => {
     const found = classifyGeminiFailure(failure);
     if (!found.usageLimitReached) return;
     usageLimitReached = true;
-    usageLimitHint = found.usageLimitHint ?? usageLimitHint;
+    usageLimitHint = stricterHint(usageLimitHint, found.usageLimitHint);
   };
   /** `kind\0name` → chamadas */
   const inventory = new Map<string, number>();
@@ -156,10 +160,14 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
     if (read) tokens = read;
     const lines = flushText();
     if (asText(o.status) === 'error') {
+      resultOk = false;
       const message = asText(asObject(o.error)?.message) ?? 'erro sem mensagem';
       limit({ message });
       lines.push(cut(`Terminou com erro: ${message}`, RAW_MAX));
-    } else lines.push('Pronto');
+    } else {
+      resultOk = true;
+      lines.push('Pronto');
+    }
     return lines;
   };
 
@@ -211,7 +219,9 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
         return { kind: kind as InventoryKind, name: name!, calls };
       });
       const answer = (segments.filter((s) => s.trim()).at(-1) ?? '').trim();
-      const limited = { usageLimitReached, ...(usageLimitHint ? { usageLimitHint } : {}) };
+      // o `result` de sucesso desmente os avisos de cota das tentativas que a CLI refez sozinha
+      const limited =
+        resultOk === true ? { usageLimitReached: false } : { usageLimitReached, ...(usageLimitHint ? { usageLimitHint } : {}) };
       if (tokens)
         return {
           measure: 'full',

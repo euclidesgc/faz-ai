@@ -92,6 +92,29 @@ describe('leitor do Gemini: casos de borda', () => {
     expect(reader.push('{"type":"result"}', 'stderr')).toEqual(['{"type":"result"}']);
     expect(reader.report().usageLimitReached).toBe(true);
   });
+  it('o aviso de nova tentativa da CLI não marca limite numa execução que terminou bem', () => {
+    const reader = geminiReader();
+    reader.push('Attempt 1 failed with status 429. Quota exceeded for metric x. Please retry in 2s. Retrying with backoff...', 'stderr');
+    reader.push(ev({ type: 'error', severity: 'warning', message: 'RESOURCE_EXHAUSTED: retrying' }), 'stdout');
+    reader.push(ev({ type: 'message', role: 'assistant', content: 'Feito.', delta: true }), 'stdout');
+    reader.push(ev({ type: 'result', status: 'success', stats: { total_tokens: 10, input_tokens: 8, output_tokens: 2 } }), 'stdout');
+    expect(reader.report()).toMatchObject({ usageLimitReached: false, answer: 'Feito.' });
+    expect(reader.report().usageLimitHint).toBeUndefined();
+  });
+  it('a cota diária não é trocada por uma espera curta que veio depois (a dica mais restritiva vence)', () => {
+    const daily = { resetsAt: null, text: null, dailyResetZone: 'America/Los_Angeles' };
+    const before = geminiReader();
+    before.push('Quota exceeded for metric x. Please retry in 41s.', 'stderr');
+    before.push(
+      ev({ type: 'result', status: 'error', error: { message: 'You have exhausted your daily quota on this model.' } }),
+      'stdout',
+    );
+    expect(before.report().usageLimitHint).toEqual(daily);
+    const after = geminiReader();
+    after.push(ev({ type: 'error', severity: 'error', message: 'You have exhausted your daily quota on this model.' }), 'stdout');
+    after.push(ev({ type: 'result', status: 'error', error: { message: 'Quota exceeded. Please retry in 41s.' } }), 'stdout');
+    expect(after.report().usageLimitHint).toEqual(daily);
+  });
   it('o 429 por minuto no stderr traz a espera da API; o texto do assistente que fala de cota não liga o limite', () => {
     const reader = geminiReader();
     reader.push(ev({ type: 'message', role: 'assistant', content: 'O README explica a quota exceeded do projeto.\n' }), 'stdout');

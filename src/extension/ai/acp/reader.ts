@@ -12,7 +12,7 @@
 //   Lido se vier; nenhum agente é obrigado a mandar, e o rascunho ainda pode mudar de nome.
 // Sem nenhum dos dois, sobra o inventário de ferramentas: `partial`, como o Cursor sem `usage`.
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../../shared/log';
-import type { FailureClass, ToolFailure, UsageLimitHint } from '../../../shared/usageLimit';
+import { stricterHint, type FailureClass, type ToolFailure, type UsageLimitHint } from '../../../shared/usageLimit';
 import { asNumber, asObject, asText, cut, type Json } from '../../aiOutput/json';
 import type { AcpToolCall } from './provider';
 
@@ -160,7 +160,7 @@ export function acpReader(opts: AcpReaderOptions): AcpReader {
       const found = opts.classifyFailure?.(failure);
       if (!found?.usageLimitReached) return;
       usageLimitReached = true;
-      usageLimitHint = found.usageLimitHint ?? usageLimitHint;
+      usageLimitHint = stricterHint(usageLimitHint, found.usageLimitHint);
     },
 
     report(sessionId) {

@@ -180,6 +180,19 @@ describe('getPanelMetrics: os seis cortes', () => {
     expect(cell(cut(sections(), 'tool'), 'gemini')).toMatchObject({ runs: 3, tokens: 180 });
   });
 
+  it('o corte por modo não perde o mês arquivado antes dele: o total do mês entra como "não definido" (história 12)', () => {
+    seedMonth(2025, 3);
+    run(at(2026, 6), 1000, { tool: 'gemini', mode: 'api', tokens: 10 });
+    expect(consolidateNow()).toEqual(['2025-03']);
+    db.run(`DELETE FROM log_months WHERE dim = 'mode'`);
+    const s = sections();
+    const mode = cut(s, 'mode');
+    expect(mode.covered.runs).toBe(cut(s, 'tool').covered.runs);
+    expect(mode.covered.durationMs).toBe(cut(s, 'tool').covered.durationMs);
+    expect(cell(mode, 'api')).toMatchObject({ runs: 1 });
+    expect(cell(mode, '')?.runs).toBe(mode.covered.runs - 1);
+  });
+
   it('RF-23: o corte por fase é o ranking de fases — os mesmos números de get_metrics por fase', () => {
     seedMonth(2026, 6);
     const phase = cut(sections(), 'phase');

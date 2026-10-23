@@ -85,6 +85,28 @@ da 0.65.0 monta, não uma captura. A história 14 (teste real) confere os dois.
   cada modelo lido da ferramenta (Detectar modelos, Conectar), e Configurações › Modelos de IA diz "lista lida
   da ferramenta em …" com a mais recente.
 
+## Revisão do #379
+
+- **A meia-noite seguinte no fim do horário de verão.** `nextWallTime` somava 24 h ao instante de hoje para achar o
+  dia seguinte; em 1º/11/2026, o dia de 25 h do Pacífico, a meia-noite de hoje + 24 h ainda é 1º/11 (23:00 PST), e a
+  pausa caía no passado (backoff). Agora o dia seguinte vem do calendário (`Date.UTC(a, m - 1, d + 1)` a partir da
+  data de parede) e o instante é resolvido no fuso. Testes com horários fixos em 1º/11/2026, 8/3/2026 e 14/3/2027; o
+  cenário congela o relógio em 1º/11/2026 10:00 PST.
+- **O 429 solto no texto** ("Lines 1-429 processed") não é mais limite: no texto o 429 só vale como status ("status:
+  429 Too Many Requests", "HTTP 429"); no ACP e na API vale o código numérico.
+- **A dica mais restritiva vence** (`stricterHint`): numa execução com mais de uma dica, a cota diária não é trocada
+  por uma espera curta que veio antes ou depois.
+- **O aviso de nova tentativa da CLI** ("Attempt 1 failed with status 429 … retrying") numa execução cujo `result`
+  terminou com sucesso não liga o limite: o leitor só conta os avisos quando a execução não terminou bem. Com isso o
+  runner encerra a pausa anterior (`clearUsageLimit`) na execução que deu certo, sem mudança nele.
+- **Mês arquivado antes do corte por modo**: sem linhas `dim='mode'`, o total do mês entra como "não definido", no
+  `get_metrics` e no painel.
+- **Destino num perfil desligado**: o catálogo marca `off` (sem mudar `enabled`, que a validação usa); o editor, o
+  resumo e o simulador avisam, sem bloquear salvar.
+- **A pausa fica por perfil, não por modelo** (decisão da revisão). A cota do Gemini é por modelo, mas a pausa por
+  modelo mudaria o formato gravado da pausa e os despachantes; o caminho para seguir com outro modelo é a política
+  de quota (Pro → Flash), que troca na hora e não pausa o perfil. Documentado em `docs/configuracoes.md`.
+
 ## Onde a especificação não cabia no código
 
 - **"`retryDelay` → pausa curta"**: a pausa é o `retryDelay` mais a folga de 3 minutos que toda renovação

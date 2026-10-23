@@ -192,6 +192,20 @@ describe('getMetrics: mês arquivado com tokens e custo', () => {
     expect(row(after[5]!, 'low')).toEqual({ label: 'low', runs: 2, durationMs: 2500, tokens: 320, costUsd: 0.625 });
   });
 
+  it('mês arquivado antes do corte por modo (sem linhas mode) entra no corte como "não definido", com o total do mês (história 12)', () => {
+    seedMixedMonth(2024, 3);
+    expect(consolidateNow()).toEqual(['2024-03']);
+    // o arquivo gravado por uma versão anterior não tem `dim = 'mode'`
+    db.run(`DELETE FROM log_months WHERE dim = 'mode'`);
+    const total = row(getMetrics(db, boardId, { limit: 100 }), 'total')!;
+    const mode = getMetrics(db, boardId, { groupBy: 'mode', limit: 100 });
+    expect(mode.rows).toHaveLength(1);
+    const { label: _label, ...numbers } = mode.rows[0]!;
+    const { label: _total, ...expected } = total;
+    expect(numbers).toMatchObject(expected);
+    expect(mode.archivedMonths).toEqual(['2024-03']);
+  });
+
   it('mês arquivado sem nenhuma medição devolve tokens e custo null, nunca zero (RF-09, RF-30)', () => {
     run(at(2024, 3), 1000, { effort: 'high' });
     run(at(2024, 3), 2000, { effort: 'high' });

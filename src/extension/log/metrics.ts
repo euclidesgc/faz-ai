@@ -401,13 +401,21 @@ function detailByInventory(db: Database, boardId: string, q: MetricsQuery, kind:
  * `tokens` e não tem `cost`.
  */
 function archiveByDim(db: Database, boardId: string, month: string, dim: string): Map<string, Accumulator> {
-  const rows = all(
-    db,
-    `SELECT metric, value, n, total FROM log_months
-     WHERE board_id = ? AND month = ? AND dim = ? AND metric IN ('runs', 'tokens', 'cost')`,
-    [boardId, month, dim],
-  );
+  const read = (d: string) =>
+    all(
+      db,
+      `SELECT metric, value, n, total FROM log_months
+       WHERE board_id = ? AND month = ? AND dim = ? AND metric IN ('runs', 'tokens', 'cost')`,
+      [boardId, month, d],
+    );
+  const rows = read(dim);
   const map = new Map<string, Accumulator>();
+  // o mês arquivado antes do corte por modo (história 12) não tem linhas `mode`: as execuções dele não tinham modo
+  // gravado, e o total do mês entra como "não definido" (''), para o corte não perder o mês
+  if (dim === 'mode' && !rows.length) {
+    for (const r of read('')) bumpArchiveRow(map, '', str(r.metric), num(r.n), num(r.total));
+    return map;
+  }
   for (const r of rows) bumpArchiveRow(map, dim ? str(r.value) : 'total', str(r.metric), num(r.n), num(r.total));
   return map;
 }
@@ -1116,9 +1124,12 @@ function panelArchiveDims(db: Database, boardId: string, months: string[]): Map<
     [boardId, ...months, ...PANEL_DIMS],
   );
   for (const r of rows) {
+    // o `mode` vem mês a mês, por `archiveByDim`, que lança o mês arquivado antes do corte como "não definido"
+    if (str(r.dim) === 'mode') continue;
     const map = out.get(str(r.dim) as MetricsBreakdownDim);
     if (map) bumpArchiveRow(map, str(r.value), str(r.metric), num(r.n), num(r.total));
   }
+  for (const month of months) merge(out.get('mode')!, archiveByDim(db, boardId, month, 'mode'));
   for (const map of out.values())
     for (const a of map.values()) {
       a.estimatedRuns = a.costedRuns;

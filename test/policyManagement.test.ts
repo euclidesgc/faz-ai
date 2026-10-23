@@ -187,6 +187,9 @@ describe('host de políticas e simulação', () => {
     // os agentes ACP do catálogo também são perfis do board, mesmo desligados: a política os pode nomear
     expect(library.profiles.map((p) => p.id)).toEqual(expect.arrayContaining(['claude', 'cursor', 'kimi', 'gemini', 'codex-acp']));
     expect(new Set(library.profiles.map((p) => p.id)).size).toBe(library.profiles.length);
+    // o desligado entra como ligado para a validação (salvar não é bloqueado), marcado `off` para a tela avisar
+    expect(library.profiles.find((p) => p.id === 'codex-acp')).toMatchObject({ enabled: true, off: true });
+    expect(library.profiles.find((p) => p.id === 'claude')?.off).toBeUndefined();
     // trocar o modo do perfil muda o rótulo; o id (o que a política grava) não muda
     router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: true });
     router.setProfileMode('gemini', 'api');

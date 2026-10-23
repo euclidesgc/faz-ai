@@ -53,6 +53,17 @@ it('edita sem gravar e exige comparação e confirmação de revisão', async ()
   await userEvent.click(screen.getByRole('button', { name: 'Voltar à edição' }));
   expect(screen.getByRole('textbox', { name: 'Nome da política' })).toHaveValue('Política revisada');
 });
+it('destino num perfil desligado: o editor e o resumo avisam, sem impedir salvar (história 12)', async () => {
+  expect(useBoardStore.getState().state!.board.aiProfiles.find((p) => p.id === 'codex-acp')?.enabled).toBe(false);
+  await open([record(policy({ targets: [{ profileId: 'codex-acp', model: null, effort: null }] }))]);
+  const note = /O perfil Codex · ACP está desligado: a política pode ser salva/;
+  await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+  expect(screen.getAllByText(note).length).toBeGreaterThan(0);
+  // a comparação (o resumo da versão) avisa de novo, e salvar segue liberado
+  await userEvent.click(screen.getByRole('button', { name: 'Comparar política antes de salvar' }));
+  expect(screen.getAllByText(note).length).toBeGreaterThan(0);
+  expect(screen.getByRole('button', { name: 'Salvar como pendente de revisão' })).toBeEnabled();
+});
 it('salva como pendente sem conceder revisão e só fecha após a confirmação do host', async () => {
   await open();
   await userEvent.click(screen.getByRole('button', { name: 'Editar' }));

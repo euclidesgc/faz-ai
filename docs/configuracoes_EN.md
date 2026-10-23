@@ -224,6 +224,13 @@ the target of a policy: with the _quota_ failure, Pro's exhausted quota can cont
 example. The mode is not part of the policy: switching Gemini's mode in **Conectar** (connect) keeps
 its policies.
 
+The Gemini quota is **per model** (Pro can run out while Flash still has quota), but the usage-limit
+pause is **per profile**: without a policy, the whole Gemini profile waits for the renewal. To continue
+with another model when one runs out, create a policy with the _quota_ failure and the target on the
+other model (Pro → Flash): the switch happens right away, and the profile is not paused. A target on a
+turned-off profile shows a warning in the editor, the summary and the simulator; the policy saves, but
+the run only switches to it after you turn the profile on.
+
 The runner, the chat and the assistants ("Sugerir agentes, regras ou skills", suggest agents,
 rules or skills; "Indicar artefatos", suggest artifacts) decide the target switch through this same
 evaluator: with an enabled, applicable policy the run continues on its target; without a policy,

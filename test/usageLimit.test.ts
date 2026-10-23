@@ -17,6 +17,7 @@ import {
   parsePauses,
   parseResetText,
   resetAtOf,
+  stricterHint,
   type UsageLimitPause,
   type UsageLimitState,
 } from '../src/shared/usageLimit';
@@ -65,6 +66,27 @@ describe('nextWallTime', () => {
 
   it('fuso inválido cai no fuso local', () => {
     expect(nextWallTime(13, 50, 'Nada/Isso', NOW)).toBe(nextWallTime(13, 50, null, NOW));
+  });
+
+  const LA = 'America/Los_Angeles';
+  it('fim do horário de verão no Pacífico (1º/11/2026, dia de 25 h): o dia seguinte vem do calendário, nunca no passado', () => {
+    // 1º/11 00:30 PDT (07:30 UTC), 01:30 PST, a segunda vez (09:30 UTC), 10:00 PST e 23:30 PST: meia-noite de 2/11 PST
+    for (const now of [Date.UTC(2026, 10, 1, 7, 30), Date.UTC(2026, 10, 1, 9, 30), Date.UTC(2026, 10, 1, 18), Date.UTC(2026, 10, 2, 7, 30)])
+      expect(nextWallTime(0, 0, LA, now)).toBe(Date.UTC(2026, 10, 2, 8, 0));
+    // 31/10 23:00 PDT: a meia-noite de 1º/11 ainda é PDT
+    expect(nextWallTime(0, 0, LA, Date.UTC(2026, 10, 1, 6, 0))).toBe(Date.UTC(2026, 10, 1, 7, 0));
+    // 13:50 já passou em 1º/11 (14:00 PST): 13:50 de 2/11 PST
+    expect(nextWallTime(13, 50, LA, Date.UTC(2026, 10, 1, 22, 0))).toBe(Date.UTC(2026, 10, 2, 21, 50));
+    expect(resetAtOf({ resetsAt: null, text: null, dailyResetZone: LA }, Date.UTC(2026, 10, 1, 18))).toBe(Date.UTC(2026, 10, 2, 8, 0));
+  });
+
+  it('início do horário de verão no Pacífico (8/3/2026 e 14/3/2027, dia de 23 h)', () => {
+    // 7/3 23:30 PST: a meia-noite de 8/3 ainda é PST
+    expect(nextWallTime(0, 0, LA, Date.UTC(2026, 2, 8, 7, 30))).toBe(Date.UTC(2026, 2, 8, 8, 0));
+    // 8/3 10:00 PDT: a meia-noite de 9/3 já é PDT
+    expect(nextWallTime(0, 0, LA, Date.UTC(2026, 2, 8, 17, 0))).toBe(Date.UTC(2026, 2, 9, 7, 0));
+    expect(nextWallTime(0, 0, LA, Date.UTC(2027, 2, 14, 19, 0))).toBe(Date.UTC(2027, 2, 15, 7, 0));
+    expect(nextWallTime(23, 0, LA, Date.UTC(2027, 2, 15, 6, 30))).toBe(Date.UTC(2027, 2, 15, 6, 0) + 24 * 60 * MIN);
   });
 });
 
@@ -196,6 +218,25 @@ describe('classifyGeminiFailure: o limite de uso do Gemini nos três modos', () 
       { message: 'erro sem mensagem' },
     ])
       expect(classifyGeminiFailure(failure)).toEqual({ usageLimitReached: false });
+  });
+
+  it('um 429 solto no texto não é limite; como status ("status: 429 Too Many Requests", "HTTP 429") é', () => {
+    for (const message of ['Lines 1-429 processed', 'Li 429 arquivos', 'issue #429 resolvida'])
+      expect(classifyGeminiFailure({ message })).toEqual({ usageLimitReached: false });
+    expect(classifyGeminiFailure({ message: '[API Error: got status: 429 Too Many Requests.]' }).usageLimitReached).toBe(true);
+    expect(classifyGeminiFailure({ message: 'Request failed: HTTP 429' }).usageLimitReached).toBe(true);
+    // no ACP e na API vale o código numérico, não o texto
+    expect(classifyGeminiFailure({ message: 'Too many', code: 429 }).usageLimitReached).toBe(true);
+    expect(classifyGeminiFailure({ message: 'Lines 1-429 processed', code: 500 }).usageLimitReached).toBe(false);
+  });
+
+  it('stricterHint: a diária vence a curta, nas duas ordens; entre curtas, a mais recente', () => {
+    const short = (ms: number) => ({ resetsAt: null, text: null, retryAfterMs: ms });
+    expect(stricterHint(DAILY, short(41_000))).toBe(DAILY);
+    expect(stricterHint(short(41_000), DAILY)).toBe(DAILY);
+    expect(stricterHint(short(41_000), short(5_000))).toEqual(short(5_000));
+    expect(stricterHint(undefined, short(1))).toEqual(short(1));
+    expect(stricterHint(DAILY, undefined)).toBe(DAILY);
   });
 
   it('durationMs lê a Duration do protobuf em JSON', () => {
