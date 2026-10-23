@@ -5,7 +5,7 @@ import { executorProfile } from './providers';
 import { redactCredentialValues } from '../credentials';
 import { authFailed } from './profileAuth';
 import { profileInstallUrl } from '../requirements';
-import { isAcpProfile, isReadyCli, profileBase, type AiProfile, type ProfileMode } from '../../shared/aiProfiles';
+import { isAcpProfile, isGeminiCli, isReadyCli, profileBase, type AiProfile, type ProfileMode } from '../../shared/aiProfiles';
 import { cursorToolNames, type CursorManifest } from './cursorManifest';
 // A única porta por onde o board chama uma ferramenta de IA. Toda execução — de um card (a pessoa, o
 // heartbeat ou o autopiloto) ou do chat — passa por `AiGateway.run`, e é aqui que o log de uso é
@@ -486,7 +486,9 @@ export class AiGateway {
       // a conferência nunca derruba a execução: se falhar, grava "não conferida" e segue
       let check: RunCheck = { status: 'unchecked', reason: report.measure === 'none' ? 'not_measured' : 'no_inventory' };
       try {
-        if (conference) check = checkRun(report, conference.manifest, conference.boardServer);
+        // o inventário do Gemini pela CLI está nos nomes dele: a conferência os lê pela tabela do Gemini
+        if (conference)
+          check = checkRun(report, conference.manifest, conference.boardServer, profile && isGeminiCli(profile) ? 'gemini' : undefined);
       } catch (e) {
         call.log(redact(`Conferência da execução indisponível: ${e instanceof Error ? e.message : String(e)}`));
       }

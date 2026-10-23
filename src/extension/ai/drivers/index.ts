@@ -10,6 +10,7 @@ import { claudeCliDriver } from './claude/cli';
 import { cursorCliDriver } from './cursor/cli';
 import { geminiAcpDriver } from './gemini/acp';
 import { geminiApiDriver } from './gemini/api';
+import { geminiCliDriver } from './gemini/cli';
 import { kimiCliDriver } from './kimi/cli';
 import type { Executor, ToolDriver } from './types';
 
@@ -34,6 +35,7 @@ const DRIVERS = new Map<string, ToolDriver>(
     kimiCliDriver,
     geminiAcpDriver,
     geminiApiDriver,
+    geminiCliDriver,
     // os demais agentes do catálogo ACP, inclusive os que ainda não são perfil pronto (Cursor e Kimi
     // Code pelo ACP rodam hoje só por um perfil personalizado com `acpAgent`)
     ...ACP_AGENTS.filter((a) => a.id !== geminiAcpDriver.tool).map(acpDriver),

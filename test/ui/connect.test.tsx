@@ -47,7 +47,7 @@ describe('Conectar ferramenta: a lista e os cartões', () => {
     expect(buttons[0]).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('o Gemini oferece o ACP e a API (história 10): a ficha inteira em cada um, o selo Recomendado na API', () => {
+  it('o Gemini oferece o ACP, a API (história 10) e a CLI (história 8): a ficha inteira em cada um, o selo Recomendado na API', () => {
     show();
     const card = screen.getByLabelText('Gemini CLI · ACP');
     expect(within(card).queryByText('Recomendado')).toBeNull();
@@ -71,9 +71,13 @@ describe('Conectar ferramenta: a lista e os cartões', () => {
       'Quando escolher',
     ]);
     expect(within(card).getByText('chave de API do Gemini')).toBeInTheDocument();
-    // a CLI ainda não tem driver: nenhum cartão para ela, só o aviso
-    expect(screen.queryByLabelText('Gemini CLI · CLI')).toBeNull();
-    expect(screen.getByText('Ainda não oferecidos nesta versão: CLI.')).toBeInTheDocument();
+    // a CLI tem o cartão dela, sem o selo, e não há mais modo planejado
+    const cli = screen.getByLabelText('Gemini CLI · CLI');
+    expect(within(cli).queryByText('Recomendado')).toBeNull();
+    expect(
+      within(cli).getByText('exclusivo se as sondas passarem; senão compatível (a 0.65.0 lê o GEMINI.md do projeto)'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Ainda não oferecidos nesta versão/)).toBeNull();
   });
 
   it('o Claude Code mostra a CLI com o selo e o porquê de ser a única', async () => {

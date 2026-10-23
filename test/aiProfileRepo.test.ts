@@ -10,7 +10,14 @@ import { AiProfileRepo, validateProfileRows } from '../src/extension/repositorie
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { exportBoard, importBoard, parseExportFile } from '../src/extension/db/boardExport';
 import { credentialsFor } from '../src/extension/credentials';
-import { ACP_READY_AGENTS, BUILTIN_ISOLATION, BUILTIN_PROFILES, catalogTool, type AiProfileDraft } from '../src/shared/aiProfiles';
+import {
+  ACP_READY_AGENTS,
+  BUILTIN_ISOLATION,
+  BUILTIN_PROFILES,
+  catalogTool,
+  isGeminiCli,
+  type AiProfileDraft,
+} from '../src/shared/aiProfiles';
 import { ACP_AGENTS } from '../src/extension/ai/acp/agents';
 /** as três CLIs prontas mais os agentes ACP prontos */
 const CATALOG = BUILTIN_PROFILES.length;
@@ -391,7 +398,24 @@ it('a importação aceita os dois conjuntos de valores e recusa ferramenta ou mo
   bad({ kind: 'builtin' });
   bad({ id: 'meu', kind: 'custom', base: 'generic', tool: 'outro' });
   bad({ id: 'claude', kind: 'acp' });
-  bad({ id: 'gemini', kind: 'catalog', base: 'generic', tool: 'gemini', mode: 'cli' });
+  // o Gemini pela CLI é um modo oferecido desde a história 8; outro agente ACP pronto em `cli`, não
+  ok({ id: 'gemini', kind: 'catalog', base: 'generic', tool: 'gemini', mode: 'cli' });
+  bad({ id: 'codex-acp', kind: 'catalog', base: 'generic', tool: 'codex-acp', mode: 'cli' });
+});
+
+it('a cópia do Gemini pela CLI é o personalizado com o agente, em acp (a CLI dele não tem cópia de catálogo)', () => {
+  repo.setEnabled(boardId, 'gemini', true, 'person');
+  repo.setMode(boardId, 'gemini', 'cli', 'person');
+  const copy = repo.duplicate(boardId, 'gemini', 'person');
+  expect(copy).toMatchObject({ kind: 'custom', mode: 'acp', base: 'generic' });
+  // a cópia dessa cópia, com a linha num modo sem driver para o personalizado (`api`), também volta ao ACP
+  run(db, "UPDATE ai_profiles SET mode = 'api' WHERE board_id = ? AND id = ?", [boardId, copy.id]);
+  const second = repo.duplicate(boardId, copy.id, 'person');
+  expect(second).toMatchObject({ kind: 'custom', mode: 'acp', base: 'generic' });
+  // o Gemini pela CLI é só o pronto: um perfil do catálogo com outra identidade e a ferramenta gemini não é
+  expect(isGeminiCli({ id: 'gemini', kind: 'catalog', tool: 'gemini', mode: 'cli' })).toBe(true);
+  expect(isGeminiCli({ id: 'gemini-copia', kind: 'catalog', tool: 'gemini', mode: 'cli' })).toBe(false);
+  expect(isGeminiCli({ id: 'gemini', kind: 'catalog', tool: 'gemini', mode: 'acp' })).toBe(false);
 });
 it('o pronto lê o modo gravado quando a ferramenta o oferece (o Gemini pela API, história 10); senão, o do código', () => {
   repo.setEnabled(boardId, 'gemini', true, 'person');
@@ -401,9 +425,11 @@ it('o pronto lê o modo gravado quando a ferramenta o oferece (o Gemini pela API
   run(db, "UPDATE ai_profiles SET mode = 'api' WHERE board_id = ? AND id = 'gemini'", [boardId]);
   expect(modeOf('gemini')).toBe('api');
   expect(repo.resolveProfile(boardId, 'gemini')).toMatchObject({ mode: 'api', tool: 'gemini', kind: 'catalog' });
-  // um modo que a extensão não oferece para a ferramenta (o CLI do Gemini ainda é planejado) volta ao do código
+  // o Gemini pela CLI (história 8) também é oferecido
   run(db, "UPDATE ai_profiles SET mode = 'cli' WHERE board_id = ? AND id = 'gemini'", [boardId]);
-  expect(modeOf('gemini')).toBe('acp');
+  expect(modeOf('gemini')).toBe('cli');
+  expect(repo.resolveProfile(boardId, 'gemini')).toMatchObject({ mode: 'cli', tool: 'gemini', kind: 'catalog' });
+  // um modo que a extensão não oferece para a ferramenta volta ao do código
   repo.setEnabled(boardId, 'claude', true, 'person');
   run(db, "UPDATE ai_profiles SET mode = 'api' WHERE board_id = ? AND id = 'claude'", [boardId]);
   expect(modeOf('claude')).toBe('cli');

@@ -1,3 +1,4 @@
+import { GEMINI_TOOL_EQUIVALENTS } from './agentTools';
 import type { ExecManifest } from './execution';
 import { splitMcpName, type RunReport } from './log';
 
@@ -41,11 +42,29 @@ const ACP_KIND_EQUIVALENTS: Record<string, string[]> = {
 };
 
 /**
- * Desvio de uma ferramenta nativa. Nome do card: negada, ou fora de `tools` (lista não vazia). Kind ACP: desvio
- * quando algum equivalente está em `deniedTools`, ou quando nenhum está em `tools` (lista não vazia).
+ * De qual ferramenta veio o inventário, quando o vocabulário dela não é o do card nem o dos kinds do ACP: o
+ * Gemini pela CLI grava os nomes internos dele (`read_file`, `run_shell_command`). A tabela do Gemini só vale
+ * para o inventário dele: o Cursor também grava nomes minúsculos (`glob`, `read`, `shell`), e uma tabela
+ * global leria o `glob` do Cursor como o do Gemini.
  */
-function toolDeviates(name: string, manifest: RunCheckManifest): boolean {
-  const equivalents = Object.hasOwn(ACP_KIND_EQUIVALENTS, name) ? ACP_KIND_EQUIVALENTS[name]! : null;
+export type RunCheckVocabulary = 'gemini';
+
+/**
+ * Os equivalentes no vocabulário do card: os kinds do ACP valem para todo inventário (como antes); os nomes do
+ * Gemini, só no do Gemini pela CLI. Um nome sem equivalente é conferido como nome do card.
+ */
+function equivalentsOf(name: string, vocabulary: RunCheckVocabulary | undefined): string[] | null {
+  if (vocabulary === 'gemini' && Object.hasOwn(GEMINI_TOOL_EQUIVALENTS, name)) return GEMINI_TOOL_EQUIVALENTS[name]!;
+  return Object.hasOwn(ACP_KIND_EQUIVALENTS, name) ? ACP_KIND_EQUIVALENTS[name]! : null;
+}
+
+/**
+ * Desvio de uma ferramenta nativa. Nome do card: negada, ou fora de `tools` (lista não vazia). Kind ACP ou nome
+ * do Gemini: desvio quando algum equivalente está em `deniedTools`, ou quando nenhum está em `tools` (lista
+ * não vazia).
+ */
+function toolDeviates(name: string, manifest: RunCheckManifest, vocabulary?: RunCheckVocabulary): boolean {
+  const equivalents = equivalentsOf(name, vocabulary);
   if (!equivalents) return manifest.deniedTools.includes(name) || (manifest.tools.length > 0 && !manifest.tools.includes(name));
   if (equivalents.length === 0) return false;
   if (equivalents.some((e) => manifest.deniedTools.includes(e))) return true;
@@ -58,8 +77,14 @@ const isFlowSkill = (name: string): boolean => name.startsWith(FLOW_SKILL_PREFIX
  * Compara o inventário da execução com o manifesto do card. `boardServer` (o servidor do board) é sempre
  * liberado. Inventário vazio não prova que nada foi usado (a ferramenta pode não informar), então vira
  * `unchecked`, nunca `ok`. Ferramentas nativas só são conferidas contra `tools` quando a lista não é vazia.
+ * `vocabulary` diz quando o inventário está nos nomes de uma ferramenta (o Gemini pela CLI).
  */
-export function checkRun(report: Pick<RunReport, 'measure' | 'inventory'>, manifest: RunCheckManifest, boardServer: string): RunCheck {
+export function checkRun(
+  report: Pick<RunReport, 'measure' | 'inventory'>,
+  manifest: RunCheckManifest,
+  boardServer: string,
+  vocabulary?: RunCheckVocabulary,
+): RunCheck {
   if (report.measure === 'none') return { status: 'unchecked', reason: 'not_measured' };
   if (report.inventory.length === 0) return { status: 'unchecked', reason: 'no_inventory' };
 
@@ -86,7 +111,7 @@ export function checkRun(report: Pick<RunReport, 'measure' | 'inventory'>, manif
         if (!isFlowSkill(item.name) && !manifest.skills.includes(item.name)) flag('skill', item.name, item.calls);
         break;
       case 'tool':
-        if (toolDeviates(item.name, manifest)) flag('tool', item.name, item.calls);
+        if (toolDeviates(item.name, manifest, vocabulary)) flag('tool', item.name, item.calls);
         break;
     }
   }

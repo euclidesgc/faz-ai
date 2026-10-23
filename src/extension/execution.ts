@@ -3,6 +3,7 @@ import {
   activeProfile,
   catalogTool,
   isAcpProfile,
+  isGeminiCli,
   isolationSummary,
   profileBase,
   profileIsolation,
@@ -153,8 +154,9 @@ export function executionPlan(
   // conhecido (nem desta execução nem registrado na pasta) e sem nada liberado, fica sem arquivo, e a
   // linha de comando segue sem restrição de servidores (só acontece fora da extensão)
   let mcpConfig: string | null = null;
-  // no modo API o board é o cliente MCP: é deste arquivo que o laço tira os servidores que conecta
-  if (base === 'claude' || isAcpProfile(cli) || cli.mode === 'api') {
+  // no modo API o board é o cliente MCP: é deste arquivo que o laço tira os servidores que conecta; o Gemini
+  // pela CLI recebe os mesmos servidores, no `mcpServers` do settings da home isolada
+  if (base === 'claude' || isAcpProfile(cli) || cli.mode === 'api' || isGeminiCli(cli)) {
     // só as definições guardadas no board (no host, com as credenciais do cofre): a execução não lê
     // `.mcp.json` nem `~/.claude.json`, e um servidor que ficou só na pasta da ferramenta não entra
     const defs: Record<string, unknown> = { ...libraryServers };

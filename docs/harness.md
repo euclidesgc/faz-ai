@@ -130,6 +130,39 @@ o modo API com a mesma chave do ACP, conferida na hora com a API.
 - A chave nunca vai para o log, para o registro de uso, para a tela nem para a exportação, e vai à
   API só no cabeçalho `x-goog-api-key`, nunca na URL.
 
+### O Gemini pela CLI
+
+O terceiro modo é a CLI de uma passada (`gemini -p`), com o Gemini CLI instalado (conferido na 0.65.0).
+Clique em **Conectar** no cartão **CLI** do Gemini: o perfil do Gemini passa para o modo CLI com a mesma
+chave do cofre, conferida na hora pela lista de modelos da API (que entram no catálogo). O que o
+Gemini aplica nesse modo:
+
+- **A home isolada**: cada execução roda com `GEMINI_CLI_HOME` apontando para uma pasta temporária só
+  com o `settings.json` do board, apagada no fim (com o que a CLI gravou nela). A configuração, o
+  `GEMINI.md`, as extensões, as skills, os comandos e os hooks da sua conta não entram; a extensão
+  fica desligada (`-e none`), a delegação também (`experimental.enableAgents`), e o `GEMINI.md` das
+  pastas acima do projeto não é lido.
+- **Ferramentas e MCP**: o settings fixa a lista exata de ferramentas que a CLI registra (`tools.core`)
+  e os servidores MCP do card, cada um só com as operações admitidas; o que fica fora o modelo nem
+  recebe, e a chamada a ele volta recusada sem rodar. `--allowed-mcp-server-names` repete a lista.
+  A aprovação segue o nível (`default` em Só o board, `auto_edit` em Board e arquivos, `yolo` em
+  Sem restrições), mas a restrição de verdade é o registro.
+- **O que a home não isola**: o `GEMINI.md` da pasta do projeto e o das pastas adicionais. Por isso as
+  sondas do verificador (sentinelas no `GEMINI.md` do projeto, da home e dos ancestrais, uma extensão e
+  um servidor MCP proibidos, contra uma API local, sem gastar a conta) provam permissões, MCP,
+  delegação e conversa nova, e o perfil roda no **regime compatível**, depois da sua ciência. A ciência
+  dada no ACP não vale para a CLI: trocar o modo pede de novo. As configurações gerenciadas do sistema
+  (as do administrador) continuam valendo por cima da home do board e entram no vínculo da prova.
+- **Consumo e conferência**: os tokens por modelo do `result.stats` do `stream-json` (o raciocínio conta
+  como saída); o inventário são as chamadas `tool_use` que rodaram, nos nomes do Gemini (`read_file`,
+  `run_shell_command`…), e a conferência os lê no vocabulário do card (`Read`, `Bash`…). A cota
+  esgotada liga o limite de uso; a chave recusada marca o login do perfil como vencido.
+- A chave vai só no ambiente do processo (`GEMINI_API_KEY`), nunca nos argumentos, no settings, no
+  log, no registro de uso nem na exportação. Sem chave no cofre, vale a `GEMINI_API_KEY` do seu
+  ambiente. Um `.env` da pasta do projeto ou das pastas acima dela (o Gemini CLI os lê) não muda o
+  endereço da API, a credencial, os cabeçalhos nem o proxy: essas variáveis vão fixadas pelo board. E
+  os comandos de shell que o modelo roda não recebem a chave.
+
 ## Diagnóstico do ambiente
 
 ### O aviso de atenção

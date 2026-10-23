@@ -98,8 +98,11 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
   const connect = useAction((input: { apiKey?: string; acknowledge?: boolean }) =>
     settings.connectAiProfile(profile.id, mode ? { ...input, mode: mode.mode } : input),
   );
-  /** no modo API a chave é conferida agora, pela API; no ACP o agente a aceita sem consultar a rede */
-  const checksNow = mode?.mode === 'api';
+  /**
+   * no modo API e na CLI (que entra por chave) a chave é conferida agora, pela API; no ACP o agente a aceita sem
+   * consultar a rede. Só o Gemini entra por chave numa CLI do catálogo: nas outras o cartão não pede chave
+   */
+  const checksNow = mode?.mode === 'api' || mode?.mode === 'cli';
   const revoke = useAction(() => settings.reviewAiProfile(profile.id, false));
   const current = CONNECT_STEPS.indexOf(state.step);
   const waitingKey = state.status === 'waiting' && state.needs === 'api-key';
@@ -185,13 +188,17 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
             placeholder={t('Cole a chave aqui')}
           />
           <p className="muted small">
-            {checksNow
+            {mode?.mode === 'cli'
               ? t(
-                  'O board confere a chave agora, lendo a lista de modelos da conta pela API do Gemini (não gasta a conta). Aceita, ela fica guardada no cofre deste computador, a mesma para todos os modos, e vai à API só no cabeçalho; ela não volta para esta tela. Recusada, a chave guardada antes continua.',
+                  'O board confere a chave agora, lendo a lista de modelos da conta pela API do Gemini (não gasta a conta). Aceita, ela fica guardada no cofre deste computador, a mesma para todos os modos, e vai para a CLI só no ambiente de cada execução; ela não volta para esta tela. Recusada, a chave guardada antes continua.',
                 )
-              : t(
-                  'A chave fica guardada no cofre deste computador e vai para o login da ferramenta; ela não volta para esta tela. A ferramenta a confere de fato na primeira execução: uma chave errada aparece ali, com a mensagem dela.',
-                )}
+              : checksNow
+                ? t(
+                    'O board confere a chave agora, lendo a lista de modelos da conta pela API do Gemini (não gasta a conta). Aceita, ela fica guardada no cofre deste computador, a mesma para todos os modos, e vai à API só no cabeçalho; ela não volta para esta tela. Recusada, a chave guardada antes continua.',
+                  )
+                : t(
+                    'A chave fica guardada no cofre deste computador e vai para o login da ferramenta; ela não volta para esta tela. A ferramenta a confere de fato na primeira execução: uma chave errada aparece ali, com a mensagem dela.',
+                  )}
           </p>
           <div className="row end">
             {changing && (

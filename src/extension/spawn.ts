@@ -104,6 +104,8 @@ export function spawnHeadless(
   // um editor aberto de dentro de uma sessão do Claude Code herda as variáveis dela; a execução do board é uma sessão própria
   const env: NodeJS.ProcessEnv = { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}), ...command.env };
   for (const name of INHERITED_SESSION_ENV) delete env[name];
+  // a chave do cofre só existe aqui, no ambiente do processo: o comando conferido pela admissão traz o nome
+  if (command.apiKeyEnv && command.apiKey) env[command.apiKeyEnv] = command.apiKey;
   // no Windows as CLIs instaladas pelo npm são .cmd e só rodam pelo shell, com os argumentos escapados
   if (command.noShell && process.platform === 'win32' && /\.(cmd|bat)$/i.test(executable))
     throw new SpawnNotStartedError('O perfil precisa de executável direto, sem shell.');

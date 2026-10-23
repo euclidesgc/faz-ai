@@ -74,6 +74,12 @@ const CURSOR_CLI: ModeEnforcement = { agent: 'advised', skills: 'advised', mcp: 
 // da execução (não há `--mcp-config`); em `-p` a permissão é sempre "auto", sem flags para estreitá-la;
 // não há `--agents` inline: o agente e os subagentes seguem como orientação no prompt
 const KIMI_CLI: ModeEnforcement = { agent: 'advised', skills: 'advised', mcp: 'advised', tools: 'advised', model: 'enforced' };
+// Gemini CLI 0.65.0 (`gemini -p`, história 8; geminicli.com/docs/reference/configuration e o pacote instalado):
+// a home isolada (`GEMINI_CLI_HOME`) leva só o `settings.json` do board, com os servidores MCP do card (cada um com
+// as operações admitidas em `includeTools`) e as ferramentas da execução em `tools.core` e `tools.allowed`; o que
+// fica fora não é registrado (o modelo nem o recebe). O modelo vai por `-m`. A CLI não recebe agente inline (os
+// subagentes dela vêm de pastas, e o board desliga a delegação): o agente do card e as skills seguem pelo pedido
+const GEMINI_CLI: ModeEnforcement = { agent: 'advised', skills: 'advised', mcp: 'enforced', tools: 'enforced', model: 'enforced' };
 /**
  * Todo agente ACP: os servidores do card vão no `session/new` (garantido); o agente e as ferramentas seguem
  * como orientação no prompt (o board responde cada pedido de permissão, mas a lista não vai por parâmetro).
@@ -157,8 +163,22 @@ export const TOOLS: readonly AiToolEntry[] = [
         },
         enforcement: API_ENFORCEMENT,
       },
+      {
+        mode: 'cli',
+        sheet: {
+          controls: 'MCP e ferramentas pelo settings da home isolada; a aprovação por nível; o contexto do projeto o Gemini carrega',
+          regime: 'exclusivo se as sondas passarem; senão compatível (a 0.65.0 lê o GEMINI.md do projeto)',
+          precision: 'boa: `tool_use` e `tool_result` no `stream-json`',
+          consumption: 'tokens por modelo (`result.stats`); o contexto próprio do projeto conta',
+          brings: 'o agente completo do Gemini CLI, numa passada',
+          signIn: 'chave de API do Gemini (cofre, no ambiente da execução)',
+          billing: 'por token',
+          whenToChoose: 'quando se quer o Gemini CLI numa passada, com o board fixando as ferramentas e os servidores MCP',
+        },
+        enforcement: GEMINI_CLI,
+      },
     ],
-    planned: [{ mode: 'cli', story: 8 }],
+    planned: [],
     recommended: {
       mode: 'api',
       reason: 'É o único modo em que o board sabe de antemão tudo o que o agente pode acessar e paga só pelo que pediu.',

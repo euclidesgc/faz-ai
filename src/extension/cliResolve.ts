@@ -1,4 +1,4 @@
-import { isAcpProfile, isReadyProfile, type AiProfile, isReadyAcp, isReadyCli } from '../shared/aiProfiles';
+import { isAcpProfile, isReadyProfile, type AiProfile, isReadyCli } from '../shared/aiProfiles';
 import { acpAgent } from './ai/acp/agents';
 import { CLI_COMMAND } from '../shared/requirements';
 import { baseValue } from '../shared/harness';
@@ -170,10 +170,12 @@ export function commandNotFound(command: string): string {
 /** O comando privado do perfil nunca vira rótulo de requisito nem argumento de shell. */
 export function profileCommand(profile: AiProfile): string {
   const standard = baseValue(CLI_COMMAND, profile.base) ?? '';
-  if (isReadyCli(profile)) return standard;
-  if (!isReadyAcp(profile) && typeof profile.config.command === 'string' && profile.config.command.trim()) return profile.config.command;
-  // o perfil ACP sem comando próprio (e o pronto, sempre) roda o agente do catálogo: é ele que a sonda procura no PATH
-  const agent = isAcpProfile(profile) ? acpAgent(String(profile.config.acpAgent)) : undefined;
+  if (isReadyCli(profile) && standard) return standard;
+  if (!isReadyProfile(profile) && typeof profile.config.command === 'string' && profile.config.command.trim())
+    return profile.config.command;
+  // o perfil ACP sem comando próprio (e o pronto, sempre) roda o agente do catálogo: é ele que a sonda procura no
+  // PATH. O Gemini pronto roda o mesmo binário nos dois modos (`gemini --acp` e `gemini -p`)
+  const agent = isAcpProfile(profile) || isReadyProfile(profile) ? acpAgent(String(profile.config.acpAgent)) : undefined;
   return agent?.command ?? standard;
 }
 export function resolveProfileCommand(profile: AiProfile, pathEnv: string | undefined, homeDir: string): string | null {

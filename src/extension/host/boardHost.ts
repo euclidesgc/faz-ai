@@ -376,12 +376,13 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       const tool = catalogTool(profile);
       let count: number;
       if (isAcpProfile(profile)) count = await readAcpModels(profile);
-      else if (profile.mode === 'api') {
-        // pela API, com a chave do cofre (a mesma que o login acabou de conferir)
-        const driver = driverOf(profile);
+      else if (driverOf(profile)?.apiModels) {
+        // pela API, com a chave do cofre (a mesma que o login acabou de conferir): o modo API e o Gemini pela
+        // CLI, que não tem comando que liste os modelos
+        const driver = driverOf(profile)!;
         const apiKey = profileApiKey(toolKeys, profile);
-        if (!driver?.apiModels || !apiKey) return null;
-        const found = await driver.apiModels(apiKey);
+        if (!apiKey) return null;
+        const found = await driver.apiModels!(apiKey);
         rememberModels(tool, found);
         count = found.length;
       } else {

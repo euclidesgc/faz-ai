@@ -55,10 +55,18 @@ describe('catálogo de ferramentas (TOOLS) e drivers de conexão', () => {
       }
   });
 
-  it('o Gemini oferece a API desde a história 10, e o selo Recomendado acende nela; o Claude só tem a CLI', () => {
+  it('o Gemini oferece a API desde a história 10 e a CLI desde a 8, e o selo Recomendado acende na API; o Claude só tem a CLI', () => {
     const gemini = TOOLS.find((t) => t.id === 'gemini')!;
-    expect(gemini.modes.map((m) => m.mode)).toEqual(['acp', 'api']);
-    expect(gemini.planned.map((p) => p.mode)).toEqual(['cli']);
+    expect(gemini.modes.map((m) => m.mode)).toEqual(['acp', 'api', 'cli']);
+    expect(gemini.planned).toEqual([]);
+    // a CLI do Gemini impõe MCP, ferramentas e modelo pelo settings da home isolada; o agente segue pelo pedido
+    expect(gemini.modes.find((m) => m.mode === 'cli')!.enforcement).toEqual({
+      agent: 'advised',
+      skills: 'advised',
+      mcp: 'enforced',
+      tools: 'enforced',
+      model: 'enforced',
+    });
     expect(gemini.recommended.mode).toBe('api');
     expect(recommendedOffered(gemini)).toBe('api');
     // até a história 11 o modo serve a Refinar, Resumir e Trabalhar com a permissão board: a ficha diz

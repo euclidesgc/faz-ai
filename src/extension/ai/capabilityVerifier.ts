@@ -27,6 +27,7 @@ import { ACP_PROTOCOL_VERSION } from './acp/run';
 import { AUTH_REQUIRED, RpcError, acpAuthenticate, rpcConnection } from './acp/connection';
 import { acpCommand, type AcpAgent, type AcpAuth, type AcpSpawnFn } from './acp/provider';
 import { version as EXTENSION_VERSION } from '../../../package.json';
+import { isGeminiCli } from '../../shared/aiProfiles';
 
 const API_KEY = 'fazai-local-verification-only';
 const NO_DELEGATION = ['Agent', 'Task', 'SendMessage', 'ListAgents'];
@@ -54,6 +55,11 @@ export interface ProbeRun {
   controlHook: boolean;
   strictHook: boolean;
   forbiddenFileWritten: boolean;
+  /**
+   * A chave chegou a um comando de shell do modelo (só as sondas que rodam um shell a observam: a do Gemini
+   * pela CLI). Credencial ao alcance de uma ferramenta é permissão a mais: o `forbidden-tool` falha.
+   */
+  secretInShell?: boolean;
   allowedReadContent: string;
   canaries: Record<string, string>;
   /** duas execuções vazias seguidas, com marcadores distintos */
@@ -64,8 +70,43 @@ export interface ProbeRun {
 type Check = CapabilityEvidence['checks'][number];
 const sha = (value: unknown) => createHash('sha256').update(canonical(value)).digest('hex');
 
+/** Os nomes das ferramentas que a sonda pede ao modelo e procura nas observações, no vocabulário da CLI. */
+export interface ProbeNames {
+  read: string;
+  shell: string;
+  write: string;
+  mcpAllowed: string;
+  mcpForbidden: string;
+  delegation: string;
+  /** os nomes de delegação que não podem aparecer entre as ferramentas declaradas ao modelo */
+  delegationNames: readonly string[];
+}
+export const CLAUDE_PROBE_NAMES: ProbeNames = {
+  read: 'Read',
+  shell: 'Bash',
+  write: 'Write',
+  mcpAllowed: 'mcp__allowed__allowed',
+  mcpForbidden: 'mcp__allowed__forbidden',
+  delegation: 'Agent',
+  delegationNames: NO_DELEGATION,
+};
+/** Gemini CLI 0.65.0: os nomes internos e o `mcp_<servidor>_<operação>` das ferramentas MCP. */
+export const GEMINI_PROBE_NAMES: ProbeNames = {
+  read: 'read_file',
+  shell: 'run_shell_command',
+  write: 'write_file',
+  mcpAllowed: 'mcp_allowed_allowed',
+  mcpForbidden: 'mcp_allowed_forbidden',
+  delegation: 'invoke_agent',
+  delegationNames: ['invoke_agent'],
+};
+
 /** Decisão pura sobre as observações; recibo = hash dos fatos observados e do vínculo. */
-export function evaluateProbes(binding: string, run: ProbeRun): Record<ExecutorCapability, Check[]> {
+export function evaluateProbes(
+  binding: string,
+  run: ProbeRun,
+  names: ProbeNames = CLAUDE_PROBE_NAMES,
+): Record<ExecutorCapability, Check[]> {
   const check = (id: string, ok: boolean | null, facts: unknown): Check => ({
     id,
     outcome: ok === null ? 'unavailable' : ok ? 'passed' : 'failed',
@@ -97,21 +138,26 @@ export function evaluateProbes(binding: string, run: ProbeRun): Record<ExecutorC
       check('managed-settings', /^[a-f0-9]{64}$/.test(run.environmentDigest), { digest: run.environmentDigest }),
     ],
     permissions: [
-      check('allowed-tool', started && resultOf('Read')?.isError === false && run.strict.requestText.includes(run.allowedReadContent), {}),
+      check(
+        'allowed-tool',
+        started && resultOf(names.read)?.isError === false && run.strict.requestText.includes(run.allowedReadContent),
+        {},
+      ),
       check(
         'forbidden-tool',
         started &&
-          refused('Bash') &&
-          refused('Write') &&
+          refused(names.shell) &&
+          refused(names.write) &&
           !run.forbiddenFileWritten &&
-          !run.strict.toolNames.some((n) => n === 'Bash' || n === 'Write'),
+          run.secretInShell !== true &&
+          !run.strict.toolNames.some((n) => n === names.shell || n === names.write),
         { hook: hookSeen && !run.strictHook },
       ),
     ],
     mcp: [
       check(
         'allowed-server',
-        started && run.strict.mcpCalls.includes('allowed:allowed') && resultOf('mcp__allowed__allowed')?.isError === false,
+        started && run.strict.mcpCalls.includes('allowed:allowed') && resultOf(names.mcpAllowed)?.isError === false,
         {},
       ),
       check(
@@ -119,10 +165,14 @@ export function evaluateProbes(binding: string, run: ProbeRun): Record<ExecutorC
         started && run.control.mcpConnections.includes('forbidden') ? !run.strict.mcpConnections.includes('forbidden') : null,
         {},
       ),
-      check('operation-scope', started && refused('mcp__allowed__forbidden') && !run.strict.mcpCalls.includes('allowed:forbidden'), {}),
+      check('operation-scope', started && refused(names.mcpForbidden) && !run.strict.mcpCalls.includes('allowed:forbidden'), {}),
     ],
     delegation: [
-      check('native-delegation-denied', started && refused('Agent') && !run.strict.toolNames.some((n) => NO_DELEGATION.includes(n)), {}),
+      check(
+        'native-delegation-denied',
+        started && refused(names.delegation) && !run.strict.toolNames.some((n) => names.delegationNames.includes(n)),
+        {},
+      ),
     ],
   };
 }
@@ -211,6 +261,8 @@ interface ApiState {
   sent: boolean;
   connections: string[];
   calls: string[];
+  /** o texto das respostas de função que voltaram ao modelo (a sonda do Gemini procura a chave nelas) */
+  outputs?: string[];
 }
 const json = (v: unknown) => JSON.stringify(v);
 const write = (file: string, text: string) => {
@@ -219,6 +271,40 @@ const write = (file: string, text: string) => {
 };
 function reply(res: http.ServerResponse, body: unknown, status = 200): void {
   res.writeHead(status, { 'content-type': 'application/json' }).end(json(body));
+}
+/**
+ * O servidor MCP de teste, por HTTP em `/mcp/<nome>`: as operações `allowed` e `forbidden`, e o registro de
+ * quem conectou e do que foi chamado. Devolve false quando o pedido não é dele.
+ */
+function mcpProbe(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  data: { id?: unknown; method?: string; params?: { protocolVersion?: string; name?: string } },
+  state: { connections: string[]; calls: string[] },
+): boolean {
+  if (!req.url?.startsWith('/mcp/')) return false;
+  const name = req.url.slice('/mcp/'.length);
+  if (data.id === undefined) {
+    res.writeHead(202).end();
+    return true;
+  }
+  if (data.method === 'initialize') state.connections.push(name);
+  const result =
+    data.method === 'initialize'
+      ? { protocolVersion: data.params?.protocolVersion, capabilities: { tools: {} }, serverInfo: { name, version: '1' } }
+      : data.method === 'tools/list'
+        ? {
+            tools: ['allowed', 'forbidden'].map((tool) => ({
+              name: tool,
+              description: `Operação ${tool} do teste`,
+              inputSchema: { type: 'object', properties: {} },
+            })),
+          }
+        : data.method === 'tools/call'
+          ? (state.calls.push(`${name}:${data.params?.name}`), { content: [{ type: 'text', text: 'FAZAI_MCP_ALLOWED' }] })
+          : {};
+  reply(res, { jsonrpc: '2.0', id: data.id, result });
+  return true;
 }
 /** Resposta SSE mínima da API: as respostas do modelo são roteirizadas, nunca valores aceitos como prova. */
 function message(res: http.ServerResponse, model: string, calls: Attempt[]): void {
@@ -301,8 +387,10 @@ export interface VerifierResult {
 export async function verifyExecutor(deps: VerifierDeps): Promise<VerifierResult> {
   const profile = executorProfile(deps.executor);
   const agent = admissionAgent(profile);
+  const gemini = isGeminiCli(profile);
   // o host entrega o perfil resolvido (pronto ou cópia do Claude), não só o id 'claude'
-  if (!agent && profile.base !== 'claude') throw new Error('O verificador de isolamento só existe para a CLI do Claude e os agentes ACP.');
+  if (!agent && profile.base !== 'claude' && !gemini)
+    throw new Error('O verificador de isolamento só existe para a CLI do Claude, a CLI do Gemini e os agentes ACP.');
   const bound = deps.admission.isolationBinding(deps.executor, deps.profileId, 'board');
   if (!bound.environmentComplete) throw new Error('Ambiente gerenciado não verificado; recibos não são gravados.');
   const now = deps.now?.() ?? Date.now();
@@ -315,8 +403,12 @@ export async function verifyExecutor(deps: VerifierDeps): Promise<VerifierResult
     authRequired = run.first.authRequired || run.second.authRequired;
     evidence = buildEvidence(bound.binding, evaluateAcpProbes(bound.binding, run), now, undefined, expected);
   } else {
-    const run = await (deps.probe ?? ((binding) => runClaudeProbes(deps, bound.executable, binding)))(bound.binding);
-    evidence = buildEvidence(bound.binding, evaluateProbes(bound.binding, run), now);
+    // as mesmas cinco capacidades e os mesmos checks nas duas CLIs; mudam a fixture, a API local e os nomes
+    const probe = gemini
+      ? () => runGeminiProbes(deps, bound.executable)
+      : (binding: string) => runClaudeProbes(deps, bound.executable, binding);
+    const run = await (deps.probe ?? probe)(bound.binding);
+    evidence = buildEvidence(bound.binding, evaluateProbes(bound.binding, run, gemini ? GEMINI_PROBE_NAMES : CLAUDE_PROBE_NAMES), now);
   }
   const verified = evidence.every((e) => expected[e.capability].every((id) => e.checks.some((c) => c.id === id && c.outcome === 'passed')));
   // Também grava falhas: uma falha mais nova nunca recorre ao sucesso antigo.
@@ -369,26 +461,7 @@ async function runClaudeProbes(deps: VerifierDeps, executable: string, _binding:
         if (body.length > 8_000_000) return reply(res, {}, 413);
       }
       const data = JSON.parse(body);
-      if (req.url?.startsWith('/mcp/')) {
-        const name = req.url.slice('/mcp/'.length);
-        if (data.id === undefined) return void res.writeHead(202).end();
-        if (data.method === 'initialize') state.connections.push(name);
-        const result =
-          data.method === 'initialize'
-            ? { protocolVersion: data.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name, version: '1' } }
-            : data.method === 'tools/list'
-              ? {
-                  tools: ['allowed', 'forbidden'].map((tool) => ({
-                    name: tool,
-                    description: `Operação ${tool} do teste`,
-                    inputSchema: { type: 'object', properties: {} },
-                  })),
-                }
-              : data.method === 'tools/call'
-                ? (state.calls.push(`${name}:${data.params.name}`), { content: [{ type: 'text', text: 'FAZAI_MCP_ALLOWED' }] })
-                : {};
-        return reply(res, { jsonrpc: '2.0', id: data.id, result });
-      }
+      if (mcpProbe(req, res, data, state)) return;
       if (req.url?.split('?')[0] === '/v1/messages') {
         if (req.headers['x-api-key'] !== API_KEY || req.headers.authorization)
           return reply(res, { error: { type: 'authentication_error', message: 'Apenas autenticação fictícia é aceita.' } }, 401);
@@ -535,6 +608,281 @@ async function runClaudeProbes(deps: VerifierDeps, executable: string, _binding:
       first,
       second,
       environmentDigest: environment,
+    };
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+/** Uma resposta da API local do Gemini em SSE (`streamGenerateContent?alt=sse`): as chamadas roteirizadas, ou um texto. */
+function geminiStream(res: http.ServerResponse, model: string, calls: Attempt[]): void {
+  const parts = calls.length
+    ? calls.map((c) => ({ functionCall: { name: c.name, args: c.input } }))
+    : [{ text: 'Verificação local encerrada.' }];
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+  res.write(
+    `data: ${json({
+      candidates: [{ content: { role: 'model', parts }, finishReason: 'STOP', index: 0 }],
+      usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+      modelVersion: model,
+    })}\r\n\r\n`,
+  );
+  res.end();
+}
+
+/** Os argumentos de isolamento do Gemini pela CLI que o controle tira: `-e none` e cada `--allowed-mcp-server-names`. */
+function withoutGeminiBarriers(args: readonly string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === '-e' && args[i + 1] === 'none') || args[i] === '--allowed-mcp-server-names') {
+      i++;
+      continue;
+    }
+    out.push(args[i]!);
+  }
+  return out;
+}
+
+/**
+ * A sondagem do Gemini pela CLI (história 8): o binário real numa fixture descartável, contra uma API local do
+ * Gemini (`GOOGLE_GEMINI_BASE_URL`, que a CLI aceita em HTTP no próprio computador) com uma chave fictícia:
+ * nada sai para a rede nem gasta a conta da pessoa. As sentinelas ficam no `GEMINI.md` do projeto, do
+ * ancestral (até a pasta com `.git`), da pasta adicional e da home da pessoa (a `HOME` da fixture, com uma
+ * extensão que traz o próprio contexto e um servidor MCP proibido, também no settings do projeto). O controle
+ * roda sem as barreiras (sem a home do board, sem `-e none` e sem `--allowed-mcp-server-names`) e precisa
+ * enxergar cada sentinela; a execução estrita é o comando do provider, com a home isolada.
+ */
+async function runGeminiProbes(deps: VerifierDeps, executable: string): Promise<ProbeRun> {
+  if (process.platform === 'win32') throw new Error('Verificador de isolamento: Windows não validado.');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-verify-gemini-'));
+  fs.chmodSync(root, 0o700);
+  const ancestor = path.join(root, 'ancestor');
+  const project = path.join(ancestor, 'project');
+  const user = path.join(root, 'user');
+  const additional = path.join(root, 'additional');
+  const marker = path.join(root, 'hook-executed');
+  const canaries = Object.fromEntries(
+    ['project', 'user', 'ancestor', 'additional', 'skill', 'agent'].map((n) => [n, `FAZAI_${n}_${randomUUID().replaceAll('-', '')}`]),
+  );
+  // a busca do `GEMINI.md` sobe até a pasta com `.git` (o `memoryBoundaryMarkers` padrão): o ancestral fica dentro
+  fs.mkdirSync(path.join(ancestor, '.git'), { recursive: true, mode: 0o700 });
+  write(path.join(project, 'GEMINI.md'), canaries.project!);
+  write(path.join(ancestor, 'GEMINI.md'), canaries.ancestor!);
+  write(path.join(additional, 'GEMINI.md'), canaries.additional!);
+  write(path.join(user, '.gemini', 'GEMINI.md'), canaries.user!);
+  // a extensão da conta da pessoa: o contexto dela conta como sentinela da home
+  const extension = path.join(user, '.gemini', 'extensions', 'fazai-sonda');
+  write(path.join(extension, 'EXTENSAO.md'), `${canaries.user}_extensao`);
+  write(path.join(project, 'allowed.txt'), 'FAZAI_READ_ALLOWED');
+  // o `.env` hostil: com a pasta confiada (`--skip-trust`), a CLI carrega o primeiro `.gemini/.env` ou `.env` que
+  // achar subindo da pasta (o `~/.gemini/.env` da pessoa, acima do projeto, inclusive) e aplica as variáveis que
+  // ainda não estão definidas. O cabeçalho que ele pede (`GEMINI_CLI_CUSTOM_HEADERS`) chega à API local e é a
+  // sentinela: o do projeto conta como do projeto, o do ancestral (o lugar do `~/.gemini/.env`) como do ancestral
+  write(path.join(project, '.env'), `GEMINI_CLI_CUSTOM_HEADERS=x-fazai-sentinela: ${canaries.project}_env\n`);
+  write(path.join(ancestor, '.gemini', '.env'), `GEMINI_CLI_CUSTOM_HEADERS=x-fazai-sentinela: ${canaries.ancestor}_env\n`);
+  const hook = path.join(root, 'hook.cjs');
+  write(hook, `require('node:fs').writeFileSync(${json(marker)}, 'executado')`);
+  let state: ApiState = { texts: [], tools: [], results: [], uses: new Map(), attempts: [], sent: false, connections: [], calls: [] };
+  const server = http.createServer(async (req, res) => {
+    try {
+      if (req.method !== 'POST') return reply(res, {}, 405);
+      let body = '';
+      for await (const chunk of req) {
+        body += String(chunk);
+        if (body.length > 8_000_000) return reply(res, {}, 413);
+      }
+      const data = JSON.parse(body);
+      if (mcpProbe(req, res, data, state)) return;
+      const route = /^\/v1beta\/models\/([^:/?]+):(streamGenerateContent|generateContent|countTokens)/.exec(req.url ?? '');
+      if (!route) return reply(res, {}, 404);
+      if (req.headers['x-goog-api-key'] !== API_KEY)
+        return reply(res, { error: { code: 401, message: 'Apenas autenticação fictícia é aceita.', status: 'UNAUTHENTICATED' } }, 401);
+      if (route[2] === 'countTokens') return reply(res, { totalTokens: 1 });
+      // o cabeçalho que um `.env` hostil pediria entra no texto observado, junto do pedido
+      state.texts.push(`${body}\n${String(req.headers['x-fazai-sentinela'] ?? '')}`);
+      if (route[2] === 'generateContent')
+        return reply(res, { candidates: [{ content: { role: 'model', parts: [{ text: '{}' }] }, finishReason: 'STOP' }] });
+      state.tools.push(
+        ((data.tools ?? []) as { functionDeclarations?: { name: string }[] }[]).flatMap((t) =>
+          (t.functionDeclarations ?? []).map((f) => f.name),
+        ),
+      );
+      // as respostas das funções voltam no pedido seguinte: o erro é a recusa da CLI (ferramenta fora do registro)
+      for (const c of data.contents ?? [])
+        for (const p of c.parts ?? [])
+          if (p.functionResponse) {
+            state.results.push({ id: String(p.functionResponse.name), isError: 'error' in (p.functionResponse.response ?? {}) });
+            (state.outputs ??= []).push(json(p.functionResponse.response ?? {}));
+          }
+      const attempts = state.sent ? [] : state.attempts;
+      state.sent = true;
+      return geminiStream(res, route[1]!, attempts);
+    } catch {
+      if (!res.headersSent) reply(res, {}, 400);
+      else res.end();
+    }
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const forbidden = { httpUrl: `${url}/mcp/forbidden` };
+  write(
+    path.join(extension, 'gemini-extension.json'),
+    json({ name: 'fazai-sonda', version: '1.0.0', contextFileName: 'EXTENSAO.md', mcpServers: { forbidden } }),
+  );
+  write(path.join(project, '.gemini', 'settings.json'), json({ mcpServers: { forbidden } }));
+  const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+  write(
+    path.join(user, '.gemini', 'settings.json'),
+    json({
+      security: { auth: { selectedType: 'gemini-api-key' } },
+      privacy: { usageStatisticsEnabled: false },
+      general: { enableAutoUpdate: false, enableAutoUpdateNotification: false },
+      mcpServers: { forbidden },
+      hooks: { SessionStart: [{ hooks: [{ type: 'command', command: `${q(process.execPath)} ${q(hook)}` }] }] },
+    }),
+  );
+  const mcpConfig = json({ mcpServers: { allowed: { type: 'http', url: `${url}/mcp/allowed` } } });
+  const env: Record<string, string> = {
+    // nada da conta da pessoa: a chave, o projeto do Google e as pastas do Gemini vêm vazios
+    ...Object.fromEntries(
+      Object.keys(process.env)
+        .filter((k) => VERIFIER_OBSERVED_ENV.test(k) || /^GEMINI_/.test(k))
+        .map((k) => [k, '']),
+    ),
+    PATH: deps.pathEnv ?? process.env.PATH ?? '',
+    HOME: user,
+    GEMINI_API_KEY: API_KEY,
+    GOOGLE_GEMINI_BASE_URL: url,
+    NO_COLOR: '1',
+  };
+  /** o que a fixture controla em toda execução, por cima do ambiente fixado pelo provider */
+  const fixed = { PATH: env.PATH!, HOME: user, GEMINI_API_KEY: API_KEY, GOOGLE_GEMINI_BASE_URL: url, NO_COLOR: '1' };
+  const execute = async (opts: {
+    control?: boolean;
+    empty?: boolean;
+    attempts?: Attempt[];
+    prompt?: string;
+    /** as ferramentas da execução, no lugar da leitura (a passada que roda um shell) */
+    tools?: string[];
+  }): Promise<ProbeObservation> => {
+    fs.rmSync(marker, { force: true });
+    state = {
+      texts: [],
+      tools: [],
+      results: [],
+      uses: new Map(),
+      attempts: opts.attempts ?? [],
+      sent: false,
+      connections: [],
+      calls: [],
+      outputs: [],
+    };
+    const input: HeadlessInput = {
+      prompt: opts.prompt ?? 'Verificação local de contrato.',
+      permission: 'board',
+      structured: true,
+      addDirs: [additional],
+      exec: {
+        agent: '',
+        agentDefinition: null,
+        model: { name: 'gemini-2.5-flash', effort: null },
+        mcpBlocked: [],
+        mcpAllowed: opts.empty ? [] : ['allowed'],
+        mcpConfig: opts.empty ? '{"mcpServers":{}}' : mcpConfig,
+        tools: opts.tools ?? (opts.empty ? [] : [GEMINI_PROBE_NAMES.read]),
+        deniedTools: [GEMINI_PROBE_NAMES.delegation],
+        toolSet: 'explicit',
+        mcpTools: opts.empty ? [] : ['mcp__allowed__allowed'],
+      },
+    };
+    let built: HeadlessCommand = headlessCommand(deps.executor, input);
+    // Controle positivo: sem a home do board (e o settings dela), sem o ambiente fixado, sem `-e none` e sem a
+    // lista de servidores, a contaminação aparece
+    if (opts.control) {
+      const { tempHome: _home, env: _env, ...rest } = built;
+      built = { ...rest, args: withoutGeminiBarriers(built.args) };
+    }
+    const { command, cleanup } = materialize(built);
+    let stdout = '';
+    try {
+      const code = await new Promise<{ code: number | null; timedOut: boolean }>((resolve) => {
+        const proc = deps.spawn({ ...command, command: executable, env: { ...env, ...command.env, ...fixed } }, project, (text, stream) => {
+          if (stream === 'stdout') stdout += text;
+        });
+        const timer = setTimeout(() => {
+          proc.kill();
+          resolve({ code: null, timedOut: true });
+        }, deps.timeoutMs ?? 90_000);
+        proc.onExit((c) => {
+          clearTimeout(timer);
+          resolve({ code: c, timedOut: false });
+        });
+      });
+      let sessionId: string | null = null;
+      for (const line of stdout.split('\n'))
+        try {
+          const event = JSON.parse(line) as { type?: string; session_id?: string };
+          if (event.type === 'init' && typeof event.session_id === 'string') sessionId = event.session_id;
+        } catch {
+          /* linha que não é JSON */
+        }
+      return {
+        ...code,
+        requestText: state.texts.join('\n'),
+        toolNames: state.tools[0] ?? [],
+        // na API do Gemini a resposta da função vem pelo nome, não por id
+        toolResults: state.results.map((r) => ({ name: r.id, isError: r.isError })),
+        mcpConnections: [...state.connections],
+        mcpCalls: [...state.calls],
+        sessionId,
+      };
+    } finally {
+      cleanup();
+    }
+  };
+  try {
+    const control = await execute({ control: true });
+    const controlHook = fs.existsSync(marker);
+    const n = GEMINI_PROBE_NAMES;
+    const strict = await execute({
+      attempts: [
+        { name: n.read, input: { file_path: path.join(project, 'allowed.txt') } },
+        { name: n.shell, input: { command: 'exit 73' } },
+        { name: n.write, input: { file_path: path.join(project, 'forbidden.txt'), content: 'não escrever' } },
+        { name: n.mcpAllowed, input: {} },
+        { name: n.mcpForbidden, input: {} },
+        { name: n.delegation, input: { agent_name: 'codebase_investigator', prompt: 'Não delegar' } },
+      ],
+    });
+    const strictHook = fs.existsSync(marker);
+    const forbiddenFileWritten = fs.existsSync(path.join(project, 'forbidden.txt'));
+    // o shell liberado não vê a chave: a passada roda um comando que a imprime; sem o fim do comando na resposta
+    // (o shell não rodou), a sonda não prova nada e conta como falha
+    await execute({
+      tools: [n.shell],
+      attempts: [{ name: n.shell, input: { command: 'printenv GEMINI_API_KEY; printenv GOOGLE_API_KEY; echo FAZAI_SHELL_FIM' } }],
+    });
+    const shellOutputs = state.outputs ?? [];
+    const secretInShell = !shellOutputs.some((o) => o.includes('FAZAI_SHELL_FIM')) || shellOutputs.some((o) => o.includes(API_KEY));
+    const m1 = `FAZAI_CONVERSATION_${randomUUID()}`;
+    const m2 = `FAZAI_CONVERSATION_${randomUUID()}`;
+    const first = { ...(await execute({ empty: true, prompt: m1 })), marker: m1 };
+    const second = { ...(await execute({ empty: true, prompt: m2 })), marker: m2 };
+    return {
+      control,
+      strict,
+      controlHook,
+      strictHook,
+      forbiddenFileWritten,
+      secretInShell,
+      allowedReadContent: 'FAZAI_READ_ALLOWED',
+      canaries,
+      first,
+      second,
+      // a configuração gerenciada do Gemini (as do sistema) entra no vínculo pelo driver; aqui, a do host
+      environmentDigest: deps.admission.environmentDigest(),
     };
   } finally {
     server.closeAllConnections();

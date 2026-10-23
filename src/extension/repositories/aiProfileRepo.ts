@@ -280,20 +280,24 @@ export class AiProfileRepo {
     if (!source) throw new Error('Perfil indisponível neste board.');
     // Cópia humana ganha referência própria; não herda revisão nem evidência executável.
     // a cópia de um agente ACP pronto é um perfil personalizado com o mesmo agente: o id novo é outra ferramenta do catálogo
-    const kind: AiProfileKind = source.kind === 'custom' || source.mode === 'acp' ? 'custom' : 'catalog';
+    // o mesmo vale para o Gemini pronto em qualquer modo (a base dele é a do agente ACP): a cópia é o personalizado
+    // com o agente, em acp, porque o Gemini pela CLI e pela API não tem cópia de catálogo (não é uma `AiBase`)
+    const kind: AiProfileKind = source.kind === 'custom' || source.mode === 'acp' || source.base === 'generic' ? 'custom' : 'catalog';
+    // o personalizado com o agente ACP é sempre do modo ACP: a cópia de uma cópia do Gemini pela API ou pela CLI
+    // não fica num modo sem driver para o personalizado
+    const mode = kind === 'custom' && source.base === 'generic' && typeof source.config.acpAgent === 'string' ? 'acp' : source.mode;
     const targetId = newProfileId(
       `${source.name} cópia`,
       profiles.map((p) => p.id),
     );
     const sourceRow = one(this.db, 'SELECT secret_ref FROM ai_profiles WHERE board_id = ? AND id = ?', [boardId, id]);
     // a cópia de um pronto leva a lista de itens que a CLI carrega (declaração herdada, sem a garantia do base)
-    const config = isReadyCli(source)
-      ? source.base === 'generic'
-        ? null
-        : { isolation: { loads: structuredClone(BUILTIN_ISOLATION[source.base].loads) } }
-      : isReadyProfile(source)
-        ? structuredClone(source.config)
-        : credentialsFor(this.db).get(ownerOf(boardId, id), str(sourceRow?.secret_ref));
+    const config =
+      isReadyCli(source) && source.base !== 'generic'
+        ? { isolation: { loads: structuredClone(BUILTIN_ISOLATION[source.base].loads) } }
+        : isReadyProfile(source)
+          ? structuredClone(source.config)
+          : credentialsFor(this.db).get(ownerOf(boardId, id), str(sourceRow?.secret_ref));
     const ref = config ? credentialsFor(this.db).put(ownerOf(boardId, targetId), config) : null;
     // a cópia do catálogo continua a ferramenta da origem; a personalizada é outra ferramenta, no modo da origem
     const tool = kind === 'catalog' ? catalogTool(source) : targetId;
@@ -306,7 +310,7 @@ export class AiProfileRepo {
         `${source.name} (cópia)`,
         kind,
         tool,
-        source.mode,
+        mode,
         source.base,
         Math.max(-1, ...profiles.map((p) => p.position)) + 1,
         ref,

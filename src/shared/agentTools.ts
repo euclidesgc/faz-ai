@@ -189,6 +189,54 @@ export const AGENT_TOOLS: Record<AgentToolsId, ToolGroup[]> = {
   ],
 };
 
+/**
+ * Os nomes de ferramenta do Gemini CLI (os da tabela acima e os que a CLI 0.65.0 registra sozinha) e os
+ * equivalentes no vocabulário do card, que é o do Claude Code (`Read`, `Grep`, `Bash`...). A conferência
+ * (`checkRun`) lê o inventário do Gemini pela CLI por aqui, e só ele (`vocabulary: 'gemini'`): o Cursor também
+ * grava nomes minúsculos (`glob`, `read`, `shell`), que uma tabela global confundiria com os do Gemini. O provider
+ * do Gemini pela CLI (`ai/providers/gemini.ts`) traduz no sentido contrário as ferramentas do card fora da
+ * admissão. `[]` é ferramenta sem efeito fora da sessão (o tópico, o modo de planejamento), que nunca é
+ * desvio. Nenhum nome daqui é um kind do ACP (o teste vigia), que vale para todo inventário.
+ */
+export const GEMINI_TOOL_EQUIVALENTS: Record<string, string[]> = {
+  read_file: ['Read'],
+  read_many_files: ['Read'],
+  // listar uma pasta é ler a árvore: vale o Read ou o Glob do card
+  list_directory: ['Read', 'Glob'],
+  glob: ['Glob'],
+  grep_search: ['Grep'],
+  list_mcp_resources: ['ListMcpResourcesTool'],
+  read_mcp_resource: ['ReadMcpResourceTool'],
+  replace: ['Edit', 'MultiEdit'],
+  write_file: ['Write'],
+  // a memória do Gemini é um arquivo que ele escreve (na home isolada da execução, apagada no fim)
+  save_memory: ['Write', 'Edit'],
+  run_shell_command: ['Bash', 'PowerShell'],
+  web_fetch: ['WebFetch'],
+  google_web_search: ['WebSearch'],
+  activate_skill: ['Skill'],
+  write_todos: ['TodoWrite'],
+  // a delegação nativa: o board a desliga em toda execução (`experimental.enableAgents: false`)
+  invoke_agent: ['Agent'],
+  update_topic: [],
+  enter_plan_mode: [],
+  exit_plan_mode: [],
+  ask_user: [],
+};
+
+/**
+ * As ferramentas do Gemini que equivalem às do card (o sentido contrário de `GEMINI_TOOL_EQUIVALENTS`), na
+ * ordem da tabela; um nome que já é do Gemini passa como está, e o que não tem equivalente fica de fora.
+ */
+export function geminiToolsFor(cardTools: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const name of cardTools) {
+    if (Object.hasOwn(GEMINI_TOOL_EQUIVALENTS, name)) out.add(name);
+    for (const [gemini, card] of Object.entries(GEMINI_TOOL_EQUIVALENTS)) if (card.includes(name)) out.add(gemini);
+  }
+  return [...out];
+}
+
 /** Os valores aceitos em `native.tool` de um agente: '' (sem ferramenta nativa) ou uma ferramenta com tabela. */
 export const NATIVE_AGENT_TOOLS: readonly string[] = ['', ...Object.keys(AGENT_TOOLS)];
 

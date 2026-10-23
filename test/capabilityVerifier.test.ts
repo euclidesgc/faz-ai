@@ -7,6 +7,7 @@ import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence'
 import {
   evaluateAcpProbes,
   evaluateProbes,
+  GEMINI_PROBE_NAMES,
   verifyExecutor,
   type AcpProbeRun,
   type ProbeObservation,
@@ -15,6 +16,8 @@ import {
 import { ACP_CAPABILITY_CHECKS, CAPABILITY_CHECKS, assessCapability, type StrictExecutionRequest } from '../src/shared/executionAdmission';
 import { BUILTIN_PROFILES, verifiableProfile, verifiableProfiles, type AiProfile } from '../src/shared/aiProfiles';
 import { evidenceCapabilities, evidenceCurrent } from '../src/shared/profileHealth';
+import { regimeFromEvidence } from '../src/shared/connect';
+import { spawnHeadless } from '../src/extension/spawn';
 
 const obs = (o: Partial<ProbeObservation> = {}): ProbeObservation => ({
   code: 0,
@@ -463,4 +466,152 @@ describe('verificação por perfil', () => {
     expect(verifiableProfile(builtin('kimi'))).toBe(false);
     expect(verifiableProfile(builtin('opencode'))).toBe(true);
   });
+});
+
+describe('sondas do Gemini pela CLI (história 8)', () => {
+  const geminiCli = (): AiProfile => ({ ...structuredClone(BUILTIN_PROFILES.find((p) => p.id === 'gemini')!), mode: 'cli', enabled: true });
+  /** o que o binário real 0.65.0 deixou observável na fixture (registro da história 8), nos nomes do Gemini */
+  const geminiRun = (leaks: string[] = []): ProbeRun => {
+    const run = good();
+    return {
+      ...run,
+      strict: {
+        ...run.strict,
+        requestText: ['FAZAI_READ_ALLOWED', ...leaks].join(' '),
+        toolNames: ['read_file', 'mcp_allowed_allowed'],
+        toolResults: [
+          { name: 'read_file', isError: false },
+          { name: 'run_shell_command', isError: true },
+          { name: 'write_file', isError: true },
+          { name: 'mcp_allowed_allowed', isError: false },
+          { name: 'mcp_allowed_forbidden', isError: true },
+          { name: 'invoke_agent', isError: true },
+        ],
+      },
+    };
+  };
+  const geminiOutcomes = (run: ProbeRun) =>
+    Object.fromEntries(
+      Object.values(evaluateProbes('b'.repeat(64), run, GEMINI_PROBE_NAMES)).flatMap((cs) => cs.map((c) => [c.id, c.outcome])),
+    );
+
+  it('os mesmos checks nos nomes do Gemini: com o GEMINI.md do projeto e o da pasta adicional vazando, só os artefatos falham', () => {
+    expect(Object.values(geminiOutcomes(geminiRun())).every((o) => o === 'passed')).toBe(true);
+    const real = geminiOutcomes(geminiRun(['c-proj', 'c-add']));
+    expect(real).toMatchObject({
+      'project-sentinel': 'failed',
+      'additional-directory-sentinel': 'failed',
+      'user-sentinel': 'passed',
+      'ancestor-sentinel': 'passed',
+      'allowed-tool': 'passed',
+      'forbidden-tool': 'passed',
+      'allowed-server': 'passed',
+      'forbidden-server': 'passed',
+      'operation-scope': 'passed',
+      'native-delegation-denied': 'passed',
+    });
+    // a delegação declarada ao modelo (o `invoke_agent` registrado) falha, mesmo recusada na chamada
+    const declared = geminiRun();
+    declared.strict.toolNames.push('invoke_agent');
+    expect(geminiOutcomes(declared)['native-delegation-denied']).toBe('failed');
+    // os nomes do Claude não provam nada no Gemini
+    expect(outcomes(geminiRun())['allowed-tool']).toBe('failed');
+  });
+
+  it('a chave no shell do modelo, ou o shell que não rodou, derruba o forbidden-tool; o .env do ancestral é sentinela do ancestral', () => {
+    expect(geminiOutcomes({ ...geminiRun(), secretInShell: false })['forbidden-tool']).toBe('passed');
+    expect(geminiOutcomes({ ...geminiRun(), secretInShell: true })['forbidden-tool']).toBe('failed');
+    // o cabeçalho que o `.gemini/.env` hostil acima do projeto pediria (`c-anc_env`) chegou ao pedido
+    expect(geminiOutcomes(geminiRun(['x-fazai-sentinela: c-anc_env']))['ancestor-sentinel']).toBe('failed');
+    // a sonda do Claude não roda shell: o campo ausente não muda nada nela
+    expect(outcomes(good())['forbidden-tool']).toBe('passed');
+  });
+
+  it('verifyExecutor grava as provas no vínculo do Gemini pela CLI; o regime que sai delas é o compatível', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-verifier-gemini-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'gemini'), 'gemini 0.65.0', { mode: 0o755 });
+      const store = new CapabilityEvidenceStore(path.join(dir, 'evidence'));
+      const admission = new ExecutionAdmission({
+        pathEnv: () => dir,
+        homeDir: dir,
+        evidence: store,
+        now: () => 1000,
+        environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
+      });
+      const p = geminiCli();
+      expect(verifiableProfile(p)).toBe(true);
+      const result = await verifyExecutor({
+        executor: p,
+        profileId: 'gemini',
+        admission,
+        store,
+        pathEnv: dir,
+        now: () => 900,
+        spawn: () => {
+          throw new Error('sem CLI');
+        },
+        probe: async () => geminiRun(['c-proj', 'c-add']),
+      });
+      expect(result.binding).toBe(admission.isolationBinding(p, 'gemini', 'board').binding);
+      expect(result.verified).toBe(false);
+      expect(regimeFromEvidence('cli', result.evidence)).toEqual({ regime: 'compatible' });
+      expect(store.load(result.binding)).toHaveLength(5);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('a fixture, a API local e o MCP de teste com uma CLI falsa que carrega o que a 0.65.0 carrega', async () => {
+    if (process.platform === 'win32') return;
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-verifier-gemini-'));
+    try {
+      // o `gemini` do PATH é um script que roda a CLI falsa com o node deste processo
+      const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+      fs.writeFileSync(
+        path.join(dir, 'gemini'),
+        `#!/bin/sh\nexec ${q(process.execPath)} ${q(path.join(__dirname, 'fakes', 'geminiCli.mjs'))} "$@"\n`,
+        { mode: 0o755 },
+      );
+      const pathEnv = `${dir}${path.delimiter}${process.env.PATH ?? ''}`;
+      const store = new CapabilityEvidenceStore(path.join(dir, 'evidence'));
+      const admission = new ExecutionAdmission({
+        pathEnv: () => pathEnv,
+        homeDir: dir,
+        evidence: store,
+        environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
+      });
+      const before = new Set(fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('fazai-verify-gemini-')));
+      const result = await verifyExecutor({
+        executor: geminiCli(),
+        profileId: 'gemini',
+        admission,
+        store,
+        pathEnv,
+        timeoutMs: 30_000,
+        spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
+      });
+      const got = Object.fromEntries(result.evidence.flatMap((e) => e.checks.map((c) => [c.id, c.outcome])));
+      // a CLI falsa, como a real: o projeto e a pasta adicional vazam; a home, o ancestral, a extensão e o MCP proibido não
+      expect(got).toEqual({
+        'fresh-conversation': 'passed',
+        'project-sentinel': 'failed',
+        'user-sentinel': 'passed',
+        'ancestor-sentinel': 'passed',
+        'additional-directory-sentinel': 'failed',
+        'managed-settings': 'passed',
+        'allowed-tool': 'passed',
+        'forbidden-tool': 'passed',
+        'allowed-server': 'passed',
+        'forbidden-server': 'passed',
+        'operation-scope': 'passed',
+        'native-delegation-denied': 'passed',
+      });
+      // a fixture e as homes temporárias somem
+      const after = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('fazai-verify-gemini-') && !before.has(n));
+      expect(after).toEqual([]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
 });

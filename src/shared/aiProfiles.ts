@@ -191,16 +191,28 @@ export const unknownProfileCapabilities = (): Record<ProfileCapability, Capabili
 /**
  * Perfil executado pelo transporte ACP (a CLI do agente fala o Agent Client Protocol), e não pela CLI
  * one-shot. Um perfil no modo API nunca é ACP, mesmo com o agente no cofre (o Gemini pronto traz o dele
- * do código): o modo declarado vence, para a execução nunca cair noutro transporte sem aviso.
+ * do código): o modo declarado vence, para a execução nunca cair noutro transporte sem aviso. O mesmo vale
+ * para o Gemini pronto no modo CLI (história 8): o agente do código continua na configuração, mas quem roda é
+ * a CLI de uma passada. A exceção é só dele, a única CLI do catálogo com base `generic`.
  */
 export const isAcpProfile = (profile: AiProfile): boolean =>
-  profile.mode !== 'api' && profile.base === 'generic' && typeof profile.config.acpAgent === 'string';
+  profile.mode !== 'api' && !isGeminiCli(profile) && profile.base === 'generic' && typeof profile.config.acpAgent === 'string';
 export const profileBase = (profile: AiProfile): AiBase | null => (profile.base === 'generic' ? null : profile.base);
 /**
- * Perfil cujas capacidades o host sabe provar: a CLI do Claude (a pronta ou uma cópia, que roda o mesmo
- * binário com os próprios ajustes) e os agentes ACP. Cursor, Kimi e as CLIs personalizadas não têm sonda.
+ * A ferramenta nativa do executor, a que escolhe a tabela de ferramentas na admissão: na CLI do catálogo, a
+ * ferramenta (o Gemini pronto pela CLI tem a base `generic`, de compatibilidade, e a tabela é a dele); nos
+ * outros perfis, a base, como sempre (no ACP e na API a tradução é a do transporte, não a de uma CLI).
  */
-export const verifiableProfile = (profile: AiProfile): boolean => profile.base === 'claude' || isAcpProfile(profile);
+export const executorToolOf = (profile: AiProfile): string => (isGeminiCli(profile) ? profile.tool : profile.base);
+/** O Gemini pronto pela CLI de uma passada (`gemini -p`, história 8). */
+export const isGeminiCli = (profile: ProfileIdentity): boolean => isReadyCli(profile) && profile.tool === 'gemini';
+/**
+ * Perfil cujas capacidades o host sabe provar: a CLI do Claude (a pronta ou uma cópia, que roda o mesmo
+ * binário com os próprios ajustes), os agentes ACP e o Gemini pela CLI (sondas com sentinelas contra uma API
+ * local). Cursor, Kimi e as CLIs personalizadas não têm sonda.
+ */
+export const verifiableProfile = (profile: AiProfile): boolean =>
+  profile.base === 'claude' || isAcpProfile(profile) || isGeminiCli(profile);
 /**
  * Os perfis que a verificação oferece: ligados, revisados e verificáveis, com o padrão do board primeiro
  * (é o que a pessoa mais provavelmente quer verificar). O pendente de revisão não roda comando nenhum.

@@ -36,6 +36,7 @@ import { cut } from './json';
 import { lineSplitter } from './lines';
 import type { OutputReader, OutputStream } from './reader';
 import { providerFor } from '../ai/providers';
+import { BOARD_SERVER } from '../execution';
 import { textReader } from './text';
 
 /** Como o board inicia um processo da CLI. O `out` recebe de qual canal cada pedaço veio. */
@@ -150,11 +151,21 @@ export function cleanStaleTemp(now = Date.now(), dir = os.tmpdir()): void {
   }
 }
 
+/** A pasta da home temporária dentro da pasta da execução (o nome não colide com um `tempFiles`, que não tem `/`). */
+export const TEMP_HOME_DIR = 'home';
+
+/** Um caminho relativo da home temporária: segmentos sem `..`, sem barra no começo e sem nada fora de `[\w.-]`. */
+const safeHomePath = (rel: string): boolean =>
+  rel.split('/').every((part) => /^[a-zA-Z0-9._-]+$/.test(part) && part !== '.' && part !== '..');
+
 export function materialize(command: HeadlessCommand, tempRoot = os.tmpdir()): { command: HeadlessCommand; cleanup: () => void } {
   const files = Object.entries(command.tempFiles ?? {});
-  if (!files.length) return { command, cleanup: () => {} };
+  const homeFiles = Object.entries(command.tempHome?.files ?? {});
+  if (!files.length && !command.tempHome) return { command, cleanup: () => {} };
   if (files.some(([name]) => !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name) || name === '..'))
     throw new Error('Nome de arquivo temporário inválido.');
+  if (command.tempHome && (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(command.tempHome.env) || homeFiles.some(([rel]) => !safeHomePath(rel))))
+    throw new Error('Home temporária inválida.');
   const dir = fs.mkdtempSync(path.join(tempRoot, 'fazai-run-'));
   try {
     let args = command.args;
@@ -164,10 +175,33 @@ export function materialize(command: HeadlessCommand, tempRoot = os.tmpdir()): {
       fs.writeFileSync(file, content, { mode: 0o600 });
       args = args.map((a) => a.split(tmpArg(name)).join(file));
     }
-    return { command: { ...command, args }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
+    let env = command.env;
+    if (command.tempHome) {
+      // a home isolada da execução: a ferramenta grava nela também (sessões, histórico), e tudo some no fim
+      const home = path.join(dir, TEMP_HOME_DIR);
+      fs.mkdirSync(home, { mode: 0o700 });
+      for (const [rel, content] of homeFiles) {
+        const file = path.join(home, ...rel.split('/'));
+        fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+        fs.writeFileSync(file, content, { mode: 0o600 });
+      }
+      env = { ...command.env, [command.tempHome.env]: home };
+    }
+    return { command: { ...command, args, ...(env ? { env } : {}) }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
   } catch (error) {
     fs.rmSync(dir, { recursive: true, force: true });
     throw error;
+  }
+}
+
+/** Os servidores MCP da execução (as chaves do `mcpConfig`, e o do board), para o leitor separar servidor e operação. */
+function mcpServerNames(input: HeadlessInput): string[] {
+  try {
+    const servers = input.exec?.mcpConfig ? (JSON.parse(input.exec.mcpConfig) as { mcpServers?: unknown }).mcpServers : null;
+    const names = servers && typeof servers === 'object' && !Array.isArray(servers) ? Object.keys(servers) : [];
+    return input.boardServer ? [...new Set([...names, BOARD_SERVER])] : names;
+  } catch {
+    return [];
   }
 }
 
@@ -175,6 +209,7 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
   const label = toolInfo(executorProfile(tool)).label;
   const provider = providerFor(tool);
   const model = input.exec?.model?.name ?? null;
+  const mcpServers = mcpServerNames(input);
   const fmtArgs = formatArgs(tool, input);
   /** quantas tentativas já começaram, para a linha da chamada no canal */
   let tries = 0;
@@ -232,7 +267,7 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
     const { command, cleanup } = materialize(built);
     const format = command.format;
     // o leitor desta tentativa, preso nela: um pedaço atrasado da tentativa anterior não suja o seguinte
-    const read = provider.reader(format, { model });
+    const read = provider.reader(format, { model, mcpServers });
     reader = read;
 
     // um partidor por canal: os dois chegam entremeados, e um aviso no `stderr` no meio de uma linha

@@ -628,11 +628,12 @@ const MIGRATIONS: Record<number, string> = {
 export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
   48: `
     -- catalog volta ao valor antigo, que se deduz da ferramenta e do modo: a cópia tem id próprio
-    -- (tool = a base), o agente ACP pronto roda em acp e a CLI pronta em cli. O pronto no modo api (o
-    -- Gemini, desde a história 10) é o agente ACP pronto do schema 47 (base generic): volta a acp, o único
-    -- modo que aquela versão conhece para ele; a escolha da API se perde com a coluna, e a chave fica no cofre
+    -- (tool = a base), o agente ACP pronto roda em acp e a CLI pronta em cli. O pronto de base generic noutro
+    -- modo (o Gemini pela API, desde a história 10, e pela CLI, desde a 8) é o agente ACP pronto do schema 47:
+    -- volta a acp, o único modo que aquela versão conhece para ele; a escolha do modo se perde com a coluna, e
+    -- a chave fica no cofre
     UPDATE ai_profiles SET kind = CASE WHEN tool <> '' AND tool <> id THEN 'copy'
-      WHEN mode = 'acp' OR (mode = 'api' AND base = 'generic') THEN 'acp' ELSE 'builtin' END
+      WHEN mode = 'acp' OR base = 'generic' THEN 'acp' ELSE 'builtin' END
       WHERE kind = 'catalog';
     ALTER TABLE ai_profiles DROP COLUMN mode;
     ALTER TABLE ai_profiles DROP COLUMN tool;
