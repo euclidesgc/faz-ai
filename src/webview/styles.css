@@ -4722,6 +4722,102 @@ div.metrics-breakdown {
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+/* Ferramentas de IA › Conectar ferramenta (história 7): a lista fixa à esquerda, os cartões dos modos à direita */
+.connect-tool {
+  margin-bottom: var(--sp-24);
+}
+.connect-layout {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--sp-16);
+}
+.connect-tools {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.connect-tools button:where(:not([class*='rt-'])) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-8) var(--sp-12);
+  text-align: left;
+  background: var(--card-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.connect-tools button:where(:not([class*='rt-'])):hover {
+  background: var(--hover);
+}
+.connect-tools button[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-select-1);
+}
+.connect-modes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+.connect-mode-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.mode-sheet {
+  display: grid;
+  gap: var(--sp-6);
+  margin: var(--sp-12) 0;
+}
+.mode-sheet > div {
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) minmax(0, 1fr);
+  gap: var(--sp-8);
+}
+.mode-sheet dt {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.mode-sheet dd {
+  margin: 0;
+}
+.connect-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  margin-top: var(--sp-12);
+  padding-top: var(--sp-12);
+  border-top: 1px solid var(--border);
+}
+.connect-steps {
+  margin: 0;
+  padding-left: var(--sp-20);
+  font-size: var(--fs-sm);
+}
+.connect-steps li[data-state='failed'] {
+  color: var(--error);
+}
+.connect-steps li[data-state='done'] {
+  color: var(--success);
+}
+.connect-key {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+@media (max-width: 720px) {
+  .connect-layout,
+  .mode-sheet > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .ai-tools-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem);

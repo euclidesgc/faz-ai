@@ -1,4 +1,4 @@
-import { isReadyCli } from '../shared/aiProfiles';
+import { isReadyCli, isReadyProfile } from '../shared/aiProfiles';
 import type { AiProfile } from '../shared/aiProfiles';
 import { profileCanProbe } from './cliProbe';
 import * as fs from 'node:fs';
@@ -115,9 +115,11 @@ export function checkRequirements(p: RequirementProbe): BoardRequirement[] {
   if (availability.blocked) out.push({ id: 'no-profile', reason: availability.reason, action: { kind: 'diagnostic' } });
   for (const w of availability.warnings) {
     const health = p.health.find((h) => h.id === w.id)!;
-    // o login dos prontos tem comando conhecido, o do driver da CLI; o dos demais se resolve pelo bloco do perfil
-    const auth = isReadyCli(health) && w.problem === 'signin' ? driverOf(health)?.auth : undefined;
-    const login = auth?.kind === 'login-command' ? auth.command : undefined;
+    // o login dos prontos tem comando conhecido, o do driver da CLI; o da ferramenta que entra por chave de API
+    // (o Gemini pelo ACP) é o Conectar; o dos demais se resolve pelo bloco do perfil
+    const auth = isReadyProfile(health) && w.problem === 'signin' ? driverOf(health)?.auth : undefined;
+    const login = isReadyCli(health) && auth?.kind === 'login-command' ? auth.command : undefined;
+    const viaConnect = auth?.kind === 'api-key';
     out.push({
       id: 'profile',
       profile: w.id,
@@ -125,7 +127,11 @@ export function checkRequirements(p: RequirementProbe): BoardRequirement[] {
       problem: w.problem,
       ...(w.problem === 'signin' && health.authExpired && health.probe?.login !== 'signed-out' ? { expired: true as const } : {}),
       optional: true,
-      action: login ? { kind: 'command', command: login, terminal: true } : { kind: 'diagnostic', profile: w.id },
+      action: login
+        ? { kind: 'command', command: login, terminal: true }
+        : viaConnect
+          ? { kind: 'connect', profile: w.id }
+          : { kind: 'diagnostic', profile: w.id },
     });
   }
   // a prova de capacidades que perdeu a validade não impede o perfil: só avisa, e só quando nada mais o impede

@@ -17,12 +17,57 @@ policies. The Harness, the agents and the AI tool connection are in
 | Tipos de card         | Story, Bug, Sub-task…, with color and default field values per type                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section                                     |
 | Regras do board       | Completion and phase-advance blocks, confirmations, filling in the suggested model, short track for small stories (Baixo effort or Bug type skips PRD and Spec)                                                                                                                                                                                                                                                                                                                         |
-| Harness               | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, admission regime (exclusive or compatible), default agent and heartbeat (see [Harness](harness_EN.md#harness) and [Agents](harness_EN.md#agents))                                                                                                                                                                                                                                                               |
-| Ferramentas de IA     | CLI profiles: enable, set a default, duplicate, create and test                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Harness               | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, default agent and heartbeat (see [Harness](harness_EN.md#harness) and [Agents](harness_EN.md#agents))                                                                                                                                                                                                                                                               |
+| Ferramentas de IA     | **Connect a tool** (choose the tool and the mode and connect); CLI profiles: enable, set a default, duplicate, create and test                                                                                                                                                                                                                                                                                                                                                         |
 | Modelos de IA         | Models and effort levels by profile; rules that suggest each card's model                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Git                   | Mode, gitflow, branch names and prefixes, worktrees, automatic merge and decision records; editable in the editor and in the browser. "Tocar histórias em paralelo" (work on stories in parallel) lives in Harness de IA › Ferramenta e execução                                                                                                                                                                                                                                      |
 | Aparência             | **Idioma** (language: automatic, Português (Brasil) or English), theme, font and size, per board, in the editor and in the browser; statuses (name and color, in the Fluxos tab; here only in browser mode)                                                                                                                                                                                                                                                                             |
 | Backup                | Export and import the board, in the Backup tab, in the editor and in the browser (in the editor, also through the command palette: `fazai.exportBoard`, `fazai.importBoard`)                                                                                                                                                                                                                                                                                                          |
+
+## AI tools: Connect a tool
+
+At the top of **Settings → AI tools**, **Connect a tool** shows the fixed list of tools the extension
+ships (Gemini first, each with its billing note). Once you pick a tool, each mode the extension
+offers for it (CLI, ACP or API; never one that doesn't work) becomes a card with the same sheet, so
+you can compare line by line: what the board controls, the expected regime, the accuracy of what was
+used, usage, what the tool brings on its own, how you sign in, billing, and when to choose it. Modes
+not offered yet appear by name only, without a card.
+
+**Recommended** is the mode in which the board controls the most of what the agent accesses and
+measures what it spends; a tie is broken by what the tool loads on its own (less is better). The
+badge only appears when the recommended mode is offered, with the reason in one sentence. For
+Gemini, the recommendation is the API, which comes in a later version: for now Gemini offers only
+ACP and shows no badge. Claude Code shows the CLI with the badge and why it is the only one (its ACP
+requires API billing, outside the subscription).
+
+A card's **Connect** button takes the catalog profile for that mode through these steps, with the
+progress on screen:
+
+1. **Find the tool**: the command on the terminal's PATH and its version; without it, the **Install**
+   link.
+2. **Sign in**: for Gemini, the **API key** field (a password field). The key goes only to this
+   computer's vault and, for each process, to the agent's sign-in through the protocol; it never
+   comes back to the screen and never goes to the log, the run records or the board export. It is the
+   same in every folder. For the ready CLIs, the sign-in probe, with the terminal command when missing.
+3. **Check the capabilities**: the verifier's probes record the profile's evidence, and the regime
+   follows from it, without asking: all five capabilities proven give the exclusive regime;
+   permissions, MCP and delegation proven, the compatible one. An ACP agent is always compatible (the
+   context files it reads on its own have no proof through the protocol).
+4. **Regime acknowledgment** (compatible only): a separate button, **I understand what the tool
+   loads**, records your acknowledgment for that profile. The regime is per profile: Gemini can run
+   in the compatible regime while Claude Code stays exclusive.
+5. **Read the models**: the models the tool announces join the catalog, in every model field.
+
+At the end, **Connected** with the version, the sign-in, the regime, how many models and the date. An
+error stays on the step where it happened, with **Try again**; a refused key brings the field back.
+Each catalog profile, in the list below, shows its connection state and **Reconnect**. The
+requirements banner keeps checking the tool and the sign-in: for Gemini, without the key in the vault
+the sign-in stays "not verified" (you may have your own `GEMINI_API_KEY`), and the sign-in warning
+leads to Connect.
+
+The **Admission regime** option left Harness › Tool and execution. If you turned on the compatible
+regime for the whole board in an earlier version, it stays on (with a notice and a **Back to
+exclusive** button); profiles acknowledged in Connect stay compatible.
 
 ## AI tools: CLI profiles
 
@@ -65,8 +110,8 @@ ones you use. Like the other ready profiles they have no Edit or Delete: **Dupli
 creates a custom profile with the same agent, to change the environment or the name. The profile id
 (`gemini`, `codex-acp`…) is the model catalog's tool, and **Detectar modelos** (detect models) reads
 the agent's models into it. **Verificar situação** (check status) checks whether the agent's command
-is on the PATH and its version; the login stays "not verified" until the Connect story, and the
-**Instalar** (install) link opens the agent's official ACP mode page. Cursor and Kimi Code stay on
+is on the PATH and its version; the login stays "not verified" (for Gemini, "connected" with the key
+in the vault, through [Connect](#ai-tools-connect-a-tool)), and the **Instalar** (install) link opens the agent's official ACP mode page. Cursor and Kimi Code stay on
 the ready one-shot CLIs, which measure tokens; Claude Code keeps running through the `claude` CLI.
 
 ### Custom profile

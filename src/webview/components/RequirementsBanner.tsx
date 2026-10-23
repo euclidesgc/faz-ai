@@ -180,7 +180,7 @@ export function cardToolLabel(state: BoardState, card: Card): string {
 function actionable(r: BoardRequirement, compact: boolean): boolean {
   const kind = r.action?.kind;
   // o Diagnóstico e as Configurações não existem no chat compacto
-  if (kind === 'settings' || kind === 'diagnostic') return !compact;
+  if (kind === 'settings' || kind === 'diagnostic' || kind === 'connect') return !compact;
   return kind === 'command';
 }
 
@@ -221,6 +221,13 @@ export function RequirementFix({
       return (
         <Button size="small" variant={variant} onClick={() => openSettings('harness')}>
           {t('Abrir Harness')}
+        </Button>
+      );
+    // a ferramenta que entra por chave de API: o login é o Conectar, em Ferramentas de IA
+    case 'connect':
+      return (
+        <Button size="small" variant={variant} onClick={() => openSettings('aiTools')}>
+          {t('Abrir o Conectar')}
         </Button>
       );
   }

@@ -121,7 +121,8 @@ export function postToHost(msg: Tracked): void {
   if (api) return api.postMessage(msg);
   if (!isWeb) {
     // fora do editor e do navegador não há host: confirma na hora para a tela não ficar esperando
-    console.log('[dev] postMessage', msg);
+    // a chave colada no Conectar não vai nem para o console de desenvolvimento
+    console.log('[dev] postMessage', 'apiKey' in msg ? { ...msg, apiKey: '[credencial local]' } : msg);
     if (msg.requestId) deliver({ type: 'done', requestId: msg.requestId, ok: true });
     return;
   }

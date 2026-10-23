@@ -49,6 +49,16 @@ describe('Ferramentas de IA', () => {
     expect(within(profileCard('Cursor')).getByText('Não encontrada')).toBeInTheDocument();
   });
 
+  it('a aba abre com o Conectar ferramenta e mostra o estado do Conectar só nos perfis do catálogo (história 7)', () => {
+    show();
+    expect(screen.getByRole('region', { name: 'Conectar ferramenta' })).toBeInTheDocument();
+    // perfil pronto de um modo oferecido: o estado e o botão de conectar
+    expect(within(profileCard('Gemini CLI')).getByTestId('connection-gemini')).toHaveTextContent('Não conectada pelo Conectar');
+    expect(within(profileCard('Gemini CLI')).getByRole('button', { name: 'Conectar' })).toBeInTheDocument();
+    // as CLIs prontas também passam pelo mesmo Conectar
+    expect(within(profileCard('Claude Code')).getByTestId('connection-claude')).toBeInTheDocument();
+  });
+
   it('agente ACP pronto: desligado, com o link da página oficial, sem Editar nem Apagar', async () => {
     show();
     act(() =>

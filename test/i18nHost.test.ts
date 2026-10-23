@@ -19,6 +19,7 @@ import { EFFORT_FIELD, EFFORT_LABELS, EFFORT_LEVELS, MODEL_EFFORT_LABEL } from '
 import { RUNNER_PERMISSIONS, heartbeatState } from '../src/shared/runner';
 import { CARD_STATUSES, OWNER_LABEL } from '../src/shared/status';
 import { timeAgo } from '../src/shared/time';
+import { TOOLS } from '../src/shared/aiTools';
 
 afterEach(() => setLocale('pt-BR'));
 
@@ -297,5 +298,27 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
     expect(t(EXEC_ASPECTS[4]!.label)).toBe('Model and effort');
     expect(t(TOOL_PRESETS[0]!.label)).toBe('Read-only');
     expect(t(EFFORT_LABELS.xhigh!)).toBe('very high');
+  });
+});
+
+describe('i18n do Conectar (história 7)', () => {
+  it('as fichas dos modos, a cobrança e a recomendação de cada ferramenta saem em inglês', () => {
+    setLocale('en');
+    const texts = TOOLS.flatMap((tool) => [tool.billing, tool.recommended.reason, ...tool.modes.flatMap((m) => Object.values(m.sheet))]);
+    expect(texts.filter((text) => t(text) === text)).toEqual([]);
+    expect(t('compatível: o Codex lê os próprios arquivos de instruções e a própria configuração')).toBe(
+      'compatible: Codex reads its own instruction files and its own configuration',
+    );
+  });
+
+  it('as mensagens do Conectar no host saem em inglês, com os valores preenchidos', () => {
+    setLocale('en');
+    expect(t('O comando `gemini` do Gemini CLI não está no PATH. Instale pela página oficial e tente de novo.')).toBe(
+      'The `gemini` command for Gemini CLI is not on the PATH. Install it from the official page and try again.',
+    );
+    expect(t('Gemini CLI recusou a chave de API: API key not valid.')).toBe('Gemini CLI refused the API key: API key not valid.');
+    expect(t('Gemini: a verificação de capacidades não passou. Pendentes: mcp/session-servers.')).toBe(
+      'Gemini: the capability check did not pass. Pending: mcp/session-servers.',
+    );
   });
 });

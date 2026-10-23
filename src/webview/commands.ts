@@ -161,6 +161,12 @@ export const settings = {
   removeAiProfile: (id: string) => req({ type: 'settings.aiProfiles.remove', id }),
   probeAiProfiles: () => request({ type: 'settings.aiProfiles.probe' }, { timeout: 70_000 }),
   testAiProfile: (id: string) => request({ type: 'settings.aiProfiles.test', id }, { timeout: 130_000 }),
+  /**
+   * O Conectar de um perfil (história 7): o `done` sai quando o fluxo para (conectada, à espera da chave ou da
+   * ciência, ou com o erro no passo). Os handshakes e a leitura de modelos podem levar alguns minutos.
+   */
+  connectAiProfile: (id: string, input: { apiKey?: string; acknowledge?: boolean } = {}) =>
+    request({ type: 'settings.aiProfiles.connect', id, ...input }, { timeout: 600_000 }),
   updateBoard: (patch: BoardPatch) => req({ type: 'settings.board.update', patch }),
   resetBoard: () => req({ type: 'settings.board.reset' }),
   upgradeBoard: () => req({ type: 'settings.board.upgrade' }),
