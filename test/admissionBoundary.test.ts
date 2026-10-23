@@ -127,6 +127,37 @@ describe('fronteira da admissão do board', () => {
     expect(() => admitted.acpCommand({ command: 'gemini', args: ['--acp'] })).toThrow('mudou');
     expect(() => admitted.acpCommand({ command: 'gemini', args: ['--acp', '--skip-trust'], env: { X: '1' } })).toThrow('mudou');
     expect(() => admitted.command({ command: 'gemini', args: [], format: 'text' })).toThrow('agente ACP');
+    // o servidor do board é o canal das permissões no ACP: fica na configuração admitida mesmo sem ferramenta nativa liberada (#1091)
+    const withBoard = admission.prepare(
+      acp,
+      acp.id,
+      {
+        ...input(),
+        boardServer: { command: 'node', args: ['bridge.js'] },
+        exec: {
+          agent: '',
+          agentDefinition: null,
+          tools: [],
+          deniedTools: [],
+          toolSet: 'explicit',
+          mcpTools: [],
+          mcpAllowed: ['memoria'],
+          mcpBlocked: [],
+          model: null,
+          mcpConfig: JSON.stringify({ mcpServers: { 'faz-ai': { command: 'node', args: ['bridge.js'] }, memoria: { command: 'mem' } } }),
+        },
+      },
+      dir,
+      request({
+        ...reviewed,
+        activeMcpIds: ['memoria'],
+        allowedMcpIds: ['memoria'],
+        boardMcpIds: ['memoria'],
+        mcpServers: [{ artifactId: 'memoria', name: 'memoria' }],
+      }),
+    );
+    expect(Object.keys(JSON.parse(withBoard.input.exec!.mcpConfig!).mcpServers)).toEqual(['faz-ai', 'memoria']);
+    expect(withBoard.input.exec!.mcpAllowed).toEqual(['memoria']);
     // outro agente do catálogo (outro comando) não herda os recibos deste
     exe('opencode', 'outro agente');
     const other = profile({ kind: 'custom', base: 'generic', config: { acpAgent: 'opencode' } });

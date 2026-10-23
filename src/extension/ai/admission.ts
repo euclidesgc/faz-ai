@@ -203,7 +203,10 @@ export class ExecutionAdmission {
       input.exec?.mcpConfig ?? (input.boardServer ? boardOnlyMcpConfig(input.boardServer) : '{"mcpServers":{}}'),
     ) as { mcpServers?: Record<string, unknown> };
     const names = request.mcpServers.filter((s) => preliminary.activeMcpIds.includes(s.artifactId)).map((s) => s.name);
-    if (preliminary.mcpTools.some((name) => name.startsWith('mcp__faz-ai__'))) names.unshift('faz-ai');
+    // no ACP o servidor do board é o canal por onde o card responde cada pedido de permissão: não é
+    // uma ferramenta nativa (o agente não tem lista de allow), então entra sempre que a execução o traz
+    if (preliminary.mcpTools.some((name) => name.startsWith('mcp__faz-ai__')) || (transport === 'acp' && source.mcpServers?.['faz-ai']))
+      names.unshift('faz-ai');
     const servers: Record<string, unknown> = {};
     for (const name of names) {
       const definition = source.mcpServers?.[name];

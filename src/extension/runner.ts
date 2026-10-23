@@ -33,7 +33,7 @@ import { modelDisplay, modelValue } from '../shared/models';
 import { effortTiers } from './models';
 import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
-import { cardV1 } from './ai/v1Prepare';
+import { cardV1, legacyStrictRequest } from './ai/v1Prepare';
 import { AiGateway, type AiCall, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
@@ -508,7 +508,15 @@ export class AiRunner {
                   phaseId: columnOf(state, card)?.id ?? '',
                   action: MODE_ACTION[mode],
                 })
-              : {}),
+              : // runtime legado: o perfil personalizado (inclusive ACP) ainda precisa da admissão por capacidades
+                target.cli.kind !== 'builtin'
+                ? {
+                    strict: {
+                      profileId: target.cli.id,
+                      request: legacyStrictRequest(state.board.runner, permission, plan.manifest.mcpServers),
+                    },
+                  }
+                : {}),
             ...(options.token !== undefined ? { work: { id: options.workId!, token: options.token } } : {}),
             artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state, card) : undefined,
             conference: { manifest: plan.manifest, boardServer: BOARD_SERVER },

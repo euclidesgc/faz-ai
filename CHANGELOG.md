@@ -21,6 +21,7 @@
 
 ### Corrigido
 
+- **Um perfil personalizado (ou ACP) volta a rodar cards e o chat no runtime padrão (#1091).** O gateway exige a admissão por capacidades de todo perfil que não é pronto, mas o runtime padrão só montava o pedido no runtime v1: o card era recusado com "Perfis configuráveis exigem contrato e admissão por capacidades". Agora o runner e o chat montam o pedido no runtime padrão (regime do board, categorias do nível de permissão e os servidores MCP do plano). No ACP, o servidor do board, por onde o card responde cada pedido de permissão, fica na sessão admitida mesmo sem ferramenta nativa liberada.
 - **Execução pela conversa e heartbeat volta a aparecer com um perfil personalizado como padrão (#1091).** Com um perfil personalizado (ou ACP) escolhido como ferramenta do projeto, Harness › Ferramenta e execução escondia toda a seção com o aviso "Perfil de CLI ainda não disponível para execução": o board conferia o id do perfil em vez do perfil resolvido. Agora a seção aparece, com o regime de admissão, o agente padrão e o heartbeat. Num perfil ACP a permissão é respondida pelo board a cada pedido do agente, então ele não precisa declarar argumentos por nível.
 
 ## 0.47.0
