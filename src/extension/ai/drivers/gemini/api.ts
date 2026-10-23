@@ -129,7 +129,7 @@ export function apiCallDecision(input: HeadlessInput, servers: readonly string[]
   const exec = input.exec;
   if (exec?.toolSet === 'explicit' && exec.mcpTools?.length && !exec.mcpTools.includes(operation))
     return { allow: false, reason: 'a operação não está no contrato da execução' };
-  return boardDecision(input.permission, { toolCallId: operation, title: operation, kind: null }, { server }, [...servers], exec);
+  return boardDecision(input.permission, { toolCallId: operation, title: operation, kind: null }, { server, tool }, [...servers], exec);
 }
 
 /** Os servidores MCP da execução admitida: o do board e os do card, com a definição de cada um. */

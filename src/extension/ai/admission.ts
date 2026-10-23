@@ -435,10 +435,19 @@ export class ExecutionAdmission {
     // No modo API quem executa as ferramentas locais é o board, pela lista admitida: as que o card nega
     // (`deniedTools` do manifesto, no vocabulário do card) saem dela e entram nas negadas, só restringindo.
     // O pedido legado não as leva à decisão (`native.deny` exige a tabela de uma CLI), e sem isto um `Bash`
-    // negado no card voltaria a valer pelo nível. No ACP a execução admitida também fica sem as negadas do
-    // card, mas lá o `boardDecision` as compara com o título do pedido do agente, no vocabulário dele (o
-    // `Bash` do card não casa com o `Shell` do Gemini): levá-las sem traduzir os nomes daria uma garantia
-    // aparente. A diferença fica aqui, explícita, como pendência do ACP (registro da história 11).
+    // negado no card voltaria a valer pelo nível. No ACP vale o mesmo, pelo outro lado: quem impõe é o
+    // `boardDecision`, que traduz cada pedido do agente (o `kind` do protocolo, ou o nome interno do Gemini)
+    // para o vocabulário do card pela tabela da conferência (registro ferramenta-por-modo-acp-negadas).
+    if (transport === 'acp') {
+      const valid = (t: unknown): t is string => typeof t === 'string' && !!t && !t.includes('\0');
+      const cardDenied = (input.exec?.deniedTools ?? []).filter(valid);
+      // A lista do card (não vazia) também restringe. A decisão do ACP não lista nativas (`tools: []`: o
+      // protocolo não tem lista de allow), e a lista vazia leria como "sem restrição"; por isso vai a do card,
+      // inteira: um nome que ela lista e que também está negado (a delegação) continua negado, porque a negação
+      // decide primeiro, e um card que só lista MCP ou delegação não libera nenhuma nativa (fechar na dúvida).
+      effective.exec!.tools = [...new Set((input.exec?.tools ?? []).filter(valid))];
+      effective.exec!.deniedTools = [...new Set([...preliminary.deniedTools, ...cardDenied])];
+    }
     if (transport === 'api') {
       const cardDenied = (input.exec?.deniedTools ?? []).filter((t) => typeof t === 'string' && t && !t.includes('\0'));
       // um nome negado que o board não reconhece não vira "nada negado": a execução não parte (fechar na dúvida)
@@ -501,9 +510,10 @@ export class ExecutionAdmission {
       );
     }
     if (decision.state !== 'admitted') throw new AdmissionBlockedError(decision);
-    // o registro da admissão diz o que o laço do modo API de fato declara: a lista já sem as negadas do card
-    if (transport === 'api') {
-      decision.tools = [...effective.exec!.tools];
+    // o registro da admissão diz o que o board de fato impõe (o laço do modo API declara, o ACP responde
+    // cada pedido): a lista já sem as negadas do card
+    if (transport !== 'cli') {
+      decision.tools = effective.exec!.tools.filter((name) => !effective.exec!.deniedTools.includes(name));
       decision.deniedTools = [...effective.exec!.deniedTools];
     }
     const rebound = () => {

@@ -11,7 +11,21 @@
 // Claude segue pela CLI `claude`, a única que pode usar a assinatura da pessoa.
 import { asNumber, asObject } from '../../aiOutput/json';
 import { classifyGeminiFailure } from '../drivers/gemini/limit';
+import { GEMINI_TOOL_EQUIVALENTS } from '../../../shared/agentTools';
 import type { AcpAgent } from './provider';
+
+/**
+ * O nome da ferramenta no `toolCallId` do Gemini CLI: o `Turn` (core) monta o id da chamada como
+ * `<nome>__<id>` (`handlePendingFunctionCall`, conferido no pacote 0.65.0 instalado em 2026-10-23,
+ * bundle/chunk-DKZARV6U.js), e o modo ACP manda esse id no `session/request_permission`
+ * (`runTool`, bundle/gemini-GLQ4MVLB.js). Só vale o nome que a tabela de equivalentes conhece; o resto
+ * (outro formato de id, ferramenta MCP, subagente com nome próprio) fica para o `kind`.
+ */
+export function geminiToolOf(toolCallId: string): string | null {
+  const at = toolCallId.indexOf('__');
+  const name = at > 0 ? toolCallId.slice(0, at) : '';
+  return name && Object.hasOwn(GEMINI_TOOL_EQUIVALENTS, name) ? name : null;
+}
 
 /** `--model <nome>`: o esforço não tem flag nesses agentes. */
 const modelFlag = (model: { name: string }) => ['--model', model.name];
@@ -34,6 +48,7 @@ export const ACP_AGENTS: readonly AcpAgent[] = [
     fullMode: 'yolo',
     // o nome de exibição que o Gemini CLI dá às ferramentas MCP: `ferramenta (servidor MCP Server)`
     mcpTitle: /^(?<tool>.+?) \((?<server>.+?) MCP Server\)/,
+    nativeToolOf: geminiToolOf,
     // "inputTokens: prompt tokens, including cached tokens" (PR #29549)
     inputIncludesCache: true,
     // versões anteriores ao PR: `_meta.quota.token_count` com `input_tokens` e `output_tokens`, sem cache

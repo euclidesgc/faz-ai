@@ -295,6 +295,24 @@ describe('vínculo de isolamento saneado', () => {
     expect(admitted.decision.binding).toBe(board);
     expect(admitted.input.exec?.deniedTools).toContain('Agent');
     expect(acpSessionMode(gemini, admitted.input)).toBeUndefined();
+    // as listas do card chegam ao `boardDecision` no vocabulário do card: as negadas somam às da delegação, e
+    // a lista `tools` vai inteira (a decisão do ACP não lista nativas); o registro só mostra o que fica liberado
+    const card = admission.prepare(
+      acp,
+      acp.id,
+      {
+        prompt: 'objetivo',
+        permission: 'full',
+        exec: { tools: ['Read', 'Grep', 'Agent'], deniedTools: ['Bash', 'mcp__srv__x'] } as HeadlessInput['exec'],
+      },
+      dir,
+      reviewed,
+    );
+    expect(card.input.exec?.deniedTools).toEqual(expect.arrayContaining(['Agent', 'Task', 'Bash', 'mcp__srv__x']));
+    expect(card.input.exec?.tools).toEqual(['Read', 'Grep', 'Agent']);
+    expect(card.decision.tools).toEqual(['Read', 'Grep']);
+    expect(card.decision.deniedTools).toEqual(expect.arrayContaining(['Bash', 'mcp__srv__x']));
+    expect(acpSessionMode(gemini, card.input)).toBeUndefined();
   });
   it('variável volátil e as da sessão do Claude Code não mudam o vínculo; as que a ferramenta lê, mudam', () => {
     const claude = profile({ config: { command: exe('claude-g', 'binário G') } });

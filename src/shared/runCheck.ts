@@ -53,22 +53,52 @@ export type RunCheckVocabulary = 'gemini';
  * Os equivalentes no vocabulário do card: os kinds do ACP valem para todo inventário (como antes); os nomes do
  * Gemini, só no do Gemini pela CLI. Um nome sem equivalente é conferido como nome do card.
  */
-function equivalentsOf(name: string, vocabulary: RunCheckVocabulary | undefined): string[] | null {
+export function equivalentsOf(name: string, vocabulary: RunCheckVocabulary | undefined): string[] | null {
   if (vocabulary === 'gemini' && Object.hasOwn(GEMINI_TOOL_EQUIVALENTS, name)) return GEMINI_TOOL_EQUIVALENTS[name]!;
   return Object.hasOwn(ACP_KIND_EQUIVALENTS, name) ? ACP_KIND_EQUIVALENTS[name]! : null;
 }
 
+/** As listas do card que restringem as ferramentas nativas, no vocabulário do card. */
+export interface ToolRestriction {
+  tools: readonly string[];
+  deniedTools: readonly string[];
+}
+
+/** Por que um uso fere o card: um equivalente negado (o nome dele) ou nenhum equivalente na lista `tools`. */
+export type ToolBreach = { denied: string } | { unlisted: true };
+
+/**
+ * A regra única de uma ferramenta nativa contra o card, pelos equivalentes dela no vocabulário do card: fere
+ * quando algum equivalente está em `deniedTools`, ou quando nenhum está em `tools` (lista não vazia). Sem
+ * equivalente (`[]`: `think`, `switch_mode`, `other`) nunca fere. A conferência depois da execução
+ * (`toolDeviates`) e a decisão em tempo real do ACP (`boardDecision`) perguntam por aqui.
+ */
+export function equivalentsBreach(equivalents: readonly string[], restriction: ToolRestriction): ToolBreach | null {
+  if (equivalents.length === 0) return null;
+  const denied = equivalents.find((e) => restriction.deniedTools.includes(e));
+  if (denied) return { denied };
+  if (restriction.tools.length > 0 && !equivalents.some((e) => restriction.tools.includes(e))) return { unlisted: true };
+  return null;
+}
+
 /**
  * Desvio de uma ferramenta nativa. Nome do card: negada, ou fora de `tools` (lista não vazia). Kind ACP ou nome
- * do Gemini: desvio quando algum equivalente está em `deniedTools`, ou quando nenhum está em `tools` (lista
- * não vazia).
+ * do Gemini: a regra dos equivalentes (`equivalentsBreach`).
  */
 function toolDeviates(name: string, manifest: RunCheckManifest, vocabulary?: RunCheckVocabulary): boolean {
   const equivalents = equivalentsOf(name, vocabulary);
   if (!equivalents) return manifest.deniedTools.includes(name) || (manifest.tools.length > 0 && !manifest.tools.includes(name));
-  if (equivalents.length === 0) return false;
-  if (equivalents.some((e) => manifest.deniedTools.includes(e))) return true;
-  return manifest.tools.length > 0 && !equivalents.some((e) => manifest.tools.includes(e));
+  return equivalentsBreach(equivalents, manifest) !== null;
+}
+
+/**
+ * Se uma entrada de `deniedTools` do card nega a ferramenta MCP `tool` do servidor `server`: o nome exato
+ * (`mcp__servidor__ferramenta`, com o servidor escrito como o Claude Code escreve: o que não for letra, número,
+ * `_` ou `-` vira `_`), o servidor inteiro (`mcp__servidor__*`) ou só o prefixo do servidor (`mcp__servidor`).
+ */
+export function deniesMcpTool(entry: string, server: string, tool: string): boolean {
+  const prefix = `mcp__${server.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+  return entry === `${prefix}__${tool}` || entry === `${prefix}__*` || entry === prefix;
 }
 
 const isFlowSkill = (name: string): boolean => name.startsWith(FLOW_SKILL_PREFIX);

@@ -124,6 +124,53 @@ describe('cenário: a prova do verificador (feita em board) vale para o card em 
     expect(end.outcome).toBe('done');
   });
 
+  it('I: Bash negado no card é imposto no ACP: o pedido de execute é recusado, mesmo em full e sem yolo', async () => {
+    const asked: unknown[] = [];
+    const agent = new FakeAgent({
+      onPrompt: async (a) => {
+        asked.push(await a.ask({ toolCallId: 'x1', title: 'npm test', kind: 'execute' }));
+        // o que o card não nega segue a regra de antes: a leitura passa
+        asked.push(await a.ask({ toolCallId: 'x2', title: 'Ler src/app.ts', kind: 'read' }));
+        // o id do Gemini CLI traz o nome interno (`<nome>__<id>`): o shell pelo nome, mesmo com o kind other
+        asked.push(await a.ask({ toolCallId: 'run_shell_command__p1-3', title: 'ls', kind: 'other' }));
+        a.update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Fase concluída.\n' } });
+        return { stopReason: 'end_turn' };
+      },
+    });
+    world = await cardWorld({ profile: 'gemini', tools: CONDUTOR_TOOLS, deniedTools: ['Bash'], permission: 'full', spawnAcp: agent.spawn });
+
+    const end = await world.run();
+
+    expect(world.lines.join('\n')).not.toMatch(/bloqueada pela admissão|capability-not-verified/);
+    expect(agent.methods()).not.toContain('session/set_mode');
+    expect(asked).toEqual([
+      { outcome: { outcome: 'selected', optionId: 'opt-reject_once' } },
+      { outcome: { outcome: 'selected', optionId: 'opt-allow_once' } },
+      { outcome: { outcome: 'selected', optionId: 'opt-reject_once' } },
+    ]);
+    expect(world.lines.some((l) => /pediu permissão para npm test: negado \(a ferramenta Bash está negada no card\)/.test(l))).toBe(true);
+    expect(world.lines.some((l) => /pediu permissão para ls: negado \(a ferramenta Bash está negada no card\)/.test(l))).toBe(true);
+    expect(end.outcome).toBe('done');
+  });
+
+  it('J: card com tools sem Bash: o pedido de execute é recusado no ACP (nenhum equivalente liberado)', async () => {
+    const asked: unknown[] = [];
+    const agent = new FakeAgent({
+      onPrompt: async (a) => {
+        asked.push(await a.ask({ toolCallId: 'y1', title: 'npm test', kind: 'execute' }));
+        a.update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Fase concluída.\n' } });
+        return { stopReason: 'end_turn' };
+      },
+    });
+    world = await cardWorld({ profile: 'gemini', tools: CONDUTOR_TOOLS.filter((t) => t !== 'Bash'), spawnAcp: agent.spawn });
+
+    const end = await world.run();
+
+    expect(asked).toEqual([{ outcome: { outcome: 'selected', optionId: 'opt-reject_once' } }]);
+    expect(world.lines.some((l) => /pediu permissão para npm test: negado/.test(l))).toBe(true);
+    expect(end.outcome).toBe('done');
+  });
+
   it('G: uma variável volátil que mudou depois da prova (outro terminal, outra sessão) não bloqueia o card', async () => {
     const agent = new FakeAgent({ onPrompt: workingTurn(() => world!) });
     world = await cardWorld({ profile: 'gemini', tools: CONDUTOR_TOOLS, spawnAcp: agent.spawn });

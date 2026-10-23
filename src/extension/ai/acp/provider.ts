@@ -45,6 +45,11 @@ export interface AcpToolCall {
   title: string | null;
   /** `read`, `edit`, `delete`, `move`, `search`, `execute`, `think`, `fetch`, `switch_mode`, `other` */
   kind: string | null;
+  /**
+   * O nome interno da ferramenta, quando o agente o deixa reconhecível (`AcpAgent.nativeToolOf`). O protocolo
+   * não tem campo para isso; ausente, o board decide pelo `kind`.
+   */
+  native?: string | null;
 }
 
 /**
@@ -85,6 +90,12 @@ export interface AcpAgent {
    * tem campo estruturado para isso; sem padrão, vale o nome do servidor aparecer no título.
    */
   readonly mcpTitle?: RegExp;
+  /**
+   * O nome interno da ferramenta a partir do `toolCallId` do pedido de permissão, no vocabulário do agente (o
+   * Gemini CLI: `run_shell_command`, `read_file`), só quando ele está na tabela de equivalentes do agente; null
+   * = não dá para saber, e o board decide pelo `kind`. Ausente nos agentes cujo id não carrega o nome.
+   */
+  nativeToolOf?(toolCallId: string): string | null;
   /** o agente ignora o `mcpServers` do `session/new` e só lê este arquivo do projeto */
   readonly projectMcpFile?: string;
   /** o `inputTokens` do `usage` já inclui o cache lido (o rascunho do protocolo não define) */
