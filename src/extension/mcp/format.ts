@@ -252,6 +252,8 @@ export function modelsOverview(s: BoardState) {
       id: p.id,
       name: p.name,
       kind: p.kind,
+      tool: p.tool,
+      mode: p.mode,
       base: p.base,
       enabled: p.enabled,
       default: s.board.aiTool === p.id,

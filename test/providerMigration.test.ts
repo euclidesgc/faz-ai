@@ -2,7 +2,6 @@ import { expect, it } from 'vitest';
 import path from 'node:path';
 import { openInMemory, newDatabase } from '../src/extension/db/database';
 import { migrate } from '../src/extension/db/schema';
-import { seedBoard } from '../src/extension/db/seed';
 import { all, run } from '../src/extension/db/query';
 
 it('origem test preserva execuções/inventário/Bash e mantém cascatas após a migração 42 → 43', async () => {
@@ -10,7 +9,9 @@ it('origem test preserva execuções/inventário/Bash e mantém cascatas após a
   const db = newDatabase();
   try {
     migrate(db, 42);
-    const board = seedBoard(db, 'migration-profile', 'Perfis');
+    // o board direto no banco: a semente de hoje grava colunas que o schema 42 não tem
+    const board = 'migration-profile';
+    run(db, "INSERT INTO boards(id,workspace_key,name) VALUES (?,?,'Perfis')", [board, board]);
     run(
       db,
       "INSERT INTO ai_runs(id,board_id,started_at,month,origin,tool,permission,admission_json) VALUES ('run',?,1,'2026-10','manual','claude','board','{}')",
@@ -20,8 +21,8 @@ it('origem test preserva execuções/inventário/Bash e mantém cascatas após a
     run(db, "INSERT INTO ai_run_bash(run_id,command,calls) VALUES ('run','echo oi',1)");
     const before = all(db, 'SELECT * FROM ai_runs');
     migrate(db);
-    // as colunas da conferência (migração posterior) nascem nulas; o resto da linha não muda
-    expect(all(db, 'SELECT * FROM ai_runs')).toEqual(before.map((r) => ({ ...r, check_status: null, check_detail: null })));
+    // as colunas da conferência e do modo (migrações posteriores) nascem nulas; o resto da linha não muda
+    expect(all(db, 'SELECT * FROM ai_runs')).toEqual(before.map((r) => ({ ...r, check_status: null, check_detail: null, mode: null })));
     expect(all(db, 'SELECT * FROM ai_run_usage')).toHaveLength(1);
     expect(all(db, 'SELECT * FROM ai_run_bash')).toHaveLength(1);
     run(
@@ -44,7 +45,7 @@ it('falha de integridade desfaz reconstrução e restaura chaves estrangeiras se
   const db = newDatabase();
   try {
     migrate(db, 42);
-    seedBoard(db, 'rollback', 'Rollback');
+    run(db, "INSERT INTO boards(id,workspace_key,name) VALUES ('rollback','rollback','Rollback')");
     db.run('PRAGMA foreign_keys=OFF');
     run(db, "INSERT INTO ai_run_usage(run_id,kind,name,calls) VALUES ('orphan','tool','Read',1)");
     db.run('PRAGMA foreign_keys=ON');

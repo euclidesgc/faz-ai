@@ -22,6 +22,15 @@ de antes) recusa abrir um board gravado por uma versão mais nova, sem tocar nel
 atualizar a extensão. Se o banco recusar alguma gravação ao abrir, o erro completo, com o comando
 que falhou, fica em **Saída → Faz AI**.
 
+**Perfis de IA: ferramenta e modo (formato 48).** Cada perfil guarda a ferramenta e o modo em que o
+board fala com ela (CLI ou ACP), e cada execução do log guarda o modo em que rodou. Os perfis gravados
+antes são convertidos na primeira leitura do board, pelo tipo antigo: a CLI pronta fica em CLI, o
+agente ACP pronto em ACP, a cópia de uma CLI pronta continua a ferramenta da base em CLI (os ajustes
+seguem no cofre local, como estavam) e o personalizado é a própria ferramenta, em ACP quando aponta um
+agente ACP e em CLI quando não. A ferramenta usada nos campos de modelo, nas políticas e no Consumo não
+muda para nenhum perfil. O personalizado importado de outra máquina, sem a configuração no cofre local,
+fica em CLI até ser salvo de novo. As execuções anteriores ficam sem modo registrado.
+
 ## Backup do board
 
 Para levar o board a outra máquina ou guardar uma cópia:

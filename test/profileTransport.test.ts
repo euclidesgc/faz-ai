@@ -13,6 +13,8 @@ it('provider genérico atravessa o transporte real com Node, preservando argumen
       id: 'node-local',
       name: 'Node local',
       kind: 'custom',
+      tool: 'node-local',
+      mode: 'cli',
       base: 'generic',
       enabled: true,
       position: 3,

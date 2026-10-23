@@ -129,13 +129,13 @@ describe('cliOfValue e targetOfValue', () => {
   });
 
   it('a cópia padrão executa o prefixo do original; o original, quando a cópia não é o padrão', () => {
-    const copy: AiProfile = { ...profile('claude'), id: 'claude-2', name: 'Claude 2', kind: 'copy' };
+    const copy: AiProfile = { ...profile('claude'), id: 'claude-2', name: 'Claude 2', kind: 'catalog' };
     expect(cliOfValue({ aiTool: 'claude-2', aiProfiles: [profile('claude'), copy] }, 'claude:haiku')?.id).toBe('claude-2');
     expect(cliOfValue({ aiTool: 'claude', aiProfiles: [copy, profile('claude')] }, 'claude:haiku')?.id).toBe('claude');
   });
 
   it('perfil personalizado aceita modelo livre', () => {
-    const custom: AiProfile = { ...profile('claude'), id: 'meu', name: 'Meu', kind: 'custom', base: 'generic' };
+    const custom: AiProfile = { ...profile('claude'), id: 'meu', name: 'Meu', kind: 'custom', tool: 'meu', mode: 'cli', base: 'generic' };
     const b = { aiTool: 'claude', aiProfiles: [profile('claude'), custom], modelCatalog: catalog };
     expect(targetOfValue(b, 'meu:qualquer@alto', 'card')).toMatchObject({
       cli: { id: 'meu' },
@@ -179,6 +179,8 @@ describe('profilesInUse e modelGroups', () => {
       name: 'Gemini ACP',
       enabled: true,
       kind: 'custom',
+      tool: 'gemini-acp',
+      mode: 'cli',
       base: 'generic',
       config: {},
       position: 9,

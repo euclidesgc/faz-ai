@@ -36,6 +36,8 @@ it('comando ausente de perfil personalizado mostra só o link público de instal
     id: 'personalizado',
     name: 'Minha CLI',
     kind: 'custom',
+    tool: 'personalizado',
+    mode: 'cli',
     base: 'generic',
     enabled: true,
     position: 3,
@@ -48,7 +50,9 @@ it('comando ausente de perfil personalizado mostra só o link público de instal
     missingProfileCommand(missing(), { ...profile, config: { ...profile.config, installUrl: 'https://example.com/?token=private' } })
       .message,
   ).not.toContain('https://');
-  expect(missingProfileCommand(missing(), { ...profile, kind: 'builtin' }).message).not.toContain('https://example.com/install');
+  expect(missingProfileCommand(missing(), { ...profile, kind: 'catalog', tool: profile.id, mode: 'cli' }).message).not.toContain(
+    'https://example.com/install',
+  );
   expect(missingProfileCommand(new SpawnNotStartedError('Outra falha'), profile).message).toBe('Outra falha');
 });
 
@@ -123,6 +127,8 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
 
     expect(ended).toBe(true);
     expect(rows()[0]).toMatchObject({ outcome: 'done', exitCode: 0, measure: 'full', inputTokens: 54, outputTokens: 1221 });
+    // o modo da execução vai para o log (migração 48): a CLI pronta roda em cli
+    expect(rows()[0]!.mode).toBe('cli');
     // o custo é o `total_cost_usd` que a CLI escreveu, não um cálculo do board
     expect(rows()[0]!.costUsd).toBeCloseTo(0.06478465, 8);
     expect(rows()[0]!.costEstimated).toBe(false);
@@ -568,7 +574,9 @@ describe('o contrato v1 não contorna a admissão no gateway', () => {
     const profile: import('../src/shared/aiProfiles').AiProfile = {
       id: 'claude-work',
       name: 'Claude Work',
-      kind: 'copy',
+      kind: 'catalog',
+      tool: 'claude',
+      mode: 'cli',
       base: 'claude',
       enabled: true,
       position: 3,
@@ -682,6 +690,8 @@ it('perfil configurável sem contrato não inicia CLI nem assume o provider base
     id: 'personalizado',
     name: 'Personalizado',
     kind: 'custom',
+    tool: 'personalizado',
+    mode: 'cli',
     base: 'generic',
     enabled: true,
     position: 3,

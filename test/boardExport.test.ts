@@ -19,6 +19,7 @@ import { migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
 import type { BoardState } from '../src/shared/model';
 import { all, run, str } from '../src/extension/db/query';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
 import { LARGE_EXPORT_BYTES } from '../src/shared/backup';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -388,6 +389,34 @@ describe('importBoard', () => {
         .snapshot()
         .cards.map((c) => c.title),
     ).toEqual(['Card antigo']);
+  });
+
+  it('arquivo de schema 47: importa pelo caminho de migração e os perfis saem com ferramenta e modo', () => {
+    const r = router;
+    // uma cópia do Claude Code e um agente ACP pronto ligado, como uma versão anterior deixava
+    r.handle({ type: 'settings.aiProfiles.duplicate', id: 'claude' });
+    new AiProfileRepo(db).setEnabled(r.boardId, 'gemini', true, 'person');
+    const copyId = r.snapshot().board.aiProfiles.find((p) => p.name === 'Claude Code (cópia)')!.id;
+    const { file } = doExport();
+    // o arquivo como o schema 47 gravava: sem as colunas novas e com os tipos antigos
+    const legacy = structuredClone(file);
+    legacy.schemaVersion = 47;
+    for (const row of legacy.tables.ai_profiles!) {
+      row.kind = row.id === 'gemini' ? 'acp' : row.id === copyId ? 'copy' : row.kind === 'catalog' ? 'builtin' : (row.kind ?? null);
+      delete row.tool;
+      delete row.mode;
+    }
+    for (const row of legacy.tables.ai_runs!) delete row.mode;
+    importBoard(target(r), parseExportFile(JSON.stringify(legacy)));
+    const profiles = openRouter(db, 'ws-a', 'A').snapshot().board.aiProfiles;
+    expect(profiles.find((p) => p.id === 'claude')).toMatchObject({ kind: 'catalog', tool: 'claude', mode: 'cli' });
+    expect(profiles.find((p) => p.id === 'gemini')).toMatchObject({ kind: 'catalog', tool: 'gemini', mode: 'acp', enabled: false });
+    expect(profiles.find((p) => p.id === copyId)).toMatchObject({ kind: 'catalog', tool: 'claude', mode: 'cli', base: 'claude' });
+    expect(all(db, "SELECT id FROM ai_profiles WHERE board_id = ? AND tool = ''", [r.boardId])).toEqual([]);
+    // um arquivo do schema 48 sem as colunas novas não é um export desta versão
+    const broken = structuredClone(file);
+    delete broken.tables.ai_profiles![0]!.tool;
+    expect(() => parseExportFile(JSON.stringify(broken))).toThrow('falta a coluna "tool" em "ai_profiles"');
   });
 
   it('export antigo sem branch_kind: a importação migra e o Bug sai em hotfix, o Retrabalho em bugfix', () => {

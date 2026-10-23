@@ -1,5 +1,5 @@
 import { RadioGroup } from '@radix-ui/themes';
-import { toolInfo } from '../../../../shared/aiProfiles';
+import { toolInfo, isReadyCli } from '../../../../shared/aiProfiles';
 import type { AiTool } from '../../../../shared/harness';
 import type { AiToolInfo } from '../../../../shared/harnessProject';
 import { settings } from '../../../commands';
@@ -59,7 +59,7 @@ export function ProjectTool({ tool }: { tool: AiToolInfo }) {
           </tbody>
         </table>
       </RadioGroup.Root>
-      {selected?.kind === 'builtin' && <BoardInstall tool={tool.id} />}
+      {selected && isReadyCli(selected) && <BoardInstall tool={tool.id} />}
     </>
   );
 }

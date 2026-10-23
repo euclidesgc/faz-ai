@@ -1,7 +1,7 @@
 // Ponto único em que o host chama o avaliador de políticas: runner (cards, refinar, resumo, conflito) e chat
 // (conversa, assistentes e sugestões) passam por aqui, sem cada um montar a própria avaliação nem decidir troca de alvo.
 import { createHash } from 'node:crypto';
-import { catalogTool } from '../shared/aiProfiles';
+import { catalogTool, isReadyCli } from '../shared/aiProfiles';
 import type { ContextAction } from '../shared/contextPlanning';
 import { effortToRun } from '../shared/execution';
 import {
@@ -163,7 +163,7 @@ export function evaluateRunPolicy(input: GateInput): { decision: PolicyDecision;
           credential:
             profile?.credentials?.review === 'pending'
               ? ('pending' as const)
-              : profile && profile.kind !== 'builtin' && !(profile.credentials?.review === 'reviewed' && profile.credentials.available)
+              : profile && !isReadyCli(profile) && !(profile.credentials?.review === 'reviewed' && profile.credentials.available)
                 ? ('missing' as const)
                 : ('reviewed' as const),
           admission: 'admitted' as const,

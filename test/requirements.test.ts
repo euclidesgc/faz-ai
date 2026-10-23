@@ -107,6 +107,8 @@ describe('requisitos do board', () => {
     const custom = health('claude', {
       id: 'local',
       kind: 'custom',
+      tool: 'local',
+      mode: 'cli',
       base: 'generic',
       problem: 'signin',
       name: 'CLI local',
@@ -313,6 +315,8 @@ describe('link de instalação de um perfil', () => {
     id: 'local',
     name: 'CLI local',
     kind: 'custom' as const,
+    tool: 'local',
+    mode: 'cli' as const,
     base: 'generic' as const,
     enabled: true,
     position: 3,

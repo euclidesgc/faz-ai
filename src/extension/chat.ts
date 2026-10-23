@@ -1,4 +1,4 @@
-import { toolInfo, activeProfile, catalogTool, contextEnforced, profileLabel } from '../shared/aiProfiles';
+import { toolInfo, activeProfile, catalogTool, contextEnforced, profileLabel, isReadyCli } from '../shared/aiProfiles';
 import { cliProblem } from '../shared/requirements';
 import type { ContextAction } from '../shared/contextPlanning';
 import { defaultTarget, targetOfValue, type RunTarget } from '../shared/runTarget';
@@ -339,7 +339,7 @@ export class ChatSession {
           ...(this.deps.gateway.runtime === 'v1'
             ? closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly)
             : // runtime legado: o perfil personalizado precisa da admissão; só o pedido, sem a configuração v1
-              target.cli.kind !== 'builtin'
+              !isReadyCli(target.cli)
               ? { strict: closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly).strict }
               : {}),
           artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state) : undefined,

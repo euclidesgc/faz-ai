@@ -1,6 +1,6 @@
 import { authFailed } from './ai/profileAuth';
 import type { AiProfile } from '../shared/aiProfiles';
-import { toolInfo, catalogTool, profileLabel } from '../shared/aiProfiles';
+import { toolInfo, catalogTool, profileLabel, isReadyCli } from '../shared/aiProfiles';
 import { resolveRunTarget, targetOfValue, type RunTarget, type RunTargetSource } from '../shared/runTarget';
 import { cliProblem } from '../shared/requirements';
 import type { ExecutionConstraints, PolicyAttempt, PolicyDecision } from '../shared/executionPolicies';
@@ -509,7 +509,7 @@ export class AiRunner {
                   action: MODE_ACTION[mode],
                 })
               : // runtime legado: o perfil personalizado (inclusive ACP) ainda precisa da admissão por capacidades
-                target.cli.kind !== 'builtin'
+                !isReadyCli(target.cli)
                 ? {
                     strict: {
                       profileId: target.cli.id,

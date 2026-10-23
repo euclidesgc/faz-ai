@@ -9,6 +9,13 @@ import {
   leakLabel,
   profileIsolation,
   catalogTool,
+  isCatalogCopy,
+  isReadyAcp,
+  isReadyCli,
+  isReadyProfile,
+  modeLabel,
+  normalizeProfileKind,
+  toolLabel,
   expandArgLines,
   newProfileId,
   resolveModelOption,
@@ -22,6 +29,8 @@ const custom: AiProfile = {
   id: 'local',
   name: 'Local',
   kind: 'custom',
+  tool: 'local',
+  mode: 'cli',
   base: 'generic',
   enabled: true,
   position: 3,
@@ -64,7 +73,7 @@ it('gera identificadores limitados, sem reservados, colisões ou delimitadores d
 it('valida configuração sem presumir permissões e devolve metadados neutros', () => {
   expect(validateProfile(custom)).toEqual([]);
   // o agente ACP pronto é generic com o agente do catálogo; sem o agente, ou com base de CLI, é inválido
-  const acp = { ...custom, kind: 'acp' as const, config: { acpAgent: 'gemini' } };
+  const acp = { ...custom, id: 'gemini', kind: 'catalog' as const, tool: 'gemini', mode: 'acp' as const, config: { acpAgent: 'gemini' } };
   expect(validateProfile(acp)).toEqual([]);
   expect(validateProfile({ ...acp, config: {} })).toEqual(['Agente ACP inválido.']);
   expect(validateProfile({ ...acp, base: 'claude' })).toContain('Tipo ou base do perfil inválido.');
@@ -77,7 +86,7 @@ it('valida configuração sem presumir permissões e devolve metadados neutros',
   expect(toolInfo(custom)).toMatchObject({ id: 'local', label: 'Local', skills: '', rules: '' });
 });
 it('resolve catálogo do base da cópia, modelo livre só no personalizado e fallback legado', () => {
-  const copy: AiProfile = { ...custom, id: 'copy', kind: 'copy', base: 'claude' };
+  const copy: AiProfile = { ...custom, id: 'copy', kind: 'catalog', tool: 'claude', mode: 'cli', base: 'claude' };
   const board = { aiTool: 'copy', aiProfiles: [...BUILTIN_PROFILES, copy, custom], modelCatalog: catalog };
   expect(catalogTool(copy)).toBe('claude');
   expect(resolveModelOption(board, 'claude:opus@high')).toMatchObject({ name: 'opus', effort: 'high' });
@@ -97,7 +106,7 @@ it('identidade do perfil é aberta e metadados de cópia preservam nome e identi
   expect(parseAiTool('["claude-trabalho"]', ['claude-trabalho'])).toBe('claude-trabalho');
   expect(parseAiTool('["ausente"]', ['claude-trabalho'])).toBe('claude');
   expect(baseInfo('personalizado')).toMatchObject({ id: 'personalizado', rules: '', skills: '' });
-  expect(toolInfo({ ...custom, id: 'minha-copia', name: 'Minha cópia', kind: 'copy', base: 'claude' })).toMatchObject({
+  expect(toolInfo({ ...custom, id: 'minha-copia', name: 'Minha cópia', kind: 'catalog', tool: 'claude', base: 'claude' })).toMatchObject({
     id: 'minha-copia',
     label: 'Minha cópia',
     skills: '.claude/skills',
@@ -118,7 +127,17 @@ it('isolamento dos prontos vem do código, com data e versão conferidas', () =>
   for (const base of ['claude', 'cursor', 'kimi'] as const) expect(BUILTIN_ISOLATION[base].checked?.sources.length).toBeGreaterThan(0);
 });
 it('cópia herda a lista do base e usa a própria quando gravada; personalizado novo é vazio', () => {
-  const copy: AiProfile = { id: 'c', name: 'C', kind: 'copy', base: 'cursor', enabled: true, position: 4, config: {} };
+  const copy: AiProfile = {
+    id: 'c',
+    name: 'C',
+    kind: 'catalog',
+    tool: 'cursor',
+    mode: 'cli',
+    base: 'cursor',
+    enabled: true,
+    position: 4,
+    config: {},
+  };
   expect(profileIsolation(copy).loads).toEqual(BUILTIN_ISOLATION.cursor.loads);
   const own = { ...copy, config: { isolation: { loads: [{ kind: 'mcp', scope: 'user' }] } } } as AiProfile;
   expect(profileIsolation(own).loads).toEqual([{ kind: 'mcp', scope: 'user' }]);
@@ -175,4 +194,37 @@ it('rótulos e resumo do que a CLI pode carregar', () => {
     }),
   ).toBe('A CLI pode carregar por conta própria: regras do projeto, servidores MCP do usuário.');
   expect(isolationSummary({ args: [], loads: [] })).toContain('sem prova de isolamento');
+});
+
+it('perfil = ferramenta × modo: os tipos antigos são lidos, e os prontos, cópias e personalizados se distinguem pela ferramenta', () => {
+  expect(['builtin', 'acp', 'copy', 'catalog'].map(normalizeProfileKind)).toEqual(['catalog', 'catalog', 'catalog', 'catalog']);
+  expect(normalizeProfileKind('custom')).toBe('custom');
+  expect(normalizeProfileKind('outro')).toBeNull();
+  const ready = (id: string) => BUILTIN_PROFILES.find((p) => p.id === id)!;
+  expect(ready('claude')).toMatchObject({ kind: 'catalog', tool: 'claude', mode: 'cli' });
+  expect(ready('gemini')).toMatchObject({ kind: 'catalog', tool: 'gemini', mode: 'acp' });
+  const copy: AiProfile = { ...ready('claude'), id: 'claude-2', name: 'Claude 2' };
+  const acpCustom: AiProfile = { ...custom, mode: 'acp', config: { acpAgent: 'gemini' } };
+  const table = [ready('claude'), ready('gemini'), copy, custom, acpCustom].map((p) => [
+    p.id,
+    isReadyProfile(p),
+    isReadyCli(p),
+    isReadyAcp(p),
+    isCatalogCopy(p),
+    catalogTool(p),
+  ]);
+  expect(table).toEqual([
+    ['claude', true, true, false, false, 'claude'],
+    ['gemini', true, false, true, false, 'gemini'],
+    ['claude-2', false, false, false, true, 'claude'],
+    ['local', false, false, false, false, 'local'],
+    ['local', false, false, false, false, 'local'],
+  ]);
+  // o rótulo da tela é "ferramenta · modo"
+  expect(`${toolLabel('gemini')} · ${modeLabel('acp')}`).toBe('Gemini · ACP');
+  expect(`${toolLabel('claude')} · ${modeLabel('cli')}`).toBe('Claude Code · CLI');
+  expect(toolLabel('github-copilot-cli')).toBe('GitHub Copilot');
+  expect(toolLabel('desconhecida')).toBe('desconhecida');
+  // a cópia de uma CLI pronta não aponta agente ACP
+  expect(validateProfile({ ...copy, config: { acpAgent: 'gemini' } })).toContain('Tipo ou base do perfil inválido.');
 });

@@ -43,7 +43,9 @@ const exe = (name: string, body: string) => {
 const profile = (over: Partial<AiProfile>): AiProfile => ({
   id: 'perfil',
   name: 'Perfil',
-  kind: 'copy',
+  kind: 'catalog',
+  tool: 'claude',
+  mode: 'cli',
   base: 'claude',
   enabled: true,
   position: 3,
@@ -87,7 +89,7 @@ afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 describe('fronteira da admissão do board', () => {
   it('perfil personalizado, mesmo sem argumentos de permissão, não roda em modo restrito', () => {
-    const custom = profile({ kind: 'custom', base: 'generic', config: { command: exe('custom-cli', 'x') } });
+    const custom = profile({ kind: 'custom', tool: 'perfil', mode: 'cli', base: 'generic', config: { command: exe('custom-cli', 'x') } });
     const error = blocked(custom);
     expect(error.decision.reasons).toContainEqual({ code: 'tool-mapping-unavailable' });
     expect(error.decision.state).toBe('blocked');
@@ -95,6 +97,8 @@ describe('fronteira da admissão do board', () => {
   it('perfil personalizado com permissionArgs declarado também continua recusado', () => {
     const custom = profile({
       kind: 'custom',
+      tool: 'perfil',
+      mode: 'cli',
       base: 'generic',
       config: { command: exe('custom-cli', 'x'), permissionArgs: { board: ['--read-only'] } },
     });
@@ -102,7 +106,7 @@ describe('fronteira da admissão do board', () => {
   });
   it('perfil ACP: o vínculo é o comando do agente do catálogo e o perfil vale só no regime compatível', () => {
     exe('gemini', 'agente de teste');
-    const acp = profile({ kind: 'custom', base: 'generic', config: { acpAgent: 'gemini' } });
+    const acp = profile({ kind: 'custom', tool: 'perfil', mode: 'acp', base: 'generic', config: { acpAgent: 'gemini' } });
     const exclusive = blocked(acp);
     expect(exclusive.decision.reasons.map((r) => r.code)).not.toContain('tool-mapping-unavailable');
     for (const capability of EXECUTOR_CAPABILITIES)
@@ -165,10 +169,10 @@ describe('fronteira da admissão do board', () => {
     expect(withBoard.input.exec!.mcpAllowed).toEqual(['memoria']);
     // outro agente do catálogo (outro comando) não herda os recibos deste
     exe('opencode', 'outro agente');
-    const other = profile({ kind: 'custom', base: 'generic', config: { acpAgent: 'opencode' } });
+    const other = profile({ kind: 'custom', tool: 'perfil', mode: 'acp', base: 'generic', config: { acpAgent: 'opencode' } });
     expect(blocked(other, reviewed).decision.reasons).toContainEqual({ code: 'capability-not-verified', capability: 'permissions' });
     // agente fora do catálogo não é vinculado
-    const unknown = profile({ kind: 'custom', base: 'generic', config: { acpAgent: 'nao-existe' } });
+    const unknown = profile({ kind: 'custom', tool: 'perfil', mode: 'acp', base: 'generic', config: { acpAgent: 'nao-existe' } });
     expect(() => admission.prepare(unknown, unknown.id, input(), dir, reviewed)).toThrow(/desconhecido/);
   });
   it('perfil CLI: agente com nome e sem definição do board é recusado, nunca descoberto nativamente', () => {
@@ -231,7 +235,7 @@ describe('vínculo de isolamento saneado', () => {
   });
   it('ACP: a permissão não entra no comando nem no vínculo', () => {
     exe('gemini', 'agente de teste');
-    const acp = profile({ kind: 'custom', base: 'generic', config: { acpAgent: 'gemini' } });
+    const acp = profile({ kind: 'custom', tool: 'perfil', mode: 'acp', base: 'generic', config: { acpAgent: 'gemini' } });
     const board = admission.isolationBinding(acp, acp.id, 'board').binding;
     expect(admission.isolationBinding(acp, acp.id, 'edits').binding).toBe(board);
     expect(admission.isolationBinding(acp, acp.id, 'full').binding).toBe(board);
@@ -244,7 +248,7 @@ describe('vínculo de isolamento saneado', () => {
     expect(acpSessionMode(gemini, { permission: 'full', exec: { deniedTools: ['Agent'] } as HeadlessInput['exec'] })).toBeUndefined();
     expect(acpSessionMode(gemini, { permission: 'full', exec: { toolSet: 'explicit', deniedTools: [] } as never })).toBeUndefined();
     expect(acpSessionMode(gemini, { permission: 'edits' })).toBeUndefined();
-    const acp = profile({ kind: 'custom', base: 'generic', config: { acpAgent: 'gemini' } });
+    const acp = profile({ kind: 'custom', tool: 'perfil', mode: 'acp', base: 'generic', config: { acpAgent: 'gemini' } });
     const board = admission.isolationBinding(acp, acp.id, 'board').binding;
     // uma sessão em yolo é outro vínculo: a prova feita no modo padrão não a cobre
     expect(admission.binding(acp, acp.id, { prompt: '', permission: 'full' }, null).binding).not.toBe(board);

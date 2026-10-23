@@ -34,6 +34,12 @@ export interface ExportTable {
   hasId: boolean;
   /** a versão do banco que criou a tabela: um export de versão anterior não a tem, e ela vale como vazia */
   since?: number;
+  /**
+   * Colunas que entraram depois da tabela, com a versão do banco que as criou. Num arquivo dessa versão em
+   * diante a linha precisa trazê-las; num anterior elas faltam, e a migração do banco em memória as cria
+   * com o padrão (quem preenche é o repositório, como num banco antigo).
+   */
+  columns?: Readonly<Record<string, number>>;
 }
 
 const byCard = 'card_id IN (SELECT id FROM cards WHERE board_id = ?)';
@@ -55,7 +61,7 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'card_links', where: 'from_id IN (SELECT id FROM cards WHERE board_id = ?)', hasId: true },
   { name: 'attachments', where: byCard, hasId: true },
   { name: 'card_events', where: 'board_id = ?', hasId: true },
-  { name: 'ai_runs', where: 'board_id = ?', hasId: true },
+  { name: 'ai_runs', where: 'board_id = ?', hasId: true, columns: { mode: 48 } },
   { name: 'ai_run_usage', where: 'run_id IN (SELECT id FROM ai_runs WHERE board_id = ?)', hasId: false },
   { name: 'ai_run_bash', where: 'run_id IN (SELECT id FROM ai_runs WHERE board_id = ?)', hasId: false, since: 33 },
   // a marcação do harness é deste board: vai junto (os caminhos relativos ao projeto e a `~` valem na outra máquina)
@@ -65,7 +71,7 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'board_artifacts', where: 'board_id = ?', hasId: true, since: 34 },
   { name: 'agent_context_contracts', where: 'board_id = ?', hasId: false, since: 35 },
   { name: 'activity_context_selections', where: 'board_id = ?', hasId: true, since: 35 },
-  { name: 'ai_profiles', where: 'board_id = ?', hasId: false, since: 42 },
+  { name: 'ai_profiles', where: 'board_id = ?', hasId: false, since: 42, columns: { tool: 48, mode: 48 } },
   { name: 'execution_policies', where: 'board_id = ?', hasId: true, since: 41 },
   { name: 'execution_policy_versions', where: 'board_id = ?', hasId: false, since: 41 },
   { name: 'board_artifact_files', where: 'artifact_id IN (SELECT id FROM board_artifacts WHERE board_id = ?)', hasId: false, since: 34 },
@@ -241,6 +247,8 @@ export function parseExportFile(text: string): BoardExportFile {
     for (const row of rows) {
       if (!isRow(row)) throw invalid(`linha inválida em "${t.name}".`);
       if (t.hasId && (typeof row.id !== 'string' || !row.id)) throw invalid(`linha sem id em "${t.name}".`);
+      for (const [column, since] of Object.entries(t.columns ?? {}))
+        if (f.schemaVersion >= since && !(column in row)) throw invalid(`falta a coluna "${column}" em "${t.name}".`);
     }
   }
   validateAdmissionRows(tables.ai_runs as Row[]);

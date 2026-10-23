@@ -33,7 +33,7 @@ export const driverFor = (tool: string, mode: ToolMode): ConnectionDriver | unde
 export const allDrivers = (): ConnectionDriver[] => [...DRIVERS.values()];
 
 /** O driver de um perfil, pela ferramenta e pelo modo dele; undefined na CLI personalizada. */
-export function driverOf(profile: Pick<AiProfile, 'kind' | 'base'> & { config?: AiProfileConfig }): ConnectionDriver | undefined {
+export function driverOf(profile: Pick<AiProfile, 'kind' | 'tool' | 'mode'> & { config?: AiProfileConfig }): ConnectionDriver | undefined {
   const tm = toolModeOf(profile);
   return tm ? driverFor(tm.tool, tm.mode) : undefined;
 }

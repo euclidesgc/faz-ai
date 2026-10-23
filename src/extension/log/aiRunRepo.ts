@@ -17,6 +17,7 @@ import { runCheckDetail, runCheckFrom, type RunCheck } from '../../shared/runChe
 import { newId } from '../db/ids';
 import { validateAdmissionDecision, type ExecutionAdmissionDecision } from '../../shared/executionAdmission';
 import { all, num, one, run, str, strOrNull, transaction, type Row } from '../db/query';
+import type { ProfileMode } from '../../shared/aiProfiles';
 
 /** Uma linha de `ai_runs`, como lida de volta (ver `AiRunStart`/`AiRunConfig` para o que cada campo significa). */
 export interface AiRun {
@@ -44,6 +45,8 @@ export interface AiRun {
   profile: string | null;
   agent: string | null;
   permission: string;
+  /** o modo da execução; `null` nas gravadas antes da migração 48 (não registrado) */
+  mode: ProfileMode | null;
   autonomous: boolean;
   clean: boolean;
   skills: string[];
@@ -102,6 +105,7 @@ function toRun(r: Row): AiRun {
     profile: strOrNull(r.profile),
     agent: strOrNull(r.agent),
     permission: str(r.permission),
+    mode: (strOrNull(r.mode) as ProfileMode | null) ?? null,
     autonomous: num(r.autonomous) === 1,
     clean: num(r.clean) === 1,
     skills: JSON.parse(str(r.skills_json) || '[]'),
@@ -166,7 +170,7 @@ export class AiRunRepo {
     }
     run(
       this.db,
-      `UPDATE ai_runs SET model = ?, effort = ?, profile = ?, agent = ?, permission = ?, autonomous = ?, clean = ?,
+      `UPDATE ai_runs SET model = ?, effort = ?, profile = ?, agent = ?, permission = ?, mode = ?, autonomous = ?, clean = ?,
          skills_json = ?, mcp_json = ?, admission_json = ?
        WHERE id = ?`,
       [
@@ -175,6 +179,7 @@ export class AiRunRepo {
         config.profile,
         config.agent,
         config.permission,
+        config.mode ?? null,
         config.autonomous ? 1 : 0,
         config.clean ? 1 : 0,
         JSON.stringify(config.skills),

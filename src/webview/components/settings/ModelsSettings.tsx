@@ -1,4 +1,4 @@
-import { activeProfile, catalogTool, isAcpProfile, type AiBase } from '../../../shared/aiProfiles';
+import { activeProfile, catalogTool, isAcpProfile, type AiBase, isReadyCli } from '../../../shared/aiProfiles';
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import type { AiTool } from '../../../shared/harness';
 import { modelId, type ModelOption } from '../../../shared/models';
@@ -129,7 +129,7 @@ export function ModelsSettings() {
   // o projeto trabalha com uma ferramenta por vez: só os modelos dela aparecem
   // o agente ACP anuncia os modelos ao abrir a sessão: o "Detectar" vale para ele como para as CLIs prontas
   const acp = isAcpProfile(profile);
-  const detectable = profile.kind === 'builtin' || acp;
+  const detectable = isReadyCli(profile) || acp;
   const tools = [{ id: toolId, label: profile.name, kind: profile.kind, base: profile.base }];
   const source = acp
     ? t('lida do agente ao abrir uma sessão ACP (session/new), sem gastar a sua conta; o agente precisa estar instalado e com login')

@@ -586,6 +586,8 @@ describe('modelos de IA', () => {
       id: profile.id,
       name: 'Minha CLI',
       kind: 'custom',
+      tool: profile.id,
+      mode: 'cli',
       base: 'generic',
       enabled: true,
       default: false,
@@ -648,7 +650,7 @@ describe('modelos de IA', () => {
   it('cópia usa o catálogo da origem e descrições de perfil não citam pastas de ferramenta', async () => {
     const copy = new AiProfileRepo(profileDb).save(
       router.snapshot().board.id,
-      { name: 'Claude copiado', kind: 'copy', base: 'claude', enabled: true, position: 3, config: {} },
+      { name: 'Claude copiado', kind: 'catalog', tool: 'claude', mode: 'cli', base: 'claude', enabled: true, position: 3, config: {} },
       'person',
     );
     const listed = (await client.listTools()).tools;
@@ -661,7 +663,7 @@ describe('modelos de IA', () => {
     expect(result.data.catalog.some((option: any) => option.value === 'claude:opus')).toBe(true);
     expect(result.data.profiles.find((profile: any) => profile.id === copy.id)).toMatchObject({
       base: 'claude',
-      kind: 'copy',
+      kind: 'catalog',
       measures: 'cost',
     });
   });

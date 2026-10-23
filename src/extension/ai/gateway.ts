@@ -6,7 +6,7 @@ import { executorProfile } from './providers';
 import { redactCredentialValues } from '../credentials';
 import { authFailed } from './profileAuth';
 import { profileInstallUrl } from '../requirements';
-import { isAcpProfile, profileBase, type AiProfile } from '../../shared/aiProfiles';
+import { isAcpProfile, isReadyCli, profileBase, type AiProfile, type ProfileMode } from '../../shared/aiProfiles';
 import { cursorToolNames, type CursorManifest } from './cursorManifest';
 // A única porta por onde o board chama uma ferramenta de IA. Toda execução — de um card (a pessoa, o
 // heartbeat ou o autopiloto) ou do chat — passa por `AiGateway.run`, e é aqui que o log de uso é
@@ -34,6 +34,11 @@ import type { RunMcpSessions } from '../mcp/runSessions';
 import { SpawnNotStartedError, type ProcessIdentity } from '../processIdentity';
 
 /** Só acrescenta um link público revisado ao erro de executável ausente do perfil personalizado. */
+/**
+ * O modo que vai para o log: o do transporte que de fato roda (o gateway escolhe o ACP pelo agente do perfil),
+ * não só o declarado, para o Consumo nunca atribuir a um modo uma execução que rodou em outro.
+ */
+const runMode = (profile: AiProfile): ProfileMode => (isAcpProfile(profile) ? 'acp' : 'cli');
 export function missingProfileCommand(error: Error, profile: AiProfile | undefined): Error {
   if (!(error instanceof SpawnNotStartedError) || !error.message.startsWith('comando "') || profile?.kind !== 'custom') return error;
   const installUrl = profileInstallUrl(profile);
@@ -73,8 +78,8 @@ export interface AiPrepared {
   /** O que o card liberou, para a conferência no fim; sem ele (chat) a execução fica "não conferida". */
   conference?: { manifest: RunCheckManifest; boardServer: string };
   input: HeadlessInput;
-  /** a configuração que o log guarda; a permissão sai de `input.permission` */
-  config: Omit<AiRunConfig, 'permission'>;
+  /** a configuração que o log guarda; a permissão sai de `input.permission`, e o modo, do perfil */
+  config: Omit<AiRunConfig, 'permission' | 'mode'>;
 }
 
 export interface AiCall {
@@ -274,15 +279,14 @@ export class AiGateway {
       if (
         !profile.enabled ||
         profile.credentials?.review === 'pending' ||
-        (profile.kind !== 'builtin' && (profile.credentials?.review !== 'reviewed' || !profile.credentials.available))
+        (!isReadyCli(profile) && (profile.credentials?.review !== 'reviewed' || !profile.credentials.available))
       )
         throw new Error('Perfil desativado ou pendente de revisão.');
       const prepared = call.prepare();
       if (this.runtime === 'v1' && !(prepared.context && prepared.strict))
         throw new Error('Runtime v1: a execução precisa da configuração resolvida e da admissão; nenhum caminho de IA ignora o plano.');
-      if (profile.kind !== 'builtin' && !prepared.strict)
-        throw new Error('Perfis configuráveis exigem contrato e admissão por capacidades.');
-      if (profile.kind !== 'builtin' && prepared.strict?.profileId !== profile.id)
+      if (!isReadyCli(profile) && !prepared.strict) throw new Error('Perfis configuráveis exigem contrato e admissão por capacidades.');
+      if (!isReadyCli(profile) && prepared.strict?.profileId !== profile.id)
         throw new Error('A admissão não corresponde ao perfil solicitado.');
       const { config } = prepared;
       conference = prepared.conference;
@@ -316,7 +320,7 @@ export class AiGateway {
           admitted = this.deps.admission.prepare(profile, prepared.strict.profileId, input, call.cwd, prepared.strict.request);
         } catch (e) {
           if (e instanceof AdmissionBlockedError)
-            runLog.describe(runId, { ...config, permission: input.permission, admission: e.decision });
+            runLog.describe(runId, { ...config, permission: input.permission, mode: runMode(profile), admission: e.decision });
           throw e;
         }
         input = admitted.input;
@@ -333,13 +337,13 @@ export class AiGateway {
       if (unsupported) throw new Error(unsupported);
       if (admitted) {
         if (!runLog.describeRequired) throw new Error('Registro obrigatório da admissão indisponível.');
-        runLog.describeRequired(runId, { ...config, permission: input.permission, admission: admitted.decision });
-      } else runLog.describe(runId, { ...config, permission: input.permission });
+        runLog.describeRequired(runId, { ...config, permission: input.permission, mode: runMode(profile), admission: admitted.decision });
+      } else runLog.describe(runId, { ...config, permission: input.permission, mode: runMode(profile) });
       if (workToken !== undefined && snapshot) this.deps.sessions!.register(runId, snapshot, input);
       call.beforeSpawn?.();
       snapshot?.validate();
       const watch = (text: string, stream: 'stdout' | 'stderr') => {
-        if (profile!.kind !== 'builtin' && profile!.config.authPatterns?.length) {
+        if (!isReadyCli(profile!) && profile!.config.authPatterns?.length) {
           authTails[stream] = (authTails[stream] + text).slice(-200000);
           privateAuthFailed ||= authFailed(profile!, Object.values(authTails), false);
         }

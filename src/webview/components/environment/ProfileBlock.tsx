@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { PROFILE_CAPABILITIES, type ProfileCapability } from '../../../shared/aiProfiles';
+import { PROFILE_CAPABILITIES, type ProfileCapability, isReadyCli } from '../../../shared/aiProfiles';
 import type { CapabilityState } from '../../../shared/executionAdmission';
 import { baseValue } from '../../../shared/harness';
 import { leaksList } from '../../isolation';
@@ -233,7 +233,7 @@ export function ProfileBlock({ health, focused }: { health: ProfileHealth; focus
                         : t('Login: não conferido (falta a linha de comando)')
               }
             >
-              {(probe?.login === 'signed-out' || health.authExpired) && health.kind === 'builtin' && login && (
+              {(probe?.login === 'signed-out' || health.authExpired) && isReadyCli(health) && login && (
                 <div className="env-fix">
                   <CopyCommand command={login} />
                   {!isWeb && (

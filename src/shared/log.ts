@@ -96,6 +96,11 @@ export interface AiRunConfig {
   profile: string | null;
   agent: string | null;
   permission: string;
+  /**
+   * O modo em que a execução rodou (`cli` ou `acp`), gravado pelo gateway com o transporte escolhido: sem ele
+   * o Consumo misturaria medições de modos diferentes. Execução anterior à migração 48 lê `null`.
+   */
+  mode?: import('./aiProfiles').ProfileMode | null;
   autonomous: boolean;
   clean: boolean;
   skills: string[];

@@ -39,7 +39,8 @@ type TextKey =
 
 /** O host não devolve configuração privada. Campos vazios numa edição mantêm o valor salvo. */
 export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfile; onClose: () => void; onSaved: () => void }) {
-  const kind = profile?.kind === 'copy' ? 'copy' : 'custom';
+  // o formulário só abre a cópia de uma CLI pronta (catálogo) ou o personalizado
+  const kind = profile?.kind === 'catalog' ? 'catalog' : 'custom';
   const [name, setName] = useState(profile?.name ?? '');
   const [values, setValues] = useState<Partial<Record<TextKey, string>>>({});
   const [touched, setTouched] = useState<Set<TextKey>>(new Set());
@@ -94,7 +95,7 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
       ...(profile ? { id: profile.id } : {}),
       name: name.trim(),
       kind,
-      base: kind === 'copy' ? profile!.base : 'generic',
+      base: kind === 'catalog' ? profile!.base : 'generic',
       enabled: profile?.enabled ?? true,
       position: profile?.position ?? 100,
       config,
@@ -152,7 +153,7 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
             )}
           </p>
         )}
-        {kind === 'copy' ? (
+        {kind === 'catalog' ? (
           field('extraArgs', 'Argumentos extras', 'Um argumento por linha.', true)
         ) : acp ? null : (
           <>
@@ -281,7 +282,7 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
         {field('installUrl', 'Endereço de instalação')}
         <fieldset className="ai-profile-isolation">
           <legend>{t('O que a CLI carrega por conta própria')}</legend>
-          {profile && kind === 'copy' && profileIsolation(profile).args.length > 0 && (
+          {profile && kind === 'catalog' && profileIsolation(profile).args.length > 0 && (
             <p className="muted">
               {t('Argumentos de isolamento: {args}', {
                 args: profileIsolation(profile)
@@ -290,7 +291,7 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
               })}
             </p>
           )}
-          {profile && kind === 'copy' && profileIsolation(profile).checked && (
+          {profile && kind === 'catalog' && profileIsolation(profile).checked && (
             <p className="muted">
               {t('Conferido na documentação em {date} · versão {version}', {
                 date: profileIsolation(profile).checked!.date,

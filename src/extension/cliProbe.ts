@@ -1,4 +1,4 @@
-import { isCatalogProfile, type AiProfile } from '../shared/aiProfiles';
+import { isReadyProfile, type AiProfile, isCatalogCopy } from '../shared/aiProfiles';
 import { redactCredentialValues } from './credentials';
 import { runCli, type CliRun } from './cliRun';
 import { driverOf } from './ai/drivers';
@@ -19,14 +19,14 @@ export function profileCanProbe(profile: AiProfile): boolean {
   return (
     profile.enabled &&
     profile.credentials?.review !== 'pending' &&
-    (isCatalogProfile(profile) || (profile.credentials?.review === 'reviewed' && profile.credentials.available))
+    (isReadyProfile(profile) || (profile.credentials?.review === 'reviewed' && profile.credentials.available))
   );
 }
 async function runProfileQuery(profile: AiProfile, executable: string, args: string[], options: ProfileProbeOptions): Promise<CliRun> {
   if (!profileCanProbe(profile)) return { code: null, stdout: '', stderr: '' };
   return runCli(executable, args, options.pathEnv, 20000, options.cwd, {
     noShell: true,
-    env: isCatalogProfile(profile) ? undefined : profile.config.env,
+    env: isReadyProfile(profile) ? undefined : profile.config.env,
   });
 }
 /** Retorna somente a versão, nunca saída bruta que possa revelar credenciais. Não é prova de isolamento. */
@@ -61,6 +61,6 @@ export async function profileSignedIn(
   return driver.signedIn({
     homeDir,
     query: (args) => runProfileQuery(profile, executable, args, options),
-    ...(profile.kind === 'copy' && profile.config.env ? { env: profile.config.env } : {}),
+    ...(isCatalogCopy(profile) && profile.config.env ? { env: profile.config.env } : {}),
   });
 }

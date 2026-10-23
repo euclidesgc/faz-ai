@@ -6,11 +6,11 @@ import { newDatabase, openInMemory } from '../src/extension/db/database';
 import { migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
 import { seedBoard } from '../src/extension/db/seed';
 import { all, one, run } from '../src/extension/db/query';
-import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
+import { AiProfileRepo, validateProfileRows } from '../src/extension/repositories/aiProfileRepo';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { exportBoard, importBoard, parseExportFile } from '../src/extension/db/boardExport';
 import { credentialsFor } from '../src/extension/credentials';
-import { ACP_READY_AGENTS, BUILTIN_ISOLATION, BUILTIN_PROFILES, type AiProfileDraft } from '../src/shared/aiProfiles';
+import { ACP_READY_AGENTS, BUILTIN_ISOLATION, BUILTIN_PROFILES, catalogTool, type AiProfileDraft } from '../src/shared/aiProfiles';
 import { ACP_AGENTS } from '../src/extension/ai/acp/agents';
 /** as três CLIs prontas mais os agentes ACP prontos */
 const CATALOG = BUILTIN_PROFILES.length;
@@ -148,7 +148,7 @@ it('importa referências desativadas/pendentes, conserva o alvo antigo e recusa 
 });
 it('o padrão aceita perfil ligado e revisado, ignorando perfil ausente, desligado ou importado', () => {
   const boards = new BoardRepo(db);
-  const copy = repo.save(boardId, draft({ kind: 'copy', base: 'cursor', config: {} }), 'person');
+  const copy = repo.save(boardId, draft({ kind: 'catalog', tool: 'cursor', mode: 'cli', base: 'cursor', config: {} }), 'person');
   boards.updateBoard(boardId, { aiTool: copy.id });
   expect(boards.snapshot(boardId).board.aiTool).toBe(copy.id);
   boards.updateBoard(boardId, { aiTool: 'inexistente' });
@@ -178,7 +178,7 @@ it('duplicar um pronto copia a lista de itens carregados; salvar grava o isolame
   const saved = repo.save(
     boardId,
     {
-      ...draft({ id: copy.id, kind: 'copy', base: 'cursor', name: copy.name }),
+      ...draft({ id: copy.id, kind: 'catalog', tool: 'cursor', mode: 'cli', base: 'cursor', name: copy.name }),
       config: { isolation: { loads: [{ kind: 'mcp', scope: 'user' }] } },
     },
     'person',
@@ -209,11 +209,24 @@ it('agente ACP pronto: desligado até a pessoa ligar, sem edição nem exclusão
     expect({ label: agent!.label, docs: agent!.docs }).toEqual({ label: ready.label, docs: ready.docs });
   }
   const listed = repo.list(boardId).find((p) => p.id === 'gemini')!;
-  expect(listed).toMatchObject({ kind: 'acp', base: 'generic', enabled: false, config: { acpAgent: 'gemini' } });
+  expect(listed).toMatchObject({
+    kind: 'catalog',
+    tool: 'gemini',
+    mode: 'acp',
+    base: 'generic',
+    enabled: false,
+    config: { acpAgent: 'gemini' },
+  });
   // nenhum board tem a linha do agente pronto: ela nasce ao ligar, sem migração nem semente
-  expect(all(db, "SELECT * FROM ai_profiles WHERE board_id=? AND kind='acp'", [boardId])).toHaveLength(0);
-  expect(repo.list(boardId).find((p) => p.id === 'codex-acp')).toMatchObject({ enabled: false, kind: 'acp' });
+  expect(all(db, "SELECT * FROM ai_profiles WHERE board_id=? AND mode='acp'", [boardId])).toHaveLength(0);
+  expect(repo.list(boardId).find((p) => p.id === 'codex-acp')).toMatchObject({ enabled: false, kind: 'catalog', mode: 'acp' });
   repo.setEnabled(boardId, 'codex-acp', true, 'person');
+  // a linha nasce já com a ferramenta e o modo
+  expect(one(db, "SELECT kind, tool, mode FROM ai_profiles WHERE board_id=? AND id='codex-acp'", [boardId])).toEqual({
+    kind: 'catalog',
+    tool: 'codex-acp',
+    mode: 'acp',
+  });
   expect(repo.list(boardId).find((p) => p.id === 'codex-acp')).toMatchObject({
     enabled: true,
     credentials: { review: 'reviewed', available: true },
@@ -223,17 +236,30 @@ it('agente ACP pronto: desligado até a pessoa ligar, sem edição nem exclusão
     acpAgent: 'codex-acp',
     installUrl: 'https://github.com/agentclientprotocol/codex-acp',
   });
-  expect(() => repo.save(boardId, { ...draft(), id: 'gemini', kind: 'acp', base: 'generic', config: {} }, 'person')).toThrow('prontos');
+  expect(() => repo.save(boardId, { ...draft(), id: 'gemini', kind: 'catalog', base: 'generic', config: {} }, 'person')).toThrow('prontos');
   expect(() => repo.remove(boardId, 'gemini', 'person')).toThrow('prontos');
   const copy = repo.duplicate(boardId, 'gemini', 'person');
-  expect(copy).toMatchObject({ kind: 'custom', base: 'generic', enabled: false, config: { acpAgent: 'gemini' } });
+  expect(copy).toMatchObject({
+    kind: 'custom',
+    tool: copy.id,
+    mode: 'acp',
+    base: 'generic',
+    enabled: false,
+    config: { acpAgent: 'gemini' },
+  });
   expect(copy.id).not.toBe('gemini');
   // sem comando de status, o login do agente pronto fica "não verificado" (a história do Conectar lê o authMethods)
   expect(await profileSignedIn({ ...listed, enabled: true }, process.execPath, '/home')).toBeNull();
   // a exportação leva a linha do agente pronto e a importação a aceita (importada, fica desligada e pendente)
   repo.setEnabled(boardId, 'codex-acp', false, 'person');
   const file = exportBoard(db, boardId, { pathOf: () => '' }, { extensionVersion: 'test' }).file;
-  expect(file.tables.ai_profiles!.find((r) => r.id === 'codex-acp')).toMatchObject({ kind: 'acp', base: 'generic', enabled: 0 });
+  expect(file.tables.ai_profiles!.find((r) => r.id === 'codex-acp')).toMatchObject({
+    kind: 'catalog',
+    tool: 'codex-acp',
+    mode: 'acp',
+    base: 'generic',
+    enabled: 0,
+  });
   const target = {
     db,
     boardId,
@@ -242,5 +268,112 @@ it('agente ACP pronto: desligado até a pessoa ligar, sem edição nem exclusão
     backup: () => undefined,
   };
   importBoard(target as never, parseExportFile(JSON.stringify(file)));
-  expect(repo.list(boardId).find((p) => p.id === 'codex-acp')).toMatchObject({ kind: 'acp', enabled: false });
+  expect(repo.list(boardId).find((p) => p.id === 'codex-acp')).toMatchObject({ kind: 'catalog', mode: 'acp', enabled: false });
+});
+
+it('salvar e duplicar gravam a ferramenta e o modo pelo tipo e pelo agente, nunca pelo rascunho', () => {
+  const cli = repo.save(boardId, draft({ tool: 'claude', mode: 'acp' }), 'person');
+  expect(cli).toMatchObject({ kind: 'custom', tool: cli.id, mode: 'cli' });
+  const acp = repo.save(boardId, draft({ name: 'Meu Gemini', config: { acpAgent: 'gemini' } }), 'person');
+  expect(acp).toMatchObject({ kind: 'custom', tool: acp.id, mode: 'acp' });
+  const copy = repo.duplicate(boardId, 'claude', 'person');
+  expect(copy).toMatchObject({ kind: 'catalog', tool: 'claude', mode: 'cli', base: 'claude' });
+  const copyOfCopy = repo.duplicate(boardId, copy.id, 'person');
+  expect(copyOfCopy).toMatchObject({ kind: 'catalog', tool: 'claude', mode: 'cli' });
+  // editar a cópia (o formulário manda catalog) mantém a ferramenta da base
+  expect(
+    repo.save(boardId, { ...draft({ id: copy.id, kind: 'catalog', base: 'claude', name: copy.name }), config: {} }, 'person'),
+  ).toMatchObject({
+    kind: 'catalog',
+    tool: 'claude',
+  });
+  // o tipo não muda numa edição, nem passando pelo valor antigo
+  expect(() => repo.save(boardId, { ...draft({ id: copy.id, base: 'claude' }), config: {} }, 'person')).toThrow('tipo');
+  expect(all(db, 'SELECT id, kind, tool, mode FROM ai_profiles WHERE board_id = ? AND tool = ?', [boardId, ''])).toEqual([]);
+});
+
+it('linhas do schema 47 viram ferramenta × modo na leitura, gravam uma vez e não mudam a ferramenta do catálogo', () => {
+  const put = (id: string, config: Record<string, unknown>) => credentialsFor(db).put(JSON.stringify(['profile', boardId, id]), config);
+  // o formato antigo, como uma versão anterior gravava: kind antigo e a ferramenta vazia (o padrão da migração)
+  run(db, "UPDATE ai_profiles SET kind = 'builtin', tool = '', mode = 'cli' WHERE board_id = ?", [boardId]);
+  const legacy: [string, string, string, string | null][] = [
+    ['gemini', 'acp', 'generic', null],
+    ['claude-trabalho', 'copy', 'claude', put('claude-trabalho', { extraArgs: ['--verbose'], env: { ACCOUNT: 'trabalho' } })],
+    ['meu-gemini', 'custom', 'generic', put('meu-gemini', { acpAgent: 'gemini' })],
+    ['minha-cli', 'custom', 'generic', put('minha-cli', { command: 'minha-cli' })],
+    // de outra máquina: a referência existe, o cofre não tem o valor
+    ['importada', 'custom', 'generic', 'f'.repeat(64)],
+  ];
+  for (const [id, kind, base, ref] of legacy)
+    run(
+      db,
+      "INSERT INTO ai_profiles(board_id,id,name,enabled,kind,base,position,secret_ref,review_state) VALUES (?,?,?,1,?,?,9,?,'reviewed')",
+      [boardId, id, id, kind, base, ref],
+    );
+  // a regra antiga da ferramenta do catálogo (cópia → a base; os demais → o id), para comparar
+  const before = Object.fromEntries(legacy.map(([id, kind, base]) => [id, kind === 'copy' ? base : id]));
+  const listed = repo.list(boardId);
+  const byId = (id: string) => listed.find((p) => p.id === id)!;
+  expect(byId('claude')).toMatchObject({ kind: 'catalog', tool: 'claude', mode: 'cli' });
+  expect(byId('gemini')).toMatchObject({ kind: 'catalog', tool: 'gemini', mode: 'acp' });
+  expect(byId('claude-trabalho')).toMatchObject({ kind: 'catalog', tool: 'claude', mode: 'cli', base: 'claude' });
+  expect(byId('meu-gemini')).toMatchObject({ kind: 'custom', tool: 'meu-gemini', mode: 'acp' });
+  expect(byId('minha-cli')).toMatchObject({ kind: 'custom', tool: 'minha-cli', mode: 'cli' });
+  expect(byId('importada')).toMatchObject({ kind: 'custom', tool: 'importada', mode: 'cli' });
+  for (const [id, tool] of Object.entries(before)) expect(catalogTool(byId(id)), id).toBe(tool);
+  // gravou o que descobriu; o personalizado sem cofre segue sem ferramenta no banco, para o save gravar
+  expect(all(db, 'SELECT id, kind, tool, mode FROM ai_profiles WHERE board_id = ? ORDER BY id', [boardId])).toEqual([
+    { id: 'claude', kind: 'catalog', tool: 'claude', mode: 'cli' },
+    { id: 'claude-trabalho', kind: 'catalog', tool: 'claude', mode: 'cli' },
+    { id: 'cursor', kind: 'catalog', tool: 'cursor', mode: 'cli' },
+    { id: 'gemini', kind: 'catalog', tool: 'gemini', mode: 'acp' },
+    { id: 'importada', kind: 'custom', tool: '', mode: 'cli' },
+    { id: 'kimi', kind: 'catalog', tool: 'kimi', mode: 'cli' },
+    { id: 'meu-gemini', kind: 'custom', tool: 'meu-gemini', mode: 'acp' },
+    { id: 'minha-cli', kind: 'custom', tool: 'minha-cli', mode: 'cli' },
+  ]);
+  // idempotente: a segunda leitura não grava nada e devolve o mesmo
+  const changes = Number(db.exec('SELECT total_changes()')[0]!.values[0]![0]);
+  expect(repo.list(boardId)).toEqual(listed);
+  expect(Number(db.exec('SELECT total_changes()')[0]!.values[0]![0])).toBe(changes);
+  // os ajustes da cópia continuam no cofre, intactos, e a execução os resolve como antes
+  expect(repo.resolveConfig(boardId, 'claude-trabalho')).toEqual({ extraArgs: ['--verbose'], env: { ACCOUNT: 'trabalho' } });
+  expect(repo.resolveConfig(boardId, 'meu-gemini')).toEqual({ acpAgent: 'gemini' });
+  // e a exportação aceita o banco no meio do caminho (o personalizado ainda sem ferramenta)
+  expect(() => exportBoard(db, boardId, { pathOf: () => '' }, { extensionVersion: 'test' })).not.toThrow();
+});
+
+it('a importação aceita os dois conjuntos de valores e recusa ferramenta ou modo que não batem com o perfil', () => {
+  const row = (over: Record<string, unknown>) => ({
+    board_id: boardId,
+    id: 'copia',
+    name: 'Cópia',
+    enabled: 0,
+    kind: 'copy',
+    tool: '',
+    mode: 'cli',
+    base: 'claude',
+    config_json: '{}',
+    position: 4,
+    secret_ref: null,
+    review_state: 'pending',
+    ...over,
+  });
+  const ok = (over: Record<string, unknown>) => expect(() => validateProfileRows([row(over) as never], boardId)).not.toThrow();
+  const bad = (over: Record<string, unknown>) => expect(() => validateProfileRows([row(over) as never], boardId)).toThrow('Tipo ou base');
+  ok({});
+  ok({ kind: 'catalog', tool: 'claude' });
+  ok({ id: 'meu', kind: 'custom', base: 'generic', tool: 'meu', mode: 'acp' });
+  ok({ id: 'claude', kind: 'builtin' });
+  ok({ id: 'claude', kind: 'catalog', tool: 'claude' });
+  ok({ id: 'gemini', kind: 'acp', base: 'generic' });
+  ok({ id: 'gemini', kind: 'catalog', base: 'generic', tool: 'gemini', mode: 'acp' });
+  bad({ kind: 'catalog' });
+  bad({ kind: 'catalog', tool: 'cursor' });
+  bad({ kind: 'catalog', tool: 'claude', mode: 'acp' });
+  bad({ kind: 'catalog', tool: 'claude', mode: 'api' });
+  bad({ kind: 'builtin' });
+  bad({ id: 'meu', kind: 'custom', base: 'generic', tool: 'outro' });
+  bad({ id: 'claude', kind: 'acp' });
+  bad({ id: 'gemini', kind: 'catalog', base: 'generic', tool: 'gemini', mode: 'cli' });
 });

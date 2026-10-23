@@ -1,4 +1,5 @@
 import { driverOf, type ConnectionDriver } from './ai/drivers';
+import { isReadyCli } from '../shared/aiProfiles';
 import * as path from 'node:path';
 import type { BranchRenamePending } from '../shared/branchRename';
 import { NODE_MIN_MAJOR, type EnvCheck, type EnvironmentReport, type InstallStep } from '../shared/environment';
@@ -210,7 +211,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
 
   // os perfis: o que faltar em cada CLI pronta traz o instalador oficial do sistema; os demais já trazem o link
   const profiles = p.health.map((h): ProfileHealth => {
-    const driver = h.kind === 'builtin' && h.probe?.found !== true ? driverOf(h) : undefined;
+    const driver = isReadyCli(h) && h.probe?.found !== true ? driverOf(h) : undefined;
     return driver ? { ...h, install: { steps: cliInstall(driver), docs: driver.docs } } : h;
   });
 

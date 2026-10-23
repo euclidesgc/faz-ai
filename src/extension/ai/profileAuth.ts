@@ -1,3 +1,4 @@
+import { isReadyCli } from '../../shared/aiProfiles';
 import type { AiProfile, AiBase } from '../../shared/aiProfiles';
 import { baseValue } from '../../shared/harness';
 const AUTH_FAILURE_PATTERNS: Record<AiBase, RegExp[]> = {
@@ -11,7 +12,7 @@ export function authFailed(profile: AiProfile, tail: readonly string[], includeN
   const output = tail.join('\n');
   return (
     (includeNative && (baseValue(AUTH_FAILURE_PATTERNS, profile.base) ?? []).some((pattern) => pattern.test(output))) ||
-    (profile.kind !== 'builtin' &&
+    (!isReadyCli(profile) &&
       (profile.config.authPatterns ?? []).some((phrase) => !!phrase.trim() && output.toLowerCase().includes(phrase.toLowerCase())))
   );
 }

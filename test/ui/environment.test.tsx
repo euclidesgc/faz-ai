@@ -27,7 +27,9 @@ const show = (r: EnvironmentReport) =>
 const profile = (id: string, over: Partial<ProfileHealth> = {}): ProfileHealth => ({
   id,
   name: id === 'claude' ? 'Claude Code' : id === 'cursor' ? 'Cursor' : id,
-  kind: 'builtin',
+  kind: 'catalog',
+  tool: id,
+  mode: 'cli',
   base: id as ProfileHealth['base'],
   registration: 'enabled',
   isDefault: id === 'claude',
@@ -451,7 +453,8 @@ describe('Diagnóstico do ambiente', () => {
             profile('claude', { verifiable: true, capabilities: unknown }),
             profile('gemini', {
               name: 'Gemini CLI',
-              kind: 'acp',
+              kind: 'catalog',
+              mode: 'acp',
               base: 'generic',
               isDefault: false,
               verifiable: true,

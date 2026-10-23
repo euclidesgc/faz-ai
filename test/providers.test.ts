@@ -41,6 +41,8 @@ const custom = (config: import('../src/shared/aiProfiles').AiProfileConfig): imp
   id: 'personalizado',
   name: 'Personalizado',
   kind: 'custom',
+  tool: 'personalizado',
+  mode: 'cli',
   base: 'generic',
   enabled: true,
   position: 3,
@@ -51,7 +53,9 @@ it('cópia preserva leitor/formato e configura comando, ambiente e argumentos ad
   const profile = {
     ...custom({ command: '/cli-alternativa', env: { ACCOUNT: 'work' }, extraArgs: ['--account work'] }),
     id: 'cursor-work',
-    kind: 'copy' as const,
+    kind: 'catalog' as const,
+    tool: 'cursor',
+    mode: 'cli' as const,
     base: 'cursor' as const,
   };
   const input: HeadlessInput = { prompt: 'oi', permission: 'board', structured: true };
@@ -131,5 +135,5 @@ it('frases de autenticação são literais, sem regex, e números do fluxo não 
   const profile = custom({ authPatterns: ['TOKEN.*EXPIRED'] });
   expect(authFailed(profile, ['token-any-expired'])).toBe(false);
   expect(authFailed(profile, ['token.*expired'])).toBe(true);
-  expect(authFailed({ ...profile, kind: 'copy', base: 'kimi' }, ['{"input_tokens":401}'], false)).toBe(false);
+  expect(authFailed({ ...profile, kind: 'catalog', tool: 'kimi', mode: 'cli', base: 'kimi' }, ['{"input_tokens":401}'], false)).toBe(false);
 });

@@ -43,6 +43,8 @@ export interface ProfileHealth {
   id: AiTool;
   name: string;
   kind: AiProfile['kind'];
+  tool: AiProfile['tool'];
+  mode: AiProfile['mode'];
   base: AiProfile['base'];
   registration: ProfileRegistration;
   isDefault: boolean;
@@ -120,6 +122,8 @@ export function profileHealth(i: ProfileHealthInput): ProfileHealth {
     id: i.profile.id,
     name: i.profile.name,
     kind: i.profile.kind,
+    tool: i.profile.tool,
+    mode: i.profile.mode,
     base: i.profile.base,
     registration,
     isDefault: i.isDefault,

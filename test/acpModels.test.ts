@@ -168,6 +168,8 @@ describe('readAcpModels no router', () => {
     name: 'Gemini ACP',
     enabled: true,
     kind: 'custom',
+    tool: 'gemini-acp',
+    mode: 'acp',
     base: 'generic',
     config: { acpAgent: 'gemini' },
     position: 9,
