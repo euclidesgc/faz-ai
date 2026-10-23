@@ -169,6 +169,12 @@ describe('fronteira da admissão do board', () => {
     const unknown = profile({ kind: 'custom', base: 'generic', config: { acpAgent: 'nao-existe' } });
     expect(() => admission.prepare(unknown, unknown.id, input(), dir, reviewed)).toThrow(/desconhecido/);
   });
+  it('perfil CLI: agente com nome e sem definição do board é recusado, nunca descoberto nativamente', () => {
+    // o oposto do ACP: na CLI o nome sem definição seria descoberta nativa, então a admissão recusa
+    const claude = profile({ config: { command: exe('claude-e', 'binário E') } });
+    const named: HeadlessInput = { ...input(), exec: { agent: 'restrito', agentDefinition: null } as HeadlessInput['exec'] };
+    expect(() => admission.prepare(claude, claude.id, named, dir, request())).toThrow(/Agente obrigatório precisa de definição do board/);
+  });
   it('cópia que troca o binário não herda a verificação da cópia anterior', () => {
     const first = profile({ config: { command: exe('claude-a', 'binário A') } });
     authorize(blocked(first).decision.binding);
