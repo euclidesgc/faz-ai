@@ -28,8 +28,20 @@ export interface ProfileIsolation {
 }
 export type AiBase = 'claude' | 'cursor' | 'kimi';
 export type ProviderBase = AiBase | 'generic';
-/** `acp`: perfil pronto de um agente do catálogo ACP (#1095); como o `builtin`, não é editado nem apagado. */
-export type AiProfileKind = 'builtin' | 'acp' | 'copy' | 'custom';
+/**
+ * De onde o perfil vem. `catalog`: de uma ferramenta que a extensão traz (`tool`), pronto ou com ajustes no
+ * cofre; `custom`: o caminho avançado, com comando próprio. Até o schema 47 o banco gravava `builtin` (CLI
+ * pronta), `acp` (agente ACP pronto) e `copy` (cópia de uma CLI pronta): `normalizeProfileKind` os lê.
+ */
+export type AiProfileKind = 'catalog' | 'custom';
+export type LegacyProfileKind = 'builtin' | 'acp' | 'copy';
+/** Os modos de uma ferramenta que o board sabe rodar hoje; `api` entra com a admissão do modo API. */
+export const PROFILE_MODES = ['cli', 'acp'] as const;
+export type ProfileMode = (typeof PROFILE_MODES)[number];
+/** O `kind` gravado (novo ou antigo) no conjunto atual; `null` para o que nenhuma versão gravou. */
+export function normalizeProfileKind(kind: unknown): AiProfileKind | null {
+  return kind === 'custom' ? 'custom' : kind === 'catalog' || kind === 'builtin' || kind === 'acp' || kind === 'copy' ? 'catalog' : null;
+}
 export type PromptVia = 'stdin' | 'arg';
 export type BoardServerVia = 'cli' | 'project' | 'none';
 export type ProfileCapability = ExecutorCapability | 'cancellation' | 'output';
@@ -79,6 +91,14 @@ export interface AiProfile {
   name: string;
   enabled: boolean;
   kind: AiProfileKind;
+  /**
+   * A ferramenta: o id do catálogo de modelos (`catalogTool`). No perfil do catálogo é a ferramenta que a
+   * extensão traz (a cópia guarda a da base); no personalizado, o próprio id.
+   */
+  tool: string;
+  /** Como o board fala com a ferramenta: a CLI de uma passada ou o Agent Client Protocol. */
+  mode: ProfileMode;
+  /** Compatibilidade de leitura: o provider que o perfil imita (`generic` no ACP e no personalizado). */
   base: ProviderBase;
   /** Na leitura pública é sempre {}; valores são resolvidos somente pelo host. */
   config: AiProfileConfig;
@@ -87,7 +107,12 @@ export interface AiProfile {
   /** Configuração, disponibilidade e revisão humana não comprovam capacidades. */
   capabilities?: Partial<Record<ProfileCapability, CapabilityState>>;
 }
-export type AiProfileDraft = Omit<AiProfile, 'id' | 'credentials' | 'capabilities'> & { id?: string };
+/** `tool` e `mode` do rascunho são ignorados: o repositório os deriva do tipo, da base e do agente ACP. */
+export type AiProfileDraft = Omit<AiProfile, 'id' | 'credentials' | 'capabilities' | 'tool' | 'mode'> & {
+  id?: string;
+  tool?: string;
+  mode?: ProfileMode;
+};
 /**
  * Os agentes do catálogo ACP (`extension/ai/acp/agents.ts`) que viram perfil pronto, com o id, o nome e a
  * página oficial de cada um (o teste confere com o catálogo). Fora: o Claude (segue pela CLI `claude`), o
@@ -117,7 +142,9 @@ export const BUILTIN_PROFILES: readonly AiProfile[] = [
       id: tool.id,
       name: tool.label,
       enabled: true,
-      kind: 'builtin' as const,
+      kind: 'catalog' as const,
+      tool: tool.id,
+      mode: 'cli' as const,
       base: tool.id,
       config: Object.freeze({}),
       position,
@@ -128,15 +155,32 @@ export const BUILTIN_PROFILES: readonly AiProfile[] = [
       id: agent.id,
       name: agent.label,
       enabled: false,
-      kind: 'acp' as const,
+      kind: 'catalog' as const,
+      tool: agent.id,
+      mode: 'acp' as const,
       base: 'generic' as const,
       config: Object.freeze({ acpAgent: agent.id, installUrl: agent.docs }),
       position: AI_BASES.length + position,
     }),
   ),
 ];
-/** Perfil do catálogo (CLI pronta ou agente ACP pronto): vem do código, não do formulário. */
-export const isCatalogProfile = (profile: Pick<AiProfile, 'kind'>): boolean => profile.kind === 'builtin' || profile.kind === 'acp';
+type ProfileIdentity = Pick<AiProfile, 'id' | 'kind' | 'tool' | 'mode'>;
+/**
+ * Perfil pronto (a CLI pronta ou o agente ACP pronto): o do catálogo sem ajustes, cujo id é a própria
+ * ferramenta. Vem do código, não do formulário: não é editado nem apagado.
+ */
+export const isReadyProfile = (profile: ProfileIdentity): boolean => profile.kind === 'catalog' && profile.tool === profile.id;
+/** A CLI pronta (o `builtin` até o schema 47): a única que roda sem cofre e sem admissão estrita própria. */
+export const isReadyCli = (profile: ProfileIdentity): boolean => isReadyProfile(profile) && profile.mode === 'cli';
+/** O agente ACP pronto (o `acp` até o schema 47). */
+export const isReadyAcp = (profile: ProfileIdentity): boolean => isReadyProfile(profile) && profile.mode === 'acp';
+/** Cópia de uma CLI pronta (o `copy` até o schema 47): a ferramenta da base com os ajustes no cofre. */
+export const isCatalogCopy = (profile: ProfileIdentity): boolean => profile.kind === 'catalog' && profile.tool !== profile.id;
+/** Nome curto da ferramenta, para o rótulo "ferramenta · modo" ("Gemini · ACP"). */
+export function toolLabel(tool: string): string {
+  return AI_BASES.find((t) => t.id === tool)?.label ?? ACP_READY_AGENTS.find((a) => a.id === tool)?.label.replace(/ CLI$/, '') ?? tool;
+}
+export const modeLabel = (mode: ProfileMode): string => mode.toUpperCase();
 export const PROFILE_MARKERS = ['prompt', 'model', 'effort', 'mcpConfig', 'addDir'] as const;
 export const unknownProfileCapabilities = (): Record<ProfileCapability, CapabilityState> =>
   Object.fromEntries(PROFILE_CAPABILITIES.map((c) => [c, 'unknown'])) as Record<ProfileCapability, CapabilityState>;
@@ -165,7 +209,8 @@ export function activeProfile(board: { aiTool: string; aiProfiles: readonly AiPr
     BUILTIN_PROFILES[0]!
   );
 }
-export const catalogTool = (profile: AiProfile): string => (profile.kind === 'copy' ? profile.base : profile.id);
+/** A ferramenta do catálogo de modelos: o mesmo valor que antes da migração 48 (cópia → a base; os demais → o id). */
+export const catalogTool = (profile: Pick<AiProfile, 'id' | 'tool'>): string => profile.tool || profile.id;
 export const profileLabel = (board: { aiProfiles: readonly AiProfile[] }, id: string): string =>
   board.aiProfiles.find((p) => p.id === id)?.name ?? id;
 export function newProfileId(name: string, taken: readonly string[]): string {
@@ -181,10 +226,12 @@ export function newProfileId(name: string, taken: readonly string[]): string {
 export function validateProfile(p: AiProfileDraft): string[] {
   const errors: string[] = [];
   if (typeof p.name !== 'string' || !p.name.trim() || p.name.length > 240 || p.name.includes('\0')) errors.push('Nome do perfil inválido.');
+  // no catálogo, `generic` é o agente ACP pronto; a cópia de uma CLI pronta não aponta agente ACP
   if (
-    !['builtin', 'acp', 'copy', 'custom'].includes(p.kind) ||
+    !['catalog', 'custom'].includes(p.kind) ||
     !['claude', 'cursor', 'kimi', 'generic'].includes(p.base) ||
-    (p.kind === 'custom' || p.kind === 'acp') !== (p.base === 'generic')
+    (p.kind === 'custom' && p.base !== 'generic') ||
+    (p.kind === 'catalog' && p.base !== 'generic' && p.config?.acpAgent !== undefined)
   )
     errors.push('Tipo ou base do perfil inválido.');
   if (typeof p.enabled !== 'boolean' || !Number.isSafeInteger(p.position) || p.position < 0 || p.position > 1000000)
@@ -196,7 +243,7 @@ export function validateProfile(p: AiProfileDraft): string[] {
     errors.push('Agente ACP inválido.');
   if (p.kind === 'custom' && (typeof c.command !== 'string' || !c.command.trim()) && typeof c.acpAgent !== 'string')
     errors.push('Informe o comando do perfil personalizado.');
-  if (p.kind === 'acp' && typeof c.acpAgent !== 'string') errors.push('Agente ACP inválido.');
+  if (p.kind === 'catalog' && p.base === 'generic' && typeof c.acpAgent !== 'string') errors.push('Agente ACP inválido.');
   if (c.boardServer === 'project' && (typeof c.mcpProjectFile !== 'string' || !c.mcpProjectFile.trim()))
     errors.push('Informe o arquivo MCP do projeto.');
   const string = (v: unknown) => typeof v === 'string' && !v.includes('\0') && v.length <= 100000;
@@ -339,13 +386,14 @@ export function parseLoads(raw: unknown): { loads: IsolationLeak[]; unrecognized
  */
 export function profileIsolation(p: AiProfile): ProfileIsolation {
   const base = p.base === 'generic' ? null : BUILTIN_ISOLATION[p.base];
-  if (p.kind === 'builtin' && base) return structuredClone(base);
+  if (p.kind === 'catalog' && p.id === p.tool && base) return structuredClone(base);
   const own = p.config.isolation;
   const { loads, unrecognized } =
     own === undefined ? { loads: structuredClone(base?.loads ?? []), unrecognized: 0 } : parseLoads(own?.loads);
-  const out: ProfileIsolation = { args: p.kind === 'copy' && base ? [...base.args] : [], loads };
+  const copy = p.kind === 'catalog' && p.id !== p.tool;
+  const out: ProfileIsolation = { args: copy && base ? [...base.args] : [], loads };
   if (unrecognized) out.unrecognized = unrecognized;
-  if (own === undefined && p.kind === 'copy' && base?.checked) out.checked = base.checked;
+  if (own === undefined && copy && base?.checked) out.checked = base.checked;
   return out;
 }
 /**

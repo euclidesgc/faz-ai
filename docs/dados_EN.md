@@ -22,6 +22,15 @@ store going back to the previous one) refuses to open a board saved by a newer v
 touching it, and asks you to update the extension. If the database refuses a write on open, the full
 error, with the statement that failed, is in **Output → Faz AI**.
 
+**AI profiles: tool and mode (format 48).** Each profile stores the tool and the mode the board uses
+to talk to it (CLI or ACP), and each run in the log stores the mode it ran in. Profiles saved before
+are converted the first time the board is read, by their old type: the ready-made CLI stays in CLI,
+the ready-made ACP agent in ACP, a copy of a ready-made CLI stays the base tool in CLI (its overrides
+stay in the local vault, as they were), and a custom profile is its own tool, in ACP when it points to
+an ACP agent and in CLI otherwise. The tool used by model fields, policies and Usage does not change
+for any profile. A custom profile imported from another machine, without its configuration in the
+local vault, stays in CLI until it is saved again. Earlier runs have no mode recorded.
+
 ## Board backup
 
 To take the board to another machine or keep a copy:

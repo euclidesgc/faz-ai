@@ -1,4 +1,4 @@
-import { BUILTIN_PROFILES } from '../../shared/aiProfiles';
+import { BUILTIN_PROFILES, isReadyCli } from '../../shared/aiProfiles';
 import type { Database } from 'sql.js';
 import type { WorkflowKind } from '../../shared/model';
 import { BOARD_TEMPLATE, BOARD_TEMPLATE_VERSION, STORY_PHASES, insertColumn } from './boardTemplate';
@@ -96,9 +96,9 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
  * nem a lista de revisão da importação com perfis que ninguém usa.
  */
 export function insertBuiltinProfiles(db: Database, boardId: string): void {
-  for (const p of BUILTIN_PROFILES.filter((p) => p.kind === 'builtin'))
+  for (const p of BUILTIN_PROFILES.filter((p) => isReadyCli(p)))
     db.run(
-      "INSERT OR IGNORE INTO ai_profiles(board_id,id,name,enabled,kind,base,position,review_state) VALUES (?,?,?,?,?,?,?,'reviewed')",
-      [boardId, p.id, p.name, 1, p.kind, p.base, p.position],
+      "INSERT OR IGNORE INTO ai_profiles(board_id,id,name,enabled,kind,tool,mode,base,position,review_state) VALUES (?,?,?,?,?,?,?,?,?,'reviewed')",
+      [boardId, p.id, p.name, 1, p.kind, p.tool, p.mode, p.base, p.position],
     );
 }

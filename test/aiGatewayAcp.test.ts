@@ -38,7 +38,10 @@ const profile = (config: AiProfile['config']): AiProfile => ({
   id: 'gemini-acp',
   name: 'Gemini ACP',
   enabled: true,
-  kind: 'builtin',
+  // o caminho da pronta (sem cofre nem admissão estrita): o teste é do transporte, não da admissão
+  kind: 'catalog',
+  tool: 'gemini-acp',
+  mode: 'cli',
   base: 'generic',
   config,
   position: 9,
@@ -80,7 +83,13 @@ describe('transporte escolhido pelo perfil', () => {
     const run = gw.run(call(profile({ acpAgent: 'gemini' })));
     expect(cli).toBe(0);
     expect(acp[0]!.command).toBe('gemini');
-    expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))[0]).toMatchObject({ id: run.runId, outcome: null, tool: 'gemini-acp' });
+    // o modo gravado é o do transporte que rodou, não o declarado no perfil
+    expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))[0]).toMatchObject({
+      id: run.runId,
+      outcome: null,
+      tool: 'gemini-acp',
+      mode: 'acp',
+    });
     run.stop();
     exit(143);
     expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))[0]).toMatchObject({ outcome: 'stopped' });
@@ -112,6 +121,7 @@ describe('transporte escolhido pelo perfil', () => {
     const custom: AiProfile = {
       ...profile({ acpAgent: 'gemini' }),
       kind: 'custom',
+      mode: 'acp',
       credentials: { review: 'reviewed', available: true },
     } as never;
     const validated: unknown[] = [];
@@ -159,7 +169,7 @@ describe('transporte escolhido pelo perfil', () => {
       enabled: true,
       credentials: { secretRef: '', review: 'reviewed', available: true },
     };
-    expect(ready.kind).toBe('acp');
+    expect(ready).toMatchObject({ kind: 'catalog', tool: 'gemini', mode: 'acp' });
     const admission = {
       prepare: (_p: unknown, _id: string, input: unknown) => ({
         input,
@@ -193,6 +203,7 @@ describe('transporte escolhido pelo perfil', () => {
     const custom: AiProfile = {
       ...profile({ acpAgent: 'gemini' }),
       kind: 'custom',
+      mode: 'acp',
       credentials: { review: 'reviewed', available: true },
     } as never;
     const admission = {

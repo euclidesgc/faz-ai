@@ -148,6 +148,8 @@ describe('sondas dos perfis revisados', () => {
     id: 'pessoal',
     name: 'Pessoal',
     kind: 'custom' as const,
+    tool: 'pessoal',
+    mode: 'cli' as const,
     base: 'generic' as const,
     enabled: true,
     position: 3,

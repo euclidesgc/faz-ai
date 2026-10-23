@@ -8,6 +8,8 @@ const pending: AiProfile = {
   ...claude,
   id: 'importado',
   kind: 'custom',
+  tool: 'importado',
+  mode: 'cli',
   base: 'generic',
   credentials: { secretRef: 'x', review: 'pending', available: false },
 };

@@ -260,22 +260,20 @@ export function recommendedOffered(entry: AiToolEntry): ToolMode | null {
 }
 
 /**
- * ADAPTADOR TEMPORÁRIO: a ferramenta e o modo de um perfil, derivados dos campos de hoje (`base`,
- * `config.acpAgent`). A história 4 da épica dá ao perfil os campos `tool` e `mode`; quando ela entrar,
- * esta função passa a devolvê-los e os chamadores não mudam.
+ * A ferramenta e o modo do driver de um perfil, lidos dos campos `tool` e `mode` (história 4). O resultado é
+ * o mesmo do adaptador que a história 5 derivava de `base` e `config.acpAgent`:
  *
- * - agente ACP (o pronto e o personalizado com `acpAgent`): `(acpAgent, 'acp')`; o personalizado usa o
- *   agente do catálogo como ferramenta (o driver é o dele), não o id do perfil;
- * - CLI pronta e cópia dela: `(base, 'cli')`, a ferramenta do catálogo de modelos (`catalogTool`);
+ * - perfil do catálogo (CLI pronta, cópia dela, agente ACP pronto): `(tool, mode)`; na cópia, `tool` já é a
+ *   base, a ferramenta do catálogo de modelos (`catalogTool`);
+ * - personalizado ACP: `(acpAgent, 'acp')`. O `tool` dele é o id do perfil (a chave do catálogo de modelos,
+ *   que não muda), mas o driver é o do agente do catálogo ACP que ele roda;
  * - CLI personalizada: null, sem driver (é o caminho avançado, que segue pelo provider genérico).
  */
-export function toolModeOf(profile: Pick<AiProfile, 'kind' | 'base'> & { config?: AiProfileConfig }): {
+export function toolModeOf(profile: Pick<AiProfile, 'kind' | 'tool' | 'mode'> & { config?: AiProfileConfig }): {
   tool: string;
   mode: ToolMode;
 } | null {
-  // a mesma regra de `isAcpProfile`, que decide o transporte no gateway: perfil genérico com `acpAgent`
-  // (o pronto do tipo `acp` traz o dele em `config`, também na leitura pública)
+  if (profile.kind === 'catalog') return profile.tool ? { tool: profile.tool, mode: profile.mode } : null;
   const agent = profile.config?.acpAgent;
-  if (profile.base === 'generic') return typeof agent === 'string' ? { tool: agent, mode: 'acp' } : null;
-  return { tool: profile.base, mode: 'cli' };
+  return profile.mode === 'acp' && typeof agent === 'string' ? { tool: agent, mode: 'acp' } : null;
 }

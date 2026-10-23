@@ -14,6 +14,8 @@ const custom: AiProfile = {
   name: 'CLI local',
   enabled: true,
   kind: 'custom',
+  tool: 'local-cli',
+  mode: 'cli',
   base: 'generic',
   config: {},
   position: 3,
@@ -79,7 +81,15 @@ describe('Superfícies de perfis de CLI', () => {
   });
 
   it('num perfil ACP, Modelos de IA oferece Detectar modelos: a lista vem da sessão do agente', async () => {
-    const acp: AiProfile = { ...custom, id: 'gemini-acp', name: 'Gemini ACP', config: { acpAgent: 'gemini' }, position: 4 };
+    const acp: AiProfile = {
+      ...custom,
+      id: 'gemini-acp',
+      tool: 'gemini-acp',
+      mode: 'acp',
+      name: 'Gemini ACP',
+      config: { acpAgent: 'gemini' },
+      position: 4,
+    };
     const state = useBoardStore.getState().state!;
     useBoardStore.setState({
       state: { ...state, board: { ...state.board, aiTool: acp.id, aiProfiles: [...state.board.aiProfiles, acp] } },

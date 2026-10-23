@@ -1,3 +1,4 @@
+import { isReadyCli } from '../shared/aiProfiles';
 import type { AiProfile } from '../shared/aiProfiles';
 import { profileCanProbe } from './cliProbe';
 import * as fs from 'node:fs';
@@ -115,7 +116,7 @@ export function checkRequirements(p: RequirementProbe): BoardRequirement[] {
   for (const w of availability.warnings) {
     const health = p.health.find((h) => h.id === w.id)!;
     // o login dos prontos tem comando conhecido, o do driver da CLI; o dos demais se resolve pelo bloco do perfil
-    const auth = health.kind === 'builtin' && w.problem === 'signin' ? driverOf(health)?.auth : undefined;
+    const auth = isReadyCli(health) && w.problem === 'signin' ? driverOf(health)?.auth : undefined;
     const login = auth?.kind === 'login-command' ? auth.command : undefined;
     out.push({
       id: 'profile',
@@ -146,7 +147,7 @@ export function checkRequirements(p: RequirementProbe): BoardRequirement[] {
 
 /** Link de instalação é metadado público revisado; URLs com credenciais/parâmetros não são divulgadas. */
 export function profileInstallUrl(profile: AiProfile): string | null {
-  if (!profileCanProbe(profile) || profile.kind === 'builtin' || typeof profile.config.installUrl !== 'string') return null;
+  if (!profileCanProbe(profile) || isReadyCli(profile) || typeof profile.config.installUrl !== 'string') return null;
   try {
     const value = profile.config.installUrl.trim(),
       url = new URL(value);

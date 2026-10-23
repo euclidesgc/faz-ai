@@ -10,7 +10,7 @@ import {
   type StrictExecutionRequest,
   type ExecutionAdmissionDecision,
 } from '../../shared/executionAdmission';
-import { isAcpProfile } from '../../shared/aiProfiles';
+import { isAcpProfile, isReadyCli } from '../../shared/aiProfiles';
 import { resolveCommand } from '../cliResolve';
 import { acpAgent } from './acp/agents';
 import { acpCommand, acpSessionMode, type AcpAgent } from './acp/provider';
@@ -209,7 +209,7 @@ export class ExecutionAdmission {
       hostRuntime: process.versions.node,
       profileId,
       tool: profile.base,
-      ...(profile.kind !== 'builtin' ? { profileConfig: profile.config } : {}),
+      ...(!isReadyCli(profile) ? { profileConfig: profile.config } : {}),
       executable: real,
       binary: this.binaryDigest(real),
       // a permissão não entra por si: no modo estrito a invocação do Claude é a mesma nos três níveis

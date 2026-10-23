@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 47;
+export const SCHEMA_VERSION = 48;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -607,7 +607,55 @@ const MIGRATIONS: Record<number, string> = {
     ALTER TABLE ai_runs ADD COLUMN check_status TEXT;
     ALTER TABLE ai_runs ADD COLUMN check_detail TEXT;
   `,
+  48: `
+    -- Ferramenta por modo, história 4: o perfil passa a ser ferramenta × modo. Só as colunas: o
+    -- preenchimento é do repositório (AiProfileRepo.list), porque o agente ACP do personalizado mora no
+    -- cofre, que a migração não lê. tool '' = ainda não preenchido; kind segue com o valor antigo
+    -- (builtin, acp, copy) até o repositório gravar catalog. Sem CHECK em mode: o modo api não deve pedir
+    -- migração. ADD COLUMN não reescreve a tabela (só o esquema), nem mesmo o ai_runs grande.
+    ALTER TABLE ai_profiles ADD COLUMN tool TEXT NOT NULL DEFAULT '';
+    ALTER TABLE ai_profiles ADD COLUMN mode TEXT NOT NULL DEFAULT 'cli';
+    -- o modo em que a execução rodou; NULL nas anteriores: não registrado, nada é inventado
+    ALTER TABLE ai_runs ADD COLUMN mode TEXT;
+  `,
 };
+
+/**
+ * O caminho de volta de cada migração que tem um (a partir da 48): leva o banco ao formato anterior sem
+ * perder o que aquela versão sabe ler. Não roda sozinho: é o procedimento de suporte para devolver um banco
+ * a uma versão anterior da extensão (que recusa abrir um formato mais novo), e o teste da migração o cobre.
+ */
+export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
+  48: `
+    -- catalog volta ao valor antigo, que se deduz da ferramenta e do modo: a cópia tem id próprio
+    -- (tool = a base), o agente ACP pronto roda em acp e a CLI pronta em cli
+    UPDATE ai_profiles SET kind = CASE WHEN tool <> '' AND tool <> id THEN 'copy' WHEN mode = 'acp' THEN 'acp' ELSE 'builtin' END
+      WHERE kind = 'catalog';
+    ALTER TABLE ai_profiles DROP COLUMN mode;
+    ALTER TABLE ai_profiles DROP COLUMN tool;
+    ALTER TABLE ai_runs DROP COLUMN mode;
+  `,
+};
+
+/** Desfaz as migrações acima de `to`, da mais nova para a mais antiga, cada uma numa transação. */
+export function migrateDown(db: Database, to: number): void {
+  const res = db.exec("SELECT value FROM meta WHERE key = 'schema_version'");
+  let current = Number(res[0]?.values[0]?.[0] ?? 0);
+  while (current > to) {
+    const sql = DOWN_MIGRATIONS[current];
+    if (!sql) throw new Error(`A migração ${current} não tem caminho de volta.`);
+    db.exec('BEGIN;');
+    try {
+      db.exec(sql);
+      db.run("INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)", [String(current - 1)]);
+      db.exec('COMMIT;');
+    } catch (e) {
+      db.exec('ROLLBACK;');
+      throw new Error(`Volta da migração ${current} do banco do board: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    current--;
+  }
+}
 
 /** Aplica as migrações pendentes até `upTo` (por padrão, a versão atual). */
 export function migrate(db: Database, upTo = SCHEMA_VERSION): void {

@@ -2,13 +2,19 @@ import type { Database } from 'sql.js';
 import {
   BUILTIN_ISOLATION,
   BUILTIN_PROFILES,
-  isCatalogProfile,
+  PROFILE_MODES,
+  catalogTool,
+  isReadyCli,
+  isReadyProfile,
   newProfileId,
+  normalizeProfileKind,
   unknownProfileCapabilities,
   validateProfile,
   type AiProfile,
   type AiProfileDraft,
   type AiProfileConfig,
+  type AiProfileKind,
+  type ProfileMode,
 } from '../../shared/aiProfiles';
 import { credentialsFor, validSecretRef } from '../credentials';
 import { all, bool, num, one, run, str, transaction, type Row } from '../db/query';
@@ -28,14 +34,71 @@ const knownConfigKeys = [
   'statusArgs',
   'authPatterns',
 ];
-const copyKeys = ['command', 'env', 'extraArgs', 'installUrl', 'authPatterns', 'isolation'];
+/**
+ * Os ajustes que um perfil do catálogo guarda no cofre por cima da ferramenta (os `overrides` da cópia): o
+ * resto vem da ferramenta. São as mesmas chaves que a cópia guardava antes da migração 48, no mesmo lugar.
+ */
+const overrideKeys = ['command', 'env', 'extraArgs', 'installUrl', 'authPatterns', 'isolation'];
+type Identity = { kind: AiProfileKind; tool: string; mode: ProfileMode };
+/**
+ * Ferramenta e modo de uma linha gravada antes da migração 48 (`tool` vazio), pelo `kind` antigo:
+ * `builtin` → (id, cli); `acp` → (id, acp); `copy` → catálogo com a ferramenta da base, em cli;
+ * `custom` → (id, acp) com agente ACP no cofre, senão (id, cli). `catalogTool` dá o mesmo valor de antes.
+ */
+function legacyIdentity(row: Row, acpAgent: unknown): Identity {
+  const ready = BUILTIN_PROFILES.find((p) => p.id === row.id);
+  if (ready) return { kind: ready.kind, tool: ready.tool, mode: ready.mode };
+  const id = str(row.id);
+  // o agente ACP pronto que saiu do catálogo continua o que era: a própria ferramenta, em acp. Pela base
+  // (generic) ele viraria uma cópia, mudaria o catalogTool e o caminho de volta o gravaria como copy
+  if (row.kind === 'acp') return { kind: 'catalog', tool: id, mode: 'acp' };
+  if (normalizeProfileKind(row.kind) === 'catalog') return { kind: 'catalog', tool: str(row.base), mode: 'cli' };
+  return { kind: 'custom', tool: id, mode: typeof acpAgent === 'string' ? 'acp' : 'cli' };
+}
+/** A identidade gravada (schema 48) ou, com `tool` vazio, a deduzida do `kind` antigo. */
+function identityOf(row: Row, acpAgent: unknown): Identity {
+  const kind = normalizeProfileKind(row.kind);
+  const mode = PROFILE_MODES.find((m) => m === row.mode);
+  return row.tool && kind && mode ? { kind, tool: str(row.tool), mode } : legacyIdentity(row, acpAgent);
+}
 /** Configuração livre nunca passa pelo SQLite nem retorna ao editor. */
 export class AiProfileRepo {
   constructor(private readonly db: Database) {}
   private rows(boardId: string): Row[] {
     return all(this.db, 'SELECT * FROM ai_profiles WHERE board_id = ? ORDER BY position, id', [boardId]);
   }
+  /**
+   * Preenchimento preguiçoso da migração 48: grava `kind`, `tool` e `mode` nas linhas que ainda não têm
+   * ferramenta. Idempotente (só toca `tool = ''`). O personalizado depende do cofre: sem ler o cofre (falha
+   * ou configuração ausente, como no perfil importado de outra máquina) nada é gravado, e a leitura segue
+   * deduzindo; o primeiro `save` grava.
+   */
+  private fillToolAndMode(boardId: string): void {
+    const pending = all(this.db, "SELECT id, kind, base, secret_ref FROM ai_profiles WHERE board_id = ? AND tool = ''", [boardId]);
+    for (const row of pending) {
+      let acpAgent: unknown;
+      if (normalizeProfileKind(row.kind) === 'custom' && !BUILTIN_PROFILES.some((p) => p.id === row.id)) {
+        let saved: Record<string, unknown> | null;
+        try {
+          saved = credentialsFor(this.db).get(ownerOf(boardId, str(row.id)), str(row.secret_ref));
+        } catch {
+          continue;
+        }
+        if (!saved) continue;
+        acpAgent = saved.acpAgent;
+      } else if (!normalizeProfileKind(row.kind)) continue;
+      const identity = legacyIdentity(row, acpAgent);
+      run(this.db, "UPDATE ai_profiles SET kind = ?, tool = ?, mode = ? WHERE board_id = ? AND id = ? AND tool = ''", [
+        identity.kind,
+        identity.tool,
+        identity.mode,
+        boardId,
+        str(row.id),
+      ]);
+    }
+  }
   list(boardId: string): AiProfile[] {
+    this.fillToolAndMode(boardId);
     const result = this.rows(boardId).map((row) => this.publicProfile(row));
     for (const p of BUILTIN_PROFILES)
       if (!result.some((row) => row.id === p.id)) result.push({ ...structuredClone(p), capabilities: unknownProfileCapabilities() });
@@ -59,15 +122,16 @@ export class AiProfileRepo {
   }
   private publicProfile(row: Row): AiProfile {
     const builtin = BUILTIN_PROFILES.find((p) => p.id === row.id);
+    const config = builtin ? null : this.publicConfigOf(row);
     return {
       ...(builtin
         ? structuredClone(builtin)
         : {
             id: str(row.id),
             name: str(row.name),
-            kind: str(row.kind) as AiProfile['kind'],
+            ...identityOf(row, config!.acpAgent),
             base: str(row.base) as AiProfile['base'],
-            config: this.publicConfigOf(row),
+            config: config!,
           }),
       enabled: bool(row.enabled),
       position: num(row.position),
@@ -84,8 +148,11 @@ export class AiProfileRepo {
   }
   save(boardId: string, draft: AiProfileDraft, actor: 'person' | 'ai', reviewed = true): AiProfile {
     this.human(actor);
-    if (isCatalogProfile(draft) || BUILTIN_PROFILES.some((p) => p.id === draft.id))
+    const kind = normalizeProfileKind(draft.kind);
+    // no catálogo, o formulário só grava a cópia de uma CLI pronta; o agente ACP pronto vem do código
+    if ((kind === 'catalog' && draft.base === 'generic') || BUILTIN_PROFILES.some((p) => p.id === draft.id))
       throw new Error('Os perfis prontos não são editados: duplique para mudar.');
+    if (!kind) throw new Error('Tipo ou base do perfil inválido.');
     return transaction(this.db, () => {
       const rows = this.rows(boardId),
         old = rows.find((row) => row.id === draft.id);
@@ -97,16 +164,16 @@ export class AiProfileRepo {
             draft.name,
             rows.map((row) => str(row.id)),
           );
-      if (old && (old.kind !== draft.kind || old.base !== draft.base))
+      if (old && (normalizeProfileKind(old.kind) !== kind || old.base !== draft.base))
         throw new Error('O tipo e a base do perfil não são alterados: crie outro perfil.');
       const saved = old ? credentialsFor(this.db).get(ownerOf(boardId, id), str(old.secret_ref)) : null;
       // O navegador não recebe a configuração privada: campos omitidos numa edição mantêm o valor do cofre.
       // A cópia só retém chaves do seu próprio tipo; explicitamente enviadas, listas podem ser esvaziadas.
       const config: AiProfileConfig = {};
       for (const [key, value] of Object.entries(saved ?? {}))
-        if (draft.kind === 'custom' || copyKeys.includes(key) || !knownConfigKeys.includes(key)) config[key] = value;
+        if (kind === 'custom' || overrideKeys.includes(key) || !knownConfigKeys.includes(key)) config[key] = value;
       for (const [key, value] of Object.entries(draft.config)) {
-        if (draft.kind !== 'custom' && !copyKeys.includes(key)) continue;
+        if (kind !== 'custom' && !overrideKeys.includes(key)) continue;
         if (key === 'env' && value && typeof value === 'object' && !Array.isArray(value)) {
           const env = { ...(config.env ?? {}) };
           for (const [name, secret] of Object.entries(value)) {
@@ -116,19 +183,25 @@ export class AiProfileRepo {
           config.env = env;
         } else config[key] = value;
       }
-      const errors = validateProfile({ ...draft, config });
+      const errors = validateProfile({ ...draft, kind, config });
       if (errors.length) throw new Error(errors.join(' '));
+      // a ferramenta e o modo saem do tipo e da configuração, nunca do rascunho: a cópia é a ferramenta da base
+      // em cli; o personalizado é a própria ferramenta, em acp quando aponta um agente do catálogo ACP
+      const tool = kind === 'catalog' ? draft.base : id,
+        mode: ProfileMode = kind === 'custom' && typeof config.acpAgent === 'string' ? 'acp' : 'cli';
       const ref = credentialsFor(this.db).put(ownerOf(boardId, id), config);
       run(
         this.db,
-        `INSERT INTO ai_profiles(board_id,id,name,enabled,kind,base,position,secret_ref,review_state)
-        VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(board_id,id) DO UPDATE SET name=excluded.name, enabled=excluded.enabled, position=excluded.position, secret_ref=excluded.secret_ref, review_state=excluded.review_state, config_json='{}'`,
+        `INSERT INTO ai_profiles(board_id,id,name,enabled,kind,tool,mode,base,position,secret_ref,review_state)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(board_id,id) DO UPDATE SET name=excluded.name, enabled=excluded.enabled, kind=excluded.kind, tool=excluded.tool, mode=excluded.mode, position=excluded.position, secret_ref=excluded.secret_ref, review_state=excluded.review_state, config_json='{}'`,
         [
           boardId,
           id,
           draft.name.trim(),
           reviewed && draft.enabled ? 1 : 0,
-          draft.kind,
+          kind,
+          tool,
+          mode,
           draft.base,
           draft.position,
           ref,
@@ -153,18 +226,20 @@ export class AiProfileRepo {
   reviewBuiltin(boardId: string, id: string, actor: 'person' | 'ai'): void {
     this.human(actor);
     if (!BUILTIN_PROFILES.some((p) => p.id === id)) throw new Error('Forneça uma configuração revisada para este perfil.');
-    run(this.db, "UPDATE ai_profiles SET review_state = 'reviewed' WHERE board_id = ? AND id = ? AND kind IN ('builtin', 'acp')", [
-      boardId,
-      id,
-    ]);
+    // o kind antigo (builtin, acp) vale até o preenchimento da migração 48 gravar catalog
+    run(
+      this.db,
+      "UPDATE ai_profiles SET review_state = 'reviewed' WHERE board_id = ? AND id = ? AND kind IN ('catalog', 'builtin', 'acp')",
+      [boardId, id],
+    );
   }
   private ensureCatalogRow(boardId: string, id: string): void {
     const p = BUILTIN_PROFILES.find((profile) => profile.id === id);
     if (p)
       run(
         this.db,
-        "INSERT OR IGNORE INTO ai_profiles(board_id,id,name,enabled,kind,base,position,review_state) VALUES (?,?,?,?,?,?,?,'reviewed')",
-        [boardId, p.id, p.name, p.enabled ? 1 : 0, p.kind, p.base, p.position],
+        "INSERT OR IGNORE INTO ai_profiles(board_id,id,name,enabled,kind,tool,mode,base,position,review_state) VALUES (?,?,?,?,?,?,?,?,?,'reviewed')",
+        [boardId, p.id, p.name, p.enabled ? 1 : 0, p.kind, p.tool, p.mode, p.base, p.position],
       );
   }
   remove(boardId: string, id: string, actor: 'person' | 'ai'): void {
@@ -180,26 +255,37 @@ export class AiProfileRepo {
     if (!source) throw new Error('Perfil indisponível neste board.');
     // Cópia humana ganha referência própria; não herda revisão nem evidência executável.
     // a cópia de um agente ACP pronto é um perfil personalizado com o mesmo agente: o id novo é outra ferramenta do catálogo
-    const kind = source.kind === 'custom' || source.kind === 'acp' ? 'custom' : 'copy';
+    const kind: AiProfileKind = source.kind === 'custom' || source.mode === 'acp' ? 'custom' : 'catalog';
     const targetId = newProfileId(
       `${source.name} cópia`,
       profiles.map((p) => p.id),
     );
     const sourceRow = one(this.db, 'SELECT secret_ref FROM ai_profiles WHERE board_id = ? AND id = ?', [boardId, id]);
     // a cópia de um pronto leva a lista de itens que a CLI carrega (declaração herdada, sem a garantia do base)
-    const config =
-      source.kind === 'builtin'
-        ? source.base === 'generic'
-          ? null
-          : { isolation: { loads: structuredClone(BUILTIN_ISOLATION[source.base].loads) } }
-        : source.kind === 'acp'
-          ? structuredClone(source.config)
-          : credentialsFor(this.db).get(ownerOf(boardId, id), str(sourceRow?.secret_ref));
+    const config = isReadyCli(source)
+      ? source.base === 'generic'
+        ? null
+        : { isolation: { loads: structuredClone(BUILTIN_ISOLATION[source.base].loads) } }
+      : isReadyProfile(source)
+        ? structuredClone(source.config)
+        : credentialsFor(this.db).get(ownerOf(boardId, id), str(sourceRow?.secret_ref));
     const ref = config ? credentialsFor(this.db).put(ownerOf(boardId, targetId), config) : null;
+    // a cópia do catálogo continua a ferramenta da origem; a personalizada é outra ferramenta, no modo da origem
+    const tool = kind === 'catalog' ? catalogTool(source) : targetId;
     run(
       this.db,
-      "INSERT INTO ai_profiles(board_id,id,name,enabled,kind,base,position,secret_ref,review_state) VALUES (?,?,?,0,?,?,?,?,'pending')",
-      [boardId, targetId, `${source.name} (cópia)`, kind, source.base, Math.max(-1, ...profiles.map((p) => p.position)) + 1, ref],
+      "INSERT INTO ai_profiles(board_id,id,name,enabled,kind,tool,mode,base,position,secret_ref,review_state) VALUES (?,?,?,0,?,?,?,?,?,?,'pending')",
+      [
+        boardId,
+        targetId,
+        `${source.name} (cópia)`,
+        kind,
+        tool,
+        source.mode,
+        source.base,
+        Math.max(-1, ...profiles.map((p) => p.position)) + 1,
+        ref,
+      ],
     );
     return this.list(boardId).find((p) => p.id === targetId)!;
   }
@@ -259,12 +345,22 @@ export function validateProfileRows(rows: Row[], boardId: string): void {
       (row.secret_ref !== null && !validSecretRef(row.secret_ref))
     )
       throw new Error('A importação de perfis exige referências locais, sem valores.');
+    // os dois conjuntos de valores: o do schema 48 (catalog/custom, com ferramenta e modo) e o antigo
+    // (builtin, acp, copy, custom), com a ferramenta vazia até o repositório preencher
+    const kind = normalizeProfileKind(row.kind),
+      tool = str(row.tool),
+      mode = row.mode === undefined ? 'cli' : str(row.mode);
+    const legacy = builtin ? (builtin.mode === 'acp' ? 'acp' : 'builtin') : kind === 'catalog' ? 'copy' : 'custom';
     if (
-      builtin
-        ? row.kind !== builtin.kind || row.base !== builtin.base || row.secret_ref !== null
-        : !['copy', 'custom'].includes(str(row.kind)) ||
-          (row.kind === 'custom') !== (row.base === 'generic') ||
-          !['claude', 'cursor', 'kimi', 'generic'].includes(str(row.base))
+      (row.kind !== 'catalog' && row.kind !== legacy) ||
+      (row.kind === 'catalog' && !tool) ||
+      !PROFILE_MODES.some((m) => m === mode) ||
+      (builtin
+        ? row.base !== builtin.base || row.secret_ref !== null || (tool !== '' && (tool !== builtin.tool || mode !== builtin.mode))
+        : (kind === 'custom') !== (row.base === 'generic') ||
+          !['claude', 'cursor', 'kimi', 'generic'].includes(str(row.base)) ||
+          (tool !== '' && tool !== (kind === 'catalog' ? str(row.base) : id)) ||
+          (kind === 'catalog' && mode !== 'cli'))
     )
       throw new Error('Tipo ou base do perfil importado inválido.');
     if (

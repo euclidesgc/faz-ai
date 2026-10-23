@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Badge, RadioGroup } from '@radix-ui/themes';
-import { PROFILE_CAPABILITIES, contextEnforced, isCatalogProfile, profileIsolation, type AiProfile } from '../../../shared/aiProfiles';
+import {
+  PROFILE_CAPABILITIES,
+  contextEnforced,
+  isReadyProfile,
+  modeLabel,
+  profileIsolation,
+  toolLabel,
+  type AiProfile,
+} from '../../../shared/aiProfiles';
 import type { HostToWebview } from '../../../shared/messages';
 import { settings } from '../../commands';
 import { t } from '../../i18n';
@@ -66,14 +74,15 @@ export function AiToolsSettings() {
     void settings.probeAiProfiles();
   };
   const profiles = state.board.aiProfiles;
-  const typeOf = (p: AiProfile) =>
-    p.kind === 'builtin'
-      ? t('Perfil pronto')
-      : p.kind === 'acp'
-        ? t('Agente ACP')
-        : p.kind === 'custom'
-          ? t('Personalizado')
-          : t('Cópia de {base}', { base: p.base });
+  // o rótulo é "ferramenta · modo" ("Gemini · ACP"); a cópia e o personalizado dizem também de onde vêm
+  const typeOf = (p: AiProfile) => {
+    const mode = modeLabel(p.mode);
+    return isReadyProfile(p)
+      ? `${toolLabel(p.tool)} · ${mode}`
+      : p.kind === 'custom'
+        ? t('Personalizado · {mode}', { mode })
+        : t('Cópia de {base}', { base: `${toolLabel(p.tool)} · ${mode}` });
+  };
   const statusOf = (p: AiProfile) => {
     const s = statuses[p.id];
     if (!s) return t('A verificar');
@@ -156,7 +165,7 @@ export function AiToolsSettings() {
                       >
                         {t('Duplicar')}
                       </ActionButton>
-                      {!isCatalogProfile(profile) && (
+                      {!isReadyProfile(profile) && (
                         <ActionButton
                           size="1"
                           variant="soft"
@@ -167,7 +176,7 @@ export function AiToolsSettings() {
                           {t('Editar')}
                         </ActionButton>
                       )}
-                      {!isCatalogProfile(profile) && !standard && (
+                      {!isReadyProfile(profile) && !standard && (
                         <DeleteButton
                           variant="ghost"
                           question={t('Apagar o perfil "{name}"?', { name: profile.name })}

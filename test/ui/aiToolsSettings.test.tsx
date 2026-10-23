@@ -62,7 +62,9 @@ describe('Ferramentas de IA', () => {
       ),
     );
     const gemini = within(profileCard('Gemini CLI'));
-    expect(gemini.getByText('Agente ACP')).toBeInTheDocument();
+    // o rótulo é a ferramenta e o modo
+    expect(gemini.getByText('Gemini · ACP')).toBeInTheDocument();
+    expect(within(profileCard('Claude Code')).getByText('Claude Code · CLI')).toBeInTheDocument();
     expect(gemini.getByRole('switch', { name: 'Ligado' })).not.toBeChecked();
     expect(gemini.getByRole('switch', { name: 'Ligado' })).toBeEnabled();
     expect(gemini.getByRole('link', { name: 'Instalar' })).toHaveAttribute('href', 'https://geminicli.com/docs/cli/acp-mode');

@@ -236,6 +236,8 @@ describe('verifyExecutor com agente ACP', () => {
     id: 'gemini-acp',
     name: 'Gemini ACP',
     kind: 'custom',
+    tool: 'gemini-acp',
+    mode: 'acp',
     base: 'generic',
     enabled: true,
     position: 5,
@@ -452,7 +454,7 @@ describe('verificação por perfil', () => {
         {
           ...builtin('claude'),
           id: 'claude-copia',
-          kind: 'copy' as const,
+          kind: 'catalog' as const,
           credentials: { secretRef: 'x', review: 'pending' as const, available: true },
         },
       ],

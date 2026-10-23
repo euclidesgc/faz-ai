@@ -1,4 +1,4 @@
-import { BUILTIN_PROFILES, validateProfile, type AiBase, type AiProfile } from '../../../shared/aiProfiles';
+import { BUILTIN_PROFILES, validateProfile, type AiBase, type AiProfile, isCatalogCopy, isReadyCli } from '../../../shared/aiProfiles';
 import { copyOf } from './copy';
 import { genericProvider } from './generic';
 // O registro dos providers: um por ferramenta, e o tipo `Record<AiBase, …>` faz o compilador exigir que
@@ -28,12 +28,12 @@ export function executorProfile(executor: AiExecutor): AiProfile {
 }
 export function providerFor(executor: AiExecutor): AiProvider {
   const profile = executorProfile(executor);
-  if (profile.kind === 'builtin') {
+  if (isReadyCli(profile)) {
     if (!isAiBase(profile.id) || profile.base !== profile.id) throw new Error('Perfil pronto inválido.');
     return PROVIDERS[profile.id];
   }
   // o agente ACP pronto segue o caminho do personalizado: o gateway troca o provider pelo transporte ACP
   const errors = validateProfile(profile);
   if (errors.length) throw new Error(errors.join(' '));
-  return profile.kind === 'copy' && isAiBase(profile.base) ? copyOf(PROVIDERS[profile.base], profile) : genericProvider(profile);
+  return isCatalogCopy(profile) && isAiBase(profile.base) ? copyOf(PROVIDERS[profile.base], profile) : genericProvider(profile);
 }

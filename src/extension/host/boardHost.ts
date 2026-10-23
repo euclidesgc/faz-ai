@@ -8,6 +8,8 @@ import {
   profileLabel,
   verifiableProfile,
   type AiProfile,
+  isReadyAcp,
+  isReadyCli,
 } from '../../shared/aiProfiles';
 import { admissionProfileOf } from '../../shared/contextAdmissionPreview';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
@@ -429,7 +431,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   };
   /** O perfil com a configuração privada, para resolver o comando e os probes; a pública traz `config` vazio. */
   const resolvedProfile = (meta: AiProfile): AiProfile => {
-    if (meta.kind === 'builtin' || meta.kind === 'acp' || !profileCanProbe(meta)) return meta;
+    if (isReadyCli(meta) || isReadyAcp(meta) || !profileCanProbe(meta)) return meta;
     try {
       return new AiProfileRepo(handle.db).resolveProfile(router.boardId, meta.id);
     } catch {
@@ -514,7 +516,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     const hadNode = !!nodePath;
     nodePath = resolveCommand('node', pathEnv, homeDir) ?? undefined;
     const meta = board.aiProfiles.find((p) => p.id === board.aiTool);
-    if (!hadNode && nodePath && (!meta || (meta.kind === 'builtin' && profileCanProbe(meta)))) pinMcp();
+    if (!hadNode && nodePath && (!meta || (isReadyCli(meta) && profileCanProbe(meta)))) pinMcp();
     lastCheckError = null;
     checking = computeHealth(false, forceSigninCheck)
       .then((health) => ({ health, list: checkRequirements({ nodePath, health, harnessIssues: harnessIssuesNow() }) }))

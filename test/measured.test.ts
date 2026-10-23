@@ -680,6 +680,8 @@ it('personalizado em texto usa o transporte uma vez e conserva consumo desconhec
     id: 'custom',
     name: 'Custom',
     kind: 'custom',
+    tool: 'custom',
+    mode: 'cli',
     base: 'generic',
     enabled: true,
     position: 3,

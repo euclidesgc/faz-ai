@@ -14,8 +14,7 @@ export const settings: Record<string, string> = {
   'Os perfis de CLI são dados do board. Configuração não comprova isolamento, permissões ou acesso ao MCP.':
     'CLI profiles are board data. Configuration does not prove isolation, permissions, or MCP access.',
   'Perfil padrão': 'Default profile',
-  'Perfil pronto': 'Builtin profile',
-  Personalizado: 'Custom',
+  'Personalizado · {mode}': 'Custom · {mode}',
   'Cópia de {base}': 'Copy of {base}',
   'A verificar': 'Not checked yet',
   'Não encontrada': 'Not found',

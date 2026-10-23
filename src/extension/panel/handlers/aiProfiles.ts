@@ -1,3 +1,4 @@
+import { isReadyCli } from '../../../shared/aiProfiles';
 import type { AiProfile } from '../../../shared/aiProfiles';
 import type { HostToWebview } from '../../../shared/messages';
 import type { StrictExecutionRequest } from '../../../shared/executionAdmission';
@@ -123,7 +124,7 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
           cwd: deps.cwd,
           timeoutMinutes: 2,
           prepare: () => ({
-            ...(profile!.kind === 'builtin' ? {} : { strict: { profileId: id, request: strict } }),
+            ...(isReadyCli(profile!) ? {} : { strict: { profileId: id, request: strict } }),
             // runtime v1: o teste do perfil também passa pelo contrato (fechado, sem MCP)
             ...(deps.gateway.runtime === 'v1' ? closedV1(id, 'chat', runner) : {}),
             config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: true, skills: [], mcp: [] },

@@ -10,6 +10,7 @@ import type { Database, SqlValue } from 'sql.js';
 import { LARGE_EXPORT_BYTES, type ImportSummary } from '../../shared/backup';
 import { isSafeRelPath } from '../../shared/artifacts';
 import { validateAdmissionDecision } from '../../shared/executionAdmission';
+import { PROFILE_MODES } from '../../shared/aiProfiles';
 import { isSafeSegment, safeName, type AttachmentStore } from '../attachments';
 import { newDatabase } from './database';
 import { all, num, one, run, str, transaction, type Row } from './query';
@@ -34,6 +35,12 @@ export interface ExportTable {
   hasId: boolean;
   /** a versão do banco que criou a tabela: um export de versão anterior não a tem, e ela vale como vazia */
   since?: number;
+  /**
+   * Colunas que entraram depois da tabela, com a versão do banco que as criou. Num arquivo dessa versão em
+   * diante a linha precisa trazê-las; num anterior elas faltam, e a migração do banco em memória as cria
+   * com o padrão (quem preenche é o repositório, como num banco antigo).
+   */
+  columns?: Readonly<Record<string, number>>;
 }
 
 const byCard = 'card_id IN (SELECT id FROM cards WHERE board_id = ?)';
@@ -55,7 +62,7 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'card_links', where: 'from_id IN (SELECT id FROM cards WHERE board_id = ?)', hasId: true },
   { name: 'attachments', where: byCard, hasId: true },
   { name: 'card_events', where: 'board_id = ?', hasId: true },
-  { name: 'ai_runs', where: 'board_id = ?', hasId: true },
+  { name: 'ai_runs', where: 'board_id = ?', hasId: true, columns: { mode: 48 } },
   { name: 'ai_run_usage', where: 'run_id IN (SELECT id FROM ai_runs WHERE board_id = ?)', hasId: false },
   { name: 'ai_run_bash', where: 'run_id IN (SELECT id FROM ai_runs WHERE board_id = ?)', hasId: false, since: 33 },
   // a marcação do harness é deste board: vai junto (os caminhos relativos ao projeto e a `~` valem na outra máquina)
@@ -65,7 +72,7 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'board_artifacts', where: 'board_id = ?', hasId: true, since: 34 },
   { name: 'agent_context_contracts', where: 'board_id = ?', hasId: false, since: 35 },
   { name: 'activity_context_selections', where: 'board_id = ?', hasId: true, since: 35 },
-  { name: 'ai_profiles', where: 'board_id = ?', hasId: false, since: 42 },
+  { name: 'ai_profiles', where: 'board_id = ?', hasId: false, since: 42, columns: { tool: 48, mode: 48 } },
   { name: 'execution_policies', where: 'board_id = ?', hasId: true, since: 41 },
   { name: 'execution_policy_versions', where: 'board_id = ?', hasId: false, since: 41 },
   { name: 'board_artifact_files', where: 'artifact_id IN (SELECT id FROM board_artifacts WHERE board_id = ?)', hasId: false, since: 34 },
@@ -241,6 +248,8 @@ export function parseExportFile(text: string): BoardExportFile {
     for (const row of rows) {
       if (!isRow(row)) throw invalid(`linha inválida em "${t.name}".`);
       if (t.hasId && (typeof row.id !== 'string' || !row.id)) throw invalid(`linha sem id em "${t.name}".`);
+      for (const [column, since] of Object.entries(t.columns ?? {}))
+        if (f.schemaVersion >= since && !(column in row)) throw invalid(`falta a coluna "${column}" em "${t.name}".`);
     }
   }
   validateAdmissionRows(tables.ai_runs as Row[]);
@@ -506,6 +515,11 @@ function parentsFirst(rows: Row[]): Row[] {
   return out;
 }
 
+/** As linhas de `ai_runs` que entram ou saem no arquivo: a decisão de admissão e o modo da execução (48). */
 function validateAdmissionRows(rows: readonly Row[]): void {
-  for (const row of rows) if (row.admission_json != null) validateAdmissionDecision(JSON.parse(str(row.admission_json)));
+  for (const row of rows) {
+    if (row.admission_json != null) validateAdmissionDecision(JSON.parse(str(row.admission_json)));
+    // nulo é "não registrado" (execução anterior à 48); fora isso, só os modos que o board grava
+    if (row.mode != null && !PROFILE_MODES.some((m) => m === row.mode)) throw invalid('modo de execução inválido.');
+  }
 }

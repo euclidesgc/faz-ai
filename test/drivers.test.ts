@@ -113,12 +113,14 @@ describe('drivers ACP: envolvem ACP_AGENTS', () => {
   });
 });
 
-describe('toolModeOf: adaptador temporário do perfil para (ferramenta, modo), até a história 4', () => {
+describe('toolModeOf: o perfil para (ferramenta, modo) do driver, pelos campos da história 4', () => {
   const profile = (p: Partial<AiProfile>): AiProfile => ({
     id: 'x',
     name: 'X',
     enabled: true,
     kind: 'custom',
+    tool: 'x',
+    mode: 'cli',
     base: 'generic',
     config: {},
     position: 9,
@@ -128,11 +130,14 @@ describe('toolModeOf: adaptador temporário do perfil para (ferramenta, modo), a
   it('pronto e cópia: a base pela CLI; agente ACP: o agente pelo ACP; CLI personalizada: sem driver', () => {
     expect(toolModeOf(BUILTIN_PROFILES.find((p) => p.id === 'claude')!)).toEqual({ tool: 'claude', mode: 'cli' });
     expect(toolModeOf(BUILTIN_PROFILES.find((p) => p.id === 'gemini')!)).toEqual({ tool: 'gemini', mode: 'acp' });
-    expect(toolModeOf(profile({ id: 'meu-kimi', kind: 'copy', base: 'kimi' }))).toEqual({ tool: 'kimi', mode: 'cli' });
-    expect(toolModeOf(profile({ id: 'meu-gemini', config: { acpAgent: 'gemini' } }))).toEqual({ tool: 'gemini', mode: 'acp' });
+    expect(toolModeOf(profile({ id: 'meu-kimi', kind: 'catalog', tool: 'kimi', base: 'kimi' }))).toEqual({ tool: 'kimi', mode: 'cli' });
+    expect(toolModeOf(profile({ id: 'meu-gemini', tool: 'meu-gemini', mode: 'acp', config: { acpAgent: 'gemini' } }))).toEqual({
+      tool: 'gemini',
+      mode: 'acp',
+    });
     expect(toolModeOf(profile({ config: { command: 'minha-cli' } }))).toBeNull();
     expect(driverOf(profile({ config: { command: 'minha-cli' } }))).toBeUndefined();
-    expect(driverOf(profile({ kind: 'copy', base: 'cursor' }))?.tool).toBe('cursor');
+    expect(driverOf(profile({ kind: 'catalog', tool: 'cursor', base: 'cursor' }))?.tool).toBe('cursor');
   });
 
   it('enforcementOf não muda: CLI pronta pela tabela, agente ACP com MCP garantido, personalizada só orientação', () => {
@@ -141,7 +146,7 @@ describe('toolModeOf: adaptador temporário do perfil para (ferramenta, modo), a
     const acp = { agent: 'advised', skills: 'advised', mcp: 'enforced', tools: 'advised', model: 'advised' };
     expect(enforcementOf(BUILTIN_PROFILES.find((p) => p.id === 'gemini')!)).toMatchObject(acp);
     // o agente ACP fora do catálogo da tela (Cursor pelo ACP, num personalizado) tem a linha do protocolo
-    expect(enforcementOf(profile({ config: { acpAgent: 'cursor' } }))).toMatchObject(acp);
+    expect(enforcementOf(profile({ mode: 'acp', config: { acpAgent: 'cursor' } }))).toMatchObject(acp);
     expect(enforcementOf(profile({ config: { command: 'minha-cli' } }))).toMatchObject({
       agent: 'advised',
       skills: 'advised',

@@ -180,7 +180,15 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   ]);
 
   // perfil ACP: os mesmos servidores do card vão no JSON (o transporte os passa no `session/new`), sem arquivo
-  const acpCli = { ...router.snapshot().board.aiProfiles[0]!, id: 'gemini-acp', base: 'generic', config: { acpAgent: 'gemini' } } as never;
+  const acpCli = {
+    ...router.snapshot().board.aiProfiles[0]!,
+    id: 'gemini-acp',
+    kind: 'custom',
+    tool: 'gemini-acp',
+    mode: 'acp',
+    base: 'generic',
+    config: { acpAgent: 'gemini' },
+  } as never;
   const acpPlan = executionPlan(router.snapshot(), card(), router.libraryMcpDefinitions(), bridge, {
     cli: acpCli,
     model: null,
@@ -994,13 +1002,24 @@ describe('executor da IA', () => {
     expect(headlessUnsupported('cursor', 'board')).toBeNull();
     expect(headlessUnsupported('perfil-personalizado', 'board')).toContain('ainda não disponível');
     // perfil personalizado resolvido: a restrição é só a falta de argumentos por nível; no ACP o board responde a permissão
-    const custom = { id: 'meu', name: 'Meu', kind: 'custom', base: 'generic', enabled: true, config: { command: 'x' } } as never;
+    const custom = {
+      id: 'meu',
+      name: 'Meu',
+      kind: 'custom',
+      tool: 'meu',
+      mode: 'cli',
+      base: 'generic',
+      enabled: true,
+      config: { command: 'x' },
+    } as never;
     expect(headlessUnsupported(custom, 'board')).toContain('não declara argumentos');
     expect(headlessUnsupported(custom, 'full')).toBeNull();
     const acp = {
       id: 'gemini-acp',
       name: 'Gemini ACP',
       kind: 'custom',
+      tool: 'gemini-acp',
+      mode: 'acp',
       base: 'generic',
       enabled: true,
       config: { acpAgent: 'gemini' },

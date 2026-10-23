@@ -319,6 +319,7 @@ describe('Diagnóstico do ambiente', () => {
     const custom: ProfileHealth = {
       ...health('cursor', false),
       kind: 'custom',
+      mode: 'cli',
       base: 'generic',
       install: { url: 'https://example.org/i' },
     };

@@ -1,4 +1,4 @@
-import { isAcpProfile, isCatalogProfile, type AiProfile } from '../shared/aiProfiles';
+import { isAcpProfile, isReadyProfile, type AiProfile, isReadyAcp, isReadyCli } from '../shared/aiProfiles';
 import { acpAgent } from './ai/acp/agents';
 import { CLI_COMMAND } from '../shared/requirements';
 import { baseValue } from '../shared/harness';
@@ -170,14 +170,14 @@ export function commandNotFound(command: string): string {
 /** O comando privado do perfil nunca vira rótulo de requisito nem argumento de shell. */
 export function profileCommand(profile: AiProfile): string {
   const standard = baseValue(CLI_COMMAND, profile.base) ?? '';
-  if (profile.kind === 'builtin') return standard;
-  if (profile.kind !== 'acp' && typeof profile.config.command === 'string' && profile.config.command.trim()) return profile.config.command;
+  if (isReadyCli(profile)) return standard;
+  if (!isReadyAcp(profile) && typeof profile.config.command === 'string' && profile.config.command.trim()) return profile.config.command;
   // o perfil ACP sem comando próprio (e o pronto, sempre) roda o agente do catálogo: é ele que a sonda procura no PATH
   const agent = isAcpProfile(profile) ? acpAgent(String(profile.config.acpAgent)) : undefined;
   return agent?.command ?? standard;
 }
 export function resolveProfileCommand(profile: AiProfile, pathEnv: string | undefined, homeDir: string): string | null {
-  return resolveCommand(profileCommand(profile), isCatalogProfile(profile) ? pathEnv : (profile.config.env?.PATH ?? pathEnv), homeDir, {
+  return resolveCommand(profileCommand(profile), isReadyProfile(profile) ? pathEnv : (profile.config.env?.PATH ?? pathEnv), homeDir, {
     onlyPath: profile.kind === 'custom',
   });
 }

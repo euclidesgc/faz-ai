@@ -1,6 +1,6 @@
 // Alvo da execução: o perfil de CLI e o modelo que valem para um card. Regra pura (sem banco nem `vscode`).
 // O valor do campo Modelo (`<perfil>:<modelo>@<esforço>`) carrega a CLI: o prefixo identifica o perfil.
-import { activeProfile, catalogTool, profileLabel, type AiProfile } from './aiProfiles';
+import { activeProfile, catalogTool, profileLabel, type AiProfile, isCatalogCopy } from './aiProfiles';
 import type { BoardState, Card } from './model';
 import { modelFieldOf, parseModelValue, suggestModelRule, type ModelOption } from './models';
 import { profileOf } from './execution';
@@ -46,7 +46,7 @@ export function cliOfValue(board: Pick<TargetBoard, 'aiTool' | 'aiProfiles'>, va
   const matching = board.aiProfiles.filter((p) => p.enabled && catalogTool(p) === prefix);
   const standard = activeProfile(board);
   if (standard.enabled && catalogTool(standard) === prefix) return standard;
-  return matching.find((p) => p.kind !== 'copy') ?? matching[0] ?? null;
+  return matching.find((p) => !isCatalogCopy(p)) ?? matching[0] ?? null;
 }
 
 function blockOf(board: TargetBoard, value: string, source: RunTargetSource): RunTargetBlock | null {
