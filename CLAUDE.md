@@ -30,6 +30,15 @@ na Revisão de uma história, rode só o que a mudança afeta:
 
 Não rode `npm test` nem `vitest run` sem filtro fora do release, nem em subagentes em segundo plano.
 
+### Antes de concluir
+
+- Antes de dar uma história ou atividade como concluída, e antes de abrir ou mergear o PR, rode
+  `npm run validate` (typecheck, eslint e prettier nos alterados contra `origin/develop`,
+  `vitest related` e os cenários de `test/scenarios/`). Só conclua com ele passando.
+- Toda história que muda o comportamento da execução de um card (plano, gateway, admissão,
+  transporte, leitura da saída, conferência, mensagens do runner) ganha ou atualiza um cenário em
+  `test/scenarios/`: o caminho real do card até a conversa, com só o processo da ferramenta falso.
+
 ## Convenções
 
 - Comentários, mensagens e nomes de teste em português. O comentário diz o porquê.
