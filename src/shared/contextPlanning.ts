@@ -2,6 +2,7 @@
 import type { BoardArtifact, ToolCategory } from './artifacts';
 import type { BoardState } from './model';
 import type { AiTool } from './harness';
+import { NATIVE_AGENT_TOOLS } from './agentTools';
 
 export const CONTEXT_ACTIONS = [
   'work',
@@ -151,7 +152,7 @@ export function validateAgentContext(v: unknown): asserts v is AgentContextContr
   keys(v.tools.native, ['tool', 'allow', 'deny']);
   if (
     typeof v.tools.native.tool !== 'string' ||
-    !['', 'claude', 'cursor', 'kimi'].includes(v.tools.native.tool) ||
+    !NATIVE_AGENT_TOOLS.includes(v.tools.native.tool) ||
     !strings(v.tools.native.allow) ||
     !strings(v.tools.native.deny)
   )

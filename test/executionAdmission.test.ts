@@ -121,6 +121,34 @@ describe('admissão por capacidades', () => {
       decide(request({ agentTools: { categories: ['run'], native: { tool: 'claude', allow: ['Bash(git *)'], deny: [] } } })).reasons,
     ).toContainEqual({ code: 'unsupported-native-restriction' });
   });
+  it('conhece o Gemini (ferramenta por modo, história 5): agente nativo dele não é pedido inválido', () => {
+    const gemini = (allow: string[]) => request({ agentTools: { categories: ['read'], native: { tool: 'gemini', allow, deny: [] } } });
+    // no executor Claude é outro executor, não um pedido malformado
+    expect(decide(gemini([])).reasons).toContainEqual({ code: 'native-executor-mismatch' });
+    expect(decide(gemini([])).reasons).not.toContainEqual({ code: 'invalid-request' });
+    // no executor Gemini (o modo CLI, história 8) os nomes da tabela dele são reconhecidos e traduzidos pelo nível
+    const own = admitExecution(
+      'gemini',
+      'board',
+      { ...gemini(['read_file']), mcpLevel: { permission: 'board', tools: [] } },
+      BINDING,
+      evidence(),
+      NOW,
+    );
+    expect(own.reasons).not.toContainEqual({ code: 'unsupported-native-restriction' });
+    expect(own.tools).toEqual(['read_file']);
+    // o perfil ACP do Gemini entra na admissão como `generic`: nenhuma ferramenta nativa traduzida, como antes
+    const acp = admitExecution(
+      'generic',
+      'board',
+      { ...request(), mcpLevel: { permission: 'board', tools: [] } },
+      BINDING,
+      evidence(),
+      NOW,
+      'acp',
+    );
+    expect(acp.tools).toEqual([]);
+  });
   it('MCP permitido sem seleção não é ativado e MCP fora dos limites é recusado', () => {
     const r = request({ mcpServers: [{ artifactId: 'm', name: 'memoria' }], allowedMcpIds: ['m'], boardMcpIds: ['m'] });
     expect(decide(r).activeMcpIds).toEqual([]);

@@ -5,8 +5,8 @@ import * as path from 'node:path';
 import type { AiTool } from '../shared/harness';
 import type { HarnessIssue } from '../shared/harnessStatus';
 import { boardAvailability, type ProfileHealth } from '../shared/profileHealth';
-import { LOGIN_COMMAND, type BoardRequirement } from '../shared/requirements';
-import { baseValue } from '../shared/harness';
+import type { BoardRequirement } from '../shared/requirements';
+import { driverOf } from './ai/drivers';
 import { byPath } from './samePath';
 import { kimiHome } from './mcp/clientConfig';
 
@@ -114,8 +114,9 @@ export function checkRequirements(p: RequirementProbe): BoardRequirement[] {
   if (availability.blocked) out.push({ id: 'no-profile', reason: availability.reason, action: { kind: 'diagnostic' } });
   for (const w of availability.warnings) {
     const health = p.health.find((h) => h.id === w.id)!;
-    // o login dos prontos tem comando conhecido; o dos demais se resolve pelo bloco do perfil
-    const login = health.kind === 'builtin' && w.problem === 'signin' ? baseValue(LOGIN_COMMAND, health.base) : undefined;
+    // o login dos prontos tem comando conhecido, o do driver da CLI; o dos demais se resolve pelo bloco do perfil
+    const auth = health.kind === 'builtin' && w.problem === 'signin' ? driverOf(health)?.auth : undefined;
+    const login = auth?.kind === 'login-command' ? auth.command : undefined;
     out.push({
       id: 'profile',
       profile: w.id,

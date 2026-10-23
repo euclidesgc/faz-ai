@@ -1,5 +1,4 @@
-import { baseValue } from '../shared/harness';
-import type { AiBase } from '../shared/aiProfiles';
+import { driverOf, type ConnectionDriver } from './ai/drivers';
 import * as path from 'node:path';
 import type { BranchRenamePending } from '../shared/branchRename';
 import { NODE_MIN_MAJOR, type EnvCheck, type EnvironmentReport, type InstallStep } from '../shared/environment';
@@ -74,35 +73,23 @@ const DOCS: Record<string, string> = {
   uv: 'https://docs.astral.sh/uv/getting-started/installation/',
   'crg-embeddings': `${CRG_DOCS}#usage`,
 };
-/** Onde cada CLI pronta explica como instalar (conferido em 2026-10-13). */
-const CLI_DOCS: Record<AiBase, string> = {
-  claude: 'https://code.claude.com/docs/en/setup',
-  cursor: 'https://cursor.com/docs/cli/installation',
-  kimi: 'https://www.kimi.com/code/docs/en/',
-};
-
 /**
  * Os comandos que instalam cada programa, conforme o site oficial dele (conferido em 2026-10-11): os
  * instaladores neutros, que valem em qualquer distribuição (`curl` no Linux e no macOS, PowerShell no
- * Windows). O git e o GitHub CLI não têm um assim: ver `packageInstall`.
+ * Windows). Os das CLIs de IA (e a página de cada uma) vêm do driver de conexão da ferramenta. O git e o
+ * GitHub CLI não têm um assim: ver `packageInstall`.
  */
 const steps = (...commands: string[]): InstallStep[] => commands.map((command) => ({ command }));
 const NVM: InstallStep = { command: 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash', step: 'nvm' };
-const INSTALL: Record<'unix' | 'windows', Record<'node' | AiBase | 'uv', InstallStep[]>> = {
+const INSTALL: Record<'unix' | 'windows', Record<'node' | 'uv', InstallStep[]>> = {
   unix: {
     // o Node.js pelo nvm, como o site do Node.js ensina: primeiro o nvm, depois o Node com ele
     node: [NVM, { command: '. "$HOME/.nvm/nvm.sh"', step: 'nvm-load' }, { command: `nvm install ${NODE_MIN_MAJOR}`, step: 'node' }],
-    claude: steps('curl -fsSL https://claude.ai/install.sh | bash'),
-    cursor: steps('curl https://cursor.com/install -fsS | bash'),
-    kimi: steps('npm install -g @moonshot-ai/kimi-code'),
     uv: steps('curl -LsSf https://astral.sh/uv/install.sh | sh'),
   },
   // no Windows, o instalador de cada um já põe o programa no PATH: falta só abrir um terminal novo
   windows: {
     node: steps('winget install OpenJS.NodeJS.LTS'),
-    claude: steps('irm https://claude.ai/install.ps1 | iex'),
-    cursor: steps("irm 'https://cursor.com/install?win32=true' | iex"),
-    kimi: steps('npm install -g @moonshot-ai/kimi-code'),
     uv: steps('powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"'),
   },
 };
@@ -197,10 +184,11 @@ const flowSkillCopy = (paths: string[]): EnvCheck => ({ id: 'flow-skill-copy', s
 export async function checkEnvironment(p: EnvironmentProbe): Promise<EnvironmentReport> {
   const req = (id: BoardRequirement['id']) => p.requirements.find((r) => r.id === id);
   const windows = p.platform === 'win32';
-  const install = INSTALL[windows ? 'windows' : 'unix'];
+  const platform = windows ? 'windows' : 'unix';
+  const install = INSTALL[platform];
   const reopen = windows ? { reopenTerminal: true as const } : {};
-  // a CLI de cada perfil pronto, com o PATH quando ela cai numa pasta fora dele
-  const cliInstall = (base: AiBase) => [...(baseValue(install, base) ?? []), ...localBin(p, true)];
+  // a CLI de cada perfil pronto, pelo driver da ferramenta, com o PATH quando ela cai numa pasta fora dele
+  const cliInstall = (driver: ConnectionDriver) => [...driver.install(platform), ...localBin(p, true)];
 
   // o Node.js que roda o MCP do board: a partir da versão mínima
   const nodeExe = p.resolve('node');
@@ -221,11 +209,10 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
   };
 
   // os perfis: o que faltar em cada CLI pronta traz o instalador oficial do sistema; os demais já trazem o link
-  const profiles = p.health.map((h): ProfileHealth =>
-    h.kind === 'builtin' && h.probe?.found !== true && h.base !== 'generic'
-      ? { ...h, install: { steps: cliInstall(h.base), docs: CLI_DOCS[h.base] } }
-      : h,
-  );
+  const profiles = p.health.map((h): ProfileHealth => {
+    const driver = h.kind === 'builtin' && h.probe?.found !== true ? driverOf(h) : undefined;
+    return driver ? { ...h, install: { steps: cliInstall(driver), docs: driver.docs } } : h;
+  });
 
   const gitExe = p.resolve('git');
   const repo = gitExe ? (await p.run(gitExe, ['rev-parse', '--is-inside-work-tree'], p.workspaceDir))?.trim() === 'true' : false;

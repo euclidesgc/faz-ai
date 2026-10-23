@@ -47,6 +47,39 @@ in progress stays on its branches and cards. Integrating into `develop` does not
 extension. `main` only accepts changes through pull requests, and the release script already deals
 with that.
 
+## How an AI tool comes in
+
+The board talks to each AI tool in a **mode**: the one-shot CLI (`cli`), the Agent Client Protocol
+(`acp`) or the model's API (`api`). Whatever is specific to a (tool, mode) pair lives in a driver; the
+board, the screens and the admission only talk to the contract.
+
+1. **The driver**: `src/extension/ai/drivers/<tool>/<mode>.ts`, with the connection contract
+   (`ConnectionDriver`, in `drivers/types.ts`): command, `locate`, version arguments, install page and
+   commands, how to sign in (`auth`), the sign-in probe (`signedIn`), the model list when the tool
+   gives it by command (`listModels`), what the gateway measures (`measure`) and what the board
+   enforces (`enforcement`). A ready CLI wraps its provider (`ai/providers/`, with the reader in
+   `aiOutput/`) through `cliDriver`; an ACP agent is an entry in `ACP_AGENTS` (`ai/acp/agents.ts`),
+   which `acpDriver` turns into a driver. Register the driver in `drivers/index.ts` (`driverFor`).
+2. **The catalog row**: the tool's entry in `TOOLS` (`src/shared/aiTools.ts`), with the page, the
+   billing note, the offered modes (only the ones with a driver), the planned ones (with the story
+   that delivers them), the recommended mode with the reason and each mode's sheet, with the eight
+   lines the screen compares: what the board controls, the expected regime, how precise the usage
+   record is, consumption, what the tool brings on its own, how to sign in, billing and when to pick it.
+3. **The test**: `test/drivers.test.ts` checks that every offered mode has a driver, that no planned
+   mode has one, that the recommended mode is one of the tool's modes and that every sheet has the
+   eight lines. The output reader gets real fixtures in `test/aiOutput*.test.ts`.
+
+**The recommendation rule** is the same for every tool: the recommended mode is the one where the
+board controls the most of what the agent can reach and measures what it spends; a tie is broken by
+what the tool loads on its own (less is better). The recommended mode may still be planned: the
+screen's badge only shows when it is offered (`recommendedOffered`). For Gemini it is the API; for
+Claude Code, the CLI, the only mode that uses the subscription.
+
+Until the profile has the `tool` and `mode` fields, `toolModeOf` (in `aiTools.ts`) derives them from
+the current fields (`base` and `acpAgent`); always use `driverOf(profile)`, never `base` directly, so
+the code does not change when the profile gets the fields. Before coding anything tool-specific, read
+the tool's current official documentation and cite the source in the comment.
+
 ## Changelog
 
 The changelog follows Keep a Changelog, with one section per version and the **Added**, **Changed**,
