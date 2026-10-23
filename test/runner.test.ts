@@ -189,6 +189,10 @@ it('a execução aplica o perfil do card: modelo por parâmetro, servidores MCP 
   });
   expect(Object.keys(JSON.parse(acpPlan.input.mcpConfig!).mcpServers)[0]).toBe('faz-ai');
   expect(acpPlan.summary.find((l) => l.startsWith('Servidores MCP'))).toContain('imposto pela CLI');
+  // o agente do card vai só pelo pedido: nome solto sem definição seria descoberta nativa, recusada na admissão
+  expect(acpPlan.input.agent).toBe('');
+  expect(acpPlan.input.agentDefinition).toBeNull();
+  expect(acpPlan.advice.join('\n')).toContain('Você atua como o agente');
 
   // sem o servidor do board da execução, a execução restrita não começa (o registro em arquivo não vale)
   router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude' } });

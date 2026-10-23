@@ -221,8 +221,9 @@ export function executionPlan(
   return {
     manifest,
     input: {
-      // no Claude Code o agente vai inline (`--agents`) e é escolhido por `--agent`; nas demais só o nome
-      agent: inline && !agentDefinition ? '' : manifest.agent,
+      // o nome só vai com a definição inline (`--agents` + `--agent`); sem ela o agente segue pelo pedido (advice)
+      // e um nome solto seria descoberta nativa, que a admissão recusa
+      agent: agentDefinition ? manifest.agent : '',
       agentDefinition,
       mcpAllowed: allowed,
       mcpBlocked: blocked,

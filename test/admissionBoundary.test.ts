@@ -121,6 +121,9 @@ describe('fronteira da admissão do board', () => {
     const reviewed = request({ regime: 'compatible', compatibilityReview: { actor: 'person', revision: 1 } });
     const admitted = admission.prepare(acp, acp.id, input(), dir, reviewed);
     expect(admitted.transport).toBe('acp');
+    // agente só com nome (sem definição) no ACP não é descoberta nativa: o nome é zerado e a execução é admitida
+    const named: HeadlessInput = { ...input(), exec: { agent: 'restrito', agentDefinition: null } as HeadlessInput['exec'] };
+    expect(admission.prepare(acp, acp.id, named, dir, reviewed).transport).toBe('acp');
     expect(admitted.acpCommand({ command: 'gemini', args: ['--acp', '--skip-trust'] }).command).toBe(
       fs.realpathSync(path.join(dir, 'gemini')),
     );
@@ -165,6 +168,12 @@ describe('fronteira da admissão do board', () => {
     // agente fora do catálogo não é vinculado
     const unknown = profile({ kind: 'custom', base: 'generic', config: { acpAgent: 'nao-existe' } });
     expect(() => admission.prepare(unknown, unknown.id, input(), dir, reviewed)).toThrow(/desconhecido/);
+  });
+  it('perfil CLI: agente com nome e sem definição do board é recusado, nunca descoberto nativamente', () => {
+    // o oposto do ACP: na CLI o nome sem definição seria descoberta nativa, então a admissão recusa
+    const claude = profile({ config: { command: exe('claude-e', 'binário E') } });
+    const named: HeadlessInput = { ...input(), exec: { agent: 'restrito', agentDefinition: null } as HeadlessInput['exec'] };
+    expect(() => admission.prepare(claude, claude.id, named, dir, request())).toThrow(/Agente obrigatório precisa de definição do board/);
   });
   it('cópia que troca o binário não herda a verificação da cópia anterior', () => {
     const first = profile({ config: { command: exe('claude-a', 'binário A') } });
