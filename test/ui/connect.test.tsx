@@ -54,7 +54,7 @@ describe('Conectar ferramenta: a lista e os cartões', () => {
     const api = screen.getByLabelText('Gemini CLI · API');
     expect(within(api).getByText('Recomendado')).toBeInTheDocument();
     expect(within(api).getByText('exclusivo, por construção: o board monta cada pedido e executa cada chamada')).toBeInTheDocument();
-    expect(within(api).getByText(/Refinar, Resumir e Trabalhar na fase com a permissão "Só o board"/)).toBeInTheDocument();
+    expect(within(api).getByText(/Refinar, Resumir e Trabalhar na fase, com qualquer permissão/)).toBeInTheDocument();
     // as oito linhas da ficha, na ordem
     expect(
       within(card)

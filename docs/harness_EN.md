@@ -118,8 +118,9 @@ the same key as ACP, checked right away with the API.
 
 - **What the model receives**: the board's request (with the phase agent, the indicated rules and
   skills), the conversation the board builds on every request and, as functions, only the tools of
-  the board server and of the MCPs the card allows. A tool the card does not allow is never declared
-  to the model, and a call to it is refused without running. The model reads no file on its own.
+  the board server and of the MCPs the card allows, plus the local tools of the permission level. A
+  tool the card does not allow is never declared to the model, and a call to it is refused without
+  running. The model reads no file on its own: the board reads it, when the model asks.
 - **Regime**: exclusive, by construction. The board asserts and signs the proof of the five
   capabilities on the first run (and again when the model, the key or the extension version
   changes), with no probe and without spending the account. The card's admission preview evaluates
@@ -130,11 +131,13 @@ the same key as ACP, checked right away with the API.
 - **Stop** cancels the request in flight and sends no further request. Each request has 2 minutes;
   the run fails after 40 requests without finishing. A 429 (usage limit) ends the run with the API's
   message and the wait time, when given; the automatic pause by quota comes in a later version.
-- **For now** the mode serves **Refinar** (refine), **Resumir** (summarize) and **Trabalhar na
-  fase** (work on the phase) with the **Só o board** (board only) permission: the model reads and
-  answers the card through the board server. Editing files and running commands come in a later
-  version; with another permission the run is refused with the reason, and Gemini over ACP is still
-  available. The model must come from the card's **Modelo** (model) field.
+- The mode serves **Refinar** (refine), **Resumir** (summarize) and **Trabalhar na fase** (work on
+  the phase) with any permission. Reading, searching, editing files and running commands are board
+  tools, by level: reading in **Só o board** (board only), files in **Board e arquivos** (board and
+  files), commands in **Sem restrições** (no restrictions), always confined to the card's folders and
+  without the tools the card denies ([details](fluxo_EN.md#work-on-the-phase-through-the-api)). The
+  inventory brings these calls by the card's names (`Read`, `Write`, `Bash`…). The model must come
+  from the card's **Modelo** (model) field.
 - The key never goes to the log, the usage record, the screen or the export, and it goes to the API
   only in the `x-goog-api-key` header, never in the URL.
 

@@ -57,6 +57,8 @@ export const GEMINI_MODEL: ModelOption = {
 
 export interface CardWorld {
   root: string;
+  /** a pasta do projeto, onde o card trabalha (o `cwd` da execução) */
+  project: string;
   /** a pasta do PATH do teste e a home falsa */
   bin: string;
   home: string;
@@ -102,6 +104,8 @@ export interface CardWorldOptions {
   api?: { endpoint: string };
   /** as ferramentas do agente da fase */
   tools: string[];
+  /** as ferramentas que o agente da fase nega (o `deniedTools` do card) */
+  deniedTools?: string[];
   permission?: RunnerPermission;
   /** com `profile: 'gemini'`: o Gemini é o perfil padrão do board (`board.aiTool`) e o card não escolhe modelo */
   boardDefault?: boolean;
@@ -150,7 +154,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
       body: 'Você conduz cards do board Faz AI. Siga a skill do fluxo e as instruções da fase.',
       model: '',
       tools: options.tools,
-      deniedTools: [],
+      deniedTools: options.deniedTools ?? [],
       skills: [],
       mcp: [],
     },
@@ -191,6 +195,10 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
     options.profile === 'gemini-api'
       ? createGeminiApiDriver({
           endpoint: options.api!.endpoint,
+          // o comando local procura o programa no PATH do teste (o host usa o do shell de login), e os
+          // segredos do host são os da home falsa
+          pathEnv: async () => process.env.PATH,
+          homeDir: home,
           connect: async (server, definition) => {
             if (server !== 'faz-ai') throw new Error(`o cenário só tem o servidor do board (pediu ${server})`);
             const token = (definition.env as Record<string, string> | undefined)?.FAZAI_RUN_TOKEN;
@@ -309,6 +317,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
 
   return {
     root,
+    project,
     bin,
     home,
     db,

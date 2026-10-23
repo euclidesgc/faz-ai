@@ -1,10 +1,13 @@
 // O driver do Gemini pela API (épica "ferramenta por modo", história 10) contra um servidor HTTP falso
 // no próprio computador: o ciclo de chamadas de função do `generateContent`, o cancelamento no meio, o 429,
-// o limite de pedidos e o que nunca pode vazar (a chave). Os servidores MCP são falsos, em memória.
-import { afterEach, describe, expect, it } from 'vitest';
+// o limite de pedidos e o que nunca pode vazar (a chave). Os servidores MCP são falsos, em memória. Na
+// história 11, as ferramentas locais no mesmo laço: arquivos em edits, o comando em full e Parar no meio dele.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { MeasureEndedError } from '../src/extension/aiOutput/errors';
 import {
-  API_BOARD_ONLY,
   MISSING_API_KEY,
   apiCallDecision,
   createGeminiApiDriver,
@@ -83,20 +86,33 @@ afterEach(async () => {
   server = undefined;
 });
 
-/** `apiKey`: a chave que o gateway entrega do cofre (`ToolKeys`); null = o perfil sem chave conectada. */
-function start(o: { input?: HeadlessInput; connect: McpConnect; maxTurns?: number; requestTimeoutMs?: number; apiKey?: string | null }) {
+/**
+ * `apiKey`: a chave que o gateway entrega do cofre (`ToolKeys`); null = o perfil sem chave conectada. `cwd`: a
+ * pasta do card (as ferramentas locais trabalham nela); `baseEnv`: o ambiente de onde sai o do comando.
+ */
+function start(o: {
+  input?: HeadlessInput;
+  connect: McpConnect;
+  maxTurns?: number;
+  requestTimeoutMs?: number;
+  apiKey?: string | null;
+  cwd?: string;
+  baseEnv?: NodeJS.ProcessEnv;
+}) {
   const driver = createGeminiApiDriver({
     endpoint: server!.endpoint,
     connect: o.connect,
     maxTurns: o.maxTurns,
     requestTimeoutMs: o.requestTimeoutMs,
+    pathEnv: async () => process.env.PATH,
+    ...(o.baseEnv ? { baseEnv: o.baseEnv } : {}),
   });
   const lines: string[] = [];
   let checks = 0;
   const ctx = {
     profile: PROFILE,
     ...(o.apiKey === null ? {} : { apiKey: o.apiKey ?? KEY }),
-    cwd: '/projeto',
+    cwd: o.cwd ?? '/projeto',
     spawn: () => {
       throw new Error('o modo API não inicia processo');
     },
@@ -377,11 +393,9 @@ describe('Gemini pela API: o ciclo de chamadas de função', () => {
 });
 
 describe('Gemini pela API: recusas antes do primeiro pedido e o vínculo', () => {
-  it('até a história 11 só a permissão board; sem chave, a causa; sem modelo, a causa', async () => {
+  it('sem chave, a causa; sem modelo, a causa', async () => {
     server = await fakeGemini([]);
     const connect = fakeMcp(TOOLS).connect;
-    expect(() => start({ connect, input: input({ permission: 'edits' }) })).toThrow(API_BOARD_ONLY);
-    expect(() => start({ connect, input: input({ permission: 'full' }) })).toThrow(API_BOARD_ONLY);
     expect(() => start({ connect, apiKey: null })).toThrow(MISSING_API_KEY);
     expect(() => start({ connect, input: input({ exec: { ...input().exec!, model: null } }) })).toThrow('precisa de um modelo');
     expect(server.requests).toEqual([]);
@@ -452,4 +466,149 @@ describe('Gemini pela API: recusas antes do primeiro pedido e o vínculo', () =>
       reason: 'a operação não está no contrato da execução',
     });
   });
+});
+
+/** Uma execução admitida com as ferramentas locais do nível, como a admissão do modo API as lista (no vocabulário do card). */
+const localInput = (permission: HeadlessInput['permission'], tools: string[], deniedTools: string[] = []): HeadlessInput =>
+  input({ permission, exec: { ...input().exec!, tools, deniedTools: ['Agent', 'Task', 'SendMessage', 'ListAgents', ...deniedTools] } });
+
+describe('Gemini pela API: as ferramentas locais (história 11)', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-api-local-')));
+    fs.mkdirSync(path.join(dir, 'card'));
+    fs.writeFileSync(path.join(dir, 'card', 'a.txt'), 'linha um\nlinha dois\n');
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  it('em edits: lê, escreve e edita na pasta do card; escapar dela volta como erro; o inventário traz Read, Write e Edit', async () => {
+    server = await fakeGemini([
+      modelTurn([
+        { functionCall: { id: 'r', name: 'read_file', args: { path: 'a.txt' } } },
+        { functionCall: { id: 'w', name: 'write_file', args: { path: 'novo/b.txt', content: 'oi' } } },
+        { functionCall: { id: 'e', name: 'edit_file', args: { path: 'a.txt', old_string: 'dois', new_string: 'DOIS' } } },
+        { functionCall: { id: 'x', name: 'write_file', args: { path: '../fora.txt', content: 'escapei' } } },
+      ]),
+      modelTurn([{ text: 'Arquivos editados.' }]),
+    ]);
+    const { measured, exit, lines } = start({
+      connect: fakeMcp(TOOLS).connect,
+      cwd: path.join(dir, 'card'),
+      input: localInput('edits', ['Read', 'Glob', 'Grep', 'Write', 'Edit']),
+    });
+
+    expect(await exit).toEqual({ code: 0, error: undefined });
+    const declared = server.requests[0]!.body.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    expect(declared.filter((n: string) => !n.startsWith('mcp__'))).toEqual(['read_file', 'glob', 'grep', 'write_file', 'edit_file']);
+    expect(fs.readFileSync(path.join(dir, 'card', 'a.txt'), 'utf8')).toBe('linha um\nlinha DOIS\n');
+    expect(fs.readFileSync(path.join(dir, 'card', 'novo', 'b.txt'), 'utf8')).toBe('oi');
+    expect(fs.existsSync(path.join(dir, 'fora.txt'))).toBe(false);
+    const responses = server.requests[1]!.body.contents.at(-1).parts.map((p: any) => p.functionResponse);
+    expect(responses[0].response.output).toContain('     2\tlinha dois');
+    expect(responses[3].response.error).toMatch(/^Fora das pastas do card/);
+    expect(measured.report().inventory).toEqual([
+      { kind: 'tool', name: 'Read', calls: 1 },
+      { kind: 'tool', name: 'Write', calls: 2 },
+      { kind: 'tool', name: 'Edit', calls: 1 },
+    ]);
+    // o canal mostra a ferramenta e o caminho, nunca o conteúdo
+    expect(lines).toContain('→ Write novo/b.txt');
+    expect(lines.join('\n')).not.toContain('escapei');
+  });
+
+  it('a decisão de novo na hora: run_command em edits não é declarado e a chamada a ele não roda', async () => {
+    server = await fakeGemini([
+      modelTurn([{ functionCall: { id: 'c', name: 'run_command', args: { command: 'touch', args: ['feito'] } } }]),
+      modelTurn([{ text: 'ok' }]),
+    ]);
+    const { measured, exit } = start({
+      connect: fakeMcp(TOOLS).connect,
+      cwd: path.join(dir, 'card'),
+      // a lista traz Bash, mas o nível edits não libera comandos
+      input: localInput('edits', ['Read', 'Write', 'Edit', 'Bash']),
+    });
+    expect((await exit).code).toBe(0);
+    expect(fs.existsSync(path.join(dir, 'card', 'feito'))).toBe(false);
+    expect(measured.report().inventory).toEqual([]);
+  });
+
+  it('em full: o comando roda sem shell, com o ambiente filtrado (sem a chave nem segredos do host)', async () => {
+    server = await fakeGemini([
+      modelTurn([
+        {
+          functionCall: {
+            id: 'c',
+            name: 'run_command',
+            args: {
+              command: process.execPath,
+              args: ['-e', 'console.log(JSON.stringify(process.env)); console.log(process.argv[1])', '$HOME; echo x'],
+            },
+          },
+        },
+      ]),
+      modelTurn([{ text: 'Comando rodado.' }]),
+    ]);
+    const { measured, exit } = start({
+      connect: fakeMcp(TOOLS).connect,
+      cwd: path.join(dir, 'card'),
+      input: localInput('full', ['Read', 'Glob', 'Grep', 'Write', 'Edit', 'Bash']),
+      baseEnv: {
+        PATH: process.env.PATH,
+        HOME: dir,
+        GEMINI_API_KEY: KEY,
+        MEU_TOKEN: 'segredo-do-host',
+        OUTRA: `x${KEY}`,
+        LANG: 'pt_BR.UTF-8',
+      },
+    });
+
+    expect((await exit).code).toBe(0);
+    const response = server.requests[1]!.body.contents.at(-1).parts[0].functionResponse.response;
+    expect(response.exit_code).toBe(0);
+    const [envLine, argLine] = response.stdout.trim().split('\n');
+    const env = JSON.parse(envLine);
+    expect(env).toMatchObject({ HOME: dir, LANG: 'pt_BR.UTF-8', GIT_TERMINAL_PROMPT: '0' });
+    expect(env.GEMINI_API_KEY).toBeUndefined();
+    expect(env.MEU_TOKEN).toBeUndefined();
+    expect(env.OUTRA).toBeUndefined();
+    // o argumento chega como veio: nenhum shell expandiu `$HOME` nem cortou no `;`
+    expect(argLine).toBe('$HOME; echo x');
+    expect(JSON.stringify(server.requests)).not.toContain('segredo-do-host');
+    expect(measured.report()).toMatchObject({
+      inventory: [{ kind: 'tool', name: 'Bash', calls: 1 }],
+      bashCommands: [{ command: 'node', calls: 1, failed: 0 }],
+    });
+  });
+
+  it('Parar no meio de um comando mata a árvore inteira (o neto também) e a execução sai com 143', async () => {
+    const pidFile = path.join(dir, 'neto.pid');
+    // o comando inicia um neto que grava o pid e fica rodando; o filho também fica
+    fs.writeFileSync(
+      path.join(dir, 'card', 'neto.js'),
+      `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000);`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'card', 'filho.js'),
+      `require('node:child_process').spawn(process.execPath, [require('node:path').join(__dirname, 'neto.js')], { stdio: 'ignore' }); setInterval(() => {}, 1000);`,
+    );
+    server = await fakeGemini([
+      modelTurn([{ functionCall: { id: 'c', name: 'run_command', args: { command: process.execPath, args: ['filho.js'] } } }]),
+      'hang',
+    ]);
+    const { measured, exit } = start({
+      connect: fakeMcp(TOOLS).connect,
+      cwd: path.join(dir, 'card'),
+      input: localInput('full', ['Bash']),
+    });
+    await vi.waitFor(() => expect(fs.existsSync(pidFile) && fs.readFileSync(pidFile, 'utf8')).toBeTruthy(), { timeout: 10_000 });
+    const pid = Number(fs.readFileSync(pidFile, 'utf8'));
+
+    measured.proc.kill();
+
+    expect((await exit).code).toBe(143);
+    // nenhum pedido depois do Parar, e o neto não sobrevive
+    expect(server.requests).toHaveLength(1);
+    await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow(), { timeout: 10_000 });
+    expect(measured.proc.terminationConfirmed!()).toBe(true);
+  }, 30_000);
 });

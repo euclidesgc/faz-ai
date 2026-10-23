@@ -94,15 +94,20 @@ export const ACP_ENFORCEMENT: ModeEnforcement = {
 
 /**
  * O modo API (épica "ferramenta por modo", história 10): o board faz o laço de chamadas de função e só
- * declara ao modelo as ferramentas que a decisão do card admite, então MCP, ferramentas e modelo são
- * garantidos por construção. O agente do card e as skills seguem pelo pedido (`systemInstruction`): não
- * há descoberta nativa de agente nem de skill num modelo puro.
+ * declara ao modelo as ferramentas que a decisão do card admite, então MCP e modelo são garantidos por
+ * construção. O agente do card e as skills seguem pelo pedido (`systemInstruction`): não há descoberta
+ * nativa de agente nem de skill num modelo puro.
+ *
+ * As ferramentas locais (história 11) seguem a regra do ACP: o board impõe o nível e as negadas do card
+ * (nunca declara nem executa o que elas tiram), e a lista de ferramentas do card vai pelo pedido e pela
+ * conferência, que acusa o que saiu dela. Por isso `tools` é orientação: dizer "imposto" faria o plano tirar
+ * a lista do pedido e o resumo prometer uma fronteira que a decisão não traça.
  */
 export const API_ENFORCEMENT: ModeEnforcement = {
   agent: 'advised',
   skills: 'advised',
   mcp: 'enforced',
-  tools: 'enforced',
+  tools: 'advised',
   model: 'enforced',
 };
 
@@ -148,18 +153,20 @@ export const TOOLS: readonly AiToolEntry[] = [
         enforcement: ACP_ENFORCEMENT,
       },
       {
-        // até a história 11 o laço só tem as ferramentas MCP: arquivos e shell (`edits`, `full`) vêm depois
+        // desde a história 11 o laço tem as ferramentas locais do board por nível: leitura em `board`, arquivos
+        // em `edits`, comandos em `full`; o modo serve a toda permissão
         mode: 'api',
         sheet: {
           controls: 'tudo: contexto, ferramentas, MCP e permissões, chamada a chamada',
           regime: 'exclusivo, por construção: o board monta cada pedido e executa cada chamada',
           precision: 'exata: o inventário é a lista de chamadas que o board executou',
           consumption: 'tokens por chamada (`usageMetadata`); nada gasto com contexto que o board não pediu',
-          brings: 'só o modelo: as ferramentas são as do board e as dos MCPs do card',
+          brings:
+            'só o modelo: ler, editar arquivos e rodar comandos são ferramentas do board, liberadas pela permissão do card e confinadas às pastas dele, mais as dos MCPs do card',
           signIn: 'chave de API do Gemini, guardada no cofre local',
           billing: 'por token',
           whenToChoose:
-            'para a finalidade do board: prever o acesso e gastar só o pedido. Por enquanto serve a Refinar, Resumir e Trabalhar na fase com a permissão "Só o board"; arquivos e comandos chegam numa próxima versão',
+            'para a finalidade do board: prever o acesso e gastar só o pedido, em Refinar, Resumir e Trabalhar na fase, com qualquer permissão',
         },
         enforcement: API_ENFORCEMENT,
       },

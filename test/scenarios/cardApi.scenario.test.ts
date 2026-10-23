@@ -4,11 +4,14 @@
 // (plano de execution.ts, gateway, admissão do modo API com a evidência por construção afirmada pelo host, o
 // laço de chamadas de função do driver, o servidor MCP do board de verdade como cliente de si mesmo, o
 // relatório, a conferência) até a mensagem gravada na conversa do card. Só a API do Gemini é falsa: um
-// servidor HTTP no próprio computador (ver cardWorld.ts).
+// servidor HTTP no próprio computador (ver cardWorld.ts). Na história 11, o mesmo card com as ferramentas
+// locais: editar um arquivo em edits, rodar um comando em full, a fuga da pasta negada, o deniedTools do card
+// valendo e a conferência sem desvio falso e com o desvio real. Os arquivos e o comando são de verdade.
 import { afterEach, describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { Connector } from '../../src/extension/ai/connect';
 import { driverOf } from '../../src/extension/ai/drivers';
-import { API_BOARD_ONLY } from '../../src/extension/ai/drivers/gemini/api';
 import { profileApiKey } from '../../src/extension/ai/apiKey';
 import { exportBoard } from '../../src/extension/db/boardExport';
 import { rememberModels } from '../../src/extension/models';
@@ -150,7 +153,8 @@ describe('cenário: Conectar o Gemini pelo cartão API e rodar um card por ele, 
     const declared: string[] = generate[0]!.body.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
     expect(declared).toContain('mcp__faz-ai__get_card');
     expect(declared).toContain('mcp__faz-ai__add_comment');
-    expect(declared.every((name) => name.startsWith('mcp__faz-ai__'))).toBe(true);
+    // em `board`, além das do servidor do board, só as ferramentas locais de leitura (história 11)
+    expect(declared.filter((name) => !name.startsWith('mcp__faz-ai__'))).toEqual(['read_file', 'glob', 'grep']);
     // a resposta do get_card voltou ao modelo, e a parte com a assinatura voltou como veio
     expect(generate[1]!.body.contents[1].parts[0].thoughtSignature).toBe('YXNzaW5hdHVyYQ==');
     expect(JSON.stringify(generate[1]!.body.contents[2])).toContain('Card do cenário');
@@ -193,17 +197,198 @@ describe('cenário: Conectar o Gemini pelo cartão API e rodar um card por ele, 
     expect(world.keys.get('gemini')).toBe('AIzaSy-a-chave-que-o-acp-ja-usa');
     expect(world.router.snapshot().board.aiProfiles.find((p) => p.id === 'gemini')?.mode).toBe('acp');
   });
+});
 
-  it('C: com a permissão full o card não roda pela API ainda (história 11), com a causa no canal', async () => {
+/** As funções locais declaradas no primeiro pedido ao modelo. */
+const localDeclared = (s: FakeGemini): string[] =>
+  s.requests
+    .find((r) => r.method === 'POST')!
+    .body.tools[0].functionDeclarations.map((d: { name: string }) => d.name)
+    .filter((n: string) => !n.startsWith('mcp__'));
+/** As respostas das funções que o board mandou de volta no pedido `n` (1 = o primeiro `generateContent`). */
+const responsesIn = (s: FakeGemini, n: number): any[] => {
+  const request = s.requests.filter((r) => r.method === 'POST')[n - 1]!;
+  return request.body.contents.at(-1).parts.map((p: any) => p.functionResponse.response);
+};
+
+describe('cenário: o card pela API com arquivos e comandos (história 11)', () => {
+  it('C: em edits, o card edita um arquivo do projeto pelo board, sem desvio, e o comando não existe para o modelo', async () => {
     calls = 0;
-    server = await fakeGemini(api(() => 'hang'));
+    server = await fakeGemini(
+      api((n) =>
+        n === 1
+          ? modelTurn([
+              { functionCall: { id: 'r', name: 'read_file', args: { path: 'notas.md' } } },
+              { functionCall: { id: 'e', name: 'edit_file', args: { path: 'notas.md', old_string: 'pendente', new_string: 'feito' } } },
+            ])
+          : n === 2
+            ? modelTurn([{ functionCall: { id: 'c', name: 'run_command', args: { command: 'touch', args: ['invadido'] } } }])
+            : modelTurn([{ text: 'Notas atualizadas.' }]),
+      ),
+    );
+    world = await cardWorld({
+      profile: 'gemini-api',
+      tools: ['Read', 'Grep', 'Glob', 'Edit', 'Write'],
+      permission: 'edits',
+      api: { endpoint: server.endpoint },
+    });
+    fs.writeFileSync(path.join(world.project, 'notas.md'), '# Notas\n\nstatus: pendente\n');
+    await connectApi(world);
+
+    const end = await world.run();
+
+    expect(end.outcome).toBe('done');
+    expect(world.aiRun()).toMatchObject({ mode: 'api', outcome: 'done', permission: 'edits' });
+    expect(world.aiRun()!.admission).toMatchObject({ state: 'admitted', tools: ['Read', 'Glob', 'Grep', 'Write', 'Edit'] });
+    expect(localDeclared(server)).toEqual(['read_file', 'glob', 'grep', 'write_file', 'edit_file']);
+    // a lista do card vai pelo pedido, e o pedido diz qual função é qual ferramenta do card
+    const system = server.requests
+      .find((r) => r.method === 'POST')!
+      .body.systemInstruction.parts.map((p: { text: string }) => p.text)
+      .join('\n');
+    expect(system).toContain('Use só estas ferramentas: Read, Grep, Glob, Edit, Write.');
+    expect(system).toContain('edit_file (Edit)');
+    expect(fs.readFileSync(path.join(world.project, 'notas.md'), 'utf8')).toBe('# Notas\n\nstatus: feito\n');
+    // o comando pedido em edits não foi declarado: volta como erro, sem rodar
+    expect(responsesIn(server, 3)[0].error).toMatch(/não existe nesta execução/);
+    expect(fs.existsSync(path.join(world.project, 'invadido'))).toBe(false);
+    expect(end.report.inventory).toEqual([
+      { kind: 'tool', name: 'Read', calls: 1 },
+      { kind: 'tool', name: 'Edit', calls: 1 },
+    ]);
+    // Read e Edit são do card: a conferência não inventa desvio
+    expect(end.check).toEqual({ status: 'ok' });
+    expect(world.lines.some((l) => l.endsWith('Conferência: sem desvio.'))).toBe(true);
+    expect(world.lines.some((l) => l.endsWith('→ Edit notas.md'))).toBe(true);
+  });
+
+  it('D: em full, o card roda um comando na pasta do projeto, sem shell e sem a chave no ambiente, sem desvio', async () => {
+    calls = 0;
+    const script =
+      'process.stdout.write(JSON.stringify({ cwd: process.cwd(), key: Object.values(process.env).some((v) => v.includes(process.argv[1])) }))';
+    server = await fakeGemini(
+      api((n) =>
+        n === 1
+          ? modelTurn([{ functionCall: { id: 'c', name: 'run_command', args: { command: process.execPath, args: ['-e', script, KEY] } } }])
+          : modelTurn([{ text: 'Comando rodado.' }]),
+      ),
+    );
     world = await cardWorld({ profile: 'gemini-api', tools: CONDUTOR_TOOLS, permission: 'full', api: { endpoint: server.endpoint } });
     await connectApi(world);
 
-    await expect(world.run()).rejects.toThrow(API_BOARD_ONLY);
+    const end = await world.run();
 
-    expect(server.requests.filter((r) => r.method === 'POST')).toEqual([]);
-    expect(world.lines.some((l) => l.includes('Não foi possível executar') && l.includes('Só o board'))).toBe(true);
-    expect(world.aiRun()).toMatchObject({ mode: 'api', outcome: 'unsupported' });
+    expect(end.outcome).toBe('done');
+    expect(localDeclared(server)).toEqual(['read_file', 'glob', 'grep', 'write_file', 'edit_file', 'run_command']);
+    const result = responsesIn(server, 2)[0];
+    expect(result.exit_code).toBe(0);
+    // o comando rodou na pasta do projeto, e nenhuma variável do ambiente dele trazia a chave (o script a recebe
+    // de argumento só para procurá-la)
+    expect(JSON.parse(result.stdout)).toEqual({ cwd: world.project, key: false });
+    expect(end.report).toMatchObject({ inventory: [{ kind: 'tool', name: 'Bash', calls: 1 }], bashCommands: [{ command: 'node' }] });
+    // Bash está nas ferramentas do condutor: sem desvio
+    expect(end.check).toEqual({ status: 'ok' });
+    expect(world.comments().some((b) => b.startsWith(DEVIATION))).toBe(false);
+    expect(world.lines.join('\n')).not.toContain(KEY);
+  });
+
+  it('E: a tentativa de escapar da pasta do card é negada: `..`, caminho absoluto fora e o .git', async () => {
+    calls = 0;
+    let outside = '';
+    server = await fakeGemini(
+      api((n) =>
+        n === 1
+          ? modelTurn([
+              { functionCall: { id: 'a', name: 'write_file', args: { path: '../fora.txt', content: 'escapei' } } },
+              { functionCall: { id: 'b', name: 'write_file', args: { path: outside, content: 'escapei' } } },
+              { functionCall: { id: 'c', name: 'read_file', args: { path: '../home/segredo.txt' } } },
+              { functionCall: { id: 'd', name: 'write_file', args: { path: '.git/hooks/pre-commit', content: 'echo invadido' } } },
+            ])
+          : modelTurn([{ text: 'Não consegui.' }]),
+      ),
+    );
+    world = await cardWorld({
+      profile: 'gemini-api',
+      tools: ['Read', 'Grep', 'Glob', 'Edit', 'Write'],
+      permission: 'edits',
+      api: { endpoint: server.endpoint },
+    });
+    outside = path.join(world.home, 'absoluto.txt');
+    fs.writeFileSync(path.join(world.home, 'segredo.txt'), 'segredo do host');
+    fs.mkdirSync(path.join(world.project, '.git', 'hooks'), { recursive: true });
+    await connectApi(world);
+
+    const end = await world.run();
+
+    expect(end.outcome).toBe('done');
+    const errors = responsesIn(server, 2).map((r) => r.error);
+    expect(errors[0]).toMatch(/^Fora das pastas do card/);
+    expect(errors[1]).toMatch(/^Fora das pastas do card/);
+    expect(errors[2]).toMatch(/^Fora das pastas do card/);
+    expect(errors[3]).toMatch(/é do git/);
+    expect(fs.existsSync(path.join(world.root, 'fora.txt'))).toBe(false);
+    expect(fs.existsSync(outside)).toBe(false);
+    expect(fs.existsSync(path.join(world.project, '.git', 'hooks', 'pre-commit'))).toBe(false);
+    expect(JSON.stringify(server.requests)).not.toContain('segredo do host');
+  });
+
+  it('F: o deniedTools do card vale no modo API: Bash negado não é declarado nem roda, mesmo em full', async () => {
+    calls = 0;
+    server = await fakeGemini(
+      api((n) =>
+        n === 1
+          ? modelTurn([
+              {
+                functionCall: {
+                  id: 'c',
+                  name: 'run_command',
+                  args: { command: process.execPath, args: ['-e', 'require("fs").writeFileSync("rodou", "")'] },
+                },
+              },
+            ])
+          : modelTurn([{ text: 'Sem comando.' }]),
+      ),
+    );
+    world = await cardWorld({
+      profile: 'gemini-api',
+      tools: CONDUTOR_TOOLS,
+      deniedTools: ['Bash'],
+      permission: 'full',
+      api: { endpoint: server.endpoint },
+    });
+    await connectApi(world);
+
+    const end = await world.run();
+
+    expect(end.outcome).toBe('done');
+    expect(localDeclared(server)).toEqual(['read_file', 'glob', 'grep', 'write_file', 'edit_file']);
+    expect(responsesIn(server, 2)[0].error).toMatch(/não existe nesta execução/);
+    expect(fs.existsSync(path.join(world.project, 'rodou'))).toBe(false);
+    expect(world.aiRun()!.admission!.deniedTools).toContain('Bash');
+    expect(world.aiRun()!.admission!.tools).not.toContain('Bash');
+  });
+
+  it('G: o desvio real continua sendo pego: em full, Write sem estar nas ferramentas do card vira mensagem na conversa', async () => {
+    calls = 0;
+    server = await fakeGemini(
+      api((n) =>
+        n === 1
+          ? modelTurn([
+              { functionCall: { id: 'r', name: 'grep', args: { pattern: 'TODO' } } },
+              { functionCall: { id: 'w', name: 'write_file', args: { path: 'saida.txt', content: 'gravado' } } },
+            ])
+          : modelTurn([{ text: 'Feito.' }]),
+      ),
+    );
+    // o condutor não lista Write: o nível full libera, o board executa, e a conferência acusa
+    world = await cardWorld({ profile: 'gemini-api', tools: CONDUTOR_TOOLS, permission: 'full', api: { endpoint: server.endpoint } });
+    await connectApi(world);
+
+    const end = await world.run();
+
+    expect(end.outcome).toBe('done');
+    expect(fs.readFileSync(path.join(world.project, 'saida.txt'), 'utf8')).toBe('gravado');
+    expect(end.check).toEqual({ status: 'deviation', deviations: [{ kind: 'tool', name: 'Write', calls: 1 }] });
+    expect(world.comments().some((b) => b.startsWith(DEVIATION) && b.includes('ferramenta Write'))).toBe(true);
   });
 });

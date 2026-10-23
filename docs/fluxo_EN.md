@@ -222,6 +222,47 @@ context. The **Conversa** tab still shows everything.
   of the tool's output. The full log is in the **Output → Faz AI** panel (or in the `faz-ai`
   terminal).
 
+### Work on the phase through the API
+
+With Gemini in **API** mode ([details](harness_EN.md#gemini-through-the-api)) there is no tool agent:
+the model asks and the **board** runs it on your computer, only what the permission level allows.
+
+| Permission                             | What the model gets from the board                                                  |
+| -------------------------------------- | ----------------------------------------------------------------------------------- |
+| **Só o board** (board only)            | the board server and the card's MCPs, plus reading (`read_file`), finding files (`glob`) and searching text (`grep`) |
+| **Board e arquivos** (board and files) | the same, plus creating or overwriting (`write_file`) and replacing a passage (`edit_file`) |
+| **Sem restrições** (no restrictions)   | the same, plus running a program (`run_command`)                                    |
+
+- The tools use the card's names: `read_file` is **Read**, `glob` is **Glob**, `grep` is **Grep**,
+  `write_file` is **Write**, `edit_file` is **Edit** and `run_command` is **Bash**. A tool the card's
+  agent denies never reaches the model, at any level. Denial ignores case and works by group: denying
+  **Read** also removes **Glob** and **Grep**; denying **Edit** or **Write** removes both writing tools;
+  denying **Bash** removes the command. Gemini CLI names (`run_shell_command`, `replace`,
+  `write_file`…) work too. A denied name the board does not recognize stops the run from starting, with
+  the name in the reason. The agent's tool list goes in the request, and
+  the run review flags what the model used outside it (for example, **Write** for an agent that does
+  not list it, with the **Sem restrições** permission).
+- Paths are confined to the project folder and the story's working folder: `..`, an absolute path
+  outside them and a symbolic link leaving them are refused, and the refusal goes back to the model
+  as an error, without writing anything. `.git` and the board's files are never read or written, and
+  the configuration of the AI tools and the editor is not written, in any folder: `.claude`, `.cursor`,
+  `.kimi-code`, `.gemini`, `.agents`, `.opencode`, `opencode.json`, `.codex`, `.qwen`, `.goose`,
+  `.github/hooks`, `.github/copilot`, `.vscode`, `.devcontainer`, `.mcp.json` and `*.code-workspace`.
+  Your account's credential folders (`~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.faz-ai`) stay out. On macOS
+  and Windows these lists ignore case (`.SSH` is `.ssh`), and on Windows a path with a short name
+  (`~`), a stream (`:`) or a part ending in a dot or space is refused. The `glob` pattern is matched
+  without a regular expression, so a model's pattern cannot freeze the editor.
+- The command runs **without a shell**: the program and the arguments go separately, and pipes, `&&`
+  and `$VAR` are not interpreted (for that the model has to call the shell as the program, which only
+  works with **Sem restrições**). It runs in a card folder, without the API key or secret-looking
+  variables in its environment, for up to 2 minutes (the model may ask for up to 10). Long output
+  keeps the beginning and the end.
+- Reading, searching and writing have size limits, and the regular-expression search has a time
+  limit: a cut result comes with a notice.
+- **Stop** cancels the request to the model and ends the running command with everything it started.
+- The **Output → Faz AI** channel shows each call with the tool and the path (or the program), without
+  the file contents or the command's arguments.
+
 ## The board day to day
 
 1. Open a folder in the editor and click the **Faz AI** icon in the sidebar. Each folder has its own

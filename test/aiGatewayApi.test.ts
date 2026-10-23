@@ -11,7 +11,7 @@ import { AiGateway, NO_CARD, type AiCall, type AiRunEnd } from '../src/extension
 import { ExecutionAdmission } from '../src/extension/ai/admission';
 import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
 import { executorOf } from '../src/extension/ai/drivers';
-import { API_BOARD_ONLY, createGeminiApiDriver, type McpConnect, type McpTool } from '../src/extension/ai/drivers/gemini/api';
+import { createGeminiApiDriver, type McpConnect, type McpTool } from '../src/extension/ai/drivers/gemini/api';
 import { legacyStrictRequest } from '../src/extension/ai/v1Prepare';
 import { profileApiKey } from '../src/extension/ai/apiKey';
 import { ToolKeys } from '../src/extension/toolKeys';
@@ -69,7 +69,8 @@ const TOOLS: Record<string, McpTool[]> = {
   intruso: [{ name: 'exfiltrar', inputSchema: { type: 'object' } }],
 };
 
-function world(permission: RunnerPermission = 'board') {
+/** `deniedTools`: as ferramentas que o card nega (o manifesto, no vocabulário do card). */
+function world(permission: RunnerPermission = 'board', deniedTools: string[] = []) {
   const connected: string[] = [];
   const executed: string[] = [];
   const connect: McpConnect = async (name) => {
@@ -129,7 +130,7 @@ function world(permission: RunnerPermission = 'board') {
         },
       }),
       tools: [],
-      deniedTools: [],
+      deniedTools,
       model: { name: 'gemini-2.5-pro', effort: null },
     },
   };
@@ -142,7 +143,7 @@ function world(permission: RunnerPermission = 'board') {
     timeoutMinutes: 30,
     prepare: () => ({
       strict: { profileId: 'gemini', request: legacyStrictRequest(router.snapshot().board.runner, permission, ['docs']) },
-      conference: { manifest: { agent: '', skills: [], mcpServers: ['docs'], tools: [], deniedTools: [] }, boardServer: 'faz-ai' },
+      conference: { manifest: { agent: '', skills: [], mcpServers: ['docs'], tools: [], deniedTools }, boardServer: 'faz-ai' },
       input,
       config: {
         model: 'gemini-2.5-pro',
@@ -187,7 +188,15 @@ describe('gateway no modo API: a decisão do card é a fronteira do que o modelo
     // o servidor que o card não admitiu nem é conectado: as ferramentas dele não existem para o modelo
     expect(w.connected.sort()).toEqual(['docs', 'faz-ai']);
     for (const request of server.requests) {
-      expect(declaredIn(request.body)).toEqual(['mcp__faz-ai__get_card', 'mcp__faz-ai__add_comment', 'mcp__docs__search']);
+      // em `board`, as ferramentas locais de leitura (história 11) e as MCP admitidas
+      expect(declaredIn(request.body)).toEqual([
+        'read_file',
+        'glob',
+        'grep',
+        'mcp__faz-ai__get_card',
+        'mcp__faz-ai__add_comment',
+        'mcp__docs__search',
+      ]);
       expect(declaredIn(request.body)).not.toContain('mcp__intruso__exfiltrar');
     }
     expect(w.executed).toEqual(['docs/search']);
@@ -240,11 +249,57 @@ describe('gateway no modo API: a decisão do card é a fronteira do que o modelo
     expect(everything).not.toContain(KEY);
   });
 
-  it('com edits ou full o modo API ainda não roda (história 11): a linha fecha como não suportada', async () => {
-    server = await fakeGemini([]);
-    const w = world('edits');
-    await expect(w.run()).rejects.toThrow(API_BOARD_ONLY);
+  it('as ferramentas locais seguem o nível (história 11): edits ganha escrita, full ganha o comando', async () => {
+    for (const [permission, expected] of [
+      ['edits', ['read_file', 'glob', 'grep', 'write_file', 'edit_file']],
+      ['full', ['read_file', 'glob', 'grep', 'write_file', 'edit_file', 'run_command']],
+    ] as const) {
+      server = await fakeGemini([modelTurn([{ text: 'pronto' }])]);
+      const end = await world(permission).run();
+      expect(end.outcome).toBe('done');
+      expect(declaredIn(server.requests[0]!.body).filter((n) => !n.startsWith('mcp__'))).toEqual(expected);
+      const row = new AiRunRepo(db).byMonth(monthOf(Date.now())).at(-1)!;
+      expect(row).toMatchObject({ outcome: 'done', mode: 'api', permission });
+      // o registro da admissão diz o que foi declarado, no vocabulário do card
+      expect(row.admission!.tools).toEqual(
+        permission === 'edits' ? ['Read', 'Glob', 'Grep', 'Write', 'Edit'] : ['Read', 'Glob', 'Grep', 'Write', 'Edit', 'Bash'],
+      );
+      await server.close();
+      server = undefined;
+    }
+  });
+
+  it('as ferramentas que o card nega não são declaradas, mesmo com o nível full', async () => {
+    server = await fakeGemini([
+      modelTurn([{ functionCall: { id: 'x', name: 'run_command', args: { command: 'echo', args: ['oi'] } } }]),
+      modelTurn([{ text: 'pronto' }]),
+    ]);
+    const w = world('full', ['Bash', 'Write']);
+
+    const end = await w.run();
+
+    expect(end.outcome).toBe('done');
+    // Write negado tira as duas de escrita (o grupo de edição), Bash tira o comando
+    expect(declaredIn(server.requests[0]!.body).filter((n) => !n.startsWith('mcp__'))).toEqual(['read_file', 'glob', 'grep']);
+    // a chamada à função não declarada volta como erro, sem rodar e sem entrar no inventário
+    expect(JSON.stringify(server.requests[1]!.body.contents.at(-1))).toContain('não existe nesta execução');
+    expect(end.report.inventory).toEqual([]);
+    const row = new AiRunRepo(db).byMonth(monthOf(Date.now())).at(-1)!;
+    expect(row.admission!.tools).toEqual(['Read', 'Glob', 'Grep']);
+    expect(row.admission!.deniedTools).toEqual(expect.arrayContaining(['Bash', 'Write', 'Agent']));
+  });
+
+  it('a negação do card no vocabulário do Gemini e sem maiúsculas vale; um nome desconhecido recusa a execução', async () => {
+    server = await fakeGemini([modelTurn([{ text: 'pronto' }])]);
+    expect((await world('full', ['run_shell_command', 'replace']).run()).outcome).toBe('done');
+    expect(declaredIn(server.requests[0]!.body).filter((n) => !n.startsWith('mcp__'))).toEqual(['read_file', 'glob', 'grep']);
+    await server.close();
+
+    server = await fakeGemini([modelTurn([{ text: 'pronto' }])]);
+    await expect(world('full', ['FerramentaInventada']).run()).rejects.toThrow(/nega "FerramentaInventada", que o modo API não reconhece/);
     expect(server.requests).toEqual([]);
-    expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))[0]).toMatchObject({ outcome: 'unsupported', mode: 'api' });
+    const row = new AiRunRepo(db).byMonth(monthOf(Date.now())).at(-1)!;
+    expect(row).toMatchObject({ outcome: 'unsupported', mode: 'api' });
+    expect(row.admission!.reasons).toEqual([{ code: 'unsupported-native-restriction', resourceId: 'FerramentaInventada' }]);
   });
 });

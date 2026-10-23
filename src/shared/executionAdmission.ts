@@ -1,5 +1,6 @@
 // Decisão pura de admissão: evidência de isolamento não se confunde com configuração ou orientação.
 import { NATIVE_AGENT_TOOLS, agentToolsOf } from './agentTools';
+import { API_TOOL_GROUPS } from './apiTools';
 import type { AiTool } from './harness';
 import type { ToolCategory } from './artifacts';
 import type { AgentContextContract, ContextChoice } from './contextPlanning';
@@ -246,7 +247,10 @@ export function admitExecution(
   if (native.tool && native.tool !== tool) reason('native-executor-mismatch');
   if (!native.tool && (native.allow.length || native.deny.length)) reason('native-executor-required');
   // Regras detalhadas que não sabemos intersectar são recusadas; não se tornam instrução no prompt.
-  const builtin = new Set((agentToolsOf(tool) ?? []).flatMap((g) => g.tools.map((t) => t.name)));
+  // No modo API as ferramentas nativas são as locais do board (`API_TOOL_GROUPS`, no vocabulário do card):
+  // não há CLI cuja tabela valha, e é desta lista que o laço declara as funções ao modelo (história 11)
+  const table = transport === 'api' ? API_TOOL_GROUPS : (agentToolsOf(tool) ?? []);
+  const builtin = new Set(table.flatMap((g) => g.tools.map((t) => t.name)));
   const recognized = (name: unknown): name is string => typeof name === 'string' && (builtin.has(name) || mcpTool(name));
   if (native.allow.some((name) => !recognized(name)) || native.deny.some((name) => !recognized(name)))
     reason('unsupported-native-restriction');
@@ -254,7 +258,7 @@ export function admitExecution(
     (c) => c !== 'agents' && (request.boardTools.mode === 'inherit' || request.boardTools.value.includes(c)),
   );
   const level = permission === 'full' ? ['read', 'edit', 'run', 'net'] : permission === 'edits' ? ['read', 'edit'] : ['read'];
-  const candidates = (agentToolsOf(tool) ?? [])
+  const candidates = table
     .filter((g) => allowedCategories.includes(g.id as ToolCategory) && level.includes(g.id))
     .flatMap((g) => g.tools.map((t) => t.name));
   const nativeAllow = native.tool ? new Set(native.allow) : null;

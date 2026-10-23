@@ -19,6 +19,9 @@ const CONNECT_WRITERS = [
   'extension/mcp/cursorHooks.ts', // registra o hook do board no ~/.cursor/hooks.json global
   'extension/mcp/pinCommands.ts', // grava o caminho completo do comando nos registros do board
   'extension/ai/capabilityVerifier.ts', // monta a fixture do verificador de isolamento numa pasta temporária (mkdtemp), nunca na da pessoa
+  // grava o que o modelo pede no modo API e cita as pastas das ferramentas só para recusá-las (`confinePath`,
+  // coberto em test/apiTools.test.ts): é o único escritor que nunca escreve nelas
+  'extension/ai/apiTools.ts',
 ];
 
 const TOOL_FOLDER = /\.claude|\.cursor|\.kimi-code|\.mcp\.json/;
