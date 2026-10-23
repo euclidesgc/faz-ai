@@ -518,6 +518,15 @@ describe('sondas do Gemini pela CLI (história 8)', () => {
     expect(outcomes(geminiRun())['allowed-tool']).toBe('failed');
   });
 
+  it('a chave no shell do modelo, ou o shell que não rodou, derruba o forbidden-tool; o .env do ancestral é sentinela do ancestral', () => {
+    expect(geminiOutcomes({ ...geminiRun(), secretInShell: false })['forbidden-tool']).toBe('passed');
+    expect(geminiOutcomes({ ...geminiRun(), secretInShell: true })['forbidden-tool']).toBe('failed');
+    // o cabeçalho que o `.gemini/.env` hostil acima do projeto pediria (`c-anc_env`) chegou ao pedido
+    expect(geminiOutcomes(geminiRun(['x-fazai-sentinela: c-anc_env']))['ancestor-sentinel']).toBe('failed');
+    // a sonda do Claude não roda shell: o campo ausente não muda nada nela
+    expect(outcomes(good())['forbidden-tool']).toBe('passed');
+  });
+
   it('verifyExecutor grava as provas no vínculo do Gemini pela CLI; o regime que sai delas é o compatível', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-verifier-gemini-'));
     try {

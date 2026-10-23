@@ -168,7 +168,9 @@ What Gemini enforces in this mode:
   exhausted quota sets the usage limit; a rejected key marks the profile's sign-in as expired.
 - The key goes only into the process environment (`GEMINI_API_KEY`), never into the arguments, the
   settings, the log, the usage record or the export. With no key in the vault, the `GEMINI_API_KEY` of
-  your environment applies.
+  your environment applies. A `.env` in the project folder or in the folders above it (Gemini CLI reads
+  them) does not change the API address, the credential, the headers or the proxy: the board pins those
+  variables. And the shell commands the model runs do not receive the key.
 
 ## Environment check
 

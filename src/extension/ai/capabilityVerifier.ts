@@ -55,6 +55,11 @@ export interface ProbeRun {
   controlHook: boolean;
   strictHook: boolean;
   forbiddenFileWritten: boolean;
+  /**
+   * A chave chegou a um comando de shell do modelo (só as sondas que rodam um shell a observam: a do Gemini
+   * pela CLI). Credencial ao alcance de uma ferramenta é permissão a mais: o `forbidden-tool` falha.
+   */
+  secretInShell?: boolean;
   allowedReadContent: string;
   canaries: Record<string, string>;
   /** duas execuções vazias seguidas, com marcadores distintos */
@@ -144,6 +149,7 @@ export function evaluateProbes(
           refused(names.shell) &&
           refused(names.write) &&
           !run.forbiddenFileWritten &&
+          run.secretInShell !== true &&
           !run.strict.toolNames.some((n) => n === names.shell || n === names.write),
         { hook: hookSeen && !run.strictHook },
       ),
@@ -255,6 +261,8 @@ interface ApiState {
   sent: boolean;
   connections: string[];
   calls: string[];
+  /** o texto das respostas de função que voltaram ao modelo (a sonda do Gemini procura a chave nelas) */
+  outputs?: string[];
 }
 const json = (v: unknown) => JSON.stringify(v);
 const write = (file: string, text: string) => {
@@ -668,6 +676,12 @@ async function runGeminiProbes(deps: VerifierDeps, executable: string): Promise<
   const extension = path.join(user, '.gemini', 'extensions', 'fazai-sonda');
   write(path.join(extension, 'EXTENSAO.md'), `${canaries.user}_extensao`);
   write(path.join(project, 'allowed.txt'), 'FAZAI_READ_ALLOWED');
+  // o `.env` hostil: com a pasta confiada (`--skip-trust`), a CLI carrega o primeiro `.gemini/.env` ou `.env` que
+  // achar subindo da pasta (o `~/.gemini/.env` da pessoa, acima do projeto, inclusive) e aplica as variáveis que
+  // ainda não estão definidas. O cabeçalho que ele pede (`GEMINI_CLI_CUSTOM_HEADERS`) chega à API local e é a
+  // sentinela: o do projeto conta como do projeto, o do ancestral (o lugar do `~/.gemini/.env`) como do ancestral
+  write(path.join(project, '.env'), `GEMINI_CLI_CUSTOM_HEADERS=x-fazai-sentinela: ${canaries.project}_env\n`);
+  write(path.join(ancestor, '.gemini', '.env'), `GEMINI_CLI_CUSTOM_HEADERS=x-fazai-sentinela: ${canaries.ancestor}_env\n`);
   const hook = path.join(root, 'hook.cjs');
   write(hook, `require('node:fs').writeFileSync(${json(marker)}, 'executado')`);
   let state: ApiState = { texts: [], tools: [], results: [], uses: new Map(), attempts: [], sent: false, connections: [], calls: [] };
@@ -686,7 +700,8 @@ async function runGeminiProbes(deps: VerifierDeps, executable: string): Promise<
       if (req.headers['x-goog-api-key'] !== API_KEY)
         return reply(res, { error: { code: 401, message: 'Apenas autenticação fictícia é aceita.', status: 'UNAUTHENTICATED' } }, 401);
       if (route[2] === 'countTokens') return reply(res, { totalTokens: 1 });
-      state.texts.push(body);
+      // o cabeçalho que um `.env` hostil pediria entra no texto observado, junto do pedido
+      state.texts.push(`${body}\n${String(req.headers['x-fazai-sentinela'] ?? '')}`);
       if (route[2] === 'generateContent')
         return reply(res, { candidates: [{ content: { role: 'model', parts: [{ text: '{}' }] }, finishReason: 'STOP' }] });
       state.tools.push(
@@ -697,8 +712,10 @@ async function runGeminiProbes(deps: VerifierDeps, executable: string): Promise<
       // as respostas das funções voltam no pedido seguinte: o erro é a recusa da CLI (ferramenta fora do registro)
       for (const c of data.contents ?? [])
         for (const p of c.parts ?? [])
-          if (p.functionResponse)
+          if (p.functionResponse) {
             state.results.push({ id: String(p.functionResponse.name), isError: 'error' in (p.functionResponse.response ?? {}) });
+            (state.outputs ??= []).push(json(p.functionResponse.response ?? {}));
+          }
       const attempts = state.sent ? [] : state.attempts;
       state.sent = true;
       return geminiStream(res, route[1]!, attempts);
@@ -740,14 +757,28 @@ async function runGeminiProbes(deps: VerifierDeps, executable: string): Promise<
     GOOGLE_GEMINI_BASE_URL: url,
     NO_COLOR: '1',
   };
+  /** o que a fixture controla em toda execução, por cima do ambiente fixado pelo provider */
+  const fixed = { PATH: env.PATH!, HOME: user, GEMINI_API_KEY: API_KEY, GOOGLE_GEMINI_BASE_URL: url, NO_COLOR: '1' };
   const execute = async (opts: {
     control?: boolean;
     empty?: boolean;
     attempts?: Attempt[];
     prompt?: string;
+    /** as ferramentas da execução, no lugar da leitura (a passada que roda um shell) */
+    tools?: string[];
   }): Promise<ProbeObservation> => {
     fs.rmSync(marker, { force: true });
-    state = { texts: [], tools: [], results: [], uses: new Map(), attempts: opts.attempts ?? [], sent: false, connections: [], calls: [] };
+    state = {
+      texts: [],
+      tools: [],
+      results: [],
+      uses: new Map(),
+      attempts: opts.attempts ?? [],
+      sent: false,
+      connections: [],
+      calls: [],
+      outputs: [],
+    };
     const input: HeadlessInput = {
       prompt: opts.prompt ?? 'Verificação local de contrato.',
       permission: 'board',
@@ -760,23 +791,24 @@ async function runGeminiProbes(deps: VerifierDeps, executable: string): Promise<
         mcpBlocked: [],
         mcpAllowed: opts.empty ? [] : ['allowed'],
         mcpConfig: opts.empty ? '{"mcpServers":{}}' : mcpConfig,
-        tools: opts.empty ? [] : [GEMINI_PROBE_NAMES.read],
+        tools: opts.tools ?? (opts.empty ? [] : [GEMINI_PROBE_NAMES.read]),
         deniedTools: [GEMINI_PROBE_NAMES.delegation],
         toolSet: 'explicit',
         mcpTools: opts.empty ? [] : ['mcp__allowed__allowed'],
       },
     };
     let built: HeadlessCommand = headlessCommand(deps.executor, input);
-    // Controle positivo: sem a home do board, sem `-e none` e sem a lista de servidores, a contaminação aparece
+    // Controle positivo: sem a home do board (e o settings dela), sem o ambiente fixado, sem `-e none` e sem a
+    // lista de servidores, a contaminação aparece
     if (opts.control) {
-      const { tempHome: _home, ...rest } = built;
+      const { tempHome: _home, env: _env, ...rest } = built;
       built = { ...rest, args: withoutGeminiBarriers(built.args) };
     }
     const { command, cleanup } = materialize(built);
     let stdout = '';
     try {
       const code = await new Promise<{ code: number | null; timedOut: boolean }>((resolve) => {
-        const proc = deps.spawn({ ...command, command: executable, env: { ...env, ...command.env } }, project, (text, stream) => {
+        const proc = deps.spawn({ ...command, command: executable, env: { ...env, ...command.env, ...fixed } }, project, (text, stream) => {
           if (stream === 'stdout') stdout += text;
         });
         const timer = setTimeout(() => {
@@ -826,6 +858,14 @@ async function runGeminiProbes(deps: VerifierDeps, executable: string): Promise<
     });
     const strictHook = fs.existsSync(marker);
     const forbiddenFileWritten = fs.existsSync(path.join(project, 'forbidden.txt'));
+    // o shell liberado não vê a chave: a passada roda um comando que a imprime; sem o fim do comando na resposta
+    // (o shell não rodou), a sonda não prova nada e conta como falha
+    await execute({
+      tools: [n.shell],
+      attempts: [{ name: n.shell, input: { command: 'printenv GEMINI_API_KEY; printenv GOOGLE_API_KEY; echo FAZAI_SHELL_FIM' } }],
+    });
+    const shellOutputs = state.outputs ?? [];
+    const secretInShell = !shellOutputs.some((o) => o.includes('FAZAI_SHELL_FIM')) || shellOutputs.some((o) => o.includes(API_KEY));
     const m1 = `FAZAI_CONVERSATION_${randomUUID()}`;
     const m2 = `FAZAI_CONVERSATION_${randomUUID()}`;
     const first = { ...(await execute({ empty: true, prompt: m1 })), marker: m1 };
@@ -836,6 +876,7 @@ async function runGeminiProbes(deps: VerifierDeps, executable: string): Promise<
       controlHook,
       strictHook,
       forbiddenFileWritten,
+      secretInShell,
       allowedReadContent: 'FAZAI_READ_ALLOWED',
       canaries,
       first,

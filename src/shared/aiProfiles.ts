@@ -205,8 +205,7 @@ export const profileBase = (profile: AiProfile): AiBase | null => (profile.base 
  */
 export const executorToolOf = (profile: AiProfile): string => (isGeminiCli(profile) ? profile.tool : profile.base);
 /** O Gemini pronto pela CLI de uma passada (`gemini -p`, história 8). */
-export const isGeminiCli = (profile: Pick<AiProfile, 'kind' | 'tool' | 'mode'>): boolean =>
-  profile.kind === 'catalog' && profile.tool === 'gemini' && profile.mode === 'cli';
+export const isGeminiCli = (profile: ProfileIdentity): boolean => isReadyCli(profile) && profile.tool === 'gemini';
 /**
  * Perfil cujas capacidades o host sabe provar: a CLI do Claude (a pronta ou uma cópia, que roda o mesmo
  * binário com os próprios ajustes), os agentes ACP e o Gemini pela CLI (sondas com sentinelas contra uma API

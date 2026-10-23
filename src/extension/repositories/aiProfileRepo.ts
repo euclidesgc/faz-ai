@@ -283,7 +283,9 @@ export class AiProfileRepo {
     // o mesmo vale para o Gemini pronto em qualquer modo (a base dele é a do agente ACP): a cópia é o personalizado
     // com o agente, em acp, porque o Gemini pela CLI e pela API não tem cópia de catálogo (não é uma `AiBase`)
     const kind: AiProfileKind = source.kind === 'custom' || source.mode === 'acp' || source.base === 'generic' ? 'custom' : 'catalog';
-    const mode = kind === 'custom' && isReadyProfile(source) ? 'acp' : source.mode;
+    // o personalizado com o agente ACP é sempre do modo ACP: a cópia de uma cópia do Gemini pela API ou pela CLI
+    // não fica num modo sem driver para o personalizado
+    const mode = kind === 'custom' && source.base === 'generic' && typeof source.config.acpAgent === 'string' ? 'acp' : source.mode;
     const targetId = newProfileId(
       `${source.name} cópia`,
       profiles.map((p) => p.id),

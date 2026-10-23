@@ -192,11 +192,11 @@ export const AGENT_TOOLS: Record<AgentToolsId, ToolGroup[]> = {
 /**
  * Os nomes de ferramenta do Gemini CLI (os da tabela acima e os que a CLI 0.65.0 registra sozinha) e os
  * equivalentes no vocabulário do card, que é o do Claude Code (`Read`, `Grep`, `Bash`...). A conferência
- * (`checkRun`) lê o inventário do Gemini por aqui, como lê os kinds do ACP; o provider do Gemini pela CLI
- * (`ai/providers/gemini.ts`) traduz no sentido contrário as ferramentas do card fora da admissão. `[]` é
- * ferramenta sem efeito fora da sessão (o tópico, o modo de planejamento), que nunca é desvio. Os nomes do
- * Gemini são minúsculos; os do card, capitalizados; e nenhum deles é um kind do ACP: não colidem (o teste
- * vigia).
+ * (`checkRun`) lê o inventário do Gemini pela CLI por aqui, e só ele (`vocabulary: 'gemini'`): o Cursor também
+ * grava nomes minúsculos (`glob`, `read`, `shell`), que uma tabela global confundiria com os do Gemini. O provider
+ * do Gemini pela CLI (`ai/providers/gemini.ts`) traduz no sentido contrário as ferramentas do card fora da
+ * admissão. `[]` é ferramenta sem efeito fora da sessão (o tópico, o modo de planejamento), que nunca é
+ * desvio. Nenhum nome daqui é um kind do ACP (o teste vigia), que vale para todo inventário.
  */
 export const GEMINI_TOOL_EQUIVALENTS: Record<string, string[]> = {
   read_file: ['Read'],

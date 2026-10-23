@@ -19,7 +19,10 @@
 // - `--approval-mode` por nível: `default` em "Só o board", `auto_edit` em "Board e arquivos", `yolo` em "Sem
 //   restrições". A restrição de verdade é o registro (`tools.core`), não a pergunta: no modo de uma passada a
 //   CLI não tem a quem perguntar;
-// - a chave de API vai só no ambiente do processo (`GEMINI_API_KEY`), posta pelo driver na hora do `spawn`.
+// - a chave de API vai só no ambiente do processo (`GEMINI_API_KEY`), posta pelo driver na hora do `spawn`; as
+//   variáveis de endpoint, credencial e proxy vão fixadas (`GEMINI_PINNED_ENV`), para um `.env` da pasta não
+//   as redefinir, e o shell do modelo recebe o ambiente sem a chave (`environmentVariableRedaction`). O
+//   `--skip-trust` fica: sem a pasta confiada, a 0.65.0 encerra no modo de uma passada e não conecta os MCPs.
 import { AGENT_TOOLS, geminiToolsFor } from '../../../shared/agentTools';
 import type { RunnerPermission } from '../../../shared/runner';
 import { geminiReader } from '../../aiOutput/gemini';
@@ -34,6 +37,74 @@ export const GEMINI_HOME_ENV = 'GEMINI_CLI_HOME';
 export const GEMINI_KEY_ENV = 'GEMINI_API_KEY';
 /** O settings do board, dentro da home temporária. */
 export const GEMINI_SETTINGS = '.gemini/settings.json';
+
+/**
+ * As variáveis que mudam o endpoint, a credencial, a autenticação, o proxy, o pedido de sistema ou o que a
+ * CLI carrega, lidas no pacote 0.65.0 (`process.env[...]` e `getEnv` em `bundle/`). Com `--skip-trust` a CLI
+ * carrega um `.env` (`.gemini/.env` ou `.env` da pasta, dos ancestrais, inclusive o `~/.gemini/.env` da pessoa
+ * acima do projeto) e aplica nele só as variáveis ainda não definidas (`loadEnvironment`): um `.env` hostil
+ * com `GOOGLE_GEMINI_BASE_URL` mandaria a chave do cofre para outro servidor. Cada uma fica fixada no ambiente
+ * do processo: com o valor do ambiente do host quando ele a define (a escolha da pessoa, que já entra no
+ * vínculo), senão vazia, o que a CLI lê como ausente e o `.env` não sobrescreve. A `GEMINI_API_KEY` não está
+ * aqui: com a chave no cofre, o `spawn` a define; sem ela, vale o login que a pessoa tiver.
+ */
+export const GEMINI_PINNED_ENV: readonly string[] = [
+  'GOOGLE_GEMINI_BASE_URL',
+  'GOOGLE_VERTEX_BASE_URL',
+  'GOOGLE_GENAI_USE_VERTEXAI',
+  'GOOGLE_GENAI_USE_GCA',
+  'GOOGLE_GENAI_API_VERSION',
+  'GOOGLE_API_KEY',
+  'GOOGLE_APPLICATION_CREDENTIALS',
+  'GOOGLE_CLOUD_ACCESS_TOKEN',
+  'GOOGLE_CLOUD_PROJECT',
+  'GOOGLE_CLOUD_PROJECT_ID',
+  'GOOGLE_CLOUD_LOCATION',
+  'GOOGLE_CLOUD_QUOTA_PROJECT',
+  'GOOGLE_CLOUD_UNIVERSE_DOMAIN',
+  'GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES',
+  'GCLOUD_PROJECT',
+  'CODE_ASSIST_ENDPOINT',
+  'CODE_ASSIST_API_VERSION',
+  'CLOUD_SHELL',
+  'GEMINI_API_KEY_AUTH_MECHANISM',
+  'GEMINI_CLI_AUTH_OVERRIDE',
+  'GEMINI_DEFAULT_AUTH_TYPE',
+  'GEMINI_CLI_USE_COMPUTE_ADC',
+  'GEMINI_CLI_CUSTOM_HEADERS',
+  'GEMINI_CLI_SYSTEM_SETTINGS_PATH',
+  'GEMINI_CLI_SYSTEM_DEFAULTS_PATH',
+  'GEMINI_CLI_TRUSTED_FOLDERS_PATH',
+  'GEMINI_CLI_EXTENSION_REGISTRY_URI',
+  'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND',
+  'GEMINI_CLI_IDE_SERVER_STDIO_ARGS',
+  'GEMINI_CLI_IDE_SERVER_PORT',
+  'GEMINI_CLI_IDE_AUTH_TOKEN',
+  'GEMINI_SYSTEM_MD',
+  'GEMINI_WRITE_SYSTEM_MD',
+  'GEMINI_MODEL',
+  'GEMINI_SANDBOX',
+  'GEMINI_SANDBOX_IMAGE',
+  'GEMINI_SANDBOX_PROXY_COMMAND',
+  'SANDBOX',
+  'OTEL_EXPORTER_OTLP_HEADERS',
+  'HTTPS_PROXY',
+  'https_proxy',
+  'HTTP_PROXY',
+  'http_proxy',
+  'ALL_PROXY',
+  'all_proxy',
+  'NO_PROXY',
+  'no_proxy',
+  'NODE_OPTIONS',
+  'NODE_EXTRA_CA_CERTS',
+  'NODE_TLS_REJECT_UNAUTHORIZED',
+];
+
+/** O ambiente fixado: só as que o host não define, vazias (as definidas o processo já herda do host). */
+export function geminiPinnedEnv(host: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  return Object.fromEntries(GEMINI_PINNED_ENV.filter((name) => host[name] === undefined).map((name) => [name, '']));
+}
 
 const APPROVAL: Record<RunnerPermission, string> = { board: 'default', edits: 'auto_edit', full: 'yolo' };
 /** Os grupos de ferramentas que cada nível libera fora da admissão (a mesma regra de `admitExecution`). */
@@ -118,7 +189,15 @@ export function geminiSettings(input: HeadlessInput): { settings: Record<string,
   return {
     servers,
     settings: {
-      security: { auth: { selectedType: 'gemini-api-key' } },
+      // a chave (e o que tiver cara de segredo) fica fora do ambiente dos comandos de shell do modelo: a CLI a
+      // tira pelo nome (`/KEY/`) quando a máscara está ligada, e o `blocked` a nomeia (`sanitizeEnvironment`)
+      security: {
+        auth: { selectedType: 'gemini-api-key' },
+        environmentVariableRedaction: { enabled: true, blocked: [GEMINI_KEY_ENV, 'GOOGLE_API_KEY'] },
+      },
+      // o `.env` genérico das pastas fica de fora (o `.gemini/.env` não tem chave que o desligue: as
+      // variáveis que importam vão fixadas no ambiente, `GEMINI_PINNED_ENV`)
+      advanced: { ignoreLocalEnv: true },
       privacy: { usageStatisticsEnabled: false },
       general: { enableAutoUpdate: false, enableAutoUpdateNotification: false },
       mcpServers,
@@ -161,6 +240,8 @@ export const geminiCliProvider: AiProvider = {
       format: structured ? 'gemini-stream-json' : 'text',
       tempHome: { env: GEMINI_HOME_ENV, files: { [GEMINI_SETTINGS]: `${JSON.stringify(settings, null, 2)}\n` } },
       apiKeyEnv: GEMINI_KEY_ENV,
+      // as variáveis de endpoint, credencial e proxy fixadas: um `.env` da pasta não as redefine
+      env: geminiPinnedEnv(),
     };
   },
   reader: (format, deps) => (format === 'gemini-stream-json' ? geminiReader(deps) : textReader()),

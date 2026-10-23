@@ -185,10 +185,12 @@ it('Gemini pela CLI: o pedido pela entrada, -p vazio, stream-json, a home isolad
   expect(built.apiKeyEnv).toBe('GEMINI_API_KEY');
   // a chave nunca está no comando: nem nos argumentos, nem no ambiente, nem no settings
   expect(built.apiKey).toBeUndefined();
-  expect(built.env).toBeUndefined();
+  expect(Object.values(built.env ?? {}).every((v) => v === '')).toBe(true);
+  expect(built.env).not.toHaveProperty('GEMINI_API_KEY');
   const settings = settingsOf(built);
-  expect(settings.security).toEqual({ auth: { selectedType: 'gemini-api-key' } });
-  expect(JSON.stringify(settings)).not.toMatch(/apiKey|GEMINI_API_KEY/);
+  expect(settings.security.auth).toEqual({ selectedType: 'gemini-api-key' });
+  // o nome da variável aparece só na máscara do shell (`blocked`); o valor, nunca
+  expect(JSON.stringify(settings)).not.toMatch(/apiKey/);
   expect(settings.experimental).toEqual({ enableAgents: false });
   expect(settings.skills).toEqual({ enabled: false });
   expect(settings.hooksConfig).toEqual({ enabled: false });
@@ -249,6 +251,39 @@ it('Gemini pela CLI admitido: tools.core é a lista da decisão, e cada servidor
   );
   expect(empty.tools).toEqual({ core: [], allowed: [] });
   expect(empty.mcp).toEqual({ allowed: ['faz-ai'] });
+});
+
+it('Gemini pela CLI: um .env da pasta não redefine endpoint, credencial nem proxy, e o shell do modelo não vê a chave', () => {
+  const pinned = [
+    'GOOGLE_GEMINI_BASE_URL',
+    'GOOGLE_VERTEX_BASE_URL',
+    'GOOGLE_GENAI_USE_VERTEXAI',
+    'GOOGLE_API_KEY',
+    'GOOGLE_CLOUD_PROJECT',
+    'GEMINI_CLI_CUSTOM_HEADERS',
+    'GEMINI_SYSTEM_MD',
+    'HTTPS_PROXY',
+    'NODE_OPTIONS',
+  ];
+  const saved = Object.fromEntries(pinned.map((n) => [n, process.env[n]]));
+  try {
+    for (const n of pinned) delete process.env[n];
+    process.env.HTTPS_PROXY = 'http://proxy.da.pessoa:3128';
+    const built = providerFor(geminiCli()).command({ prompt: 'oi', permission: 'board', structured: true });
+    // o que o host não define vai vazio (a CLI lê como ausente, e o `.env` só preenche o que falta)
+    for (const n of pinned.filter((n) => n !== 'HTTPS_PROXY')) expect(built.env![n]).toBe('');
+    // o que o host define, o processo já herda: nada a fixar, e o valor da pessoa não vai para o comando
+    expect(built.env).not.toHaveProperty('HTTPS_PROXY');
+    // a chave não está entre as fixadas: com o cofre, o `spawn` a define; sem ele, vale o login da pessoa
+    expect(built.env).not.toHaveProperty('GEMINI_API_KEY');
+    const settings = settingsOf(built);
+    expect(settings.advanced).toEqual({ ignoreLocalEnv: true });
+    expect(settings.security.environmentVariableRedaction).toEqual({ enabled: true, blocked: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'] });
+  } finally {
+    for (const [n, v] of Object.entries(saved))
+      if (v === undefined) delete process.env[n];
+      else process.env[n] = v;
+  }
 });
 
 it('Gemini pela CLI: a chave recusada no result é login vencido; no ACP a recusa vem pelo protocolo', () => {

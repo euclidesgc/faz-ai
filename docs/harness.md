@@ -159,7 +159,9 @@ Gemini aplica nesse modo:
   esgotada liga o limite de uso; a chave recusada marca o login do perfil como vencido.
 - A chave vai só no ambiente do processo (`GEMINI_API_KEY`), nunca nos argumentos, no settings, no
   log, no registro de uso nem na exportação. Sem chave no cofre, vale a `GEMINI_API_KEY` do seu
-  ambiente.
+  ambiente. Um `.env` da pasta do projeto ou das pastas acima dela (o Gemini CLI os lê) não muda o
+  endereço da API, a credencial, os cabeçalhos nem o proxy: essas variáveis vão fixadas pelo board. E
+  os comandos de shell que o modelo roda não recebem a chave.
 
 ## Diagnóstico do ambiente
 

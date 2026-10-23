@@ -80,6 +80,17 @@ describe('checkRun', () => {
 });
 
 describe('checkRun com inventário do Gemini pela CLI (nomes do Gemini, história 8)', () => {
+  const check = (inventory: InventoryItem[], m = manifest()) => checkRun(run(inventory), m, 'faz-ai', 'gemini');
+  it('a tabela do Gemini só vale para o inventário dele: o glob do Cursor segue conferido como nome do card', () => {
+    const card = manifest({ tools: ['Read', 'Grep', 'Glob'], deniedTools: [] });
+    const glob: InventoryItem[] = [{ kind: 'tool', name: 'glob', calls: 1 }];
+    // no Gemini, `glob` é o `Glob` do card
+    expect(checkRun(run(glob), card, 'faz-ai', 'gemini')).toEqual({ status: 'ok' });
+    // no Cursor (sem vocabulário), o mesmo nome continua sendo conferido como está, como antes desta história
+    expect(checkRun(run(glob), card, 'faz-ai')).toEqual({ status: 'deviation', deviations: [{ kind: 'tool', name: 'glob', calls: 1 }] });
+    // e os kinds do ACP valem para todo inventário, como antes
+    expect(checkRun(run([{ kind: 'tool', name: 'read', calls: 1 }]), card, 'faz-ai', 'gemini')).toEqual({ status: 'ok' });
+  });
   it('os nomes do Gemini são lidos no vocabulário do card: dentro das tools, sem desvio; fora, ou negados, com desvio', () => {
     const card = manifest({ tools: ['Read', 'Grep', 'Glob'], deniedTools: ['Bash'] });
     expect(

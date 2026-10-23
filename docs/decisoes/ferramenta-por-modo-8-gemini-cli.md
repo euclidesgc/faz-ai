@@ -69,6 +69,26 @@ Rodado de verdade, com o binário 0.65.0 contra uma API do Gemini **local e fals
   o aplica por cima do ambiente do processo. O validador da admissão compara o nome declarado e recusa uma
   chave em comando que não a declara. A chave não está nos argumentos, no `env` do comando, no settings, no
   vínculo (`bindingContext` não a usa), no log (o gateway mascara) nem no `ai_runs`.
+- **O `.env` da pasta não redireciona a chave** (achado na revisão do #376, reproduzido com a 0.65.0). Com
+  `--skip-trust` a CLI liga `GEMINI_CLI_TRUST_WORKSPACE` e o `loadEnvironment` carrega o primeiro `.gemini/.env`
+  ou `.env` subindo da pasta (inclusive o `~/.gemini/.env` da pessoa acima do projeto), aplicando só as
+  variáveis ainda não definidas: um `.env` com `GOOGLE_GEMINI_BASE_URL` mandava o `x-goog-api-key` com a chave
+  do cofre para outro servidor. Agora as variáveis que a 0.65.0 lê para endpoint, credencial, autenticação,
+  cabeçalhos, proxy, pedido de sistema e carga do Node (`GEMINI_PINNED_ENV`, lidas no pacote) vão fixadas no
+  ambiente do comando: as que o host não define, vazias (a CLI as lê como ausentes e o `.env` não as
+  sobrescreve); as que o host define, o processo já herda. O settings liga `advanced.ignoreLocalEnv` (o `.env`
+  genérico das pastas sai; o `.gemini/.env` não tem chave que o desligue, por isso a fixação). A
+  `GEMINI_API_KEY` não é fixada: com a chave no cofre, o `spawn` a define; sem ela, vale o login da pessoa.
+  Não dá para tirar o `--skip-trust`: sem a pasta confiada, a CLI encerra no modo de uma passada
+  (`FatalUntrustedWorkspaceError`) e não conecta os servidores MCP; desligar o `folderTrust` daria o mesmo
+  efeito. As sondas ganharam um `.env` hostil no projeto e um `.gemini/.env` no ancestral (o lugar do
+  `~/.gemini/.env` acima do projeto), cada um pedindo um cabeçalho sentinela (`GEMINI_CLI_CUSTOM_HEADERS`) que a
+  API local enxerga; e o cenário F confere o ambiente final do processo falso com os dois arquivos.
+- **O shell do modelo não vê a chave**: o settings liga `security.environmentVariableRedaction` (`enabled`,
+  com `blocked: ['GEMINI_API_KEY', 'GOOGLE_API_KEY']`; a CLI também tira pelo nome `/KEY/`,
+  `sanitizeEnvironment`). Sem isso o `run_shell_command` imprimia a chave (reproduzido com a 0.65.0). A sonda
+  roda uma passada com o shell liberado que imprime as duas variáveis: a chave na resposta, ou o shell que não
+  rodou, derruba o `forbidden-tool` (`ProbeRun.secretInShell`; a sonda do Claude não roda shell e não muda).
 - **A admissão do comando com a home**: a variável da home fica fora da comparação do ambiente, e o conteúdo
   gravado nela é conferido arquivo a arquivo, como o dos `tempFiles`; trocar o settings depois da admissão ou
   apontar outra home é recusado.
@@ -100,8 +120,13 @@ Rodado de verdade, com o binário 0.65.0 contra uma API do Gemini **local e fals
   resultado conta (pode ter rodado). A cota esgotada liga `usageLimitReached`; a chave recusada vira login
   vencido pelos padrões do Gemini em `profileAuth` (só no modo CLI).
 - **A conferência**: `GEMINI_TOOL_EQUIVALENTS` (`shared/agentTools.ts`) dá os equivalentes no vocabulário do
-  card de cada nome do Gemini, como `ACP_KIND_EQUIVALENTS` faz para o ACP; os três vocabulários não colidem
-  (o teste vigia).
+  card de cada nome do Gemini, como `ACP_KIND_EQUIVALENTS` faz para o ACP. A tabela só vale para o inventário
+  do Gemini pela CLI (`checkRun(..., 'gemini')`, que o gateway passa pelo perfil): o Cursor também grava nomes
+  minúsculos (`glob`, `read`, `shell`), e uma tabela global leria o `glob` dele como o do Gemini (achado na
+  revisão do #376). Os kinds do ACP seguem valendo para todo inventário, como antes.
+- **`isGeminiCli`** é `isReadyCli(perfil) && tool === 'gemini'`: só o perfil pronto, não um do catálogo com
+  outra identidade. A cópia de um Gemini (pronto, ou cópia dele, em qualquer modo) é o personalizado com o
+  agente, sempre em `acp`.
 
 ## Onde a especificação não cabia no código
 
