@@ -3,8 +3,11 @@
 // do card admite. Esta é a parte pura: o nome da função que o modelo vê, o nome no vocabulário do card
 // (Read/Glob/Grep/Write/Edit/Bash, o mesmo do Claude Code, que é o que o card, a admissão e a conferência
 // usam) e a categoria do nível de permissão. Quem executa é `src/extension/ai/apiTools.ts`.
-import type { ToolGroup } from './agentTools';
+import { AGENT_TOOLS, type ToolGroup } from './agentTools';
 import type { RunnerPermission } from './runner';
+
+/** As ferramentas de delegação que toda execução do board nega (`Agent`, `Task`…): nomes reconhecidos. */
+const SUBAGENT_NAMES = ['Agent', 'Task', 'SendMessage', 'ListAgents'];
 
 /** Uma ferramenta local do modo API. */
 export interface ApiLocalTool {
@@ -68,12 +71,75 @@ export const API_TOOL_GROUPS: ToolGroup[] = [
   },
 ];
 
+type Card = ApiLocalTool['card'];
+const READ_GROUP: Card[] = ['Read', 'Glob', 'Grep'];
+const EDIT_GROUP: Card[] = ['Write', 'Edit'];
+const RUN_GROUP: Card[] = ['Bash'];
+
 /**
- * Se uma entrada de `deniedTools` do card nega a ferramenta: o nome exato (`Bash`) ou uma regra com argumento
- * (`Bash(git push *)`). O board não sabe casar a regra com os argumentos com a precisão da CLI, então ela
- * nega a ferramenta inteira: na dúvida, o mais restrito.
+ * O que cada nome negado tira das ferramentas locais, com a semântica de grupo do Claude Code (as regras de
+ * `Read` valem para `Glob` e `Grep`; as de `Edit` valem para toda ferramenta que edita arquivo,
+ * code.claude.com/docs/en/settings, "Permission rules"), e na dúvida o grupo inteiro: negar `Write` também
+ * nega `Edit`, porque as duas reescrevem o conteúdo de um arquivo. Os nomes vêm do vocabulário do card (o do
+ * Claude Code), do Gemini CLI (`AGENT_TOOLS.gemini`, mais `search_file_content`, o nome anterior do
+ * `grep_search`) e das próprias funções locais. As chaves são minúsculas: a comparação não diferencia.
  */
-export const deniesTool = (entry: string, card: string): boolean => entry === card || entry.startsWith(`${card}(`);
+const DENY_GROUPS: Record<string, Card[]> = {
+  // vocabulário do card (Claude Code)
+  read: READ_GROUP,
+  glob: ['Glob'],
+  grep: ['Grep'],
+  write: EDIT_GROUP,
+  edit: EDIT_GROUP,
+  multiedit: EDIT_GROUP,
+  notebookedit: EDIT_GROUP,
+  bash: RUN_GROUP,
+  powershell: RUN_GROUP,
+  monitor: RUN_GROUP,
+  // Gemini CLI
+  read_file: READ_GROUP,
+  read_many_files: READ_GROUP,
+  list_directory: ['Glob'],
+  grep_search: ['Grep'],
+  search_file_content: ['Grep'],
+  replace: EDIT_GROUP,
+  write_file: EDIT_GROUP,
+  run_shell_command: RUN_GROUP,
+  // as funções locais do modo API
+  edit_file: EDIT_GROUP,
+  run_command: RUN_GROUP,
+};
+
+/** Os nomes que o board reconhece e que não tiram nada das ferramentas locais (rede, delegação, skills…). */
+const KNOWN_ELSEWHERE = new Set([
+  ...Object.values(AGENT_TOOLS).flatMap((groups) => groups.flatMap((g) => g.tools.map((t) => t.name.toLowerCase()))),
+  ...SUBAGENT_NAMES.map((n) => n.toLowerCase()),
+]);
+
+/**
+ * As ferramentas locais que uma entrada de `deniedTools` do card tira. Vale o nome (sem diferenciar
+ * maiúsculas) ou uma regra com argumento (`Bash(git push *)`), que nega a ferramenta inteira: o board não
+ * casa argumentos com a precisão da CLI, e na dúvida vale o mais restrito. Uma ferramenta MCP
+ * (`mcp__servidor__ferramenta`) ou um nome conhecido de outro grupo não tira nada daqui. `null` = o nome não
+ * é reconhecido: a admissão do modo API recusa a execução, em vez de adivinhar o que ele queria negar.
+ */
+export function deniedLocal(entry: string): Card[] | null {
+  const name = entry
+    .trim()
+    .replace(/\(.*\)$/s, '')
+    .trim()
+    .toLowerCase();
+  if (!name) return null;
+  if (Object.hasOwn(DENY_GROUPS, name)) return DENY_GROUPS[name]!;
+  if (/^mcp__[a-z0-9_-]+__[a-z0-9_*-]+$/.test(name) || KNOWN_ELSEWHERE.has(name)) return [];
+  return null;
+}
+
+/** Se uma entrada de `deniedTools` nega a ferramenta local `card`. O nome não reconhecido nega todas (fechar na dúvida). */
+export const deniesTool = (entry: string, card: string): boolean => {
+  const denied = deniedLocal(entry);
+  return denied === null || denied.includes(card as Card);
+};
 
 /**
  * As ferramentas locais que uma execução admitida declara ao modelo: as da categoria do nível, que a decisão

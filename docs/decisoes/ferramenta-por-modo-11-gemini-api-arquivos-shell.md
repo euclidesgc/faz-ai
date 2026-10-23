@@ -103,6 +103,45 @@ tem ferramentas locais próprias na API: as de arquivo e de comando do Gemini CL
   `maskApiKey` antes de voltar ao modelo. A instrução do sistema diz quais funções locais existem, com o
   nome do card, e quais são as pastas.
 
+## Revisão de segurança do #377
+
+Seis achados da revisão, cada um com um teste que falhava no commit anterior (conferido rodando os mesmos
+casos contra ele) e passa agora:
+
+1. **Glob com retrocesso catastrófico (alta).** O glob virava expressão regular, e `"**/".repeat(20)+"zz"`
+   contra um caminho de 14 níveis levou 81 s na thread do host, sem o Parar conseguir interromper (o laço é
+   síncrono). O casador passou para `src/shared/globMatch.ts`, sem expressão regular sobre o caminho: `**`
+   seguidos viram um, os trechos casam por tabela (trecho do padrão × trecho do caminho) e, dentro do trecho,
+   `*`/`?`/`[...]` casam por dois ponteiros, polinomial; `{a,b}` é expandido com limite (64 alternativas,
+   1000 caracteres, 64 trechos), e o que passa disso volta como recusa. O percurso confere o Parar também a
+   cada entrada. Teste: o padrão da revisão e `"*".repeat(50)+"z"` terminam em milissegundos, na função e
+   na ferramenta.
+2. **Configuração de ferramenta incompleta (alta).** A lista protegida (`WRITE_PROTECTED`) agora deriva do
+   que o board já conhece (a pasta de cada adaptador, `TOOL_ADAPTERS`, e o arquivo MCP de projeto de cada
+   agente ACP) e de uma tabela por agente do catálogo (`ACP_PROJECT_CONFIG`), conferida na documentação
+   oficial: Gemini `.gemini`; Antigravity `.agents`, `.agent`; OpenCode `.opencode`, `opencode.json(c)`,
+   `tui.json(c)`; Codex `.codex`; Copilot CLI `.github/hooks`, `.github/copilot`; Qwen Code `.qwen`; goose
+   `.goose`; Kimi `.kimi-code`; mais `.vscode`, `.devcontainer`, `.mcp.json` e `*.code-workspace`. Vale em
+   qualquer profundidade (o Codex lê `.codex/config.toml` de subpastas). O teste falha se um agente do
+   catálogo não tiver entrada na tabela.
+3. **Negação do card (média/alta).** `deniedLocal` compara sem maiúsculas, aplica a semântica de grupo do
+   Claude Code (negar `Read` tira `Glob` e `Grep`; negar `Edit`, `Write`, `MultiEdit` ou `NotebookEdit` tira
+   as duas de escrita, porque as duas reescrevem o arquivo; `Bash`, `PowerShell` e `Monitor` tiram o
+   comando), traduz o vocabulário do Gemini CLI (`read_file`, `read_many_files`, `list_directory`,
+   `grep_search`, `search_file_content`, `replace`, `write_file`, `run_shell_command`) e o das funções
+   locais. Os outros nomes das tabelas de ferramentas, a delegação e `mcp__…` são reconhecidos e não tiram
+   nada daqui. Um nome que não é nenhum desses faz a admissão do modo API recusar a execução
+   (`unsupported-native-restriction`, com o nome), e no laço ele nega todas as locais.
+4. **Maiúsculas no macOS (média).** Os caminhos reais são os de `fs.realpathSync.native` (a grafia do disco),
+   e as listas (`.git`, `.faz-ai*`, a configuração protegida, os segredos do host) comparam em minúsculas no
+   macOS e no Windows. A fronteira das pastas do card continua comparando como o sistema: dobrar ali deixaria
+   uma pasta irmã com outra grafia entrar, num volume que diferencia.
+5. **Windows (média).** `windowsPathProblem` recusa o nome curto 8.3 (`~`), o fluxo alternativo (`:`), o
+   trecho terminado em ponto ou espaço e o caminho de dispositivo (`\\?\`, `\\.\`); a função é pura e o teste
+   a roda em qualquer sistema, e `confinePath` a aplica quando o sistema é o Windows.
+6. **`grep` num caminho único (baixa).** O que não é arquivo nem pasta (FIFO, dispositivo, socket) é recusado
+   antes de ir à thread da busca, que também pula o que não é arquivo.
+
 ## Onde a especificação não cabia no código
 
 - **"`deniedTools` do card respeitado".** A execução admitida perdia as negadas do card em todo transporte

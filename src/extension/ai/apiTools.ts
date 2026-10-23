@@ -6,8 +6,11 @@
 //   os diretórios adicionais que a admissão vinculou, `addDirs`): `..`, symlink para fora e caminho absoluto
 //   fora são recusados. Dentro delas, o board não deixa ler nem escrever o `.git` (configuração com
 //   credencial, hooks que rodam código) nem os arquivos do próprio board (`.faz-ai*`), e não deixa escrever
-//   a configuração das ferramentas de IA e do editor (`.vscode`, `.claude`, `.cursor`, `.gemini`,
-//   `.mcp.json`), que faria um comando rodar fora do nível `full`. Os segredos do host (`~/.faz-ai`, onde
+//   a configuração das ferramentas de IA e do editor (`WRITE_PROTECTED`, derivada dos adaptadores e do
+//   catálogo ACP: `.claude`, `.cursor`, `.kimi-code`, `.gemini`, `.opencode`, `.codex`, `.qwen`…, mais
+//   `.vscode`, `.devcontainer`, `.mcp.json` e `*.code-workspace`), que faria um comando rodar fora do nível
+//   `full`. As listas comparam sem maiúsculas onde o sistema não diferencia (macOS, Windows), e no Windows os
+//   nomes que ele resolve por outro (8.3 com `~`, fluxo com `:`, ponto ou espaço no fim) são recusados. Os segredos do host (`~/.faz-ai`, onde
 //   ficam as pontes do board, `~/.ssh`, `~/.gnupg`, `~/.aws`) ficam de fora mesmo quando uma pasta da
 //   execução os contém;
 // - leitura, saída e tempo têm limite: arquivo grande, resultado longo e busca demorada são cortados com aviso;
@@ -26,7 +29,10 @@ import { StringDecoder } from 'node:string_decoder';
 import { Worker } from 'node:worker_threads';
 import type { ApiLocalTool } from '../../shared/apiTools';
 import { bashCommandTerms } from '../../shared/bashCommand';
+import { GlobError, globMatcher } from '../../shared/globMatch';
 import { asList, asNumber, asObject, asText, type Json } from '../aiOutput/json';
+import { TOOL_ADAPTERS } from '../toolAdapters';
+import { ACP_AGENTS } from './acp/agents';
 import { resolveCommand } from '../cliResolve';
 import { INHERITED_SESSION_ENV, launchSpec } from '../spawn';
 
@@ -98,10 +104,89 @@ export class LocalToolError extends Error {}
 export class LocalToolStopped extends Error {}
 
 const isWindows = process.platform === 'win32';
+/**
+ * Os sistemas de arquivos do Windows e do macOS não diferenciam maiúsculas por padrão: `.SSH/id_rsa` abre a
+ * chave de `.ssh`. Toda lista de nomes proibidos é comparada em minúsculas nesses sistemas (os trechos já vão
+ * em minúsculas em todo sistema; os caminhos dos segredos do host, só onde o sistema não diferencia).
+ */
+const FOLD_CASE = process.platform === 'win32' || process.platform === 'darwin';
+/** O caminho real do sistema (`realpath(3)`), que no macOS e no Windows devolve a grafia do disco. */
+const realpath = (p: string): string => fs.realpathSync.native(p);
 /** Nunca lidos nem escritos, em nenhum nível: credenciais e hooks do git, arquivos do próprio board. */
 const NEVER = (segment: string): boolean => segment === '.git' || segment.startsWith('.faz-ai');
-/** Nunca escritos pelas ferramentas de arquivo: a configuração que faria uma ferramenta ou o editor rodar algo. */
-const NO_WRITE = new Set(['.vscode', '.claude', '.cursor', '.gemini', '.mcp.json']);
+
+/**
+ * O que cada agente ACP do catálogo (`ACP_AGENTS`) lê do projeto como configuração, conferido na documentação
+ * oficial em 2026-10-23: Gemini CLI `.gemini/` (geminicli.com/docs); Antigravity `.agents/` e o antigo
+ * `.agent/` (regras, fluxos, skills), além do `.gemini/`; OpenCode `opencode.json(c)`, `tui.json(c)` e
+ * `.opencode/` (opencode.ai/docs/config); Codex `.codex/config.toml` (learn.chatgpt.com/docs/config-file);
+ * GitHub Copilot CLI `.github/hooks/*.json` e `.github/copilot/settings*.json`
+ * (docs.github.com/en/copilot/reference/hooks-reference); Qwen Code `.qwen/settings.json`
+ * (qwenlm.github.io/qwen-code-docs); goose `.goose/` (receitas, goose-docs.ai). Cursor e Kimi Code vêm
+ * também dos adaptadores (`TOOL_ADAPTERS`). O teste confere que todo agente do catálogo tem entrada aqui.
+ */
+export const ACP_PROJECT_CONFIG: Record<string, readonly string[]> = {
+  gemini: ['.gemini'],
+  'antigravity-acp': ['.agents', '.agent', '.gemini'],
+  opencode: ['.opencode', 'opencode.json', 'opencode.jsonc', 'tui.json', 'tui.jsonc'],
+  'codex-acp': ['.codex'],
+  cursor: ['.cursor'],
+  kimi: ['.kimi-code'],
+  'github-copilot-cli': ['.github/hooks', '.github/copilot'],
+  'qwen-code': ['.qwen'],
+  goose: ['.goose'],
+};
+
+/** A configuração do editor que roda algo sozinha: tarefas e configurações, contêiner de desenvolvimento, MCP do projeto. */
+const EDITOR_CONFIG = ['.vscode', '.devcontainer', '.mcp.json'];
+
+/**
+ * Nunca escritos pelas ferramentas de arquivo, em qualquer profundidade: a configuração que faria uma
+ * ferramenta de IA ou o editor rodar algo sem o nível `full`. Derivada do que o board já conhece de cada
+ * ferramenta (a pasta dos adaptadores, o arquivo MCP do projeto de cada agente ACP) mais a tabela acima,
+ * para a lista não divergir quando uma ferramenta entra. Cada item é um caminho de trechos (`.github/hooks`).
+ */
+export const WRITE_PROTECTED: readonly string[] = [
+  ...new Set(
+    [
+      ...EDITOR_CONFIG,
+      ...Object.values(TOOL_ADAPTERS).map((a) => a!.root),
+      ...ACP_AGENTS.flatMap((a) => (a.projectMcpFile ? [a.projectMcpFile.split('/')[0]!] : [])),
+      ...Object.values(ACP_PROJECT_CONFIG).flat(),
+    ].map((p) => p.toLowerCase()),
+  ),
+];
+/** Os arquivos protegidos pelo fim do nome (um espaço de trabalho do VS Code roda tarefas e extensões). */
+const WRITE_PROTECTED_SUFFIX = ['.code-workspace'];
+
+/** Se os trechos (em minúsculas) caem numa configuração protegida, em qualquer profundidade. */
+export function writeProtected(segments: readonly string[]): boolean {
+  const lower = segments.map((s) => s.toLowerCase());
+  if (lower.length && WRITE_PROTECTED_SUFFIX.some((suffix) => lower.at(-1)!.endsWith(suffix))) return true;
+  return WRITE_PROTECTED.some((entry) => {
+    const parts = entry.split('/');
+    return lower.some((_, i) => parts.every((part, k) => lower[i + k] === part));
+  });
+}
+
+/**
+ * O que o Windows resolve por outro nome e que passaria pelas listas de nomes: o nome curto 8.3 (`GIT~1` é o
+ * `.git`), o fluxo alternativo (`a.txt:oculto`, `.git::$INDEX_ALLOCATION`), o trecho terminado em ponto ou
+ * espaço (`.git.` abre `.git`) e o caminho de dispositivo (`\\?\`, `\\.\`). Pura, para o teste rodar em
+ * qualquer sistema; a recusa só é aplicada no Windows, onde esses nomes valem outra coisa.
+ */
+export function windowsPathProblem(asked: string): string | null {
+  if (/^[\\/]{2}[?.][\\/]/.test(asked)) return 'caminho de dispositivo do Windows';
+  for (const [i, segment] of asked.split(/[\\/]+/).entries()) {
+    if (!segment || segment === '.' || segment === '..') continue;
+    if (i === 0 && /^[A-Za-z]:$/.test(segment)) continue;
+    if (segment.includes('~')) return 'nome curto do Windows (com ~)';
+    if (segment.includes(':')) return 'fluxo alternativo do Windows (com :)';
+    if (/[. ]$/.test(segment)) return 'trecho terminado em ponto ou espaço';
+  }
+  return null;
+}
+
 /** Pastas que a busca pula, a menos que o padrão as peça. */
 const SKIP_WALK = new Set(['node_modules']);
 
@@ -115,7 +200,7 @@ export function realLocalRoots(cwd: string, addDirs: readonly string[] = []): st
   const roots: string[] = [];
   for (const dir of [cwd, ...addDirs]) {
     try {
-      const real = fs.realpathSync(path.resolve(cwd, dir));
+      const real = realpath(path.resolve(cwd, dir));
       if (fs.statSync(real).isDirectory() && !roots.includes(real)) roots.push(real);
     } catch {
       if (dir === cwd) throw new Error(`A pasta do card não existe: ${cwd}`);
@@ -124,23 +209,30 @@ export function realLocalRoots(cwd: string, addDirs: readonly string[] = []): st
   return roots;
 }
 
-/** `child` está em `parent` (ou é ele). `path.relative` já compara sem maiúsculas no Windows. */
-function within(parent: string, child: string): boolean {
-  const rel = path.relative(parent, child);
+/**
+ * `child` está em `parent` (ou é ele). `fold` compara sem maiúsculas: é o que vale para as listas de
+ * proibidos no macOS e no Windows. A fronteira das pastas do card compara como o sistema (o `realpath` já
+ * devolve a grafia do disco), para uma pasta irmã com outra grafia, num volume que diferencia, não entrar.
+ */
+export function within(parent: string, child: string, fold = false): boolean {
+  const rel = fold ? path.relative(parent.toLowerCase(), child.toLowerCase()) : path.relative(parent, child);
   return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
 }
 
 /** Os segredos do host que nenhuma ferramenta toca, mesmo dentro de uma pasta da execução. */
 function hostSecrets(homeDir: string): string[] {
   const dirs = ['.faz-ai', '.ssh', '.gnupg', '.aws'].map((d) => path.join(homeDir, d));
-  return dirs.map((d) => {
+  return dirs.flatMap((d) => {
     try {
-      return fs.realpathSync(d);
+      return [d, realpath(d)];
     } catch {
-      return d;
+      return [d];
     }
   });
 }
+
+/** Se o caminho cai num segredo do host, sem diferenciar maiúsculas onde o sistema não diferencia. */
+const isHostSecret = (secrets: readonly string[], p: string): boolean => secrets.some((s) => within(s, p, FOLD_CASE));
 
 /** O caminho real mais próximo que existe, com o resto (o que ainda vai ser criado) por cima. */
 function realOrParent(abs: string): string {
@@ -148,7 +240,7 @@ function realOrParent(abs: string): string {
   const rest: string[] = [];
   for (;;) {
     try {
-      return path.join(fs.realpathSync(current), ...rest.reverse());
+      return path.join(realpath(current), ...rest.reverse());
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT' && (e as NodeJS.ErrnoException).code !== 'ENOTDIR') throw e;
       const parent = path.dirname(current);
@@ -170,9 +262,16 @@ interface Confined {
  * card; absoluto, só dentro de uma das pastas. O real (com os symlinks resolvidos) é o que precisa ficar
  * dentro: um symlink que aponta para fora é recusado como um `..`.
  */
-export function confinePath(ctx: Pick<LocalToolContext, 'roots' | 'homeDir'>, raw: unknown, mode: 'read' | 'write'): Confined {
+export function confinePath(
+  ctx: Pick<LocalToolContext, 'roots' | 'homeDir'>,
+  raw: unknown,
+  mode: 'read' | 'write',
+  platform: NodeJS.Platform = process.platform,
+): Confined {
   const asked = typeof raw === 'string' ? raw.trim() : '';
   if (!asked || asked.includes('\0')) throw new LocalToolError('Caminho vazio ou inválido.');
+  const windows = platform === 'win32' ? windowsPathProblem(asked) : null;
+  if (windows) throw new LocalToolError(`Caminho recusado (${windows}): ${asked}`);
   const base = ctx.roots[0];
   if (!base) throw new LocalToolError('A execução não tem pasta de trabalho.');
   const abs = path.resolve(base, asked);
@@ -180,7 +279,7 @@ export function confinePath(ctx: Pick<LocalToolContext, 'roots' | 'homeDir'>, ra
   if (!ctx.roots.some((root) => within(root, abs))) throw new LocalToolError(`Fora das pastas do card: ${asked}`);
   let real: string;
   try {
-    real = mode === 'read' ? fs.realpathSync(abs) : realOrParent(abs);
+    real = mode === 'read' ? realpath(abs) : realOrParent(abs);
   } catch (e) {
     if (e instanceof LocalToolError) throw e;
     const code = (e as NodeJS.ErrnoException).code;
@@ -195,9 +294,11 @@ export function confinePath(ctx: Pick<LocalToolContext, 'roots' | 'homeDir'>, ra
     .map((s) => s.toLowerCase());
   if (segments.some(NEVER))
     throw new LocalToolError(`O board não deixa ${mode === 'read' ? 'ler' : 'escrever'} ${asked}: é do git ou do próprio board.`);
-  if (mode === 'write' && segments.some((s) => NO_WRITE.has(s)))
+  if (mode === 'write' && writeProtected(segments))
     throw new LocalToolError(`O board não deixa escrever ${asked}: é configuração de ferramenta de IA ou do editor.`);
-  if (hostSecrets(ctx.homeDir ?? os.homedir()).some((secret) => within(secret, real)))
+  // o pedido e o real: num sistema que não diferencia maiúsculas, `.SSH` é o `.ssh`
+  const secrets = hostSecrets(ctx.homeDir ?? os.homedir());
+  if (isHostSecret(secrets, real) || isHostSecret(secrets, abs))
     throw new LocalToolError(`O board não deixa ${mode === 'read' ? 'ler' : 'escrever'} ${asked}: é um segredo do computador.`);
   const fromCard = path.relative(base, real);
   const shown = within(base, real) ? fromCard.split(path.sep).join('/') || '.' : real;
@@ -241,39 +342,17 @@ function readFile(args: Json, ctx: LocalToolContext): LocalToolResult {
   return { response: { output: capped(body, limits.resultChars) + more } };
 }
 
-/** O padrão de glob como expressão regular, sobre o caminho com `/`: `**`, `*`, `?`, `{a,b}` e `[abc]`. */
-export function globRegex(glob: string): RegExp {
-  let re = '';
-  let braces = 0;
-  for (let i = 0; i < glob.length; i++) {
-    const c = glob[i]!;
-    if (c === '*') {
-      if (glob[i + 1] === '*') {
-        if (glob[i + 2] === '/') {
-          re += '(?:.*/)?';
-          i += 2;
-        } else {
-          re += '.*';
-          i += 1;
-        }
-      } else re += '[^/]*';
-    } else if (c === '?') re += '[^/]';
-    else if (c === '{') {
-      braces++;
-      re += '(?:';
-    } else if (c === '}' && braces) {
-      braces--;
-      re += ')';
-    } else if (c === ',' && braces) re += '|';
-    else if (c === '[' && glob.indexOf(']', i + 2) > i) {
-      const end = glob.indexOf(']', i + 2);
-      const body = glob.slice(i + 1, end).replace(/\\/g, '\\\\');
-      re += `[${body.startsWith('!') ? `^${body.slice(1)}` : body}]`;
-      i = end;
-    } else re += c.replace(/[.+^${}()|[\]\\/]/g, '\\$&');
+/**
+ * O casador do glob do modelo, sem expressão regular sobre o caminho (`shared/globMatch.ts`, polinomial):
+ * um padrão que explodiria uma expressão regular termina rápido. O padrão fora dos limites volta como recusa.
+ */
+function globOf(pattern: string): (rel: string) => boolean {
+  try {
+    return globMatcher(pattern.replace(/^\.\//, ''), FOLD_CASE);
+  } catch (e) {
+    if (e instanceof GlobError) throw new LocalToolError(e.message);
+    throw e;
   }
-  while (braces-- > 0) re += ')';
-  return new RegExp(`^${re}$`, isWindows ? 'i' : '');
 }
 
 /**
@@ -305,17 +384,19 @@ async function walk(
       continue;
     }
     for (const entry of entries) {
+      // o Parar vale entre um arquivo e outro, não só entre as pastas
+      if (ctx.signal.aborted) throw new LocalToolStopped();
       if (++visited > limits.walkEntries) return { files, truncated: true };
       const name = entry.name.toLowerCase();
       if (NEVER(name) || (!opts.includeSkipped && SKIP_WALK.has(name))) continue;
       const full = path.join(dir, entry.name);
-      if (secrets.some((s) => within(s, full))) continue;
+      if (isHostSecret(secrets, full)) continue;
       if (entry.isDirectory()) queue.push(full);
       else if (entry.isFile() || entry.isSymbolicLink()) {
         let real = full;
         if (entry.isSymbolicLink()) {
           try {
-            real = fs.realpathSync(full);
+            real = realpath(full);
             if (!fs.statSync(real).isFile() || !ctx.roots.some((r) => within(r, real))) continue;
           } catch {
             continue;
@@ -340,8 +421,8 @@ async function glob(args: Json, ctx: LocalToolContext): Promise<LocalToolResult>
   if (!pattern || pattern.includes('\0')) throw new LocalToolError('Falta o padrão (pattern).');
   const start = confinePath(ctx, asText(args.path) ?? '.', 'read');
   if (!fs.statSync(start.real).isDirectory()) throw new LocalToolError(`Não é uma pasta: ${start.shown}`);
-  const re = globRegex(pattern.replace(/^\.\//, ''));
-  const { files, truncated } = await walk(start, ctx, (rel) => re.test(rel), {
+  const matches = globOf(pattern);
+  const { files, truncated } = await walk(start, ctx, matches, {
     includeSkipped: /node_modules/i.test(pattern),
     max: limits.matches,
   });
@@ -364,7 +445,8 @@ let truncated = false;
 outer: for (const f of files) {
   let buf;
   try {
-    if (fs.statSync(f.real).size > maxBytes) continue;
+    const st = fs.statSync(f.real);
+    if (!st.isFile() || st.size > maxBytes) continue;
     buf = fs.readFileSync(f.real);
   } catch { continue; }
   if (buf.subarray(0, 8000).includes(0)) continue;
@@ -391,11 +473,14 @@ async function grep(args: Json, ctx: LocalToolContext): Promise<LocalToolResult>
   }
   const start = confinePath(ctx, asText(args.path) ?? '.', 'read');
   const filter = asText(args.glob);
-  const re = filter ? globRegex(filter.replace(/^\.\//, '')) : null;
-  // um arquivo pedido direto é buscado só nele; uma pasta, em tudo o que a busca visita dentro dela
-  const isDir = fs.statSync(start.real).isDirectory();
+  const matches = filter ? globOf(filter) : null;
+  // um arquivo pedido direto é buscado só nele; uma pasta, em tudo o que a busca visita dentro dela. O que
+  // não é nem um nem outro (FIFO, dispositivo, socket) é recusado aqui: ler uma FIFO prenderia a busca
+  const st = fs.statSync(start.real);
+  const isDir = st.isDirectory();
+  if (!isDir && !st.isFile()) throw new LocalToolError(`Não é um arquivo nem uma pasta: ${start.shown}`);
   const listed = isDir
-    ? await walk(start, ctx, (rel) => !re || re.test(rel) || re.test(path.posix.basename(rel)), {
+    ? await walk(start, ctx, (rel) => !matches || matches(rel) || matches(path.posix.basename(rel)), {
         includeSkipped: !!filter && /node_modules/i.test(filter),
         max: limits.walkEntries,
       })
@@ -444,7 +529,7 @@ function writeConfined(file: Confined, content: string, limits: LocalToolLimits)
   const dir = path.dirname(file.real);
   fs.mkdirSync(dir, { recursive: true });
   // a pasta criada agora continua dentro: entre a conferência e a criação ninguém trocou um trecho por symlink
-  if (path.relative(fs.realpathSync(dir), dir) !== '') throw new LocalToolError('A pasta do arquivo mudou durante a gravação.');
+  if (path.relative(realpath(dir), dir) !== '') throw new LocalToolError('A pasta do arquivo mudou durante a gravação.');
   const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | (fs.constants.O_NOFOLLOW ?? 0);
   const fd = fs.openSync(file.real, flags, 0o666);
   try {

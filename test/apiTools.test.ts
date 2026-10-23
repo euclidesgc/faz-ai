@@ -6,17 +6,25 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import {
+  ACP_PROJECT_CONFIG,
   commandEnv,
   confinePath,
-  globRegex,
   LocalToolError,
   LocalToolStopped,
   realLocalRoots,
   runLocalTool,
+  windowsPathProblem,
+  within,
+  WRITE_PROTECTED,
+  writeProtected,
   type LocalToolContext,
 } from '../src/extension/ai/apiTools';
-import { API_LOCAL_TOOLS, apiLocalTools, deniesTool, type ApiLocalTool } from '../src/shared/apiTools';
+import { ACP_AGENTS } from '../src/extension/ai/acp/agents';
+import { TOOL_ADAPTERS } from '../src/extension/toolAdapters';
+import { API_LOCAL_TOOLS, apiLocalTools, deniedLocal, deniesTool, type ApiLocalTool } from '../src/shared/apiTools';
+import { GlobError, globMatcher } from '../src/shared/globMatch';
 import { admitExecution, type StrictExecutionRequest } from '../src/shared/executionAdmission';
 import { checkRun } from '../src/shared/runCheck';
 
@@ -81,6 +89,70 @@ describe('confinamento: todo caminho cai numa pasta do card, pelo caminho real',
     const inHome = { ...ctx, roots: realLocalRoots(home) };
     expect(await error('read_file', { path: '.ssh/id_rsa' }, inHome)).toMatch(/segredo do computador/);
   });
+
+  it('a configuração de toda ferramenta do catálogo e do editor não se escreve, em qualquer profundidade e grafia', async () => {
+    // a lista deriva dos adaptadores e do catálogo ACP: nenhuma ferramenta fica de fora
+    for (const agent of ACP_AGENTS) expect(Object.keys(ACP_PROJECT_CONFIG), agent.id).toContain(agent.id);
+    for (const adapter of Object.values(TOOL_ADAPTERS)) expect(WRITE_PROTECTED).toContain(adapter!.root);
+    for (const p of [
+      '.kimi-code/mcp.json',
+      '.opencode/plugins/p.js',
+      'opencode.json',
+      'opencode.jsonc',
+      'tui.json',
+      '.qwen/settings.json',
+      '.codex/config.toml',
+      'sub/pasta/.codex/config.toml',
+      '.github/hooks/politica.json',
+      '.github/copilot/settings.json',
+      '.agents/rules/r.md',
+      '.agent/workflows/w.md',
+      '.goose/recipes/r.yaml',
+      '.devcontainer/devcontainer.json',
+      'projeto.code-workspace',
+      '.KIMI-CODE/mcp.json',
+      '.VSCode/tasks.json',
+    ])
+      expect(await error('write_file', { path: p, content: '{}' }), p).toMatch(/configuração de ferramenta de IA ou do editor/);
+    // o que só parece: `.github` fora de hooks e copilot, e um nome que contém o protegido sem ser ele
+    expect(writeProtected(['.github', 'workflows', 'ci.yml'])).toBe(false);
+    expect(writeProtected(['meu.codex', 'x'])).toBe(false);
+    expect(
+      (await runLocalTool(tool('write_file'), { path: '.github/workflows/ci.yml', content: 'x' }, ctx)).response.error,
+    ).toBeUndefined();
+  });
+
+  it('as listas de proibidos não diferenciam maiúsculas onde o sistema não diferencia: .SSH, .AWS, .GIT', async () => {
+    expect(within('/h/.ssh', '/h/.SSH/id_rsa', true)).toBe(true);
+    expect(within('/h/.ssh', '/h/.SSH/id_rsa', false)).toBe(false);
+    fs.mkdirSync(path.join(home, '.aws'));
+    fs.writeFileSync(path.join(home, '.aws', 'credentials'), 'segredo');
+    fs.mkdirSync(path.join(home, '.git'));
+    fs.writeFileSync(path.join(home, '.git', 'config'), 'x');
+    const inHome = { ...ctx, roots: realLocalRoots(home) };
+    // num volume que diferencia maiúsculas, `.SSH` simplesmente não existe; no macOS e no Windows é o `.ssh`
+    const folds = fs.existsSync(path.join(home, '.SSH'));
+    for (const p of ['.SSH/id_rsa', '.AWS/credentials', '.Ssh/id_rsa']) {
+      const refused = await error('read_file', { path: p }, inHome);
+      expect(refused, p).toMatch(folds ? /segredo do computador/ : /Não existe/);
+    }
+    expect(await error('read_file', { path: '.GIT/config' }, inHome)).toMatch(folds ? /é do git/ : /Não existe/);
+  });
+
+  it('no Windows, o nome curto (~), o fluxo (:), o trecho com ponto ou espaço no fim e o caminho de dispositivo', () => {
+    expect(windowsPathProblem('GIT~1/config')).toMatch(/nome curto/);
+    expect(windowsPathProblem('a.txt:oculto')).toMatch(/fluxo/);
+    expect(windowsPathProblem('.git::$INDEX_ALLOCATION/config')).toMatch(/fluxo/);
+    expect(windowsPathProblem('.git./config')).toMatch(/ponto ou espaço/);
+    expect(windowsPathProblem('.ssh /id_rsa')).toMatch(/ponto ou espaço/);
+    expect(windowsPathProblem('\\\\?\\C:\\x')).toMatch(/dispositivo/);
+    expect(windowsPathProblem('C:\\projeto\\src\\a.ts')).toBeNull();
+    expect(windowsPathProblem('src/../a.ts')).toBeNull();
+    // a recusa entra no confinamento quando o sistema é o Windows (aqui, simulado)
+    expect(() => confinePath(ctx, 'GIT~1/config', 'read', 'win32')).toThrow(/nome curto/);
+    expect(() => confinePath(ctx, 'a.txt:x', 'write', 'win32')).toThrow(/fluxo/);
+    expect(confinePath(ctx, 'a.txt', 'read', 'win32').shown).toBe('a.txt');
+  });
 });
 
 describe('arquivos: ler, buscar, escrever e editar, com limites', () => {
@@ -107,8 +179,33 @@ describe('arquivos: ler, buscar, escrever e editar, com limites', () => {
     expect(found.response.output).toBe('src/x/c.ts');
     // fora da pasta do card, o caminho aparece inteiro
     expect((await runLocalTool(tool('glob'), { pattern: '*.ts', path: extra }, ctx)).response.output).toBe(path.join(extra, 'b.ts'));
-    expect(globRegex('src/*.{js,ts}').test('src/d.js')).toBe(true);
-    expect(globRegex('src/*.{js,ts}').test('src/x/c.ts')).toBe(false);
+    expect(globMatcher('src/*.{js,ts}')('src/d.js')).toBe(true);
+    expect(globMatcher('src/*.{js,ts}')('src/x/c.ts')).toBe(false);
+  });
+
+  it('o glob casa sem retrocesso: `**/` repetido e `*` repetido terminam rápido, na função e na ferramenta', async () => {
+    const deep = `${'a/'.repeat(40)}b.ts`;
+    const started = Date.now();
+    // como expressão regular, cada um destes levava tempo exponencial na thread do editor
+    expect(globMatcher(`${'**/'.repeat(20)}zz`)(deep)).toBe(false);
+    expect(globMatcher(`${'*'.repeat(50)}z`)('a'.repeat(250))).toBe(false);
+    expect(globMatcher(`${'**/'.repeat(20)}*.ts`)(deep)).toBe(true);
+    expect(globMatcher('**/x/**/*.{js,ts}')('p/x/q/r/a.ts')).toBe(true);
+    expect(globMatcher('[!a]*.ts')('b.ts')).toBe(true);
+    expect(globMatcher('[!a]*.ts')('a.ts')).toBe(false);
+    expect(globMatcher('*.TS', true)('x.ts')).toBe(true);
+    expect(Date.now() - started).toBeLessThan(500);
+    // pela ferramenta, numa árvore funda
+    fs.mkdirSync(path.join(card, ...Array(15).fill('d')), { recursive: true });
+    fs.writeFileSync(path.join(card, ...Array(15).fill('d'), 'f.txt'), '');
+    const t0 = Date.now();
+    expect((await runLocalTool(tool('glob'), { pattern: `${'**/'.repeat(20)}zz` }, ctx)).response.output).toBe(
+      'Nenhum arquivo encontrado.',
+    );
+    expect(Date.now() - t0).toBeLessThan(2000);
+    // o padrão fora dos limites volta como recusa
+    expect(() => globMatcher('{a,b}'.repeat(10))).toThrow(GlobError);
+    expect(await error('glob', { pattern: 'x'.repeat(2000) })).toMatch(/longo demais/);
   });
 
   it('grep busca linha a linha, e uma expressão que explode é encerrada no tempo limite sem travar o editor', async () => {
@@ -119,6 +216,15 @@ describe('arquivos: ler, buscar, escrever e editar, com limites', () => {
     const started = Date.now();
     expect(await error('grep', { pattern: '^(a+)+$', path: 'redos.txt' }, { ...ctx, limits: { grepMs: 300 } })).toMatch(/passou de 0.3 s/);
     expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  it.skipIf(process.platform === 'win32')('grep num caminho que não é arquivo (FIFO) recusa sem ler', async () => {
+    execFileSync('mkfifo', [path.join(card, 'fila')]);
+    const started = Date.now();
+    expect(await error('grep', { pattern: 'x', path: 'fila' }, { ...ctx, limits: { grepMs: 3000 } })).toBe(
+      'Não é um arquivo nem uma pasta: fila',
+    );
+    expect(Date.now() - started).toBeLessThan(2000);
   });
 
   it('write_file cria as pastas; edit_file exige o trecho único (ou replace_all) e recusa o que não existe', async () => {
@@ -211,9 +317,38 @@ describe('a decisão por nível, no vocabulário do card', () => {
     expect(apiLocalTools('full', exec(ALL)).map((t) => t.card)).toEqual(ALL);
     // [] explícito é nenhuma ferramenta local
     expect(apiLocalTools('full', exec([]))).toEqual([]);
-    expect(apiLocalTools('full', exec(ALL, ['Bash(git push *)', 'Write'])).map((t) => t.card)).toEqual(['Read', 'Glob', 'Grep', 'Edit']);
+    expect(apiLocalTools('full', exec(ALL, ['Bash(git push *)', 'Glob'])).map((t) => t.card)).toEqual(['Read', 'Grep', 'Write', 'Edit']);
     expect(deniesTool('Bash(rm *)', 'Bash')).toBe(true);
-    expect(deniesTool('Bashful', 'Bash')).toBe(false);
+  });
+
+  it('a negação do card: sem maiúsculas, por grupo, no vocabulário do Gemini, e o desconhecido fecha', () => {
+    // (a) sem diferenciar maiúsculas
+    expect(deniedLocal('bash')).toEqual(['Bash']);
+    expect(deniedLocal('EDIT')).toEqual(['Write', 'Edit']);
+    // (b) grupo: Edit e Write tiram as duas de escrita; Read tira Glob e Grep; Bash tira o comando
+    expect(apiLocalTools('full', exec(ALL, ['Edit'])).map((t) => t.fn)).toEqual(['read_file', 'glob', 'grep', 'run_command']);
+    expect(apiLocalTools('full', exec(ALL, ['Write'])).map((t) => t.fn)).toEqual(['read_file', 'glob', 'grep', 'run_command']);
+    expect(apiLocalTools('full', exec(ALL, ['Read'])).map((t) => t.fn)).toEqual(['write_file', 'edit_file', 'run_command']);
+    expect(apiLocalTools('full', exec(ALL, ['Bash'])).map((t) => t.fn)).not.toContain('run_command');
+    expect(deniedLocal('MultiEdit')).toEqual(['Write', 'Edit']);
+    expect(deniedLocal('PowerShell')).toEqual(['Bash']);
+    // (c) o vocabulário do Gemini CLI e o das funções locais
+    expect(deniedLocal('run_shell_command')).toEqual(['Bash']);
+    expect(deniedLocal('run_command')).toEqual(['Bash']);
+    expect(deniedLocal('write_file')).toEqual(['Write', 'Edit']);
+    expect(deniedLocal('replace')).toEqual(['Write', 'Edit']);
+    expect(deniedLocal('edit_file')).toEqual(['Write', 'Edit']);
+    expect(deniedLocal('read_file')).toEqual(['Read', 'Glob', 'Grep']);
+    expect(deniedLocal('list_directory')).toEqual(['Glob']);
+    expect(deniedLocal('search_file_content')).toEqual(['Grep']);
+    expect(deniedLocal('grep_search')).toEqual(['Grep']);
+    // o reconhecido de outro grupo não tira nada daqui
+    for (const name of ['WebFetch', 'Agent', 'Task', 'web_fetch', 'mcp__docs__search', 'Skill'])
+      expect(deniedLocal(name), name).toEqual([]);
+    // (d) o desconhecido: null, e no laço nega todas as locais
+    expect(deniedLocal('Bashful')).toBeNull();
+    expect(deniedLocal('FerramentaInventada')).toBeNull();
+    expect(apiLocalTools('full', exec(ALL, ['FerramentaInventada']))).toEqual([]);
   });
 
   it('a admissão do modo API lista as ferramentas locais pelo nível (a tabela do board, não a de uma CLI)', () => {

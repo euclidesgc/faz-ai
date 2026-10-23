@@ -22,7 +22,7 @@ import { acpCommand, acpSessionMode, type AcpAgent } from './acp/provider';
 import { executorOf, type ApiInvocation, type Executor } from './drivers';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import { boardOnlyMcpConfig } from '../execution';
-import { deniesTool } from '../../shared/apiTools';
+import { deniedLocal, deniesTool } from '../../shared/apiTools';
 import { canonical, constructionEvidence, CapabilityEvidenceStore } from './capabilityEvidence';
 import { INHERITED_SESSION_ENV } from '../spawn';
 
@@ -441,6 +441,17 @@ export class ExecutionAdmission {
     // aparente. A diferença fica aqui, explícita, como pendência do ACP (registro da história 11).
     if (transport === 'api') {
       const cardDenied = (input.exec?.deniedTools ?? []).filter((t) => typeof t === 'string' && t && !t.includes('\0'));
+      // um nome negado que o board não reconhece não vira "nada negado": a execução não parte (fechar na dúvida)
+      const unknown = cardDenied.filter((t) => deniedLocal(t) === null);
+      if (unknown.length) {
+        const blocked = new AdmissionBlockedError({
+          ...preliminary,
+          state: 'blocked',
+          reasons: unknown.map((name) => ({ code: 'unsupported-native-restriction', resourceId: name })),
+        });
+        blocked.message = `Execução bloqueada pela admissão: o card nega ${unknown.map((n) => `"${n}"`).join(', ')}, que o modo API não reconhece. Use os nomes das ferramentas do card (Read, Glob, Grep, Write, Edit, Bash).`;
+        throw blocked;
+      }
       effective.exec!.tools = preliminary.tools.filter((name) => !cardDenied.some((entry) => deniesTool(entry, name)));
       effective.exec!.deniedTools = [...new Set([...preliminary.deniedTools, ...cardDenied])];
     }

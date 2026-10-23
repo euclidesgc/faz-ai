@@ -219,15 +219,24 @@ modelo pede e o **board** executa no seu computador, só o que o nível de permi
 
 - As ferramentas usam os nomes do card: `read_file` é **Read**, `glob` é **Glob**, `grep` é **Grep**,
   `write_file` é **Write**, `edit_file` é **Edit** e `run_command` é **Bash**. Uma ferramenta que o
-  agente do card nega não chega ao modelo, em nenhum nível. A lista de ferramentas do agente vai pelo
+  agente do card nega não chega ao modelo, em nenhum nível. A negação vale sem diferenciar maiúsculas
+  e por grupo: negar **Read** tira também **Glob** e **Grep**; negar **Edit** ou **Write** tira as duas
+  de escrita; negar **Bash** tira o comando. Os nomes do Gemini CLI (`run_shell_command`, `replace`,
+  `write_file`…) também valem. Um nome negado que o board não reconhece faz a execução não partir, com
+  o nome na causa. A lista de ferramentas do agente vai pelo
   pedido, e a conferência acusa o que o modelo usou fora dela (por exemplo, **Write** num agente que
   não a lista, com a permissão **Sem restrições**).
 - Os caminhos ficam presos à pasta do projeto e à pasta de trabalho da história: `..`, um caminho
   absoluto fora delas e um link simbólico que sai delas são recusados, e a recusa volta ao modelo
   como erro, sem gravar nada. O `.git` e os arquivos do board nunca são lidos nem escritos, e a
-  configuração das ferramentas e do editor (`.vscode`, `.claude`, `.cursor`, `.gemini`, `.mcp.json`)
-  não é escrita. As pastas de credenciais da sua conta (`~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.faz-ai`)
-  ficam de fora.
+  configuração das ferramentas de IA e do editor não é escrita, em qualquer pasta: `.claude`,
+  `.cursor`, `.kimi-code`, `.gemini`, `.agents`, `.opencode`, `opencode.json`, `.codex`, `.qwen`,
+  `.goose`, `.github/hooks`, `.github/copilot`, `.vscode`, `.devcontainer`, `.mcp.json` e
+  `*.code-workspace`. As pastas de credenciais da sua conta (`~/.ssh`, `~/.gnupg`, `~/.aws`,
+  `~/.faz-ai`) ficam de fora. No macOS e no Windows essas listas não diferenciam maiúsculas (`.SSH` é
+  o `.ssh`), e no Windows um caminho com nome curto (`~`), fluxo (`:`) ou trecho terminado em ponto ou
+  espaço é recusado. O padrão de `glob` é casado sem expressão regular, então um padrão do modelo não
+  trava o editor.
 - O comando roda **sem shell**: o programa e os argumentos vão separados, e pipe, `&&` e `$VAR` não
   são interpretados (para isso, o modelo precisa chamar o shell como programa, o que só vale em
   **Sem restrições**). Ele roda numa pasta do card, sem a chave da API nem variáveis com cara de

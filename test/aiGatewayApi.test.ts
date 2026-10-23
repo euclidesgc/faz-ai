@@ -279,12 +279,27 @@ describe('gateway no modo API: a decisão do card é a fronteira do que o modelo
     const end = await w.run();
 
     expect(end.outcome).toBe('done');
-    expect(declaredIn(server.requests[0]!.body).filter((n) => !n.startsWith('mcp__'))).toEqual(['read_file', 'glob', 'grep', 'edit_file']);
+    // Write negado tira as duas de escrita (o grupo de edição), Bash tira o comando
+    expect(declaredIn(server.requests[0]!.body).filter((n) => !n.startsWith('mcp__'))).toEqual(['read_file', 'glob', 'grep']);
     // a chamada à função não declarada volta como erro, sem rodar e sem entrar no inventário
     expect(JSON.stringify(server.requests[1]!.body.contents.at(-1))).toContain('não existe nesta execução');
     expect(end.report.inventory).toEqual([]);
     const row = new AiRunRepo(db).byMonth(monthOf(Date.now())).at(-1)!;
-    expect(row.admission!.tools).toEqual(['Read', 'Glob', 'Grep', 'Edit']);
+    expect(row.admission!.tools).toEqual(['Read', 'Glob', 'Grep']);
     expect(row.admission!.deniedTools).toEqual(expect.arrayContaining(['Bash', 'Write', 'Agent']));
+  });
+
+  it('a negação do card no vocabulário do Gemini e sem maiúsculas vale; um nome desconhecido recusa a execução', async () => {
+    server = await fakeGemini([modelTurn([{ text: 'pronto' }])]);
+    expect((await world('full', ['run_shell_command', 'replace']).run()).outcome).toBe('done');
+    expect(declaredIn(server.requests[0]!.body).filter((n) => !n.startsWith('mcp__'))).toEqual(['read_file', 'glob', 'grep']);
+    await server.close();
+
+    server = await fakeGemini([modelTurn([{ text: 'pronto' }])]);
+    await expect(world('full', ['FerramentaInventada']).run()).rejects.toThrow(/nega "FerramentaInventada", que o modo API não reconhece/);
+    expect(server.requests).toEqual([]);
+    const row = new AiRunRepo(db).byMonth(monthOf(Date.now())).at(-1)!;
+    expect(row).toMatchObject({ outcome: 'unsupported', mode: 'api' });
+    expect(row.admission!.reasons).toEqual([{ code: 'unsupported-native-restriction', resourceId: 'FerramentaInventada' }]);
   });
 });
