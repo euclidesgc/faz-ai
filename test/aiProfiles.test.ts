@@ -63,6 +63,10 @@ it('valida configuração sem presumir permissões e devolve metadados neutros',
   expect(validateProfile(custom)).toEqual([]);
   expect(validateProfile({ ...custom, config: { boardServer: 'project' } })).toHaveLength(2);
   expect(validateProfile({ ...custom, config: { command: 'cli', permissionArgs: { board: ['--readonly'] } } })).toEqual([]);
+  // com agente ACP o comando é o do catálogo; o id tem o formato do registro do ACP
+  expect(validateProfile({ ...custom, config: { acpAgent: 'gemini' } })).toEqual([]);
+  expect(validateProfile({ ...custom, config: { acpAgent: 'Gemini CLI' } })).toEqual(['Agente ACP inválido.']);
+  expect(validateProfile({ ...custom, config: {} })).toEqual(['Informe o comando do perfil personalizado.']);
   expect(toolInfo(custom)).toMatchObject({ id: 'local', label: 'Local', skills: '', rules: '' });
 });
 it('resolve catálogo do base da cópia, modelo livre só no personalizado e fallback legado', () => {

@@ -4,8 +4,16 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { ExecutionAdmission } from '../src/extension/ai/admission';
 import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
-import { evaluateProbes, verifyExecutor, type ProbeObservation, type ProbeRun } from '../src/extension/ai/capabilityVerifier';
-import { CAPABILITY_CHECKS, assessCapability, type StrictExecutionRequest } from '../src/shared/executionAdmission';
+import {
+  evaluateAcpProbes,
+  evaluateProbes,
+  verifyExecutor,
+  type AcpProbeRun,
+  type ProbeObservation,
+  type ProbeRun,
+} from '../src/extension/ai/capabilityVerifier';
+import { ACP_CAPABILITY_CHECKS, CAPABILITY_CHECKS, assessCapability, type StrictExecutionRequest } from '../src/shared/executionAdmission';
+import type { AiProfile } from '../src/shared/aiProfiles';
 
 const obs = (o: Partial<ProbeObservation> = {}): ProbeObservation => ({
   code: 0,
@@ -167,5 +175,139 @@ describe('verifyExecutor', () => {
     });
     expect(result.verified).toBe(false);
     expect(() => admission.prepare('claude', 'claude', { prompt: 'x', permission: 'board' }, dir, request())).toThrow();
+  });
+});
+
+const handshake = (sessionId: string | null, version = 1) => ({
+  protocolVersion: version,
+  agentCapabilities: { loadSession: false },
+  sessionId,
+  authRequired: false,
+  error: null,
+});
+const acpGood = (): AcpProbeRun => ({
+  first: handshake('s1'),
+  second: handshake('s2'),
+  mcpConnected: true,
+  environmentDigest: 'a'.repeat(64),
+});
+const acpOutcomes = (run: AcpProbeRun) =>
+  Object.fromEntries(
+    Object.entries(evaluateAcpProbes('b'.repeat(64), run)).flatMap(([cap, cs]) => cs.map((c) => [`${cap}/${c.id}`, c.outcome])),
+  );
+
+describe('avaliação do handshake ACP', () => {
+  it('passa o protocolo, a sessão nova e o MCP da sessão; os arquivos do agente ficam sem prova', () => {
+    expect(acpOutcomes(acpGood())).toEqual({
+      'conversation/fresh-session': 'passed',
+      'artifacts/own-context-files': 'unavailable',
+      'artifacts/managed-settings': 'passed',
+      'permissions/protocol-version': 'passed',
+      'mcp/session-servers': 'passed',
+      'delegation/protocol-version': 'passed',
+    });
+  });
+  it('sessão repetida, outra versão do protocolo, login pendente e MCP ignorado falham', () => {
+    const same = acpGood();
+    same.second = handshake('s1');
+    expect(acpOutcomes(same)['conversation/fresh-session']).toBe('failed');
+    const v2 = acpGood();
+    v2.first = handshake('s1', 2);
+    expect(acpOutcomes(v2)['permissions/protocol-version']).toBe('failed');
+    const login = acpGood();
+    login.first = { ...handshake(null), authRequired: true, error: 'auth_required' };
+    expect(acpOutcomes(login)['delegation/protocol-version']).toBe('failed');
+    expect(acpOutcomes(login)['conversation/fresh-session']).toBe('failed');
+    const noMcp = acpGood();
+    noMcp.mcpConnected = false;
+    expect(acpOutcomes(noMcp)['mcp/session-servers']).toBe('failed');
+  });
+});
+
+describe('verifyExecutor com agente ACP', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-verifier-acp-'));
+    fs.writeFileSync(path.join(dir, 'gemini'), 'agente de teste', { mode: 0o755 });
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const acp: AiProfile = {
+    id: 'gemini-acp',
+    name: 'Gemini ACP',
+    kind: 'custom',
+    base: 'generic',
+    enabled: true,
+    position: 5,
+    config: { acpAgent: 'gemini' },
+    credentials: { secretRef: 'b'.repeat(64), review: 'reviewed', available: true },
+  };
+  const request = (regime: 'exclusive' | 'compatible'): StrictExecutionRequest => ({
+    version: 1,
+    mcpLevel: { permission: 'board', tools: [] },
+    regime,
+    ...(regime === 'compatible' ? { compatibilityReview: { actor: 'person' as const, revision: 1 } } : {}),
+    boardTools: { mode: 'inherit' },
+    agentTools: { categories: ['read'], native: { tool: '', allow: [], deny: [] } },
+    activeMcpIds: [],
+    allowedMcpIds: [],
+    boardMcpIds: [],
+    mcpServers: [],
+    mcpTools: [],
+    boardMcpTools: [],
+  });
+  it('grava os recibos do handshake no vínculo do agente: admissível no regime compatível, não no exclusivo', async () => {
+    const store = new CapabilityEvidenceStore(path.join(dir, 'evidence'));
+    const admission = new ExecutionAdmission({
+      pathEnv: () => dir,
+      homeDir: dir,
+      evidence: store,
+      now: () => 1000,
+      environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
+    });
+    const result = await verifyExecutor({
+      executor: acp,
+      profileId: acp.id,
+      admission,
+      store,
+      pathEnv: dir,
+      now: () => 900,
+      spawn: () => {
+        throw new Error('sem CLI');
+      },
+      probeAcp: async () => acpGood(),
+    });
+    // "verificado" pede todos os checks: o dos arquivos do agente nunca passa no ACP
+    expect(result.verified).toBe(false);
+    const evidence = store.load(result.binding);
+    expect(evidence).toHaveLength(5);
+    expect(evidence.find((e) => e.capability === 'permissions')?.checks.map((c) => c.id)).toEqual(ACP_CAPABILITY_CHECKS.permissions);
+    expect(assessCapability('artifacts', result.binding, evidence, 1000, ACP_CAPABILITY_CHECKS).state).toBe('partial');
+    expect(assessCapability('mcp', result.binding, evidence, 1000, ACP_CAPABILITY_CHECKS).state).toBe('verified');
+    expect(() => admission.prepare(acp, acp.id, { prompt: 'x', permission: 'board' }, dir, request('exclusive'))).toThrow();
+    const admitted = admission.prepare(acp, acp.id, { prompt: 'x', permission: 'board' }, dir, request('compatible'));
+    expect(admitted.decision.state).toBe('admitted');
+    expect(admitted.transport).toBe('acp');
+  });
+  it('sem o transporte ACP no host, não há sondagem', async () => {
+    const store = new CapabilityEvidenceStore(path.join(dir, 'evidence'));
+    const admission = new ExecutionAdmission({
+      pathEnv: () => dir,
+      homeDir: dir,
+      evidence: store,
+      now: () => 1000,
+      environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
+    });
+    await expect(
+      verifyExecutor({
+        executor: acp,
+        profileId: acp.id,
+        admission,
+        store,
+        pathEnv: dir,
+        spawn: () => {
+          throw new Error('sem CLI');
+        },
+      }),
+    ).rejects.toThrow(/ACP indisponível/);
   });
 });

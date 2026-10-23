@@ -98,7 +98,53 @@ describe('transporte escolhido pelo perfil', () => {
     expect(new AiRunRepo(db).byMonth(monthOf(Date.now())).map((r) => r.outcome)).toEqual(['unsupported', 'unsupported']);
   });
 
-  it('perfil ACP personalizado admitido é recusado: a admissão vincula a CLI one-shot, não o agente ACP', () => {
+  it('perfil ACP personalizado admitido roda pelo comando que a admissão vinculou', () => {
+    let cli = 0;
+    const spawn: SpawnFn = () => {
+      cli++;
+      return { onExit: () => {}, kill: () => {} };
+    };
+    const acp: { command: string; args: string[] }[] = [];
+    const spawnAcp: AcpSpawnFn = (command) => {
+      acp.push(command);
+      return { write: () => {}, end: () => {}, onExit: () => {}, kill: () => {} };
+    };
+    const custom: AiProfile = {
+      ...profile({ acpAgent: 'gemini' }),
+      kind: 'custom',
+      credentials: { review: 'reviewed', available: true },
+    } as never;
+    const validated: unknown[] = [];
+    // a admissão de mentira admite o transporte ACP e devolve o executável vinculado
+    const admission = {
+      prepare: (_p: unknown, _id: string, input: unknown) => ({
+        input,
+        decision: { state: 'admitted' },
+        transport: 'acp',
+        command: () => {
+          throw new Error('não é CLI');
+        },
+        acpCommand: (c: { command: string; args: string[] }) => {
+          validated.push(c);
+          return { ...c, command: '/bin/gemini-vinculado' };
+        },
+      }),
+    } as never;
+    const describeRequired: unknown[] = [];
+    const runLog = { ...createRunLog(db), describeRequired: (_id: string, d: unknown) => describeRequired.push(d) };
+    const gw = new AiGateway({ boardId: router.boardId, runLog, spawn, spawnAcp, admission });
+    const strictCall: AiCall = {
+      ...call(custom),
+      prepare: () => ({ ...call(custom).prepare(), strict: { profileId: custom.id, request: { activeMcpIds: [] } as never } }),
+    };
+    gw.run(strictCall);
+    expect(cli).toBe(0);
+    expect(validated).toEqual([{ command: 'gemini', args: ['--acp', '--skip-trust'] }]);
+    expect(acp[0]).toMatchObject({ command: '/bin/gemini-vinculado', args: ['--acp', '--skip-trust'] });
+    expect(describeRequired).toHaveLength(1);
+  });
+
+  it('perfil ACP admitido como CLI (e vice-versa) é recusado antes de iniciar', () => {
     let started = 0;
     const spawn: SpawnFn = () => {
       started++;
@@ -113,17 +159,16 @@ describe('transporte escolhido pelo perfil', () => {
       kind: 'custom',
       credentials: { review: 'reviewed', available: true },
     } as never;
-    // a admissão de mentira admite tudo: a recusa tem de vir do gateway, não dela
     const admission = {
-      prepare: (_p: unknown, _id: string, input: unknown) => ({ input, decision: { state: 'admitted' }, command: (c: unknown) => c }),
+      prepare: (_p: unknown, _id: string, input: unknown) => ({ input, decision: { state: 'admitted' }, transport: 'cli' }),
     } as never;
-    const runLog = createRunLog(db);
-    const gw = new AiGateway({ boardId: router.boardId, runLog, spawn, spawnAcp, admission });
+    const gw = new AiGateway({ boardId: router.boardId, runLog: createRunLog(db), spawn, spawnAcp, admission });
     const strictCall: AiCall = {
       ...call(custom),
       prepare: () => ({ ...call(custom).prepare(), strict: { profileId: custom.id, request: { activeMcpIds: [] } as never } }),
     };
-    expect(() => gw.run(strictCall)).toThrow(/admissão por capacidades ainda não cobre o transporte ACP/);
+    expect(() => gw.run(strictCall)).toThrow(/não é do transporte ACP/);
     expect(started).toBe(0);
+    expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))[0]).toMatchObject({ outcome: 'unsupported' });
   });
 });

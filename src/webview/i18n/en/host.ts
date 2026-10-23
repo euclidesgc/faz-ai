@@ -162,6 +162,7 @@ export const host: Record<string, string> = {
   'Posição ou estado do perfil inválido.': 'Invalid profile position or state.',
   'Configuração do perfil inválida.': 'Invalid profile configuration.',
   'Informe o comando do perfil personalizado.': 'Enter the custom profile command.',
+  'Agente ACP inválido.': 'Invalid ACP agent.',
   'Informe o arquivo MCP do projeto.': 'Enter the project MCP file.',
   'Estado do perfil inválido.': 'Invalid profile state.',
   'O tipo e a base do perfil não são alterados: crie outro perfil.': 'The profile type and base cannot be changed: create another profile.',

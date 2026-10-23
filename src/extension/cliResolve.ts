@@ -1,4 +1,5 @@
-import type { AiProfile } from '../shared/aiProfiles';
+import { isAcpProfile, type AiProfile } from '../shared/aiProfiles';
+import { acpAgent } from './ai/acp/agents';
 import { CLI_COMMAND } from '../shared/requirements';
 import { baseValue } from '../shared/harness';
 import * as fs from 'node:fs';
@@ -169,11 +170,11 @@ export function commandNotFound(command: string): string {
 /** O comando privado do perfil nunca vira rótulo de requisito nem argumento de shell. */
 export function profileCommand(profile: AiProfile): string {
   const standard = baseValue(CLI_COMMAND, profile.base) ?? '';
-  return profile.kind === 'builtin'
-    ? standard
-    : typeof profile.config.command === 'string' && profile.config.command.trim()
-      ? profile.config.command
-      : standard;
+  if (profile.kind === 'builtin') return standard;
+  if (typeof profile.config.command === 'string' && profile.config.command.trim()) return profile.config.command;
+  // o perfil ACP sem comando próprio roda o agente do catálogo: é ele que a sonda procura no PATH
+  const agent = isAcpProfile(profile) ? acpAgent(String(profile.config.acpAgent)) : undefined;
+  return agent?.command ?? standard;
 }
 export function resolveProfileCommand(profile: AiProfile, pathEnv: string | undefined, homeDir: string): string | null {
   return resolveCommand(profileCommand(profile), profile.kind === 'builtin' ? pathEnv : (profile.config.env?.PATH ?? pathEnv), homeDir, {

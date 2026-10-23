@@ -1,10 +1,19 @@
 import type { RunnerPermission } from '../../shared/runner';
+import type { AiProfile } from '../../shared/aiProfiles';
 import { executorProfile, type AiExecutor } from './providers';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { admitExecution, type StrictExecutionRequest, type ExecutionAdmissionDecision } from '../../shared/executionAdmission';
+import {
+  admitExecution,
+  type ExecutionTransport,
+  type StrictExecutionRequest,
+  type ExecutionAdmissionDecision,
+} from '../../shared/executionAdmission';
+import { isAcpProfile } from '../../shared/aiProfiles';
 import { resolveCommand } from '../cliResolve';
+import { acpAgent } from './acp/agents';
+import { acpCommand, type AcpAgent } from './acp/provider';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import { boardOnlyMcpConfig } from '../execution';
 import { canonical, CapabilityEvidenceStore } from './capabilityEvidence';
@@ -25,12 +34,29 @@ interface AdmissionOptions {
   environmentEvidence(): { state: 'complete'; digest: string } | { state: 'unknown' };
   now?(): number;
 }
+/** O comando de um agente ACP como o gateway o inicia. */
+export interface AcpBuiltCommand {
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+}
 export interface AdmittedExecution {
   input: HeadlessInput;
   decision: ExecutionAdmissionDecision;
+  transport: ExecutionTransport;
   /** Revalida identidade/argumentos/arquivos antes de cada tentativa e antes de liberar o launcher. */
   command(command: HeadlessCommand): HeadlessCommand;
+  /** O mesmo para o agente ACP: o comando e os argumentos do catálogo, sem arquivo temporário nem formato. */
+  acpCommand(command: AcpBuiltCommand): AcpBuiltCommand;
 }
+/** O agente do catálogo de um perfil ACP; lança se o id não existe (o gateway recusa pelo mesmo motivo). */
+export function admissionAgent(profile: AiProfile): AcpAgent | null {
+  if (!isAcpProfile(profile)) return null;
+  const agent = acpAgent(String(profile.config.acpAgent));
+  if (!agent) throw new Error(`Agente ACP desconhecido: ${String(profile.config.acpAgent)}.`);
+  return agent;
+}
+export const admissionTransport = (profile: AiProfile): ExecutionTransport => (isAcpProfile(profile) ? 'acp' : 'cli');
 function digestFile(file: string): string {
   const hash = createHash('sha256');
   const fd = fs.openSync(file, 'r');
@@ -79,12 +105,17 @@ export class ExecutionAdmission {
     cwd: string | null,
   ): { binding: string; executable: string; environmentComplete: boolean } {
     const profile = executorProfile(executor);
-    const template = headlessCommand(profile, { ...input, prompt: '<prompt-da-execucao>', structured: true });
+    const agent = admissionAgent(profile);
+    // no ACP o vínculo é o comando e os argumentos do agente do catálogo: não há flags de isolamento,
+    // arquivo temporário nem formato de saída; o modelo do card entra nos argumentos quando o agente aceita
+    const template = agent
+      ? { transport: 'acp' as const, agent: agent.id, ...acpCommand(agent, { ...input, prompt: '<prompt-da-execucao>' }) }
+      : headlessCommand(profile, { ...input, prompt: '<prompt-da-execucao>', structured: true });
     const executable = resolveCommand(
       template.command,
-      template.env?.PATH ?? this.options.pathEnv(),
+      ('env' in template ? template.env?.PATH : undefined) ?? this.options.pathEnv(),
       this.options.homeDir,
-      template.lookup,
+      'lookup' in template ? template.lookup : undefined,
     );
     if (!executable) throw new Error('Executor indisponível para admissão.');
     const real = fs.realpathSync(executable);
@@ -109,7 +140,11 @@ export class ExecutionAdmission {
             cwd: fs.realpathSync(cwd),
             additionalDirectories: (input.addDirs ?? []).map((d) => fs.realpathSync(path.resolve(cwd, d))),
           }),
-      environment: { ...process.env, ...(this.options.pathEnv() ? { PATH: this.options.pathEnv() } : {}), ...template.env },
+      environment: {
+        ...process.env,
+        ...(this.options.pathEnv() ? { PATH: this.options.pathEnv() } : {}),
+        ...('env' in template ? template.env : {}),
+      },
       environmentEvidence: environment,
     };
     return {
@@ -138,12 +173,14 @@ export class ExecutionAdmission {
   preview(executor: AiExecutor, profileId: string, request: StrictExecutionRequest, _cwd: string): ExecutionAdmissionDecision {
     const now = this.options.now?.() ?? Date.now();
     const permission = 'board' as const;
-    const tool = executorProfile(executor).base;
-    const preliminary = admitExecution(tool, permission, request, '', [], now);
+    const profile = executorProfile(executor);
+    const tool = profile.base;
+    const transport = admissionTransport(profile);
+    const preliminary = admitExecution(tool, permission, request, '', [], now, transport);
     try {
       if (preliminary.reasons.some((r) => r.code !== 'capability-not-verified')) return preliminary;
       const bound = this.isolationBinding(executor, profileId, permission);
-      const decision = admitExecution(tool, permission, request, bound.binding, this.options.evidence.load(bound.binding), now);
+      const decision = admitExecution(tool, permission, request, bound.binding, this.options.evidence.load(bound.binding), now, transport);
       if (!bound.environmentComplete) {
         decision.state = 'blocked';
         decision.reasons.push({ code: 'environment-not-verified' });
@@ -158,7 +195,8 @@ export class ExecutionAdmission {
     if (!profileId.trim() || profileId.length > 240 || profileId.includes('\0')) throw new Error('Identidade de perfil inválida.');
     const profile = structuredClone(executorProfile(executor));
     const tool = profile.base;
-    const preliminary = admitExecution(tool, input.permission, request, '', [], this.options.now?.() ?? Date.now());
+    const transport = admissionTransport(profile);
+    const preliminary = admitExecution(tool, input.permission, request, '', [], this.options.now?.() ?? Date.now(), transport);
     if (preliminary.reasons.some((r) => r.code !== 'capability-not-verified')) throw new AdmissionBlockedError(preliminary);
     // O contexto da CLI fica fechado, mesmo sem MCP: nunca recorrer ao arquivo do usuário implicitamente.
     const source = JSON.parse(
@@ -213,6 +251,7 @@ export class ExecutionAdmission {
       isolation.binding,
       this.options.evidence.load(isolation.binding),
       this.options.now?.() ?? Date.now(),
+      transport,
     );
     if (!bound.environmentComplete) {
       decision.state = 'blocked';
@@ -222,10 +261,28 @@ export class ExecutionAdmission {
       );
     }
     if (decision.state !== 'admitted') throw new AdmissionBlockedError(decision);
+    const rebound = () => {
+      if (this.binding(profile, profileId, effective, cwd).binding !== bound.binding)
+        throw new Error('O executor ou o ambiente mudou após a admissão.');
+    };
     return {
       input: effective,
       decision,
+      transport,
+      acpCommand: (command) => {
+        if (transport !== 'acp') throw new Error('A admissão é de uma CLI de uma passada, não de um agente ACP.');
+        rebound();
+        const expected = acpCommand(admissionAgent(profile)!, effective);
+        if (
+          (command.command !== expected.command && command.command !== bound.executable) ||
+          canonical(command.args) !== canonical(expected.args) ||
+          canonical(command.env) !== canonical(undefined)
+        )
+          throw new Error('O comando do agente mudou após a admissão.');
+        return { ...command, command: bound.executable };
+      },
       command: (command) => {
+        if (transport !== 'cli') throw new Error('A admissão é de um agente ACP, não de uma CLI de uma passada.');
         if (this.binding(profile, profileId, effective, cwd).binding !== bound.binding)
           throw new Error('O executor ou o ambiente mudou após a admissão.');
         const expected = headlessCommand(profile, { ...effective, structured: command.format !== 'text' });

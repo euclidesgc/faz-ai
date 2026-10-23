@@ -138,7 +138,10 @@ export function validateProfile(p: AiProfileDraft): string[] {
     errors.push('Posição ou estado do perfil inválido.');
   const c = p.config;
   if (!c || typeof c !== 'object' || Array.isArray(c)) return [...errors, 'Configuração do perfil inválida.'];
-  if (p.kind === 'custom' && (typeof c.command !== 'string' || !c.command.trim()))
+  // com `acpAgent` o comando é o do agente do catálogo; o id desconhecido é recusado pelo gateway
+  if (c.acpAgent !== undefined && (typeof c.acpAgent !== 'string' || !/^[a-z0-9][a-z0-9-]{0,99}$/.test(c.acpAgent)))
+    errors.push('Agente ACP inválido.');
+  if (p.kind === 'custom' && (typeof c.command !== 'string' || !c.command.trim()) && typeof c.acpAgent !== 'string')
     errors.push('Informe o comando do perfil personalizado.');
   if (c.boardServer === 'project' && (typeof c.mcpProjectFile !== 'string' || !c.mcpProjectFile.trim()))
     errors.push('Informe o arquivo MCP do projeto.');

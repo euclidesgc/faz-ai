@@ -1,7 +1,7 @@
 import { collectClaudeEnvironment } from '../ai/environmentEvidence';
 import { defaultManifestDir } from '../ai/cursorManifest';
 import { cursorHookStatus } from '../mcp/cursorHooks';
-import { PROFILE_CAPABILITIES, activeProfile, profileIsolation, profileLabel, type AiProfile } from '../../shared/aiProfiles';
+import { PROFILE_CAPABILITIES, activeProfile, isAcpProfile, profileIsolation, profileLabel, type AiProfile } from '../../shared/aiProfiles';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
 import { profileCanProbe, profileSignedIn, profileVersion } from '../cliProbe';
@@ -868,11 +868,14 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
         store: evidenceStore,
         pathEnv,
         spawn: (command, cwd, out) => spawnHeadless(command, cwd, out, pathEnv),
+        spawnAgent: (command, cwd, out) => spawnAcpProcess({ ...command, format: 'text' }, cwd, out, pathEnv),
       });
       const failed = result.evidence.flatMap((e) => e.checks.filter((c) => c.outcome !== 'passed').map((c) => `${e.capability}/${c.id}`));
-      return result.verified
-        ? 'Isolamento verificado: as cinco capacidades têm recibos válidos.'
-        : `Isolamento não verificado. Pendentes: ${failed.join(', ') || 'checks ausentes'}.`;
+      if (result.verified) return 'Isolamento verificado: as cinco capacidades têm recibos válidos.';
+      // no ACP os arquivos de contexto do agente ficam sem prova de propósito: o perfil vale no regime compatível
+      if (isAcpProfile(profile) && failed.join(',') === 'artifacts/own-context-files')
+        return 'Handshake do agente verificado. Os arquivos de contexto que ele lê por conta própria não têm prova: o perfil é admissível só no regime compatível.';
+      return `Isolamento não verificado. Pendentes: ${failed.join(', ') || 'checks ausentes'}.`;
     },
     async connectAI(target = {}) {
       const tool = target.tool ?? router.snapshot().board.aiTool;

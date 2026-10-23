@@ -89,7 +89,7 @@ cada fase e move os cards conforme avança, sempre parando para a sua aprovaçã
   consulta o mesmo com `get_metrics`. [Métricas](docs/metricas.md)
 - **Board no navegador.** Abra o mesmo board numa aba do navegador, sincronizado com o editor, ou
   sirva-o sem o editor com o comando `faz-ai`. [Dados e navegador](docs/dados.md)
-- **Agentes por ACP (não validado).** Um perfil de CLI pode rodar pelo Agent Client Protocol, com Gemini CLI, OpenCode, Codex, Cursor, Kimi Code, GitHub Copilot CLI, Qwen Code, goose e Google Antigravity. O board responde as permissões pelo card, e os servidores MCP do card entram na sessão sem arquivo no projeto. Entre na ferramenta no terminal antes de usar (o comando de cada uma está em [Ferramentas MCP](docs/mcp.md#execução-por-acp-transporte-do-perfil)). Ainda não roda na extensão: a admissão por capacidades recusa o perfil ACP até cobrir o comando do agente. Também não foi validado com as CLIs reais; o Claude Code segue pela CLI.
+- **Agentes por ACP.** Um perfil de CLI personalizado com o campo **Agente ACP** roda pelo Agent Client Protocol, com Gemini CLI, OpenCode, Codex, Cursor, Kimi Code, GitHub Copilot CLI, Qwen Code, goose e Google Antigravity. O board responde as permissões pelo card, e os servidores MCP do card entram na sessão sem arquivo no projeto. Entre na ferramenta no terminal antes de usar (o comando de cada uma está em [Ferramentas MCP](docs/mcp.md#execução-por-acp-transporte-do-perfil)). A admissão por capacidades verifica o handshake do agente e admite o perfil só no regime compatível, porque o agente lê os próprios arquivos de contexto. O Claude Code segue pela CLI.
 - **Servidor MCP.** Claude Code, Cursor ou qualquer cliente MCP consulta e edita o board.
   [Ferramentas MCP](docs/mcp.md)
 

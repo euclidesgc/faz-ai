@@ -86,6 +86,11 @@ export const settings: Record<string, string> = {
     'One argument per line. Missing arguments do not mean verified isolation.',
   'Argumentos de versão': 'Version arguments',
   'Argumentos do status do login': 'Sign-in status arguments',
+  'Agente ACP': 'ACP agent',
+  'Id do agente no catálogo ACP (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio: CLI de uma passada.':
+    'Agent id in the ACP catalog (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Empty: one-shot CLI.',
+  'O perfil roda pelo Agent Client Protocol: o comando, os argumentos e as permissões são os do agente, respondidas pelo card.':
+    'The profile runs over the Agent Client Protocol: the command, arguments and permissions are the agent’s, answered by the card.',
   'Frases de login vencido': 'Expired sign-in phrases',
   'Uma frase por linha.': 'One phrase per line.',
   'Variáveis de ambiente': 'Environment variables',

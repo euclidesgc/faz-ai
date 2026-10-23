@@ -326,10 +326,9 @@ export class AiGateway {
       if (isAcpProfile(profile)) {
         if (!agent) throw new Error(`Agente ACP desconhecido: ${String(profile.config.acpAgent)}.`);
         if (!this.deps.spawnAcp) throw new Error('Transporte ACP indisponível neste host.');
-        // a admissão vincula o executável e os argumentos da CLI one-shot, não o comando do agente ACP:
-        // rodar o agente com ela seria ignorar o vínculo admitido, então recusa até a admissão cobrir o ACP
-        if (admitted) throw new Error('A admissão por capacidades ainda não cobre o transporte ACP; o perfil não roda.');
-      }
+        // a admissão vinculou o comando do agente, não o de uma CLI: o validador certo é o do transporte
+        if (admitted && admitted.transport !== 'acp') throw new Error('A admissão não é do transporte ACP; o perfil não roda.');
+      } else if (admitted && admitted.transport !== 'cli') throw new Error('A admissão é de um agente ACP; o perfil não roda pela CLI.');
       const unsupported = admitted || agent ? null : headlessUnsupported(profile, input.permission);
       if (unsupported) throw new Error(unsupported);
       if (admitted) {
@@ -354,7 +353,9 @@ export class AiGateway {
             format = 'text';
             snapshot?.validate();
             if (workToken !== undefined) this.deps.sessions!.assert(workToken);
-            return spawnProcess(command, cwd, (text, stream) => {
+            // o comando e os argumentos do agente são os admitidos; o executável é o do vínculo
+            const checked = admitted?.acpCommand(command) ?? command;
+            return spawnProcess(checked, cwd, (text, stream) => {
               watch(text, stream);
               out(text, stream);
             });
