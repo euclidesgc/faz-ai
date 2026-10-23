@@ -7,6 +7,8 @@ export interface CredentialStore {
   put(owner: string, value: Record<string, unknown>): string;
   get(owner: string, ref: string): Record<string, unknown> | null;
   has(owner: string, ref: string): boolean;
+  /** apaga o valor da referência, se for do dono (trocar ou esquecer uma chave não deixa o cifrado antigo no disco) */
+  delete(owner: string, ref: string): void;
   redact(text: string): string;
 }
 class PrivateValues {
@@ -85,6 +87,9 @@ export function credentialsFor(db: Database): CredentialStore {
       },
       has(owner, ref) {
         return values.get(ref)?.owner === owner;
+      },
+      delete(owner, ref) {
+        if (values.get(ref)?.owner === owner) values.delete(ref);
       },
       redact: (text) => privateValues.redact(text),
     };
@@ -205,6 +210,12 @@ export class LocalCredentials implements CredentialStore {
     } catch {
       return null;
     }
+  }
+  /** Só apaga o arquivo do mesmo dono (o hash do dono no envelope): uma referência de outro não é tocada. */
+  delete(owner: string, ref: string): void {
+    if (!this.has(owner, ref)) return;
+    fs.rmSync(path.join(this.directory, `${ref}.json`), { force: true });
+    syncDir(this.directory);
   }
   has(owner: string, ref: string): boolean {
     if (!validSecretRef(ref)) return false;

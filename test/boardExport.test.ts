@@ -267,6 +267,19 @@ const readAll = (r: MessageRouter) =>
 const target = (r: MessageRouter, backup?: () => void) => ({ db, backup, store: r.store, workspaceKey: 'ws-a', boardId: r.boardId });
 
 describe('importBoard', () => {
+  it('a ciência do regime compatível por perfil não vem na importação: quem importa dá a própria (história 7)', () => {
+    router.recordCompatibilityReview('gemini');
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true } } } as never);
+    expect(router.snapshot().board.runner.compatibilityReviews).toEqual({ gemini: 1 });
+    const text = JSON.stringify(doExport().file);
+    router.handle({ type: 'settings.board.reset' });
+    importBoard(target(router), parseExportFile(text));
+    const runner = openRouter(db, 'ws-a', 'A').snapshot().board.runner;
+    expect(runner.compatibilityReviews).toEqual({});
+    // o resto do runner vem como estava
+    expect(runner.heartbeat).toBe(true);
+  });
+
   it('ida e volta: o board volta igual (ids, números, conteúdo, configuração e anexos)', () => {
     const before = comparable(router.snapshot());
     const files = readAll(router);

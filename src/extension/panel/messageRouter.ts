@@ -305,6 +305,10 @@ export class MessageRouter {
     this.changed();
     return revision;
   }
+  /** Tira a ciência do perfil: o Conectar provou o exclusivo. A revogação pela pessoa vem por `settings.aiProfiles.review`. */
+  revokeCompatibilityReview(profileId: string): void {
+    if (this.ctx.boards.revokeCompatibilityReview(this.boardId, profileId)) this.changed();
+  }
   /** As conexões concluídas, gravadas no banco do board (sem segredo: versão, login, regime, modelos e data). */
   savedConnections(): Record<string, ConnectSummary> {
     try {

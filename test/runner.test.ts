@@ -1556,6 +1556,31 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
   // uma linha `result` que o leitor do Claude Code reconhece como limite de uso esgotado (RF-03: só este sinal estrutural liga a flag)
   const usageLimitResult = () => JSON.stringify({ type: 'result', is_error: true, result: 'usage limit reached' });
 
+  it('a troca para um perfil com outro regime (ciência no Conectar) é recusada: as restrições mudaram (história 7)', () => {
+    useSonnetMedium();
+    addCursorModel();
+    // o Cursor tem a ciência do compatível; o Claude do card segue no exclusivo do board
+    router.recordCompatibilityReview('cursor');
+    policyTo({ profileId: 'cursor', model: 'composer-2', effort: null });
+    const done = vi.fn();
+    runner.start(storyId, { origin: 'manual', onExit: done });
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    // nenhuma segunda execução: o destino rodaria num regime que a execução pedida não tinha
+    expect(procs).toHaveLength(1);
+    expect(log.some((l) => /Recusados: cursor:composer-2 \(constraints-changed\)/.test(l))).toBe(true);
+  });
+
+  it('controle: sem a ciência, os dois perfis estão no mesmo regime e a troca para o Cursor acontece', () => {
+    useSonnetMedium();
+    addCursorModel();
+    policyTo({ profileId: 'cursor', model: 'composer-2', effort: null });
+    runner.start(storyId, { origin: 'manual', onExit: vi.fn() });
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(2);
+  });
+
   it('política aplicável + limite esgotado: segunda chamada ao gateway com o destino, comentário na conversa, sem bloqueio', () => {
     useSonnetMedium();
     policyToFable();

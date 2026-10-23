@@ -77,15 +77,21 @@ export class ToolKeys {
     if (!TOOL_ID.test(tool)) throw new Error(`Ferramenta inválida: ${tool}.`);
     const parsed = parseApiKey(apiKey);
     if ('error' in parsed) throw new Error(parsed.error);
+    const index = this.index();
+    const old = index[tool];
     const ref = this.store.put(ownerOf(tool), { apiKey: parsed.key });
-    this.write({ ...this.index(), [tool]: ref });
+    this.write({ ...index, [tool]: ref });
+    // o índice já aponta para a nova: a cifrada antiga sai do disco
+    if (old && old !== ref) this.store.delete(ownerOf(tool), old);
   }
 
-  /** Esquece a chave da ferramenta (o arquivo cifrado fica órfão no cofre, sem índice que o abra). */
+  /** Esquece a chave da ferramenta: o índice deixa de apontar para ela e o arquivo cifrado sai do disco. */
   remove(tool: string): void {
     const index = this.index();
-    if (!(tool in index)) return;
+    const old = index[tool];
+    if (!old) return;
     delete index[tool];
     this.write(index);
+    this.store.delete(ownerOf(tool), old);
   }
 }

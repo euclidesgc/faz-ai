@@ -155,6 +155,7 @@ describe('credenciais locais e referências MCP', () => {
       put: () => {
         throw new Error('disco cheio');
       },
+      delete: () => {},
       get: () => null,
       has: () => false,
       redact: (text) => text,

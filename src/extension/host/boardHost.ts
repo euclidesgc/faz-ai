@@ -19,6 +19,8 @@ import { profileCanProbe, profileSignedIn, profileVersion } from '../cliProbe';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
+import { createHash } from 'node:crypto';
+import { Verifications } from '../ai/verifications';
 import * as path from 'node:path';
 import { openFile, type DbHandle } from '../db/database';
 import { dayOf } from '../../shared/log';
@@ -354,6 +356,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     verify: async (profileId) => (await verifyDetailed(profileId)).result,
     reviewOf: (id) => router.snapshot().board.runner.compatibilityReviews[id] ?? null,
     recordReview: (id) => router.recordCompatibilityReview(id),
+    revokeReview: (id) => router.revokeCompatibilityReview(id),
     // os modelos entram no catálogo do board, como o "Detectar modelos": ficam em todo campo de modelo
     listModels: async (profile, exe) => {
       // a chave do catálogo de modelos: o id do agente ACP; na CLI, a ferramenta (a da base, numa cópia)
@@ -1002,7 +1005,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   // a varredura da abertura: só a janela dona limpa sozinha (o botão da tela age onde foi clicado)
   if (ownsBoard) void orphanSweeper.sweep();
 
-  const verifying = new Map<string, Promise<{ message: string; result: VerifierResult }>>();
   /** A verificação de um perfil: recusa com uma mensagem clara o que não está ligado ou não tem sonda. */
   const verifyProfile = async (profileId: string): Promise<{ message: string; result: VerifierResult }> => {
     const meta = router.snapshot().board.aiProfiles.find((p) => p.id === profileId);
@@ -1034,18 +1036,6 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       };
     return { result, message: `${meta.name}: isolamento não verificado. Pendentes: ${failed.join(', ') || 'checks ausentes'}.` };
   };
-  /** A verificação com o resultado inteiro (o Conectar tira o regime dele); a mesma pedida duas vezes roda uma vez só. */
-  const verifyDetailed = (profileId: string): Promise<{ message: string; result: VerifierResult }> => {
-    const running = verifying.get(profileId);
-    if (running) return running;
-    const done = verifyProfile(profileId).finally(() => {
-      verifying.delete(profileId);
-      // o Diagnóstico mostra as capacidades lidas das provas: confere de novo com as novas
-      void checkNow();
-    });
-    verifying.set(profileId, done);
-    return done;
-  };
   /** A prova gravada ainda vale para o vínculo atual do perfil (o digest do binário fica em cache na admissão). */
   const hasCurrentEvidence = (profileId: string): boolean => {
     try {
@@ -1056,23 +1046,31 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       return false;
     }
   };
-  /**
-   * A verificação que o host dispara sozinho (ao ligar um agente ACP, ao conectar a ferramenta dele): em
-   * segundo plano, sem gastar a conta da pessoa, com o resultado no log. Só o ACP, como pede a épica: a CLI
-   * do Claude roda quatro vezes na fixture e fica no comando da paleta. Com a prova em vigor para o vínculo
-   * atual, não refaz o handshake.
-   */
-  const verifyInBackground = (profileId: string, why: string): void => {
-    const meta = router.snapshot().board.aiProfiles.find((p) => p.id === profileId);
-    // uma verificação deste perfil já em andamento (ligar e conferir ao mesmo tempo) não abre outro handshake
-    // o Conectar em curso faz a própria verificação, já com a chave que a pessoa acabou de colar
-    if (disposed || !meta || !meta.enabled || !isAcpProfile(meta) || verifying.has(profileId) || connector.active(profileId)) return;
-    if (hasCurrentEvidence(profileId)) return;
-    api
-      .verifyExecutor(profileId)
-      .then((message) => o.log(`Verificação de capacidades (${why}): ${message}`))
-      .catch((e: unknown) => o.log(`Verificação de capacidades de ${meta.name} (${why}): ${e instanceof Error ? e.message : String(e)}`));
+  /** O estado da chave do cofre com que a verificação do perfil roda: o digest dela, ou `''` sem chave. */
+  const keyStateOf = (profileId: string): string => {
+    try {
+      const apiKey = acpAuthOf(new AiProfileRepo(handle.db).resolveProfile(router.boardId, profileId))?.apiKey;
+      return apiKey ? createHash('sha256').update(apiKey).digest('hex') : '';
+    } catch {
+      return '';
+    }
   };
+  // a verificação por perfil (uma de cada vez por estado da chave) e a automática em segundo plano, que não
+  // corre por cima do Conectar (ver `ai/verifications.ts`)
+  const verifications = new Verifications<{ message: string; result: VerifierResult }>({
+    profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
+    run: verifyProfile,
+    keyState: keyStateOf,
+    current: hasCurrentEvidence,
+    busy: (id) => connector.active(id),
+    message: (r) => r.message,
+    log: o.log,
+    // o Diagnóstico mostra as capacidades lidas das provas: confere de novo com as novas
+    done: () => void checkNow(),
+    disposed: () => disposed,
+  });
+  const verifyDetailed = (profileId: string) => verifications.detailed(profileId);
+  const verifyInBackground = (profileId: string, why: string): void => verifications.inBackground(profileId, why);
   /** Prova o agente ACP no vínculo atual se ainda não tentou nele; sem executável (CLI ausente), nada a provar. */
   const verifyOncePerBinding = (profileId: string, health: ProfileHealth | undefined): void => {
     // sem login (ou com o login vencido) a tentativa deste vínculo fica esquecida: quando o login voltar,

@@ -11,7 +11,8 @@ import { Connector } from '../../src/extension/ai/connect';
 import { acpAgent } from '../../src/extension/ai/acp/agents';
 import { acpSessionModels } from '../../src/extension/ai/acp/models';
 import { acpSignIn } from '../../src/extension/ai/acp/signIn';
-import { verifyExecutor } from '../../src/extension/ai/capabilityVerifier';
+import { verifyExecutor, type VerifierResult } from '../../src/extension/ai/capabilityVerifier';
+import { Verifications } from '../../src/extension/ai/verifications';
 import { profileSignedIn, profileVersion } from '../../src/extension/cliProbe';
 import { resolveProfileCommand } from '../../src/extension/cliResolve';
 import { exportBoard } from '../../src/extension/db/boardExport';
@@ -31,23 +32,18 @@ afterEach(() => {
 });
 
 /** O Conectar montado como o host monta (`host/boardHost.ts`), sobre as peças do mundo do card. */
-function connectorOf(w: CardWorld, agent: FakeGemini, published: ConnectState[]): Connector {
+function connectorOf(w: CardWorld, agent: FakeGemini, published: ConnectState[], backgroundLog: string[] = []): Connector {
   const repo = new AiProfileRepo(w.db);
   const scratch = (what: string) => fs.mkdtempSync(path.join(w.root, `${what}-`));
   const authOf = (p: { id: string }) => {
     const apiKey = w.keys.get('gemini');
     return p.id === 'gemini' && apiKey ? { methodId: 'gemini-api-key', apiKey } : undefined;
   };
-  const connector: Connector = new Connector({
+  // a verificação como o host a coordena (`ai/verifications.ts`): a chave lida na hora de cada verificação, uma
+  // de cada vez por estado da chave, e a automática ligada ao `onProfileEnabled` de verdade do router
+  const verifications: Verifications<VerifierResult> = new Verifications<VerifierResult>({
     profile: (id) => w.router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
-    enable: (id) => void w.router.handle({ type: 'settings.aiProfiles.setEnabled', id, enabled: true }),
-    resolve: (id) => repo.resolveProfile(w.router.boardId, id),
-    locate: (profile) => resolveProfileCommand(profile, w.bin, w.home),
-    version: (profile, exe) => profileVersion(profile, exe, { pathEnv: w.bin }),
-    signedIn: (profile, exe) => profileSignedIn(profile, exe, w.home, { pathEnv: w.bin, hasApiKey: (t) => w.keys.has(t) }),
-    keys: w.keys,
-    authenticate: (_profile, executable, auth) => acpSignIn(gemini, auth, { executable, cwd: scratch('signin'), spawn: agent.spawn }),
-    verify: (id) => {
+    run: async (id) => {
       const profile = repo.resolveProfile(w.router.boardId, id);
       return verifyExecutor({
         executor: profile,
@@ -62,8 +58,26 @@ function connectorOf(w: CardWorld, agent: FakeGemini, published: ConnectState[])
         acpAuth: authOf(profile),
       });
     },
+    keyState: () => w.keys.get('gemini') ?? '',
+    current: () => false,
+    busy: (id) => connector.active(id),
+    message: (r) => (r.verified ? 'verificado' : 'não verificado'),
+    log: (line) => backgroundLog.push(line),
+  });
+  w.router.onProfileEnabled((id) => verifications.inBackground(id, 'perfil ligado'));
+  const connector: Connector = new Connector({
+    profile: (id) => w.router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
+    enable: (id) => void w.router.handle({ type: 'settings.aiProfiles.setEnabled', id, enabled: true }),
+    resolve: (id) => repo.resolveProfile(w.router.boardId, id),
+    locate: (profile) => resolveProfileCommand(profile, w.bin, w.home),
+    version: (profile, exe) => profileVersion(profile, exe, { pathEnv: w.bin }),
+    signedIn: (profile, exe) => profileSignedIn(profile, exe, w.home, { pathEnv: w.bin, hasApiKey: (t) => w.keys.has(t) }),
+    keys: w.keys,
+    authenticate: (_profile, executable, auth) => acpSignIn(gemini, auth, { executable, cwd: scratch('signin'), spawn: agent.spawn }),
+    verify: (id) => verifications.detailed(id),
     reviewOf: (id) => w.router.snapshot().board.runner.compatibilityReviews[id] ?? null,
     recordReview: (id) => w.router.recordCompatibilityReview(id),
+    revokeReview: (id) => w.router.revokeCompatibilityReview(id),
     listModels: async (profile, executable) => {
       const found = await acpSessionModels(gemini, profile.id, scratch('models'), {
         executable,
@@ -193,5 +207,36 @@ describe('cenário: Conectar o Gemini em ACP com a chave no cofre e rodar um car
     expect(wrong).toMatchObject({ step: 'signIn', status: 'waiting', needs: 'api-key' });
     expect(wrong.error).toMatch(/recusou a chave de API/);
     expect(wrong.error).not.toContain('AIzaSy-chave-errada-000000');
+    // a chave recusada no login não liga o perfil
+    expect(world.router.snapshot().board.aiProfiles.find((p) => p.id === 'gemini')?.enabled).toBe(false);
+  });
+
+  it('primeiro Conectar com a chave válida já no primeiro clique: ligar o perfil não verifica sem a chave', async () => {
+    const agent = new FakeGemini({ validKey: KEY });
+    world = await cardWorld({ profile: 'gemini', tools: CONDUTOR_TOOLS, spawnAcp: agent.spawn, viaConnect: true });
+    const background: string[] = [];
+    const connector = connectorOf(world, agent, [], background);
+    const state = await connector.connect('gemini', { apiKey: KEY });
+    expect(state).toMatchObject({ step: 'review', status: 'waiting', needs: 'review', summary: { regime: 'compatible' } });
+    expect(state.error).toBeUndefined();
+    expect(await connector.connect('gemini', { acknowledge: true })).toMatchObject({ status: 'connected' });
+    // o `onProfileEnabled` disparou ao ligar o perfil, mas a verificação automática não correu por cima do Conectar
+    expect(background).toEqual([]);
+    // os processos do agente: o login e os dois handshakes do Conectar (todos com a chave), e a leitura dos modelos
+    expect(agent.processes.every((p) => p.apiKey === KEY)).toBe(true);
+    expect(agent.processes).toHaveLength(4);
+  });
+
+  it('uma verificação começada sem a chave não responde a quem já tem a chave', async () => {
+    const agent = new FakeGemini({ validKey: KEY });
+    world = await cardWorld({ profile: 'gemini', tools: CONDUTOR_TOOLS, spawnAcp: agent.spawn, viaConnect: true });
+    const background: string[] = [];
+    const connector = connectorOf(world, agent, [], background);
+    // a pessoa liga o Gemini à mão antes de conectar: a verificação automática começa sem chave
+    world.router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: true });
+    // e cola a chave no Conectar enquanto ela corre: o Conectar faz a própria verificação, com a chave
+    expect(await connector.connect('gemini', { apiKey: KEY })).toMatchObject({ step: 'review', status: 'waiting' });
+    await expect.poll(() => background.length).toBe(1);
+    expect(background[0]).toMatch(/perfil ligado/);
   });
 });

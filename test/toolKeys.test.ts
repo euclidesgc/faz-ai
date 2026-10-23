@@ -54,11 +54,26 @@ describe('ToolKeys', () => {
     expect(store.redact(`erro com ${KEY} no meio`)).toBe('erro com [credencial local] no meio');
   });
 
-  it('trocar a chave aponta o índice para a nova', () => {
+  it('trocar a chave aponta o índice para a nova e apaga a cifrada antiga; esquecer apaga a atual', () => {
     const { keys } = keysIn(root);
+    const vault = path.join(root, 'boards', '.credentials');
+    const refs = () => fs.readdirSync(vault).filter((f) => /^[a-f0-9]{64}\.json$/.test(f));
     keys.set('gemini', KEY);
+    const [first] = refs();
     keys.set('gemini', `${KEY}-nova`);
     expect(keys.get('gemini')).toBe(`${KEY}-nova`);
+    expect(refs()).toHaveLength(1);
+    expect(refs()).not.toContain(first);
+    keys.remove('gemini');
+    expect(refs()).toEqual([]);
+  });
+
+  it('apagar só tira o arquivo do mesmo dono', () => {
+    const { store, keys } = keysIn(root);
+    const other = store.put(JSON.stringify(['outro', 'dono']), { valor: 'x' });
+    keys.set('gemini', KEY);
+    store.delete(JSON.stringify(['tool-key', 'gemini']), other);
+    expect(store.has(JSON.stringify(['outro', 'dono']), other)).toBe(true);
   });
 
   it('recusa chave fora do formato e ferramenta inválida, sem gravar nada', () => {

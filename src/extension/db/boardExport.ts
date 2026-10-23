@@ -202,6 +202,23 @@ function omitSecrets(column: string, value: SqlValue): SqlValue {
   }
 }
 
+/**
+ * A configuração do runner importada sem a ciência do regime compatível por perfil (história 7): a ciência é
+ * um ato da pessoa na máquina em que o perfil roda, sobre o que a ferramenta carrega ali; quem importa dá a
+ * própria no Conectar. O resto do runner (inclusive o regime do board) vem como estava.
+ */
+function withoutReviews(value: SqlValue): SqlValue {
+  if (typeof value !== 'string') return value;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !('compatibilityReviews' in parsed)) return value;
+    const { compatibilityReviews: _dropped, ...rest } = parsed as Record<string, unknown>;
+    return JSON.stringify(rest);
+  } catch {
+    return value;
+  }
+}
+
 /** Nome sugerido para o arquivo exportado: `<nome do board>-<AAAA-MM-DD>.fazai.json`. */
 export function exportFileName(boardName: string, now = Date.now()): string {
   const d = new Date(now);
@@ -384,6 +401,7 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
   try {
     migrate(mem, file.schemaVersion);
     const boardRow: Row = { ...file.board, workspace_key: target.workspaceKey };
+    if (boardRow.runner_json !== undefined) boardRow.runner_json = withoutReviews(boardRow.runner_json);
     if (columnsOf(mem, 'boards').includes('log_rollup_day')) boardRow.log_rollup_day = '';
     insertRows(mem, 'boards', [boardRow]);
     for (const t of EXPORT_TABLES) {

@@ -58,6 +58,10 @@ function host(over: Partial<ConnectorDeps> = {}) {
     },
     reviewOf: (id) => reviews[id] ?? null,
     recordReview: (id) => (reviews[id] = (reviews[id] ?? 0) + 1),
+    revokeReview: (id) => {
+      calls.push(`revoke:${id}`);
+      delete reviews[id];
+    },
     listModels: async () => {
       calls.push('models');
       return 6;
@@ -76,15 +80,16 @@ function host(over: Partial<ConnectorDeps> = {}) {
 describe('Conectar o Gemini em ACP, passo a passo', () => {
   it('locate → pede a chave → authenticate e verify → ciência → modelos → Conectada', async () => {
     const h = host();
-    // 1. Conectar: liga o perfil, acha a CLI e para no campo da chave
+    // 1. Conectar: acha a CLI e para no campo da chave, sem ligar o perfil (ligado, ele seria verificado sem a chave)
     const first = await h.connector.connect('gemini');
     expect(first).toMatchObject({ step: 'signIn', status: 'waiting', needs: 'api-key', summary: { version: '0.65.0' } });
-    expect(h.calls).toEqual(['enable:gemini']);
+    expect(h.calls).toEqual([]);
+    expect(h.profiles.get('gemini')!.enabled).toBe(false);
 
-    // 2. a chave colada vai para o cofre e para o authenticate; o verify dá o regime compatível
+    // 2. a chave colada vai para o cofre e para o authenticate; só então o perfil liga, e o verify dá o compatível
     const second = await h.connector.connect('gemini', { apiKey: `  ${KEY}\n` });
     expect(h.keys.get('gemini')).toBe(KEY);
-    expect(h.calls).toEqual(['enable:gemini', `authenticate:gemini-api-key:${KEY}`, 'verify:gemini']);
+    expect(h.calls).toEqual([`authenticate:gemini-api-key:${KEY}`, 'enable:gemini', 'verify:gemini']);
     expect(second).toMatchObject({
       step: 'review',
       status: 'waiting',
@@ -132,6 +137,31 @@ describe('Conectar o Gemini em ACP, passo a passo', () => {
     });
   });
 
+  it('o perfil fica "em conexão" antes de qualquer efeito: o host vê isso já no ligar o perfil', async () => {
+    let activeWhenEnabled: boolean | null = null;
+    const h = host({ enable: (id) => void (activeWhenEnabled = h.connector.active(id)) });
+    h.keys.set('gemini', KEY);
+    const pending = h.connector.connect('gemini');
+    // marcado de forma síncrona, antes de o fluxo começar
+    expect(h.connector.active('gemini')).toBe(true);
+    await pending;
+    expect(activeWhenEnabled).toBe(true);
+  });
+
+  it('o perfil que passa a provar o exclusivo perde a ciência antiga', async () => {
+    const h = host({ verify: async () => ({ evidence: evidence('cli') }) });
+    h.reviews.claude = 2;
+    expect(await h.connector.connect('claude')).toMatchObject({ status: 'connected', summary: { regime: 'exclusive', reviewed: null } });
+    expect(h.calls).toContain('revoke:claude');
+    expect(h.reviews).toEqual({});
+  });
+
+  it('cópia ou personalizado não passam pelo Conectar (só o perfil pronto do catálogo)', async () => {
+    const h = host();
+    h.profiles.set('claude-2', { ...ready('claude'), id: 'claude-2', name: 'Claude cópia' });
+    await expect(h.connector.connect('claude-2')).rejects.toThrow(/o Conectar é das ferramentas do catálogo/);
+  });
+
   it('dois cliques seguidos viram uma conexão só', async () => {
     const h = host();
     h.keys.set('gemini', KEY);
@@ -148,6 +178,9 @@ describe('Conectar: o erro fica preso ao passo, com "Tentar de novo"', () => {
     const state = await h.connector.connect('gemini');
     expect(state).toMatchObject({ step: 'locate', status: 'failed', docs: 'https://geminicli.com/docs/cli/acp-mode' });
     expect(state.error).toContain('`gemini`');
+    // sem a ferramenta, o perfil não é ligado
+    expect(h.calls).not.toContain('enable:gemini');
+    expect(h.profiles.get('gemini')!.enabled).toBe(false);
     // "Tentar de novo" é o mesmo pedido: com a CLI instalada, segue
     h.deps.locate = () => '/usr/local/bin/gemini';
     expect(await h.connector.connect('gemini')).toMatchObject({ step: 'signIn', needs: 'api-key' });
@@ -214,7 +247,29 @@ describe('Conectar: o erro fica preso ao passo, com "Tentar de novo"', () => {
     expect(state).toMatchObject({ step: 'models', status: 'failed', error: 'Gemini CLI não anunciou modelos na sessão.' });
     expect(h.reviews.gemini).toBe(1);
     fail = false;
-    expect(await h.connector.connect('gemini')).toMatchObject({ status: 'connected', summary: { reviewed: 1 } });
+    const before = h.calls.length;
+    // "Tentar de novo" (até com o clique da ciência repetido) retoma dos modelos: sem login, sondas nem revisão nova
+    expect(await h.connector.connect('gemini', { acknowledge: true })).toMatchObject({ status: 'connected', summary: { reviewed: 1 } });
+    // nada de authenticate nem verify (os modelos deste host falso não aparecem em `calls`)
+    expect(h.calls.slice(before)).toEqual([]);
+    expect(h.reviews.gemini).toBe(1);
+  });
+
+  it('ciência que falha ao gravar: "Tentar de novo" retoma da ciência, sem refazer as sondas', async () => {
+    let broken = true;
+    const h = host({
+      recordReview: () => {
+        if (broken) throw new Error('banco indisponível');
+        return 1;
+      },
+    });
+    h.keys.set('gemini', KEY);
+    await h.connector.connect('gemini');
+    expect(await h.connector.connect('gemini', { acknowledge: true })).toMatchObject({ step: 'review', status: 'failed' });
+    broken = false;
+    const before = h.calls.length;
+    expect(await h.connector.connect('gemini', { acknowledge: true })).toMatchObject({ status: 'connected', summary: { reviewed: 1 } });
+    expect(h.calls.slice(before)).toEqual(['models']);
   });
 });
 

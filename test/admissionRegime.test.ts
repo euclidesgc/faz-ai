@@ -8,6 +8,7 @@ import { BoardContext } from '../src/extension/panel/handlers/context';
 import { admissionRegimeOf, DEFAULT_RUNNER, parseRunner } from '../src/shared/runner';
 import { admitExecution } from '../src/shared/executionAdmission';
 import { legacyStrictRequest } from '../src/extension/ai/v1Prepare';
+import { aiProfileHandlers } from '../src/extension/panel/handlers/aiProfiles';
 import type { StrictExecutionRequest } from '../src/shared/executionAdmission';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -105,6 +106,24 @@ describe('o repositório sobe a revisão quando a pessoa liga o compatível', ()
     expect(runner().compatibilityReviews).toEqual({ gemini: 2 });
     // e o regime do board segue o que era
     expect(runner().admissionRegime).toBe('exclusive');
+  });
+
+  it('a pessoa dá e revoga a ciência de um perfil (a ação de quem não passa pelo Conectar)', () => {
+    const review = aiProfileHandlers['settings.aiProfiles.review'];
+    const person = { byAi: false } as Parameters<typeof review>[2];
+    expect(review({ type: 'settings.aiProfiles.review', id: 'claude', accept: true }, ctx, person)).toBe(true);
+    expect(runner().compatibilityReviews).toEqual({ claude: 1 });
+    expect(admissionRegimeOf(runner(), 'claude')).toMatchObject({ regime: 'compatible' });
+    expect(review({ type: 'settings.aiProfiles.review', id: 'claude', accept: false }, ctx, person)).toBe(true);
+    expect(runner().compatibilityReviews).toEqual({});
+    expect(admissionRegimeOf(runner(), 'claude')).toEqual({ regime: 'exclusive' });
+    // revogar o que não há não muda o board
+    expect(review({ type: 'settings.aiProfiles.review', id: 'claude', accept: false }, ctx, person)).toBe(false);
+    // a IA não dá ciência, e perfil desconhecido é recusado
+    expect(() => review({ type: 'settings.aiProfiles.review', id: 'claude', accept: true }, ctx, { byAi: true } as typeof person)).toThrow(
+      /ato da pessoa/,
+    );
+    expect(() => review({ type: 'settings.aiProfiles.review', id: 'nada', accept: true }, ctx, person)).toThrow(/indisponível/);
   });
 });
 

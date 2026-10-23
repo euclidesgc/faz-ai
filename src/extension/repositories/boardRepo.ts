@@ -74,6 +74,21 @@ export class BoardRepo {
     return revision;
   }
 
+  /**
+   * Tira a ciência do regime compatível de um perfil: a pessoa a revogou, ou o perfil passou a provar o
+   * exclusivo no Conectar. Devolve se havia ciência.
+   */
+  revokeCompatibilityReview(boardId: string, profileId: string): boolean {
+    const current = parseRunner(str(one(this.db, 'SELECT runner_json FROM boards WHERE id = ?', [boardId])?.runner_json));
+    if (!(profileId in current.compatibilityReviews)) return false;
+    const { [profileId]: _gone, ...rest } = current.compatibilityReviews;
+    run(this.db, 'UPDATE boards SET runner_json = ? WHERE id = ?', [
+      JSON.stringify(parseRunner(JSON.stringify({ ...current, compatibilityReviews: rest }))),
+      boardId,
+    ]);
+    return true;
+  }
+
   /** Grava um valor na tabela meta, substituindo o existente. */
   setMeta(key: string, value: string): void {
     run(this.db, 'INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', [key, value]);

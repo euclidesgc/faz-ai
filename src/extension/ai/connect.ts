@@ -9,7 +9,7 @@
 // para toda ferramenta, e a diferença entre elas é o `auth` do driver. Um passo que espera a pessoa (a chave,
 // a ciência) para o fluxo com `waiting`; um erro fica preso ao passo (`failed`), e "Tentar de novo" chama
 // `connect` outra vez. A chave nunca volta: nem no estado publicado, nem no erro (que passa por `redact`).
-import { isAcpProfile, verifiableProfile, type AiProfile } from '../../shared/aiProfiles';
+import { isAcpProfile, isReadyProfile, verifiableProfile, type AiProfile } from '../../shared/aiProfiles';
 import { regimeFromEvidence, type ConnectState, type ConnectStep, type ConnectSummary } from '../../shared/connect';
 import type { CapabilityEvidence } from '../../shared/executionAdmission';
 import { parseApiKey } from '../toolKeys';
@@ -46,6 +46,8 @@ export interface ConnectorDeps {
   reviewOf(profileId: string): number | null;
   /** grava a ciência do perfil e devolve a revisão nova */
   recordReview(profileId: string): number;
+  /** tira a ciência do perfil (ele provou o exclusivo, ou a pessoa a revogou) */
+  revokeReview(profileId: string): void;
   /** lê os modelos da ferramenta e os junta ao catálogo; null quando ela não lista (vale a lista embutida) */
   listModels(profile: AiProfile, executable: string): Promise<number | null>;
   /** grava o resumo da conexão concluída (versão, login, regime, modelos, data) */
@@ -86,13 +88,31 @@ export class Connector {
     return out;
   }
 
-  /** Conecta (ou reconecta) o perfil. Dois cliques seguidos viram uma conexão só. */
+  /**
+   * Conecta (ou reconecta) o perfil. Dois cliques seguidos viram uma conexão só. O perfil fica marcado como "em
+   * conexão" antes de qualquer efeito (ligar o perfil, guardar a chave): ligar dispara, no mesmo instante, a
+   * verificação automática do host, que precisa saber que o Conectar faz a dele.
+   */
   connect(profileId: string, input: ConnectInput = {}): Promise<ConnectState> {
     const running = this.running.get(profileId);
     if (running) return running;
-    const done = this.flow(profileId, input).finally(() => this.running.delete(profileId));
+    const done = Promise.resolve()
+      .then(() => this.flow(profileId, input))
+      .finally(() => this.running.delete(profileId));
     this.running.set(profileId, done);
     return done;
+  }
+
+  /**
+   * De onde o fluxo retoma: depois de um passo que espera a pessoa (a ciência) ou que falhou depois do login
+   * (a ciência, os modelos), com o resumo que já tinha; a chave e a sondagem não se refazem. Uma chave nova
+   * colada recomeça do login.
+   */
+  private resumeFrom(previous: ConnectState | undefined, input: ConnectInput): 'review' | 'models' | null {
+    if (!previous || input.apiKey !== undefined || !previous.summary.signIn) return null;
+    if (previous.step === 'review' && (previous.status === 'waiting' || previous.status === 'failed')) return 'review';
+    if (previous.step === 'models' && previous.status === 'failed') return 'models';
+    return null;
   }
 
   private async flow(profileId: string, input: ConnectInput): Promise<ConnectState> {
@@ -100,11 +120,16 @@ export class Connector {
     const meta = deps.profile(profileId);
     if (!meta) throw new Error(`Perfil indisponível neste board: ${profileId}.`);
     const driver = driverOf(meta);
-    if (!driver) throw new Error(`${meta.name}: o Conectar é das ferramentas do catálogo; o perfil personalizado segue pelo formulário.`);
-    const previous = this.states.get(profileId);
-    // a ciência retoma de onde parou: as provas acabaram de ser gravadas, não há por que sondar de novo
-    const resume = input.acknowledge && previous?.status === 'waiting' && previous.step === 'review' ? previous.summary : null;
-    const state: ConnectState = { profileId, step: 'locate', status: 'running', summary: resume ? { ...resume } : {} };
+    // o Conectar é do perfil pronto do catálogo (o id é a ferramenta); cópias e personalizados seguem pelo formulário
+    if (!driver || !isReadyProfile(meta))
+      throw new Error(`${meta.name}: o Conectar é das ferramentas do catálogo; o perfil personalizado segue pelo formulário.`);
+    const resume = this.resumeFrom(this.states.get(profileId), input);
+    const state: ConnectState = {
+      profileId,
+      step: 'locate',
+      status: 'running',
+      summary: resume ? { ...this.states.get(profileId)!.summary } : {},
+    };
     const publish = () => {
       this.states.set(profileId, structuredClone(state));
       deps.publish(structuredClone(state));
@@ -126,30 +151,42 @@ export class Connector {
       return structuredClone(state);
     };
     try {
-      if (!meta.enabled) deps.enable(profileId);
-      const profile = deps.resolve(profileId);
+      // o perfil pronto vem do código (a configuração dele é a do catálogo): as sondas rodam nele como se ligado,
+      // e ele só é ligado de fato depois de a ferramenta ser achada e de o login ter o que precisa (a chave no
+      // cofre). Ligar antes faria a verificação automática do host correr sem a chave
+      const probe: AiProfile = { ...meta, enabled: true };
       enter('locate');
-      const executable = deps.locate(profile);
+      const executable = deps.locate(probe);
       if (!executable)
         return stop('failed', {
           error: `O comando \`${driver.command}\` do ${meta.name} não está no PATH. Instale pela página oficial e tente de novo.`,
           docs: driver.docs,
         });
       if (!resume) {
-        state.summary.version = await deps.version(profile, executable);
+        state.summary.version = await deps.version(probe, executable);
         const step = { state, enter, stop };
-        const signIn = await this.signIn(driver, profile, executable, input, step);
+        const signIn = await this.signIn(driver, probe, executable, input, step);
         if (signIn) return signIn;
+        if (!deps.profile(profileId)?.enabled) deps.enable(profileId);
         enter('verify');
-        const verified = await this.verify(driver, profile, step);
+        const verified = await this.verify(driver, deps.resolve(profileId), step);
         if (verified) return verified;
+      } else if (!deps.profile(profileId)?.enabled) deps.enable(profileId);
+      const profile = deps.resolve(profileId);
+      if (resume !== 'models') {
+        enter('review');
+        const existing = deps.reviewOf(profileId);
+        if (state.summary.regime === 'compatible') {
+          // a ciência só é gravada uma vez por conexão: "Tentar de novo" depois dela não sobe a revisão
+          const reviewed = existing ?? (input.acknowledge ? deps.recordReview(profileId) : null);
+          if (!reviewed) return stop('waiting', { needs: 'review' });
+          state.summary.reviewed = reviewed;
+        } else {
+          // o perfil que agora prova o exclusivo perde a ciência antiga: ela o deixaria rodar no compatível
+          if (existing && state.summary.regime === 'exclusive') deps.revokeReview(profileId);
+          state.summary.reviewed = null;
+        }
       }
-      enter('review');
-      if (state.summary.regime === 'compatible') {
-        const reviewed = input.acknowledge ? deps.recordReview(profileId) : deps.reviewOf(profileId);
-        if (!reviewed) return stop('waiting', { needs: 'review' });
-        state.summary.reviewed = reviewed;
-      } else state.summary.reviewed = null;
       enter('models');
       state.summary.models = await deps.listModels(profile, executable);
       const summary: ConnectSummary = {

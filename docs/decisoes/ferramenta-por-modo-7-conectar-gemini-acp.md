@@ -75,6 +75,32 @@ verificador, a leitura de modelos) precisa autenticar de novo.
 - **Sem verificação por cima do Conectar.** A verificação automática da história 2 e 3 (ao ligar, ao conferir o
   ambiente) não roda enquanto o Conectar do perfil está em curso, e passa a autenticar com a chave do cofre: o
   Gemini deixa de ficar com a prova falha por `auth_required` quando a pessoa usa a chave do board.
+- **Ordem do Conectar e a corrida com a verificação automática** (achado na revisão do #373). Ligar o perfil
+  dispara, de forma síncrona, o `onProfileEnabled` do router e a verificação automática do host; se o perfil
+  fosse ligado antes da chave (e antes de o Conectar estar marcado como em curso), essa verificação rodava sem a
+  chave, e a do Conectar a reaproveitava: o primeiro Conectar com chave válida parava em "recusou a sessão com a
+  chave guardada". Agora: o Conectar marca o perfil como em curso antes de qualquer efeito (`connect` adia o
+  fluxo um tique); o perfil só é ligado depois de `locate` achar a ferramenta e de o login ter o que precisa (a
+  chave no cofre e aceita pelo `authenticate`), e as sondas anteriores rodam no perfil pronto como se ligado (a
+  configuração dele é a do catálogo); e a coordenação das verificações saiu do `boardHost.ts` para
+  `ai/verifications.ts` (`Verifications`), que só reaproveita uma verificação em andamento com o mesmo estado da
+  chave (o digest da chave do cofre). O cenário liga o `onProfileEnabled` de verdade do router à mesma
+  coordenação que o host usa e confere o primeiro Conectar com a chave já no primeiro clique.
+- **O Conectar é do perfil pronto** (`isReadyProfile`): cópias e personalizados seguem pelo formulário e pela ação
+  de ciência da lista (abaixo).
+- **A ciência pode sair.** Reconectar um perfil que passa a provar o exclusivo tira a ciência antiga dele (ela o
+  deixaria no compatível); a pessoa revoga ou dá a ciência de qualquer perfil por `settings.aiProfiles.review
+  { id, accept }` (ato da pessoa: a IA e o MCP são recusados, como em todo `settings.aiProfiles.*`); e a
+  importação de um board descarta `compatibilityReviews` (quem importa dá a própria ciência, na máquina onde o
+  perfil roda). O regime do board importado continua vindo como estava.
+- **O regime das políticas é por perfil.** `constraints.regime` do runner e do chat é o do perfil que roda a
+  tentativa, e cada candidato da política tem o regime do perfil dele (`policyGate.ts`): a troca do Claude
+  (exclusivo) para um perfil com ciência (compatível) é recusada com `constraints-changed`, como qualquer troca
+  que mudaria o que a execução pode carregar.
+- **"Tentar de novo" retoma do passo que falhou** depois do login (a ciência ou os modelos), com o resumo que já
+  tinha, sem refazer a chave nem as sondas; a ciência só é gravada se ainda não houver (repetir o clique não sobe
+  a revisão). Uma chave nova colada recomeça do login.
+- **Trocar ou esquecer a chave apaga a cifrada antiga** (`CredentialStore.delete`, só do mesmo dono).
 
 ## Onde a especificação não cabia no código
 

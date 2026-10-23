@@ -319,7 +319,8 @@ export class ChatSession {
     let execution: AiExecution;
     const constraints = {
       permission,
-      regime: admissionRegimeOf(state.board.runner).regime,
+      // o regime do perfil do chat (a ciência dele no Conectar, ou o do board)
+      regime: admissionRegimeOf(state.board.runner, target.cli.id).regime,
       agentId: null,
       scopeDigest: scopeDigest([plan.tools, plan.deniedTools, plan.mcpAllowed, !!hooks.draftOnly]),
     };
