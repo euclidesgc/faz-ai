@@ -175,6 +175,16 @@ What Gemini enforces in this mode:
   them) does not change the API address, the credential, the headers or the proxy: the board pins those
   variables. And the shell commands the model runs do not receive the key.
 
+### Gemini real test
+
+The real test runs a minimal card through the board's path in the three modes (CLI, ACP and API), with
+the real binary and Google's real API. **It spends your account's quota**, so it stays out of `npm test`
+and only runs with explicit confirmation: `node scripts/gemini-real.mjs --sim` (or `FAZAI_REAL_CONFIRM=1`
+on `npm run test:cli-real -- test/cli-real/gemini.real.ts`). Without confirmation the script refuses and
+the test skips each mode with the reason (a missing `gemini` binary or `GEMINI_API_KEY` skips too). What
+each mode has verified and not validated, and how to check usage against the AI Studio dashboard, is in
+`docs/decisoes/ferramenta-por-modo-14-teste-real-gemini.md` (Portuguese).
+
 ## Environment check
 
 ### The warning icon
