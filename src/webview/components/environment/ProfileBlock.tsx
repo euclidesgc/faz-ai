@@ -68,6 +68,16 @@ function Capabilities({ health }: { health: ProfileHealth }) {
           </Line>
         );
       })}
+      {health.verifiable && !isWeb && health.capabilities.every((c) => c === 'unknown') && (
+        <li className="env-item skipped">
+          <p className="small muted">
+            {t(
+              'Sem recibos de capacidade deste perfil: rode "Faz AI: Verificar o isolamento da CLI de IA" na paleta de comandos e escolha {name}.',
+              { name: health.name },
+            )}
+          </p>
+        </li>
+      )}
       {admission && (
         <Line
           state={admission.state === 'admitted' ? 'ok' : 'missing'}

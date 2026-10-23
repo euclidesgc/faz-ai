@@ -184,6 +184,9 @@ const HANDLERS: HandlerMap = {
   ...harnessHandlers,
 };
 
+/** A leitura da admissão do host para a prévia: o pedido e o alvo (card, fase e ação) que ele avalia. */
+type AdmissionReader = (request: StrictExecutionRequest, target: ContextActivityTarget) => ExecutionAdmissionDecision | null;
+
 /** Aplica mensagens do webview no banco. Não depende da API do VSCode. */
 export class MessageRouter {
   readonly executions: RunMcpSessions;
@@ -245,10 +248,18 @@ export class MessageRouter {
   get boardId(): string {
     return this.ctx.boardId;
   }
-  private admissionReader: ((request: StrictExecutionRequest) => ExecutionAdmissionDecision | null) | null = null;
-  /** Leitura da admissão real (recibos do host) para a prévia; sem ela a prévia diz que a admissão está indisponível. */
-  setAdmissionReader(reader: (request: StrictExecutionRequest) => ExecutionAdmissionDecision | null): void {
+  private admissionReader: AdmissionReader | null = null;
+  /**
+   * Leitura da admissão real (recibos do host) para a prévia; sem ela a prévia diz que a admissão está
+   * indisponível. Recebe o alvo para avaliar o perfil que vai executar o card, não o padrão do board.
+   */
+  setAdmissionReader(reader: AdmissionReader): void {
     this.admissionReader = reader;
+  }
+  private profileEnabledListeners: ((profileId: string) => void)[] = [];
+  /** Avisa quando a pessoa liga um perfil: o host verifica as capacidades do perfil ACP recém-ligado. */
+  onProfileEnabled(fn: (profileId: string) => void): void {
+    this.profileEnabledListeners.push(fn);
   }
   setAiProfileRuntime(runtime: AiProfileRuntime): void {
     this.aiProfileRuntime = runtime;
@@ -443,6 +454,7 @@ export class MessageRouter {
       const column = result.columns.find((c) => c.id === msg.columnId);
       if (column?.category === 'cancelled') this.cancelListeners.forEach((fn) => fn([msg.cardId]));
     }
+    if (changed && msg.type === 'settings.aiProfiles.setEnabled' && msg.enabled) this.profileEnabledListeners.forEach((fn) => fn(msg.id));
     return result;
   }
 
@@ -786,7 +798,7 @@ export class MessageRouter {
     const state = this.contextDraftState();
     const resolved = resolveContextDraft(state, target);
     const request = this.admissionReader ? strictRequestFromDraft(state, resolved) : null;
-    const decision = request ? this.admissionReader!(request) : null;
+    const decision = request ? this.admissionReader!(request, resolved.target) : null;
     return decision ? applyAdmissionDecision(resolved, decision) : resolved;
   }
 

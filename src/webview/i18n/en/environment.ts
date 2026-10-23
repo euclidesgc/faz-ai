@@ -41,6 +41,8 @@ export const environment: Record<string, string> = {
   'Precisa verificar de novo: a linha de comando mudou desde o último teste':
     'Needs checking again: the command line changed since the last test',
   'Não validado: este perfil ainda não foi testado': 'Not validated: this profile has not been tested yet',
+  'Sem recibos de capacidade deste perfil: rode "Faz AI: Verificar o isolamento da CLI de IA" na paleta de comandos e escolha {name}.':
+    'No capability receipts for this profile: run "Faz AI: Verify the AI CLI isolation" from the Command Palette and pick {name}.',
   'Depende do item anterior': 'Depends on the item above',
   Falta: 'Missing',
   uv: 'uv',

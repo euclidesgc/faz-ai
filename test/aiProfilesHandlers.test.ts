@@ -152,3 +152,12 @@ it('Testar perfil custom envia contrato mínimo à admissão e oculta valores pr
   expect((await runtime.test(saved.id)).error).toContain('desativado');
   expect(run).toHaveBeenCalledTimes(1);
 });
+
+it('ligar um perfil avisa o host (que verifica o agente ACP); desligar não avisa', () => {
+  const enabled = vi.fn();
+  router.onProfileEnabled(enabled);
+  router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: true });
+  expect(enabled).toHaveBeenCalledWith('gemini');
+  router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: false });
+  expect(enabled).toHaveBeenCalledTimes(1);
+});

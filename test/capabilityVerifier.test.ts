@@ -13,7 +13,8 @@ import {
   type ProbeRun,
 } from '../src/extension/ai/capabilityVerifier';
 import { ACP_CAPABILITY_CHECKS, CAPABILITY_CHECKS, assessCapability, type StrictExecutionRequest } from '../src/shared/executionAdmission';
-import type { AiProfile } from '../src/shared/aiProfiles';
+import { BUILTIN_PROFILES, verifiableProfile, verifiableProfiles, type AiProfile } from '../src/shared/aiProfiles';
+import { evidenceCapabilities } from '../src/shared/profileHealth';
 
 const obs = (o: Partial<ProbeObservation> = {}): ProbeObservation => ({
   code: 0,
@@ -309,5 +310,79 @@ describe('verifyExecutor com agente ACP', () => {
         },
       }),
     ).rejects.toThrow(/ACP indisponível/);
+  });
+});
+
+describe('verificação por perfil', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-verifier-perfil-'));
+    for (const bin of ['claude', 'cursor-agent', 'gemini']) fs.writeFileSync(path.join(dir, bin), 'binário de teste', { mode: 0o755 });
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const builtin = (id: string, over: Partial<AiProfile> = {}): AiProfile => ({ ...BUILTIN_PROFILES.find((p) => p.id === id)!, ...over });
+  const make = () => {
+    const store = new CapabilityEvidenceStore(path.join(dir, 'evidence'));
+    const admission = new ExecutionAdmission({
+      pathEnv: () => dir,
+      homeDir: dir,
+      evidence: store,
+      now: () => 1000,
+      environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
+    });
+    return { store, admission };
+  };
+  const deps = (executor: AiProfile, store: CapabilityEvidenceStore, admission: ExecutionAdmission) => ({
+    executor,
+    profileId: executor.id,
+    admission,
+    store,
+    pathEnv: dir,
+    now: () => 900,
+    spawn: () => {
+      throw new Error('sem CLI');
+    },
+    probe: async () => good(),
+    probeAcp: async () => acpGood(),
+  });
+
+  it('aceita o perfil resolvido do Claude (não só o id) e recusa o que não tem sonda', async () => {
+    const { store, admission } = make();
+    const result = await verifyExecutor(deps(builtin('claude'), store, admission));
+    expect(result.verified).toBe(true);
+    await expect(verifyExecutor(deps(builtin('cursor'), store, admission))).rejects.toThrow(/só existe para a CLI do Claude/);
+  });
+
+  it('cada perfil tem a própria evidência: provar o agente ACP não prova o Claude', async () => {
+    const { store, admission } = make();
+    const gemini = builtin('gemini', { enabled: true });
+    const result = await verifyExecutor(deps(gemini, store, admission));
+    const own = evidenceCapabilities(result.binding, store.load(result.binding), 1000, 'acp');
+    // na ordem de PROFILE_CAPABILITIES: os arquivos do agente ficam sem prova; cancelamento e saída não têm sonda
+    expect(own).toEqual(['verified', 'partial', 'verified', 'verified', 'verified', 'unknown', 'unknown']);
+    const claude = admission.isolationBinding(builtin('claude'), 'claude', 'board').binding;
+    expect(claude).not.toBe(result.binding);
+    expect(evidenceCapabilities(claude, store.load(claude), 1000, 'cli').every((c) => c === 'unknown')).toBe(true);
+  });
+
+  it('o comando oferece só os perfis ligados, revisados e verificáveis, com o padrão primeiro', () => {
+    const board = {
+      aiTool: 'gemini',
+      aiProfiles: [
+        builtin('claude'),
+        builtin('cursor'),
+        builtin('gemini', { enabled: true }),
+        builtin('opencode'),
+        {
+          ...builtin('claude'),
+          id: 'claude-copia',
+          kind: 'copy' as const,
+          credentials: { secretRef: 'x', review: 'pending' as const, available: true },
+        },
+      ],
+    };
+    expect(verifiableProfiles(board).map((p) => p.id)).toEqual(['gemini', 'claude']);
+    expect(verifiableProfile(builtin('kimi'))).toBe(false);
+    expect(verifiableProfile(builtin('opencode'))).toBe(true);
   });
 });
