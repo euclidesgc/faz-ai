@@ -48,7 +48,7 @@ Entregar a forma de uso em histórias derivadas, empilhadas na `develop`, nesta 
 | --- | --- | --- | --- |
 | 1 | Admissão por capacidades cobre o transporte ACP (`#1090`, entregue) | — | um perfil ACP é admitido pelo gateway, só no regime compatível |
 | 2 | Regime compatível escolhido pela pessoa (`#1091`, entregue) | 1 | o board roda no regime compatível, com a revisão do que a CLI carrega |
-| 3 | Agente ACP como perfil pronto do catálogo | 2 | o agente aparece em Ferramentas de IA sem perfil personalizado |
+| 3 | Agente ACP como perfil pronto do catálogo (`#1095`, entregue) | 2 | o agente aparece em Ferramentas de IA sem perfil personalizado |
 | 4 | Conectar ferramenta: login pela tela | 3 | botão Conectar, estado "conectada", login pelo agente |
 | 5 | Modelos descobertos na conexão (`#1094`, entregue pelo Detectar modelos) | 4 | lista de modelos por ferramenta, em todo campo de modelo e nas políticas |
 | 6 | Limite de uso por agente | 3 | a pausa e o fallback das políticas valem para os agentes ACP |
@@ -97,6 +97,10 @@ recusado, e os perfis prontos da 3 nasceriam sem poder rodar.
   `test/ui/...` (a opção na tela), `docs/configuracoes.md` e `docs/harness.md`.
 
 ### 3. Agente ACP como perfil pronto do catálogo
+
+> Entregue em 2026-10-23 (`#1095`) com o `kind` novo, `acp`, e sem migração: a linha do perfil nasce
+> quando a pessoa liga. A situação da CLI (`cliProbe.ts`) ficou na versão; o login espera a 4.
+> Registro em [`1095-agente-acp-perfil-pronto.md`](1095-agente-acp-perfil-pronto.md).
 
 - Cada entrada de `ACP_AGENTS` vira um perfil do board com `kind: 'builtin'` (ou um `kind` novo,
   `acp`, se o `builtin` carregar regras demais das três CLIs) e `base: 'generic'` com `acpAgent`

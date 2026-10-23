@@ -41,7 +41,8 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
 ## Conectar a ferramenta de IA
 
 1. Em Configurações → **Ferramentas de IA**, escolha o perfil de CLI padrão do projeto. Claude Code,
-   Cursor e Kimi Code vêm prontos; também é possível criar cópias e perfis personalizados. O padrão
+   Cursor e Kimi Code vêm prontos, e os agentes ACP do catálogo (Gemini CLI, Codex, OpenCode…) vêm
+   prontos e desligados; também é possível criar cópias e perfis personalizados. O padrão
    só vale quando nada indica outro: a CLI de cada execução sai do modelo escolhido (veja
    [Qual CLI executa](configuracoes.md#qual-cli-executa)). Em **Harness → Ferramenta e execução**,
    você pode trocar o perfil em uso.

@@ -56,6 +56,19 @@ only the cards of that profile, and the warning appears only for the profiles in
 regras** (suggest rules) acts only on the suggested profile and preserves other profiles' bands.
 Over MCP, `get_card` shows the target in `model` (`tool`, `from` and, if invalid, `blocked`).
 
+### Ready ACP agent
+
+The ACP catalog agents that do not coincide with a ready CLI come as ready profiles of the
+**Agente ACP** (ACP agent) type: Gemini CLI, Codex, OpenCode, GitHub Copilot CLI, Qwen Code, goose
+and Google Antigravity. They appear switched off in **Ferramentas de IA** (AI tools); turn on the
+ones you use. Like the other ready profiles they have no Edit or Delete: **Duplicar** (duplicate)
+creates a custom profile with the same agent, to change the environment or the name. The profile id
+(`gemini`, `codex-acp`…) is the model catalog's tool, and **Detectar modelos** (detect models) reads
+the agent's models into it. **Verificar situação** (check status) checks whether the agent's command
+is on the PATH and its version; the login stays "not verified" until the Connect story, and the
+**Instalar** (install) link opens the agent's official ACP mode page. Cursor and Kimi Code stay on
+the ready one-shot CLIs, which measure tokens; Claude Code keeps running through the `claude` CLI.
+
 ### Custom profile
 
 To create a custom profile, enter the command and one argument per line. The markers `{prompt}`,

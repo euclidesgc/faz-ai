@@ -10,7 +10,10 @@ import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { exportBoard, importBoard, parseExportFile } from '../src/extension/db/boardExport';
 import { credentialsFor } from '../src/extension/credentials';
-import { BUILTIN_ISOLATION, type AiProfileDraft } from '../src/shared/aiProfiles';
+import { ACP_READY_AGENTS, BUILTIN_ISOLATION, BUILTIN_PROFILES, type AiProfileDraft } from '../src/shared/aiProfiles';
+import { ACP_AGENTS } from '../src/extension/ai/acp/agents';
+/** as três CLIs prontas mais os agentes ACP prontos */
+const CATALOG = BUILTIN_PROFILES.length;
 let db: Database, repo: AiProfileRepo, boardId: string;
 const draft = (extra: Partial<AiProfileDraft> = {}): AiProfileDraft => ({
   name: 'Minha CLI',
@@ -54,7 +57,7 @@ it('migra dois boards preservando padrões e catálogo e semeia os três prontos
       ai_tools_json: '["codex","claude"]',
       model_catalog_json: '[{"id":"codex:model"}]',
     });
-    expect(repo.list(boardId)).toHaveLength(3);
+    expect(repo.list(boardId)).toHaveLength(CATALOG);
   } finally {
     old.close();
   }
@@ -106,7 +109,7 @@ it('impõe revisão humana e trava os prontos e o padrão; cópia ganha referên
 it('completa prontos ausentes só na leitura e ignora configurações adulteradas dos prontos', () => {
   run(db, "DELETE FROM ai_profiles WHERE board_id=? AND id='cursor'", [boardId]);
   run(db, "UPDATE ai_profiles SET config_json=? WHERE board_id=? AND id='claude'", ['{"command":"não-executar"}', boardId]);
-  expect(repo.list(boardId)).toHaveLength(3);
+  expect(repo.list(boardId)).toHaveLength(CATALOG);
   expect(repo.resolveConfig(boardId, 'claude')).toEqual({});
   expect(all(db, 'SELECT * FROM ai_profiles WHERE board_id=?', [boardId])).toHaveLength(2);
 });
@@ -126,7 +129,8 @@ it('importa referências desativadas/pendentes, conserva o alvo antigo e recusa 
   const result = importBoard(target as never, parseExportFile(JSON.stringify(file)));
   expect(result).toBeDefined();
   expect(backups).toBe(1);
-  expect(repo.list(boardId).every((p) => !p.enabled && p.credentials?.review === 'pending')).toBe(true);
+  // os agentes ACP prontos sem linha não vêm no arquivo e seguem desligados, sem revisão a fazer
+  expect(repo.list(boardId).every((p) => !p.enabled && (!p.credentials || p.credentials.review === 'pending'))).toBe(true);
   expect(() => repo.resolveConfig(boardId, profile.id)).toThrow('revisão');
   const invalid = structuredClone(file);
   invalid.tables.ai_profiles![3]!.config_json = '{"env":{"TOKEN":"imported-sentinel"}}';
@@ -139,7 +143,7 @@ it('importa referências desativadas/pendentes, conserva o alvo antigo e recusa 
   legacy.schemaVersion = 41;
   delete legacy.tables.ai_profiles;
   importBoard(target as never, parseExportFile(JSON.stringify(legacy)));
-  expect(repo.list(boardId)).toHaveLength(3);
+  expect(repo.list(boardId)).toHaveLength(CATALOG);
   expect(repo.list(boardId).every((p) => !p.enabled)).toBe(true);
 });
 it('o padrão aceita perfil ligado e revisado, ignorando perfil ausente, desligado ou importado', () => {
@@ -195,4 +199,48 @@ it('duplicar um pronto copia a lista de itens carregados; salvar grava o isolame
   expect(() =>
     repo.save(boardId, draft({ config: { command: 'x', isolation: { loads: [{ kind: 'x', scope: 'user' }] } as never } }), 'person'),
   ).toThrow('Isolamento');
+});
+
+it('agente ACP pronto: desligado até a pessoa ligar, sem edição nem exclusão; a cópia é um personalizado com o agente', async () => {
+  // o catálogo de perfis prontos aponta para agentes que existem no catálogo ACP, com o mesmo nome e página
+  for (const ready of ACP_READY_AGENTS) {
+    const agent = ACP_AGENTS.find((a) => a.id === ready.id);
+    expect(agent, ready.id).toBeDefined();
+    expect({ label: agent!.label, docs: agent!.docs }).toEqual({ label: ready.label, docs: ready.docs });
+  }
+  const listed = repo.list(boardId).find((p) => p.id === 'gemini')!;
+  expect(listed).toMatchObject({ kind: 'acp', base: 'generic', enabled: false, config: { acpAgent: 'gemini' } });
+  // nenhum board tem a linha do agente pronto: ela nasce ao ligar, sem migração nem semente
+  expect(all(db, "SELECT * FROM ai_profiles WHERE board_id=? AND kind='acp'", [boardId])).toHaveLength(0);
+  expect(repo.list(boardId).find((p) => p.id === 'codex-acp')).toMatchObject({ enabled: false, kind: 'acp' });
+  repo.setEnabled(boardId, 'codex-acp', true, 'person');
+  expect(repo.list(boardId).find((p) => p.id === 'codex-acp')).toMatchObject({
+    enabled: true,
+    credentials: { review: 'reviewed', available: true },
+  });
+  // a configuração resolvida é a do catálogo: o agente e a página oficial, nada do cofre
+  expect(repo.resolveConfig(boardId, 'codex-acp')).toEqual({
+    acpAgent: 'codex-acp',
+    installUrl: 'https://github.com/agentclientprotocol/codex-acp',
+  });
+  expect(() => repo.save(boardId, { ...draft(), id: 'gemini', kind: 'acp', base: 'generic', config: {} }, 'person')).toThrow('prontos');
+  expect(() => repo.remove(boardId, 'gemini', 'person')).toThrow('prontos');
+  const copy = repo.duplicate(boardId, 'gemini', 'person');
+  expect(copy).toMatchObject({ kind: 'custom', base: 'generic', enabled: false, config: { acpAgent: 'gemini' } });
+  expect(copy.id).not.toBe('gemini');
+  // sem comando de status, o login do agente pronto fica "não verificado" (a história do Conectar lê o authMethods)
+  expect(await profileSignedIn({ ...listed, enabled: true }, process.execPath, '/home')).toBeNull();
+  // a exportação leva a linha do agente pronto e a importação a aceita (importada, fica desligada e pendente)
+  repo.setEnabled(boardId, 'codex-acp', false, 'person');
+  const file = exportBoard(db, boardId, { pathOf: () => '' }, { extensionVersion: 'test' }).file;
+  expect(file.tables.ai_profiles!.find((r) => r.id === 'codex-acp')).toMatchObject({ kind: 'acp', base: 'generic', enabled: 0 });
+  const target = {
+    db,
+    boardId,
+    workspaceKey: 'profiles',
+    store: { backupCards: () => undefined, pathOf: () => '' },
+    backup: () => undefined,
+  };
+  importBoard(target as never, parseExportFile(JSON.stringify(file)));
+  expect(repo.list(boardId).find((p) => p.id === 'codex-acp')).toMatchObject({ kind: 'acp', enabled: false });
 });

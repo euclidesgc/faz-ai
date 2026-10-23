@@ -295,7 +295,10 @@ describe('importBoard', () => {
       ...before,
       board: {
         ...before.board,
-        aiProfiles: before.board.aiProfiles.map((p) => ({ ...p, enabled: false, credentials: { ...p.credentials!, review: 'pending' } })),
+        // o agente ACP pronto sem linha no banco não vem no arquivo: segue como estava
+        aiProfiles: before.board.aiProfiles.map((p) =>
+          p.credentials ? { ...p, enabled: false, credentials: { ...p.credentials, review: 'pending' } } : p,
+        ),
       },
     });
     expect(other.snapshot().board.workspaceKey).toBe('ws-a');

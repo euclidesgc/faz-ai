@@ -90,9 +90,13 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
   return boardId;
 }
 
-/** A criação de um board novo usa as mesmas identidades da migração. */
+/**
+ * A criação de um board novo usa as mesmas identidades da migração. Só as CLIs prontas ganham linha: o agente
+ * ACP pronto (#1095) nasce desligado e a linha dele é gravada quando a pessoa liga, para não encher o backup
+ * nem a lista de revisão da importação com perfis que ninguém usa.
+ */
 export function insertBuiltinProfiles(db: Database, boardId: string): void {
-  for (const p of BUILTIN_PROFILES)
+  for (const p of BUILTIN_PROFILES.filter((p) => p.kind === 'builtin'))
     db.run(
       "INSERT OR IGNORE INTO ai_profiles(board_id,id,name,enabled,kind,base,position,review_state) VALUES (?,?,?,?,?,?,?,'reviewed')",
       [boardId, p.id, p.name, 1, p.kind, p.base, p.position],

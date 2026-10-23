@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Badge, RadioGroup } from '@radix-ui/themes';
-import { PROFILE_CAPABILITIES, contextEnforced, profileIsolation, type AiProfile } from '../../../shared/aiProfiles';
+import { PROFILE_CAPABILITIES, contextEnforced, isCatalogProfile, profileIsolation, type AiProfile } from '../../../shared/aiProfiles';
 import type { HostToWebview } from '../../../shared/messages';
 import { settings } from '../../commands';
 import { t } from '../../i18n';
@@ -67,7 +67,13 @@ export function AiToolsSettings() {
   };
   const profiles = state.board.aiProfiles;
   const typeOf = (p: AiProfile) =>
-    p.kind === 'builtin' ? t('Perfil pronto') : p.kind === 'custom' ? t('Personalizado') : t('Cópia de {base}', { base: p.base });
+    p.kind === 'builtin'
+      ? t('Perfil pronto')
+      : p.kind === 'acp'
+        ? t('Agente ACP')
+        : p.kind === 'custom'
+          ? t('Personalizado')
+          : t('Cópia de {base}', { base: p.base });
   const statusOf = (p: AiProfile) => {
     const s = statuses[p.id];
     if (!s) return t('A verificar');
@@ -150,7 +156,7 @@ export function AiToolsSettings() {
                       >
                         {t('Duplicar')}
                       </ActionButton>
-                      {profile.kind !== 'builtin' && (
+                      {!isCatalogProfile(profile) && (
                         <ActionButton
                           size="1"
                           variant="soft"
@@ -161,7 +167,7 @@ export function AiToolsSettings() {
                           {t('Editar')}
                         </ActionButton>
                       )}
-                      {profile.kind !== 'builtin' && !standard && (
+                      {!isCatalogProfile(profile) && !standard && (
                         <DeleteButton
                           variant="ghost"
                           question={t('Apagar o perfil "{name}"?', { name: profile.name })}

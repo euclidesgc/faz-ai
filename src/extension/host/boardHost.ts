@@ -415,7 +415,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
   };
   /** O perfil com a configuração privada, para resolver o comando e os probes; a pública traz `config` vazio. */
   const resolvedProfile = (meta: AiProfile): AiProfile => {
-    if (meta.kind === 'builtin' || !profileCanProbe(meta)) return meta;
+    if (meta.kind === 'builtin' || meta.kind === 'acp' || !profileCanProbe(meta)) return meta;
     try {
       return new AiProfileRepo(handle.db).resolveProfile(router.boardId, meta.id);
     } catch {

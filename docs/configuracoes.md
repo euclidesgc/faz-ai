@@ -56,6 +56,18 @@ cards daquele perfil, e o aviso aparece só para os perfis em uso. **Sugerir reg
 perfil sugerido e preserva as faixas de outros perfis. Pelo MCP, o `get_card` mostra o alvo em
 `model` (`tool`, `from` e, se inválido, `blocked`).
 
+### Agente ACP pronto
+
+Os agentes do catálogo ACP que não coincidem com uma CLI pronta vêm como perfis prontos do tipo
+**Agente ACP**: Gemini CLI, Codex, OpenCode, GitHub Copilot CLI, Qwen Code, goose e Google
+Antigravity. Eles aparecem desligados em **Ferramentas de IA**; ligue o que você usa. Como os outros
+prontos, não têm Editar nem Apagar: **Duplicar** cria um perfil personalizado com o mesmo agente, para
+mudar o ambiente ou o nome. O id do perfil (`gemini`, `codex-acp`…) é a ferramenta do catálogo de
+modelos, e **Detectar modelos** lê os modelos do agente nele. **Verificar situação** confere se o
+comando do agente está no PATH e a versão; o login fica "não verificado" até a história do Conectar,
+e o link **Instalar** abre a página oficial do modo ACP do agente. Cursor e Kimi Code ficam nas CLIs
+prontas de uma passada, que medem tokens; o Claude Code segue pela CLI `claude`.
+
 ### Perfil personalizado
 
 Para criar um personalizado, informe o comando e um argumento por linha. Os marcadores `{prompt}`,

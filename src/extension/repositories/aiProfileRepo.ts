@@ -2,6 +2,7 @@ import type { Database } from 'sql.js';
 import {
   BUILTIN_ISOLATION,
   BUILTIN_PROFILES,
+  isCatalogProfile,
   newProfileId,
   unknownProfileCapabilities,
   validateProfile,
@@ -83,7 +84,7 @@ export class AiProfileRepo {
   }
   save(boardId: string, draft: AiProfileDraft, actor: 'person' | 'ai', reviewed = true): AiProfile {
     this.human(actor);
-    if (draft.kind === 'builtin' || BUILTIN_PROFILES.some((p) => p.id === draft.id))
+    if (isCatalogProfile(draft) || BUILTIN_PROFILES.some((p) => p.id === draft.id))
       throw new Error('Os perfis prontos não são editados: duplique para mudar.');
     return transaction(this.db, () => {
       const rows = this.rows(boardId),
@@ -141,6 +142,8 @@ export class AiProfileRepo {
     this.human(actor);
     if (typeof enabled !== 'boolean') throw new Error('Estado do perfil inválido.');
     if (!enabled && this.defaultId(boardId) === id) throw new Error('Escolha outro perfil padrão antes de desligar este.');
+    // o agente ACP pronto só ganha linha no banco quando a pessoa liga: boards antigos não passam por migração
+    this.ensureCatalogRow(boardId, id);
     const row = one(this.db, 'SELECT * FROM ai_profiles WHERE board_id = ? AND id = ?', [boardId, id]);
     if (!row) throw new Error('Perfil indisponível neste board.');
     if (enabled && row.review_state !== 'reviewed') throw new Error('Revise o perfil importado antes de ligar.');
@@ -150,7 +153,19 @@ export class AiProfileRepo {
   reviewBuiltin(boardId: string, id: string, actor: 'person' | 'ai'): void {
     this.human(actor);
     if (!BUILTIN_PROFILES.some((p) => p.id === id)) throw new Error('Forneça uma configuração revisada para este perfil.');
-    run(this.db, "UPDATE ai_profiles SET review_state = 'reviewed' WHERE board_id = ? AND id = ? AND kind = 'builtin'", [boardId, id]);
+    run(this.db, "UPDATE ai_profiles SET review_state = 'reviewed' WHERE board_id = ? AND id = ? AND kind IN ('builtin', 'acp')", [
+      boardId,
+      id,
+    ]);
+  }
+  private ensureCatalogRow(boardId: string, id: string): void {
+    const p = BUILTIN_PROFILES.find((profile) => profile.id === id);
+    if (p)
+      run(
+        this.db,
+        "INSERT OR IGNORE INTO ai_profiles(board_id,id,name,enabled,kind,base,position,review_state) VALUES (?,?,?,?,?,?,?,'reviewed')",
+        [boardId, p.id, p.name, p.enabled ? 1 : 0, p.kind, p.base, p.position],
+      );
   }
   remove(boardId: string, id: string, actor: 'person' | 'ai'): void {
     this.human(actor);
@@ -164,7 +179,8 @@ export class AiProfileRepo {
       source = profiles.find((p) => p.id === id);
     if (!source) throw new Error('Perfil indisponível neste board.');
     // Cópia humana ganha referência própria; não herda revisão nem evidência executável.
-    const kind = source.kind === 'custom' ? 'custom' : 'copy';
+    // a cópia de um agente ACP pronto é um perfil personalizado com o mesmo agente: o id novo é outra ferramenta do catálogo
+    const kind = source.kind === 'custom' || source.kind === 'acp' ? 'custom' : 'copy';
     const targetId = newProfileId(
       `${source.name} cópia`,
       profiles.map((p) => p.id),
@@ -176,7 +192,9 @@ export class AiProfileRepo {
         ? source.base === 'generic'
           ? null
           : { isolation: { loads: structuredClone(BUILTIN_ISOLATION[source.base].loads) } }
-        : credentialsFor(this.db).get(ownerOf(boardId, id), str(sourceRow?.secret_ref));
+        : source.kind === 'acp'
+          ? structuredClone(source.config)
+          : credentialsFor(this.db).get(ownerOf(boardId, id), str(sourceRow?.secret_ref));
     const ref = config ? credentialsFor(this.db).put(ownerOf(boardId, targetId), config) : null;
     run(
       this.db,
@@ -189,7 +207,9 @@ export class AiProfileRepo {
   resolveConfig(boardId: string, id: string): AiProfileConfig {
     const row = one(this.db, 'SELECT * FROM ai_profiles WHERE board_id = ? AND id = ?', [boardId, id]);
     if (!row || !bool(row.enabled) || row.review_state !== 'reviewed') throw new Error('Perfil desativado ou pendente de revisão.');
-    if (BUILTIN_PROFILES.some((p) => p.id === id)) return {};
+    // o pronto ACP leva o agente do catálogo (e a página oficial); nada vem do cofre
+    const builtin = BUILTIN_PROFILES.find((p) => p.id === id);
+    if (builtin) return structuredClone(builtin.config);
     const config = credentialsFor(this.db).get(ownerOf(boardId, id), str(row.secret_ref));
     if (!config) throw new Error('Configuração local do perfil indisponível.');
     return config;
@@ -241,7 +261,7 @@ export function validateProfileRows(rows: Row[], boardId: string): void {
       throw new Error('A importação de perfis exige referências locais, sem valores.');
     if (
       builtin
-        ? row.kind !== 'builtin' || row.base !== builtin.base || row.secret_ref !== null
+        ? row.kind !== builtin.kind || row.base !== builtin.base || row.secret_ref !== null
         : !['copy', 'custom'].includes(str(row.kind)) ||
           (row.kind === 'custom') !== (row.base === 'generic') ||
           !['claude', 'cursor', 'kimi', 'generic'].includes(str(row.base))

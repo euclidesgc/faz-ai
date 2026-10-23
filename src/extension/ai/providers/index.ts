@@ -32,6 +32,7 @@ export function providerFor(executor: AiExecutor): AiProvider {
     if (!isAiBase(profile.id) || profile.base !== profile.id) throw new Error('Perfil pronto inválido.');
     return PROVIDERS[profile.id];
   }
+  // o agente ACP pronto segue o caminho do personalizado: o gateway troca o provider pelo transporte ACP
   const errors = validateProfile(profile);
   if (errors.length) throw new Error(errors.join(' '));
   return profile.kind === 'copy' && isAiBase(profile.base) ? copyOf(PROVIDERS[profile.base], profile) : genericProvider(profile);

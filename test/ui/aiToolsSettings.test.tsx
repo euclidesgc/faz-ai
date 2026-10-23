@@ -49,6 +49,30 @@ describe('Ferramentas de IA', () => {
     expect(within(profileCard('Cursor')).getByText('Não encontrada')).toBeInTheDocument();
   });
 
+  it('agente ACP pronto: desligado, com o link da página oficial, sem Editar nem Apagar', async () => {
+    show();
+    act(() =>
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: {
+            type: 'aiProfiles.status',
+            profiles: { gemini: { found: false, version: null, signedIn: null, installUrl: 'https://geminicli.com/docs/cli/acp-mode' } },
+          },
+        }),
+      ),
+    );
+    const gemini = within(profileCard('Gemini CLI'));
+    expect(gemini.getByText('Agente ACP')).toBeInTheDocument();
+    expect(gemini.getByRole('switch', { name: 'Ligado' })).not.toBeChecked();
+    expect(gemini.getByRole('switch', { name: 'Ligado' })).toBeEnabled();
+    expect(gemini.getByRole('link', { name: 'Instalar' })).toHaveAttribute('href', 'https://geminicli.com/docs/cli/acp-mode');
+    expect(gemini.queryByRole('button', { name: 'Editar' })).toBeNull();
+    expect(gemini.queryByRole('button', { name: 'Apagar' })).toBeNull();
+    await userEvent.click(gemini.getByRole('switch', { name: 'Ligado' }));
+    expect(lastSent('settings.aiProfiles.setEnabled')).toMatchObject({ id: 'gemini', enabled: true });
+    confirmLast();
+  });
+
   it('formulário novo exige nome e comando e mostra avisos de argumento no Windows e MCP nenhum', async () => {
     show();
     await userEvent.click(screen.getByRole('button', { name: 'Novo perfil' }));

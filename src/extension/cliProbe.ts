@@ -1,4 +1,4 @@
-import type { AiProfile } from '../shared/aiProfiles';
+import { isCatalogProfile, type AiProfile } from '../shared/aiProfiles';
 import { redactCredentialValues } from './credentials';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -112,14 +112,14 @@ export function profileCanProbe(profile: AiProfile): boolean {
   return (
     profile.enabled &&
     profile.credentials?.review !== 'pending' &&
-    (profile.kind === 'builtin' || (profile.credentials?.review === 'reviewed' && profile.credentials.available))
+    (isCatalogProfile(profile) || (profile.credentials?.review === 'reviewed' && profile.credentials.available))
   );
 }
 async function runProfileQuery(profile: AiProfile, executable: string, args: string[], options: ProfileProbeOptions): Promise<CliRun> {
   if (!profileCanProbe(profile)) return { code: null, stdout: '', stderr: '' };
   return runCli(executable, args, options.pathEnv, 20000, options.cwd, {
     noShell: true,
-    env: profile.kind === 'builtin' ? undefined : profile.config.env,
+    env: isCatalogProfile(profile) ? undefined : profile.config.env,
   });
 }
 /** Retorna somente a versão, nunca saída bruta que possa revelar credenciais. Não é prova de isolamento. */
@@ -138,6 +138,8 @@ export async function profileSignedIn(
   options: ProfileProbeOptions = {},
 ): Promise<boolean | null> {
   if (!profileCanProbe(profile)) return null;
+  // o agente ACP pronto não tem comando de status; o login pela tela (authMethods) é outra história da épica
+  if (profile.kind === 'acp') return null;
   if (profile.kind === 'custom') {
     const args = profile.config.statusArgs?.trim().split(/\s+/).filter(Boolean);
     if (!args?.length) return null;

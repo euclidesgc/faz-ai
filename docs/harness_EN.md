@@ -44,7 +44,8 @@ promise a percentage: it shows, in the inventory, what is being loaded.
 ## Connecting the AI tool
 
 1. In Settings → **Ferramentas de IA** (AI tools), choose the project's default CLI profile. Claude
-   Code, Cursor and Kimi Code are built in; you can also create copies and custom profiles. The
+   Code, Cursor and Kimi Code are built in, and the catalog's ACP agents (Gemini CLI, Codex,
+   OpenCode…) come built in and switched off; you can also create copies and custom profiles. The
    default only applies when nothing indicates another: the CLI of each run comes from the chosen
    model (see [Which CLI runs](configuracoes_EN.md#which-cli-runs)). You can switch the active
    profile in **Harness → Ferramenta e execução** (Tool and execution).
