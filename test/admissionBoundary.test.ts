@@ -121,6 +121,9 @@ describe('fronteira da admissão do board', () => {
     const reviewed = request({ regime: 'compatible', compatibilityReview: { actor: 'person', revision: 1 } });
     const admitted = admission.prepare(acp, acp.id, input(), dir, reviewed);
     expect(admitted.transport).toBe('acp');
+    // agente só com nome (sem definição) no ACP não é descoberta nativa: o nome é zerado e a execução é admitida
+    const named: HeadlessInput = { ...input(), exec: { agent: 'restrito', agentDefinition: null } as HeadlessInput['exec'] };
+    expect(admission.prepare(acp, acp.id, named, dir, reviewed).transport).toBe('acp');
     expect(admitted.acpCommand({ command: 'gemini', args: ['--acp', '--skip-trust'] }).command).toBe(
       fs.realpathSync(path.join(dir, 'gemini')),
     );

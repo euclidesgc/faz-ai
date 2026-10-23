@@ -230,6 +230,8 @@ export class ExecutionAdmission {
         mcpConfig: JSON.stringify({ mcpServers: servers }),
       },
     });
+    // o transporte ACP não tem descoberta nativa de agente: o agente já segue pelo pedido
+    if (transport === 'acp') effective.exec!.agent = '';
     if (effective.exec!.agent && !effective.exec!.agentDefinition)
       throw new Error('Agente obrigatório precisa de definição do board; descoberta nativa não é permitida.');
     if (effective.exec!.agentDefinition) {
