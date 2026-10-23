@@ -43,14 +43,19 @@ const input = (over: Partial<HeadlessInput> = {}): HeadlessInput => ({
 });
 
 /** Servidores MCP falsos: cada um com as suas ferramentas e um registro do que o board chamou. */
-function fakeMcp(tools: Record<string, McpTool[]>, results: Record<string, (args: any, signal: AbortSignal) => Promise<any> | any> = {}) {
+function fakeMcp(
+  tools: Record<string, McpTool[]>,
+  results: Record<string, (args: any, signal: AbortSignal) => Promise<any> | any> = {},
+  /** a listagem de um servidor no lugar da lista fixa (falha, demora) */
+  lists: Record<string, (signal?: AbortSignal) => Promise<McpTool[]>> = {},
+) {
   const calls: { server: string; tool: string; args: unknown }[] = [];
   const connected: string[] = [];
   const closed: string[] = [];
   const connect: McpConnect = async (server) => {
     connected.push(server);
     const connection: McpConnection = {
-      listTools: async () => tools[server] ?? [],
+      listTools: async (signal) => (lists[server] ? lists[server](signal) : (tools[server] ?? [])),
       callTool: async (tool, args, signal) => {
         calls.push({ server, tool, args });
         const fn = results[`${server}/${tool}`];
@@ -255,6 +260,69 @@ describe('Gemini pela API: o ciclo de chamadas de função', () => {
     expect(lines.join('\n')).not.toContain(KEY);
   });
 
+  it('a chave ecoada atravessando o limite do corte (300) não deixa pedaço dela passar', async () => {
+    // a chave começa perto do fim do que cabe: cortar antes de mascarar deixaria o começo dela no log
+    const echoed = `${'x'.repeat(290)} ${KEY} fim`;
+    server = await fakeGemini([{ status: 400, json: { error: { status: 'INVALID_ARGUMENT', message: echoed } } }]);
+    const { exit, lines } = start({ connect: fakeMcp(TOOLS).connect });
+    const end = await exit;
+    for (const text of [end.error!.message, ...lines]) {
+      expect(text).not.toContain(KEY.slice(0, 8));
+    }
+    // mascarada antes do corte: o que o corte leva é o pedaço da máscara, não o da chave
+    expect(end.error!.message).toMatch(/x \[chave/);
+  });
+
+  it('o texto do modelo que repete a chave sai do log mascarado, mesmo cortado no meio dela', async () => {
+    server = await fakeGemini([modelTurn([{ text: `${'y'.repeat(295)}${KEY}` }])]);
+    const { exit, lines } = start({ connect: fakeMcp(TOOLS).connect });
+    expect((await exit).code).toBe(0);
+    expect(lines.join('\n')).not.toContain(KEY.slice(0, 8));
+  });
+
+  it('um MCP do card que falha ao listar as ferramentas fica de fora, com o motivo no log; o do board, não', async () => {
+    server = await fakeGemini([modelTurn([{ text: 'ok' }])]);
+    const docsFails = fakeMcp(TOOLS, {}, { docs: () => Promise.reject(new Error('lista quebrada')) });
+    const ok = start({ connect: docsFails.connect });
+    expect((await ok.exit).code).toBe(0);
+    expect(server.requests[0]!.body.tools[0].functionDeclarations.map((d: { name: string }) => d.name)).toEqual([
+      'mcp__faz-ai__get_card',
+      'mcp__faz-ai__add_comment',
+    ]);
+    expect(ok.lines).toContain('Servidor MCP docs não listou as ferramentas: lista quebrada. A execução segue sem ele.');
+    // a conexão que falhou ao listar também é fechada no fim
+    expect(docsFails.closed.sort()).toEqual(['docs', 'faz-ai']);
+    const boardFails = start({ connect: fakeMcp(TOOLS, {}, { 'faz-ai': () => Promise.reject(new Error('sem lista')) }).connect });
+    const end = await boardFails.exit;
+    expect(end.code).toBe(1);
+    expect(end.error?.message).toBe('O servidor do board não listou as ferramentas: sem lista');
+  });
+
+  it('Parar durante a listagem das ferramentas: o sinal chega à listagem e a execução termina na hora', async () => {
+    server = await fakeGemini([]);
+    let listing!: () => void;
+    const started = new Promise<void>((r) => (listing = r));
+    const slow = fakeMcp(
+      TOOLS,
+      {},
+      {
+        // só termina se receber o Parar: sem o sinal, a execução ficaria presa aqui
+        docs: (signal) =>
+          new Promise((_resolve, reject) => {
+            listing();
+            signal?.addEventListener('abort', () => reject(new Error('listagem abortada')));
+          }),
+      },
+    );
+    const { measured, exit } = start({ connect: slow.connect });
+    await started;
+    const at = Date.now();
+    measured.proc.kill();
+    expect(await exit).toEqual({ code: 143, error: undefined });
+    expect(Date.now() - at).toBeLessThan(1000);
+    expect(server.requests).toEqual([]);
+  });
+
   it('limite de pedidos: o modelo que não para de chamar funções termina com falha', async () => {
     server = await fakeGemini(() => modelTurn([{ functionCall: { name: 'mcp__faz-ai__get_card', args: {} } }]));
     const { exit } = start({ connect: fakeMcp(TOOLS).connect, maxTurns: 3 });
@@ -363,6 +431,13 @@ describe('Gemini pela API: recusas antes do primeiro pedido e o vínculo', () =>
     expect((refused as Error).message).toBe(
       'A API do Gemini recusou a chave (HTTP 400, INVALID_ARGUMENT): API key [chave da API] not valid. Please pass a valid API key.',
     );
+  });
+
+  it('a conferência da chave: a chave ecoada atravessando o limite do corte sai mascarada inteira', async () => {
+    server = await fakeGemini([{ status: 400, json: { error: { status: 'INVALID_ARGUMENT', message: `${'z'.repeat(292)} ${KEY}` } } }]);
+    const refused = (await createGeminiApiDriver({ endpoint: server.endpoint }).apiModels!(KEY).catch((e: Error) => e)) as Error;
+    expect(refused.message).toContain('HTTP 400, INVALID_ARGUMENT');
+    expect(refused.message).not.toContain(KEY.slice(0, 8));
   });
 
   it('a decisão de cada função: servidor fora da execução, delegação e o escopo de operações do contrato', () => {

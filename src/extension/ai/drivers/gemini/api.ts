@@ -35,6 +35,7 @@ import { boardSelfTransport } from '../../../mcp/selfClient';
 import { boardDecision, type AcpDecision } from '../../acp/run';
 import { apiBinding, apiEndpoint } from '../../apiBinding';
 import type { ModelOption } from '../../../../shared/models';
+import { maskApiKey } from '../../../toolKeys';
 import type { ExecutorContext, ToolDriver } from '../types';
 
 /** A raiz da API do Gemini (a versão `v1beta`, a que tem `systemInstruction`, ferramentas e o pensamento). */
@@ -81,7 +82,8 @@ export interface McpToolResult {
 }
 /** Uma conexão MCP aberta pelo board, como cliente. */
 export interface McpConnection {
-  listTools(): Promise<McpTool[]>;
+  /** as ferramentas do servidor; o `signal` é o Parar da execução (a listagem para entre as páginas e no pedido) */
+  listTools(signal?: AbortSignal): Promise<McpTool[]>;
   callTool(name: string, args: Json, signal: AbortSignal): Promise<McpToolResult>;
   /** as instruções que o servidor dá a todo cliente no `initialize` */
   instructions(): string | undefined;
@@ -140,11 +142,12 @@ export async function clientConnection(transport: Transport): Promise<McpConnect
   const client = new Client({ name: API_CLIENT_NAME, title: LABEL, version: EXTENSION_VERSION });
   await client.connect(transport, { timeout: 15_000 });
   return {
-    listTools: async () => {
+    listTools: async (signal) => {
       const tools: McpTool[] = [];
       let cursor: string | undefined;
       do {
-        const page = await client.listTools({ cursor }, { timeout: 15_000 });
+        signal?.throwIfAborted();
+        const page = await client.listTools({ cursor }, { timeout: 15_000, signal });
         tools.push(...(page.tools as McpTool[]));
         cursor = page.nextCursor;
       } while (cursor && tools.length < 1000);
@@ -221,7 +224,7 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
   const endpoint = apiEndpoint(o.endpoint);
   const url = `${endpoint}/models/${encodeURIComponent(model)}:generateContent`;
   /** nenhuma mensagem que sai daqui repete a chave, nem a que veio de fora (rede, servidor MCP) */
-  const scrub = (text: string): string => text.split(key).join('[chave da API]');
+  const scrub = (text: string): string => maskApiKey(text, key, '[chave da API]');
 
   const listeners: ((code: number | null, error?: Error) => void)[] = [];
   const stop = new AbortController();
@@ -295,9 +298,22 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
           continue;
         }
         connections.push(connection);
+        stopped();
         const note = connection.instructions();
         if (server === BOARD_SERVER && note) instructions.push(`Instruções do servidor MCP ${server}:\n${note}`);
-        for (const tool of await connection.listTools()) {
+        // a listagem obedece ao Parar (o sinal vai a cada página); uma falha nela é tratada como a da conexão
+        let tools: McpTool[];
+        try {
+          tools = await connection.listTools(stop.signal);
+        } catch (e) {
+          stopped();
+          const why = e instanceof Error ? e.message : String(e);
+          if (server === BOARD_SERVER) return fail(`O servidor do board não listou as ferramentas: ${why}`);
+          ctx.log(scrub(`Servidor MCP ${server} não listou as ferramentas: ${why}. A execução segue sem ele.`));
+          continue;
+        }
+        stopped();
+        for (const tool of tools) {
           // a decisão antes de declarar: a ferramenta que o card não admite nunca chega ao modelo
           if (!apiCallDecision(input, names, server, tool.name).allow) continue;
           const wanted = mcpOperation(server, tool.name);
@@ -342,7 +358,7 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
               `A API do Gemini recusou o pedido por limite de uso (HTTP 429${err?.status ? `, ${err.status}` : ''})${err?.retryDelay ? `; tente de novo em ${err.retryDelay}` : ''}.`,
             );
           return fail(
-            `A API do Gemini recusou o pedido (HTTP ${res.status}${err?.status ? `, ${err.status}` : ''}): ${cut(err?.message || res.text, 300)}`,
+            `A API do Gemini recusou o pedido (HTTP ${res.status}${err?.status ? `, ${err.status}` : ''}): ${cut(scrub(err?.message || res.text), 300)}`,
           );
         }
         let data: Json;
@@ -376,7 +392,8 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
           const text = part.thought === true ? null : asText(part.text);
           if (!text) continue;
           answer.push(text);
-          for (const line of text.split('\n')) if (line.trim()) ctx.log(cut(line, 300));
+          // mascarar antes de cortar: o corte no meio da chave deixaria um pedaço dela passar
+          for (const line of scrub(text).split('\n')) if (line.trim()) ctx.log(cut(line, 300));
         }
         const calls = parts.map((p) => asObject(p.functionCall)).filter((c): c is Json => !!c);
         if (!calls.length) {
@@ -395,7 +412,7 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
           const target = byName.get(name);
           let response: Json;
           if (!target) {
-            ctx.log(`${LABEL} chamou ${cut(name, 120)}: negado (a função não foi declarada pelo board).`);
+            ctx.log(`${LABEL} chamou ${cut(scrub(name), 120)}: negado (a função não foi declarada pelo board).`);
             response = { error: `A função ${name} não existe nesta execução.` };
           } else {
             // a mesma decisão da declaração, de novo na hora: nada muda no meio da execução sem passar por ela
@@ -485,7 +502,7 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
  */
 async function listApiModels(apiKey: string, o: Required<GeminiApiOptions>): Promise<ModelOption[]> {
   const endpoint = apiEndpoint(o.endpoint);
-  const scrub = (text: string): string => text.split(apiKey).join('[chave da API]');
+  const scrub = (text: string): string => maskApiKey(text, apiKey, '[chave da API]');
   const options: ModelOption[] = [];
   let pageToken: string | null = null;
   for (let page = 0; page < 20; page++) {
@@ -507,7 +524,7 @@ async function listApiModels(apiKey: string, o: Required<GeminiApiOptions>): Pro
       const err = apiError(text);
       throw new Error(
         scrub(
-          `A API do Gemini recusou a chave (HTTP ${status}${err?.status ? `, ${err.status}` : ''})${err?.message ? `: ${cut(err.message, 300)}` : ''}`,
+          `A API do Gemini recusou a chave (HTTP ${status}${err?.status ? `, ${err.status}` : ''})${err?.message ? `: ${cut(scrub(err.message), 300)}` : ''}`,
         ),
       );
     }

@@ -93,7 +93,14 @@ função diverge entre as páginas do Vertex (64) e a referência REST atual (12
   chave de toda mensagem que vem de fora, inclusive a do servidor que a repete), no `ai_runs`, na
   evidência (só o digest, dentro do hash do vínculo), na tela (a configuração pública é vazia),
   na exportação (a linha do pronto não tem `secret_ref` e a configuração não vai no arquivo) nem na
-  URL. Os testes leem cada uma dessas superfícies.
+  URL. Os testes leem cada uma dessas superfícies. Toda mensagem é mascarada antes de cortada (um corte
+  no meio da chave deixaria o começo dela passar), e `maskApiKey` (`toolKeys.ts`) também tira o começo da
+  chave cortado por outra camada (no fim do texto ou antes de "…"), no laço, na conferência e no Conectar.
+- **Revisão do #375.** Uma falha ao listar as ferramentas de um MCP do card é tratada como a da conexão
+  (as ferramentas dele ficam de fora, com o motivo no log; a do servidor do board encerra a execução); a
+  listagem recebe o sinal do Parar e confere o Parar entre as páginas; e o validador
+  `AdmittedExecution.api()` relê, antes de cada pedido e de cada chamada, a prova por construção que
+  admitiu a execução: removida, alterada ou vencida no meio do laço, o próximo pedido não sai.
 
 ## O Conectar do cartão API (sobre a história 7)
 

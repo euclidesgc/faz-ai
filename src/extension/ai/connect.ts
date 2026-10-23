@@ -13,7 +13,7 @@ import { isAcpProfile, isReadyProfile, modeLabel, verifiableProfile, type AiProf
 import { toolModeEntry, type ToolMode } from '../../shared/aiTools';
 import { regimeFromEvidence, type ConnectInput, type ConnectState, type ConnectStep, type ConnectSummary } from '../../shared/connect';
 import type { CapabilityEvidence } from '../../shared/executionAdmission';
-import { parseApiKey } from '../toolKeys';
+import { maskApiKey, parseApiKey } from '../toolKeys';
 import type { AcpAuth } from './acp/provider';
 import { acpLoginHint } from './acp/provider';
 import { acpAgent } from './acp/agents';
@@ -244,7 +244,8 @@ export class Connector {
           else throw new Error(`${profile.name}: o login por chave não tem método neste modo.`);
         } catch (e) {
           // a chave recusada não chega ao cofre, então a ocultação dele não a conhece: mascara aqui
-          throw new Error(message(e).split(apiKey).join('[credencial local]'));
+          // inclusive o começo dela, se outra camada cortou a mensagem no meio da chave
+          throw new Error(maskApiKey(message(e), apiKey));
         }
       };
       try {

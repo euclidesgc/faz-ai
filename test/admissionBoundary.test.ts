@@ -706,6 +706,29 @@ describe('admissão do modo API (história 9)', () => {
     expect(() => admission.prepare(claudeApi, 'claude', apiInput(), dir, request())).toThrow('ainda não roda nesta versão');
   });
 
+  it('antes de cada pedido o validador relê a prova: removida ou vencida no meio do laço, o próximo pedido não sai', () => {
+    let at = now;
+    const timed = new ExecutionAdmission({
+      pathEnv: () => dir,
+      homeDir: dir,
+      evidence: store,
+      now: () => at,
+      environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
+      apiKey: () => API_KEY,
+    });
+    const p = apiProfile();
+    const admitted = timed.prepare(p, 'gemini', apiInput(), dir, request());
+    expect(() => admitted.api()).not.toThrow();
+    // vencida (a validade é de 14 dias)
+    at = now + 15 * 24 * 60 * 60 * 1000;
+    expect(() => admitted.api()).toThrow('A prova do modo API perdeu a validade durante a execução');
+    // removida
+    at = now;
+    expect(() => admitted.api()).not.toThrow();
+    fs.rmSync(path.join(dir, 'evidence'), { recursive: true, force: true });
+    expect(() => admitted.api()).toThrow(/perdeu a validade durante a execução \(conversation, artifacts, permissions, mcp, delegation\)/);
+  });
+
   it('o host só afirma o que o laço garante: um check sem garantia deixa a capacidade parcial e a execução bloqueada', () => {
     const partial = admissionWith({
       ...apiExecutor(),

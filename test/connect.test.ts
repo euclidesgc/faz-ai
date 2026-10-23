@@ -401,6 +401,28 @@ describe('Conectar o Gemini pelo cartão API (história 10): o mesmo perfil, o m
     expect(h.profiles.get('gemini')!.mode).toBe('acp');
   });
 
+  it('a recusa que outra camada cortou no meio da chave sai sem pedaço dela (no ACP e na API)', async () => {
+    // o erro já chega cortado com reticências, no meio da chave: o Conectar mascara também o começo dela
+    const cutAt = (key: string) => `${'w'.repeat(280)} ${key.slice(0, 14)}…`;
+    const acp = host({
+      authenticate: async (_p, _e, auth) => {
+        throw new Error(cutAt(auth.apiKey));
+      },
+    });
+    const viaAcp = await acp.connector.connect('gemini', { apiKey: KEY });
+    expect(viaAcp.error).toMatch(/\[credencial local\]…$/);
+    expect(viaAcp.error).not.toContain(KEY.slice(0, 8));
+    const api = host({
+      locate: () => null,
+      checkApiKey: async (_p, key) => {
+        throw new Error(cutAt(key));
+      },
+    });
+    const viaApi = await api.connector.connect('gemini', { mode: 'api', apiKey: KEY });
+    expect(viaApi.error).not.toContain(KEY.slice(0, 8));
+    expect(JSON.stringify([...acp.published, ...api.published])).not.toContain(KEY.slice(0, 8));
+  });
+
   it('um modo que a ferramenta não oferece é recusado', async () => {
     await expect(host().connector.connect('gemini', { mode: 'cli' })).rejects.toThrow('o modo CLI não é oferecido');
     await expect(host().connector.connect('claude', { mode: 'api' })).rejects.toThrow('o modo API não é oferecido');

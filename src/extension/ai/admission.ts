@@ -487,6 +487,19 @@ export class ExecutionAdmission {
       api: () => {
         if (transport !== 'api') throw new Error(`A admissão é ${TRANSPORT_OF[transport]}, não do modo API.`);
         rebound();
+        // a prova que admitiu a execução ainda vale: removida, alterada ou vencida no meio do laço, o próximo
+        // pedido não sai (a execução seguinte afirma de novo, na admissão). `load` lança na prova alterada
+        const evidence = this.options.evidence.load(isolation.binding);
+        const at = this.options.now?.() ?? Date.now();
+        const lost = decision.capabilities
+          .filter((c) => c.state === 'verified')
+          .filter(
+            (c) =>
+              assessCapability(c.capability, isolation.binding, evidence, at, API_CAPABILITY_CHECKS, evidenceSource('api')).state !==
+              'verified',
+          );
+        if (lost.length)
+          throw new Error(`A prova do modo API perdeu a validade durante a execução (${lost.map((c) => c.capability).join(', ')}).`);
       },
       acpCommand: (command) => {
         if (transport !== 'acp') throw new Error(`A admissão é ${TRANSPORT_OF[transport]}, não de um agente ACP.`);

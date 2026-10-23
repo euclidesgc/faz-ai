@@ -26,6 +26,23 @@ export function parseApiKey(raw: unknown): { key: string } | { error: string } {
   return { key };
 }
 
+/**
+ * Mascara a chave num texto que pode ter vindo de fora (o erro de um servidor que a ecoa). Além da chave
+ * inteira, o começo dela cortado no fim do texto ou antes de "…" (o corte de uma mensagem longa feito antes
+ * de chegar aqui): um pedaço da chave já identifica a conta. Quem corta mensagens mascara antes de cortar;
+ * isto é a defesa para o corte que não é nosso (o de outra camada).
+ */
+export function maskApiKey(text: string, key: string, mask = '[credencial local]'): string {
+  if (!key) return text;
+  let out = text.split(key).join(mask);
+  for (let len = key.length - 1; len >= 8; len--) {
+    const prefix = key.slice(0, len);
+    out = out.split(`${prefix}…`).join(`${mask}…`);
+    if (out.endsWith(prefix)) out = out.slice(0, -prefix.length) + mask;
+  }
+  return out;
+}
+
 export class ToolKeys {
   constructor(
     private readonly store: CredentialStore,
