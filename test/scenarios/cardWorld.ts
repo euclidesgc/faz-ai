@@ -24,7 +24,11 @@ import { MessageRouter } from '../../src/extension/panel/messageRouter';
 import { AiRunner } from '../../src/extension/runner';
 import type { AiRunEnd } from '../../src/extension/ai/gateway';
 import { ACP_CAPABILITY_CHECKS, EXECUTOR_CAPABILITIES } from '../../src/shared/executionAdmission';
-import type { RunnerPermission } from '../../src/shared/runner';
+import { admissionRegimeOf, type RunnerPermission } from '../../src/shared/runner';
+import type { AiProfile } from '../../src/shared/aiProfiles';
+import { driverOf } from '../../src/extension/ai/drivers';
+import { ToolKeys } from '../../src/extension/toolKeys';
+import { credentialsFor } from '../../src/extension/credentials';
 import { monthOf } from '../../src/shared/log';
 import type { ModelOption } from '../../src/shared/models';
 
@@ -46,7 +50,14 @@ export const GEMINI_MODEL: ModelOption = {
 
 export interface CardWorld {
   root: string;
+  /** a pasta do PATH do teste e a home falsa */
+  bin: string;
+  home: string;
   db: Database;
+  admission: ExecutionAdmission;
+  evidence: CapabilityEvidenceStore;
+  /** o cofre das chaves por ferramenta, sobre o cofre do banco do mundo (como o host) */
+  keys: ToolKeys;
   router: MessageRouter;
   runner: AiRunner;
   cardId: string;
@@ -73,6 +84,12 @@ export interface CardWorldOptions {
   boardDefault?: boolean;
   /** o processo do agente ACP; obrigatório no perfil ACP */
   spawnAcp?: AcpSpawnFn;
+  /**
+   * O perfil chega pronto pelo Conectar (história 7), não pelo atalho do teste: o mundo não liga o Gemini, não
+   * grava recibos, não liga o regime compatível do board e não escolhe o modelo do card. O gateway lê a chave
+   * do cofre (`keys`, o cofre do banco do mundo) e o regime da ciência por perfil, como o host.
+   */
+  viaConnect?: boolean;
 }
 
 export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
@@ -81,9 +98,16 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   const home = path.join(root, 'home');
   const bin = path.join(root, 'bin');
   for (const d of [project, home, bin]) fs.mkdirSync(d);
-  // o binário que a admissão resolve pelo PATH e cujo conteúdo entra no vínculo; nunca é executado
-  fs.writeFileSync(path.join(bin, 'gemini'), '#!/bin/sh\n# agente de teste: o processo é o falso, em memória\n', { mode: 0o755 });
+  // o binário que a admissão resolve pelo PATH e cujo conteúdo entra no vínculo; o processo é o falso, em
+  // memória. Pelo Conectar ele roda uma vez, para dizer a versão (`gemini --version`, como a 0.65.0)
+  const connect = options.viaConnect;
+  fs.writeFileSync(
+    path.join(bin, 'gemini'),
+    connect ? '#!/bin/sh\necho 0.65.0\n' : '#!/bin/sh\n# agente de teste: o processo é o falso, em memória\n',
+    { mode: 0o755 },
+  );
   const db = await openInMemory(WASM_DIR);
+  const keys = new ToolKeys(credentialsFor(db), path.join(root, 'tool-keys.json'));
   const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
     workspaceKey: 'ws',
     folderName: 'Projeto',
@@ -110,7 +134,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   // a pessoa liga o perfil pronto (ligar é a revisão dele), escolhe o regime compatível (revisado por ela) e a permissão.
   // O Claude Code segue padrão do board, e o card vai para o Gemini pelo campo Modelo, com um modelo que o
   // "Detectar modelos" trouxe da sessão ACP: é assim que o agente do board chega ao ACP com as ferramentas dele
-  if (options.profile === 'gemini') {
+  if (options.profile === 'gemini' && !connect) {
     router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: true });
     router.handle({
       type: 'settings.models.set',
@@ -124,7 +148,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
       runner: {
         defaultAgent: 'condutor-do-board',
         permission: options.permission ?? 'full',
-        ...(options.profile === 'gemini' ? { admissionRegime: 'compatible' } : {}),
+        ...(options.profile === 'gemini' && !connect ? { admissionRegime: 'compatible' } : {}),
       },
     },
   } as never);
@@ -137,7 +161,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
     evidence,
     environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
   });
-  if (options.profile === 'gemini') {
+  if (options.profile === 'gemini' && !connect) {
     // os recibos que o verificador do host gravaria para este agente: o ACP não prova os arquivos de
     // contexto próprios (`own-context-files`), por isso o perfil só roda no regime compatível. Como o
     // verificador, a prova é feita em `board`: ela vale para qualquer permissão do card (história 3)
@@ -178,6 +202,16 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
       return { kill: () => exit(143), onExit: (fn) => (exit = fn) };
     },
     spawnAcp: options.spawnAcp,
+    // como o host: a chave do cofre para o driver que entra por chave, e o regime da ciência do perfil
+    ...(connect
+      ? {
+          apiKey: (profile: AiProfile) => {
+            const driver = driverOf(profile);
+            return driver?.auth.kind === 'api-key' ? keys.get(driver.tool) : null;
+          },
+          regimeOf: (profileId: string) => admissionRegimeOf(router.snapshot().board.runner, profileId),
+        }
+      : {}),
   });
   const runner = new AiRunner(router, {
     gateway,
@@ -193,14 +227,19 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   const story = s.workflows.find((w) => w.kind === 'parent')!;
   const phase = s.columns.filter((c) => c.workflowId === story.id && c.aiActive).sort((a, b) => a.position - b.position)[0]!;
   const cardId = router.createCard({ typeId: s.cardTypes[0]!.id, columnId: phase.id, parentId: null, title: 'Card do cenário' });
-  if (options.profile === 'gemini' && !options.boardDefault) {
+  if (options.profile === 'gemini' && !options.boardDefault && !connect) {
     const field = s.fieldDefs.find((f) => f.kind === 'model')!;
     router.handle({ type: 'field.setValue', cardId, fieldId: field.id, value: GEMINI_MODEL.id });
   }
 
   return {
     root,
+    bin,
+    home,
     db,
+    admission,
+    evidence,
+    keys,
     router,
     runner,
     cardId,

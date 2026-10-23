@@ -6,7 +6,8 @@
 // Escrita à mão de propósito, no protótipo: são três dezenas de linhas, e o SDK oficial
 // (`@agentclientprotocol/sdk`) traria dependência nova para validar um desenho. Ver a lista do que
 // falta no registro de decisão (`docs/decisoes/acp-transporte-de-agentes.md`).
-import { asObject, asText, type Json } from '../../aiOutput/json';
+import { asList, asObject, asText, type Json } from '../../aiOutput/json';
+import type { AcpAuth } from './provider';
 
 /** O erro que o agente devolveu num pedido; `code` segue o JSON-RPC (e o ACP, para `auth_required`). */
 export class RpcError extends Error {
@@ -40,6 +41,25 @@ export interface RpcConnection {
   receive(line: string): boolean;
   /** O agente saiu: os pedidos sem resposta falham com este erro. */
   close(error: Error): void;
+}
+
+/**
+ * O login por chave pelo protocolo, logo depois do `initialize`: `authenticate` com o método que o agente
+ * anunciou em `authMethods` e a chave em `_meta["api-key"]` (o formato do Gemini CLI 0.65.0). Sem chave,
+ * nada é pedido (vale o login que o agente já tiver). Um agente que não anuncia o método também não recebe
+ * a chave: quem chama decide se isso é erro (o Conectar) ou se segue sem (a execução, como antes).
+ * A recusa do agente lança o `RpcError` dele, sem a chave na mensagem.
+ */
+export async function acpAuthenticate(
+  rpc: RpcConnection,
+  init: Json,
+  auth: AcpAuth | undefined,
+): Promise<'authenticated' | 'not-offered' | 'none'> {
+  if (!auth) return 'none';
+  const offered = asList(init.authMethods).some((m) => asText(asObject(m)?.id) === auth.methodId);
+  if (!offered) return 'not-offered';
+  await rpc.request('authenticate', { methodId: auth.methodId, _meta: { 'api-key': auth.apiKey } });
+  return 'authenticated';
 }
 
 export function rpcConnection(h: RpcHandlers): RpcConnection {

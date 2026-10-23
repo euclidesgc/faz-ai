@@ -50,6 +50,8 @@ export interface AiProfileRuntimeDeps {
   resolve?: typeof resolveProfileCommand;
   version?: typeof profileVersion;
   signedIn?: typeof profileSignedIn;
+  /** a chave da ferramenta está no cofre: é o login de quem entra por chave de API (o Gemini) */
+  hasApiKey?: (tool: string) => boolean;
 }
 
 /** Sondas e teste são assíncronos, portanto a HostBridge publica suas respostas; o router fica síncrono. */
@@ -73,7 +75,11 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
                 found = true;
                 [version, signedIn] = await Promise.all([
                   (deps.version ?? profileVersion)(profile, exe, { pathEnv: deps.pathEnv(), cwd: deps.cwd }),
-                  (deps.signedIn ?? profileSignedIn)(profile, exe, deps.homeDir, { pathEnv: deps.pathEnv(), cwd: deps.cwd }),
+                  (deps.signedIn ?? profileSignedIn)(profile, exe, deps.homeDir, {
+                    pathEnv: deps.pathEnv(),
+                    cwd: deps.cwd,
+                    ...(deps.hasApiKey ? { hasApiKey: deps.hasApiKey } : {}),
+                  }),
                 ]);
               }
             } catch {

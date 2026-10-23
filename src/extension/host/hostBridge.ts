@@ -215,6 +215,14 @@ export class HostBridge {
       case 'settings.aiProfiles.probe':
         this.post(await this.router.probeAiProfiles());
         return;
+      // o Conectar demora (achar a CLI, o login, as sondas, os modelos): o `done` só sai quando o fluxo para.
+      // A chave colada segue direto para o host, e a mensagem não é guardada nem repetida a ninguém
+      case 'settings.aiProfiles.connect':
+        await this.router.connectProfile(msg.id, {
+          ...(msg.apiKey !== undefined ? { apiKey: msg.apiKey } : {}),
+          ...(msg.acknowledge ? { acknowledge: true } : {}),
+        });
+        return;
       case 'settings.aiProfiles.test':
         this.post(await this.router.testAiProfile(msg.id));
         // o teste muda a evidência do perfil: o aviso do topo reflete o resultado sem recarregar

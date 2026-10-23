@@ -1,0 +1,252 @@
+// O Conectar no host (épica "ferramenta por modo", história 7): `connect(profileId)` leva um perfil do
+// catálogo de "a pessoa clicou em Conectar" a "Conectada", passo a passo, pelo driver da ferramenta:
+//
+//   locate → login (a chave de API no cofre e o `authenticate` do agente, ou a sonda de login da CLI) →
+//   verify (as sondas de capacidade gravam as provas do perfil; o regime sai delas) → ciência (só no regime
+//   compatível; grava a revisão do perfil) → modelos (o catálogo lido da ferramenta, com a data) → Conectada
+//
+// O que depende do host (processos, cofre, banco, verificador) chega por `ConnectorDeps`; o fluxo é o mesmo
+// para toda ferramenta, e a diferença entre elas é o `auth` do driver. Um passo que espera a pessoa (a chave,
+// a ciência) para o fluxo com `waiting`; um erro fica preso ao passo (`failed`), e "Tentar de novo" chama
+// `connect` outra vez. A chave nunca volta: nem no estado publicado, nem no erro (que passa por `redact`).
+import { isAcpProfile, verifiableProfile, type AiProfile } from '../../shared/aiProfiles';
+import { regimeFromEvidence, type ConnectState, type ConnectStep, type ConnectSummary } from '../../shared/connect';
+import type { CapabilityEvidence } from '../../shared/executionAdmission';
+import { parseApiKey } from '../toolKeys';
+import type { AcpAuth } from './acp/provider';
+import { acpLoginHint } from './acp/provider';
+import { acpAgent } from './acp/agents';
+import { driverOf, type ToolDriver } from './drivers';
+
+/** O que a tela manda junto do Conectar: a chave colada no campo, ou o clique na ciência do regime. */
+export interface ConnectInput {
+  apiKey?: string;
+  acknowledge?: boolean;
+}
+
+export interface ConnectorDeps {
+  /** o perfil público (sem o cofre) */
+  profile(id: string): AiProfile | null;
+  /** liga o perfil (é a revisão do perfil pronto): sem isso nada dele roda nem é sondado */
+  enable(id: string): void;
+  /** o perfil com o cofre aplicado, para o host resolver o comando e sondar */
+  resolve(id: string): AiProfile;
+  /** o executável do perfil no PATH do terminal (e nas pastas de instalação usuais), ou null */
+  locate(profile: AiProfile): string | null;
+  version(profile: AiProfile, executable: string): Promise<string | null>;
+  /** a sonda de login da CLI (`login-command`) */
+  signedIn(profile: AiProfile, executable: string): Promise<boolean | null>;
+  /** o cofre das chaves por ferramenta (`ToolKeys`) */
+  keys: { get(tool: string): string | null; set(tool: string, apiKey: string): void };
+  /** entrega a chave ao agente pelo `authenticate` (`acpSignIn`); lança com o motivo quando ele recusa */
+  authenticate(profile: AiProfile, executable: string, auth: AcpAuth): Promise<void>;
+  /** as sondas de capacidade do perfil, gravando as provas no vínculo dele (`BoardHost.verifyExecutor`) */
+  verify(profileId: string): Promise<{ evidence: CapabilityEvidence[]; authRequired?: boolean }>;
+  /** a revisão da ciência já gravada para o perfil, ou null */
+  reviewOf(profileId: string): number | null;
+  /** grava a ciência do perfil e devolve a revisão nova */
+  recordReview(profileId: string): number;
+  /** lê os modelos da ferramenta e os junta ao catálogo; null quando ela não lista (vale a lista embutida) */
+  listModels(profile: AiProfile, executable: string): Promise<number | null>;
+  /** grava o resumo da conexão concluída (versão, login, regime, modelos, data) */
+  save(profileId: string, summary: ConnectSummary): void;
+  /** o resumo da última conexão concluída, gravado */
+  saved(profileId: string): ConnectSummary | null;
+  /** publica o estado para a tela a cada passo */
+  publish(state: ConnectState): void;
+  /** mascara o que o cofre conhece (as chaves) numa mensagem */
+  redact(text: string): string;
+  log?(line: string): void;
+  now?(): number;
+}
+
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+export class Connector {
+  /** a última conexão de cada perfil nesta sessão (a em curso, a que espera a pessoa, a que falhou) */
+  private states = new Map<string, ConnectState>();
+  private running = new Map<string, Promise<ConnectState>>();
+
+  constructor(private readonly deps: ConnectorDeps) {}
+
+  /** Um Conectar deste perfil está em andamento: o host não dispara a verificação automática por cima dele. */
+  active(profileId: string): boolean {
+    return this.running.has(profileId);
+  }
+
+  /** O estado de cada perfil: a conexão desta sessão ou, sem ela, a última concluída que ficou gravada. */
+  snapshot(profileIds: readonly string[]): Record<string, ConnectState> {
+    const out: Record<string, ConnectState> = {};
+    for (const id of profileIds) {
+      const live = this.states.get(id);
+      const saved = live ? null : this.deps.saved(id);
+      if (live) out[id] = live;
+      else if (saved) out[id] = { profileId: id, step: 'models', status: 'connected', summary: saved };
+    }
+    return out;
+  }
+
+  /** Conecta (ou reconecta) o perfil. Dois cliques seguidos viram uma conexão só. */
+  connect(profileId: string, input: ConnectInput = {}): Promise<ConnectState> {
+    const running = this.running.get(profileId);
+    if (running) return running;
+    const done = this.flow(profileId, input).finally(() => this.running.delete(profileId));
+    this.running.set(profileId, done);
+    return done;
+  }
+
+  private async flow(profileId: string, input: ConnectInput): Promise<ConnectState> {
+    const { deps } = this;
+    const meta = deps.profile(profileId);
+    if (!meta) throw new Error(`Perfil indisponível neste board: ${profileId}.`);
+    const driver = driverOf(meta);
+    if (!driver) throw new Error(`${meta.name}: o Conectar é das ferramentas do catálogo; o perfil personalizado segue pelo formulário.`);
+    const previous = this.states.get(profileId);
+    // a ciência retoma de onde parou: as provas acabaram de ser gravadas, não há por que sondar de novo
+    const resume = input.acknowledge && previous?.status === 'waiting' && previous.step === 'review' ? previous.summary : null;
+    const state: ConnectState = { profileId, step: 'locate', status: 'running', summary: resume ? { ...resume } : {} };
+    const publish = () => {
+      this.states.set(profileId, structuredClone(state));
+      deps.publish(structuredClone(state));
+    };
+    const enter = (step: ConnectStep) => {
+      state.step = step;
+      state.status = 'running';
+      delete state.error;
+      delete state.needs;
+      publish();
+    };
+    const stop = (status: 'waiting' | 'failed', extra: Partial<ConnectState> = {}): ConnectState => {
+      Object.assign(state, { status }, extra);
+      if (state.error) state.error = deps.redact(state.error);
+      publish();
+      deps.log?.(
+        `Conectar ${meta.name}: ${status === 'failed' ? `falhou no passo ${state.step}` : `espera a pessoa no passo ${state.step}`}${state.error ? ` (${state.error})` : ''}.`,
+      );
+      return structuredClone(state);
+    };
+    try {
+      if (!meta.enabled) deps.enable(profileId);
+      const profile = deps.resolve(profileId);
+      enter('locate');
+      const executable = deps.locate(profile);
+      if (!executable)
+        return stop('failed', {
+          error: `O comando \`${driver.command}\` do ${meta.name} não está no PATH. Instale pela página oficial e tente de novo.`,
+          docs: driver.docs,
+        });
+      if (!resume) {
+        state.summary.version = await deps.version(profile, executable);
+        const step = { state, enter, stop };
+        const signIn = await this.signIn(driver, profile, executable, input, step);
+        if (signIn) return signIn;
+        enter('verify');
+        const verified = await this.verify(driver, profile, step);
+        if (verified) return verified;
+      }
+      enter('review');
+      if (state.summary.regime === 'compatible') {
+        const reviewed = input.acknowledge ? deps.recordReview(profileId) : deps.reviewOf(profileId);
+        if (!reviewed) return stop('waiting', { needs: 'review' });
+        state.summary.reviewed = reviewed;
+      } else state.summary.reviewed = null;
+      enter('models');
+      state.summary.models = await deps.listModels(profile, executable);
+      const summary: ConnectSummary = {
+        version: state.summary.version ?? null,
+        signIn: state.summary.signIn ?? 'unverified',
+        regime: state.summary.regime ?? null,
+        reviewed: state.summary.reviewed ?? null,
+        models: state.summary.models ?? null,
+        at: deps.now?.() ?? Date.now(),
+      };
+      deps.save(profileId, summary);
+      state.summary = summary;
+      state.status = 'connected';
+      publish();
+      deps.log?.(`Conectar ${meta.name}: conectada.`);
+      return structuredClone(state);
+    } catch (e) {
+      return stop('failed', { error: message(e) });
+    }
+  }
+
+  /** O passo do login, pelo `auth` do driver; devolve o estado quando o fluxo para aqui. */
+  private async signIn(
+    driver: ToolDriver,
+    profile: AiProfile,
+    executable: string,
+    input: ConnectInput,
+    { state, enter, stop }: Step,
+  ): Promise<ConnectState | null> {
+    const { deps } = this;
+    enter('signIn');
+    const auth = driver.auth;
+    if (auth.kind === 'api-key') {
+      if (input.apiKey !== undefined) {
+        const parsed = parseApiKey(input.apiKey);
+        if ('error' in parsed) return stop('waiting', { needs: 'api-key', error: parsed.error });
+        deps.keys.set(driver.tool, parsed.key);
+      }
+      const apiKey = deps.keys.get(driver.tool);
+      if (!apiKey) return stop('waiting', { needs: 'api-key' });
+      try {
+        await deps.authenticate(profile, executable, { methodId: auth.methodId, apiKey });
+      } catch (e) {
+        // a chave fica no cofre (pode ter sido a rede); o campo volta para a pessoa trocar se quiser
+        return stop('waiting', { needs: 'api-key', error: message(e) });
+      }
+      state.summary.signIn = 'api-key';
+      return null;
+    }
+    if (auth.kind === 'login-command') {
+      const signedIn = await deps.signedIn(profile, executable);
+      if (signedIn === false)
+        return stop('failed', {
+          error: `Entre na conta do ${profile.name} no terminal (\`${auth.command}\`) e tente de novo.`,
+          command: auth.command,
+        });
+      state.summary.signIn = signedIn ? 'signed-in' : 'unverified';
+      return null;
+    }
+    // o agente ACP sem login por chave entra pelo terminal; a verificação diz se ele recusa a sessão
+    state.summary.signIn = 'unverified';
+    return null;
+  }
+
+  /** O passo da verificação: grava as provas e tira o regime delas; devolve o estado quando o fluxo para aqui. */
+  private async verify(driver: ToolDriver, profile: AiProfile, { state, enter, stop }: Step): Promise<ConnectState | null> {
+    const summary = state.summary;
+    // sem sonda de capacidades (Cursor, Kimi Code): o regime não se aplica, e a ciência também não
+    if (!verifiableProfile(profile)) {
+      summary.regime = null;
+      return null;
+    }
+    const result = await this.deps.verify(profile.id);
+    if (result.authRequired) {
+      const agent = isAcpProfile(profile) ? acpAgent(String(profile.config.acpAgent)) : undefined;
+      if (driver.auth.kind === 'api-key') {
+        enter('signIn');
+        return stop('waiting', {
+          needs: 'api-key',
+          error: `${profile.name} recusou a sessão com a chave guardada. Confira a chave e tente de novo.`,
+        });
+      }
+      return stop('failed', { error: agent ? acpLoginHint(agent) : `${profile.name} pede login.` });
+    }
+    const regime = regimeFromEvidence(driver.transport, result.evidence);
+    if (!regime.regime)
+      return stop('failed', {
+        error: `${profile.name}: a verificação de capacidades não passou. Pendentes: ${regime.pending.join(', ') || 'checks ausentes'}.`,
+      });
+    summary.regime = regime.regime;
+    return null;
+  }
+}
+
+/** O que cada passo recebe do fluxo: o estado que ele preenche, a entrada num passo e a parada. */
+interface Step {
+  state: ConnectState;
+  enter(step: ConnectStep): void;
+  stop(status: 'waiting' | 'failed', extra?: Partial<ConnectState>): ConnectState;
+}

@@ -18,9 +18,12 @@ export function acpDriver(agent: AcpAgent): ToolDriver {
     docs: agent.docs,
     // o catálogo não traz instalador: a página oficial de cada agente explica
     install: () => [],
-    auth: { kind: 'acp-authenticate', terminal: agent.login },
-    // o agente não tem comando de status; o login pela tela (`authMethods`) é a história 7
-    signedIn: async () => null,
+    auth: agent.apiKeyAuth
+      ? { kind: 'api-key', methodId: agent.apiKeyAuth.methodId, terminal: agent.login }
+      : { kind: 'acp-authenticate', terminal: agent.login },
+    // o agente não tem comando de status. Com login por chave, a chave no cofre conta como login; sem ela,
+    // "não verificado" e não "sem login": o agente pode ter o login dele (`GEMINI_API_KEY`, o do terminal)
+    signedIn: async (probe) => (agent.apiKeyAuth && probe.hasApiKey ? true : null),
     measure: acpMeasure(agent),
     // o agente ACP fora do catálogo da tela (o do Cursor, o do Kimi Code) tem a linha do protocolo
     enforcement: toolModeEntry(agent.id, 'acp')?.enforcement ?? ACP_ENFORCEMENT,
@@ -33,6 +36,8 @@ export function acpDriver(agent: AcpAgent): ToolDriver {
         log: ctx.log,
         runId: ctx.runId,
         leaseCoordinationDir: ctx.leaseCoordinationDir,
+        // a chave do cofre vai no `authenticate` de cada processo; sem ela, vale o login que o agente tiver
+        ...(agent.apiKeyAuth && ctx.apiKey ? { auth: { methodId: agent.apiKeyAuth.methodId, apiKey: ctx.apiKey } } : {}),
       });
     },
     // no ACP o vínculo é o comando e os argumentos do agente: não há flags de isolamento, arquivo

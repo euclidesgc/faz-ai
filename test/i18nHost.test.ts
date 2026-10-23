@@ -229,6 +229,7 @@ describe('i18n do host: mensagens preenchidas', () => {
         defaultAgent: '',
         admissionRegime: 'exclusive',
         compatibilityReviewRevision: 0,
+        compatibilityReviews: {},
       },
       { offline: true, unsupported: null },
     );

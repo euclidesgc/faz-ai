@@ -18,6 +18,7 @@ import type { AiRunOrigin } from './log';
 import type { BranchKind, GitConfig, MainBranch } from './git';
 import type { UsageLimitState } from './usageLimit';
 import type { BranchRenamePending, RenameOutcome } from './branchRename';
+import type { ConnectState } from './connect';
 
 export type Id = string;
 
@@ -322,6 +323,11 @@ export interface BoardState {
   orphans: OrphanReport;
   /** o último Diagnóstico do ambiente; null antes de rodar a primeira vez */
   environment: EnvironmentReport | null;
+  /**
+   * O Conectar de cada perfil do catálogo (história 7): a conexão em curso, a que espera a pessoa ou falhou
+   * nesta sessão e, sem ela, a última concluída. Ausente no host sem o Conectar (o `faz-ai` sem a tela).
+   */
+  connections?: Record<string, ConnectState>;
   /** o Diagnóstico ainda não abriu sozinho nesta máquina: a interface abre a tela uma vez */
   environmentFirstRun: boolean;
   /** Preview of artifacts to import into the board. */

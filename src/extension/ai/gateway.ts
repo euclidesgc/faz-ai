@@ -170,6 +170,17 @@ export interface AiGatewayDeps {
   boardId: string;
   /** obrigatório: sem ele a execução não teria onde ser registrada */
   runLog: RunLog;
+  /**
+   * A chave de API do cofre para o perfil cujo driver entra por chave (o Gemini pelo ACP, história 7); null
+   * sem chave. Ela vai ao driver e é mascarada em toda linha do log, em toda mensagem de erro e no `ai_runs`.
+   */
+  apiKey?(profile: AiProfile): string | null;
+  /**
+   * O regime do pedido de admissão para o perfil que vai rodar: a ciência do perfil no Conectar, ou o regime
+   * do board (`admissionRegimeOf`). Quem monta o pedido não sabe o perfil final em todo caminho (o chat, o
+   * teste do perfil, o runner legado); o gateway sabe, e aplica aqui, num lugar só.
+   */
+  regimeOf?(profileId: string): Pick<StrictExecutionRequest, 'regime' | 'compatibilityReview'>;
   /** inicia o comando da CLI; é o único lugar que recebe um */
   spawn: SpawnFn;
 }
@@ -251,8 +262,11 @@ export class AiGateway {
     let privateAuthFailed = false;
     let conference: AiPrepared['conference'];
     const authTails = { stdout: '', stderr: '' };
+    /** a chave do cofre desta execução: mascarada aqui mesmo, sem depender de o cofre já a conhecer */
+    let apiKey: string | undefined;
     const redact = (text: string) => {
-      const safe = redactCredentialValues(text, profile?.config);
+      const masked = apiKey ? text.split(apiKey).join('[credencial local]') : text;
+      const safe = redactCredentialValues(masked, profile?.config);
       return this.deps.redact?.(this.deps.sessions?.redact(safe) ?? safe) ?? this.deps.sessions?.redact(safe) ?? safe;
     };
     const revoke = () => {
@@ -315,8 +329,10 @@ export class AiGateway {
       let admitted: AdmittedExecution | undefined;
       if (prepared.strict) {
         if (!this.deps.admission) throw new Error('Admissão por capacidades indisponível; execução v1 bloqueada.');
+        const { regime: _regime, compatibilityReview: _review, ...request } = prepared.strict.request;
+        const strict = this.deps.regimeOf ? { ...request, ...this.deps.regimeOf(prepared.strict.profileId) } : prepared.strict.request;
         try {
-          admitted = this.deps.admission.prepare(profile, prepared.strict.profileId, input, call.cwd, prepared.strict.request);
+          admitted = this.deps.admission.prepare(profile, prepared.strict.profileId, input, call.cwd, strict);
         } catch (e) {
           if (e instanceof AdmissionBlockedError)
             runLog.describe(runId, { ...config, permission: input.permission, mode: runMode(profile), admission: e.decision });
@@ -349,9 +365,11 @@ export class AiGateway {
       // o driver é a única diferença: o ciclo do log, a admissão e o cancelamento seguem iguais. Os dois
       // `spawn` levam as conferências do gateway; o driver usa o do transporte dele
       const spawnProcess = this.deps.spawnAcp;
+      apiKey = this.deps.apiKey?.(profile) ?? undefined;
       measured = executor.run(input, {
         profile,
         cwd: call.cwd,
+        ...(apiKey ? { apiKey } : {}),
         spawnAcp:
           spawnProcess &&
           ((command, cwd, out) => {

@@ -44,6 +44,13 @@ export const ACP_AGENTS: readonly AcpAgent[] = [
         ? null
         : { inputTokens: input, outputTokens: output, cacheReadTokens: 0, cacheWriteTokens: 0 };
     },
+    // lido no pacote 0.65.0 (`GeminiAgent.initialize` e `authenticate` em bundle/gemini-*.js): o
+    // `initialize` anuncia `gemini-api-key` com `_meta: { "api-key": { provider: "google" } }`, e o
+    // `authenticate` lê a chave de `_meta["api-key"]`, chama `refreshAuth` e grava só o
+    // `security.auth.selectedType`. A chave fica na memória do processo (`this.apiKey`): cada processo do
+    // agente (execução, sondagem, leitura de modelos) autentica de novo. Desde 18/06/2026 a conta individual
+    // Google entra pelo Antigravity; o Gemini CLI segue com chave de API (docs/decisoes/ferramenta-por-modo-gemini.md)
+    apiKeyAuth: { methodId: 'gemini-api-key' },
   },
   {
     id: 'antigravity-acp',

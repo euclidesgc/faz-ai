@@ -95,6 +95,37 @@ describe('o repositório sobe a revisão quando a pessoa liga o compatível', ()
     ctx.boards.updateBoard(ctx.boardId, { runner: { admissionRegime: 'compatible' } });
     expect(runner().compatibilityReviewRevision).toBe(2);
   });
+
+  it('a ciência por perfil do Conectar: só o host grava, e a tela não a escreve (história 7)', () => {
+    expect(ctx.boards.recordCompatibilityReview(ctx.boardId, 'gemini')).toBe(1);
+    expect(ctx.boards.recordCompatibilityReview(ctx.boardId, 'gemini')).toBe(2);
+    expect(runner().compatibilityReviews).toEqual({ gemini: 2 });
+    // o mesmo pedido de atualização que a tela manda não muda a ciência de ninguém
+    ctx.boards.updateBoard(ctx.boardId, { runner: { compatibilityReviews: { gemini: 99, claude: 1 }, heartbeat: true } });
+    expect(runner().compatibilityReviews).toEqual({ gemini: 2 });
+    // e o regime do board segue o que era
+    expect(runner().admissionRegime).toBe('exclusive');
+  });
+});
+
+describe('regime por perfil (história 7)', () => {
+  it('a ciência do perfil vale para ele; os outros seguem o regime do board', () => {
+    const runner = { ...DEFAULT_RUNNER, compatibilityReviews: { gemini: 3 } };
+    expect(admissionRegimeOf(runner, 'gemini')).toEqual({ regime: 'compatible', compatibilityReview: { actor: 'person', revision: 3 } });
+    expect(admissionRegimeOf(runner, 'claude')).toEqual({ regime: 'exclusive' });
+    expect(admissionRegimeOf(runner)).toEqual({ regime: 'exclusive' });
+    // quem ligou o compatível do board antes da história 7 continua com ele em todo perfil
+    const legacy = { ...runner, admissionRegime: 'compatible' as const, compatibilityReviewRevision: 2 };
+    expect(admissionRegimeOf(legacy, 'claude')).toEqual({ regime: 'compatible', compatibilityReview: { actor: 'person', revision: 2 } });
+  });
+  it('a leitura descarta id inválido e revisão que não é inteiro positivo', () => {
+    expect(
+      parseRunner('{"compatibilityReviews":{"gemini":2,"Nome Ruim":1,"claude":0,"kimi":1.5,"codex-acp":"3"}}').compatibilityReviews,
+    ).toEqual({
+      gemini: 2,
+    });
+    expect(parseRunner('{"compatibilityReviews":[1]}').compatibilityReviews).toEqual({});
+  });
 });
 
 describe('pedido de admissão do runtime legado para um perfil personalizado', () => {

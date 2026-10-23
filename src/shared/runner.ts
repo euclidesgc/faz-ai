@@ -51,6 +51,12 @@ export interface RunnerConfig {
    * (`compatibilityReview`), e sobe a cada vez que ela liga; 0 enquanto nunca ligou
    */
   compatibilityReviewRevision: number;
+  /**
+   * A ciência do regime compatível por perfil (história 7): o passo do Conectar em que a pessoa declara que
+   * entende o que a ferramenta carrega por conta própria. A revisão sobe a cada ciência e vale só para o
+   * perfil dela; quem grava é o host, no Conectar (a tela não manda o número, `BoardRepo` o descarta).
+   */
+  compatibilityReviews: Record<string, number>;
 }
 
 export const ADMISSION_REGIMES: { value: AdmissionRegime; label: string; hint: string }[] = [
@@ -67,15 +73,29 @@ export const ADMISSION_REGIMES: { value: AdmissionRegime; label: string; hint: s
 ];
 
 /**
- * O regime e a revisão que vão no pedido de admissão. No compatível a revisão é a contagem de vezes
- * que a pessoa o ligou (nunca zero: `parseRunner` garante); a admissão recusa qualquer outro ator.
+ * O regime e a revisão que vão no pedido de admissão. Com o perfil, vale primeiro a ciência dele no Conectar
+ * (`compatibilityReviews`, a revisão daquele perfil); sem ela, o regime do board, que até a história 7 a
+ * pessoa escolhia em Harness › Ferramenta e execução e que segue valendo para quem o ligou. No compatível a
+ * revisão nunca é zero (`parseRunner` garante); a admissão recusa qualquer outro ator.
  */
 export const admissionRegimeOf = (
-  runner: Pick<RunnerConfig, 'admissionRegime' | 'compatibilityReviewRevision'>,
-): { regime: AdmissionRegime; compatibilityReview?: { actor: 'person'; revision: number } } =>
-  runner.admissionRegime === 'compatible'
+  runner: Pick<RunnerConfig, 'admissionRegime' | 'compatibilityReviewRevision'> & Partial<Pick<RunnerConfig, 'compatibilityReviews'>>,
+  profileId?: string,
+): { regime: AdmissionRegime; compatibilityReview?: { actor: 'person'; revision: number } } => {
+  const own = profileId ? runner.compatibilityReviews?.[profileId] : undefined;
+  if (own) return { regime: 'compatible', compatibilityReview: { actor: 'person', revision: own } };
+  return runner.admissionRegime === 'compatible'
     ? { regime: 'compatible', compatibilityReview: { actor: 'person', revision: runner.compatibilityReviewRevision } }
     : { regime: 'exclusive' };
+};
+
+/** As ciências por perfil gravadas: só ids de perfil válidos com revisão inteira positiva. */
+function parseReviews(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return Object.fromEntries(
+    Object.entries(raw).filter(([id, n]) => /^[a-z0-9][a-z0-9-]{0,31}$/.test(id) && Number.isSafeInteger(n) && (n as number) > 0),
+  ) as Record<string, number>;
+}
 
 export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint: string }[] = [
   {
@@ -113,6 +133,7 @@ export const DEFAULT_RUNNER: RunnerConfig = {
   defaultAgent: '',
   admissionRegime: 'exclusive',
   compatibilityReviewRevision: 0,
+  compatibilityReviews: {},
 };
 
 /**
@@ -150,6 +171,7 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
     admissionRegime: regime,
     // compatível sem revisão não existe: a configuração gravada à mão vale como a primeira revisão
     compatibilityReviewRevision: Number.isSafeInteger(revision) && revision > 0 ? revision : regime === 'compatible' ? 1 : 0,
+    compatibilityReviews: parseReviews(raw.compatibilityReviews),
     autopilotPaused: raw.autopilotPaused === true,
     defaultAgent: typeof raw.defaultAgent === 'string' ? raw.defaultAgent.trim() : '',
     heartbeat: raw.heartbeat === true,

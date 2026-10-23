@@ -155,7 +155,10 @@ describe('acpSessionModels', () => {
 
   it('sem login, o erro diz como entrar em vez de abrir o navegador', async () => {
     const agent = fakeAgent(() => ({ error: { code: -32000, message: 'Authentication required' } }));
-    await expect(acpSessionModels(gemini, 'gemini-acp', '/tmp/x', { spawn: agent.spawn })).rejects.toThrow('Rode `gemini` no terminal');
+    // o Gemini entra pela chave de API, na tela do Conectar (história 7)
+    await expect(acpSessionModels(gemini, 'gemini-acp', '/tmp/x', { spawn: agent.spawn })).rejects.toThrow(
+      'Conectar ferramenta, com a chave de API',
+    );
   });
 });
 

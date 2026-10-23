@@ -24,8 +24,8 @@ import { executorProfile, type AiExecutor } from './providers';
 import { admissionAgent, VERIFIER_OBSERVED_ENV, type ExecutionAdmission } from './admission';
 import { canonical, type CapabilityEvidenceStore } from './capabilityEvidence';
 import { ACP_PROTOCOL_VERSION } from './acp/run';
-import { AUTH_REQUIRED, RpcError, rpcConnection } from './acp/connection';
-import { acpCommand, type AcpAgent, type AcpSpawnFn } from './acp/provider';
+import { AUTH_REQUIRED, RpcError, acpAuthenticate, rpcConnection } from './acp/connection';
+import { acpCommand, type AcpAgent, type AcpAuth, type AcpSpawnFn } from './acp/provider';
 import { version as EXTENSION_VERSION } from '../../../package.json';
 
 const API_KEY = 'fazai-local-verification-only';
@@ -280,6 +280,11 @@ export interface VerifierDeps {
   spawnAgent?: AcpSpawnFn;
   /** substituível em testes: o handshake do agente ACP */
   probeAcp?(binding: string): Promise<AcpProbeRun>;
+  /**
+   * A chave do cofre para o `authenticate` de cada handshake (o agente com login por chave não abre a sessão
+   * sem ela). Não entra no vínculo nem nos recibos: trocar a chave não muda o que a prova cobre.
+   */
+  acpAuth?: AcpAuth;
 }
 export interface VerifierResult {
   binding: string;
@@ -288,6 +293,8 @@ export interface VerifierResult {
   verified: boolean;
   /** o índice do vínculo da última prova por perfil não foi gravado; os recibos foram */
   indexError?: string;
+  /** o agente ACP recusou a sessão por falta de login (ou recusou a chave): o Conectar diz isso no passo do login */
+  authRequired?: boolean;
 }
 
 /** Executa as sondagens e grava as evidências. Recusa quando o ambiente gerenciado não pôde ser lido. */
@@ -301,9 +308,11 @@ export async function verifyExecutor(deps: VerifierDeps): Promise<VerifierResult
   const now = deps.now?.() ?? Date.now();
   const expected = agent ? ACP_CAPABILITY_CHECKS : CAPABILITY_CHECKS;
   let evidence: CapabilityEvidence[];
+  let authRequired = false;
   if (agent) {
     if (!deps.spawnAgent && !deps.probeAcp) throw new Error('Transporte ACP indisponível neste host.');
     const run = await (deps.probeAcp ?? (() => runAcpProbes(deps, agent, bound.executable)))(bound.binding);
+    authRequired = run.first.authRequired || run.second.authRequired;
     evidence = buildEvidence(bound.binding, evaluateAcpProbes(bound.binding, run), now, undefined, expected);
   } else {
     const run = await (deps.probe ?? ((binding) => runClaudeProbes(deps, bound.executable, binding)))(bound.binding);
@@ -320,7 +329,7 @@ export async function verifyExecutor(deps: VerifierDeps): Promise<VerifierResult
   } catch (e) {
     indexError = `O índice das provas por perfil não foi gravado (${e instanceof Error ? e.message : String(e)}); os recibos valem, mas o aviso de prova invalidada não aparece para este perfil.`;
   }
-  return { binding: bound.binding, evidence, verified, ...(indexError ? { indexError } : {}) };
+  return { binding: bound.binding, evidence, verified, ...(indexError ? { indexError } : {}), ...(authRequired ? { authRequired } : {}) };
 }
 
 /** A fixture neutraliza provedores/chaves: nunca usa nem reencaminha a autenticação da pessoa. */
@@ -602,6 +611,8 @@ async function acpHandshake(
     });
     result.protocolVersion = typeof init.protocolVersion === 'number' ? init.protocolVersion : null;
     result.agentCapabilities = asObject(init.agentCapabilities) ?? null;
+    // a recusa da chave volta como `auth_required`, como a sessão sem login
+    await acpAuthenticate(rpc, init, deps.acpAuth);
     const session = await rpc.request('session/new', {
       cwd,
       mcpServers: [{ name: 'allowed', command: server.command, args: server.args, env: [] }],

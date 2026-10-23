@@ -268,6 +268,12 @@ export type WebviewToHost =
   | { type: 'settings.aiProfiles.probe' }
   /** Faz um teste explícito, limitado a dois minutos, sem MCP nem ferramentas de alteração. */
   | { type: 'settings.aiProfiles.test'; id: string }
+  /**
+   * Conecta (ou reconecta) um perfil do catálogo pelo driver dele (história 7). `apiKey` é a chave colada no
+   * campo: vai só para o cofre do host e nunca volta. `acknowledge` é o clique na ciência do regime compatível.
+   * O estado de cada passo chega pelo `connections` do board.
+   */
+  | { type: 'settings.aiProfiles.connect'; id: string; apiKey?: string; acknowledge?: boolean }
   | { type: 'settings.models.set'; catalog: ModelOption[] }
   /**
    * relê os modelos da ferramenta (configuração local ou lista embutida) e os junta ao catálogo;
