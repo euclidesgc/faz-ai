@@ -441,10 +441,9 @@ export class ExecutionAdmission {
     if (transport === 'acp') {
       const valid = (t: unknown): t is string => typeof t === 'string' && !!t && !t.includes('\0');
       const cardDenied = (input.exec?.deniedTools ?? []).filter(valid);
-      // A lista do card (não vazia) também restringe. A decisão do ACP não lista nativas (`tools: []`: o
-      // protocolo não tem lista de allow), e a lista vazia leria como "sem restrição"; por isso vai a do card,
-      // inteira: um nome que ela lista e que também está negado (a delegação) continua negado, porque a negação
-      // decide primeiro, e um card que só lista MCP ou delegação não libera nenhuma nativa (fechar na dúvida).
+      // A lista do card vai para o registro e a conferência, no vocabulário do card (a decisão do ACP não lista
+      // nativas: o protocolo não tem lista de allow). Ela não recusa pedidos, como no modo API: o `boardDecision`
+      // impõe só as negadas, e um nome listado que também está negado (a delegação) continua negado.
       effective.exec!.tools = [...new Set((input.exec?.tools ?? []).filter(valid))];
       effective.exec!.deniedTools = [...new Set([...preliminary.deniedTools, ...cardDenied])];
     }

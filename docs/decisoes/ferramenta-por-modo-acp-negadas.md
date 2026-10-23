@@ -15,14 +15,17 @@ em `full` recebia "permitido" para um pedido de kind `execute`.
 ## Decisão
 
 - **A admissão leva as listas do card ao ACP** (`admission.ts`, `transport === 'acp'`): as negadas do card
-  somam às da delegação, e a lista `tools` do card vai inteira (no vocabulário do card). O registro da
-  admissão mostra o que o board impõe, como no modo API.
+  somam às da delegação, e a lista `tools` do card vai inteira (no vocabulário do card), para o registro e a
+  conferência. O registro da admissão mostra o que fica liberado, como no modo API.
 - **O `boardDecision` traduz o pedido para o vocabulário do card** pela mesma tabela da conferência
   (`ACP_KIND_EQUIVALENTS`, em `src/shared/runCheck.ts`). A regra é uma função só, `equivalentsBreach`, que a
-  conferência (`toolDeviates`) também usa: recusa quando algum equivalente está em `deniedTools` ou quando
-  nenhum está em `tools` (lista não vazia). Recusar é responder com a opção de rejeição (`reject_once`) do
-  pedido. Kind sem equivalente (`think`, `switch_mode`, `other`) ou desconhecido segue o nível, como antes.
-  `delete` e `move` têm `Bash` entre os equivalentes.
+  conferência (`toolDeviates`) também usa. Em tempo real só a negação é imposta: recusa quando algum
+  equivalente está em `deniedTools`, respondendo com a opção de rejeição (`reject_once`) do pedido. Kind sem
+  equivalente (`think`, `switch_mode`, `other`) ou desconhecido segue o nível, como antes. `delete` e `move`
+  têm `Bash` entre os equivalentes.
+- **A lista `tools` do card é conferida, não imposta**, como no modo API (história 11) e coerente com
+  `ACP_ENFORCEMENT.tools: 'advised'`. O pedido de um kind sem equivalente na lista é liberado pelo nível, e
+  a conferência acusa o desvio na conversa do card (`runCheckNotice`).
 - **O nome interno do Gemini CLI vale antes do kind.** O protocolo não tem campo com o nome da ferramenta
   (agentclientprotocol.com/protocol/tool-calls: `toolCallId`, `title`, `kind`, `rawInput`). No Gemini CLI
   0.65.0 (pacote instalado, lido em 2026-10-23) o `Turn` monta o id como `<nome>__<id>`
@@ -36,12 +39,14 @@ em `full` recebia "permitido" para um pedido de kind `execute`.
   `acpSessionMode` nunca pede o modo sem perguntas e o board responde cada pedido (a admissão recusa se
   pedisse).
 
+## Alternativa descartada
+
+- **Impor também a lista `tools` no pedido** (recusar o kind sem equivalente nela). Seria parcial: o que o
+  agente roda sem pedir permissão (a leitura, no modo padrão do Gemini) nem passa pelo board. E quebraria o
+  condutor do board no Gemini, que não lista `Edit`/`Write` e não tem subagentes para quem delegar a
+  edição. Ficaria também assimétrico com o modo API, onde a lista é só conferida.
+
 ## Consequências
 
-- O que o agente roda sem pedir permissão (a leitura, no modo padrão do Gemini) não passa pelo board: a
-  lista continua conferida depois (`checkRun`), e `ACP_ENFORCEMENT.tools` segue `advised`.
-- A lista `tools` do card passa a recusar pedidos no ACP: um agente que não lista `Edit`/`Write` (o condutor
-  do board) não edita arquivos pelo ACP, e um que não lista `Skill` não ativa skill do Gemini
-  (`activate_skill`). É a mesma regra da conferência e do Claude Code.
-- Diferença com o modo API, explícita: lá a lista `tools` segue só conferida (história 11, alternativa
-  descartada "impor a lista"); as negadas são impostas nos dois.
+- As negadas do card valem igual no ACP e no modo API; a lista `tools` é conferida nos dois.
+- Um `activate_skill` do Gemini com `Skill` negado no card é recusado pelo nome, mesmo com o kind `other`.

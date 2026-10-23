@@ -94,8 +94,8 @@ function subagentOf(call: AcpToolCall): string | null {
  * Decide pelo manifesto do card: ferramenta MCP só dos servidores do card, subagente só da lista de
  * ferramentas do card, edição e comando pelo nível. Na dúvida (título que não se reconhece), vale o nível.
  *
- * As listas do card (`tools`, `deniedTools`) estão no vocabulário do card (`Bash`, `Read`), e o pedido do
- * agente chega no do protocolo: a ponte é a mesma tabela da conferência (`equivalentsOf`, `equivalentsBreach`).
+ * As negadas do card (`deniedTools`) estão no vocabulário do card (`Bash`, `Read`), e o pedido do agente
+ * chega no do protocolo: a ponte é a mesma tabela da conferência (`equivalentsOf`, `equivalentsBreach`).
  * O nome interno da ferramenta (`call.native`, o Gemini CLI) vale quando o agente o deixa reconhecível; senão,
  * o `kind`. Um kind sem equivalente (`think`, `switch_mode`, `other`) ou desconhecido segue o nível. A regra não
  * depende do modo da sessão: é o board que responde cada pedido (a execução admitida nunca roda em yolo).
@@ -124,9 +124,11 @@ export function boardDecision(
     const native = call.native ? equivalentsOf(call.native, 'gemini') : null;
     const name = native ? call.native! : (call.kind ?? 'other');
     const equivalents = native ?? equivalentsOf(name, undefined);
-    const breach = equivalents ? equivalentsBreach(equivalents, { tools: exec?.tools ?? [], deniedTools }) : null;
+    // só as negadas são impostas: a lista `tools` do card é conferida depois (`checkRun`), não recusada aqui,
+    // como no modo API (`ACP_ENFORCEMENT.tools: 'advised'`: a leitura nem passa pelo board, e impor a lista
+    // deixaria o agente sem subagentes, como o condutor no Gemini, sem editar). Por isso `tools: []` aqui
+    const breach = equivalents ? equivalentsBreach(equivalents, { tools: [], deniedTools }) : null;
     if (breach && 'denied' in breach) return { allow: false, reason: `a ferramenta ${breach.denied} está negada no card` };
-    if (breach) return { allow: false, reason: `nenhuma ferramenta equivalente a ${name} está na lista do card` };
   }
   if (!boardAllows(permission, call, mcp, servers)) return { allow: false, reason: `fora do nível ${permission}` };
   return { allow: true, reason: null };

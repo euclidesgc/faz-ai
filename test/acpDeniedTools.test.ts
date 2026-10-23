@@ -63,23 +63,16 @@ describe('boardDecision: deniedTools do card no vocabulário do ACP', () => {
   });
 });
 
-describe('boardDecision: tools não vazio do card', () => {
-  it('kind sem nenhum equivalente na lista é recusado; com um equivalente, passa', () => {
-    expect(decide(call('execute', 'npm test'), exec(['Read', 'Grep'], []))).toEqual({
+describe('boardDecision: a lista tools do card é conferida, não imposta (como no modo API)', () => {
+  it('kind sem nenhum equivalente na lista é liberado pelo nível: o desvio fica para a conferência', () => {
+    expect(decide(call('execute', 'npm test'), exec(['Read', 'Grep'], []))).toEqual({ allow: true, reason: null });
+    // um card que só lista MCP também não recusa nativa nenhuma
+    expect(decide(call('edit'), exec(['mcp__srv__x'], [])).allow).toBe(true);
+    // o nível continua valendo
+    expect(decide(call('execute', 'npm test'), exec(['Read', 'Grep'], []), 'edits')).toEqual({
       allow: false,
-      reason: 'nenhuma ferramenta equivalente a execute está na lista do card',
+      reason: 'fora do nível edits',
     });
-    expect(decide(call('execute', 'npm test'), exec(['Read', 'Bash'], [])).allow).toBe(true);
-    // search vale com Grep ou Glob
-    expect(decide(call('search'), exec(['Glob'], [])).allow).toBe(true);
-  });
-
-  it('lista vazia não restringe (a mesma semântica da conferência)', () => {
-    expect(decide(call('execute'), exec([], [])).allow).toBe(true);
-  });
-
-  it('um card que só lista MCP não libera nativa nenhuma', () => {
-    expect(decide(call('edit'), exec(['mcp__srv__x'], [])).allow).toBe(false);
   });
 
   it('o nome listado que também está negado continua negado (a negação decide primeiro)', () => {
@@ -100,18 +93,20 @@ describe('boardDecision: o nome interno do Gemini CLI, quando o pedido o traz', 
     expect(acpAgent('opencode')?.nativeToolOf).toBeUndefined();
   });
 
-  it('o nome vale antes do kind: run_shell_command com PowerShell liberado passa; com Bash negado, não', () => {
-    // pelo kind execute, só Bash; pelo nome, Bash ou PowerShell
-    expect(decide(call('execute', 'dir', 'run_shell_command'), exec(['PowerShell'], [])).allow).toBe(true);
-    expect(decide(call('execute', 'dir', null), exec(['PowerShell'], [])).allow).toBe(false);
-    expect(decide(call('execute', 'ls', 'run_shell_command'), exec([], ['Bash'])).reason).toBe('a ferramenta Bash está negada no card');
+  it('o nome vale antes do kind: run_shell_command com Bash negado é recusado mesmo com o kind other', () => {
+    expect(decide(call('other', 'ls', 'run_shell_command'), exec([], ['Bash'])).reason).toBe('a ferramenta Bash está negada no card');
+    // pelo kind other, sem o nome, nada seria recusado
+    expect(decide(call('other', 'ls', null), exec([], ['Bash'])).allow).toBe(true);
+    // PowerShell negado: pelo nome (Bash ou PowerShell) recusa; pelo kind execute (só Bash), não
+    expect(decide(call('execute', 'dir', 'run_shell_command'), exec([], ['PowerShell'])).allow).toBe(false);
+    expect(decide(call('execute', 'dir', null), exec([], ['PowerShell'])).allow).toBe(true);
   });
 
-  it('activate_skill (kind other) segue a lista do card pelo nome: Skill fora da lista recusa', () => {
-    expect(decide(call('other', 'activate_skill', 'activate_skill'), exec(['Read'], [])).allow).toBe(false);
-    expect(decide(call('other', 'activate_skill', 'activate_skill'), exec(['Read', 'Skill'], [])).allow).toBe(true);
-    // nome sem equivalente (o tópico) nunca é recusado pela lista
-    expect(decide(call('other', 'tópico', 'update_topic'), exec(['Read'], [])).allow).toBe(true);
+  it('activate_skill (kind other): Skill negado recusa; fora da lista tools, passa (conferência)', () => {
+    expect(decide(call('other', 'activate_skill', 'activate_skill'), exec([], ['Skill'])).allow).toBe(false);
+    expect(decide(call('other', 'activate_skill', 'activate_skill'), exec(['Read'], [])).allow).toBe(true);
+    // nome sem equivalente (o tópico) nunca é recusado
+    expect(decide(call('other', 'tópico', 'update_topic'), exec([], ['Bash'])).allow).toBe(true);
   });
 
   it('a delegação nativa do Gemini (invoke_agent) cai na negação da delegação', () => {
@@ -151,7 +146,7 @@ describe('a regra única com a conferência', () => {
     expect(deniesMcpTool('mcp__srv__xy', 'srv', 'x')).toBe(false);
   });
 
-  it('a decisão em tempo real e a conferência concordam em cada kind', () => {
+  it('a decisão em tempo real recusa o que a conferência acusa por negação; a lista tools só a conferência', () => {
     const manifests = [exec([], ['Bash']), exec(['Read', 'Grep'], []), exec(['Edit'], ['Write']), exec([], [])];
     for (const kind of ['read', 'search', 'edit', 'delete', 'move', 'execute', 'fetch', 'think', 'switch_mode', 'other'])
       for (const m of manifests) {
@@ -160,9 +155,10 @@ describe('a regra única com a conferência', () => {
           { ...m, skills: [], mcpServers: [], agent: null } as never,
           'faz-ai',
         );
+        const breach = equivalentsBreach(equivalentsOf(kind, undefined)!, m);
         const refused = !decide(call(kind), m).allow;
-        expect(refused, `${kind} ${JSON.stringify(m)}`).toBe(check.status === 'deviation');
-        expect(refused).toBe(equivalentsBreach(equivalentsOf(kind, undefined)!, m) !== null);
+        expect(breach !== null, `${kind} ${JSON.stringify(m)}`).toBe(check.status === 'deviation');
+        expect(refused, `${kind} ${JSON.stringify(m)}`).toBe(breach !== null && 'denied' in breach);
       }
   });
 });

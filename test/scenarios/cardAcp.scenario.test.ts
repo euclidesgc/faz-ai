@@ -153,11 +153,13 @@ describe('cenário: a prova do verificador (feita em board) vale para o card em 
     expect(end.outcome).toBe('done');
   });
 
-  it('J: card com tools sem Bash: o pedido de execute é recusado no ACP (nenhum equivalente liberado)', async () => {
+  it('J: card com tools sem Bash: o execute é liberado no pedido (tools é conferida) e vira desvio na conversa', async () => {
     const asked: unknown[] = [];
     const agent = new FakeAgent({
       onPrompt: async (a) => {
-        asked.push(await a.ask({ toolCallId: 'y1', title: 'npm test', kind: 'execute' }));
+        const execute = { toolCallId: 'y1', title: 'npm test', kind: 'execute', status: 'pending' };
+        a.update({ sessionUpdate: 'tool_call', ...execute });
+        asked.push(await a.ask(execute));
         a.update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Fase concluída.\n' } });
         return { stopReason: 'end_turn' };
       },
@@ -166,9 +168,13 @@ describe('cenário: a prova do verificador (feita em board) vale para o card em 
 
     const end = await world.run();
 
-    expect(asked).toEqual([{ outcome: { outcome: 'selected', optionId: 'opt-reject_once' } }]);
-    expect(world.lines.some((l) => /pediu permissão para npm test: negado/.test(l))).toBe(true);
+    // como no modo API, a lista do card não recusa o pedido: o nível full libera
+    expect(asked).toEqual([{ outcome: { outcome: 'selected', optionId: 'opt-allow_once' } }]);
+    expect(world.lines.some((l) => /pediu permissão para npm test: permitido/.test(l))).toBe(true);
     expect(end.outcome).toBe('done');
+    // e a conferência acusa o uso fora da lista, com a mensagem na conversa (runCheckNotice)
+    expect(end.check).toEqual({ status: 'deviation', deviations: [{ kind: 'tool', name: 'execute', calls: 1 }] });
+    expect(world.comments()).toContain(`${DEVIATION} do que o card liberou (ferramenta execute).`);
   });
 
   it('G: uma variável volátil que mudou depois da prova (outro terminal, outra sessão) não bloqueia o card', async () => {
