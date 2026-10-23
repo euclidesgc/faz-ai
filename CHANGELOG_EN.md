@@ -19,6 +19,10 @@
 - **Refine no longer keeps the previous description text (#1076).** **Refine with AI** stopped saving the `descricao-anterior-*.md` attachment before rewriting the description, and the instruction that asked for it left the prompt. The previous text is no longer kept anywhere; the refine comment summarizes what changed and why. Old attachments with that name stay on the story, unused.
 - **The AI receives at most the last 20 conversation messages (#1076).** Without a summary, `get_card` sends only the 20 latest messages and says in `omittedBefore` how many were left out. With a summary, the summary always comes; past 20 messages, the last 19 after it come. The **Conversa** tab still shows everything. Repeated messages and board notices stay as they were.
 
+### Fixed
+
+- **Execution by conversation and heartbeat shows again with a custom profile as default (#1091).** With a custom (or ACP) profile chosen as the project's tool, Harness › Tool and execution hid the whole section behind the notice "CLI profile is not available for execution yet": the board checked the profile id instead of the resolved profile. The section now shows, with the admission regime, the default agent and the heartbeat. In an ACP profile the board answers each permission request from the agent, so it needs no per-level arguments.
+
 ## 0.47.0
 
 ### Added
