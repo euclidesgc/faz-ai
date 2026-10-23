@@ -392,7 +392,16 @@ describe('a decisão por nível, no vocabulário do card', () => {
     for (const name of ['WebFetch', 'Agent', 'Task', 'web_fetch', 'mcp__docs__search', 'Skill'])
       expect(deniedLocal(name), name).toEqual([]);
     // o servidor MCP inteiro, servidor com ponto e os nomes do Claude Code fora da tabela de agentes
-    for (const name of ['mcp__github', 'mcp__claude.ai__x', 'mcp__github__*', 'KillShell', 'BashOutput', 'ExitPlanMode', 'AskUserQuestion'])
+    for (const name of [
+      'mcp__github',
+      'mcp__claude.ai__x',
+      'mcp__github__*',
+      'KillShell',
+      'BashOutput',
+      'ExitPlanMode',
+      'AskUserQuestion',
+      'save_memory',
+    ])
       expect(deniedLocal(name), name).toEqual([]);
     expect(deniedLocal('LS')).toEqual(['Glob']);
     expect(deniedLocal('NotebookRead')).toEqual(['Read', 'Glob', 'Grep']);

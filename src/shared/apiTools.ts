@@ -3,7 +3,7 @@
 // do card admite. Esta é a parte pura: o nome da função que o modelo vê, o nome no vocabulário do card
 // (Read/Glob/Grep/Write/Edit/Bash, o mesmo do Claude Code, que é o que o card, a admissão e a conferência
 // usam) e a categoria do nível de permissão. Quem executa é `src/extension/ai/apiTools.ts`.
-import { AGENT_TOOLS, AGENT_TOOLS_ALWAYS_REMOVED, type ToolGroup } from './agentTools';
+import { AGENT_TOOLS, AGENT_TOOLS_ALWAYS_REMOVED, GEMINI_TOOL_EQUIVALENTS, type ToolGroup } from './agentTools';
 import type { RunnerPermission } from './runner';
 
 /** As ferramentas de delegação que toda execução do board nega (`Agent`, `Task`…): nomes reconhecidos. */
@@ -117,6 +117,8 @@ const DENY_GROUPS: Record<string, Card[]> = {
 const KNOWN_ELSEWHERE = new Set(
   [
     ...Object.values(AGENT_TOOLS).flatMap((groups) => groups.flatMap((g) => g.tools.map((t) => t.name))),
+    // os que o Gemini CLI registra sozinho (história 8: `save_memory`, o tópico, o modo de plano…)
+    ...Object.keys(GEMINI_TOOL_EQUIVALENTS),
     ...SUBAGENT_NAMES,
     // as que a tabela de agentes deixa de fora de propósito (o Claude Code sempre as tira de um subagente)
     ...AGENT_TOOLS_ALWAYS_REMOVED,
