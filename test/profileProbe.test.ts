@@ -29,6 +29,18 @@ describe('probeProfiles', () => {
     expect(d.signedIn).not.toHaveBeenCalled();
   });
 
+  it('modo API (história 10): sem binário para achar nem versão; o login é a chave no cofre', async () => {
+    const gemini = { ...BUILTIN_PROFILES.find((p) => p.id === 'gemini')!, enabled: true, mode: 'api' as const };
+    const d = { resolve: vi.fn(() => null), version: vi.fn(), signedIn: vi.fn(async () => false) };
+    expect((await probeProfiles([gemini], d)).get('gemini')).toEqual({ id: 'gemini', found: true, login: 'signed-out' });
+    d.signedIn.mockResolvedValue(true);
+    expect((await probeProfiles([gemini], d)).get('gemini')).toEqual({ id: 'gemini', found: true, login: 'signed-in' });
+    expect(d.resolve).not.toHaveBeenCalled();
+    expect(d.version).not.toHaveBeenCalled();
+    // sem binário: a sonda de login recebe o executável vazio e não roda comando nenhum
+    expect(d.signedIn).toHaveBeenCalledWith(gemini, '');
+  });
+
   it('CLI achada: caminho, versão e login', async () => {
     const map = await probeProfiles([claude], deps());
     expect(map.get('claude')).toEqual({ id: 'claude', found: true, path: '/bin/claude', version: '1.2.3', login: 'signed-in' });

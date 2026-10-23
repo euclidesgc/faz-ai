@@ -29,9 +29,11 @@ agente ACP pronto em ACP, a cópia de uma CLI pronta continua a ferramenta da ba
 seguem no cofre local, como estavam) e o personalizado é a própria ferramenta, em ACP quando aponta um
 agente ACP e em CLI quando não. A ferramenta usada nos campos de modelo, nas políticas e no Consumo não
 muda para nenhum perfil. O personalizado importado de outra máquina, sem a configuração no cofre local,
-fica em CLI até ser salvo de novo. As execuções anteriores ficam sem modo registrado. O modo API já é
-um valor conhecido do formato (no log e no arquivo exportado), sem migração nova, mas nenhum perfil roda
-nele ainda: a importação recusa um perfil em API.
+fica em CLI até ser salvo de novo. As execuções anteriores ficam sem modo registrado. O modo API é um
+valor do mesmo formato (no log e no arquivo exportado), sem migração nova: só o Gemini pronto roda nele,
+e a importação aceita o Gemini em API e recusa o modo em qualquer outro perfil. A chave de API nunca vai
+no arquivo exportado; no computador que importa, conecte o Gemini de novo. Voltar o banco ao formato 47
+(o procedimento de suporte para uma versão anterior) deixa o Gemini em ACP, o único modo que ela conhece.
 
 ## Backup do board
 

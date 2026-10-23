@@ -19,13 +19,16 @@ import type { AiMeasure } from '../provider';
 /**
  * Como se entra na conta da ferramenta: um comando no terminal (as CLIs prontas), o login do agente ACP no
  * terminal (`acp-authenticate`, os agentes sem login por chave) ou a chave de API (`api-key`): a pessoa a
- * cola na tela do Conectar, o host a guarda no cofre (`ToolKeys`, por ferramenta) e a entrega ao agente no
- * `authenticate` do protocolo (`methodId`), em cada processo. O `terminal` é o login alternativo da ferramenta.
+ * cola na tela do Conectar e o host a guarda no cofre (`ToolKeys`, por ferramenta, a mesma nos modos). No
+ * agente ACP, o host a entrega no `authenticate` do protocolo (`methodId`), em cada processo, e o `terminal`
+ * é o login alternativo da ferramenta. No modo API (história 10) não há agente: quem usa a chave é o próprio
+ * board, e o Conectar a confere na hora com a API (`checkApiKey`); `docs` é a página onde se cria a chave.
  */
 export type DriverAuth =
   | { kind: 'login-command'; command: string }
   | { kind: 'acp-authenticate'; terminal: string }
-  | { kind: 'api-key'; methodId: string; terminal: string };
+  | { kind: 'api-key'; methodId: string; terminal: string }
+  | { kind: 'api-key'; methodId?: undefined; docs: string };
 
 /** O que a sonda de login recebe do host: tudo já com o perfil aplicado, para o driver não ver segredos à toa. */
 export interface SignInProbe {
@@ -56,6 +59,11 @@ export interface ConnectionDriver {
   signedIn(probe: SignInProbe): Promise<boolean | null>;
   /** os modelos da conta, quando a ferramenta os lista por comando; ausente quando não lista */
   listModels?(executable: string, pathEnv: string | undefined): Promise<ModelOption[]>;
+  /**
+   * Só no modo API: os modelos da conta pela API, com a chave. É também a conferência da chave no Conectar
+   * (uma chamada que não gasta a conta); lança com o motivo quando a API recusa.
+   */
+  apiModels?(apiKey: string): Promise<ModelOption[]>;
   /** o que o gateway promete medir: custo, tokens ou nada */
   readonly measure: AiMeasure;
   /** o que o board impõe neste modo: a linha do catálogo (`TOOLS`) */
@@ -77,9 +85,16 @@ export interface ExecutorContext extends Pick<MeasuredDeps, 'log' | 'runId' | 'l
   spawnAcp?: AcpSpawnFn;
   /**
    * A chave de API da ferramenta, lida do cofre pelo gateway, para o driver com `auth.kind === 'api-key'`.
-   * Não entra no vínculo (`bindingContext` não a vê) nem no log: o gateway a mascara em toda linha.
+   * Não entra no log: o gateway a mascara em toda linha. No ACP não entra no vínculo; no modo API só o
+   * digest dela entra, pelo `bindingContext` (a admissão o recebe do mesmo cofre).
    */
   apiKey?: string;
+  /**
+   * As conferências do gateway antes de cada pedido ao modelo no modo API (o par dos `spawn` acima, que
+   * não existem nele): o vínculo admitido não mudou, o snapshot dos artefatos segue válido e a sessão MCP
+   * da execução não foi revogada. Lança quando algo mudou; o driver para sem mandar o pedido.
+   */
+  beforeRequest?(): void;
 }
 
 /**
@@ -135,7 +150,13 @@ export interface Executor {
    * A parte da ferramenta no vínculo, para uma entrada (o prompt já vem trocado pelo marcador) e uma
    * pasta (null no vínculo de isolamento, que vale para qualquer pasta de projeto).
    */
-  bindingContext(input: HeadlessInput, ctx: { profile: AiProfile; cwd: string | null }): BindingInvocation;
+  bindingContext(input: HeadlessInput, ctx: { profile: AiProfile; cwd: string | null; apiKey?: string | null }): BindingInvocation;
+  /**
+   * Só no modo API: os checks de `API_CAPABILITY_CHECKS` que o laço do driver cumpre de fato para esta
+   * entrada. O host afirma e assina por construção (`recordByConstruction`) só estes; um check que o laço
+   * não cumpre fica sem recibo, e a capacidade sai parcial, em vez de uma promessa assinada.
+   */
+  guarantees?(input: HeadlessInput): readonly string[];
 }
 
 /** Um driver: a conexão e a execução de uma ferramenta num modo. */

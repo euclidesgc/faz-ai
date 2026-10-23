@@ -7,6 +7,25 @@ import type { MessageRouter } from '../panel/messageRouter';
 import { manifestOf } from '../../shared/execution';
 import { findCard } from './format';
 
+/**
+ * O transporte do board, como cliente, até um servidor MCP da biblioteca: stdio (o board inicia o
+ * comando, na pasta do projeto) ou HTTP/SSE pela URL. É o mesmo para o `call_board_mcp_tool` e para o
+ * laço do modo API (`drivers/gemini/api.ts`), em que o board é o cliente dos MCPs do card.
+ */
+export function libraryMcpTransport(definition: Record<string, unknown>, workspaceDir: string): Transport {
+  if (typeof definition.command === 'string')
+    return new StdioClientTransport({
+      command: definition.command,
+      args: (definition.args ?? []) as string[],
+      env: { ...getDefaultEnvironment(), ...((definition.env as Record<string, string>) ?? {}) },
+      cwd: workspaceDir || undefined,
+      stderr: 'ignore',
+    });
+  const url = new URL(String(definition.url));
+  const options = { requestInit: { headers: definition.headers as Record<string, string> | undefined } };
+  return definition.type === 'sse' ? new SSEClientTransport(url, options) : new StreamableHTTPClientTransport(url, options);
+}
+
 /** Cada chamada tem uma conexão curta: alterações e remoções valem já, sem processos órfãos no host. */
 export async function withBoardMcp<T>(
   router: MessageRouter,
@@ -30,20 +49,7 @@ export async function withBoardMcp<T>(
   }
   if (!definition) throw new Error('Definição MCP não encontrada.');
   const client = new Client({ name: 'faz-ai-board', version: '1.0.0' });
-  let transport: Transport;
-  if (typeof definition.command === 'string') {
-    transport = new StdioClientTransport({
-      command: definition.command,
-      args: (definition.args ?? []) as string[],
-      env: { ...getDefaultEnvironment(), ...((definition.env as Record<string, string>) ?? {}) },
-      cwd: workspaceDir || undefined,
-      stderr: 'ignore',
-    });
-  } else {
-    const url = new URL(String(definition.url));
-    const options = { requestInit: { headers: definition.headers as Record<string, string> | undefined } };
-    transport = definition.type === 'sse' ? new SSEClientTransport(url, options) : new StreamableHTTPClientTransport(url, options);
-  }
+  const transport = libraryMcpTransport(definition, workspaceDir);
   try {
     access?.assert();
     const abort = () => {

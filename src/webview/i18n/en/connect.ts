@@ -42,6 +42,15 @@ export const connect: Record<string, string> = {
   'Conectar em andamento: "{step}"': 'Connect in progress: "{step}"',
   'versão desconhecida': 'unknown version',
   'chave de API guardada': 'API key stored',
+  'chave de API conferida': 'API key checked',
+  'Modo em uso': 'Mode in use',
+  'Passa o perfil da ferramenta para este modo quando o login der certo, com a mesma chave e os mesmos modelos.':
+    'Switches the tool’s profile to this mode once the sign-in succeeds, with the same key and the same models.',
+  'O board confere a chave agora, lendo a lista de modelos da conta pela API do Gemini (não gasta a conta). Aceita, ela fica guardada no cofre deste computador, a mesma para todos os modos, e vai à API só no cabeçalho; ela não volta para esta tela. Recusada, a chave guardada antes continua.':
+    'The board checks the key now, by reading the account’s model list through the Gemini API (it does not spend the account). Once accepted, it is stored in this computer’s vault, the same for every mode, and goes to the API only in the header; it never comes back to this screen. If refused, the key stored before stays.',
+  'Confere a chave com a API, guarda no cofre e continua o Conectar.':
+    'Checks the key with the API, stores it in the vault and continues Connect.',
+  'Conferir e guardar a chave': 'Check and store the key',
   'regime compatível, sem ciência: o perfil não roda até você dar a ciência':
     'compatible regime, not acknowledged: the profile does not run until you acknowledge it',
   'O Conectar espera você no passo "{step}": continue no cartão em Conectar ferramenta, acima.':
@@ -105,6 +114,18 @@ export const connect: Record<string, string> = {
   'chave de API do Gemini': 'Gemini API key',
   'por token': 'per token',
   'quando se quer o agente do próprio Gemini CLI decidindo como trabalhar': 'when you want Gemini CLI’s own agent deciding how to work',
+  // a ficha do Gemini pela API (história 10)
+  'tudo: contexto, ferramentas, MCP e permissões, chamada a chamada': 'everything: context, tools, MCP and permissions, call by call',
+  'exclusivo, por construção: o board monta cada pedido e executa cada chamada':
+    'exclusive, by construction: the board builds each request and executes each call',
+  'exata: o inventário é a lista de chamadas que o board executou': 'exact: the inventory is the list of calls the board executed',
+  'tokens por chamada (`usageMetadata`); nada gasto com contexto que o board não pediu':
+    'tokens per call (`usageMetadata`); nothing spent on context the board did not ask for',
+  'só o modelo: as ferramentas são as do board e as dos MCPs do card':
+    'only the model: the tools are the board’s and those of the card’s MCPs',
+  'chave de API do Gemini, guardada no cofre local': 'Gemini API key, kept in the local vault',
+  'para a finalidade do board: prever o acesso e gastar só o pedido. Por enquanto serve a Refinar, Resumir e Trabalhar na fase com a permissão "Só o board"; arquivos e comandos chegam numa próxima versão':
+    'for the board’s purpose: knowing the access in advance and spending only on the request. For now it serves refine, summarize and work on the phase with the "board only" permission; files and commands come in a later version',
   'Assinatura do Claude pela CLI; uma chave de API da Anthropic é cobrança por token, fora da assinatura.':
     'Claude subscription through the CLI; an Anthropic API key is billed per token, outside the subscription.',
   'É o único modo que usa a assinatura: o ACP do Claude exige cobrança por API.':

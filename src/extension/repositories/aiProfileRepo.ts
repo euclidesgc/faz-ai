@@ -16,6 +16,7 @@ import {
   type AiProfileKind,
   type ProfileMode,
 } from '../../shared/aiProfiles';
+import { toolModeEntry } from '../../shared/aiTools';
 import { credentialsFor, validSecretRef } from '../credentials';
 import { all, bool, num, one, run, str, transaction, type Row } from '../db/query';
 
@@ -60,6 +61,17 @@ function identityOf(row: Row, acpAgent: unknown): Identity {
   const kind = normalizeProfileKind(row.kind);
   const mode = PROFILE_MODES.find((m) => m === row.mode);
   return row.tool && kind && mode ? { kind, tool: str(row.tool), mode } : legacyIdentity(row, acpAgent);
+}
+/**
+ * O modo de um perfil pronto: o gravado na linha, quando a extensão oferece esse modo para a ferramenta
+ * (`TOOLS`); senão, o do código. É o "um perfil por ferramenta, com o modo trocável" da épica: quem troca é
+ * o Conectar (história 7), e o Gemini passa a ter o modo API oferecido na história 10. Um modo que esta
+ * versão não oferece (gravado por uma mais nova, ou que saiu do catálogo) volta ao do código, em vez de
+ * deixar o perfil num modo sem driver.
+ */
+function readyMode(builtin: AiProfile, stored: unknown): ProfileMode {
+  const mode = PROFILE_MODES.find((m) => m === stored);
+  return mode && toolModeEntry(builtin.tool, mode) ? mode : builtin.mode;
 }
 /** Configuração livre nunca passa pelo SQLite nem retorna ao editor. */
 export class AiProfileRepo {
@@ -125,7 +137,7 @@ export class AiProfileRepo {
     const config = builtin ? null : this.publicConfigOf(row);
     return {
       ...(builtin
-        ? structuredClone(builtin)
+        ? { ...structuredClone(builtin), mode: readyMode(builtin, row.mode) }
         : {
             id: str(row.id),
             name: str(row.name),
@@ -221,6 +233,19 @@ export class AiProfileRepo {
     if (!row) throw new Error('Perfil indisponível neste board.');
     if (enabled && row.review_state !== 'reviewed') throw new Error('Revise o perfil importado antes de ligar.');
     run(this.db, 'UPDATE ai_profiles SET enabled = ? WHERE board_id = ? AND id = ?', [enabled ? 1 : 0, boardId, id]);
+  }
+  /**
+   * Troca o modo do perfil pronto (o Conectar, ao conectar o cartão de outro modo): só um modo que a extensão
+   * oferece para a ferramenta. O id, as políticas, o catálogo de modelos e a chave da ferramenta não mudam;
+   * o vínculo da admissão muda com o transporte, e as provas do outro modo deixam de valer para ele.
+   */
+  setMode(boardId: string, id: string, mode: ProfileMode, actor: 'person' | 'ai'): void {
+    this.human(actor);
+    const builtin = BUILTIN_PROFILES.find((p) => p.id === id);
+    if (!builtin) throw new Error('Só o perfil pronto troca de modo; o personalizado segue pelo formulário.');
+    if (!toolModeEntry(builtin.tool, mode)) throw new Error(`O modo ${mode} não é oferecido para ${builtin.name}.`);
+    this.ensureCatalogRow(boardId, id);
+    run(this.db, 'UPDATE ai_profiles SET mode = ? WHERE board_id = ? AND id = ?', [mode, boardId, id]);
   }
   /** Revisão explícita dos prontos importados; não liga o perfil nem concede capacidades. */
   reviewBuiltin(boardId: string, id: string, actor: 'person' | 'ai'): void {
@@ -355,16 +380,19 @@ export function validateProfileRows(rows: Row[], boardId: string): void {
       (row.kind !== 'catalog' && row.kind !== legacy) ||
       (row.kind === 'catalog' && !tool) ||
       !PROFILE_MODES.some((m) => m === mode) ||
-      // `api` é um modo conhecido desde a história 9, mas nenhum perfil roda nele ainda: nem pronto, nem
-      // cópia, nem personalizado (que tem comando próprio ou agente ACP), com ou sem a ferramenta gravada
-      mode === 'api' ||
       (builtin
         ? row.base !== builtin.base ||
           row.secret_ref !== null ||
           // sem a ferramenta (linha ainda não preenchida), o modo é o do pronto ou o padrão da coluna (`cli`);
-          // um pronto de CLI em `acp` não passa por estar sem ferramenta
-          (tool === '' ? mode !== builtin.mode && mode !== 'cli' : tool !== builtin.tool || mode !== builtin.mode)
-        : (kind === 'custom') !== (row.base === 'generic') ||
+          // um pronto de CLI em `acp` não passa por estar sem ferramenta. Com a ferramenta, vale o modo do
+          // pronto ou outro que a extensão oferece para ela (o Gemini pela API, desde a história 10); a
+          // chave nunca vem no arquivo: ela é do cofre de quem conectou
+          (tool === ''
+            ? mode !== builtin.mode && mode !== 'cli'
+            : tool !== builtin.tool || (mode !== builtin.mode && !toolModeEntry(builtin.tool, mode as ProfileMode)))
+        : // `api` só existe no pronto: a cópia e o personalizado (comando próprio ou agente ACP) não rodam nele
+          mode === 'api' ||
+          (kind === 'custom') !== (row.base === 'generic') ||
           !['claude', 'cursor', 'kimi', 'generic'].includes(str(row.base)) ||
           (tool !== '' && tool !== (kind === 'catalog' ? str(row.base) : id)) ||
           (kind === 'catalog' && mode !== 'cli'))

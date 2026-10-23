@@ -36,30 +36,39 @@ not offered yet appear by name only, without a card.
 **Recommended** is the mode in which the board controls the most of what the agent accesses and
 measures what it spends; a tie is broken by what the tool loads on its own (less is better). The
 badge only appears when the recommended mode is offered, with the reason in one sentence. For
-Gemini, the recommendation is the API, which comes in a later version: for now Gemini offers only
-ACP and shows no badge. Claude Code shows the CLI with the badge and why it is the only one (its ACP
+Gemini, the recommendation is the **API**, and the badge is on its card; the **ACP** card stays next to
+it. Claude Code shows the CLI with the badge and why it is the only one (its ACP
 requires API billing, outside the subscription).
 
-A card's **Connect** button takes the catalog profile for that mode through these steps, with the
-progress on screen:
+A card's **Connect** button takes the tool's catalog profile, in that mode, through these steps, with
+the progress on screen. There is one profile per tool, with a switchable mode: for Gemini, the **ACP**
+and **API** cards connect the same profile (same id, same policies, same model catalog and same key),
+and it switches to the card's mode once the sign-in succeeds; the card of the mode the profile runs in
+shows **Mode in use**.
 
 1. **Find the tool**: the command on the terminal's PATH and its version; without it, the **Install**
-   link.
+   link. In API mode there is nothing to find: the extension itself talks to the API.
 2. **Sign in**: for Gemini, the **API key** field (a password field). The key is stored in this
-   computer's vault and, for each process, goes to the agent's sign-in through the protocol; it never
-   comes back to the screen and never goes to the log, the run records or the board export. It is the
-   same in every folder. Gemini CLI accepts the key at sign-in without calling the API: it is actually
-   checked on the first run, and a wrong key shows up there, with Gemini's message. The profile is
-   only turned on after this step. For the ready CLIs, the sign-in probe, with the terminal command
-   when missing.
+   computer's vault, the same in every folder and in both modes; it never comes back to the screen and
+   never goes to the log, the run records or the board export. Over **ACP** it goes, for each process,
+   to the agent's sign-in through the protocol, and Gemini CLI accepts it without calling the API: it is
+   actually checked on the first run, and a wrong key shows up there, with Gemini's message. Over the
+   **API** it is **checked right away**: the board reads the account's model list with it (it does not
+   spend the account), and the screen says "API key checked". In both, a new key only replaces the
+   stored one after it is accepted; if refused, the previous one stays. The profile is only turned on
+   (and only switches mode) after this step. For the ready CLIs, the sign-in probe, with the terminal
+   command when missing.
 3. **Check the capabilities**: the verifier's probes record the profile's evidence, and the regime
    follows from it, without asking: all five capabilities proven give the exclusive regime;
    permissions, MCP and delegation proven, the compatible one. An ACP agent is always compatible (the
-   context files it reads on its own have no proof through the protocol).
+   context files it reads on its own have no proof through the protocol). API mode is exclusive by
+   construction, with no probe: the board asserts the proof on the first run, for the card's model; the
+   ACP acknowledgment, if any, is removed.
 4. **Regime acknowledgment** (compatible only): a separate button, **I understand what the tool
    loads**, records your acknowledgment for that profile. The regime is per profile: Gemini can run
    in the compatible regime while Claude Code stays exclusive.
-5. **Read the models**: the models the tool announces join the catalog, in every model field.
+5. **Read the models**: the models the tool announces join the catalog, in every model field (over the
+   API, the account's models that answer `generateContent`).
 
 At the end, **Connected** with the version, the sign-in, the regime, how many models and the date, plus
 the **Change the key** and **Revoke acknowledgment** actions. An error stays on the step where it
@@ -75,9 +84,10 @@ acknowledgments**: whoever imports gives their own, on the machine where the pro
 do not go through Connect (copies and custom profiles) give and revoke the acknowledgment in the list,
 with **Acknowledge the compatible regime** and the same text as Connect. An execution policy does not
 switch to a profile with a different regime (`constraints-changed`). The
-requirements banner keeps checking the tool and the sign-in: for Gemini, without the key in the vault
-the sign-in stays "not verified" (you may have your own `GEMINI_API_KEY`), and the sign-in warning
-leads to Connect.
+requirements banner keeps checking the tool and the sign-in: for Gemini over ACP, without the key in
+the vault the sign-in stays "not verified" (you may have your own `GEMINI_API_KEY`); over the API,
+without the key in the vault the sign-in is missing (there is no other), and the sign-in warning leads
+to Connect.
 
 The **Admission regime** option left Harness › Tool and execution. If you turned on the compatible
 regime for the whole board in an earlier version, it stays on (with a notice and a **Back to

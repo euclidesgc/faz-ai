@@ -99,6 +99,37 @@ aparece, o board grava o caminho completo do comando nos registros do `faz-ai` e
 roda, e o arquivo fica fora do git (`.git/info/exclude`). Se o arquivo de MCPs do projeto estiver
 versionado, o board não grava nele.
 
+### O Gemini pela API
+
+O Gemini tem três modos no catálogo da extensão; o **API** é o recomendado, porque é o único em que o
+board sabe de antemão tudo o que o modelo pode acessar e paga só pelo que pediu. Nele não há CLI
+instalada nem processo da ferramenta: o board chama o `generateContent` da API do Gemini com a chave
+de API guardada no cofre local e faz ele mesmo o ciclo de chamadas de função. Para usar, clique em
+**Conectar** no cartão **API** do Gemini em Ferramentas de IA › Conectar ferramenta (veja
+[Configurações](configuracoes.md#ferramentas-de-ia-conectar-ferramenta)): o perfil do Gemini passa para
+o modo API com a mesma chave do ACP, conferida na hora com a API.
+
+- **O que o modelo recebe**: o pedido do board (com o agente da fase, as rules e as skills indicadas),
+  a conversa montada pelo board a cada pedido e, como funções, só as ferramentas do servidor do board e
+  dos MCPs que o card libera. Uma ferramenta que o card não libera nunca é declarada ao modelo, e uma
+  chamada a ela é recusada sem rodar. O modelo não lê arquivo nenhum por conta própria.
+- **Regime**: exclusivo, por construção. O board afirma e assina a prova das cinco capacidades na
+  primeira execução (e de novo quando o modelo, a chave ou a versão da extensão mudam), sem sonda e
+  sem gastar a conta. A prévia de admissão do card avalia a prova do modelo do card.
+- **Consumo e conferência**: os tokens de cada pedido (`usageMetadata`) somados na execução; o
+  inventário é a lista das chamadas que o board executou, e a conferência compara com o card como nos
+  outros modos.
+- **Parar** cancela o pedido em curso e não manda o próximo. Cada pedido tem 2 minutos; a execução
+  para com falha depois de 40 pedidos sem terminar. Um 429 (limite de uso) encerra a execução com a
+  mensagem da API e o tempo de espera, quando vem; a pausa automática por cota é de uma versão
+  seguinte.
+- **Por enquanto** o modo serve a **Refinar**, **Resumir** e **Trabalhar na fase** com a permissão
+  **Só o board**: o modelo lê e responde o card pelo servidor do board. Editar arquivos e rodar
+  comandos chegam numa próxima versão; com outra permissão, a execução é recusada com a causa, e o
+  Gemini pelo ACP continua disponível. O modelo precisa vir do campo **Modelo** do card.
+- A chave nunca vai para o log, para o registro de uso, para a tela nem para a exportação, e vai à
+  API só no cabeçalho `x-goog-api-key`, nunca na URL.
+
 ## Diagnóstico do ambiente
 
 ### O aviso de atenção

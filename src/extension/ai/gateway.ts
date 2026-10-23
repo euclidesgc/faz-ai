@@ -1,6 +1,6 @@
 import type { ContextDraftResolution } from '../../shared/contextDraftResolution';
 import type { AcpSpawnFn } from './acp/provider';
-import { executorOf } from './drivers';
+import { executorOf, type Executor } from './drivers';
 import { executorProfile } from './providers';
 import { redactCredentialValues } from '../credentials';
 import { authFailed } from './profileAuth';
@@ -149,6 +149,11 @@ export interface AiExecution {
 export interface AiGatewayDeps {
   /** Inicia um agente ACP com a entrada aberta (só o host inicia processos de IA). */
   spawnAcp?: AcpSpawnFn;
+  /**
+   * Quem executa cada perfil; o registro dos drivers por padrão. O cenário do modo API troca pelo driver
+   * apontado para o servidor HTTP falso, o mesmo que entrega à admissão (`ExecutionAdmission`).
+   */
+  executorOf?(profile: AiProfile): Executor;
   /** O host confere também perfis importados no caminho legado antes de preparar arquivos. */
   profile?(id: string): AiProfile | null;
   resolveProfile?(id: string): AiProfile;
@@ -341,12 +346,16 @@ export class AiGateway {
         input = admitted.input;
       }
       // a ferramenta sem suporte para esta permissão nem começa: confere antes de gravar a configuração
-      const executor = executorOf(profile);
+      const executor = (this.deps.executorOf ?? executorOf)(profile);
       if (executor.transport === 'acp') {
         if (!this.deps.spawnAcp) throw new Error('Transporte ACP indisponível neste host.');
         // a admissão vinculou o comando do agente, não o de uma CLI: o validador certo é o do transporte
         if (admitted && admitted.transport !== 'acp') throw new Error('A admissão não é do transporte ACP; o perfil não roda.');
-      } else if (admitted && admitted.transport !== 'cli') throw new Error('A admissão é de um agente ACP; o perfil não roda pela CLI.');
+      } else if (executor.transport === 'api') {
+        // no modo API quem executa cada chamada é o board: sem a decisão admitida não há o que declarar ao modelo
+        if (!admitted) throw new Error('O modo API exige a admissão por capacidades; o perfil não roda sem ela.');
+        if (admitted.transport !== 'api') throw new Error('A admissão não é do modo API; o perfil não roda.');
+      } else if (admitted && admitted.transport !== 'cli') throw new Error('A admissão é de outro transporte; o perfil não roda pela CLI.');
       const unsupported = admitted || executor.transport === 'acp' ? null : headlessUnsupported(profile, input.permission);
       if (unsupported) throw new Error(unsupported);
       if (admitted) {
@@ -366,10 +375,17 @@ export class AiGateway {
       // `spawn` levam as conferências do gateway; o driver usa o do transporte dele
       const spawnProcess = this.deps.spawnAcp;
       apiKey = this.deps.apiKey?.(profile) ?? undefined;
+      // o modo API não abre processo: é uma execução, e as conferências dos `spawn` rodam antes de cada pedido
+      if (executor.transport === 'api') attempts = 1;
       measured = executor.run(input, {
         profile,
         cwd: call.cwd,
         ...(apiKey ? { apiKey } : {}),
+        beforeRequest: () => {
+          if (workToken !== undefined) this.deps.sessions!.assert(workToken);
+          snapshot?.validate();
+          admitted?.api();
+        },
         spawnAcp:
           spawnProcess &&
           ((command, cwd, out) => {

@@ -44,6 +44,15 @@ export function admissionProfileOf(s: BoardState, target: ContextActivityTarget)
   return runTargetOf(s, card)?.cli.id ?? null;
 }
 
+/**
+ * O modelo do alvo do card (o mesmo de `admissionProfileOf`), para a prévia do modo API, em que a prova é
+ * de um modelo; null sem card ou sem modelo escolhido. Na CLI e no ACP a prévia não o usa.
+ */
+export function admissionModelOf(s: BoardState, target: ContextActivityTarget): string | null {
+  const card = target.cardId ? s.cards.find((c) => c.id === target.cardId) : undefined;
+  return (card && runTargetOf(s, card)?.model?.name) || null;
+}
+
 /** Troca "admissão indisponível" pela decisão do host, explicando cada razão (com o recurso, quando há). */
 export function applyAdmissionDecision(resolved: ContextDraftResolution, decision: ExecutionAdmissionDecision): ContextDraftResolution {
   const diagnostics = resolved.diagnostics.filter((d) => d.code !== 'admission-unavailable');

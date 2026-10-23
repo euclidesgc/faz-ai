@@ -221,6 +221,8 @@ export class HostBridge {
         await this.router.connectProfile(msg.id, {
           ...(msg.apiKey !== undefined ? { apiKey: msg.apiKey } : {}),
           ...(msg.acknowledge ? { acknowledge: true } : {}),
+          // o cartão do modo; o Conectar confere que a ferramenta o oferece antes de usar
+          ...(typeof msg.mode === 'string' ? { mode: msg.mode } : {}),
         });
         return;
       case 'settings.aiProfiles.test':

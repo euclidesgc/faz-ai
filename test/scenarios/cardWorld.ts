@@ -1,8 +1,10 @@
 // O mundo de um cenário de ponta a ponta do card: banco em memória, router, runner e gateway montados
 // como o host monta (`host/boardHost.ts`), com a admissão por capacidades de verdade, o log de uso de
 // verdade e a conferência de verdade. Só a ponta externa é falsa: o processo da ferramenta (o agente
-// ACP falso, em processo, ou o `spawn` da CLI que só guarda o comando montado) e o binário que a
-// admissão confere, que é um arquivo qualquer na pasta do PATH do teste.
+// ACP falso, em processo, ou o `spawn` da CLI que só guarda o comando montado), o binário que a
+// admissão confere, que é um arquivo qualquer na pasta do PATH do teste, e, no modo API, a API do
+// Gemini (um servidor HTTP falso no próprio computador). No modo API o servidor MCP do board roda de
+// verdade: é por ele que o modelo lê e responde o card.
 //
 // Por que existe: os testes isolados de execution.ts, admission.ts e runCheck.ts passavam e o card de
 // verdade num perfil ACP ainda acusava desvio falso na conferência (#364). Só o caminho inteiro, do
@@ -16,6 +18,11 @@ import { ExecutionAdmission } from '../../src/extension/ai/admission';
 import { CapabilityEvidenceStore } from '../../src/extension/ai/capabilityEvidence';
 import type { AcpSpawnFn } from '../../src/extension/ai/acp/provider';
 import type { HeadlessCommand } from '../../src/extension/headless';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { executorOf, type ToolDriver } from '../../src/extension/ai/drivers';
+import { clientConnection, createGeminiApiDriver } from '../../src/extension/ai/drivers/gemini/api';
+import { createMcpServer } from '../../src/extension/mcp/server';
+import { profileApiKey } from '../../src/extension/ai/apiKey';
 import { openInMemory } from '../../src/extension/db/database';
 import { AiProfileRepo } from '../../src/extension/repositories/aiProfileRepo';
 import { createRunLog } from '../../src/extension/log/runLog';
@@ -26,7 +33,6 @@ import type { AiRunEnd } from '../../src/extension/ai/gateway';
 import { ACP_CAPABILITY_CHECKS, EXECUTOR_CAPABILITIES } from '../../src/shared/executionAdmission';
 import { admissionRegimeOf, type RunnerPermission } from '../../src/shared/runner';
 import type { AiProfile } from '../../src/shared/aiProfiles';
-import { driverOf } from '../../src/extension/ai/drivers';
 import { ToolKeys } from '../../src/extension/toolKeys';
 import { credentialsFor } from '../../src/extension/credentials';
 import { monthOf } from '../../src/shared/log';
@@ -60,6 +66,8 @@ export interface CardWorld {
   keys: ToolKeys;
   router: MessageRouter;
   runner: AiRunner;
+  /** no modo API: o driver de verdade apontado para o servidor HTTP falso (o Conectar o usa para conferir a chave) */
+  apiDriver: ToolDriver | null;
   cardId: string;
   /** cada linha que o runner escreveu no canal de log */
   lines: string[];
@@ -75,8 +83,17 @@ export interface CardWorld {
 }
 
 export interface CardWorldOptions {
-  /** o perfil de CLI do card: `gemini` (agente ACP pronto do catálogo, pelo campo Modelo) ou `claude` (o padrão do board) */
-  profile: 'gemini' | 'claude';
+  /**
+   * o perfil de CLI do card: `gemini` (agente ACP pronto do catálogo, pelo campo Modelo), `gemini-api` (o
+   * mesmo perfil no modo API, contra o servidor HTTP falso de `api`) ou `claude` (o padrão do board)
+   */
+  profile: 'gemini' | 'gemini-api' | 'claude';
+  /**
+   * o modo API: a raiz do servidor falso. O perfil chega pelo Conectar de verdade (o cenário o conecta pelo
+   * cartão API, com a chave no cofre `keys`), e o servidor MCP do board roda de verdade, em memória, ligado ao
+   * router e ao runner do cenário
+   */
+  api?: { endpoint: string };
   /** as ferramentas do agente da fase */
   tools: string[];
   permission?: RunnerPermission;
@@ -100,7 +117,8 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   for (const d of [project, home, bin]) fs.mkdirSync(d);
   // o binário que a admissão resolve pelo PATH e cujo conteúdo entra no vínculo; o processo é o falso, em
   // memória. Pelo Conectar ele roda uma vez, para dizer a versão (`gemini --version`, como a 0.65.0)
-  const connect = options.viaConnect;
+  // o modo API só existe pelo Conectar (o cartão API grava o modo e confere a chave)
+  const connect = options.viaConnect || options.profile === 'gemini-api';
   fs.writeFileSync(
     path.join(bin, 'gemini'),
     connect ? '#!/bin/sh\necho 0.65.0\n' : '#!/bin/sh\n# agente de teste: o processo é o falso, em memória\n',
@@ -134,7 +152,8 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   // a pessoa liga o perfil pronto (ligar é a revisão dele), escolhe o regime compatível (revisado por ela) e a permissão.
   // O Claude Code segue padrão do board, e o card vai para o Gemini pelo campo Modelo, com um modelo que o
   // "Detectar modelos" trouxe da sessão ACP: é assim que o agente do board chega ao ACP com as ferramentas dele
-  if (options.profile === 'gemini' && !connect) {
+  const gemini = options.profile !== 'claude';
+  if (gemini && !connect) {
     router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: true });
     router.handle({
       type: 'settings.models.set',
@@ -144,7 +163,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   router.handle({
     type: 'settings.board.update',
     patch: {
-      ...(options.profile === 'gemini' && options.boardDefault ? { aiTool: 'gemini' } : {}),
+      ...(gemini && options.boardDefault ? { aiTool: 'gemini' } : {}),
       runner: {
         defaultAgent: 'condutor-do-board',
         permission: options.permission ?? 'full',
@@ -155,11 +174,36 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
 
   const profiles = new AiProfileRepo(db);
   const evidence = new CapabilityEvidenceStore(path.join(root, 'evidencias'));
+  // no modo API o processo falso é o servidor HTTP falso: o driver de verdade, apontado para ele, e o board
+  // como cliente do próprio servidor MCP (o de verdade, ligado ao router e ao runner, por um par em memória
+  // no lugar do socket da pasta). Nenhuma prova é gravada antes: quem afirma é o host, na execução
+  /** o runner que o servidor MCP do board recebe; ele nasce depois do gateway, que o driver precisa antes */
+  const served: { runner?: AiRunner } = {};
+  const apiDriver =
+    options.profile === 'gemini-api'
+      ? createGeminiApiDriver({
+          endpoint: options.api!.endpoint,
+          connect: async (server, definition) => {
+            if (server !== 'faz-ai') throw new Error(`o cenário só tem o servidor do board (pediu ${server})`);
+            const token = (definition.env as Record<string, string> | undefined)?.FAZAI_RUN_TOKEN;
+            const [client, serverSide] = InMemoryTransport.createLinkedPair();
+            await createMcpServer(
+              { getRouter: async () => router, getRunner: async () => served.runner, workspaceDir: project, version: '0.0.0-cenario' },
+              () => token,
+            ).connect(serverSide);
+            return clientConnection(client);
+          },
+        })
+      : null;
+  const pick = (p: AiProfile) => (apiDriver && p.mode === 'api' ? apiDriver : executorOf(p));
   const admission = new ExecutionAdmission({
     pathEnv: () => bin,
     homeDir: home,
     evidence,
     environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
+    executorOf: pick,
+    // como o host: o vínculo do modo API leva o digest da chave do cofre da ferramenta
+    apiKey: (profile) => profileApiKey(keys, profile),
   });
   if (options.profile === 'gemini' && !connect) {
     // os recibos que o verificador do host gravaria para este agente: o ACP não prova os arquivos de
@@ -188,6 +232,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   const cliCommands: HeadlessCommand[] = [];
   const gateway = new AiGateway({
     resolveProfile: (id) => profiles.resolveProfile(router.boardId, id),
+    executorOf: pick,
     profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
     boardId: router.boardId,
     runLog: createRunLog(db),
@@ -205,10 +250,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
     // como o host: a chave do cofre para o driver que entra por chave, e o regime da ciência do perfil
     ...(connect
       ? {
-          apiKey: (profile: AiProfile) => {
-            const driver = driverOf(profile);
-            return driver?.auth.kind === 'api-key' ? keys.get(driver.tool) : null;
-          },
+          apiKey: (profile: AiProfile) => profileApiKey(keys, profile),
           regimeOf: (profileId: string) => admissionRegimeOf(router.snapshot().board.runner, profileId),
         }
       : {}),
@@ -221,13 +263,14 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
     nodePath: 'node',
     log: (line) => lines.push(line),
   });
+  served.runner = runner;
 
   // uma história numa fase de texto da IA do fluxo principal (a primeira em que a IA trabalha)
   const s = router.snapshot();
   const story = s.workflows.find((w) => w.kind === 'parent')!;
   const phase = s.columns.filter((c) => c.workflowId === story.id && c.aiActive).sort((a, b) => a.position - b.position)[0]!;
   const cardId = router.createCard({ typeId: s.cardTypes[0]!.id, columnId: phase.id, parentId: null, title: 'Card do cenário' });
-  if (options.profile === 'gemini' && !options.boardDefault && !connect) {
+  if (gemini && !options.boardDefault && !connect) {
     const field = s.fieldDefs.find((f) => f.kind === 'model')!;
     router.handle({ type: 'field.setValue', cardId, fieldId: field.id, value: GEMINI_MODEL.id });
   }
@@ -242,6 +285,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
     keys,
     router,
     runner,
+    apiDriver,
     cardId,
     lines,
     cliCommands,

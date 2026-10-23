@@ -1,5 +1,6 @@
 import type { WebviewToHost } from '../shared/messages';
 import type { BranchRenamePending } from '../shared/branchRename';
+import type { ConnectInput } from '../shared/connect';
 import type { AiTool } from '../shared/harness';
 import type { HarnessUsage, SelectableKind } from '../shared/harnessSelection';
 import type { AgentInput } from '../shared/messages';
@@ -167,7 +168,7 @@ export const settings = {
    */
   /** Dá ou revoga a ciência do regime compatível de um perfil (o caminho de quem não passa pelo Conectar, e a revogação). */
   reviewAiProfile: (id: string, accept: boolean) => req({ type: 'settings.aiProfiles.review', id, accept }),
-  connectAiProfile: (id: string, input: { apiKey?: string; acknowledge?: boolean } = {}) =>
+  connectAiProfile: (id: string, input: ConnectInput = {}) =>
     request({ type: 'settings.aiProfiles.connect', id, ...input }, { timeout: 600_000 }),
   updateBoard: (patch: BoardPatch) => req({ type: 'settings.board.update', patch }),
   resetBoard: () => req({ type: 'settings.board.reset' }),

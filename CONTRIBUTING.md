@@ -75,7 +75,11 @@ num driver; o board, as telas e a admissão só falam com o contrato.
    o `bindingContext` devolve `apiBinding(...)` (`ai/apiBinding.ts`: endpoint, modelo, versão da
    extensão e o digest da chave, nunca a chave), e a prova não vem de sonda, mas da evidência por
    construção que o host assina (`recordByConstruction`, com os checks de `API_CAPABILITY_CHECKS`); o
-   laço do driver é quem cumpre esses checks, com teste.
+   laço do driver é quem cumpre esses checks, com teste. O driver diz quais checks o laço cumpre
+   (`guarantees`), e a admissão afirma só esses, quando o vínculo atual não tem prova em vigor; o
+   gateway entrega `ctx.beforeRequest` (a admissão reconfere o vínculo com `AdmittedExecution.api()`)
+   para o driver chamar antes de cada pedido ao modelo e de cada chamada de ferramenta. A referência é
+   `drivers/gemini/api.ts`, com o board como cliente MCP de si mesmo (`mcp/selfClient.ts`).
 2. **A linha do catálogo**: a entrada da ferramenta em `TOOLS` (`src/shared/aiTools.ts`), com a
    página, a nota de cobrança, os modos oferecidos (só os que têm driver), os planejados (com a
    história que os entrega), o modo recomendado com o motivo e a ficha de cada modo, com as oito

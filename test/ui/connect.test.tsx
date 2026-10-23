@@ -47,10 +47,14 @@ describe('Conectar ferramenta: a lista e os cartões', () => {
     expect(buttons[0]).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('o Gemini oferece só o ACP nesta versão: um cartão, a ficha inteira e nenhum selo', () => {
+  it('o Gemini oferece o ACP e a API (história 10): a ficha inteira em cada um, o selo Recomendado na API', () => {
     show();
     const card = screen.getByLabelText('Gemini CLI · ACP');
     expect(within(card).queryByText('Recomendado')).toBeNull();
+    const api = screen.getByLabelText('Gemini CLI · API');
+    expect(within(api).getByText('Recomendado')).toBeInTheDocument();
+    expect(within(api).getByText('exclusivo, por construção: o board monta cada pedido e executa cada chamada')).toBeInTheDocument();
+    expect(within(api).getByText(/Refinar, Resumir e Trabalhar na fase com a permissão "Só o board"/)).toBeInTheDocument();
     // as oito linhas da ficha, na ordem
     expect(
       within(card)
@@ -67,10 +71,9 @@ describe('Conectar ferramenta: a lista e os cartões', () => {
       'Quando escolher',
     ]);
     expect(within(card).getByText('chave de API do Gemini')).toBeInTheDocument();
-    // a CLI e a API ainda não têm driver: nenhum cartão para elas, só o aviso
+    // a CLI ainda não tem driver: nenhum cartão para ela, só o aviso
     expect(screen.queryByLabelText('Gemini CLI · CLI')).toBeNull();
-    expect(screen.queryByLabelText('Gemini CLI · API')).toBeNull();
-    expect(screen.getByText('Ainda não oferecidos nesta versão: CLI, API.')).toBeInTheDocument();
+    expect(screen.getByText('Ainda não oferecidos nesta versão: CLI.')).toBeInTheDocument();
   });
 
   it('o Claude Code mostra a CLI com o selo e o porquê de ser a única', async () => {
@@ -145,6 +148,33 @@ describe('Conectar ferramenta: o fluxo na tela', () => {
     confirmLast();
     expect(await screen.findByRole('alert')).toHaveTextContent('Gemini CLI recusou a chave de API: API key not valid.');
     expect(screen.getByLabelText('Chave de API')).toHaveValue(KEY);
+  });
+
+  it('o cartão API conecta o mesmo perfil no modo api, confere a chave na hora e diz isso na tela', async () => {
+    show();
+    const api = () => screen.getByLabelText('Gemini CLI · API');
+    await userEvent.click(within(api()).getByRole('button', { name: 'Conectar' }));
+    expect(lastSent('settings.aiProfiles.connect')).toMatchObject({ id: 'gemini', mode: 'api' });
+    // o host publica a espera da chave para o modo api: o campo aparece no cartão API, não no ACP
+    publish({ mode: 'api', step: 'signIn', status: 'waiting', needs: 'api-key', summary: { version: null } });
+    confirmLast();
+    expect(await within(api()).findByText(/O board confere a chave agora, lendo a lista de modelos da conta/)).toBeInTheDocument();
+    expect(within(screen.getByLabelText('Gemini CLI · ACP')).queryByLabelText('Chave de API')).toBeNull();
+    await userEvent.type(within(api()).getByLabelText('Chave de API'), KEY);
+    await userEvent.click(within(api()).getByRole('button', { name: 'Conferir e guardar a chave' }));
+    expect(lastSent('settings.aiProfiles.connect')).toMatchObject({ id: 'gemini', mode: 'api', apiKey: KEY });
+    // conectada: a chave conferida, sem versão de binário, exclusivo
+    publish({
+      mode: 'api',
+      step: 'models',
+      status: 'connected',
+      summary: { version: null, signIn: 'api-key-checked', regime: 'exclusive', reviewed: null, models: 2, at: 1_700_000_000_000 },
+    });
+    confirmLast();
+    expect(await within(api()).findByRole('status')).toHaveTextContent(
+      /^Conectada · chave de API conferida · regime exclusivo · 2 modelos · /,
+    );
+    expect(document.body.innerHTML).not.toContain(KEY);
   });
 
   it('o texto do campo diz que a chave é guardada e conferida na primeira execução, não validada aqui', () => {

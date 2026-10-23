@@ -68,6 +68,34 @@ describe('ToolKeys', () => {
     expect(refs()).toEqual([]);
   });
 
+  it('replace: a chave nova só substitui a guardada depois de aceita; recusada, a antiga fica no cofre e no disco', async () => {
+    const { keys } = keysIn(root);
+    const vault = path.join(root, 'boards', '.credentials');
+    const refs = () => fs.readdirSync(vault).filter((f) => /^[a-f0-9]{64}\.json$/.test(f));
+    keys.set('gemini', KEY);
+    const before = refs();
+    const other = 'AIzaSy-outra-chave-999999';
+    const seen: string[] = [];
+    await expect(
+      keys.replace('gemini', `  ${other}\n`, async (k) => {
+        seen.push(k);
+        throw new Error('recusada');
+      }),
+    ).rejects.toThrow('recusada');
+    // o `accept` recebe a chave já sem espaços; nada mudou no índice nem no cofre
+    expect(seen).toEqual([other]);
+    expect(keys.get('gemini')).toBe(KEY);
+    expect(refs()).toEqual(before);
+    // aceita: a nova entra e só então a cifrada antiga sai
+    await keys.replace('gemini', other, async () => {});
+    expect(keys.get('gemini')).toBe(other);
+    expect(refs()).toHaveLength(1);
+    expect(refs()).not.toEqual(before);
+    // fora do formato nem chega ao `accept`
+    await expect(keys.replace('gemini', 'com espaço', async () => void seen.push('nao'))).rejects.toThrow('uma linha só');
+    expect(seen).toEqual([other]);
+  });
+
   it('apagar só tira o arquivo do mesmo dono', () => {
     const { store, keys } = keysIn(root);
     const other = store.put(JSON.stringify(['outro', 'dono']), { valor: 'x' });

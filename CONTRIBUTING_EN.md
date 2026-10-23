@@ -76,7 +76,12 @@ board, the screens and the admission only talk to the contract.
    is no process: `bindingContext` returns `apiBinding(...)` (`ai/apiBinding.ts`: endpoint, model,
    extension version and the key digest, never the key), and the proof does not come from a probe but
    from the by-construction evidence the host signs (`recordByConstruction`, with the checks in
-   `API_CAPABILITY_CHECKS`); the driver's loop is what fulfills those checks, with tests.
+   `API_CAPABILITY_CHECKS`); the driver's loop is what fulfills those checks, with tests. The driver
+   says which checks its loop fulfills (`guarantees`), and the admission asserts only those, when the
+   current binding has no proof in force; the gateway hands it `ctx.beforeRequest` (the admission
+   re-checks the binding with `AdmittedExecution.api()`) to call before every model request and every
+   tool call. The reference is `drivers/gemini/api.ts`, with the board as MCP client of itself
+   (`mcp/selfClient.ts`).
 2. **The catalog row**: the tool's entry in `TOOLS` (`src/shared/aiTools.ts`), with the page, the
    billing note, the offered modes (only the ones with a driver), the planned ones (with the story
    that delivers them), the recommended mode with the reason and each mode's sheet, with the eight

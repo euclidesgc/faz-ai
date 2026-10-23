@@ -21,9 +21,15 @@ const DAY = 24 * 60 * 60 * 1000;
  * chave). Não sonda nada: o recibo é o digest da afirmação (fonte, capacidade, check e vínculo), e quem
  * dá valor a ela é a assinatura do host, feita por `recordByConstruction` com a mesma chave local das
  * provas das sondas. A validade é a mesma das sondas; como refazer não custa nada, vencer só obriga o
- * host a afirmar de novo para o vínculo atual.
+ * host a afirmar de novo para o vínculo atual. `guaranteed` são os checks que o laço do driver cumpre de
+ * fato (`Executor.guarantees`): os outros ficam sem recibo, e a capacidade sai parcial, nunca afirmada à toa.
  */
-export function constructionEvidence(binding: string, now: number, ttlMs = 14 * DAY): CapabilityEvidence[] {
+export function constructionEvidence(
+  binding: string,
+  now: number,
+  ttlMs = 14 * DAY,
+  guaranteed: readonly string[] = Object.values(API_CAPABILITY_CHECKS).flat(),
+): CapabilityEvidence[] {
   if (!/^[a-f0-9]{64}$/.test(binding)) throw new Error('Vínculo de evidência inválido.');
   return EXECUTOR_CAPABILITIES.map((capability) => ({
     version: 1,
@@ -32,13 +38,15 @@ export function constructionEvidence(binding: string, now: number, ttlMs = 14 * 
     binding,
     checkedAt: now,
     expiresAt: now + ttlMs,
-    checks: API_CAPABILITY_CHECKS[capability].map((id) => ({
-      id,
-      outcome: 'passed' as const,
-      receipt: createHash('sha256')
-        .update(canonical({ source: 'by-construction', capability, check: id, binding }))
-        .digest('hex'),
-    })),
+    checks: API_CAPABILITY_CHECKS[capability]
+      .filter((id) => guaranteed.includes(id))
+      .map((id) => ({
+        id,
+        outcome: 'passed' as const,
+        receipt: createHash('sha256')
+          .update(canonical({ source: 'by-construction', capability, check: id, binding }))
+          .digest('hex'),
+      })),
   }));
 }
 /** O índice do vínculo da última prova por perfil (não começa com um hash, então `load` nunca o lê como evidência). */
@@ -86,8 +94,8 @@ export class CapabilityEvidenceStore {
    * API, quando a execução ou o Conectar não acham prova em vigor para o vínculo atual); a IA e a tela não
    * têm caminho até aqui, e a evidência só vale para o transporte `api` (`evidenceSource`).
    */
-  recordByConstruction(binding: string, now: number, ttlMs?: number): CapabilityEvidence[] {
-    const rows = constructionEvidence(binding, now, ttlMs);
+  recordByConstruction(binding: string, now: number, ttlMs?: number, guaranteed?: readonly string[]): CapabilityEvidence[] {
+    const rows = constructionEvidence(binding, now, ttlMs, guaranteed);
     for (const row of rows) this.record(row);
     return rows;
   }

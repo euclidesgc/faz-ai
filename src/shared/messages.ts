@@ -1,4 +1,5 @@
 import type { PolicyReply, PolicyScenario } from './policyManagement';
+import type { ToolMode } from './aiTools';
 import type { ExecutionPolicy } from './executionPolicies';
 import type { ContextDraftResolution } from './contextDraftResolution';
 import type { ContextActivityTarget, ContextPlanningWrite, ActivityContextWrite } from './contextPlanning';
@@ -271,9 +272,10 @@ export type WebviewToHost =
   /**
    * Conecta (ou reconecta) um perfil do catálogo pelo driver dele (história 7). `apiKey` é a chave colada no
    * campo: vai só para o cofre do host e nunca volta. `acknowledge` é o clique na ciência do regime compatível.
-   * O estado de cada passo chega pelo `connections` do board.
+   * `mode` é o cartão em que a pessoa clicou (um perfil por ferramenta, o modo trocável: o Gemini pelo ACP ou
+   * pela API, história 10); sem ele, o modo atual do perfil. O estado de cada passo chega pelo `connections`.
    */
-  | { type: 'settings.aiProfiles.connect'; id: string; apiKey?: string; acknowledge?: boolean }
+  | { type: 'settings.aiProfiles.connect'; id: string; apiKey?: string; acknowledge?: boolean; mode?: ToolMode }
   /**
    * Dá (`accept: true`) ou revoga a ciência do regime compatível de um perfil (história 7): o perfil com ciência
    * roda no compatível; sem ela, no regime do board.

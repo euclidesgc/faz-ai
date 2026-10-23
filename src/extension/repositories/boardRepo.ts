@@ -28,6 +28,9 @@ import { parseRules, type BoardRules } from '../../shared/rules';
 import { seedBoard } from '../db/seed';
 import { BOARD_TEMPLATE, insertColumn, pendingUpgrade } from '../db/boardTemplate';
 import { isCardStatus } from '../../shared/status';
+
+/** A chave, na tabela meta, do contador das revisões de ciência já dadas por perfil (fora da exportação). */
+const reviewCounterKey = (boardId: string) => `compatibility_review_issued:${boardId}`;
 import { parseRunner, type RunnerConfig } from '../../shared/runner';
 import { parseProfiles, type LegacyExecProfile } from '../../shared/execution';
 import type { HarnessSelection, HarnessUsage, SelectableKind } from '../../shared/harnessSelection';
@@ -68,10 +71,27 @@ export class BoardRepo {
    */
   recordCompatibilityReview(boardId: string, profileId: string): number {
     const current = parseRunner(str(one(this.db, 'SELECT runner_json FROM boards WHERE id = ?', [boardId])?.runner_json));
-    const revision = (current.compatibilityReviews[profileId] ?? 0) + 1;
+    // monotônica: a revogação tira a ciência do runner, mas a última revisão dada fica no contador, e a
+    // próxima ciência é sempre maior que qualquer anterior (revogar e dar de novo nunca volta a 1)
+    const issued = this.reviewCounter(boardId);
+    const revision = Math.max(current.compatibilityReviews[profileId] ?? 0, issued[profileId] ?? 0) + 1;
     const next = { ...current, compatibilityReviews: { ...current.compatibilityReviews, [profileId]: revision } };
     run(this.db, 'UPDATE boards SET runner_json = ? WHERE id = ?', [JSON.stringify(parseRunner(JSON.stringify(next))), boardId]);
+    this.setMeta(reviewCounterKey(boardId), JSON.stringify({ ...issued, [profileId]: revision }));
     return revision;
+  }
+
+  /** A última revisão de ciência dada a cada perfil do board, mesmo as revogadas (fica na tabela meta). */
+  private reviewCounter(boardId: string): Record<string, number> {
+    try {
+      const raw: unknown = JSON.parse(this.getMeta(reviewCounterKey(boardId)) ?? '{}');
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+      return Object.fromEntries(
+        Object.entries(raw).filter((e): e is [string, number] => Number.isSafeInteger(e[1]) && (e[1] as number) > 0),
+      );
+    } catch {
+      return {};
+    }
   }
 
   /**

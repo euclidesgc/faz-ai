@@ -42,18 +42,32 @@ export const STEP_NAMES: Record<ConnectStep, string> = {
   models: 'Ler os modelos',
 };
 
-/** O perfil do catálogo que conecta a ferramenta neste modo: o pronto, cujo id é a própria ferramenta. */
-export const catalogProfileOf = (profiles: readonly AiProfile[], tool: string, mode: string): AiProfile | undefined =>
-  profiles.find((p) => isReadyProfile(p) && p.tool === tool && p.mode === mode);
+/**
+ * O perfil do catálogo que conecta a ferramenta: o pronto, cujo id é a própria ferramenta. É um perfil por
+ * ferramenta, com o modo trocável (história 10): o cartão de outro modo conecta o mesmo perfil, que passa
+ * para aquele modo quando o login dá certo.
+ */
+export const catalogProfileOf = (profiles: readonly AiProfile[], tool: string): AiProfile | undefined =>
+  profiles.find((p) => isReadyProfile(p) && p.tool === tool);
 
 /**
  * "Conectada · 0.65.0 · chave de API guardada · regime compatível (ciência 1) · 6 modelos · data". A ciência é a de
  * agora (`review`, do runner do board), não a da hora da conexão: revogada depois, o resumo diz que falta.
  */
 export function connectionSummary(s: Partial<ConnectSummary>, review: number | null = s.reviewed ?? null): string {
+  // o modo API não tem binário nem versão: a chave conferida é o que diz que ele está pronto
+  const checked = s.signIn === 'api-key-checked';
   const parts = [
-    s.version ?? t('versão desconhecida'),
-    t(s.signIn === 'api-key' ? 'chave de API guardada' : s.signIn === 'signed-in' ? 'login confirmado' : 'login não verificado'),
+    ...(checked && !s.version ? [] : [s.version ?? t('versão desconhecida')]),
+    t(
+      checked
+        ? 'chave de API conferida'
+        : s.signIn === 'api-key'
+          ? 'chave de API guardada'
+          : s.signIn === 'signed-in'
+            ? 'login confirmado'
+            : 'login não verificado',
+    ),
     s.regime === 'exclusive'
       ? t('regime exclusivo')
       : s.regime === 'compatible'
@@ -80,7 +94,12 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
   /** "Trocar a chave" aberto no cartão conectado */
   const [changing, setChanging] = useState(false);
   const review = useBoardStore((s) => s.state?.board.runner.compatibilityReviews?.[profile.id] ?? null);
-  const connect = useAction((input: { apiKey?: string; acknowledge?: boolean }) => settings.connectAiProfile(profile.id, input));
+  // o modo do cartão vai junto: "Tentar de novo" e a chave continuam o Conectar deste modo
+  const connect = useAction((input: { apiKey?: string; acknowledge?: boolean }) =>
+    settings.connectAiProfile(profile.id, mode ? { ...input, mode: mode.mode } : input),
+  );
+  /** no modo API a chave é conferida agora, pela API; no ACP o agente a aceita sem consultar a rede */
+  const checksNow = mode?.mode === 'api';
   const revoke = useAction(() => settings.reviewAiProfile(profile.id, false));
   const current = CONNECT_STEPS.indexOf(state.step);
   const waitingKey = state.status === 'waiting' && state.needs === 'api-key';
@@ -113,7 +132,7 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
             <IconCheck /> {t('Conectada')} · {connectionSummary(state.summary, review)}
           </p>
           <div className="row end">
-            {state.summary.signIn === 'api-key' && !changing && (
+            {(state.summary.signIn === 'api-key' || state.summary.signIn === 'api-key-checked') && !changing && (
               <ActionButton
                 size="1"
                 variant="soft"
@@ -166,9 +185,13 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
             placeholder={t('Cole a chave aqui')}
           />
           <p className="muted small">
-            {t(
-              'A chave fica guardada no cofre deste computador e vai para o login da ferramenta; ela não volta para esta tela. A ferramenta a confere de fato na primeira execução: uma chave errada aparece ali, com a mensagem dela.',
-            )}
+            {checksNow
+              ? t(
+                  'O board confere a chave agora, lendo a lista de modelos da conta pela API do Gemini (não gasta a conta). Aceita, ela fica guardada no cofre deste computador, a mesma para todos os modos, e vai à API só no cabeçalho; ela não volta para esta tela. Recusada, a chave guardada antes continua.',
+                )
+              : t(
+                  'A chave fica guardada no cofre deste computador e vai para o login da ferramenta; ela não volta para esta tela. A ferramenta a confere de fato na primeira execução: uma chave errada aparece ali, com a mensagem dela.',
+                )}
           </p>
           <div className="row end">
             {changing && (
@@ -187,11 +210,15 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
             )}
             <ActionButton
               type="submit"
-              hint={t('Guarda a chave no cofre e continua o Conectar.')}
+              hint={t(
+                checksNow
+                  ? 'Confere a chave com a API, guarda no cofre e continua o Conectar.'
+                  : 'Guarda a chave no cofre e continua o Conectar.',
+              )}
               disabled={!apiKey.trim()}
               loading={connect.busy}
             >
-              {t('Guardar a chave e continuar')}
+              {t(checksNow ? 'Conferir e guardar a chave' : 'Guardar a chave e continuar')}
             </ActionButton>
           </div>
         </form>
@@ -246,9 +273,13 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
 /** Um cartão de modo: a ficha, o selo Recomendado (só no modo recomendado oferecido) e o Conectar. */
 function ModeCard({ tool, mode, recommended }: { tool: AiToolEntry; mode: ToolModeEntry; recommended: boolean }) {
   const state = useBoardStore((s) => s.state)!;
-  const profile = catalogProfileOf(state.board.aiProfiles, tool.id, mode.mode);
-  const connection = profile ? state.connections?.[profile.id] : undefined;
-  const connect = useAction(() => settings.connectAiProfile(profile!.id));
+  const profile = catalogProfileOf(state.board.aiProfiles, tool.id);
+  /** o perfil da ferramenta está neste modo (é por ele que os cards rodam) */
+  const inUse = profile?.mode === mode.mode;
+  // a conexão é do perfil, e o cartão mostra a deste modo: a em curso dele, ou a concluída do modo em uso
+  const raw = profile ? state.connections?.[profile.id] : undefined;
+  const connection = raw && (raw.mode ?? profile!.mode) === mode.mode ? raw : undefined;
+  const connect = useAction(() => settings.connectAiProfile(profile!.id, { mode: mode.mode }));
   const title = `${tool.name} · ${modeLabel(mode.mode as AiProfile['mode'])}`;
   return (
     <Card className="connect-mode" aria-label={title}>
@@ -257,6 +288,11 @@ function ModeCard({ tool, mode, recommended }: { tool: AiToolEntry; mode: ToolMo
         {recommended && (
           <Badge color="indigo" variant="solid">
             {t('Recomendado')}
+          </Badge>
+        )}
+        {inUse && profile?.enabled && (
+          <Badge color="gray" variant="soft">
+            {t('Modo em uso')}
           </Badge>
         )}
       </div>
@@ -274,9 +310,11 @@ function ModeCard({ tool, mode, recommended }: { tool: AiToolEntry; mode: ToolMo
           hint={
             connection?.status === 'connected'
               ? t('Refaz o login, a verificação e a leitura dos modelos.')
-              : t('Acha a ferramenta, faz o login, verifica as capacidades e lê os modelos.')
+              : inUse
+                ? t('Acha a ferramenta, faz o login, verifica as capacidades e lê os modelos.')
+                : t('Passa o perfil da ferramenta para este modo quando o login der certo, com a mesma chave e os mesmos modelos.')
           }
-          disabled={!profile || connection?.status === 'running'}
+          disabled={!profile || raw?.status === 'running'}
           disabledReason={!profile ? t('Este modo ainda não tem perfil neste board.') : t('O Conectar está em curso.')}
           loading={connect.busy}
           onClick={() => void connect.run()}

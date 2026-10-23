@@ -24,6 +24,12 @@ export async function probeProfiles(profiles: readonly AiProfile[], deps: Profil
     profiles
       .filter((p) => !isPendingReview(p))
       .map(async (profile): Promise<ProfileProbe> => {
+        // o modo API não tem binário: quem fala com a rede é a extensão, então ele está sempre presente. O
+        // login é a chave no cofre (só a presença, sem rede: quem a confere é o Conectar)
+        if (profile.mode === 'api') {
+          const signedIn = await deps.signedIn(profile, '').catch(() => null);
+          return { id: profile.id, found: true, login: signedIn === null ? 'unchecked' : signedIn ? 'signed-in' : 'signed-out' };
+        }
         const executable = deps.resolve(profile);
         if (!executable) return { id: profile.id, found: false, login: 'unchecked' };
         const [version, signedIn] = await Promise.all([

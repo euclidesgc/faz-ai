@@ -86,6 +86,20 @@ export const ACP_ENFORCEMENT: ModeEnforcement = {
   model: 'advised',
 };
 
+/**
+ * O modo API (épica "ferramenta por modo", história 10): o board faz o laço de chamadas de função e só
+ * declara ao modelo as ferramentas que a decisão do card admite, então MCP, ferramentas e modelo são
+ * garantidos por construção. O agente do card e as skills seguem pelo pedido (`systemInstruction`): não
+ * há descoberta nativa de agente nem de skill num modelo puro.
+ */
+export const API_ENFORCEMENT: ModeEnforcement = {
+  agent: 'advised',
+  skills: 'advised',
+  mcp: 'enforced',
+  tools: 'enforced',
+  model: 'enforced',
+};
+
 /** A ficha de um agente pelo ACP: o protocolo é o mesmo, mudam o consumo, a entrada e a cobrança. */
 function acpSheet(o: { name: string; consumption: string; signIn: string; billing: string; whenToChoose?: string }): ModeSheet {
   return {
@@ -127,11 +141,24 @@ export const TOOLS: readonly AiToolEntry[] = [
         }),
         enforcement: ACP_ENFORCEMENT,
       },
+      {
+        // até a história 11 o laço só tem as ferramentas MCP: arquivos e shell (`edits`, `full`) vêm depois
+        mode: 'api',
+        sheet: {
+          controls: 'tudo: contexto, ferramentas, MCP e permissões, chamada a chamada',
+          regime: 'exclusivo, por construção: o board monta cada pedido e executa cada chamada',
+          precision: 'exata: o inventário é a lista de chamadas que o board executou',
+          consumption: 'tokens por chamada (`usageMetadata`); nada gasto com contexto que o board não pediu',
+          brings: 'só o modelo: as ferramentas são as do board e as dos MCPs do card',
+          signIn: 'chave de API do Gemini, guardada no cofre local',
+          billing: 'por token',
+          whenToChoose:
+            'para a finalidade do board: prever o acesso e gastar só o pedido. Por enquanto serve a Refinar, Resumir e Trabalhar na fase com a permissão "Só o board"; arquivos e comandos chegam numa próxima versão',
+        },
+        enforcement: API_ENFORCEMENT,
+      },
     ],
-    planned: [
-      { mode: 'cli', story: 8 },
-      { mode: 'api', story: 10 },
-    ],
+    planned: [{ mode: 'cli', story: 8 }],
     recommended: {
       mode: 'api',
       reason: 'É o único modo em que o board sabe de antemão tudo o que o agente pode acessar e paga só pelo que pediu.',

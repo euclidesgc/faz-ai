@@ -663,17 +663,71 @@ describe('admissão do modo API (história 9)', () => {
     );
   });
 
-  it('sem driver da API, o perfil no modo API é recusado com a causa, e nunca cai na CLI nem no ACP', () => {
+  it('com o driver da API (história 10), o host afirma a prova por construção na execução, e a prévia usa o modelo do card', () => {
     const p = apiProfile();
     expect(admissionTransport(p)).toBe('api');
-    expect(() => executorOf(p)).toThrow('O modo API de Gemini ainda não roda nesta versão da extensão.');
-    expect(() => admission.prepare(p, 'gemini', apiInput(), dir, request())).toThrow('ainda não roda nesta versão');
+    expect(executorOf(p).transport).toBe('api');
+    // sem a chave do cofre não há vínculo do modo API
+    expect(admissionWith(executorOf(p)).preview(p, 'gemini', request(), dir, MODEL.name).reasons).toContainEqual({
+      code: 'executor-unavailable',
+    });
+    // a chave chega à admissão pelo cofre da ferramenta (no host, `profileApiKey(toolKeys, perfil)`)
+    const admission = new ExecutionAdmission({
+      pathEnv: () => dir,
+      homeDir: dir,
+      evidence: store,
+      now: () => now,
+      environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
+      apiKey: () => API_KEY,
+    });
+    // a prévia não grava nada: sem modelo não há vínculo do modo API; com o do card, avalia a prova que o
+    // host afirmaria
     expect(admission.preview(p, 'gemini', request(), dir).reasons).toContainEqual({ code: 'executor-unavailable' });
+    expect(admission.preview(p, 'gemini', request(), dir, MODEL.name)).toMatchObject({ state: 'admitted', reasons: [] });
+    expect(fs.existsSync(path.join(dir, 'evidence'))).toBe(false);
+    // a execução: o driver registrado diz o que o laço garante, e o host assina por construção
+    const admitted = admission.prepare(p, 'gemini', apiInput(), dir, request());
+    expect(admitted).toMatchObject({ transport: 'api', decision: { state: 'admitted' } });
+    const isolation = admission.isolationBinding(p, 'gemini', 'board', MODEL).binding;
+    const rows = store.load(isolation);
+    expect(rows.map((r) => r.capability).sort()).toEqual([...EXECUTOR_CAPABILITIES].sort());
+    expect(rows.every((r) => r.source === 'by-construction' && r.checks.every((c) => c.outcome === 'passed'))).toBe(true);
+    // o validador do modo API passa no vínculo admitido; uma segunda execução não afirma de novo
+    expect(() => admitted.api()).not.toThrow();
+    admission.prepare(p, 'gemini', apiInput(), dir, request());
+    expect(store.load(isolation)).toHaveLength(rows.length);
     // o Gemini pronto traz o agente ACP do código: no modo API ele não é ACP
     const ready = { ...BUILTIN_PROFILES.find((b) => b.id === 'gemini')!, mode: 'api' as const };
     expect(isAcpProfile(ready)).toBe(false);
     expect(admissionTransport(ready)).toBe('api');
-    expect(() => executorOf(ready)).toThrow('O modo API de Gemini');
+    // uma ferramenta sem o laço da API é recusada com a causa, e nunca cai na CLI nem no ACP
+    const claudeApi = profile({ id: 'claude', kind: 'catalog', tool: 'claude', mode: 'api', base: 'claude' });
+    expect(() => executorOf(claudeApi)).toThrow('O modo API de Claude Code ainda não roda nesta versão da extensão.');
+    expect(() => admission.prepare(claudeApi, 'claude', apiInput(), dir, request())).toThrow('ainda não roda nesta versão');
+  });
+
+  it('o host só afirma o que o laço garante: um check sem garantia deixa a capacidade parcial e a execução bloqueada', () => {
+    const partial = admissionWith({
+      ...apiExecutor(),
+      guarantees: () => ['board-built-request', 'no-own-context-files', 'declared-functions'],
+    });
+    const p = apiProfile();
+    let error: unknown;
+    try {
+      partial.prepare(p, 'gemini', apiInput(), dir, request());
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(AdmissionBlockedError);
+    expect((error as AdmissionBlockedError).decision.reasons).toEqual([
+      { code: 'capability-not-verified', capability: 'mcp' },
+      { code: 'capability-not-verified', capability: 'delegation' },
+    ]);
+    // e a prévia mostra o mesmo, sem gravar
+    const isolation = partial.isolationBinding(p, 'gemini', 'board', MODEL).binding;
+    const written = store.load(isolation).length;
+    expect(partial.preview(p, 'gemini', request(), dir, MODEL.name).state).toBe('blocked');
+    expect(store.load(isolation)).toHaveLength(written);
   });
 
   it('o vínculo da CLI e do ACP continua sem o modelo do card (a régua da história 6)', () => {
