@@ -3,7 +3,8 @@
 > Registro de uma épica proposta, ainda não decidida no board. Ele parte do que a develop já tem
 > (`#983`, `#977`, `#988`, `#1055`) e desenha as histórias derivadas na ordem em que uma depende da
 > outra. Cada história ganha o próprio registro quando for entregue. Escrito em 2026-10-22; a
-> história 2 entrou em 2026-10-23, depois da entrega da 1.
+> história 2 entrou em 2026-10-23, depois da entrega da 1, e a 9 no mesmo dia, depois da
+> homologação da 5.
 
 ## Contexto
 
@@ -53,9 +54,10 @@ Entregar a forma de uso em histórias derivadas, empilhadas na `develop`, nesta 
 | 6 | Limite de uso por agente | 3 | a pausa e o fallback das políticas valem para os agentes ACP |
 | 7 | Teste real do transporte (reabre a `#988`) | 3 | cada agente validado com a CLI, fixture gravada |
 | 8 | Catálogo lido do registro do ACP | 3 | agente novo sem versão nova da extensão (opcional) |
+| 9 | Catálogo de modelos acompanha o agente | 4, 5 | modelos lidos ao conectar e ao abrir o board; aviso quando um modelo em uso some |
 
 A 6 e a 7 podem andar em paralelo com a 4 e a 5. A 8 fica para depois de haver dois agentes
-validados.
+validados. A 9 vem depois da 4, porque a conexão é o momento certo da primeira leitura.
 
 A história 2 não estava no desenho original: a 1 provou que um agente ACP só é admissível no
 regime compatível, e o regime está fixo em `exclusive` no host desde a `#880` ("até o host preparar
@@ -159,6 +161,35 @@ recusado, e os perfis prontos da 3 nasceriam sem poder rodar.
 - Ler `registry.json` do ACP com cache, só para comando, argumentos e distribuição; o que cada
   agente mede continua declarado à mão. Entra quando houver dois agentes validados.
 
+### 9. Catálogo de modelos acompanha o agente
+
+> Pedida na homologação da 5 (2026-10-23): a lista do agente muda com o tempo, modelos novos
+> surgem e outros saem, e a pessoa não deve depender de lembrar de clicar em Detectar modelos.
+
+- **Leitura na conexão**: Conectar (4) bem-sucedido grava os modelos do agente no catálogo na
+  mesma passada, sem segundo clique. O botão **Detectar modelos** continua no perfil, para reler
+  quando a pessoa quiser.
+- **Leitura ao abrir o board**: o host abre uma sessão com cada perfil ACP habilitado e instalado,
+  em segundo plano, logo após abrir o board (e de novo quando a faixa de requisitos reconfere o
+  login). Cada leitura é só `initialize` e `session/new`, nunca `session/prompt`, então não gasta a
+  conta; falha de leitura (agente sem login, binário sumido) não derruba nada: o catálogo fica como
+  está e o relatório do ambiente registra o motivo.
+- **Diferença entre leituras**: o catálogo guarda a data da última leitura por ferramenta. Modelo
+  novo entra; modelo que o agente parou de anunciar sai do catálogo mas fica marcado como
+  "fora do catálogo" onde já estiver escolhido (o campo de modelo já mostra esse estado desde a
+  `#1093`), sem apagar a escolha da pessoa.
+- **Alertas na tela de ambiente**: a tela Ambiente (relatório de requisitos) ganha uma seção de
+  modelos por ferramenta com o que mudou desde a última leitura (entrou, saiu) e, em destaque, um
+  aviso por modelo que **saiu e está em uso**: em regra de modelo, agente do board, política de
+  execução ou card não concluído, com o link para cada lugar. O aviso vai também à faixa de
+  requisitos, como os de CLI sem login.
+- **Fica fora**: trocar a escolha da pessoa automaticamente (o board só avisa; a política de
+  fallback é o lugar de "se este sumir, use aquele") e reler o catálogo das CLIs de uma passada
+  (Cursor, Kimi) nesse mesmo ciclo, que vem depois se a 9 provar o ganho.
+- Testes: `test/acpModels.test.ts` (diferença entre leituras), `test/environment.test.ts`
+  (relatório com modelos que saíram e onde estão em uso), `test/ui/...` (seção na tela Ambiente
+  e aviso na faixa); `docs/harness.md` (Diagnóstico/Ambiente) e `docs/configuracoes.md`.
+
 ## Alternativas descartadas
 
 - **Ligar o ACP sem a admissão (história 1 como "exceção para generic")**: abriria um caminho de
@@ -179,7 +210,8 @@ recusado, e os perfis prontos da 3 nasceriam sem poder rodar.
   ferramenta sem ficar longa (campo de modelo com seções).
 - A medição varia por agente: fallback para um agente sem medição funciona, e o painel de Consumo
   mostra "desconhecido", nunca zero. Comparar custo-benefício só entre agentes com a mesma medição.
-- `cliProbe.ts` e a faixa de requisitos passam a conhecer oito comandos a mais.
+- `cliProbe.ts` e a faixa de requisitos passam a conhecer oito comandos a mais, e a abertura do
+  board passa a abrir uma sessão curta com cada agente ACP habilitado (9), em segundo plano.
 - Documentação: `docs/harness.md` (perfis), `docs/configuracoes.md` (Conectar, modelos por
   ferramenta, políticas), `docs/mcp.md` (seção ACP), README (recurso novo) e CHANGELOGs, em pt e en.
 
@@ -194,6 +226,8 @@ flowchart LR
   H3 --> H6[6 Limite de uso por agente]
   H3 --> H7[7 Teste real]
   H3 -.-> H8[8 Catálogo do registro]
+  H4 --> H9[9 Catálogo acompanha o agente]
+  H5 --> H9
 ```
 
 ```mermaid
