@@ -23,6 +23,7 @@ import { executorOf, type ApiInvocation, type Executor } from './drivers';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import { boardOnlyMcpConfig } from '../execution';
 import { deniedLocal, deniesTool } from '../../shared/apiTools';
+import { isCardToolName } from '../../shared/runCheck';
 import { canonical, constructionEvidence, CapabilityEvidenceStore } from './capabilityEvidence';
 import { INHERITED_SESSION_ENV } from '../spawn';
 
@@ -441,6 +442,18 @@ export class ExecutionAdmission {
     if (transport === 'acp') {
       const valid = (t: unknown): t is string => typeof t === 'string' && !!t && !t.includes('\0');
       const cardDenied = (input.exec?.deniedTools ?? []).filter(valid);
+      // uma negada fora do vocabulário do card (`Bash(rm:*)`, `bash`) não tem tradução para o pedido do agente:
+      // aceitá-la seria uma garantia aparente, então a execução não parte (o mesmo motivo do modo API)
+      const unknown = cardDenied.filter((t) => !isCardToolName(t));
+      if (unknown.length) {
+        const blocked = new AdmissionBlockedError({
+          ...preliminary,
+          state: 'blocked',
+          reasons: unknown.map((name) => ({ code: 'unsupported-native-restriction', resourceId: name })),
+        });
+        blocked.message = `Execução bloqueada pela admissão: o card nega ${unknown.map((n) => `"${n}"`).join(', ')}, que o ACP não reconhece. Use os nomes das ferramentas do card (Read, Glob, Grep, Write, Edit, Bash) ou mcp__servidor__ferramenta.`;
+        throw blocked;
+      }
       // A lista do card vai para o registro e a conferência, no vocabulário do card (a decisão do ACP não lista
       // nativas: o protocolo não tem lista de allow). Ela não recusa pedidos, como no modo API: o `boardDecision`
       // impõe só as negadas, e um nome listado que também está negado (a delegação) continua negado.

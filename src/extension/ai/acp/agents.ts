@@ -27,6 +27,28 @@ export function geminiToolOf(toolCallId: string): string | null {
   return name && Object.hasOwn(GEMINI_TOOL_EQUIVALENTS, name) ? name : null;
 }
 
+/** O nome válido que o Gemini CLI dá a um nome MCP (`generateValidName`, 0.65.0): fora de `[A-Za-z0-9_.:-]` vira `_`. */
+const geminiValidName = (name: string): string => name.replace(/[^a-zA-Z0-9_\-.:]/g, '_');
+
+/**
+ * A ferramenta MCP no `toolCallId` do Gemini CLI. A ferramenta MCP se chama `mcp_<servidor>_<ferramenta>`
+ * (`DiscoveredMCPTool.getFullyQualifiedName` e `generateValidName`, pacote 0.65.0, bundle/chunk-DKZARV6U.js),
+ * e o id é `<nome>__<id>`. O servidor é o mais longo dos do card que casa com o prefixo (o nome do servidor
+ * pode ter `_`); um `mcp_` de servidor fora do card fica com o primeiro trecho, e o board o recusa por não ser
+ * do card. A ferramenta vai até o primeiro `__` depois do prefixo.
+ */
+export function geminiMcpToolOf(toolCallId: string, servers: readonly string[]): { server: string; tool: string } | null {
+  if (!toolCallId.startsWith('mcp_')) return null;
+  const at = toolCallId.indexOf('__');
+  const name = at > 0 ? toolCallId.slice(0, at) : toolCallId;
+  const server = [...servers]
+    .sort((a, b) => b.length - a.length)
+    .find((s) => name.startsWith(`mcp_${geminiValidName(s)}_`) && name.length > `mcp_${geminiValidName(s)}_`.length);
+  if (server) return { server, tool: name.slice(`mcp_${geminiValidName(server)}_`.length) };
+  const m = /^mcp_([^_]+)_(.+)$/.exec(name);
+  return m ? { server: m[1]!, tool: m[2]! } : null;
+}
+
 /** `--model <nome>`: o esforço não tem flag nesses agentes. */
 const modelFlag = (model: { name: string }) => ['--model', model.name];
 
@@ -47,8 +69,10 @@ export const ACP_AGENTS: readonly AcpAgent[] = [
     // conferido na 0.65.0), sem `configOptions`: a escolha do card vai só pela linha de comando
     fullMode: 'yolo',
     // o nome de exibição que o Gemini CLI dá às ferramentas MCP: `ferramenta (servidor MCP Server)`
-    mcpTitle: /^(?<tool>.+?) \((?<server>.+?) MCP Server\)/,
+    // ancorado no título inteiro: no Gemini o título do shell é o comando do modelo, que pode imitar este
+    mcpTitle: /^(?<tool>[^()]+?) \((?<server>[^()]+?) MCP Server\)$/,
     nativeToolOf: geminiToolOf,
+    mcpToolOfId: geminiMcpToolOf,
     // "inputTokens: prompt tokens, including cached tokens" (PR #29549)
     inputIncludesCache: true,
     // versões anteriores ao PR: `_meta.quota.token_count` com `input_tokens` e `output_tokens`, sem cache

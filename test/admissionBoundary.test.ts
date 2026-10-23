@@ -313,6 +313,25 @@ describe('vínculo de isolamento saneado', () => {
     expect(card.decision.tools).toEqual(['Read', 'Grep']);
     expect(card.decision.deniedTools).toEqual(expect.arrayContaining(['Bash', 'mcp__srv__x']));
     expect(acpSessionMode(gemini, card.input)).toBeUndefined();
+    // uma negada fora do vocabulário do card não tem tradução para o pedido: a execução não parte
+    let refused: unknown;
+    try {
+      admission.prepare(
+        acp,
+        acp.id,
+        { prompt: 'objetivo', permission: 'full', exec: { tools: [], deniedTools: ['Bash(rm:*)', 'bash', 'Read'] } as never },
+        dir,
+        reviewed,
+      );
+    } catch (e) {
+      refused = e;
+    }
+    expect(refused).toBeInstanceOf(AdmissionBlockedError);
+    expect((refused as AdmissionBlockedError).decision.reasons).toEqual([
+      { code: 'unsupported-native-restriction', resourceId: 'Bash(rm:*)' },
+      { code: 'unsupported-native-restriction', resourceId: 'bash' },
+    ]);
+    expect((refused as Error).message).toContain('que o ACP não reconhece');
   });
   it('variável volátil e as da sessão do Claude Code não mudam o vínculo; as que a ferramenta lê, mudam', () => {
     const claude = profile({ config: { command: exe('claude-g', 'binário G') } });

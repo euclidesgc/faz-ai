@@ -1,4 +1,4 @@
-import { GEMINI_TOOL_EQUIVALENTS } from './agentTools';
+import { AGENT_TOOLS, GEMINI_TOOL_EQUIVALENTS } from './agentTools';
 import type { ExecManifest } from './execution';
 import { splitMcpName, type RunReport } from './log';
 
@@ -95,11 +95,38 @@ function toolDeviates(name: string, manifest: RunCheckManifest, vocabulary?: Run
  * Se uma entrada de `deniedTools` do card nega a ferramenta MCP `tool` do servidor `server`: o nome exato
  * (`mcp__servidor__ferramenta`, com o servidor escrito como o Claude Code escreve: o que não for letra, número,
  * `_` ou `-` vira `_`), o servidor inteiro (`mcp__servidor__*`) ou só o prefixo do servidor (`mcp__servidor`).
+ * A ferramenta passa pela mesma normalização, e nada diferencia maiúsculas: o nome que o agente mostra (`Search`
+ * no título do Gemini) pode não ser o do servidor (`search`), e na dúvida vale negar.
  */
 export function deniesMcpTool(entry: string, server: string, tool: string): boolean {
-  const prefix = `mcp__${server.replace(/[^A-Za-z0-9_-]/g, '_')}`;
-  return entry === `${prefix}__${tool}` || entry === `${prefix}__*` || entry === prefix;
+  const clean = (s: string) => s.replace(/[^A-Za-z0-9_-]/g, '_').toLowerCase();
+  const prefix = `mcp__${clean(server)}`;
+  const e = entry.toLowerCase();
+  return e === `${prefix}__${clean(tool)}` || e === `${prefix}__*` || e === prefix;
 }
+
+/** O formato de um nome MCP no vocabulário do card: a ferramenta, o servidor inteiro (`__*`) ou só o servidor. */
+const CARD_MCP_NAME = /^mcp__[A-Za-z0-9_-]+(__([A-Za-z0-9_-]+|\*))?$/;
+
+/**
+ * Se um nome é do vocabulário do card (o do Claude Code): uma ferramenta da tabela do Claude, um equivalente
+ * da tabela do ACP ou do Gemini, uma de delegação, ou um nome MCP. Uma regra fina (`Bash(rm:*)`) ou outra
+ * grafia (`bash`) não é: a negação dela não tem tradução para o ACP.
+ */
+export function isCardToolName(name: string): boolean {
+  if (CARD_MCP_NAME.test(name)) return true;
+  return CARD_TOOL_NAMES.has(name);
+}
+
+const CARD_TOOL_NAMES: ReadonlySet<string> = new Set([
+  ...AGENT_TOOLS.claude.flatMap((g) => g.tools.map((t) => t.name)),
+  ...Object.values(ACP_KIND_EQUIVALENTS).flat(),
+  ...Object.values(GEMINI_TOOL_EQUIVALENTS).flat(),
+  'Agent',
+  'Task',
+  'SendMessage',
+  'ListAgents',
+]);
 
 const isFlowSkill = (name: string): boolean => name.startsWith(FLOW_SKILL_PREFIX);
 

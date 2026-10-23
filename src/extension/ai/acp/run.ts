@@ -23,6 +23,7 @@ import type { ExecInput } from '../../execution';
 import { BOARD_SERVER, SUBAGENT_TOOLS } from '../../execution';
 import { ensureProjectServer } from '../../mcp/clientConfig';
 import { deniesMcpTool, equivalentsBreach, equivalentsOf } from '../../../shared/runCheck';
+import { NO_DELEGATION } from '../../../shared/executionAdmission';
 import type { HeadlessInput } from '../provider';
 import { AUTH_REQUIRED, RpcError, acpAuthenticate, rpcConnection } from './connection';
 import { version as EXTENSION_VERSION } from '../../../../package.json';
@@ -32,6 +33,7 @@ import {
   acpLoginHint,
   acpMcpToolOf,
   acpSessionMode,
+  NEVER_MCP_KINDS,
   type AcpAgent,
   type AcpAuth,
   type AcpMcpServer,
@@ -121,16 +123,26 @@ export function boardDecision(
     const deniedMcp = mcp.tool !== undefined ? deniedTools.find((t) => deniesMcpTool(t, mcp.server, mcp.tool!)) : undefined;
     if (deniedMcp) return { allow: false, reason: `a ferramenta ${deniedMcp} está negada no card` };
   } else {
+    const kind = (call.kind ?? 'other').toLowerCase();
     const native = call.native ? equivalentsOf(call.native, 'gemini') : null;
-    const name = native ? call.native! : (call.kind ?? 'other');
-    const equivalents = native ?? equivalentsOf(name, undefined);
+    const byKind = equivalentsOf(kind, undefined);
+    // o nome interno decide, mas um kind que muda o computador soma os equivalentes dele: nome e kind
+    // divergentes (um nome de leitura num pedido de execute) não afrouxam a negação
+    const equivalents = native ? [...new Set([...native, ...(NEVER_MCP_KINDS.includes(kind) ? (byKind ?? []) : [])])] : byKind;
     // só as negadas são impostas: a lista `tools` do card é conferida depois (`checkRun`), não recusada aqui,
     // como no modo API (`ACP_ENFORCEMENT.tools: 'advised'`: a leitura nem passa pelo board, e impor a lista
     // deixaria o agente sem subagentes, como o condutor no Gemini, sem editar). Por isso `tools: []` aqui
     const breach = equivalents ? equivalentsBreach(equivalents, { tools: [], deniedTools }) : null;
     if (breach && 'denied' in breach) return { allow: false, reason: `a ferramenta ${breach.denied} está negada no card` };
+    // sem nome interno, um pedido `other`, sem kind ou de kind desconhecido não diz que ferramenta é: com
+    // negadas do card além da delegação, fecha na dúvida (como o modo API com o nome que não reconhece).
+    // `think` e `switch_mode` não agem fora da sessão e seguem o nível
+    const cardDenies = deniedTools.some((t) => !NO_DELEGATION.includes(t));
+    if (!native && cardDenies && (kind === 'other' || byKind === null))
+      return { allow: false, reason: `o pedido não diz a ferramenta (${kind}) e o card nega ferramentas` };
   }
-  if (!boardAllows(permission, call, mcp, servers)) return { allow: false, reason: `fora do nível ${permission}` };
+  if (!boardAllows(permission, { ...call, kind: call.kind?.toLowerCase() ?? null }, mcp, servers))
+    return { allow: false, reason: `fora do nível ${permission}` };
   return { allow: true, reason: null };
 }
 

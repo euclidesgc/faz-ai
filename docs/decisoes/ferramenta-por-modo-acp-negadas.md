@@ -35,6 +35,21 @@ em `full` recebia "permitido" para um pedido de kind `execute`.
 - **Ferramenta MCP pelo nome do card.** Reconhecida a chamada MCP (`mcpTitle`), `mcp__srv__x`,
   `mcp__srv__*` ou `mcp__srv` negados recusam a ferramenta (`deniesMcpTool`). O modo API pergunta pelo
   mesmo nome. A lista `tools` não se aplica a MCP: vale o servidor do card.
+- **Um título não faz uma chamada virar MCP** (revisão de segurança). No Gemini o título do pedido de shell
+  é o comando que o modelo escreveu, e a chamada lida como MCP pulava as negadas e o nível (o servidor é do
+  card). `acpMcpToolOf`, o mesmo na decisão e no leitor da conferência, segue esta ordem: nome interno no id
+  (não é MCP); kind `execute`, `delete` ou `move` (nunca é MCP); o id MCP do Gemini
+  (`mcp_<servidor>_<ferramenta>__<id>`, `DiscoveredMCPTool.getFullyQualifiedName`, pacote 0.65.0);
+  `mcpTitle` ancorado no título inteiro; e a busca do servidor no título só para o agente sem `mcpTitle`.
+- **Nome interno e kind divergentes.** Num pedido `execute`, `delete` ou `move`, os equivalentes do kind somam
+  aos do nome interno.
+- **Fecha na dúvida.** O kind é lido em minúsculas. Com negadas do card além da delegação, um pedido sem nome
+  interno e com kind `other`, sem kind ou desconhecido é recusado, como o modo API recusa o nome que não
+  reconhece. `think` e `switch_mode` seguem o nível.
+- **Negada fora do vocabulário do card bloqueia a admissão** (`unsupported-native-restriction`, como no modo
+  API): `Bash(rm:*)` ou `bash` não têm tradução para o pedido do agente (`isCardToolName`).
+- **Nome MCP normalizado nos dois lados.** `deniesMcpTool` normaliza servidor e ferramenta e não diferencia
+  maiúsculas (`mcp__docs__search` nega `Search (docs MCP Server)`), errando para negar.
 - **Sem depender do yolo.** A execução admitida tem `toolSet: 'explicit'` e a delegação negada, então
   `acpSessionMode` nunca pede o modo sem perguntas e o board responde cada pedido (a admissão recusa se
   pedisse).
