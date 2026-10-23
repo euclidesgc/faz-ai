@@ -21,6 +21,37 @@ export type RunCheckManifest = Pick<ExecManifest, 'skills' | 'mcpServers' | 'too
 /** Prefixo das skills do fluxo do board, que vêm pelo `get_skill` e nunca contam como desvio. */
 const FLOW_SKILL_PREFIX = 'faz-ai-';
 
+/**
+ * O leitor ACP grava o inventário pelo kind do protocolo (minúsculo), não pelo nome do Claude Code que o card usa.
+ * Cada kind vira a lista de nomes equivalentes do card; `[]` é kind sem efeito ou não atribuível a uma ferramenta
+ * (`think`, `switch_mode`, `other`), que nunca é desvio: a permissão já foi decidida em tempo real, por chamada.
+ * Os nomes do Claude/Cursor/Kimi são capitalizados, então não colidem com estes.
+ */
+const ACP_KIND_EQUIVALENTS: Record<string, string[]> = {
+  think: [],
+  switch_mode: [],
+  other: [],
+  read: ['Read'],
+  search: ['Grep', 'Glob'],
+  edit: ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'],
+  delete: ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash'],
+  move: ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash'],
+  execute: ['Bash'],
+  fetch: ['WebFetch', 'WebSearch'],
+};
+
+/**
+ * Desvio de uma ferramenta nativa. Nome do card: negada, ou fora de `tools` (lista não vazia). Kind ACP: desvio
+ * quando algum equivalente está em `deniedTools`, ou quando nenhum está em `tools` (lista não vazia).
+ */
+function toolDeviates(name: string, manifest: RunCheckManifest): boolean {
+  const equivalents = Object.hasOwn(ACP_KIND_EQUIVALENTS, name) ? ACP_KIND_EQUIVALENTS[name]! : null;
+  if (!equivalents) return manifest.deniedTools.includes(name) || (manifest.tools.length > 0 && !manifest.tools.includes(name));
+  if (equivalents.length === 0) return false;
+  if (equivalents.some((e) => manifest.deniedTools.includes(e))) return true;
+  return manifest.tools.length > 0 && !equivalents.some((e) => manifest.tools.includes(e));
+}
+
 const isFlowSkill = (name: string): boolean => name.startsWith(FLOW_SKILL_PREFIX);
 
 /**
@@ -55,8 +86,7 @@ export function checkRun(report: Pick<RunReport, 'measure' | 'inventory'>, manif
         if (!isFlowSkill(item.name) && !manifest.skills.includes(item.name)) flag('skill', item.name, item.calls);
         break;
       case 'tool':
-        if (manifest.deniedTools.includes(item.name)) flag('tool', item.name, item.calls);
-        else if (manifest.tools.length > 0 && !manifest.tools.includes(item.name)) flag('tool', item.name, item.calls);
+        if (toolDeviates(item.name, manifest)) flag('tool', item.name, item.calls);
         break;
     }
   }
