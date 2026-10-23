@@ -989,6 +989,19 @@ describe('executor da IA', () => {
     expect(headlessUnsupported('claude', 'board')).toBeNull();
     expect(headlessUnsupported('cursor', 'board')).toBeNull();
     expect(headlessUnsupported('perfil-personalizado', 'board')).toContain('ainda não disponível');
+    // perfil personalizado resolvido: a restrição é só a falta de argumentos por nível; no ACP o board responde a permissão
+    const custom = { id: 'meu', name: 'Meu', kind: 'custom', base: 'generic', enabled: true, config: { command: 'x' } } as never;
+    expect(headlessUnsupported(custom, 'board')).toContain('não declara argumentos');
+    expect(headlessUnsupported(custom, 'full')).toBeNull();
+    const acp = {
+      id: 'gemini-acp',
+      name: 'Gemini ACP',
+      kind: 'custom',
+      base: 'generic',
+      enabled: true,
+      config: { acpAgent: 'gemini' },
+    } as never;
+    expect(headlessUnsupported(acp, 'board')).toBeNull();
     // o Claude Code recusa pular as permissões como root
     expect(headlessUnsupported('claude', 'full', 0)).toContain('root');
     expect(headlessUnsupported('claude', 'full', 1000)).toBeNull();

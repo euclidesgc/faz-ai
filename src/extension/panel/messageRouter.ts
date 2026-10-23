@@ -31,6 +31,7 @@ import { agentProfiles } from '../../shared/execution';
 import { columnsOf } from '../../shared/selectors';
 import type { AttachmentStore } from '../attachments';
 import { headlessUnsupported } from '../headless';
+import { activeProfile } from '../../shared/aiProfiles';
 import { boardServerFootprint } from '../mcp/footprint';
 import type { RunResolver } from '../log/eventLog';
 import { getMetrics, getPanelMetrics, type MetricsQuery, type MetricsResult } from '../log/metrics';
@@ -387,7 +388,8 @@ export class MessageRouter {
       heartbeatNextAt: this.heartbeatNextAt,
       chat: this.chat,
       autopilot: this.autopilot,
-      aiRunUnsupported: headlessUnsupported(s.board.aiTool, s.board.runner.permission),
+      // o perfil padrão resolvido, não o id: um personalizado ou ACP como padrão não é "indisponível"
+      aiRunUnsupported: headlessUnsupported(activeProfile(s.board), s.board.runner.permission),
       requirements: this.requirements,
       requirementsCheckedAt: this.requirementsCheckedAt,
       authExpired: this.authExpired,

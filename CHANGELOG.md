@@ -19,6 +19,10 @@
 - **Refinar não guarda mais o texto anterior da descrição (#1076).** O **Refinar com IA** deixou de gravar o anexo `descricao-anterior-*.md` antes de reescrever a descrição, e a instrução que pedia isso saiu do prompt. O texto anterior não fica guardado em lugar nenhum; o comentário do refino resume o que mudou e por quê. Anexos antigos com esse nome continuam na história, sem uso.
 - **A IA recebe no máximo as últimas 20 mensagens da conversa (#1076).** Sem resumo, o `get_card` manda só as 20 últimas mensagens e diz em `omittedBefore` quantas ficaram de fora. Com resumo, ele sempre vem; passando de 20 mensagens, vêm as 19 últimas depois dele. A aba **Conversa** segue mostrando tudo. Mensagens repetidas e avisos do board continuam como estavam.
 
+### Corrigido
+
+- **Execução pela conversa e heartbeat volta a aparecer com um perfil personalizado como padrão (#1091).** Com um perfil personalizado (ou ACP) escolhido como ferramenta do projeto, Harness › Ferramenta e execução escondia toda a seção com o aviso "Perfil de CLI ainda não disponível para execução": o board conferia o id do perfil em vez do perfil resolvido. Agora a seção aparece, com o regime de admissão, o agente padrão e o heartbeat. Num perfil ACP a permissão é respondida pelo board a cada pedido do agente, então ele não precisa declarar argumentos por nível.
+
 ## 0.47.0
 
 ### Adicionado
