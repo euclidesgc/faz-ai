@@ -1039,6 +1039,8 @@ describe('executor da IA', () => {
       parallel: false,
       parallelStories: 2,
       autopilotPaused: false,
+      admissionRegime: 'exclusive',
+      compatibilityReviewRevision: 0,
     });
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'edits', timeoutMinutes: 999 } } });
     expect(router.snapshot().board.runner).toMatchObject({ permission: 'edits', timeoutMinutes: 240 });

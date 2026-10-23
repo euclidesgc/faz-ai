@@ -6,6 +6,14 @@ import type { ActivityKind } from './activity';
 export type RunnerPermission = 'board' | 'edits' | 'full';
 
 /**
+ * O regime de admissão do board (#1091). `exclusive`: a ferramenta só roda com as cinco capacidades
+ * verificadas, e a IA vê só o que o board montou. `compatible`: o board aceita que a ferramenta
+ * carregue os próprios arquivos de contexto (o que ela declara em "O que a CLI carrega por conta
+ * própria"); permissões, MCP e delegação continuam exigidos. É a escolha da pessoa, nunca da IA.
+ */
+export type AdmissionRegime = 'exclusive' | 'compatible';
+
+/**
  * O que a IA faz ao ser chamada para um card: `phase` trabalha a fase em que o card está (o que a
  * coluna pede, até passar a vez); `refine` só deixa o card claro e completo (texto, campos,
  * checklist), sem trabalhar a fase, sem mover e sem mexer em arquivos; `summarize` lê a conversa do
@@ -36,7 +44,38 @@ export interface RunnerConfig {
   autopilotPaused: boolean;
   /** nome do agente (arquivo marcado no Harness) usado quando nem o card nem a fase indicam um; vazio = o primeiro marcado, ou o embutido */
   defaultAgent: string;
+  /** o regime de admissão escolhido pela pessoa em Harness › Ferramenta e execução */
+  admissionRegime: AdmissionRegime;
+  /**
+   * quantas vezes a pessoa ligou o regime compatível: é a revisão que a admissão exige
+   * (`compatibilityReview`), e sobe a cada vez que ela liga; 0 enquanto nunca ligou
+   */
+  compatibilityReviewRevision: number;
 }
+
+export const ADMISSION_REGIMES: { value: AdmissionRegime; label: string; hint: string }[] = [
+  {
+    value: 'exclusive',
+    label: 'Exclusivo',
+    hint: 'A ferramenta só roda com as cinco capacidades verificadas: a IA vê exatamente o contexto que o board montou para o card.',
+  },
+  {
+    value: 'compatible',
+    label: 'Compatível',
+    hint: 'A ferramenta pode carregar os próprios arquivos de contexto (regras, skills, agentes, hooks e MCPs que o perfil declara em "O que a CLI carrega por conta própria"). Permissões, MCP e delegação continuam exigidos. É o único regime em que um agente ACP roda.',
+  },
+];
+
+/**
+ * O regime e a revisão que vão no pedido de admissão. No compatível a revisão é a contagem de vezes
+ * que a pessoa o ligou (nunca zero: `parseRunner` garante); a admissão recusa qualquer outro ator.
+ */
+export const admissionRegimeOf = (
+  runner: Pick<RunnerConfig, 'admissionRegime' | 'compatibilityReviewRevision'>,
+): { regime: AdmissionRegime; compatibilityReview?: { actor: 'person'; revision: number } } =>
+  runner.admissionRegime === 'compatible'
+    ? { regime: 'compatible', compatibilityReview: { actor: 'person', revision: runner.compatibilityReviewRevision } }
+    : { regime: 'exclusive' };
 
 export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint: string }[] = [
   {
@@ -72,6 +111,8 @@ export const DEFAULT_RUNNER: RunnerConfig = {
   parallelSubtasks: 2,
   autopilotPaused: false,
   defaultAgent: '',
+  admissionRegime: 'exclusive',
+  compatibilityReviewRevision: 0,
 };
 
 /**
@@ -101,7 +142,14 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
   const interval = Math.round(Number(raw.heartbeatMinutes));
   const parallel = Math.round(Number(raw.parallelStories));
   const subtasks = Math.round(Number(raw.parallelSubtasks));
+  const regime: AdmissionRegime = ADMISSION_REGIMES.some((r) => r.value === raw.admissionRegime)
+    ? (raw.admissionRegime as AdmissionRegime)
+    : DEFAULT_RUNNER.admissionRegime;
+  const revision = Math.round(Number(raw.compatibilityReviewRevision));
   return {
+    admissionRegime: regime,
+    // compatível sem revisão não existe: a configuração gravada à mão vale como a primeira revisão
+    compatibilityReviewRevision: Number.isSafeInteger(revision) && revision > 0 ? revision : regime === 'compatible' ? 1 : 0,
     autopilotPaused: raw.autopilotPaused === true,
     defaultAgent: typeof raw.defaultAgent === 'string' ? raw.defaultAgent.trim() : '',
     heartbeat: raw.heartbeat === true,

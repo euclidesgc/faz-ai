@@ -5,6 +5,7 @@ import { strictRequestFromDraft } from '../../shared/contextAdmissionPreview';
 import type { ContextAction, ContextActivityTarget } from '../../shared/contextPlanning';
 import type { StrictExecutionRequest } from '../../shared/executionAdmission';
 import type { BoardState } from '../../shared/model';
+import { admissionRegimeOf, type RunnerConfig } from '../../shared/runner';
 import { blockingContextDiagnostics, type AiPrepared, type ContextRuntime } from './gateway';
 
 /** Runtime pedido pelo ambiente (`FAZ_AI_CONTEXT_RUNTIME=v1`); qualquer outro valor mantém o legado. */
@@ -25,7 +26,7 @@ export function cardV1(state: BoardState, profileId: string, target: ContextActi
 }
 
 /** Execução sem card (chat, assistentes, teste do perfil): contexto fechado, sem MCP além do contrato vazio. */
-export function closedV1(profileId: string, action: ContextAction, readOnly = false): V1Fields {
+export function closedV1(profileId: string, action: ContextAction, runner: RunnerConfig, readOnly = false): V1Fields {
   const context: ContextDraftResolution = {
     target: { cardId: null, workflowId: null, phaseId: '', action },
     agent: null,
@@ -42,7 +43,7 @@ export function closedV1(profileId: string, action: ContextAction, readOnly = fa
   };
   const request: StrictExecutionRequest = {
     version: 1,
-    regime: 'exclusive',
+    ...admissionRegimeOf(runner),
     agentTools: { categories: readOnly ? ['read'] : [], native: { tool: '', allow: [], deny: [] } },
     boardTools: { mode: 'explicit', value: [] },
     activeMcpIds: [],

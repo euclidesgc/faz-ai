@@ -947,4 +947,13 @@ export const harness: Record<string, string> = {
   'Conectar ao board': 'Connect to the board',
   'Conecta a ferramenta de IA ao MCP do board.': 'Connects the AI tool to the board MCP.',
   'Registra o servidor MCP do board em {tool}.': 'Registers the board MCP server in {tool}.',
+  'Regime de admissão': 'Admission regime',
+  Exclusivo: 'Exclusive',
+  Compatível: 'Compatible',
+  'A ferramenta só roda com as cinco capacidades verificadas: a IA vê exatamente o contexto que o board montou para o card.':
+    'The tool only runs with all five capabilities verified: the AI sees exactly the context the board built for the card.',
+  'A ferramenta pode carregar os próprios arquivos de contexto (regras, skills, agentes, hooks e MCPs que o perfil declara em "O que a CLI carrega por conta própria"). Permissões, MCP e delegação continuam exigidos. É o único regime em que um agente ACP roda.':
+    'The tool may load its own context files (the rules, skills, agents, hooks and MCPs the profile declares under "What the CLI loads on its own"). Permissions, MCP and delegation are still required. It is the only regime in which an ACP agent runs.',
+  'Regime compatível ligado por você (revisão {n}). O contexto de cada execução pode ir além do que o board montou: confira em Ferramentas de IA o que o perfil padrão declara em "O que a CLI carrega por conta própria".':
+    'Compatible regime turned on by you (review {n}). The context of each run may go beyond what the board built: check in AI Tools what the default profile declares under "What the CLI loads on its own".',
 };

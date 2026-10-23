@@ -408,6 +408,10 @@ describe('Diagnóstico: próxima execução e limites (#880)', () => {
     expect(r.limits).toBeNull();
     expect(r.regime).toBe('exclusive');
   });
+  it('o regime é o que a pessoa escolheu no board (#1091)', async () => {
+    const r = await checkEnvironment(probe({ health: [health('claude')], extra: { regime: () => 'compatible' } }));
+    expect(r.regime).toBe('compatible');
+  });
   it('usa o simulador e os limites da base e lista os perfis em uso não disponíveis', async () => {
     const asked: boolean[] = [];
     const limits = { branchProcesses: 2 };

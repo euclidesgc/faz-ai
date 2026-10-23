@@ -177,8 +177,8 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   board): dois handshakes do agente numa pasta descartável, sem gastar a sua conta. A capacidade de
   artefatos fica parcial de propósito, porque o agente lê os próprios arquivos de contexto, e o
   perfil é admissível só no regime compatível.
-- **Próxima execução e limites:** mostra o regime, o alvo padrão (com a regra e a versão, ou o
-  bloqueio), os cards cujo alvo está indisponível e a tabela de limites com pedido, efetivo e motivo.
+- **Próxima execução e limites:** mostra o regime escolhido em Harness › Ferramenta e execução, o
+  alvo padrão (com a regra e a versão, ou o bloqueio), os cards cujo alvo está indisponível e a tabela de limites com pedido, efetivo e motivo.
   Vem do simulador de políticas e dos limites efetivos; sem eles, mostra "Indisponível nesta
   versão".
 - **Banco de artefatos** (antes "definição do harness"): recomendação, não bloqueio. O board
@@ -215,8 +215,15 @@ levam ao Harness e ao terminal do login.
 O board gerencia uma **biblioteca particular**, independente da ferramenta de IA. Em
 **Configurações → Harness**, a aba **Biblioteca do board** concentra o CRUD de **Regras**,
 **Skills**, **Sub-agentes** e **MCPs**. **Ferramenta e execução** escolhe a IA, os modelos, as
-permissões, o agente padrão e o heartbeat; também conecta a ferramenta ao servidor MCP do board.
-Trocar de ferramenta preserva os artefatos e suas seleções.
+permissões, o **regime de admissão**, o agente padrão e o heartbeat; também conecta a ferramenta ao
+servidor MCP do board. Trocar de ferramenta preserva os artefatos e suas seleções.
+
+O **regime de admissão** é a régua com que o board decide se deixa a ferramenta rodar um card.
+**Exclusivo** (o padrão) exige as cinco capacidades verificadas: a IA vê exatamente o contexto que o
+board montou. **Compatível** aceita que a ferramenta carregue os próprios arquivos de contexto, o
+que o perfil declara em **O que a CLI carrega por conta própria**; permissões, MCP e delegação
+continuam exigidos. Ligar o compatível é a sua revisão: o board conta a revisão a cada vez que você
+liga, e a mostra no aviso da opção. É o único regime em que um agente ACP roda.
 
 Execuções usam só as cópias guardadas no banco do board. Um item marcado em **Configurações →
 Harness** que existe só na pasta da ferramenta, sem ter sido copiado, aparece como ausente e não

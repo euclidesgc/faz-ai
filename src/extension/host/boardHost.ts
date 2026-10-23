@@ -18,7 +18,7 @@ import { orchestratesStory, effectiveLimits, LIVE_WORK_STATES } from '../../shar
 import { terminateProcessGroup } from '../processIdentity';
 import { CommentRepo } from '../repositories/commentRepo';
 import type { AiActivity } from '../../shared/model';
-import type { AiRunMode } from '../../shared/runner';
+import { admissionRegimeOf, type AiRunMode } from '../../shared/runner';
 import { columnOf } from '../../shared/selectors';
 import { Heartbeat } from '../heartbeat';
 import { contextRuntimeFromEnv } from '../ai/v1Prepare';
@@ -258,6 +258,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
       cwd: o.folderPath,
       homeDir,
       pathEnv: () => pathEnv,
+      runner: () => router.snapshot().board.runner,
     }),
   );
   const runner = new AiRunner(router, {
@@ -575,6 +576,7 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
               return null;
             }
           },
+          regime: () => admissionRegimeOf(router.snapshot().board.runner).regime,
           effectiveLimits: () => {
             try {
               return effectiveLimits(s.board.runner, s.board.git.mode);

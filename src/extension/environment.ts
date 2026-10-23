@@ -7,6 +7,7 @@ import { HARNESS_ISSUES, type HarnessIssue } from '../shared/harnessStatus';
 import { boardAvailability, type ProfileHealth } from '../shared/profileHealth';
 import type { AiTool } from '../shared/harness';
 import type { EffectiveLimits } from '../shared/orchestration';
+import type { AdmissionRegime } from '../shared/runner';
 import type { PolicySimulation } from '../shared/policyManagement';
 import type { BoardRequirement } from '../shared/requirements';
 
@@ -38,6 +39,8 @@ export interface EnvironmentProbe {
   simulateNextRun?(defaultAvailable: boolean): PolicySimulation | null;
   /** Os limites efetivos (#621); ausente: `limits` fica null. */
   effectiveLimits?(): EffectiveLimits | null;
+  /** O regime de admissão escolhido pela pessoa (#1091); ausente: exclusivo. */
+  regime?(): AdmissionRegime;
   /** o que falta no banco de artefatos do board; null quando não dá para saber (sem o inventário) */
   harnessIssues: HarnessIssue[] | null;
   /** cópias antigas da skill do fluxo nas pastas das ferramentas (só avisa; null quando não dá para saber) */
@@ -320,7 +323,7 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     required: [node],
     profiles,
     availability: boardAvailability(profiles),
-    regime: 'exclusive',
+    regime: p.regime?.() ?? 'exclusive',
     nextRun,
     limits: p.effectiveLimits?.() ?? null,
     harness: harnessCheck(p.harnessIssues, req('harness')),

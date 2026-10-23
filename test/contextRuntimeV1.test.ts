@@ -1,6 +1,7 @@
 // E5.3: no runtime `v1`, nenhuma porta de IA executa ignorando o plano. Sem agente com contrato válido e
 // sem admissão do host, o processo não abre (um teste por porta: runner, chat, teste do perfil), e o
 // gateway recusa qualquer chamada que chegue sem configuração resolvida.
+import { DEFAULT_RUNNER } from '../src/shared/runner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -100,10 +101,10 @@ describe('runtime v1 (E5.3)', () => {
   });
 
   it('preparadores: o contexto fechado não traz agente nem MCP; o do card exige agente', () => {
-    const closed = closedV1('claude', 'chat', true);
+    const closed = closedV1('claude', 'chat', DEFAULT_RUNNER, true);
     expect(closed.context.items).toEqual([]);
     expect(closed.strict.request).toMatchObject({ activeMcpIds: [], agentTools: { categories: ['read'] } });
-    expect(closedV1('claude', 'chat').strict.request.agentTools.categories).toEqual([]);
+    expect(closedV1('claude', 'chat', DEFAULT_RUNNER).strict.request.agentTools.categories).toEqual([]);
     const s = router.snapshot();
     const phaseId = s.columns.find((c) => c.name === 'Discovery')!.id;
     expect(() => cardV1(s, 'claude', { cardId, workflowId: null, phaseId, action: 'work' })).toThrow(/Runtime v1/);
