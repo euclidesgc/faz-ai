@@ -1,6 +1,5 @@
 import { Checkbox, Select, TextField as RxTextField } from '@radix-ui/themes';
 import { useState } from 'react';
-import { activeProfile } from '../../shared/aiProfiles';
 import { modelGroups } from '../../shared/runTarget';
 import { modelDisplay } from '../modelText';
 import type { FieldDef, FieldValue } from '../../shared/model';
@@ -107,7 +106,8 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
 
 /** Valor do item "sem modelo": o Select do Radix não aceita `value` vazio. */
 const NO_MODEL = '__none';
-const OTHER_MODEL = '__other';
+/** prefixo do item "Outro modelo…" de cada perfil personalizado: `__other:<perfil>` */
+const OTHER_MODEL = '__other:';
 
 /**
  * Modelo + nível de esforço, escolhidos no catálogo do board. `part` mostra só o seletor de modelo ou só o de
@@ -123,21 +123,21 @@ export function ModelEditor({
   part?: 'both' | 'model' | 'effort';
 }) {
   const board = useBoardStore((s) => s.state?.board);
-  const active = board ? activeProfile(board) : null;
-  const [otherOpen, setOtherOpen] = useState(false);
+  // o perfil personalizado que recebe o identificador livre; null com o campo fechado
+  const [other, setOther] = useState<string | null>(null);
   const [otherName, setOtherName] = useState('');
   const current = parseModelValue(value);
-  // um grupo por perfil ligado; o valor fora deles (perfil desligado, modelo apagado) continua visível
-  const groups = board ? modelGroups(board).filter((g) => g.options.length > 0) : [];
+  // um grupo por perfil ligado; o personalizado aparece mesmo sem modelo cadastrado, porque aceita um
+  // identificador livre; o valor fora deles (perfil desligado, modelo apagado) continua visível
+  const groups = board ? modelGroups(board).filter((g) => g.options.length > 0 || g.custom) : [];
   const option = current ? groups.flatMap((g) => g.options).find((o) => o.id === current.id) : undefined;
   const submitOther = () => {
     const name = otherName.trim();
-    if (!active || active.kind !== 'custom' || !name || /[\s\0:@]/.test(name)) return;
-    onChange(modelValue(`${active.id}:${name}`, null));
-    setOtherOpen(false);
+    if (other && name && !/[\s\0:@]/.test(name)) onChange(modelValue(`${other}:${name}`, null));
+    setOther(null);
     setOtherName('');
   };
-  const modelSelect = otherOpen ? (
+  const modelSelect = other ? (
     <RxTextField.Root
       autoFocus
       aria-label={t('Outro modelo')}
@@ -149,7 +149,7 @@ export function ModelEditor({
         if (e.key === 'Enter') submitOther();
         if (e.key === 'Escape') {
           setOtherName('');
-          setOtherOpen(false);
+          setOther(null);
         }
       }}
     />
@@ -157,8 +157,8 @@ export function ModelEditor({
     <Select.Root
       value={current?.id ?? NO_MODEL}
       onValueChange={(id) => {
-        if (id === OTHER_MODEL) {
-          setOtherOpen(true);
+        if (id.startsWith(OTHER_MODEL)) {
+          setOther(id.slice(OTHER_MODEL.length));
           return;
         }
         const o = groups.flatMap((g) => g.options).find((x) => x.id === id);
@@ -177,9 +177,9 @@ export function ModelEditor({
                 {o.label}
               </Select.Item>
             ))}
+            {g.custom && <Select.Item value={`${OTHER_MODEL}${g.cli}`}>{t('Outro modelo…')}</Select.Item>}
           </Select.Group>
         ))}
-        {active?.kind === 'custom' && <Select.Item value={OTHER_MODEL}>{t('Outro modelo…')}</Select.Item>}
       </Select.Content>
     </Select.Root>
   );

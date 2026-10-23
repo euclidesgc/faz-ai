@@ -126,11 +126,18 @@ export interface ModelGroup {
   cli: string;
   label: string;
   options: ModelOption[];
+  /** perfil personalizado (CLI própria ou agente ACP): aceita um identificador livre além do catálogo */
+  custom: boolean;
 }
 
 /** Um grupo por catálogo dos perfis ligados. */
 export function modelGroups(board: TargetBoard): ModelGroup[] {
   return board.aiProfiles
     .filter((p) => p.enabled)
-    .map((p) => ({ cli: p.id, label: profileLabel(board, p.id), options: board.modelCatalog.filter((m) => m.tool === catalogTool(p)) }));
+    .map((p) => ({
+      cli: p.id,
+      label: profileLabel(board, p.id),
+      options: board.modelCatalog.filter((m) => m.tool === catalogTool(p)),
+      custom: p.kind === 'custom',
+    }));
 }

@@ -62,8 +62,9 @@ To create a custom profile, enter the command and one argument per line. The mar
 `{model}`, `{effort}`, `{mcpConfig}` and `{addDir}` insert, respectively, the request, the model,
 the effort, the MCP file and an additional folder when they are available. Choose **Entrada do
 pedido** (prompt input: argument or stdin) and **Servidor do board** (board server: CLI, project
-file or none). In a card's **Modelo** field, **Outro modelo…** (other model) accepts a free-form
-identifier for that profile without adding it to the catalog. **Testar** (Test) runs a short request
+file or none). In a card's **Modelo** (model) field, every enabled custom profile (own CLI or ACP
+agent) forms a group, even with no model registered, and that group's **Outro modelo…** (other model)
+item accepts a free-form identifier for the profile without adding it to the catalog. **Testar** (Test) runs a short request
 and uses your subscription; an OK response does not prove isolation, permissions or MCP
 restrictions. Capabilities without evidence remain unknown and may prevent a run.
 

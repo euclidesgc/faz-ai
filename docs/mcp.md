@@ -131,7 +131,8 @@ privado. O prefixo do `value` escolhe o perfil de CLI que executa o card; sem mo
 nem na regra, vale o perfil padrão. `set_ai_tool` define esse **perfil padrão**: recebe o ID de um perfil
 ligado e não cria, edita, revisa nem ativa perfis.
 Uma cópia usa o catálogo da origem. Para um perfil personalizado, os modelos podem ser cadastrados
-à mão; o campo Modelo também aceita “Outro modelo…” sem cadastro. O valor é
+à mão; o campo Modelo lista cada perfil personalizado ligado como um grupo e aceita, nele, “Outro
+modelo…” sem cadastro. O valor é
 `<perfil>:<modelo>@<esforço>` (sem `@<esforço>` quando não houver esforço). O perfil personalizado
 retorna saída em texto e consumo/custo desconhecidos, nunca zero presumido. Testar o perfil na
 interface usa a assinatura e uma resposta OK não comprova isolamento, permissões ou MCP.

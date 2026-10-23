@@ -62,8 +62,9 @@ Para criar um personalizado, informe o comando e um argumento por linha. Os marc
 `{model}`, `{effort}`, `{mcpConfig}` e `{addDir}` inserem, respectivamente, o pedido, o modelo, o
 esforço, o arquivo MCP e uma pasta adicional quando estiverem disponíveis. Escolha **Entrada do
 pedido** (argumento ou stdin) e **Servidor do board** (CLI, arquivo no projeto ou nenhum). No campo
-**Modelo** de um card, **Outro modelo…** aceita um identificador livre desse perfil sem cadastrá-lo
-no catálogo. **Testar** executa um pedido curto e usa a sua assinatura; uma resposta OK não comprova
+**Modelo** de um card, cada perfil personalizado ligado (CLI própria ou agente ACP) forma um grupo,
+mesmo sem modelo cadastrado, e o item **Outro modelo…** desse grupo aceita um identificador livre do
+perfil sem cadastrá-lo no catálogo. **Testar** executa um pedido curto e usa a sua assinatura; uma resposta OK não comprova
 isolamento, permissões nem restrições MCP. Capacidades sem evidência permanecem desconhecidas e
 podem impedir a execução.
 
