@@ -42,7 +42,7 @@
 
 - **Configurações › Ferramentas de IA: os defeitos achados no teste de ponta a ponta com o rastreio do board.**
   - **Perfil de CLI personalizado:**
-    - Com o perfil personalizado como padrão, **Trabalhar na fase** ficava sempre desligado com "O perfil não declara argumentos para esta permissão restrita.", mesmo com os argumentos preenchidos. A conferência olhava a cópia do perfil que vai para a tela, sem os argumentos. Agora ela usa a configuração que a execução usa.
+    - Com o perfil personalizado de CLI como padrão, **Trabalhar na fase** ficava desligado com um motivo errado ("O perfil não declara argumentos para esta permissão restrita.", mesmo com os argumentos preenchidos). O motivo real é que esse perfil não passa na admissão por capacidades: o board não consegue provar o que um comando qualquer acessa. Agora o botão fica desligado com esse motivo e a indicação de usar uma ferramenta do catálogo pelo Conectar. O personalizado ACP antigo segue rodando.
     - Editar os argumentos de um nível de permissão apagava os dos outros níveis, ao contrário do "deixe vazio para manter". Agora cada nível é gravado sozinho, e um nível enviado vazio é esvaziado de propósito.
   - **Gemini pelo ACP com a chave recusada:** a chave errada passava pelo Conectar (o Gemini não a confere no login), e na execução o card ia para **Bloqueado** com o JSON cru da API. Agora o board reconhece a recusa da API (`API_KEY_INVALID`) também no ACP e trata como login vencido, como já fazia na CLI.
   - **Situação dos perfis:**

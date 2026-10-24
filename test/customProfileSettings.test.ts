@@ -1,7 +1,7 @@
-// Configurações › Ferramentas de IA, perfil de CLI personalizado: os dois defeitos achados no teste de ponta a
-// ponta com o rastreio do board. (1) O "Trabalhar na fase" ficava sempre desligado com "O perfil não declara
-// argumentos para esta permissão restrita.", porque a conferência usava o perfil público do snapshot, que não leva
-// os argumentos (ficam no cofre). (2) Editar os argumentos de um nível apagava os dos outros níveis.
+// Configurações › Ferramentas de IA, perfil de CLI personalizado, achados no teste de ponta a ponta com o rastreio do
+// board. (1) O "Trabalhar na fase" dizia "O perfil não declara argumentos para esta permissão restrita." mesmo com os
+// argumentos preenchidos; o motivo real é que o personalizado de CLI não passa na admissão por capacidades, e é ele
+// que a tela mostra agora. (2) Editar os argumentos de um nível apagava os dos outros níveis.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -11,8 +11,7 @@ import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
 import type { AiProfileDraft } from '../src/shared/aiProfiles';
 import { admissionBlockedText } from '../src/extension/ai/admission';
-
-const MISSING_ARGS = 'O perfil não declara argumentos para esta permissão restrita.';
+import { CUSTOM_CLI_UNSUPPORTED, customCliUnsupported } from '../src/extension/headless';
 
 let dir: string;
 let router: MessageRouter;
@@ -49,21 +48,32 @@ function saveCustom(config: AiProfileDraft['config'], id?: string): string {
   return id ?? router.snapshot().board.aiProfiles.find((p) => !before.includes(p.id))!.id;
 }
 
-describe('perfil personalizado como padrão: o "Trabalhar na fase"', () => {
-  it('liga quando o perfil declara os argumentos da permissão do board, que o snapshot público não traz', () => {
-    const id = saveCustom({ command: '/bin/echo', permissionArgs: { board: ['--modo-board'] } });
+describe('perfil personalizado de CLI como padrão: o "Trabalhar na fase"', () => {
+  it('desliga antes do clique, com o motivo da admissão, mesmo com os argumentos de todos os níveis', () => {
+    const id = saveCustom({ command: '/bin/echo', permissionArgs: { board: ['--b'], edits: ['--e'], full: ['--f'] } });
     router.handle({ type: 'settings.board.update', patch: { aiTool: id } });
-    const state = router.snapshot();
-    expect(state.board.runner.permission).toBe('board');
-    // o público continua sem os argumentos: a regra é a do perfil que a execução usa
-    expect(state.board.aiProfiles.find((p) => p.id === id)!.config.permissionArgs).toBeUndefined();
-    expect(state.aiRunUnsupported).toBeNull();
+    // antes dizia "não declara argumentos" (errado) e, corrigido isso, ligava e a execução era recusada na admissão
+    expect(router.snapshot().aiRunUnsupported).toBe(CUSTOM_CLI_UNSUPPORTED);
   });
 
-  it('continua desligado, com o motivo, quando o nível do board não tem argumentos', () => {
-    const id = saveCustom({ command: '/bin/echo', permissionArgs: { edits: ['--modo-arquivos'] } });
-    router.handle({ type: 'settings.board.update', patch: { aiTool: id } });
-    expect(router.snapshot().aiRunUnsupported).toBe(MISSING_ARGS);
+  it('o personalizado ACP antigo segue sem esse motivo: ele continua rodando', () => {
+    const custom = router.snapshot().board.aiProfiles.find((p) => p.id === 'claude')!;
+    const legacyAcp = {
+      ...custom,
+      id: 'gemini-acp',
+      kind: 'custom',
+      base: 'generic',
+      mode: 'acp',
+      config: { acpAgent: 'gemini' },
+    } as typeof custom;
+    expect(customCliUnsupported(legacyAcp)).toBeNull();
+    expect(customCliUnsupported({ ...legacyAcp, mode: 'cli', config: { command: '/bin/echo' } } as typeof custom)).toBe(
+      CUSTOM_CLI_UNSUPPORTED,
+    );
+  });
+
+  it('um perfil do catálogo como padrão não ganha o motivo', () => {
+    expect(customCliUnsupported(router.snapshot().board.aiProfiles.find((p) => p.id === 'claude')!)).toBeNull();
   });
 });
 
