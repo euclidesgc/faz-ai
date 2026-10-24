@@ -107,6 +107,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           terminal.show();
           terminal.sendText(command);
         },
+        // o login de um agente em Conectar agentes: o terminal roda o próprio processo do login (não um shell), e o
+        // código de saída dele chega quando o terminal fecha; 0 é sucesso, como o protocolo do ACP pede
+        runTerminal: (spec) =>
+          new Promise((resolve) => {
+            const terminal = vscode.window.createTerminal({
+              name: spec.name,
+              shellPath: spec.command,
+              shellArgs: spec.args,
+              env: spec.env,
+              cwd: spec.cwd,
+            });
+            const closed = vscode.window.onDidCloseTerminal((t) => {
+              if (t !== terminal) return;
+              closed.dispose();
+              resolve(t.exitStatus?.code ?? null);
+            });
+            context.subscriptions.push(closed);
+            terminal.show();
+          }),
         editor: {
           name: editorName,
           startedAt: windowStartedAt,

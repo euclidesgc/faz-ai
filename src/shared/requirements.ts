@@ -20,11 +20,11 @@ export type RequirementAction =
   /** a tela de Configurações → Harness */
   | { kind: 'settings' }
   /**
-   * Ferramentas de IA › Conectar ferramenta: o login da ferramenta que entra por chave de API (história 7) e o
+   * Conectar agentes, na aba Conexão do agente: o login da ferramenta que entra por chave de API (história 7) e o
    * Reconectar do perfil do catálogo cuja prova perdeu a validade (história 13)
    */
   | { kind: 'connect'; profile: AiTool }
-  /** Ferramentas de IA, na lista de perfis: o "Verificar capacidades" do perfil verificável sem Conectar (história 13) */
+  /** Conectar agentes, nos detalhes do perfil: o "Verificar capacidades" do perfil verificável sem Conectar (história 13) */
   | { kind: 'aiTools'; profile: AiTool };
 
 /**
@@ -44,7 +44,7 @@ export interface BoardRequirement {
   problem?: ProfileProblem | 'evidence-invalidated';
   /**
    * em `evidence-invalidated`: o board refaz a verificação sozinho (agente ACP); sem isso, a pessoa refaz em
-   * Ferramentas de IA (o Reconectar, ou o "Verificar capacidades" do perfil sem Conectar), pela `action`
+   * Conectar agentes (o Reconectar, ou o "Verificar capacidades" do perfil sem Conectar), pela `action`
    */
   automatic?: true;
   /** só o login que venceu numa execução (o probe não confirmou a saída): uma execução manual ainda pode limpar */

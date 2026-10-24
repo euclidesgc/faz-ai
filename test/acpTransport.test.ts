@@ -287,9 +287,7 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
     expect(agent.methods()).toEqual(['initialize', 'session/new']);
     expect(end.code).toBe(1);
     // o Gemini entra pela chave de API na tela do Conectar (história 7); os outros agentes, pelo terminal
-    expect(lines).toContain(
-      'Gemini CLI pede login. Conecte em Configurações › Ferramentas de IA › Conectar ferramenta, com a chave de API.',
-    );
+    expect(lines).toContain('Gemini CLI pede login. Conecte em Configurações › Conectar agentes, com a chave de API.');
     expect(end.error?.message).toMatch(/pede login/);
     const opencode = new FakeAgent({ sessionNew: () => ({ error: { code: -32000, message: 'Authentication required' } }) });
     const other = run(opencode, {}, acpAgent('opencode')!);
@@ -632,7 +630,7 @@ describe('login por chave de API pelo ACP (história 7)', () => {
     const end = await ended;
     expect(end.code).toBe(1);
     expect(agent.methods()).toEqual(['initialize', 'authenticate']);
-    expect(end.error?.message).toMatch(/Conectar ferramenta/);
+    expect(end.error?.message).toMatch(/Conectar agentes/);
     expect([...lines, end.error?.message].join('\n')).not.toContain(KEY);
   });
 

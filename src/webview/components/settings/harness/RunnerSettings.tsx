@@ -83,7 +83,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
               </Callout.Icon>
               <Callout.Text>
                 {t(
-                  'Regime compatível ligado para o board inteiro (revisão {n}), de uma versão anterior. Agora o regime é de cada perfil: a ciência é dada no Conectar, em Ferramentas de IA.',
+                  'Regime compatível ligado para o board inteiro (revisão {n}), de uma versão anterior. Agora o regime é de cada perfil: a ciência é dada no Conectar, em Conectar agentes.',
                   { n: runner.compatibilityReviewRevision },
                 )}
               </Callout.Text>
@@ -92,7 +92,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
                   size="1"
                   variant="soft"
                   hint={t(
-                    'Desliga o regime compatível do board. Os perfis com ciência seguem no compatível; os que não passam pelo Conectar (cópias, personalizados) recebem a ciência na lista de Ferramentas de IA.',
+                    'Desliga o regime compatível do board. Os perfis com ciência seguem no compatível; os que não passam pelo Conectar (cópias, personalizados) recebem a ciência nos detalhes deles, em Conectar agentes.',
                   )}
                   onClick={() => settings.updateBoard({ runner: { admissionRegime: 'exclusive' } })}
                 >

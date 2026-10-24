@@ -267,8 +267,8 @@ export const board: Record<string, string> = {
   'Parar a IA': 'Stop the AI',
   'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está.':
     'Runs {tool} in the background to do the work the phase asks for.',
-  'Parte <b>só do que está no board</b>: as rules e skills marcadas no Harness e o agente do card (ou o padrão do board). No Claude Code o contexto vazio é imposto; nas outras CLIs, veja o que elas carregam sozinhas em Ferramentas de IA.':
-    "Starts from <b>only what is on the board</b>: the rules and skills marked in the Harness and the card's agent (or the board's default). In Claude Code the empty context is enforced; for other CLIs, see what they load on their own in Ferramentas de IA.",
+  'Parte <b>só do que está no board</b>: as rules e skills marcadas no Harness e o agente do card (ou o padrão do board). No Claude Code o contexto vazio é imposto; nas outras CLIs, veja o que elas carregam sozinhas nos detalhes de cada agente, em Conectar agentes.':
+    "Starts from <b>only what is on the board</b>: the rules and skills marked in the Harness and the card's agent (or the board's default). In Claude Code the empty context is enforced; for other CLIs, see what they load on their own in each agent's details, in Connect agents.",
   'Ao terminar, passa a vez — pede revisão, pergunta ou move o card — sem acompanhamento ao vivo; a resposta chega na conversa.':
     "When it's done, it hands off — asks for review, asks a question, or moves the card — with no live follow-along; the reply shows up in the conversation.",
   'O consumo fica registrado em Métricas.': 'Usage is logged in Metrics.',
@@ -453,11 +453,12 @@ export const board: Record<string, string> = {
   '{name}: a verificação de capacidades perdeu a validade': '{name}: the capability check is no longer valid',
   'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. O board já está verificando de novo, sem gastar a sua conta; o resultado fica em Saída › Faz AI.':
     'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. The board is already checking again, without using your account; the result goes to Output › Faz AI.',
-  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Abra o Conectar e conecte este perfil de novo: a verificação faz parte do Conectar.':
-    'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Open Connect and connect this profile again: the check is part of Connect.',
-  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Verificar capacidades neste perfil, em Ferramentas de IA.':
-    'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Click Check capabilities on this profile, in AI tools.',
-  'Abrir Ferramentas de IA': 'Open AI tools',
+  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Abra Conectar agentes e conecte este perfil de novo: a verificação faz parte do Conectar.':
+    'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Open Connect agents and connect this profile again: the check is part of Connect.',
+  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Verificar capacidades nos detalhes deste perfil, em Conectar agentes.':
+    "The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Click Check capabilities in this profile's details, in Connect agents.",
+  'Abrir Conectar agentes': 'Open Connect agents',
+  'Abrir os detalhes do perfil': 'Open the profile details',
   '{name}: pendente de revisão': '{name}: pending review',
   'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 22 ou mais novo, e ele não está no PATH do terminal. Sem ele, a IA não alcança o board. Instale o Node.js e clique em Verificar de novo.':
     "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 22 or newer, and it is not on the terminal's PATH. Without it, the AI cannot reach the board. Install Node.js and click Check again.",

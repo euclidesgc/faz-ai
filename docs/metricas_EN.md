@@ -191,7 +191,7 @@ governs executions only with the v1 runtime, which is opt-in; without it, execut
 the gateway only runs with the resolved configuration and capability admission: runner (phase,
 refine, summary, conflict), chat, Harness assistants and profile test. Without an agent with a valid
 contract or without receipts (recorded by the profile's **Connect**, or by **Verificar capacidades**,
-check capabilities, in AI tools; valid for 14 days), the process does not start. The legacy runtime remains the default.
+check capabilities, in Connect agents; valid for 14 days), the process does not start. The legacy runtime remains the default.
 
 ## Card Usage tab
 

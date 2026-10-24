@@ -12,6 +12,7 @@ import { settings } from './settings';
 import { shared } from './shared';
 import { workflows } from './workflows';
 import { connect } from './connect';
+import { agentConnect } from './agentConnect';
 
 export const EN: Record<string, string> = {
   ...library,
@@ -26,6 +27,7 @@ export const EN: Record<string, string> = {
   ...metrics,
   ...environment,
   ...connect,
+  ...agentConnect,
 };
 
 /** Nomes do board padrão em inglês (ver ./defaults). */

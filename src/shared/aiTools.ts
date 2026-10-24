@@ -318,6 +318,12 @@ export const TOOLS: readonly AiToolEntry[] = [
   })),
 ];
 
+/**
+ * As ferramentas do catálogo que entram por uma chave de API guardada no cofre do board: o Conectar confere e guarda a
+ * chave, e cada execução a entrega à ferramenta. Hoje só o Gemini, nos três modos (o teste confere com os drivers).
+ */
+export const VAULT_KEY_TOOLS: readonly string[] = ['gemini'];
+
 export const toolEntry = (id: string): AiToolEntry | undefined => TOOLS.find((t) => t.id === id);
 /** O modo oferecido de uma ferramenta; undefined quando ela não o oferece (planejado, ou sem entrada). */
 export const toolModeEntry = (tool: string, mode: ToolMode): ToolModeEntry | undefined =>

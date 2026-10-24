@@ -64,7 +64,7 @@ export function checkRequirements(p: RequirementProbe): BoardRequirement[] {
         optional: true,
         // o board refaz sozinho: o Diagnóstico mostra o andamento. Sem isso (a CLI do Claude, que roda quatro vezes
         // na sonda), a pessoa refaz: no Reconectar do perfil do catálogo, ou no "Verificar capacidades" do perfil
-        // sem Conectar (a cópia), em Ferramentas de IA; o comando da paleta saiu na história 13
+        // sem Conectar (a cópia), em Conectar agentes; o comando da paleta saiu na história 13
         action:
           h.evidenceInvalidated === 'automatic'
             ? { kind: 'diagnostic', profile: h.id }

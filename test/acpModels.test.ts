@@ -157,7 +157,7 @@ describe('acpSessionModels', () => {
     const agent = fakeAgent(() => ({ error: { code: -32000, message: 'Authentication required' } }));
     // o Gemini entra pela chave de API, na tela do Conectar (história 7)
     await expect(acpSessionModels(gemini, 'gemini-acp', '/tmp/x', { spawn: agent.spawn })).rejects.toThrow(
-      'Conectar ferramenta, com a chave de API',
+      'Conectar agentes, com a chave de API',
     );
   });
 });

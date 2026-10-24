@@ -3,7 +3,8 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
-import { ModelsSettings } from '../../src/webview/components/settings/ModelsSettings';
+import { AgentModels } from '../../src/webview/components/settings/agentConnect/AgentModels';
+import { ModelSuggestion } from '../../src/webview/components/settings/agentConnect/ModelSuggestion';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 let board: SeededBoard;
@@ -12,16 +13,18 @@ beforeAll(async () => {
 });
 beforeEach(() => syncStore(board.router));
 
+const state = () => useBoardStore.getState().state!;
+const tool = () => state().board.aiTool;
+/** Conectar agentes: os modelos do agente em uso (aba Modelos) e a sugestão de modelo do board, como na tela. */
 const show = () =>
   render(
     <Theme>
-      <ModelsSettings />
+      <AgentModels profile={state().board.aiProfiles.find((p) => p.id === tool())!} />
+      <ModelSuggestion />
     </Theme>,
   );
-const state = () => useBoardStore.getState().state!;
-const tool = () => state().board.aiTool;
 
-describe('ModelsSettings', () => {
+describe('Conectar agentes: os modelos do agente', () => {
   it('Detectar modelos e Novo modelo ficam no topo; não há linha solta de adicionar', () => {
     show();
     expect(screen.getByRole('button', { name: 'Detectar modelos' })).toBeInTheDocument();
@@ -136,7 +139,7 @@ describe('ModelsSettings', () => {
   });
 });
 
-describe('ModelsSettings: modos rápidos do Cursor', () => {
+describe('Conectar agentes: modos rápidos do Cursor', () => {
   it('a chave só aparece no Cursor e grava a regra', async () => {
     show();
     expect(screen.queryByRole('switch', { name: 'Incluir os modos rápidos' })).toBeNull();
@@ -151,7 +154,7 @@ describe('ModelsSettings: modos rápidos do Cursor', () => {
   });
 });
 
-describe('ModelsSettings: preencher o modelo sugerido (RF01/RF07)', () => {
+describe('Conectar agentes: preencher o modelo sugerido (RF01/RF07)', () => {
   it('sem regra de sugestão, o interruptor fica desabilitado e o aviso de dependência aparece', () => {
     board.router.handle({ type: 'settings.modelRules.set', rules: [] });
     syncStore(board.router);
@@ -183,17 +186,6 @@ describe('ModelsSettings: preencher o modelo sugerido (RF01/RF07)', () => {
     expect(toggle).toBeEnabled();
     await userEvent.click(toggle);
     expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { autoApplyModelSuggestion: false } });
-  });
-});
-
-describe('ModelsSettings: cabeçalho da ferramenta (RF09)', () => {
-  it('mostra a ferramenta atual e troca para a seção de ferramenta em Harness ao clicar', async () => {
-    show();
-    const link = screen.getByRole('button', { name: 'Trocar a ferramenta de IA, em Harness' });
-    await userEvent.click(link);
-    const s = useBoardStore.getState();
-    expect(s.settingsTab).toBe('harness');
-    expect(s.pendingSettingsSection).toBe('harness-tool');
   });
 });
 

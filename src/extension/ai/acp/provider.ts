@@ -135,7 +135,7 @@ export interface AcpAuth {
 /** O que dizer quando o agente recusa a sessão sem login: a tela do Conectar no agente com chave, o terminal nos demais. */
 export function acpLoginHint(agent: AcpAgent): string {
   return agent.apiKeyAuth
-    ? `${agent.label} pede login. Conecte em Configurações › Ferramentas de IA › Conectar ferramenta, com a chave de API.`
+    ? `${agent.label} pede login. Conecte em Configurações › Conectar agentes, com a chave de API.`
     : `${agent.label} pede login. Rode \`${agent.login}\` no terminal uma vez e entre com a sua conta.`;
 }
 

@@ -71,8 +71,7 @@ const START = 'Trabalhe no pedido do board descrito nas instruções e responda 
 const FUNCTION_NAME = /^[A-Za-z_][A-Za-z0-9_.:-]{0,63}$/;
 
 /** A causa, quando o perfil no modo API não tem chave no cofre: o que a pessoa faz para resolver. */
-export const MISSING_API_KEY =
-  'Falta a chave de API do Gemini: conecte o Gemini pelo cartão API em Configurações › Ferramentas de IA › Conectar ferramenta.';
+export const MISSING_API_KEY = 'Falta a chave de API do Gemini: conecte o Gemini no modo API em Configurações › Conectar agentes.';
 
 /** Uma ferramenta que um servidor MCP lista. */
 export interface McpTool {

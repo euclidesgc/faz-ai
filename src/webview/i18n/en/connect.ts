@@ -1,12 +1,8 @@
-// Ferramentas de IA › Conectar ferramenta (história 7): a tela, as fichas dos modos de `TOOLS`
+// O Conectar de cada agente (história 7), em Conectar agentes: os passos, as fichas dos modos de `TOOLS`
 // (`src/shared/aiTools.ts`) e as mensagens do Conectar no host.
 export const connect: Record<string, string> = {
   // a tela
-  'Conectar ferramenta': 'Connect a tool',
-  'Escolha a ferramenta e o modo. A extensão acha a ferramenta, faz o login, verifica o que ela carrega por conta própria e lê os modelos: o que fica com você é entrar na conta.':
-    'Choose the tool and the mode. The extension finds the tool, signs in, checks what it loads on its own, and reads the models: all you do is sign in to your account.',
   Perfis: 'Profiles',
-  'Página oficial': 'Official page',
   'Ainda não oferecidos nesta versão: {modes}.': 'Not offered in this version yet: {modes}.',
   Recomendado: 'Recommended',
   'O que o board controla': 'What the board controls',
@@ -21,9 +17,6 @@ export const connect: Record<string, string> = {
   'Acha a ferramenta, faz o login, verifica as capacidades e lê os modelos.':
     'Finds the tool, signs in, checks the capabilities, and reads the models.',
   'Refaz o login, a verificação e a leitura dos modelos.': 'Redoes the sign-in, the check, and the model reading.',
-  'Refaz o login, a verificação e a leitura dos modelos deste perfil.':
-    'Redoes the sign-in, the check, and the model reading for this profile.',
-  'Este modo ainda não tem perfil neste board.': 'This mode has no profile on this board yet.',
   'O Conectar está em curso.': 'Connect is in progress.',
   'Achar a ferramenta': 'Find the tool',
   'Entrar na conta': 'Sign in',
@@ -37,15 +30,12 @@ export const connect: Record<string, string> = {
   'espera você': 'waiting for you',
   falhou: 'failed',
   Conectada: 'Connected',
-  'Não conectada pelo Conectar': 'Not connected through Connect',
   'Conectar parou com erro no passo "{step}"': 'Connect stopped with an error at "{step}"',
   'Conectar em andamento: "{step}"': 'Connect in progress: "{step}"',
   'versão desconhecida': 'unknown version',
   'chave de API guardada': 'API key stored',
   'chave de API conferida': 'API key checked',
   'Modo em uso': 'Mode in use',
-  'Passa o perfil da ferramenta para este modo quando o login der certo, com a mesma chave e os mesmos modelos.':
-    'Switches the tool’s profile to this mode once the sign-in succeeds, with the same key and the same models.',
   'O board confere a chave agora, lendo a lista de modelos da conta pela API do Gemini (não gasta a conta). Aceita, ela fica guardada no cofre deste computador, a mesma para todos os modos, e vai para a CLI só no ambiente de cada execução; ela não volta para esta tela. Recusada, a chave guardada antes continua.':
     'The board checks the key now, by reading your account’s model list through the Gemini API (it does not spend your quota). Once accepted, it is stored in this computer’s vault, the same for every mode, and reaches the CLI only in the environment of each run; it never comes back to this screen. If refused, the previously stored key stays.',
   'MCP e ferramentas pelo settings da home isolada; a aprovação por nível; o contexto do projeto o Gemini carrega':
@@ -79,7 +69,6 @@ export const connect: Record<string, string> = {
     'Records your acknowledgment of the compatible regime for this profile, after reading what it loads.',
   'Dar ciência do regime compatível ao perfil "{name}"?': 'Acknowledge the compatible regime for profile "{name}"?',
   'Regime compatível com a sua ciência (revisão {n})': 'Compatible regime with your acknowledgment (revision {n})',
-  'Sem ciência do regime compatível': 'No acknowledgment of the compatible regime',
   'Ligue o perfil antes.': 'Turn the profile on first.',
   'Retoma o Conectar do passo em que parou.': 'Resumes Connect from the step where it stopped.',
   'login confirmado': 'signed in',
@@ -106,13 +95,11 @@ export const connect: Record<string, string> = {
     'Gives your acknowledgment of the compatible regime again: the profile runs again, without redoing Connect.',
   'Abre um terminal com o comando de login.': 'Opens a terminal with the sign-in command.',
   'Tentar de novo': 'Try again',
-  'Abrir o Conectar': 'Open Connect',
-  'Regime compatível ligado para o board inteiro (revisão {n}), de uma versão anterior. Agora o regime é de cada perfil: a ciência é dada no Conectar, em Ferramentas de IA.':
-    'Compatible regime turned on for the whole board (revision {n}), from an earlier version. The regime is now per profile: you acknowledge it in Connect, under AI tools.',
-  'Desliga o regime compatível do board. Os perfis com ciência seguem no compatível; os que não passam pelo Conectar (cópias, personalizados) recebem a ciência na lista de Ferramentas de IA.':
-    'Turns off the board-wide compatible regime. Acknowledged profiles stay compatible; those that do not go through Connect (copies, custom profiles) get the acknowledgment in the AI tools list.',
+  'Regime compatível ligado para o board inteiro (revisão {n}), de uma versão anterior. Agora o regime é de cada perfil: a ciência é dada no Conectar, em Conectar agentes.':
+    'Compatible regime turned on for the whole board (revision {n}), from an earlier version. The regime is now per profile: you acknowledge it in Connect, under Connect agents.',
+  'Desliga o regime compatível do board. Os perfis com ciência seguem no compatível; os que não passam pelo Conectar (cópias, personalizados) recebem a ciência nos detalhes deles, em Conectar agentes.':
+    'Turns off the board-wide compatible regime. Acknowledged profiles stay compatible; those that do not go through Connect (copies, custom profiles) get the acknowledgment in their details, in Connect agents.',
   'Voltar ao exclusivo': 'Back to exclusive',
-
   // as fichas dos modos (`TOOLS`)
   'Chave de API do Gemini: cobrança por token, por projeto (há um nível gratuito).':
     'Gemini API key: billed per token, per project (there is a free tier).',
@@ -183,7 +170,6 @@ export const connect: Record<string, string> = {
     'when you want the {name} agent deciding how to work, with the board answering each request',
   'tokens e custo do turno': 'tokens and cost for the turn',
   'não medido: o agente não informa os tokens pelo ACP': 'not measured: the agent does not report tokens over ACP',
-
   // as mensagens do Conectar no host
   'O comando `{command}` do {name} não está no PATH. Instale pela página oficial e tente de novo.':
     'The `{command}` command for {name} is not on the PATH. Install it from the official page and try again.',
@@ -205,8 +191,8 @@ export const connect: Record<string, string> = {
   '{name} recusou a chave de API: {reason}': '{name} refused the API key: {reason}',
   'A versão instalada do {name} não oferece o login por chave de API pelo ACP ({method}). Atualize a ferramenta e tente de novo.':
     'The installed version of {name} does not offer API key sign-in over ACP ({method}). Update the tool and try again.',
-  '{name} pede login. Conecte em Configurações › Ferramentas de IA › Conectar ferramenta, com a chave de API.':
-    '{name} asks you to sign in. Connect it in Settings › AI tools › Connect a tool, with the API key.',
+  '{name} pede login. Conecte em Configurações › Conectar agentes, com a chave de API.':
+    '{name} asks you to sign in. Connect it in Settings › Connect agents, with the API key.',
   'Cole a chave de API.': 'Paste the API key.',
   'A chave de API tem de ser uma linha só, sem espaços, com 8 a 512 caracteres.':
     'The API key must be a single line, without spaces, 8 to 512 characters long.',

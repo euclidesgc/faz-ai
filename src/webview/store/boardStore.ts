@@ -51,7 +51,7 @@ export interface HarnessFileRef {
   file?: string;
 }
 import { resolveHarnessTab, type HarnessTab, type HarnessTopic } from '../../shared/harnessTopics';
-import { type SettingsTab } from '../../shared/settingsTab';
+import { toSettingsTab, type SettingsTab } from '../../shared/settingsTab';
 import { SETTINGS_SECTIONS } from '../../shared/settingsSections';
 export type { SettingsTab };
 
@@ -102,9 +102,9 @@ interface BoardStore extends UiState, ViewState, UiPrefs {
   environmentProfile: string | null;
   /** abre o Diagnóstico do ambiente, no bloco de um perfil quando há um */
   openEnvironment(profile?: string): void;
-  /** a ferramenta que o Conectar ferramenta mostra ao abrir (vinda do aviso do topo); fica na memória */
+  /** o agente que Conectar agentes mostra ao abrir (vindo do aviso do topo); fica na memória */
   connectTool: string | null;
-  /** abre Ferramentas de IA › Conectar ferramenta, já na ferramenta do perfil (o perfil pronto tem o id da ferramenta) */
+  /** abre Conectar agentes, já no agente do perfil */
   openConnect(profile: string): void;
   /** o chat está aberto no painel lateral do board (no navegador; no editor ele fica na barra lateral) */
   chatOpen: boolean;
@@ -221,7 +221,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     setBulkBusy: (bulkBusy) => set({ bulkBusy }),
     // o Diagnóstico é de passagem: ao reabrir, volta para o board
     view: persisted?.view === 'environment' ? 'board' : (persisted?.view ?? 'board'),
-    settingsTab: persisted?.settingsTab ?? 'columns',
+    // uma aba que saiu (Ferramentas de IA, Modelos de IA) cai onde o conteúdo dela mora agora, nunca numa tela vazia
+    settingsTab: toSettingsTab(persisted?.settingsTab ?? 'columns'),
     // as abas por ferramenta saíram: quem deixou uma aberta guarda o valor antigo, que cai em `tool`
     harnessTab: resolveHarnessTab(persisted?.harnessTab),
     harnessTopic: 'rules',
@@ -268,7 +269,7 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       persist(get());
     },
     openConnect(profile) {
-      set({ view: 'settings', settingsTab: 'aiTools', connectTool: profile, openCardId: null, attachmentModal: null });
+      set({ view: 'settings', settingsTab: 'connect', connectTool: profile, openCardId: null, attachmentModal: null });
       persist(get());
     },
     openSettings(settingsTab) {
@@ -379,7 +380,7 @@ export function useHostSync(): void {
         s.openCard(msg.cardId);
       } else if (msg.type === 'ui.openSettings') {
         const info = msg.section ? SETTINGS_SECTIONS[msg.section] : undefined;
-        s.openSettings(msg.tab);
+        s.openSettings(toSettingsTab(msg.tab));
         useBoardStore.setState({
           pendingSettingsSection: msg.section ?? null,
           ...(info?.harnessTab && { harnessTab: info.harnessTab }),

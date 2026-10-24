@@ -2,12 +2,12 @@
 
 # Configurações do board
 
-Este é o manual detalhado da tela de **Configurações**: o que cada seção ajusta, como funcionam os
-perfis de CLI, o catálogo de modelos com as regras de sugestão e as políticas de execução e
-fallback. O Harness, os agentes e a conexão da ferramenta de IA estão em
+Este é o manual detalhado da tela de **Configurações**: o que cada seção ajusta, como o board se conecta
+aos agentes de IA (Claude Code, Cursor, Codex, Gemini e os outros), o catálogo de modelos de cada agente
+com as regras de sugestão e as políticas de execução e fallback. O Harness e os agentes do board estão em
 [Harness, agentes e ferramentas de IA](harness.md).
 
-![Configurações: catálogo de modelos e regras de sugestão](images/settings.png)
+![Configurações › Conectar agentes: o agente em uso, a lista e a conexão do agente escolhido](images/settings.png)
 
 ## Seções da tela
 
@@ -17,51 +17,86 @@ fallback. O Harness, os agentes e a conexão da ferramenta de IA estão em
 | Tipos de card         | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria                                                 |
 | Regras do board       | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido, trilha curta para histórias pequenas (esforço Baixo ou tipo Bug pula o PRD e a Spec)                                                                                                                                                                                                                                                                                                              |
+| Conectar agentes      | O agente de IA que roda os cards (um em uso de cada vez) e os outros ligados; a conta de cada um (entrar e sair); o **Conectar** com o board e o modo (CLI, ACP ou API); os modelos de cada agente; o teste rápido, a sessão de teste e o log do protocolo; cópias e perfis personalizados; as regras que sugerem o modelo de cada card e as políticas de execução e fallback                                                                                                                  |
 | Harness               | Biblioteca única de regras, skills, subagentes e MCPs, com importação por tipo, CRUD e assistentes; ferramenta, permissão, agente padrão e heartbeat (ver [Harness](harness.md#harness) e [Agentes](harness.md#agentes))                                                                                                                                                                                                                                                                     |
-| Ferramentas de IA     | **Conectar ferramenta** (escolher a ferramenta e o modo e conectar); perfis de CLI: ligar, escolher o padrão, duplicar, criar e testar                                                                                                                                                                                                                                                                                                                                                       |
-| Modelos de IA         | Modelos e níveis de esforço por perfil; regras que sugerem o modelo de cada card                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Git                   | Modo, gitflow, nome e prefixos das branches, worktrees, merge automático e registros de decisão; editável no editor e no navegador. "Tocar histórias em paralelo" fica em Harness de IA › Ferramenta e execução                                                                                                                                                                                                                                                                              |
 | Aparência             | **Idioma** (automático, Português (Brasil) ou English), tema, fonte e tamanho, por board, no editor e no navegador; status (nome e cor, na aba Fluxos; aqui só no modo navegador)                                                                                                                                                                                                                                                                                                           |
 | Backup                | Exportar e importar o board, na aba Backup, no editor e no navegador (no editor, também pela paleta de comandos: `fazai.exportBoard`, `fazai.importBoard`)                                                                                                                                                                                                                                                                                                                                 |
 
-## Ferramentas de IA: Conectar ferramenta
+## Conectar agentes
 
-No topo de **Configurações → Ferramentas de IA**, **Conectar ferramenta** mostra a lista fixa das
-ferramentas que a extensão traz (o Gemini primeiro, cada uma com a nota de cobrança). Escolhida a
-ferramenta, cada modo que a extensão oferece para ela (CLI, ACP ou API; nunca um que não funciona)
-vira um cartão com a mesma ficha, para comparar linha a linha: o que o board controla, o regime
-esperado, a precisão do que foi usado, o consumo, o que a ferramenta traz por conta própria, como se
-entra, a cobrança e quando escolher. Os modos ainda não oferecidos aparecem só pelo nome, sem cartão.
+**Configurações → Conectar agentes** junta o que antes ficava em duas telas (Ferramentas de IA e Modelos de
+IA). No topo fica o **agente em uso**: o que roda os cards que não escolhem outro (pelo campo Modelo, pelo
+agente ou por uma regra), com o modo, o resumo da conexão e a conta. Abaixo, à esquerda, a lista dos
+agentes; à direita, o agente escolhido, com as abas **Conexão**, **Modelos**, **Testar** e **Detalhes**.
+No fim da tela ficam as regras de sugestão de modelo e as políticas de execução e fallback, que valem para
+o board inteiro.
 
-**Recomendado** é o modo em que o board controla mais do que o agente acessa e mede o que ele gasta;
-empate se desfaz pelo que a ferramenta carrega por conta própria (menos é melhor). O selo aparece só
-quando o modo recomendado é oferecido, com o motivo em uma frase. Para o Gemini, o recomendado é a
-**API**, e o selo fica no cartão dela; o cartão **ACP** segue ao lado. O Claude Code
-mostra a CLI com o selo e o porquê de ser a única (o ACP dele exige cobrança por API, fora da
-assinatura).
+### A lista
 
-O botão **Conectar** de um cartão leva o perfil do catálogo da ferramenta, naquele modo, por estes
-passos, com o progresso na tela. É um perfil por ferramenta, com o modo trocável: no Gemini, os cartões
-**ACP** e **API** conectam o mesmo perfil (o mesmo id, as mesmas políticas, o mesmo catálogo de modelos
-e a mesma chave), e ele passa para o modo do cartão quando o login dá certo; o cartão do modo em que o
-perfil roda mostra **Modo em uso**.
+A lista junta os agentes que o board executa (os que a extensão traz e os seus perfis) com o
+[registro oficial do ACP](https://agentclientprotocol.com/registry), de onde vêm o ícone, a descrição e a
+versão publicada de cada um. O agente em uso vem primeiro, depois os ligados e os desligados; cada linha
+diz o modo e a situação: conectado, ligado, desligado, não instalado, o Conectar em curso, à espera de
+você ou parado com erro. Os agentes do registro que o board ainda não executa ficam à parte, em **Outros
+agentes do registro do ACP**: dá para entrar na conta e conversar com eles na sessão de teste, mas não
+usá-los nos cards. O registro é baixado uma vez e guardado por 6 horas na pasta de dados; sem rede, a
+lista segue com a cópia anterior e diz de quando ela é. **Atualizar lista** baixa de novo e relê o PATH
+(depois de instalar um agente com o board aberto); **Verificar situação** confere de novo a instalação,
+a versão e o login de cada perfil ligado. **Agente personalizado (CLI)** abre o formulário do perfil
+personalizado ([abaixo](#perfil-personalizado-avançado)).
 
-1. **Achar a ferramenta**: o comando no PATH do terminal e a versão; sem ele, o link **Instalar**. No
+### A conta: entrar e sair
+
+A seção **Conta** da aba Conexão diz se o agente tem login e qual conta ele usa ("Claude Max ·
+pessoa@exemplo.com"), quando a ferramenta informa. A verificação é curta e não deixa processo aberto: nas
+CLIs prontas, o status da própria CLI (`claude auth status`, `cursor-agent status`); nos agentes pelo
+ACP, o `initialize` e uma sessão nova sem pedido, que não gastam a conta. Ao abrir um agente ligado e
+instalado, a tela confere a conta sozinha; nos outros, pelo botão **Verificar a conta**.
+
+Sem login, a seção mostra os jeitos de entrar que a ferramenta oferece:
+
+- **Entrar no terminal**: o board abre o login da própria ferramenta num terminal do editor (o comando
+  aparece na tela, como `claude auth login`) e espera o terminal fechar; com a saída sem erro, confere a
+  conta de novo sozinho e, se o Conectar tinha parado por falta de login, retoma. No navegador, sem o
+  editor, a tela mostra o comando para você rodar e conferir depois.
+- **Entrar**: o próprio agente faz o login pelo protocolo (pode abrir o navegador), e o board espera você
+  terminar.
+- **Entrar com a chave**: a chave de API vai para a ferramenta e não volta para a tela nem para o log. No
+  Gemini, ela passa pelo Conectar, que a confere e guarda no cofre deste computador.
+
+**Sair da conta** aparece quando há login e a ferramenta sai pelo board (o `logout` do protocolo, ou o
+comando da CLI no Claude Code e no Cursor). Ela pede confirmação, porque vale para a máquina inteira: o
+terminal e o editor também ficam sem login até você entrar de novo.
+
+### O Conectar: da ferramenta à conexão com o board
+
+A seção **Conexão com o board** conduz o perfil do catálogo por estes passos, com o progresso na tela. Na
+ferramenta com mais de um modo (o Gemini: CLI, ACP e API), o seletor de modo fica no topo da seção, com o
+selo **Recomendado** e o motivo no modo recomendado, e **Como funciona o modo** abre a ficha do modo: o
+que o board controla, o regime esperado, a precisão do que foi usado, o consumo, o que a ferramenta traz
+por conta própria, como se entra, a cobrança e quando escolher. **Recomendado** é o modo em que o board
+controla mais do que o agente acessa e mede o que ele gasta; empate se desfaz pelo que a ferramenta
+carrega por conta própria (menos é melhor). É um perfil por ferramenta, com o modo trocável: o Conectar
+noutro modo (**Conectar no modo API**) passa o perfil para aquele modo quando o login dá certo, com o
+mesmo id, as mesmas políticas, o mesmo catálogo de modelos e a mesma chave.
+
+1. **Achar a ferramenta**: o comando no PATH do terminal e a versão; sem ele, o link de instalação. No
    modo API não há o que achar: quem fala com a API é a extensão.
 2. **Entrar na conta**: no Gemini, o campo da **chave de API** (de senha). A chave fica guardada no
-   cofre deste computador, a mesma em todas as pastas e nos dois modos; ela não volta para a tela e não
+   cofre deste computador, a mesma em todas as pastas e nos três modos; ela não volta para a tela e não
    entra no log, no registro das execuções nem na exportação do board. No **ACP** ela vai, a cada
    processo, para o login do agente pelo protocolo, e o Gemini CLI a aceita sem consultar a API: ela é
    conferida de fato na primeira execução, e uma chave errada aparece ali, com a mensagem do Gemini. Na
-   **API** ela é **conferida na hora**: o board lê a lista de modelos da conta com ela (não gasta a
-   conta), e a tela diz "chave de API conferida". Nos dois, a chave nova só substitui a guardada depois
-   de aceita; recusada, a anterior continua. O perfil só é ligado (e só muda de modo) depois deste
-   passo. Nas CLIs prontas, a sonda de login, com o comando para o terminal quando falta.
+   **API** e na **CLI** ela é **conferida na hora**: o board lê a lista de modelos da conta com ela (não
+   gasta a conta), e a tela diz "chave de API conferida". Nos três, a chave nova só substitui a guardada
+   depois de aceita; recusada, a anterior continua. O perfil só é ligado (e só muda de modo) depois deste
+   passo. Nas CLIs prontas, a sonda de login; sem login, o passo para com o comando, e **Entrar no
+   terminal** leva ao login que o board acompanha.
 3. **Verificar as capacidades**: as sondas do verificador gravam as provas do perfil, e o regime sai
    delas, sem pergunta: as cinco capacidades provadas dão o regime exclusivo; permissões, MCP e
    delegação provadas, o compatível. Um agente ACP é sempre compatível (os arquivos de contexto que
-   ele lê sozinho não têm prova pelo protocolo). O modo API é exclusivo por construção, sem sonda: o
-   board afirma a prova na primeira execução, para o modelo do card; a ciência do ACP, se havia, sai.
+   ele lê sozinho não têm prova pelo protocolo). O modo API é exclusivo por construção, sem sonda.
 4. **Ciência do regime** (só no compatível): um botão à parte, **Entendo o que a ferramenta carrega**,
    grava a sua ciência para aquele perfil. O regime vale por perfil: o Gemini pode rodar no compatível
    enquanto o Claude Code segue no exclusivo.
@@ -71,52 +106,100 @@ perfil roda mostra **Modo em uso**.
 No fim, **Conectada** com a versão, o login, o regime, quantos modelos e a data, e as ações **Trocar a
 chave** e **Revogar ciência**. Um erro fica preso ao passo em que ocorreu, com **Tentar de novo**, que
 retoma desse passo (a ciência e os modelos não refazem o login nem as sondas); se o agente recusar a
-chave no login, o campo volta com o que você colou. Cada perfil do catálogo, na lista abaixo, mostra o
-estado da conexão (inclusive quando o Conectar espera você) e **Reconectar**.
+chave no login, o campo volta com o que você colou. **Reconectar** refaz o login, a verificação e a
+leitura dos modelos. A ciência é de cada perfil e pode sair: **Revogar ciência** a tira (o perfil deixa
+de rodar no compatível até você dar a ciência de novo); reconectar um perfil que passa a provar o regime
+exclusivo a tira sozinho; e **importar um board não traz a ciência dos perfis**. Uma política de execução
+não troca o perfil por outro com regime diferente (`constraints-changed`).
 
-A verificação de capacidades não tem mais comando à parte: o comando da paleta **Faz AI: Verificar o
-isolamento da CLI de IA** saiu. Ela roda no **Conectar** e no **Reconectar** (o Claude Code e o Gemini
-pela CLI entram aqui), sozinha quando você liga um agente ACP, e, nos perfis verificáveis que não passam
-pelo Conectar (a cópia do Claude Code e o personalizado ACP de uma versão anterior), pelo botão
-**Verificar capacidades** do perfil na lista. Nenhuma das sondas gasta a sua conta. Quando uma prova
-perde a validade (a CLI, o ambiente ou a extensão mudou), a faixa de requisitos diz onde refazer:
-**Abrir o Conectar** no perfil do catálogo, **Abrir Ferramentas de IA** na cópia.
+Abaixo do Conectar, **Ligado** diz se o board usa o agente (o campo Modelo dos cards, o chat e as regras
+oferecem os modelos dele) e **Usar nos cards** o põe em uso. O agente em uso não desliga: ponha outro em
+uso antes. A verificação de capacidades não tem comando à parte: ela roda no Conectar e no Reconectar,
+sozinha quando você liga um agente ACP, e, nos perfis verificáveis que não passam pelo Conectar (a cópia
+do Claude Code e o personalizado ACP de uma versão anterior), pelo botão **Verificar capacidades** nos
+Detalhes do perfil. Nenhuma das sondas gasta a sua conta. Quando uma prova perde a validade (a CLI, o
+ambiente ou a extensão mudou), a faixa de requisitos diz onde refazer: **Abrir Conectar agentes** no
+perfil do catálogo, **Abrir os detalhes do perfil** na cópia.
 
-A ciência é de cada perfil e pode sair: **Revogar ciência** a tira (o perfil deixa de rodar no
-compatível até você dar a ciência de novo); reconectar um perfil que passa a provar o regime exclusivo
-a tira sozinho; e **importar um board não traz a ciência dos perfis**: quem importa dá a própria, na
-máquina em que o perfil roda. Os perfis que não passam pelo Conectar (cópias e personalizados) dão e
-revogam a ciência na lista, com **Dar ciência do regime compatível** e o mesmo texto do Conectar.
-Uma política de execução não troca o perfil por outro com regime diferente (`constraints-changed`). A faixa de requisitos continua
-conferindo a ferramenta e o login: no Gemini pelo ACP, sem a chave no cofre o login fica "não
-verificado" (ele pode ter a sua `GEMINI_API_KEY`); pela API, sem a chave no cofre falta o login (não há
-outro), e o aviso de login leva ao Conectar.
+### Os modelos de cada agente
 
-A opção **Regime de admissão** saiu de Harness › Ferramenta e execução. Quem tinha ligado o regime
-compatível para o board inteiro numa versão anterior continua com ele (e vê o aviso com o botão
-**Voltar ao exclusivo**); os perfis com ciência no Conectar seguem no compatível.
+A aba **Modelos** mostra o catálogo do agente: os modelos que o campo Modelo dos cards, o chat e as regras
+de sugestão oferecem para ele, com os níveis de esforço de cada um. Cada modelo tem nome, identificador
+na ferramenta, esforços aceitos e esforço padrão; **Novo modelo** cadastra à mão e a lixeira tira do
+catálogo, sem confirmação.
 
-## Ferramentas de IA: perfis de CLI
+**Detectar modelos** lê a lista da ferramenta: no Cursor, dos modelos da sua conta, pelo comando
+`cursor-agent models`, lido ao abrir o board com a CLI autenticada, e a primeira lista lida
+substitui a embutida uma vez só; no Claude Code, uma lista embutida que pode ser editada. Num agente pelo
+ACP, o botão abre uma sessão com o agente (`initialize` e `session/new`, sem pedido, então sem gastar a
+sua conta) e lê os modelos que ele anuncia: o seletor de modelo das opções da sessão, no esquema atual do
+protocolo, ou o bloco `models` da forma anterior, que o Gemini CLI ainda usa. O modelo atual do agente
+fica em primeiro. Um agente que não anuncia modelos deixa o catálogo como está, com o aviso; aí vale
+**Novo modelo** ou **Outro modelo…** no card. Na execução, o modelo do card vai pelo seletor da sessão
+(`session/set_config_option`) quando o agente o expõe, e pela linha de comando (`--model`) onde o agente
+aceita; o agente que não aceita nenhum dos dois segue com o modelo dele, e o log da execução diz qual.
 
-Um **perfil de CLI** é uma ferramenta que o board pode escolher para executar. Os perfis prontos
-são Claude Code, Cursor e Kimi Code. Uma **cópia** usa o catálogo de modelos e a medição de consumo
-da ferramenta de origem, mas mantém comando, credenciais e verificação próprios. Um
-**personalizado** aceita outra CLI com saída em texto; tokens e custo ficam desconhecidos. Em
-**Configurações → Ferramentas de IA**, ligue um perfil revisado e escolha o padrão; só essa tela
-cria, edita, duplica e testa perfis. Importações ficam desligadas até revisão local. Configuração e
-credenciais salvas não voltam à tela nem entram no export do board.
+Cada modelo lido da ferramenta (pelo **Detectar modelos** ou pelo **Conectar**) guarda a data da
+leitura, e a aba diz "lista lida da ferramenta em …" com a mais recente. Sem essa linha, a lista é a
+embutida ou a que você montou à mão. Uma lista velha (a conta mudou de plano, a ferramenta tirou um
+modelo) se corrige detectando de novo ou reconectando.
 
-Comandos, argumentos, ambiente e credenciais permanecem no cofre local: exportação, tela e MCP
-mostram apenas referências e estado. Cópias não herdam provas de isolamento, e um personalizado sem
-tradução verificada não executa. Sondas de versão/login e o botão **Testar** não comprovam
-capacidades.
+No Cursor, a lista traz uma linha por nível de cada modelo (`claude-opus-5-5-low`, `-medium`,
+`-high`…); o board junta as variantes num modelo com os níveis dele. As versões rápidas (`-fast`,
+respondem mais depressa e cobram mais pelos mesmos tokens) ficam de fora até você ligar **Incluir
+os modos rápidos** na aba Modelos do Cursor: aí cada uma entra como um modelo à parte ("Claude Opus 5.5
+1M Fast"), só para os modelos que estão no catálogo; desligar a chave as tira do catálogo. Pelo MCP,
+é a regra `includeFastModels` do `update_rules`. No plano gratuito do Cursor só o **Auto** roda: os
+outros modelos são recusados antes de começar (o card bloqueado explica como escolher Auto), e por
+isso as regras de sugestão do Cursor começam todas em Auto.
+
+### Testar: o teste rápido, a sessão de teste e o log do protocolo
+
+A aba **Testar** tem três partes:
+
+- **Teste rápido pelo caminho dos cards**: um pedido curto pelo mesmo caminho das execuções (a CLI, o
+  ACP ou a API do perfil), depois da confirmação, porque usa a sua assinatura. Uma resposta OK não
+  comprova isolamento, permissões nem MCP.
+- **Sessão de teste pelo ACP**: abre o agente pelo SDK oficial do ACP e conversa com ele em tempo real: o
+  texto, o raciocínio, as ferramentas, o plano e os pedidos de permissão, que você responde ali. O topo
+  mostra o que o agente declarou (versão do protocolo, nome e versão do agente, a sessão, a conta e as
+  capacidades) e as **opções da sessão** que ele anuncia (modelo, modo, esforço, modo rápido), que valem
+  só para o teste: o modelo de um card vem do campo Modelo dele. A sessão usa o mesmo comando dos cards
+  quando o board conhece o agente pelo ACP; o Claude Code, que roda os cards pela CLI, testa pelo
+  adaptador `claude-agent-acp`. Uma sessão por tela: abrir outra fecha a anterior. Ela fecha sozinha
+  depois de 10 minutos parada (nunca no meio de uma resposta), com **Encerrar sessão** ou ao fechar a
+  tela, e a conversa diz quando fechou. Se o agente pedir login, entre na conta na aba Conexão e clique em
+  **Abrir de novo**.
+- **Log do protocolo ACP**: cada mensagem JSON-RPC das verificações de conta, dos logins e da sessão de
+  teste, nos dois sentidos, com o tempo de cada pedido, o pedido mais lento, as linhas que o agente
+  escreve fora do protocolo (`stderr`) e o início e a saída de cada processo. O arquivo do dia
+  (`acp-AAAA-MM-DD.jsonl`, na pasta do rastreio do board) guarda tudo, com o JSON completo; **Abrir
+  arquivo** o abre no editor. Chaves e tokens de acesso nunca entram; os contadores de consumo
+  (`inputTokens`, `totalTokens`) entram.
+
+### Detalhes: perfis de CLI, cópias e personalizados
+
+Cada agente do board é um **perfil de CLI**: uma ferramenta que o board pode escolher para executar. Os
+perfis prontos são Claude Code, Cursor e Kimi Code, pela CLI de uma passada, e os agentes ACP do
+catálogo (Gemini CLI, Codex, OpenCode, GitHub Copilot CLI, Qwen Code, goose e Google Antigravity), que
+vêm desligados. Uma **cópia** usa o catálogo de modelos e a medição de consumo da ferramenta de origem,
+mas mantém comando, credenciais e verificação próprios. Um **personalizado** aceita outra CLI com saída
+em texto; tokens e custo ficam desconhecidos. Importações ficam desligadas até revisão local.
+Configuração e credenciais salvas não voltam à tela nem entram no export do board.
+
+A aba **Detalhes** mostra o tipo do perfil ("Claude Code · CLI", "Cópia de Claude Code · CLI",
+"Personalizado · CLI"), o selo de isolamento, a ciência do regime compatível e as **Capacidades e
+evidências**, com **Duplicar** em todos e **Editar** e **Apagar** nas cópias e nos personalizados (o
+perfil em uso não se apaga). Comandos, argumentos, ambiente e credenciais permanecem no cofre local:
+exportação, tela e MCP mostram apenas referências e estado. Cópias não herdam provas de isolamento, e
+um personalizado sem tradução verificada não executa.
 
 ### Qual CLI executa
 
 O valor do campo **Modelo** (`<perfil>:<modelo>@<esforço>`) já diz o perfil de CLI. Para cada
 execução o board usa o primeiro nível preenchido: o **Modelo do card**, o **modelo do agente**, a
 **regra de modelo** (mesmo com "Preencher o modelo sugerido automaticamente" desligado) e, sem
-nenhum, o **perfil de CLI padrão** de Configurações → Ferramentas de IA. Assim, sub-tarefas da
+nenhum, o **agente em uso** de Configurações → Conectar agentes. Assim, sub-tarefas da
 mesma história podem rodar em CLIs diferentes, e as regras por esforço podem apontar para perfis
 diferentes.
 
@@ -132,24 +215,21 @@ perfil sugerido e preserva as faixas de outros perfis. Pelo MCP, o `get_card` mo
 
 Os agentes do catálogo ACP que não coincidem com uma CLI pronta vêm como perfis prontos do tipo
 **Agente ACP**: Gemini CLI, Codex, OpenCode, GitHub Copilot CLI, Qwen Code, goose e Google
-Antigravity. Eles aparecem desligados em **Ferramentas de IA**; ligue o que você usa. Como os outros
-prontos, não têm Editar nem Apagar: **Duplicar** cria um perfil personalizado com o mesmo agente, para
-mudar o ambiente ou o nome. O id do perfil (`gemini`, `codex-acp`…) é a ferramenta do catálogo de
-modelos, e **Detectar modelos** lê os modelos do agente nele. **Verificar situação** confere se o
-comando do agente está no PATH e a versão; o login fica "não verificado" (no Gemini, "conectado"
-com a chave no cofre, pelo [Conectar](#ferramentas-de-ia-conectar-ferramenta)), e o link **Instalar**
-abre a página oficial do modo ACP do agente. Cursor e Kimi Code ficam nas CLIs
-prontas de uma passada, que medem tokens; o Claude Code segue pela CLI `claude`.
+Antigravity. Eles aparecem desligados na lista; ligue o que você usa, de preferência pelo **Conectar**.
+Como os outros prontos, não têm Editar nem Apagar: **Duplicar** cria um perfil personalizado com o mesmo
+agente, para mudar o ambiente ou o nome. O id do perfil (`gemini`, `codex-acp`…) é a ferramenta do
+catálogo de modelos. A situação diz se o comando do agente está no PATH e a versão, com o link de
+instalação. Cursor e Kimi Code ficam nas CLIs prontas de uma passada, que medem tokens; o Claude Code
+segue pela CLI `claude`.
 
 ### Perfil personalizado (Avançado)
 
-O personalizado é o caminho avançado, para uma linha de comando que o catálogo não traz: as
-ferramentas do catálogo entram pelo **Conectar ferramenta**. O formulário fica em **Avançado**, abaixo
-da lista de perfis, no botão **Novo perfil de CLI personalizado**. O personalizado novo é **só de
-CLI**: o campo **Agente ACP** saiu do formulário novo, e o board recusa transformar uma CLI
-personalizada em agente ACP. Os personalizados ACP criados numa versão anterior (e a cópia de um agente
-ACP pronto) **continuam rodando como estão**: a lista mostra o aviso, com **Abrir o Conectar** no
-agente deles, e **Verificar capacidades**; editar mostra o mesmo aviso e mantém o agente salvo.
+O personalizado é o caminho avançado, para uma linha de comando que o catálogo não traz: os agentes do
+catálogo entram pelo **Conectar**. O formulário abre pelo botão **Agente personalizado (CLI)**, abaixo
+da lista. O personalizado novo é **só de CLI**: o board recusa transformar uma CLI personalizada em
+agente ACP. Os personalizados ACP criados numa versão anterior (e a cópia de um agente ACP pronto)
+**continuam rodando como estão**: os Detalhes mostram o aviso, com **Abrir o agente do catálogo** e
+**Verificar capacidades**; editar mostra o mesmo aviso e mantém o agente salvo.
 
 Para criar um personalizado, informe o comando e um argumento por linha. Os marcadores `{prompt}`,
 `{model}`, `{effort}`, `{mcpConfig}` e `{addDir}` inserem, respectivamente, o pedido, o modelo, o
@@ -157,9 +237,9 @@ esforço, o arquivo MCP e uma pasta adicional quando estiverem disponíveis. Esc
 pedido** (argumento ou stdin) e **Servidor do board** (CLI, arquivo no projeto ou nenhum). No campo
 **Modelo** de um card, cada perfil personalizado ligado (CLI própria ou agente ACP) forma um grupo,
 mesmo sem modelo cadastrado, e o item **Outro modelo…** desse grupo aceita um identificador livre do
-perfil sem cadastrá-lo no catálogo. **Testar** executa um pedido curto e usa a sua assinatura; uma resposta OK não comprova
-isolamento, permissões nem restrições MCP. Capacidades sem evidência permanecem desconhecidas e
-podem impedir a execução.
+perfil sem cadastrá-lo no catálogo. O **Teste rápido** executa um pedido curto e usa a sua assinatura;
+uma resposta OK não comprova isolamento, permissões nem restrições MCP. Capacidades sem evidência
+permanecem desconhecidas e podem impedir a execução.
 
 ### Capacidades e evidências
 
@@ -173,38 +253,14 @@ o card (**Próxima execução**) e `get_card`/`get_harness` (`execution.cliLoads
 decisão. O teste com CLIs reais fica fora do `npm test`: `npm run test:cli-real` (Claude Code
 validado em ambiente local controlado; Cursor e Kimi Code **não validados**).
 
-## Modelos de IA e regras de sugestão
+## Sugestão de modelo para cada card
 
-**Detectar modelos** lê a lista da ferramenta: no Cursor, dos modelos da sua conta, pelo comando
-`cursor-agent models`, lido ao abrir o board com a CLI autenticada, e a primeira lista lida
-substitui a embutida uma vez só; no Claude Code, uma lista embutida que pode ser editada. Num perfil
-com **Agente ACP**, o botão abre uma sessão com o agente (`initialize` e `session/new`, sem pedido,
-então sem gastar a sua conta) e lê os modelos que ele anuncia: o seletor de modelo das opções da
-sessão, no esquema atual do protocolo, ou o bloco `models` da forma anterior, que o Gemini CLI ainda
-usa. O modelo atual do agente fica em primeiro. Um agente que não anuncia modelos deixa o catálogo
-como está, com o aviso; aí vale **Novo modelo** ou **Outro modelo…** no card. Na execução, o modelo
-do card vai pelo seletor da sessão (`session/set_config_option`) quando o agente o expõe, e pela
-linha de comando (`--model`) onde o agente aceita; o agente que não aceita nenhum dos dois segue com
-o modelo dele, e o log da execução diz qual.
-
-Cada modelo lido da ferramenta (pelo **Detectar modelos** ou pelo **Conectar**) guarda a data da
-leitura, e o bloco da ferramenta diz "lista lida da ferramenta em …" com a mais recente. Sem essa
-linha, a lista é a embutida ou a que você montou à mão. Uma lista velha (a conta mudou de plano, a
-ferramenta tirou um modelo) se corrige detectando de novo ou reconectando.
-
-No Cursor, a lista traz uma linha por nível de cada modelo (`claude-opus-5-5-low`, `-medium`,
-`-high`…); o board junta as variantes num modelo com os níveis dele. As versões rápidas (`-fast`,
-respondem mais depressa e cobram mais pelos mesmos tokens) ficam de fora até você ligar **Incluir
-os modos rápidos** no cartão do Cursor: aí cada uma entra como um modelo à parte ("Claude Opus 5.5
-1M Fast"), só para os modelos que estão no catálogo; desligar a chave as tira do catálogo. Pelo MCP,
-é a regra `includeFastModels` do `update_rules`. No plano gratuito do Cursor só o **Auto** roda: os
-outros modelos são recusados antes de começar (o card bloqueado explica como escolher Auto), e por
-isso as regras de sugestão do Cursor começam todas em Auto.
-
-As regras de sugestão combinam condições com E e OU, por exemplo
-`Esforço da atividade = Alto E Tags = backend`. O resultado é sempre uma sugestão: no card, o
-modelo e o esforço podem ser trocados a qualquer momento. O editor de regras tem só nome, condições
-e modelo sugerido.
+No fim de **Conectar agentes**, as **regras de sugestão** combinam condições com E e OU, por exemplo
+`Esforço da atividade = Alto E Tags = backend`, e sugerem o agente, o modelo e o esforço. O resultado é
+sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento. O editor de
+regras tem só nome, condições e modelo sugerido. **Preencher o modelo sugerido automaticamente**, logo
+acima das regras, preenche o campo Modelo ao criar ou mudar um card, se ele estiver vazio ou com a
+sugestão anterior; um modelo escolhido à mão nunca é trocado.
 
 ## Políticas de execução e fallback
 
@@ -215,7 +271,7 @@ com recusas explicadas, destinos ordenados, limites acumulados e exigência de r
 há trabalho parcial ou desconhecido. Políticas importadas permanecem pendentes de revisão;
 snapshots anteriores não mudam com a edição.
 
-Em **Configurações → Ferramentas de IA → Políticas de execução e fallback → Gerenciar políticas**,
+Em **Configurações → Conectar agentes → Políticas de execução e fallback → Gerenciar políticas**,
 o editor manual permite condições, destinos ordenados, limites, duplicação, remoção e histórico
 paginado. A comparação integral precede a confirmação de revisão humana; salvar como pendente não
 autoriza execução. Conflitos de versão preservam o rascunho e permitem recarregar a base antes de
@@ -272,11 +328,11 @@ dependência não está satisfeita. Os links permitem navegar: clique em um para
 correspondente do board, que rola e destaca por 2 segundos, ou clique em um link do Settings para
 abrir o board na seção certa. No modo navegador, os links para o Settings aparecem só como texto.
 
-**"Preencher o modelo sugerido automaticamente"** fica em Modelos, não em Regras; um aviso simples
-em Regras indica a mudança de lugar. O campo Intervalo do heartbeat fica desabilitado quando o
-heartbeat está desligado, sem um componente de dependência adicional. Os cabeçalhos de Modelos,
-Agentes, Rules e Skills mostram "Mostrando os X do [ferramenta] · trocar ferramenta", permitindo
-mudar a ferramenta de qualquer uma dessas telas do board.
+**"Preencher o modelo sugerido automaticamente"** fica em Conectar agentes, junto das regras de
+sugestão, não em Regras; um aviso simples em Regras indica a mudança de lugar. O campo Intervalo do
+heartbeat fica desabilitado quando o heartbeat está desligado, sem um componente de dependência
+adicional. Os cabeçalhos de Agentes, Rules e Skills mostram "Mostrando os X do [ferramenta] · trocar
+ferramenta", permitindo mudar a ferramenta de qualquer uma dessas telas do board.
 
 ## Atualizar o board padrão
 

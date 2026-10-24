@@ -89,10 +89,9 @@ cada fase e move os cards conforme avança, sempre parando para a sua aprovaçã
   consulta o mesmo com `get_metrics`. [Métricas](docs/metricas.md)
 - **Board no navegador.** Abra o mesmo board numa aba do navegador, sincronizado com o editor, ou
   sirva-o sem o editor com o comando `faz-ai`. [Dados e navegador](docs/dados.md)
-- **Agentes por ACP.** Gemini CLI, Codex, OpenCode, GitHub Copilot CLI, Qwen Code, goose e Google Antigravity vêm como perfis prontos, desligados, em Ferramentas de IA, e rodam pelo Agent Client Protocol; o perfil personalizado ficou como caminho avançado, só de CLI (os personalizados ACP de versões anteriores continuam rodando). O board responde as permissões pelo card, e os servidores MCP do card entram na sessão sem arquivo no projeto. Entre na ferramenta no terminal antes de usar (o comando de cada uma está em [Ferramentas MCP](docs/mcp.md#execução-por-acp-transporte-do-perfil)). A admissão por capacidades verifica o handshake do agente e admite o perfil só no regime compatível, porque o agente lê os próprios arquivos de contexto. O Claude Code segue pela CLI.
-- **Conectar ferramenta.** Em Ferramentas de IA, escolha a ferramenta e o modo, compare os modos lado a lado (com o recomendado e o motivo) e clique em **Conectar**: a extensão acha a ferramenta, faz o login, verifica as capacidades, pede a sua ciência quando o regime é compatível e lê os modelos. O Gemini entra pelo ACP com a chave de API, que fica só no cofre deste computador ([detalhes](docs/configuracoes.md#ferramentas-de-ia-conectar-ferramenta)).
-- **Gemini pela API.** No cartão **API** do Gemini no Conectar, com a mesma chave de API, o board chama o modelo direto e faz ele mesmo o ciclo de ferramentas: o modelo só vê as ferramentas do board e dos MCPs que o card libera, e o consumo é medido em tokens. Ler, editar arquivos e rodar comandos são ferramentas do board, liberadas pela permissão do card e presas às pastas dele ([detalhes](docs/harness.md#o-gemini-pela-api)).
-- **Gemini pela CLI.** No cartão **CLI** do Gemini, com a mesma chave, o board roda o Gemini CLI numa passada com uma home isolada só com o settings dele: as ferramentas e os servidores MCP são os do card, e o consumo é medido em tokens ([detalhes](docs/harness.md#o-gemini-pela-cli)).
+- **Conectar agentes.** Uma tela para escolher o agente de IA que roda os cards (Claude Code, Cursor, Kimi Code ou um agente ACP do catálogo, como Gemini CLI, Codex e OpenCode), entrar e sair da conta dele, conectá-lo ao board, ajustar os modelos e testá-lo numa sessão ao vivo pelo ACP, com o log do protocolo. Os outros agentes do registro oficial do ACP aparecem para teste, e as chaves de API ficam só no cofre deste computador ([detalhes](docs/configuracoes.md#conectar-agentes)).
+- **Gemini pela API.** No modo **API** do Gemini, em Conectar agentes, com a mesma chave de API, o board chama o modelo direto e faz ele mesmo o ciclo de ferramentas: o modelo só vê as ferramentas do board e dos MCPs que o card libera, e o consumo é medido em tokens. Ler, editar arquivos e rodar comandos são ferramentas do board, liberadas pela permissão do card e presas às pastas dele ([detalhes](docs/harness.md#o-gemini-pela-api)).
+- **Gemini pela CLI.** No modo **CLI** do Gemini, com a mesma chave, o board roda o Gemini CLI numa passada com uma home isolada só com o settings dele: as ferramentas e os servidores MCP são os do card, e o consumo é medido em tokens ([detalhes](docs/harness.md#o-gemini-pela-cli)).
 - **Cota do Gemini.** Nos três modos, a cota esgotada pausa o perfil do Gemini até a renovação (a diária à meia-noite do Pacífico, a por minuto pelo tempo que a API pede), e o painel de Métricas separa o consumo por modo ([detalhes](docs/automacao.md#o-que-cada-rodada-faz)).
 - **Servidor MCP.** Claude Code, Cursor ou qualquer cliente MCP consulta e edita o board.
   [Ferramentas MCP](docs/mcp.md)
@@ -110,8 +109,8 @@ comando oficial de instalação; o board não instala nada.
 ## Configurações
 
 A extensão não acrescenta chaves ao `settings.json` do editor: toda a configuração fica no próprio
-board, em **Configurações** (workflows e colunas, tipos de card, campos, regras, Harness, ferramentas
-e modelos de IA, Git, aparência e backup). Veja [Configurações do board](docs/configuracoes.md).
+board, em **Configurações** (workflows e colunas, tipos de card, campos, regras, Conectar agentes,
+Harness, Git, aparência e backup). Veja [Configurações do board](docs/configuracoes.md).
 
 Comandos da paleta (`Ctrl+Shift+P`):
 
