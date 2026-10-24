@@ -1,6 +1,7 @@
 import type { Tracked, WebviewToHost } from '../shared/messages';
 import { onHostMessage, postToHost } from './vscode';
 import { beginRequest } from './inFlight';
+import { traceUi } from './trace';
 
 /** Quanto tempo uma ação espera o `done` do host antes de desistir e destravar a tela. */
 export const REQUEST_TIMEOUT_MS = 20_000;
@@ -36,6 +37,7 @@ function newRequestId(): string {
 export function request(msg: WebviewToHost, opts: { timeout?: number } = {}): Promise<void> {
   const requestId = newRequestId();
   const end = beginRequest();
+  const startedAt = Date.now();
   const promise = new Promise<void>((resolve, reject) => {
     const cleanup = () => {
       off();
@@ -51,11 +53,21 @@ export function request(msg: WebviewToHost, opts: { timeout?: number } = {}): Pr
     const off = onHostMessage((m) => {
       if (m.type !== 'done' || m.requestId !== requestId) return;
       cleanup();
+      // o tempo visto pela tela: o do host mais o envio e a volta do estado
+      traceUi({
+        ev: 'request',
+        type: msg.type,
+        rid: requestId,
+        ms: Date.now() - startedAt,
+        ok: m.ok,
+        ...(m.error ? { err: m.error } : {}),
+      });
       if (m.ok) resolve();
       else reject(new Error(m.error ?? 'Falhou.'));
     });
     const timer = setTimeout(() => {
       cleanup();
+      traceUi({ ev: 'timeout', type: msg.type, rid: requestId, ms: Date.now() - startedAt, ok: false, err: REQUEST_TIMEOUT_MESSAGE });
       window.dispatchEvent(new MessageEvent('message', { data: { type: 'error', message: REQUEST_TIMEOUT_MESSAGE } }));
       reject(new Error(REQUEST_TIMEOUT_MESSAGE));
     }, opts.timeout ?? REQUEST_TIMEOUT_MS);

@@ -20,6 +20,7 @@ import { parseGit, type MainBranch } from '../../../shared/git';
 import { BoardLibrary } from '../../boardLibrary';
 import { ArtifactImporter } from '../../artifactImport';
 import { BoardHarness } from './harness';
+import type { Trace } from '../../log/trace';
 
 export interface RouterOptions {
   workspaceKey: string;
@@ -40,6 +41,8 @@ export interface RouterOptions {
   seedAgents?: boolean;
   /** o `gh` que renomeia branches no GitHub (#466); sem ele, o processo `gh` do PATH */
   gh?: GhRunner;
+  /** o rastreio do board (ações da tela, mudanças aplicadas, ferramentas MCP); sem ele, nada é rastreado */
+  trace?: Trace;
 }
 
 /** Repositórios, anexos e harness do board aberto, compartilhados pelo router e pelos handlers. */

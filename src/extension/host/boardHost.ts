@@ -38,6 +38,7 @@ import { AiGateway } from '../ai/gateway';
 import { RunArtifactSnapshots } from '../runArtifactSnapshot';
 import { ArtifactRepo } from '../repositories/artifactRepo';
 import { createRunLog } from '../log/runLog';
+import { createTrace, tracedRunLog } from '../log/trace';
 import { consolidate } from '../log/rollup';
 import { BoardRepo } from '../repositories/boardRepo';
 import { removeProjectServer } from '../mcp/clientConfig';
@@ -174,7 +175,19 @@ export function boardDbFile(storageDir: string, folderPath: string): string {
   return file;
 }
 
-export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
+export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost> {
+  // o rastreio do board: ações da tela, mudanças, ferramentas MCP e execuções, um arquivo por dia.
+  // `FAZAI_TRACE=1` repete cada linha no canal de log, legível
+  const trace = createTrace(path.join(opts.storageDir, 'trace', workspaceKey(opts.folderPath)), opts.log, process.env.FAZAI_TRACE === '1');
+  // tudo o que o host já escreve no canal de log também entra no rastreio, na ordem em que aconteceu
+  const o: BoardHostOptions = {
+    ...opts,
+    log: (line) => {
+      opts.log(line);
+      trace.write({ src: 'host', ev: 'log', data: line });
+    },
+  };
+  o.log(`Rastreio do board em ${trace.file()}`);
   const handle: DbHandle = await openFile(boardDbFile(o.storageDir, o.folderPath), o.wasmDir);
   const homeDir = os.homedir();
   const router = new MessageRouter(handle, {
@@ -188,13 +201,14 @@ export async function createBoardHost(o: BoardHostOptions): Promise<BoardHost> {
     workspaceDir: o.folderPath,
     homeDir,
     log: o.log,
+    trace,
     extensionVersion: o.version,
     // os agentes de fábrica nascem na pasta global da ferramenta na primeira abertura
     seedAgents: true,
     // a renomeação de branches (#466) usa o PATH do shell de login, como o `gh` das rotinas de fundo
     gh: ghProcess(() => ({ ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}) })),
   });
-  const runLog = createRunLog(handle.db, o.log);
+  const runLog = tracedRunLog(createRunLog(handle.db, o.log), trace);
   // execuções que a sessão anterior não fechou (a janela caiu, a máquina desligou) viram 'unknown' em
   // vez de ficarem abertas para sempre. Só a janela dona do board faz isso: duas janelas na mesma
   // pasta compartilham o arquivo do banco, e a segunda a abrir marcaria como inconclusiva uma

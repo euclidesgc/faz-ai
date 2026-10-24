@@ -56,6 +56,10 @@
         "icon": "$(globe)"
       },
       {
+        "command": "fazai.openTrace",
+        "title": "%command.openTrace.title%"
+      },
+      {
         "command": "fazai.exportBoard",
         "title": "%command.exportBoard.title%"
       },

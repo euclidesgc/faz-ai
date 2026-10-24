@@ -52,10 +52,13 @@ export interface AgentInput {
   background?: boolean;
 }
 import type { SettingsTab } from './settingsTab';
+import type { TraceEntry } from './trace';
 import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, LinkKind, WorkflowKind } from './model';
 
 export type WebviewToHost =
   | { type: 'ready' }
+  /** linhas do rastreio juntadas na tela (cliques, erros, tempos de resposta); o host só grava no arquivo */
+  | { type: 'ui.trace'; entries: TraceEntry[] }
   | { type: 'view.set'; patch: Partial<ViewState> }
   /** preferências da pessoa (avisos dispensados...), guardadas no host para valerem entre painéis e reinícios */
   | { type: 'prefs.set'; patch: Partial<UiPrefs> }

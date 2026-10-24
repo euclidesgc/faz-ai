@@ -331,6 +331,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('fazai.openEnvironment', () => openBoard({ type: 'ui.openView', view: 'environment' })),
     vscode.commands.registerCommand('fazai.refreshSidebar', () => tree.refresh()),
     vscode.commands.registerCommand('fazai.openInBrowser', openInBrowser),
+    // o rastreio do dia: cada ação da tela, mudança, ferramenta MCP e execução, para investigar um defeito
+    vscode.commands.registerCommand('fazai.openTrace', async () => {
+      const file = (await getRouter())?.trace.file();
+      if (!file || !fs.existsSync(file)) return void vscode.window.showInformationMessage('Ainda não há rastreio do board hoje.');
+      await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(file));
+    }),
     vscode.commands.registerCommand('fazai.exportBoard', exportBoard),
     vscode.commands.registerCommand('fazai.importBoard', importBoard),
     vscode.commands.registerCommand('fazai.connectAI', (target?: Parameters<BoardHost['connectAI']>[0], opts?: { fromBoard?: boolean }) =>

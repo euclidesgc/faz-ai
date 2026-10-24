@@ -44,6 +44,7 @@ import { getMetrics, getPanelMetrics, type MetricsQuery, type MetricsResult } fr
 import { cardUsage } from '../log/cardUsage';
 import type { CardUsage } from '../../shared/cardUsage';
 import type { MetricsPanelQuery, MetricsPanelResult } from '../../shared/metrics';
+import { NO_TRACE, type Trace } from '../log/trace';
 import { BoardContext, type Actor, type Handler, type HandlerMap, type MessageType, type RouterOptions } from './handlers/context';
 import { boardBackupHandlers } from './handlers/boardBackup';
 import { boardSettingsHandlers } from './handlers/boardSettings';
@@ -112,6 +113,7 @@ export type ChatMessageIn = Extract<
 const viaBridge = () => false;
 const bridgeOnly = {
   ready: viaBridge,
+  'ui.trace': viaBridge,
   'view.set': viaBridge,
   'prefs.set': viaBridge,
   'ui.scope.set': viaBridge,
@@ -258,6 +260,11 @@ export class MessageRouter {
   get boardId(): string {
     return this.ctx.boardId;
   }
+
+  /** O rastreio do board, compartilhado pelas interfaces e pelo servidor MCP; sem um nas opções, não grava. */
+  get trace(): Trace {
+    return this.ctx.opts.trace ?? NO_TRACE;
+  }
   private admissionReader: AdmissionReader | null = null;
   /**
    * Leitura da admissão real (recibos do host) para a prévia; sem ela a prévia diz que a admissão está
@@ -403,6 +410,7 @@ export class MessageRouter {
 
   /** Uma tarefa em segundo plano falhou: além do log, a pessoa precisa ver, senão a tela fica esperando para sempre. */
   reportError(message: string): void {
+    this.trace.write({ src: 'router', ev: 'error', err: message });
     this.errorListeners.forEach((fn) => fn(message));
   }
 
@@ -520,10 +528,32 @@ export class MessageRouter {
     const startedAt = performance.now();
     // um handler que lança depois de gravar em parte deixaria o cache desatualizado: esquece antes
     this.invalidateSnapshot();
-    const changed = handler(msg, this.ctx, actor);
+    let changed: boolean;
+    try {
+      changed = handler(msg, this.ctx, actor);
+    } catch (e) {
+      this.trace.write({
+        src: 'router',
+        ev: 'apply',
+        type: msg.type,
+        ok: false,
+        err: e instanceof Error ? e.message : String(e),
+        data: { by: actor.author, ai: actor.byAi },
+      });
+      throw e;
+    }
     if (changed) this.ctx.log.record(msg, actor, probe);
     const result = changed ? this.changed() : this.snapshot();
     const elapsed = performance.now() - startedAt;
+    // `changed: false` é a mensagem que não mudou nada: num clique da pessoa, quase sempre um defeito
+    this.trace.write({
+      src: 'router',
+      ev: 'apply',
+      type: msg.type,
+      ms: Math.round(elapsed),
+      ok: true,
+      data: { changed, by: actor.author, ai: actor.byAi },
+    });
     if (elapsed >= SLOW_MS) this.ctx.opts.log?.(`[tempo] ${msg.type} levou ${Math.round(elapsed)} ms (com os ouvintes da mudança)`);
     if (changed && msg.type === 'card.move') {
       const column = result.columns.find((c) => c.id === msg.columnId);

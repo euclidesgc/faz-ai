@@ -9,6 +9,7 @@ import type { AiTool } from '../../shared/harness';
 import type { ViewStateStore } from '../viewState';
 import type { PrefsStore } from '../prefs';
 import type { MessageRouter } from '../panel/messageRouter';
+import { messageData, summarize } from '../../shared/trace';
 import { DEFAULT_SCOPE, projectForWebview, sameScope, type WebviewScope } from '../../shared/webviewState';
 
 /**
@@ -34,6 +35,9 @@ const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'executionPolicy.simulate',
   'executionPolicy.assist',
 ]);
+
+/** Quantas linhas um lote do rastreio da tela traz, no máximo: a tela não pode encher o arquivo de uma vez. */
+const MAX_UI_TRACE = 200;
 
 /** O que depende de onde o board está rodando: dentro do editor ou num navegador. */
 export interface HostEnv {
@@ -127,7 +131,22 @@ export class HostBridge {
   post(msg: HostToWebview): void {
     // o estado que mudou vai antes de qualquer outra mensagem: um aviso ou resultado nunca chega com a tela atrasada
     if (msg.type !== 'boardState') this.flushBoard();
+    this.traceSend(msg);
     this.send(msg);
+  }
+
+  /** O que vai para a tela: do estado, só o tamanho; o `done` já é rastreado em `handle`; o resto, resumido. */
+  private traceSend(msg: HostToWebview): void {
+    const trace = this.router.trace;
+    if (msg.type === 'done') return;
+    if (msg.type === 'boardState')
+      return trace.write({
+        src: 'bridge',
+        ev: 'state',
+        data: { view: this.scope.view, card: this.scope.openCardId, cards: msg.state.cards.length },
+      });
+    if (msg.type === 'error') return trace.write({ src: 'bridge', ev: 'send', type: msg.type, ok: false, err: msg.message });
+    trace.write({ src: 'bridge', ev: 'send', type: msg.type, data: messageData(msg) });
   }
 
   dispose(): void {
@@ -180,18 +199,45 @@ export class HostBridge {
    * `ok: false`. As leituras que têm resposta própria correlacionada (`*.readResult`, `metrics.result`...) não recebem `done`.
    */
   async handle(msg: Tracked): Promise<void> {
+    // o rastreio da própria tela não é uma ação: só vai para o arquivo
+    if (msg.type === 'ui.trace') return this.traceUi(msg.entries);
     const requestId = SELF_ANSWERING.has(msg.type) ? undefined : msg.requestId;
+    const trace = this.router.trace;
+    const startedAt = Date.now();
+    trace.write({ src: 'bridge', ev: 'recv', type: msg.type, rid: msg.requestId, data: messageData(msg) });
     // o que mudou por outra origem (a IA, outra janela) e ainda esperava o intervalo vai antes da resposta
     this.flushBoard();
     try {
       await this.dispatch(msg);
+      trace.write({ src: 'bridge', ev: 'done', type: msg.type, rid: msg.requestId, ms: Date.now() - startedAt, ok: true });
       this.flushBoard();
       if (requestId) this.post({ type: 'done', requestId, ok: true });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      trace.write({ src: 'bridge', ev: 'done', type: msg.type, rid: msg.requestId, ms: Date.now() - startedAt, ok: false, err: message });
       this.flushBoard();
       this.post({ type: 'error', message });
       if (requestId) this.post({ type: 'done', requestId, ok: false, error: message });
+    }
+  }
+
+  /** As linhas que a tela juntou (cliques, erros, tempos de resposta) vão para o mesmo arquivo do host, com a origem `ui`. */
+  private traceUi(entries: unknown): void {
+    if (!Array.isArray(entries)) return;
+    for (const e of entries.slice(0, MAX_UI_TRACE)) {
+      if (!e || typeof e !== 'object') continue;
+      const { at, ev, type, rid, ms, ok, err, data } = e as Record<string, unknown>;
+      this.router.trace.write({
+        src: 'ui',
+        at: typeof at === 'number' ? at : Date.now(),
+        ev: typeof ev === 'string' ? ev : 'ui',
+        ...(typeof type === 'string' ? { type } : {}),
+        ...(typeof rid === 'string' ? { rid } : {}),
+        ...(typeof ms === 'number' ? { ms } : {}),
+        ...(typeof ok === 'boolean' ? { ok } : {}),
+        ...(typeof err === 'string' ? { err } : {}),
+        ...(data !== undefined ? { data: summarize(data) } : {}),
+      });
     }
   }
 

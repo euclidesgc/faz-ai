@@ -1,6 +1,7 @@
 {
   "command.openBoard.title": "Faz AI: Open Board",
   "command.openInBrowser.title": "Faz AI: Open board in the browser",
+  "command.openTrace.title": "Faz AI: Open the board trace (log of everything that happened)",
   "command.refreshSidebar.title": "Faz AI: Refresh",
   "command.openCard.title": "Faz AI: Open Card",
   "command.connectAI.title": "Faz AI: Install the board MCP (global)",
