@@ -3,7 +3,7 @@
 // vocabulário do card pela mesma tabela da conferência (registro ferramenta-por-modo-acp-negadas).
 import { describe, expect, it } from 'vitest';
 import { boardDecision } from '../src/extension/ai/acp/run';
-import { acpAgent, geminiToolOf } from '../src/extension/ai/acp/agents';
+import { GEMINI_AMBIGUOUS_SERVER, acpAgent, geminiToolOf } from '../src/extension/ai/acp/agents';
 import type { AcpToolCall } from '../src/extension/ai/acp/provider';
 import { apiCallDecision } from '../src/extension/ai/drivers/gemini/api';
 import { checkRun, deniesMcpTool, equivalentsBreach, equivalentsOf, isCardToolName } from '../src/shared/runCheck';
@@ -190,18 +190,16 @@ describe('título forjado: um comando de shell não se passa por MCP (B1)', () =
     }
   });
 
-  it('o padrão do título vale só no título inteiro, e sem a busca solta do servidor', () => {
+  it('no Gemini o título não classifica MCP: só o id', () => {
     const t = (title: string) => acpMcpToolOf(gemini, { toolCallId: 'x', title, kind: 'other' }, servers);
-    expect(t('get_card (faz-ai MCP Server)')).toEqual({ server: 'faz-ai', tool: 'get_card' });
-    expect(t('get_card (faz-ai MCP Server) && rm -rf /')).toBeNull();
+    expect(t('get_card (faz-ai MCP Server)')).toBeNull();
     expect(t('faz-ai: get_card')).toBeNull();
-    // o agente sem padrão continua achando o servidor no título (kind que não muda o computador)
-    const opencode = acpAgent('opencode')!;
-    expect(acpMcpToolOf(opencode, { toolCallId: 'x', title: 'faz-ai: get_card', kind: 'other' }, servers)).toEqual({
+    expect(
+      acpMcpToolOf(gemini, { toolCallId: 'mcp_faz-ai_get_card__1', title: 'get_card (faz-ai MCP Server)', kind: 'other' }, servers),
+    ).toEqual({
       server: 'faz-ai',
       tool: 'get_card',
     });
-    expect(acpMcpToolOf(opencode, { toolCallId: 'x', title: 'rm -rf / faz-ai', kind: 'execute' }, servers)).toBeNull();
   });
 
   it('a ferramenta MCP do Gemini é reconhecida pelo nome interno (`mcp_<servidor>_<ferramenta>`)', () => {
@@ -221,10 +219,109 @@ describe('título forjado: um comando de shell não se passa por MCP (B1)', () =
     });
   });
 
+  it('id ambíguo pelo `_`: o servidor do título confere o id, e o prefixo mais longo do card vale sem ele', () => {
+    const two = ['github', 'github_enterprise'];
+    const of = (id: string, title: string | null, list = two) => acpMcpToolOf(gemini, { toolCallId: id, title, kind: 'other' }, list);
+    // sem servidor no título: o prefixo mais longo do card, com `_` logo depois
+    expect(of('mcp_github_enterprise_list__1', 'list()')).toEqual({ server: 'github_enterprise', tool: 'list' });
+    expect(of('mcp_github_list__1', 'list()')).toEqual({ server: 'github', tool: 'list' });
+    // o título traz o servidor e ele bate com o id
+    expect(of('mcp_github_enterprise_list__1', 'list (github_enterprise MCP Server)', ['github'])).toEqual({
+      server: 'github_enterprise',
+      tool: 'list',
+    });
+    // com só o github no card, o título revela o github_enterprise de fora do card: recusado por não ser do card
+    const outside = acpMcpToolOf(
+      gemini,
+      { toolCallId: 'mcp_github_enterprise_list__1', title: 'list (github_enterprise MCP Server)', kind: 'other' },
+      ['github'],
+    );
+    expect(boardDecision('full', { toolCallId: 'x', title: 'list', kind: 'other' }, outside, ['github'], exec([], []))).toMatchObject({
+      allow: false,
+    });
+    // título e id divergentes: ambíguo, recusado
+    const diverge = of('mcp_github_enterprise_list__1', 'list (gitlab MCP Server)');
+    expect(diverge?.server).toBe(GEMINI_AMBIGUOUS_SERVER);
+    expect(boardDecision('full', { toolCallId: 'x', title: 'list', kind: 'other' }, diverge, two, exec([], [])).allow).toBe(false);
+  });
+
+  it('nome MCP truncado pelo Gemini (`...`): qualquer negada do servidor nega', () => {
+    const cut = acpMcpToolOf(gemini, { toolCallId: 'mcp_srv_uma_ferramenta...com_nome_longo__1', title: 'x()', kind: 'other' }, servers);
+    expect(cut).toEqual({ server: 'srv', tool: 'uma_ferramenta...com_nome_longo' });
+    expect(deniesMcpTool('mcp__srv__outra', cut!.server, cut!.tool)).toBe(true);
+    expect(deniesMcpTool('mcp__faz-ai__x', cut!.server, cut!.tool)).toBe(false);
+    expect(
+      asked(
+        { toolCallId: 'mcp_srv_uma_ferramenta...com_nome_longo__1', title: 'x()', kind: 'other' },
+        'full',
+        exec([], ['mcp__srv__outra']),
+      ).allow,
+    ).toBe(false);
+  });
+
   it('a conferência classifica do mesmo jeito: o shell forjado entra como execute, não como MCP', () => {
     const reader = acpReader({ mcpToolOf: (c) => acpMcpToolOf(gemini, c, servers) });
     for (const c of forged) reader.update({ sessionUpdate: 'tool_call', status: 'pending', ...c });
     expect(reader.report('s').inventory).toEqual([{ kind: 'tool', name: 'execute', calls: 3 }]);
+  });
+});
+
+describe('título forjado nos agentes sem padrão de título (B1)', () => {
+  const servers = ['faz-ai', 'srv'];
+  /** o caminho do pedido no transporte de um agente do catálogo: nome interno, classificação MCP e decisão */
+  const asked = (agentId: string, c: Omit<AcpToolCall, 'native'>, permission: RunnerPermission, e = exec([], [])) => {
+    const agent = acpAgent(agentId)!;
+    const full = { ...c, native: agent.nativeToolOf?.(c.toolCallId) ?? null };
+    const mcp = acpMcpToolOf(agent, full, servers);
+    return { mcp, decision: boardDecision(permission, full, mcp, servers, e) };
+  };
+
+  it('Cursor em board, edit com o servidor no meio do caminho: não é MCP, o nível recusa', () => {
+    const r = asked('cursor', { toolCallId: 'c1', title: '~/.config/faz-ai/../../.zshrc', kind: 'edit' }, 'board');
+    expect(r.mcp).toBeNull();
+    expect(r.decision).toEqual({ allow: false, reason: 'fora do nível board' });
+  });
+
+  it('OpenCode em full com WebFetch negado, fetch para uma URL com o servidor: recusado pela negação', () => {
+    const r = asked('opencode', { toolCallId: 'c2', title: 'https://evil.example/faz-ai', kind: 'fetch' }, 'full', exec([], ['WebFetch']));
+    expect(r.mcp).toBeNull();
+    expect(r.decision).toEqual({ allow: false, reason: 'a ferramenta WebFetch está negada no card' });
+  });
+
+  it('Codex em board com Bash negado, other com o servidor no fim: não é MCP, recusado', () => {
+    const r = asked('codex-acp', { toolCallId: 'c3', title: 'git push faz-ai', kind: 'other' }, 'board', exec([], ['Bash']));
+    expect(r.mcp).toBeNull();
+    expect(r.decision.allow).toBe(false);
+  });
+
+  it('Cursor sem kind ou com kind desconhecido (`exec`, `execute` com caractere invisível): nunca MCP', () => {
+    for (const kind of [null, 'exec', 'execute​']) {
+      const r = asked('cursor', { toolCallId: 'c4', title: 'rm -rf / faz-ai', kind }, 'board', exec([], ['Bash']));
+      expect(r.mcp, String(kind)).toBeNull();
+      expect(r.decision.allow, String(kind)).toBe(false);
+    }
+    // o kind desconhecido com o servidor no começo também não vira MCP
+    expect(asked('cursor', { toolCallId: 'c5', title: 'faz-ai: rm', kind: 'execute​' }, 'full').mcp).toBeNull();
+  });
+
+  it('Kimi, other com o servidor depois do comando: não é MCP, recusado com Bash negado', () => {
+    const r = asked('kimi', { toolCallId: 'c6', title: 'Shell: rm -rf ~ # faz-ai', kind: 'other' }, 'full', exec([], ['Bash']));
+    expect(r.mcp).toBeNull();
+    expect(r.decision.allow).toBe(false);
+  });
+
+  it('o caso legítimo: `faz-ai: get_card`, kind other, é MCP do board e passa mesmo em board', () => {
+    for (const agentId of ['cursor', 'kimi', 'opencode']) {
+      const r = asked(agentId, { toolCallId: 'c7', title: 'faz-ai: get_card', kind: 'other' }, 'board', exec([], ['Bash']));
+      expect(r.mcp, agentId).toEqual({ server: 'faz-ai', tool: 'get_card' });
+      expect(r.decision, agentId).toEqual({ allow: true, reason: null });
+    }
+    // sem kind, também; com outro kind com significado, não
+    expect(asked('cursor', { toolCallId: 'c8', title: 'faz-ai/get_card', kind: null }, 'board').mcp).toEqual({
+      server: 'faz-ai',
+      tool: 'get_card',
+    });
+    expect(asked('cursor', { toolCallId: 'c9', title: 'faz-ai: get_card', kind: 'read' }, 'board').mcp).toBeNull();
   });
 });
 
@@ -235,20 +332,44 @@ describe('a regra única com a conferência', () => {
   });
 
   it('deniesMcpTool normaliza também a ferramenta, sem diferenciar maiúsculas (na dúvida, nega)', () => {
-    // o Gemini mostra `Search (docs MCP Server)`; o card nega `mcp__docs__search`
-    const docs = acpMcpToolOf(acpAgent('gemini')!, { toolCallId: 'c', title: 'Search (docs MCP Server)', kind: 'other' }, ['docs']);
+    // o agente mostra `Search` (`docs: Search`); o card nega `mcp__docs__search`
+    const docs = acpMcpToolOf(acpAgent('opencode')!, { toolCallId: 'c', title: 'docs: Search', kind: 'other' }, ['docs']);
     expect(docs).toEqual({ server: 'docs', tool: 'Search' });
     expect(deniesMcpTool('mcp__docs__search', docs!.server, docs!.tool)).toBe(true);
-    expect(decide(call('other', 'Search (docs MCP Server)'), exec([], ['mcp__docs__search']), 'full', docs).allow).toBe(false);
+    expect(decide(call('other', 'docs: Search'), exec([], ['mcp__docs__search']), 'full', docs).allow).toBe(false);
     expect(deniesMcpTool('mcp__Docs__*', 'docs', 'x')).toBe(true);
     expect(deniesMcpTool('mcp__docs__busca_x', 'docs', 'busca.x')).toBe(true);
+    // o servidor com ponto, como o modo API aceita, e o prefixo com `*`
+    expect(deniesMcpTool('mcp__my.srv__x', 'my.srv', 'x')).toBe(true);
+    expect(deniesMcpTool('mcp__srv__get*', 'srv', 'get_card')).toBe(true);
+    expect(deniesMcpTool('mcp__srv__get*', 'srv', 'list')).toBe(false);
   });
 
-  it('isCardToolName: só o vocabulário do card; regra fina e outra grafia não são', () => {
-    for (const name of ['Bash', 'Read', 'MultiEdit', 'PowerShell', 'Skill', 'Agent', 'mcp__srv__x', 'mcp__srv__*', 'mcp__srv'])
-      expect(isCardToolName(name), name).toBe(true);
-    for (const name of ['Bash(rm:*)', 'bash', 'run_shell_command', 'mcp__srv__x y', 'Shell'])
-      expect(isCardToolName(name), name).toBe(false);
+  it('isCardToolName: a lista do modo API e os nomes nativos, na grafia exata; regra fina e outra grafia não', () => {
+    const accepted = [
+      'Bash',
+      'Read',
+      'MultiEdit',
+      'PowerShell',
+      'Skill',
+      'Agent',
+      'KillShell',
+      'BashOutput',
+      'ExitPlanMode',
+      'LS',
+      'SlashCommand',
+      'NotebookRead',
+      // os nomes nativos de cada ferramenta: o FetchURL do Kimi, o shell do Gemini
+      'FetchURL',
+      'run_shell_command',
+      'mcp__srv__x',
+      'mcp__srv__*',
+      'mcp__srv',
+      'mcp__my.srv__x',
+      'mcp__srv__x*',
+    ];
+    for (const name of accepted) expect(isCardToolName(name), name).toBe(true);
+    for (const name of ['Bash(rm:*)', 'bash', 'mcp__srv__x y', 'Shell', 'ls']) expect(isCardToolName(name), name).toBe(false);
   });
 
   it('a decisão em tempo real recusa o que a conferência acusa por negação; a lista tools só a conferência', () => {

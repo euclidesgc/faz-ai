@@ -99,9 +99,10 @@ export interface AcpAgent {
   nativeToolOf?(toolCallId: string): string | null;
   /**
    * A ferramenta MCP a partir do `toolCallId`, quando o agente põe nele o nome qualificado da ferramenta (o
-   * Gemini CLI: `mcp_<servidor>_<ferramenta>__<id>`). Mais firme que o título, que o agente escreve como texto.
+   * Gemini CLI: `mcp_<servidor>_<ferramenta>__<id>`). Mais firme que o título, que o agente escreve como texto:
+   * com ele, o título não classifica (só confere o servidor, quando o traz).
    */
-  mcpToolOfId?(toolCallId: string, servers: readonly string[]): { server: string; tool: string } | null;
+  mcpToolOfId?(call: AcpToolCall, servers: readonly string[]): { server: string; tool: string } | null;
   /** o agente ignora o `mcpServers` do `session/new` e só lê este arquivo do projeto */
   readonly projectMcpFile?: string;
   /** o `inputTokens` do `usage` já inclui o cache lido (o rascunho do protocolo não define) */
@@ -164,32 +165,45 @@ export function acpCommand(agent: AcpAgent, input: HeadlessInput): { command: st
 /** Os kinds que mudam o computador: uma chamada deles nunca é lida como MCP, seja qual for o título. */
 export const NEVER_MCP_KINDS: readonly string[] = ['execute', 'delete', 'move'];
 
+/** O nome de um servidor como o Claude Code o escreve (o que não for letra, número, `_` ou `-` vira `_`), em minúsculas. */
+const normalServer = (s: string): string => s.replace(/[^A-Za-z0-9_-]/g, '_').toLowerCase();
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * `servidor/ferramenta` de uma chamada MCP entre os servidores que o board passou; null = não é MCP (ou não deu para saber).
  *
- * O título é texto escrito pelo agente, e no Gemini o do shell é o próprio comando, que o modelo escreve: um
- * título forjado (`rm -rf / faz-ai`, `echo (faz-ai MCP Server)`) não pode virar MCP, que pularia as negadas
- * e o nível. Por isso, nesta ordem: o nome interno no id (`nativeToolOf`) diz que não é MCP; `execute`,
- * `delete` e `move` nunca são; o id MCP do agente (`mcpToolOfId`) diz que é; o padrão do título do agente
- * (`mcpTitle`) vale só no título inteiro; e a busca do nome do servidor no título só para o agente sem padrão.
+ * O título é texto escrito pelo agente (no Gemini, o do shell é o próprio comando do modelo), e a chamada lida
+ * como MCP de um servidor do card pula as negadas e o nível: um título forjado (`rm -rf / faz-ai`,
+ * `https://evil.example/faz-ai`) não pode virar MCP. Por isso, nesta ordem:
+ * - o nome interno no id (`nativeToolOf`) diz que não é MCP;
+ * - o agente que põe o nome MCP no id (`mcpToolOfId`, o Gemini) é lido só pelo id; o título só confere;
+ * - pelo título, só um pedido de kind `other` ou sem kind: qualquer kind com significado (`read`, `edit`,
+ *   `search`, `fetch`, `execute`, `delete`, `move`) ou desconhecido (inclusive com caractere invisível) é
+ *   julgado pelo kind, nunca como MCP;
+ * - com o padrão do agente (`mcpTitle`), o título inteiro; sem ele, o servidor como palavra no COMEÇO do
+ *   título (`faz-ai: get_card`, `faz-ai/get_card`), nunca em qualquer lugar.
  */
 export function acpMcpToolOf(agent: AcpAgent, call: AcpToolCall, servers: string[]): { server: string; tool: string } | null {
   if (agent.nativeToolOf?.(call.toolCallId)) return null;
-  if (NEVER_MCP_KINDS.includes((call.kind ?? '').toLowerCase())) return null;
-  const byId = agent.mcpToolOfId?.(call.toolCallId, servers);
-  if (byId) return byId;
+  const kind = call.kind === null ? '' : call.kind.toLowerCase();
+  if (NEVER_MCP_KINDS.includes(kind)) return null;
+  if (agent.mcpToolOfId) return agent.mcpToolOfId(call, servers);
+  if (kind !== '' && kind !== 'other') return null;
   if (!call.title) return null;
   if (agent.mcpTitle) {
     const m = agent.mcpTitle.exec(call.title);
     return m?.groups?.server && m.groups.tool ? { server: m.groups.server, tool: m.groups.tool } : null;
   }
-  // sem padrão conhecido: o nome do servidor no título (o Zed e boa parte dos agentes mostram
-  // `servidor: ferramenta` ou `ferramenta (servidor)`); o resto do título fica como nome da ferramenta
-  const server = servers.find((s) => new RegExp(`(^|[^\\w-])${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\w-]|$)`).test(call.title!));
+  // sem padrão conhecido: o servidor como primeira palavra do título (o Zed e boa parte dos agentes mostram
+  // `servidor: ferramenta`); o mais longo primeiro, para `github_enterprise` não ser lido como `github`
+  const title = call.title.trimStart();
+  const server = [...servers]
+    .sort((a, b) => b.length - a.length)
+    .find((s) => [s, normalServer(s)].some((name) => new RegExp(`^${escapeRegExp(name)}([:/ ._-]|$)`, 'i').test(title)));
   if (!server) return null;
-  const tool = call.title
-    .replace(server, '')
-    .replace(/^[\s:/()\-_]+|[\s:/()\-_]+$/g, '')
+  const tool = title
+    .slice(server.length)
+    .replace(/^[\s:/()._-]+|[\s:/()._-]+$/g, '')
     .replace(/\s*\(\s*\)\s*/g, '');
-  return { server, tool: tool || call.title };
+  return { server, tool: tool || title };
 }

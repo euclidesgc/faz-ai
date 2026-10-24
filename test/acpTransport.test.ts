@@ -52,10 +52,12 @@ function run(agent: FakeAgent, input: Partial<HeadlessInput> = {}, spec: AcpAgen
 const typicalTurn = async (agent: FakeAgent) => {
   agent.update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Lendo o ' } });
   agent.update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'card.\nVou ' } });
-  const board = { toolCallId: 't1', title: 'get_card (faz-ai MCP Server)', kind: 'other', status: 'pending' };
+  // o id como o Gemini CLI 0.65.0 o monta para a ferramenta MCP (`mcp_<servidor>_<ferramenta>__<id>`): é por ele
+  // que o board reconhece o MCP no Gemini, não pelo título
+  const board = { toolCallId: 'mcp_faz-ai_get_card__t1', title: 'get_card (faz-ai MCP Server)', kind: 'other', status: 'pending' };
   agent.update({ sessionUpdate: 'tool_call', ...board });
   const boardAnswer = await agent.ask(board);
-  agent.update({ sessionUpdate: 'tool_call_update', toolCallId: 't1', status: 'completed' });
+  agent.update({ sessionUpdate: 'tool_call_update', toolCallId: 'mcp_faz-ai_get_card__t1', status: 'completed' });
   const edit = { toolCallId: 't2', title: 'Editar src/app.ts', kind: 'edit', status: 'pending' };
   agent.update({ sessionUpdate: 'tool_call', ...edit });
   const editAnswer = await agent.ask(edit);

@@ -1,4 +1,5 @@
-import { AGENT_TOOLS, GEMINI_TOOL_EQUIVALENTS } from './agentTools';
+import { GEMINI_TOOL_EQUIVALENTS } from './agentTools';
+import { KNOWN_TOOL_NAMES, MCP_DENY_ENTRY } from './apiTools';
 import type { ExecManifest } from './execution';
 import { splitMcpName, type RunReport } from './log';
 
@@ -96,37 +97,36 @@ function toolDeviates(name: string, manifest: RunCheckManifest, vocabulary?: Run
  * (`mcp__servidor__ferramenta`, com o servidor escrito como o Claude Code escreve: o que não for letra, número,
  * `_` ou `-` vira `_`), o servidor inteiro (`mcp__servidor__*`) ou só o prefixo do servidor (`mcp__servidor`).
  * A ferramenta passa pela mesma normalização, e nada diferencia maiúsculas: o nome que o agente mostra (`Search`
- * no título do Gemini) pode não ser o do servidor (`search`), e na dúvida vale negar.
+ * no título do Gemini) pode não ser o do servidor (`search`), e na dúvida vale negar. A entrada também é
+ * normalizada (`mcp__my.srv__x` nega a `x` do `my.srv`), e `mcp__srv__x*` nega as que começam por `x`. Um nome
+ * que o Gemini truncou (com `...`, acima de 64 caracteres) não dá para comparar: qualquer negada do servidor nega.
  */
 export function deniesMcpTool(entry: string, server: string, tool: string): boolean {
-  const clean = (s: string) => s.replace(/[^A-Za-z0-9_-]/g, '_').toLowerCase();
-  const prefix = `mcp__${clean(server)}`;
-  const e = entry.toLowerCase();
-  return e === `${prefix}__${clean(tool)}` || e === `${prefix}__*` || e === prefix;
+  const clean = (s: string) => s.replace(/[^A-Za-z0-9_*-]/g, '_').toLowerCase();
+  const m = /^mcp__(.+?)(?:__(.+))?$/i.exec(entry.trim());
+  if (!m || clean(m[1]!) !== clean(server)) return false;
+  const pattern = m[2];
+  if (!pattern || pattern === '*' || tool.includes('...')) return true;
+  if (pattern.endsWith('*')) return clean(tool).startsWith(clean(pattern.slice(0, -1)));
+  return clean(pattern) === clean(tool);
 }
 
-/** O formato de um nome MCP no vocabulário do card: a ferramenta, o servidor inteiro (`__*`) ou só o servidor. */
-const CARD_MCP_NAME = /^mcp__[A-Za-z0-9_-]+(__([A-Za-z0-9_-]+|\*))?$/;
-
-/**
- * Se um nome é do vocabulário do card (o do Claude Code): uma ferramenta da tabela do Claude, um equivalente
- * da tabela do ACP ou do Gemini, uma de delegação, ou um nome MCP. Uma regra fina (`Bash(rm:*)`) ou outra
- * grafia (`bash`) não é: a negação dela não tem tradução para o ACP.
- */
-export function isCardToolName(name: string): boolean {
-  if (CARD_MCP_NAME.test(name)) return true;
-  return CARD_TOOL_NAMES.has(name);
-}
-
+/** Os nomes reconhecidos numa negada, na grafia exata: os do modo API (`KNOWN_TOOL_NAMES`) e os equivalentes das tabelas. */
 const CARD_TOOL_NAMES: ReadonlySet<string> = new Set([
-  ...AGENT_TOOLS.claude.flatMap((g) => g.tools.map((t) => t.name)),
+  ...KNOWN_TOOL_NAMES,
   ...Object.values(ACP_KIND_EQUIVALENTS).flat(),
   ...Object.values(GEMINI_TOOL_EQUIVALENTS).flat(),
-  'Agent',
-  'Task',
-  'SendMessage',
-  'ListAgents',
 ]);
+
+/**
+ * Se um nome negado é reconhecido no ACP: a mesma lista que o modo API aceita (`KNOWN_TOOL_NAMES`, com os nomes
+ * nativos de cada ferramenta), os equivalentes das tabelas e os nomes MCP (`MCP_DENY_ENTRY`), mas na grafia
+ * exata. Uma regra fina (`Bash(rm:*)`) ou outra grafia (`bash`) não é: a negação dela não tem tradução para o
+ * pedido do agente, que é comparado por equivalentes.
+ */
+export function isCardToolName(name: string): boolean {
+  return MCP_DENY_ENTRY.test(name) || CARD_TOOL_NAMES.has(name);
+}
 
 const isFlowSkill = (name: string): boolean => name.startsWith(FLOW_SKILL_PREFIX);
 
