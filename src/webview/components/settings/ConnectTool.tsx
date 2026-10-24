@@ -363,12 +363,15 @@ export function ConnectTool() {
           ))}
         </ul>
         <div className="connect-modes">
-          <p className="small">
-            {t(tool.billing)}{' '}
-            <a href={tool.docs} target="_blank" rel="noopener noreferrer">
-              {t('Página oficial')}
-            </a>
-          </p>
+          <header className="connect-tool-head">
+            <h3>{tool.name}</h3>
+            <p className="small muted">
+              {t(tool.billing)}{' '}
+              <a href={tool.docs} target="_blank" rel="noopener noreferrer">
+                {t('Página oficial')}
+              </a>
+            </p>
+          </header>
           {tool.modes.map((mode) => (
             <ModeCard key={mode.mode} tool={tool} mode={mode} recommended={recommended === mode.mode} />
           ))}
