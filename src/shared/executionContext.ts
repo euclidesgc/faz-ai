@@ -1,4 +1,3 @@
-import { activeProfile } from './aiProfiles';
 import { estimateAgentContext, estimateContext, tokensOf, type ContextEstimate } from './contextEstimate';
 import { contextAgentOrigin, contextFilesOf, type ContextOrigin } from './contextSources';
 import {
@@ -96,7 +95,8 @@ function preview(s: BoardState, m: ExecManifest, estimate: ContextEstimate, p: E
   return {
     estimate,
     items,
-    enforcement: enforcementOf(activeProfile(s.board)),
+    // o que o board impõe é do perfil que executa o card (o do modelo dele), não do padrão
+    enforcement: enforcementOf(m.target.cli),
     overlaps: instructionOverlaps(m),
   };
 }

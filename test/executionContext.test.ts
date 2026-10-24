@@ -179,4 +179,17 @@ describe('prévia do contexto efetivo', () => {
     expect(p.enforcement.mcp).toBe('enforced');
     expect(p.enforcement.tools).toBe('enforced');
   });
+
+  it('o que o board impõe é do perfil que executa o card (o do modelo), não do padrão', () => {
+    const s = state();
+    s.board.aiProfiles = s.board.aiProfiles.map((p) => (p.id === 'kimi' ? { ...p, enabled: true } : p));
+    s.board.modelCatalog = [
+      { id: 'kimi:kimi-code/k3', tool: 'kimi', model: 'kimi-code/k3', label: 'K3', efforts: [], defaultEffort: null },
+    ];
+    // o padrão segue o Claude Code; o agente do card escolhe um modelo do Kimi
+    s.board.execProfiles = [agent('dev', { model: 'kimi:kimi-code/k3' })];
+    const p = executionContextOf(s, s.cards[0]!);
+    expect(p.enforcement.mcp).toBe('advised');
+    expect(p.enforcement.tools).toBe('advised');
+  });
 });

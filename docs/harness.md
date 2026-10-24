@@ -43,10 +43,10 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
 1. Em Configurações → **Conectar agentes**, escolha o agente que roda os cards, entre na conta dele e
    conecte-o ao board ([Conectar agentes](configuracoes.md#conectar-agentes)). Claude Code, Cursor e
    Kimi Code vêm prontos, e os agentes ACP do catálogo (Gemini CLI, Codex, OpenCode…) vêm prontos e
-   desligados; também é possível criar cópias e perfis personalizados. O agente em uso
-   só vale quando nada indica outro: a CLI de cada execução sai do modelo escolhido (veja
-   [Qual CLI executa](configuracoes.md#qual-cli-executa)). Em **Harness → Ferramenta e execução**,
-   você pode trocar o perfil em uso.
+   desligados; também é possível criar cópias e perfis personalizados. Todo agente ligado roda
+   cards, ao mesmo tempo: a CLI de cada execução sai do modelo escolhido (veja
+   [Qual CLI executa](configuracoes.md#qual-cli-executa)), e o agente padrão só roda os cards sem
+   modelo. Em **Harness → Ferramenta e execução**, você pode trocar o perfil padrão.
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O
    board registra o servidor `faz-ai` no arquivo global que a ferramenta lê. Isso também acontece
    sozinho, em silêncio, ao abrir a pasta (e a cada versão nova da extensão), sempre no escopo do

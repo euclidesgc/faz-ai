@@ -53,6 +53,21 @@ describe('perfil personalizado de CLI como padrão: o "Trabalhar na fase"', () =
     const id = saveCustom({ command: '/bin/echo', permissionArgs: { board: ['--b'], edits: ['--e'], full: ['--f'] } });
     router.handle({ type: 'settings.board.update', patch: { aiTool: id } });
     // antes dizia "não declara argumentos" (errado) e, corrigido isso, ligava e a execução era recusada na admissão
+    expect(router.snapshot().aiRunUnsupportedBy?.[id]).toBe(CUSTOM_CLI_UNSUPPORTED);
+  });
+
+  it('o motivo é do perfil: com outro agente ligado que roda, o board não para, e só o geral para com todos sem rodar', () => {
+    const id = saveCustom({ command: '/bin/echo', permissionArgs: { board: ['--b'], edits: ['--e'], full: ['--f'] } });
+    router.handle({ type: 'settings.board.update', patch: { aiTool: id } });
+    const others = router
+      .snapshot()
+      .board.aiProfiles.filter((p) => p.enabled && p.id !== id)
+      .map((p) => p.id);
+    expect(others.length).toBeGreaterThan(0);
+    // o padrão não roda, mas os cards com o modelo de outro agente ligado seguem: o heartbeat não para
+    expect(router.snapshot().aiRunUnsupported).toBeNull();
+    for (const other of others) expect(router.snapshot().aiRunUnsupportedBy?.[other]).toBeUndefined();
+    for (const other of others) router.handle({ type: 'settings.aiProfiles.setEnabled', id: other, enabled: false });
     expect(router.snapshot().aiRunUnsupported).toBe(CUSTOM_CLI_UNSUPPORTED);
   });
 

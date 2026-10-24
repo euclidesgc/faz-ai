@@ -148,7 +148,7 @@ function BoardConnection({ profile }: { profile: AiProfile }) {
   );
 }
 
-/** Ligar, desligar e usar nos cards: o que decide se o board executa os cards com este agente. */
+/** Ligar, desligar e tornar padrão: ligado, o board executa com este agente os cards com um modelo dele. */
 function ProfileUse({ profile }: { profile: AiProfile }) {
   const state = useBoardStore((s) => s.state)!;
   const standard = state.board.aiTool === profile.id;
@@ -166,7 +166,7 @@ function ProfileUse({ profile }: { profile: AiProfile }) {
           onChange={(on) => void enabled.run(on)}
         />
         {standard ? (
-          <Badge color="indigo">{t('Em uso nos cards')}</Badge>
+          <Badge color="indigo">{t('Padrão dos cards')}</Badge>
         ) : (
           <ActionButton
             size="1"
@@ -176,18 +176,24 @@ function ProfileUse({ profile }: { profile: AiProfile }) {
               pending ? t('Revise o perfil antes: salve a configuração dele no formulário.') : t('Ligue ou conecte o agente antes.')
             }
             loading={useInCards.busy}
-            hint={t('Os cards que não escolhem outro agente (pelo campo Modelo, pelo agente ou por uma regra) passam a rodar com este.')}
+            hint={t(
+              'Os cards sem modelo (nem no card, nem no agente, nem por uma regra) passam a rodar com este. Os outros seguem no agente do modelo deles.',
+            )}
             onClick={() => void useInCards.run()}
           >
-            {t('Usar nos cards')}
+            {t('Tornar padrão')}
           </ActionButton>
         )}
       </div>
       <Text as="p" size="1" color="gray">
         {standard
-          ? t('É o agente que roda os cards que não escolhem outro. Para desligá-lo, ponha outro agente em uso antes.')
+          ? t(
+              'Roda os cards sem modelo; os com o modelo de outro agente ligado rodam nele, ao mesmo tempo. Para desligá-lo, torne outro agente padrão antes.',
+            )
           : profile.enabled
-            ? t('Ligado: o campo Modelo dos cards, o chat e as regras de sugestão oferecem os modelos dele.')
+            ? t(
+                'Ligado: roda os cards com um modelo dele, ao mesmo tempo que os outros agentes. O campo Modelo dos cards, o chat e as regras de sugestão oferecem os modelos dele.',
+              )
             : t('Desligado: o board não roda nada com ele.')}
         {summary &&
           ` ${t('Conectado: {summary}.', { summary: connectionSummary(summary, state.board.runner.compatibilityReviews?.[profile.id] ?? null) })}`}

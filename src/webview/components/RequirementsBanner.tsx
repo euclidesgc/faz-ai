@@ -148,13 +148,25 @@ export function CopyCommand({ command }: { command: string }) {
 }
 
 /**
+ * Por que o perfil que executaria o `card` (ou o padrão, sem card) não roda pelo board: o personalizado de CLI, a
+ * permissão que a ferramenta não aceita. É do perfil do card: o padrão sem rodar não desliga o card com o modelo de
+ * outro agente ligado.
+ */
+export function runUnsupportedReason(state: BoardState, card?: Card): string | null {
+  if (state.aiRunUnsupported) return state.aiRunUnsupported;
+  const target = card ? runTargetOf(state, card) : defaultTarget(state.board);
+  return (target && state.aiRunUnsupportedBy?.[target.cli.id]) || null;
+}
+
+/**
  * Por que os botões de IA do card não rodam agora, no idioma da interface; null quando rodam. Além
  * da permissão que a ferramenta não aceita, o board sem nenhum perfil de CLI disponível, a CLI que falta ou está sem
  * login, ou o login que venceu. Só conta o perfil que executaria o `card` (`runTargetOf`), ou o padrão sem card: o
  * problema de outro perfil não bloqueia.
  */
 export function aiBlockedReason(state: BoardState, card?: Card): string | null {
-  if (state.aiRunUnsupported) return t(state.aiRunUnsupported);
+  const unsupported = runUnsupportedReason(state, card);
+  if (unsupported) return t(unsupported);
   // nenhum perfil disponível bloqueia qualquer execução
   const none = state.requirements.find((r) => r.id === 'no-profile');
   if (none) return t('{title}: veja em Configurações → Verificar ambiente.', { title: requirementTexts(none).title });

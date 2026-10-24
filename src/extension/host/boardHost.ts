@@ -64,6 +64,7 @@ import { checkRequirements, profileInstallUrl } from '../requirements';
 import { checkEnvironment, linuxFamily } from '../environment';
 import { isPendingReview, probeProfiles } from '../profileProbe';
 import { evidenceCapabilities, evidenceCurrent, profileHealth, profilesInUse, type ProfileHealth } from '../../shared/profileHealth';
+import { profilesInUse as queuedProfiles } from '../../shared/runTarget';
 import { editorMcpFiles, pinEditorCommands } from '../mcp/pinCommands';
 import { harnessIssues } from '../../shared/harnessStatus';
 import { findFlowSkillCopies } from '../flowSkillCopies';
@@ -795,7 +796,8 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
           // o Diagnóstico confere também os perfis desligados, para a pessoa ver antes de ligar
           health: await computeHealth(true, true),
           workspaceDir: o.folderPath,
-          profilesInUse: profilesInUse(s.board),
+          // os das regras e dos agentes, mais os dos cards na fila da IA: um card com o modelo de outro agente conta
+          profilesInUse: [...new Set([...profilesInUse(s.board), ...queuedProfiles(s).map((p) => p.id)])],
           // o simulador e os limites são os da base (#620, #621); nada aqui chama a IA nem recalcula regra
           simulateNextRun: (available) => {
             try {

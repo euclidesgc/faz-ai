@@ -43,7 +43,7 @@ function AgentRow({ item, selected, onSelect }: { item: AgentListItem; selected:
       </span>
       {/* a linha já diz a situação: o selo fica para o que pede atenção (o Conectar parado ou à espera) */}
       {item.inUse ? (
-        <Badge color="indigo">{t('Em uso')}</Badge>
+        <Badge color="indigo">{t('Padrão')}</Badge>
       ) : (
         (state === 'waiting' || state === 'failed') && (
           <Badge color={STATE_COLOR[state]} variant="soft">
@@ -146,7 +146,7 @@ function AgentDetail({ item, onEdit }: { item: AgentListItem; onEdit(profile: Ai
             {p ? profileKind(p) : t('Registro do ACP · {version}', { version: item.registry?.version ?? '?' })}
           </Text>
         </div>
-        {item.inUse && <Badge color="indigo">{t('Em uso')}</Badge>}
+        {item.inUse && <Badge color="indigo">{t('Padrão')}</Badge>}
       </div>
       {description && <Text size="2">{description}</Text>}
       {docs && (
@@ -180,8 +180,11 @@ function AgentDetail({ item, onEdit }: { item: AgentListItem; onEdit(profile: Ai
   );
 }
 
-/** O agente em uso: o que roda os cards que não escolhem outro, com a conexão e a conta. */
-function InUse({ item, onOpen }: { item: AgentListItem | undefined; onOpen(tab: AgentTab): void }) {
+/**
+ * O agente padrão: o que roda os cards sem modelo, com a conexão e a conta. Os outros ligados também rodam cards, ao
+ * mesmo tempo, pelo modelo de cada card: a linha de baixo diz quais, para ninguém achar que precisa trocar o padrão.
+ */
+function InUse({ item, others, onOpen }: { item: AgentListItem | undefined; others: string[]; onOpen(tab: AgentTab): void }) {
   const state = useBoardStore((s) => s.state)!;
   const account = useAgentConnectStore((s) => (item ? accountOf(s.accounts, item.key) : null));
   if (!item?.profile) return null;
@@ -189,11 +192,11 @@ function InUse({ item, onOpen }: { item: AgentListItem | undefined; onOpen(tab: 
   const connection = state.connections?.[p.id];
   const review = state.board.runner.compatibilityReviews?.[p.id] ?? null;
   return (
-    <Card className="agent-in-use" aria-label={t('Agente em uso')}>
+    <Card className="agent-in-use" aria-label={t('Agente padrão')}>
       <AgentIcon icon={item.icon} />
       <div className="agent-in-use-text">
         <Text size="3" weight="medium">
-          {t('Agente em uso: {name}', { name: item.name })}
+          {t('Agente padrão: {name}', { name: item.name })}
         </Text>
         <Text size="1" color="gray">
           {modeLabel(p.mode)}
@@ -203,18 +206,23 @@ function InUse({ item, onOpen }: { item: AgentListItem | undefined; onOpen(tab: 
             : t('Ainda não conectado pelo board')}
           {account?.label ? ` · ${account.label}` : ''}
         </Text>
+        <Text size="1" color="gray">
+          {others.length
+            ? t('Também rodam cards, pelo modelo de cada um: {names}.', { names: others.join(', ') })
+            : t('Ligue outro agente para usar os modelos dele nos cards, junto com este.')}
+        </Text>
       </div>
       <div className="row">
         <ActionButton
           size="1"
           variant="soft"
           color="gray"
-          hint={t('Mostra a conexão e a conta do agente em uso')}
+          hint={t('Mostra a conexão e a conta do agente padrão')}
           onClick={() => onOpen('connection')}
         >
           {t('Ver conexão')}
         </ActionButton>
-        <ActionButton size="1" variant="soft" hint={t('Abre a aba Testar do agente em uso')} onClick={() => onOpen('test')}>
+        <ActionButton size="1" variant="soft" hint={t('Abre a aba Testar do agente padrão')} onClick={() => onOpen('test')}>
           {t('Testar')}
         </ActionButton>
       </div>
@@ -286,10 +294,14 @@ export function AgentConnectSettings() {
         }
       >
         {t(
-          'Escolha o agente de IA que roda os cards, entre na conta dele, conecte-o ao board e ajuste os modelos. Só um agente fica em uso de cada vez; os outros ligados entram pelo campo Modelo, pelas regras de sugestão e pelas políticas de fallback.',
+          'Conecte os agentes de IA ao board, entre na conta de cada um e ajuste os modelos. Todo agente ligado roda cards, ao mesmo tempo que os outros: cada card vai para o agente do modelo dele (o do card, o do agente do harness ou o da regra de sugestão), e o padrão roda os cards sem modelo.',
         )}
       </PageHeader>
-      <InUse item={board.find((i) => i.inUse)} onOpen={(tab) => select(aiTool, tab)} />
+      <InUse
+        item={board.find((i) => i.inUse)}
+        others={board.filter((i) => !i.inUse && i.profile?.enabled).map((i) => i.name)}
+        onOpen={(tab) => select(aiTool, tab)}
+      />
       <div className="agents-grid">
         <AgentList
           board={board}

@@ -1,5 +1,5 @@
 // A situação de cada agente na lista de Conectar agentes, numa palavra: o que a pessoa precisa saber para decidir o
-// próximo passo (instalar, conectar, ligar, testar). O "Em uso" fica à parte, num selo: ele se soma à situação.
+// próximo passo (instalar, conectar, ligar, testar). O "Padrão" fica à parte, num selo: ele se soma à situação.
 import type { AgentListItem } from '../../../../shared/agentConnect';
 import { isReadyProfile, modeLabel, toolLabel, type AiProfile } from '../../../../shared/aiProfiles';
 import type { ConnectState } from '../../../../shared/connect';

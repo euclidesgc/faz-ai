@@ -4855,7 +4855,7 @@ div.metrics-breakdown {
   background: var(--warn-bg);
 }
 
-/* Conectar agentes: o agente em uso no topo, a lista à esquerda e o agente escolhido, com as abas, à direita */
+/* Conectar agentes: o agente padrão no topo, a lista à esquerda e o agente escolhido, com as abas, à direita */
 .agents {
   display: flex;
   flex-direction: column;

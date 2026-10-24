@@ -7,7 +7,7 @@ the board connects to the AI agents (Claude Code, Cursor, Codex, Gemini and the 
 model catalog with the suggestion rules, and the execution and fallback policies. The Harness and the
 board's agents are in [Harness, agents and AI tools](harness_EN.md).
 
-![Settings › Connect agents: the agent in use, the list and the chosen agent's connection](images/settings_en.png)
+![Settings › Connect agents: the default agent, the list and the chosen agent's connection](images/settings_en.png)
 
 ## Sections of the screen
 
@@ -17,7 +17,7 @@ board's agents are in [Harness, agents and AI tools](harness_EN.md).
 | Tipos de card         | Story, Bug, Sub-task…, with color and default field values per type                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section                                     |
 | Regras do board       | Completion and phase-advance blocks, confirmations, filling in the suggested model, short track for small stories (Baixo effort or Bug type skips PRD and Spec)                                                                                                                                                                                                                                                                                                                         |
-| Conectar agentes      | The AI agent that runs the cards (one in use at a time) and the other enabled ones; each one's account (sign in and out); **Conectar** (connect) with the board and the mode (CLI, ACP or API); each agent's models; the quick test, the test session and the protocol log; copies and custom profiles; the rules that suggest each card's model and the execution and fallback policies                                                                                            |
+| Conectar agentes      | The AI agents that run the cards (every enabled agent, at the same time, and the default one for cards with no model); each one's account (sign in and out); **Conectar** (connect) with the board and the mode (CLI, ACP or API); each agent's models; the quick test, the test session and the protocol log; copies and custom profiles; the rules that suggest each card's model and the execution and fallback policies                                                                                            |
 | Harness               | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, default agent and heartbeat (see [Harness](harness_EN.md#harness) and [Agents](harness_EN.md#agents))                                                                                                                                                                                                                                                               |
 | Git                   | Mode, gitflow, branch names and prefixes, worktrees, automatic merge and decision records; editable in the editor and in the browser. "Tocar histórias em paralelo" (work on stories in parallel) lives in Harness de IA › Ferramenta e execução                                                                                                                                                                                                                                      |
 | Aparência             | **Idioma** (language: automatic, Português (Brasil) or English), theme, font and size, per board, in the editor and in the browser; statuses (name and color, in the Fluxos tab; here only in browser mode)                                                                                                                                                                                                                                                                             |
@@ -26,9 +26,11 @@ board's agents are in [Harness, agents and AI tools](harness_EN.md).
 ## Connect agents
 
 **Settings → Conectar agentes** (connect agents) brings together what used to live on two screens
-(Ferramentas de IA and Modelos de IA). At the top is the **agent in use**: the one that runs the cards
-that do not pick another (through the Model field, the agent or a rule), with its mode, the connection
-summary and the account. Below, on the left, the list of agents; on the right, the chosen agent, with
+(Ferramentas de IA and Modelos de IA). Every enabled agent runs cards, alongside the others: each card
+goes to its model's agent (the card's, the harness agent's or the suggestion rule's; see
+[Which CLI runs](#which-cli-runs)), with nothing to switch. At the top is the **default agent**: the one
+that runs the cards with no model, with its mode, the connection summary, the account and the other
+enabled agents that also run cards. Below, on the left, the list of agents; on the right, the chosen agent, with
 the **Conexão** (connection), **Modelos** (models), **Testar** (test) and **Detalhes** (details) tabs.
 The model suggestion rules and the execution and fallback policies, which apply to the whole board, sit
 at the end of the screen.
@@ -37,7 +39,7 @@ at the end of the screen.
 
 The list joins the agents the board runs (the ones the extension ships and your profiles) with the
 [official ACP registry](https://agentclientprotocol.com/registry), which provides each one's icon,
-description and published version. The agent in use comes first, then the enabled and the disabled
+description and published version. The default agent comes first, then the enabled and the disabled
 ones; each row tells the mode and the state: connected, enabled, disabled, not installed, Connect in
 progress, waiting for you or stopped with an error. Registry agents the board does not run yet stay
 apart, under **Outros agentes do registro do ACP** (other agents from the ACP registry): you can sign in
@@ -125,9 +127,10 @@ regime until you acknowledge again); reconnecting a profile that now proves the 
 it by itself; and **importing a board does not bring the profiles' acknowledgments**. An execution policy
 does not swap the profile for another one with a different regime (`constraints-changed`).
 
-Below Connect, **Ligado** (enabled) tells whether the board uses the agent (the cards' Model field, the
-chat and the rules offer its models) and **Usar nos cards** (use in cards) puts it in use. The agent in
-use cannot be disabled: put another one in use first. The capability check has no separate command: it
+Below Connect, **Ligado** (enabled) tells whether the board uses the agent: when enabled, it runs the
+cards with one of its models, alongside the other agents, and the cards' Model field, the chat and the
+rules offer its models. **Tornar padrão** (make default) makes it run the cards with no model. The
+default agent cannot be disabled: make another one the default first. The capability check has no separate command: it
 runs in Connect and Reconnect, by itself when you enable an ACP agent and, on the verifiable profiles
 that do not go through Connect (the Claude Code copy and a custom ACP profile from an earlier version),
 through the **Verificar capacidades** (check capabilities) button in the profile's Details. None of the
@@ -217,15 +220,19 @@ without a verified translation does not run.
 The value of the **Modelo** (Model) field (`<profile>:<model>@<effort>`) already names the CLI
 profile. For each run the board uses the first level that is filled in: the **card's Model**, the
 **agent's model**, the **model rule** (even with "Preencher o modelo sugerido automaticamente",
-fill in the suggested model automatically, off) and, with none, the **agent in use** in
+fill in the suggested model automatically, off) and, with none, the **default agent** in
 Configurações → Conectar agentes. So sub-tasks of the same story can run on different CLIs, and
-effort-based rules can point to different profiles.
+effort-based rules can point to different profiles. Cards on different agents run at the same time,
+within the Harness parallel run limits, without switching the default.
 
 The first level that is filled in is final: if the choice is invalid (profile off, model outside the
 catalog or unknown effort), the card is **blocked** with the reason, without falling to the next
 level or to the default. The Model field, the chat and the rule editor list the models of **all
 enabled profiles**, grouped by profile. Expired login and missing CLI apply per profile: they stop
-only the cards of that profile, and the warning appears only for the profiles in use. **Sugerir
+only the cards of that profile, and the warning appears only for the profiles in use. The same goes for
+a profile the board does not run (the custom CLI one, or a permission the tool does not accept):
+**Trabalhar na fase** (work on the phase) turns off only on its cards, the heartbeat and the autopilot
+skip only those cards, and the board only stops when no enabled profile runs. **Sugerir
 regras** (suggest rules) acts only on the suggested profile and preserves other profiles' bands.
 Over MCP, `get_card` shows the target in `model` (`tool`, `from` and, if invalid, `blocked`).
 

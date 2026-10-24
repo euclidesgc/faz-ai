@@ -36,7 +36,7 @@ interface AgentConnectStore {
   accounts: Record<string, AgentAccount>;
   statuses: Record<string, ProfileStatus>;
   quickTests: Record<string, QuickTest>;
-  /** o agente escolhido na lista; null = o agente em uso */
+  /** o agente escolhido na lista; null = o agente padrão */
   selected: string | null;
   tab: AgentTab;
   select(key: string, tab?: AgentTab): void;

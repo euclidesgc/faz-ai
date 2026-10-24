@@ -1,7 +1,9 @@
 // A fachada de montagem do comando da CLI. Quem sabe montar o comando de cada ferramenta é o provider
 // dela (`ai/providers/`); aqui ficam só as perguntas que o resto do board faz sobre isso.
 import { isAiBase } from '../shared/harness';
-import { isAcpProfile, type AiProfile } from '../shared/aiProfiles';
+import { activeProfile, isAcpProfile, type AiProfile } from '../shared/aiProfiles';
+import type { AiTool } from '../shared/harness';
+import type { Board } from '../shared/model';
 import type { RunnerPermission } from '../shared/runner';
 import { providerFor, executorProfile, type AiExecutor } from './ai/providers';
 
@@ -36,6 +38,27 @@ export const CUSTOM_CLI_UNSUPPORTED =
 /** O motivo de um perfil personalizado de CLI não rodar; null nos demais (o personalizado ACP antigo segue rodando). */
 export function customCliUnsupported(profile: AiProfile): string | null {
   return profile.kind === 'custom' && !isAcpProfile(profile) ? CUSTOM_CLI_UNSUPPORTED : null;
+}
+
+/**
+ * Por que cada perfil ligado não roda pelo board (`aiRunUnsupportedBy`) e, só quando nenhum ligado roda, o motivo
+ * geral (`aiRunUnsupported`, o do padrão primeiro), que para o heartbeat. O board roda qualquer agente ligado ao
+ * mesmo tempo: o padrão sem rodar não desliga os cards que escolheram o modelo de outro agente.
+ */
+export function runUnsupported(board: Pick<Board, 'aiTool' | 'aiProfiles' | 'runner'>): {
+  aiRunUnsupported: string | null;
+  aiRunUnsupportedBy: Record<AiTool, string>;
+} {
+  const by: Record<AiTool, string> = {};
+  // o perfil padrão resolvido, não o id: um personalizado ou ACP como padrão não é "indisponível"
+  const standard = activeProfile(board);
+  const enabled = [standard, ...board.aiProfiles.filter((p) => p.enabled && p.id !== standard.id)];
+  for (const p of enabled) {
+    const reason = customCliUnsupported(p) ?? headlessUnsupported(p, board.runner.permission);
+    if (reason) by[p.id] = reason;
+  }
+  const all = enabled.every((p) => by[p.id]);
+  return { aiRunUnsupported: all ? (by[standard.id] ?? null) : null, aiRunUnsupportedBy: by };
 }
 
 export function headlessCommand(tool: AiExecutor, input: HeadlessInput): HeadlessCommand {

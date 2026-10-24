@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { activeProfile, catalogTool, isAcpProfile, type AiProfile } from '../../../shared/aiProfiles';
+import { catalogTool, isAcpProfile, type AiProfile } from '../../../shared/aiProfiles';
 import { TYPE_CONDITION, modelId, resolveModelInput, type ModelRule } from '../../../shared/models';
 import { newId } from '../../db/ids';
 import type { MessageRouter } from '../../panel/messageRouter';
@@ -19,7 +19,7 @@ const profileOf = (router: MessageRouter, id?: string): AiProfile => {
 export function registerModelTools(tool: DefineTool): void {
   tool(
     'get_models',
-    'Catálogo de modelos de LLM e perfis de CLI do board, com os níveis de esforço e as regras de sugestão. `value` usa `<perfil>:<modelo>@<esforço>` e o prefixo escolhe o perfil de CLI que executa o card; quando nada indica um modelo (card, agente ou regra), vale o perfil padrão. Uma cópia usa o catálogo do perfil pronto de origem e um personalizado aceita modelo livre. O board não guarda preço: o custo de uma execução é o que o executor informa. ' +
+    'Catálogo de modelos de LLM e perfis de CLI do board, com os níveis de esforço e as regras de sugestão. `value` usa `<perfil>:<modelo>@<esforço>` e o prefixo escolhe o perfil de CLI que executa o card; quando nada indica um modelo (card, agente ou regra), vale o perfil padrão. Todo perfil ligado roda cards, ao mesmo tempo que os outros: `runsWith` em cada modelo do catálogo diz o perfil que o executa (null: nenhum ligado o roda) e `ready` em cada perfil diz se ele roda agora. Uma cópia usa o catálogo do perfil pronto de origem e um personalizado aceita modelo livre. O board não guarda preço: o custo de uma execução é o que o executor informa. ' +
       'O campo "Esforço da atividade" do card é o tamanho da tarefa, não o esforço do modelo: as regras sugerem o modelo a partir dele.',
     {},
     (_a, router) => models(router),
@@ -43,7 +43,7 @@ export function registerModelTools(tool: DefineTool): void {
   tool(
     'detect_models',
     'Relê os modelos do perfil de CLI e os junta ao catálogo. Uma cópia usa o catálogo do pronto de origem; um perfil ACP abre uma sessão com o agente e lê os modelos que ele anuncia; um perfil personalizado de CLI própria tem catálogo cadastrado à mão.',
-    { tool: toolArg.optional().describe('Por padrão, a ferramenta em uso no projeto') },
+    { tool: toolArg.optional().describe('Por padrão, o perfil padrão do board') },
     async (a, router) => {
       const profile = profileOf(router, a.tool);
       if (profile.kind === 'custom' && !isAcpProfile(profile)) throw new Error('Perfil personalizado: catálogo cadastrado à mão.');
@@ -138,7 +138,7 @@ export function registerModelTools(tool: DefineTool): void {
         groups: r.when.map((g) =>
           g.map((c) => ({ fieldId: fieldId(c.field), op: c.not ? ('isNot' as const) : ('is' as const), value: c.value })),
         ),
-        model: resolveModelInput(s.board.modelCatalog, r.model, activeProfile(s.board)),
+        model: resolveModelInput(s.board.modelCatalog, r.model, s.board.aiProfiles),
       }));
       router.handle({ type: 'settings.modelRules.set', rules });
       return models(router);
@@ -148,7 +148,7 @@ export function registerModelTools(tool: DefineTool): void {
   tool(
     'suggest_model_rules',
     'Recria as regras "Esforço da tarefa → modelo" (Baixo, Médio, Alto) com um modelo leve, um intermediário e um forte do perfil indicado.',
-    { tool: toolArg.optional().describe('Por padrão, a ferramenta em uso no projeto') },
+    { tool: toolArg.optional().describe('Por padrão, o perfil padrão do board') },
     (a, router) => {
       const profile = profileOf(router, a.tool);
       if (profile.kind === 'custom') throw new Error('Perfil personalizado: cadastre os modelos e regras à mão.');

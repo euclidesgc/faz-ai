@@ -309,8 +309,10 @@ export interface BoardState {
   heartbeatNextAt: number | null;
   /** autopiloto das histórias em modo autônomo (YOLO) */
   autopilot: Autopilot;
-  /** por que a ferramenta do projeto não pode ser executada pelo board; null quando pode */
+  /** por que nenhum perfil ligado pode ser executado pelo board; null quando algum pode (o motivo de cada um está em `aiRunUnsupportedBy`) */
   aiRunUnsupported: string | null;
+  /** por que cada perfil ligado não pode ser executado pelo board; sem a chave (ou sem o mapa), o perfil roda */
+  aiRunUnsupportedBy?: Record<AiTool, string>;
   /** o que falta para o board trabalhar com a ferramenta de IA (CLI, login, servidor MCP…); vazio quando está tudo pronto */
   requirements: BoardRequirement[];
   /** quando o host terminou a última conferência dos requisitos (ms), mesmo sem mudança; 0 antes da primeira */

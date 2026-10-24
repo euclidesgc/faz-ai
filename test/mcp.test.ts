@@ -591,6 +591,8 @@ describe('modelos de IA', () => {
       base: 'generic',
       enabled: true,
       default: false,
+      // o personalizado de CLI não roda cards (o board não prova o que ele acessa)
+      ready: false,
       measures: 'none',
     });
     expect(JSON.stringify(result)).not.toMatch(/private-command|private-env|"config"|"env"/);
@@ -740,6 +742,46 @@ describe('modelos de IA', () => {
     await call('set_ai_tool', { tool: 'claude' });
     expect((await set('opus turbo')).text).toContain('não aceita o esforço');
     expect((await set('modelo-que-nao-existe')).text).toContain('não está no catálogo');
+  });
+
+  it('board multiagente: qualquer modelo de qualquer perfil ligado roda, com `runsWith`, sem trocar o padrão', async () => {
+    // o Cursor entra no board e o padrão volta ao Claude Code: os dois ficam ligados
+    await call('set_ai_tool', { tool: 'cursor' });
+    await call('set_ai_tool', { tool: 'claude' });
+    const m = (await call('get_models')).data;
+    expect(m.profiles.find((p: any) => p.id === 'claude')).toMatchObject({ default: true, ready: true });
+    expect(m.profiles.find((p: any) => p.id === 'cursor')).toMatchObject({ default: false, enabled: true, ready: true });
+    expect(m.catalog.find((o: any) => o.value === 'claude:opus').runsWith).toBe('claude');
+    expect(m.catalog.find((o: any) => o.value === 'cursor:auto').runsWith).toBe('cursor');
+    expect(m.note).toContain('runsWith');
+    const listed = (await client.listTools()).tools;
+    expect(listed.find((x) => x.name === 'get_models')!.description).toContain('`runsWith`');
+
+    // dois cards, um em cada agente, com o Claude Code ainda como padrão
+    const a = (await call('create_card', { title: 'No Cursor', fields: { Modelo: 'cursor:auto' } })).data.id;
+    const b = (await call('create_card', { title: 'No Claude', fields: { Modelo: 'claude:opus@high' } })).data.id;
+    expect((await call('get_card', { card: a })).data.model).toMatchObject({ tool: 'cursor', from: 'card' });
+    expect((await call('get_card', { card: b })).data.model).toMatchObject({ tool: 'claude', from: 'card' });
+
+    // desligado o Cursor, o modelo dele fica sem quem rode
+    router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'cursor', enabled: false });
+    expect((await call('get_models')).data.catalog.find((o: any) => o.value === 'cursor:auto').runsWith).toBeNull();
+  });
+
+  it('o modelo livre vale em qualquer personalizado ligado, não só no padrão', async () => {
+    const custom = new AiProfileRepo(profileDb).save(
+      router.snapshot().board.id,
+      { name: 'Agente ACP', kind: 'custom', base: 'generic', mode: 'acp', enabled: true, position: 3, config: { command: 'agente-acp' } },
+      'person',
+    );
+    expect(router.snapshot().board.aiTool).toBe('claude');
+    const created = await call('create_card', { title: 'Modelo livre', fields: { Modelo: `${custom.id}:modelo-avulso` } });
+    expect(created.error).toBe(false);
+    expect((await call('get_card', { card: created.data.id })).data.model).toMatchObject({ tool: custom.id, model: 'modelo-avulso' });
+    const rules = await call('set_model_rules', {
+      rules: [{ when: [[{ field: 'Tipo', value: 'História' }]], model: `${custom.id}:outro` }],
+    });
+    expect(rules.error).toBe(false);
   });
 
   it('upsert_model grava o modelo; get_models não devolve preço nenhum, e o board não aceita preço', async () => {

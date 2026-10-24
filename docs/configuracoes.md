@@ -7,7 +7,7 @@ aos agentes de IA (Claude Code, Cursor, Codex, Gemini e os outros), o catálogo 
 com as regras de sugestão e as políticas de execução e fallback. O Harness e os agentes do board estão em
 [Harness, agentes e ferramentas de IA](harness.md).
 
-![Configurações › Conectar agentes: o agente em uso, a lista e a conexão do agente escolhido](images/settings.png)
+![Configurações › Conectar agentes: o agente padrão, a lista e a conexão do agente escolhido](images/settings.png)
 
 ## Seções da tela
 
@@ -17,7 +17,7 @@ com as regras de sugestão e as políticas de execução e fallback. O Harness e
 | Tipos de card         | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria                                                 |
 | Regras do board       | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido, trilha curta para histórias pequenas (esforço Baixo ou tipo Bug pula o PRD e a Spec)                                                                                                                                                                                                                                                                                                              |
-| Conectar agentes      | O agente de IA que roda os cards (um em uso de cada vez) e os outros ligados; a conta de cada um (entrar e sair); o **Conectar** com o board e o modo (CLI, ACP ou API); os modelos de cada agente; o teste rápido, a sessão de teste e o log do protocolo; cópias e perfis personalizados; as regras que sugerem o modelo de cada card e as políticas de execução e fallback                                                                                                                  |
+| Conectar agentes      | Os agentes de IA que rodam os cards (todo agente ligado, ao mesmo tempo, e o padrão para os cards sem modelo); a conta de cada um (entrar e sair); o **Conectar** com o board e o modo (CLI, ACP ou API); os modelos de cada agente; o teste rápido, a sessão de teste e o log do protocolo; cópias e perfis personalizados; as regras que sugerem o modelo de cada card e as políticas de execução e fallback                                                                                                                  |
 | Harness               | Biblioteca única de regras, skills, subagentes e MCPs, com importação por tipo, CRUD e assistentes; ferramenta, permissão, agente padrão e heartbeat (ver [Harness](harness.md#harness) e [Agentes](harness.md#agentes))                                                                                                                                                                                                                                                                     |
 | Git                   | Modo, gitflow, nome e prefixos das branches, worktrees, merge automático e registros de decisão; editável no editor e no navegador. "Tocar histórias em paralelo" fica em Harness de IA › Ferramenta e execução                                                                                                                                                                                                                                                                              |
 | Aparência             | **Idioma** (automático, Português (Brasil) ou English), tema, fonte e tamanho, por board, no editor e no navegador; status (nome e cor, na aba Fluxos; aqui só no modo navegador)                                                                                                                                                                                                                                                                                                           |
@@ -26,8 +26,10 @@ com as regras de sugestão e as políticas de execução e fallback. O Harness e
 ## Conectar agentes
 
 **Configurações → Conectar agentes** junta o que antes ficava em duas telas (Ferramentas de IA e Modelos de
-IA). No topo fica o **agente em uso**: o que roda os cards que não escolhem outro (pelo campo Modelo, pelo
-agente ou por uma regra), com o modo, o resumo da conexão e a conta. Abaixo, à esquerda, a lista dos
+IA). Todo agente ligado roda cards, ao mesmo tempo que os outros: cada card vai para o agente do modelo dele
+(o do card, o do agente do harness ou o da regra de sugestão; veja [Qual CLI executa](#qual-cli-executa)),
+sem trocar nada. No topo fica o **agente padrão**: o que roda os cards sem modelo, com o modo, o resumo da
+conexão, a conta e os outros agentes ligados que também rodam cards. Abaixo, à esquerda, a lista dos
 agentes; à direita, o agente escolhido, com as abas **Conexão**, **Modelos**, **Testar** e **Detalhes**.
 No fim da tela ficam as regras de sugestão de modelo e as políticas de execução e fallback, que valem para
 o board inteiro.
@@ -36,7 +38,7 @@ o board inteiro.
 
 A lista junta os agentes que o board executa (os que a extensão traz e os seus perfis) com o
 [registro oficial do ACP](https://agentclientprotocol.com/registry), de onde vêm o ícone, a descrição e a
-versão publicada de cada um. O agente em uso vem primeiro, depois os ligados e os desligados; cada linha
+versão publicada de cada um. O agente padrão vem primeiro, depois os ligados e os desligados; cada linha
 diz o modo e a situação: conectado, ligado, desligado, não instalado, o Conectar em curso, à espera de
 você ou parado com erro. Os agentes do registro que o board ainda não executa ficam à parte, em **Outros
 agentes do registro do ACP**: dá para entrar na conta e conversar com eles na sessão de teste, mas não
@@ -112,9 +114,10 @@ de rodar no compatível até você dar a ciência de novo); reconectar um perfil
 exclusivo a tira sozinho; e **importar um board não traz a ciência dos perfis**. Uma política de execução
 não troca o perfil por outro com regime diferente (`constraints-changed`).
 
-Abaixo do Conectar, **Ligado** diz se o board usa o agente (o campo Modelo dos cards, o chat e as regras
-oferecem os modelos dele) e **Usar nos cards** o põe em uso. O agente em uso não desliga: ponha outro em
-uso antes. A verificação de capacidades não tem comando à parte: ela roda no Conectar e no Reconectar,
+Abaixo do Conectar, **Ligado** diz se o board usa o agente: ligado, ele roda os cards com um modelo dele,
+junto com os outros agentes, e o campo Modelo dos cards, o chat e as regras oferecem os modelos dele.
+**Tornar padrão** o põe para rodar os cards sem modelo. O agente padrão não desliga: torne outro padrão
+antes. A verificação de capacidades não tem comando à parte: ela roda no Conectar e no Reconectar,
 sozinha quando você liga um agente ACP, e, nos perfis verificáveis que não passam pelo Conectar (a cópia
 do Claude Code e o personalizado ACP de uma versão anterior), pelo botão **Verificar capacidades** nos
 Detalhes do perfil. Nenhuma das sondas gasta a sua conta. Quando uma prova perde a validade (a CLI, o
@@ -199,15 +202,19 @@ um personalizado sem tradução verificada não executa.
 O valor do campo **Modelo** (`<perfil>:<modelo>@<esforço>`) já diz o perfil de CLI. Para cada
 execução o board usa o primeiro nível preenchido: o **Modelo do card**, o **modelo do agente**, a
 **regra de modelo** (mesmo com "Preencher o modelo sugerido automaticamente" desligado) e, sem
-nenhum, o **agente em uso** de Configurações → Conectar agentes. Assim, sub-tarefas da
+nenhum, o **agente padrão** de Configurações → Conectar agentes. Assim, sub-tarefas da
 mesma história podem rodar em CLIs diferentes, e as regras por esforço podem apontar para perfis
-diferentes.
+diferentes. Os cards de agentes diferentes rodam ao mesmo tempo, dentro dos limites de execução
+paralela do Harness, sem trocar o padrão.
 
 O primeiro nível preenchido é definitivo: se a escolha for inválida (perfil desligado, modelo fora
 do catálogo ou esforço inexistente), o card fica **bloqueado** com o motivo, sem cair para o próximo
 nível nem para o padrão. O campo Modelo, o chat e o editor de regras listam os modelos de **todos
 os perfis ligados**, agrupados por perfil. Login vencido e CLI ausente valem por perfil: param só os
-cards daquele perfil, e o aviso aparece só para os perfis em uso. **Sugerir regras** age só no
+cards daquele perfil, e o aviso aparece só para os perfis em uso. O mesmo vale para o perfil que o board
+não roda (o personalizado de CLI, ou a permissão que a ferramenta não aceita): o **Trabalhar na fase**
+desliga só nos cards dele, o heartbeat e o autopiloto pulam só esses cards, e o board só para quando
+nenhum perfil ligado roda. **Sugerir regras** age só no
 perfil sugerido e preserva as faixas de outros perfis. Pelo MCP, o `get_card` mostra o alvo em
 `model` (`tool`, `from` e, se inválido, `blocked`).
 
