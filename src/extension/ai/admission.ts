@@ -36,7 +36,7 @@ const TRANSPORT_OF: Record<ExecutionTransport, string> = {
   api: 'do modo API',
 };
 
-/** As capacidades como a tela de Ferramentas de IA as nomeia. */
+/** As capacidades como a tela de Conectar agentes as nomeia. */
 const CAPABILITY_TEXT: Record<ExecutorCapability, string> = {
   conversation: 'conversa nova',
   artifacts: 'controle de artefatos',
@@ -56,7 +56,7 @@ export function admissionBlockedText(decision: Pick<ExecutionAdmissionDecision, 
   const parts: string[] = [];
   if (unverified.length)
     parts.push(
-      `o perfil ainda não teve verificado: ${unverified.join(', ')}. Em Configurações › Ferramentas de IA, use o Conectar da ferramenta ou "Verificar capacidades", nos perfis que têm um dos dois (o personalizado de CLI não tem)`,
+      `o perfil ainda não teve verificado: ${unverified.join(', ')}. Em Configurações › Conectar agentes, use o Conectar do agente ou "Verificar capacidades" nos detalhes dele, nos perfis que têm um dos dois (o personalizado de CLI não tem)`,
     );
   for (const r of decision.reasons) {
     if (r.code === 'capability-not-verified' && r.capability) continue;

@@ -1,30 +1,20 @@
-// O Conectar ferramenta (épica "ferramenta por modo", história 7): a lista fixa das ferramentas que a extensão
-// traz (`TOOLS`), um cartão por modo oferecido com a mesma ficha em cada um, o selo Recomendado só quando o
-// modo recomendado é oferecido, e o progresso do Conectar de cada perfil, com o erro preso ao passo. A tela
-// só mostra: o fluxo é do host (`src/extension/ai/connect.ts`), e a chave colada vai direto para ele.
+// O progresso do Conectar de um perfil (épica "ferramenta por modo", história 7), agora dentro de Conectar agentes:
+// os passos, o que o passo atual espera da pessoa (a chave de API, a ciência do regime) e o erro preso a ele. O
+// fluxo é do host (`src/extension/ai/connect.ts`); a tela só mostra, e a chave colada vai direto para ele.
 import { useEffect, useState } from 'react';
-import { Badge, Callout, Card, TextField } from '@radix-ui/themes';
-import {
-  MODE_SHEET_LINES,
-  TOOLS,
-  recommendedOffered,
-  toolEntry,
-  type AiToolEntry,
-  type ModeSheetLine,
-  type ToolModeEntry,
-} from '../../../shared/aiTools';
-import { isReadyProfile, modeLabel, type AiProfile } from '../../../shared/aiProfiles';
-import { CONNECT_STEPS, type ConnectState, type ConnectStep, type ConnectSummary } from '../../../shared/connect';
-import { settings, ui } from '../../commands';
-import { formatDateTime, t, tn } from '../../i18n';
-import { useBoardStore } from '../../store/boardStore';
-import { useAction } from '../../useAction';
-import { isWeb } from '../../vscode';
-import { ActionButton, IconCheck, IconWarning } from '../ui';
-import { SectionHeader } from './SectionHeader';
+import { Callout, TextField } from '@radix-ui/themes';
+import { MODE_SHEET_LINES, type ModeSheetLine, type ToolModeEntry } from '../../../../shared/aiTools';
+import { isReadyProfile, type AiProfile } from '../../../../shared/aiProfiles';
+import { CONNECT_STEPS, type ConnectState, type ConnectStep, type ConnectSummary } from '../../../../shared/connect';
+import { settings, ui } from '../../../commands';
+import { formatDateTime, t, tn } from '../../../i18n';
+import { useBoardStore } from '../../../store/boardStore';
+import { useAction } from '../../../useAction';
+import { isWeb } from '../../../vscode';
+import { ActionButton, IconCheck, IconWarning } from '../../ui';
 
 /** Os rótulos das oito linhas da ficha, na ordem de `MODE_SHEET_LINES`. */
-const SHEET_LABEL: Record<ModeSheetLine, string> = {
+export const SHEET_LABEL: Record<ModeSheetLine, string> = {
   controls: 'O que o board controla',
   regime: 'Regime esperado',
   precision: 'Precisão do que foi usado',
@@ -89,7 +79,21 @@ export const reviewText = (name: string): string =>
   );
 
 /** O progresso do Conectar de um perfil: os passos, o que o passo atual espera da pessoa e o erro preso a ele. */
-export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; state: ConnectState; mode?: ToolModeEntry }) {
+export function ConnectProgress({
+  profile,
+  state,
+  mode,
+  login,
+}: {
+  profile: AiProfile;
+  state: ConnectState;
+  mode?: ToolModeEntry;
+  /**
+   * entra na conta pela tela (o login no terminal que o board acompanha e, no fim, retoma o Conectar); sem ele, o
+   * passo do login que falhou só abre o comando num terminal
+   */
+  login?: () => void;
+}) {
   const [apiKey, setApiKey] = useState('');
   /** "Trocar a chave" aberto no cartão conectado */
   const [changing, setChanging] = useState(false);
@@ -283,7 +287,17 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
       {state.status === 'failed' && (
         <div className="row">
           {state.command && <code>{state.command}</code>}
-          {state.command && !isWeb && (
+          {state.command && login && (
+            <ActionButton
+              size="1"
+              variant="soft"
+              hint={t('Abre o login num terminal; quando ele fechar, o board confere a conta e retoma o Conectar sozinho.')}
+              onClick={login}
+            >
+              {t('Entrar no terminal')}
+            </ActionButton>
+          )}
+          {state.command && !login && !isWeb && (
             <ActionButton
               size="1"
               variant="soft"
@@ -307,113 +321,16 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
   );
 }
 
-/** Um cartão de modo: a ficha, o selo Recomendado (só no modo recomendado oferecido) e o Conectar. */
-function ModeCard({ tool, mode, recommended }: { tool: AiToolEntry; mode: ToolModeEntry; recommended: boolean }) {
-  const state = useBoardStore((s) => s.state)!;
-  const profile = catalogProfileOf(state.board.aiProfiles, tool.id);
-  /** o perfil da ferramenta está neste modo (é por ele que os cards rodam) */
-  const inUse = profile?.mode === mode.mode;
-  // a conexão é do perfil, e o cartão mostra a deste modo: a em curso dele, ou a concluída do modo em uso
-  const raw = profile ? state.connections?.[profile.id] : undefined;
-  const connection = raw && (raw.mode ?? profile!.mode) === mode.mode ? raw : undefined;
-  const connect = useAction(() => settings.connectAiProfile(profile!.id, { mode: mode.mode }));
-  const title = `${tool.name} · ${modeLabel(mode.mode as AiProfile['mode'])}`;
+/** A ficha de um modo, linha a linha: o que o board controla, o regime, a precisão, o consumo, a cobrança… */
+export function ModeSheetList({ mode }: { mode: ToolModeEntry }) {
   return (
-    <Card className="connect-mode" aria-label={title}>
-      <div className="connect-mode-head">
-        <strong>{title}</strong>
-        {recommended && (
-          <Badge color="indigo" variant="solid">
-            {t('Recomendado')}
-          </Badge>
-        )}
-        {inUse && profile?.enabled && (
-          <Badge color="gray" variant="soft">
-            {t('Modo em uso')}
-          </Badge>
-        )}
-      </div>
-      {recommended && <p className="small">{t(tool.recommended.reason)}</p>}
-      <dl className="mode-sheet">
-        {MODE_SHEET_LINES.map((line) => (
-          <div key={line}>
-            <dt>{t(SHEET_LABEL[line])}</dt>
-            <dd>{t(mode.sheet[line])}</dd>
-          </div>
-        ))}
-      </dl>
-      <div className="row end">
-        <ActionButton
-          hint={
-            connection?.status === 'connected'
-              ? t('Refaz o login, a verificação e a leitura dos modelos.')
-              : inUse
-                ? t('Acha a ferramenta, faz o login, verifica as capacidades e lê os modelos.')
-                : t('Passa o perfil da ferramenta para este modo quando o login der certo, com a mesma chave e os mesmos modelos.')
-          }
-          disabled={!profile || raw?.status === 'running'}
-          disabledReason={!profile ? t('Este modo ainda não tem perfil neste board.') : t('O Conectar está em curso.')}
-          loading={connect.busy}
-          onClick={() => void connect.run()}
-        >
-          {t(connection?.status === 'connected' ? 'Reconectar' : 'Conectar')}
-        </ActionButton>
-      </div>
-      {profile && connection && <ConnectProgress profile={profile} state={connection} mode={mode} />}
-    </Card>
-  );
-}
-
-/** Ferramentas de IA › Conectar ferramenta. */
-export function ConnectTool() {
-  // o aviso do topo abre o Conectar já na ferramenta do perfil (o perfil pronto tem o id da ferramenta)
-  const requested = useBoardStore((s) => s.connectTool);
-  const [toolId, setToolId] = useState(requested && toolEntry(requested) ? requested : TOOLS[0]!.id);
-  useEffect(() => {
-    if (requested && toolEntry(requested)) setToolId(requested);
-  }, [requested]);
-  const tool = toolEntry(toolId) ?? TOOLS[0]!;
-  const recommended = recommendedOffered(tool);
-  return (
-    <section className="connect-tool" aria-label={t('Conectar ferramenta')}>
-      <SectionHeader id="connect-tool" title={t('Conectar ferramenta')}>
-        {t(
-          'Escolha a ferramenta e o modo. A extensão acha a ferramenta, faz o login, verifica o que ela carrega por conta própria e lê os modelos: o que fica com você é entrar na conta.',
-        )}
-      </SectionHeader>
-      <div className="connect-layout">
-        <ul className="connect-tools" aria-label={t('Ferramentas')}>
-          {TOOLS.map((entry) => (
-            <li key={entry.id}>
-              <button type="button" aria-pressed={entry.id === tool.id} onClick={() => setToolId(entry.id)}>
-                <strong>{entry.name}</strong>
-                <span className="muted small">{t(entry.billing)}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-        <div className="connect-modes">
-          <header className="connect-tool-head">
-            <h3>{tool.name}</h3>
-            <p className="small muted">
-              {t(tool.billing)}{' '}
-              <a href={tool.docs} target="_blank" rel="noopener noreferrer">
-                {t('Página oficial')}
-              </a>
-            </p>
-          </header>
-          {tool.modes.map((mode) => (
-            <ModeCard key={mode.mode} tool={tool} mode={mode} recommended={recommended === mode.mode} />
-          ))}
-          {tool.planned.length > 0 && (
-            <p className="muted small">
-              {t('Ainda não oferecidos nesta versão: {modes}.', {
-                modes: tool.planned.map((p) => modeLabel(p.mode as AiProfile['mode'])).join(', '),
-              })}
-            </p>
-          )}
+    <dl className="mode-sheet">
+      {MODE_SHEET_LINES.map((line) => (
+        <div key={line}>
+          <dt>{t(SHEET_LABEL[line])}</dt>
+          <dd>{t(mode.sheet[line])}</dd>
         </div>
-      </div>
-    </section>
+      ))}
+    </dl>
   );
 }

@@ -64,6 +64,9 @@ import {
   User,
   X,
   Zap,
+  ArrowLeft,
+  ArrowRight,
+  SquareTerminal,
   type LucideIcon,
   type LucideProps,
 } from 'lucide-react';
@@ -162,3 +165,7 @@ export const IconOk = icon(CircleCheck, 'IconOk');
 export const IconMissing = icon(CircleX, 'IconMissing');
 export const IconRecommend = icon(CircleAlert, 'IconRecommend');
 export const IconSkipped = icon(CircleDashed, 'IconSkipped');
+// log do protocolo ACP (POC): quem enviou a mensagem, e os fatos do processo do agente
+export const IconToAgent = icon(ArrowRight, 'IconToAgent');
+export const IconFromAgent = icon(ArrowLeft, 'IconFromAgent');
+export const IconProcess = icon(SquareTerminal, 'IconProcess');

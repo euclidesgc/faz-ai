@@ -40,9 +40,10 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
 
 ## Conectar a ferramenta de IA
 
-1. Em Configurações → **Ferramentas de IA**, escolha o perfil de CLI padrão do projeto. Claude Code,
-   Cursor e Kimi Code vêm prontos, e os agentes ACP do catálogo (Gemini CLI, Codex, OpenCode…) vêm
-   prontos e desligados; também é possível criar cópias e perfis personalizados. O padrão
+1. Em Configurações → **Conectar agentes**, escolha o agente que roda os cards, entre na conta dele e
+   conecte-o ao board ([Conectar agentes](configuracoes.md#conectar-agentes)). Claude Code, Cursor e
+   Kimi Code vêm prontos, e os agentes ACP do catálogo (Gemini CLI, Codex, OpenCode…) vêm prontos e
+   desligados; também é possível criar cópias e perfis personalizados. O agente em uso
    só vale quando nada indica outro: a CLI de cada execução sai do modelo escolhido (veja
    [Qual CLI executa](configuracoes.md#qual-cli-executa)). Em **Harness → Ferramenta e execução**,
    você pode trocar o perfil em uso.
@@ -105,9 +106,9 @@ O Gemini tem três modos no catálogo da extensão; o **API** é o recomendado, 
 board sabe de antemão tudo o que o modelo pode acessar e paga só pelo que pediu. Nele não há CLI
 instalada nem processo da ferramenta: o board chama o `generateContent` da API do Gemini com a chave
 de API guardada no cofre local e faz ele mesmo o ciclo de chamadas de função. Para usar, clique em
-**Conectar** no cartão **API** do Gemini em Ferramentas de IA › Conectar ferramenta (veja
-[Configurações](configuracoes.md#ferramentas-de-ia-conectar-ferramenta)): o perfil do Gemini passa para
-o modo API com a mesma chave do ACP, conferida na hora com a API.
+**Conectar no modo API** no Gemini, em Configurações › Conectar agentes (veja
+[Configurações](configuracoes.md#conectar-agentes)): o perfil do Gemini passa para o modo API com a
+mesma chave do ACP, conferida na hora com a API.
 
 - **O que o modelo recebe**: o pedido do board (com o agente da fase, as rules e as skills indicadas),
   a conversa montada pelo board a cada pedido e, como funções, só as ferramentas do servidor do board e
@@ -136,7 +137,7 @@ o modo API com a mesma chave do ACP, conferida na hora com a API.
 ### O Gemini pela CLI
 
 O terceiro modo é a CLI de uma passada (`gemini -p`), com o Gemini CLI instalado (conferido na 0.65.0).
-Clique em **Conectar** no cartão **CLI** do Gemini: o perfil do Gemini passa para o modo CLI com a mesma
+Clique em **Conectar no modo CLI** no Gemini: o perfil do Gemini passa para o modo CLI com a mesma
 chave do cofre, conferida na hora pela lista de modelos da API (que entram no catálogo). O que o
 Gemini aplica nesse modo:
 
@@ -262,9 +263,9 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   conectar a ferramenta dele ao board e, com o agente ligado, quando a conferência do ambiente acha o
   vínculo dele sem prova em vigor (uma vez por vínculo), a menos que a prova do vínculo atual ainda
   valha (o resultado vai para Saída › Faz AI). Nos perfis do catálogo (o Claude Code, o Gemini pela CLI
-  e os agentes ACP prontos), ela é um passo do **Conectar** e do **Reconectar**, em Ferramentas de IA;
+  e os agentes ACP prontos), ela é um passo do **Conectar** e do **Reconectar**, em Conectar agentes;
   nos verificáveis que não passam pelo Conectar (a cópia do Claude Code e o personalizado ACP de uma
-  versão anterior), roda pelo botão **Verificar capacidades** do perfil, na mesma tela. O comando da
+  versão anterior), roda pelo botão **Verificar capacidades** nos Detalhes do perfil, na mesma tela. O comando da
   paleta "Verificar o isolamento da CLI de IA" saiu. No Claude Code, a CLI roda numa pasta descartável
   contra uma API local, com uma chave falsa; num agente ACP, são dois handshakes numa pasta
   descartável. Nenhuma das duas gasta a sua conta. Enquanto um perfil verificável não tem recibos, o

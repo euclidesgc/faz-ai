@@ -62,7 +62,7 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
     setValues((before) => ({ ...before, [key]: text }));
     setTouched((before) => new Set(before).add(key));
   };
-  // o personalizado novo é só de CLI (história 13): o agente ACP entra pelo Conectar ferramenta. O campo do agente
+  // o personalizado novo é só de CLI (história 13): o agente ACP entra pelo Conectar, em Conectar agentes. O campo do agente
   // só aparece no personalizado ACP, que continua editável e rodando como está, e no importado pendente sem a
   // configuração nesta máquina (um backup anterior ao formato 48 não diz se ele era ACP: a pessoa diz, e o host
   // aceita o agente nessa linha, `AiProfileRepo.save`)
@@ -142,7 +142,7 @@ export function AiProfileForm({ profile, onClose, onSaved }: { profile?: AiProfi
         {customAcp && (
           <p className="ai-profile-notice">
             {t(
-              'Personalizado pelo ACP: continua rodando como está. O caminho normal é Conectar ferramenta, com o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.',
+              'Personalizado pelo ACP: continua rodando como está. O caminho normal é conectar o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.',
             )}
           </p>
         )}

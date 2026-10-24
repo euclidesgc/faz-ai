@@ -2,6 +2,7 @@ import { collectClaudeEnvironment } from '../ai/environmentEvidence';
 import { defaultManifestDir } from '../ai/cursorManifest';
 import { cursorHookStatus } from '../mcp/cursorHooks';
 import {
+  BUILTIN_PROFILES,
   PROFILE_CAPABILITIES,
   catalogTool,
   isAcpProfile,
@@ -83,6 +84,7 @@ import { profileApiKey } from '../ai/apiKey';
 import { credentialsFor } from '../credentials';
 import { recoverProjectServers } from '../mcp/projectServerLease';
 import { loginShellPath, spawnAcpProcess, spawnHeadless } from '../spawn';
+import { AgentConnectService, type TerminalSpec } from '../agentConnect/service';
 
 /** Complemento do nome na mensagem de "comando não encontrado", para não piorar o que a pessoa já lê no log. */
 const COMMAND_HINT: Record<string, string> = { gh: ' (GitHub CLI)' };
@@ -113,6 +115,11 @@ export interface BoardHostOptions {
    * ausente fora do editor, onde fica só o comando para copiar
    */
   runInTerminal?: (name: string, command: string, cwd: string) => void;
+  /**
+   * roda um processo num terminal do editor e devolve o código de saída quando ele fecha (o login de um agente, em
+   * Conectar agentes: o board verifica a conta de novo sozinho); ausente fora do editor
+   */
+  runTerminal?: (spec: TerminalSpec) => Promise<number | null>;
 }
 
 /** O board de uma pasta em funcionamento: banco, roteador, executor da IA e heartbeat. Não depende da API do VSCode. */
@@ -343,7 +350,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       });
       if (!found.options.length)
         throw new Error(
-          `${agent.label} não anunciou modelos na sessão; cadastre-os à mão em Modelos de IA ou use "Outro modelo…" no card.`,
+          `${agent.label} não anunciou modelos na sessão; cadastre-os à mão na aba Modelos do agente, em Conectar agentes, ou use "Outro modelo…" no card.`,
         );
       rememberModels(profile.id, found.options);
       o.log(
@@ -419,6 +426,35 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   // o fim do Conectar muda o login, a prova e os modelos do perfil: a faixa de requisitos confere de novo
   router.onConnect((id, input) => connector.connect(id, input).finally(() => void checkNow()));
   router.setConnections(connector.snapshot(router.snapshot().board.aiProfiles.map((p) => p.id)));
+  // Conectar agentes: a lista do registro, a conta de cada agente, o login e o logout. O log do protocolo fica na
+  // pasta do rastreio do board, ao lado dele
+  router.setAgentConnect(
+    new AgentConnectService({
+      storageDir: o.storageDir,
+      logDir: path.join(o.storageDir, 'trace', workspaceKey(o.folderPath)),
+      homeDir,
+      pathEnv: async (fresh) => (fresh ? (pathEnv = (await loginShellPath(true)) ?? pathEnv) : pathEnv),
+      profiles: () => router.snapshot().board.aiProfiles,
+      privateProfile: (id) => {
+        try {
+          return new AiProfileRepo(handle.db).resolveProfile(router.boardId, id);
+        } catch (e) {
+          // o perfil desligado: o pronto tem a configuração no código (o agente ACP, a página oficial), sem segredo, e é
+          // com ela que a tela diz se a ferramenta está instalada e verifica a conta; o do cofre espera ser ligado
+          const profile = router.snapshot().board.aiProfiles.find((p) => p.id === id);
+          const builtin = BUILTIN_PROFILES.find((p) => p.id === id);
+          if (profile && builtin) return { ...profile, config: structuredClone(builtin.config) };
+          throw e;
+        }
+      },
+      acpAuth: acpAuthOf,
+      hasApiKey: (tool) => toolKeys.has(tool),
+      ...(o.runTerminal ? { runTerminal: o.runTerminal } : {}),
+      connection: (id) => router.snapshot().connections?.[id],
+      resumeConnect: (id) => router.connectProfile(id, {}),
+      log: o.log,
+    }),
+  );
   const runner = new AiRunner(router, {
     gateway,
     cwd: o.folderPath,
@@ -1127,7 +1163,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   };
   // ligar um agente ACP já prova o handshake dele: sem isso o perfil ficaria com as capacidades sem prova
   router.onProfileEnabled((profileId) => verifyInBackground(profileId, 'perfil ligado'));
-  // "Verificar capacidades" em Ferramentas de IA (história 13): o perfil verificável sem Conectar (a cópia do
+  // "Verificar capacidades" em Conectar agentes (história 13): o perfil verificável sem Conectar (a cópia do
   // Claude Code, o personalizado ACP) refaz as provas por aqui, no lugar do comando que saiu da paleta
   router.onVerify((profileId) => verifyDetailed(profileId).then((r) => r.message));
 

@@ -11,6 +11,9 @@ import type { PrefsStore } from '../prefs';
 import type { MessageRouter } from '../panel/messageRouter';
 import { messageData, summarize } from '../../shared/trace';
 import { DEFAULT_SCOPE, projectForWebview, sameScope, type WebviewScope } from '../../shared/webviewState';
+import { TEST_IDLE } from '../../shared/agentConnect';
+import { TestSession } from '../agentConnect/session';
+import type { AgentConnectService } from '../agentConnect/service';
 
 /**
  * Quanto tempo as mudanças do board se acumulam antes de um envio à interface (#1066). Uma execução da IA
@@ -34,6 +37,7 @@ const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'executionPolicy.read',
   'executionPolicy.simulate',
   'executionPolicy.assist',
+  'agentConnect.registry',
 ]);
 
 /** Quantas linhas um lote do rastreio da tela traz, no máximo: a tela não pode encher o arquivo de uma vez. */
@@ -113,6 +117,8 @@ export class HostBridge {
   private timer: ReturnType<typeof setTimeout> | null = null;
   /** interface escondida (aba ou painel fora de vista): as mudanças esperam ela voltar */
   private visible = true;
+  /** a sessão de teste de Conectar agentes desta interface, criada na primeira vez que a pessoa abre uma */
+  private testSession: TestSession | null = null;
 
   constructor(
     private send: (msg: HostToWebview) => void,
@@ -126,6 +132,16 @@ export class HostBridge {
     this.subs.push(router.onDidError((message) => this.post({ type: 'error', message })));
     this.subs.push(viewState.onDidChange((view, origin) => origin !== this && this.post({ type: 'viewState', view })));
     this.subs.push(prefs.onDidChange((prefs, origin) => origin !== this && this.post({ type: 'prefs', prefs })));
+    const agents = router.agentConnect;
+    // a conta de um agente e o log das verificações valem para todas as telas abertas (o editor e o navegador)
+    if (agents)
+      this.subs.push(
+        agents.on((notice) =>
+          notice.type === 'account'
+            ? this.post({ type: 'agentConnect.account', key: notice.key, account: notice.account })
+            : this.post({ type: 'agentConnect.log', entry: notice.entry }),
+        ),
+      );
   }
 
   post(msg: HostToWebview): void {
@@ -153,6 +169,103 @@ export class HostBridge {
     this.subs.forEach((off) => off());
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    // a interface fechou: o processo da sessão de teste não pode ficar órfão
+    this.testSession?.close();
+    this.testSession = null;
+  }
+
+  private agents(): AgentConnectService {
+    const service = this.router.agentConnect;
+    if (!service) throw new Error('Conectar agentes não está disponível neste host.');
+    return service;
+  }
+
+  /** A sessão de teste desta interface: o que ela manda vai só para esta tela; o log vai também para o arquivo. */
+  private session(): TestSession {
+    const service = this.agents();
+    this.testSession ??= new TestSession(
+      {
+        event: (event) => this.post({ type: 'agentConnect.test.event', event }),
+        state: (state) => this.post({ type: 'agentConnect.test.state', state }),
+        log: (entry) => {
+          service.writeLog(entry, false);
+          this.post({ type: 'agentConnect.log', entry });
+        },
+      },
+      service.spawn,
+    );
+    return this.testSession;
+  }
+
+  /** As mensagens de Conectar agentes; false quando a mensagem não é dela. */
+  private async dispatchAgentConnect(msg: WebviewToHost): Promise<boolean> {
+    switch (msg.type) {
+      case 'agentConnect.registry':
+        try {
+          const { listing, installed } = await this.agents().listing(msg.refresh);
+          this.post({ type: 'agentConnect.registryResult', requestId: msg.requestId, listing, installed });
+        } catch (e) {
+          this.post({ type: 'agentConnect.registryResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return true;
+      case 'agentConnect.sync': {
+        const service = this.agents();
+        this.post({ type: 'agentConnect.accounts', accounts: service.snapshot() });
+        this.post({ type: 'agentConnect.test.state', state: this.testSession?.state ?? TEST_IDLE });
+        this.post({ type: 'agentConnect.logFile', file: service.logFilePath() });
+        return true;
+      }
+      case 'agentConnect.openLog': {
+        const file = this.agents().logFilePath();
+        if (!file) throw new Error('Este board não tem pasta de dados para o log do protocolo.');
+        await fs.access(file).catch(() => {
+          throw new Error('Ainda não há log do protocolo hoje: verifique a conta de um agente ou abra uma sessão de teste.');
+        });
+        await this.env.openFile(file);
+        return true;
+      }
+      // a conta, o login e o logout seguem pelos avisos do serviço (`agentConnect.account`): o login pode levar o
+      // tempo da pessoa no navegador, e a tela não fica presa esperando o `done`
+      case 'agentConnect.check':
+        void this.agents().check(msg.key);
+        return true;
+      case 'agentConnect.login':
+        void this.agents().login(msg.key, msg.methodId, msg.apiKey);
+        return true;
+      case 'agentConnect.logout':
+        void this.agents().logout(msg.key);
+        return true;
+      case 'agentConnect.test.open': {
+        const { launch, auth } = await this.agents().testLaunch(msg.key);
+        const cwd = this.router.workspaceDir || os.homedir();
+        // não espera: a primeira abertura pode levar o tempo do npx baixar o pacote; a tela acompanha pelo estado
+        void this.session().open(msg.key, launch, cwd, auth);
+        return true;
+      }
+      case 'agentConnect.test.reopen':
+        void this.session().reopen();
+        return true;
+      case 'agentConnect.test.prompt':
+        this.session().prompt(msg.text);
+        return true;
+      case 'agentConnect.test.permission':
+        this.testSession?.answerPermission(msg.permissionId, msg.optionId);
+        return true;
+      case 'agentConnect.test.setConfig':
+        await this.session().setConfigOption(msg.configId, msg.value);
+        return true;
+      case 'agentConnect.test.setMode':
+        await this.session().setMode(msg.modeId);
+        return true;
+      case 'agentConnect.test.cancel':
+        this.testSession?.cancel();
+        return true;
+      case 'agentConnect.test.close':
+        this.testSession?.close();
+        return true;
+      default:
+        return false;
+    }
   }
 
   /**
@@ -254,6 +367,7 @@ export class HostBridge {
   }
 
   private async dispatch(msg: WebviewToHost): Promise<void> {
+    if (await this.dispatchAgentConnect(msg)) return;
     switch (msg.type) {
       case 'ready':
         this.post({ type: 'viewState', view: this.viewState.get() });

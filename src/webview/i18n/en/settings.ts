@@ -3,29 +3,16 @@ export const settings: Record<string, string> = {
   'cadastrada à mão': 'entered manually',
   'lida do agente ao abrir uma sessão ACP (session/new), sem gastar a sua conta; o agente precisa estar instalado e com login':
     'read from the agent when opening an ACP session (session/new), without spending your account; the agent must be installed and signed in',
-  'Modelos do perfil selecionado, com os níveis de esforço de cada um. Escolher um catálogo não muda o perfil executor do board.':
-    'Models for the selected profile, with their effort levels. Choosing a catalog does not change the board executor profile.',
   'Nenhum modelo. Use "Novo modelo" para cadastrar à mão.': 'No models. Use "New model" to add one manually.',
   'Ferramentas de IA': 'AI tools',
-  'Consulta instalação, versão e login de cada perfil.': 'Checks installation, version, and sign-in for each profile.',
   'Verificar situação': 'Check status',
   'Abre o formulário de um perfil de CLI personalizado.': 'Opens the form for a custom CLI profile.',
-  'Os perfis de CLI são dados do board. Configuração não comprova isolamento, permissões ou acesso ao MCP.':
-    'CLI profiles are board data. Configuration does not prove isolation, permissions, or MCP access.',
   'Perfil padrão': 'Default profile',
   'Personalizado · {mode}': 'Custom · {mode}',
   'Cópia de {base}': 'Copy of {base}',
-  'A verificar': 'Not checked yet',
   'Não encontrada': 'Not found',
-  'Desligada: ligue para verificar': 'Off: turn it on to check',
-  'Pendente de revisão: salve o perfil para verificar': 'Pending review: save the profile to check',
-  'Login vencido': 'Sign-in expired',
   'Encontrada · {version}': 'Found · {version}',
   'Encontrada · {version} · login não verificado': 'Found · {version} · sign-in not verified',
-  'Encontrada · login não verificado': 'Found · sign-in not verified',
-  Encontrada: 'Found',
-  'Pendente de revisão local': 'Pending local review',
-  'Executa um pedido curto nesta CLI; usa a sua assinatura.': 'Runs a short request in this CLI; uses your subscription.',
   'Testar o perfil "{name}"?': 'Test profile "{name}"?',
   'O teste roda a ferramenta e usa a sua assinatura. Uma resposta OK não comprova isolamento, permissões ou MCP.':
     'The test runs the tool and uses your subscription. An OK reply does not prove isolation, permissions, or MCP access.',
@@ -52,9 +39,7 @@ export const settings: Record<string, string> = {
     'Evidence source and version: not provided. A person’s declaration does not receive a verified badge.',
   'Fonte da situação: sonda local do host. Versão da CLI: {version}.': 'Status source: local host probe. CLI version: {version}.',
   desconhecida: 'unknown',
-  'Testando perfil…': 'Testing profile…',
   'A resposta não comprova isolamento, permissões ou MCP.': 'The response does not prove isolation, permissions, or MCP access.',
-  'Nenhum perfil cadastrado.': 'No profiles registered.',
   'Editar perfil {name}': 'Edit profile {name}',
   'Novo perfil de CLI': 'New CLI profile',
   'Os valores salvos não são mostrados. Deixe um campo vazio para manter o valor atual.':
@@ -91,21 +76,16 @@ export const settings: Record<string, string> = {
   'Agente ACP': 'ACP agent',
   'Id do agente no catálogo ACP (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio mantém o agente salvo.':
     'Agent id in the ACP catalog (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Blank keeps the saved agent.',
-  'Personalizado pelo ACP: continua rodando como está. O caminho normal é Conectar ferramenta, com o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.':
-    'Custom over ACP: it keeps running as it is. The usual path is Connect a tool, with the catalog agent in ACP mode; new custom profiles are CLI only.',
+  'Personalizado pelo ACP: continua rodando como está. O caminho normal é conectar o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.':
+    'Custom over ACP: it keeps running as it is. The usual path is to connect the catalog agent in ACP mode; new custom profiles are CLI only.',
   'Informe o agente ACP do perfil: a configuração dele não está nesta máquina.':
     'Enter the profile’s ACP agent: its configuration is not on this machine.',
   'Id do agente no catálogo ACP, se o perfil era de um agente ACP no board de origem (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio: CLI de uma passada.':
     'Agent id in the ACP catalog, if the profile was an ACP agent in the source board (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Empty: one-shot CLI.',
   'Revise o perfil antes: salve a configuração dele no formulário.': 'Review the profile first: save its configuration in the form.',
-  'Abre o Conectar ferramenta no agente deste perfil.': 'Opens Connect a tool on this profile’s agent.',
   'Refaz as sondas de capacidade deste perfil numa pasta descartável e grava as provas, sem gastar a sua conta.':
     'Reruns this profile’s capability probes in a throwaway folder and records the proofs, without spending your account.',
   'Verificar capacidades': 'Check capabilities',
-  Avançado: 'Advanced',
-  'Perfil de CLI personalizado, para uma linha de comando que o catálogo não traz. Ele roda pela CLI de uma passada: o board não mede tokens nem custo, não verifica as capacidades e só orienta pelo pedido o agente, as skills, o MCP e as ferramentas. Para as ferramentas do catálogo, use Conectar ferramenta, acima.':
-    'Custom CLI profile, for a command line the catalog does not include. It runs as a one-shot CLI: the board does not measure tokens or cost, does not check its capabilities, and only guides the agent, skills, MCP and tools through the prompt. For the catalog tools, use Connect a tool, above.',
-  'Novo perfil de CLI personalizado': 'New custom CLI profile',
   'O perfil roda pelo Agent Client Protocol: o comando, os argumentos e as permissões são os do agente, respondidas pelo card.':
     'The profile runs over the Agent Client Protocol: the command, arguments and permissions are the agent’s, answered by the card.',
   'Frases de login vencido': 'Expired sign-in phrases',
@@ -236,12 +216,6 @@ export const settings: Record<string, string> = {
   'deixar a história onde está.': 'leave the story where it is.',
   'Ao concluir a última sub-tarefa': 'When finishing the last sub-task',
   'Preencher o modelo sugerido': 'Fill in the suggested model',
-  'um card é criado ou um atributo dele muda, e o campo de modelo está vazio ou ainda tem a sugestão anterior':
-    'a card is created or one of its attributes changes, and the model field is empty or still has the previous suggestion',
-  'preencher o modelo com a sugestão das regras. Um modelo escolhido à mão nunca é trocado.':
-    "fill in the model with the rules' suggestion. A hand-picked model is never replaced.",
-  'não mexer no modelo. A sugestão só é aplicada pelo botão no card.':
-    'leave the model alone. The suggestion is only applied by the button on the card.',
   Preencher: 'Fill in',
   'Excluir card': 'Delete card',
   'um card é movido para a lixeira': 'a card is moved to the trash',
@@ -348,8 +322,6 @@ export const settings: Record<string, string> = {
     'read from the cursor-agent models command, with the account in use; without the CLI signed in, the list built into the extension',
   'lida do comando kimi provider list --json, com os provedores configurados; sem a CLI, lista embutida na extensão':
     'read from the kimi provider list --json command, with the configured providers; without the CLI, the list built into the extension',
-  'Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards. A ferramenta é escolhida em Harness.':
-    'Models of the tool in use in the project, with the effort levels of each. This is where the options of the cards\' "Model" field come from. The tool is chosen in Harness.',
   '{count} modelo(s)': '{count} model(s)',
   'Ao detectar: {source}. Modelos que você acrescentou à mão são mantidos.': 'On detect: {source}. Models you added by hand are kept.',
   'Esforços aceitos (separados por vírgula)': 'Accepted efforts (comma-separated)',
@@ -450,8 +422,8 @@ export const settings: Record<string, string> = {
   'Sim ou não': 'Yes or no',
   'Uma caixa de marcar; no card aparece o nome do campo quando marcada.': 'A checkbox; on the card the field name shows when checked.',
   'Modelo de IA': 'AI model',
-  'Modelo e esforço do catálogo em Modelos de IA; diz qual modelo trabalha no card.':
-    'Model and effort from the catalog in AI models; says which model works on the card.',
+  'Modelo e esforço do catálogo de cada agente, em Conectar agentes; diz qual modelo trabalha no card.':
+    "Model and effort from each agent's catalog, in Connect agents; says which model works on the card.",
   Selo: 'Badge',
   'Selo preenchido com o valor.': 'Badge filled with the value.',
   'Selo vazado': 'Outline badge',
@@ -475,13 +447,10 @@ export const settings: Record<string, string> = {
   'Incluir os modos rápidos': 'Include fast modes',
   'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"); desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.':
     'Cursor has a fast version of many models: it answers sooner and charges more for the same tokens. When on, each one enters the catalog as a separate model (for example, "Claude Opus 5.5 1M Fast"); when off, they leave the catalog. The list comes from the cursor-agent models command, read with the CLI signed in.',
-  'ferramenta Cursor': 'Cursor tool',
   'em Harness': 'in Harness',
   'Mostrando os modelos do {tool}': 'Showing the {tool} models',
   'lista lida da ferramenta em {date}': 'list read from the tool on {date}',
   'Mostrando os agentes do {tool}': 'Showing the {tool} agents',
-  'trocar ferramenta': 'switch tool',
-  'Trocar a ferramenta de IA, em Harness': 'Switch the AI tool, in Harness',
   'Preencher o modelo sugerido automaticamente': 'Fill in the suggested model automatically',
   'Ao criar ou mudar um card, preenche o campo "Modelo" com a sugestão das regras abaixo, se ele estiver vazio ou com a sugestão anterior. Um modelo escolhido à mão nunca é trocado.':
     'When a card is created or changed, fills in the "Model" field with the rules\' suggestion below, if it is empty or still has the previous suggestion. A hand-picked model is never replaced.',
@@ -497,7 +466,6 @@ export const settings: Record<string, string> = {
   'O formulário já está aberto logo abaixo.': 'The form is already open right below.',
   'Abre o formulário de um modelo novo.': 'Opens the form for a new model.',
   'O board não tem o campo "{field}".': 'The board has no "{field}" field.',
-
   // renomeação da principal e da develop (#498)
   'Branch principal': 'Main branch',
   detectada: 'detected',
@@ -544,7 +512,6 @@ export const settings: Record<string, string> = {
   Feature: 'Feature',
   Bugfix: 'Bugfix',
   Hotfix: 'Hotfix',
-
   // branches e worktrees órfãs (#465)
   'Branches e worktrees órfãs': 'Orphan branches and worktrees',
   'Branches e worktrees que o board criou e cuja história já terminou ou não existe mais. As seguras não perdem nada e o board as limpa sozinho; as que dependem de decisão têm arquivos ou commits que só existem ali.':

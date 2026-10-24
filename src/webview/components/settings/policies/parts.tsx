@@ -68,7 +68,7 @@ export const profileLabel = (library: PolicyLibrary, id: string): string => {
 export const offTargetNote = (library: PolicyLibrary, profileId: string): string | null =>
   library.profiles.find((p) => p.id === profileId)?.off
     ? t(
-        'O perfil {name} está desligado: a política pode ser salva, mas a execução só troca para ele depois que você o ligar em Ferramentas de IA.',
+        'O perfil {name} está desligado: a política pode ser salva, mas a execução só troca para ele depois que você o ligar em Conectar agentes.',
         {
           name: profileLabel(library, profileId),
         },

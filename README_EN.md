@@ -94,10 +94,9 @@ in the Portuguese interface.
   used). The AI queries the same with `get_metrics`. [Metrics](docs/metricas_EN.md)
 - **Board in the browser.** Open the same board in a browser tab, in sync with the editor, or serve it
   without the editor with the `faz-ai` command. [Data and browser](docs/dados_EN.md)
-- **ACP agents.** Gemini CLI, Codex, OpenCode, GitHub Copilot CLI, Qwen Code, goose and Google Antigravity come as ready profiles, switched off, in AI tools, and run through the Agent Client Protocol; the custom profile became an advanced, CLI-only path (custom ACP profiles from earlier versions keep running). The board answers permissions by the card, and the card's MCP servers join the session without a file in the project. Sign in to the tool in the terminal before using it (each one's command is in [MCP tools](docs/mcp.md#execução-por-acp-transporte-do-perfil)). The capability admission verifies the agent's handshake and admits the profile only in the compatible regime, because the agent reads its own context files. Claude Code keeps running through the CLI.
-- **Connect a tool.** In AI tools, pick the tool and the mode, compare the modes side by side (with the recommended one and why) and click **Connect**: the extension finds the tool, signs in, checks the capabilities, asks for your acknowledgment when the regime is compatible and reads the models. Gemini connects over ACP with an API key, which stays only in this computer's vault ([details](docs/configuracoes_EN.md#ai-tools-connect-a-tool)).
-- **Gemini through the API.** In Gemini's **API** card in Connect, with the same API key, the board calls the model directly and runs the tool loop itself: the model only sees the tools of the board and of the MCPs the card allows, and usage is measured in tokens. Reading, editing files and running commands are board tools, allowed by the card's permission and confined to its folders ([details](docs/harness_EN.md#gemini-through-the-api)).
-- **Gemini through the CLI.** On Gemini's **CLI** card, with the same key, the board runs Gemini CLI in a single pass with an isolated home holding only its settings: the tools and MCP servers are the card's, and usage is measured in tokens ([details](docs/harness_EN.md#gemini-through-the-cli)).
+- **Connect agents.** One screen to pick the AI agent that runs the cards (Claude Code, Cursor, Kimi Code or a catalog ACP agent such as Gemini CLI, Codex and OpenCode), sign in and out of it, connect it to the board, tune its models and test it in a live session over ACP, with the protocol log. The other agents from the official ACP registry show up for testing, and API keys stay only in this computer's vault ([details](docs/configuracoes_EN.md#connect-agents)).
+- **Gemini through the API.** In Gemini's **API** mode, in Connect agents, with the same API key, the board calls the model directly and runs the tool loop itself: the model only sees the tools of the board and of the MCPs the card allows, and usage is measured in tokens. Reading, editing files and running commands are board tools, allowed by the card's permission and confined to its folders ([details](docs/harness_EN.md#gemini-through-the-api)).
+- **Gemini through the CLI.** In Gemini's **CLI** mode, with the same key, the board runs Gemini CLI in a single pass with an isolated home holding only its settings: the tools and MCP servers are the card's, and usage is measured in tokens ([details](docs/harness_EN.md#gemini-through-the-cli)).
 - **Gemini quota.** In the three modes, an exhausted quota pauses the Gemini profile until it renews (the daily one at midnight Pacific time, the per-minute one for the time the API asks), and the Metrics panel splits usage by mode ([details](docs/automacao_EN.md#what-each-round-does)).
 - **MCP server.** Claude Code, Cursor or any MCP client can query and edit the board.
   [MCP tools](docs/mcp.md)
@@ -115,8 +114,8 @@ the official install command; the board installs nothing.
 ## Settings
 
 The extension adds no keys to the editor's `settings.json`: all configuration lives in the board
-itself, under **Configurações** (workflows and columns, card types, fields, rules, Harness, AI tools
-and models, Git, appearance and backup). See [Board settings](docs/configuracoes_EN.md).
+itself, under **Configurações** (workflows and columns, card types, fields, rules, Connect agents,
+Harness, Git, appearance and backup). See [Board settings](docs/configuracoes_EN.md).
 
 Command palette (`Ctrl+Shift+P`):
 

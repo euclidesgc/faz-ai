@@ -190,7 +190,7 @@ opcional; sem ele, a execução continua legada.
 **Runtime v1 (opcional).** Com `FAZ_AI_CONTEXT_RUNTIME=v1` no ambiente que abre o editor, o gateway
 só executa com a configuração resolvida e a admissão por capacidades: runner (fase, refinar, resumo,
 conflito), chat, assistentes do Harness e teste do perfil. Sem agente com contrato válido ou sem
-recibos (gravados no **Conectar** do perfil, ou em **Verificar capacidades** em Ferramentas de IA,
+recibos (gravados no **Conectar** do perfil, ou em **Verificar capacidades** em Conectar agentes,
 validade de 14 dias), o processo
 não abre. O legado continua o padrão.
 

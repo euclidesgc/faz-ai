@@ -1,0 +1,227 @@
+import { useEffect, useState } from 'react';
+import { Badge, Callout, SegmentedControl, Text } from '@radix-ui/themes';
+import type { AgentListItem } from '../../../../shared/agentConnect';
+import { modeLabel, type AiProfile } from '../../../../shared/aiProfiles';
+import { recommendedOffered, toolEntry, toolModeEntry, type ToolMode } from '../../../../shared/aiTools';
+import { agentConnect, settings } from '../../../commands';
+import { t } from '../../../i18n';
+import { useAgentConnectStore } from '../../../store/agentConnectStore';
+import { useBoardStore } from '../../../store/boardStore';
+import { useAction } from '../../../useAction';
+import { ActionButton, IconCheck, IconExternal, IconWarning, SwitchField } from '../../ui';
+import { AccountPanel } from './AccountPanel';
+import { connectable } from './AgentDetails';
+import { ConnectProgress, ModeSheetList, connectionSummary } from './connectProgress';
+
+/** A ferramenta nesta máquina: achada (com a versão) ou não, com onde instalar. */
+function ToolStep({ item }: { item: AgentListItem }) {
+  const installed = useAgentConnectStore((s) => (item.profile ? s.installed[item.profile.id] : undefined));
+  const status = useAgentConnectStore((s) => (item.profile ? s.statuses[item.profile.id] : undefined));
+  const p = item.profile;
+  // o modo API não tem binário: quem fala com a API é a extensão
+  if (p?.mode === 'api')
+    return (
+      <div className="agent-step done">
+        <IconCheck />
+        <Text size="2">{t('Sem programa para instalar: no modo API, quem fala com o modelo é a extensão.')}</Text>
+      </div>
+    );
+  // a sonda do host pula o perfil desligado (`skipped`): aí vale o comando achado no PATH, sem rodar nada
+  const probed = status && !status.skipped ? status : undefined;
+  const found = p ? (probed?.found ?? installed) : item.registry?.available;
+  const docs = status?.installUrl ?? (p ? (toolEntry(p.tool)?.docs ?? null) : null) ?? item.registry?.url ?? null;
+  return (
+    <div className={`agent-step ${found ? 'done' : found === false ? 'missing' : ''}`}>
+      {found ? <IconCheck /> : <IconWarning />}
+      <Text size="2">
+        {found
+          ? probed?.version
+            ? t('Instalado · versão {version}', { version: probed.version })
+            : t('Instalado')
+          : found === false
+            ? t('Não encontrado nesta máquina')
+            : t('Ainda não verificado')}
+      </Text>
+      {!p && item.registry?.note && (
+        <Text size="1" color="gray">
+          {t(item.registry.note)}
+        </Text>
+      )}
+      {!found && docs && (
+        <a href={docs} target="_blank" rel="noopener noreferrer">
+          <IconExternal /> {t('Como instalar')}
+        </a>
+      )}
+    </div>
+  );
+}
+
+/**
+ * O Conectar do board para o perfil pronto: acha a ferramenta, confere o login, verifica o que ela carrega por conta
+ * própria e lê os modelos. Na ferramenta com mais de um modo (o Gemini), escolhe-se o modo aqui.
+ */
+function BoardConnection({ profile }: { profile: AiProfile }) {
+  const state = useBoardStore((s) => s.state)!;
+  const entry = toolEntry(profile.tool);
+  const [mode, setMode] = useState<ToolMode>(profile.mode);
+  useEffect(() => setMode(profile.mode), [profile.mode]);
+  const modeEntry = toolModeEntry(profile.tool, mode);
+  const recommended = entry ? recommendedOffered(entry) : null;
+  const raw = state.connections?.[profile.id];
+  // a conexão é do perfil, e a tela mostra a do modo escolhido: a em curso dele, ou a concluída do modo em uso
+  const connection = raw && (raw.mode ?? profile.mode) === mode ? raw : undefined;
+  const connect = useAction(() => settings.connectAiProfile(profile.id, { mode }));
+  // a CLI pronta entra pelo login do terminal que o board acompanha: o passo do login que falhou leva a ele
+  const cliLogin = profile.mode === 'cli' && ['claude', 'cursor', 'kimi'].includes(profile.base);
+  const switching = mode !== profile.mode;
+  return (
+    <section className="agent-board-connection" aria-label={t('Conexão com o board')}>
+      <Text size="2" weight="medium">
+        {t('Conexão com o board')}
+      </Text>
+      {entry && entry.modes.length > 1 && (
+        <div className="agent-modes">
+          <SegmentedControl.Root value={mode} onValueChange={(v) => setMode(v as ToolMode)} aria-label={t('Modo de conexão')}>
+            {entry.modes.map((m) => (
+              <SegmentedControl.Item key={m.mode} value={m.mode}>
+                {modeLabel(m.mode)}
+              </SegmentedControl.Item>
+            ))}
+          </SegmentedControl.Root>
+          {mode === profile.mode && profile.enabled && (
+            <Badge color="gray" variant="soft">
+              {t('Modo em uso')}
+            </Badge>
+          )}
+          {recommended === mode && (
+            <Badge color="indigo" variant="solid">
+              {t('Recomendado')}
+            </Badge>
+          )}
+        </div>
+      )}
+      {recommended === mode && entry && entry.modes.length > 1 && (
+        <Text as="p" size="1">
+          {t(entry.recommended.reason)}
+        </Text>
+      )}
+      {modeEntry && (
+        <details className="agent-mode-sheet">
+          <summary>{t('Como funciona o modo {mode}', { mode: modeLabel(mode) })}</summary>
+          <ModeSheetList mode={modeEntry} />
+        </details>
+      )}
+      {connection ? (
+        <ConnectProgress
+          profile={profile}
+          state={connection}
+          mode={modeEntry}
+          {...(cliLogin ? { login: () => void agentConnect.login(profile.id, 'cli-login') } : {})}
+        />
+      ) : (
+        <Text as="p" size="1" color="gray">
+          {t(
+            'Ainda não conectado pelo board. O Conectar acha a ferramenta, confere o login, verifica o que ela carrega por conta própria (sem gastar a sua conta) e lê os modelos.',
+          )}
+        </Text>
+      )}
+      <div className="row end">
+        <ActionButton
+          hint={
+            switching
+              ? t('Passa o agente para este modo quando o login der certo, com a mesma chave e os mesmos modelos.')
+              : connection?.status === 'connected'
+                ? t('Refaz o login, a verificação e a leitura dos modelos.')
+                : t('Acha a ferramenta, faz o login, verifica as capacidades e lê os modelos.')
+          }
+          disabled={raw?.status === 'running'}
+          disabledReason={t('O Conectar está em curso.')}
+          loading={connect.busy}
+          onClick={() => void connect.run()}
+        >
+          {switching
+            ? t('Conectar no modo {mode}', { mode: modeLabel(mode) })
+            : t(connection?.status === 'connected' ? 'Reconectar' : 'Conectar')}
+        </ActionButton>
+      </div>
+    </section>
+  );
+}
+
+/** Ligar, desligar e usar nos cards: o que decide se o board executa os cards com este agente. */
+function ProfileUse({ profile }: { profile: AiProfile }) {
+  const state = useBoardStore((s) => s.state)!;
+  const standard = state.board.aiTool === profile.id;
+  const pending = profile.credentials?.review === 'pending';
+  const enabled = useAction((on: boolean) => settings.setAiProfileEnabled(profile.id, on));
+  const useInCards = useAction(() => settings.updateBoard({ aiTool: profile.id }));
+  const summary = state.connections?.[profile.id]?.status === 'connected' ? state.connections[profile.id]!.summary : null;
+  return (
+    <section className="agent-use" aria-label={t('Uso nos cards')}>
+      <div className="row wrap">
+        <SwitchField
+          label={t('Ligado')}
+          checked={profile.enabled}
+          disabled={standard || enabled.busy || pending}
+          onChange={(on) => void enabled.run(on)}
+        />
+        {standard ? (
+          <Badge color="indigo">{t('Em uso nos cards')}</Badge>
+        ) : (
+          <ActionButton
+            size="1"
+            variant="soft"
+            disabled={!profile.enabled || pending}
+            disabledReason={
+              pending ? t('Revise o perfil antes: salve a configuração dele no formulário.') : t('Ligue ou conecte o agente antes.')
+            }
+            loading={useInCards.busy}
+            hint={t('Os cards que não escolhem outro agente (pelo campo Modelo, pelo agente ou por uma regra) passam a rodar com este.')}
+            onClick={() => void useInCards.run()}
+          >
+            {t('Usar nos cards')}
+          </ActionButton>
+        )}
+      </div>
+      <Text as="p" size="1" color="gray">
+        {standard
+          ? t('É o agente que roda os cards que não escolhem outro. Para desligá-lo, ponha outro agente em uso antes.')
+          : profile.enabled
+            ? t('Ligado: o campo Modelo dos cards, o chat e as regras de sugestão oferecem os modelos dele.')
+            : t('Desligado: o board não roda nada com ele.')}
+        {summary &&
+          ` ${t('Conectado: {summary}.', { summary: connectionSummary(summary, state.board.runner.compatibilityReviews?.[profile.id] ?? null) })}`}
+      </Text>
+    </section>
+  );
+}
+
+/** A aba Conexão: a ferramenta nesta máquina, a conta, a conexão com o board e o uso nos cards. */
+export function AgentConnection({ item }: { item: AgentListItem }) {
+  const p = item.profile;
+  const installed = useAgentConnectStore((s) => (p ? s.installed[p.id] : undefined));
+  return (
+    <div className="agent-connection">
+      <ToolStep item={item} />
+      <AccountPanel agentKey={item.key} name={item.name} profile={p} autoCheck={!!p && p.enabled && installed !== false} />
+      {p && connectable(p) && <BoardConnection profile={p} />}
+      {p && !connectable(p) && (
+        <Text as="p" size="1" color="gray">
+          {t(
+            'Cópias e perfis personalizados não passam pelo Conectar: em Detalhes, verifique as capacidades e dê a ciência do regime; depois, ligue o perfil aqui.',
+          )}
+        </Text>
+      )}
+      {p && <ProfileUse profile={p} />}
+      {!p && (
+        <Callout.Root color="gray" size="1">
+          <Callout.Text>
+            {t(
+              'O board ainda não executa cards com este agente: ele está no registro do ACP, mas não no catálogo da extensão. Dá para entrar na conta e conversar com ele na aba Testar.',
+            )}
+          </Callout.Text>
+        </Callout.Root>
+      )}
+    </div>
+  );
+}

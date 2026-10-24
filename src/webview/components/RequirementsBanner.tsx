@@ -4,6 +4,7 @@ import type { BoardState, Card } from '../../shared/model';
 import { defaultTarget, runTargetOf } from '../../shared/runTarget';
 import { cliProblem, type BoardRequirement } from '../../shared/requirements';
 import { useBoardStore } from '../store/boardStore';
+import { useAgentConnectStore } from '../store/agentConnectStore';
 import { t } from '../i18n';
 import { ui } from '../commands';
 import { useAction } from '../useAction';
@@ -85,10 +86,10 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
                       )
                     : r.action?.kind === 'connect'
                       ? t(
-                          'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Abra o Conectar e conecte este perfil de novo: a verificação faz parte do Conectar.',
+                          'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Abra Conectar agentes e conecte este perfil de novo: a verificação faz parte do Conectar.',
                         )
                       : t(
-                          'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Verificar capacidades neste perfil, em Ferramentas de IA.',
+                          'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Verificar capacidades nos detalhes deste perfil, em Conectar agentes.',
                         )
                   : r.problem === 'not-admissible'
                     ? t('O regime em vigor não admite este perfil. Veja o motivo no Diagnóstico do ambiente.')
@@ -228,18 +229,26 @@ export function RequirementFix({
           {t('Abrir Harness')}
         </Button>
       );
-    // a ferramenta que entra por chave de API: o login é o Conectar, em Ferramentas de IA
+    // a ferramenta que entra por chave de API e o perfil do catálogo que precisa reconectar: Conectar agentes, na
+    // aba Conexão do agente
     case 'connect':
       return (
         <Button size="small" variant={variant} onClick={() => openConnect(action.profile)}>
-          {t('Abrir o Conectar')}
+          {t('Abrir Conectar agentes')}
         </Button>
       );
-    // o perfil verificável sem Conectar (a cópia do Claude Code): o "Verificar capacidades" fica na lista de perfis
+    // o perfil verificável sem Conectar (a cópia do Claude Code): o "Verificar capacidades" fica nos detalhes dele
     case 'aiTools':
       return (
-        <Button size="small" variant={variant} onClick={() => openSettings('aiTools')}>
-          {t('Abrir Ferramentas de IA')}
+        <Button
+          size="small"
+          variant={variant}
+          onClick={() => {
+            useAgentConnectStore.getState().select(action.profile, 'details');
+            openSettings('connect');
+          }}
+        >
+          {t('Abrir os detalhes do perfil')}
         </Button>
       );
   }

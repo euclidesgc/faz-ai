@@ -61,6 +61,7 @@ import { settleDelivery } from '../delivery';
 import { WorkRepo } from '../repositories/workRepo';
 import { credentialsFor } from '../credentials';
 import { RunMcpSessions, type RunMcpAccess } from '../mcp/runSessions';
+import type { AgentConnectService } from '../agentConnect/service';
 
 export type { RouterOptions };
 
@@ -179,6 +180,22 @@ const bridgeOnly = {
   'settings.aiProfiles.connect': viaBridge,
   // as sondas demoram (a CLI do Claude roda quatro vezes na fixture): a HostBridge espera e publica o resultado
   'settings.aiProfiles.verify': viaBridge,
+  // Conectar agentes: a conta, o login e a sessão de teste são do serviço do host e da HostBridge, e não mudam o
+  // board (o que muda o board, como ligar o perfil ou ler os modelos, segue pelos `settings.*`)
+  'agentConnect.registry': viaBridge,
+  'agentConnect.sync': viaBridge,
+  'agentConnect.check': viaBridge,
+  'agentConnect.login': viaBridge,
+  'agentConnect.logout': viaBridge,
+  'agentConnect.test.open': viaBridge,
+  'agentConnect.test.reopen': viaBridge,
+  'agentConnect.test.prompt': viaBridge,
+  'agentConnect.test.permission': viaBridge,
+  'agentConnect.test.setConfig': viaBridge,
+  'agentConnect.test.setMode': viaBridge,
+  'agentConnect.test.cancel': viaBridge,
+  'agentConnect.test.close': viaBridge,
+  'agentConnect.openLog': viaBridge,
 } satisfies Partial<HandlerMap>;
 
 /** Um handler por tipo de mensagem, agrupados por domínio em ./handlers. */
@@ -292,6 +309,14 @@ export class MessageRouter {
     if (!profile || !isAcpProfile(profile)) return;
     if (!this.acpModelsReader) throw new Error('Leitura de modelos do agente ACP indisponível neste host.');
     await this.acpModelsReader(profile);
+  }
+  private agentConnectService: AgentConnectService | null = null;
+  /** O serviço da tela de Conectar agentes (registro, conta, login): é do host, que tem o PATH e o cofre. */
+  setAgentConnect(service: AgentConnectService): void {
+    this.agentConnectService = service;
+  }
+  get agentConnect(): AgentConnectService | null {
+    return this.agentConnectService;
   }
   private connector: ((id: string, input: ConnectInput) => Promise<unknown>) | null = null;
   private connections: Record<string, ConnectState> | undefined;
@@ -977,6 +1002,11 @@ export class MessageRouter {
       .filter((a) => a.kind !== 'mcp')
       .slice(0, 60)
       .map((a) => ({ kind: a.kind, name: a.name, origin: a.origin, body: a.body.slice(0, 4000) }));
+  }
+
+  /** A pasta do projeto aberto; vazio quando o board abriu sem projeto. */
+  get workspaceDir(): string | undefined {
+    return this.ctx.opts.workspaceDir;
   }
 
   projectProfile(): ProjectProfile {

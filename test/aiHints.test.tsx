@@ -10,7 +10,7 @@ describe('aiHints', () => {
     const html = renderToStaticMarkup(<>{workHint('Claude')}</>);
     expect(html).toContain('Claude');
     expect(html).toContain('só do que está no board');
-    expect(html).toContain('Ferramentas de IA');
+    expect(html).toContain('Conectar agentes');
     expect(html).toContain('Métricas');
     expect(html).not.toContain('sessão limpa');
   });

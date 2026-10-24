@@ -41,10 +41,10 @@ export const environment: Record<string, string> = {
   'Precisa verificar de novo: a linha de comando mudou desde o último teste':
     'Needs checking again: the command line changed since the last test',
   'Não validado: este perfil ainda não foi testado': 'Not validated: this profile has not been tested yet',
-  'Sem recibos de capacidade deste perfil: conecte {name} em Ferramentas de IA; a verificação faz parte do Conectar.':
-    'No capability receipts for this profile: connect {name} in AI tools; the check is part of Connect.',
-  'Sem recibos de capacidade deste perfil: clique em Verificar capacidades em {name}, em Ferramentas de IA.':
-    'No capability receipts for this profile: click Check capabilities on {name}, in AI tools.',
+  'Sem recibos de capacidade deste perfil: conecte {name} em Conectar agentes; a verificação faz parte do Conectar.':
+    'No capability receipts for this profile: connect {name} in Connect agents; the check is part of Connect.',
+  'Sem recibos de capacidade deste perfil: clique em Verificar capacidades nos detalhes de {name}, em Conectar agentes.':
+    "No capability receipts for this profile: click Check capabilities in {name}'s details, in Connect agents.",
   'Depende do item anterior': 'Depends on the item above',
   Falta: 'Missing',
   uv: 'uv',

@@ -68,15 +68,15 @@ function Capabilities({ health }: { health: ProfileHealth }) {
         );
       })}
       {/* a verificação é do Conectar (o perfil do catálogo) ou do "Verificar capacidades" (a cópia, o personalizado
-          ACP), os dois em Ferramentas de IA, que existe também no navegador: a paleta de comandos não tem mais o comando */}
+          ACP), os dois em Conectar agentes, que existe também no navegador: a paleta de comandos não tem mais o comando */}
       {health.verifiable && health.capabilities.every((c) => c === 'unknown') && (
         <li className="env-item skipped">
           <p className="small muted">
             {isReadyProfile(health)
-              ? t('Sem recibos de capacidade deste perfil: conecte {name} em Ferramentas de IA; a verificação faz parte do Conectar.', {
+              ? t('Sem recibos de capacidade deste perfil: conecte {name} em Conectar agentes; a verificação faz parte do Conectar.', {
                   name: health.name,
                 })
-              : t('Sem recibos de capacidade deste perfil: clique em Verificar capacidades em {name}, em Ferramentas de IA.', {
+              : t('Sem recibos de capacidade deste perfil: clique em Verificar capacidades nos detalhes de {name}, em Conectar agentes.', {
                   name: health.name,
                 })}
           </p>
@@ -110,7 +110,7 @@ function Capabilities({ health }: { health: ProfileHealth }) {
 }
 
 /**
- * O Testar do Diagnóstico: o mesmo da tela Ferramentas de IA (a mesma mensagem ao host, que roda a
+ * O Testar do Diagnóstico: o mesmo da tela Conectar agentes (a mesma mensagem ao host, que roda a
  * ferramenta pelo gateway e confere o ambiente de novo ao fim). Um clique por vez.
  */
 function TestProfile({ id }: { id: string }) {

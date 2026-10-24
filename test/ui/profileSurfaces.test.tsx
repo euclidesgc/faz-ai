@@ -5,7 +5,7 @@ import { Theme } from '@radix-ui/themes';
 import { seedBoard, syncStore, lastSent } from './setup';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import { ModelEditor } from '../../src/webview/components/FieldRenderer';
-import { ModelsSettings } from '../../src/webview/components/settings/ModelsSettings';
+import { AgentModels } from '../../src/webview/components/settings/agentConnect/AgentModels';
 import { ProjectTool } from '../../src/webview/components/settings/harness/ProjectTool';
 import { toolInfo, type AiProfile } from '../../src/shared/aiProfiles';
 
@@ -44,10 +44,10 @@ describe('Superfícies de perfis de CLI', () => {
     expect(lastSent('settings.board.update')).toMatchObject({ patch: { aiTool: 'claude' } });
   });
 
-  it('Modelos de IA permite cadastrar no catálogo custom, sem oferecer detecção', async () => {
+  it('os modelos do agente personalizado se cadastram à mão, sem oferecer detecção', async () => {
     render(
       <Theme>
-        <ModelsSettings />
+        <AgentModels profile={custom} />
       </Theme>,
     );
     expect(screen.queryByRole('button', { name: 'Detectar modelos' })).toBeNull();
@@ -80,7 +80,7 @@ describe('Superfícies de perfis de CLI', () => {
     expect(value).toBe('local-cli:modelo-avulso');
   });
 
-  it('num perfil ACP, Modelos de IA oferece Detectar modelos: a lista vem da sessão do agente', async () => {
+  it('num perfil ACP, os modelos do agente oferecem Detectar modelos: a lista vem da sessão do agente', async () => {
     const acp: AiProfile = {
       ...custom,
       id: 'gemini-acp',
@@ -96,7 +96,7 @@ describe('Superfícies de perfis de CLI', () => {
     });
     render(
       <Theme>
-        <ModelsSettings />
+        <AgentModels profile={acp} />
       </Theme>,
     );
     expect(screen.getByText('Nenhum modelo. Use "Detectar modelos" ou "Novo modelo".')).toBeInTheDocument();

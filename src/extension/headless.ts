@@ -31,7 +31,7 @@ export function headlessUnsupported(executor: AiExecutor, permission: RunnerPerm
  * O "Trabalhar na fase" desliga antes do clique com este motivo, em vez de ligar e a execução ser recusada.
  */
 export const CUSTOM_CLI_UNSUPPORTED =
-  'O perfil personalizado de CLI não roda cards: o board não consegue provar o que ele acessa. Use uma ferramenta do catálogo pelo Conectar, em Configurações › Ferramentas de IA.';
+  'O perfil personalizado de CLI não roda cards: o board não consegue provar o que ele acessa. Use um agente do catálogo pelo Conectar, em Configurações › Conectar agentes.';
 
 /** O motivo de um perfil personalizado de CLI não rodar; null nos demais (o personalizado ACP antigo segue rodando). */
 export function customCliUnsupported(profile: AiProfile): string | null {

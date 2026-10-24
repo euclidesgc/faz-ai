@@ -28,7 +28,7 @@ export const FIELD_KINDS: { value: FieldKind; label: string; hint: string; sampl
   {
     value: 'model',
     label: 'Modelo de IA',
-    hint: 'Modelo e esforço do catálogo em Modelos de IA; diz qual modelo trabalha no card.',
+    hint: 'Modelo e esforço do catálogo de cada agente, em Conectar agentes; diz qual modelo trabalha no card.',
     sample: () => null,
   },
 ];

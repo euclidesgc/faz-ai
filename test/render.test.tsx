@@ -20,7 +20,8 @@ import { FieldsSettings } from '../src/webview/components/settings/FieldsSetting
 import { HarnessSettings } from '../src/webview/components/settings/HarnessSettings';
 import { RuleBuilder } from '../src/webview/components/settings/ModelRulesEditor';
 import { AppearanceSettings } from '../src/webview/components/settings/AppearanceSettings';
-import { ModelsSettings } from '../src/webview/components/settings/ModelsSettings';
+import { AgentModels } from '../src/webview/components/settings/agentConnect/AgentModels';
+import { ModelSuggestion } from '../src/webview/components/settings/agentConnect/ModelSuggestion';
 import { RulesSettings } from '../src/webview/components/settings/RulesSettings';
 import { Settings } from '../src/webview/components/settings/Settings';
 import { GitSettings } from '../src/webview/components/settings/GitSettings';
@@ -236,8 +237,15 @@ describe('telas montam sem erro', () => {
     const rules = html(<RulesSettings />);
     expect(rules).toContain('Avançar de fase');
     expect(rules).not.toContain('mudou para a aba Modelos');
-    const models = html(<ModelsSettings />);
-    expect(models).not.toContain('gpt-6.1-sol'); // só a ferramenta em uso
+    // Conectar agentes › Modelos do agente e a sugestão de modelo do board
+    const claude = useBoardStore.getState().state!.board.aiProfiles.find((p) => p.id === 'claude')!;
+    const models = html(
+      <>
+        <AgentModels profile={claude} />
+        <ModelSuggestion />
+      </>,
+    );
+    expect(models).not.toContain('gpt-6.1-sol'); // só os modelos do agente escolhido
     for (const text of [
       'Detectar modelos',
       'Fable 5.1',

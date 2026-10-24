@@ -4,6 +4,7 @@ import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RequirementsBanner, aiBlockedReason } from '../../src/webview/components/RequirementsBanner';
 import { useBoardStore } from '../../src/webview/store/boardStore';
+import { useAgentConnectStore } from '../../src/webview/store/agentConnectStore';
 import { App } from '../../src/webview/App';
 import type { MessageRouter } from '../../src/extension/panel/messageRouter';
 import type { BoardRequirement } from '../../src/shared/requirements';
@@ -137,17 +138,19 @@ describe('faixa de requisitos do board', () => {
     expect(screen.getByText('Gemini CLI: a verificação de capacidades perdeu a validade')).toBeInTheDocument();
     // o comando da paleta saiu (história 13): o pronto refaz no Reconectar, a cópia no "Verificar capacidades"
     expect(screen.queryByText(/Verificar o isolamento da CLI de IA/)).toBeNull();
-    // o texto diz o mesmo que o botão ao lado, "Abrir o Conectar"
-    expect(screen.getByText(/Abra o Conectar e conecte este perfil de novo/)).toBeInTheDocument();
-    expect(screen.getByText(/Clique em Verificar capacidades neste perfil, em Ferramentas de IA/)).toBeInTheDocument();
+    // o texto diz o mesmo que o botão ao lado, "Abrir Conectar agentes"
+    expect(screen.getByText(/Abra Conectar agentes e conecte este perfil de novo/)).toBeInTheDocument();
+    expect(screen.getByText(/Clique em Verificar capacidades nos detalhes deste perfil, em Conectar agentes/)).toBeInTheDocument();
     expect(screen.getByText(/O board já está verificando de novo, sem gastar a sua conta/)).toBeInTheDocument();
     expect(region()).toHaveClass('warn');
     expect(region()).not.toHaveClass('error');
     expect(aiBlockedReason(useBoardStore.getState().state!)).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir Ferramentas de IA' }));
-    expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'aiTools' });
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir o Conectar' }));
-    expect(useBoardStore.getState()).toMatchObject({ settingsTab: 'aiTools', connectTool: 'claude' });
+    // a cópia vai aos detalhes dela, onde fica o "Verificar capacidades"; o pronto, à conexão
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir os detalhes do perfil' }));
+    expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'connect' });
+    expect(useAgentConnectStore.getState()).toMatchObject({ selected: 'claude-trabalho', tab: 'details' });
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir Conectar agentes' }));
+    expect(useBoardStore.getState()).toMatchObject({ settingsTab: 'connect', connectTool: 'claude' });
   });
 
   it('o login de um perfil pronto traz o comando de login e o "Abrir no terminal"', async () => {

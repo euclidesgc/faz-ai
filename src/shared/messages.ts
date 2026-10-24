@@ -14,6 +14,7 @@ import type { UiPrefs } from './prefs';
 import type { AiTool, InstallScope } from './harness';
 import type { HarnessUsage, SelectableKind } from './harnessSelection';
 import type { McpServerInput } from './harnessCatalog';
+import type { AgentAccount, ProtocolLogEntry, RegistryListing, TestEvent, TestState } from './agentConnect';
 
 /** Public MCP configuration for editing: secret values must be masked by the host. */
 export type McpServerView = Omit<McpServerInput, 'env' | 'headers'> & {
@@ -404,7 +405,31 @@ export type WebviewToHost =
   /** substitui o board atual pelo arquivo estacionado sob `token`; grava o .bak antes */
   | { type: 'backup.import.apply'; token: string }
   /** descarta o arquivo estacionado */
-  | { type: 'backup.import.cancel'; token: string };
+  | { type: 'backup.import.cancel'; token: string }
+  // Conectar agentes (`src/extension/agentConnect/`): a conta de cada agente e a sessão de teste; nada disso muda o
+  // board (ligar o perfil, conectar e ler modelos seguem pelos `settings.aiProfiles.*` e `settings.models.*`)
+  /** a lista do registro oficial do ACP (em cache) e quais perfis têm a ferramenta instalada; responde em `agentConnect.registryResult` */
+  | { type: 'agentConnect.registry'; requestId: string; refresh?: boolean }
+  /** pede o que a tela precisa ao abrir: as contas já verificadas, a sessão de teste e o arquivo do log */
+  | { type: 'agentConnect.sync' }
+  /** verifica a conta do agente (`key`: o id do perfil ou `registry:<id>`); o resultado chega em `agentConnect.account` */
+  | { type: 'agentConnect.check'; key: string }
+  /** entra na conta pelo método: no terminal (o board espera ele fechar) ou pelo próprio agente; `apiKey` nunca vai para o log */
+  | { type: 'agentConnect.login'; key: string; methodId: string; apiKey?: string }
+  /** sai da conta do agente (vale para a máquina inteira) */
+  | { type: 'agentConnect.logout'; key: string }
+  /** abre a sessão de teste com o agente; uma sessão anterior desta tela fecha */
+  | { type: 'agentConnect.test.open'; key: string }
+  /** fecha e abre de novo a sessão de teste (depois de entrar na conta) */
+  | { type: 'agentConnect.test.reopen' }
+  | { type: 'agentConnect.test.prompt'; text: string }
+  | { type: 'agentConnect.test.permission'; permissionId: string; optionId: string | null }
+  | { type: 'agentConnect.test.setConfig'; configId: string; value: string | boolean }
+  | { type: 'agentConnect.test.setMode'; modeId: string }
+  | { type: 'agentConnect.test.cancel' }
+  | { type: 'agentConnect.test.close' }
+  /** abre o arquivo do log do protocolo de hoje no editor */
+  | { type: 'agentConnect.openLog' };
 
 export type HostToWebview =
   | { type: 'boardState'; state: BoardState; attachmentsBaseUri: string }
@@ -458,7 +483,25 @@ export type HostToWebview =
   /** o host pede à interface para abrir uma tela fora das Configurações */
   | { type: 'ui.openView'; view: 'environment' }
   /** o host terminou de tratar a mensagem enviada com este `requestId` (qualquer tipo): deu certo, ou falhou com o erro já mostrado em `error` */
-  | { type: 'done'; requestId: string; ok: boolean; error?: string };
+  | { type: 'done'; requestId: string; ok: boolean; error?: string }
+  | {
+      type: 'agentConnect.registryResult';
+      requestId: string;
+      listing?: RegistryListing;
+      /** o perfil tem a ferramenta no PATH (o modo API não tem binário e conta como instalado) */
+      installed?: Record<string, boolean>;
+      error?: string;
+    }
+  /** as contas já verificadas, ao abrir a tela */
+  | { type: 'agentConnect.accounts'; accounts: Record<string, AgentAccount> }
+  /** a conta de um agente mudou (verificando, verificada, login em curso, erro) */
+  | { type: 'agentConnect.account'; key: string; account: AgentAccount }
+  | { type: 'agentConnect.test.state'; state: TestState }
+  | { type: 'agentConnect.test.event'; event: TestEvent }
+  /** uma linha do log do protocolo ACP (mensagem JSON-RPC ou fato do processo) */
+  | { type: 'agentConnect.log'; entry: ProtocolLogEntry }
+  /** onde o log do protocolo é gravado hoje; null quando o board não tem pasta de dados (testes) */
+  | { type: 'agentConnect.logFile'; file: string | null };
 
 /**
  * Envelope opcional de qualquer mensagem da interface: com `requestId`, o host responde `done` quando termina de tratá-la.

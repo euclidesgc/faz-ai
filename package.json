@@ -243,6 +243,7 @@
     "zustand": "^4.5.4"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "^2.0.2",
     "dompurify": "^3.4.16",
     "radix-ui": "^1.1.3"
   }

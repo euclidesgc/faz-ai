@@ -762,7 +762,7 @@ export class AiRunner {
     // o fim do que a ferramenta escreveu vai junto: a pessoa entende a falha sem sair do card
     // o plano gratuito do Cursor só roda o Auto: a recusa diz pouco, e a saída é o modelo do card
     const freePlan = run.tail.some((l) => /free plans can only use auto/i.test(l))
-      ? `\n\nO plano gratuito do Cursor só roda o modelo Auto: escolha Auto no campo Modelo do card, ou use o botão Recriar as regras de "Esforço da atividade" em Configurações → Modelos de IA, que no Cursor sugere Auto.`
+      ? `\n\nO plano gratuito do Cursor só roda o modelo Auto: escolha Auto no campo Modelo do card, ou use o botão Recriar as regras de "Esforço da atividade" em Configurações → Conectar agentes, que no Cursor sugere Auto.`
       : '';
     // o motivo da medição é recado do board no canal, não saída da ferramenta: fica fora do fim da saída
     const notice = end.measureError ? cut(end.measureError.message, TAIL_CHARS) : null;

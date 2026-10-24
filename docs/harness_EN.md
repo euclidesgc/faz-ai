@@ -43,10 +43,11 @@ promise a percentage: it shows, in the inventory, what is being loaded.
 
 ## Connecting the AI tool
 
-1. In Settings → **Ferramentas de IA** (AI tools), choose the project's default CLI profile. Claude
+1. In Settings → **Conectar agentes** (connect agents), choose the agent that runs the cards, sign in
+   to it and connect it to the board ([Connect agents](configuracoes_EN.md#connect-agents)). Claude
    Code, Cursor and Kimi Code are built in, and the catalog's ACP agents (Gemini CLI, Codex,
    OpenCode…) come built in and switched off; you can also create copies and custom profiles. The
-   default only applies when nothing indicates another: the CLI of each run comes from the chosen
+   agent in use only applies when nothing indicates another: the CLI of each run comes from the chosen
    model (see [Which CLI runs](configuracoes_EN.md#which-cli-runs)). You can switch the active
    profile in **Harness → Ferramenta e execução** (Tool and execution).
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
@@ -112,9 +113,9 @@ Gemini has three modes in the extension catalog; **API** is the recommended one,
 only mode in which the board knows in advance everything the model can access and pays only for what
 it asked. There is no CLI to install and no tool process: the board calls the Gemini API's
 `generateContent` with the API key kept in the local vault and runs the function-calling loop itself.
-To use it, click **Connect** on Gemini's **API** card in AI tools › Connect a tool (see
-[Settings](configuracoes_EN.md#ai-tools-connect-a-tool)): the Gemini profile switches to API mode with
-the same key as ACP, checked right away with the API.
+To use it, click **Conectar no modo API** (connect in API mode) on Gemini, in Settings › Conectar
+agentes (see [Settings](configuracoes_EN.md#connect-agents)): the Gemini profile switches to API mode
+with the same key as ACP, checked right away with the API.
 
 - **What the model receives**: the board's request (with the phase agent, the indicated rules and
   skills), the conversation the board builds on every request and, as functions, only the tools of
@@ -144,7 +145,7 @@ the same key as ACP, checked right away with the API.
 ### Gemini through the CLI
 
 The third mode is the one-shot CLI (`gemini -p`), with Gemini CLI installed (checked on 0.65.0). Click
-**Conectar** (connect) on Gemini's **CLI** card: the Gemini profile switches to CLI mode with the same
+**Conectar no modo CLI** (connect in CLI mode) on Gemini: the Gemini profile switches to CLI mode with the same
 key from the vault, checked right away through the API's model list (the models go into the catalog).
 What Gemini enforces in this mode:
 
@@ -273,9 +274,9 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   the environment check finds its binding without a valid proof (once per binding), unless the
   proof for the current binding is still valid (the result goes to Output › Faz AI). For the catalog
   profiles (Claude Code, Gemini over the CLI and the ready ACP agents) it is a step of **Connect** and
-  **Reconnect**, in AI tools; for the checkable profiles that do not go through Connect (a copy of
-  Claude Code and a custom ACP profile from an earlier version), it runs through the profile's
-  **Verificar capacidades** (check capabilities) button, on the same screen. The "Verify the AI CLI
+  **Reconnect**, in Connect agents; for the checkable profiles that do not go through Connect (a copy
+  of Claude Code and a custom ACP profile from an earlier version), it runs through the
+  **Verificar capacidades** (check capabilities) button in the profile's Details, on the same screen. The "Verify the AI CLI
   isolation" palette command is gone. For Claude Code, the CLI runs in a throwaway folder against a
   local API with a fake key; for an ACP agent, it is two handshakes in a throwaway folder. Neither
   spends your account. While a checkable profile has no receipts, its block says where to check it. For an ACP agent the artifacts capability

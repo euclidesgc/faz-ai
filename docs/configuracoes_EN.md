@@ -2,12 +2,12 @@
 
 # Board settings
 
-This is the detailed manual of the **Configurações** (Settings) screen: what each section adjusts,
-how CLI profiles work, the model catalog with its suggestion rules and the execution and fallback
-policies. The Harness, the agents and the AI tool connection are in
-[Harness, agents and AI tools](harness_EN.md).
+This is the detailed manual of the **Configurações** (Settings) screen: what each section adjusts, how
+the board connects to the AI agents (Claude Code, Cursor, Codex, Gemini and the others), each agent's
+model catalog with the suggestion rules, and the execution and fallback policies. The Harness and the
+board's agents are in [Harness, agents and AI tools](harness_EN.md).
 
-![Settings: model catalog and suggestion rules](images/settings_en.png)
+![Settings › Connect agents: the agent in use, the list and the chosen agent's connection](images/settings_en.png)
 
 ## Sections of the screen
 
@@ -17,113 +17,208 @@ policies. The Harness, the agents and the AI tool connection are in
 | Tipos de card         | Story, Bug, Sub-task…, with color and default field values per type                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section                                     |
 | Regras do board       | Completion and phase-advance blocks, confirmations, filling in the suggested model, short track for small stories (Baixo effort or Bug type skips PRD and Spec)                                                                                                                                                                                                                                                                                                                         |
+| Conectar agentes      | The AI agent that runs the cards (one in use at a time) and the other enabled ones; each one's account (sign in and out); **Conectar** (connect) with the board and the mode (CLI, ACP or API); each agent's models; the quick test, the test session and the protocol log; copies and custom profiles; the rules that suggest each card's model and the execution and fallback policies                                                                                            |
 | Harness               | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, default agent and heartbeat (see [Harness](harness_EN.md#harness) and [Agents](harness_EN.md#agents))                                                                                                                                                                                                                                                               |
-| Ferramentas de IA     | **Connect a tool** (choose the tool and the mode and connect); CLI profiles: enable, set a default, duplicate, create and test                                                                                                                                                                                                                                                                                                                                                         |
-| Modelos de IA         | Models and effort levels by profile; rules that suggest each card's model                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Git                   | Mode, gitflow, branch names and prefixes, worktrees, automatic merge and decision records; editable in the editor and in the browser. "Tocar histórias em paralelo" (work on stories in parallel) lives in Harness de IA › Ferramenta e execução                                                                                                                                                                                                                                      |
 | Aparência             | **Idioma** (language: automatic, Português (Brasil) or English), theme, font and size, per board, in the editor and in the browser; statuses (name and color, in the Fluxos tab; here only in browser mode)                                                                                                                                                                                                                                                                             |
 | Backup                | Export and import the board, in the Backup tab, in the editor and in the browser (in the editor, also through the command palette: `fazai.exportBoard`, `fazai.importBoard`)                                                                                                                                                                                                                                                                                                          |
 
-## AI tools: Connect a tool
+## Connect agents
 
-At the top of **Settings → AI tools**, **Connect a tool** shows the fixed list of tools the extension
-ships (Gemini first, each with its billing note). Once you pick a tool, each mode the extension
-offers for it (CLI, ACP or API; never one that doesn't work) becomes a card with the same sheet, so
-you can compare line by line: what the board controls, the expected regime, the accuracy of what was
-used, usage, what the tool brings on its own, how you sign in, billing, and when to choose it. Modes
-not offered yet appear by name only, without a card.
+**Settings → Conectar agentes** (connect agents) brings together what used to live on two screens
+(Ferramentas de IA and Modelos de IA). At the top is the **agent in use**: the one that runs the cards
+that do not pick another (through the Model field, the agent or a rule), with its mode, the connection
+summary and the account. Below, on the left, the list of agents; on the right, the chosen agent, with
+the **Conexão** (connection), **Modelos** (models), **Testar** (test) and **Detalhes** (details) tabs.
+The model suggestion rules and the execution and fallback policies, which apply to the whole board, sit
+at the end of the screen.
 
-**Recommended** is the mode in which the board controls the most of what the agent accesses and
-measures what it spends; a tie is broken by what the tool loads on its own (less is better). The
-badge only appears when the recommended mode is offered, with the reason in one sentence. For
-Gemini, the recommendation is the **API**, and the badge is on its card; the **ACP** card stays next to
-it. Claude Code shows the CLI with the badge and why it is the only one (its ACP
-requires API billing, outside the subscription).
+### The list
 
-A card's **Connect** button takes the tool's catalog profile, in that mode, through these steps, with
-the progress on screen. There is one profile per tool, with a switchable mode: for Gemini, the **ACP**
-and **API** cards connect the same profile (same id, same policies, same model catalog and same key),
-and it switches to the card's mode once the sign-in succeeds; the card of the mode the profile runs in
-shows **Mode in use**.
+The list joins the agents the board runs (the ones the extension ships and your profiles) with the
+[official ACP registry](https://agentclientprotocol.com/registry), which provides each one's icon,
+description and published version. The agent in use comes first, then the enabled and the disabled
+ones; each row tells the mode and the state: connected, enabled, disabled, not installed, Connect in
+progress, waiting for you or stopped with an error. Registry agents the board does not run yet stay
+apart, under **Outros agentes do registro do ACP** (other agents from the ACP registry): you can sign in
+and talk to them in the test session, but not use them for cards. The registry is downloaded once and
+kept for 6 hours in the data folder; without a network, the list keeps the previous copy and says how old
+it is. **Atualizar lista** (refresh list) downloads it again and rereads the PATH (after installing an
+agent with the board open); **Verificar situação** (check status) checks again the installation, version
+and sign-in of each enabled profile. **Agente personalizado (CLI)** (custom agent) opens the custom
+profile form ([below](#custom-profile-advanced)).
 
-1. **Find the tool**: the command on the terminal's PATH and its version; without it, the **Install**
-   link. In API mode there is nothing to find: the extension itself talks to the API.
-2. **Sign in**: for Gemini, the **API key** field (a password field). The key is stored in this
-   computer's vault, the same in every folder and in both modes; it never comes back to the screen and
-   never goes to the log, the run records or the board export. Over **ACP** it goes, for each process,
-   to the agent's sign-in through the protocol, and Gemini CLI accepts it without calling the API: it is
-   actually checked on the first run, and a wrong key shows up there, with Gemini's message. Over the
-   **API** it is **checked right away**: the board reads the account's model list with it (it does not
-   spend the account), and the screen says "API key checked". In both, a new key only replaces the
-   stored one after it is accepted; if refused, the previous one stays. The profile is only turned on
-   (and only switches mode) after this step. For the ready CLIs, the sign-in probe, with the terminal
-   command when missing.
-3. **Check the capabilities**: the verifier's probes record the profile's evidence, and the regime
-   follows from it, without asking: all five capabilities proven give the exclusive regime;
+### The account: signing in and out
+
+The **Conta** (account) section of the Connection tab tells whether the agent is signed in and which
+account it uses ("Claude Max · person@example.com"), when the tool reports it. The check is short and
+leaves no process running: on the ready CLIs, the CLI's own status (`claude auth status`, `cursor-agent
+status`); on agents over ACP, `initialize` and a new session with no request, which do not spend your
+account. When you open an enabled, installed agent, the screen checks the account by itself; for the
+others, through the **Verificar a conta** (check the account) button.
+
+When signed out, the section shows the ways in that the tool offers:
+
+- **Entrar no terminal** (sign in from the terminal): the board opens the tool's own sign-in in an
+  editor terminal (the command shows on screen, like `claude auth login`) and waits for the terminal to
+  close; when it exits without error, the board checks the account again by itself and, if Connect had
+  stopped for lack of a sign-in, resumes it. In the browser, without the editor, the screen shows the
+  command for you to run and check afterwards.
+- **Entrar** (sign in): the agent signs in over the protocol (it may open the browser), and the board
+  waits for you to finish.
+- **Entrar com a chave** (sign in with the key): the API key goes to the tool and never comes back to the
+  screen or to the log. For Gemini, it goes through Connect, which checks it and keeps it in this
+  computer's vault.
+
+**Sair da conta** (sign out) appears when the agent is signed in and the tool can sign out through the
+board (the protocol's `logout`, or the CLI command on Claude Code and Cursor). It asks for confirmation,
+because it applies to the whole machine: the terminal and the editor are signed out too until you sign in
+again.
+
+### Connect: from the tool to the board connection
+
+The **Conexão com o board** (connection to the board) section takes the catalog profile through these
+steps, showing the progress on screen. For a tool with more than one mode (Gemini: CLI, ACP and API),
+the mode selector sits at the top of the section, with the **Recomendado** (recommended) badge and the
+reason on the recommended mode, and **Como funciona o modo** (how the mode works) opens the mode's sheet:
+what the board controls, the expected regime, the precision of what was used, the consumption, what the
+tool brings on its own, how you sign in, the billing and when to choose it. **Recommended** is the mode
+in which the board controls the most of what the agent accesses and measures what it spends; a tie is
+broken by what the tool loads on its own (less is better). It is one profile per tool, with a
+switchable mode: Connect in another mode (**Conectar no modo API**, connect in API mode) moves the
+profile to that mode when the sign-in works, with the same id, the same policies, the same model
+catalog and the same key.
+
+1. **Find the tool**: the command on the terminal's PATH and its version; without it, the install link.
+   In API mode there is nothing to find: the extension talks to the API itself.
+2. **Sign in**: for Gemini, the **API key** field (a password field). The key is kept in this
+   computer's vault, the same for every folder and for the three modes; it never comes back to the
+   screen and never goes into the log, the run records or the board export. In **ACP** it goes, on
+   each process, to the agent's sign-in over the protocol, and Gemini CLI accepts it without asking the
+   API: it is really checked on the first run, and a wrong key shows up there, with Gemini's message.
+   In **API** and **CLI** it is **checked right away**: the board reads the account's model list with it
+   (this does not spend the account), and the screen says "API key checked". In all three, the new key
+   only replaces the stored one after it is accepted; if refused, the previous one stays. The profile is
+   only turned on (and only changes mode) after this step. On the ready CLIs, the sign-in probe; without
+   a sign-in, the step stops with the command, and **Entrar no terminal** leads to the sign-in the board
+   follows.
+3. **Check the capabilities**: the verifier's probes record the profile's proofs, and the regime comes
+   from them, with no question asked: the five capabilities proven give the exclusive regime;
    permissions, MCP and delegation proven, the compatible one. An ACP agent is always compatible (the
-   context files it reads on its own have no proof through the protocol). API mode is exclusive by
-   construction, with no probe: the board asserts the proof on the first run, for the card's model; the
-   ACP acknowledgment, if any, is removed.
-4. **Regime acknowledgment** (compatible only): a separate button, **I understand what the tool
-   loads**, records your acknowledgment for that profile. The regime is per profile: Gemini can run
-   in the compatible regime while Claude Code stays exclusive.
-5. **Read the models**: the models the tool announces join the catalog, in every model field (over the
+   context files it reads by itself have no proof over the protocol). API mode is exclusive by
+   construction, with no probe.
+4. **Regime acknowledgment** (compatible only): a separate button, **Entendo o que a ferramenta
+   carrega** (I understand what the tool loads), records your acknowledgment for that profile. The
+   regime applies per profile: Gemini can run in the compatible regime while Claude Code stays
+   exclusive.
+5. **Read the models**: the models the tool announces go into the catalog, in every model field (in
    API, the account's models that answer `generateContent`).
 
-At the end, **Connected** with the version, the sign-in, the regime, how many models and the date, plus
-the **Change the key** and **Revoke acknowledgment** actions. An error stays on the step where it
-happened, with **Try again**, which resumes from that step (the acknowledgment and the models do not
-redo the sign-in or the probes); if the agent refuses the key at sign-in, the field comes back with
-what you pasted. Each catalog profile, in the list below, shows its connection state (including when
-Connect is waiting for you) and **Reconnect**.
+At the end, **Conectada** (connected) with the version, the sign-in, the regime, how many models and the
+date, and the **Trocar a chave** (change the key) and **Revogar ciência** (revoke acknowledgment)
+actions. An error stays attached to the step where it happened, with **Tentar de novo** (try again),
+which resumes from that step (the acknowledgment and the models do not redo the sign-in or the probes);
+if the agent refuses the key at sign-in, the field comes back with what you pasted. **Reconectar**
+(reconnect) redoes the sign-in, the check and the model reading. The acknowledgment belongs to each
+profile and can go away: **Revogar ciência** removes it (the profile stops running in the compatible
+regime until you acknowledge again); reconnecting a profile that now proves the exclusive regime removes
+it by itself; and **importing a board does not bring the profiles' acknowledgments**. An execution policy
+does not swap the profile for another one with a different regime (`constraints-changed`).
 
-The capability check no longer has a command of its own: the **Faz AI: Verify the AI CLI isolation**
-palette command is gone. The check runs in **Connect** and **Reconnect** (Claude Code and Gemini over
-the CLI go through here), on its own when you turn on an ACP agent, and, for the verifiable profiles
-that do not go through Connect (a copy of Claude Code and a custom ACP profile from an earlier
-version), through the profile's **Verificar capacidades** (check capabilities) button in the list. None
-of the probes spends your account. When a proof stops being valid (the CLI, the environment or the
-extension changed), the requirements banner says where to redo it: **Open Connect** for a catalog
-profile, **Open AI tools** for a copy.
+Below Connect, **Ligado** (enabled) tells whether the board uses the agent (the cards' Model field, the
+chat and the rules offer its models) and **Usar nos cards** (use in cards) puts it in use. The agent in
+use cannot be disabled: put another one in use first. The capability check has no separate command: it
+runs in Connect and Reconnect, by itself when you enable an ACP agent and, on the verifiable profiles
+that do not go through Connect (the Claude Code copy and a custom ACP profile from an earlier version),
+through the **Verificar capacidades** (check capabilities) button in the profile's Details. None of the
+probes spends your account. When a proof loses its validity (the CLI, the environment or the extension
+changed), the requirements banner says where to redo it: **Abrir Conectar agentes** (open Connect
+agents) on the catalog profile, **Abrir os detalhes do perfil** (open the profile details) on the copy.
 
-The acknowledgment is per profile and can go away: **Revoke acknowledgment** removes it (the profile
-stops running in the compatible regime until you acknowledge it again); reconnecting a profile that now
-proves the exclusive regime removes it on its own; and **importing a board does not bring the profiles'
-acknowledgments**: whoever imports gives their own, on the machine where the profile runs. Profiles that
-do not go through Connect (copies and custom profiles) give and revoke the acknowledgment in the list,
-with **Acknowledge the compatible regime** and the same text as Connect. An execution policy does not
-switch to a profile with a different regime (`constraints-changed`). The
-requirements banner keeps checking the tool and the sign-in: for Gemini over ACP, without the key in
-the vault the sign-in stays "not verified" (you may have your own `GEMINI_API_KEY`); over the API,
-without the key in the vault the sign-in is missing (there is no other), and the sign-in warning leads
-to Connect.
+### Each agent's models
 
-The **Admission regime** option left Harness › Tool and execution. If you turned on the compatible
-regime for the whole board in an earlier version, it stays on (with a notice and a **Back to
-exclusive** button); profiles acknowledged in Connect stay compatible.
+The **Modelos** (models) tab shows the agent's catalog: the models the cards' Model field, the chat and
+the suggestion rules offer for it, with each one's effort levels. Each model has a name, an identifier in
+the tool, accepted efforts and a default effort; **Novo modelo** (new model) registers one by hand and the
+trash icon removes it from the catalog, without confirmation.
 
-## AI tools: CLI profiles
+**Detectar modelos** (detect models) reads the tool's list: for Cursor, the models of your account,
+through the `cursor-agent models` command, read when the board opens with the CLI signed in, and the
+first list read replaces the built-in one only once; for Claude Code, a built-in list you can edit. On
+an agent over ACP, the button opens a session with the agent (`initialize` and `session/new`, with no
+prompt, so it does not spend your account) and reads the models it announces: the model selector among
+the session config options, in the protocol's current schema, or the `models` block of the earlier
+form, which Gemini CLI still uses. The agent's current model comes first. An agent that announces no
+models leaves the catalog as it is, with a warning; then **Novo modelo** (new model) or **Outro
+modelo…** (other model) in the card apply. When running, the card's model goes through the session
+selector (`session/set_config_option`) when the agent exposes it, and through the command line
+(`--model`) where the agent accepts it; an agent that takes neither keeps its own model, and the run log
+says which.
 
-A **CLI profile** is a tool the board can choose to run. The built-in profiles are Claude Code,
-Cursor and Kimi Code. A **copy** uses the model catalog and usage measurement of its source tool,
-but keeps its own command, credentials and verification. A **custom** profile accepts another CLI
-with text output; tokens and cost remain unknown. In **Configurações → Ferramentas de IA**
-(Settings → AI tools), enable a reviewed profile and choose the default; only this screen creates,
-edits, duplicates and tests profiles. Imports stay disabled until local review. Saved configuration
-and credentials are not returned to the screen and are not included in the board export.
+Each model read from the tool (by **Detectar modelos** or by **Conectar**) keeps the date it was read,
+and the tab says "lista lida da ferramenta em …" (list read from the tool on …) with the most recent
+one. Without that line, the list is the built-in one or the one you built by hand. An old list (the
+account changed plan, the tool dropped a model) is fixed by detecting again or reconnecting.
 
-Commands, arguments, environment and credentials remain in the local vault: exports, the screen and
-MCP show only references and status. Copies do not inherit isolation evidence, and a custom profile
-without a verified mapping does not run. Version/login probes and the **Testar** (Test) button do
-not prove capabilities.
+For Cursor, the list has one line per level of each model (`claude-opus-5-5-low`, `-medium`,
+`-high`…); the board groups the variants into one model with its levels. The fast versions (`-fast`,
+they answer sooner and charge more for the same tokens) stay out until you turn on **Incluir os modos
+rápidos** (include fast modes) on Cursor's Models tab: then each one enters as a separate model
+("Claude Opus 5.5 1M Fast"), only for the models in the catalog; turning it off removes them from the
+catalog. Through MCP, it is the `includeFastModels` rule of `update_rules`. On Cursor's free plan only
+**Auto** runs: the other models are refused before starting (the blocked card explains how to pick
+Auto), which is why Cursor's suggestion rules all start at Auto.
+
+### Test: the quick test, the test session and the protocol log
+
+The **Testar** (test) tab has three parts:
+
+- **Teste rápido pelo caminho dos cards** (quick test through the cards path): a short request through
+  the same path as the runs (the profile's CLI, ACP or API), after a confirmation, because it uses your
+  subscription. An OK answer does not prove isolation, permissions or MCP.
+- **Sessão de teste pelo ACP** (test session over ACP): opens the agent through the official ACP SDK
+  and talks to it in real time: the text, the reasoning, the tools, the plan and the permission
+  requests, which you answer there. The top shows what the agent declared (protocol version, the
+  agent's name and version, the session, the account and the capabilities) and the **session options**
+  it announces (model, mode, effort, fast mode), which apply to the test only: a card's model comes from
+  its Model field. The session uses the same command as the cards when the board knows the agent over
+  ACP; Claude Code, which runs the cards through the CLI, tests through the `claude-agent-acp` adapter.
+  One session per screen: opening another closes the previous one. It closes by itself after 10 idle
+  minutes (never in the middle of an answer), with **Encerrar sessão** (end session) or when the
+  screen closes, and the conversation says when it closed. If the agent asks for a sign-in, sign in on
+  the Connection tab and click **Abrir de novo** (open again).
+- **Log do protocolo ACP** (ACP protocol log): every JSON-RPC message of the account checks, the
+  sign-ins and the test session, in both directions, with each request's time, the slowest request,
+  the lines the agent writes outside the protocol (`stderr`) and the start and exit of each process.
+  The day's file (`acp-YYYY-MM-DD.jsonl`, in the board's trace folder) keeps everything, with the full
+  JSON; **Abrir arquivo** (open file) opens it in the editor. Keys and access tokens never go in; the
+  consumption counters (`inputTokens`, `totalTokens`) do.
+
+### Details: CLI profiles, copies and custom profiles
+
+Each board agent is a **CLI profile**: a tool the board can choose to run. The ready profiles are Claude
+Code, Cursor and Kimi Code, through the one-shot CLI, and the catalog's ACP agents (Gemini CLI, Codex,
+OpenCode, GitHub Copilot CLI, Qwen Code, goose and Google Antigravity), which come disabled. A **copy**
+uses the source tool's model catalog and consumption measurement, but keeps its own command,
+credentials and verification. A **custom** profile accepts another CLI with text output; tokens and cost
+stay unknown. Imports stay disabled until reviewed locally. Saved configuration and credentials never
+come back to the screen or into the board export.
+
+The **Detalhes** (details) tab shows the profile type ("Claude Code · CLI", "Cópia de Claude Code ·
+CLI", "Personalizado · CLI"), the isolation badge, the compatible regime acknowledgment and the
+**Capacidades e evidências** (capabilities and evidence), with **Duplicar** (duplicate) on all of them
+and **Editar** (edit) and **Apagar** (delete) on copies and custom profiles (the profile in use cannot be
+deleted). Commands, arguments, environment and credentials stay in the local vault: export, screen and
+MCP show only references and state. Copies do not inherit isolation proofs, and a custom profile
+without a verified translation does not run.
 
 ### Which CLI runs
 
 The value of the **Modelo** (Model) field (`<profile>:<model>@<effort>`) already names the CLI
 profile. For each run the board uses the first level that is filled in: the **card's Model**, the
 **agent's model**, the **model rule** (even with "Preencher o modelo sugerido automaticamente",
-fill in the suggested model automatically, off) and, with none, the **default CLI profile** in
-Configurações → Ferramentas de IA. So sub-tasks of the same story can run on different CLIs, and
+fill in the suggested model automatically, off) and, with none, the **agent in use** in
+Configurações → Conectar agentes. So sub-tasks of the same story can run on different CLIs, and
 effort-based rules can point to different profiles.
 
 The first level that is filled in is final: if the choice is invalid (profile off, model outside the
@@ -138,25 +233,22 @@ Over MCP, `get_card` shows the target in `model` (`tool`, `from` and, if invalid
 
 The ACP catalog agents that do not coincide with a ready CLI come as ready profiles of the
 **Agente ACP** (ACP agent) type: Gemini CLI, Codex, OpenCode, GitHub Copilot CLI, Qwen Code, goose
-and Google Antigravity. They appear switched off in **Ferramentas de IA** (AI tools); turn on the
-ones you use. Like the other ready profiles they have no Edit or Delete: **Duplicar** (duplicate)
+and Google Antigravity. They appear disabled in the list; enable the ones you use, preferably through
+**Conectar**. Like the other ready profiles they have no Edit or Delete: **Duplicar** (duplicate)
 creates a custom profile with the same agent, to change the environment or the name. The profile id
-(`gemini`, `codex-acp`…) is the model catalog's tool, and **Detectar modelos** (detect models) reads
-the agent's models into it. **Verificar situação** (check status) checks whether the agent's command
-is on the PATH and its version; the login stays "not verified" (for Gemini, "connected" with the key
-in the vault, through [Connect](#ai-tools-connect-a-tool)), and the **Instalar** (install) link opens the agent's official ACP mode page. Cursor and Kimi Code stay on
-the ready one-shot CLIs, which measure tokens; Claude Code keeps running through the `claude` CLI.
+(`gemini`, `codex-acp`…) is the model catalog's tool. The status tells whether the agent's command is on
+the PATH and its version, with the install link. Cursor and Kimi Code stay on the ready one-shot CLIs,
+which measure tokens; Claude Code keeps running through the `claude` CLI.
 
 ### Custom profile (Advanced)
 
 The custom profile is the advanced path, for a command line the catalog does not include: the catalog
-tools come in through **Connect a tool**. The form sits under **Avançado** (advanced), below the
-profile list, in the **Novo perfil de CLI personalizado** (new custom CLI profile) button. A new custom
-profile is **CLI only**: the **Agente ACP** (ACP agent) field left the new form, and the board refuses
-to turn a custom CLI into an ACP agent. Custom ACP profiles created in an earlier version (and a copy
-of a ready ACP agent) **keep running as they are**: the list shows a notice, with **Open Connect** on
-their agent, and **Verificar capacidades** (check capabilities); editing shows the same notice and
-keeps the saved agent.
+agents come in through **Conectar**. The form opens from the **Agente personalizado (CLI)** (custom
+agent) button, below the list. A new custom profile is **CLI only**: the board refuses to turn a custom
+CLI into an ACP agent. Custom ACP profiles created in an earlier version (and a copy of a ready ACP
+agent) **keep running as they are**: their Details show a notice, with **Abrir o agente do catálogo**
+(open the catalog agent) and **Verificar capacidades** (check capabilities); editing shows the same
+notice and keeps the saved agent.
 
 To create a custom profile, enter the command and one argument per line. The markers `{prompt}`,
 `{model}`, `{effort}`, `{mcpConfig}` and `{addDir}` insert, respectively, the request, the model,
@@ -164,9 +256,9 @@ the effort, the MCP file and an additional folder when they are available. Choos
 pedido** (prompt input: argument or stdin) and **Servidor do board** (board server: CLI, project
 file or none). In a card's **Modelo** (model) field, every enabled custom profile (own CLI or ACP
 agent) forms a group, even with no model registered, and that group's **Outro modelo…** (other model)
-item accepts a free-form identifier for the profile without adding it to the catalog. **Testar** (Test) runs a short request
-and uses your subscription; an OK response does not prove isolation, permissions or MCP
-restrictions. Capabilities without evidence remain unknown and may prevent a run.
+item accepts a free-form identifier for the profile without adding it to the catalog. The **quick test**
+runs a short request and uses your subscription; an OK response does not prove isolation, permissions or
+MCP restrictions. Capabilities without evidence remain unknown and may prevent a run.
 
 ### Capabilities and evidence
 
@@ -182,40 +274,15 @@ verification. Each run's summary, the card (**Próxima execução**, next run) a
 outside `npm test`: `npm run test:cli-real` (Claude Code validated in a controlled local
 environment; Cursor and Kimi Code **not validated**).
 
-## AI models and suggestion rules
+## Model suggestion for each card
 
-**Detectar modelos** (detect models) reads the tool's list: for Cursor, the models of your account,
-through the `cursor-agent models` command, read when the board opens with the CLI signed in, and the
-first list read replaces the built-in one only once; for Claude Code, a built-in list you can edit.
-In a profile with **Agente ACP** (ACP agent), the button opens a session with the agent (`initialize`
-and `session/new`, with no prompt, so it does not spend your account) and reads the models it
-announces: the model selector among the session config options, in the protocol's current schema, or
-the `models` block of the earlier form, which Gemini CLI still uses. The agent's current model comes
-first. An agent that announces no models leaves the catalog as it is, with a warning; then **Novo
-modelo** (new model) or **Outro modelo…** (other model) in the card apply. When running, the card's
-model goes through the session selector (`session/set_config_option`) when the agent exposes it, and
-through the command line (`--model`) where the agent accepts it; an agent that takes neither keeps
-its own model, and the run log says which.
-
-Each model read from the tool (by **Detectar modelos** or by **Conectar**, connect) keeps the date it
-was read, and the tool's block says "lista lida da ferramenta em …" (list read from the tool on …) with
-the most recent one. Without that line, the list is the built-in one or the one you built by hand. An
-old list (the account changed plan, the tool dropped a model) is fixed by detecting again or
-reconnecting.
-
-For Cursor, the list has one line per level of each model (`claude-opus-5-5-low`, `-medium`,
-`-high`…); the board groups the variants into one model with its levels. The fast versions (`-fast`,
-they answer sooner and charge more for the same tokens) stay out until you turn on **Incluir os
-modos rápidos** (include fast modes) on the Cursor card: then each one enters as a separate model
-("Claude Opus 5.5 1M Fast"), only for the models in the catalog; turning it off removes them from
-the catalog. Through MCP, it is the `includeFastModels` rule of `update_rules`. On Cursor's free plan
-only **Auto** runs: the other models are refused before starting (the blocked card explains how to
-pick Auto), which is why Cursor's suggestion rules all start at Auto.
-
-Suggestion rules combine conditions with AND and OR, for example
-`Esforço da atividade = Alto E Tags = backend`. The result is always a suggestion: on the card, the
-model and the effort can be changed at any time. The rule editor has only name, conditions and
-suggested model.
+At the end of **Conectar agentes**, the **suggestion rules** combine conditions with AND and OR, for
+example `Esforço da atividade = Alto E Tags = backend`, and suggest the agent, the model and the effort.
+The result is always a suggestion: on the card, the model and the effort can be changed at any time. The
+rule editor has only name, conditions and suggested model. **Preencher o modelo sugerido
+automaticamente** (fill in the suggested model automatically), right above the rules, fills in the Model
+field when a card is created or changes, if it is empty or holds the previous suggestion; a model chosen
+by hand is never replaced.
 
 ## Execution and fallback policies
 
@@ -226,8 +293,8 @@ function, with explained rejections, ordered targets, accumulated limits and a r
 requirement when there is partial or unknown work. Imported policies remain pending review; earlier
 snapshots do not change with editing.
 
-Under **Configurações → Ferramentas de IA → Políticas de execução e fallback → Gerenciar
-políticas** (Settings → AI tools → Execution and fallback policies → Manage policies), the manual
+Under **Configurações → Conectar agentes → Políticas de execução e fallback → Gerenciar
+políticas** (Settings → Connect agents → Execution and fallback policies → Manage policies), the manual
 editor supports conditions, ordered targets, limits, duplication, removal and paginated history. A
 complete comparison precedes the human review confirmation; saving as pending does not authorize
 execution. Version conflicts preserve the draft and let you reload the base before reviewing again.
@@ -292,11 +359,11 @@ scrolls and highlights for 2 seconds, or click a link in the Settings to open th
 right section. In browser mode, the links to the Settings appear as text only.
 
 **"Preencher o modelo sugerido automaticamente"** (fill in the suggested model automatically) lives
-in Modelos, not in Regras; a simple notice in Regras indicates the move. The Heartbeat interval
-field stays disabled when the heartbeat is off, with no additional dependency component. The headers
-of Modelos, Agentes, Rules and Skills show "Mostrando os X do [ferramenta] · trocar ferramenta"
-(showing the X of [tool] · switch tool), letting you change the tool from any of these board
-screens.
+in Conectar agentes, next to the suggestion rules, not in Regras; a simple notice in Regras indicates
+the move. The Heartbeat interval field stays disabled when the heartbeat is off, with no additional
+dependency component. The headers of Agentes, Rules and Skills show "Mostrando os X do [ferramenta] ·
+trocar ferramenta" (showing the X of [tool] · switch tool), letting you change the tool from any of
+these board screens.
 
 ## Updating the default board
 

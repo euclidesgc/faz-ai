@@ -32,6 +32,25 @@ export const executionPolicies = {
     req({ type: 'settings.executionPolicy.save', policy, expectedRevision, reviewed }),
   remove: (id: string, expectedRevision: number) => req({ type: 'settings.executionPolicy.remove', id, expectedRevision }),
 };
+/**
+ * Conectar agentes: a conta, o login e a sessão de teste. O `done` sai logo (o login pode levar o tempo da pessoa no
+ * navegador ou no terminal); o progresso chega pela conta (`agentConnect.account`) e pelo estado da sessão.
+ */
+export const agentConnect = {
+  check: (key: string) => req({ type: 'agentConnect.check', key }),
+  login: (key: string, methodId: string, apiKey?: string) =>
+    req({ type: 'agentConnect.login', key, methodId, ...(apiKey ? { apiKey } : {}) }),
+  logout: (key: string) => req({ type: 'agentConnect.logout', key }),
+  openTest: (key: string) => req({ type: 'agentConnect.test.open', key }),
+  reopenTest: () => req({ type: 'agentConnect.test.reopen' }),
+  prompt: (text: string) => req({ type: 'agentConnect.test.prompt', text }),
+  answer: (permissionId: string, optionId: string | null) => post({ type: 'agentConnect.test.permission', permissionId, optionId }),
+  setConfig: (configId: string, value: string | boolean) => req({ type: 'agentConnect.test.setConfig', configId, value }),
+  setMode: (modeId: string) => req({ type: 'agentConnect.test.setMode', modeId }),
+  cancel: () => post({ type: 'agentConnect.test.cancel' }),
+  closeTest: () => req({ type: 'agentConnect.test.close' }),
+  openLog: () => req({ type: 'agentConnect.openLog' }),
+};
 export const contextPlanning = {
   saveBatch: (inputs: import('../shared/contextPlanning').ActivityContextWrite[]) => req({ type: 'contextPlanning.saveBatch', inputs }),
   save: (input: import('../shared/contextPlanning').ContextPlanningWrite) => req({ type: 'contextPlanning.save', input }),

@@ -465,7 +465,7 @@ describe('Diagnóstico do ambiente', () => {
       expect(b.getByText('Permissões: Desconhecida').closest('li')).not.toHaveClass('ok');
       expect(b.queryByText('Permissões: Verificada')).not.toBeInTheDocument();
     });
-    it('cada perfil mostra as próprias capacidades e, sem recibos, como verificá-lo em Ferramentas de IA', () => {
+    it('cada perfil mostra as próprias capacidades e, sem recibos, como verificá-lo em Conectar agentes', () => {
       syncStore(router);
       renderThemed(<EnvironmentView />);
       const unknown = Array(7).fill('unknown');
@@ -496,9 +496,9 @@ describe('Diagnóstico do ambiente', () => {
       // o comando da paleta saiu (história 13): o pronto verifica no Conectar, a cópia no "Verificar capacidades"
       const hint = /Sem recibos de capacidade deste perfil/;
       const claude = within(block('Claude Code'));
-      expect(claude.getByText(hint)).toHaveTextContent('conecte Claude Code em Ferramentas de IA; a verificação faz parte do Conectar.');
+      expect(claude.getByText(hint)).toHaveTextContent('conecte Claude Code em Conectar agentes; a verificação faz parte do Conectar.');
       expect(within(block('Claude trabalho')).getByText(hint)).toHaveTextContent(
-        'clique em Verificar capacidades em Claude trabalho, em Ferramentas de IA.',
+        'clique em Verificar capacidades nos detalhes de Claude trabalho, em Conectar agentes.',
       );
       expect(screen.queryByText(/paleta de comandos/)).toBeNull();
       expect(claude.getByText('MCP: Desconhecida')).toBeInTheDocument();

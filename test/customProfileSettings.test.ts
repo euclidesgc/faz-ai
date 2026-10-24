@@ -1,4 +1,4 @@
-// Configurações › Ferramentas de IA, perfil de CLI personalizado, achados no teste de ponta a ponta com o rastreio do
+// Configurações › Conectar agentes, perfil de CLI personalizado, achados no teste de ponta a ponta com o rastreio do
 // board. (1) O "Trabalhar na fase" dizia "O perfil não declara argumentos para esta permissão restrita." mesmo com os
 // argumentos preenchidos; o motivo real é que o personalizado de CLI não passa na admissão por capacidades, e é ele
 // que a tela mostra agora. (2) Editar os argumentos de um nível apagava os dos outros níveis.
@@ -106,7 +106,7 @@ describe('Testar e execução bloqueados pela admissão: o motivo em frase', () 
       ],
     });
     expect(text).toBe(
-      'Execução bloqueada pela admissão: o perfil ainda não teve verificado: conversa nova, MCP. Em Configurações › Ferramentas de IA, use o Conectar da ferramenta ou "Verificar capacidades", nos perfis que têm um dos dois (o personalizado de CLI não tem); o perfil roda no regime compatível e falta a sua ciência, no cartão do perfil; o board não sabe traduzir as ferramentas do card para esta CLI; codigo-novo.',
+      'Execução bloqueada pela admissão: o perfil ainda não teve verificado: conversa nova, MCP. Em Configurações › Conectar agentes, use o Conectar do agente ou "Verificar capacidades" nos detalhes dele, nos perfis que têm um dos dois (o personalizado de CLI não tem); o perfil roda no regime compatível e falta a sua ciência, no cartão do perfil; o board não sabe traduzir as ferramentas do card para esta CLI; codigo-novo.',
     );
     expect(text).not.toContain('capability-not-verified');
   });

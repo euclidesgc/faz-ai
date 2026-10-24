@@ -8,11 +8,10 @@ import { TypesSettings } from './TypesSettings';
 import { FieldsSettings } from './FieldsSettings';
 import { RulesSettings } from './RulesSettings';
 import { HarnessSettings } from './HarnessSettings';
-import { ModelsSettings } from './ModelsSettings';
-import { AiToolsSettings } from './AiToolsSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 import { GitSettings } from './GitSettings';
 import { BackupSettings } from './BackupSettings';
+import { AgentConnectSettings } from './agentConnect/AgentConnectSettings';
 import { scrollToAndHighlight } from './highlight';
 import { RequirementsAlertIcon, useRequirementsAlert } from '../RequirementsBanner';
 import {
@@ -21,14 +20,13 @@ import {
   DeleteButton,
   FormField,
   IconAppearance,
-  IconAi,
   IconBackup,
   IconBranch,
   IconColumns,
+  IconConnect,
   IconDoctor,
   IconFields,
   IconHarness,
-  IconModels,
   IconPanelClose,
   IconPanelOpen,
   IconReset,
@@ -43,9 +41,8 @@ const TABS: [SettingsTab, string, Icon][] = [
   ['types', 'Tipos de card', IconTypes],
   ['fields', 'Campos personalizados', IconFields],
   ['rules', 'Regras do board', IconRules],
+  ['connect', 'Conectar agentes', IconConnect],
   ['harness', 'Harness', IconHarness],
-  ['aiTools', 'Ferramentas de IA', IconAi],
-  ['models', 'Modelos de IA', IconModels],
   ['git', 'Git', IconBranch],
   ['appearance', 'Aparência', IconAppearance],
   ['backup', 'Backup', IconBackup],
@@ -178,10 +175,9 @@ export function Settings() {
         {tab === 'types' && <TypesSettings />}
         {tab === 'fields' && <FieldsSettings />}
         {tab === 'rules' && <RulesSettings />}
-        {tab === 'models' && <ModelsSettings />}
         {tab === 'appearance' && <AppearanceSettings />}
         {tab === 'harness' && <HarnessSettings />}
-        {tab === 'aiTools' && <AiToolsSettings />}
+        {tab === 'connect' && <AgentConnectSettings />}
         {tab === 'git' && <GitSettings />}
         {tab === 'backup' && <BackupSettings />}
       </div>
