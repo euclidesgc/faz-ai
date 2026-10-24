@@ -45,6 +45,7 @@
 
 ### Fixed
 
+- **The screen shifted when a select or menu opened in the editor.** The VS Code webview gives the `body` 20 px of side padding, and the Radix scroll lock zeroed it on every opening: everything jumped left and came back on close. The editor's side padding now lives on the app root, and the `body` has no margin or padding of its own, once and for all.
 - **Model suggestion: the move up, move down, edit and remove buttons of each rule were stuck together.** Their click areas overlapped; now there is room between them, and the action row does not wrap.
 - **Settings › AI tools: the defects found in the end-to-end test with the board trace.**
   - **Custom CLI profile:**
