@@ -1,5 +1,4 @@
 import type { BoardState, Card, Column } from '../../../shared/model';
-import { activeProfile } from '../../../shared/aiProfiles';
 import { columnsOf } from '../../../shared/selectors';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { boardOverview, cardDetail, coerceFieldValue, findColumn, findField, type CardSection } from '../format';
@@ -30,7 +29,7 @@ export const setFields = (
 ): void => {
   const values = Object.entries(fields ?? {}).map(([name, value]) => {
     const f = findField(s, name);
-    return { fieldId: f.id, value: coerceFieldValue(f, value, s.board.modelCatalog, activeProfile(s.board)) };
+    return { fieldId: f.id, value: coerceFieldValue(f, value, s.board.modelCatalog, s.board.aiProfiles) };
   });
   for (const v of values) router.handle({ type: 'field.setValue', cardId, ...v }, origin);
 };
@@ -38,7 +37,7 @@ export const setFields = (
 /** Só valida os campos (sem gravar), para não deixar um card pela metade. */
 export const validateFields = (s: BoardState, fields: Record<string, unknown> | undefined): void => {
   for (const [name, value] of Object.entries(fields ?? {}))
-    coerceFieldValue(findField(s, name), value, s.board.modelCatalog, activeProfile(s.board));
+    coerceFieldValue(findField(s, name), value, s.board.modelCatalog, s.board.aiProfiles);
 };
 
 /** Cria os itens do checklist na ordem dada e devolve os itens do card (com ids). */

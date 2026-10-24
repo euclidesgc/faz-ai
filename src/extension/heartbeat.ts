@@ -3,7 +3,7 @@ import type { WebviewToHost } from '../shared/messages';
 import { cardRef, type BoardState, type Card } from '../shared/model';
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
-import { cardCliProblem, cliProblem, noProfileAvailable, type CliProblem } from '../shared/requirements';
+import { cardCliProblem, cardRunUnsupported, cliProblem, noProfileAvailable, type CliProblem } from '../shared/requirements';
 import { profilesInUse } from '../shared/runTarget';
 import { profileLabel } from '../shared/aiProfiles';
 import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
@@ -76,8 +76,8 @@ export function heartbeatTargets(s: BoardState): Card[] {
     const story = card.parentId ? byId.get(card.parentId) : card;
     // as histórias em modo autônomo são do autopiloto, que não espera o intervalo
     if (!story || !isLive(story) || story.yolo || out.includes(story)) continue;
-    // login vencido ou CLI ausente do perfil da história: só ela fica de fora, as dos outros perfis seguem
-    if (cardCliProblem(s, story)) continue;
+    // login vencido, CLI ausente ou perfil que o board não roda, da história: só ela fica de fora, as dos outros perfis seguem
+    if (cardCliProblem(s, story) || cardRunUnsupported(s, story)) continue;
     const withHuman = isWithHuman(story);
     if (withHuman && !unanswered.has(story.id)) continue;
     // já há uma execução tocando a história: outra em paralelo pisaria nas mesmas sub-tarefas
@@ -114,7 +114,8 @@ export function refineTargets(s: BoardState): Card[] {
       isBacklogColumn(s, c) &&
       !isWithHuman(c) &&
       !isAiWorking(s, c) &&
-      !cardCliProblem(s, c),
+      !cardCliProblem(s, c) &&
+      !cardRunUnsupported(s, c),
   );
 }
 
@@ -133,7 +134,8 @@ export function summaryTargets(s: BoardState): Card[] {
       !isAiWorking(s, c) &&
       !childrenOf(s, c.id).some((k) => isLive(k) && isAiWorking(s, k)) &&
       needsSummary(s, c) &&
-      !cardCliProblem(s, c),
+      !cardCliProblem(s, c) &&
+      !cardRunUnsupported(s, c),
   );
 }
 
@@ -171,7 +173,8 @@ export function conflictTargets(s: BoardState, pending: ReadonlySet<string>): Ca
       c.status !== 'waiting_answer' &&
       !isAiWorking(s, c) &&
       !childrenOf(s, c.id).some((k) => isLive(k) && isAiWorking(s, k)) &&
-      !cardCliProblem(s, c),
+      !cardCliProblem(s, c) &&
+      !cardRunUnsupported(s, c),
   );
 }
 

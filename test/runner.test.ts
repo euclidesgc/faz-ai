@@ -955,11 +955,12 @@ describe('executor da IA', () => {
     const getuid = vi.spyOn(process as { getuid: () => number }, 'getuid').mockReturnValue(0);
     try {
       router.handle({ type: 'settings.board.update', patch: { aiTool: 'claude', runner: { permission: 'full' } } });
-      expect(router.snapshot().aiRunUnsupported).toContain('root');
+      // o motivo é do perfil do Claude Code: os outros agentes ligados seguem rodando os cards com modelos deles
+      expect(router.snapshot().aiRunUnsupportedBy?.claude).toContain('root');
       expect(() => runner.start(storyId)).toThrow('root');
       expect(procs).toHaveLength(0);
       router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'board' } } });
-      expect(router.snapshot().aiRunUnsupported).toBeNull();
+      expect(router.snapshot().aiRunUnsupportedBy?.claude).toBeUndefined();
       runner.start(storyId);
       expect(procs).toHaveLength(1);
       expect(procs[0]!.command.command).toBe('claude');

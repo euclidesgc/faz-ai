@@ -197,6 +197,20 @@ describe('heartbeat', () => {
     expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([5, 3, 1]); // Plan, Spec, PRD: da direita para a esquerda
   });
 
+  it('o perfil que o board não roda tira da fila só os cards dele: o card com o modelo de outro agente ligado segue', () => {
+    router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'cursor', enabled: true });
+    router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
+    create('Sem modelo', 'PRD'); // #1: vai para o padrão (Cursor)
+    create('Com modelo', 'PRD'); // #2: vai para o Claude Code, pelo modelo
+    const field = router.snapshot().fieldDefs.find((f) => f.kind === 'model')!;
+    router.handle({ type: 'field.setValue', cardId: card(2).id, fieldId: field.id, value: 'claude:opus' });
+    const s = router.snapshot();
+    expect(s.board.aiTool).toBe('cursor');
+    expect(heartbeatTargets(s).map((c) => c.number)).toEqual([1, 2]);
+    // o Cursor não roda pelo board: a #1 espera, a #2 roda no Claude Code ao mesmo tempo
+    expect(heartbeatTargets({ ...s, aiRunUnsupportedBy: { cursor: 'Sem suporte' } }).map((c) => c.number)).toEqual([2]);
+  });
+
   it('bug fura a fila: entra na frente mesmo estando numa coluna anterior', () => {
     const bugTypeId = createBugType();
     create('A', 'Plan'); // #1 pronto, mais adiante no fluxo

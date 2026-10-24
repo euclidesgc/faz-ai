@@ -240,6 +240,27 @@ describe('botões de IA sem perfil disponível', () => {
     expect(aiBlockedReason(useBoardStore.getState().state!)).toContain('linha de comando do Cursor não foi encontrada');
   });
 
+  it('o perfil que não roda bloqueia só os cards dele: o padrão sem rodar não desliga o card com o modelo de outro agente', () => {
+    const s = router.snapshot();
+    const field = s.fieldDefs.find((f) => f.kind === 'model')!;
+    const model = s.board.modelCatalog.find((o) => o.tool === 'claude')!;
+    const story = s.cards.find((c) => !c.parentId)!;
+    const semModelo = story;
+    const comModelo = { id: router.createCard({ typeId: story.typeId, columnId: story.columnId, parentId: null, title: 'Outra' }) };
+    router.handle({ type: 'field.setValue', cardId: comModelo.id, fieldId: field.id, value: model.id });
+    // o Cursor (padrão) não roda pelo board; o Claude Code, ligado, roda
+    act(() => {
+      sync();
+      useBoardStore.setState({ state: { ...useBoardStore.getState().state!, aiRunUnsupportedBy: { cursor: 'Sem suporte no Cursor' } } });
+    });
+    const state = useBoardStore.getState().state!;
+    const card = (id: string) => state.cards.find((c) => c.id === id)!;
+    expect(aiBlockedReason(state, card(semModelo.id))).toBe('Sem suporte no Cursor');
+    expect(aiBlockedReason(state, card(comModelo.id))).toBeNull();
+    // sem card, vale o padrão
+    expect(aiBlockedReason(state)).toBe('Sem suporte no Cursor');
+  });
+
   it('o login vencido do perfil padrão durante a execução (sinal reativo) também bloqueia', () => {
     setAuthExpired('cursor');
     expect(aiBlockedReason(useBoardStore.getState().state!)).toContain('login do Cursor venceu');

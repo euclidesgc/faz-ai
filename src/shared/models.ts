@@ -160,7 +160,7 @@ export const modelDisplay = (
  * Interpreta um modelo escrito por uma pessoa ou IA: o valor exato (`claude:opus@high`), ou o
  * nome/identificador do modelo seguido opcionalmente do esforço ("Opus 5.5 high", "k3 @ max").
  */
-export function resolveModelInput(catalog: ModelOption[], text: string, profile?: AiProfile): string {
+export function resolveModelInput(catalog: ModelOption[], text: string, profiles: readonly AiProfile[] = []): string {
   const raw = text.trim();
   const exact = parseModelValue(raw);
   const byId = exact && catalog.find((o) => o.id === exact.id);
@@ -171,7 +171,9 @@ export function resolveModelInput(catalog: ModelOption[], text: string, profile?
     return modelValue(o.id, e);
   };
   if (byId) return pick(byId, exact.effort);
-  if (profile?.kind === 'custom' && exact?.id.startsWith(`${profile.id}:`)) {
+  // o modelo livre vale em qualquer personalizado ligado, não só no padrão: o prefixo diz qual
+  const profile = exact && profiles.find((p) => p.enabled && p.kind === 'custom' && exact.id.startsWith(`${p.id}:`));
+  if (profile) {
     const name = exact.id.slice(profile.id.length + 1);
     if (name && !/[\s\0:@]/.test(name) && (!exact.effort || !/[\s\0:@]/.test(exact.effort))) return raw;
   }

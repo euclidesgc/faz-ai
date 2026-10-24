@@ -129,7 +129,12 @@ harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_ski
 `get_models.profiles` lista os perfis de CLI e seus IDs, sem comando, configuração ou ambiente
 privado. O prefixo do `value` escolhe o perfil de CLI que executa o card; sem modelo no card, no agente
 nem na regra, vale o perfil padrão. `set_ai_tool` define esse **perfil padrão**: recebe o ID de um perfil
-ligado e não cria, edita, revisa nem ativa perfis.
+ligado e não cria, edita, revisa nem ativa perfis. Todo perfil ligado roda cards ao mesmo tempo: cada item
+de `get_models.catalog` traz `runsWith`, o perfil ligado que executa aquele valor (o mesmo que o runner
+escolhe), ou `null` quando nenhum ligado o roda; cada perfil traz `ready` (ligado, com a CLI e o login em
+dia e sem motivo para o board não rodar). O modelo livre (`<perfil>:<modelo>`) vale em qualquer perfil
+personalizado ligado, não só no padrão, em `create_card`, `update_card`, `update_card_type` e
+`set_model_rules`.
 Uma cópia usa o catálogo da origem. Para um perfil personalizado, os modelos podem ser cadastrados
 à mão; num perfil ACP, `detect_models` abre uma sessão com o agente e lê os modelos que ele anuncia
 (sem pedido, sem gastar a conta). O campo Modelo lista cada perfil personalizado ligado como um grupo

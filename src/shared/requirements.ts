@@ -91,3 +91,13 @@ export function cardCliProblem(state: BoardState, card: Card): CliProblem | null
   const target = runTargetOf(state, card);
   return target ? cliProblem(state, target.cli.id) : null;
 }
+
+/**
+ * Por que o perfil que executaria o card não roda pelo board (personalizado de CLI, permissão sem argumento, root),
+ * ou null. É do perfil do card, não do padrão: um card com o modelo de outro agente ligado roda mesmo com o padrão
+ * sem rodar, e vice-versa.
+ */
+export function cardRunUnsupported(state: BoardState, card: Card): string | null {
+  const target = runTargetOf(state, card);
+  return (target && state.aiRunUnsupportedBy?.[target.cli.id]) || null;
+}

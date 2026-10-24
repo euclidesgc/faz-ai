@@ -30,8 +30,8 @@ import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
 import { agentProfiles } from '../../shared/execution';
 import { columnsOf } from '../../shared/selectors';
 import type { AttachmentStore } from '../attachments';
-import { customCliUnsupported, headlessUnsupported } from '../headless';
-import { activeProfile, isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
+import { runUnsupported } from '../headless';
+import { isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
 import type { ConnectInput, ConnectState, ConnectSummary } from '../../shared/connect';
 import type { ToolMode } from '../../shared/aiTools';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
@@ -512,9 +512,7 @@ export class MessageRouter {
       heartbeatNextAt: this.heartbeatNextAt,
       chat: this.chat,
       autopilot: this.autopilot,
-      // o perfil padrão resolvido, não o id: um personalizado ou ACP como padrão não é "indisponível"
-      aiRunUnsupported:
-        customCliUnsupported(activeProfile(s.board)) ?? headlessUnsupported(activeProfile(s.board), s.board.runner.permission),
+      ...runUnsupported(s.board),
       requirements: this.requirements,
       requirementsCheckedAt: this.requirementsCheckedAt,
       authExpired: this.authExpired,

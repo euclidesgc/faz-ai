@@ -9,7 +9,8 @@ import {
   type AiProfile,
 } from '../../shared/aiProfiles';
 import { orchestratesStory } from '../../shared/orchestration';
-import { resolveRunTarget } from '../../shared/runTarget';
+import { cliOfValue, resolveRunTarget } from '../../shared/runTarget';
+import { cliProblem } from '../../shared/requirements';
 import { agentOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
@@ -99,7 +100,7 @@ export function needsTriage(s: BoardState, c: Card): boolean {
 }
 
 /** Valida e normaliza o valor de um campo conforme o seu tipo. */
-export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOption[], profile?: AiProfile): FieldValue {
+export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOption[], profiles: readonly AiProfile[] = []): FieldValue {
   if (value === null || value === undefined || value === '') return null;
   const option = (v: unknown): string => {
     const o = f.options.find((x) => same(x, String(v)));
@@ -119,7 +120,7 @@ export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOpti
     case 'multiselect':
       return (Array.isArray(value) ? value : [value]).map(option);
     case 'model':
-      return resolveModelInput(catalog, String(value), profile);
+      return resolveModelInput(catalog, String(value), profiles);
     case 'date':
       if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) throw new Error(`O campo "${f.name}" espera uma data no formato AAAA-MM-DD.`);
       return String(value);
@@ -257,6 +258,8 @@ export function modelsOverview(s: BoardState) {
       base: p.base,
       enabled: p.enabled,
       default: s.board.aiTool === p.id,
+      // ligado, com a CLI e o login em dia e sem motivo para o board não rodar: pronto para os cards agora
+      ready: p.enabled && !s.aiRunUnsupportedBy?.[p.id] && cliProblem(s, p.id) === null,
       measures: p.base === 'claude' ? 'cost' : p.base === 'generic' ? 'none' : 'tokens',
     })),
     catalog: s.board.modelCatalog.map((o) => ({
@@ -266,6 +269,8 @@ export function modelsOverview(s: BoardState) {
       label: o.label,
       efforts: o.efforts,
       defaultEffort: o.defaultEffort,
+      // o perfil ligado que executa este valor (o mesmo que o runner escolhe), ou null: nenhum agente ligado o roda
+      runsWith: cliOfValue(s.board, o.id)?.id ?? null,
     })),
     rules: s.board.modelRules.map((r) => ({
       ...(r.name ? { name: r.name } : {}),
@@ -274,7 +279,7 @@ export function modelsOverview(s: BoardState) {
       value: r.model,
       enabled: r.enabled,
     })),
-    note: 'Num card, `value` usa `<perfil>:<modelo>@<esforço>` (ex.: "claude:opus@high"). A cópia usa o catálogo do perfil pronto de origem; o perfil personalizado aceita modelo livre.',
+    note: 'Num card, `value` usa `<perfil>:<modelo>@<esforço>` (ex.: "claude:opus@high"). O board roda qualquer agente ligado ao mesmo tempo: cada card vai para o perfil do modelo dele (`runsWith`), e o padrão só roda os cards sem modelo. Escolha só modelos com `runsWith`; sem ele, nenhum agente ligado roda o modelo e o card fica bloqueado. A cópia usa o catálogo do perfil pronto de origem; o perfil personalizado aceita modelo livre (`<perfil>:<modelo>`).',
   };
 }
 

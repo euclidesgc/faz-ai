@@ -1,4 +1,4 @@
-// Configurações › Conectar agentes: a lista (os agentes do board e os do registro do ACP), o agente em uso, a conexão
+// Configurações › Conectar agentes: a lista (os agentes do board e os do registro do ACP), o agente padrão, a conexão
 // com o board (o Conectar, com a chave que nunca volta para a tela), a conta (entrar no terminal que o board
 // acompanha, sair com confirmação), os modelos, a sessão de teste e os detalhes de cada perfil. Os casos das telas
 // Ferramentas de IA e Conectar ferramenta, que esta substituiu, vieram para cá.
@@ -105,8 +105,8 @@ const openAgent = async (name: string, tabName?: string) => {
   return within(screen.getByLabelText(name));
 };
 
-describe('Conectar agentes: a lista e o agente em uso', () => {
-  it('os agentes do board vêm primeiro, o em uso com o selo; os do registro que o board não roda ficam à parte', () => {
+describe('Conectar agentes: a lista e o agente padrão', () => {
+  it('os agentes do board vêm primeiro, o padrão com o selo; os do registro que o board não roda ficam à parte', () => {
     show();
     answerRegistry([
       registryAgent('claude-acp', { name: 'Claude Agent' }),
@@ -118,7 +118,7 @@ describe('Conectar agentes: a lista e o agente em uso', () => {
         note: 'Instale o amp-acp pela página do agente: o board não baixa binários.',
       }),
     ]);
-    expect(row('Claude Code')).toHaveTextContent('Em uso');
+    expect(row('Claude Code')).toHaveTextContent('Padrão');
     // o ícone vem do registro: o Claude Code é o "Claude Agent" (`claude-acp`) lá
     expect(row('Claude Code').querySelector('img')).toHaveAttribute('src', 'https://cdn.example.org/claude-acp.svg');
     // o Gemini do registro é o perfil do board: não aparece duas vezes
@@ -132,11 +132,22 @@ describe('Conectar agentes: a lista e o agente em uso', () => {
     expect(screen.getAllByRole('tab').map(label)).toEqual(['Conexão', 'Modelos', 'Testar', 'Detalhes']);
   });
 
-  it('o agente em uso aparece no topo, com a conta; Testar abre a aba Testar dele', async () => {
+  it('o agente padrão aparece no topo, com a conta e os outros ligados que também rodam cards; Testar abre a aba Testar dele', async () => {
     show();
     account('claude', { status: 'signed-in', label: 'Claude Max · pessoa@exemplo.com' });
-    const inUse = within(screen.getByLabelText('Agente em uso'));
-    expect(inUse.getByText('Agente em uso: Claude Code')).toBeInTheDocument();
+    const inUse = within(screen.getByLabelText('Agente padrão'));
+    expect(inUse.getByText('Agente padrão: Claude Code')).toBeInTheDocument();
+    const others = board.router
+      .snapshot()
+      .board.aiProfiles.filter((p) => p.enabled && p.id !== 'claude')
+      .map((p) => p.name);
+    expect(
+      inUse.getByText(
+        others.length
+          ? `Também rodam cards, pelo modelo de cada um: ${others.join(', ')}.`
+          : 'Ligue outro agente para usar os modelos dele nos cards, junto com este.',
+      ),
+    ).toBeInTheDocument();
     expect(inUse.getByText(/CLI · Ainda não conectado pelo board · Claude Max · pessoa@exemplo.com/)).toBeInTheDocument();
     await userEvent.click(inUse.getByRole('button', { name: 'Testar' }));
     expect(tab('Testar')).toHaveAttribute('aria-selected', 'true');
@@ -157,11 +168,11 @@ describe('Conectar agentes: a lista e o agente em uso', () => {
     expect(cursor.getByRole('link', { name: 'Como instalar' })).toHaveAttribute('href', 'https://example.org/instalar');
   });
 
-  it('o pronto em uso não desliga, e o pronto não tem as ações de cópia e personalizado', async () => {
+  it('o pronto padrão não desliga, e o pronto não tem as ações de cópia e personalizado', async () => {
     show();
     const claude = within(screen.getByLabelText('Claude Code'));
     expect(claude.getByRole('switch', { name: 'Ligado' })).toBeDisabled();
-    expect(claude.getByText('Em uso nos cards')).toBeInTheDocument();
+    expect(claude.getByText('Padrão dos cards')).toBeInTheDocument();
     await userEvent.click(tab('Detalhes'));
     expect(claude.queryByRole('button', { name: 'Editar' })).toBeNull();
     expect(claude.queryByRole('button', { name: 'Apagar' })).toBeNull();
@@ -175,7 +186,7 @@ describe('Conectar agentes: a lista e o agente em uso', () => {
     expect(gemini.getByText('Gemini · ACP')).toBeInTheDocument();
     expect(gemini.getByRole('switch', { name: 'Ligado' })).not.toBeChecked();
     expect(gemini.getByRole('switch', { name: 'Ligado' })).toBeEnabled();
-    expect(gemini.getByRole('button', { name: 'Usar nos cards' })).toBeDisabled();
+    expect(gemini.getByRole('button', { name: 'Tornar padrão' })).toBeDisabled();
     await userEvent.click(gemini.getByRole('switch', { name: 'Ligado' }));
     expect(lastSent('settings.aiProfiles.setEnabled')).toMatchObject({ id: 'gemini', enabled: true });
     confirmLast();
@@ -386,7 +397,7 @@ describe('Conectar agentes: a conexão com o board', () => {
 describe('Conectar agentes: a conta', () => {
   it('abrir um agente ligado e instalado confere a conta sozinho; o desligado espera o clique', async () => {
     show();
-    // o Claude Code, em uso, abre selecionado: a conta é conferida na hora
+    // o Claude Code, o padrão, abre selecionado: a conta é conferida na hora
     expect(sentOf('agentConnect.check').map((m) => m.key)).toEqual(['claude']);
     confirmLast();
     const opencode = await openAgent('OpenCode');
@@ -684,7 +695,7 @@ describe('Conectar agentes: detalhes e perfis personalizados', () => {
     const custom = s.board.aiProfiles.find((p) => p.name === 'Perfil ações')!;
     show();
     const card = await openAgent('Perfil ações');
-    await userEvent.click(card.getByRole('button', { name: 'Usar nos cards' }));
+    await userEvent.click(card.getByRole('button', { name: 'Tornar padrão' }));
     expect(lastSent('settings.board.update')).toEqual({ type: 'settings.board.update', patch: { aiTool: custom.id } });
     confirmLast();
     await userEvent.click(tab('Detalhes'));

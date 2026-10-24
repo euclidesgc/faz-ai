@@ -46,10 +46,11 @@ promise a percentage: it shows, in the inventory, what is being loaded.
 1. In Settings → **Conectar agentes** (connect agents), choose the agent that runs the cards, sign in
    to it and connect it to the board ([Connect agents](configuracoes_EN.md#connect-agents)). Claude
    Code, Cursor and Kimi Code are built in, and the catalog's ACP agents (Gemini CLI, Codex,
-   OpenCode…) come built in and switched off; you can also create copies and custom profiles. The
-   agent in use only applies when nothing indicates another: the CLI of each run comes from the chosen
-   model (see [Which CLI runs](configuracoes_EN.md#which-cli-runs)). You can switch the active
-   profile in **Harness → Ferramenta e execução** (Tool and execution).
+   OpenCode…) come built in and switched off; you can also create copies and custom profiles. Every
+   enabled agent runs cards, at the same time: the CLI of each run comes from the chosen model (see
+   [Which CLI runs](configuracoes_EN.md#which-cli-runs)), and the default agent only runs the cards with
+   no model. You can switch the default profile in **Harness → Ferramenta e execução** (Tool and
+   execution).
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
    **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai`
    server in the global file the tool reads. This also happens on its own, silently, when the folder

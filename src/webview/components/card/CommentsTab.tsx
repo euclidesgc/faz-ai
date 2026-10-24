@@ -11,7 +11,7 @@ import { BOARD_AUTHOR } from '../../../shared/gitflow';
 import { formatDateTime, t, translateGitNotice } from '../../i18n';
 import { useAttachmentRefs } from './attachmentRefs';
 import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
-import { aiBlockedReason, cardToolLabel } from '../RequirementsBanner';
+import { aiBlockedReason, cardToolLabel, runUnsupportedReason } from '../RequirementsBanner';
 import { Button, DeleteButton, Hint, IconRun, IconSuggest } from '../ui';
 import { summarizeHint, workHint } from '../aiHints';
 import { activeComments } from '../../../shared/conversation';
@@ -118,7 +118,7 @@ export function CommentsTab({
         />
         <div className="row wrap">
           <span className="muted small ai-permission" title={blocked ?? t(permission.hint)}>
-            {state.aiRunUnsupported
+            {runUnsupportedReason(state, card)
               ? t('Trabalhar na fase daqui não está disponível para o {tool}.', { tool: toolLabel })
               : t('Permissão do {tool} ao ser chamado: {permission}.', { tool: toolLabel, permission: t(permission.label) })}{' '}
             <a onClick={() => openSettings('harness')}>{t('Mudar')}</a>

@@ -1,4 +1,4 @@
-import { toolInfo, activeProfile, catalogTool, contextEnforced, profileLabel, isReadyCli } from '../shared/aiProfiles';
+import { toolInfo, catalogTool, contextEnforced, profileLabel, isReadyCli } from '../shared/aiProfiles';
 import { cliProblem } from '../shared/requirements';
 import type { ContextAction } from '../shared/contextPlanning';
 import { defaultTarget, targetOfValue, type RunTarget } from '../shared/runTarget';
@@ -350,7 +350,8 @@ export class ChatSession {
             profile: null,
             agent: null,
             autonomous: false,
-            clean: contextEnforced(activeProfile(state.board)),
+            // o contexto imposto é o do perfil do modelo escolhido no chat, não o do padrão
+            clean: contextEnforced(target.cli),
             skills: [],
             mcp: [],
           },

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { activeProfile } from '../../../shared/aiProfiles';
 import type { BoardState } from '../../../shared/model';
 import { coerceFieldValue, findField, findType, findWorkflow } from '../format';
 import { colorArg, fieldsArg, workflowArg } from './args';
@@ -50,7 +49,7 @@ export function registerTypeAndFieldTools(tool: DefineTool): void {
         ? Object.fromEntries(
             Object.entries(a.default_fields).map(([name, value]) => {
               const f = findField(s, name);
-              return [f.id, coerceFieldValue(f, value, s.board.modelCatalog, activeProfile(s.board))];
+              return [f.id, coerceFieldValue(f, value, s.board.modelCatalog, s.board.aiProfiles)];
             }),
           )
         : undefined;

@@ -3,7 +3,7 @@ import { cardRef, type BoardState, type Card, type Column } from '../shared/mode
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
-import { cardCliProblem, noProfileAvailable } from '../shared/requirements';
+import { cardCliProblem, cardRunUnsupported, noProfileAvailable } from '../shared/requirements';
 import { limitOf, type AiRunMode } from '../shared/runner';
 import { nextColumnFor } from '../shared/advance';
 import { childrenOf, columnOf, isAiWorking, isLive } from '../shared/selectors';
@@ -414,8 +414,9 @@ export class Autopilot {
         const counts = runningByKind(s, this.runner.running);
         for (const r of autopilotRuns(s)) {
           // login vencido (preventivo ou pela falha reativa) ou CLI ausente do perfil da história: não insiste
-          // sozinho, a pessoa resolve; só essa história espera, as dos outros perfis seguem
-          if (cardCliProblem(s, r.story)) continue;
+          // sozinho, a pessoa resolve; só essa história espera, as dos outros perfis seguem. O perfil que o board não
+          // roda (personalizado de CLI, permissão sem argumento) também espera: a execução seria recusada
+          if (cardCliProblem(s, r.story) || cardRunUnsupported(s, r.story)) continue;
           // a história passou de fase desde a última execução e a conversa está cheia: primeiro o resumo (uma
           // execução de texto), depois a fase. Uma história que ainda não rodou nesta sessão segue direto
           const from = this.lastRunColumn.get(r.story.id);

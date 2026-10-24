@@ -1,23 +1,25 @@
-// Configurações › Conectar agentes: a lista, o agente em uso, a conexão, a conta, os modelos, a sessão de teste, o log
+// Configurações › Conectar agentes: a lista, o agente padrão, a conexão, a conta, os modelos, a sessão de teste, o log
 // do protocolo e as mensagens do host sobre a conta e a sessão de teste.
 export const agentConnect: Record<string, string> = {
-  // a página, o menu e o agente em uso
+  // a página, o menu e o agente padrão
   'Conectar agentes': 'Connect agents',
-  'Escolha o agente de IA que roda os cards, entre na conta dele, conecte-o ao board e ajuste os modelos. Só um agente fica em uso de cada vez; os outros ligados entram pelo campo Modelo, pelas regras de sugestão e pelas políticas de fallback.':
-    'Pick the AI agent that runs the cards, sign in to it, connect it to the board and tune its models. Only one agent is in use at a time; the other enabled ones come in through the Model field, the suggestion rules and the fallback policies.',
+  'Conecte os agentes de IA ao board, entre na conta de cada um e ajuste os modelos. Todo agente ligado roda cards, ao mesmo tempo que os outros: cada card vai para o agente do modelo dele (o do card, o do agente do harness ou o da regra de sugestão), e o padrão roda os cards sem modelo.':
+    "Connect the AI agents to the board, sign in to each one and tune the models. Every enabled agent runs cards, alongside the others: each card goes to its model's agent (the card's, the harness agent's or the suggestion rule's), and the default one runs the cards with no model.",
   'Verificar situação': 'Check status',
   'Confere de novo se cada agente está instalado, a versão e o login da CLI.':
     "Checks again whether each agent is installed, its version and the CLI's sign-in.",
   'Atualizar lista': 'Refresh list',
   'Baixa de novo a lista do registro oficial do ACP e relê o PATH (depois de instalar um agente).':
     'Downloads the official ACP registry list again and rereads the PATH (after you install an agent).',
-  'Agente em uso': 'Agent in use',
-  'Agente em uso: {name}': 'Agent in use: {name}',
+  'Agente padrão': 'Default agent',
+  'Agente padrão: {name}': 'Default agent: {name}',
+  'Também rodam cards, pelo modelo de cada um: {names}.': "Also running cards, by each card's model: {names}.",
+  'Ligue outro agente para usar os modelos dele nos cards, junto com este.':
+    'Enable another agent to use its models in cards, alongside this one.',
   'Ainda não conectado pelo board': 'Not connected by the board yet',
   'Ver conexão': 'See connection',
-  'Mostra a conexão e a conta do agente em uso': 'Shows the connection and the account of the agent in use',
-  'Abre a aba Testar do agente em uso': 'Opens the Test tab of the agent in use',
-  'Em uso': 'In use',
+  'Mostra a conexão e a conta do agente padrão': 'Shows the connection and the account of the default agent',
+  'Abre a aba Testar do agente padrão': 'Opens the Test tab of the default agent',
 
   // a lista
   'Buscar agente': 'Search agents',
@@ -67,15 +69,15 @@ export const agentConnect: Record<string, string> = {
   'Abre o login num terminal; quando ele fechar, o board confere a conta e retoma o Conectar sozinho.':
     'Opens the sign-in in a terminal; when it closes, the board checks the account and resumes Connect on its own.',
   'Uso nos cards': 'Use in cards',
-  'Em uso nos cards': 'In use in cards',
-  'Usar nos cards': 'Use in cards',
+  'Padrão dos cards': 'Default for cards',
+  'Tornar padrão': 'Make default',
   'Ligue ou conecte o agente antes.': 'Enable or connect the agent first.',
-  'Os cards que não escolhem outro agente (pelo campo Modelo, pelo agente ou por uma regra) passam a rodar com este.':
-    'Cards that do not pick another agent (through the Model field, the agent or a rule) will run with this one.',
-  'É o agente que roda os cards que não escolhem outro. Para desligá-lo, ponha outro agente em uso antes.':
-    'This is the agent that runs the cards that do not pick another. To disable it, put another agent in use first.',
-  'Ligado: o campo Modelo dos cards, o chat e as regras de sugestão oferecem os modelos dele.':
-    "Enabled: the cards' Model field, the chat and the suggestion rules offer its models.",
+  'Os cards sem modelo (nem no card, nem no agente, nem por uma regra) passam a rodar com este. Os outros seguem no agente do modelo deles.':
+    "Cards with no model (not on the card, the agent or a rule) will run with this one. The others stay on their model's agent.",
+  'Roda os cards sem modelo; os com o modelo de outro agente ligado rodam nele, ao mesmo tempo. Para desligá-lo, torne outro agente padrão antes.':
+    "Runs the cards with no model; the ones with another enabled agent's model run on that agent, at the same time. To disable it, make another agent the default first.",
+  'Ligado: roda os cards com um modelo dele, ao mesmo tempo que os outros agentes. O campo Modelo dos cards, o chat e as regras de sugestão oferecem os modelos dele.':
+    "Enabled: runs the cards with one of its models, alongside the other agents. The cards' Model field, the chat and the suggestion rules offer its models.",
   'Desligado: o board não roda nada com ele.': 'Disabled: the board runs nothing with it.',
   'Conectado: {summary}.': 'Connected: {summary}.',
   'Cópias e perfis personalizados não passam pelo Conectar: em Detalhes, verifique as capacidades e dê a ciência do regime; depois, ligue o perfil aqui.':
