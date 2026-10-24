@@ -45,6 +45,7 @@
 
 ### Corrigido
 
+- **Sugestão de modelo: os botões de subir, descer, editar e remover de cada regra ficavam colados.** As áreas de clique se sobrepunham; agora há espaço entre elas, e a linha de ações não quebra.
 - **Configurações › Ferramentas de IA: os defeitos achados no teste de ponta a ponta com o rastreio do board.**
   - **Perfil de CLI personalizado:**
     - Com o perfil personalizado de CLI como padrão, **Trabalhar na fase** ficava desligado com um motivo errado ("O perfil não declara argumentos para esta permissão restrita.", mesmo com os argumentos preenchidos). O motivo real é que esse perfil não passa na admissão por capacidades: o board não consegue provar o que um comando qualquer acessa. Agora o botão fica desligado com esse motivo e a indicação de usar uma ferramenta do catálogo pelo Conectar. O personalizado ACP antigo segue rodando.

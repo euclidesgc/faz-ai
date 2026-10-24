@@ -2909,6 +2909,15 @@ body.host-web .drawer {
   flex-wrap: wrap;
   gap: var(--sp-4) var(--sp-8);
 }
+/* numa célula de tabela, os ícones ficam numa linha só, com espaço para o clique entre eles: o botão
+   ghost do Radix tem margem negativa, que sobreporia as áreas de clique vizinhas */
+.table td .row-actions {
+  flex-wrap: nowrap;
+  gap: var(--sp-8);
+}
+.table td .row-actions .rt-IconButton {
+  margin: 0;
+}
 .scope-group {
   margin-top: var(--sp-12);
 }

@@ -265,39 +265,41 @@ export function ModelRulesEditor() {
               <td>{describeRule(state, r, { word: t, name: dt })}</td>
               <td>{modelDisplay(state.board.modelCatalog, r.model, true)}</td>
               <td className="narrow">
-                <IconButton
-                  variant="ghost"
-                  color="gray"
-                  title={t('Subir (tem prioridade sobre as de baixo)')}
-                  aria-label={t('Subir')}
-                  disabled={i === 0}
-                  onClick={() => move(i, -1)}
-                >
-                  <IconArrowUp />
-                </IconButton>
-                <IconButton
-                  variant="ghost"
-                  color="gray"
-                  title={t('Descer')}
-                  aria-label={t('Descer')}
-                  disabled={i === rules.length - 1}
-                  onClick={() => move(i, 1)}
-                >
-                  <IconArrowDown />
-                </IconButton>
-                <IconButton variant="ghost" color="gray" title={t('Editar')} aria-label={t('Editar')} onClick={() => setEditing(r)}>
-                  <IconEdit />
-                </IconButton>
-                {/* sem confirmação de propósito: a regra pode ser remontada em segundos */}
-                <IconButton
-                  variant="ghost"
-                  color="red"
-                  title={t('Remover da lista')}
-                  aria-label={t('Remover da lista')}
-                  onClick={() => setRules(sent.current().filter((x) => x.id !== r.id))}
-                >
-                  <IconTrash />
-                </IconButton>
+                <div className="row-actions">
+                  <IconButton
+                    variant="ghost"
+                    color="gray"
+                    title={t('Subir (tem prioridade sobre as de baixo)')}
+                    aria-label={t('Subir')}
+                    disabled={i === 0}
+                    onClick={() => move(i, -1)}
+                  >
+                    <IconArrowUp />
+                  </IconButton>
+                  <IconButton
+                    variant="ghost"
+                    color="gray"
+                    title={t('Descer')}
+                    aria-label={t('Descer')}
+                    disabled={i === rules.length - 1}
+                    onClick={() => move(i, 1)}
+                  >
+                    <IconArrowDown />
+                  </IconButton>
+                  <IconButton variant="ghost" color="gray" title={t('Editar')} aria-label={t('Editar')} onClick={() => setEditing(r)}>
+                    <IconEdit />
+                  </IconButton>
+                  {/* sem confirmação de propósito: a regra pode ser remontada em segundos */}
+                  <IconButton
+                    variant="ghost"
+                    color="red"
+                    title={t('Remover da lista')}
+                    aria-label={t('Remover da lista')}
+                    onClick={() => setRules(sent.current().filter((x) => x.id !== r.id))}
+                  >
+                    <IconTrash />
+                  </IconButton>
+                </div>
               </td>
             </tr>
           ))}

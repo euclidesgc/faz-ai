@@ -45,6 +45,7 @@
 
 ### Fixed
 
+- **Model suggestion: the move up, move down, edit and remove buttons of each rule were stuck together.** Their click areas overlapped; now there is room between them, and the action row does not wrap.
 - **Settings › AI tools: the defects found in the end-to-end test with the board trace.**
   - **Custom CLI profile:**
     - With a custom CLI profile as the default, **Trabalhar na fase** (work on the phase) stayed off with the wrong reason ("The profile declares no arguments for this restricted permission.", even with the arguments filled in). The real reason is that this profile does not pass capability admission: the board cannot prove what an arbitrary command accesses. The button now stays off with that reason and the hint to use a catalog tool through Connect. The legacy custom ACP profile keeps running.
