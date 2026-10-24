@@ -2656,9 +2656,11 @@ h4 {
   font-weight: 600;
 }
 
-/* navegação do topo: abas discretas, para a cor de destaque ficar só nas ações principais */
+/* navegação do topo: abas discretas, para a cor de destaque ficar só nas ações principais. Num painel
+   estreito as ações descem para uma segunda linha em vez de empurrar o nome do board e os ícones para fora */
 .topbar {
-  gap: var(--sp-12);
+  flex-wrap: wrap;
+  gap: var(--sp-4) var(--sp-12);
   min-height: 42px;
 }
 .topbar nav button {
@@ -4743,7 +4745,9 @@ div.metrics-breakdown {
 .connect-tools button:where(:not([class*='rt-'])) {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  /* esticado e quebrando linha: os botões herdam nowrap, e o texto da cobrança vazava da borda */
+  align-items: stretch;
+  white-space: normal;
   gap: var(--sp-2);
   width: 100%;
   padding: var(--sp-8) var(--sp-12);
@@ -4757,6 +4761,9 @@ div.metrics-breakdown {
 .connect-tools button:where(:not([class*='rt-'])):hover {
   background: var(--hover);
 }
+.connect-tools button .small {
+  overflow-wrap: anywhere;
+}
 .connect-tools button[aria-pressed='true'] {
   border-color: var(--accent);
   box-shadow: var(--shadow-select-1);
@@ -4765,6 +4772,11 @@ div.metrics-breakdown {
   display: flex;
   flex-direction: column;
   gap: var(--sp-12);
+}
+.connect-tool-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
 }
 .connect-mode-head {
   display: flex;

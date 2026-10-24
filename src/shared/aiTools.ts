@@ -300,7 +300,7 @@ export const TOOLS: readonly AiToolEntry[] = [
     id: a.id,
     name: a.name,
     docs: a.docs,
-    billing: 'A da conta da própria ferramenta; confira na página oficial.',
+    billing: 'Cobrança da conta da própria ferramenta; confira na página oficial.',
     modes: [
       {
         mode: 'acp',
@@ -308,7 +308,7 @@ export const TOOLS: readonly AiToolEntry[] = [
           name: a.name,
           consumption: a.consumption,
           signIn: 'login da própria ferramenta, pelo protocolo ou no terminal',
-          billing: 'a da conta da ferramenta',
+          billing: 'da conta da ferramenta',
         }),
         enforcement: ACP_ENFORCEMENT,
       },

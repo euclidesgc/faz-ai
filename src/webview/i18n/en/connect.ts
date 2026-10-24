@@ -172,11 +172,11 @@ export const connect: Record<string, string> = {
   'o agente completo do Kimi Code, numa passada, com a permissão sempre automática':
     'the full Kimi Code agent, in a single pass, with permission always automatic',
   'conta do Kimi Code': 'Kimi Code account',
-  'A da conta da própria ferramenta; confira na página oficial.': 'The tool’s own account billing; check the official page.',
+  'Cobrança da conta da própria ferramenta; confira na página oficial.': 'The tool’s own account billing; check the official page.',
   'É o único modo que a extensão oferece para esta ferramenta.': 'It is the only mode the extension offers for this tool.',
   'tokens do último pedido do turno': 'tokens for the last request of the turn',
   'login da própria ferramenta, pelo protocolo ou no terminal': 'the tool’s own sign-in, through the protocol or in the terminal',
-  'a da conta da ferramenta': 'the tool’s account billing',
+  'da conta da ferramenta': 'the tool’s own account',
   'quando se quer o agente do {name} decidindo como trabalhar, com o board respondendo cada pedido':
     'when you want the {name} agent deciding how to work, with the board answering each request',
   'tokens e custo do turno': 'tokens and cost for the turn',
