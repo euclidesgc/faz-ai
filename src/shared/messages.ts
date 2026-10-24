@@ -410,7 +410,17 @@ export type HostToWebview =
   | { type: 'boardState'; state: BoardState; attachmentsBaseUri: string }
   | {
       type: 'aiProfiles.status';
-      profiles: Record<string, { found: boolean; version: string | null; signedIn: boolean | null; installUrl: string | null }>;
+      profiles: Record<
+        string,
+        {
+          found: boolean;
+          version: string | null;
+          signedIn: boolean | null;
+          installUrl: string | null;
+          /** a sonda não rodou: o perfil está desligado ou pendente de revisão (`found: false` aqui não é "não instalada") */
+          skipped?: 'off' | 'pending';
+        }
+      >;
     }
   | { type: 'aiProfiles.testResult'; id: string; ok: boolean; output: string; error?: string }
   | { type: 'ui.openCard'; cardId: Id }

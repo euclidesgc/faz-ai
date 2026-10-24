@@ -82,6 +82,29 @@ it('sonda perfis com resolução falsa e só devolve metadados públicos', async
   expect(JSON.stringify(result)).not.toContain('fake-cli');
 });
 
+it('perfil desligado não é sondado e volta marcado como desligado, não como "não encontrado"', async () => {
+  const saved = repo.save(router.boardId, draft(), 'person');
+  router.handle({ type: 'settings.aiProfiles.setEnabled', id: saved.id, enabled: false });
+  const resolve = vi.fn(() => '/fake/bin');
+  const runtime = createAiProfileRuntime({
+    repo,
+    gateway: { run: vi.fn() },
+    boardId: () => router.boardId,
+    cwd: dir,
+    homeDir: dir,
+    pathEnv: () => '/fake',
+    resolve,
+    version: vi.fn(async () => '1.2.3'),
+    signedIn: vi.fn(async () => true),
+  });
+  const result = await runtime.probe();
+  expect(result.profiles[saved.id]).toEqual({ found: false, version: null, signedIn: null, installUrl: null, skipped: 'off' });
+  // os prontos desligados (o Codex, por exemplo) também: a CLI pode estar instalada
+  expect(result.profiles['codex-acp']).toMatchObject({ found: false, skipped: 'off' });
+  // o ligado segue sondado, sem a marca
+  expect(result.profiles.claude).not.toHaveProperty('skipped');
+});
+
 it('Testar usa origem test, NO_CARD, permissão board e 60 linhas; recusa teste concorrente sem revelar env', async () => {
   const calls: unknown[] = [];
   let finish: ((end: unknown) => void) | undefined;

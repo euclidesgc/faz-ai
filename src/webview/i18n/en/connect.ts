@@ -102,6 +102,8 @@ export const connect: Record<string, string> = {
   'Grava a sua ciência para este perfil; a revisão sobe a cada vez.':
     'Records your acknowledgment for this profile; the revision goes up each time.',
   'Entendo o que a ferramenta carrega': 'I understand what the tool loads',
+  'Dá de novo a sua ciência do regime compatível: o perfil volta a rodar, sem refazer o Conectar.':
+    'Gives your acknowledgment of the compatible regime again: the profile runs again, without redoing Connect.',
   'Abre um terminal com o comando de login.': 'Opens a terminal with the sign-in command.',
   'Tentar de novo': 'Try again',
   'Abrir o Conectar': 'Open Connect',

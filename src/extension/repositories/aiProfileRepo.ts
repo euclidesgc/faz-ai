@@ -193,6 +193,10 @@ export class AiProfileRepo {
             else env[name] = secret as string;
           }
           config.env = env;
+        } else if (key === 'permissionArgs' && value && typeof value === 'object' && !Array.isArray(value)) {
+          // por nível, como o ambiente: a edição manda só o nível preenchido, e trocar o objeto inteiro apagava os
+          // outros (o "deixe vazio para manter" não valia). Um nível enviado como lista vazia é esvaziado de propósito
+          config.permissionArgs = { ...(config.permissionArgs ?? {}), ...(value as AiProfileConfig['permissionArgs']) };
         } else config[key] = value;
       }
       const errors = validateProfile({ ...draft, kind, config });

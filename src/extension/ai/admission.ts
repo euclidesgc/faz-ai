@@ -14,6 +14,7 @@ import {
   type ExecutionTransport,
   type StrictExecutionRequest,
   type ExecutionAdmissionDecision,
+  type ExecutorCapability,
 } from '../../shared/executionAdmission';
 import { executorToolOf, isAcpProfile, isReadyCli } from '../../shared/aiProfiles';
 import { resolveCommand } from '../cliResolve';
@@ -35,11 +36,41 @@ const TRANSPORT_OF: Record<ExecutionTransport, string> = {
   api: 'do modo API',
 };
 
+/** As capacidades como a tela de Ferramentas de IA as nomeia. */
+const CAPABILITY_TEXT: Record<ExecutorCapability, string> = {
+  conversation: 'conversa nova',
+  artifacts: 'controle de artefatos',
+  permissions: 'permissões',
+  mcp: 'MCP',
+  delegation: 'delegação',
+};
+
+/**
+ * O motivo do bloqueio em frase, para a pessoa: os códigos crus ("capability-not-verified/conversation, …") iam
+ * direto para a tela do Testar e para a conversa do card. Um código sem frase própria segue como veio.
+ */
+export function admissionBlockedText(decision: Pick<ExecutionAdmissionDecision, 'reasons'>): string {
+  const unverified = decision.reasons.flatMap((r) =>
+    r.code === 'capability-not-verified' && r.capability ? [CAPABILITY_TEXT[r.capability]] : [],
+  );
+  const parts: string[] = [];
+  if (unverified.length)
+    parts.push(
+      `o perfil ainda não teve verificado: ${unverified.join(', ')}. Em Configurações › Ferramentas de IA, use o Conectar da ferramenta ou "Verificar capacidades", nos perfis que têm um dos dois (o personalizado de CLI não tem)`,
+    );
+  for (const r of decision.reasons) {
+    if (r.code === 'capability-not-verified' && r.capability) continue;
+    if (r.code === 'compatibility-not-reviewed')
+      parts.push('o perfil roda no regime compatível e falta a sua ciência, no cartão do perfil');
+    else if (r.code === 'tool-mapping-unavailable') parts.push('o board não sabe traduzir as ferramentas do card para esta CLI');
+    else parts.push(r.capability ? `${r.code}/${r.capability}` : r.code);
+  }
+  return `Execução bloqueada pela admissão: ${parts.join('; ')}.`;
+}
+
 export class AdmissionBlockedError extends Error {
   constructor(readonly decision: ExecutionAdmissionDecision) {
-    super(
-      `Execução bloqueada pela admissão: ${decision.reasons.map((r) => (r.capability ? `${r.code}/${r.capability}` : r.code)).join(', ')}.`,
-    );
+    super(admissionBlockedText(decision));
     this.name = 'AdmissionBlockedError';
   }
 }

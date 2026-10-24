@@ -241,6 +241,18 @@ export class HostBridge {
     }
   }
 
+  /**
+   * Refaz a situação dos perfis depois de uma ação que a muda (ligar, conectar). A ação já deu certo: um host sem
+   * sonda (os testes) ou uma sonda que falha não a desfazem nem viram erro dela.
+   */
+  private async reprobe(): Promise<void> {
+    try {
+      this.post(await this.router.probeAiProfiles());
+    } catch {
+      /* sem sonda neste host: a lista fica com a situação anterior até o "Verificar situação" */
+    }
+  }
+
   private async dispatch(msg: WebviewToHost): Promise<void> {
     switch (msg.type) {
       case 'ready':
@@ -270,6 +282,14 @@ export class HostBridge {
           // o cartão do modo; o Conectar confere que a ferramenta o oferece antes de usar
           ...(typeof msg.mode === 'string' ? { mode: msg.mode } : {}),
         });
+        // o Conectar acha a ferramenta e pode ligar o perfil: a situação da lista de perfis é refeita, senão a linha
+        // mostrava "Conectada" ao lado do "Não encontrada" de antes
+        await this.reprobe();
+        return;
+      // ligar ou desligar muda o que a sonda pode olhar: a situação vem refeita junto
+      case 'settings.aiProfiles.setEnabled':
+        this.router.handle(msg);
+        await this.reprobe();
         return;
       // a verificação do perfil que não passa pelo Conectar (a cópia do Claude, o personalizado ACP): o `done`
       // sai no fim das sondas, e a frase do resultado vira aviso. A faixa de requisitos não é conferida aqui: o

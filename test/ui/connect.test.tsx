@@ -262,7 +262,14 @@ describe('Conectar ferramenta: o fluxo na tela', () => {
     syncStore(board.router);
     confirmLast();
     expect(await screen.findByText(/regime compatível, sem ciência: o perfil não roda/)).toBeInTheDocument();
-    expect(within(screen.getByLabelText('Gemini CLI · ACP')).queryByRole('button', { name: 'Revogar ciência' })).toBeNull();
+    const card = screen.getByLabelText('Gemini CLI · ACP');
+    expect(within(card).queryByRole('button', { name: 'Revogar ciência' })).toBeNull();
+    // o passo da ciência volta a esperar a pessoa, em vez de "feito" ao lado do "sem ciência" do resumo
+    expect(within(card).getByText('Ciência do regime:').closest('li')).toHaveAttribute('data-state', 'waiting');
+    expect(within(card).getByText('Ciência do regime:').closest('li')).toHaveTextContent('espera você');
+    // e a ciência volta pelo próprio cartão, sem refazer o Conectar
+    await userEvent.click(within(card).getByRole('button', { name: 'Entendo o que a ferramenta carrega' }));
+    expect(lastSent('settings.aiProfiles.review')).toMatchObject({ id: 'gemini', accept: true });
   });
 
   it('a lista dos perfis diz quando o Conectar espera você, apontando para o cartão', () => {

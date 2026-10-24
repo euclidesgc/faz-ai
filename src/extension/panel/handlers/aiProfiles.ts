@@ -79,7 +79,9 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
           let version: string | null = null;
           let signedIn: boolean | null = null;
           let installUrl: string | null = null;
-          if (profileCanProbe(meta)) {
+          // desligado ou pendente não é sondado: dizer "não encontrada" fazia parecer que a CLI não estava instalada
+          const skipped = profileCanProbe(meta) ? undefined : meta.enabled ? ('pending' as const) : ('off' as const);
+          if (!skipped) {
             try {
               const profile = deps.repo.resolveProfile(deps.boardId(), meta.id);
               installUrl = profileInstallUrl(profile);
@@ -99,7 +101,7 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
               // Uma configuração pendente ou indisponível nunca é apresentada como CLI validada.
             }
           }
-          return [meta.id, { found, version, signedIn, installUrl }] as const;
+          return [meta.id, { found, version, signedIn, installUrl, ...(skipped ? { skipped } : {}) }] as const;
         }),
       );
       return { type: 'aiProfiles.status', profiles: Object.fromEntries(results) };

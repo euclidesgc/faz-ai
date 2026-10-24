@@ -17,6 +17,8 @@ export const settings: Record<string, string> = {
   'Cópia de {base}': 'Copy of {base}',
   'A verificar': 'Not checked yet',
   'Não encontrada': 'Not found',
+  'Desligada: ligue para verificar': 'Off: turn it on to check',
+  'Pendente de revisão: salve o perfil para verificar': 'Pending review: save the profile to check',
   'Login vencido': 'Sign-in expired',
   'Encontrada · {version}': 'Found · {version}',
   'Encontrada · {version} · login não verificado': 'Found · {version} · sign-in not verified',

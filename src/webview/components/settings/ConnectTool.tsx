@@ -104,6 +104,13 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
    */
   const checksNow = mode?.mode === 'api' || mode?.mode === 'cli';
   const revoke = useAction(() => settings.reviewAiProfile(profile.id, false));
+  const accept = useAction(() => settings.reviewAiProfile(profile.id, true));
+  /**
+   * conectada no regime compatível, mas sem a ciência de agora (revogada depois): o passo da ciência volta a esperar
+   * a pessoa, com o botão para dar de novo, em vez de "feito" ao lado do "sem ciência" do resumo
+   */
+  const reviewMissing = state.status === 'connected' && state.summary.regime === 'compatible' && !review;
+  const reviewIndex = CONNECT_STEPS.indexOf('review');
   const current = CONNECT_STEPS.indexOf(state.step);
   const waitingKey = state.status === 'waiting' && state.needs === 'api-key';
   // o campo só limpa quando o fluxo passa do login (a chave foi aceita) ou termina: na recusa, o que a pessoa
@@ -113,6 +120,7 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
     if (pastSignIn && !changing) setApiKey('');
   }, [pastSignIn, changing, state.step, state.status]);
   const stepState = (i: number): string => {
+    if (reviewMissing && i === reviewIndex) return t('espera você');
     if (state.status === 'connected' || i < current) return t('feito');
     if (i > current) return t('a seguir');
     return t(state.status === 'running' ? 'em curso' : state.status === 'waiting' ? 'espera você' : 'falhou');
@@ -124,7 +132,18 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
     <div className="connect-progress" aria-busy={state.status === 'running' || connect.busy}>
       <ol className="connect-steps" aria-label={t('Passos do Conectar')}>
         {CONNECT_STEPS.map((step, i) => (
-          <li key={step} data-state={state.status === 'connected' || i < current ? 'done' : i === current ? state.status : 'next'}>
+          <li
+            key={step}
+            data-state={
+              reviewMissing && i === reviewIndex
+                ? 'waiting'
+                : state.status === 'connected' || i < current
+                  ? 'done'
+                  : i === current
+                    ? state.status
+                    : 'next'
+            }
+          >
             {t(STEP_NAMES[step])}: <span className="muted">{stepState(i)}</span>
           </li>
         ))}
@@ -134,7 +153,18 @@ export function ConnectProgress({ profile, state, mode }: { profile: AiProfile; 
           <p role="status" className="row">
             <IconCheck /> {t('Conectada')} · {connectionSummary(state.summary, review)}
           </p>
+          {reviewMissing && <p>{reviewText(profile.name)}</p>}
           <div className="row end">
+            {reviewMissing && (
+              <ActionButton
+                size="1"
+                hint={t('Dá de novo a sua ciência do regime compatível: o perfil volta a rodar, sem refazer o Conectar.')}
+                loading={accept.busy}
+                onClick={() => void accept.run()}
+              >
+                {t('Entendo o que a ferramenta carrega')}
+              </ActionButton>
+            )}
             {(state.summary.signIn === 'api-key' || state.summary.signIn === 'api-key-checked') && !changing && (
               <ActionButton
                 size="1"
