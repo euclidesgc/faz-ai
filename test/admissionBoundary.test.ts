@@ -295,6 +295,43 @@ describe('vínculo de isolamento saneado', () => {
     expect(admitted.decision.binding).toBe(board);
     expect(admitted.input.exec?.deniedTools).toContain('Agent');
     expect(acpSessionMode(gemini, admitted.input)).toBeUndefined();
+    // as listas do card chegam ao `boardDecision` no vocabulário do card: as negadas somam às da delegação, e
+    // a lista `tools` vai inteira (a decisão do ACP não lista nativas); o registro só mostra o que fica liberado
+    const card = admission.prepare(
+      acp,
+      acp.id,
+      {
+        prompt: 'objetivo',
+        permission: 'full',
+        exec: { tools: ['Read', 'Grep', 'Agent'], deniedTools: ['Bash', 'mcp__srv__x'] } as HeadlessInput['exec'],
+      },
+      dir,
+      reviewed,
+    );
+    expect(card.input.exec?.deniedTools).toEqual(expect.arrayContaining(['Agent', 'Task', 'Bash', 'mcp__srv__x']));
+    expect(card.input.exec?.tools).toEqual(['Read', 'Grep', 'Agent']);
+    expect(card.decision.tools).toEqual(['Read', 'Grep']);
+    expect(card.decision.deniedTools).toEqual(expect.arrayContaining(['Bash', 'mcp__srv__x']));
+    expect(acpSessionMode(gemini, card.input)).toBeUndefined();
+    // uma negada fora do vocabulário do card não tem tradução para o pedido: a execução não parte
+    let refused: unknown;
+    try {
+      admission.prepare(
+        acp,
+        acp.id,
+        { prompt: 'objetivo', permission: 'full', exec: { tools: [], deniedTools: ['Bash(rm:*)', 'bash', 'Read'] } as never },
+        dir,
+        reviewed,
+      );
+    } catch (e) {
+      refused = e;
+    }
+    expect(refused).toBeInstanceOf(AdmissionBlockedError);
+    expect((refused as AdmissionBlockedError).decision.reasons).toEqual([
+      { code: 'unsupported-native-restriction', resourceId: 'Bash(rm:*)' },
+      { code: 'unsupported-native-restriction', resourceId: 'bash' },
+    ]);
+    expect((refused as Error).message).toContain('que o ACP não reconhece');
   });
   it('variável volátil e as da sessão do Claude Code não mudam o vínculo; as que a ferramenta lê, mudam', () => {
     const claude = profile({ config: { command: exe('claude-g', 'binário G') } });

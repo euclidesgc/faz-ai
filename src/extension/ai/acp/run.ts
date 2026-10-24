@@ -22,6 +22,8 @@ import { MeasureBrokenError } from '../../aiOutput/errors';
 import type { ExecInput } from '../../execution';
 import { BOARD_SERVER, SUBAGENT_TOOLS } from '../../execution';
 import { ensureProjectServer } from '../../mcp/clientConfig';
+import { deniesMcpTool, equivalentsBreach, equivalentsOf } from '../../../shared/runCheck';
+import { NO_DELEGATION } from '../../../shared/executionAdmission';
 import type { HeadlessInput } from '../provider';
 import { AUTH_REQUIRED, RpcError, acpAuthenticate, rpcConnection } from './connection';
 import { version as EXTENSION_VERSION } from '../../../../package.json';
@@ -31,6 +33,7 @@ import {
   acpLoginHint,
   acpMcpToolOf,
   acpSessionMode,
+  NEVER_MCP_KINDS,
   type AcpAgent,
   type AcpAuth,
   type AcpMcpServer,
@@ -92,11 +95,17 @@ function subagentOf(call: AcpToolCall): string | null {
 /**
  * Decide pelo manifesto do card: ferramenta MCP só dos servidores do card, subagente só da lista de
  * ferramentas do card, edição e comando pelo nível. Na dúvida (título que não se reconhece), vale o nível.
+ *
+ * As negadas do card (`deniedTools`) estão no vocabulário do card (`Bash`, `Read`), e o pedido do agente
+ * chega no do protocolo: a ponte é a mesma tabela da conferência (`equivalentsOf`, `equivalentsBreach`).
+ * O nome interno da ferramenta (`call.native`, o Gemini CLI) vale quando o agente o deixa reconhecível; senão,
+ * o `kind`. Um kind sem equivalente (`think`, `switch_mode`, `other`) ou desconhecido segue o nível. A regra não
+ * depende do modo da sessão: é o board que responde cada pedido (a execução admitida nunca roda em yolo).
  */
 export function boardDecision(
   permission: RunnerPermission,
   call: AcpToolCall,
-  mcp: { server: string } | null,
+  mcp: { server: string; tool?: string } | null,
   servers: string[],
   exec?: Pick<ExecInput, 'tools' | 'deniedTools'>,
 ): AcpDecision {
@@ -106,9 +115,34 @@ export function boardDecision(
     const listed = (exec?.tools ?? []).some((t) => t.toLowerCase().startsWith(sub.toLowerCase()));
     if (!listed) return { allow: false, reason: `o subagente não está na lista do card` };
   }
-  const denied = (exec?.deniedTools ?? []).find((t) => call.title?.toLowerCase().startsWith(t.toLowerCase()));
+  const deniedTools = exec?.deniedTools ?? [];
+  const denied = deniedTools.find((t) => call.title?.toLowerCase().startsWith(t.toLowerCase()));
   if (denied) return { allow: false, reason: `a ferramenta ${denied} está negada no card` };
-  if (!boardAllows(permission, call, mcp, servers)) return { allow: false, reason: `fora do nível ${permission}` };
+  if (mcp) {
+    // o card nega pelo nome que o Claude Code usa (`mcp__servidor__ferramenta`, `mcp__servidor__*`)
+    const deniedMcp = mcp.tool !== undefined ? deniedTools.find((t) => deniesMcpTool(t, mcp.server, mcp.tool!)) : undefined;
+    if (deniedMcp) return { allow: false, reason: `a ferramenta ${deniedMcp} está negada no card` };
+  } else {
+    const kind = (call.kind ?? 'other').toLowerCase();
+    const native = call.native ? equivalentsOf(call.native, 'gemini') : null;
+    const byKind = equivalentsOf(kind, undefined);
+    // o nome interno decide, mas um kind que muda o computador soma os equivalentes dele: nome e kind
+    // divergentes (um nome de leitura num pedido de execute) não afrouxam a negação
+    const equivalents = native ? [...new Set([...native, ...(NEVER_MCP_KINDS.includes(kind) ? (byKind ?? []) : [])])] : byKind;
+    // só as negadas são impostas: a lista `tools` do card é conferida depois (`checkRun`), não recusada aqui,
+    // como no modo API (`ACP_ENFORCEMENT.tools: 'advised'`: a leitura nem passa pelo board, e impor a lista
+    // deixaria o agente sem subagentes, como o condutor no Gemini, sem editar). Por isso `tools: []` aqui
+    const breach = equivalents ? equivalentsBreach(equivalents, { tools: [], deniedTools }) : null;
+    if (breach && 'denied' in breach) return { allow: false, reason: `a ferramenta ${breach.denied} está negada no card` };
+    // sem nome interno, um pedido `other`, sem kind ou de kind desconhecido não diz que ferramenta é: com
+    // negadas do card além da delegação, fecha na dúvida (como o modo API com o nome que não reconhece).
+    // `think` e `switch_mode` não agem fora da sessão e seguem o nível
+    const cardDenies = deniedTools.some((t) => !NO_DELEGATION.includes(t));
+    if (!native && cardDenies && (kind === 'other' || byKind === null))
+      return { allow: false, reason: `o pedido não diz a ferramenta (${kind}) e o card nega ferramentas` };
+  }
+  if (!boardAllows(permission, { ...call, kind: call.kind?.toLowerCase() ?? null }, mcp, servers))
+    return { allow: false, reason: `fora do nível ${permission}` };
   return { allow: true, reason: null };
 }
 
@@ -179,7 +213,9 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
     },
     onRequest: (method, params) => {
       if (method !== 'session/request_permission') throw new RpcError(-32601, `método não suportado pelo board: ${method}`);
-      const call = toolCallOf(asObject(params.toolCall)) ?? { toolCallId: '?', title: null, kind: null };
+      const read = toolCallOf(asObject(params.toolCall)) ?? { toolCallId: '?', title: null, kind: null };
+      // o nome interno da ferramenta, quando o agente o deixa no id (o Gemini CLI): decide antes do `kind`
+      const call = { ...read, native: agent.nativeToolOf?.(read.toolCallId) ?? null };
       if (killed) return { outcome: { outcome: 'cancelled' } };
       const mcp = mcpToolOf(call);
       const { allow, reason } = boardDecision(input.permission, call, mcp, names, input.exec);

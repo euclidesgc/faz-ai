@@ -23,6 +23,7 @@ import { executorOf, type ApiInvocation, type Executor } from './drivers';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import { boardOnlyMcpConfig } from '../execution';
 import { deniedLocal, deniesTool } from '../../shared/apiTools';
+import { isCardToolName } from '../../shared/runCheck';
 import { canonical, constructionEvidence, CapabilityEvidenceStore } from './capabilityEvidence';
 import { INHERITED_SESSION_ENV } from '../spawn';
 
@@ -435,10 +436,30 @@ export class ExecutionAdmission {
     // No modo API quem executa as ferramentas locais é o board, pela lista admitida: as que o card nega
     // (`deniedTools` do manifesto, no vocabulário do card) saem dela e entram nas negadas, só restringindo.
     // O pedido legado não as leva à decisão (`native.deny` exige a tabela de uma CLI), e sem isto um `Bash`
-    // negado no card voltaria a valer pelo nível. No ACP a execução admitida também fica sem as negadas do
-    // card, mas lá o `boardDecision` as compara com o título do pedido do agente, no vocabulário dele (o
-    // `Bash` do card não casa com o `Shell` do Gemini): levá-las sem traduzir os nomes daria uma garantia
-    // aparente. A diferença fica aqui, explícita, como pendência do ACP (registro da história 11).
+    // negado no card voltaria a valer pelo nível. No ACP vale o mesmo, pelo outro lado: quem impõe é o
+    // `boardDecision`, que traduz cada pedido do agente (o `kind` do protocolo, ou o nome interno do Gemini)
+    // para o vocabulário do card pela tabela da conferência (registro ferramenta-por-modo-acp-negadas).
+    if (transport === 'acp') {
+      const valid = (t: unknown): t is string => typeof t === 'string' && !!t && !t.includes('\0');
+      const cardDenied = (input.exec?.deniedTools ?? []).filter(valid);
+      // uma negada fora do vocabulário do card (`Bash(rm:*)`, `bash`) não tem tradução para o pedido do agente:
+      // aceitá-la seria uma garantia aparente, então a execução não parte (o mesmo motivo do modo API)
+      const unknown = cardDenied.filter((t) => !isCardToolName(t));
+      if (unknown.length) {
+        const blocked = new AdmissionBlockedError({
+          ...preliminary,
+          state: 'blocked',
+          reasons: unknown.map((name) => ({ code: 'unsupported-native-restriction', resourceId: name })),
+        });
+        blocked.message = `Execução bloqueada pela admissão: o card nega ${unknown.map((n) => `"${n}"`).join(', ')}, que o ACP não reconhece. Use os nomes das ferramentas do card (Read, Glob, Grep, Write, Edit, Bash) ou mcp__servidor__ferramenta.`;
+        throw blocked;
+      }
+      // A lista do card vai para o registro e a conferência, no vocabulário do card (a decisão do ACP não lista
+      // nativas: o protocolo não tem lista de allow). Ela não recusa pedidos, como no modo API: o `boardDecision`
+      // impõe só as negadas, e um nome listado que também está negado (a delegação) continua negado.
+      effective.exec!.tools = [...new Set((input.exec?.tools ?? []).filter(valid))];
+      effective.exec!.deniedTools = [...new Set([...preliminary.deniedTools, ...cardDenied])];
+    }
     if (transport === 'api') {
       const cardDenied = (input.exec?.deniedTools ?? []).filter((t) => typeof t === 'string' && t && !t.includes('\0'));
       // um nome negado que o board não reconhece não vira "nada negado": a execução não parte (fechar na dúvida)
@@ -501,9 +522,10 @@ export class ExecutionAdmission {
       );
     }
     if (decision.state !== 'admitted') throw new AdmissionBlockedError(decision);
-    // o registro da admissão diz o que o laço do modo API de fato declara: a lista já sem as negadas do card
-    if (transport === 'api') {
-      decision.tools = [...effective.exec!.tools];
+    // o registro da admissão diz o que o board de fato impõe (o laço do modo API declara, o ACP responde
+    // cada pedido): a lista já sem as negadas do card
+    if (transport !== 'cli') {
+      decision.tools = effective.exec!.tools.filter((name) => !effective.exec!.deniedTools.includes(name));
       decision.deniedTools = [...effective.exec!.deniedTools];
     }
     const rebound = () => {

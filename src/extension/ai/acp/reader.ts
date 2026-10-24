@@ -48,7 +48,8 @@ export interface AcpReader {
 
 export const toolCallOf = (o: Json | null): AcpToolCall | null => {
   const id = asText(o?.toolCallId);
-  return id ? { toolCallId: id, title: asText(o?.title), kind: asText(o?.kind) } : null;
+  // o kind do protocolo é minúsculo; um agente que o escreva de outro jeito não escapa da tabela de equivalentes
+  return id ? { toolCallId: id, title: asText(o?.title), kind: asText(o?.kind)?.toLowerCase() ?? null } : null;
 };
 
 export function acpReader(opts: AcpReaderOptions): AcpReader {

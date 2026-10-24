@@ -113,25 +113,38 @@ const DENY_GROUPS: Record<string, Card[]> = {
   run_command: RUN_GROUP,
 };
 
+/**
+ * Os nomes de ferramenta que o board reconhece numa negada do card, na grafia de cada ferramenta: as tabelas de
+ * agente de cada ferramenta (o `FetchURL` do Kimi, os nomes do Gemini), os que o Gemini CLI registra sozinho, a
+ * delegação e os nomes do Claude Code fora da tabela. O modo API os lê sem diferenciar maiúsculas
+ * (`deniedLocal`); o ACP, na grafia exata (`isCardToolName`), porque lá a negada é comparada com equivalentes.
+ */
+export const KNOWN_TOOL_NAMES: readonly string[] = [
+  ...Object.values(AGENT_TOOLS).flatMap((groups) => groups.flatMap((g) => g.tools.map((t) => t.name))),
+  // os que o Gemini CLI registra sozinho (história 8: `save_memory`, o tópico, o modo de plano…)
+  ...Object.keys(GEMINI_TOOL_EQUIVALENTS),
+  ...SUBAGENT_NAMES,
+  // as que a tabela de agentes deixa de fora de propósito (o Claude Code sempre as tira de um subagente)
+  ...AGENT_TOOLS_ALWAYS_REMOVED,
+  // outros nomes do Claude Code que um card nega sem tirar nada daqui: o acompanhamento e o fim de um
+  // comando em segundo plano (o comando em si é `Bash`), o modo de plano, a pergunta e os comandos
+  // (code.claude.com/docs/en/tools-reference e nomes anteriores)
+  'KillShell',
+  'KillBash',
+  'BashOutput',
+  'SlashCommand',
+  'TodoRead',
+  // os nomes do Claude Code que `DENY_GROUPS` traz em minúsculas (anteriores ou fora da tabela)
+  'MultiEdit',
+  'LS',
+  'NotebookRead',
+];
+
+/** Um nome MCP numa negada: `mcp__servidor`, `mcp__servidor__ferramenta` ou `mcp__servidor__prefixo*`, com ponto no servidor. */
+export const MCP_DENY_ENTRY = /^mcp__[a-z0-9_.-]+(__[a-z0-9_.*-]+)?$/i;
+
 /** Os nomes que o board reconhece e que não tiram nada das ferramentas locais (rede, delegação, skills…). */
-const KNOWN_ELSEWHERE = new Set(
-  [
-    ...Object.values(AGENT_TOOLS).flatMap((groups) => groups.flatMap((g) => g.tools.map((t) => t.name))),
-    // os que o Gemini CLI registra sozinho (história 8: `save_memory`, o tópico, o modo de plano…)
-    ...Object.keys(GEMINI_TOOL_EQUIVALENTS),
-    ...SUBAGENT_NAMES,
-    // as que a tabela de agentes deixa de fora de propósito (o Claude Code sempre as tira de um subagente)
-    ...AGENT_TOOLS_ALWAYS_REMOVED,
-    // outros nomes do Claude Code que um card nega sem tirar nada daqui: o acompanhamento e o fim de um
-    // comando em segundo plano (o comando em si é `Bash`), o modo de plano, a pergunta e os comandos
-    // (code.claude.com/docs/en/tools-reference e nomes anteriores)
-    'KillShell',
-    'KillBash',
-    'BashOutput',
-    'SlashCommand',
-    'TodoRead',
-  ].map((n) => n.toLowerCase()),
-);
+const KNOWN_ELSEWHERE = new Set(KNOWN_TOOL_NAMES.map((n) => n.toLowerCase()));
 
 /**
  * As ferramentas locais que uma entrada de `deniedTools` do card tira. Vale o nome (sem diferenciar
@@ -149,7 +162,7 @@ export function deniedLocal(entry: string): Card[] | null {
   if (!name) return null;
   if (Object.hasOwn(DENY_GROUPS, name)) return DENY_GROUPS[name]!;
   // `mcp__servidor` (o servidor inteiro) ou `mcp__servidor__ferramenta`, com ponto no servidor (`claude.ai`)
-  if (/^mcp__[a-z0-9_.-]+(__[a-z0-9_.*-]+)?$/.test(name) || KNOWN_ELSEWHERE.has(name)) return [];
+  if (MCP_DENY_ENTRY.test(name) || KNOWN_ELSEWHERE.has(name)) return [];
   return null;
 }
 

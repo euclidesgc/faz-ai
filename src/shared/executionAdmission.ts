@@ -108,7 +108,8 @@ export interface ExecutionAdmissionDecision {
 }
 
 const CATEGORIES: readonly ToolCategory[] = ['read', 'edit', 'run', 'net', 'agents'];
-const NO_DELEGATION = ['Agent', 'Task', 'SendMessage', 'ListAgents'];
+/** As ferramentas de delegação que toda execução admitida nega. */
+export const NO_DELEGATION: readonly string[] = ['Agent', 'Task', 'SendMessage', 'ListAgents'];
 const known = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const texts = (v: unknown): v is string[] =>
   Array.isArray(v) && v.length <= 1000 && v.every((x) => typeof x === 'string' && !!x && !x.includes('\0')) && new Set(v).size === v.length;

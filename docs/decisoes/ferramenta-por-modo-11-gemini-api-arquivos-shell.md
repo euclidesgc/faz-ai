@@ -187,7 +187,8 @@ Reproduzidos no `ddca1e28` e corrigidos, cada um com teste em `test/apiTools.tes
   admitido (o pedido legado não as leva). Corrigido só no modo API. No ACP a mesma lacuna fica como
   pendência, explícita no código (`admission.ts`): lá o `boardDecision` compara as negadas com o título do
   pedido do agente, no vocabulário dele (o `Bash` do card não casa com o `Shell` do Gemini), e levar as
-  negadas sem traduzir os nomes daria uma garantia aparente.
+  negadas sem traduzir os nomes daria uma garantia aparente. Fechada em
+  [ferramenta-por-modo-acp-negadas](ferramenta-por-modo-acp-negadas.md).
 - **"Conferência com desvio real".** Com a lista do agente imposta, o modo API não teria desvio real
   possível em ferramenta local. A especificação pede os dois casos, e a regra do ACP (impor nível e
   negadas, conferir a lista) os dá; ver a alternativa descartada abaixo.
