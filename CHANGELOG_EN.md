@@ -2,7 +2,7 @@
 
 # Changelog
 
-## Unreleased
+## 0.48.0
 
 ### Added
 
