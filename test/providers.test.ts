@@ -286,9 +286,17 @@ it('Gemini pela CLI: um .env da pasta não redefine endpoint, credencial nem pro
   }
 });
 
-it('Gemini pela CLI: a chave recusada no result é login vencido; no ACP a recusa vem pelo protocolo', () => {
+it('Gemini pela CLI e pelo ACP: a chave recusada pela API é login vencido', () => {
   const tail = ['Terminou com erro: [API Error: {"error":{"code":400,"message":"API key not valid. Please pass a valid API key."'];
   expect(authFailed(geminiCli(), tail)).toBe(true);
-  expect(authFailed({ ...geminiCli(), mode: 'acp' }, tail)).toBe(false);
+  // a saída real do Gemini CLI 0.65.0 pelo ACP com a chave errada: o `authenticate` passa e o `session/prompt`
+  // falha com o 400 da API (rastreio do board, teste de ponta a ponta de Ferramentas de IA)
+  const acpTail = [
+    'Falhou: {"error":{"message":"{\\n  \\"error\\": {\\n    \\"code\\": 400,\\n    \\"message\\": \\"API key not valid. Please pass a valid API key.\\",',
+    '        "reason": "API_KEY_INVALID",',
+  ];
+  expect(authFailed({ ...geminiCli(), mode: 'acp' }, acpTail)).toBe(true);
+  // outro agente ACP com a mesma frase não é o Gemini: a regra é dele
+  expect(authFailed({ ...geminiCli(), tool: 'opencode', id: 'opencode', mode: 'acp' }, acpTail)).toBe(false);
   expect(authFailed(geminiCli(), ['Terminou com erro: [API Error: You have exhausted your daily quota on this model.]'])).toBe(false);
 });

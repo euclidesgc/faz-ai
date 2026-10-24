@@ -131,6 +131,8 @@ export function AiToolsSettings() {
   const statusOf = (p: AiProfile) => {
     const s = statuses[p.id];
     if (!s) return t('A verificar');
+    if (s.skipped === 'off') return t('Desligada: ligue para verificar');
+    if (s.skipped === 'pending') return t('Pendente de revisão: salve o perfil para verificar');
     if (!s.found) return t('Não encontrada');
     if (s.signedIn === false) return t('Login vencido');
     if (s.signedIn === null)

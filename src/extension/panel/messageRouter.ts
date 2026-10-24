@@ -261,6 +261,21 @@ export class MessageRouter {
     return this.ctx.boardId;
   }
 
+  /**
+   * O perfil padrão como a execução o vê. O snapshot leva só a configuração pública do perfil, sem os argumentos
+   * por permissão do personalizado (ficam no cofre): conferir por ela dizia "não declara argumentos" mesmo com eles
+   * preenchidos, e o "Trabalhar na fase" nunca ligava. Sem a configuração local (perfil pendente), vale a pública.
+   */
+  private runnableProfile(board: BoardState['board']): AiProfile {
+    const profile = activeProfile(board);
+    if (profile.kind !== 'custom') return profile;
+    try {
+      return new AiProfileRepo(this.ctx.dbHandle.db).resolveProfile(this.boardId, profile.id);
+    } catch {
+      return profile;
+    }
+  }
+
   /** O rastreio do board, compartilhado pelas interfaces e pelo servidor MCP; sem um nas opções, não grava. */
   get trace(): Trace {
     return this.ctx.opts.trace ?? NO_TRACE;
@@ -488,7 +503,7 @@ export class MessageRouter {
       chat: this.chat,
       autopilot: this.autopilot,
       // o perfil padrão resolvido, não o id: um personalizado ou ACP como padrão não é "indisponível"
-      aiRunUnsupported: headlessUnsupported(activeProfile(s.board), s.board.runner.permission),
+      aiRunUnsupported: headlessUnsupported(this.runnableProfile(s.board), s.board.runner.permission),
       requirements: this.requirements,
       requirementsCheckedAt: this.requirementsCheckedAt,
       authExpired: this.authExpired,
@@ -601,10 +616,14 @@ export class MessageRouter {
 
   /** O que falta para o board trabalhar com a ferramenta de IA (informado pelo host, que confere). */
   setRequirements(list: BoardRequirement[]): void {
-    // avisa mesmo sem mudança: o "Verificar de novo" da interface espera o fim da conferência
+    // só avisa quando a lista muda (ou na primeira conferência). Com o perfil padrão sem login, a conferência roda a
+    // cada 10 s, e avisar sempre remontava e reenviava o board inteiro a todas as interfaces, sem nada mudar. O
+    // "Verificar de novo" não depende do aviso: espera a própria ação (`recheckRequirements`) e o `done` dela
+    const changed = !this.requirementsCheckedAt || JSON.stringify(list) !== JSON.stringify(this.requirements);
     this.requirements = list;
     this.requirementsCheckedAt = Date.now();
-    this.notify();
+    if (changed) this.notify();
+    else this.invalidateSnapshot();
   }
 
   /** Quem confere os requisitos quando a pessoa pede "Verificar de novo"; resolve ao terminar e rejeita se falhou. */

@@ -51,6 +51,30 @@ beforeEach(async () => {
   );
 });
 
+describe('HostBridge: situação dos perfis depois de ligar', () => {
+  it('ligar ou desligar um perfil reenvia a situação, sem esperar o "Verificar situação"', async () => {
+    let probes = 0;
+    router.setAiProfileRuntime({
+      probe: async () => (
+        probes++,
+        { type: 'aiProfiles.status', profiles: { 'codex-acp': { found: true, version: '2.2.2', signedIn: null, installUrl: null } } }
+      ),
+      test: async (id) => ({ type: 'aiProfiles.testResult', id, ok: true, output: '' }),
+    });
+    await bridge.handle({ type: 'settings.aiProfiles.setEnabled', id: 'codex-acp', enabled: true, requestId: 'on' });
+    expect(router.snapshot().board.aiProfiles.find((p) => p.id === 'codex-acp')?.enabled).toBe(true);
+    expect(probes).toBe(1);
+    // a situação nova chega antes da confirmação da ação
+    const types = sent.map((m) => m.type);
+    expect(types.indexOf('aiProfiles.status')).toBeLessThan(types.indexOf('done'));
+  });
+
+  it('sem sonda no host, ligar o perfil continua dando certo', async () => {
+    await bridge.handle({ type: 'settings.aiProfiles.setEnabled', id: 'codex-acp', enabled: true, requestId: 'on' });
+    expect(sent).toContainEqual({ type: 'done', requestId: 'on', ok: true });
+  });
+});
+
 describe('HostBridge: preferências da pessoa', () => {
   it('publica status e resultado do teste de perfil sem configuração privada', async () => {
     router.setAiProfileRuntime({
