@@ -13,6 +13,9 @@ const api: VsCodeApi | null = typeof acquireVsCodeApi === 'function' ? acquireVs
 /** O board está numa página do navegador (servida pelo Faz AI), e não num webview do editor. */
 export const isWeb: boolean = !api && typeof document !== 'undefined' && document.getElementById('root')?.dataset.host === 'web';
 
+/** Há um host do outro lado (o editor ou o servidor do navegador); sem ele, a página está solta (testes, Vite). */
+export const hasHost: boolean = !!api || isWeb;
+
 const UI_STATE_KEY = 'fazai.ui';
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 

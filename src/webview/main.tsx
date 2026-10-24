@@ -6,6 +6,7 @@ import { ChatApp } from './ChatApp';
 import { useLocale } from './i18n';
 import { FiltersApp } from './FiltersApp';
 import { isWeb } from './vscode';
+import { installUiTrace } from './trace';
 import { Theme } from '@radix-ui/themes';
 // Radix Themes antes dos nossos estilos: só os tokens base, as escalas que os componentes usam (os
 // valores são os mesmos de tokens.css) e os componentes; sem utilities.css
@@ -32,6 +33,9 @@ if (isWeb) {
     window.open(link.href, '_blank', 'noopener');
   });
 }
+
+// cliques, erros e tempos de resposta vão para o rastreio do board, junto das mensagens que o host recebe
+installUiTrace();
 
 // a tela "Carregando…" já nasce com tema; a preferência salva chega depois, com o board
 applyTheme('system');
