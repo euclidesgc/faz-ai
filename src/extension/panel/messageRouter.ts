@@ -30,7 +30,7 @@ import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
 import { agentProfiles } from '../../shared/execution';
 import { columnsOf } from '../../shared/selectors';
 import type { AttachmentStore } from '../attachments';
-import { headlessUnsupported } from '../headless';
+import { customCliUnsupported, headlessUnsupported } from '../headless';
 import { activeProfile, isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
 import type { ConnectInput, ConnectState, ConnectSummary } from '../../shared/connect';
 import type { ToolMode } from '../../shared/aiTools';
@@ -261,21 +261,6 @@ export class MessageRouter {
     return this.ctx.boardId;
   }
 
-  /**
-   * O perfil padrão como a execução o vê. O snapshot leva só a configuração pública do perfil, sem os argumentos
-   * por permissão do personalizado (ficam no cofre): conferir por ela dizia "não declara argumentos" mesmo com eles
-   * preenchidos, e o "Trabalhar na fase" nunca ligava. Sem a configuração local (perfil pendente), vale a pública.
-   */
-  private runnableProfile(board: BoardState['board']): AiProfile {
-    const profile = activeProfile(board);
-    if (profile.kind !== 'custom') return profile;
-    try {
-      return new AiProfileRepo(this.ctx.dbHandle.db).resolveProfile(this.boardId, profile.id);
-    } catch {
-      return profile;
-    }
-  }
-
   /** O rastreio do board, compartilhado pelas interfaces e pelo servidor MCP; sem um nas opções, não grava. */
   get trace(): Trace {
     return this.ctx.opts.trace ?? NO_TRACE;
@@ -503,7 +488,8 @@ export class MessageRouter {
       chat: this.chat,
       autopilot: this.autopilot,
       // o perfil padrão resolvido, não o id: um personalizado ou ACP como padrão não é "indisponível"
-      aiRunUnsupported: headlessUnsupported(this.runnableProfile(s.board), s.board.runner.permission),
+      aiRunUnsupported:
+        customCliUnsupported(activeProfile(s.board)) ?? headlessUnsupported(activeProfile(s.board), s.board.runner.permission),
       requirements: this.requirements,
       requirementsCheckedAt: this.requirementsCheckedAt,
       authExpired: this.authExpired,

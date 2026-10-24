@@ -151,6 +151,8 @@ export const host: Record<string, string> = {
   'Perfis configuráveis exigem contrato e admissão por capacidades.': 'Configurable profiles require a contract and capability admission.',
   'Perfil genérico sem tradução do contrato neutro.': 'Generic profile has no neutral contract mapping.',
   'O perfil não declara argumentos para esta permissão restrita.': 'The profile declares no arguments for this restricted permission.',
+  'O perfil personalizado de CLI não roda cards: o board não consegue provar o que ele acessa. Use uma ferramenta do catálogo pelo Conectar, em Configurações › Ferramentas de IA.':
+    'A custom CLI profile does not run cards: the board cannot prove what it accesses. Use a catalog tool through Connect, in Settings › AI tools.',
   'Arquivo MCP do perfil precisa ser relativo ao projeto.': 'The profile MCP file must be relative to the project.',
 
   'Perfil desativado ou pendente de revisão.': 'Profile disabled or pending review.',

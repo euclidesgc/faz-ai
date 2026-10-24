@@ -1,7 +1,7 @@
 // A fachada de montagem do comando da CLI. Quem sabe montar o comando de cada ferramenta é o provider
 // dela (`ai/providers/`); aqui ficam só as perguntas que o resto do board faz sobre isso.
 import { isAiBase } from '../shared/harness';
-import { isAcpProfile } from '../shared/aiProfiles';
+import { isAcpProfile, type AiProfile } from '../shared/aiProfiles';
 import type { RunnerPermission } from '../shared/runner';
 import { providerFor, executorProfile, type AiExecutor } from './ai/providers';
 
@@ -23,6 +23,19 @@ export function headlessUnsupported(executor: AiExecutor, permission: RunnerPerm
   if (tool === 'claude' && permission === 'full' && uid === 0)
     return 'O Claude Code não roda "Sem restrições" como root (comum em contêineres e no WSL como root), e o modo autônomo usa esse nível. Rode o editor com um usuário comum, ou escolha "Board e arquivos" em Configurações → Harness → Execução pela conversa.';
   return null;
+}
+
+/**
+ * O perfil personalizado de CLI não passa na admissão por capacidades: o board não prova o que um comando qualquer
+ * acessa (não é verificável, história 13) nem traduz as ferramentas do card para ele (`tool-mapping-unavailable`).
+ * O "Trabalhar na fase" desliga antes do clique com este motivo, em vez de ligar e a execução ser recusada.
+ */
+export const CUSTOM_CLI_UNSUPPORTED =
+  'O perfil personalizado de CLI não roda cards: o board não consegue provar o que ele acessa. Use uma ferramenta do catálogo pelo Conectar, em Configurações › Ferramentas de IA.';
+
+/** O motivo de um perfil personalizado de CLI não rodar; null nos demais (o personalizado ACP antigo segue rodando). */
+export function customCliUnsupported(profile: AiProfile): string | null {
+  return profile.kind === 'custom' && !isAcpProfile(profile) ? CUSTOM_CLI_UNSUPPORTED : null;
 }
 
 export function headlessCommand(tool: AiExecutor, input: HeadlessInput): HeadlessCommand {

@@ -42,7 +42,7 @@
 
 - **Settings › AI tools: the defects found in the end-to-end test with the board trace.**
   - **Custom CLI profile:**
-    - With a custom profile as the default, **Trabalhar na fase** (work on the phase) stayed off with "The profile declares no arguments for this restricted permission.", even with the arguments filled in. The check looked at the copy of the profile sent to the screen, which has no arguments. It now uses the configuration the run uses.
+    - With a custom CLI profile as the default, **Trabalhar na fase** (work on the phase) stayed off with the wrong reason ("The profile declares no arguments for this restricted permission.", even with the arguments filled in). The real reason is that this profile does not pass capability admission: the board cannot prove what an arbitrary command accesses. The button now stays off with that reason and the hint to use a catalog tool through Connect. The legacy custom ACP profile keeps running.
     - Editing one permission level's arguments erased the other levels', contrary to "leave empty to keep". Now each level is saved on its own, and a level sent empty is emptied on purpose.
   - **Gemini over ACP with a rejected key:** the wrong key got through Connect (Gemini does not check it at sign-in), and on the run the card went to **Blocked** with the API's raw JSON. The board now recognizes the API refusal (`API_KEY_INVALID`) over ACP too and treats it as an expired sign-in, as it already did for the CLI.
   - **Profile status:**
