@@ -101,6 +101,11 @@ mesmo id, as mesmas políticas, o mesmo catálogo de modelos e a mesma chave.
    delas, sem pergunta: as cinco capacidades provadas dão o regime exclusivo; permissões, MCP e
    delegação provadas, o compatível. Um agente ACP é sempre compatível (os arquivos de contexto que
    ele lê sozinho não têm prova pelo protocolo). O modo API é exclusivo por construção, sem sonda.
+   No ACP, a prova de MCP é o agente conectar no servidor de teste que o board entrega na sessão. Cada
+   agente liga os servidores num momento: ao abrir a sessão (Gemini, OpenCode), logo depois (Codex) ou
+   só no primeiro pedido (Antigravity). Por isso a sonda espera até 10 segundos e, sem conexão, manda um
+   pedido mínimo ("Responda só OK.") e espera de novo; esse pedido gasta um turno da conta, e só nos
+   agentes que precisam dele.
 4. **Ciência do contexto aberto** (só no regime compatível): o aviso diz o que a ferramenta carrega
    sozinha e o custo disso, e o botão **Usar assim mesmo** grava a sua ciência para aquele perfil. O regime vale por perfil: o Gemini pode rodar no compatível
    enquanto o Claude Code segue no exclusivo.

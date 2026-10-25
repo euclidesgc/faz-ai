@@ -926,7 +926,11 @@ process.stdin.on('data', (chunk) => {
 process.stdin.on('end', () => process.exit(0));
 `;
 
-/** Abre o agente uma vez: `initialize`, `session/new` com o servidor de teste, e fecha. Nada de `session/prompt`: não gasta a conta da pessoa. */
+/**
+ * Abre o agente uma vez: `initialize`, `session/new` com o servidor de teste, e fecha. O `session/prompt` só vai
+ * quando `nudge` pede e o agente não ligou o servidor sozinho: há agentes que só iniciam os servidores MCP no
+ * primeiro turno (o Antigravity 1.4.1), e um pedido mínimo é o único jeito de observar a conexão neles.
+ */
 async function acpHandshake(
   deps: Pick<VerifierDeps, 'spawnAgent' | 'timeoutMs' | 'acpAuth' | 'mcpWaitMs'>,
   agent: AcpAgent,
@@ -934,6 +938,7 @@ async function acpHandshake(
   cwd: string,
   server: { command: string; args: string[]; env: { name: string; value: string }[] },
   connected: () => boolean,
+  nudge = false,
 ): Promise<AcpHandshake> {
   const result: AcpHandshake = { protocolVersion: null, agentCapabilities: null, sessionId: null, authRequired: false, error: null };
   const built = acpCommand(agent, { prompt: '', permission: 'board' });
@@ -974,8 +979,17 @@ async function acpHandshake(
     });
     result.sessionId = asText(session.sessionId);
     // o agente pode iniciar os servidores depois de responder a sessão: espera a conexão antes de fechar o processo
-    const until = Date.now() + (deps.mcpWaitMs ?? 10_000);
-    while (!connected() && !exited && Date.now() < until) await new Promise((r) => setTimeout(r, 100));
+    const wait = async () => {
+      const until = Date.now() + (deps.mcpWaitMs ?? 10_000);
+      while (!connected() && !exited && Date.now() < until) await new Promise((r) => setTimeout(r, 100));
+    };
+    await wait();
+    // ainda sem conexão: um turno mínimo faz o agente que adia os servidores iniciá-los. A resposta não importa, e o
+    // turno não espera o fim: a conexão (ou a espera) decide, e o processo fecha em seguida
+    if (nudge && !connected() && !exited && result.sessionId) {
+      rpc.request('session/prompt', { sessionId: result.sessionId, prompt: [{ type: 'text', text: 'Responda só OK.' }] }).catch(() => {});
+      await wait();
+    }
   } catch (e) {
     if (e instanceof RpcError && e.code === AUTH_REQUIRED) result.authRequired = true;
     result.error = e instanceof Error ? e.message : String(e);
@@ -1011,7 +1025,8 @@ export async function runAcpProbes(
   const server = { command: process.execPath, args: [script, marker], env: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }] };
   const connected = () => fs.existsSync(marker);
   try {
-    const first = await acpHandshake(deps, agent, executable, project, server, connected);
+    // só o primeiro handshake pode pedir o turno mínimo: o segundo prova a sessão nova, e a conexão já foi vista
+    const first = await acpHandshake(deps, agent, executable, project, server, connected, true);
     const second = await acpHandshake(deps, agent, executable, project, server, connected);
     return { first, second, mcpConnected: fs.existsSync(marker), environmentDigest: deps.admission.environmentDigest() };
   } finally {

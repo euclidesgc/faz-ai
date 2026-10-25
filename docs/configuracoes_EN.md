@@ -113,7 +113,11 @@ catalog and the same key.
    from them, with no question asked: the five capabilities proven give the exclusive regime;
    permissions, MCP and delegation proven, the compatible one. An ACP agent is always compatible (the
    context files it reads by itself have no proof over the protocol). API mode is exclusive by
-   construction, with no probe.
+   construction, with no probe. Over ACP, the MCP proof is the agent connecting to the test server the
+   board hands in the session. Each agent starts its servers at a different moment: when the session
+   opens (Gemini, OpenCode), right after (Codex) or only on the first request (Antigravity). So the probe
+   waits up to 10 seconds and, with no connection, sends a minimal request ("Responda só OK.") and waits
+   again; that request uses one turn from the account, and only for the agents that need it.
 4. **Ciência do contexto aberto** (open context acknowledgment, compatible regime only): the warning
    says what the tool loads on its own and what that costs, and the **Usar assim mesmo** (use it anyway)
    button records your acknowledgment for that profile. The regime applies per profile: Gemini can run
