@@ -73,9 +73,14 @@ export interface ContextScopeReport {
   locations: ContextLocationResult[];
   /** a frase do erro quando o teste não chegou ao fim */
   error?: string;
+  /** modo API: não há programa que leia arquivos, o board monta cada pedido; fechado sem teste e sem gasto */
+  byConstruction?: true;
 }
 
 export type ContextScopeState = 'closed' | 'open' | 'unverified';
+
+/** No modo API quem fala com o modelo é a extensão: nada é lido sozinho, então não há o que descobrir nem testar. */
+export const closedByConstruction = (profile: { mode: string }): boolean => profile.mode === 'api';
 
 /**
  * Fechado: o controle passou, ao menos um local foi conferido e nenhum vaza. Aberto: algum local vaza (vale mesmo
@@ -83,6 +88,7 @@ export type ContextScopeState = 'closed' | 'open' | 'unverified';
  */
 export function contextScopeState(r: ContextScopeReport | null | undefined): ContextScopeState {
   if (!r) return 'unverified';
+  if (r.byConstruction) return 'closed';
   if (r.locations.some((l) => l.verdict.state === 'leaks')) return 'open';
   return r.control && r.locations.some((l) => l.verdict.state === 'controlled') ? 'closed' : 'unverified';
 }

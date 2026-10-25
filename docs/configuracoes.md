@@ -140,6 +140,10 @@ com aquele agente:
   pode trazer instruções que não estão no card.
 - **Não verificado**: o teste ainda não rodou, ou nenhum local teve prova.
 
+No **modo API** (o Gemini pela API) o contexto é **fechado por construção**: o próprio board monta cada
+pedido ao modelo e nenhum programa lê arquivos por conta própria. A seção diz isso direto, sem teste e
+sem gastar a conta.
+
 O board descobre isso em tempo de execução, sem uma lista de locais guardada na extensão, então vale
 também para um agente que surgir depois:
 

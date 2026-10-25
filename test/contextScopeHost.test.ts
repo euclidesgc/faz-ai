@@ -6,7 +6,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { runContextScope, type ContextScopeDeps } from '../src/extension/ai/contextScope';
-import type { ContextLocationResult, ContextScopeReport } from '../src/shared/contextScope';
+import { contextScopeState, type ContextLocationResult, type ContextScopeReport } from '../src/shared/contextScope';
 
 let dir: string;
 let project: string;
@@ -146,6 +146,16 @@ describe('contexto do card no host', () => {
     expect(fs.existsSync(calls[2]!.cwd)).toBe(false);
     expect(calls[1]!.input).toMatchObject({ permission: 'board', draftOnly: true, exec: { tools: [], toolSet: 'explicit' } });
     expect(JSON.parse((calls[1]!.input.exec as { mcpConfig: string }).mcpConfig)).toEqual({ mcpServers: {} });
+  });
+
+  it('no modo API é fechado por construção: nenhum pedido ao modelo, nenhum gasto', async () => {
+    const { gateway, calls } = fakeGateway([]);
+    // um perfil qualquer no modo API (o Gemini pronto nasce desligado e não resolve)
+    const api = { ...repo.resolveProfile(router.boardId, 'claude'), id: 'gemini', mode: 'api' as const };
+    const report = await runContextScope({ ...deps(gateway), repo: { resolveProfile: () => api } }, 'gemini');
+    expect(calls).toHaveLength(0);
+    expect(report).toMatchObject({ profileId: 'gemini', byConstruction: true, locations: [] });
+    expect(contextScopeState(report)).toBe('closed');
   });
 
   it('com o agente usando ferramentas, nada vira prova', async () => {

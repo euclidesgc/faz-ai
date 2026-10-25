@@ -8,7 +8,7 @@ import { formatDateTime, t } from '../../../i18n';
 import { listenAgentConnect, useAgentConnectStore, type AgentTab } from '../../../store/agentConnectStore';
 import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
-import { contextScopeState } from '../../../../shared/contextScope';
+import { closedByConstruction, contextScopeState } from '../../../../shared/contextScope';
 import { ActionButton, Hint, IconConnect, IconExternal, IconLock, IconPlus } from '../../ui';
 import { AiProfileForm } from '../AiProfileForm';
 import { PageHeader } from '../PageHeader';
@@ -40,7 +40,7 @@ function AgentRow({ item, selected, onSelect }: { item: AgentListItem; selected:
         <span className="muted">
           {item.profile ? modeLabel(item.profile.mode) : 'ACP'} · {t(STATE_LABEL[state])}
           {/* o cadeado compara os agentes sem abrir cada um: o contexto fechado foi verificado */}
-          {contextScopeState(scope) === 'closed' && (
+          {(contextScopeState(scope) === 'closed' || (item.profile && closedByConstruction(item.profile))) && (
             <span className="agent-row-lock" role="img" aria-label={t('Contexto fechado')}>
               <IconLock />
             </span>

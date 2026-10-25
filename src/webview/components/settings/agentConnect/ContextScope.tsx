@@ -3,6 +3,7 @@ import { Badge, Select, Text, TextField } from '@radix-ui/themes';
 import type { AiProfile } from '../../../../shared/aiProfiles';
 import {
   CONTEXT_KINDS,
+  closedByConstruction,
   contextScopeState,
   type ContextLocationKind,
   type ContextLocationResult,
@@ -177,6 +178,20 @@ export function ContextScope({ profile }: { profile: AiProfile }) {
     settings.contextLocation(profile.id, 'remove', { path, scope, kind }),
   );
   const rows = [...(report?.locations ?? [])].sort((a, b) => ORDER[a.verdict.state] - ORDER[b.verdict.state]);
+  if (closedByConstruction(profile))
+    return (
+      <section className="context-scope" aria-label={t('Contexto do card')}>
+        <Text size="2" weight="medium">
+          {t('Contexto do card')}
+        </Text>
+        <p className="row" role="status">
+          <IconLock />{' '}
+          {t(
+            'Contexto fechado por construção: no modo API o próprio board monta cada pedido, e nenhum programa lê arquivos por conta própria. Não há o que testar.',
+          )}
+        </p>
+      </section>
+    );
   return (
     <section className="context-scope" aria-label={t('Contexto do card')}>
       <div className="row">

@@ -11,6 +11,7 @@ import { isReadyCli, profileBase, type AiProfile } from '../../shared/aiProfiles
 import {
   TEXT_KINDS,
   canaryLine,
+  closedByConstruction,
   discoveryPrompt,
   parseDiscovery,
   pickQuoteLine,
@@ -176,6 +177,9 @@ export async function runContextScope(deps: ContextScopeDeps, profileId: string)
     version: deps.version(profileId),
     at: Date.now(),
   };
+  // no modo API o board monta cada pedido: perguntar ao modelo onde "a ferramenta" lê traria a resposta de outro
+  // programa (a CLI), e ele exigiria um modelo que o teste não tem; fechado por construção, sem gastar a conta
+  if (closedByConstruction(profile)) return { ...base, discovered: false, control: true, locations: [], byConstruction: true };
   const ask = (prompt: string, cwd: string) => askAgent(deps, profile, prompt, cwd);
 
   // 1. descoberta: onde a ferramenta lê, segundo o próprio agente

@@ -259,6 +259,8 @@ export const agentConnect: Record<string, string> = {
   'Sem binário para esta plataforma.': 'No binary for this platform.',
   // o contexto do card
   'entra sozinho': 'loads on its own',
+  'Contexto fechado por construção: no modo API o próprio board monta cada pedido, e nenhum programa lê arquivos por conta própria. Não há o que testar.':
+    'Closed context by construction: in API mode the board itself builds each request, and no program reads files on its own. There is nothing to test.',
   'Arquivos: {list}': 'Files: {list}',
   'fica de fora: só entra se o card incluir': 'stays out: only enters if the card includes it',
   'fica de fora: só entra se o card incluir (testado com isca)': 'stays out: only enters if the card includes it (tested with a decoy)',

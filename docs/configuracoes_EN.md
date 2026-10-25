@@ -159,6 +159,10 @@ the Connection tab, says whether that holds for the agent:
   That costs more and may bring instructions that are not in the card.
 - **Not verified**: the test hasn't run yet, or no location had proof.
 
+In **API mode** (Gemini through the API) the context is **closed by construction**: the board itself
+builds each request to the model and no program reads files on its own. The section says so directly,
+with no test and no spending from the account.
+
 The board finds this out at run time, with no list of locations stored in the extension, so it also
 works for an agent that shows up later:
 

@@ -437,7 +437,9 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
         // em segundo plano; ele gasta pedidos da conta, mas é o que diz à pessoa o que o agente lê além do card
         const saved = router.savedConnections()[id];
         const tested = router.savedContextScopes()[id];
-        if (saved && (!tested || tested.version !== (saved.version ?? null)))
+        const mode = router.snapshot().board.aiProfiles.find((p) => p.id === id)?.mode;
+        // no modo API não há o que testar: o contexto é fechado por construção
+        if (saved && mode !== 'api' && (!tested || tested.version !== (saved.version ?? null)))
           void router.runContextScope(id).catch((e) => o.log(`[contexto] ${e instanceof Error ? e.message : String(e)}`));
       }),
   );

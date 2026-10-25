@@ -491,6 +491,22 @@ describe('Conectar agentes: o contexto do card', () => {
     expect(within(row('Claude Code')).queryByRole('img', { name: 'Contexto fechado' })).toBeNull();
   });
 
+  it('no modo API: fechado por construção, sem teste nem botões, e com o cadeado na lista', async () => {
+    show();
+    act(() =>
+      useBoardStore.setState((s) => {
+        const st = s.state!;
+        const aiProfiles = st.board.aiProfiles.map((p) => (p.id === 'gemini' ? { ...p, mode: 'api' as const } : p));
+        return { state: { ...st, board: { ...st.board, aiProfiles } } };
+      }),
+    );
+    const gemini = await openAgent('Gemini CLI');
+    const scope = within(gemini.getByLabelText('Contexto do card'));
+    expect(scope.getByRole('status')).toHaveTextContent('Contexto fechado por construção');
+    expect(scope.queryByRole('button', { name: /Testar/ })).toBeNull();
+    expect(within(row('Gemini CLI')).getByRole('img', { name: 'Contexto fechado' })).toBeInTheDocument();
+  });
+
   it('a pessoa acrescenta um local que o agente esqueceu e tira o que acrescentou', async () => {
     show();
     const scope = within(screen.getByLabelText('Contexto do card'));
