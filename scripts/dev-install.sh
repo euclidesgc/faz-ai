@@ -35,7 +35,8 @@ command -v "$editor" >/dev/null || {
 publisher=$(node -p "require('./package.json').publisher")
 name=$(node -p "require('./package.json').name")
 version=$(node -p "require('./package.json').version")
-out="${TMPDIR:-/tmp}/$name-$version-dev.vsix"
+tmp="${TMPDIR:-/tmp}"
+out="${tmp%/}/$name-$version-dev.vsix"
 
 # o vsce roda o vscode:prepublish, que é o build da extensão e da interface
 echo "Gerando $name $version…"
