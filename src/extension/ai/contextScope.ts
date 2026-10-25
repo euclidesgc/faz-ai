@@ -12,6 +12,10 @@ import {
   TEXT_KINDS,
   canaryLine,
   closedByConstruction,
+  estimateTokens,
+  isBoardReference,
+  overlapOf,
+  type ContextOverlap,
   discoveryPrompt,
   parseDiscovery,
   pickQuoteLine,
@@ -203,6 +207,8 @@ export async function runContextScope(deps: ContextScopeDeps, profileId: string)
     round.owners.set(probe.id, { index, file });
   };
   const covered = new Set<string>();
+  // o texto de cada arquivo que existe, pelo caminho que a tela mostra: dá o custo e a comparação do que vazar
+  const texts = new Map<string, string>();
   locations.forEach((loc, i) => {
     if (!TEXT_KINDS.includes(loc.kind)) return void (verdicts[i] = { state: 'untested', reason: 'not-text' });
     if (unresolvablePath(loc.path)) return void (verdicts[i] = { state: 'untested', reason: 'pattern' });
@@ -214,6 +220,7 @@ export async function runContextScope(deps: ContextScopeDeps, profileId: string)
         const text = readText(file);
         const line = text && pickQuoteLine(text, loc.kind, random);
         if (!line) continue;
+        texts.set(displayPath(file, deps.cwd, deps.homeDir), text);
         add(inProject, i, displayPath(file, deps.cwd, deps.homeDir), line);
         probed++;
       }
@@ -241,6 +248,7 @@ export async function runContextScope(deps: ContextScopeDeps, profileId: string)
       source: 'project',
     });
     verdicts.push(null);
+    texts.set(displayPath(file, deps.cwd, deps.homeDir), text);
     add(inProject, locations.length - 1, displayPath(file, deps.cwd, deps.homeDir), line);
   }
 
@@ -300,14 +308,66 @@ export async function runContextScope(deps: ContextScopeDeps, profileId: string)
       fs.rmSync(fixture, { recursive: true, force: true });
     }
   }
-  const results: ContextLocationResult[] = locations.map((loc, i) => ({
-    ...loc,
-    verdict: verdicts[i] ?? { state: 'untested', reason: 'run-failed' },
-  }));
-  return { ...base, at: Date.now(), discovered: declared !== null, control, locations: results };
+  const results: ContextLocationResult[] = locations.map((loc, i) => {
+    const verdict = verdicts[i] ?? { state: 'untested', reason: 'run-failed' };
+    // o custo de cada arquivo que vaza: a isca de um local que ainda não existe não custa nada hoje
+    return verdict.state === 'leaks'
+      ? {
+          ...loc,
+          verdict: {
+            ...verdict,
+            tokens: verdict.files.map((f) => leakCost(texts.get(f), loc.kind)),
+            // o arquivo que já é só a referência do board não pede mais ação
+            ...(verdict.files.some((f) => isBoardReference(texts.get(f)))
+              ? { refs: verdict.files.map((f) => isBoardReference(texts.get(f))) }
+              : {}),
+          },
+        }
+      : { ...loc, verdict };
+  });
+  const leakedTexts = results.flatMap((l) =>
+    l.verdict.state === 'leaks' ? l.verdict.files.filter((f) => texts.has(f)).map((f) => [f, texts.get(f)!] as const) : [],
+  );
+  const overlaps: ContextOverlap[] = [];
+  for (let i = 0; i < leakedTexts.length; i++)
+    for (let j = i + 1; j < leakedTexts.length; j++) {
+      const [a, ta] = leakedTexts[i]!;
+      const [b, tb] = leakedTexts[j]!;
+      const o = overlapOf(ta, tb);
+      // só o que repete de verdade: um quarto das linhas de um dos dois
+      if (o && Math.max(o.aInB, o.bInA) >= 0.25) overlaps.push({ a, b, ...o });
+    }
+  return {
+    ...base,
+    at: Date.now(),
+    discovered: declared !== null,
+    control,
+    locations: results,
+    ...(overlaps.length ? { overlaps } : {}),
+  };
 }
 
 const same = (a: ContextLocation, b: ContextLocation) => a.scope === b.scope && a.path === b.path;
+
+/**
+ * O que um arquivo que vaza põe no contexto. Da skill e do agente, só a descrição do cabeçalho entra sempre (o corpo
+ * carrega sob demanda); dos outros, o arquivo inteiro.
+ */
+function leakCost(text: string | undefined, kind: ContextLocation['kind']): number {
+  if (!text) return 0;
+  if (kind === 'skill' || kind === 'agent') {
+    const description = text.split(/\r?\n/).find((l) => /^description:\s*\S/.test(l));
+    if (description) return estimateTokens(description);
+  }
+  return estimateTokens(text);
+}
+
+/** Uma pergunta avulsa ao agente, rodando como no teste (sem ferramentas, na pasta do projeto): devolve o texto. */
+export async function askContextQuestion(deps: ContextScopeDeps, profileId: string, prompt: string): Promise<string> {
+  const profile = deps.repo.resolveProfile(deps.boardId(), profileId);
+  if (closedByConstruction(profile)) throw new Error('No modo API não há ferramenta instalada para perguntar.');
+  return (await askAgent(deps, profile, prompt, deps.cwd)).text;
+}
 
 /** Uma rodada do agente pelo gateway, com as mesmas travas de um card e sem ferramentas. */
 function askAgent(deps: ContextScopeDeps, profile: AiProfile, prompt: string, cwd: string): Promise<Answer> {

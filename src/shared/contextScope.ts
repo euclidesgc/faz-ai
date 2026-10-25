@@ -54,7 +54,11 @@ export type LocationVerdict =
   /** rodando pelo board, nada do arquivo chegou ao modelo: ele só entra se o card o incluir */
   | { state: 'controlled'; how: 'quote' | 'canary' }
   /** rodando pelo board, o arquivo chegou ao modelo */
-  | { state: 'leaks'; how: 'quote' | 'canary'; files: string[] }
+  /**
+   * `tokens`: a estimativa do que cada arquivo de `files` põe no contexto de todo card (ausente nos testes antigos);
+   * `refs`: o arquivo já é só a referência que o board deixou ao importar ou juntar
+   */
+  | { state: 'leaks'; how: 'quote' | 'canary'; files: string[]; tokens?: number[]; refs?: boolean[] }
   | { state: 'untested'; reason: UntestedReason };
 
 export interface ContextLocationResult extends ContextLocation {
@@ -75,6 +79,19 @@ export interface ContextScopeReport {
   error?: string;
   /** modo API: não há programa que leia arquivos, o board monta cada pedido; fechado sem teste e sem gasto */
   byConstruction?: true;
+  /** os arquivos que vazam e repetem linhas um do outro (só os de texto que existem) */
+  overlaps?: ContextOverlap[];
+}
+
+/**
+ * Dois arquivos que entram sozinhos com linhas em comum. `bInA` é a fração das linhas de `b` que estão em `a`: com
+ * 1, trocar `b` por uma referência a `a` não perde nada (o "Juntar" só aparece aí).
+ */
+export interface ContextOverlap {
+  a: string;
+  b: string;
+  aInB: number;
+  bInA: number;
 }
 
 export type ContextScopeState = 'closed' | 'open' | 'unverified';
@@ -173,8 +190,11 @@ export function parseDiscovery(text: string): ContextLocation[] | null {
   return out;
 }
 
-/** O caminho tem um trecho que só o agente sabe preencher (`<projeto>`, `{nome}`): o board não testa. */
-export const unresolvablePath = (p: string): boolean => /[<>{}]/.test(p);
+/**
+ * O caminho tem um trecho que só o agente sabe preencher (`<projeto>`, `{nome}`) ou é uma descrição, não um caminho
+ * ("(instalação da CLI)/skills", do Kimi Code 2.3.0): o board não testa.
+ */
+export const unresolvablePath = (p: string): boolean => /[<>{}()]/.test(p);
 
 // ---------- verificação ----------
 
@@ -303,4 +323,154 @@ export function verificationPrompt(probes: QuoteProbe[], control: { line: string
 export function quoted(answer: string, probe: QuoteProbe): boolean {
   const tail = normalizeQuote(probe.tail);
   return tail.length >= MIN_TAIL_CHARS && normalizeQuote(answer).includes(tail);
+}
+
+// ---------- o que fazer com o que vaza ----------
+
+/** A resposta do agente a uma pergunta sobre ele (o comando que desinstala um plugin): em curso, a resposta ou nada. */
+export type ContextAdvice =
+  { state: 'running' } | { state: 'done'; command: string | null; at: number } | { state: 'failed'; error: string };
+
+/** A pergunta do comando que desinstala um plugin: uma linha, sem ferramentas. */
+export const uninstallPrompt = (plugin: string): string =>
+  [
+    'Teste do contexto (Faz AI). Não use nenhuma ferramenta.',
+    `Qual é o comando, no terminal, para desinstalar o plugin "${plugin}" da sua ferramenta?`,
+    'Responda só com o comando, numa linha, sem explicação. Se a ferramenta não tiver comando para isso, responda só NÃO SEI.',
+  ].join('\n');
+
+/** O comando da resposta: a última linha que não é raciocínio nem "não sei", sem crases. null = o agente não sabe. */
+export function parseUninstall(answer: string): string | null {
+  const lines = answer
+    .split(/\r?\n/)
+    .map((l) => l.replace(/^[•*>-]\s*/, '').trim())
+    // a CLI do Kimi Code fecha a saída de texto com "To resume this session: kimi -r …", que não é a resposta
+    .filter((l) => l && !l.startsWith('```') && !/^to resume this session/i.test(l));
+  const last =
+    lines
+      .at(-1)
+      ?.replace(/^`+|`+$/g, '')
+      .trim() ?? '';
+  if (!last || /n[ãa]o sei/i.test(last) || last.length > 200) return null;
+  return last;
+}
+
+/** Tokens aproximados de um texto: uns quatro caracteres por token, a conta de bolso dos modelos atuais. */
+export const estimateTokens = (text: string): number => Math.ceil(text.length / 4);
+
+/** As linhas que contam para comparar dois arquivos: sem vazias, sem marcação solta e sem as muito curtas. */
+export function significantLines(text: string): Set<string> {
+  return new Set(
+    text
+      .split(/\r?\n/)
+      .map(normalizeQuote)
+      .filter((l) => l.length >= 12),
+  );
+}
+
+/** As frações de linhas de um arquivo presentes no outro; null quando um deles não tem linha que conte. */
+export function overlapOf(a: string, b: string): { aInB: number; bInA: number } | null {
+  const la = significantLines(a);
+  const lb = significantLines(b);
+  if (!la.size || !lb.size) return null;
+  const shared = [...la].filter((l) => lb.has(l)).length;
+  return { aInB: shared / la.size, bInA: shared / lb.size };
+}
+
+/**
+ * De onde vem um arquivo que vaza, para a sugestão certa:
+ * - `faz-ai-copy`: uma cópia antiga da skill do fluxo que versões anteriores do board instalaram;
+ * - `plugin`: vem de um plugin instalado na ferramenta (o nome sai do caminho);
+ * - `user-skill` / `user-instructions`: da sua pasta pessoal, vale para todos os projetos;
+ * - `project`: do próprio projeto.
+ */
+export type LeakOrigin =
+  | { kind: 'board-reference' }
+  | { kind: 'faz-ai-copy' }
+  | { kind: 'plugin'; plugin: string }
+  | { kind: 'user-skill' }
+  | { kind: 'user-instructions' }
+  | { kind: 'project' };
+
+export function leakOrigin(file: string, loc: Pick<ContextLocation, 'scope' | 'kind'>): LeakOrigin {
+  if (/(^|\/)skills\/faz-ai-[a-z0-9-]+\//.test(file)) return { kind: 'faz-ai-copy' };
+  const plugin = /(^|\/)plugins\/(?:managed\/|cache\/|marketplaces\/)?([^/]+)\//.exec(file);
+  if (plugin) return { kind: 'plugin', plugin: plugin[2]! };
+  if (loc.scope === 'project' && !file.startsWith('~') && !file.startsWith('/') && !file.startsWith('..')) return { kind: 'project' };
+  return loc.kind === 'skill' || loc.kind === 'agent' ? { kind: 'user-skill' } : { kind: 'user-instructions' };
+}
+
+/** Os arquivos de um local que vaza, agrupados pela origem: cada grupo leva uma sugestão. */
+export interface LeakGroup {
+  origin: LeakOrigin;
+  files: string[];
+  tokens: number;
+}
+
+export function leakGroups(loc: ContextLocationResult): LeakGroup[] {
+  if (loc.verdict.state !== 'leaks') return [];
+  const { files, tokens } = loc.verdict;
+  const groups: LeakGroup[] = [];
+  files.forEach((file, i) => {
+    const origin: LeakOrigin = loc.verdict.state === 'leaks' && loc.verdict.refs?.[i] ? { kind: 'board-reference' } : leakOrigin(file, loc);
+    const key = JSON.stringify(origin);
+    const group = groups.find((g) => JSON.stringify(g.origin) === key);
+    const t = tokens?.[i] ?? 0;
+    if (group) {
+      group.files.push(file);
+      group.tokens += t;
+    } else groups.push({ origin, files: [file], tokens: t });
+  });
+  return groups;
+}
+
+/** Os tokens que um local põe em todo card (a soma dos arquivos que vazam). */
+export const leakTokens = (loc: ContextLocationResult): number =>
+  loc.verdict.state === 'leaks' ? (loc.verdict.tokens ?? []).reduce((a, b) => a + b, 0) : 0;
+
+/** A chave de um local para "Manter assim": o escopo e o caminho, como a pessoa os vê. */
+export const locationKey = (loc: Pick<ContextLocation, 'scope' | 'path'>): string => `${loc.scope}:${loc.path}`;
+
+/** Um nome de regra a partir do caminho do arquivo (`AGENTS.md` → `agents`, `.cursor/rules/x.mdc` → `cursor-rules-x`). */
+export function ruleNameFor(file: string): string {
+  const name = file
+    .replace(/\.(md|mdc|txt)$/i, '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+    .replace(/-+$/, '');
+  return name || 'instrucoes-do-projeto';
+}
+
+/** O arquivo já é só uma das referências que o board deixa ao importar ou juntar: não há mais o que fazer nele. */
+export function isBoardReference(text: string | undefined): boolean {
+  const body = (text ?? '').trim();
+  return (
+    /^As instruções que estavam neste arquivo viraram a regra "[^"\n]+" do board Faz AI/.test(body) ||
+    /^@\S+$/.test(body) ||
+    /^As instruções deste projeto estão em \S+\.$/.test(body)
+  );
+}
+
+/** O que fica no arquivo cujas instruções viraram regra do board: uma referência para quem usa a ferramenta fora dele. */
+export const importedReference = (rule: string): string =>
+  `As instruções que estavam neste arquivo viraram a regra "${rule}" do board Faz AI (Configurações › Harness). O board a entrega aos cards que a pedirem.\n`;
+
+/**
+ * O que fica no arquivo repetido que vira referência ao outro. O CLAUDE.md entende `@caminho` (a importação do
+ * Claude Code); nos outros, uma frase que aponta o arquivo.
+ */
+export function mergedReference(keep: string, replaced: string): string {
+  const name = replaced.split('/').pop() ?? replaced;
+  if (/^CLAUDE(\.local)?\.md$/.test(name)) return `@${relativeTo(replaced, keep)}\n`;
+  return `As instruções deste projeto estão em ${relativeTo(replaced, keep)}.\n`;
+}
+
+/** O caminho de `target` visto da pasta de `from` (os dois relativos à raiz do projeto). */
+function relativeTo(from: string, target: string): string {
+  const up = from.split('/').length - 1;
+  return up ? `${'../'.repeat(up)}${target}` : target;
 }

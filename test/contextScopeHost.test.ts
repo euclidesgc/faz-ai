@@ -6,7 +6,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { runContextScope, type ContextScopeDeps } from '../src/extension/ai/contextScope';
-import { contextScopeState, type ContextLocationResult, type ContextScopeReport } from '../src/shared/contextScope';
+import { contextScopeState, isBoardReference, type ContextLocationResult, type ContextScopeReport } from '../src/shared/contextScope';
 
 let dir: string;
 let project: string;
@@ -124,9 +124,15 @@ describe('contexto do card no host', () => {
     const report = await runContextScope(deps(gateway), 'claude');
 
     expect(report).toMatchObject({ profileId: 'claude', version: '2.1.296', discovered: true, control: true });
-    expect(byPath(report, 'CLAUDE.md').verdict).toEqual({ state: 'leaks', how: 'quote', files: ['CLAUDE.md'] });
+    expect(byPath(report, 'CLAUDE.md').verdict).toMatchObject({ state: 'leaks', how: 'quote', files: ['CLAUDE.md'] });
     // não existe no projeto: a isca na pasta descartável mostra que ele carregaria
-    expect(byPath(report, '.foo/rules/*.md').verdict).toEqual({ state: 'leaks', how: 'canary', files: ['.foo/rules/fazai-teste.md'] });
+    // a isca de um local que ainda não existe não custa nada hoje
+    expect(byPath(report, '.foo/rules/*.md').verdict).toEqual({
+      state: 'leaks',
+      how: 'canary',
+      files: ['.foo/rules/fazai-teste.md'],
+      tokens: [0],
+    });
     expect(byPath(report, '.foo/agents/*.md').verdict).toEqual({ state: 'controlled', how: 'canary' });
     expect(byPath(report, '~/.foo/FOO.md').verdict).toEqual({ state: 'controlled', how: 'quote' });
     expect(byPath(report, '~/.foo/ausente.md').verdict).toEqual({ state: 'untested', reason: 'missing-user' });
@@ -184,6 +190,7 @@ describe('contexto do card no router', () => {
       probe: async () => ({ type: 'aiProfiles.status', profiles: {} }),
       test: async (id) => ({ type: 'aiProfiles.testResult', id, ok: true, output: '' }),
       contextScope: async () => report,
+      contextAsk: async () => 'NÃO SEI',
     });
     const pending = router.runContextScope('claude');
     expect(router.snapshot().contextScopeRunning).toEqual(['claude']);
@@ -218,5 +225,123 @@ describe('contexto do card no router', () => {
         { source: 'ai' },
       ),
     ).toThrow('revisão humana');
+  });
+});
+
+describe('contexto do card: custo, repetidos e ações', () => {
+  const AGENTS =
+    'Rode os testes antes de concluir a história.\nUse português nos comentários do código.\nNão publique nada sem a pessoa pedir.\n';
+  const CLAUDE = 'Rode os testes antes de concluir a história.\nUse português nos comentários do código.\n';
+
+  it('o teste mede o custo do que vaza e acha os arquivos repetidos', async () => {
+    write(path.join(project, 'AGENTS.md'), AGENTS);
+    write(path.join(project, 'CLAUDE.md'), CLAUDE);
+    const { gateway } = fakeGateway(['CLAUDE.md', 'AGENTS.md'], {
+      discovery: JSON.stringify({
+        tool: 'X',
+        locations: [
+          { path: 'CLAUDE.md', kind: 'instructions' },
+          { path: 'AGENTS.md', kind: 'instructions' },
+        ],
+      }),
+    });
+    const report = await runContextScope(deps(gateway), 'claude');
+    const claude = byPath(report, 'CLAUDE.md').verdict;
+    expect(claude).toMatchObject({ state: 'leaks', tokens: [Math.ceil(CLAUDE.length / 4)] });
+    expect(report.overlaps).toEqual([{ a: 'CLAUDE.md', b: 'AGENTS.md', aInB: 1, bInA: 2 / 3 }]);
+  });
+
+  /** Um teste gravado em que o CLAUDE.md e o AGENTS.md do projeto vazam, como o host grava. */
+  const saveLeaks = async () => {
+    write(path.join(project, 'AGENTS.md'), AGENTS);
+    write(path.join(project, 'CLAUDE.md'), CLAUDE);
+    const leak = (p: string) => ({
+      path: p,
+      scope: 'project' as const,
+      kind: 'instructions' as const,
+      loads: 'always' as const,
+      source: 'agent' as const,
+      verdict: { state: 'leaks' as const, how: 'quote' as const, files: [p], tokens: [10] },
+    });
+    const report: ContextScopeReport = {
+      profileId: 'claude',
+      version: '1',
+      at: 1,
+      discovered: true,
+      control: true,
+      locations: [leak('CLAUDE.md'), leak('AGENTS.md'), { ...leak('~/.foo/FOO.md'), scope: 'user' }],
+    };
+    router.setAiProfileRuntime({
+      probe: async () => ({ type: 'aiProfiles.status', profiles: {} }),
+      test: async (id) => ({ type: 'aiProfiles.testResult', id, ok: true, output: '' }),
+      contextScope: async () => report,
+      contextAsk: async () => '• pensando\n`foo plugin remove br`',
+    });
+    await router.runContextScope('claude');
+  };
+
+  it('"Manter assim" fica guardado por local e sai com "Desfazer"', async () => {
+    await saveLeaks();
+    router.handle({ type: 'settings.aiProfiles.contextKeep', id: 'claude', location: { scope: 'project', path: 'AGENTS.md' }, keep: true });
+    expect(router.snapshot().contextKept).toEqual({ claude: ['project:AGENTS.md'] });
+    router.handle({
+      type: 'settings.aiProfiles.contextKeep',
+      id: 'claude',
+      location: { scope: 'project', path: 'AGENTS.md' },
+      keep: false,
+    });
+    expect(router.snapshot().contextKept).toEqual({ claude: [] });
+  });
+
+  it('importar como regra leva o conteúdo inteiro para a regra e deixa a referência; nunca sobrescreve uma regra', async () => {
+    await saveLeaks();
+    router.handle({ type: 'settings.aiProfiles.contextFix', id: 'claude', fix: { op: 'import', file: 'AGENTS.md', rule: 'agents' } });
+    expect(fs.readFileSync(path.join(project, 'AGENTS.md'), 'utf8')).toContain('regra "agents" do board Faz AI');
+    // o board reconhece a referência que ele mesmo deixou: o próximo teste não sugere importar de novo
+    expect(isBoardReference(fs.readFileSync(path.join(project, 'AGENTS.md'), 'utf8'))).toBe(true);
+    const rule = router.snapshot().harness.library?.artifacts.find((a) => a.kind === 'rule' && a.name === 'agents');
+    expect(rule).toBeDefined();
+    write(path.join(project, 'AGENTS.md'), AGENTS);
+    expect(() =>
+      router.handle({ type: 'settings.aiProfiles.contextFix', id: 'claude', fix: { op: 'import', file: 'AGENTS.md', rule: 'agents' } }),
+    ).toThrow('Já existe a regra "agents"');
+    // só arquivos do projeto que o teste viu vazar
+    expect(() =>
+      router.handle({ type: 'settings.aiProfiles.contextFix', id: 'claude', fix: { op: 'import', file: 'README.md', rule: 'leia' } }),
+    ).toThrow('não está entre os que o último teste mostrou');
+    expect(() =>
+      router.handle({ type: 'settings.aiProfiles.contextFix', id: 'claude', fix: { op: 'import', file: '~/.foo/FOO.md', rule: 'foo' } }),
+    ).toThrow('não está entre os que o último teste mostrou');
+  });
+
+  it('juntar troca só o arquivo cujas linhas estão todas no outro; com linhas a perder, recusa', async () => {
+    await saveLeaks();
+    expect(() =>
+      router.handle({
+        type: 'settings.aiProfiles.contextFix',
+        id: 'claude',
+        fix: { op: 'merge', keep: 'CLAUDE.md', replace: 'AGENTS.md' },
+      }),
+    ).toThrow('1 linha(s) que não estão em CLAUDE.md');
+    expect(fs.readFileSync(path.join(project, 'AGENTS.md'), 'utf8')).toBe(AGENTS);
+    router.handle({ type: 'settings.aiProfiles.contextFix', id: 'claude', fix: { op: 'merge', keep: 'AGENTS.md', replace: 'CLAUDE.md' } });
+    expect(fs.readFileSync(path.join(project, 'CLAUDE.md'), 'utf8')).toBe('@AGENTS.md\n');
+  });
+
+  it('a IA não age sobre o contexto; abrir pasta só vale para caminhos do teste; o comando de desinstalar vem do agente', async () => {
+    await saveLeaks();
+    expect(() =>
+      router.handle(
+        { type: 'settings.aiProfiles.contextFix', id: 'claude', fix: { op: 'merge', keep: 'AGENTS.md', replace: 'CLAUDE.md' } },
+        { source: 'ai' },
+      ),
+    ).toThrow('revisão humana');
+    expect(router.contextFolder('claude', 'CLAUDE.md')).toBe(project);
+    expect(router.contextFolder('claude', '~/.foo/FOO.md')).toBe(path.join(home, '.foo'));
+    expect(() => router.contextFolder('claude', '/etc')).toThrow('não está no último teste');
+    await router.askContextUninstall('claude', 'br');
+    expect(router.snapshot().contextAdvice).toEqual({
+      claude: { br: { state: 'done', command: 'foo plugin remove br', at: expect.any(Number) } },
+    });
   });
 });

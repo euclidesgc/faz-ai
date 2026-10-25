@@ -195,6 +195,33 @@ it (as a card or phase rule, for example).
 - **Acrescentar um local** (add a location) adds a path the agent didn't declare to the test. It stays on
   this machine only, and a new discovery doesn't erase it.
 
+For each location that **loads on its own**, the section says what to do, by the file's origin, and what
+it costs (about four characters per token; for skills and agents, only the description, which is what
+always enters):
+
+- **Old Faz AI copy** (`skills/faz-ai-*` in the tool's folder): earlier board versions installed the flow
+  skill there; the flow now comes from the board, and the folder can be deleted.
+- **Tool plugin** (`plugins/<name>/…`): if you don't use the plugin, uninstall it. **Como desinstalar?**
+  (how to uninstall) asks the agent itself for the command (one request from the account) and shows it as
+  the agent's suggestion, for you to check; the board never runs the command.
+- **Skill or instructions from your home folder**: they apply to every project. Import the skill into the
+  board and remove it from the folder, or move to the project whatever is only for it.
+- **Project file**: **Importar como regra** (import as rule) moves the whole content to a board rule (which
+  only enters the cards that ask for it) and leaves a reference sentence in the file, for whoever uses the
+  tool outside the board. The preview shows the rule name and how the file ends up; nothing is written
+  before the confirmation, and the board never overwrites a rule with the same name.
+- **Repeated files**: the section says how much of one file repeats in the other. When every line of one
+  is in the other, **Juntar** (merge) replaces the repeated one with a reference (in CLAUDE.md,
+  `@AGENTS.md`, Claude Code's import; in the others, a sentence pointing to the file). With lines to lose,
+  the section only suggests merging by hand.
+
+**Abrir pasta** (open folder) opens the location in the system, without changing anything. **Manter
+assim** (keep it) accepts that the location enters every card: the suggestion goes away, the cost leaves
+the summary and the summary says the context is open by your choice; **Desfazer** (undo) brings the
+suggestion back. The actions only apply to the project files the last test showed leaking (they stay in
+git and can be undone); the home folder and plugins only get the suggestion. After importing or merging,
+the test runs again.
+
 The test runs on its own after each Connect on a version not tested yet and, whenever you want, through
 **Testar agora** (test now) or **Testar de novo** (test again). It uses a few requests from the agent's
 account (the discovery and one or two quoting rounds). The result stays in the board's database, outside

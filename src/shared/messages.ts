@@ -278,6 +278,22 @@ export type WebviewToHost =
    * pedindo que ele cite linhas desses arquivos, rodando como um card. Gasta pedidos da conta da ferramenta.
    */
   | { type: 'settings.aiProfiles.contextScope'; id: string }
+  /** "Manter assim": a pessoa aceita que o local entre sozinho; a sugestão some e o aviso fica discreto. */
+  | { type: 'settings.aiProfiles.contextKeep'; id: string; location: Pick<ContextLocation, 'path' | 'scope'>; keep: boolean }
+  /** Abre no sistema a pasta de um local do último teste do contexto (só caminhos que o teste mostrou). */
+  | { type: 'settings.aiProfiles.contextReveal'; id: string; path: string }
+  /** Pergunta ao agente o comando que desinstala um plugin dele; a resposta vai para `contextAdvice` do estado. */
+  | { type: 'settings.aiProfiles.contextAsk'; id: string; plugin: string }
+  /**
+   * Fecha um vazamento no projeto, com a confirmação da pessoa: `import` leva o conteúdo do arquivo para uma regra
+   * do board e deixa nele uma referência; `merge` troca um arquivo repetido por uma referência ao outro. Depois o
+   * teste do contexto roda de novo.
+   */
+  | {
+      type: 'settings.aiProfiles.contextFix';
+      id: string;
+      fix: { op: 'import'; file: string; rule: string } | { op: 'merge'; keep: string; replace: string };
+    }
   /** Acrescenta ou tira um local que a pessoa sabe que o agente lê; a descoberta do agente não apaga os dela. */
   | {
       type: 'settings.aiProfiles.contextLocation';

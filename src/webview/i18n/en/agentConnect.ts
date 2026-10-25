@@ -322,4 +322,58 @@ export const agentConnect: Record<string, string> = {
   'sem prova: o agente não citou nem a linha de controle': "no proof: the agent didn't even quote the control line",
   'sem prova: o agente usou ferramentas no teste': 'no proof: the agent used tools during the test',
   'o teste não rodou': "the test didn't run",
+  // o que fazer com o que entra sozinho
+  'Cópias antigas da skill do fluxo que versões anteriores do Faz AI instalaram: o fluxo agora vem do board, e você pode apagar estas pastas.':
+    'Old copies of the flow skill that earlier Faz AI versions installed: the flow now comes from the board, and you can delete these folders.',
+  'Vêm do plugin "{plugin}" da ferramenta: se você não o usa, desinstale.':
+    'They come from the tool\'s "{plugin}" plugin: if you don\'t use it, uninstall it.',
+  'Da sua pasta pessoal, entram em todos os projetos. Importe para o board (Harness › Importar) e tire da pasta, ou mova para a pasta de skills do projeto que a usa (isso só limita o vazamento a esse projeto).':
+    'From your home folder, they enter every project. Import them into the board (Harness › Import) and remove them from the folder, or move them to the skills folder of the project that uses them (that only limits the leak to that project).',
+  'Instruções da sua pasta pessoal, valem para todos os projetos: mova para o projeto o que for só dele.':
+    'Instructions from your home folder apply to every project: move to the project whatever is only for it.',
+  'Do projeto: leve o conteúdo para uma regra do board, que entra só nos cards que a pedirem, e deixe aqui uma referência para quem usa a ferramenta fora do board.':
+    'From the project: move the content to a board rule, which only enters the cards that ask for it, and leave a reference here for whoever uses the tool outside the board.',
+  'Perguntando ao agente…': 'Asking the agent…',
+  'Já é só a referência que o board deixou: entra em todo card apenas esta linha, e não há mais o que fazer aqui.':
+    'It is already just the reference the board left: only this line enters every card, and there is nothing left to do here.',
+  'Sugerido pelo agente, confira antes de rodar:': 'Suggested by the agent, check before running:',
+  'O agente não soube dizer o comando: veja a documentação da ferramenta.':
+    "The agent couldn't tell the command: see the tool's documentation.",
+  'Pergunta ao agente o comando que desinstala este plugin. Gasta um pedido da conta dele; o board nunca roda o comando.':
+    "Asks the agent for the command that uninstalls this plugin. It uses one request from the agent's account; the board never runs the command.",
+  'Como desinstalar?': 'How to uninstall?',
+  'Prévia da mudança': 'Change preview',
+  'Nome da regra': 'Rule name',
+  'Letras minúsculas, números e hífens.': 'Lowercase letters, numbers and hyphens.',
+  'O conteúdo de {file} vira a regra "{rule}" do board (Configurações › Harness), e {file} passa a ter só:':
+    'The content of {file} becomes the board rule "{rule}" (Settings › Harness), and {file} keeps only:',
+  'Para a regra entrar nos cards, marque-a em Harness › Regras (sempre ou pelo card). Depois, o teste do contexto roda de novo.':
+    'For the rule to enter cards, mark it in Harness › Rules (always or by card). Then the context test runs again.',
+  'Todas as linhas de {replace} já estão em {keep}: nada se perde. {replace} passa a ter só:':
+    'Every line of {replace} is already in {keep}: nothing is lost. {replace} keeps only:',
+  'Depois, o teste do contexto roda de novo.': 'Then the context test runs again.',
+  'Fecha sem mudar nada.': 'Closes without changing anything.',
+  'Informe o nome da regra': 'Enter the rule name',
+  'Grava a mudança no projeto. Ela fica no git: dá para desfazer.': 'Writes the change in the project. It stays in git: it can be undone.',
+  'Importar como regra': 'Import as rule',
+  Juntar: 'Merge',
+  'Repete {pct}% das linhas em {other}.': 'Repeats {pct}% of its lines in {other}.',
+  'Troca {file} por uma referência a {other}, que já tem todas as linhas dele.':
+    'Replaces {file} with a reference to {other}, which already has all its lines.',
+  'Juntar em {other}': 'Merge into {other}',
+  'Junte à mão o que só existe aqui e deixe uma referência.': 'Merge by hand what only exists here and leave a reference.',
+  'Mantido por você: entra em todo card.': 'Kept by you: it enters every card.',
+  'Volta a mostrar a sugestão deste local.': "Shows this location's suggestion again.",
+  'Mostra a prévia: o conteúdo vira uma regra do board e o arquivo fica com uma referência.':
+    'Shows the preview: the content becomes a board rule and the file keeps a reference.',
+  'Abre a pasta no sistema; o board não muda nada nela.': "Opens the folder in the system; the board doesn't change anything in it.",
+  'Você quer que este local entre em todo card: a sugestão some e ele não conta no resumo.':
+    "You want this location to enter every card: the suggestion goes away and it doesn't count in the summary.",
+  'Manter assim': 'Keep it',
+  '~1 token em todo card': '~1 token in every card',
+  '~{n} tokens em todo card': '~{n} tokens in every card',
+  'Contexto aberto por escolha sua · verificado em {date}: você manteve {list}.':
+    'Open context by your choice · verified on {date}: you kept {list}.',
+  'Custa ~1 token em todo card.': 'Costs ~1 token in every card.',
+  'Custa ~{n} tokens em todo card.': 'Costs ~{n} tokens in every card.',
 };

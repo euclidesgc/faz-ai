@@ -63,6 +63,7 @@ describe('HostBridge: situação dos perfis depois de ligar', () => {
       contextScope: async () => {
         throw new Error('sem teste do contexto');
       },
+      contextAsk: async () => 'NÃO SEI',
     });
     await bridge.handle({ type: 'settings.aiProfiles.setEnabled', id: 'codex-acp', enabled: true, requestId: 'on' });
     expect(router.snapshot().board.aiProfiles.find((p) => p.id === 'codex-acp')?.enabled).toBe(true);
@@ -89,6 +90,7 @@ describe('HostBridge: preferências da pessoa', () => {
       contextScope: async () => {
         throw new Error('sem teste do contexto');
       },
+      contextAsk: async () => 'NÃO SEI',
     });
     await bridge.handle({ type: 'settings.aiProfiles.probe', requestId: 'probe' });
     await bridge.handle({ type: 'settings.aiProfiles.test', id: 'cli', requestId: 'test' });
@@ -109,6 +111,7 @@ describe('HostBridge: preferências da pessoa', () => {
       contextScope: async () => {
         throw new Error('sem teste do contexto');
       },
+      contextAsk: async () => 'NÃO SEI',
     });
     await bridge.handle({ type: 'settings.aiProfiles.test', id: 'cli', requestId: 'a' });
     ok = false;

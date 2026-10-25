@@ -5,15 +5,18 @@ import {
   CONTEXT_KINDS,
   closedByConstruction,
   contextScopeState,
+  leakTokens,
+  locationKey,
   type ContextLocationKind,
   type ContextLocationResult,
   type ContextScopeReport,
   type UntestedReason,
 } from '../../../../shared/contextScope';
 import { settings } from '../../../commands';
-import { formatDateTime, t } from '../../../i18n';
+import { formatDateTime, t, tn } from '../../../i18n';
 import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
+import { ContextLeak } from './ContextLeak';
 import { ActionButton, ActionIconButton, FormField, Hint, IconInfo, IconLock, IconPlus, IconTrash, IconWarning } from '../../ui';
 
 const KIND_LABEL: Record<ContextLocationKind, string> = {
@@ -60,7 +63,7 @@ function Verdict({ loc }: { loc: ContextLocationResult }) {
 }
 
 /** A linha do resumo: fechado, aberto ou não verificado, e de onde vem a conclusão. */
-function Summary({ report, current }: { report: ContextScopeReport | undefined; current: string | null }) {
+function Summary({ report, current, kept }: { report: ContextScopeReport | undefined; current: string | null; kept: string[] }) {
   if (!report)
     return (
       <p className="row">
@@ -75,7 +78,10 @@ function Summary({ report, current }: { report: ContextScopeReport | undefined; 
     );
   const state = contextScopeState(report);
   const when = formatDateTime(report.at);
-  const leaking = report.locations.filter((l) => l.verdict.state === 'leaks');
+  // os que a pessoa manteve não são problema a resolver: saem da lista e do custo, e o resumo diz que foi escolha dela
+  const allLeaking = report.locations.filter((l) => l.verdict.state === 'leaks');
+  const leaking = allLeaking.filter((l) => !kept.includes(locationKey(l)));
+  const cost = leaking.reduce((sum, l) => sum + leakTokens(l), 0);
   const outdated = report.version && current && report.version !== current;
   return (
     <>
@@ -84,6 +90,14 @@ function Summary({ report, current }: { report: ContextScopeReport | undefined; 
           <>
             <IconLock /> {t('Contexto fechado · verificado em {date}: a IA usa só o que o card entrega.', { date: when })}
           </>
+        ) : state === 'open' && !leaking.length ? (
+          <>
+            <IconInfo />{' '}
+            {t('Contexto aberto por escolha sua · verificado em {date}: você manteve {list}.', {
+              date: when,
+              list: allLeaking.map((l) => l.path).join(', '),
+            })}
+          </>
         ) : state === 'open' ? (
           <>
             <IconWarning />{' '}
@@ -91,6 +105,7 @@ function Summary({ report, current }: { report: ContextScopeReport | undefined; 
               date: when,
               list: leaking.map((l) => l.path).join(', '),
             })}
+            {cost > 0 && ` ${tn(cost, 'Custa ~1 token em todo card.', 'Custa ~{n} tokens em todo card.')}`}
           </>
         ) : (
           <>
@@ -163,6 +178,7 @@ function AddLocation({ profileId, onClose }: { profileId: string; onClose(): voi
 }
 
 const ORDER = { leaks: 0, controlled: 1, untested: 2 } as const;
+const NO_KEPT: string[] = [];
 
 /**
  * O contexto do card do agente: o que ele carrega sozinho além do que o card entrega. O agente declara onde a
@@ -172,6 +188,7 @@ export function ContextScope({ profile }: { profile: AiProfile }) {
   const report = useBoardStore((s) => s.state?.contextScopes?.[profile.id]);
   const running = useBoardStore((s) => !!s.state?.contextScopeRunning?.includes(profile.id));
   const current = useBoardStore((s) => s.state?.connections?.[profile.id]?.summary.version ?? null);
+  const kept = useBoardStore((s) => s.state?.contextKept?.[profile.id]) ?? NO_KEPT;
   const [adding, setAdding] = useState(false);
   const test = useAction(() => settings.testContextScope(profile.id));
   const remove = useAction((path: string, scope: 'project' | 'user', kind: ContextLocationKind) =>
@@ -210,7 +227,7 @@ export function ContextScope({ profile }: { profile: AiProfile }) {
           {t('Testando o que o agente lê sozinho… Gasta alguns pedidos da conta dele.')}
         </p>
       ) : (
-        <Summary report={report} current={current} />
+        <Summary report={report} current={current} kept={kept} />
       )}
       {test.error && <p role="alert">{t(test.error)}</p>}
       {rows.length > 0 && (
@@ -228,6 +245,7 @@ export function ContextScope({ profile }: { profile: AiProfile }) {
                 {loc.verdict.state === 'leaks' && (loc.verdict.files.length > 1 || loc.verdict.files[0] !== loc.path) && (
                   <div className="context-files muted small">{t('Arquivos: {list}', { list: loc.verdict.files.join(', ') })}</div>
                 )}
+                {loc.verdict.state === 'leaks' && <ContextLeak profileId={profile.id} loc={loc} overlaps={report?.overlaps ?? []} />}
                 <div className="context-item-meta muted small">
                   {t(KIND_LABEL[loc.kind])} · {t(loc.scope === 'user' ? 'seus arquivos' : 'projeto')}
                   {loc.loads && (

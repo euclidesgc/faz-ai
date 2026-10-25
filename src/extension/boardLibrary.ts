@@ -406,6 +406,11 @@ export class BoardLibrary {
   }
 
   /** Valida o nome novo (criar ou renomear) e devolve o artefato a editar, se houver. */
+  /** Já existe um artefato com este nome: quem cria a partir de outro lugar recusa em vez de sobrescrever. */
+  has(kind: ArtifactKind, name: string): boolean {
+    return !!this.repo.get(this.ctx.boardId, kind, name);
+  }
+
   private target(kind: ArtifactKind, name: string, previous: string | undefined, pattern: RegExp, invalid: string) {
     const existing = this.repo.get(this.ctx.boardId, kind, previous ?? name);
     if (previous !== undefined && !existing) throw new Error('Artefato não encontrado.');

@@ -9,6 +9,7 @@ import type { ContextProposal } from '../../shared/contextProposal';
 import { scanLibraryFolder } from '../libraryImport';
 import { agentOfArtifact, type ArtifactKind } from '../../shared/artifacts';
 import type { ImportSource } from '../../shared/artifactImport';
+import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { ToolExporter } from '../toolExport';
@@ -33,7 +34,13 @@ import type { AttachmentStore } from '../attachments';
 import { runUnsupported } from '../headless';
 import { isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
 import type { ConnectInput, ConnectState, ConnectSummary } from '../../shared/connect';
-import type { ContextLocation, ContextScopeReport } from '../../shared/contextScope';
+import {
+  parseUninstall,
+  uninstallPrompt,
+  type ContextAdvice,
+  type ContextLocation,
+  type ContextScopeReport,
+} from '../../shared/contextScope';
 import type { ToolMode } from '../../shared/aiTools';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 
@@ -43,6 +50,8 @@ const CONNECTIONS_META_KEY = 'ai_connections';
 const CONTEXT_SCOPES_META_KEY = 'ai_context_scopes';
 /** Os locais que a pessoa acrescentou ao teste do contexto, por perfil. */
 const CONTEXT_EXTRA_META_KEY = 'ai_context_extra';
+/** Os locais que a pessoa manteve ("Manter assim"), por perfil. */
+const CONTEXT_KEPT_META_KEY = 'ai_context_kept';
 import { boardServerFootprint } from '../mcp/footprint';
 import type { RunResolver } from '../log/eventLog';
 import { getMetrics, getPanelMetrics, type MetricsQuery, type MetricsResult } from '../log/metrics';
@@ -182,6 +191,8 @@ const bridgeOnly = {
   'settings.aiProfiles.probe': viaBridge,
   'settings.aiProfiles.test': viaBridge,
   'settings.aiProfiles.contextScope': viaBridge,
+  'settings.aiProfiles.contextReveal': viaBridge,
+  'settings.aiProfiles.contextAsk': viaBridge,
   // a chave colada vai direto da HostBridge ao Conectar do host: nunca passa por `handle` nem pelo log de eventos
   'settings.aiProfiles.connect': viaBridge,
   // as sondas demoram (a CLI do Claude roda quatro vezes na fixture): a HostBridge espera e publica o resultado
@@ -394,6 +405,52 @@ export class MessageRouter {
   // lidos da `meta` uma vez e guardados: o snapshot sai a cada mudança do board e não pode consultar o banco a mais
   private contextScopesCache: Record<string, ContextScopeReport> | null = null;
   private contextExtraCache: Record<string, ContextLocation[]> | null = null;
+  private contextKeptCache: Record<string, string[]> | null = null;
+  /** as respostas do agente sobre como desinstalar um plugin: só desta sessão, não vão para o banco */
+  private contextAdvice: Record<string, Record<string, ContextAdvice>> = {};
+  contextKept(): Record<string, string[]> {
+    return (this.contextKeptCache ??= this.metaRecord<string[]>(CONTEXT_KEPT_META_KEY));
+  }
+  /**
+   * Pergunta ao agente o comando que desinstala um plugin dele. A resposta vai para o estado, marcada na tela como
+   * sugestão do agente: o board nunca roda o comando.
+   */
+  async askContextUninstall(id: string, plugin: string): Promise<void> {
+    if (!this.aiProfileRuntime) throw new Error('A pergunta ao agente não está disponível neste host.');
+    if (!/^[\w.@-]{1,80}$/.test(plugin)) throw new Error('Nome de plugin inválido.');
+    const set = (advice: ContextAdvice) => {
+      this.contextAdvice = { ...this.contextAdvice, [id]: { ...this.contextAdvice[id], [plugin]: advice } };
+      this.notify();
+    };
+    set({ state: 'running' });
+    try {
+      set({ state: 'done', command: parseUninstall(await this.aiProfileRuntime.contextAsk(id, uninstallPrompt(plugin))), at: Date.now() });
+    } catch (e) {
+      set({ state: 'failed', error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  /**
+   * A pasta de um caminho que o último teste do contexto mostrou (um local ou um arquivo que vaza), para abrir no
+   * sistema. Outro caminho é recusado: a tela não abre pastas livres.
+   */
+  contextFolder(id: string, shown: string): string {
+    const report = this.savedContextScopes()[id];
+    const known = report?.locations.some((l) => l.path === shown || (l.verdict.state === 'leaks' && l.verdict.files.includes(shown)));
+    if (!known) throw new Error(`O caminho ${shown} não está no último teste do contexto.`);
+    const home = this.ctx.opts.homeDir || os.homedir();
+    const root = this.ctx.opts.workspaceDir ?? process.cwd();
+    const abs = shown.startsWith('~')
+      ? path.join(home, shown.replace(/^~\/?/, ''))
+      : path.isAbsolute(shown)
+        ? shown
+        : path.resolve(root, shown);
+    // um local com curinga abre a pasta antes do primeiro curinga; um arquivo, a pasta dele
+    const parts = abs.split(path.sep);
+    const firstGlob = parts.findIndex((p) => /[*?]/.test(p));
+    let dir = firstGlob >= 0 ? parts.slice(0, firstGlob).join(path.sep) || path.sep : abs;
+    while (dir && !fs.existsSync(dir)) dir = path.dirname(dir);
+    return fs.existsSync(dir) && fs.statSync(dir).isFile() ? path.dirname(dir) : dir;
+  }
   /** Os testes do contexto gravados (um por perfil); a leitura tolera o valor ausente ou estragado. */
   savedContextScopes(): Record<string, ContextScopeReport> {
     return (this.contextScopesCache ??= this.metaRecord<ContextScopeReport>(CONTEXT_SCOPES_META_KEY));
@@ -567,6 +624,8 @@ export class MessageRouter {
       contextScopes: this.savedContextScopes(),
       contextExtra: this.contextExtra(),
       contextScopeRunning: [...this.contextRunning],
+      contextKept: this.contextKept(),
+      contextAdvice: this.contextAdvice,
       environmentFirstRun: this.environmentFirstRun,
       artifactImport: this.ctx.importer.current,
       mainBranch: this.ctx.mainBranch(),
@@ -589,6 +648,7 @@ export class MessageRouter {
       throw new Error('Perfis executáveis exigem revisão humana.');
     // o handler grava os locais da pessoa direto na `meta`: a cópia guardada aqui relê no próximo snapshot
     if (msg.type === 'settings.aiProfiles.contextLocation') this.contextExtraCache = null;
+    if (msg.type === 'settings.aiProfiles.contextKeep') this.contextKeptCache = null;
     const handler = HANDLERS[msg.type] as Handler<MessageType>;
     const actor = this.actorOf(ctx);
     // o aviso de perfil ligado é da transição desligado → ligado; religar o que já está ligado não avisa

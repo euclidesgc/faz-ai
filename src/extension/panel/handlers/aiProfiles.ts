@@ -12,11 +12,53 @@ import { redactCredentialValues } from '../../credentials';
 import { profileInstallUrl } from '../../requirements';
 import { AiProfileRepo } from '../../repositories/aiProfileRepo';
 import type { HandlerMap } from './context';
-import { runContextScope } from '../../ai/contextScope';
-import { CONTEXT_KINDS, normalizeLocationPath, type ContextLocation, type ContextScopeReport } from '../../../shared/contextScope';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { askContextQuestion, runContextScope } from '../../ai/contextScope';
+import {
+  CONTEXT_KINDS,
+  importedReference,
+  locationKey,
+  mergedReference,
+  normalizeLocationPath,
+  significantLines,
+  type ContextLocation,
+  type ContextScopeReport,
+} from '../../../shared/contextScope';
+import { RULE_NAME_PATTERN } from '../../../shared/artifactImport';
+import type { BoardContext } from './context';
 
 /** A chave dos locais da pessoa na `meta` (a mesma do router, que a publica no estado). */
 const CONTEXT_EXTRA_KEY = 'ai_context_extra';
+/** A chave dos locais mantidos pela pessoa na `meta` (a mesma do router). */
+const CONTEXT_KEPT_KEY = 'ai_context_kept';
+const CONTEXT_SCOPES_KEY = 'ai_context_scopes';
+const significantLinesOf = (text: string): string[] => [...significantLines(text)];
+
+function metaRecord<T>(ctx: BoardContext, key: string): Record<string, T> {
+  try {
+    const raw: unknown = JSON.parse(ctx.boards.getMeta(key) ?? '{}');
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, T>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Um arquivo do projeto que o último teste do contexto mostrou entrando sozinho, já resolvido na pasta do projeto.
+ * A tela só pode agir sobre ele: nada de caminho livre, fora do projeto ou que o teste não viu vazar.
+ */
+function leakedProjectFile(ctx: BoardContext, id: string, file: string): string {
+  const report = metaRecord<ContextScopeReport>(ctx, CONTEXT_SCOPES_KEY)[id];
+  const leaked = report?.locations.some((l) => l.scope === 'project' && l.verdict.state === 'leaks' && l.verdict.files.includes(file));
+  const root = ctx.opts.workspaceDir;
+  if (!leaked || !root) throw new Error(`O arquivo ${file} não está entre os que o último teste mostrou entrando sozinho no projeto.`);
+  const abs = path.resolve(root, file);
+  const rel = path.relative(root, abs);
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) throw new Error(`O arquivo ${file} está fora do projeto.`);
+  if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) throw new Error(`O arquivo ${file} não existe mais.`);
+  return abs;
+}
 
 /** Gravações de perfil são atos da pessoa; o repositório recusa a IA e mantém segredos fora do snapshot. */
 export const aiProfileHandlers = {
@@ -49,6 +91,41 @@ export const aiProfileHandlers = {
     else return ctx.boards.revokeCompatibilityReview(ctx.boardId, msg.id);
     return true;
   },
+  /** "Manter assim" de um local que vaza: guardado nesta máquina, por perfil, pela chave `escopo:caminho`. */
+  'settings.aiProfiles.contextKeep': (msg, ctx) => {
+    const all = metaRecord<string[]>(ctx, CONTEXT_KEPT_KEY);
+    const key = locationKey(msg.location);
+    const rest = (all[msg.id] ?? []).filter((k) => k !== key);
+    ctx.boards.setMeta(CONTEXT_KEPT_KEY, JSON.stringify({ ...all, [msg.id]: msg.keep ? [...rest, key] : rest }));
+    return true;
+  },
+  /**
+   * As ações da pessoa sobre um arquivo do projeto que vaza, depois da prévia e da confirmação na tela. O conteúdo
+   * nunca se perde: `import` o leva inteiro para a regra antes de trocar o arquivo; `merge` só troca o arquivo cujas
+   * linhas estão todas no outro (a tela só oferece aí, e o host confere de novo).
+   */
+  'settings.aiProfiles.contextFix': (msg, ctx) => {
+    const fix = msg.fix;
+    if (fix.op === 'import') {
+      const abs = leakedProjectFile(ctx, msg.id, fix.file);
+      if (!RULE_NAME_PATTERN.test(fix.rule)) throw new Error('Nome de regra inválido: use letras minúsculas, números e hífens.');
+      // o `saveRule` sem `previous` sobrescreveria a regra de mesmo nome: aqui ela nunca é trocada
+      if (ctx.library.has('rule', fix.rule)) throw new Error(`Já existe a regra "${fix.rule}" no board: escolha outro nome.`);
+      ctx.library.saveRule(fix.rule, fs.readFileSync(abs, 'utf8'), { via: 'manual' });
+      fs.writeFileSync(abs, importedReference(fix.rule));
+      ctx.harness.load();
+      return true;
+    }
+    const keep = leakedProjectFile(ctx, msg.id, fix.keep);
+    const replace = leakedProjectFile(ctx, msg.id, fix.replace);
+    if (keep === replace) throw new Error('Escolha dois arquivos diferentes.');
+    const kept = new Set(significantLinesOf(fs.readFileSync(keep, 'utf8')));
+    const missing = significantLinesOf(fs.readFileSync(replace, 'utf8')).filter((l) => !kept.has(l));
+    if (missing.length)
+      throw new Error(`${fix.replace} tem ${missing.length} linha(s) que não estão em ${fix.keep}: junte à mão para não perder nada.`);
+    fs.writeFileSync(replace, mergedReference(fix.keep, fix.replace));
+    return true;
+  },
   /** Um local do teste do contexto, acrescentado ou tirado pela pessoa (o router já recusa a IA e o MCP aqui). */
   'settings.aiProfiles.contextLocation': (msg, ctx) => {
     if (!new AiProfileRepo(ctx.dbHandle.db).list(ctx.boardId).some((p) => p.id === msg.id))
@@ -76,6 +153,8 @@ export interface AiProfileRuntime {
   test(id: string): Promise<Extract<HostToWebview, { type: 'aiProfiles.testResult' }>>;
   /** O teste do contexto do card (descoberta pelo agente e citação); gasta pedidos da conta da ferramenta. */
   contextScope(id: string): Promise<ContextScopeReport>;
+  /** Uma pergunta avulsa ao agente, sem ferramentas (o comando que desinstala um plugin); gasta um pedido. */
+  contextAsk(id: string, prompt: string): Promise<string>;
 }
 
 export interface AiProfileRuntimeDeps {
@@ -103,22 +182,23 @@ export interface AiProfileRuntimeDeps {
 export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRuntime {
   const running = new Set<string>();
   const profiles = () => deps.repo.list(deps.boardId());
+  const scopeDeps = () => ({
+    repo: deps.repo,
+    gateway: deps.gateway,
+    boardId: deps.boardId,
+    cwd: deps.cwd,
+    homeDir: deps.homeDir,
+    ...(deps.runner ? { runner: deps.runner } : {}),
+    version: deps.contextVersion ?? (() => null),
+    extra: deps.contextExtra ?? (() => []),
+    ...(deps.log ? { log: deps.log } : {}),
+  });
   return {
     contextScope(id) {
-      return runContextScope(
-        {
-          repo: deps.repo,
-          gateway: deps.gateway,
-          boardId: deps.boardId,
-          cwd: deps.cwd,
-          homeDir: deps.homeDir,
-          ...(deps.runner ? { runner: deps.runner } : {}),
-          version: deps.contextVersion ?? (() => null),
-          extra: deps.contextExtra ?? (() => []),
-          ...(deps.log ? { log: deps.log } : {}),
-        },
-        id,
-      );
+      return runContextScope(scopeDeps(), id);
+    },
+    contextAsk(id, prompt) {
+      return askContextQuestion(scopeDeps(), id, prompt);
     },
     async probe() {
       const results = await Promise.all(

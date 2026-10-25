@@ -14,7 +14,7 @@ import { ACCOUNT_UNCHECKED, TEST_IDLE, type AgentAccount, type RegistryAgent } f
 import { MODE_SHEET_LINES } from '../../src/shared/aiTools';
 import type { AiProfile } from '../../src/shared/aiProfiles';
 import type { ConnectState } from '../../src/shared/connect';
-import type { ContextLocationResult } from '../../src/shared/contextScope';
+import type { ContextLocationResult, ContextOverlap } from '../../src/shared/contextScope';
 import type { BoardState } from '../../src/shared/model';
 import type { HostToWebview } from '../../src/shared/messages';
 
@@ -431,13 +431,21 @@ describe('Conectar agentes: o contexto do card', () => {
     ...over,
   });
   /** O teste do contexto gravado, como o host publica (sem passar pelo router, que é o mesmo nos outros casos). */
-  const withScope = (locations: ContextLocationResult[], extra: Partial<BoardState> = {}) =>
+  const withScope = (locations: ContextLocationResult[], extra: Partial<BoardState> = {}, overlaps?: ContextOverlap[]) =>
     act(() =>
       useBoardStore.setState((s) => ({
         state: {
           ...s.state!,
           contextScopes: {
-            claude: { profileId: 'claude', version: '2.1.296', at: Date.UTC(2026, 9, 25, 15), discovered: true, control: true, locations },
+            claude: {
+              profileId: 'claude',
+              version: '2.1.296',
+              at: Date.UTC(2026, 9, 25, 15),
+              discovered: true,
+              control: true,
+              locations,
+              ...(overlaps ? { overlaps } : {}),
+            },
           },
           ...extra,
         },
@@ -505,6 +513,107 @@ describe('Conectar agentes: o contexto do card', () => {
     expect(scope.getByRole('status')).toHaveTextContent('Contexto fechado por construção');
     expect(scope.queryByRole('button', { name: /Testar/ })).toBeNull();
     expect(within(row('Gemini CLI')).getByRole('img', { name: 'Contexto fechado' })).toBeInTheDocument();
+  });
+
+  it('o que vaza do projeto: sugestão, custo, abrir a pasta e importar como regra, com prévia antes de gravar', async () => {
+    show();
+    withScope([leak({ verdict: { state: 'leaks', how: 'quote', files: ['CLAUDE.md'], tokens: [1200] } })]);
+    const scope = within(screen.getByLabelText('Contexto do card'));
+    expect(scope.getByRole('status')).toHaveTextContent('Custa ~1200 tokens em todo card.');
+    expect(scope.getByText(/Do projeto: leve o conteúdo para uma regra do board/)).toBeInTheDocument();
+    await userEvent.click(scope.getByRole('button', { name: 'Abrir pasta' }));
+    expect(lastSent('settings.aiProfiles.contextReveal')).toMatchObject({ id: 'claude', path: 'CLAUDE.md' });
+    confirmLast();
+    await userEvent.click(scope.getByRole('button', { name: 'Importar como regra' }));
+    const preview = within(scope.getByRole('group', { name: 'Prévia da mudança' }));
+    expect(preview.getByLabelText('Nome da regra')).toHaveValue('claude');
+    expect(preview.getByText(/regra "claude" do board Faz AI/)).toBeInTheDocument();
+    // nada é gravado antes da confirmação
+    expect(sentOf('settings.aiProfiles.contextFix')).toHaveLength(0);
+    await userEvent.click(preview.getByRole('button', { name: 'Importar como regra' }));
+    expect(lastSent('settings.aiProfiles.contextFix')).toMatchObject({
+      id: 'claude',
+      fix: { op: 'import', file: 'CLAUDE.md', rule: 'claude' },
+    });
+    confirmLast();
+  });
+
+  it('repetidos: "Juntar" só no arquivo que cabe inteiro no outro, e com prévia', async () => {
+    show();
+    withScope(
+      [
+        leak({ verdict: { state: 'leaks', how: 'quote', files: ['CLAUDE.md'], tokens: [10] } }),
+        leak({ path: 'AGENTS.md', verdict: { state: 'leaks', how: 'quote', files: ['AGENTS.md'], tokens: [20] } }),
+      ],
+      {},
+      [{ a: 'CLAUDE.md', b: 'AGENTS.md', aInB: 1, bInA: 0.5 }],
+    );
+    const scope = within(screen.getByLabelText('Contexto do card'));
+    expect(scope.getAllByRole('button', { name: /^Juntar em/ }).map((b) => b.textContent)).toEqual(['Juntar em AGENTS.md']);
+    expect(scope.getByText('Repete 50% das linhas em CLAUDE.md.')).toBeInTheDocument();
+    await userEvent.click(scope.getByRole('button', { name: 'Juntar em AGENTS.md' }));
+    const preview = within(scope.getByRole('group', { name: 'Prévia da mudança' }));
+    expect(preview.getByText('@AGENTS.md')).toBeInTheDocument();
+    await userEvent.click(preview.getByRole('button', { name: 'Juntar' }));
+    expect(lastSent('settings.aiProfiles.contextFix')).toMatchObject({ fix: { op: 'merge', keep: 'AGENTS.md', replace: 'CLAUDE.md' } });
+    confirmLast();
+  });
+
+  it('plugin e cópia antiga do Faz AI têm sugestões próprias; o comando de desinstalar vem do agente, marcado como sugestão', async () => {
+    show();
+    const files = ['~/.kimi-code/skills/faz-ai-fluxo/SKILL.md', '~/.kimi-code/plugins/managed/br/skills/api/SKILL.md'];
+    withScope([
+      leak({
+        path: '~/.kimi-code/**/SKILL.md',
+        scope: 'user',
+        kind: 'skill',
+        verdict: { state: 'leaks', how: 'quote', files, tokens: [5, 7] },
+      }),
+    ]);
+    const scope = within(screen.getByLabelText('Contexto do card'));
+    expect(scope.getByText(/Cópias antigas da skill do fluxo/)).toBeInTheDocument();
+    expect(scope.getByText(/Vêm do plugin "br" da ferramenta/)).toBeInTheDocument();
+    // da pasta pessoal não se importa nem se junta: o board não mexe nela
+    expect(scope.queryByRole('button', { name: 'Importar como regra' })).toBeNull();
+    await userEvent.click(scope.getByRole('button', { name: 'Como desinstalar?' }));
+    expect(lastSent('settings.aiProfiles.contextAsk')).toMatchObject({ id: 'claude', plugin: 'br' });
+    confirmLast();
+    withScope(
+      [
+        leak({
+          path: '~/.kimi-code/**/SKILL.md',
+          scope: 'user',
+          kind: 'skill',
+          verdict: { state: 'leaks', how: 'quote', files, tokens: [5, 7] },
+        }),
+      ],
+      {
+        contextAdvice: { claude: { br: { state: 'done', command: 'kimi plugin remove br', at: 1 } } },
+      },
+    );
+    expect(scope.getByText('kimi plugin remove br')).toBeInTheDocument();
+    expect(scope.getByText(/Sugerido pelo agente, confira antes de rodar/)).toBeInTheDocument();
+  });
+
+  it('"Manter assim" tira a sugestão e o local do resumo; "Desfazer" traz de volta', async () => {
+    show();
+    const loc = leak({ verdict: { state: 'leaks', how: 'quote', files: ['CLAUDE.md'], tokens: [10] } });
+    withScope([loc]);
+    const scope = within(screen.getByLabelText('Contexto do card'));
+    await userEvent.click(scope.getByRole('button', { name: 'Manter assim' }));
+    expect(lastSent('settings.aiProfiles.contextKeep')).toMatchObject({
+      id: 'claude',
+      location: { scope: 'project', path: 'CLAUDE.md' },
+      keep: true,
+    });
+    confirmLast();
+    withScope([loc], { contextKept: { claude: ['project:CLAUDE.md'] } });
+    expect(scope.getByRole('status')).toHaveTextContent('Contexto aberto por escolha sua');
+    expect(scope.getByText('Mantido por você: entra em todo card.')).toBeInTheDocument();
+    expect(scope.queryByText(/Do projeto: leve o conteúdo/)).toBeNull();
+    await userEvent.click(scope.getByRole('button', { name: 'Desfazer' }));
+    expect(lastSent('settings.aiProfiles.contextKeep')).toMatchObject({ keep: false });
+    confirmLast();
   });
 
   it('a pessoa acrescenta um local que o agente esqueceu e tira o que acrescentou', async () => {

@@ -178,6 +178,31 @@ incluir (como regra do card ou da fase, por exemplo).
 - **Acrescentar um local** inclui no teste um caminho que o agente não declarou. Ele fica só nesta
   máquina, e uma nova descoberta não o apaga.
 
+Em cada local que **entra sozinho**, a seção diz o que fazer, pela origem do arquivo, e quanto ele custa
+(uns quatro caracteres por token; da skill e do agente, só a descrição, que é o que entra sempre):
+
+- **Cópia antiga do Faz AI** (`skills/faz-ai-*` na pasta da ferramenta): versões anteriores do board
+  instalavam a skill do fluxo ali; hoje o fluxo vem do board, e a pasta pode ser apagada.
+- **Plugin da ferramenta** (`plugins/<nome>/…`): se você não usa o plugin, desinstale. **Como
+  desinstalar?** pergunta o comando ao próprio agente (um pedido da conta) e o mostra como sugestão dele,
+  para você conferir; o board nunca roda o comando.
+- **Skill ou instruções da sua pasta pessoal**: valem para todos os projetos. Importe a skill para o board
+  e tire-a da pasta, ou leve para o projeto o que for só dele.
+- **Arquivo do projeto**: **Importar como regra** leva o conteúdo inteiro para uma regra do board (que
+  entra só nos cards que a pedirem) e deixa no arquivo uma frase de referência, para quem usa a
+  ferramenta fora do board. A prévia mostra o nome da regra e como o arquivo fica; nada é gravado antes da
+  confirmação, e o board nunca sobrescreve uma regra de mesmo nome.
+- **Arquivos repetidos**: a seção diz quanto de um arquivo se repete no outro. Quando todas as linhas de
+  um estão no outro, **Juntar** troca o repetido por uma referência (no CLAUDE.md, `@AGENTS.md`, a
+  importação do Claude Code; nos outros, uma frase que aponta o arquivo). Com linhas a perder, a seção
+  só sugere juntar à mão.
+
+**Abrir pasta** abre o local no sistema, sem mudar nada. **Manter assim** aceita que o local entre em todo
+card: a sugestão some, o custo sai do resumo e o resumo diz que o contexto está aberto por escolha sua;
+**Desfazer** traz a sugestão de volta. As ações só valem para os arquivos do projeto que o último teste
+mostrou vazando (ficam no git e dá para desfazer); a pasta pessoal e os plugins ficam só com a sugestão.
+Depois de importar ou juntar, o teste roda de novo.
+
 O teste roda sozinho depois de cada Conectar numa versão ainda não testada e, quando você quiser, por
 **Testar agora** ou **Testar de novo**. Ele gasta alguns pedidos da conta do agente (a descoberta e uma
 ou duas rodadas de citação). O resultado fica no banco do board, fora da exportação, e a tela avisa

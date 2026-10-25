@@ -183,6 +183,13 @@ export const settings = {
   testAiProfile: (id: string) => request({ type: 'settings.aiProfiles.test', id }, { timeout: 130_000 }),
   // três rodadas de até cinco minutos cada: a descoberta e as duas citações
   testContextScope: (id: string) => request({ type: 'settings.aiProfiles.contextScope', id }, { timeout: 16 * 60_000 }),
+  contextKeep: (id: string, location: Pick<ContextLocation, 'path' | 'scope'>, keep: boolean) =>
+    request({ type: 'settings.aiProfiles.contextKeep', id, location, keep }),
+  contextReveal: (id: string, path: string) => request({ type: 'settings.aiProfiles.contextReveal', id, path }),
+  // um pedido ao agente: até cinco minutos
+  contextAsk: (id: string, plugin: string) => request({ type: 'settings.aiProfiles.contextAsk', id, plugin }, { timeout: 6 * 60_000 }),
+  contextFix: (id: string, fix: Extract<WebviewToHost, { type: 'settings.aiProfiles.contextFix' }>['fix']) =>
+    request({ type: 'settings.aiProfiles.contextFix', id, fix }),
   contextLocation: (id: string, op: 'add' | 'remove', location: Pick<ContextLocation, 'path' | 'scope' | 'kind'>) =>
     request({ type: 'settings.aiProfiles.contextLocation', id, op, location }),
   /**

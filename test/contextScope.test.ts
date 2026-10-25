@@ -3,7 +3,18 @@ import {
   canaryLine,
   contextScopeState,
   discoveryPrompt,
+  importedReference,
+  isBoardReference,
+  leakGroups,
+  leakOrigin,
+  leakTokens,
+  mergedReference,
   normalizeLocationPath,
+  overlapOf,
+  parseUninstall,
+  ruleNameFor,
+  uninstallPrompt,
+  unresolvablePath,
   parseDiscovery,
   pickQuoteLine,
   quoteProbe,
@@ -50,6 +61,9 @@ describe('contexto do card: descoberta', () => {
     expect(parseDiscovery('Não sei dizer.')).toBeNull();
     expect(parseDiscovery('{"tool": "?", "locations": []}')).toEqual([]);
     expect(normalizeLocationPath('./CLAUDE.md')).toBe('CLAUDE.md');
+    // descrição no lugar do caminho: fica sem teste, não vira isca
+    expect(unresolvablePath('(instalação da CLI)/skills')).toBe(true);
+    expect(unresolvablePath('.kimi-code/skills/*/SKILL.md')).toBe(false);
   });
 });
 
@@ -126,5 +140,71 @@ describe('contexto do card: estado', () => {
     expect(contextScopeState(report(['leaks'], false))).toBe('open');
     expect(contextScopeState(report(['controlled'], false))).toBe('unverified');
     expect(contextScopeState(report(['untested']))).toBe('unverified');
+  });
+});
+
+describe('contexto do card: o que fazer com o que vaza', () => {
+  const leaking = (files: string[], over: Partial<ContextScopeReport['locations'][number]> = {}) => ({
+    path: '~/.kimi-code/skills/*/SKILL.md',
+    scope: 'user' as const,
+    kind: 'skill' as const,
+    loads: 'on-demand' as const,
+    source: 'agent' as const,
+    verdict: { state: 'leaks' as const, how: 'quote' as const, files, tokens: files.map(() => 10) },
+    ...over,
+  });
+
+  it('a origem de cada arquivo decide a sugestão: cópia antiga do Faz AI, plugin, pasta pessoal ou projeto', () => {
+    const loc = leaking([
+      '~/.kimi-code/skills/faz-ai-fluxo/SKILL.md',
+      '~/.kimi-code/plugins/managed/br/skills/api/SKILL.md',
+      '~/.kimi-code/skills/minha-skill/SKILL.md',
+      '~/.kimi-code/skills/faz-ai-modo-autonomo/SKILL.md',
+    ]);
+    expect(leakGroups(loc)).toEqual([
+      {
+        origin: { kind: 'faz-ai-copy' },
+        files: ['~/.kimi-code/skills/faz-ai-fluxo/SKILL.md', '~/.kimi-code/skills/faz-ai-modo-autonomo/SKILL.md'],
+        tokens: 20,
+      },
+      { origin: { kind: 'plugin', plugin: 'br' }, files: ['~/.kimi-code/plugins/managed/br/skills/api/SKILL.md'], tokens: 10 },
+      { origin: { kind: 'user-skill' }, files: ['~/.kimi-code/skills/minha-skill/SKILL.md'], tokens: 10 },
+    ]);
+    expect(leakTokens(loc)).toBe(40);
+    expect(leakOrigin('AGENTS.md', { scope: 'project', kind: 'instructions' })).toEqual({ kind: 'project' });
+    // a referência que o board deixou não pede mais ação
+    const ref = leaking(['AGENTS.md'], { path: 'AGENTS.md', scope: 'project', kind: 'instructions' });
+    expect(leakGroups({ ...ref, verdict: { state: 'leaks', how: 'quote', files: ['AGENTS.md'], refs: [true] } })[0]!.origin).toEqual({
+      kind: 'board-reference',
+    });
+    expect(isBoardReference(importedReference('agents'))).toBe(true);
+    expect(isBoardReference(mergedReference('AGENTS.md', 'CLAUDE.md'))).toBe(true);
+    expect(isBoardReference('# Regras do projeto\nRode os testes.')).toBe(false);
+    // a instrução herdada de uma pasta acima do projeto não é do projeto: o board não mexe nela
+    expect(leakOrigin('../CLAUDE.md', { scope: 'project', kind: 'instructions' })).toEqual({ kind: 'user-instructions' });
+  });
+
+  it('as frações de linhas repetidas dizem se um arquivo cabe inteiro no outro', () => {
+    const agents =
+      'Rode os testes antes de concluir a história.\nUse português nos comentários do código.\nNão publique sem a pessoa pedir.';
+    const claude = 'Rode os testes antes de concluir a história.\nUse português nos comentários do código.';
+    expect(overlapOf(agents, claude)).toEqual({ aInB: 2 / 3, bInA: 1 });
+    expect(overlapOf('# título', agents)).toBeNull();
+  });
+
+  it('o nome da regra sai do caminho, e as referências apontam o arquivo certo (o CLAUDE.md importa com @)', () => {
+    expect(ruleNameFor('AGENTS.md')).toBe('agents');
+    expect(ruleNameFor('.cursor/rules/Regra Ação.mdc')).toBe('cursor-rules-regra-acao');
+    expect(importedReference('agents')).toContain('regra "agents" do board Faz AI');
+    expect(mergedReference('AGENTS.md', 'CLAUDE.md')).toBe('@AGENTS.md\n');
+    expect(mergedReference('AGENTS.md', '.claude/CLAUDE.md')).toBe('@../AGENTS.md\n');
+    expect(mergedReference('AGENTS.md', 'KIMI.md')).toBe('As instruções deste projeto estão em AGENTS.md.\n');
+  });
+
+  it('o comando de desinstalar vem da última linha da resposta; "não sei" vira nada', () => {
+    expect(uninstallPrompt('br')).toContain('desinstalar o plugin "br"');
+    expect(parseUninstall('• Pensando no comando...\n`kimi plugin remove br`')).toBe('kimi plugin remove br');
+    expect(parseUninstall('NÃO SEI')).toBeNull();
+    expect(parseUninstall('• NÃO SEI\n\nTo resume this session: kimi -r session_1')).toBeNull();
   });
 });

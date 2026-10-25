@@ -421,6 +421,18 @@ export class HostBridge {
         });
         return;
       }
+      case 'settings.aiProfiles.contextReveal':
+        await this.env.openExternal(this.router.contextFolder(msg.id, msg.path));
+        return;
+      // a resposta vai para o estado (`contextAdvice`): a tela mostra o comando como sugestão do agente
+      case 'settings.aiProfiles.contextAsk':
+        await this.router.askContextUninstall(msg.id, msg.plugin);
+        return;
+      // a ação muda o que o agente lê: o teste roda de novo, em segundo plano, e a tela acompanha pelo estado
+      case 'settings.aiProfiles.contextFix':
+        this.router.handle(msg);
+        void this.router.runContextScope(msg.id).catch(() => {});
+        return;
       case 'settings.aiProfiles.test':
         this.post(await this.router.testAiProfile(msg.id));
         // o teste muda a evidência do perfil: o aviso do topo reflete o resultado sem recarregar

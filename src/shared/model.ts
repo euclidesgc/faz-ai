@@ -19,7 +19,7 @@ import type { BranchKind, GitConfig, MainBranch } from './git';
 import type { UsageLimitState } from './usageLimit';
 import type { BranchRenamePending, RenameOutcome } from './branchRename';
 import type { ConnectState } from './connect';
-import type { ContextLocation, ContextScopeReport } from './contextScope';
+import type { ContextAdvice, ContextLocation, ContextScopeReport } from './contextScope';
 
 export type Id = string;
 
@@ -337,6 +337,10 @@ export interface BoardState {
   contextExtra?: Record<string, ContextLocation[]>;
   /** os perfis com o teste do contexto em curso */
   contextScopeRunning?: string[];
+  /** os locais que a pessoa manteve ("Manter assim"), por perfil, pela chave `escopo:caminho` */
+  contextKept?: Record<string, string[]>;
+  /** a resposta do agente sobre como desinstalar um plugin, por perfil e plugin (desta sessão do editor) */
+  contextAdvice?: Record<string, Record<string, ContextAdvice>>;
   /** o Diagnóstico ainda não abriu sozinho nesta máquina: a interface abre a tela uma vez */
   environmentFirstRun: boolean;
   /** Preview of artifacts to import into the board. */

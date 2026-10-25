@@ -5273,6 +5273,44 @@ body[data-theme='dark'] img.agent-icon {
 .context-verdict.controlled {
   color: var(--success);
 }
+.context-leak {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin-top: var(--sp-4);
+}
+.context-advice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-6) var(--sp-8);
+  border-left: 2px solid var(--warn-border);
+  background: var(--warn-bg);
+  border-radius: var(--radius-sm);
+}
+.context-overlap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.context-fix {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  padding: var(--sp-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.context-fix-preview {
+  margin: 0;
+  padding: var(--sp-6);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-xs);
+  background: var(--code-bg);
+  border-radius: var(--radius-sm);
+}
 .context-add {
   display: flex;
   flex-direction: column;
