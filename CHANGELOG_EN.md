@@ -43,6 +43,7 @@
 
 ### Removed
 
+- **Connect agents: the "Agente padrão" (default agent) card at the top is gone.** It repeated what the screen already shows: the default agent opens selected, with the **Padrão** (default) badge in the list and on its panel, and the connection status is in the **Conexão** (connection) tab. The panel badge got a hint that explains what the default is and where to change it.
 - **"Ferramenta deste projeto" (this project's tool) section of the Harness.** Choosing the default agent repeated **Tornar padrão** (make default) in Conectar agentes, and **Conectar ao board** (connect to the board) repeated each agent's Conexão tab; the table of what each tool loads also left. The conversation and heartbeat run text now talks about each card's agent.
 - **Recreate default board.** The item that deleted the whole board and recreated it with the default left Settings, along with the `reset_board` MCP tool. To bring the board to the current default without losing cards, use **Atualizar board** (update board); to start over from a saved board, use **Importar** (import) in Backup.
 - **The Ferramentas de IA (AI tools) and Modelos de IA (AI models) screens.** Their content moved to Conectar agentes: Connect, the CLI profiles, the custom profile (through the **Agente personalizado (CLI)** button), the capabilities and the acknowledgment live on the agent; the model catalog, on its Models tab; the suggestion rules and the execution policies, at the end of the screen. An old link to those tabs opens Conectar agentes.

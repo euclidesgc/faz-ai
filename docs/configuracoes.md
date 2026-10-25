@@ -28,9 +28,8 @@ com as regras de sugestão e as regras de fallback. O Harness e os agentes do bo
 **Configurações → Conectar agentes** junta o que antes ficava em duas telas (Ferramentas de IA e Modelos de
 IA). Todo agente ligado roda cards, ao mesmo tempo que os outros: cada card vai para o agente do modelo dele
 (o do card, o do agente do harness ou o da regra de sugestão; veja [Qual CLI executa](#qual-cli-executa)),
-sem trocar nada. No topo fica o **agente padrão**: o que roda os cards sem modelo, com o modo, o resumo da
-conexão, a conta e os outros agentes ligados que também rodam cards. Abaixo, à esquerda, a lista dos
-agentes; à direita, o agente escolhido, com as abas **Conexão**, **Modelos**, **Testar** e **Detalhes**.
+sem trocar nada. O **agente padrão** roda os cards sem modelo e leva o selo **Padrão** na lista e no
+painel dele, que já abre selecionado ao entrar na tela. À esquerda fica a lista dos agentes; à direita, o agente escolhido, com as abas **Conexão**, **Modelos**, **Testar** e **Detalhes**.
 No fim da tela ficam as regras de fallback do agente escolhido na lista. As regras de sugestão de
 modelo valem para o board inteiro e ficam em **Harness › Ferramenta e execução**.
 

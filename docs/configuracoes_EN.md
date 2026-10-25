@@ -28,9 +28,9 @@ board's agents are in [Harness, agents and AI tools](harness_EN.md).
 **Settings → Conectar agentes** (connect agents) brings together what used to live on two screens
 (Ferramentas de IA and Modelos de IA). Every enabled agent runs cards, alongside the others: each card
 goes to its model's agent (the card's, the harness agent's or the suggestion rule's; see
-[Which CLI runs](#which-cli-runs)), with nothing to switch. At the top is the **default agent**: the one
-that runs the cards with no model, with its mode, the connection summary, the account and the other
-enabled agents that also run cards. Below, on the left, the list of agents; on the right, the chosen agent, with
+[Which CLI runs](#which-cli-runs)), with nothing to switch. The **default agent** runs the cards with no
+model and carries the **Padrão** (default) badge in the list and on its panel, which opens already selected
+when you enter the screen. On the left is the list of agents; on the right, the chosen agent, with
 the **Conexão** (connection), **Modelos** (models), **Testar** (test) and **Detalhes** (details) tabs.
 The fallback rules of the agent chosen in the list sit at the end of the screen. The model
 suggestion rules apply to the whole board and live in **Harness › Ferramenta e execução** (tool and

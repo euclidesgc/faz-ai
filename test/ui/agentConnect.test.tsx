@@ -132,25 +132,19 @@ describe('Conectar agentes: a lista e o agente padrão', () => {
     expect(screen.getAllByRole('tab').map(label)).toEqual(['Conexão', 'Modelos', 'Testar', 'Detalhes']);
   });
 
-  it('o agente padrão aparece no topo, com a conta e os outros ligados que também rodam cards; Testar abre a aba Testar dele', async () => {
+  it('sem cartão do agente padrão no topo: o selo "Padrão" do agente escolhido explica o que é', async () => {
     show();
-    account('claude', { status: 'signed-in', label: 'Claude Max · pessoa@exemplo.com' });
-    const inUse = within(screen.getByLabelText('Agente padrão'));
-    expect(inUse.getByText('Agente padrão: Claude Code')).toBeInTheDocument();
-    const others = board.router
-      .snapshot()
-      .board.aiProfiles.filter((p) => p.enabled && p.id !== 'claude')
-      .map((p) => p.name);
+    expect(screen.queryByLabelText('Agente padrão')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ver conexão' })).toBeNull();
+    const badge = within(screen.getByLabelText('Claude Code')).getByText('Padrão');
+    await userEvent.hover(badge);
     expect(
-      inUse.getByText(
-        others.length
-          ? `Também rodam cards, pelo modelo de cada um: ${others.join(', ')}.`
-          : 'Ligue outro agente para usar os modelos dele nos cards, junto com este.',
-      ),
+      (
+        await screen.findAllByText(
+          'Roda os cards que não dizem qual modelo usar. Para trocar, use Tornar padrão na aba Conexão de outro agente.',
+        )
+      )[0],
     ).toBeInTheDocument();
-    expect(inUse.getByText(/CLI · Ainda não conectado pelo board · Claude Max · pessoa@exemplo.com/)).toBeInTheDocument();
-    await userEvent.click(inUse.getByRole('button', { name: 'Testar' }));
-    expect(tab('Testar')).toHaveAttribute('aria-selected', 'true');
   });
 
   it('a situação de cada agente: instalado com a versão; não encontrado, com onde instalar', async () => {

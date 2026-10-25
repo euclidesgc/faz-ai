@@ -43,6 +43,7 @@
 
 ### Removido
 
+- **Conectar agentes: sai o cartão "Agente padrão" do topo.** Ele repetia o que a tela já mostra: o agente padrão abre selecionado, com o selo **Padrão** na lista e no painel, e a situação da conexão fica na aba **Conexão**. O selo do painel ganhou uma dica que explica o que é o padrão e onde trocá-lo.
 - **Seção "Ferramenta deste projeto" do Harness.** A escolha do agente padrão repetia o **Tornar padrão** de Conectar agentes, e o **Conectar ao board** repetia a aba Conexão de cada agente; a tabela do que cada ferramenta carrega também saiu. O texto de Execução pela conversa e heartbeat passa a falar do agente de cada card.
 - **Recriar board padrão.** O item que apagava o board inteiro e o recriava com o padrão saiu de Configurações, junto com a ferramenta MCP `reset_board`. Para levar o board ao padrão atual sem perder cards, use **Atualizar board**; para recomeçar de um board salvo, use **Importar** em Backup.
 - **Telas Ferramentas de IA e Modelos de IA.** O conteúdo delas foi para Conectar agentes: o Conectar, os perfis de CLI, o perfil personalizado (pelo botão **Agente personalizado (CLI)**), as capacidades e a ciência ficam no agente; o catálogo de modelos, na aba Modelos dele; as regras de sugestão e as políticas de execução, no fim da tela. Um link antigo para essas abas abre Conectar agentes.

@@ -8,15 +8,8 @@ export const agentConnect: Record<string, string> = {
   Atualizar: 'Refresh',
   'Confere de novo quais agentes estão instalados, a versão de cada um e se você está com a conta conectada. Use depois de instalar um agente, entrar na conta dele ou atualizá-lo fora do board.':
     "Checks again which agents are installed, each one's version and whether you are signed in to the account. Use it after installing an agent, signing in to it or updating it outside the board.",
-  'Agente padrão': 'Default agent',
-  'Agente padrão: {name}': 'Default agent: {name}',
-  'Também rodam cards, pelo modelo de cada um: {names}.': "Also running cards, by each card's model: {names}.",
-  'Ligue outro agente para usar os modelos dele nos cards, junto com este.':
-    'Enable another agent to use its models in cards, alongside this one.',
-  'Ainda não conectado pelo board': 'Not connected by the board yet',
-  'Ver conexão': 'See connection',
-  'Mostra a conexão e a conta do agente padrão': 'Shows the connection and the account of the default agent',
-  'Abre a aba Testar do agente padrão': 'Opens the Test tab of the default agent',
+  'Roda os cards que não dizem qual modelo usar. Para trocar, use Tornar padrão na aba Conexão de outro agente.':
+    "Runs the cards that don't say which model to use. To change it, use Make default in another agent's Connection tab.",
 
   // a lista
   'Buscar agente': 'Search agents',
