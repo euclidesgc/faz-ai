@@ -60,7 +60,7 @@ export function PolicyAssistant({
   };
   if (!mode)
     return (
-      <div className="actions">
+      <div className="actions-toolbar">
         {modes.map((m) => (
           <Button key={m} variant="soft" onClick={() => setMode(m)}>
             {t(MODE_LABELS[m])}
@@ -83,7 +83,7 @@ export function PolicyAssistant({
           {(id) => <TextArea id={id} rows={3} maxLength={MAX_GOAL_CHARS} value={goal} onChange={(e) => setGoal(e.target.value)} />}
         </FormField>
       )}
-      <div className="actions">
+      <div className="actions-toolbar">
         <Button disabled={ask.busy || (mode === 'create' && !goal.trim())} onClick={() => void ask.run(mode)}>
           {ask.busy ? t('Consultando a IA…') : t('Pedir proposta')}
         </Button>

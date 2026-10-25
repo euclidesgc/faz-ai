@@ -12,7 +12,7 @@ import { rich } from '../../i18n/rich';
 /**
  * Tela do harness. Toda execução do board parte só do que está no board (no Claude Code, contexto vazio imposto; nas outras
  * CLIs, o que elas carregam sozinhas aparece em Conectar agentes). A aba "Artefatos do board" organiza regras, skills,
- * agentes e servidores MCP; "Ferramenta e execução" escolhe a IA e o executor. As políticas de execução ficam em Conectar agentes.
+ * agentes e servidores MCP; "Ferramenta e execução" escolhe a IA e o executor. As regras de fallback ficam em Conectar agentes.
  */
 export function HarnessSettings() {
   const board = useBoardStore((s) => s.state!.board);

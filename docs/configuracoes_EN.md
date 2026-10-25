@@ -4,7 +4,7 @@
 
 This is the detailed manual of the **Configurações** (Settings) screen: what each section adjusts, how
 the board connects to the AI agents (Claude Code, Cursor, Codex, Gemini and the others), each agent's
-model catalog with the suggestion rules, and the execution and fallback policies. The Harness and the
+model catalog with the suggestion rules, and the fallback rules. The Harness and the
 board's agents are in [Harness, agents and AI tools](harness_EN.md).
 
 ![Settings › Connect agents: the default agent, the list and the chosen agent's connection](images/settings_en.png)
@@ -17,7 +17,7 @@ board's agents are in [Harness, agents and AI tools](harness_EN.md).
 | Tipos de card         | Story, Bug, Sub-task…, with color and default field values per type                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section                                     |
 | Regras do board       | Completion and phase-advance blocks, confirmations, filling in the suggested model, short track for small stories (Baixo effort or Bug type skips PRD and Spec)                                                                                                                                                                                                                                                                                                                         |
-| Conectar agentes      | The AI agents that run the cards (every enabled agent, at the same time, and the default one for cards with no model); each one's account (sign in and out); **Conectar** (connect) with the board and the mode (CLI, ACP or API); each agent's models; the quick test, the test session and the protocol log; copies and custom profiles; the rules that suggest each card's model and the execution and fallback policies                                                                                            |
+| Conectar agentes      | The AI agents that run the cards (every enabled agent, at the same time, and the default one for cards with no model); each one's account (sign in and out); **Conectar** (connect) with the board and the mode (CLI, ACP or API); each agent's models; the quick test, the test session and the protocol log; copies and custom profiles; the rules that suggest each card's model and the fallback rules                                                                                                               |
 | Harness               | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, default agent and heartbeat (see [Harness](harness_EN.md#harness) and [Agents](harness_EN.md#agents))                                                                                                                                                                                                                                                               |
 | Git                   | Mode, gitflow, branch names and prefixes, worktrees, automatic merge and decision records; editable in the editor and in the browser. "Tocar histórias em paralelo" (work on stories in parallel) lives in Harness de IA › Ferramenta e execução                                                                                                                                                                                                                                      |
 | Aparência             | **Idioma** (language: automatic, Português (Brasil) or English), theme, font and size, per board, in the editor and in the browser; statuses (name and color, in the Fluxos tab; here only in browser mode)                                                                                                                                                                                                                                                                             |
@@ -32,7 +32,7 @@ goes to its model's agent (the card's, the harness agent's or the suggestion rul
 that runs the cards with no model, with its mode, the connection summary, the account and the other
 enabled agents that also run cards. Below, on the left, the list of agents; on the right, the chosen agent, with
 the **Conexão** (connection), **Modelos** (models), **Testar** (test) and **Detalhes** (details) tabs.
-The model suggestion rules and the execution and fallback policies, which apply to the whole board, sit
+The model suggestion rules and the fallback rules, which apply to the whole board, sit
 at the end of the screen.
 
 ### The list
@@ -291,68 +291,82 @@ automaticamente** (fill in the suggested model automatically), right above the r
 field when a card is created or changes, if it is empty or holds the previous suggestion; a model chosen
 by hand is never replaced.
 
-## Execution and fallback policies
+## Fallback rules
 
-The **execution and fallback policies** separate versioned definition, local human review and
-history (schema 41). The resolver does not replace an invalid explicit choice with a default, nor
-redirect a prefix to the default copied profile. The evaluator and the simulation use the same
-function, with explained rejections, ordered targets, accumulated limits and a reconciliation
-requirement when there is partial or unknown work. Imported policies remain pending review; earlier
-snapshots do not change with editing.
+When a model runs out of usage quota, the board continues the card on another model, from any
+enabled agent. Without a rule, the card waits for the quota to renew. The **fallback rules** live
+under **Configurações → Conectar agentes** (Settings → Connect agents), right below the model
+suggestion rules, as a list: the order is the priority (the first matching rule wins), and each row
+shows **when** ("Claude Code · CLI · Opus 5.5 runs out of quota"), what the board **uses instead**
+("Gemini · API · Pro, then Cursor · CLI · Auto") and **how** (switches by itself or asks first), with
+the switch to enable and disable, move up, move down, edit and remove.
 
-Under **Configurações → Conectar agentes → Políticas de execução e fallback → Gerenciar
-políticas** (Settings → Connect agents → Execution and fallback policies → Manage policies), the manual
-editor supports conditions, ordered targets, limits, duplication, removal and paginated history. A
-complete comparison precedes the human review confirmation; saving as pending does not authorize
-execution. Version conflicts preserve the draft and let you reload the base before reviewing again.
-The host simulator uses the same evaluator, without AI, and identifies credentials/admission as
-scenario assumptions. Changes to the saved policies or to the context invalidate the displayed
-result.
+**Montar nova regra** (build new rule) opens the editor on the same screen, in three steps:
 
-The profiles the policies and the simulator know are the board's profiles (the extension's, the
-copies and the custom ones), with the mode in the name ("Gemini · API", "Claude Code · CLI"), and each
-one's models are those in the board catalog. So a Gemini profile, in any mode, can be the source and
-the target of a policy: with the _quota_ failure, Pro's exhausted quota can continue on Flash, for
-example. The mode is not part of the policy: switching Gemini's mode in **Conectar** (connect) keeps
-its policies.
+1. **When this model runs out of quota**: the model that failed. One source per rule: any model, any
+   model of one agent, or one model of one agent. For another model, build another rule.
+2. **Use instead, in this order**: the list of models that replace the failed one, from any agent on
+   the board. If the first one fails too, the board tries the next. A target equal to the model that
+   failed does not save. A target on a turned-off agent shows a warning in the list and in the editor:
+   the rule saves, but the switch only happens after you turn the agent on in Connect agents.
+3. **How to switch**: **Switches by itself** (the card continues on the next model without asking) or
+   **Asks first** (the card stays with you, with the options in the conversation).
+
+The name comes from the rule itself ("Opus 5.5 → Gemini · API · Pro") until you write one, and the
+sentence at the bottom of the editor says exactly what the rule does. **Salvar regra** (save rule)
+saves and takes effect right away: saving from the screen is the human review (the AI never saves or
+enables a rule). If another window changed the same rule while you were editing, the editor warns and
+offers **Recarregar e salvar de novo** (reload and save again), keeping your draft.
+
+**Avançado** (advanced), closed by default, holds what the simple path does not need: the failure
+types (today the run only reports an exhausted quota; the other types wait until it reports them),
+the actions **Bloqueia o card** (blocks the card) and **Espera e tenta de novo** (waits and tries
+again), how to treat a model hand-picked on the card (by default the rule also switches when the
+source is exactly that model), the situation conditions (run action, harness agent, phase, card type,
+who called; empty means all), the limits (attempts, deadline, backoff and process caps), **Simulate**
+the draft, **Suggest fallbacks** and **Review conflicts** with the AI, and the rule's **earlier
+versions** (use one as a draft).
+
+The profiles the rules know are the board's profiles (the extension's, the copies and the custom
+ones), with the mode in the name ("Gemini · API", "Claude Code · CLI"), and each one's models are
+those in the board catalog. The mode is not part of the rule: switching Gemini's mode in **Conectar**
+(connect) keeps its rules.
 
 The Gemini quota is **per model** (Pro can run out while Flash still has quota), but the usage-limit
-pause is **per profile**: without a policy, the whole Gemini profile waits for the renewal. To continue
-with another model when one runs out, create a policy with the _quota_ failure and the target on the
-other model (Pro → Flash): the switch happens right away, and the profile is not paused. A target on a
-turned-off profile shows a warning in the editor, the summary and the simulator; the policy saves, but
-the run only switches to it after you turn the profile on.
+pause is **per profile**: without a rule, the whole Gemini profile waits for the renewal. To continue
+with another model when one runs out, build the rule Pro → Flash: the switch happens right away, and
+the profile is not paused.
 
-The runner, the chat and the assistants ("Sugerir agentes, regras ou skills", suggest agents,
-rules or skills; "Indicar artefatos", suggest artifacts) decide the target switch through this same
-evaluator: with an enabled, applicable policy the run continues on its target; without a policy,
-the failure blocks and nothing runs on another target. In **Próxima execução** (next run), the
-simulation evaluates only the saved and enabled policies, without spending tokens or opening the
-CLI. **Criar com ajuda de IA** (create with AI help), **Sugerir fallbacks** (suggest fallbacks) and
-**Revisar conflitos** (review conflicts) ask the AI only for a proposal (a draft with explanation,
-differences and simulated examples, without secrets): it goes through the editor's validator and
-nothing is saved or enabled until you review and confirm. The AI also reads the policies over MCP
-(`get_execution_policies`, read-only); creating, reviewing and enabling is always the person's
-action.
+The runner, the chat and the assistants ("Sugerir agentes, regras ou skills", suggest agents, rules
+or skills; "Indicar artefatos", suggest artifacts) decide the switch through this same evaluator:
+with an enabled, applicable rule the run continues on its target; without a rule, the failure blocks
+and nothing runs on another target. At the end of the section, **Testar as regras** (test the rules)
+simulates the next run with only the saved and enabled rules, without spending tokens or opening the
+CLI, and **Criar com ajuda de IA** (create with AI help) asks the AI only for a proposal (a draft with
+explanation, differences and simulated examples, without secrets): it goes through the editor's
+validator and nothing is saved until you open the proposal in the editor and save. The AI also reads
+the rules over MCP (`get_execution_policies`, read-only).
+
+Underneath, each rule is still a versioned execution policy (schema 41): every save creates a
+version, earlier versions are kept, and the host refuses two enabled rules tied on priority or a
+target outside the catalog.
 
 ### The old fallback model
 
 The old **fallback model** on suggestion rules no longer switches anything at run time: fallback is
-decided only by the execution and fallback policies. When the board opens, when rules are saved or
-after a backup is imported, each legacy fallback becomes a **disabled policy proposal pending
-review** (id `legacy-<rule>`, action _offer_, failure _quota_, target = the fallback model), with
-history at version 1. The proposal does not copy the rule's conditions (card fields and type):
-adjust them in the editor. The conversion happens once; if you remove the proposal, it does not
-come back.
+decided only by the fallback rules. When the board opens, when rules are saved or after a backup is
+imported, each legacy fallback becomes a **disabled rule pending review** (id `legacy-<rule>`, action
+_asks first_, failure _quota_, target = the fallback model), with history at version 1. The rule does
+not copy the suggestion rule's conditions (card fields and type): adjust them under Advanced. The
+conversion happens once; if you remove the rule, it does not come back.
 
-Under **Políticas → Gerenciar políticas** (Policies → Manage policies) a notice lists the proposals
-and the fallbacks that could not be converted (model or effort outside the catalog); nothing
-switches CLI until you compare, simulate, review and enable the policy. The rule editor no longer
-has a fallback field and does not show the old fallback; the conversion and the notice live in the
-policies. The MCP `set_model_rules` has no `fallback` parameter (the key is ignored in a call) and
-`get_models` returns no fallback. On export, CLI profile credentials and variables are not in the
-file; on import, the profiles come back disabled and the policies pending, and the notice lists
-both.
+In the list, the pending rule shows **Precisa da sua revisão** (needs your review) with the switch
+locked; **Revisar e ligar** (review and enable) opens the editor, and saving records it as reviewed.
+At the end of the section, a notice lists the proposals and the fallbacks that could not be converted
+(model or effort outside the catalog). The suggestion rule editor no longer has a fallback field. The
+MCP `set_model_rules` has no `fallback` parameter (the key is ignored in a call) and `get_models`
+returns no fallback. On export, CLI profile credentials and variables are not in the file; on import,
+the profiles come back disabled and the rules pending, and the notice lists both.
 
 ## Dependencies between options and cross-links
 

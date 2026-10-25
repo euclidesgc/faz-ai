@@ -56,7 +56,7 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
       <h4>{policy ? t('Simular política') : t('Próxima execução')}</h4>
       {!policy && <p className="muted">{t('Usa só as políticas salvas e ligadas, pelo mesmo avaliador da execução.')}</p>}
       <p className="muted">{t('Este cenário é hipotético. Não inicia IA, não grava o board e não comprova admissão ou credenciais.')}</p>
-      <div className="context-contract-fields">
+      <div className="fallback-grid">
         <Choice
           label={t('Modelo de origem do cenário')}
           value={scenario.sourceValue || '__default'}

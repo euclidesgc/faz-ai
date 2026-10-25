@@ -4,7 +4,7 @@
 
 Este é o manual detalhado da tela de **Configurações**: o que cada seção ajusta, como o board se conecta
 aos agentes de IA (Claude Code, Cursor, Codex, Gemini e os outros), o catálogo de modelos de cada agente
-com as regras de sugestão e as políticas de execução e fallback. O Harness e os agentes do board estão em
+com as regras de sugestão e as regras de fallback. O Harness e os agentes do board estão em
 [Harness, agentes e ferramentas de IA](harness.md).
 
 ![Configurações › Conectar agentes: o agente padrão, a lista e a conexão do agente escolhido](images/settings.png)
@@ -17,7 +17,7 @@ com as regras de sugestão e as políticas de execução e fallback. O Harness e
 | Tipos de card         | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria                                                 |
 | Regras do board       | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido, trilha curta para histórias pequenas (esforço Baixo ou tipo Bug pula o PRD e a Spec)                                                                                                                                                                                                                                                                                                              |
-| Conectar agentes      | Os agentes de IA que rodam os cards (todo agente ligado, ao mesmo tempo, e o padrão para os cards sem modelo); a conta de cada um (entrar e sair); o **Conectar** com o board e o modo (CLI, ACP ou API); os modelos de cada agente; o teste rápido, a sessão de teste e o log do protocolo; cópias e perfis personalizados; as regras que sugerem o modelo de cada card e as políticas de execução e fallback                                                                                                                  |
+| Conectar agentes      | Os agentes de IA que rodam os cards (todo agente ligado, ao mesmo tempo, e o padrão para os cards sem modelo); a conta de cada um (entrar e sair); o **Conectar** com o board e o modo (CLI, ACP ou API); os modelos de cada agente; o teste rápido, a sessão de teste e o log do protocolo; cópias e perfis personalizados; as regras que sugerem o modelo de cada card e as regras de fallback                                                                                                                                 |
 | Harness               | Biblioteca única de regras, skills, subagentes e MCPs, com importação por tipo, CRUD e assistentes; ferramenta, permissão, agente padrão e heartbeat (ver [Harness](harness.md#harness) e [Agentes](harness.md#agentes))                                                                                                                                                                                                                                                                     |
 | Git                   | Modo, gitflow, nome e prefixos das branches, worktrees, merge automático e registros de decisão; editável no editor e no navegador. "Tocar histórias em paralelo" fica em Harness de IA › Ferramenta e execução                                                                                                                                                                                                                                                                              |
 | Aparência             | **Idioma** (automático, Português (Brasil) ou English), tema, fonte e tamanho, por board, no editor e no navegador; status (nome e cor, na aba Fluxos; aqui só no modo navegador)                                                                                                                                                                                                                                                                                                           |
@@ -31,7 +31,7 @@ IA). Todo agente ligado roda cards, ao mesmo tempo que os outros: cada card vai 
 sem trocar nada. No topo fica o **agente padrão**: o que roda os cards sem modelo, com o modo, o resumo da
 conexão, a conta e os outros agentes ligados que também rodam cards. Abaixo, à esquerda, a lista dos
 agentes; à direita, o agente escolhido, com as abas **Conexão**, **Modelos**, **Testar** e **Detalhes**.
-No fim da tela ficam as regras de sugestão de modelo e as políticas de execução e fallback, que valem para
+No fim da tela ficam as regras de sugestão de modelo e as regras de fallback, que valem para
 o board inteiro.
 
 ### A lista
@@ -269,61 +269,78 @@ regras tem só nome, condições e modelo sugerido. **Preencher o modelo sugerid
 acima das regras, preenche o campo Modelo ao criar ou mudar um card, se ele estiver vazio ou com a
 sugestão anterior; um modelo escolhido à mão nunca é trocado.
 
-## Políticas de execução e fallback
+## Regras de fallback
 
-As **políticas de execução e fallback** separam definição versionada, revisão humana local e
-histórico (schema 41). O resolvedor não troca uma escolha explícita inválida por um padrão nem
-redireciona um prefixo para o perfil-cópia padrão. O avaliador e a simulação usam a mesma função,
-com recusas explicadas, destinos ordenados, limites acumulados e exigência de reconciliação quando
-há trabalho parcial ou desconhecido. Políticas importadas permanecem pendentes de revisão;
-snapshots anteriores não mudam com a edição.
+Quando um modelo esgota o limite de uso (a cota), o board segue o card em outro modelo, de qualquer
+agente ligado. Sem regra, o card espera a cota renovar. As **regras de fallback** ficam em
+**Configurações → Conectar agentes**, logo abaixo das regras de sugestão de modelo, numa lista: a
+ordem é a prioridade (a primeira que casar vence), cada linha mostra **quando** ("Claude Code · CLI ·
+Opus 5.5 esgota a cota"), o que o board **usa no lugar** ("Gemini · API · Pro, depois Cursor · CLI ·
+Auto") e **como** (troca sozinho ou pergunta antes), com o interruptor para ligar e desligar, subir,
+descer, editar e remover.
 
-Em **Configurações → Conectar agentes → Políticas de execução e fallback → Gerenciar políticas**,
-o editor manual permite condições, destinos ordenados, limites, duplicação, remoção e histórico
-paginado. A comparação integral precede a confirmação de revisão humana; salvar como pendente não
-autoriza execução. Conflitos de versão preservam o rascunho e permitem recarregar a base antes de
-revisar novamente. O simulador do host usa o mesmo avaliador, sem IA, e identifica
-credenciais/admissão como hipóteses do cenário. Mudanças nas políticas salvas ou no contexto
-invalidam o resultado exibido.
+**Montar nova regra** abre o editor na própria tela, em três passos:
 
-Os perfis que as políticas e o simulador conhecem são os perfis do board (os da extensão, as cópias e
-os personalizados), com o modo no nome ("Gemini · API", "Claude Code · CLI"), e os modelos de cada um
-são os do catálogo do board. Assim um perfil do Gemini, em qualquer modo, pode ser origem e destino
-de uma política: com a falha _quota_, a cota esgotada do Pro pode seguir no Flash, por exemplo. O
-modo não entra na política: trocar o Gemini de modo no **Conectar** mantém as políticas dele.
+1. **Quando este modelo esgotar a cota**: o modelo que falhou. Uma origem por regra: qualquer modelo,
+   qualquer modelo de um agente, ou um modelo de um agente. Para outro modelo, monte outra regra.
+2. **Usar no lugar, nesta ordem**: a lista de modelos que substituem o que falhou, de qualquer agente
+   do board. Se o primeiro também falhar, o board tenta o seguinte. Um destino igual ao modelo que
+   falhou não salva. Um destino num agente desligado aparece com aviso na lista e no editor: a regra
+   salva, mas a troca só acontece depois que você ligar o agente em Conectar agentes.
+3. **Como trocar**: **Troca sozinho** (o card segue no próximo modelo sem perguntar) ou **Pergunta
+   antes** (o card fica com você, com as opções na conversa).
 
-A cota do Gemini é **por modelo** (o Pro pode esgotar enquanto o Flash ainda tem cota), mas a pausa pelo
-limite de uso é **por perfil**: sem política, o perfil do Gemini inteiro espera a renovação. Para seguir
-com outro modelo quando um esgota, crie uma política com a falha _quota_ e o destino no outro modelo
-(Pro → Flash): a troca acontece na hora, e o perfil não fica pausado. Um destino num perfil desligado
-aparece com um aviso no editor, no resumo e no simulador; a política salva, mas a execução só troca para
-ele depois de você ligar o perfil.
+O nome sai da própria regra ("Opus 5.5 → Gemini · API · Pro") enquanto você não escrever um, e a
+frase no fim do editor diz exatamente o que a regra faz. **Salvar regra** grava e já vale: salvar
+pela tela é a revisão humana (a IA não grava nem liga regra). Se outra janela mudou a mesma regra
+enquanto você editava, o editor avisa e oferece **Recarregar e salvar de novo**, mantendo o seu
+rascunho.
 
-Runner, chat e assistentes ("Sugerir agentes, regras ou skills", "Indicar artefatos") decidem a
-troca de alvo por esse mesmo avaliador: com política ligada e aplicável a execução segue no destino
-dela; sem política, a falha bloqueia e nada roda noutro alvo. Em **Próxima execução**, a simulação
-avalia só as políticas salvas e ligadas, sem gastar tokens nem abrir a CLI. **Criar com ajuda de
-IA**, **Sugerir fallbacks** e **Revisar conflitos** pedem à IA só uma proposta (rascunho com
-explicação, diferenças e exemplos simulados, sem segredos): ela passa pelo validador do editor e
-nada é salvo ou ligado até você revisar e confirmar. A IA também consulta as políticas pelo MCP
-(`get_execution_policies`, só leitura); criar, revisar e ativar é sempre ação da pessoa.
+**Avançado**, fechado por padrão, guarda o que o caminho simples não precisa: os tipos de falha (hoje
+a execução só reporta a cota esgotada; os outros tipos ficam para quando ela os reportar), as ações
+**Bloqueia o card** e **Espera e tenta de novo**, como tratar o modelo escolhido à mão no card (por
+padrão a regra também troca quando a origem é exatamente esse modelo), as condições de situação (ação
+da execução, agente do harness, fase, tipo de card, quem chamou; vazio vale para todas), os limites
+(tentativas, prazo, intervalo e tetos de processos), **Simular** o rascunho, **Sugerir fallbacks** e
+**Revisar conflitos** com a IA e as **versões anteriores** da regra (usar uma como rascunho).
+
+Os perfis que as regras conhecem são os perfis do board (os da extensão, as cópias e os personalizados),
+com o modo no nome ("Gemini · API", "Claude Code · CLI"), e os modelos de cada um são os do catálogo
+do board. O modo não entra na regra: trocar o Gemini de modo no **Conectar** mantém as regras dele.
+
+A cota do Gemini é **por modelo** (o Pro pode esgotar enquanto o Flash ainda tem cota), mas a pausa
+pelo limite de uso é **por perfil**: sem regra, o perfil do Gemini inteiro espera a renovação. Para
+seguir com outro modelo quando um esgota, monte a regra Pro → Flash: a troca acontece na hora, e o
+perfil não fica pausado.
+
+Runner, chat e assistentes ("Sugerir agentes, regras ou skills", "Indicar artefatos") decidem a troca
+por esse mesmo avaliador: com regra ligada e aplicável a execução segue no destino dela; sem regra,
+a falha bloqueia e nada roda noutro alvo. No fim da seção, **Testar as regras** simula a próxima
+execução só com as regras salvas e ligadas, sem gastar tokens nem abrir a CLI, e **Criar com ajuda de
+IA** pede à IA só uma proposta (rascunho com explicação, diferenças e exemplos simulados, sem
+segredos): ela passa pelo validador do editor e nada é salvo até você abrir a proposta no editor e
+salvar. A IA também consulta as regras pelo MCP (`get_execution_policies`, só leitura).
+
+Por baixo, cada regra continua uma política de execução versionada (schema 41): toda gravação gera uma
+versão, as versões anteriores ficam guardadas, e o host recusa duas regras ligadas empatadas na
+prioridade ou um destino fora do catálogo.
 
 ### O modelo reserva antigo
 
 O antigo **modelo reserva** das regras de sugestão não troca mais nada na execução: o fallback é
-decidido só pelas políticas de execução e fallback. Ao abrir o board, ao salvar regras ou depois de
-importar um backup, cada reserva legada vira uma **proposta de política desligada e pendente de
-revisão** (id `legacy-<regra>`, ação _oferecer_, falha _quota_, destino = o modelo reserva), com
-histórico na versão 1. A proposta não copia as condições da regra (campos e tipo do card):
-ajuste-as no editor. A conversão acontece uma vez; se você remover a proposta, ela não volta.
+decidido só pelas regras de fallback. Ao abrir o board, ao salvar regras ou depois de importar um
+backup, cada reserva legada vira uma **regra desligada e pendente de revisão** (id `legacy-<regra>`,
+ação _pergunta antes_, falha _quota_, destino = o modelo reserva), com histórico na versão 1. A regra
+não copia as condições da regra de sugestão (campos e tipo do card): ajuste-as em Avançado. A
+conversão acontece uma vez; se você remover a regra, ela não volta.
 
-Em **Políticas → Gerenciar políticas** um aviso lista as propostas e as reservas sem conversão
-(modelo ou esforço fora do catálogo); nada troca de CLI até você comparar, simular, revisar e ligar
-a política. O editor de regras não tem mais campo de reserva e não mostra a reserva antiga; a
-conversão e o aviso ficam nas políticas. O MCP `set_model_rules` não tem o parâmetro `fallback` (a
-chave é ignorada numa chamada) e `get_models` não devolve reserva. Ao exportar, credenciais e
-variáveis dos perfis de CLI não vão no arquivo; ao importar, os perfis voltam desligados e as
-políticas pendentes, e o aviso lista ambos.
+Na lista, a regra pendente aparece com **Precisa da sua revisão** e o interruptor travado;
+**Revisar e ligar** abre o editor, e salvar a grava revisada. No fim da seção, um aviso lista as
+propostas e as reservas sem conversão (modelo ou esforço fora do catálogo). O editor de regras de
+sugestão não tem mais campo de reserva. O MCP `set_model_rules` não tem o parâmetro `fallback` (a chave
+é ignorada numa chamada) e `get_models` não devolve reserva. Ao exportar, credenciais e variáveis dos
+perfis de CLI não vão no arquivo; ao importar, os perfis voltam desligados e as regras pendentes, e o
+aviso lista ambos.
 
 ## Dependências entre opções e links cruzados
 

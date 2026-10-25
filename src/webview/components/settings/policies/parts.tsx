@@ -76,6 +76,123 @@ export const offTargetNote = (library: PolicyLibrary, profileId: string): string
     : null;
 export const targetLabel = (library: PolicyLibrary, target: ExecutionTarget) =>
   `${profileLabel(library, target.profileId)} · ${target.model ?? t('Modelo padrão')}${target.effort ? ` · ${target.effort}` : ''}`;
+
+/** O nome do modelo como a tela mostra (o rótulo do catálogo, ou o código quando o modelo não está nele). */
+export const modelName = (library: PolicyLibrary, profileId: string, model: string | null): string => {
+  if (model === null) return t('Modelo padrão');
+  const profile = library.profiles.find((p) => p.id === profileId);
+  return library.models.find((m) => m.model === model && (!profile || m.tool === profile.tool))?.label ?? model;
+};
+/** "Gemini · API · Pro", ou "Gemini · API · Pro · high" com o esforço. */
+export const targetName = (library: PolicyLibrary, target: ExecutionTarget): string =>
+  `${profileLabel(library, target.profileId)} · ${modelName(library, target.profileId, target.model)}${target.effort ? ` · ${target.effort}` : ''}`;
+
+/**
+ * A origem de uma regra simples: qualquer modelo (`*`), qualquer modelo de um agente (`p:<perfil>`) ou um modelo de um
+ * agente (`m:<perfil>:<modelo>`). As condições guardam perfis × modelos; a regra simples usa uma origem só, porque dois
+ * perfis e dois modelos casariam as quatro combinações, e não as duas que a pessoa pediu. `null`: as condições têm mais
+ * de uma origem (regra montada no modo avançado ou importada).
+ */
+export const ANY_ORIGIN = '*';
+export const originOf = (c: ExecutionPolicy['conditions']): string | null => {
+  if (!c.profileIds.length && !c.models.length) return ANY_ORIGIN;
+  if (c.profileIds.length !== 1 || c.models.length > 1) return null;
+  const model = c.models[0];
+  if (model === null) return null;
+  return model === undefined ? `p:${c.profileIds[0]}` : `m:${c.profileIds[0]}:${model}`;
+};
+export const originConditions = (origin: string): Pick<ExecutionPolicy['conditions'], 'profileIds' | 'models'> => {
+  if (origin === ANY_ORIGIN) return { profileIds: [], models: [] };
+  const [kind, profileId, ...rest] = origin.split(':');
+  return kind === 'p' ? { profileIds: [profileId!], models: [] } : { profileIds: [profileId!], models: [rest.join(':')] };
+};
+const offSuffix = (library: PolicyLibrary, profileId: string) =>
+  library.profiles.find((p) => p.id === profileId)?.off ? ` (${t('desligado')})` : '';
+/** As origens que o select oferece: qualquer modelo, cada agente e cada modelo de cada agente. */
+export function originChoices(library: PolicyLibrary): { value: string; label: string }[] {
+  const choices = [{ value: ANY_ORIGIN, label: t('Qualquer modelo, de qualquer agente') }];
+  for (const p of library.profiles) {
+    const name = profileLabel(library, p.id) + offSuffix(library, p.id);
+    choices.push({ value: `p:${p.id}`, label: t('Qualquer modelo de {agent}', { agent: name }) });
+    for (const m of library.models.filter((m) => p.modelIds.includes(m.id)))
+      choices.push({ value: `m:${p.id}:${m.model}`, label: `${name} · ${m.label}` });
+  }
+  return choices;
+}
+export const originLabel = (library: PolicyLibrary, c: ExecutionPolicy['conditions']): string => {
+  const origin = originOf(c);
+  if (origin === ANY_ORIGIN) return t('qualquer modelo');
+  if (origin === null) {
+    const profiles = c.profileIds.map((id) => profileLabel(library, id));
+    const models = c.models.map((m) => m ?? t('Modelo padrão'));
+    return [profiles.join(', ') || t('qualquer agente'), models.join(', ') || t('qualquer modelo')].join(' · ');
+  }
+  const { profileIds, models } = originConditions(origin);
+  return models.length
+    ? `${profileLabel(library, profileIds[0]!)} · ${modelName(library, profileIds[0]!, models[0]!)}`
+    : t('qualquer modelo de {agent}', { agent: profileLabel(library, profileIds[0]!) });
+};
+/** Os destinos que o select oferece: cada modelo de cada agente, e o modelo padrão de cada agente. */
+export const targetKeyOf = (target: Pick<ExecutionTarget, 'profileId' | 'model'>) => `${target.profileId}|${target.model ?? ''}`;
+export function targetChoices(library: PolicyLibrary): { value: string; label: string }[] {
+  const choices: { value: string; label: string }[] = [];
+  for (const p of library.profiles) {
+    const name = profileLabel(library, p.id) + offSuffix(library, p.id);
+    for (const m of library.models.filter((m) => p.modelIds.includes(m.id)))
+      choices.push({ value: targetKeyOf({ profileId: p.id, model: m.model }), label: `${name} · ${m.label}` });
+    choices.push({ value: targetKeyOf({ profileId: p.id, model: null }), label: `${name} · ${t('Modelo padrão')}` });
+  }
+  return choices;
+}
+/** A regra usa algo além do caminho simples (origem única, só a cota, trocar sozinho ou perguntar, sem outras condições). */
+export const isAdvanced = (p: ExecutionPolicy): boolean =>
+  originOf(p.conditions) === null ||
+  p.conditions.failures.length !== 1 ||
+  p.conditions.failures[0] !== 'quota' ||
+  !['auto', 'offer'].includes(p.action) ||
+  p.conditions.actions.length > 0 ||
+  p.conditions.agentIds.length > 0 ||
+  p.conditions.phaseIds.length > 0 ||
+  p.conditions.cardTypeIds.length > 0 ||
+  p.conditions.origins.length > 0 ||
+  p.conditions.explicit === 'only';
+export const HOW_LABELS: Record<ExecutionPolicy['action'], string> = {
+  auto: 'Troca sozinho',
+  offer: 'Pergunta antes',
+  block: 'Bloqueia o card',
+  wait: 'Espera e tenta de novo',
+};
+/** Um nome curto para a regra a partir da origem e do primeiro destino ("Opus 5.5 → Pro (Gemini · API)"). */
+export const defaultName = (p: ExecutionPolicy, library: PolicyLibrary): string => {
+  const origin = originOf(p.conditions);
+  const { profileIds, models } = origin !== null && origin !== ANY_ORIGIN ? originConditions(origin) : { profileIds: [], models: [] };
+  const from = models.length ? modelName(library, profileIds[0]!, models[0]!) : originLabel(library, p.conditions);
+  const target = p.targets[0];
+  // o agente só entra no nome quando o destino está noutro agente
+  const to = target
+    ? modelName(library, target.profileId, target.model) +
+      (target.profileId === profileIds[0] ? '' : ` (${profileLabel(library, target.profileId)})`)
+    : t(HOW_LABELS[p.action]);
+  return `${from.charAt(0).toUpperCase()}${from.slice(1)} → ${to}`;
+};
+/** A frase da regra: "Quando X esgotar a cota, o board troca sozinho para Y; se também falhar, Z." */
+export function ruleSentence(p: ExecutionPolicy, library: PolicyLibrary): string {
+  const failures =
+    p.conditions.failures.length === 1 && p.conditions.failures[0] === 'quota'
+      ? t('esgotar a cota')
+      : t('falhar por {failures}', { failures: p.conditions.failures.map((f) => t(FAILURE_LABELS[f]).toLowerCase()).join(', ') });
+  const when = t('Quando {origin} {failure}', { origin: originLabel(library, p.conditions), failure: failures });
+  if (p.action === 'block') return `${when}, ${t('o card fica bloqueado')}.`;
+  if (p.action === 'wait') return `${when}, ${t('o board espera {seconds} s e tenta de novo', { seconds: p.limits.backoffMs / 1000 })}.`;
+  if (!p.targets.length) return `${when}, … (${t('escolha ao menos um modelo')})`;
+  const [first, ...rest] = p.targets.map((target) => targetName(library, target));
+  const how =
+    p.action === 'auto'
+      ? t('o board troca sozinho para {target}', { target: first! })
+      : t('o board pergunta se segue em {target}', { target: first! });
+  const then = rest.length ? `; ${t('se também falhar, {targets}', { targets: rest.join(t(', depois ')) })}` : '';
+  return `${when}, ${how}${then}.`;
+}
 export function Choice({
   label,
   value,
@@ -127,18 +244,21 @@ export function NumberField({
 }
 export function Checks<T extends string | null>({
   label,
+  hint,
   values,
   choices,
   onChange,
 }: {
   label: string;
+  hint?: string;
   values: T[];
   choices: { value: T; label: string }[];
   onChange(value: T[]): void;
 }) {
   return (
-    <fieldset>
+    <fieldset className="fallback-checks">
       <legend>{label}</legend>
+      {hint && <p className="muted small">{hint}</p>}
       {choices.map((o) => (
         <label className="check" key={String(o.value)}>
           <Checkbox

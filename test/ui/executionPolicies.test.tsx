@@ -23,68 +23,144 @@ function reply(
     window.dispatchEvent(new MessageEvent('message', { data: { type: 'executionPolicy.result', requestId: message.requestId, ...value } })),
   );
 }
-async function open(records: ExecutionPolicyRecord[] = [record()]) {
+const library = (records: ExecutionPolicyRecord[], extra: Partial<PolicyReply['library']> = {}) => ({
+  library: { snapshot: { version: 1 as const, records }, ...builtinPolicyCatalog(useBoardStore.getState().state!), ...extra },
+});
+/** A tela lê as regras ao montar, sem clique. */
+async function open(records: ExecutionPolicyRecord[] = [record()], extra: Partial<PolicyReply['library']> = {}) {
   renderThemed(<ExecutionPoliciesSettings />);
-  expect(posted).not.toHaveBeenCalled();
-  await userEvent.click(screen.getByRole('button', { name: 'Gerenciar políticas' }));
-  reply({ library: { snapshot: { version: 1, records }, ...builtinPolicyCatalog(useBoardStore.getState().state!) } });
-  await screen.findByRole('button', { name: 'Nova política' });
+  await waitFor(() => expect(sentOf('executionPolicy.read')).toHaveLength(1));
+  reply(library(records, extra));
+  await screen.findByRole('button', { name: 'Montar nova regra' });
 }
-it('edita sem gravar e exige comparação e confirmação de revisão', async () => {
+const confirmSaves = async (count: number) => {
+  for (let i = 1; i <= count; i++) {
+    await waitFor(() => expect(sentOf('settings.executionPolicy.save')).toHaveLength(i));
+    confirmLast();
+  }
+};
+
+it('a lista lê as regras ao montar e mostra cada uma como uma frase: quando, usa no lugar e como', async () => {
+  await open();
+  expect(posted).toHaveBeenCalled();
+  const row = screen.getByRole('row', { name: /Quota da implementação/ });
+  expect(within(row).getByText(/esgota a cota/)).toBeInTheDocument();
+  expect(within(row).getByText(/, depois /)).toBeInTheDocument();
+  expect(within(row).getByText('Troca sozinho')).toBeInTheDocument();
+  // a regra do fixture tem condições de ação e origem: a lista avisa que há mais
+  expect(within(row).getByText('+ condições')).toBeInTheDocument();
+  expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
+});
+it('edita e salva em um clique: a gravação já vai revisada, com a versão da base', async () => {
   await open();
   await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
-  await userEvent.clear(screen.getByRole('textbox', { name: 'Nome da política' }));
-  await userEvent.type(screen.getByRole('textbox', { name: 'Nome da política' }), 'Política revisada');
+  await userEvent.clear(screen.getByRole('textbox', { name: 'Nome da regra' }));
+  await userEvent.type(screen.getByRole('textbox', { name: 'Nome da regra' }), 'Regra revisada');
   expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
-  await userEvent.click(screen.getByRole('button', { name: 'Comparar política antes de salvar' }));
-  expect(screen.getByRole('button', { name: 'Confirmar revisão e salvar' })).toBeDisabled();
-  expect(screen.getByText('Quota da implementação')).toBeInTheDocument();
-  expect(screen.getByText('Política revisada')).toBeInTheDocument();
-  await userEvent.click(screen.getByRole('checkbox', { name: 'Revisei as condições, os destinos e os limites desta versão' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Confirmar revisão e salvar' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Salvar regra' }));
   expect(lastSent('settings.executionPolicy.save')).toMatchObject({
     expectedRevision: 1,
     reviewed: true,
-    policy: { name: 'Política revisada' },
+    policy: { name: 'Regra revisada', action: 'auto' },
   });
-  expect(screen.getAllByRole('button', { name: 'Salvando…' }).every((b) => b.hasAttribute('disabled'))).toBe(true);
+  expect(screen.getByRole('button', { name: 'Salvando…' })).toBeDisabled();
+  // conflito de versão: o rascunho fica, e recarregar troca só a base
   confirmLast(false, 'A política mudou. Releia antes de salvar.');
   await screen.findByRole('alert');
-  await userEvent.click(screen.getByRole('button', { name: 'Voltar à edição' }));
-  expect(screen.getByRole('textbox', { name: 'Nome da política' })).toHaveValue('Política revisada');
+  await userEvent.click(screen.getByRole('button', { name: 'Recarregar e salvar de novo' }));
+  reply(library([{ ...record(policy({ name: 'Mudança concorrente' })), revision: 2 }]));
+  expect(await screen.findByRole('textbox', { name: 'Nome da regra' })).toHaveValue('Regra revisada');
+  await userEvent.click(screen.getByRole('button', { name: 'Salvar regra' }));
+  expect(lastSent('settings.executionPolicy.save')).toMatchObject({ expectedRevision: 2, policy: { name: 'Regra revisada' } });
+  confirmLast();
+  await waitFor(() => expect(sentOf('executionPolicy.read')).toHaveLength(3));
+  reply(library([{ ...record(policy({ name: 'Regra revisada' })), revision: 3 }]));
+  await screen.findByRole('row', { name: /Regra revisada/ });
+  expect(screen.queryByRole('textbox', { name: 'Nome da regra' })).toBeNull();
 });
-it('destino num perfil desligado: o editor e o resumo avisam, sem impedir salvar (história 12)', async () => {
+it('destino num agente desligado: a lista e o editor avisam, sem impedir salvar (história 12)', async () => {
   expect(useBoardStore.getState().state!.board.aiProfiles.find((p) => p.id === 'codex-acp')?.enabled).toBe(false);
   await open([record(policy({ targets: [{ profileId: 'codex-acp', model: null, effort: null }] }))]);
-  const note = /O perfil Codex · ACP está desligado: a política pode ser salva/;
+  expect(screen.getByText('(agente desligado)')).toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
-  expect(screen.getAllByText(note).length).toBeGreaterThan(0);
-  // a comparação (o resumo da versão) avisa de novo, e salvar segue liberado
-  await userEvent.click(screen.getByRole('button', { name: 'Comparar política antes de salvar' }));
-  expect(screen.getAllByText(note).length).toBeGreaterThan(0);
-  expect(screen.getByRole('button', { name: 'Salvar como pendente de revisão' })).toBeEnabled();
+  expect(screen.getByRole('note')).toHaveTextContent(/O perfil Codex · ACP está desligado: a política pode ser salva/);
+  await userEvent.click(screen.getByRole('button', { name: 'Salvar regra' }));
+  expect(lastSent('settings.executionPolicy.save')).toMatchObject({ reviewed: true, policy: { targets: [{ profileId: 'codex-acp' }] } });
 });
-it('salva como pendente sem conceder revisão e só fecha após a confirmação do host', async () => {
+it('regra pendente de revisão: o interruptor fica travado e "Revisar e ligar" grava revisada e ligada', async () => {
+  await open([{ ...record(policy({ enabled: false })), review: 'pending' }]);
+  expect(screen.getByText('Precisa da sua revisão')).toBeInTheDocument();
+  expect(screen.getByRole('switch', { name: 'Regra Quota da implementação em uso' })).toBeDisabled();
+  await userEvent.click(screen.getByRole('button', { name: 'Revisar e ligar' }));
+  await userEvent.click(screen.getByRole('switch', { name: 'Ligada' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Salvar regra' }));
+  expect(lastSent('settings.executionPolicy.save')).toMatchObject({ expectedRevision: 1, reviewed: true, policy: { enabled: true } });
+});
+it('o interruptor da lista desliga a regra com uma gravação revisada', async () => {
   await open();
-  await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Comparar política antes de salvar' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Salvar como pendente de revisão' }));
-  expect(lastSent('settings.executionPolicy.save')).toMatchObject({ reviewed: false, expectedRevision: 1 });
-  confirmLast();
-  await waitFor(() => expect(sentOf('executionPolicy.read')).toHaveLength(2));
-  reply({
-    library: {
-      snapshot: { version: 1, records: [{ ...record(), revision: 2, review: 'pending' }] },
-      ...builtinPolicyCatalog(useBoardStore.getState().state!),
-    },
+  await userEvent.click(screen.getByRole('switch', { name: 'Regra Quota da implementação em uso' }));
+  expect(lastSent('settings.executionPolicy.save')).toMatchObject({ expectedRevision: 1, reviewed: true, policy: { enabled: false } });
+});
+it('a ordem da lista é a prioridade: descer renumera em duas passadas, sem empatar duas regras ligadas', async () => {
+  await open([record(policy({ id: 'a', name: 'Primeira', priority: 10 })), record(policy({ id: 'b', name: 'Segunda', priority: 20 }))]);
+  const first = screen.getByRole('row', { name: /Primeira/ });
+  await userEvent.click(within(first).getByRole('button', { name: 'Descer' }));
+  await confirmSaves(4);
+  const writes = sentOf('settings.executionPolicy.save');
+  // primeiro a faixa alta (b, a), depois a definitiva: b fica na frente
+  expect(writes.map((w) => [w.policy.id, w.policy.priority, w.expectedRevision])).toEqual([
+    ['b', 500000, 1],
+    ['a', 500010, 1],
+    ['b', 0, 2],
+    ['a', 10, 2],
+  ]);
+  expect(writes.every((w) => w.reviewed)).toBe(true);
+});
+it('regra nova: origem o modelo do agente padrão, um destino noutro agente, troca sozinha, ligada; o nome sai da frase', async () => {
+  await open([]);
+  expect(screen.getByText('Nenhuma regra: ao esgotar a cota, o card espera a renovação.')).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Montar nova regra' }));
+  expect(screen.getByRole('radio', { name: /Troca sozinho/ })).toBeChecked();
+  expect(screen.getByRole('combobox', { name: 'Modelo 1' })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Adicionar à lista' }));
+  const sent = lastSent('settings.executionPolicy.save');
+  expect(sent).toMatchObject({
+    expectedRevision: 0,
+    reviewed: true,
+    policy: { enabled: true, action: 'auto', conditions: { failures: ['quota'], explicit: 'include' } },
   });
-  await screen.findByText('Pendente de revisão');
+  expect(sent.policy.name).toMatch(/→/);
+  // o board de teste só tem modelos do Claude: o destino é outro modelo do mesmo agente
+  expect(sent.policy.targets).toHaveLength(1);
+  expect(sent.policy.targets[0]!.model).not.toBe(sent.policy.conditions.models[0]);
 });
-it('simula no host, mostra hipóteses e marca resultado desatualizado ao editar', async () => {
+it('um destino igual ao modelo que falhou não salva: o editor avisa', async () => {
+  await open([]);
+  await userEvent.click(screen.getByRole('button', { name: 'Montar nova regra' }));
+  const origin = screen.getByRole('combobox', { name: 'Modelo que falhou' }).textContent!;
+  await choose(screen.getByRole('combobox', { name: 'Modelo 1' }), origin);
+  expect(screen.getByText('É o mesmo modelo que falhou: escolha outro.')).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Adicionar à lista' }));
+  expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
+});
+it('Perguntar antes vira a ação "offer"; Avançado troca para bloquear e esvazia os destinos', async () => {
   await open();
   await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+  await userEvent.click(screen.getByRole('radio', { name: /Pergunta antes/ }));
+  expect(screen.getByText(/o board pergunta se segue em/)).toBeInTheDocument();
+  await userEvent.click(screen.getByText('Avançado'));
+  await choose(screen.getByRole('combobox', { name: 'Ação' }), 'Bloqueia o card');
+  expect(screen.getByText(/o card fica bloqueado/)).toBeInTheDocument();
+  await userEvent.clear(screen.getByRole('spinbutton', { name: 'Máximo de tentativas' }));
+  await userEvent.type(screen.getByRole('spinbutton', { name: 'Máximo de tentativas' }), '4');
+  await userEvent.click(screen.getByRole('button', { name: 'Salvar regra' }));
+  expect(lastSent('settings.executionPolicy.save').policy).toMatchObject({ action: 'block', targets: [], limits: { maxAttempts: 4 } });
+});
+it('Testar as regras simula sem rascunho, pelo host, e marca o resultado desatualizado quando as regras mudam', async () => {
+  await open();
+  await userEvent.click(screen.getByText('Testar as regras, pedir sugestão à IA e reservas antigas'));
   await userEvent.click(screen.getByRole('button', { name: 'Simular sem executar' }));
-  expect(lastSent('executionPolicy.simulate').scenario.effects).toBe('unknown');
+  expect(lastSent('executionPolicy.simulate').scenario.draft).toBeNull();
   expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
   reply(
     {
@@ -114,155 +190,64 @@ it('simula no host, mostra hipóteses e marca resultado desatualizado ao editar'
     useBoardStore.setState({ state: { ...useBoardStore.getState().state!, executionPolicyRevision: 'changed-in-another-window' } }),
   );
   expect(screen.getByText(/Resultado desatualizado/)).toBeInTheDocument();
-  await userEvent.type(screen.getByRole('textbox', { name: 'Nome da política' }), ' alterada');
-  expect(screen.getByText(/Resultado desatualizado/)).toBeInTheDocument();
 });
-it('histórico carrega versões e usa a antiga como novo rascunho com a revisão atual', async () => {
-  await open([{ ...record(), revision: 3 }]);
-  await userEvent.click(screen.getByRole('button', { name: 'Histórico' }));
-  reply({ history: [record(policy({ name: 'Versão anterior' }))], nextBefore: null });
-  await screen.findByText('Versão anterior');
-  await userEvent.click(screen.getByRole('button', { name: 'Usar versão como rascunho' }));
-  expect(screen.getByRole('textbox', { name: 'Nome da política' })).toHaveValue('Versão anterior');
-  await userEvent.click(screen.getByRole('button', { name: 'Comparar política antes de salvar' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Salvar como pendente de revisão' }));
-  expect(lastSent('settings.executionPolicy.save').expectedRevision).toBe(3);
-});
-it('edita destinos ordenados e limites sem reconstruir o avaliador na interface', async () => {
+it('o editor simula o rascunho dentro de Avançado, sem gravar', async () => {
   await open();
   await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
-  const targets = screen.getAllByRole('group').filter((group) => within(group).queryByText(/^Destino [12]$/));
-  expect(targets).toHaveLength(2);
-  await userEvent.click(within(targets[1]!).getByRole('button', { name: 'Subir destino' }));
-  await choose(screen.getByRole('combobox', { name: 'Ação da política' }), 'Oferecer alternativas');
-  await userEvent.clear(screen.getByRole('spinbutton', { name: 'Máximo de tentativas' }));
-  await userEvent.type(screen.getByRole('spinbutton', { name: 'Máximo de tentativas' }), '4');
-  await userEvent.click(screen.getByRole('button', { name: 'Comparar política antes de salvar' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Salvar como pendente de revisão' }));
-  expect(lastSent('settings.executionPolicy.save').policy).toMatchObject({
-    action: 'offer',
-    targets: [{ profileId: 'cursor' }, { profileId: 'claude' }],
-    limits: { maxAttempts: 4 },
-  });
-});
-it('recarrega a versão concorrente sem perder o rascunho e exige nova comparação', async () => {
-  await open();
-  await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
-  await userEvent.clear(screen.getByRole('textbox', { name: 'Nome da política' }));
-  await userEvent.type(screen.getByRole('textbox', { name: 'Nome da política' }), 'Minha proposta');
-  await userEvent.click(screen.getByRole('button', { name: 'Comparar política antes de salvar' }));
-  await userEvent.click(screen.getByRole('checkbox', { name: 'Revisei as condições, os destinos e os limites desta versão' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Recarregar versão para comparar' }));
-  reply({
-    library: {
-      snapshot: { version: 1, records: [{ ...record(policy({ name: 'Mudança concorrente' })), revision: 2 }] },
-      ...builtinPolicyCatalog(useBoardStore.getState().state!),
-    },
-  });
-  expect(await screen.findByRole('textbox', { name: 'Nome da política' })).toHaveValue('Minha proposta');
-  await userEvent.click(screen.getByRole('button', { name: 'Comparar política antes de salvar' }));
-  expect(screen.getByText('Mudança concorrente')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Confirmar revisão e salvar' })).toBeDisabled();
-  await userEvent.click(screen.getByRole('checkbox', { name: 'Revisei as condições, os destinos e os limites desta versão' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Confirmar revisão e salvar' }));
-  expect(lastSent('settings.executionPolicy.save')).toMatchObject({ expectedRevision: 2, policy: { name: 'Minha proposta' } });
-});
-it('Próxima execução simula sem rascunho, pelo host', async () => {
-  await open();
-  await userEvent.click(screen.getByRole('button', { name: 'Simular sem executar' }));
-  expect(lastSent('executionPolicy.simulate').scenario.draft).toBeNull();
+  await userEvent.click(screen.getByText('Avançado'));
+  // o editor vem antes da lista: o primeiro Simular é o do rascunho (o outro, no fim da seção, é o das regras salvas)
+  await userEvent.click(screen.getAllByRole('button', { name: 'Simular sem executar' })[0]!);
+  expect(lastSent('executionPolicy.simulate').scenario.draft).toMatchObject({ id: 'quota', name: 'Quota da implementação' });
   expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
 });
-it('mostra a proposta da IA antes de qualquer gravação e só a entrega ao editor como rascunho', async () => {
+it('versões anteriores: carrega dentro de Avançado e usa a antiga como rascunho com a versão atual', async () => {
+  await open([{ ...record(), revision: 3 }]);
+  await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+  await userEvent.click(screen.getByText('Avançado'));
+  await userEvent.click(screen.getByRole('button', { name: 'Ver versões anteriores' }));
+  reply({ history: [record(policy({ name: 'Versão anterior' }))], nextBefore: null });
+  await screen.findByText(/Versão 1 ·/);
+  await userEvent.click(screen.getByRole('button', { name: 'Usar versão como rascunho' }));
+  expect(screen.getByRole('textbox', { name: 'Nome da regra' })).toHaveValue('Versão anterior');
+  await userEvent.click(screen.getByRole('button', { name: 'Salvar regra' }));
+  expect(lastSent('settings.executionPolicy.save')).toMatchObject({ expectedRevision: 3, policy: { name: 'Versão anterior' } });
+});
+it('a proposta da IA aparece antes de qualquer gravação e só chega ao editor como rascunho', async () => {
   await open();
+  await userEvent.click(screen.getByText('Testar as regras, pedir sugestão à IA e reservas antigas'));
   await userEvent.click(screen.getByRole('button', { name: 'Criar com ajuda de IA' }));
   await userEvent.type(screen.getByRole('textbox', { name: 'Objetivo da política' }), 'trocar quando a quota acabar');
   await userEvent.click(screen.getByRole('button', { name: 'Pedir proposta' }));
-  const sent = lastSent('executionPolicy.assist');
-  expect(sent.input).toMatchObject({ mode: 'create', goal: 'trocar quando a quota acabar', draft: null });
+  expect(lastSent('executionPolicy.assist').input).toMatchObject({ mode: 'create', goal: 'trocar quando a quota acabar', draft: null });
   const proposed = { ...policy(), id: 'ia', name: 'Proposta da IA', enabled: false };
   reply({ assistance: { explanation: 'Troca só após a quota.', policy: proposed, problems: [], scenarios: [] } }, 'executionPolicy.assist');
   await screen.findByText('Troca só após a quota.');
   expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
   await userEvent.click(screen.getByRole('button', { name: 'Abrir proposta no editor' }));
-  expect(screen.getByRole('textbox', { name: 'Nome da política' })).toHaveValue('Proposta da IA');
+  expect(screen.getByRole('textbox', { name: 'Nome da regra' })).toHaveValue('Proposta da IA');
   expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
 });
-it('mostra o motivo quando a IA não está disponível e mantém o editor manual', async () => {
+it('sem IA disponível, o assistente mostra o motivo e a lista continua editável', async () => {
   await open();
+  await userEvent.click(screen.getByText('Testar as regras, pedir sugestão à IA e reservas antigas'));
   await userEvent.click(screen.getByRole('button', { name: 'Criar com ajuda de IA' }));
   await userEvent.type(screen.getByRole('textbox', { name: 'Objetivo da política' }), 'objetivo');
   await userEvent.click(screen.getByRole('button', { name: 'Pedir proposta' }));
   reply({ error: 'A CLI do Claude Code não foi encontrada: veja o aviso no topo do board.' }, 'executionPolicy.assist');
   await screen.findByRole('alert');
   await userEvent.click(screen.getByRole('button', { name: 'Fechar assistente' }));
-  expect(screen.getByRole('button', { name: 'Nova política' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Montar nova regra' })).toBeEnabled();
 });
-it('rascunho, comparação, simulação, revisão e ativação: só a confirmação final liga a política', async () => {
-  await open([]);
-  await userEvent.click(screen.getByRole('button', { name: 'Nova política' }));
-  await userEvent.type(screen.getByRole('textbox', { name: 'Nome da política' }), 'Bloquear na quota');
-  await userEvent.click(screen.getByRole('checkbox', { name: 'Definição ligada' }));
-  // simular não grava nada
-  await userEvent.click(screen.getByRole('button', { name: 'Simular sem executar' }));
-  expect(lastSent('executionPolicy.simulate').scenario.draft).toMatchObject({ name: 'Bloquear na quota', enabled: true });
-  reply(
-    {
-      simulation: {
-        hypothetical: true,
-        problems: [],
-        requested: { state: 'resolved', from: 'card', explicit: true, target: { profileId: 'claude', model: 'opus', effort: null } },
-        decision: {
-          action: 'block',
-          reason: 'policy-block',
-          policy: null,
-          target: null,
-          alternatives: [],
-          rejected: [],
-          budget: null,
-          nextAttempt: 2,
-          notBefore: null,
-          visited: [],
-          consumption: [null],
-        },
-      },
-    },
-    'executionPolicy.simulate',
-  );
-  expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
-  // comparar: política nova, sem confirmação marcada
-  await userEvent.click(screen.getByRole('button', { name: 'Comparar política antes de salvar' }));
-  expect(screen.getByText('Política nova')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Confirmar revisão e salvar' })).toBeDisabled();
-  expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
-  // confirmar a revisão liga a política: uma gravação, versão 0, revisada e ligada
-  await userEvent.click(screen.getByRole('checkbox', { name: 'Revisei as condições, os destinos e os limites desta versão' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Confirmar revisão e salvar' }));
-  expect(sentOf('settings.executionPolicy.save')).toHaveLength(1);
-  expect(lastSent('settings.executionPolicy.save')).toMatchObject({
-    expectedRevision: 0,
-    reviewed: true,
-    policy: { name: 'Bloquear na quota', enabled: true, action: 'block' },
+it('mostra o aviso das reservas antigas: propostas pendentes e regras sem conversão', async () => {
+  await open([{ ...record(policy({ id: 'legacy-r1', name: 'Reserva migrada da regra: Backend', enabled: false })), review: 'pending' }], {
+    legacy: [
+      { ruleId: 'r1', ruleName: 'Backend', policyId: 'legacy-r1', status: 'proposed', review: 'pending' },
+      { ruleId: 'r2', ruleName: '', policyId: null, status: 'unconvertible', review: null, reason: 'model-missing' },
+    ],
   });
-});
-it('mostra o aviso de migração das reservas antigas: propostas pendentes e regras sem conversão', async () => {
-  renderThemed(<ExecutionPoliciesSettings />);
-  await userEvent.click(screen.getByRole('button', { name: 'Gerenciar políticas' }));
-  reply({
-    library: {
-      snapshot: {
-        version: 1,
-        records: [{ ...record(policy({ id: 'legacy-r1', name: 'Reserva migrada da regra: Backend', enabled: false })), review: 'pending' }],
-      },
-      ...builtinPolicyCatalog(useBoardStore.getState().state!),
-      legacy: [
-        { ruleId: 'r1', ruleName: 'Backend', policyId: 'legacy-r1', status: 'proposed', review: 'pending' },
-        { ruleId: 'r2', ruleName: '', policyId: null, status: 'unconvertible', review: null, reason: 'model-missing' },
-      ],
-    },
-  });
+  await userEvent.click(screen.getByText('Testar as regras, pedir sugestão à IA e reservas antigas'));
   const note = await screen.findByRole('note');
-  expect(within(note).getByText(/Nada troca de CLI até você revisar e ligar a política/)).toBeInTheDocument();
+  expect(within(note).getByText(/Nada troca de agente até você revisar e ligar a regra/)).toBeInTheDocument();
   expect(within(note).getByText('Regra "Backend": proposta pendente de revisão')).toBeInTheDocument();
   expect(within(note).getByText('Regra "r2": sem conversão (o modelo não está no catálogo)')).toBeInTheDocument();
   expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
