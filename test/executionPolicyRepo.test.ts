@@ -8,7 +8,7 @@ import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { ExecutionPolicyRepo } from '../src/extension/repositories/executionPolicyRepo';
 import { exportBoard, importBoard, parseExportFile } from '../src/extension/db/boardExport';
 import { evaluateExecutionPolicy } from '../src/shared/executionPolicies';
-import { catalog, evaluation, policy, profiles } from './fixtures/executionPolicy';
+import { catalog, evaluation, other, policy, primary, profiles } from './fixtures/executionPolicy';
 
 let db: Database;
 let boardId: string;
@@ -65,7 +65,7 @@ describe('políticas versionadas do board', () => {
       ),
     ).toThrow('Destino');
     expect(() => repo.save(boardId, { expectedRevision: 0, policy: policy({ id: 'tie' }), reviewed: true }, scope, 'person')).toThrow(
-      'ambiguous-priority',
+      'Esta regra empata na prioridade com "Quota da implementação" (claude)',
     );
     expect(JSON.stringify(repo.read(boardId))).toBe(before);
     expect(repo.history(boardId, 'quota')).toHaveLength(1);
@@ -84,6 +84,23 @@ describe('políticas versionadas do board', () => {
     repo.save(boardId, { expectedRevision: 0, policy: old, reviewed: false }, scope, 'person');
     expect(save({ ...old, enabled: true, priority: 30 }, 1).revision).toBe(2);
     expect(() => save({ ...old, name: 'Mudou', enabled: true }, 2)).toThrow('um modelo que falha');
+  });
+  it('o ciclo entre regras de agentes diferentes não salva, e o erro diz o nome e o agente da outra regra', () => {
+    const conditions = policy().conditions;
+    repo.save(boardId, { expectedRevision: 0, policy: policy({ targets: [other] }), reviewed: true }, scope, 'person');
+    const back = policy({
+      id: 'volta',
+      name: 'Composer de volta ao Opus',
+      priority: 20,
+      conditions: { ...conditions, profileIds: ['cursor'], models: ['composer'] },
+      targets: [primary],
+    });
+    expect(() => repo.save(boardId, { expectedRevision: 0, policy: back, reviewed: true }, scope, 'person')).toThrow(
+      'Esta regra fecha um ciclo com "Quota da implementação" (claude): o card voltaria a um modelo que já falhou.',
+    );
+    // desligada, a regra salva: o ciclo só é acusado quando as duas valem
+    repo.save(boardId, { expectedRevision: 0, policy: { ...back, enabled: false }, reviewed: true }, scope, 'person');
+    expect(repo.read(boardId)).toHaveLength(2);
   });
   it('importação preserva versões e definições, mas retira revisão executável até confirmação humana', () => {
     repo.save(boardId, { expectedRevision: 0, policy: policy(), reviewed: true }, scope, 'person');

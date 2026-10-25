@@ -366,3 +366,17 @@ it('mostra o aviso das reservas antigas: propostas pendentes e regras sem conver
   expect(within(note).getByText('Regra "r2": sem conversão (o modelo não está no catálogo)')).toBeInTheDocument();
   expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
 });
+it('o erro de ciclo do host chega com o nome da outra regra, também traduzido', async () => {
+  await open();
+  await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Salvar regra' }));
+  // o erro chega depois: a tela o mostra já no idioma trocado
+  setLocale('en');
+  confirmLast(
+    false,
+    'Esta regra fecha um ciclo com "Volta" (Cursor · CLI): o card voltaria a um modelo que já falhou. Tire esse destino de uma das regras.',
+  );
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'This rule closes a cycle with "Volta" (Cursor · CLI): the card would go back to a model that already failed.',
+  );
+});

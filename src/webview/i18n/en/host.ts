@@ -199,7 +199,11 @@ export const host: Record<string, string> = {
   'Política indisponível neste board.': 'Policy unavailable on this board.',
   'A política mudou. Releia antes de salvar.': 'The policy changed. Read it again before saving.',
   'Destino da política inválido ou indisponível no catálogo.': 'Policy target is invalid or unavailable in the catalog.',
-  'Políticas conflitantes: {problems}.': 'Conflicting policies: {problems}.',
+  'Esta regra fecha um ciclo com {rules}: o card voltaria a um modelo que já falhou. Tire esse destino de uma das regras.':
+    'This rule closes a cycle with {rules}: the card would go back to a model that already failed. Remove that target from one of the rules.',
+  'Esta regra empata na prioridade com {rules}, e as duas valem para o mesmo caso. Mude a ordem na lista.':
+    'This rule ties on priority with {rules}, and both apply to the same case. Change the order in the list.',
+  'A regra {rule} tem um destino fora do catálogo.': 'The {rule} rule has a target outside the catalog.',
   'Histórico de política incompleto ou fora do board.': 'Policy history is incomplete or outside the board.',
   'Versão atual diverge do histórico da política.': 'The current version differs from policy history.',
   'Histórico de política fora do board.': 'Policy history is outside the board.',

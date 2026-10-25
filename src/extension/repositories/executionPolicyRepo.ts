@@ -10,9 +10,31 @@ import {
   type ExecutionPolicyRecord,
   type ExecutionPolicySnapshot,
   type PolicyProfile,
+  type PolicyProblem,
 } from '../../shared/executionPolicies';
 import { all, num, one, run, str, transaction, type Row } from '../db/query';
 import { now } from '../db/ids';
+
+/**
+ * O conflito que impede salvar, dito com o nome das regras e o agente de cada uma: a pessoa precisa achar a outra regra,
+ * talvez na tela de outro agente (o ciclo Opus → Gemini Pro → Opus junta regras do Claude e do Gemini). Fala do primeiro
+ * problema que envolve a regra salva.
+ */
+function conflictMessage(id: string, problems: PolicyProblem[], records: ExecutionPolicyRecord[], catalog: PolicyCatalog): string {
+  const problem = problems.find((p) => p.policyIds.includes(id)) ?? problems[0]!;
+  const rule = (policyId: string) => {
+    const policy = records.find((r) => r.policy.id === policyId)?.policy;
+    if (!policy) return `"${policyId}"`;
+    const profile = catalog.profiles.find((p) => p.id === policy.conditions.profileIds[0]);
+    return profile ? `"${policy.name}" (${profile.label ?? profile.id})` : `"${policy.name}"`;
+  };
+  const others = [...new Set(problem.policyIds.filter((p) => p !== id))].map(rule).join(', ');
+  if (problem.code === 'cycle')
+    return `Esta regra fecha um ciclo com ${others || rule(id)}: o card voltaria a um modelo que já falhou. Tire esse destino de uma das regras.`;
+  if (problem.code === 'ambiguous-priority')
+    return `Esta regra empata na prioridade com ${others}, e as duas valem para o mesmo caso. Mude a ordem na lista.`;
+  return `A regra ${rule(problem.policyIds[0]!)} tem um destino fora do catálogo.`;
+}
 
 export interface PolicyWrite {
   expectedRevision: number;
@@ -104,8 +126,7 @@ export class ExecutionPolicyRepo {
     validateExecutionPolicySnapshot({ version: 1, records });
     const problems =
       record.review === 'reviewed' && record.policy.enabled ? executionPolicyProblems(records, catalog.profiles, catalog.models) : [];
-    if (problems.length)
-      throw new Error(`Políticas conflitantes: ${problems.map((p) => `${p.code} (${p.policyIds.join(', ')})`).join('; ')}.`);
+    if (problems.length) throw new Error(conflictMessage(record.policy.id, problems, records, catalog));
     const json = JSON.stringify(record.policy);
     run(
       this.db,

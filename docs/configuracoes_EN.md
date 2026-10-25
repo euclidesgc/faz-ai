@@ -355,8 +355,10 @@ simulates the next run with the chosen rule (of the agent on the screen), withou
 opening the CLI, and says **Passou** (passed) when that rule decided, the way it was configured, or
 **Não passou** (failed) with the reason (an earlier rule in the list decided, the rule does not apply
 to the scenario, or it applied but the board could not proceed). **Revisar conflitos** (review
-conflicts) only looks at the rules of the agent on the screen: rules of different agents start from
-different models and never compete for the same failure. **Criar com ajuda de IA** (create with AI help) asks the AI only for a proposal (a draft with
+conflicts) looks at the rules of the agent on the screen: rules of different agents start from
+different models and never tie on the same failure, but a cycle that goes through another agent (Opus →
+Gemini Pro in one rule, Gemini Pro → Opus in another) shows up. Enabling the rule that closes a cycle
+does not save, and the error names the other rule and its agent. **Criar com ajuda de IA** (create with AI help) asks the AI only for a proposal (a draft with
 explanation, differences and simulated examples, without secrets): it goes through the editor's
 validator and nothing is saved until you open the proposal in the editor and save. The AI also reads
 the rules over MCP (`get_execution_policies`, read-only).

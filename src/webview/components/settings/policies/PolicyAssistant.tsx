@@ -8,7 +8,7 @@ import { useAction } from '../../../useAction';
 import { useBoardStore } from '../../../store/boardStore';
 import { getLocale, t } from '../../../i18n';
 import { FormField } from '../../ui';
-import { FAILURE_LABELS, PolicySummary, REASON_LABELS, targetLabel } from './parts';
+import { FAILURE_LABELS, PolicySummary, REASON_LABELS, profileLabel, targetLabel } from './parts';
 
 const MODE_LABELS: Record<PolicyAssistMode, string> = {
   create: 'Criar com ajuda de IA',
@@ -72,7 +72,13 @@ export function PolicyAssistant({
       </div>
     );
   const policy = result?.policy ?? null;
-  const name = (id: string) => library.snapshot.records.find((r) => r.policy.id === id)?.policy.name ?? draft?.name ?? id;
+  // a regra de outro agente (num ciclo que passa por ele) leva o nome do agente, para a pessoa saber em que tela achá-la
+  const name = (id: string) => {
+    const policy = library.snapshot.records.find((r) => r.policy.id === id)?.policy;
+    if (!policy) return draft?.name ?? id;
+    const owner = policy.conditions.profileIds[0];
+    return owner && owner !== profileId ? `${policy.name} (${profileLabel(library, owner)})` : policy.name;
+  };
   return (
     <section aria-label={t(MODE_LABELS[mode])}>
       <h4>{t(MODE_LABELS[mode])}</h4>

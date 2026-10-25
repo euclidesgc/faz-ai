@@ -42,6 +42,7 @@ const input = (over: Partial<PolicyAssistInput> = {}): PolicyAssistInput => ({
   language: 'pt-BR',
   ...over,
 });
+const primaryOf = () => ({ profileId: 'claude', model: 'opus', effort: null });
 const reply = (p: unknown, explanation = 'Explica a ordem.') => JSON.stringify({ explanation, policy: p });
 const run = (text: string, i: PolicyAssistInput) =>
   parsePolicyAssistance(text, i, router.snapshot(), router.executionPolicyLibrary().snapshot);
@@ -110,6 +111,21 @@ describe('assistente de políticas', () => {
     const toItself = { ...base(), priority: 50, targets: [{ profileId: 'claude', model: 'opus', effort: null }] };
     expect(() => run(reply(toItself), input({ profileId: 'claude' }))).toThrow(/deste agente/);
     expect(run(reply({ ...base(), priority: 50 }), input({ profileId: 'claude' })).policy).not.toBeNull();
+  });
+
+  it('Revisar conflitos na tela de um agente mostra o ciclo que passa por outro agente, e não o empate de outro agente', () => {
+    const save = (p: ReturnType<typeof policy>) =>
+      router.handle({ type: 'settings.executionPolicy.save', policy: p, expectedRevision: 0, reviewed: true });
+    const cursor = { ...policy().conditions, profileIds: ['cursor'], models: ['composer'] };
+    save(policy({ action: 'offer', targets: [{ profileId: 'cursor', model: 'composer', effort: null }] }));
+    // a volta (Composer → Opus) entra desligada, como uma regra importada; ligar daria o ciclo
+    save(policy({ id: 'volta', name: 'Volta', priority: 20, enabled: false, action: 'offer', conditions: cursor, targets: [primaryOf()] }));
+    const snapshot = router.executionPolicyLibrary().snapshot;
+    const records = snapshot.records.map((r) => (r.policy.id === 'volta' ? { ...r, policy: { ...r.policy, enabled: true } } : r));
+    const forced = { ...snapshot, records };
+    const r = parsePolicyAssistance(reply(null), input({ mode: 'conflicts', goal: '', profileId: 'claude' }), router.snapshot(), forced);
+    expect(r.problems.map((p) => p.code)).toEqual(['cycle']);
+    expect(r.problems[0]!.policyIds).toEqual(expect.arrayContaining(['quota', 'volta']));
   });
 
   it('conflitos sem rascunho só explicam', () => {

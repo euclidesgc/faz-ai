@@ -149,14 +149,15 @@ export function parsePolicyAssistance(
 }
 
 /**
- * Os conflitos que a tela de um agente revisa: os que envolvem só regras dele. Regras de agentes diferentes falham em
- * modelos diferentes, então não disputam a mesma falha; a cadeia que passa por outro agente para no "já tentado".
+ * Os conflitos que a tela de um agente revisa. Empate e destino inválido: só entre regras dele (regras de agentes
+ * diferentes falham em modelos diferentes e não disputam a mesma falha). Ciclo: todo ciclo que passa por uma regra dele,
+ * mesmo junto com regras de outro agente (Opus → Gemini Pro numa, Gemini Pro → Opus noutra).
  */
 function problemsOf(snapshot: ExecutionPolicySnapshot, catalog: ReturnType<typeof builtinPolicyCatalog>, profileId: string | undefined) {
   const all = executionPolicyProblems(snapshot.records, catalog.profiles, catalog.models);
   if (profileId === undefined) return all;
   const mine = new Set(policiesOfProfile(snapshot.records, profileId).map((r) => r.policy.id));
-  return all.filter((p) => p.policyIds.every((id) => mine.has(id)));
+  return all.filter((p) => (p.code === 'cycle' ? p.policyIds.some((id) => mine.has(id)) : p.policyIds.every((id) => mine.has(id))));
 }
 
 /** Exemplos conferíveis: cada falha da política, com destinos admitidos e indisponíveis, pelo simulador local. */
