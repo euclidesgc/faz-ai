@@ -1,5 +1,11 @@
 export const policies: Record<string, string> = {
   'Simular esta regra': 'Simulate this rule',
+  'Monte uma regra primeiro: o teste simula a regra escolhida.': 'Build a rule first: the test simulates the chosen rule.',
+  'Regra a testar': 'Rule to test',
+  desligada: 'off',
+  'A regra escolhida não decidiu: a decisão veio de {name}, que vem antes na lista.':
+    'The chosen rule did not decide: the decision came from {name}, which comes earlier in the list.',
+  'A regra escolhida não se aplica a este cenário.': 'The chosen rule does not apply to this scenario.',
   'Testar as regras': 'Test the rules',
   'Se este modelo esgotar a cota agora, o que esta regra faz? Sem iniciar IA nem gravar nada.':
     'If this model ran out of quota right now, what would this rule do? Without starting AI or saving anything.',

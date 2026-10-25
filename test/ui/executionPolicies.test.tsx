@@ -156,11 +156,21 @@ it('Perguntar antes vira a ação "offer"; Avançado troca para bloquear e esvaz
   await userEvent.click(screen.getByRole('button', { name: 'Salvar regra' }));
   expect(lastSent('settings.executionPolicy.save').policy).toMatchObject({ action: 'block', targets: [], limits: { maxAttempts: 4 } });
 });
-it('Testar as regras simula sem rascunho, pelo host, e marca o resultado desatualizado quando as regras mudam', async () => {
-  await open();
+it('Testar as regras: a regra escolhida vai como rascunho ligado, com o cenário dela, e o resultado fica desatualizado quando as regras mudam', async () => {
+  await open([record(policy({ enabled: false }))]);
   await userEvent.click(screen.getByText('Testar as regras, pedir sugestão à IA e reservas antigas'));
+  // a regra do fixture vira o cenário: o modelo de origem dela (claude · opus, no catálogo do board) já vem escolhido
+  expect(screen.getByRole('combobox', { name: 'Regra a testar' })).toHaveTextContent('Quota da implementação (desligada)');
+  expect(screen.getByRole('combobox', { name: 'Modelo que falha' })).toHaveTextContent(/Opus/);
   await userEvent.click(screen.getByRole('button', { name: 'Simular sem executar' }));
-  expect(lastSent('executionPolicy.simulate').scenario.draft).toBeNull();
+  const scenario = lastSent('executionPolicy.simulate').scenario;
+  // a regra desligada é testada como se estivesse ligada; só na cópia da simulação
+  expect(scenario.draft).toMatchObject({ id: 'quota', enabled: true });
+  expect(scenario).toMatchObject({
+    sourceValue: expect.stringMatching(/^claude:opus/),
+    failure: 'quota',
+    context: { action: 'work', origin: 'manual' },
+  });
   expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
   reply(
     {
@@ -190,6 +200,44 @@ it('Testar as regras simula sem rascunho, pelo host, e marca o resultado desatua
     useBoardStore.setState({ state: { ...useBoardStore.getState().state!, executionPolicyRevision: 'changed-in-another-window' } }),
   );
   expect(screen.getByText(/Resultado desatualizado/)).toBeInTheDocument();
+});
+it('Testar as regras sem nenhuma regra: pede para montar uma antes e não simula', async () => {
+  await open([]);
+  await userEvent.click(screen.getByText('Testar as regras, pedir sugestão à IA e reservas antigas'));
+  expect(screen.getByText('Monte uma regra primeiro: o teste simula a regra escolhida.')).toBeInTheDocument();
+  expect(screen.queryByRole('combobox', { name: 'Regra a testar' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Simular sem executar' })).toBeDisabled();
+});
+it('Testar as regras avisa quando outra regra, antes na lista, decidiu no lugar da escolhida', async () => {
+  await open([record(policy({ id: 'primeira', name: 'Primeira', priority: 5 })), record()]);
+  await userEvent.click(screen.getByText('Testar as regras, pedir sugestão à IA e reservas antigas'));
+  await choose(screen.getByRole('combobox', { name: 'Regra a testar' }), 'Quota da implementação');
+  await userEvent.click(screen.getByRole('button', { name: 'Simular sem executar' }));
+  reply(
+    {
+      simulation: {
+        hypothetical: true,
+        problems: [],
+        requested: { state: 'resolved', from: 'card', explicit: true, target: { profileId: 'claude', model: 'opus', effort: null } },
+        decision: {
+          action: 'fallback',
+          reason: 'fallback-permitted',
+          policy: { id: 'primeira', revision: 1 },
+          target: { profileId: 'claude', model: 'haiku', effort: null },
+          alternatives: [],
+          rejected: [],
+          budget: null,
+          nextAttempt: 2,
+          notBefore: null,
+          visited: [],
+          consumption: [null],
+        },
+      },
+    },
+    'executionPolicy.simulate',
+  );
+  await screen.findByText(/O board segue com/);
+  expect(screen.getByRole('note')).toHaveTextContent('A regra escolhida não decidiu: a decisão veio de Primeira');
 });
 it('o editor simula o rascunho dentro de Avançado, sem gravar', async () => {
   await open();

@@ -18,10 +18,39 @@ import { Choice, NumberField, ORIGIN_LABELS, FAILURE_LABELS, REASON_LABELS, offT
  * supõe os destinos admitidos e sem trabalho feito: é a decisão das regras que a pessoa quer ver, não a
  * admissão hipotética.
  */
+type Scenario = Omit<PolicyScenario, 'draft'>;
+
+/** O cenário que a regra descreve: o primeiro modelo, a primeira fase, o primeiro tipo… de cada condição dela. */
+function scenarioOf(rule: ExecutionPolicy, library: PolicyLibrary, base: Scenario): Scenario {
+  const { conditions: c } = rule;
+  const profileId = c.profileIds[0];
+  const model = c.models[0] ?? (profileId ? library.models.find((m) => m.tool === profileId)?.model : undefined);
+  const option = library.models.find((m) => (!profileId || m.tool === profileId) && m.model === model);
+  return {
+    ...base,
+    sourceValue: option ? `${option.tool}:${option.model}${option.defaultEffort ? `@${option.defaultEffort}` : ''}` : base.sourceValue,
+    ...(profileId ? { defaultProfileId: profileId } : {}),
+    failure: c.failures[0] ?? 'quota',
+    explicit: c.explicit !== 'exclude',
+    context: {
+      action: c.actions[0] ?? 'work',
+      origin: c.origins[0] ?? 'manual',
+      agentId: c.agentIds[0] ?? null,
+      phaseId: c.phaseIds[0] ?? null,
+      cardTypeId: c.cardTypeIds[0] ?? null,
+    },
+  };
+}
+
 export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy | null; library: PolicyLibrary }) {
   const state = useBoardStore((s) => s.state)!;
   const first = library.models[0];
-  const [scenario, setScenario] = useState<Omit<PolicyScenario, 'draft'>>({
+  // sem rascunho (a seção): a pessoa escolhe qual regra salva testar; a regra escolhida vai como rascunho
+  // ligado, para a desligada ser testada como se estivesse ligada
+  const records = library.snapshot.records;
+  const [ruleId, setRuleId] = useState<string | null>(policy ? null : (records[0]?.policy.id ?? null));
+  const selected = policy ? null : (records.find((r) => r.policy.id === ruleId)?.policy ?? null);
+  const base: Scenario = {
     sourceValue: first ? `${first.tool}:${first.model}${first.defaultEffort ? `@${first.defaultEffort}` : ''}` : '',
     defaultProfileId: state.board.aiTool,
     explicit: true,
@@ -32,10 +61,17 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
     elapsedMs: 0,
     runningGlobal: 0,
     runningByProfile: {},
-  });
+  };
+  const [scenario, setScenario] = useState<Scenario>(() => (selected ? scenarioOf(selected, library, base) : base));
+  const pickRule = (id: string) => {
+    setRuleId(id);
+    const rule = records.find((r) => r.policy.id === id)?.policy;
+    if (rule) setScenario(scenarioOf(rule, library, scenario));
+  };
+  const draft = policy ?? (selected ? { ...selected, enabled: true } : null);
   const [result, setResult] = useState<{ value: Simulation; inputs: string } | null>(null);
   const fingerprint = JSON.stringify([
-    policy,
+    draft,
     scenario,
     library,
     state.executionPolicyRevision,
@@ -45,7 +81,7 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
     state.harness.library?.artifacts,
   ]);
   const simulate = useAction(async () => {
-    const response = await requestExecutionPolicy({ type: 'executionPolicy.simulate', scenario: { ...scenario, draft: policy } });
+    const response = await requestExecutionPolicy({ type: 'executionPolicy.simulate', scenario: { ...scenario, draft } });
     if (!response.simulation) throw new Error(t('A simulação não retornou uma decisão.'));
     setResult({ value: response.simulation, inputs: fingerprint });
   });
@@ -71,6 +107,20 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
               'Se este modelo esgotar a cota agora, o que o board faz? Sem iniciar IA nem gravar nada: a decisão das regras salvas e ligadas.',
             )}
       </p>
+      {!policy && records.length === 0 && <p className="muted">{t('Monte uma regra primeiro: o teste simula a regra escolhida.')}</p>}
+      {!policy && records.length > 0 && (
+        <div className="fallback-grid">
+          <Choice
+            label={t('Regra a testar')}
+            value={ruleId ?? ''}
+            choices={records.map((r) => ({
+              value: r.policy.id,
+              label: r.policy.enabled ? r.policy.name : `${r.policy.name} (${t('desligada')})`,
+            }))}
+            onChange={pickRule}
+          />
+        </div>
+      )}
       <div className="fallback-grid">
         <Choice
           label={t('Modelo que falha')}
@@ -189,7 +239,7 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
         </div>
       </details>
       <div className="actions-toolbar">
-        <Button disabled={simulate.busy} onClick={() => void simulate.run()}>
+        <Button disabled={simulate.busy || (!policy && !selected)} onClick={() => void simulate.run()}>
           {simulate.busy ? t('Simulando…') : t('Simular sem executar')}
         </Button>
       </div>
@@ -212,6 +262,14 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
                 ` ${t('Pela regra {name} (versão {version}).', { name: ruleName(decision.policy.id), version: decision.policy.revision })}`}
             </p>
           )}
+          {selected && decision.policy && decision.policy.id !== selected.id && (
+            <p role="note">
+              {t('A regra escolhida não decidiu: a decisão veio de {name}, que vem antes na lista.', {
+                name: ruleName(decision.policy.id),
+              })}
+            </p>
+          )}
+          {selected && !decision.policy && <p role="note">{t('A regra escolhida não se aplica a este cenário.')}</p>}
           {decision.target && offTargetNote(library, decision.target.profileId) && (
             <p role="note">{offTargetNote(library, decision.target.profileId)}</p>
           )}
