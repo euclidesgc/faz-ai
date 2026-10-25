@@ -49,8 +49,8 @@ promise a percentage: it shows, in the inventory, what is being loaded.
    OpenCode…) come built in and switched off; you can also create copies and custom profiles. Every
    enabled agent runs cards, at the same time: the CLI of each run comes from the chosen model (see
    [Which CLI runs](configuracoes_EN.md#which-cli-runs)), and the default agent only runs the cards with
-   no model. You can switch the default profile in **Harness → Ferramenta e execução** (Tool and
-   execution).
+   no model. In **Conectar agentes** (connect agents), **Tornar padrão** (make default) switches the
+   default agent.
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
    **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai`
    server in the global file the tool reads. This also happens on its own, silently, when the folder
@@ -339,9 +339,10 @@ terminal.
 The board manages a **private library**, independent of the AI tool. Under **Configurações →
 Harness** (Settings → Harness), the **Biblioteca do board** (Board library) tab provides CRUD for
 **Regras** (Rules), **Skills**, **Sub-agentes** (Sub-agents) and **MCPs**. **Ferramenta e
-execução** (Tool and execution) selects the AI, models, permissions, the **admission regime**, the
-default agent and heartbeat, and connects the tool to the board's MCP server. Switching tools
-preserves artifacts and their selections.
+execução** (Tool and execution) sets the permissions, the harness default agent, the timeout, the
+heartbeat, the context plan and the cards' model suggestion. The board's default agent, each agent's
+connection to the board's MCP server and the admission regime live in Conectar agentes (connect
+agents). Switching agents preserves artifacts and their selections.
 
 The **admission regime** is the yardstick the board uses to decide whether the tool may run a card.
 **Exclusive** (the default) requires all five capabilities verified: the AI sees exactly the context

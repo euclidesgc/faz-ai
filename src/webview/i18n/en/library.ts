@@ -73,8 +73,6 @@ export const library: Record<string, string> = {
   'Copia os itens selecionados para a biblioteca do board.': 'Copies selected items to the board library.',
   'Importar selecionados ({n})': 'Import selected ({n})',
   'Importação concluída. Os artefatos estão nas abas correspondentes.': 'Import complete. Artifacts are in their corresponding tabs.',
-  'A ferramenta selecionada define a execução e os modelos dos cards. Regras, skills, subagentes e MCPs são gerenciados na biblioteca do board, compartilhada entre as ferramentas.':
-    'The selected tool determines execution and card models. Rules, skills, subagents and MCPs are managed in the board library, shared across tools.',
   'Aguarde a resposta da IA.': 'Wait for the AI response.',
   'Objetivo e uso': 'Goal and usage',
   'Revisar e salvar': 'Review and save',

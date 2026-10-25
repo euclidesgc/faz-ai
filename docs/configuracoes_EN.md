@@ -17,8 +17,8 @@ board's agents are in [Harness, agents and AI tools](harness_EN.md).
 | Tipos de card         | Story, Bug, Sub-task…, with color and default field values per type                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section                                     |
 | Regras do board       | Completion and phase-advance blocks, confirmations, filling in the suggested model, short track for small stories (Baixo effort or Bug type skips PRD and Spec)                                                                                                                                                                                                                                                                                                                         |
-| Conectar agentes      | The AI agents that run the cards (every enabled agent, at the same time, and the default one for cards with no model); each one's account (sign in and out); **Conectar** (connect) with the board and the mode (CLI, ACP or API); each agent's models; the quick test, the test session and the protocol log; copies and custom profiles; the rules that suggest each card's model and the fallback rules                                                                                                               |
-| Harness               | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; tool, permissions, default agent and heartbeat (see [Harness](harness_EN.md#harness) and [Agents](harness_EN.md#agents))                                                                                                                                                                                                                                                               |
+| Conectar agentes      | The AI agents that run the cards (every enabled agent, at the same time, and the default one for cards with no model); each one's account (sign in and out); **Conectar** (connect) with the board and the mode (CLI, ACP or API); each agent's models; the quick test, the test session and the protocol log; copies and custom profiles; each agent's fallback rules                                                                                                               |
+| Harness               | A single library of rules, skills, subagents and MCPs, with typed imports, CRUD and assistants; permissions, harness default agent, heartbeat and the rules that suggest each card's model (see [Harness](harness_EN.md#harness) and [Agents](harness_EN.md#agents))                                                                                                                                                                                                                                                               |
 | Git                   | Mode, gitflow, branch names and prefixes, worktrees, automatic merge and decision records; editable in the editor and in the browser. "Tocar histórias em paralelo" (work on stories in parallel) lives in Harness de IA › Ferramenta e execução                                                                                                                                                                                                                                      |
 | Aparência             | **Idioma** (language: automatic, Português (Brasil) or English), theme, font and size, per board, in the editor and in the browser; statuses (name and color, in the Fluxos tab; here only in browser mode)                                                                                                                                                                                                                                                                             |
 | Backup                | Export and import the board, in the Backup tab, in the editor and in the browser (in the editor, also through the command palette: `fazai.exportBoard`, `fazai.importBoard`)                                                                                                                                                                                                                                                                                                          |
@@ -32,8 +32,9 @@ goes to its model's agent (the card's, the harness agent's or the suggestion rul
 that runs the cards with no model, with its mode, the connection summary, the account and the other
 enabled agents that also run cards. Below, on the left, the list of agents; on the right, the chosen agent, with
 the **Conexão** (connection), **Modelos** (models), **Testar** (test) and **Detalhes** (details) tabs.
-The model suggestion rules, which apply to the whole board, and the fallback rules of the agent
-chosen in the list sit at the end of the screen.
+The fallback rules of the agent chosen in the list sit at the end of the screen. The model
+suggestion rules apply to the whole board and live in **Harness › Ferramenta e execução** (tool and
+execution).
 
 ### The list
 
@@ -283,7 +284,7 @@ environment; Cursor and Kimi Code **not validated**).
 
 ## Model suggestion for each card
 
-At the end of **Conectar agentes**, the **suggestion rules** combine conditions with AND and OR, for
+In **Harness › Ferramenta e execução** (tool and execution), the **suggestion rules** combine conditions with AND and OR, for
 example `Esforço da atividade = Alto E Tags = backend`, and suggest the agent, the model and the effort.
 The result is always a suggestion: on the card, the model and the effort can be changed at any time. The
 rule editor has only name, conditions and suggested model. **Preencher o modelo sugerido
@@ -299,8 +300,8 @@ tool's output reader: Claude Code's `rate_limit_event` and limit `result`, Gemin
 quota 403 and Cursor's `ActionRequiredError: You've hit your usage limit` refusal (on the Free plan,
 the agent quota is separate from the dashboard's usage bar: it can run out with the bar at half).
 The **fallback rules** live
-under **Configurações → Conectar agentes** (Settings → Connect agents), right below the model
-suggestion rules, and belong to the agent chosen in the list: each rule starts from one of its
+under **Configurações → Conectar agentes** (Settings → Connect agents), below the chosen agent, and
+belong to the agent chosen in the list: each rule starts from one of its
 models that fails, and the section shows only its rules (old rules without an agent show up on every
 agent). They sit in a list: the order is the priority (the first matching rule wins), and each row
 shows **when** ("Claude Code · CLI · Opus 5.5 runs out of quota"), what the board **uses instead**
@@ -397,7 +398,7 @@ scrolls and highlights for 2 seconds, or click a link in the Settings to open th
 right section. In browser mode, the links to the Settings appear as text only.
 
 **"Preencher o modelo sugerido automaticamente"** (fill in the suggested model automatically) lives
-in Conectar agentes, next to the suggestion rules, not in Regras; a simple notice in Regras indicates
+in Harness › Ferramenta e execução, next to the suggestion rules, not in Regras; a simple notice in Regras indicates
 the move. The Heartbeat interval field stays disabled when the heartbeat is off, with no additional
 dependency component. The headers of Agentes, Rules and Skills show "Mostrando os X do [ferramenta] ·
 trocar ferramenta" (showing the X of [tool] · switch tool), letting you change the tool from any of

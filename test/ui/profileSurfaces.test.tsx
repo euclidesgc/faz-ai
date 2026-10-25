@@ -6,8 +6,7 @@ import { seedBoard, syncStore, lastSent } from './setup';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 import { ModelEditor } from '../../src/webview/components/FieldRenderer';
 import { AgentModels } from '../../src/webview/components/settings/agentConnect/AgentModels';
-import { ProjectTool } from '../../src/webview/components/settings/harness/ProjectTool';
-import { toolInfo, type AiProfile } from '../../src/shared/aiProfiles';
+import type { AiProfile } from '../../src/shared/aiProfiles';
 
 const custom: AiProfile = {
   id: 'local-cli',
@@ -31,19 +30,6 @@ beforeEach(async () => {
 });
 
 describe('Superfícies de perfis de CLI', () => {
-  it('Harness lista o perfil custom com caminhos indisponíveis e envia a troca de executor', async () => {
-    render(
-      <Theme>
-        <ProjectTool tool={toolInfo(custom)} />
-      </Theme>,
-    );
-    const row = screen.getByRole('row', { name: /CLI local/ });
-    expect(within(row).getAllByText('—')).toHaveLength(3);
-    expect(screen.queryByText('Instalar MCP')).toBeNull();
-    await userEvent.click(screen.getByRole('radio', { name: 'Claude Code' }));
-    expect(lastSent('settings.board.update')).toMatchObject({ patch: { aiTool: 'claude' } });
-  });
-
   it('os modelos do agente personalizado se cadastram à mão, sem oferecer detecção', async () => {
     render(
       <Theme>

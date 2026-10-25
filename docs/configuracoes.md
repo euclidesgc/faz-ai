@@ -17,8 +17,8 @@ com as regras de sugestão e as regras de fallback. O Harness e os agentes do bo
 | Tipos de card         | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria                                                 |
 | Regras do board       | Bloqueios de conclusão e de avanço de fase, confirmações, preenchimento do modelo sugerido, trilha curta para histórias pequenas (esforço Baixo ou tipo Bug pula o PRD e a Spec)                                                                                                                                                                                                                                                                                                              |
-| Conectar agentes      | Os agentes de IA que rodam os cards (todo agente ligado, ao mesmo tempo, e o padrão para os cards sem modelo); a conta de cada um (entrar e sair); o **Conectar** com o board e o modo (CLI, ACP ou API); os modelos de cada agente; o teste rápido, a sessão de teste e o log do protocolo; cópias e perfis personalizados; as regras que sugerem o modelo de cada card e as regras de fallback                                                                                                                                 |
-| Harness               | Biblioteca única de regras, skills, subagentes e MCPs, com importação por tipo, CRUD e assistentes; ferramenta, permissão, agente padrão e heartbeat (ver [Harness](harness.md#harness) e [Agentes](harness.md#agentes))                                                                                                                                                                                                                                                                     |
+| Conectar agentes      | Os agentes de IA que rodam os cards (todo agente ligado, ao mesmo tempo, e o padrão para os cards sem modelo); a conta de cada um (entrar e sair); o **Conectar** com o board e o modo (CLI, ACP ou API); os modelos de cada agente; o teste rápido, a sessão de teste e o log do protocolo; cópias e perfis personalizados; as regras de fallback                                                                                                                                 |
+| Harness               | Biblioteca única de regras, skills, subagentes e MCPs, com importação por tipo, CRUD e assistentes; permissão, agente padrão do harness, heartbeat e as regras que sugerem o modelo de cada card (ver [Harness](harness.md#harness) e [Agentes](harness.md#agentes))                                                                                                                                                                                                                                                                     |
 | Git                   | Modo, gitflow, nome e prefixos das branches, worktrees, merge automático e registros de decisão; editável no editor e no navegador. "Tocar histórias em paralelo" fica em Harness de IA › Ferramenta e execução                                                                                                                                                                                                                                                                              |
 | Aparência             | **Idioma** (automático, Português (Brasil) ou English), tema, fonte e tamanho, por board, no editor e no navegador; status (nome e cor, na aba Fluxos; aqui só no modo navegador)                                                                                                                                                                                                                                                                                                           |
 | Backup                | Exportar e importar o board, na aba Backup, no editor e no navegador (no editor, também pela paleta de comandos: `fazai.exportBoard`, `fazai.importBoard`)                                                                                                                                                                                                                                                                                                                                 |
@@ -31,8 +31,8 @@ IA). Todo agente ligado roda cards, ao mesmo tempo que os outros: cada card vai 
 sem trocar nada. No topo fica o **agente padrão**: o que roda os cards sem modelo, com o modo, o resumo da
 conexão, a conta e os outros agentes ligados que também rodam cards. Abaixo, à esquerda, a lista dos
 agentes; à direita, o agente escolhido, com as abas **Conexão**, **Modelos**, **Testar** e **Detalhes**.
-No fim da tela ficam as regras de sugestão de modelo, que valem para o board inteiro, e as regras de
-fallback do agente escolhido na lista.
+No fim da tela ficam as regras de fallback do agente escolhido na lista. As regras de sugestão de
+modelo valem para o board inteiro e ficam em **Harness › Ferramenta e execução**.
 
 ### A lista
 
@@ -262,7 +262,7 @@ validado em ambiente local controlado; Cursor e Kimi Code **não validados**).
 
 ## Sugestão de modelo para cada card
 
-No fim de **Conectar agentes**, as **regras de sugestão** combinam condições com E e OU, por exemplo
+Em **Harness › Ferramenta e execução**, as **regras de sugestão** combinam condições com E e OU, por exemplo
 `Esforço da atividade = Alto E Tags = backend`, e sugerem o agente, o modelo e o esforço. O resultado é
 sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento. O editor de
 regras tem só nome, condições e modelo sugerido. **Preencher o modelo sugerido automaticamente**, logo
@@ -277,7 +277,7 @@ ferramenta: o `rate_limit_event` e o `result` de limite do Claude Code, o 429 do
 cota do Kimi Code e a recusa `ActionRequiredError: You've hit your usage limit` do Cursor (no plano
 Free, a cota do agente é separada da barra de uso do painel: ela pode acabar com a barra pela
 metade). As **regras de fallback** ficam em
-**Configurações → Conectar agentes**, logo abaixo das regras de sugestão de modelo, e são do agente
+**Configurações → Conectar agentes**, abaixo do agente escolhido, e são do agente
 escolhido na lista: cada regra parte de um modelo dele que falha, e a seção mostra só as regras dele
 (as antigas sem agente aparecem em todos). Elas ficam numa lista: a
 ordem é a prioridade (a primeira que casar vence), cada linha mostra **quando** ("Claude Code · CLI ·
@@ -369,8 +369,8 @@ dependência não está satisfeita. Os links permitem navegar: clique em um para
 correspondente do board, que rola e destaca por 2 segundos, ou clique em um link do Settings para
 abrir o board na seção certa. No modo navegador, os links para o Settings aparecem só como texto.
 
-**"Preencher o modelo sugerido automaticamente"** fica em Conectar agentes, junto das regras de
-sugestão, não em Regras; um aviso simples em Regras indica a mudança de lugar. O campo Intervalo do
+**"Preencher o modelo sugerido automaticamente"** fica em Harness › Ferramenta e execução, junto das
+regras de sugestão, não em Regras; um aviso simples em Regras indica a mudança de lugar. O campo Intervalo do
 heartbeat fica desabilitado quando o heartbeat está desligado, sem um componente de dependência
 adicional. Os cabeçalhos de Agentes, Rules e Skills mostram "Mostrando os X do [ferramenta] · trocar
 ferramenta", permitindo mudar a ferramenta de qualquer uma dessas telas do board.

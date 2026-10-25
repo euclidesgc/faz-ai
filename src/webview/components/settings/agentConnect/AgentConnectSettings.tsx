@@ -16,7 +16,6 @@ import { AgentConnection } from './AgentConnection';
 import { AgentDetails } from './AgentDetails';
 import { AgentModels } from './AgentModels';
 import { AgentTest } from './AgentTest';
-import { ModelSuggestion } from './ModelSuggestion';
 import { STATE_COLOR, STATE_LABEL, agentState, profileKind } from './agentStatus';
 import { connectionSummary } from './connectProgress';
 
@@ -328,7 +327,6 @@ export function AgentConnectSettings() {
           </Card>
         )}
       </div>
-      <ModelSuggestion />
       {/* as regras de fallback são do agente escolhido: cada uma parte de um modelo dele que falha */}
       {item?.profile && <ExecutionPoliciesSettings key={item.profile.id} profileId={item.profile.id} />}
     </div>

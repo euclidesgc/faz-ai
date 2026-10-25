@@ -36,14 +36,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
         }
       >
         {t(
-          'O botão "Trabalhar na fase" de um card roda o {tool} em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define o que ele pode fazer nessas execuções ("Refinar com IA" roda só com o board, quando a ferramenta tem esse nível; sem ele, o pedido proíbe mexer em arquivos). O {tool} precisa estar instalado e autenticado nesta máquina{suffix}.',
-          {
-            tool: tool.label,
-            suffix:
-              board.aiTool === 'claude'
-                ? t('; o board é entregue a ele em cada execução, sem depender do botão acima')
-                : t(', e o servidor do board conectado (botão acima)'),
-          },
+          'O botão "Trabalhar na fase" de um card roda a IA dele em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define o que ela pode fazer nessas execuções ("Refinar com IA" roda só com o board, quando a ferramenta tem esse nível; sem ele, o pedido proíbe mexer em arquivos). O agente de cada card precisa estar instalado, autenticado e ligado em Conectar agentes.',
         )}
       </SectionHeader>
       {unsupported ? (

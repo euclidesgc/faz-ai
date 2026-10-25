@@ -8,12 +8,13 @@ import { ModelRulesEditor } from '../ModelRulesEditor';
 
 /**
  * O modelo de cada card: as regras que sugerem o agente, o modelo e o esforço pelo tipo, pelos campos e pelas tags
- * do card, e o "preencher sozinho". Vale para o board inteiro, com qualquer agente conectado.
+ * do card, e o "preencher sozinho". Vale para o board inteiro, com qualquer agente conectado: por isso fica no
+ * Harness, e não na tela de um agente.
  */
 export function ModelSuggestion() {
   const { modelRules, rules } = useBoardStore((s) => s.state!.board);
   return (
-    <section className="agent-board-section">
+    <section className="model-suggestion">
       <Card className="form-card" aria-label={t('Preencher o modelo sugerido')}>
         <SwitchField
           label={t('Preencher o modelo sugerido automaticamente')}

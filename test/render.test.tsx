@@ -21,7 +21,7 @@ import { HarnessSettings } from '../src/webview/components/settings/HarnessSetti
 import { RuleBuilder } from '../src/webview/components/settings/ModelRulesEditor';
 import { AppearanceSettings } from '../src/webview/components/settings/AppearanceSettings';
 import { AgentModels } from '../src/webview/components/settings/agentConnect/AgentModels';
-import { ModelSuggestion } from '../src/webview/components/settings/agentConnect/ModelSuggestion';
+import { ModelSuggestion } from '../src/webview/components/settings/harness/ModelSuggestion';
 import { RulesSettings } from '../src/webview/components/settings/RulesSettings';
 import { Settings } from '../src/webview/components/settings/Settings';
 import { GitSettings } from '../src/webview/components/settings/GitSettings';
@@ -237,7 +237,7 @@ describe('telas montam sem erro', () => {
     const rules = html(<RulesSettings />);
     expect(rules).toContain('Avançar de fase');
     expect(rules).not.toContain('mudou para a aba Modelos');
-    // Conectar agentes › Modelos do agente e a sugestão de modelo do board
+    // Conectar agentes › Modelos do agente e, no Harness, a sugestão de modelo do board
     const claude = useBoardStore.getState().state!.board.aiProfiles.find((p) => p.id === 'claude')!;
     const models = html(
       <>
@@ -298,9 +298,10 @@ describe('telas montam sem erro', () => {
       })
       .join('\n');
     for (const text of [
-      'Ferramenta deste projeto',
-      'type="radio"',
       'Artefatos do board',
+      // a sugestão de modelo vale para o board inteiro: mora no Harness, não na tela de um agente
+      'Sugestão de modelo',
+      'Preencher o modelo sugerido automaticamente',
       'Execução pela conversa e heartbeat',
       'A IA lê o projeto e usa as ferramentas do board',
       'Tempo limite por execução',

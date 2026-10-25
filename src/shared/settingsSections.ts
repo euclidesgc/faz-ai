@@ -15,8 +15,7 @@ export interface SettingsSectionInfo {
 }
 
 export const SETTINGS_SECTIONS: Record<string, SettingsSectionInfo> = {
-  'model-rules': { tab: 'connect' },
-  'harness-tool': { tab: 'harness', harnessTab: 'tool' },
+  'model-rules': { tab: 'harness', harnessTab: 'tool' },
   'execution-policies': { tab: 'connect' },
   heartbeat: { tab: 'harness', harnessTab: 'tool' },
   // as âncoras da tela por ferramenta caem na aba de artefatos do board

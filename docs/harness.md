@@ -46,7 +46,7 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
    desligados; também é possível criar cópias e perfis personalizados. Todo agente ligado roda
    cards, ao mesmo tempo: a CLI de cada execução sai do modelo escolhido (veja
    [Qual CLI executa](configuracoes.md#qual-cli-executa)), e o agente padrão só roda os cards sem
-   modelo. Em **Harness → Ferramenta e execução**, você pode trocar o perfil padrão.
+   modelo. Em **Conectar agentes**, **Tornar padrão** troca o agente padrão.
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O
    board registra o servidor `faz-ai` no arquivo global que a ferramenta lê. Isso também acontece
    sozinho, em silêncio, ao abrir a pasta (e a cada versão nova da extensão), sempre no escopo do
@@ -325,9 +325,10 @@ levam ao Harness e ao terminal do login.
 
 O board gerencia uma **biblioteca particular**, independente da ferramenta de IA. Em
 **Configurações → Harness**, a aba **Biblioteca do board** concentra o CRUD de **Regras**,
-**Skills**, **Sub-agentes** e **MCPs**. **Ferramenta e execução** escolhe a IA, os modelos, as
-permissões, o **regime de admissão**, o agente padrão e o heartbeat; também conecta a ferramenta ao
-servidor MCP do board. Trocar de ferramenta preserva os artefatos e suas seleções.
+**Skills**, **Sub-agentes** e **MCPs**. **Ferramenta e execução** define as permissões, o agente
+padrão do harness, o tempo limite, o heartbeat, o plano de contexto e a sugestão de modelo dos cards.
+O agente padrão do board, a conexão de cada agente ao servidor MCP do board e o regime de admissão
+ficam em Conectar agentes. Trocar de agente preserva os artefatos e suas seleções.
 
 O **regime de admissão** é a régua com que o board decide se deixa a ferramenta rodar um card.
 **Exclusivo** (o padrão) exige as cinco capacidades verificadas: a IA vê exatamente o contexto que o

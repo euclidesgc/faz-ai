@@ -49,18 +49,13 @@ describe('DependsOn', () => {
     useBoardStore.setState({ settingsTab: 'columns', pendingSettingsSection: null });
     render(
       <Theme>
-        <DependsOn
-          label="ferramenta Cursor"
-          satisfied={false}
-          target={{ kind: 'board', section: 'harness-tool' }}
-          targetHint="em Harness"
-        />
+        <DependsOn label="o heartbeat" satisfied={false} target={{ kind: 'board', section: 'heartbeat' }} targetHint="em Harness" />
       </Theme>,
     );
     await userEvent.click(screen.getByRole('button', { name: /Abrir/ }));
     const s = useBoardStore.getState();
     expect(s.settingsTab).toBe('harness');
     expect(s.harnessTab).toBe('tool');
-    expect(s.pendingSettingsSection).toBe('harness-tool');
+    expect(s.pendingSettingsSection).toBe('heartbeat');
   });
 });
