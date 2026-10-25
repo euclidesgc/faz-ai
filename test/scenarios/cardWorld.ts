@@ -44,6 +44,17 @@ const WASM_DIR = path.resolve(__dirname, '../../node_modules/sql.js/dist');
 /** As ferramentas do `condutor-do-board` de `.claude/agents/` (sem o curinga do servidor do board). */
 export const CONDUTOR_TOOLS = ['Read', 'Grep', 'Glob', 'Agent', 'Bash'];
 
+/** O modelo "Auto" do Cursor no catálogo do board (o que a CLI impõe na conta Free). */
+export const CURSOR_MODEL: ModelOption = {
+  id: 'cursor:auto',
+  tool: 'cursor',
+  model: 'auto',
+  label: 'Auto',
+  efforts: [],
+  defaultEffort: null,
+  fromTool: true,
+};
+
 /** Um modelo do Gemini CLI no catálogo do board, como o "Detectar modelos" grava a partir da sessão ACP. */
 export const GEMINI_MODEL: ModelOption = {
   id: 'gemini:gemini-2.5-pro',
@@ -90,7 +101,7 @@ export interface CardWorldOptions {
    * o perfil de CLI do card: `gemini` (agente ACP pronto do catálogo, pelo campo Modelo), `gemini-api` (o
    * mesmo perfil no modo API, contra o servidor HTTP falso de `api`) ou `claude` (o padrão do board)
    */
-  profile: 'gemini' | 'gemini-api' | 'gemini-cli' | 'claude';
+  profile: 'gemini' | 'gemini-api' | 'gemini-cli' | 'claude' | 'cursor';
   /**
    * `gemini-cli` (história 8): o mesmo perfil no modo CLI. O processo da CLI é este `spawn` (o falso que emite o
    * `stream-json` gravado da 0.65.0); sem ele, o de sempre, que só guarda o comando
@@ -136,6 +147,8 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
     connect ? '#!/bin/sh\necho 0.65.0\n' : '#!/bin/sh\n# agente de teste: o processo é o falso, em memória\n',
     { mode: 0o755 },
   );
+  // o perfil Cursor (modo CLI, o único dele): o binário que a admissão resolve pelo PATH; o processo é o `spawn` falso
+  if (options.profile === 'cursor') fs.writeFileSync(path.join(bin, 'cursor-agent'), '#!/bin/sh\n# agente de teste\n', { mode: 0o755 });
   const db = await openInMemory(WASM_DIR);
   const keys = new ToolKeys(credentialsFor(db), path.join(root, 'tool-keys.json'));
   const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
@@ -164,7 +177,12 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   // a pessoa liga o perfil pronto (ligar é a revisão dele), escolhe o regime compatível (revisado por ela) e a permissão.
   // O Claude Code segue padrão do board, e o card vai para o Gemini pelo campo Modelo, com um modelo que o
   // "Detectar modelos" trouxe da sessão ACP: é assim que o agente do board chega ao ACP com as ferramentas dele
-  const gemini = options.profile !== 'claude';
+  const cursor = options.profile === 'cursor';
+  const gemini = options.profile !== 'claude' && !cursor;
+  if (cursor) {
+    router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'cursor', enabled: true });
+    router.handle({ type: 'settings.models.set', catalog: [...router.snapshot().board.modelCatalog, CURSOR_MODEL] });
+  }
   if (gemini && !connect) {
     router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: true });
     router.handle({
@@ -181,7 +199,9 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
       runner: {
         defaultAgent: 'condutor-do-board',
         permission: options.permission ?? 'full',
-        ...((options.profile === 'gemini' || options.profile === 'gemini-cli') && !connect ? { admissionRegime: 'compatible' } : {}),
+        ...((options.profile === 'gemini' || options.profile === 'gemini-cli' || cursor) && !connect
+          ? { admissionRegime: 'compatible' }
+          : {}),
       },
     },
   } as never);
@@ -312,9 +332,9 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   const story = s.workflows.find((w) => w.kind === 'parent')!;
   const phase = s.columns.filter((c) => c.workflowId === story.id && c.aiActive).sort((a, b) => a.position - b.position)[0]!;
   const cardId = router.createCard({ typeId: s.cardTypes[0]!.id, columnId: phase.id, parentId: null, title: 'Card do cenário' });
-  if (gemini && !options.boardDefault && !connect) {
+  if ((gemini || cursor) && !options.boardDefault && !connect) {
     const field = s.fieldDefs.find((f) => f.kind === 'model')!;
-    router.handle({ type: 'field.setValue', cardId, fieldId: field.id, value: GEMINI_MODEL.id });
+    router.handle({ type: 'field.setValue', cardId, fieldId: field.id, value: cursor ? CURSOR_MODEL.id : GEMINI_MODEL.id });
   }
 
   return {

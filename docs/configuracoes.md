@@ -272,7 +272,11 @@ sugestão anterior; um modelo escolhido à mão nunca é trocado.
 ## Regras de fallback
 
 Quando um modelo esgota o limite de uso (a cota), o board segue o card em outro modelo, de qualquer
-agente ligado. Sem regra, o card espera a cota renovar. As **regras de fallback** ficam em
+agente ligado. Sem regra, o card espera a cota renovar. O sinal vem do leitor da saída de cada
+ferramenta: o `rate_limit_event` e o `result` de limite do Claude Code, o 429 do Gemini, o 403 de
+cota do Kimi Code e a recusa `ActionRequiredError: You've hit your usage limit` do Cursor (no plano
+Free, a cota do agente é separada da barra de uso do painel: ela pode acabar com a barra pela
+metade). As **regras de fallback** ficam em
 **Configurações → Conectar agentes**, logo abaixo das regras de sugestão de modelo, numa lista: a
 ordem é a prioridade (a primeira que casar vence), cada linha mostra **quando** ("Claude Code · CLI ·
 Opus 5.5 esgota a cota"), o que o board **usa no lugar** ("Gemini · API · Pro, depois Cursor · CLI ·

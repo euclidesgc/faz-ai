@@ -99,6 +99,10 @@ banner asks you to **reload the window** (Cursor only reads project servers when
 and then to **turn on `faz-ai`** in Cursor Settings → MCP (Cursor keeps every new project server
 off).
 
+The board hook, which enforces MCP, subagents and tools at use time through `cursor-agent`, is
+registered in `~/.cursor/hooks.json` when the window opens: always in Cursor and, in other editors,
+when `cursor-agent` exists in the terminal PATH (the board in VS Code with the Cursor profile).
+
 ### The editor chat's PATH
 
 The editor chat starts the board's MCP with the PATH the editor opened with: Node installed later

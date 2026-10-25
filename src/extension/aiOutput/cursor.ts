@@ -11,11 +11,20 @@
 // A CLI não informa custo em dólar e o board não o calcula: só os tokens são medidos. A ausência de
 // `usage` é tratada como caso normal — ver o comentário em `report()`.
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
+import { USAGE_LIMIT_TEXT } from '../../shared/conversation';
 import { asList, asNumber, asObject, asText, cut, type Json } from './json';
 import type { OutputReader, OutputStream } from './reader';
 
 /** Tamanho de uma linha que não é JSON, como o modo texto já corta hoje. */
 const RAW_MAX = 300;
+
+/**
+ * A cota do agente esgotada, como a CLI 2026.10.22 escreve (conferido contra a conta Free): uma linha fora
+ * do stream, logo depois do `user`, `ActionRequiredError: You've hit your usage limit Get Cursor Pro for
+ * more Agent usage...`, e a CLI sai com 1. Só uma linha de erro da própria CLI conta: um texto do
+ * assistente que fale de limite não é limite.
+ */
+const USAGE_LIMIT = /^\s*(ActionRequiredError|UsageLimitError|Error)\b[^\n]*(usage limit|hit your (usage |weekly |session )?limit)/i;
 
 /** `mcp__servidor__ferramenta` → `servidor/ferramenta`: o mesmo corte no primeiro `__` depois do
  * prefixo que `claude.ts` usa, porque nome de servidor com `_` é comum e com `/` não é. */
@@ -36,6 +45,8 @@ export function cursorReader(): OutputReader {
   const resultTexts: string[] = [];
   /** o consumo do último `result` que trouxe um bloco `usage`; `null` enquanto nenhum trouxe */
   let tokens: AiRunTokens | null = null;
+  /** a CLI recusou por cota do agente esgotada: o runner pausa o perfil ou aplica a regra de fallback */
+  let usageLimitReached = false;
 
   const count = (kind: InventoryKind, name: string): void => {
     const key = `${kind}\u0000${name}`;
@@ -123,11 +134,15 @@ export function cursorReader(): OutputReader {
         };
     }
     const failed = o.is_error === true || asText(o.subtype) === 'error';
+    // um `result` de erro cujo texto é o do limite: a mesma expressão dos outros leitores
+    if (failed && text && USAGE_LIMIT_TEXT.test(text)) usageLimitReached = true;
     return [failed ? 'Terminou com erro' : 'Pronto'];
   };
 
   return {
     push(line: string, stream: OutputStream): string[] {
+      // a cota esgotada vem como linha de erro fora do stream (stdout) ou no stderr: vale nos dois
+      if (USAGE_LIMIT.test(line)) usageLimitReached = true;
       // stderr é texto de gente, nunca passa pelo interpretador
       if (stream === 'stderr') return line ? [cut(line, RAW_MAX)] : [];
       if (!line.trim()) return [];
@@ -181,8 +196,7 @@ export function cursorReader(): OutputReader {
           inventory: items,
           answer,
           reason: null,
-          // este leitor não interpreta eventos de limite de uso: a reserva é só do leitor do Claude
-          usageLimitReached: false,
+          usageLimitReached,
         };
       }
 
@@ -194,8 +208,8 @@ export function cursorReader(): OutputReader {
       // não vazio e consumo nulo, o rótulo correto é `partial`: ele diz exatamente o que houve
       // (inventário sim, consumo não) sem inventar nem apagar fato. Resista à tentação de "simplificar"
       // isto para `none` — perderia informação real de graça.
-      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, usageLimitReached: false };
-      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached: false };
+      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, usageLimitReached };
+      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached };
     },
 
     get sawEvent(): boolean {

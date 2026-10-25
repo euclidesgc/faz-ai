@@ -408,10 +408,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // no Cursor, o servidor do board é registrado no projeto assim que a pasta abre, antes de o board
       // ser aberto: o chat do editor enxerga o board sem a pessoa instalar nada (o global não funciona
       // no Cursor; veja registerCursorProject)
-      if (editorName === 'cursor') {
-        void registerInCursor(f.uri.fsPath, bridgePath, output);
-        void installBoardCursorHook(context, bridgePath, output);
-      }
+      if (editorName === 'cursor') void registerInCursor(f.uri.fsPath, bridgePath, output);
+      // o hook garante a execução pelo cursor-agent, que roda também fora do editor Cursor (o board no VS Code
+      // com o perfil Cursor): no Cursor sempre; nos outros editores, quando a CLI existe no PATH do terminal
+      void installBoardCursorHook(context, bridgePath, output, editorName !== 'cursor');
       // em segundo plano: a CLI da ferramenta pode demorar, e o servidor do board não depende dela
       ensureUserInstall(context, f.uri.fsPath, bridgePath, output, []);
       stopMcp = await startMcpServer(socketPath(f.uri.fsPath), {
@@ -562,13 +562,23 @@ export async function deactivate(): Promise<void> {
   host = null;
 }
 
-/** Copia o script do hook ao lado da ponte e o registra no ~/.cursor/hooks.json global; sem efeito fora de uma execução do board. */
-async function installBoardCursorHook(context: vscode.ExtensionContext, bridgePath: string, output: vscode.OutputChannel): Promise<void> {
+/**
+ * Copia o script do hook ao lado da ponte e o registra no ~/.cursor/hooks.json global; sem efeito fora de uma
+ * execução do board. Com `onlyWithCli`, só mexe na home de quem tem o `cursor-agent` instalado.
+ */
+async function installBoardCursorHook(
+  context: vscode.ExtensionContext,
+  bridgePath: string,
+  output: vscode.OutputChannel,
+  onlyWithCli = false,
+): Promise<void> {
   try {
+    const homeDir = os.homedir();
+    const pathEnv = (await loginShellPath()) ?? process.env.PATH;
+    if (onlyWithCli && !resolveCommand('cursor-agent', pathEnv, homeDir)) return;
     const scriptPath = path.join(path.dirname(bridgePath), 'cursor-hook.js');
     fs.copyFileSync(path.join(context.extensionPath, 'dist', 'cursor-hook.js'), scriptPath);
-    const homeDir = os.homedir();
-    const nodeCommand = resolveCommand('node', (await loginShellPath()) ?? process.env.PATH, homeDir) ?? undefined;
+    const nodeCommand = resolveCommand('node', pathEnv, homeDir) ?? undefined;
     const r = installCursorHook({ homeDir, scriptPath, nodeCommand });
     if (r === 'invalid') output.appendLine('[hook] ~/.cursor/hooks.json não é um JSON válido; o hook do board não foi registrado.');
   } catch (e) {

@@ -50,6 +50,8 @@ export type SpawnFn = (
 export interface MeasuredDeps {
   /** Raiz compartilhada de coordenação; nos testes usa uma pasta temporária própria. */
   leaseCoordinationDir?: string;
+  /** Quanto esperar pelo fim da árvore de processos antes de reter o empréstimo; nos testes, menos. */
+  treeEndWaitMs?: number;
   spawn: SpawnFn;
   /**
    * Cada linha legível que a ferramenta produziu, mais os recados do board sobre a execução (a
@@ -80,6 +82,9 @@ const ARG_MAX = 80;
 
 /** Tamanho da linha de evento pela metade no canal, o mesmo corte que os leitores dão à linha ruim. */
 const REST_MAX = 300;
+/** Quanto a saída espera pelo fim da árvore de processos antes de reter o empréstimo MCP, e de quanto em quanto confere. */
+const TREE_END_WAIT_MS = 5000;
+const TREE_END_POLL_MS = 250;
 
 /**
  * O que as CLIs escrevem no `stderr` quando recusam um argumento (commander, clap, yargs, argparse e
@@ -330,6 +335,14 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
       // cada tentativa termina uma vez: um segundo aviso de saída não repete nem revive nada
       if (exited) return;
       exited = true;
+      // O cursor-agent deixa um filho vivo por um instante depois de sair (ao recusar por cota, por exemplo). Fechar
+      // a execução nesse instante reteria o empréstimo MCP sem necessidade: antes de concluir, espera até 5 s pelo
+      // fim do grupo de processos, conferindo a cada 250 ms. Sem empréstimo, ou já confirmado, conclui na hora.
+      const settle = (exitCode: number | null, exitError?: Error, waited = 0): void => {
+        if (!projectLease || proc.terminationConfirmed?.() === true || waited >= (deps.treeEndWaitMs ?? TREE_END_WAIT_MS))
+          return finish(exitCode, exitError);
+        setTimeout(() => settle(exitCode, exitError, waited + TREE_END_POLL_MS), TREE_END_POLL_MS);
+      };
       // o resto que ficou sem quebra de linha: no modo texto é o fim da resposta e segue pelo leitor
       // de texto. No estruturado, se for JSON completo é a última linha de evento sem o `\n` final e
       // é interpretada (descartá-la perderia justamente o `result` com o consumo); se não for, é uma
@@ -357,7 +370,7 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
         reader = text;
         failure = new MeasureIgnoredError(label);
         deps.log(failure.message);
-        finish(code, error);
+        settle(code, error);
         return;
       }
       // a CLI recusou o argumento do formato antes de começar (nada no `stdout`): a versão instalada
@@ -370,7 +383,7 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
         // relatório não afirma uma repetição que não aconteceu
         if (killed) {
           failure = new MeasureEndedError();
-          finish(code, error);
+          settle(code, error);
           return;
         }
         try {
@@ -388,7 +401,7 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
         failure = new MeasureEndedError();
         deps.log(failure.message);
       }
-      finish(code, error);
+      settle(code, error);
     });
   };
 

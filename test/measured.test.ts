@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { spawnMeasured, cleanStaleTemp, formatArgs, refusesFormat, materialize, type SpawnFn } from '../src/extension/aiOutput/measured';
 import { MeasureEndedError, MeasureRefusedError } from '../src/extension/aiOutput/errors';
 import type { OutputStream } from '../src/extension/aiOutput/reader';
@@ -663,6 +663,8 @@ describe('empréstimo MCP no transporte medido', () => {
     try {
       const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, {
         ...deps,
+        // sem espera: o processo nunca vai confirmar, e o teste não precisa dos 5 s de tolerância
+        treeEndWaitMs: 0,
         spawn: (...args) => {
           const proc = spawn(...args);
           return { onExit: proc.onExit, kill: proc.kill };
@@ -676,6 +678,34 @@ describe('empréstimo MCP no transporte medido', () => {
       expect(error?.message).toContain('não foi confirmado');
       expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(true);
       expect(fs.readdirSync(deps.leaseCoordinationDir)).toHaveLength(1);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('um filho que vive um instante depois da saída não retém o empréstimo: a saída espera o fim do grupo', async () => {
+    // o cursor-agent de verdade: sai (close do filho direto) com um processo do grupo ainda vivo por um momento
+    const { dir, deps } = setup();
+    try {
+      let confirmed = false;
+      const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, {
+        ...deps,
+        treeEndWaitMs: 2000,
+        spawn: (...args) => {
+          const proc = spawn(...args);
+          return { onExit: proc.onExit, kill: proc.kill, terminationConfirmed: () => confirmed };
+        },
+      });
+      const ended: { code: number | null; error?: Error }[] = [];
+      run.proc.onExit((code, error) => ended.push({ code, error }));
+      started[0]!.exit(1);
+      // ainda não concluiu: está esperando o grupo
+      expect(ended).toEqual([]);
+      setTimeout(() => (confirmed = true), 300);
+      await vi.waitFor(() => expect(ended).toHaveLength(1), { timeout: 1900, interval: 50 });
+      expect(ended[0]!.error).toBeUndefined();
+      expect(ended[0]!.code).toBe(1);
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

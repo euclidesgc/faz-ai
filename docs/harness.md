@@ -91,6 +91,10 @@ que a pasta abre no Cursor. Na primeira vez em cada projeto, a faixa pede para *
 janela** (o Cursor só lê os servidores do projeto ao abrir a janela) e depois para **ligar o
 `faz-ai`** em Cursor Settings → MCP (o Cursor deixa desligado todo servidor novo do projeto).
 
+O hook do board, que garante MCP, subagentes e ferramentas na hora do uso pelo `cursor-agent`, é
+registrado no `~/.cursor/hooks.json` ao abrir a janela: sempre no Cursor e, nos outros editores,
+quando o `cursor-agent` existe no PATH do terminal (o board no VS Code com o perfil Cursor).
+
 ### O PATH do chat do editor
 
 O chat do editor inicia o MCP do board com o PATH de quando o editor abriu: um Node instalado depois

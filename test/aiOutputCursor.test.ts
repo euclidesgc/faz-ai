@@ -138,4 +138,48 @@ describe('stream-json do Cursor', () => {
     expect(c.inputTokens).toBe(1_000_000);
     expect(c.costUsd).toBeNull();
   });
+
+  it('a cota do agente esgotada (conta Free, CLI 2026.10.22): a linha de erro fora do stream liga o limite de uso', () => {
+    // o que a CLI escreveu de verdade: init, o pedido e a recusa como linha solta, saindo com 1
+    const reader = cursorReader();
+    reader.push(init('Auto'), 'stdout');
+    reader.push(
+      JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'oi' }] }, session_id: SESSION }),
+      'stdout',
+    );
+    const lines = reader.push(
+      "ActionRequiredError: You've hit your usage limit Get Cursor Pro for more Agent usage, unlimited Tab, and more.",
+      'stdout',
+    );
+    // a linha vai para o canal como texto, e o relatório leva o sinal estrutural que o runner exige
+    expect(lines[0]).toContain('ActionRequiredError');
+    expect(reader.report()).toMatchObject({ measure: 'none', usageLimitReached: true });
+  });
+
+  it('o limite também vale no stderr e num result de erro; o assistente falar de limite não é limite', () => {
+    const stderr = cursorReader();
+    stderr.push("ActionRequiredError: You've hit your usage limit", 'stderr');
+    expect(stderr.report().usageLimitReached).toBe(true);
+
+    const result = cursorReader();
+    result.push(
+      JSON.stringify({ type: 'result', subtype: 'error', is_error: true, result: 'You have hit your usage limit for today.' }),
+      'stdout',
+    );
+    expect(result.report().usageLimitReached).toBe(true);
+
+    const talk = cursorReader();
+    talk.push(
+      JSON.stringify({
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'O rate limit da API foi ajustado.' }] },
+      }),
+      'stdout',
+    );
+    talk.push(
+      JSON.stringify({ type: 'result', subtype: 'success', result: 'Pronto: o usage limit do serviço foi documentado.' }),
+      'stdout',
+    );
+    expect(talk.report().usageLimitReached).toBe(false);
+  });
 });

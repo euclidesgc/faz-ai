@@ -294,7 +294,11 @@ by hand is never replaced.
 ## Fallback rules
 
 When a model runs out of usage quota, the board continues the card on another model, from any
-enabled agent. Without a rule, the card waits for the quota to renew. The **fallback rules** live
+enabled agent. Without a rule, the card waits for the quota to renew. The signal comes from each
+tool's output reader: Claude Code's `rate_limit_event` and limit `result`, Gemini's 429, Kimi Code's
+quota 403 and Cursor's `ActionRequiredError: You've hit your usage limit` refusal (on the Free plan,
+the agent quota is separate from the dashboard's usage bar: it can run out with the bar at half).
+The **fallback rules** live
 under **Configurações → Conectar agentes** (Settings → Connect agents), right below the model
 suggestion rules, as a list: the order is the priority (the first matching rule wins), and each row
 shows **when** ("Claude Code · CLI · Opus 5.5 runs out of quota"), what the board **uses instead**
