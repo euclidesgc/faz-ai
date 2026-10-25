@@ -11,6 +11,11 @@ export interface PolicyAssistInput {
   /** o rascunho aberto no editor; nunca é a política ativa */
   draft: ExecutionPolicy | null;
   language: 'pt-BR' | 'en';
+  /**
+   * O agente da tela de regras: a IA recebe só as regras do modelo dele que falha, e a proposta tem de falhar num modelo
+   * dele. Regras de agentes diferentes nunca casam a mesma falha, então os conflitos ficam dentro do agente.
+   */
+  profileId?: string;
 }
 export interface PolicyAssistScenario {
   failure: PolicyFailure;
@@ -27,6 +32,11 @@ export interface PolicyAssistResult {
 }
 
 export const MAX_GOAL_CHARS = 2000;
+/** As regras que valem para o agente: as do modelo dele que falha e as antigas sem agente (valem para todos). */
+export const policiesOfProfile = <T extends { policy: ExecutionPolicy }>(records: readonly T[], profileId: string | undefined): T[] =>
+  profileId === undefined
+    ? [...records]
+    : records.filter((r) => !r.policy.conditions.profileIds.length || r.policy.conditions.profileIds.includes(profileId));
 /** Padrões comuns de segredo: nem o objetivo vai à IA nem a resposta dela chega à tela com eles. */
 const SECRET =
   /(sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|(api[_-]?key|token|secret|password|senha)\s*[:=]\s*\S+|Bearer\s+[A-Za-z0-9._-]{16,})/i;

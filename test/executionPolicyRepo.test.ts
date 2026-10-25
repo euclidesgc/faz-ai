@@ -70,6 +70,21 @@ describe('políticas versionadas do board', () => {
     expect(JSON.stringify(repo.read(boardId))).toBe(before);
     expect(repo.history(boardId, 'quota')).toHaveLength(1);
   });
+  it('a regra salva pela pessoa é de um modelo só e não volta para ele; ligar e reordenar a antiga continuam', () => {
+    const save = (p: ReturnType<typeof policy>, expectedRevision = 0) =>
+      repo.save(boardId, { expectedRevision, policy: p, reviewed: true }, scope, 'person');
+    const conditions = policy().conditions;
+    expect(() => save(policy({ conditions: { ...conditions, profileIds: [] } }))).toThrow('um modelo que falha');
+    expect(() => save(policy({ conditions: { ...conditions, models: [] } }))).toThrow('um modelo que falha');
+    expect(() => save(policy({ conditions: { ...conditions, profileIds: ['claude', 'cursor'] } }))).toThrow('um modelo que falha');
+    expect(() => save(policy({ targets: [{ profileId: 'claude', model: 'opus', effort: null }] }))).toThrow('mesmo modelo que falha');
+    expect(repo.read(boardId)).toHaveLength(0);
+    // a regra antiga (sem modelo de origem) chegou por migração: ligar, desligar e mudar a prioridade não esbarram nela
+    const old = policy({ conditions: { ...conditions, models: [] }, enabled: false, targets: [policy().targets[1]!] });
+    repo.save(boardId, { expectedRevision: 0, policy: old, reviewed: false }, scope, 'person');
+    expect(save({ ...old, enabled: true, priority: 30 }, 1).revision).toBe(2);
+    expect(() => save({ ...old, name: 'Mudou', enabled: true }, 2)).toThrow('um modelo que falha');
+  });
   it('importação preserva versões e definições, mas retira revisão executável até confirmação humana', () => {
     repo.save(boardId, { expectedRevision: 0, policy: policy(), reviewed: true }, scope, 'person');
     const file = exportBoard(db, boardId, store, { extensionVersion: 'test' }).file;

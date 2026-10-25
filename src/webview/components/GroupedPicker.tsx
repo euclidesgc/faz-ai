@@ -30,6 +30,7 @@ export function GroupedPicker({
   groups,
   onChange,
   placeholder,
+  disabled,
 }: {
   id?: string;
   ariaLabel?: string;
@@ -38,6 +39,7 @@ export function GroupedPicker({
   groups: PickerGroup[];
   onChange(value: string): void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   const uid = useId();
   const [open, setOpen] = useState(false);
@@ -71,6 +73,7 @@ export function GroupedPicker({
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-label={ariaLabel}
+          disabled={disabled}
         >
           <span className="picker-trigger-label">{current?.label ?? placeholder ?? value}</span>
         </Button>

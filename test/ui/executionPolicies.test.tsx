@@ -28,7 +28,7 @@ const library = (records: ExecutionPolicyRecord[], extra: Partial<PolicyReply['l
 });
 /** A tela lê as regras ao montar, sem clique. */
 async function open(records: ExecutionPolicyRecord[] = [record()], extra: Partial<PolicyReply['library']> = {}) {
-  renderThemed(<ExecutionPoliciesSettings />);
+  renderThemed(<ExecutionPoliciesSettings profileId="claude" />);
   await waitFor(() => expect(sentOf('executionPolicy.read')).toHaveLength(1));
   reply(library(records, extra));
   await screen.findByRole('button', { name: 'Montar nova regra' });
@@ -116,32 +116,60 @@ it('a ordem da lista é a prioridade: descer renumera em duas passadas, sem empa
   ]);
   expect(writes.every((w) => w.reviewed)).toBe(true);
 });
-it('regra nova: origem o modelo do agente padrão, um destino noutro agente, troca sozinha, ligada; o nome sai da frase', async () => {
+it('regra nova: começa sem modelo; o que falha é só do agente da tela e o destino não oferece ele mesmo', async () => {
   await open([]);
-  expect(screen.getByText('Nenhuma regra: ao esgotar a cota, o card espera a renovação.')).toBeInTheDocument();
+  expect(screen.getByText(/Nenhuma regra para .*: ao esgotar a cota, o card espera a renovação\./)).toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Montar nova regra' }));
   expect(screen.getByRole('radio', { name: /Troca sozinho/ })).toBeChecked();
-  expect(screen.getByRole('combobox', { name: 'Modelo 1' })).toBeInTheDocument();
+  // sem o modelo que falha, nada salva e o destino espera
+  expect(screen.getByRole('button', { name: 'Adicionar à lista' })).toBeDisabled();
+  expect(screen.getByRole('combobox', { name: 'Modelo 1' })).toBeDisabled();
+  // o modelo que falha: só os do agente da tela, num grupo só
+  await userEvent.click(screen.getByRole('combobox', { name: 'Modelo que falha' }));
+  const groups = within(screen.getByRole('listbox')).getAllByRole('group');
+  expect(groups).toHaveLength(1);
+  const origin = within(groups[0]!).getAllByRole('option')[0]!.textContent!;
+  await userEvent.click(within(groups[0]!).getAllByRole('option')[0]!);
+  // o destino oferece todos os modelos, menos o que falha
+  await userEvent.click(screen.getByRole('combobox', { name: 'Modelo 1' }));
+  const own = within(screen.getByRole('listbox')).getAllByRole('group')[0]!;
+  expect(within(own).queryByRole('option', { name: origin })).toBeNull();
+  const target = within(own).getAllByRole('option')[0]!;
+  const targetLabel = target.textContent!;
+  await userEvent.click(target);
+  expect(screen.getByRole('combobox', { name: 'Modelo 1' })).toHaveTextContent(targetLabel);
   await userEvent.click(screen.getByRole('button', { name: 'Adicionar à lista' }));
   const sent = lastSent('settings.executionPolicy.save');
   expect(sent).toMatchObject({
     expectedRevision: 0,
     reviewed: true,
-    policy: { enabled: true, action: 'auto', conditions: { failures: ['quota'], explicit: 'include' } },
+    policy: { enabled: true, action: 'auto', conditions: { profileIds: ['claude'], failures: ['quota'], explicit: 'include' } },
   });
+  expect(sent.policy.conditions.models).toHaveLength(1);
   expect(sent.policy.name).toMatch(/→/);
-  // o board de teste só tem modelos do Claude: o destino é outro modelo do mesmo agente
   expect(sent.policy.targets).toHaveLength(1);
   expect(sent.policy.targets[0]!.model).not.toBe(sent.policy.conditions.models[0]);
 });
-it('um destino igual ao modelo que falhou não salva: o editor avisa', async () => {
-  await open([]);
-  await userEvent.click(screen.getByRole('button', { name: 'Montar nova regra' }));
-  const origin = screen.getByRole('combobox', { name: 'Modelo que falhou' }).textContent!;
-  await choose(screen.getByRole('combobox', { name: 'Modelo 1' }), origin);
-  expect(screen.getByText('É o mesmo modelo que falhou: escolha outro.')).toBeInTheDocument();
-  await userEvent.click(screen.getByRole('button', { name: 'Adicionar à lista' }));
+it('trocar o modelo que falha limpa os destinos, e a linha vazia não salva', async () => {
+  await open();
+  await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+  expect(screen.getByRole('combobox', { name: 'Modelo 2' })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('combobox', { name: 'Modelo que falha' }));
+  const options = within(screen.getByRole('listbox')).getAllByRole('option');
+  await userEvent.click(options.find((o) => o.getAttribute('aria-selected') !== 'true')!);
+  expect(screen.queryByRole('combobox', { name: 'Modelo 2' })).toBeNull();
+  expect(screen.getByRole('combobox', { name: 'Modelo 1' })).toHaveTextContent('Escolha o modelo');
+  expect(screen.getByRole('button', { name: 'Salvar regra' })).toBeDisabled();
+  expect(screen.getByText('Escolha o modelo de cada linha de "Usar no lugar", ou remova a linha vazia.')).toBeInTheDocument();
   expect(sentOf('settings.executionPolicy.save')).toHaveLength(0);
+});
+it('a tela de um agente mostra só as regras do modelo dele que falha', async () => {
+  await open([
+    record(),
+    record(policy({ id: 'outra', name: 'Regra do Cursor', priority: 20, conditions: { ...policy().conditions, profileIds: ['cursor'] } })),
+  ]);
+  expect(screen.getByRole('row', { name: /Quota da implementação/ })).toBeInTheDocument();
+  expect(screen.queryByRole('row', { name: /Regra do Cursor/ })).toBeNull();
 });
 it('Perguntar antes vira a ação "offer"; Avançado troca para bloquear e esvazia os destinos', async () => {
   await open();
@@ -161,7 +189,7 @@ it('Testar as regras: a regra escolhida vai como rascunho ligado, com o cenário
   await userEvent.click(screen.getByText('Testar as regras, pedir sugestão à IA e reservas antigas'));
   // a regra do fixture vira o cenário: o modelo de origem dela (claude · opus, no catálogo do board) já vem escolhido
   expect(screen.getByRole('combobox', { name: 'Regra a testar' })).toHaveTextContent('Quota da implementação (desligada)');
-  expect(screen.getByRole('combobox', { name: 'Modelo que falha' })).toHaveTextContent(/Opus/);
+  expect(screen.getByRole('combobox', { name: 'Modelo que falha no teste' })).toHaveTextContent(/Opus/);
   await userEvent.click(screen.getByRole('button', { name: 'Simular sem executar' }));
   const scenario = lastSent('executionPolicy.simulate').scenario;
   // a regra desligada é testada como se estivesse ligada; só na cópia da simulação
@@ -196,6 +224,8 @@ it('Testar as regras: a regra escolhida vai como rascunho ligado, com o cenário
     'executionPolicy.simulate',
   );
   await screen.findByText('É preciso reconciliar o trabalho antes de tentar novamente.');
+  expect(screen.getByText('✗ Não passou')).toBeInTheDocument();
+  expect(screen.getByText(/A regra não se aplica a este cenário/)).toBeInTheDocument();
   act(() =>
     useBoardStore.setState({ state: { ...useBoardStore.getState().state!, executionPolicyRevision: 'changed-in-another-window' } }),
   );
@@ -237,7 +267,38 @@ it('Testar as regras avisa quando outra regra, antes na lista, decidiu no lugar 
     'executionPolicy.simulate',
   );
   await screen.findByText(/O board segue com/);
-  expect(screen.getByRole('note')).toHaveTextContent('A regra escolhida não decidiu: a decisão veio de Primeira');
+  expect(screen.getByText('✗ Não passou')).toBeInTheDocument();
+  expect(screen.getByText('Quem decidiu foi a regra Primeira, que vem antes na lista.')).toBeInTheDocument();
+});
+it('Testar as regras diz que passou quando a regra escolhida decidiu como foi configurada', async () => {
+  await open();
+  await userEvent.click(screen.getByText('Testar as regras, pedir sugestão à IA e reservas antigas'));
+  await userEvent.click(screen.getByRole('button', { name: 'Simular sem executar' }));
+  reply(
+    {
+      simulation: {
+        hypothetical: true,
+        problems: [],
+        requested: { state: 'resolved', from: 'card', explicit: true, target: { profileId: 'claude', model: 'opus', effort: null } },
+        decision: {
+          action: 'fallback',
+          reason: 'fallback-permitted',
+          policy: { id: 'quota', revision: 1 },
+          target: { profileId: 'claude', model: 'haiku', effort: null },
+          alternatives: [],
+          rejected: [],
+          budget: null,
+          nextAttempt: 2,
+          notBefore: null,
+          visited: [],
+          consumption: [null],
+        },
+      },
+    },
+    'executionPolicy.simulate',
+  );
+  expect(await screen.findByText('✓ Passou')).toBeInTheDocument();
+  expect(screen.getByText('A regra Quota da implementação decidiu como você configurou.')).toBeInTheDocument();
 });
 it('o editor simula o rascunho dentro de Avançado, sem gravar', async () => {
   await open();
@@ -266,7 +327,12 @@ it('a proposta da IA aparece antes de qualquer gravação e só chega ao editor 
   await userEvent.click(screen.getByRole('button', { name: 'Criar com ajuda de IA' }));
   await userEvent.type(screen.getByRole('textbox', { name: 'Objetivo da política' }), 'trocar quando a quota acabar');
   await userEvent.click(screen.getByRole('button', { name: 'Pedir proposta' }));
-  expect(lastSent('executionPolicy.assist').input).toMatchObject({ mode: 'create', goal: 'trocar quando a quota acabar', draft: null });
+  expect(lastSent('executionPolicy.assist').input).toMatchObject({
+    mode: 'create',
+    goal: 'trocar quando a quota acabar',
+    draft: null,
+    profileId: 'claude',
+  });
   const proposed = { ...policy(), id: 'ia', name: 'Proposta da IA', enabled: false };
   reply({ assistance: { explanation: 'Troca só após a quota.', policy: proposed, problems: [], scenarios: [] } }, 'executionPolicy.assist');
   await screen.findByText('Troca só após a quota.');

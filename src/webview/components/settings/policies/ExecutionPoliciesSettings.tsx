@@ -10,7 +10,8 @@ import { t } from '../../../i18n';
 import { ActionButton, IconArrowDown, IconArrowUp, IconEdit, IconPlus, IconTrash } from '../../ui';
 import { SectionHeader } from '../SectionHeader';
 import { PolicyEditor } from './PolicyEditor';
-import { HOW_LABELS, isAdvanced, offTargetNote, originLabel, targetName } from './parts';
+import { policiesOfProfile } from '../../../../shared/policyAssistant';
+import { EMPTY_TARGET, HOW_LABELS, isAdvanced, offTargetNote, originLabel, profileLabel, targetName } from './parts';
 import { PolicySimulation } from './PolicySimulation';
 import { PolicyAssistant } from './PolicyAssistant';
 
@@ -25,10 +26,10 @@ const newId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(
 const byPriority = (records: ExecutionPolicyRecord[]) => [...records].sort((a, b) => a.policy.priority - b.policy.priority);
 
 /**
- * Regras de fallback: a lista (ordem = prioridade, liga/desliga, editar, excluir) e o editor inline. As políticas
+ * Regras de fallback do agente escolhido em Conectar agentes: cada regra é de um modelo dele que falha. A lista (ordem = prioridade, liga/desliga, editar, excluir) e o editor inline. As políticas
  * continuam versionadas e revisadas no host; a tela só fala em regras ("quando X esgotar a cota, usar Y").
  */
-export function ExecutionPoliciesSettings() {
+export function ExecutionPoliciesSettings({ profileId }: { profileId: string }) {
   const state = useBoardStore((s) => s.state)!;
   const [library, setLibrary] = useState<PolicyLibrary | null>(null);
   const [editor, setEditor] = useState<{ base: ExecutionPolicyRecord | null; initial: ExecutionPolicy } | null>(null);
@@ -54,13 +55,10 @@ export function ExecutionPoliciesSettings() {
     await executionPolicies.remove(row.policy.id, row.revision);
     await reload();
   });
+  const profile = library?.profiles.find((p) => p.id === profileId);
+  const agent = library ? profileLabel(library, profileId) : profileId;
   const newRule = () => {
-    const tool = state.board.aiTool;
-    const model = library!.models.find((m) => m.tool === tool);
-    const usable = (m: { tool: string }) => library!.profiles.some((p) => p.id === m.tool && !p.off);
-    // o primeiro destino: um modelo de outro agente ligado; sem outro agente, outro modelo do mesmo
-    const next =
-      library!.models.find((m) => m.tool !== tool && usable(m)) ?? library!.models.find((m) => m.tool === tool && m !== model && usable(m));
+    // a regra nova começa vazia: a pessoa escolhe o modelo dele que falha e, depois, os que entram no lugar
     const initial: ExecutionPolicy = {
       version: 1,
       id: newId(),
@@ -68,8 +66,8 @@ export function ExecutionPoliciesSettings() {
       enabled: true,
       priority: Math.min(1000000, Math.max(0, ...library!.snapshot.records.map((r) => r.policy.priority)) + 10),
       conditions: {
-        profileIds: [tool],
-        models: model ? [model.model] : [],
+        profileIds: [profileId],
+        models: [],
         actions: [],
         agentIds: [],
         phaseIds: [],
@@ -79,12 +77,12 @@ export function ExecutionPoliciesSettings() {
         explicit: 'include',
       },
       action: 'auto',
-      targets: next ? [{ profileId: next.tool, model: next.model, effort: next.defaultEffort }] : [],
+      targets: [EMPTY_TARGET],
       limits: { maxAttempts: 2, maxElapsedMs: 3600000, backoffMs: 30000, globalProcesses: null, perProfile: {} },
     };
     setEditor({ base: null, initial });
   };
-  const rows = library ? byPriority(library.snapshot.records) : [];
+  const rows = library ? byPriority(policiesOfProfile(library.snapshot.records, profileId)) : [];
   const move = (index: number, delta: number) => {
     const order = [...rows];
     [order[index], order[index + delta]] = [order[index + delta]!, order[index]!];
@@ -106,11 +104,11 @@ export function ExecutionPoliciesSettings() {
     <section>
       <SectionHeader
         id="execution-policies"
-        title={t('Regras de fallback')}
+        title={t('Regras de fallback de {agent}', { agent })}
         actions={
           <ActionButton
-            disabled={!library || editor !== null || !library.models.length}
-            disabledReason={!library?.models.length ? t('Conecte um agente com modelos antes.') : t('Termine a regra que está aberta.')}
+            disabled={!library || editor !== null || !profile?.modelIds.length}
+            disabledReason={!profile?.modelIds.length ? t('Este agente ainda não tem modelos.') : t('Termine a regra que está aberta.')}
             hint={t('Abre o formulário de uma regra nova.')}
             onClick={newRule}
           >
@@ -119,13 +117,15 @@ export function ExecutionPoliciesSettings() {
         }
       >
         {t(
-          'Quando um modelo esgota o limite de uso, o board segue o card em outro modelo, de qualquer agente ligado. Sem regra, o card espera a cota renovar.',
+          'Quando um modelo de {agent} esgota o limite de uso, o board segue o card em outro modelo, de qualquer agente ligado. Sem regra, o card espera a cota renovar.',
+          { agent },
         )}
       </SectionHeader>
 
       {library && editor && (
         <PolicyEditor
           key={editor.initial.id}
+          profileId={profileId}
           initial={editor.initial}
           base={editor.base}
           library={library}
@@ -273,7 +273,7 @@ export function ExecutionPoliciesSettings() {
             {!rows.length && (
               <tr>
                 <td colSpan={6} className="muted">
-                  {t('Nenhuma regra: ao esgotar a cota, o card espera a renovação.')}
+                  {t('Nenhuma regra para {agent}: ao esgotar a cota, o card espera a renovação.', { agent })}
                 </td>
               </tr>
             )}
@@ -285,10 +285,11 @@ export function ExecutionPoliciesSettings() {
         <details className="fallback-extras">
           <summary>{t('Testar as regras, pedir sugestão à IA e reservas antigas')}</summary>
           <div className="fallback-advanced-body">
-            <PolicySimulation policy={null} library={library} />
+            <PolicySimulation profileId={profileId} policy={null} library={library} />
             <section>
               <h4>{t('Pedir sugestão à IA')}</h4>
               <PolicyAssistant
+                profileId={profileId}
                 modes={['create', 'conflicts']}
                 draft={null}
                 library={library}

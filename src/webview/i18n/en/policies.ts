@@ -3,14 +3,12 @@ export const policies: Record<string, string> = {
   'Monte uma regra primeiro: o teste simula a regra escolhida.': 'Build a rule first: the test simulates the chosen rule.',
   'Regra a testar': 'Rule to test',
   desligada: 'off',
-  'A regra escolhida não decidiu: a decisão veio de {name}, que vem antes na lista.':
-    'The chosen rule did not decide: the decision came from {name}, which comes earlier in the list.',
-  'A regra escolhida não se aplica a este cenário.': 'The chosen rule does not apply to this scenario.',
   'Testar as regras': 'Test the rules',
   'Se este modelo esgotar a cota agora, o que esta regra faz? Sem iniciar IA nem gravar nada.':
     'If this model ran out of quota right now, what would this rule do? Without starting AI or saving anything.',
-  'Se este modelo esgotar a cota agora, o que o board faz? Sem iniciar IA nem gravar nada: a decisão das regras salvas e ligadas.':
-    'If this model ran out of quota right now, what would the board do? Without starting AI or saving anything: the decision of the saved, enabled rules.',
+  'Escolha a regra e o cenário: o teste diz se ela decide como você configurou. Sem iniciar IA nem gravar nada.':
+    'Choose the rule and the scenario: the test says whether it decides as you configured it. Without starting AI or saving anything.',
+  'Sai do modelo que falha e do destino': 'Comes from the model that fails and the target',
   'Modelo que falha': 'Failing model',
   'Qualquer fase': 'Any phase',
   'Qualquer tipo': 'Any type',
@@ -182,9 +180,6 @@ export const policies: Record<string, string> = {
   // Regras de fallback: a lista
   'O host não devolveu as regras.': 'The host did not return the rules.',
   'Regras de fallback': 'Fallback rules',
-  'Conecte um agente com modelos antes.': 'Connect an agent with models first.',
-  'Quando um modelo esgota o limite de uso, o board segue o card em outro modelo, de qualquer agente ligado. Sem regra, o card espera a cota renovar.':
-    'When a model runs out of usage quota, the board continues the card on another model, from any enabled agent. Without a rule, the card waits for the quota to renew.',
   'Lendo regras…': 'Reading rules…',
   'Usa no lugar': 'Uses instead',
   Como: 'How',
@@ -199,20 +194,14 @@ export const policies: Record<string, string> = {
   'Remover a regra "{name}"?': 'Remove the rule "{name}"?',
   'A regra deixa a lista. As versões anteriores ficam guardadas.': 'The rule leaves the list. Earlier versions are kept.',
   'Remover regra': 'Remove rule',
-  'Nenhuma regra: ao esgotar a cota, o card espera a renovação.': 'No rules: when the quota runs out, the card waits for it to renew.',
   'Testar as regras, pedir sugestão à IA e reservas antigas': 'Test the rules, ask the AI for a suggestion, and old fallbacks',
   'Pedir sugestão à IA': 'Ask the AI for a suggestion',
   'Cada reserva de regra antiga virou uma regra desligada e pendente de revisão. Nada troca de agente até você revisar e ligar a regra; as condições da regra de sugestão (campos e tipo do card) não foram copiadas.':
     'Each old rule fallback became a disabled rule pending review. Nothing switches agent until you review and enable the rule; the suggestion rule conditions (card fields and type) were not copied.',
   // Regras de fallback: o editor
   'A regra foi removida. Seu rascunho foi preservado.': 'The rule was removed. Your draft has been preserved.',
-  'Um destino é igual ao modelo que falhou: escolha outro modelo.': 'A target is the same as the model that failed: choose another model.',
   'Regra de fallback': 'Fallback rule',
   '1. Quando este modelo esgotar a cota': '1. When this model runs out of quota',
-  'Modelo que falhou': 'Model that failed',
-  'Várias origens (regra avançada)': 'Several sources (advanced rule)',
-  'Uma origem por regra. Para outro modelo, monte outra regra: a primeira da lista que casar vence.':
-    'One source per rule. For another model, build another rule: the first matching rule in the list wins.',
   '2. Usar no lugar, nesta ordem': '2. Use instead, in this order',
   'Esta regra não troca de modelo (veja a ação em Avançado).': 'This rule does not switch model (see the action under Advanced).',
   'Modelo {number}': 'Model {number}',
@@ -224,8 +213,6 @@ export const policies: Record<string, string> = {
   'Remover destino {number}': 'Remove target {number}',
   'É o mesmo modelo que falhou: escolha outro.': 'It is the same model that failed: choose another.',
   'Outro modelo': 'Another model',
-  'Vale qualquer modelo de qualquer agente. A troca só acontece com o agente do destino ligado em Conectar agentes.':
-    'Any model of any agent works. The switch only happens with the target agent enabled in Connect agents.',
   '3. Como trocar': '3. How to switch',
   'Como trocar': 'How to switch',
   'o card segue no próximo modelo sem perguntar': 'the card continues on the next model without asking',
@@ -255,8 +242,6 @@ export const policies: Record<string, string> = {
   'Adicionar à lista': 'Add to the list',
   // Regras de fallback: a frase e os rótulos
   desligado: 'off',
-  'Qualquer modelo, de qualquer agente': 'Any model, from any agent',
-  'Qualquer modelo de {agent}': 'Any model of {agent}',
   'qualquer modelo': 'any model',
   'qualquer agente': 'any agent',
   'qualquer modelo de {agent}': 'any model of {agent}',
@@ -273,4 +258,31 @@ export const policies: Record<string, string> = {
   'Pergunta antes': 'Asks first',
   'Bloqueia o card': 'Blocks the card',
   'Espera e tenta de novo': 'Waits and tries again',
+  'Regras de fallback de {agent}': '{agent} fallback rules',
+  'Este agente ainda não tem modelos.': 'This agent has no models yet.',
+  'Quando um modelo de {agent} esgota o limite de uso, o board segue o card em outro modelo, de qualquer agente ligado. Sem regra, o card espera a cota renovar.':
+    'When a {agent} model runs out of usage, the board continues the card on another model, from any enabled agent. Without a rule, the card waits for the quota to renew.',
+  'Nenhuma regra para {agent}: ao esgotar a cota, o card espera a renovação.':
+    'No rules for {agent}: when the quota runs out, the card waits for it to renew.',
+  'Escolha o modelo que falha.': 'Choose the model that fails.',
+  'Escolha ao menos um modelo para usar no lugar.': 'Choose at least one model to use instead.',
+  'Escolha o modelo de cada linha de "Usar no lugar", ou remova a linha vazia.':
+    'Choose the model on each "Use instead" row, or remove the empty row.',
+  'Um modelo de destino é o mesmo modelo que falha.': 'A target model is the same model that fails.',
+  'A regra precisa de um modelo que falha, de um agente só.': 'The rule needs one model that fails, from a single agent.',
+  'Escolha um modelo de {agent}': 'Choose a {agent} model',
+  'Só os modelos de {agent}: as regras desta tela são dele. Para outro modelo, monte outra regra.':
+    'Only {agent} models: the rules on this screen belong to it. For another model, build another rule.',
+  'Escolha o modelo': 'Choose the model',
+  'Vale qualquer modelo de qualquer agente, menos o que falha. A troca só acontece com o agente do destino ligado em Conectar agentes.':
+    'Any model from any agent works, except the one that fails. The switch only happens with the target agent enabled in Connect agents.',
+  'Modelo que falha no teste': 'Model that fails in the test',
+  'Complete a regra para testar: {missing}': 'Complete the rule to test it: {missing}',
+  Passou: 'Passed',
+  'Não passou': 'Failed',
+  'A regra {name} decidiu como você configurou.': 'The {name} rule decided as you configured it.',
+  'Quem decidiu foi a regra {name}, que vem antes na lista.': 'The {name} rule decided instead, because it comes earlier in the list.',
+  'A regra não se aplica a este cenário: confira o modelo que falha, a fase e o tipo de card.':
+    'The rule does not apply to this scenario: check the model that fails, the phase and the card type.',
+  'A regra se aplicou, mas não deu para seguir como ela pede.': 'The rule applied, but the board could not proceed as it asks.',
 };

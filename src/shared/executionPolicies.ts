@@ -194,6 +194,19 @@ export function validateExecutionPolicy(v: unknown): asserts v is ExecutionPolic
   )
     fail();
 }
+/**
+ * A regra de fallback como a pessoa a cadastra: de um modelo só (o que falha, de um agente) para outros modelos,
+ * nunca para ele mesmo. O validador de formato aceita mais (várias origens, de propostas e reservas antigas); esta é a
+ * regra que a tela e o salvamento pela pessoa exigem. Devolve o motivo, ou null.
+ */
+export function fallbackRuleProblem(p: ExecutionPolicy): string | null {
+  const { profileIds, models } = p.conditions;
+  if (profileIds.length !== 1 || models.length !== 1 || models[0] === null)
+    return 'A regra precisa de um modelo que falha, de um agente só.';
+  if (p.targets.some((t) => t.profileId === profileIds[0] && t.model === models[0]))
+    return 'Um modelo de destino é o mesmo modelo que falha.';
+  return null;
+}
 export function validateExecutionPolicySnapshot(value: unknown): asserts value is ExecutionPolicySnapshot {
   if (!keys(value, ['version', 'records']) || value.version !== 1 || !Array.isArray(value.records) || value.records.length > 200)
     throw new Error('Snapshot de políticas inválido.');

@@ -3070,6 +3070,25 @@ body.host-web .drawer {
 .fallback-simulation .fallback-sentence p {
   margin: 0 0 var(--sp-4);
 }
+/* o veredito do teste vem antes do detalhe: o selo diz se passou, a frase diz por quê */
+.fallback-verdict {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-8);
+}
+/* a borda da caixa do resultado acompanha o veredito, para ele se ver de longe */
+.fallback-sentence:has(.fallback-verdict.pass) {
+  border-left-color: var(--success);
+}
+.fallback-sentence:has(.fallback-verdict.fail) {
+  border-left-color: var(--error);
+}
+.fallback-verdict.pass strong {
+  color: var(--success);
+}
+.fallback-verdict.fail strong {
+  color: var(--error);
+}
 .fallback-history {
   margin: 0;
   padding-left: var(--sp-16);

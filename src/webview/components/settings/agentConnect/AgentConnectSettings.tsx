@@ -329,7 +329,8 @@ export function AgentConnectSettings() {
         )}
       </div>
       <ModelSuggestion />
-      <ExecutionPoliciesSettings />
+      {/* as regras de fallback são do agente escolhido: cada uma parte de um modelo dele que falha */}
+      {item?.profile && <ExecutionPoliciesSettings key={item.profile.id} profileId={item.profile.id} />}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Card, IconButton, RadioGroup, Text, TextField } from '@radix-ui/themes';
 import {
   POLICY_FAILURES,
+  fallbackRuleProblem,
   validateExecutionPolicy,
   type ExecutionPolicy,
   type ExecutionPolicyRecord,
@@ -25,8 +26,8 @@ import {
   ORIGIN_LABELS,
   defaultName,
   offTargetNote,
+  EMPTY_TARGET,
   originGroups,
-  anyOriginChoice,
   originConditions,
   originOf,
   profileLabel,
@@ -38,14 +39,13 @@ import {
 import { PolicySimulation } from './PolicySimulation';
 import { PolicyAssistant } from './PolicyAssistant';
 
-const MANY_ORIGINS = '__many';
-
 /**
  * O editor de uma regra de fallback, em três blocos (quando, usar no lugar, como trocar) e um Avançado fechado. Salvar
  * pela tela é a revisão humana (`reviewed: true`): o repositório já recusa a gravação por IA. O conflito de versão
  * (`expectedRevision`) mantém o rascunho e oferece recarregar a base.
  */
 export function PolicyEditor({
+  profileId,
   initial,
   base,
   library,
@@ -53,6 +53,8 @@ export function PolicyEditor({
   onReload,
   onCancel,
 }: {
+  /** o agente da tela: a regra é de um modelo dele */
+  profileId: string;
   initial: ExecutionPolicy;
   base: ExecutionPolicyRecord | null;
   library: PolicyLibrary;
@@ -71,6 +73,8 @@ export function PolicyEditor({
   const save = useAction(async () => {
     const policy = { ...draft, name };
     validateExecutionPolicy(policy);
+    const problem = fallbackRuleProblem(policy);
+    if (problem) throw new Error(problem);
     await executionPolicies.save(policy, baseVersion?.revision ?? 0, true);
     await onSaved();
   });
@@ -101,17 +105,27 @@ export function PolicyEditor({
     [targets[a], targets[b]] = [targets[b]!, targets[a]!];
     change({ targets });
   };
-  const origin = originOf(draft.conditions);
-  const origins = originGroups(library);
-  const targets = targetGroups(library);
-  const originKey = origin !== null ? originConditions(origin) : null;
-  const sameAsOrigin = (target: ExecutionTarget) =>
-    !!originKey && originKey.profileIds[0] === target.profileId && (originKey.models.length === 0 || originKey.models[0] === target.model);
+  // a origem vale só quando é um modelo deste agente; a regra antiga com outra origem abre sem origem escolhida
+  const raw = originOf(draft.conditions);
+  const originKey = raw !== null && raw.startsWith(`m:${profileId}:`) ? originConditions(raw) : null;
+  const origin = originKey ? { profileId, model: originKey.models[0]! } : null;
+  const origins = originGroups(library, profileId);
+  const sameAsOrigin = (target: ExecutionTarget) => !!origin && origin.profileId === target.profileId && origin.model === target.model;
   const routing = ['auto', 'offer'].includes(draft.action);
+  // o que impede salvar, na ordem em que a pessoa preenche
+  const missing = !origin
+    ? t('Escolha o modelo que falha.')
+    : routing && !draft.targets.length
+      ? t('Escolha ao menos um modelo para usar no lugar.')
+      : routing && draft.targets.some((target) => !target.profileId)
+        ? t('Escolha o modelo de cada linha de "Usar no lugar", ou remova a linha vazia.')
+        : routing && draft.targets.some(sameAsOrigin)
+          ? t('Um modelo de destino é o mesmo modelo que falha.')
+          : null;
   const submit = () => {
     try {
+      if (missing) throw new Error(missing);
       validateExecutionPolicy({ ...draft, name });
-      if (routing && draft.targets.some(sameAsOrigin)) throw new Error(t('Um destino é igual ao modelo que falhou: escolha outro modelo.'));
       setValidation('');
       void save.run();
     } catch (error) {
@@ -128,7 +142,7 @@ export function PolicyEditor({
               id={id}
               autoFocus
               value={named ? draft.name : ''}
-              placeholder={defaultName(draft, library)}
+              placeholder={origin ? defaultName(draft, library) : t('Sai do modelo que falha e do destino')}
               onChange={(e) => {
                 setNamed(e.target.value !== '');
                 change({ name: e.target.value });
@@ -142,16 +156,24 @@ export function PolicyEditor({
       <section className="fallback-block">
         <h4>{t('1. Quando este modelo esgotar a cota')}</h4>
         <Choice
-          label={t('Modelo que falhou')}
-          value={origin ?? MANY_ORIGINS}
-          choices={[anyOriginChoice(), ...(origin === null ? [{ value: MANY_ORIGINS, label: t('Várias origens (regra avançada)') }] : [])]}
+          label={t('Modelo que falha')}
+          value={origin ? `m:${origin.profileId}:${origin.model}` : ''}
+          placeholder={t('Escolha um modelo de {agent}', { agent: profileLabel(library, profileId) })}
+          choices={[]}
           groups={origins}
           onChange={(v) => {
-            if (v !== MANY_ORIGINS) condition(originConditions(v));
+            if (v === raw) return;
+            // outro modelo que falha: os destinos voltam ao começo, sem escolha (o antigo podia ser o novo modelo)
+            change({
+              conditions: { ...draft.conditions, ...originConditions(v) },
+              targets: routing ? [EMPTY_TARGET] : [],
+            });
           }}
         />
         <Text as="p" size="1" color="gray">
-          {t('Uma origem por regra. Para outro modelo, monte outra regra: a primeira da lista que casar vence.')}
+          {t('Só os modelos de {agent}: as regras desta tela são dele. Para outro modelo, monte outra regra.', {
+            agent: profileLabel(library, profileId),
+          })}
         </Text>
       </section>
 
@@ -164,14 +186,22 @@ export function PolicyEditor({
               const profile = library.profiles.find((p) => p.id === target.profileId);
               const option = library.models.find((m) => profile?.modelIds.includes(m.id) && m.model === target.model);
               const key = targetKeyOf(target);
-              const known = targets.some((g) => g.options.some((c) => c.value === key));
-              const off = offTargetNote(library, target.profileId);
+              // cada linha oferece todos os modelos, menos o que falha e os escolhidos nas outras linhas
+              const targets = targetGroups(
+                library,
+                origin,
+                draft.targets.filter((other, i) => i !== index && other.profileId).map(targetKeyOf),
+              );
+              const known = !target.profileId || targets.some((g) => g.options.some((c) => c.value === key));
+              const off = target.profileId ? offTargetNote(library, target.profileId) : null;
               return (
                 <li key={index} className="fallback-target">
                   <span className="fallback-target-number">{index + 1}</span>
                   <Choice
                     label={t('Modelo {number}', { number: index + 1 })}
                     value={key}
+                    placeholder={t('Escolha o modelo')}
+                    disabled={!origin}
                     choices={known ? [] : [{ value: key, label: t('Ausente: {name}', { name: targetName(library, target) }) }]}
                     groups={targets}
                     onChange={(v) => {
@@ -185,6 +215,7 @@ export function PolicyEditor({
                   <Choice
                     label={t('Esforço')}
                     value={target.effort ?? '__default'}
+                    disabled={!target.profileId}
                     choices={[
                       { value: '__default', label: t('Padrão do modelo') },
                       ...(option?.efforts.map((value) => ({ value, label: value })) ?? []),
@@ -245,30 +276,17 @@ export function PolicyEditor({
             <Button
               variant="soft"
               size="1"
-              disabled={draft.targets.length >= 100}
-              onClick={() => {
-                const next = library.models.find(
-                  (m) =>
-                    !sameAsOrigin({ profileId: m.tool, model: m.model, effort: null }) &&
-                    !draft.targets.some((target) => target.profileId === m.tool && target.model === m.model) &&
-                    library.profiles.some((p) => p.id === m.tool && !p.off),
-                );
-                change({
-                  targets: [
-                    ...draft.targets,
-                    next
-                      ? { profileId: next.tool, model: next.model, effort: next.defaultEffort }
-                      : { profileId: library.profiles[0]!.id, model: null, effort: null },
-                  ],
-                });
-              }}
+              disabled={!origin || draft.targets.length >= 100 || draft.targets.some((target) => !target.profileId)}
+              onClick={() => change({ targets: [...draft.targets, EMPTY_TARGET] })}
             >
               <IconPlus /> {t('Outro modelo')}
             </Button>
           </div>
         )}
         <Text as="p" size="1" color="gray">
-          {t('Vale qualquer modelo de qualquer agente. A troca só acontece com o agente do destino ligado em Conectar agentes.')}
+          {t(
+            'Vale qualquer modelo de qualquer agente, menos o que falha. A troca só acontece com o agente do destino ligado em Conectar agentes.',
+          )}
         </Text>
       </section>
 
@@ -298,7 +316,12 @@ export function PolicyEditor({
             label={t('Ação')}
             value={draft.action}
             choices={(['auto', 'offer', 'block', 'wait'] as const).map((value) => ({ value, label: t(HOW_LABELS[value]) }))}
-            onChange={(v) => change({ action: v as ExecutionPolicy['action'], ...(['block', 'wait'].includes(v) ? { targets: [] } : {}) })}
+            onChange={(v) =>
+              change({
+                action: v as ExecutionPolicy['action'],
+                ...(['block', 'wait'].includes(v) ? { targets: [] } : !draft.targets.length ? { targets: [EMPTY_TARGET] } : {}),
+              })
+            }
           />
           <Checks
             label={t('Tipos de falha')}
@@ -420,6 +443,7 @@ export function PolicyEditor({
             ))}
           </div>
           <PolicyAssistant
+            profileId={profileId}
             modes={['fallbacks', 'conflicts']}
             draft={draft}
             library={library}
@@ -431,7 +455,7 @@ export function PolicyEditor({
               setValidation('');
             }}
           />
-          <PolicySimulation policy={{ ...draft, name }} library={library} />
+          <PolicySimulation profileId={profileId} policy={{ ...draft, name }} incomplete={missing} library={library} />
           {baseVersion && (
             <section>
               <h5>{t('Versões anteriores')}</h5>
@@ -474,7 +498,8 @@ export function PolicyEditor({
         </div>
       </details>
 
-      <p className="fallback-sentence">{ruleSentence({ ...draft, name }, library)}</p>
+      <p className="fallback-sentence">{origin ? ruleSentence({ ...draft, name }, library) : t('Escolha o modelo que falha.')}</p>
+      {missing && origin && !validation && <p className="muted small">{missing}</p>}
       {validation && <p role="alert">{t(validation)}</p>}
       {save.error && (
         <p role="alert">
@@ -491,7 +516,7 @@ export function PolicyEditor({
         <Button variant="soft" color="gray" disabled={save.busy} onClick={onCancel}>
           {t('Cancelar')}
         </Button>
-        <Button disabled={save.busy || refreshBase.busy} onClick={submit}>
+        <Button disabled={save.busy || refreshBase.busy || !!missing} title={missing ?? undefined} onClick={submit}>
           {save.busy ? t('Salvando…') : baseVersion ? t('Salvar regra') : t('Adicionar à lista')}
         </Button>
       </div>

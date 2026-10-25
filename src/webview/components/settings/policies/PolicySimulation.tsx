@@ -5,6 +5,7 @@ import { POLICY_FAILURES } from '../../../../shared/executionPolicies';
 import { CONTEXT_ACTIONS } from '../../../../shared/contextPlanning';
 import { CONTEXT_ACTION_LABELS } from '../../../../shared/contextPlan';
 import type { PolicyLibrary, PolicyScenario, PolicySimulation as Simulation } from '../../../../shared/policyManagement';
+import { policiesOfProfile } from '../../../../shared/policyAssistant';
 import { requestExecutionPolicy } from '../../../request';
 import { useAction } from '../../../useAction';
 import { t } from '../../../i18n';
@@ -52,17 +53,33 @@ function scenarioOf(rule: ExecutionPolicy, library: PolicyLibrary, base: Scenari
   };
 }
 
-export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy | null; library: PolicyLibrary }) {
+/** O que a regra faz quando decide: o teste passa quando foi ela que decidiu, e decidiu isso. */
+const EXPECTED: Record<ExecutionPolicy['action'], string> = { auto: 'fallback', offer: 'offer', block: 'block', wait: 'wait' };
+
+export function PolicySimulation({
+  profileId,
+  policy,
+  incomplete,
+  library,
+}: {
+  /** o agente da tela: o teste é do modelo dele que falha */
+  profileId: string;
+  policy: ExecutionPolicy | null;
+  /** no editor: o que falta na regra antes de dar para testar */
+  incomplete?: string | null;
+  library: PolicyLibrary;
+}) {
   const state = useBoardStore((s) => s.state)!;
-  const first = library.models[0];
+  const profile = library.profiles.find((p) => p.id === profileId);
+  const first = library.models.find((m) => profile?.modelIds.includes(m.id)) ?? library.models[0];
   // sem rascunho (a seção): a pessoa escolhe qual regra salva testar; a regra escolhida vai como rascunho
   // ligado, para a desligada ser testada como se estivesse ligada
-  const records = library.snapshot.records;
+  const records = policiesOfProfile(library.snapshot.records, profileId);
   const [ruleId, setRuleId] = useState<string | null>(policy ? null : (records[0]?.policy.id ?? null));
   const selected = policy ? null : (records.find((r) => r.policy.id === ruleId)?.policy ?? null);
   const base: Scenario = {
     sourceValue: first ? `${first.tool}:${first.model}${first.defaultEffort ? `@${first.defaultEffort}` : ''}` : '',
-    defaultProfileId: state.board.aiTool,
+    defaultProfileId: profileId,
     explicit: true,
     context: { action: 'work', origin: 'manual', agentId: null, phaseId: null, cardTypeId: null },
     failure: 'quota',
@@ -97,19 +114,26 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
   });
   const change = (patch: Partial<typeof scenario>) => setScenario({ ...scenario, ...patch });
   const context = (patch: Partial<PolicyScenario['context']>) => change({ context: { ...scenario.context, ...patch } });
-  const modelGroups = modelGroupsOf(library);
+  const modelGroups = modelGroupsOf(library, profileId);
   const ruleName = (id: string) =>
     id === policy?.id ? policy.name : (library.snapshot.records.find((r) => r.policy.id === id)?.policy.name ?? id);
   const decision = result?.value.decision;
+  // a regra em teste: a do editor ou a escolhida na lista
+  const rule = policy ?? selected;
+  const passed =
+    !!rule &&
+    !!decision &&
+    decision.policy?.id === rule.id &&
+    decision.action === EXPECTED[rule.action] &&
+    (decision.action !== 'fallback' || !!decision.target) &&
+    (decision.action !== 'offer' || decision.alternatives.length > 0);
   return (
     <section aria-label={policy ? t('Simular esta regra') : t('Testar as regras')} className="fallback-simulation">
       <h4>{policy ? t('Simular esta regra') : t('Testar as regras')}</h4>
       <p className="muted">
         {policy
           ? t('Se este modelo esgotar a cota agora, o que esta regra faz? Sem iniciar IA nem gravar nada.')
-          : t(
-              'Se este modelo esgotar a cota agora, o que o board faz? Sem iniciar IA nem gravar nada: a decisão das regras salvas e ligadas.',
-            )}
+          : t('Escolha a regra e o cenário: o teste diz se ela decide como você configurou. Sem iniciar IA nem gravar nada.')}
       </p>
       {!policy && records.length === 0 && <p className="muted">{t('Monte uma regra primeiro: o teste simula a regra escolhida.')}</p>}
       {!policy && records.length > 0 && (
@@ -127,7 +151,7 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
       )}
       <div className="fallback-grid">
         <Choice
-          label={t('Modelo que falha')}
+          label={t('Modelo que falha no teste')}
           value={scenario.sourceValue || '__default'}
           choices={[{ value: '__default', label: t('Modelo padrão') }]}
           groups={modelGroups}
@@ -244,15 +268,28 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
         </div>
       </details>
       <div className="actions-toolbar">
-        <Button disabled={simulate.busy || (!policy && !selected)} onClick={() => void simulate.run()}>
+        <Button disabled={simulate.busy || (!policy && !selected) || !!incomplete} onClick={() => void simulate.run()}>
           {simulate.busy ? t('Simulando…') : t('Simular sem executar')}
         </Button>
       </div>
+      {incomplete && <p className="muted small">{t('Complete a regra para testar: {missing}', { missing: incomplete })}</p>}
       {simulate.error && <p role="alert">{t(simulate.error)}</p>}
       {result && decision && (
         <div role="status" className="fallback-sentence">
           {result.inputs !== fingerprint && (
             <p className="muted">{t('Resultado desatualizado: simule novamente após alterar o cenário ou a política.')}</p>
+          )}
+          {rule && (
+            <p className={`fallback-verdict ${passed ? 'pass' : 'fail'}`}>
+              <strong>{passed ? `✓ ${t('Passou')}` : `✗ ${t('Não passou')}`}</strong>
+              {passed
+                ? t('A regra {name} decidiu como você configurou.', { name: rule.name })
+                : decision.policy && decision.policy.id !== rule.id
+                  ? t('Quem decidiu foi a regra {name}, que vem antes na lista.', { name: ruleName(decision.policy.id) })
+                  : !decision.policy
+                    ? t('A regra não se aplica a este cenário: confira o modelo que falha, a fase e o tipo de card.')
+                    : t('A regra se aplicou, mas não deu para seguir como ela pede.')}
+            </p>
           )}
           {decision.action === 'fallback' && decision.target ? (
             <p>
@@ -267,14 +304,6 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
                 ` ${t('Pela regra {name} (versão {version}).', { name: ruleName(decision.policy.id), version: decision.policy.revision })}`}
             </p>
           )}
-          {selected && decision.policy && decision.policy.id !== selected.id && (
-            <p role="note">
-              {t('A regra escolhida não decidiu: a decisão veio de {name}, que vem antes na lista.', {
-                name: ruleName(decision.policy.id),
-              })}
-            </p>
-          )}
-          {selected && !decision.policy && <p role="note">{t('A regra escolhida não se aplica a este cenário.')}</p>}
           {decision.target && offTargetNote(library, decision.target.profileId) && (
             <p role="note">{offTargetNote(library, decision.target.profileId)}</p>
           )}

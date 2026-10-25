@@ -2,6 +2,7 @@ import type { Database } from 'sql.js';
 import type { ModelOption } from '../../shared/models';
 import {
   executionPolicyProblems,
+  fallbackRuleProblem,
   targetProblem,
   validateExecutionPolicy,
   validateExecutionPolicySnapshot,
@@ -81,6 +82,13 @@ export class ExecutionPolicyRepo {
     const old = one(this.db, 'SELECT * FROM execution_policies WHERE id = ?', [input.policy.id]);
     if (old && (old.board_id !== boardId || old.deleted_at !== null)) throw new Error('Política indisponível neste board.');
     if ((old ? num(old.revision) : 0) !== input.expectedRevision) throw new Error('A política mudou. Releia antes de salvar.');
+    // a regra editada pela pessoa é de um modelo só (o que falha) e nunca volta para ele mesmo. Só a mudança de
+    // conteúdo passa por isso: ligar, desligar e reordenar uma regra antiga continua valendo como estava.
+    const content = (p: ExecutionPolicy) => JSON.stringify({ ...p, enabled: null, priority: null });
+    if (input.reviewed && (!old || content(JSON.parse(String(old.policy_json))) !== content(input.policy))) {
+      const problem = fallbackRuleProblem(input.policy);
+      if (problem) throw new Error(problem);
+    }
     if (input.reviewed && input.policy.enabled)
       for (const target of input.policy.targets)
         if (targetProblem(target, catalog.profiles, catalog.models))

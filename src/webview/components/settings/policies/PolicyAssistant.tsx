@@ -28,12 +28,15 @@ const ELIGIBILITY_LABELS: Record<PolicyScenario['eligibility'], string> = {
  * O editor manual não depende deste painel nem de executor admissível.
  */
 export function PolicyAssistant({
+  profileId,
   modes,
   draft,
   library,
   applyLabel,
   onApply,
 }: {
+  /** o agente da tela: a IA vê e propõe só as regras do modelo dele que falha */
+  profileId: string;
   modes: PolicyAssistMode[];
   draft: ExecutionPolicy | null;
   library: PolicyLibrary;
@@ -47,7 +50,7 @@ export function PolicyAssistant({
   const ask = useAction(async (next: PolicyAssistMode) => {
     setResult(null);
     const reply = await requestExecutionPolicy(
-      { type: 'executionPolicy.assist', input: { mode: next, goal, draft, language: getLocale() } },
+      { type: 'executionPolicy.assist', input: { mode: next, goal, draft, language: getLocale(), profileId } },
       (state.board.runner.timeoutMinutes + 1) * 60_000,
     );
     if (!reply.assistance) throw new Error(t('A IA não devolveu uma proposta.'));

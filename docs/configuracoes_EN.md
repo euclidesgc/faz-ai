@@ -32,8 +32,8 @@ goes to its model's agent (the card's, the harness agent's or the suggestion rul
 that runs the cards with no model, with its mode, the connection summary, the account and the other
 enabled agents that also run cards. Below, on the left, the list of agents; on the right, the chosen agent, with
 the **Conexão** (connection), **Modelos** (models), **Testar** (test) and **Detalhes** (details) tabs.
-The model suggestion rules and the fallback rules, which apply to the whole board, sit
-at the end of the screen.
+The model suggestion rules, which apply to the whole board, and the fallback rules of the agent
+chosen in the list sit at the end of the screen.
 
 ### The list
 
@@ -300,19 +300,25 @@ quota 403 and Cursor's `ActionRequiredError: You've hit your usage limit` refusa
 the agent quota is separate from the dashboard's usage bar: it can run out with the bar at half).
 The **fallback rules** live
 under **Configurações → Conectar agentes** (Settings → Connect agents), right below the model
-suggestion rules, as a list: the order is the priority (the first matching rule wins), and each row
+suggestion rules, and belong to the agent chosen in the list: each rule starts from one of its
+models that fails, and the section shows only its rules (old rules without an agent show up on every
+agent). They sit in a list: the order is the priority (the first matching rule wins), and each row
 shows **when** ("Claude Code · CLI · Opus 5.5 runs out of quota"), what the board **uses instead**
 ("Gemini · API · Pro, then Cursor · CLI · Auto") and **how** (switches by itself or asks first), with
 the switch to enable and disable, move up, move down, edit and remove.
 
 **Montar nova regra** (build new rule) opens the editor on the same screen, in three steps:
 
-1. **When this model runs out of quota**: the model that failed. One source per rule: any model, any
-   model of one agent, or one model of one agent. For another model, build another rule.
+1. **When this model runs out of quota**: the model that fails, among the models of the agent on the
+   screen. One source per rule; for another model, build another rule. A new rule starts with no model.
 2. **Use instead, in this order**: the list of models that replace the failed one, from any agent on
-   the board. If the first one fails too, the board tries the next. A target equal to the model that
-   failed does not save. A target on a turned-off agent shows a warning in the list and in the editor:
-   the rule saves, but the switch only happens after you turn the agent on in Connect agents.
+   the board, including other models of the same agent. Each row offers every model except the one
+   that fails and those already chosen on other rows, and changing the model that fails resets the
+   list to one empty row. If the first one fails too, the board tries the next. Without the model that
+   fails, with an empty row, or with a target equal to the model that fails, the rule does not save:
+   the button is off with the reason, and the host refuses the same save. A target on a turned-off
+   agent shows a warning in the list and in the editor: the rule saves, but the switch only happens
+   after you turn the agent on in Connect agents.
 3. **How to switch**: **Switches by itself** (the card continues on the next model without asking) or
    **Asks first** (the card stays with you, with the options in the conversation).
 
@@ -345,8 +351,12 @@ The runner, the chat and the assistants ("Sugerir agentes, regras ou skills", su
 or skills; "Indicar artefatos", suggest artifacts) decide the switch through this same evaluator:
 with an enabled, applicable rule the run continues on its target; without a rule, the failure blocks
 and nothing runs on another target. At the end of the section, **Testar as regras** (test the rules)
-simulates the next run with only the saved and enabled rules, without spending tokens or opening the
-CLI, and **Criar com ajuda de IA** (create with AI help) asks the AI only for a proposal (a draft with
+simulates the next run with the chosen rule (of the agent on the screen), without spending tokens or
+opening the CLI, and says **Passou** (passed) when that rule decided, the way it was configured, or
+**Não passou** (failed) with the reason (an earlier rule in the list decided, the rule does not apply
+to the scenario, or it applied but the board could not proceed). **Revisar conflitos** (review
+conflicts) only looks at the rules of the agent on the screen: rules of different agents start from
+different models and never compete for the same failure. **Criar com ajuda de IA** (create with AI help) asks the AI only for a proposal (a draft with
 explanation, differences and simulated examples, without secrets): it goes through the editor's
 validator and nothing is saved until you open the proposal in the editor and save. The AI also reads
 the rules over MCP (`get_execution_policies`, read-only).

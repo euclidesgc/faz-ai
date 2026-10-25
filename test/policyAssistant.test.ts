@@ -87,6 +87,31 @@ describe('assistente de políticas', () => {
     expect(() => run(reply(clash), input())).toThrow(/ambígua/);
   });
 
+  it('na tela de um agente, a IA vê só as regras dele e a proposta tem de falhar num modelo dele', () => {
+    const save = (p: ReturnType<typeof policy>) =>
+      router.handle({ type: 'settings.executionPolicy.save', policy: p, expectedRevision: 0, reviewed: true });
+    save(policy({ action: 'offer', targets: [alternative] }));
+    save(
+      policy({
+        id: 'do-cursor',
+        name: 'Do Cursor',
+        action: 'offer',
+        conditions: { ...policy().conditions, profileIds: ['cursor'], models: ['composer'] },
+        targets: [alternative],
+      }),
+    );
+    const state = router.snapshot();
+    const snapshot = router.executionPolicyLibrary().snapshot;
+    const prompt = policyAssistancePrompt(input({ profileId: 'claude' }), state, snapshot);
+    expect(prompt).toContain('Quota da implementação');
+    expect(prompt).not.toContain('Do Cursor');
+    const fromCursor = { ...base(), conditions: { ...base().conditions, profileIds: ['cursor'], models: ['composer'] } };
+    expect(() => run(reply(fromCursor), input({ profileId: 'claude' }))).toThrow(/deste agente/);
+    const toItself = { ...base(), priority: 50, targets: [{ profileId: 'claude', model: 'opus', effort: null }] };
+    expect(() => run(reply(toItself), input({ profileId: 'claude' }))).toThrow(/deste agente/);
+    expect(run(reply({ ...base(), priority: 50 }), input({ profileId: 'claude' })).policy).not.toBeNull();
+  });
+
   it('conflitos sem rascunho só explicam', () => {
     expect(run(reply(null), input({ mode: 'conflicts', goal: '' })).policy).toBeNull();
     expect(() => run(reply(base()), input({ mode: 'conflicts', goal: '' }))).toThrow(/só explica/);

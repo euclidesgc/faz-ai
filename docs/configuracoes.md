@@ -31,8 +31,8 @@ IA). Todo agente ligado roda cards, ao mesmo tempo que os outros: cada card vai 
 sem trocar nada. No topo fica o **agente padrão**: o que roda os cards sem modelo, com o modo, o resumo da
 conexão, a conta e os outros agentes ligados que também rodam cards. Abaixo, à esquerda, a lista dos
 agentes; à direita, o agente escolhido, com as abas **Conexão**, **Modelos**, **Testar** e **Detalhes**.
-No fim da tela ficam as regras de sugestão de modelo e as regras de fallback, que valem para
-o board inteiro.
+No fim da tela ficam as regras de sugestão de modelo, que valem para o board inteiro, e as regras de
+fallback do agente escolhido na lista.
 
 ### A lista
 
@@ -277,7 +277,9 @@ ferramenta: o `rate_limit_event` e o `result` de limite do Claude Code, o 429 do
 cota do Kimi Code e a recusa `ActionRequiredError: You've hit your usage limit` do Cursor (no plano
 Free, a cota do agente é separada da barra de uso do painel: ela pode acabar com a barra pela
 metade). As **regras de fallback** ficam em
-**Configurações → Conectar agentes**, logo abaixo das regras de sugestão de modelo, numa lista: a
+**Configurações → Conectar agentes**, logo abaixo das regras de sugestão de modelo, e são do agente
+escolhido na lista: cada regra parte de um modelo dele que falha, e a seção mostra só as regras dele
+(as antigas sem agente aparecem em todos). Elas ficam numa lista: a
 ordem é a prioridade (a primeira que casar vence), cada linha mostra **quando** ("Claude Code · CLI ·
 Opus 5.5 esgota a cota"), o que o board **usa no lugar** ("Gemini · API · Pro, depois Cursor · CLI ·
 Auto") e **como** (troca sozinho ou pergunta antes), com o interruptor para ligar e desligar, subir,
@@ -285,12 +287,16 @@ descer, editar e remover.
 
 **Montar nova regra** abre o editor na própria tela, em três passos:
 
-1. **Quando este modelo esgotar a cota**: o modelo que falhou. Uma origem por regra: qualquer modelo,
-   qualquer modelo de um agente, ou um modelo de um agente. Para outro modelo, monte outra regra.
+1. **Quando este modelo esgotar a cota**: o modelo que falha, entre os modelos do agente da tela.
+   Uma origem por regra; para outro modelo, monte outra regra. A regra nova começa sem modelo.
 2. **Usar no lugar, nesta ordem**: a lista de modelos que substituem o que falhou, de qualquer agente
-   do board. Se o primeiro também falhar, o board tenta o seguinte. Um destino igual ao modelo que
-   falhou não salva. Um destino num agente desligado aparece com aviso na lista e no editor: a regra
-   salva, mas a troca só acontece depois que você ligar o agente em Conectar agentes.
+   do board, inclusive outros modelos do mesmo agente. Cada linha oferece todos os modelos menos o que
+   falha e os já escolhidos nas outras linhas, e trocar o modelo que falha volta a lista a uma linha
+   vazia. Se o primeiro também falhar, o board tenta o seguinte. Sem o modelo que falha, com uma
+   linha vazia ou com um destino igual ao modelo que falha, a regra não salva: o botão fica desligado
+   com o motivo, e o host recusa a mesma gravação. Um destino num agente desligado aparece com aviso
+   na lista e no editor: a regra salva, mas a troca só acontece depois que você ligar o agente em
+   Conectar agentes.
 3. **Como trocar**: **Troca sozinho** (o card segue no próximo modelo sem perguntar) ou **Pergunta
    antes** (o card fica com você, com as opções na conversa).
 
@@ -320,7 +326,11 @@ perfil não fica pausado.
 Runner, chat e assistentes ("Sugerir agentes, regras ou skills", "Indicar artefatos") decidem a troca
 por esse mesmo avaliador: com regra ligada e aplicável a execução segue no destino dela; sem regra,
 a falha bloqueia e nada roda noutro alvo. No fim da seção, **Testar as regras** simula a próxima
-execução só com as regras salvas e ligadas, sem gastar tokens nem abrir a CLI, e **Criar com ajuda de
+execução com a regra escolhida (do agente da tela), sem gastar tokens nem abrir a CLI, e diz
+**Passou** quando foi ela que decidiu, do jeito que foi configurada, ou **Não passou** com o motivo
+(outra regra antes na lista decidiu, a regra não se aplica ao cenário, ou se aplicou mas não deu para
+seguir). **Revisar conflitos** olha só as regras do agente da tela: regras de agentes diferentes partem
+de modelos diferentes e não disputam a mesma falha. **Criar com ajuda de
 IA** pede à IA só uma proposta (rascunho com explicação, diferenças e exemplos simulados, sem
 segredos): ela passa pelo validador do editor e nada é salvo até você abrir a proposta no editor e
 salvar. A IA também consulta as regras pelo MCP (`get_execution_policies`, só leitura).
