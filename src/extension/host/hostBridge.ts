@@ -412,6 +412,15 @@ export class HostBridge {
       case 'settings.aiProfiles.verify':
         this.post({ type: 'notice', message: await this.router.verifyProfile(msg.id) });
         return;
+      // o teste do contexto do card: o resultado vai para o estado (`contextScopes`); o aviso só diz que terminou
+      case 'settings.aiProfiles.contextScope': {
+        const report = await this.router.runContextScope(msg.id);
+        this.post({
+          type: 'notice',
+          message: report.error ? `O teste do contexto não terminou: ${report.error}` : 'Teste do contexto concluído.',
+        });
+        return;
+      }
       case 'settings.aiProfiles.test':
         this.post(await this.router.testAiProfile(msg.id));
         // o teste muda a evidência do perfil: o aviso do topo reflete o resultado sem recarregar

@@ -114,23 +114,23 @@ catalog and the same key.
    permissions, MCP and delegation proven, the compatible one. An ACP agent is always compatible (the
    context files it reads by itself have no proof over the protocol). API mode is exclusive by
    construction, with no probe.
-4. **Regime acknowledgment** (compatible only): a separate button, **Entendo o que a ferramenta
-   carrega** (I understand what the tool loads), records your acknowledgment for that profile. The
-   regime applies per profile: Gemini can run in the compatible regime while Claude Code stays
-   exclusive.
+4. **Ciência do contexto aberto** (open context acknowledgment, compatible regime only): the warning
+   says what the tool loads on its own and what that costs, and the **Usar assim mesmo** (use it anyway)
+   button records your acknowledgment for that profile. The regime applies per profile: Gemini can run
+   in the compatible regime while Claude Code stays exclusive.
 5. **Read the models**: the models the tool announces go into the catalog, in every model field (in
    API, the account's models that answer `generateContent`).
 
 At the end, a single line: **Pronto para rodar cards** (ready to run cards), with the date the board
 checked. **Ver detalhes** (see details) opens the steps, the technical summary (the version, the sign-in,
-the regime, how many models) and the mode sheet, with **Revogar ciência** (revoke acknowledgment);
+the regime, how many models) and the mode sheet, with **Parar de usar com o contexto aberto** (stop using with the open context);
 **Trocar a chave** (change the key) stays in view. Without your acknowledgment, the line says it is
 missing and the details open already. An error stays attached to the step where it happened, with **Tentar de novo** (try again),
 which resumes from that step (the acknowledgment and the models do not redo the sign-in or the probes);
 if the agent refuses the key at sign-in, the field comes back with what you pasted. **Reconectar**
 (reconnect), low-key because it is rare, redoes the sign-in, the check and the model reading: use it if
 something stopped working. The acknowledgment belongs to each
-profile and can go away: **Revogar ciência** removes it (the profile stops running in the compatible
+profile and can go away: **Parar de usar com o contexto aberto** removes it (the profile stops running in the compatible
 regime until you acknowledge again); reconnecting a profile that now proves the exclusive regime removes
 it by itself; and **importing a board does not bring the profiles' acknowledgments**. An execution policy
 does not swap the profile for another one with a different regime (`constraints-changed`).
@@ -146,6 +146,52 @@ through the **Verificar capacidades** (check capabilities) button in the profile
 probes spends your account. When a proof loses its validity (the CLI, the environment or the extension
 changed), the requirements banner says where to redo it: **Abrir Conectar agentes** (open Connect
 agents) on the catalog profile, **Abrir os detalhes do perfil** (open the profile details) on the copy.
+
+### Card context: closed or open
+
+A card costs less and comes out more precise when the AI uses only what the board provides (the story,
+the phase, the chosen rules, skills and MCP servers). The **Contexto do card** (card context) section, in
+the Connection tab, says whether that holds for the agent:
+
+- **Contexto fechado** (closed context, with a lock, also in the agent list): running through the board,
+  nothing the tool reads on its own reached the model.
+- **Contexto aberto** (open context): some file loads on its own in every card, and the line says which.
+  That costs more and may bring instructions that are not in the card.
+- **Not verified**: the test hasn't run yet, or no location had proof.
+
+The board finds this out at run time, with no list of locations stored in the extension, so it also
+works for an agent that shows up later:
+
+1. **Discovery.** The board asks the agent itself where its tool loads instructions, rules, memory,
+   skills, agents, hooks, settings and MCP servers from, in the project and in the user's folder. The
+   request brings an example from a fictional tool, so the agent doesn't copy real names.
+2. **Verification.** The board runs the agent **the way it runs a card** (the same barriers, no tools and
+   no MCP) and asks it to copy the lines in its context that start with passages picked at random from
+   those files. Quoting the rest of the line proves the file reached the model; nobody gets that right
+   by chance. The project's instruction files the agent didn't mention are checked too.
+3. **Control.** One line goes in the request itself: if the agent doesn't quote it, no "stays out"
+   counts. If it uses tools during the test, nothing counts as proof, since it may have opened the file
+   on purpose.
+
+What the agent declares shows as **Padrão da ferramenta** (tool default: "always loads", "loads when
+relevant"): how the tool behaves running on its own. Each location's verdict comes only from the test. A
+file the tool "always loads" that, through the board, **stays out** only enters a card when you include
+it (as a card or phase rule, for example).
+
+- **Locations that don't exist in the project yet** (an `AGENTS.md` you haven't created) are tested with
+  a decoy in a throwaway folder: you learn before creating the file whether it would enter every card.
+- **Files in your home folder are only read**: the board never writes to them. A declared location that
+  doesn't exist there stays untested.
+- **Settings, hooks and MCP servers** don't enter the context as text, so quoting doesn't check them;
+  Connect's capability verifier covers them.
+- **Acrescentar um local** (add a location) adds a path the agent didn't declare to the test. It stays on
+  this machine only, and a new discovery doesn't erase it.
+
+The test runs on its own after each Connect on a version not tested yet and, whenever you want, through
+**Testar agora** (test now) or **Testar de novo** (test again). It uses a few requests from the agent's
+account (the discovery and one or two quoting rounds). The result stays in the board's database, outside
+the export, and the screen warns when the agent changed versions since the last test. The test only
+informs: card admission is still decided by each profile's regime.
 
 ### Each agent's models
 

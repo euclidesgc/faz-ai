@@ -19,6 +19,7 @@ import type { BranchKind, GitConfig, MainBranch } from './git';
 import type { UsageLimitState } from './usageLimit';
 import type { BranchRenamePending, RenameOutcome } from './branchRename';
 import type { ConnectState } from './connect';
+import type { ContextLocation, ContextScopeReport } from './contextScope';
 
 export type Id = string;
 
@@ -330,6 +331,12 @@ export interface BoardState {
    * nesta sessão e, sem ela, a última concluída. Ausente no host sem o Conectar (o `faz-ai` sem a tela).
    */
   connections?: Record<string, ConnectState>;
+  /** o último teste do contexto do card de cada perfil (gravado no banco do board, fora da exportação) */
+  contextScopes?: Record<string, ContextScopeReport>;
+  /** os locais que a pessoa acrescentou, por perfil: a descoberta do agente não os apaga */
+  contextExtra?: Record<string, ContextLocation[]>;
+  /** os perfis com o teste do contexto em curso */
+  contextScopeRunning?: string[];
   /** o Diagnóstico ainda não abriu sozinho nesta máquina: a interface abre a tela uma vez */
   environmentFirstRun: boolean;
   /** Preview of artifacts to import into the board. */

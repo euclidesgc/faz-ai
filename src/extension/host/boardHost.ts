@@ -325,6 +325,9 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       pathEnv: () => pathEnv,
       runner: () => router.snapshot().board.runner,
       hasApiKey: (tool) => toolKeys.has(tool),
+      contextVersion: (id) => router.savedConnections()[id]?.version ?? null,
+      contextExtra: (id) => router.contextExtra()[id] ?? [],
+      log: o.log,
     }),
   );
   /** Abre o agente ACP numa pasta descartável (`fazai-<o quê>-`), roda `fn` e apaga a pasta. */
@@ -425,7 +428,19 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     log: o.log,
   });
   // o fim do Conectar muda o login, a prova e os modelos do perfil: a faixa de requisitos confere de novo
-  router.onConnect((id, input) => connector.connect(id, input).finally(() => void checkNow()));
+  router.onConnect((id, input) =>
+    connector
+      .connect(id, input)
+      .finally(() => void checkNow())
+      .then(() => {
+        // conectado numa versão sem teste do contexto (o primeiro Conectar ou uma versão nova): o teste roda sozinho,
+        // em segundo plano; ele gasta pedidos da conta, mas é o que diz à pessoa o que o agente lê além do card
+        const saved = router.savedConnections()[id];
+        const tested = router.savedContextScopes()[id];
+        if (saved && (!tested || tested.version !== (saved.version ?? null)))
+          void router.runContextScope(id).catch((e) => o.log(`[contexto] ${e instanceof Error ? e.message : String(e)}`));
+      }),
+  );
   router.setConnections(connector.snapshot(router.snapshot().board.aiProfiles.map((p) => p.id)));
   // Conectar agentes: a lista do registro, a conta de cada agente, o login e o logout. O log do protocolo fica na
   // pasta do rastreio do board, ao lado dele

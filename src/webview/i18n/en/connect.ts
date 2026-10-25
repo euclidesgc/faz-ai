@@ -6,7 +6,6 @@ export const connect: Record<string, string> = {
   'Ainda não oferecidos nesta versão: {modes}.': 'Not offered in this version yet: {modes}.',
   Recomendado: 'Recommended',
   'O que o board controla': 'What the board controls',
-  'Regime esperado': 'Expected regime',
   'Precisão do que foi usado': 'Accuracy of what was used',
   'O que a ferramenta traz': 'What the tool brings',
   'Como se entra': 'How you sign in',
@@ -27,7 +26,6 @@ export const connect: Record<string, string> = {
   'Achar a ferramenta': 'Find the tool',
   'Entrar na conta': 'Sign in',
   'Verificar as capacidades': 'Check the capabilities',
-  'Ciência do regime': 'Regime acknowledgment',
   'Ler os modelos': 'Read the models',
   'Passos do Conectar': 'Connect steps',
   feito: 'done',
@@ -67,13 +65,10 @@ export const connect: Record<string, string> = {
   'Trocar a chave': 'Change the key',
   'Guarda outra chave no cofre e refaz o login e a verificação.': 'Stores another key in the vault and redoes the sign-in and the check.',
   'Fecha o campo sem trocar a chave guardada.': 'Closes the field without changing the stored key.',
-  'Revogar ciência': 'Revoke acknowledgment',
   'Tira a sua ciência do regime compatível: o perfil deixa de rodar até você dar a ciência de novo.':
     'Removes your acknowledgment of the compatible regime: the profile stops running until you acknowledge it again.',
-  'Dar ciência do regime compatível': 'Acknowledge the compatible regime',
   'Grava a sua ciência do regime compatível para este perfil, depois de ler o que ele carrega.':
     'Records your acknowledgment of the compatible regime for this profile, after reading what it loads.',
-  'Dar ciência do regime compatível ao perfil "{name}"?': 'Acknowledge the compatible regime for profile "{name}"?',
   'Regime compatível com a sua ciência (revisão {n})': 'Compatible regime with your acknowledgment (revision {n})',
   'Ligue o perfil antes.': 'Turn the profile on first.',
   'Retoma o Conectar do passo em que parou.': 'Resumes Connect from the step where it stopped.',
@@ -93,12 +88,9 @@ export const connect: Record<string, string> = {
     'The key is stored in this computer’s vault and goes to the tool’s sign-in; it never comes back to this screen. The tool actually checks it on the first run: a wrong key shows up there, with the tool’s message.',
   'Guarda a chave no cofre e continua o Conectar.': 'Stores the key in the vault and continues Connect.',
   'Guardar a chave e continuar': 'Store the key and continue',
-  'O {name} roda no regime compatível: ele carrega por conta própria arquivos de instruções e configuração que o board não montou. Permissões, MCP e delegação continuam decididos pelo card.':
-    '{name} runs in the compatible regime: it loads instruction and configuration files on its own that the board did not assemble. Permissions, MCP, and delegation are still decided by the card.',
   'O que ele traz: {brings}.': 'What it brings: {brings}.',
   'Grava a sua ciência para este perfil; a revisão sobe a cada vez.':
     'Records your acknowledgment for this profile; the revision goes up each time.',
-  'Entendo o que a ferramenta carrega': 'I understand what the tool loads',
   'Dá de novo a sua ciência do regime compatível: o perfil volta a rodar, sem refazer o Conectar.':
     'Gives your acknowledgment of the compatible regime again: the profile runs again, without redoing Connect.',
   'Abre um terminal com o comando de login.': 'Opens a terminal with the sign-in command.',
@@ -208,4 +200,12 @@ export const connect: Record<string, string> = {
   '{name}: o Conectar é das ferramentas do catálogo; o perfil personalizado segue pelo formulário.':
     '{name}: Connect is for catalog tools; a custom profile goes through the form.',
   'O Conectar não está disponível neste host.': 'Connect is not available on this host.',
+  'Contexto do card': 'Card context',
+  'Ciência do contexto aberto': 'Open context acknowledgment',
+  'Parar de usar com o contexto aberto': 'Stop using with the open context',
+  'Usar com o contexto aberto': 'Use with the open context',
+  'Usar o perfil "{name}" com o contexto aberto?': 'Use the "{name}" profile with the open context?',
+  'Usar assim mesmo': 'Use it anyway',
+  'O {name} roda com o contexto aberto (regime compatível): além do que o card entrega, ele carrega por conta própria arquivos de instruções e configuração que o board não montou. Isso gasta mais e pode trazer instruções que não estão no card. Permissões, MCP e delegação continuam decididos pelo card.':
+    '{name} runs with the open context (compatible regime): besides what the card provides, it loads on its own instruction and configuration files the board did not assemble. That costs more and may bring instructions that are not in the card. Permissions, MCP and delegation are still decided by the card.',
 };

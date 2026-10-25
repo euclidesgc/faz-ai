@@ -27,10 +27,10 @@ export function leaksList(iso: ProfileIsolation): string {
 
 /**
  * O resumo do isolamento. `enforced` vem de `contextEnforced(perfil)` (capacidades verificadas): lista
- * vazia sozinha nunca vira "Contexto vazio (imposto)".
+ * vazia sozinha nunca vira "Contexto fechado".
  */
 export function isolationText(iso: ProfileIsolation, enforced: boolean): string {
   const list = leaksList(iso);
-  if (list) return t('A CLI pode carregar por conta própria: {list}.', { list });
-  return enforced ? t('Contexto vazio (imposto)') : t('Nenhum item conhecido carregado (sem prova de isolamento)');
+  if (list) return t('Contexto aberto: a CLI pode carregar por conta própria {list}.', { list });
+  return enforced ? t('Contexto fechado') : t('Contexto não verificado: nenhum item conhecido carregado, sem prova');
 }

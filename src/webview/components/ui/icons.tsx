@@ -25,6 +25,7 @@ import {
   Heart,
   Heading,
   Info,
+  Lock,
   Italic,
   Link,
   List,
@@ -101,6 +102,7 @@ export const IconExternal = icon(ExternalLink, 'IconExternal');
 export const IconWarning = icon(TriangleAlert, 'IconWarning');
 /** aviso que qualifica um número (painel de métricas) */
 export const IconInfo = icon(Info, 'IconInfo');
+export const IconLock = icon(Lock, 'IconLock');
 export const IconHeart = icon(Heart, 'IconHeart');
 export const IconYolo = icon(Zap, 'IconYolo');
 export const IconPlus = icon(Plus, 'IconPlus');

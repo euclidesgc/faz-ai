@@ -1,6 +1,7 @@
 import type { WebviewToHost } from '../shared/messages';
 import type { BranchRenamePending } from '../shared/branchRename';
 import type { ConnectInput } from '../shared/connect';
+import type { ContextLocation } from '../shared/contextScope';
 import type { AiTool } from '../shared/harness';
 import type { HarnessUsage, SelectableKind } from '../shared/harnessSelection';
 import type { AgentInput } from '../shared/messages';
@@ -180,6 +181,10 @@ export const settings = {
   removeAiProfile: (id: string) => req({ type: 'settings.aiProfiles.remove', id }),
   probeAiProfiles: () => request({ type: 'settings.aiProfiles.probe' }, { timeout: 70_000 }),
   testAiProfile: (id: string) => request({ type: 'settings.aiProfiles.test', id }, { timeout: 130_000 }),
+  // três rodadas de até cinco minutos cada: a descoberta e as duas citações
+  testContextScope: (id: string) => request({ type: 'settings.aiProfiles.contextScope', id }, { timeout: 16 * 60_000 }),
+  contextLocation: (id: string, op: 'add' | 'remove', location: Pick<ContextLocation, 'path' | 'scope' | 'kind'>) =>
+    request({ type: 'settings.aiProfiles.contextLocation', id, op, location }),
   /**
    * O Conectar de um perfil (história 7): o `done` sai quando o fluxo para (conectada, à espera da chave ou da
    * ciência, ou com o erro no passo). Os handshakes e a leitura de modelos podem levar alguns minutos.

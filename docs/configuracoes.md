@@ -101,19 +101,19 @@ mesmo id, as mesmas políticas, o mesmo catálogo de modelos e a mesma chave.
    delas, sem pergunta: as cinco capacidades provadas dão o regime exclusivo; permissões, MCP e
    delegação provadas, o compatível. Um agente ACP é sempre compatível (os arquivos de contexto que
    ele lê sozinho não têm prova pelo protocolo). O modo API é exclusivo por construção, sem sonda.
-4. **Ciência do regime** (só no compatível): um botão à parte, **Entendo o que a ferramenta carrega**,
-   grava a sua ciência para aquele perfil. O regime vale por perfil: o Gemini pode rodar no compatível
+4. **Ciência do contexto aberto** (só no regime compatível): o aviso diz o que a ferramenta carrega
+   sozinha e o custo disso, e o botão **Usar assim mesmo** grava a sua ciência para aquele perfil. O regime vale por perfil: o Gemini pode rodar no compatível
    enquanto o Claude Code segue no exclusivo.
 5. **Ler os modelos**: os modelos que a ferramenta anuncia entram no catálogo, em todo campo de modelo
    (na API, os modelos da conta que respondem ao `generateContent`).
 
 No fim, uma linha só: **Pronto para rodar cards**, com a data em que o board conferiu. **Ver detalhes**
 abre os passos, o resumo técnico (a versão, o login, o regime, quantos modelos) e a ficha do modo, com
-**Revogar ciência**; **Trocar a chave** fica à vista. Sem a sua ciência, a linha diz que ela falta e os
+**Parar de usar com o contexto aberto**; **Trocar a chave** fica à vista. Sem a sua ciência, a linha diz que ela falta e os
 detalhes já abrem. Um erro fica preso ao passo em que ocorreu, com **Tentar de novo**, que
 retoma desse passo (a ciência e os modelos não refazem o login nem as sondas); se o agente recusar a
 chave no login, o campo volta com o que você colou. **Reconectar**, discreto porque é raro, refaz o
-login, a verificação e a leitura dos modelos: use se algo parou de funcionar. A ciência é de cada perfil e pode sair: **Revogar ciência** a tira (o perfil deixa
+login, a verificação e a leitura dos modelos: use se algo parou de funcionar. A ciência é de cada perfil e pode sair: **Parar de usar com o contexto aberto** a tira (o perfil deixa
 de rodar no compatível até você dar a ciência de novo); reconectar um perfil que passa a provar o regime
 exclusivo a tira sozinho; e **importar um board não traz a ciência dos perfis**. Uma política de execução
 não troca o perfil por outro com regime diferente (`constraints-changed`).
@@ -127,6 +127,53 @@ do Claude Code e o personalizado ACP de uma versão anterior), pelo botão **Ver
 Detalhes do perfil. Nenhuma das sondas gasta a sua conta. Quando uma prova perde a validade (a CLI, o
 ambiente ou a extensão mudou), a faixa de requisitos diz onde refazer: **Abrir Conectar agentes** no
 perfil do catálogo, **Abrir os detalhes do perfil** na cópia.
+
+### Contexto do card: fechado ou aberto
+
+Um card gasta menos e sai mais preciso quando a IA usa só o que o board entrega (a história, a fase, as
+regras, skills e servidores MCP escolhidos). A seção **Contexto do card**, na aba Conexão, diz se é assim
+com aquele agente:
+
+- **Contexto fechado** (com um cadeado, também na lista de agentes): rodando pelo board, nada do que a
+  ferramenta lê sozinha chegou ao modelo.
+- **Contexto aberto**: algum arquivo entra sozinho em todo card, e a linha diz quais. Isso gasta mais e
+  pode trazer instruções que não estão no card.
+- **Não verificado**: o teste ainda não rodou, ou nenhum local teve prova.
+
+O board descobre isso em tempo de execução, sem uma lista de locais guardada na extensão, então vale
+também para um agente que surgir depois:
+
+1. **Descoberta.** O board pergunta ao próprio agente de onde a ferramenta dele carrega instruções,
+   regras, memória, skills, agentes, hooks, configurações e servidores MCP, no projeto e na pasta do
+   usuário. O pedido traz um exemplo de uma ferramenta fictícia, para o agente não copiar nomes reais.
+2. **Verificação.** O board roda o agente **como roda um card** (as mesmas travas, sem ferramentas e sem
+   MCP) e pede que ele copie as linhas do contexto que começam com trechos escolhidos ao acaso nesses
+   arquivos. Citar o resto da linha prova que o arquivo chegou ao modelo; ninguém acerta isso por acaso.
+   Os arquivos de instrução do projeto que o agente não citou também são conferidos.
+3. **Controle.** Uma linha vai no próprio pedido: se o agente não a citar, nenhum "fica de fora" vale.
+   Se ele usar ferramentas durante o teste, nada vira prova, porque ele pode ter aberto o arquivo de
+   propósito.
+
+O que o agente declara aparece como **Padrão da ferramenta** ("carrega sempre", "carrega quando
+combina"): é como ela se comporta rodando sozinha. O veredito de cada local vem só do teste. Um arquivo
+que a ferramenta "carrega sempre" e que, pelo board, **fica de fora** só entra num card quando você o
+incluir (como regra do card ou da fase, por exemplo).
+
+- **Locais que ainda não existem no projeto** (um `AGENTS.md` que você ainda não criou) são testados com
+  uma isca numa pasta descartável: você fica sabendo antes de criar o arquivo se ele entraria em todo
+  card.
+- **Os arquivos da sua pasta pessoal só são lidos**: o board nunca escreve neles. Um local declarado que
+  não existe ali fica como não testado.
+- **Configuração, hooks e servidores MCP** não entram no contexto como texto, então a citação não os
+  confere; o verificador de capacidades do Conectar cuida deles.
+- **Acrescentar um local** inclui no teste um caminho que o agente não declarou. Ele fica só nesta
+  máquina, e uma nova descoberta não o apaga.
+
+O teste roda sozinho depois de cada Conectar numa versão ainda não testada e, quando você quiser, por
+**Testar agora** ou **Testar de novo**. Ele gasta alguns pedidos da conta do agente (a descoberta e uma
+ou duas rodadas de citação). O resultado fica no banco do board, fora da exportação, e a tela avisa
+quando o agente mudou de versão desde o último teste. O teste só informa: a admissão dos cards continua
+decidida pelo regime de cada perfil.
 
 ### Os modelos de cada agente
 

@@ -33,11 +33,16 @@ import type { AttachmentStore } from '../attachments';
 import { runUnsupported } from '../headless';
 import { isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
 import type { ConnectInput, ConnectState, ConnectSummary } from '../../shared/connect';
+import type { ContextLocation, ContextScopeReport } from '../../shared/contextScope';
 import type { ToolMode } from '../../shared/aiTools';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 
 /** As conexões concluídas por perfil (o resumo do Conectar), na tabela `meta`: fora da exportação do board. */
 const CONNECTIONS_META_KEY = 'ai_connections';
+/** O último teste do contexto do card de cada perfil, também na `meta`: depende do projeto e da máquina. */
+const CONTEXT_SCOPES_META_KEY = 'ai_context_scopes';
+/** Os locais que a pessoa acrescentou ao teste do contexto, por perfil. */
+const CONTEXT_EXTRA_META_KEY = 'ai_context_extra';
 import { boardServerFootprint } from '../mcp/footprint';
 import type { RunResolver } from '../log/eventLog';
 import { getMetrics, getPanelMetrics, type MetricsQuery, type MetricsResult } from '../log/metrics';
@@ -176,6 +181,7 @@ const bridgeOnly = {
   'backup.import.cancel': viaBridge,
   'settings.aiProfiles.probe': viaBridge,
   'settings.aiProfiles.test': viaBridge,
+  'settings.aiProfiles.contextScope': viaBridge,
   // a chave colada vai direto da HostBridge ao Conectar do host: nunca passa por `handle` nem pelo log de eventos
   'settings.aiProfiles.connect': viaBridge,
   // as sondas demoram (a CLI do Claude roda quatro vezes na fixture): a HostBridge espera e publica o resultado
@@ -384,6 +390,45 @@ export class MessageRouter {
     if (!this.aiProfileRuntime) throw new Error('Teste de perfil indisponível neste host.');
     return this.aiProfileRuntime.test(id).finally(() => this.invalidateSnapshot());
   }
+  private contextRunning = new Set<string>();
+  // lidos da `meta` uma vez e guardados: o snapshot sai a cada mudança do board e não pode consultar o banco a mais
+  private contextScopesCache: Record<string, ContextScopeReport> | null = null;
+  private contextExtraCache: Record<string, ContextLocation[]> | null = null;
+  /** Os testes do contexto gravados (um por perfil); a leitura tolera o valor ausente ou estragado. */
+  savedContextScopes(): Record<string, ContextScopeReport> {
+    return (this.contextScopesCache ??= this.metaRecord<ContextScopeReport>(CONTEXT_SCOPES_META_KEY));
+  }
+  contextExtra(): Record<string, ContextLocation[]> {
+    return (this.contextExtraCache ??= this.metaRecord<ContextLocation[]>(CONTEXT_EXTRA_META_KEY));
+  }
+  private metaRecord<T>(key: string): Record<string, T> {
+    try {
+      const raw: unknown = JSON.parse(this.ctx.boards.getMeta(key) ?? '{}');
+      return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, T>) : {};
+    } catch {
+      return {};
+    }
+  }
+  /**
+   * O teste do contexto do card de um perfil: um por vez para cada perfil; o resultado substitui o anterior. A tela
+   * acompanha pelo `contextScopeRunning` do estado.
+   */
+  async runContextScope(id: string): Promise<ContextScopeReport> {
+    if (!this.aiProfileRuntime) throw new Error('O teste do contexto não está disponível neste host.');
+    if (this.contextRunning.has(id)) throw new Error('O teste do contexto deste agente já está em curso.');
+    this.contextRunning.add(id);
+    this.notify();
+    try {
+      const report = await this.aiProfileRuntime.contextScope(id);
+      this.contextScopesCache = { ...this.savedContextScopes(), [id]: report };
+      this.ctx.boards.setMeta(CONTEXT_SCOPES_META_KEY, JSON.stringify(this.contextScopesCache));
+      this.ctx.dbHandle.scheduleSave();
+      return report;
+    } finally {
+      this.contextRunning.delete(id);
+      this.notify();
+    }
+  }
   executionPolicyLibrary(): PolicyLibrary {
     const snapshot = this.ctx.executionPolicies.snapshot(this.boardId);
     const catalog = builtinPolicyCatalog(this.snapshot());
@@ -519,6 +564,9 @@ export class MessageRouter {
       usageLimit: this.usageLimit,
       environment: this.environment,
       ...(this.connections ? { connections: this.connections } : {}),
+      contextScopes: this.savedContextScopes(),
+      contextExtra: this.contextExtra(),
+      contextScopeRunning: [...this.contextRunning],
       environmentFirstRun: this.environmentFirstRun,
       artifactImport: this.ctx.importer.current,
       mainBranch: this.ctx.mainBranch(),
@@ -539,6 +587,8 @@ export class MessageRouter {
       throw new Error('Políticas executáveis exigem revisão humana.');
     if (msg.type.startsWith('settings.aiProfiles.') && (ctx.source === 'ai' || ctx.externalMcp || ctx.runToken !== undefined))
       throw new Error('Perfis executáveis exigem revisão humana.');
+    // o handler grava os locais da pessoa direto na `meta`: a cópia guardada aqui relê no próximo snapshot
+    if (msg.type === 'settings.aiProfiles.contextLocation') this.contextExtraCache = null;
     const handler = HANDLERS[msg.type] as Handler<MessageType>;
     const actor = this.actorOf(ctx);
     // o aviso de perfil ligado é da transição desligado → ligado; religar o que já está ligado não avisa

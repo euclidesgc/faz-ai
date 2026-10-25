@@ -8,7 +8,8 @@ import { formatDateTime, t } from '../../../i18n';
 import { listenAgentConnect, useAgentConnectStore, type AgentTab } from '../../../store/agentConnectStore';
 import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
-import { ActionButton, Hint, IconConnect, IconExternal, IconPlus } from '../../ui';
+import { contextScopeState } from '../../../../shared/contextScope';
+import { ActionButton, Hint, IconConnect, IconExternal, IconLock, IconPlus } from '../../ui';
 import { AiProfileForm } from '../AiProfileForm';
 import { PageHeader } from '../PageHeader';
 import { ExecutionPoliciesSettings } from '../policies/ExecutionPoliciesSettings';
@@ -29,6 +30,7 @@ function AgentIcon({ icon }: { icon: string | null }) {
 function AgentRow({ item, selected, onSelect }: { item: AgentListItem; selected: boolean; onSelect(): void }) {
   const connections = useBoardStore((s) => s.state!.connections);
   const installed = useAgentConnectStore((s) => s.installed);
+  const scope = useBoardStore((s) => (item.profile ? s.state!.contextScopes?.[item.profile.id] : undefined));
   const state = agentState(item, connections, installed);
   return (
     <button type="button" className={`agent-row ${selected ? 'selected' : ''}`} aria-pressed={selected} onClick={onSelect}>
@@ -37,6 +39,12 @@ function AgentRow({ item, selected, onSelect }: { item: AgentListItem; selected:
         <span className="agent-row-name">{item.name}</span>
         <span className="muted">
           {item.profile ? modeLabel(item.profile.mode) : 'ACP'} · {t(STATE_LABEL[state])}
+          {/* o cadeado compara os agentes sem abrir cada um: o contexto fechado foi verificado */}
+          {contextScopeState(scope) === 'closed' && (
+            <span className="agent-row-lock" role="img" aria-label={t('Contexto fechado')}>
+              <IconLock />
+            </span>
+          )}
         </span>
       </span>
       {/* a linha já diz a situação: o selo fica para o que pede atenção (o Conectar parado ou à espera) */}

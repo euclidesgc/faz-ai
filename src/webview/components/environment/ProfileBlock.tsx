@@ -87,7 +87,9 @@ function Capabilities({ health }: { health: ProfileHealth }) {
           state={admission.state === 'admitted' ? 'ok' : 'missing'}
           label={
             admission.state === 'admitted'
-              ? t('Admissível no regime {regime}', { regime: admission.regime === 'exclusive' ? t('exclusivo') : t('compatível') })
+              ? t('Admissível com o contexto {regime}', {
+                  regime: admission.regime === 'exclusive' ? t('fechado (regime exclusivo)') : t('aberto (regime compatível)'),
+                })
               : t('Não admissível')
           }
         >

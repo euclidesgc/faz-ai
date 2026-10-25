@@ -202,14 +202,14 @@ export function AgentDetails({ item, onEdit }: { item: AgentListItem; onEdit(pro
               reviewed !== null
                 ? void review.run(profile.id, false)
                 : ask({
-                    title: t('Dar ciência do regime compatível ao perfil "{name}"?', { name: profile.name }),
+                    title: t('Usar o perfil "{name}" com o contexto aberto?', { name: profile.name }),
                     message: reviewText(profile.name),
-                    confirmLabel: t('Entendo o que a ferramenta carrega'),
+                    confirmLabel: t('Usar assim mesmo'),
                     onConfirm: () => void review.run(profile.id, true),
                   })
             }
           >
-            {t(reviewed !== null ? 'Revogar ciência' : 'Dar ciência do regime compatível')}
+            {t(reviewed !== null ? 'Parar de usar com o contexto aberto' : 'Usar com o contexto aberto')}
           </ActionButton>
         )}
         {!connectable(profile) && verifiableProfile(profile) && (

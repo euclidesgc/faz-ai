@@ -16,7 +16,7 @@ import { ActionButton, IconCheck, IconWarning } from '../../ui';
 /** Os rótulos das oito linhas da ficha, na ordem de `MODE_SHEET_LINES`. */
 export const SHEET_LABEL: Record<ModeSheetLine, string> = {
   controls: 'O que o board controla',
-  regime: 'Regime esperado',
+  regime: 'Contexto do card',
   precision: 'Precisão do que foi usado',
   consumption: 'Consumo',
   brings: 'O que a ferramenta traz',
@@ -28,7 +28,7 @@ export const STEP_NAMES: Record<ConnectStep, string> = {
   locate: 'Achar a ferramenta',
   signIn: 'Entrar na conta',
   verify: 'Verificar as capacidades',
-  review: 'Ciência do regime',
+  review: 'Ciência do contexto aberto',
   models: 'Ler os modelos',
 };
 
@@ -78,7 +78,7 @@ export function connectionSummary(s: Partial<ConnectSummary>, review: number | n
 /** O texto da ciência do regime compatível: o mesmo no Conectar e na lista dos perfis. */
 export const reviewText = (name: string): string =>
   t(
-    'O {name} roda no regime compatível: ele carrega por conta própria arquivos de instruções e configuração que o board não montou. Permissões, MCP e delegação continuam decididos pelo card.',
+    'O {name} roda com o contexto aberto (regime compatível): além do que o card entrega, ele carrega por conta própria arquivos de instruções e configuração que o board não montou. Isso gasta mais e pode trazer instruções que não estão no card. Permissões, MCP e delegação continuam decididos pelo card.',
     { name },
   );
 
@@ -189,7 +189,7 @@ export function ConnectProgress({
                 loading={revoke.busy}
                 onClick={() => void revoke.run()}
               >
-                {t('Revogar ciência')}
+                {t('Parar de usar com o contexto aberto')}
               </ActionButton>
             )}
           </details>
@@ -202,7 +202,7 @@ export function ConnectProgress({
                 loading={accept.busy}
                 onClick={() => void accept.run()}
               >
-                {t('Entendo o que a ferramenta carrega')}
+                {t('Usar assim mesmo')}
               </ActionButton>
             )}
             {(state.summary.signIn === 'api-key' || state.summary.signIn === 'api-key-checked') && !changing && (
@@ -305,7 +305,7 @@ export function ConnectProgress({
               loading={connect.busy}
               onClick={() => void connect.run({ acknowledge: true })}
             >
-              {t('Entendo o que a ferramenta carrega')}
+              {t('Usar assim mesmo')}
             </ActionButton>
           </div>
         </Callout.Root>

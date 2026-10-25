@@ -49,7 +49,11 @@ export function NextRunSection({ report }: { report: Pick<EnvironmentReport, 're
   return (
     <section aria-labelledby="env-next-run">
       <h3 id="env-next-run">{t('Próxima execução e limites')}</h3>
-      <p className="small">{t('Regime de contexto: {regime}', { regime: regime === 'exclusive' ? t('exclusivo') : t('compatível') })}</p>
+      <p className="small">
+        {t('Contexto do card: {regime}', {
+          regime: regime === 'exclusive' ? t('fechado (regime exclusivo)') : t('aberto (regime compatível)'),
+        })}
+      </p>
       {!decision ? (
         <p className="small muted">{t(UNAVAILABLE)}</p>
       ) : (

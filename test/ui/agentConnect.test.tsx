@@ -14,6 +14,8 @@ import { ACCOUNT_UNCHECKED, TEST_IDLE, type AgentAccount, type RegistryAgent } f
 import { MODE_SHEET_LINES } from '../../src/shared/aiTools';
 import type { AiProfile } from '../../src/shared/aiProfiles';
 import type { ConnectState } from '../../src/shared/connect';
+import type { ContextLocationResult } from '../../src/shared/contextScope';
+import type { BoardState } from '../../src/shared/model';
 import type { HostToWebview } from '../../src/shared/messages';
 
 const KEY = 'AIzaSy-chave-da-tela-123456';
@@ -315,8 +317,8 @@ describe('Conectar agentes: a conexão com o board', () => {
     publish({ step: 'review', status: 'waiting', needs: 'review', summary: { regime: 'compatible' } });
     show();
     const gemini = await openAgent('Gemini CLI');
-    expect(gemini.getByText(/O Gemini CLI roda no regime compatível/)).toHaveTextContent('o agente completo do Gemini CLI');
-    await userEvent.click(gemini.getByRole('button', { name: 'Entendo o que a ferramenta carrega' }));
+    expect(gemini.getByText(/O Gemini CLI roda com o contexto aberto/)).toHaveTextContent('o agente completo do Gemini CLI');
+    await userEvent.click(gemini.getByRole('button', { name: 'Usar assim mesmo' }));
     expect(lastSent('settings.aiProfiles.connect')).toMatchObject({ id: 'gemini', acknowledge: true });
     confirmLast();
   });
@@ -364,7 +366,7 @@ describe('Conectar agentes: a conexão com o board', () => {
       ),
     ).toBeInTheDocument();
     expect(within(details).getByText('Como funciona o modo ACP')).toBeInTheDocument();
-    expect(within(details).getByRole('button', { name: 'Revogar ciência' })).toBeInTheDocument();
+    expect(within(details).getByRole('button', { name: 'Parar de usar com o contexto aberto' })).toBeInTheDocument();
     // a ficha do modo sai de cima: conectado, ela só aparece nos detalhes
     expect(gemini.getAllByText(/Como funciona o modo ACP/)).toHaveLength(1);
     await userEvent.click(gemini.getByRole('button', { name: 'Reconectar' }));
@@ -390,7 +392,7 @@ describe('Conectar agentes: a conexão com o board', () => {
     connected();
     show();
     const gemini = await openAgent('Gemini CLI');
-    await userEvent.click(gemini.getByRole('button', { name: 'Revogar ciência' }));
+    await userEvent.click(gemini.getByRole('button', { name: 'Parar de usar com o contexto aberto' }));
     expect(lastSent('settings.aiProfiles.review')).toMatchObject({ type: 'settings.aiProfiles.review', id: 'gemini', accept: false });
     board.router.handle({ type: 'settings.aiProfiles.review', id: 'gemini', accept: false });
     syncStore(board.router);
@@ -398,9 +400,9 @@ describe('Conectar agentes: a conexão com o board', () => {
     expect(await gemini.findByRole('status')).toHaveTextContent('Falta a sua ciência: o agente não roda cards até você dá-la.');
     expect(gemini.getByText('Ver detalhes').closest('details')).toHaveAttribute('open');
     expect(gemini.getByText(/sem a sua ciência: o perfil não roda/)).toBeInTheDocument();
-    expect(gemini.queryByRole('button', { name: 'Revogar ciência' })).toBeNull();
-    expect(gemini.getByText('Ciência do regime:').closest('li')).toHaveAttribute('data-state', 'waiting');
-    await userEvent.click(gemini.getByRole('button', { name: 'Entendo o que a ferramenta carrega' }));
+    expect(gemini.queryByRole('button', { name: 'Parar de usar com o contexto aberto' })).toBeNull();
+    expect(gemini.getByText('Ciência do contexto aberto:').closest('li')).toHaveAttribute('data-state', 'waiting');
+    await userEvent.click(gemini.getByRole('button', { name: 'Usar assim mesmo' }));
     expect(lastSent('settings.aiProfiles.review')).toMatchObject({ id: 'gemini', accept: true });
   });
 
@@ -414,6 +416,97 @@ describe('Conectar agentes: a conexão com o board', () => {
     expect(claude.getByText('claude auth login')).toBeInTheDocument();
     await userEvent.click(claude.getByRole('button', { name: 'Entrar no terminal' }));
     expect(lastSent('agentConnect.login')).toEqual({ type: 'agentConnect.login', key: 'claude', methodId: 'cli-login' });
+    confirmLast();
+  });
+});
+
+describe('Conectar agentes: o contexto do card', () => {
+  const leak = (over: Partial<ContextLocationResult> = {}): ContextLocationResult => ({
+    path: 'CLAUDE.md',
+    scope: 'project',
+    kind: 'instructions',
+    loads: 'always',
+    source: 'agent',
+    verdict: { state: 'controlled', how: 'quote' },
+    ...over,
+  });
+  /** O teste do contexto gravado, como o host publica (sem passar pelo router, que é o mesmo nos outros casos). */
+  const withScope = (locations: ContextLocationResult[], extra: Partial<BoardState> = {}) =>
+    act(() =>
+      useBoardStore.setState((s) => ({
+        state: {
+          ...s.state!,
+          contextScopes: {
+            claude: { profileId: 'claude', version: '2.1.296', at: Date.UTC(2026, 9, 25, 15), discovered: true, control: true, locations },
+          },
+          ...extra,
+        },
+      })),
+    );
+
+  it('sem teste: diz que não sabe o que o agente lê e "Testar agora" pede o teste ao host', async () => {
+    show();
+    const scope = within(screen.getByLabelText('Contexto do card'));
+    expect(scope.getByText('Ainda não testado: o board não sabe o que este agente lê sozinho.')).toBeInTheDocument();
+    await userEvent.click(scope.getByRole('button', { name: 'Testar agora' }));
+    expect(lastSent('settings.aiProfiles.contextScope')).toMatchObject({ id: 'claude' });
+    confirmLast();
+  });
+
+  it('fechado: o cadeado na lista e cada local separa o padrão da ferramenta do que o teste provou no board', async () => {
+    show();
+    withScope([
+      leak(),
+      leak({
+        path: '~/.claude/skills/*/SKILL.md',
+        scope: 'user',
+        kind: 'skill',
+        loads: 'on-demand',
+        verdict: { state: 'untested', reason: 'missing-user' },
+      }),
+    ]);
+    expect(within(row('Claude Code')).getByRole('img', { name: 'Contexto fechado' })).toBeInTheDocument();
+    const scope = within(screen.getByLabelText('Contexto do card'));
+    expect(scope.getByRole('status')).toHaveTextContent('Contexto fechado · verificado em');
+    await userEvent.click(scope.getByText('O que este agente lê sozinho (2 locais)'));
+    const items = within(scope.getByRole('list', { name: 'Locais' }))
+      .getAllByRole('listitem')
+      .map((li) => li.textContent);
+    // o que o agente declarou (o padrão da ferramenta) fica separado do que o teste provou no board
+    expect(items[0]).toBe('CLAUDE.md fica de fora: só entra se o card incluirinstruções · projeto · Padrão da ferramenta: carrega sempre');
+    expect(items[1]).toContain('não existe na sua pasta pessoal; o board não escreve nela');
+  });
+
+  it('aberto: o resumo lista o que entra sozinho, os detalhes já abrem e a versão nova pede outro teste', () => {
+    show();
+    withScope([leak({ verdict: { state: 'leaks', how: 'quote', files: ['CLAUDE.md', '../CLAUDE.md'] } })], {
+      connections: { claude: { profileId: 'claude', step: 'models', status: 'connected', summary: { version: '2.2.0' } } },
+    });
+    const scope = within(screen.getByLabelText('Contexto do card'));
+    expect(scope.getByRole('status')).toHaveTextContent('Contexto aberto · verificado em');
+    expect(scope.getByRole('status')).toHaveTextContent('a IA também lê CLAUDE.md.');
+    expect(scope.getByText('O que este agente lê sozinho (1 locais)').closest('details')).toHaveAttribute('open');
+    expect(scope.getByText('Arquivos: CLAUDE.md, ../CLAUDE.md')).toBeInTheDocument();
+    expect(scope.getByText('Testado na versão 2.1.296; a atual é 2.2.0. Teste de novo.')).toBeInTheDocument();
+    expect(within(row('Claude Code')).queryByRole('img', { name: 'Contexto fechado' })).toBeNull();
+  });
+
+  it('a pessoa acrescenta um local que o agente esqueceu e tira o que acrescentou', async () => {
+    show();
+    const scope = within(screen.getByLabelText('Contexto do card'));
+    await userEvent.click(scope.getByRole('button', { name: /Acrescentar um local/ }));
+    await userEvent.type(scope.getByLabelText('Caminho'), '~/.claude/NOTAS.md');
+    await userEvent.click(scope.getByRole('button', { name: 'Acrescentar' }));
+    expect(lastSent('settings.aiProfiles.contextLocation')).toMatchObject({
+      id: 'claude',
+      op: 'add',
+      location: { path: '~/.claude/NOTAS.md', scope: 'user', kind: 'instructions' },
+    });
+    confirmLast();
+    withScope([leak({ path: 'NOTAS.md', loads: null, source: 'person' })]);
+    await userEvent.click(scope.getByText(/O que este agente lê sozinho/));
+    await userEvent.click(scope.getByRole('button', { name: 'Tirar NOTAS.md' }));
+    expect(lastSent('settings.aiProfiles.contextLocation')).toMatchObject({ op: 'remove', location: { path: 'NOTAS.md' } });
     confirmLast();
   });
 });
@@ -887,15 +980,15 @@ describe('Conectar agentes: detalhes e perfis personalizados', () => {
     show();
     const card = await openAgent('Claude da ciência', 'Detalhes');
     expect(card.getByText('sem ciência')).toBeInTheDocument();
-    await userEvent.click(card.getByRole('button', { name: 'Dar ciência do regime compatível' }));
+    await userEvent.click(card.getByRole('button', { name: 'Usar com o contexto aberto' }));
     const dialog = await screen.findByRole('dialog');
-    expect(dialog).toHaveTextContent('O Claude da ciência roda no regime compatível');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Entendo o que a ferramenta carrega' }));
+    expect(dialog).toHaveTextContent('O Claude da ciência roda com o contexto aberto');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Usar assim mesmo' }));
     expect(lastSent('settings.aiProfiles.review')).toMatchObject({ id: copy.id, accept: true });
     board.router.handle({ type: 'settings.aiProfiles.review', id: copy.id, accept: true });
     syncStore(board.router);
     confirmLast();
-    await userEvent.click(await card.findByRole('button', { name: 'Revogar ciência' }));
+    await userEvent.click(await card.findByRole('button', { name: 'Parar de usar com o contexto aberto' }));
     expect(lastSent('settings.aiProfiles.review')).toMatchObject({ id: copy.id, accept: false });
     confirmLast();
   });

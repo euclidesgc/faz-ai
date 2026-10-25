@@ -575,7 +575,7 @@ describe('Diagnóstico do ambiente', () => {
         },
       });
       const s = within(screen.getByRole('region', { name: 'Próxima execução e limites' }));
-      expect(s.getByText('Regime de contexto: exclusivo')).toBeInTheDocument();
+      expect(s.getByText('Contexto do card: fechado (regime exclusivo)')).toBeInTheDocument();
       expect(s.getByText(/Alvo padrão: cursor · composer/)).toBeInTheDocument();
       expect(s.getByText(/regra p1, versão 3/)).toBeInTheDocument();
       expect(s.getByText(/Os cards com alvo Cursor não rodam/)).toBeInTheDocument();

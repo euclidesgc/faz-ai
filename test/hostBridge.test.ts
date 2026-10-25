@@ -60,6 +60,9 @@ describe('HostBridge: situação dos perfis depois de ligar', () => {
         { type: 'aiProfiles.status', profiles: { 'codex-acp': { found: true, version: '2.2.2', signedIn: null, installUrl: null } } }
       ),
       test: async (id) => ({ type: 'aiProfiles.testResult', id, ok: true, output: '' }),
+      contextScope: async () => {
+        throw new Error('sem teste do contexto');
+      },
     });
     await bridge.handle({ type: 'settings.aiProfiles.setEnabled', id: 'codex-acp', enabled: true, requestId: 'on' });
     expect(router.snapshot().board.aiProfiles.find((p) => p.id === 'codex-acp')?.enabled).toBe(true);
@@ -83,6 +86,9 @@ describe('HostBridge: preferências da pessoa', () => {
         profiles: { cli: { found: true, version: '1.0.0', signedIn: null, installUrl: null } },
       }),
       test: async (id) => ({ type: 'aiProfiles.testResult', id, ok: true, output: 'OK' }),
+      contextScope: async () => {
+        throw new Error('sem teste do contexto');
+      },
     });
     await bridge.handle({ type: 'settings.aiProfiles.probe', requestId: 'probe' });
     await bridge.handle({ type: 'settings.aiProfiles.test', id: 'cli', requestId: 'test' });
@@ -100,6 +106,9 @@ describe('HostBridge: preferências da pessoa', () => {
     router.setAiProfileRuntime({
       probe: async () => ({ type: 'aiProfiles.status', profiles: {} }),
       test: async (id) => ({ type: 'aiProfiles.testResult', id, ok, output: '', ...(ok ? {} : { error: 'falhou' }) }),
+      contextScope: async () => {
+        throw new Error('sem teste do contexto');
+      },
     });
     await bridge.handle({ type: 'settings.aiProfiles.test', id: 'cli', requestId: 'a' });
     ok = false;

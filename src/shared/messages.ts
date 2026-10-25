@@ -1,5 +1,6 @@
 import type { PolicyReply, PolicyScenario } from './policyManagement';
 import type { ToolMode } from './aiTools';
+import type { ContextLocation } from './contextScope';
 import type { ExecutionPolicy } from './executionPolicies';
 import type { ContextDraftResolution } from './contextDraftResolution';
 import type { ContextActivityTarget, ContextPlanningWrite, ActivityContextWrite } from './contextPlanning';
@@ -272,6 +273,18 @@ export type WebviewToHost =
   | { type: 'settings.aiProfiles.probe' }
   /** Faz um teste explícito, limitado a dois minutos, sem MCP nem ferramentas de alteração. */
   | { type: 'settings.aiProfiles.test'; id: string }
+  /**
+   * Testa o contexto do card do perfil (o que o agente carrega sozinho): o agente declara onde lê e o board confere
+   * pedindo que ele cite linhas desses arquivos, rodando como um card. Gasta pedidos da conta da ferramenta.
+   */
+  | { type: 'settings.aiProfiles.contextScope'; id: string }
+  /** Acrescenta ou tira um local que a pessoa sabe que o agente lê; a descoberta do agente não apaga os dela. */
+  | {
+      type: 'settings.aiProfiles.contextLocation';
+      id: string;
+      op: 'add' | 'remove';
+      location: Pick<ContextLocation, 'path' | 'scope' | 'kind'>;
+    }
   /**
    * Conecta (ou reconecta) um perfil do catálogo pelo driver dele (história 7). `apiKey` é a chave colada no
    * campo: vai só para o cofre do host e nunca volta. `acknowledge` é o clique na ciência do regime compatível.

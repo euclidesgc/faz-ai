@@ -12,6 +12,7 @@ import { ActionButton, Hint, IconCheck, IconExternal, IconWarning, SwitchField }
 import { AccountPanel } from './AccountPanel';
 import { connectable } from './AgentDetails';
 import { ConnectProgress, ModeSheetList } from './connectProgress';
+import { ContextScope } from './ContextScope';
 
 /** A ferramenta nesta máquina: achada (com a versão) ou não, com onde instalar. */
 function ToolStep({ item }: { item: AgentListItem }) {
@@ -223,6 +224,7 @@ export function AgentConnection({ item }: { item: AgentListItem }) {
       <ToolStep item={item} />
       <AccountPanel agentKey={item.key} name={item.name} profile={p} autoCheck={!!p && p.enabled && installed !== false} />
       {p && connectable(p) && <BoardConnection profile={p} />}
+      {p && <ContextScope profile={p} />}
       {p && !connectable(p) && (
         <Text as="p" size="1" color="gray">
           {t(

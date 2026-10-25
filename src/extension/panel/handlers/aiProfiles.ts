@@ -12,6 +12,11 @@ import { redactCredentialValues } from '../../credentials';
 import { profileInstallUrl } from '../../requirements';
 import { AiProfileRepo } from '../../repositories/aiProfileRepo';
 import type { HandlerMap } from './context';
+import { runContextScope } from '../../ai/contextScope';
+import { CONTEXT_KINDS, normalizeLocationPath, type ContextLocation, type ContextScopeReport } from '../../../shared/contextScope';
+
+/** A chave dos locais da pessoa na `meta` (a mesma do router, que a publica no estado). */
+const CONTEXT_EXTRA_KEY = 'ai_context_extra';
 
 /** Gravações de perfil são atos da pessoa; o repositório recusa a IA e mantém segredos fora do snapshot. */
 export const aiProfileHandlers = {
@@ -44,11 +49,33 @@ export const aiProfileHandlers = {
     else return ctx.boards.revokeCompatibilityReview(ctx.boardId, msg.id);
     return true;
   },
+  /** Um local do teste do contexto, acrescentado ou tirado pela pessoa (o router já recusa a IA e o MCP aqui). */
+  'settings.aiProfiles.contextLocation': (msg, ctx) => {
+    if (!new AiProfileRepo(ctx.dbHandle.db).list(ctx.boardId).some((p) => p.id === msg.id))
+      throw new Error(`Perfil indisponível neste board: ${msg.id}.`);
+    const path = normalizeLocationPath(msg.location.path);
+    if (!path) throw new Error('Informe o caminho do arquivo ou da pasta.');
+    if (!CONTEXT_KINDS.includes(msg.location.kind)) throw new Error('Tipo de local desconhecido.');
+    let all: Record<string, ContextLocation[]> = {};
+    try {
+      all = JSON.parse(ctx.boards.getMeta(CONTEXT_EXTRA_KEY) ?? '{}') as Record<string, ContextLocation[]>;
+    } catch {
+      // um valor estragado recomeça vazio
+    }
+    const scope = path.startsWith('~') || path.startsWith('/') ? 'user' : 'project';
+    const rest = (all[msg.id] ?? []).filter((l) => !(l.path === path && l.scope === scope));
+    const next: ContextLocation[] =
+      msg.op === 'add' ? [...rest, { path, scope, kind: msg.location.kind, loads: null, source: 'person' }] : rest;
+    ctx.boards.setMeta(CONTEXT_EXTRA_KEY, JSON.stringify({ ...all, [msg.id]: next }));
+    return true;
+  },
 } satisfies Partial<HandlerMap>;
 
 export interface AiProfileRuntime {
   probe(): Promise<Extract<HostToWebview, { type: 'aiProfiles.status' }>>;
   test(id: string): Promise<Extract<HostToWebview, { type: 'aiProfiles.testResult' }>>;
+  /** O teste do contexto do card (descoberta pelo agente e citação); gasta pedidos da conta da ferramenta. */
+  contextScope(id: string): Promise<ContextScopeReport>;
 }
 
 export interface AiProfileRuntimeDeps {
@@ -65,6 +92,11 @@ export interface AiProfileRuntimeDeps {
   signedIn?: typeof profileSignedIn;
   /** a chave da ferramenta está no cofre: é o login de quem entra por chave de API (o Gemini) */
   hasApiKey?: (tool: string) => boolean;
+  /** a versão do agente no último Conectar, para o teste do contexto vencer quando ela mudar */
+  contextVersion?: (id: string) => string | null;
+  /** os locais que a pessoa acrescentou ao teste do contexto */
+  contextExtra?: (id: string) => ContextLocation[];
+  log?: (line: string) => void;
 }
 
 /** Sondas e teste são assíncronos, portanto a HostBridge publica suas respostas; o router fica síncrono. */
@@ -72,6 +104,22 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
   const running = new Set<string>();
   const profiles = () => deps.repo.list(deps.boardId());
   return {
+    contextScope(id) {
+      return runContextScope(
+        {
+          repo: deps.repo,
+          gateway: deps.gateway,
+          boardId: deps.boardId,
+          cwd: deps.cwd,
+          homeDir: deps.homeDir,
+          ...(deps.runner ? { runner: deps.runner } : {}),
+          version: deps.contextVersion ?? (() => null),
+          extra: deps.contextExtra ?? (() => []),
+          ...(deps.log ? { log: deps.log } : {}),
+        },
+        id,
+      );
+    },
     async probe() {
       const results = await Promise.all(
         profiles().map(async (meta) => {
