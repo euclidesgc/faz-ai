@@ -54,6 +54,7 @@
 
 ### Corrigido
 
+- **Codex pelo ACP não conectava ("Pendentes: mcp/session-servers").** A verificação de capacidades fechava o agente logo depois de abrir a sessão, e o Codex só liga os servidores MCP depois disso. Além disso, dentro do editor o servidor de teste precisa de uma variável de ambiente que o Codex não repassa. A verificação agora espera até 10 segundos pela conexão e entrega a variável na própria definição do servidor, como já fazia com o servidor do board; a execução dos cards não tinha o problema.
 - **A tela deslocava ao abrir um seletor ou menu no editor.** A webview do VS Code dá 20 px de espaço lateral ao `body`, e a trava de scroll do Radix zerava esse espaço a cada abertura: tudo pulava para a esquerda e voltava ao fechar. O espaço lateral do editor passa para a raiz do app, e o `body` fica sem margem nem padding, de uma vez.
 - **Seletores de modelo agrupados por agente, com filtro por nome.** O campo Modelo do card e os seletores das Regras de fallback (modelo que falhou, destinos, simulador) mostram um grupo por agente e um campo para digitar parte do nome e filtrar a lista, em vez de uma lista longa sem busca.
 - **Regras de fallback: o teste ignora o intervalo entre tentativas.** O `backoffMs` da regra vale durante o uso do board; na simulação ele é zerado numa cópia, para a pessoa ver a decisão da regra sem esperar o intervalo (antes a resposta era "Aguarde o intervalo entre tentativas").

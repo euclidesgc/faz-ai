@@ -367,6 +367,12 @@ export interface VerifierDeps {
   /** substituível em testes: o handshake do agente ACP */
   probeAcp?(binding: string): Promise<AcpProbeRun>;
   /**
+   * quanto o handshake espera, depois do `session/new`, o agente conectar no servidor MCP de teste. O Codex
+   * (codex-acp 2.2.2) responde a sessão antes de iniciar os servidores: sem a espera, a sondagem fechava o processo
+   * antes da conexão e a capacidade de MCP nunca era provada
+   */
+  mcpWaitMs?: number;
+  /**
    * A chave do cofre para o `authenticate` de cada handshake (o agente com login por chave não abre a sessão
    * sem ela). Não entra no vínculo nem nos recibos: trocar a chave não muda o que a prova cobre.
    */
@@ -922,11 +928,12 @@ process.stdin.on('end', () => process.exit(0));
 
 /** Abre o agente uma vez: `initialize`, `session/new` com o servidor de teste, e fecha. Nada de `session/prompt`: não gasta a conta da pessoa. */
 async function acpHandshake(
-  deps: VerifierDeps,
+  deps: Pick<VerifierDeps, 'spawnAgent' | 'timeoutMs' | 'acpAuth' | 'mcpWaitMs'>,
   agent: AcpAgent,
   executable: string,
   cwd: string,
-  server: { command: string; args: string[] },
+  server: { command: string; args: string[]; env: { name: string; value: string }[] },
+  connected: () => boolean,
 ): Promise<AcpHandshake> {
   const result: AcpHandshake = { protocolVersion: null, agentCapabilities: null, sessionId: null, authRequired: false, error: null };
   const built = acpCommand(agent, { prompt: '', permission: 'board' });
@@ -963,9 +970,12 @@ async function acpHandshake(
     await acpAuthenticate(rpc, init, deps.acpAuth);
     const session = await rpc.request('session/new', {
       cwd,
-      mcpServers: [{ name: 'allowed', command: server.command, args: server.args, env: [] }],
+      mcpServers: [{ name: 'allowed', command: server.command, args: server.args, env: server.env }],
     });
     result.sessionId = asText(session.sessionId);
+    // o agente pode iniciar os servidores depois de responder a sessão: espera a conexão antes de fechar o processo
+    const until = Date.now() + (deps.mcpWaitMs ?? 10_000);
+    while (!connected() && !exited && Date.now() < until) await new Promise((r) => setTimeout(r, 100));
   } catch (e) {
     if (e instanceof RpcError && e.code === AUTH_REQUIRED) result.authRequired = true;
     result.error = e instanceof Error ? e.message : String(e);
@@ -981,7 +991,13 @@ async function acpHandshake(
 }
 
 /** A sondagem do agente ACP numa fixture descartável: dois handshakes e o servidor MCP de teste. */
-async function runAcpProbes(deps: VerifierDeps, agent: AcpAgent, executable: string): Promise<AcpProbeRun> {
+export async function runAcpProbes(
+  deps: Pick<VerifierDeps, 'spawnAgent' | 'timeoutMs' | 'acpAuth' | 'mcpWaitMs'> & {
+    admission: Pick<ExecutionAdmission, 'environmentDigest'>;
+  },
+  agent: AcpAgent,
+  executable: string,
+): Promise<AcpProbeRun> {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-verify-acp-'));
   fs.chmodSync(root, 0o700);
   const project = path.join(root, 'project');
@@ -989,10 +1005,14 @@ async function runAcpProbes(deps: VerifierDeps, agent: AcpAgent, executable: str
   const marker = path.join(root, 'mcp-connected');
   fs.mkdirSync(project, { recursive: true, mode: 0o700 });
   write(script, MCP_PROBE_SERVER);
-  const server = { command: process.execPath, args: [script, marker] };
+  // no editor o `process.execPath` é o Electron, que só roda o script como node com ELECTRON_RUN_AS_NODE. A
+  // variável vai na própria entrada do servidor, como a do servidor do board (`runner.ts`): o Codex inicia os
+  // servidores MCP com o ambiente filtrado, e a herdada do editor não chegava
+  const server = { command: process.execPath, args: [script, marker], env: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }] };
+  const connected = () => fs.existsSync(marker);
   try {
-    const first = await acpHandshake(deps, agent, executable, project, server);
-    const second = await acpHandshake(deps, agent, executable, project, server);
+    const first = await acpHandshake(deps, agent, executable, project, server, connected);
+    const second = await acpHandshake(deps, agent, executable, project, server, connected);
     return { first, second, mcpConnected: fs.existsSync(marker), environmentDigest: deps.admission.environmentDigest() };
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
