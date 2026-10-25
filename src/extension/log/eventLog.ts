@@ -33,7 +33,7 @@ export interface Probe {
 }
 
 export interface EventLogDeps {
-  /** muda quando o board é recriado (settings.board.reset) */
+  /** muda quando um export é importado no lugar do board */
   boardId: () => string;
   /** canal de log; as falhas vão para lá e a operação segue */
   log?: (line: string) => void;

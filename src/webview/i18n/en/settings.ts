@@ -141,17 +141,10 @@ export const settings: Record<string, string> = {
   'Atualizar board': 'Update board',
   'Leva este board ao padrão atual da extensão, sem mover nenhum card':
     "Brings this board to the extension's current default, without moving any card",
-  'Recriar o board do zero?': 'Recreate the board from scratch?',
-  'Todos os {count} card(s), conversas, anexos e configurações deste board serão apagados, e o board volta ao padrão. Isso não pode ser desfeito. Regras e skills do projeto não são afetadas.':
-    "All {count} card(s), conversations, attachments and settings of this board will be deleted, and the board goes back to the default. This can't be undone. Project rules and skills are not affected.",
-  'Apagar tudo e recriar': 'Delete everything and recreate',
-  'Recriar board padrão': 'Recreate default board',
   'Depende de <b>{label}</b> (agora: {state})': 'Depends on <b>{label}</b> (now: {state})',
   'Depende de <b>{label}</b>': 'Depends on <b>{label}</b>',
   'Abrir {label}, {hint}': 'Open {label}, {hint}',
   abrir: 'open',
-  'Apaga todos os cards e configurações e recria o board com o padrão atual':
-    'Deletes all cards and settings and recreates the board with the current default',
   'Prévia do card do tipo {typeName}': 'Preview of the {typeName} card type',
   'Título do card': 'Card title',
   'Texto difícil de ler nesta cor.': 'Text is hard to read on this color.',

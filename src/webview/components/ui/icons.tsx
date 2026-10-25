@@ -48,7 +48,6 @@ import {
   Plug,
   Plus,
   Quote,
-  RotateCcw,
   Scale,
   Shapes,
   UserCog,
@@ -158,7 +157,6 @@ export const IconModels = icon(Cpu, 'IconModels');
 export const IconAppearance = icon(Palette, 'IconAppearance');
 export const IconConnect = icon(Plug, 'IconConnect');
 export const IconUpgrade = icon(CircleArrowUp, 'IconUpgrade');
-export const IconReset = icon(RotateCcw, 'IconReset');
 export const IconBackup = icon(DatabaseBackup, 'IconBackup');
 export const IconDoctor = icon(Stethoscope, 'IconDoctor');
 export const IconOk = icon(CircleCheck, 'IconOk');

@@ -41,6 +41,7 @@
 
 ### Removido
 
+- **Recriar board padrão.** O item que apagava o board inteiro e o recriava com o padrão saiu de Configurações, junto com a ferramenta MCP `reset_board`. Para levar o board ao padrão atual sem perder cards, use **Atualizar board**; para recomeçar de um board salvo, use **Importar** em Backup.
 - **Telas Ferramentas de IA e Modelos de IA.** O conteúdo delas foi para Conectar agentes: o Conectar, os perfis de CLI, o perfil personalizado (pelo botão **Agente personalizado (CLI)**), as capacidades e a ciência ficam no agente; o catálogo de modelos, na aba Modelos dele; as regras de sugestão e as políticas de execução, no fim da tela. Um link antigo para essas abas abre Conectar agentes.
 - **Comando "Faz AI: Verificar o isolamento da CLI de IA" (ferramenta por modo, história 13).** A verificação de capacidades não tem mais comando à parte: ela roda no **Conectar** e no **Reconectar** (o Claude Code e o Gemini pela CLI inclusive), sozinha quando você liga um agente ACP e por **Verificar capacidades** em Ferramentas de IA, nos perfis que não passam pelo Conectar. Nenhuma das sondas gasta a sua conta.
 - **Campo Agente ACP no perfil personalizado novo (ferramenta por modo, história 13).** Um agente ACP entra pelo **Conectar ferramenta**, e o board recusa transformar uma CLI personalizada em agente ACP. O Cursor e o Kimi Code pelo ACP, que só existiam por esse campo, seguem nos personalizados já criados até o teste real deles.

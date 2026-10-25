@@ -192,7 +192,6 @@ export const settings = {
   /** As sondas de capacidade do perfil sem Conectar (a cópia do Claude, o personalizado ACP); a do Claude leva minutos. */
   verifyAiProfile: (id: string) => request({ type: 'settings.aiProfiles.verify', id }, { timeout: 600_000 }),
   updateBoard: (patch: BoardPatch) => req({ type: 'settings.board.update', patch }),
-  resetBoard: () => req({ type: 'settings.board.reset' }),
   upgradeBoard: () => req({ type: 'settings.board.upgrade' }),
   createWorkflow: (name: string, kind: WorkflowKind) => req({ type: 'settings.workflow.create', name, kind }),
   updateWorkflow: (workflowId: Id, patch: PatchOf<'settings.workflow.update'>) =>

@@ -3,8 +3,8 @@ import type { Id } from '../../../shared/model';
 import { workflowDeleteBlocker } from '../../../shared/selectors';
 import { upgradeBoard } from '../../db/boardTemplate';
 import type { BoardContext, HandlerMap } from './context';
-import { clearRenames, guardGitPatch, registerRenames } from './branchRename';
-import { applyFastModels, initModels, useTool } from './models';
+import { guardGitPatch, registerRenames } from './branchRename';
+import { applyFastModels, useTool } from './models';
 
 /** Configurações do board: colunas, tipos, campos, workflows, regras, agentes de execução e o próprio board. */
 export const boardSettingsHandlers = {
@@ -80,14 +80,6 @@ export const boardSettingsHandlers = {
     ctx.boards.updateBoard(ctx.boardId, msg.patch);
     if (renames) registerRenames(ctx, renames);
     if (msg.patch.aiTool) useTool(ctx, ctx.state().board.aiTool);
-    return true;
-  },
-  'settings.board.reset': (_msg, ctx) => {
-    ctx.boards.deleteBoard(ctx.boardId).forEach((id) => ctx.store.removeCard(id));
-    ctx.boardId = ctx.boards.getOrCreate(ctx.opts.workspaceKey, ctx.opts.folderName).id;
-    initModels(ctx);
-    clearRenames(ctx);
-    ctx.harness.load();
     return true;
   },
   'settings.board.upgrade': (_msg, ctx) => {

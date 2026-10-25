@@ -23,7 +23,6 @@ export const board: Record<string, string> = {
   'Carregando board…': 'Loading board…',
   'Carregando…': 'Loading…',
   'Isso leva alguns segundos.': 'This takes a few seconds.',
-  'Recriando o board…': 'Recreating the board…',
   'Atualizando o board…': 'Updating the board…',
   'Importando o board…': 'Importing the board…',
   'Esvaziando a lixeira…': 'Emptying the trash…',

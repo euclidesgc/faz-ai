@@ -62,7 +62,7 @@ export class BoardContext {
   readonly importer: ArtifactImporter;
   /** o log de utilização: sonda antes do handler e registro depois, feitos pelo router */
   readonly log: EventLog;
-  /** muda quando o board é recriado (settings.board.reset) */
+  /** muda quando um export é importado no lugar do board (backup.import.apply) */
   boardId: string;
   /** cards aprovados por uma pessoa; o router avisa depois de gravar */
   readonly approved: string[] = [];

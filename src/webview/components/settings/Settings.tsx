@@ -17,7 +17,6 @@ import { RequirementsAlertIcon, useRequirementsAlert } from '../RequirementsBann
 import {
   Button,
   Hint,
-  DeleteButton,
   FormField,
   IconAppearance,
   IconBackup,
@@ -29,7 +28,6 @@ import {
   IconHarness,
   IconPanelClose,
   IconPanelOpen,
-  IconReset,
   IconRules,
   IconTypes,
   IconUpgrade,
@@ -156,18 +154,6 @@ export function Settings() {
               title={t('Leva este board ao padrão atual da extensão, sem mover nenhum card')}
             />
           )}
-          <DeleteButton
-            variant="ghost"
-            question={t('Recriar o board do zero?')}
-            message={t(
-              'Todos os {count} card(s), conversas, anexos e configurações deste board serão apagados, e o board volta ao padrão. Isso não pode ser desfeito. Regras e skills do projeto não são afetadas.',
-              { count: state.cards.length },
-            )}
-            confirmLabel={t('Apagar tudo e recriar')}
-            onConfirm={() => withOverlay(t('Recriando o board…'), () => settings.resetBoard())}
-            {...navProps(collapsed, t('Recriar board padrão'), IconReset)}
-            title={t('Apaga todos os cards e configurações e recria o board com o padrão atual')}
-          />
         </div>
       </div>
       <div className="settings-main">

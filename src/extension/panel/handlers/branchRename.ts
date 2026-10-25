@@ -105,14 +105,8 @@ export function registerRenames(ctx: BoardContext, { changes, changed }: RenameC
   ctx.mainBranch(true);
 }
 
-/** O board foi recriado: os pedidos e o resultado de antes não valem mais. */
 /** Há pedido de renomeação à espera de resposta: criar branches espera, para não criar o nome novo antes da hora. */
 export const hasPendingRename = (ctx: BoardContext): boolean => readPending(ctx).length > 0;
-
-export function clearRenames(ctx: BoardContext): void {
-  writePending(ctx, []);
-  writeResult(ctx, null);
-}
 
 /** Renomear, Desfazer ou dispensar o resultado: as três respostas do aviso. */
 export const branchRenameHandlers = {

@@ -540,7 +540,7 @@ describe('harness e padrões pelo MCP', () => {
     expect((await call('read_rule_file', { file: 'temporaria' })).error).toBe(true);
   });
 
-  it('aplica os padrões do tipo aos cards novos e recria o board', async () => {
+  it('aplica os padrões do tipo aos cards novos', async () => {
     // a Fase não tem padrão por tipo: ela é a fase da história a que cada sub-tarefa pertence
     const phase = await call('update_card_type', { type: 'Sub-tarefa', default_fields: { Fase: 'Implementação' } });
     expect(phase.text).toContain('não tem valor padrão por tipo');
@@ -559,11 +559,6 @@ describe('harness e padrões pelo MCP', () => {
     // o valor informado vence o padrão, e a IA grava a Fase
     expect(sub.fields).toEqual({ Fase: 'Spec', 'Esforço da atividade': 'Alto', Modelo: 'Claude Code · Sonnet 5.5 · high' });
     expect((await call('get_card', { card: 1 })).data.fields).toBeUndefined();
-
-    const fresh = (await call('reset_board')).data;
-    expect(fresh.workflows[0].columns.every((c: any) => c.cards === 0)).toBe(true);
-    expect(fresh.cardTypes.find((t: any) => t.name === 'Sub-tarefa').defaultFields).toBeUndefined();
-    expect((await call('create_card', { title: 'Nova' })).data.id).toBe('#1');
   });
 });
 

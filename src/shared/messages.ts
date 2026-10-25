@@ -258,7 +258,6 @@ export type WebviewToHost =
       patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance>; runner?: Partial<RunnerConfig>; git?: Partial<GitConfig> };
     }
   /** apaga tudo e recria o board com o padrão atual */
-  | { type: 'settings.board.reset' }
   /** leva o board ao padrão atual sem recriá-lo: só acrescenta e completa, os cards não saem do lugar */
   | { type: 'settings.board.upgrade' }
   /** Cria ou atualiza um perfil de CLI; os valores privados ficam somente no host. */

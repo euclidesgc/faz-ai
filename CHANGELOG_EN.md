@@ -41,6 +41,7 @@
 
 ### Removed
 
+- **Recreate default board.** The item that deleted the whole board and recreated it with the default left Settings, along with the `reset_board` MCP tool. To bring the board to the current default without losing cards, use **Atualizar board** (update board); to start over from a saved board, use **Importar** (import) in Backup.
 - **The Ferramentas de IA (AI tools) and Modelos de IA (AI models) screens.** Their content moved to Conectar agentes: Connect, the CLI profiles, the custom profile (through the **Agente personalizado (CLI)** button), the capabilities and the acknowledgment live on the agent; the model catalog, on its Models tab; the suggestion rules and the execution policies, at the end of the screen. An old link to those tabs opens Conectar agentes.
 - **The "Faz AI: Verify the AI CLI isolation" command (tool per mode, story 13).** The capability check no longer has a command of its own: it runs in **Connect** and **Reconnect** (Claude Code and Gemini over the CLI included), on its own when you turn on an ACP agent, and through **Check capabilities** in AI tools, for the profiles that do not go through Connect. None of the probes spends your account.
 - **The ACP agent field in a new custom profile (tool per mode, story 13).** An ACP agent comes in through **Connect a tool**, and the board refuses to turn a custom CLI into an ACP agent. Cursor and Kimi Code over ACP, which only existed through that field, stay in the custom profiles already created until their real-world test.

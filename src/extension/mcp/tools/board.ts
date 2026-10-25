@@ -180,14 +180,4 @@ export function registerBoardRulesTools(tool: DefineTool): void {
       return router.handle({ type: 'settings.rules.update', patch }).board.rules;
     },
   );
-
-  tool(
-    'reset_board',
-    'APAGA o board inteiro (cards, comentários, anexos e configurações) e recria com o padrão. Não pode ser desfeito: confirme com a pessoa antes.',
-    {},
-    (_a, router) => {
-      router.handle({ type: 'settings.board.reset' });
-      return overview(router);
-    },
-  );
 }

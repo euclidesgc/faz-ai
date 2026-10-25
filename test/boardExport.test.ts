@@ -18,6 +18,7 @@ import { newDatabase, openFile } from '../src/extension/db/database';
 import { migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
 import type { BoardState } from '../src/shared/model';
 import { all, run, str } from '../src/extension/db/query';
+import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
 import { LARGE_EXPORT_BYTES } from '../src/shared/backup';
@@ -264,6 +265,11 @@ function comparable(s: BoardState) {
 const readAll = (r: MessageRouter) =>
   Object.fromEntries(r.snapshot().attachments.map((a) => [a.id, fs.readFileSync(r.store.pathOf(a)).toString('base64')]));
 
+/** Apaga o board da pasta (com os anexos) e reabre a pasta: o roteador cria um board vazio no lugar. */
+function wipe(): void {
+  new BoardRepo(db).deleteBoard(router.boardId).forEach((id) => router.store.removeCard(id));
+  router = openRouter(db, 'ws-a', 'A');
+}
 const target = (r: MessageRouter, backup?: () => void) => ({ db, backup, store: r.store, workspaceKey: 'ws-a', boardId: r.boardId });
 
 describe('importBoard', () => {
@@ -272,7 +278,7 @@ describe('importBoard', () => {
     router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true } } } as never);
     expect(router.snapshot().board.runner.compatibilityReviews).toEqual({ gemini: 1 });
     const text = JSON.stringify(doExport().file);
-    router.handle({ type: 'settings.board.reset' });
+    wipe();
     importBoard(target(router), parseExportFile(text));
     const runner = openRouter(db, 'ws-a', 'A').snapshot().board.runner;
     expect(runner.compatibilityReviews).toEqual({});
@@ -286,8 +292,8 @@ describe('importBoard', () => {
     const { file } = doExport();
     const text = JSON.stringify(file);
 
-    // apaga o board da pasta e deixa o roteador recriar um vazio, como "Recriar board padrão" faz
-    router.handle({ type: 'settings.board.reset' });
+    // apaga o board da pasta e reabre: o roteador cria um vazio no lugar
+    wipe();
     expect(router.snapshot().cards).toHaveLength(0);
     expect(fs.existsSync(router.store.pathOf(router.snapshot().attachments[0] ?? { cardId: storyId, storedName: 'x' }))).toBe(false);
 
