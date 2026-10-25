@@ -535,7 +535,10 @@ export class HostBridge {
         return;
       case 'settings.models.detect':
         // num perfil ACP a lista vem do agente, por uma sessão aberta agora; nos outros, da última leitura da CLI
-        if (!msg.fastOnly) await this.router.readAcpModels(msg.tool);
+        if (!msg.fastOnly) {
+          await this.router.readAcpModels(msg.tool);
+          await this.router.readToolModels(msg.tool);
+        }
         this.router.handle(msg);
         return;
       case 'harness.import.apply': {

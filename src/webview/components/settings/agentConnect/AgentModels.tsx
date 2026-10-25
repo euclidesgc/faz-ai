@@ -3,6 +3,8 @@ import { Button, Card, IconButton, Text, TextField } from '@radix-ui/themes';
 import { catalogTool, isAcpProfile, isReadyCli, type AiBase, type AiProfile } from '../../../../shared/aiProfiles';
 import type { AiTool } from '../../../../shared/harness';
 import { modelId, type ModelOption } from '../../../../shared/models';
+import { olderThan } from '../../../../shared/claudeModelDocs';
+import { useAgentConnectStore } from '../../../store/agentConnectStore';
 import { settings } from '../../../commands';
 import { formatDateTime, t } from '../../../i18n';
 import { useBoardStore } from '../../../store/boardStore';
@@ -18,7 +20,8 @@ const splitList = (s: string): string[] =>
 
 /** De onde vem a lista de modelos de cada CLI pronta ao clicar em "Detectar". */
 const SOURCES: Record<AiBase, string> = {
-  claude: 'lista embutida na extensão (o Claude Code não guarda a lista em arquivo)',
+  claude:
+    'lida da página de modelos da documentação do Claude Code (a CLI não lista os modelos), com a versão mínima de cada um; sem rede, lista embutida na extensão',
   cursor: 'lida do comando cursor-agent models, com a conta em uso; sem a CLI autenticada, lista embutida na extensão',
   kimi: 'lida do comando kimi provider list --json, com os provedores configurados; sem a CLI, lista embutida na extensão',
 };
@@ -112,6 +115,10 @@ export function AgentModels({ profile }: { profile: AiProfile }) {
   const board = useBoardStore((s) => s.state!.board);
   const catalog = board.modelCatalog;
   const tool = catalogTool(profile);
+  // a versão instalada, para o aviso do modelo que pede uma CLI mais nova (a sonda do perfil, ou a do Conectar)
+  const probed = useAgentConnectStore((s) => s.statuses[profile.id]?.version);
+  const connected = useBoardStore((s) => s.state?.connections?.[profile.id]?.summary.version);
+  const installed = probed ?? connected;
   const [adding, setAdding] = useState(false);
   const detect = useAction(() => settings.detectModels(tool));
   // as mudanças partem da última lista enviada (ver useSentList)
@@ -135,7 +142,8 @@ export function AgentModels({ profile }: { profile: AiProfile }) {
       <div className="row wrap agent-models-head">
         <Text size="2" color="gray">
           {t('{count} modelo(s)', { count: mine.length })}
-          {readAt > 0 && ` · ${t('lista lida da ferramenta em {date}', { date: formatDateTime(readAt) })}`}
+          {readAt > 0 &&
+            ` · ${t(profile.base === 'claude' ? 'lista lida da documentação em {date}' : 'lista lida da ferramenta em {date}', { date: formatDateTime(readAt) })}`}
         </Text>
         <div className="row">
           {detectable && (
@@ -208,6 +216,15 @@ export function AgentModels({ profile }: { profile: AiProfile }) {
                   }
                   onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                 />
+                {/* a CLI mais velha que a documentação pede: o apelido roda um modelo anterior a este */}
+                {o.requires && olderThan(installed, o.requires) && (
+                  <Text as="p" size="1" color="amber" className="model-requires">
+                    {t('Pede o Claude Code v{required} ou mais novo; o instalado é {installed}. Rode claude update.', {
+                      required: o.requires,
+                      installed: installed ?? '?',
+                    })}
+                  </Text>
+                )}
               </td>
               <td>
                 <code>{o.model}</code>

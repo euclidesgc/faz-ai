@@ -519,11 +519,11 @@ describe('harness e padrões pelo MCP', () => {
     expect(fs.existsSync(path.join(dir, '.claude', 'skills'))).toBe(false);
 
     // skill marcada no card aparece como obrigatória, com o caminho do SKILL.md
-    const created = (await call('create_card', { title: 'História', fields: { Skills: ['revisar-spec'], Modelo: 'Claude Haiku 4.5' } }))
+    const created = (await call('create_card', { title: 'História', fields: { Skills: ['revisar-spec'], Modelo: 'Claude Haiku 5.5' } }))
       .data;
     const card = (await call('get_card', { card: created.id })).data;
     expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', scope: 'board', path: libraryPath('skill', 'revisar-spec') }]);
-    expect(card.model).toMatchObject({ tool: 'claude', model: 'haiku', effort: null, value: 'claude:haiku' });
+    expect(card.model).toMatchObject({ tool: 'claude', model: 'haiku', effort: 'medium', value: 'claude:haiku@medium' });
 
     expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual(copiedSkill('revisar-spec'));
     expect(fs.existsSync(path.join(dir, '.claude'))).toBe(false);
@@ -726,7 +726,7 @@ describe('modelos de IA', () => {
     expect(cursor.catalog.some((o: any) => o.tool === 'cursor')).toBe(true);
     // as faixas de esforço de outro perfil (Claude) ficam; as do perfil sugerido (Cursor) entram
     expect(cursor.rules.map((r: any) => r.value)).toEqual([
-      'claude:haiku',
+      'claude:haiku@medium',
       'claude:sonnet@medium',
       'claude:opus@high',
       'cursor:auto',
@@ -800,14 +800,14 @@ describe('modelos de IA', () => {
     // regras iniciais: Esforço Baixo/Médio/Alto → modelo leve/intermediário/forte da primeira ferramenta
     const rules = (await call('get_models')).data.rules;
     expect(rules.map((r: any) => [r.when, r.value])).toEqual([
-      ['Esforço da atividade = Baixo', 'claude:haiku'],
+      ['Esforço da atividade = Baixo', 'claude:haiku@medium'],
       ['Esforço da atividade = Médio', 'claude:sonnet@medium'],
       ['Esforço da atividade = Alto', 'claude:opus@high'],
     ]);
 
     const created = (await call('create_card', { title: 'H', fields: { Esforço: 'Baixo' } })).data;
     const card = (await call('get_card', { card: created.id })).data;
-    expect(card.model.value).toBe('claude:haiku');
+    expect(card.model.value).toBe('claude:haiku@medium');
     // a nota diz o que fazer com o modelo e separa o esforço do modelo do "Esforço da atividade"
     expect(card.model.note).toMatch(/Execute com este modelo e esforço[\s\S]*avise a pessoa/);
     expect(card.model.note).toContain('"Esforço da atividade" é o tamanho da tarefa');
@@ -828,7 +828,7 @@ describe('modelos de IA', () => {
     });
     // o resumo do create_card traz o campo Modelo gravado; o valor normalizado vem pelo get_card
     const doc = (await call('create_card', { title: 'Doc', fields: { Tags: ['docs'], Esforço: 'Alto' } })).data;
-    expect((await call('get_card', { card: doc.id })).data.model.value).toBe('claude:haiku');
+    expect((await call('get_card', { card: doc.id })).data.model.value).toBe('claude:haiku@medium');
     const cursor = (await call('suggest_model_rules', { tool: 'cursor' })).data.rules;
     // a faixa de esforço do Claude (outro perfil) é preservada, as do Cursor são substituídas
     expect(cursor.filter((r: any) => r.when.startsWith('Esforço')).map((r: any) => r.value)).toEqual([
@@ -929,7 +929,7 @@ describe('regras de modelo com E e OU', () => {
     expect(await modelOf({ Esforço: 'Alto', Tags: ['frontend'] })).toBe('claude:opus@high'); // só uma: cai na regra seguinte
     expect(await modelOf({ Esforço: 'Médio' }, 'Bug')).toBe('claude:fable@max'); // OU: segundo grupo, com negação
     expect(await modelOf({ Esforço: 'Baixo' }, 'Bug')).toBeUndefined(); // a negação falha e nenhuma outra casa
-    expect(await modelOf({ Tags: ['docs'] })).toBe('claude:haiku'); // a regra desligada é pulada
+    expect(await modelOf({ Tags: ['docs'] })).toBe('claude:haiku@medium'); // a regra desligada é pulada
     expect((await call('set_model_rules', { rules: [{ when: [[{ field: 'Inexistente', value: 'x' }]], model: 'haiku' }] })).error).toBe(
       true,
     );

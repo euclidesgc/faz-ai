@@ -11,15 +11,16 @@ const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
 /**
  * Modelos conhecidos de cada ferramenta, conforme a documentação delas quando isto foi escrito.
- * É só o ponto de partida: o catálogo é editável no board e, quando a ferramenta informa a lista
- * (o Cursor), `discoverModels` usa a lista real.
+ * É só o ponto de partida: o catálogo é editável no board e, quando dá para ler a lista (o comando do Cursor e do
+ * Kimi Code, a página de modelos do Claude Code), `discoverModels` usa a lista real. A do Claude Code abaixo é a
+ * reserva para quando a página não carrega (conferida nela em 2026-10-25).
  */
 const BUILTIN: Record<AiBase, Seed[]> = {
   claude: [
     ['fable', 'Fable 5.1', CLAUDE_EFFORTS, 'high'],
     ['opus', 'Opus 5.5', CLAUDE_EFFORTS, 'medium'],
     ['sonnet', 'Sonnet 5.5', CLAUDE_EFFORTS, 'medium'],
-    ['haiku', 'Haiku 4.5', [], null],
+    ['haiku', 'Haiku 5.5', CLAUDE_EFFORTS, 'medium'],
   ],
   // ids conferidos em `cursor-agent models` (2026-10-05); a lista real da conta vem desse comando
   cursor: [

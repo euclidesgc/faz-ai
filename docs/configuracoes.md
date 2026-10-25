@@ -220,7 +220,13 @@ catálogo, sem confirmação.
 
 **Detectar modelos** lê a lista da ferramenta: no Cursor, dos modelos da sua conta, pelo comando
 `cursor-agent models`, lido ao abrir o board com a CLI autenticada, e a primeira lista lida
-substitui a embutida uma vez só; no Claude Code, uma lista embutida que pode ser editada. Num agente pelo
+substitui a embutida uma vez só. O Claude Code não tem comando que liste os modelos: no Conectar e no
+**Detectar modelos**, o board lê a [página de modelos da documentação oficial](https://code.claude.com/docs/en/model-config)
+(em Markdown) e tira dela, para cada apelido que roda (`fable`, `opus`, `sonnet`, `haiku`), o nome do
+modelo na API da Anthropic, os níveis de esforço, o esforço padrão e a versão mínima do Claude Code. A aba
+diz "lista lida da documentação" com a data, e um modelo que pede uma CLI mais nova que a instalada avisa,
+com o `claude update`: numa CLI mais velha, o apelido roda o modelo anterior. Sem rede, vale a lista embutida
+na extensão. Num agente pelo
 ACP, o botão abre uma sessão com o agente (`initialize` e `session/new`, sem pedido, então sem gastar a
 sua conta) e lê os modelos que ele anuncia: o seletor de modelo das opções da sessão, no esquema atual do
 protocolo, ou o bloco `models` da forma anterior, que o Gemini CLI ainda usa. O modelo atual do agente

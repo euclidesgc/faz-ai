@@ -13,3 +13,6 @@ board-harness/
 .kimi-code/
 
 .cursor/
+
+# trecho da documentação do Claude Code como a página publica: a leitura é testada contra o original
+test/fixtures/claude-model-config.md

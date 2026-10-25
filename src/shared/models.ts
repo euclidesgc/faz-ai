@@ -26,6 +26,11 @@ export interface ModelOption {
    * de quando é o catálogo, e um catálogo velho (a conta mudou de plano, o Google tirou um modelo) fica visível.
    */
   readAt?: number;
+  /**
+   * a versão mínima da CLI para o modelo, quando a documentação da ferramenta diz (o Claude Code); a tela de Modelos
+   * avisa quando a CLI instalada é mais velha, porque aí o apelido roda um modelo anterior
+   */
+  requires?: string;
 }
 
 /** Campo especial usado em condições: o tipo do card. */
@@ -105,7 +110,8 @@ export const modelLabel = (catalog: ModelOption[], value: FieldValue | undefined
 /**
  * Janela de contexto, em tokens, dos modelos que o board conhece, pelo nome que a ferramenta aceita.
  * Claude: a tabela de modelos da Anthropic (cache de 2026-10-06): Fable 5.1, Opus 5.5, Sonnet 5.5 e
- * Haiku 5.5 com 1M; Haiku 4.5 com 200 mil (o `haiku` do catálogo embutido é o Haiku 4.5). Um modelo fora
+ * Haiku 5.5 com 1M; Haiku 4.5 com 200 mil. O apelido `haiku` é o Haiku 5.5 desde o Claude Code v2.1.293 (a página
+ * de modelos da documentação, lida no Conectar); numa CLI mais velha ele roda o 4.5. Um modelo fora
  * daqui, como os do Cursor, fica sem janela: a tela não inventa o tamanho.
  */
 const CONTEXT_WINDOWS: Partial<Record<AiBase, Record<string, number>>> = {
@@ -113,7 +119,7 @@ const CONTEXT_WINDOWS: Partial<Record<AiBase, Record<string, number>>> = {
     fable: 1_000_000,
     opus: 1_000_000,
     sonnet: 1_000_000,
-    haiku: 200_000,
+    haiku: 1_000_000,
     'claude-fable-5-1': 1_000_000,
     'claude-opus-5-5': 1_000_000,
     'claude-sonnet-5-5': 1_000_000,

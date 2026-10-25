@@ -49,7 +49,7 @@ describe('Conectar agentes: os modelos do agente', () => {
 
   it('com a lista lida da ferramenta, a tela diz a data da leitura; só a embutida, não diz (história 12)', () => {
     const { unmount } = show();
-    expect(screen.queryByText(/lista lida da ferramenta em/)).toBeNull();
+    expect(screen.queryByText(/lista lida da (ferramenta|documentação) em/)).toBeNull();
     unmount();
     const catalog = state().board.modelCatalog;
     const first = catalog.findIndex((m) => m.tool === tool());
@@ -61,7 +61,31 @@ describe('Conectar agentes: os modelos do agente', () => {
       },
     });
     show();
-    expect(screen.getByText(/lista lida da ferramenta em .*15:07/)).toBeInTheDocument();
+    // o Claude Code não lista os modelos: a lista dele vem da página de modelos da documentação
+    expect(screen.getByText(/lista lida da documentação em .*15:07/)).toBeInTheDocument();
+  });
+
+  it('o modelo que pede uma CLI mais nova que a instalada avisa, com o comando para atualizar', () => {
+    const catalog = state().board.modelCatalog.map((m) =>
+      m.id === 'claude:haiku' ? { ...m, label: 'Haiku 5.5', requires: '2.1.293', fromTool: true as const } : m,
+    );
+    const withVersion = (version: string) =>
+      useBoardStore.setState({
+        state: {
+          ...state(),
+          board: { ...state().board, modelCatalog: catalog },
+          connections: { claude: { profileId: 'claude', step: 'models', status: 'connected', summary: { version } } },
+        },
+      });
+    withVersion('2.1.280 (Claude Code)');
+    const { unmount } = show();
+    expect(
+      screen.getByText('Pede o Claude Code v2.1.293 ou mais novo; o instalado é 2.1.280 (Claude Code). Rode claude update.'),
+    ).toBeInTheDocument();
+    unmount();
+    withVersion('2.1.310 (Claude Code)');
+    show();
+    expect(screen.queryByText(/Pede o Claude Code/)).toBeNull();
   });
 
   it('o rascunho recusa um identificador que já existe', async () => {

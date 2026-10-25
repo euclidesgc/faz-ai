@@ -415,6 +415,11 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
         const driver = driverOf(profile);
         if (!driver?.listModels) return null;
         const found = await driver.listModels(exe, pathEnv);
+        // sem lista (o Claude Code sem rede para a documentação): o catálogo fica com a embutida, e o resumo diz isso
+        if (!found.length) {
+          router.handle({ type: 'settings.models.detect', tool });
+          return null;
+        }
         rememberModels(tool, found);
         count = found.length;
       }
@@ -426,6 +431,15 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     publish: () => router.setConnections(connector.snapshot(router.snapshot().board.aiProfiles.map((p) => p.id))),
     redact: (text) => router.redactCredentials(text),
     log: o.log,
+  });
+  // "Detectar modelos" de uma CLI que tem de onde ler a lista (o Claude Code pela documentação, o Cursor e o Kimi
+  // Code pelo comando): lê de novo antes de juntar ao catálogo, e não só a última leitura do Conectar
+  router.onReadToolModels(async (profile) => {
+    const driver = driverOf(profile);
+    if (!driver?.listModels || isAcpProfile(profile)) return;
+    const exe = resolveProfileCommand(profile, pathEnv, homeDir);
+    if (!exe) return;
+    rememberModels(catalogTool(profile), await driver.listModels(exe, pathEnv));
   });
   // o fim do Conectar muda o login, a prova e os modelos do perfil: a faixa de requisitos confere de novo
   router.onConnect((id, input) =>

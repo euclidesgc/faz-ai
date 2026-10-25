@@ -239,7 +239,13 @@ trash icon removes it from the catalog, without confirmation.
 
 **Detectar modelos** (detect models) reads the tool's list: for Cursor, the models of your account,
 through the `cursor-agent models` command, read when the board opens with the CLI signed in, and the
-first list read replaces the built-in one only once; for Claude Code, a built-in list you can edit. On
+first list read replaces the built-in one only once. Claude Code has no command that lists the models: on
+Connect and on **Detectar modelos**, the board reads the [models page of the official
+documentation](https://code.claude.com/docs/en/model-config) (in Markdown) and takes from it, for each alias it
+runs (`fable`, `opus`, `sonnet`, `haiku`), the model name on the Anthropic API, the effort levels, the default
+effort and the minimum Claude Code version. The tab says "list read from the documentation" with the date, and a
+model that needs a newer CLI than the installed one warns, with `claude update`: on an older CLI, the alias runs
+the previous model. Without network, the list built into the extension applies. On
 an agent over ACP, the button opens a session with the agent (`initialize` and `session/new`, with no
 prompt, so it does not spend your account) and reads the models it announces: the model selector among
 the session config options, in the protocol's current schema, or the `models` block of the earlier

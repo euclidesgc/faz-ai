@@ -321,6 +321,17 @@ export class MessageRouter {
     this.acpModelsReader = fn;
   }
   /** Lê os modelos do agente quando `tool` é um perfil ACP; nos outros perfis não faz nada (a lista já vem da CLI ou é embutida). */
+  private toolModelsReader: ((profile: AiProfile) => Promise<void>) | null = null;
+  /** Quem lê de novo a lista de modelos de uma CLI pronta (o host, que tem o PATH e a rede). */
+  onReadToolModels(fn: (profile: AiProfile) => Promise<void>): void {
+    this.toolModelsReader = fn;
+  }
+  /** O "Detectar modelos" de uma CLI pronta: a lista da documentação ou do comando dela, antes de juntar ao catálogo. */
+  async readToolModels(tool: string): Promise<void> {
+    const profile = this.snapshot().board.aiProfiles.find((p) => p.id === tool);
+    if (!profile || isAcpProfile(profile) || !this.toolModelsReader) return;
+    await this.toolModelsReader(profile);
+  }
   async readAcpModels(tool: string): Promise<void> {
     const profile = this.snapshot().board.aiProfiles.find((p) => p.id === tool);
     if (!profile || !isAcpProfile(profile)) return;

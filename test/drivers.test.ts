@@ -108,10 +108,10 @@ describe('drivers das CLIs prontas: envolvem os providers atuais', () => {
     expect(driver.install('windows').length).toBeGreaterThan(0);
   });
 
-  it('só as CLIs que listam modelos (Cursor e Kimi Code) têm listModels', () => {
+  it('as CLIs com de onde ler a lista têm listModels: o Cursor e o Kimi Code pelo comando, o Claude Code pela documentação', () => {
     expect(driverFor('cursor', 'cli')!.listModels).toBeTypeOf('function');
     expect(driverFor('kimi', 'cli')!.listModels).toBeTypeOf('function');
-    expect(driverFor('claude', 'cli')!.listModels).toBeUndefined();
+    expect(driverFor('claude', 'cli')!.listModels).toBeTypeOf('function');
     for (const d of allDrivers().filter((x) => x.mode === 'acp')) expect(d.listModels).toBeUndefined();
   });
 

@@ -180,7 +180,7 @@ describe('telas montam sem erro', () => {
     // esforço da atividade antes do modelo, e o esforço do modelo numa linha própria
     expect(drawer.indexOf('Esforço da atividade')).toBeLessThan(drawer.indexOf('>Modelo<'));
     expect(drawer.indexOf('>Modelo<')).toBeLessThan(drawer.indexOf('Esforço do modelo'));
-    expect(drawer).toContain('Claude Code · Haiku 4.5');
+    expect(drawer).toContain('Claude Code · Haiku 5.5');
   });
 
   it('configurações', () => {

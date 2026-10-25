@@ -308,8 +308,8 @@ export const settings: Record<string, string> = {
   'Detectar modelos': 'Detect models',
   'Novo modelo': 'New model',
   'Fonte: {source}': 'Source: {source}',
-  'lista embutida na extensão (o Claude Code não guarda a lista em arquivo)':
-    'list built into the extension (Claude Code does not keep the list in a file)',
+  'lida da página de modelos da documentação do Claude Code (a CLI não lista os modelos), com a versão mínima de cada um; sem rede, lista embutida na extensão':
+    "read from the Claude Code documentation's models page (the CLI doesn't list the models), with each one's minimum version; without network, the list built into the extension",
   'lida do comando cursor-agent models, com a conta em uso; sem a CLI autenticada, lista embutida na extensão':
     'read from the cursor-agent models command, with the account in use; without the CLI signed in, the list built into the extension',
   'lida do comando kimi provider list --json, com os provedores configurados; sem a CLI, lista embutida na extensão':
@@ -442,6 +442,9 @@ export const settings: Record<string, string> = {
   'em Harness': 'in Harness',
   'Mostrando os modelos do {tool}': 'Showing the {tool} models',
   'lista lida da ferramenta em {date}': 'list read from the tool on {date}',
+  'lista lida da documentação em {date}': 'list read from the documentation on {date}',
+  'Pede o Claude Code v{required} ou mais novo; o instalado é {installed}. Rode claude update.':
+    'Needs Claude Code v{required} or newer; the installed one is {installed}. Run claude update.',
   'Mostrando os agentes do {tool}': 'Showing the {tool} agents',
   'Preencher o modelo sugerido automaticamente': 'Fill in the suggested model automatically',
   'Ao criar ou mudar um card, preenche o campo "Modelo" com a sugestão das regras abaixo, se ele estiver vazio ou com a sugestão anterior. Um modelo escolhido à mão nunca é trocado.':
