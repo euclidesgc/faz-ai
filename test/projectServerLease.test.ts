@@ -205,6 +205,43 @@ describe('empréstimo coordenado do MCP', () => {
     expect(fs.existsSync(target())).toBe(false);
   });
 
+  it('devolve sozinho o empréstimo deste host retido por uma execução cujo grupo já morreu, ao pedir o próximo', () => {
+    // o cenário real: o cursor-agent terminou o trabalho, mas um filho ainda vivia na saída; a execução
+    // reteve o empréstimo e ninguém o devolvia até reabrir a janela
+    const identity = { pid: 123, birth: 'nascimento', groupId: 123, platform: process.platform, generation: 'tentativa' };
+    const first = leaseProjectServer(dir, spec, options);
+    first.prepareControlledProcess();
+    first.recordControlledProcess(identity);
+    expect(first.release()).toBe(false);
+    const dead = { ...options, probes: { group: () => 'dead' as const } };
+    const second = leaseProjectServer(dir, spec, dead);
+    expect(second.generation).not.toBe(first.generation);
+    expect(lines.join('\n')).toContain('A árvore de processos da execução anterior já encerrou');
+    expect(json().mcpServers['faz-ai']).toEqual({ type: 'stdio', ...spec.entry });
+    expect(locks()).toHaveLength(1);
+    second.prepareControlledProcess();
+    second.recordControlledProcess(identity);
+    second.confirmProcessStopped();
+    expect(second.release()).toBe(true);
+    expect(fs.existsSync(target())).toBe(false);
+  });
+
+  it('mantém o empréstimo deste host enquanto o grupo vive, não tem processo registrado ou ainda está em "prepared"', () => {
+    const identity = { pid: 123, birth: 'nascimento', groupId: 123, platform: process.platform, generation: 'tentativa' };
+    const refused = /emprestado ou aguarda reconciliação/;
+    const alive = { ...options, probes: { group: () => 'alive' as const } };
+    const dead = { ...options, probes: { group: () => 'dead' as const } };
+    const inPrepared = leaseProjectServer(dir, spec, options);
+    expect(() => leaseProjectServer(dir, spec, dead)).toThrow(refused);
+    inPrepared.prepareControlledProcess();
+    expect(() => leaseProjectServer(dir, spec, dead)).toThrow(refused);
+    inPrepared.recordControlledProcess(identity);
+    expect(() => leaseProjectServer(dir, spec, alive)).toThrow(refused);
+    expect(json().mcpServers['faz-ai']).toEqual({ type: 'stdio', ...spec.entry });
+    inPrepared.confirmProcessStopped();
+    expect(inPrepared.release()).toBe(true);
+  });
+
   it('recusa identidade inválida ou um segundo processo sem preparar nova tentativa', () => {
     const lease = leaseProjectServer(dir, spec, options);
     const identity = { pid: 123, birth: 'nascimento', groupId: 123, platform: process.platform, generation: 'tentativa' };

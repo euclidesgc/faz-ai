@@ -38,6 +38,8 @@ export interface LeaseOptions {
   log(line: string): void;
   /** Injeção de falhas nas fronteiras duráveis, usada pelos testes de queda. */
   checkpoint?(point: 'journal' | 'write' | 'restore'): void;
+  /** Sondas de processo substituíveis, usadas pelos testes da reconciliação. */
+  probes?: { owner?(owner: Owner): ProcessState; group?(identity: ProcessIdentity): ProcessState };
 }
 export interface ProjectServerLease {
   readonly file: string;
@@ -216,12 +218,22 @@ export function leaseProjectServer(cwd: string, spec: ProjectMcpSpec, options: L
   fs.mkdirSync(root, { recursive: true, mode: 0o700 });
   if (fs.lstatSync(root).isSymbolicLink()) throw new Error('A pasta de coordenação MCP não pode ser um link.');
   const lock = lockOf(root, file);
+  const acquire = () => fs.mkdirSync(lock, { mode: 0o700 });
   try {
-    fs.mkdirSync(lock, { mode: 0o700 });
+    acquire();
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'EEXIST')
-      throw new Error('O arquivo MCP está emprestado ou aguarda reconciliação em outra execução.');
-    throw e;
+    if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+    // Uma execução anterior deste host pode ter terminado sem confirmar o fim da árvore de processos
+    // (o cursor-agent deixa um filho vivo por um instante); ela retém o empréstimo, e ninguém mais o
+    // devolve enquanto a janela vive. Antes de recusar, tenta reconciliar o que já tem prova de fim.
+    try {
+      recoverProjectServers(options);
+      acquire();
+    } catch (again) {
+      if ((again as NodeJS.ErrnoException).code === 'EEXIST')
+        throw new Error('O arquivo MCP está emprestado ou aguarda reconciliação em outra execução.');
+      throw again;
+    }
   }
   let journalWritten = false;
   let journal: Journal;
@@ -295,11 +307,20 @@ export function leaseProjectServer(cwd: string, spec: ProjectMcpSpec, options: L
   };
 }
 
-/** Só recupera preparação sem processo e dono comprovadamente morto. Ambiguidade conserva tudo. */
+/** O diário é deste mesmo processo (PID e nascimento iguais), não de um PID reutilizado. */
+const ownedByThisHost = (owner: Owner): boolean =>
+  owner.pid === process.pid && owner.birth !== null && owner.birth === processBirth(process.pid);
+
+/**
+ * Recupera preparação sem processo e dono comprovadamente morto. Ambiguidade conserva tudo.
+ * Um empréstimo deste próprio host, deixado em "processo não confirmado" por uma execução que já
+ * acabou, também é devolvido, mas só com o processo controlado registrado e o grupo dele morto: a
+ * execução não vai mais confirmar nada, e sem isso o Cursor ficaria recusado até reabrir a janela.
+ */
 export function recoverProjectServers(
   options: LeaseOptions,
-  stateOf: (owner: Owner) => ProcessState = processState,
-  groupState: (identity: ProcessIdentity) => ProcessState = processGroupState,
+  stateOf: (owner: Owner) => ProcessState = options.probes?.owner ?? processState,
+  groupState: (identity: ProcessIdentity) => ProcessState = options.probes?.group ?? processGroupState,
 ): number {
   const root = rootOf(options);
   if (!fs.existsSync(root)) return 0;
@@ -309,7 +330,13 @@ export function recoverProjectServers(
     const lock = path.join(root, name);
     try {
       let j = journalAt(lock);
-      if (lockOf(root, j.file) !== lock || stateOf(j.owner) !== 'dead') continue;
+      if (lockOf(root, j.file) !== lock) continue;
+      const ownerDead = stateOf(j.owner) === 'dead';
+      const mine = !ownerDead && ownedByThisHost(j.owner);
+      if (!ownerDead && !mine) continue;
+      // Do próprio host, só o caso com prova completa: um diário em "prepared" ou sem processo registrado
+      // pode ser de uma execução ainda em curso nesta janela.
+      if (mine && (j.phase !== 'process-unconfirmed' || !j.gate?.process || groupState(j.gate.process) !== 'dead')) continue;
       // Trava de recuperação independente: duas janelas não restauram o mesmo diário simultaneamente.
       const recovery = path.join(lock, 'recovery');
       try {
@@ -328,6 +355,7 @@ export function recoverProjectServers(
           j = { ...j, phase: 'prepared' };
           atomicWrite(path.join(lock, 'journal.json'), JSON.stringify(j));
         }
+        if (mine) options.log('A árvore de processos da execução anterior já encerrou; o empréstimo MCP retido é devolvido agora.');
         if (restore(lock, j, options)) count++;
       } finally {
         // A restauração bem-sucedida já retirou a geração antiga. Não toca numa nova posse.

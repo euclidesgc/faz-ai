@@ -244,7 +244,9 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
           deps.log('Não foi possível restaurar o empréstimo MCP; diário preservado para reconciliação.');
         }
       } else {
-        deps.log('O fim da árvore de processos não foi confirmado; empréstimo MCP retido para reconciliação.');
+        deps.log(
+          'O fim da árvore de processos não foi confirmado; empréstimo MCP retido para reconciliação (a próxima execução o devolve assim que a árvore encerrar).',
+        );
         error ??= new Error('O encerramento da árvore de processos ainda não foi confirmado.');
       }
     }
