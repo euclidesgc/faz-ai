@@ -52,7 +52,7 @@ beforeEach(async () => {
 });
 
 describe('HostBridge: situação dos perfis depois de ligar', () => {
-  it('ligar ou desligar um perfil reenvia a situação, sem esperar o "Verificar situação"', async () => {
+  it('ligar ou desligar um perfil reenvia a situação, sem esperar o "Atualizar"', async () => {
     let probes = 0;
     router.setAiProfileRuntime({
       probe: async () => (

@@ -43,9 +43,9 @@ diz o modo e a situação: conectado, ligado, desligado, não instalado, o Conec
 você ou parado com erro. Os agentes do registro que o board ainda não executa ficam à parte, em **Outros
 agentes do registro do ACP**: dá para entrar na conta e conversar com eles na sessão de teste, mas não
 usá-los nos cards. O registro é baixado uma vez e guardado por 6 horas na pasta de dados; sem rede, a
-lista segue com a cópia anterior e diz de quando ela é. **Atualizar lista** baixa de novo e relê o PATH
-(depois de instalar um agente com o board aberto); **Verificar situação** confere de novo a instalação,
-a versão e o login de cada perfil ligado. **Agente personalizado (CLI)** abre o formulário do perfil
+lista segue com a cópia anterior e diz de quando ela é. **Atualizar** baixa a lista de novo e confere outra
+vez quais agentes estão instalados, a versão e o login de cada um (use depois de instalar um agente,
+entrar na conta dele ou atualizá-lo com o board aberto). **Agente personalizado (CLI)** abre o formulário do perfil
 personalizado ([abaixo](#perfil-personalizado-avançado)).
 
 ### A conta: entrar e sair

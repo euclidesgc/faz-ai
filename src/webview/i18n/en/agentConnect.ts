@@ -5,12 +5,9 @@ export const agentConnect: Record<string, string> = {
   'Conectar agentes': 'Connect agents',
   'Conecte os agentes de IA ao board, entre na conta de cada um e ajuste os modelos. Todo agente ligado roda cards, ao mesmo tempo que os outros: cada card vai para o agente do modelo dele (o do card, o do agente do harness ou o da regra de sugestão), e o padrão roda os cards sem modelo.':
     "Connect the AI agents to the board, sign in to each one and tune the models. Every enabled agent runs cards, alongside the others: each card goes to its model's agent (the card's, the harness agent's or the suggestion rule's), and the default one runs the cards with no model.",
-  'Verificar situação': 'Check status',
-  'Confere de novo se cada agente está instalado, a versão e o login da CLI.':
-    "Checks again whether each agent is installed, its version and the CLI's sign-in.",
-  'Atualizar lista': 'Refresh list',
-  'Baixa de novo a lista do registro oficial do ACP e relê o PATH (depois de instalar um agente).':
-    'Downloads the official ACP registry list again and rereads the PATH (after you install an agent).',
+  Atualizar: 'Refresh',
+  'Confere de novo quais agentes estão instalados, a versão de cada um e se você está com a conta conectada. Use depois de instalar um agente, entrar na conta dele ou atualizá-lo fora do board.':
+    "Checks again which agents are installed, each one's version and whether you are signed in to the account. Use it after installing an agent, signing in to it or updating it outside the board.",
   'Agente padrão': 'Default agent',
   'Agente padrão: {name}': 'Default agent: {name}',
   'Também rodam cards, pelo modelo de cada um: {names}.': "Also running cards, by each card's model: {names}.",

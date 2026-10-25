@@ -244,7 +244,7 @@ export function AgentConnectSettings() {
     listenAgentConnect();
     loadRegistry();
     void probe.run();
-    // a consulta acontece na entrada da aba; "Verificar situação" pede outra
+    // a consulta acontece na entrada da aba; "Atualizar" pede outra
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // o aviso do topo abre a tela já no agente do perfil
@@ -270,26 +270,21 @@ export function AgentConnectSettings() {
       <PageHeader
         title={t('Conectar agentes')}
         actions={
-          <>
-            <ActionButton
-              variant="soft"
-              color="gray"
-              hint={t('Confere de novo se cada agente está instalado, a versão e o login da CLI.')}
-              loading={probe.busy}
-              onClick={() => void probe.run()}
-            >
-              {t('Verificar situação')}
-            </ActionButton>
-            <ActionButton
-              variant="soft"
-              color="gray"
-              hint={t('Baixa de novo a lista do registro oficial do ACP e relê o PATH (depois de instalar um agente).')}
-              loading={loadingRegistry}
-              onClick={() => loadRegistry(true)}
-            >
-              {t('Atualizar lista')}
-            </ActionButton>
-          </>
+          <ActionButton
+            variant="soft"
+            color="gray"
+            hint={t(
+              'Confere de novo quais agentes estão instalados, a versão de cada um e se você está com a conta conectada. Use depois de instalar um agente, entrar na conta dele ou atualizá-lo fora do board.',
+            )}
+            loading={probe.busy || loadingRegistry}
+            onClick={() => {
+              // um botão só: a lista do registro (agente recém-instalado) e a situação de cada perfil (versão e login)
+              loadRegistry(true);
+              void probe.run();
+            }}
+          >
+            {t('Atualizar')}
+          </ActionButton>
         }
       >
         {t(

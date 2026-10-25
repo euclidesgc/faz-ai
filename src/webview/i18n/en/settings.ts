@@ -5,7 +5,6 @@ export const settings: Record<string, string> = {
     'read from the agent when opening an ACP session (session/new), without spending your account; the agent must be installed and signed in',
   'Nenhum modelo. Use "Novo modelo" para cadastrar à mão.': 'No models. Use "New model" to add one manually.',
   'Ferramentas de IA': 'AI tools',
-  'Verificar situação': 'Check status',
   'Abre o formulário de um perfil de CLI personalizado.': 'Opens the form for a custom CLI profile.',
   'Perfil padrão': 'Default profile',
   'Personalizado · {mode}': 'Custom · {mode}',

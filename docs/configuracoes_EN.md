@@ -46,9 +46,9 @@ progress, waiting for you or stopped with an error. Registry agents the board do
 apart, under **Outros agentes do registro do ACP** (other agents from the ACP registry): you can sign in
 and talk to them in the test session, but not use them for cards. The registry is downloaded once and
 kept for 6 hours in the data folder; without a network, the list keeps the previous copy and says how old
-it is. **Atualizar lista** (refresh list) downloads it again and rereads the PATH (after installing an
-agent with the board open); **Verificar situação** (check status) checks again the installation, version
-and sign-in of each enabled profile. **Agente personalizado (CLI)** (custom agent) opens the custom
+it is. **Atualizar** (refresh) downloads the list again and checks once more
+which agents are installed, each one's version and sign-in (use it after installing an agent, signing in
+to it or updating it with the board open). **Agente personalizado (CLI)** (custom agent) opens the custom
 profile form ([below](#custom-profile-advanced)).
 
 ### The account: signing in and out

@@ -362,7 +362,7 @@ export class HostBridge {
     try {
       this.post(await this.router.probeAiProfiles());
     } catch {
-      /* sem sonda neste host: a lista fica com a situação anterior até o "Verificar situação" */
+      /* sem sonda neste host: a lista fica com a situação anterior até o "Atualizar" de Conectar agentes */
     }
   }
 

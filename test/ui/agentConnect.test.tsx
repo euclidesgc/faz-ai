@@ -195,6 +195,15 @@ describe('Conectar agentes: a lista e o agente padrão', () => {
     expect(gemini.queryByRole('button', { name: 'Apagar' })).toBeNull();
   });
 
+  it('"Atualizar" baixa a lista de novo e confere a situação dos agentes, num botão só', async () => {
+    show();
+    answerRegistry([]);
+    const probes = sentOf('settings.aiProfiles.probe').length;
+    expect(screen.queryByRole('button', { name: /Verificar situação|Atualizar lista/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Atualizar' }));
+    expect(lastSent('agentConnect.registry')).toMatchObject({ refresh: true });
+    expect(sentOf('settings.aiProfiles.probe')).toHaveLength(probes + 1);
+  });
   it('o aviso do topo abre a tela já no agente do perfil', () => {
     useBoardStore.getState().openConnect('opencode');
     expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'connect', connectTool: 'opencode' });
