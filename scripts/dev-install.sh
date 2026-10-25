@@ -39,10 +39,10 @@ tmp="${TMPDIR:-/tmp}"
 out="${tmp%/}/$name-$version-dev.vsix"
 
 # o vsce roda o vscode:prepublish, que é o build da extensão e da interface
-echo "Gerando $name $version…"
+echo "Gerando ${name} ${version}…"
 npx --no-install vsce package --out "$out"
 
-echo "Instalando no $editor…"
+echo "Instalando no ${editor}…"
 "$editor" --install-extension "$out" --force
 
 if [ "$reload" = 1 ]; then
