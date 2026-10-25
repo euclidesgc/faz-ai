@@ -342,6 +342,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     treeView.onDidChangeVisibility((e) => {
       if (e.visible && folder()) void openBoard();
     }),
+    // só para quem desenvolve: o scripts/dev-install.sh instala a VSIX nova e abre vscode://euclidesgc.faz-ai/reload,
+    // que esta versão (a antiga, ainda carregada) atende recarregando a janela, que volta já com a nova
+    vscode.window.registerUriHandler({
+      handleUri: (uri) => {
+        if (uri.path === '/reload') void vscode.commands.executeCommand('workbench.action.reloadWindow');
+      },
+    }),
     vscode.commands.registerCommand('fazai.openBoard', () => openBoard()),
     vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard({ type: 'ui.openCard', cardId })),
     vscode.commands.registerCommand('fazai.openBoardSettings', (args?: { tab?: unknown; section?: string }) =>

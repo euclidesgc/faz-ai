@@ -18,7 +18,10 @@ export const fake = {
   folders: undefined as string[] | undefined,
   /** cada `createFileSystemWatcher`, com o padrão pedido; `fire` simula a mudança de um arquivo */
   watchers: [] as FakeWatcher[],
+  /** o `registerUriHandler` da extensão: o teste simula o editor abrindo um `vscode://` dela */
+  uriHandler: undefined as { handleUri(uri: Uri): void } | undefined,
   reset(): void {
+    this.uriHandler = undefined;
     this.watchers.length = 0;
     this.commands.clear();
     this.messages.length = 0;
@@ -77,6 +80,10 @@ export class Uri {
   }
   static joinPath(base: Uri, ...parts: string[]): Uri {
     return Uri.file(path.join(base.fsPath, ...parts));
+  }
+  /** como no VS Code: o caminho depois da autoridade (`vscode://pub.ext/reload` → `/reload`) */
+  get path(): string {
+    return this.scheme === 'file' ? this.fsPath : new URL(this.raw).pathname;
   }
   toString(): string {
     return this.raw;
@@ -194,6 +201,10 @@ export const window = {
   createStatusBarItem: () => ({ text: '', tooltip: '', command: '', show() {}, hide() {}, dispose() {} }),
   createTreeView: () => ({ badge: undefined as unknown, onDidChangeVisibility: () => disposable, dispose() {} }),
   registerWebviewViewProvider: () => disposable,
+  registerUriHandler: (handler: { handleUri(uri: Uri): void }) => {
+    fake.uriHandler = handler;
+    return disposable;
+  },
   createWebviewPanel: (_type: string, title: string) => {
     const panel = new FakePanel(title);
     fake.panels.push(panel);

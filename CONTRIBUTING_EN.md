@@ -24,6 +24,12 @@ server), `src/webview` (React interface), `src/shared` (model, protocol and the 
 both host and interface), `src/mcp-bridge` (the stdio bridge used by AI clients) and `src/cli` (the
 board outside the editor).
 
+To try the packaged extension in your everyday editor, `npm run dev:install` builds the VSIX of the
+`package.json` version, installs it in VS Code and reloads the window (`npm run dev:install -- --cursor`
+for Cursor; `--no-reload` only installs). The window reloads through the
+`vscode://euclidesgc.faz-ai/reload` link, which the already installed version handles: on the first
+install, reload by hand, and the editor may ask you to allow the link the first time.
+
 To try the interface without the editor, `node dist/cli.js <folder> --data <test data folder>`
 serves the board in the browser. The tests cover the extension's activation (with a fake editor in
 `test/fakes/vscode.ts`) and the page server (`test/webServer.test.ts`).

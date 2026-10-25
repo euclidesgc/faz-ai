@@ -71,6 +71,20 @@ const activateExtension = async () => {
   return { deactivate };
 };
 
+it.skipIf(process.platform === 'win32')(
+  'o link de recarregar do scripts/dev-install.sh recarrega a janela; outro caminho não faz nada',
+  async () => {
+    const { deactivate } = await activateExtension();
+    const reloads: unknown[] = [];
+    fake.commands.set('workbench.action.reloadWindow', () => void reloads.push(1));
+    fake.uriHandler!.handleUri(Uri.parse('vscode://euclidesgc.faz-ai/outra-coisa'));
+    expect(reloads).toHaveLength(0);
+    fake.uriHandler!.handleUri(Uri.parse('vscode://euclidesgc.faz-ai/reload'));
+    expect(reloads).toHaveLength(1);
+    await deactivate();
+  },
+);
+
 it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serve no navegador e grava ao encerrar', async () => {
   const { deactivate } = await activateExtension();
 

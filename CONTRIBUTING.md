@@ -24,6 +24,12 @@ servidor MCP), `src/webview` (interface em React), `src/shared` (modelo, protoco
 board usadas pelo host e pela interface), `src/mcp-bridge` (ponte stdio usada pelos clientes de IA)
 e `src/cli` (o board fora do editor).
 
+Para testar a extensão empacotada no seu editor do dia a dia, `npm run dev:install` gera a VSIX da
+versão do `package.json`, instala no VS Code e recarrega a janela (`npm run dev:install -- --cursor`
+para o Cursor; `--no-reload` só instala). A janela recarrega pelo link
+`vscode://euclidesgc.faz-ai/reload`, que a versão já instalada atende: na primeira instalação,
+recarregue à mão, e o editor pode pedir para permitir o link na primeira vez.
+
 Para testar a interface sem o editor, `node dist/cli.js <pasta> --data <pasta de dados de teste>`
 serve o board no navegador. Os testes cobrem a ativação da extensão (com um editor de mentira em
 `test/fakes/vscode.ts`) e o servidor da página (`test/webServer.test.ts`).
