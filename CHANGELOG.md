@@ -47,6 +47,7 @@
 ### Corrigido
 
 - **A tela deslocava ao abrir um seletor ou menu no editor.** A webview do VS Code dá 20 px de espaço lateral ao `body`, e a trava de scroll do Radix zerava esse espaço a cada abertura: tudo pulava para a esquerda e voltava ao fechar. O espaço lateral do editor passa para a raiz do app, e o `body` fica sem margem nem padding, de uma vez.
+- **A tela inteira rolava além do limite, como se houvesse uma tela dentro da outra.** Os rótulos invisíveis de acessibilidade e os seletores escondidos ficavam fora do recorte da área que rola (Configurações, board, card aberto) e esticavam o documento; a roda do mouse, o foco ou um "ir para a seção" rolavam a janela toda, na vertical e na horizontal. Agora o documento nunca rola: só cada área, e o que está posicionado dentro dela fica no recorte dela.
 - **Sugestão de modelo: os botões de subir, descer, editar e remover de cada regra ficavam colados.** As áreas de clique se sobrepunham; agora há espaço entre elas, e a linha de ações não quebra.
 - **Configurações › Ferramentas de IA: os defeitos achados no teste de ponta a ponta com o rastreio do board.**
   - **Perfil de CLI personalizado:**
