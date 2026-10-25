@@ -3062,6 +3062,14 @@ body.host-web .drawer {
   border-left: 3px solid var(--accent);
   border-radius: var(--radius);
 }
+/* o simulador: ar entre "Mais condições" e o botão, e entre o botão e a frase do resultado */
+.fallback-simulation .actions-toolbar,
+.fallback-simulation .fallback-sentence {
+  margin-top: var(--sp-12);
+}
+.fallback-simulation .fallback-sentence p {
+  margin: 0 0 var(--sp-4);
+}
 .fallback-history {
   margin: 0;
   padding-left: var(--sp-16);

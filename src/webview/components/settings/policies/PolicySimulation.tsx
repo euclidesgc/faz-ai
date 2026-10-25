@@ -11,6 +11,13 @@ import { t } from '../../../i18n';
 import { useBoardStore } from '../../../store/boardStore';
 import { Choice, NumberField, ORIGIN_LABELS, FAILURE_LABELS, REASON_LABELS, offTargetNote, profileLabel, targetLabel } from './parts';
 
+/**
+ * O simulador das regras: uma pergunta ("se este modelo esgotar a cota agora, o que o board faz?") com o
+ * modelo, a fase e o tipo de card; o resto do cenário (perfil padrão, tipo de falha, efeitos, estado dos
+ * destinos, ação, origem, agente, tempo e processos) fica fechado em "Mais condições". O cenário simples
+ * supõe os destinos admitidos e sem trabalho feito: é a decisão das regras que a pessoa quer ver, não a
+ * admissão hipotética.
+ */
 export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy | null; library: PolicyLibrary }) {
   const state = useBoardStore((s) => s.state)!;
   const first = library.models[0];
@@ -20,8 +27,8 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
     explicit: true,
     context: { action: 'work', origin: 'manual', agentId: null, phaseId: null, cardTypeId: null },
     failure: 'quota',
-    effects: 'unknown',
-    eligibility: 'blocked-admission',
+    effects: 'none',
+    eligibility: 'admitted',
     elapsedMs: 0,
     runningGlobal: 0,
     runningByProfile: {},
@@ -51,77 +58,31 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
       label: `${profileLabel(library, m.tool)} · ${m.label}`,
     })),
   ];
+  const ruleName = (id: string) =>
+    id === policy?.id ? policy.name : (library.snapshot.records.find((r) => r.policy.id === id)?.policy.name ?? id);
+  const decision = result?.value.decision;
   return (
-    <section aria-label={policy ? t('Simular política') : t('Próxima execução')}>
-      <h4>{policy ? t('Simular política') : t('Próxima execução')}</h4>
-      {!policy && <p className="muted">{t('Usa só as políticas salvas e ligadas, pelo mesmo avaliador da execução.')}</p>}
-      <p className="muted">{t('Este cenário é hipotético. Não inicia IA, não grava o board e não comprova admissão ou credenciais.')}</p>
+    <section aria-label={policy ? t('Simular esta regra') : t('Testar as regras')} className="fallback-simulation">
+      <h4>{policy ? t('Simular esta regra') : t('Testar as regras')}</h4>
+      <p className="muted">
+        {policy
+          ? t('Se este modelo esgotar a cota agora, o que esta regra faz? Sem iniciar IA nem gravar nada.')
+          : t(
+              'Se este modelo esgotar a cota agora, o que o board faz? Sem iniciar IA nem gravar nada: a decisão das regras salvas e ligadas.',
+            )}
+      </p>
       <div className="fallback-grid">
         <Choice
-          label={t('Modelo de origem do cenário')}
+          label={t('Modelo que falha')}
           value={scenario.sourceValue || '__default'}
           choices={modelChoices}
           onChange={(v) => change({ sourceValue: v === '__default' ? '' : v })}
         />
         <Choice
-          label={t('Perfil padrão do cenário')}
-          value={scenario.defaultProfileId}
-          choices={library.profiles.map((p) => ({ value: p.id, label: profileLabel(library, p.id) }))}
-          onChange={(v) => change({ defaultProfileId: v })}
-        />
-        <Choice
-          label={t('Falha do cenário')}
-          value={scenario.failure}
-          choices={POLICY_FAILURES.map((f) => ({ value: f, label: t(FAILURE_LABELS[f]) }))}
-          onChange={(v) => change({ failure: v as PolicyScenario['failure'] })}
-        />
-        <Choice
-          label={t('Efeitos da tentativa')}
-          value={scenario.effects}
-          choices={[
-            { value: 'unknown', label: t('Desconhecidos') },
-            { value: 'partial', label: t('Trabalho parcial') },
-            { value: 'none', label: t('Ausência de efeitos comprovada no cenário') },
-          ]}
-          onChange={(v) => change({ effects: v as PolicyScenario['effects'] })}
-        />
-        <Choice
-          label={t('Estado hipotético dos destinos')}
-          value={scenario.eligibility}
-          choices={[
-            { value: 'blocked-admission', label: t('Sem admissão comprovada') },
-            { value: 'pending-credentials', label: t('Credenciais pendentes') },
-            { value: 'unavailable', label: t('Indisponíveis') },
-            { value: 'admitted', label: t('Credenciais revisadas e admissão válida no cenário') },
-          ]}
-          onChange={(v) => change({ eligibility: v as PolicyScenario['eligibility'] })}
-        />
-        <Choice
-          label={t('Ação do cenário')}
-          value={scenario.context.action}
-          choices={CONTEXT_ACTIONS.map((a) => ({ value: a, label: t(CONTEXT_ACTION_LABELS[a]) }))}
-          onChange={(v) => context({ action: v as PolicyScenario['context']['action'] })}
-        />
-        <Choice
-          label={t('Origem do cenário')}
-          value={scenario.context.origin}
-          choices={Object.entries(ORIGIN_LABELS).map(([value, label]) => ({ value, label: t(label) }))}
-          onChange={(v) => context({ origin: v as PolicyScenario['context']['origin'] })}
-        />
-        <Choice
-          label={t('Agente do cenário')}
-          value={scenario.context.agentId ?? '__none'}
-          choices={[
-            { value: '__none', label: t('Sem agente') },
-            ...(state.harness.library?.artifacts.filter((a) => a.kind === 'agent').map((a) => ({ value: a.id, label: a.name })) ?? []),
-          ]}
-          onChange={(v) => context({ agentId: v === '__none' ? null : v })}
-        />
-        <Choice
-          label={t('Fase do cenário')}
+          label={t('Fase')}
           value={scenario.context.phaseId ?? '__none'}
           choices={[
-            { value: '__none', label: t('Sem fase') },
+            { value: '__none', label: t('Qualquer fase') },
             ...state.columns.map((c) => ({
               value: c.id,
               label: `${state.workflows.find((w) => w.id === c.workflowId)?.name} · ${c.name}`,
@@ -130,89 +91,160 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
           onChange={(v) => context({ phaseId: v === '__none' ? null : v })}
         />
         <Choice
-          label={t('Tipo do cenário')}
+          label={t('Tipo de card')}
           value={scenario.context.cardTypeId ?? '__none'}
-          choices={[{ value: '__none', label: t('Sem tipo') }, ...state.cardTypes.map((c) => ({ value: c.id, label: c.name }))]}
+          choices={[{ value: '__none', label: t('Qualquer tipo') }, ...state.cardTypes.map((c) => ({ value: c.id, label: c.name }))]}
           onChange={(v) => context({ cardTypeId: v === '__none' ? null : v })}
         />
-        <NumberField
-          label={t('Tempo decorrido (segundos)')}
-          value={scenario.elapsedMs / 1000}
-          max={86400}
-          onChange={(v) => change({ elapsedMs: v * 1000 })}
-        />
-        <NumberField
-          label={t('Processos globais no cenário')}
-          value={scenario.runningGlobal}
-          onChange={(v) => change({ runningGlobal: v })}
-        />
-        {library.profiles.map((p) => (
-          <NumberField
-            key={p.id}
-            label={t('Processos no cenário: {profile}', { profile: profileLabel(library, p.id) })}
-            value={scenario.runningByProfile[p.id] ?? 0}
-            onChange={(v) => change({ runningByProfile: { ...scenario.runningByProfile, [p.id]: v } })}
-          />
-        ))}
       </div>
-      <label className="check">
-        <Checkbox checked={scenario.explicit} onCheckedChange={(v) => change({ explicit: v === true })} />
-        {t('Modelo escolhido explicitamente pela pessoa')}
-      </label>
-      <Button disabled={simulate.busy} onClick={() => void simulate.run()}>
-        {simulate.busy ? t('Simulando…') : t('Simular sem executar')}
-      </Button>
+      <details className="fallback-advanced">
+        <summary>{t('Mais condições do cenário')}</summary>
+        <div className="fallback-advanced-body">
+          <div className="fallback-grid">
+            <Choice
+              label={t('Perfil padrão do cenário')}
+              value={scenario.defaultProfileId}
+              choices={library.profiles.map((p) => ({ value: p.id, label: profileLabel(library, p.id) }))}
+              onChange={(v) => change({ defaultProfileId: v })}
+            />
+            <Choice
+              label={t('Tipo de falha')}
+              value={scenario.failure}
+              choices={POLICY_FAILURES.map((f) => ({ value: f, label: t(FAILURE_LABELS[f]) }))}
+              onChange={(v) => change({ failure: v as PolicyScenario['failure'] })}
+            />
+            <Choice
+              label={t('O que a IA já tinha feito')}
+              value={scenario.effects}
+              choices={[
+                { value: 'none', label: t('Nada') },
+                { value: 'partial', label: t('Trabalho parcial') },
+                { value: 'unknown', label: t('Desconhecido') },
+              ]}
+              onChange={(v) => change({ effects: v as PolicyScenario['effects'] })}
+            />
+            <Choice
+              label={t('Estado dos destinos')}
+              value={scenario.eligibility}
+              choices={[
+                { value: 'admitted', label: t('Prontos (credenciais revisadas e admissão válida)') },
+                { value: 'blocked-admission', label: t('Sem admissão comprovada') },
+                { value: 'pending-credentials', label: t('Credenciais pendentes') },
+                { value: 'unavailable', label: t('Indisponíveis') },
+              ]}
+              onChange={(v) => change({ eligibility: v as PolicyScenario['eligibility'] })}
+            />
+            <Choice
+              label={t('Ação do cenário')}
+              value={scenario.context.action}
+              choices={CONTEXT_ACTIONS.map((a) => ({ value: a, label: t(CONTEXT_ACTION_LABELS[a]) }))}
+              onChange={(v) => context({ action: v as PolicyScenario['context']['action'] })}
+            />
+            <Choice
+              label={t('Origem do cenário')}
+              value={scenario.context.origin}
+              choices={Object.entries(ORIGIN_LABELS).map(([value, label]) => ({ value, label: t(label) }))}
+              onChange={(v) => context({ origin: v as PolicyScenario['context']['origin'] })}
+            />
+            <Choice
+              label={t('Agente do cenário')}
+              value={scenario.context.agentId ?? '__none'}
+              choices={[
+                { value: '__none', label: t('Qualquer agente') },
+                ...(state.harness.library?.artifacts.filter((a) => a.kind === 'agent').map((a) => ({ value: a.id, label: a.name })) ?? []),
+              ]}
+              onChange={(v) => context({ agentId: v === '__none' ? null : v })}
+            />
+            <NumberField
+              label={t('Tempo decorrido (segundos)')}
+              value={scenario.elapsedMs / 1000}
+              max={86400}
+              onChange={(v) => change({ elapsedMs: v * 1000 })}
+            />
+            <NumberField
+              label={t('Processos globais no cenário')}
+              value={scenario.runningGlobal}
+              onChange={(v) => change({ runningGlobal: v })}
+            />
+          </div>
+          <label className="check">
+            <Checkbox checked={scenario.explicit} onCheckedChange={(v) => change({ explicit: v === true })} />
+            {t('Modelo escolhido à mão no card')}
+          </label>
+          <details className="fallback-advanced">
+            <summary>{t('Processos em andamento por agente')}</summary>
+            <div className="fallback-advanced-body">
+              <div className="fallback-grid">
+                {library.profiles.map((p) => (
+                  <NumberField
+                    key={p.id}
+                    label={profileLabel(library, p.id)}
+                    value={scenario.runningByProfile[p.id] ?? 0}
+                    onChange={(v) => change({ runningByProfile: { ...scenario.runningByProfile, [p.id]: v } })}
+                  />
+                ))}
+              </div>
+            </div>
+          </details>
+        </div>
+      </details>
+      <div className="actions-toolbar">
+        <Button disabled={simulate.busy} onClick={() => void simulate.run()}>
+          {simulate.busy ? t('Simulando…') : t('Simular sem executar')}
+        </Button>
+      </div>
       {simulate.error && <p role="alert">{t(simulate.error)}</p>}
-      {result && (
-        <div role="status">
-          {result.inputs !== fingerprint && <p>{t('Resultado desatualizado: simule novamente após alterar o cenário ou a política.')}</p>}
-          <h4>{t('Decisão do cenário')}</h4>
-          <p>{t(REASON_LABELS[result.value.decision.reason] ?? result.value.decision.reason)}</p>
-          {result.value.decision.policy && (
+      {result && decision && (
+        <div role="status" className="fallback-sentence">
+          {result.inputs !== fingerprint && (
+            <p className="muted">{t('Resultado desatualizado: simule novamente após alterar o cenário ou a política.')}</p>
+          )}
+          {decision.action === 'fallback' && decision.target ? (
             <p>
-              {t('Regra: {name} · versão {version}', {
-                name:
-                  result.value.decision.policy.id === policy?.id
-                    ? policy.name
-                    : (library.snapshot.records.find((r) => r.policy.id === result.value.decision.policy!.id)?.policy.name ??
-                      result.value.decision.policy.id),
-                version: result.value.decision.policy.revision,
+              <strong>{t('O board segue com {target}.', { target: targetLabel(library, decision.target) })}</strong>
+              {decision.policy &&
+                ` ${t('Pela regra {name} (versão {version}).', { name: ruleName(decision.policy.id), version: decision.policy.revision })}`}
+            </p>
+          ) : (
+            <p>
+              <strong>{t(REASON_LABELS[decision.reason] ?? decision.reason)}</strong>
+              {decision.policy &&
+                ` ${t('Pela regra {name} (versão {version}).', { name: ruleName(decision.policy.id), version: decision.policy.revision })}`}
+            </p>
+          )}
+          {decision.target && offTargetNote(library, decision.target.profileId) && (
+            <p role="note">{offTargetNote(library, decision.target.profileId)}</p>
+          )}
+          {decision.alternatives.length > 0 && (
+            <p>
+              {t('Alternativas para você escolher: {targets}', {
+                targets: decision.alternatives.map((a) => targetLabel(library, a)).join(', '),
               })}
             </p>
           )}
-          {result.value.decision.target && (
-            <p>{t('Próximo destino: {target}', { target: targetLabel(library, result.value.decision.target) })}</p>
+          {(result.value.problems.length > 0 || decision.rejected.length > 0) && (
+            <ul className="muted">
+              {result.value.problems.map((p, i) => (
+                <li key={i}>
+                  {t(p.code === 'cycle' ? 'Cadeia cíclica' : p.code === 'ambiguous-priority' ? 'Prioridade ambígua' : 'Destino inválido')}:{' '}
+                  {p.policyIds.map(ruleName).join(' → ')}
+                </li>
+              ))}
+              {decision.rejected.map((r, i) => (
+                <li key={`rejected-${i}`}>
+                  {targetLabel(library, r.target)}: {t(REASON_LABELS[r.reason] ?? r.reason)}
+                </li>
+              ))}
+            </ul>
           )}
-          {result.value.decision.target && offTargetNote(library, result.value.decision.target.profileId) && (
-            <p role="note">{offTargetNote(library, result.value.decision.target.profileId)}</p>
-          )}
-          <p>{t('Próxima tentativa: {number}', { number: result.value.decision.nextAttempt })}</p>
-          <p>{t('Consumo da tentativa anterior: desconhecido neste cenário.')}</p>
-          {result.value.decision.budget && (
-            <p>
-              {t('Limite da cadeia: {attempts} tentativas · prazo {seconds} segundos', {
-                attempts: result.value.decision.budget.maxAttempts,
-                seconds: result.value.decision.budget.deadlineAt / 1000,
-              })}
-            </p>
-          )}
-          <ul>
-            {result.value.problems.map((p, i) => (
-              <li key={i}>
-                {t(p.code === 'cycle' ? 'Cadeia cíclica' : p.code === 'ambiguous-priority' ? 'Prioridade ambígua' : 'Destino inválido')}:{' '}
-                {p.policyIds
-                  .map((id) =>
-                    id === policy?.id ? policy.name : (library.snapshot.records.find((r) => r.policy.id === id)?.policy.name ?? id),
-                  )
-                  .join(' → ')}
-              </li>
-            ))}
-            {result.value.decision.rejected.map((r, i) => (
-              <li key={`rejected-${i}`}>
-                {targetLabel(library, r.target)}: {t(REASON_LABELS[r.reason] ?? r.reason)}
-              </li>
-            ))}
-          </ul>
+          <p className="muted">
+            {t('Tentativa {number}', { number: decision.nextAttempt })}
+            {decision.budget &&
+              ` · ${t('limite da cadeia: {attempts} tentativas, prazo {seconds} s', {
+                attempts: decision.budget.maxAttempts,
+                seconds: decision.budget.deadlineAt / 1000,
+              })}`}
+          </p>
         </div>
       )}
     </section>
