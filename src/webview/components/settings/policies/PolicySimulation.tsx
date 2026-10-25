@@ -135,7 +135,6 @@ export function PolicySimulation({
           ? t('Se este modelo esgotar a cota agora, o que esta regra faz? Sem iniciar IA nem gravar nada.')
           : t('Escolha a regra e o cenário: o teste diz se ela decide como você configurou. Sem iniciar IA nem gravar nada.')}
       </p>
-      {!policy && records.length === 0 && <p className="muted">{t('Monte uma regra primeiro: o teste simula a regra escolhida.')}</p>}
       {!policy && records.length > 0 && (
         <div className="fallback-grid">
           <Choice

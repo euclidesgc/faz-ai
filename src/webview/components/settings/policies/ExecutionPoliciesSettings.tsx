@@ -283,14 +283,17 @@ export function ExecutionPoliciesSettings({ profileId }: { profileId: string }) 
 
       {library && (
         <details className="fallback-extras">
-          <summary>{t('Testar as regras, pedir sugestão à IA e reservas antigas')}</summary>
+          <summary>
+            {/* testar e revisar conflitos só fazem sentido com regra cadastrada: sem ela, o bloco oferece só a IA */}
+            {rows.length ? t('Testar as regras, pedir sugestão à IA e reservas antigas') : t('Pedir sugestão à IA e reservas antigas')}
+          </summary>
           <div className="fallback-advanced-body">
-            <PolicySimulation profileId={profileId} policy={null} library={library} />
+            {rows.length > 0 && <PolicySimulation profileId={profileId} policy={null} library={library} />}
             <section>
               <h4>{t('Pedir sugestão à IA')}</h4>
               <PolicyAssistant
                 profileId={profileId}
-                modes={['create', 'conflicts']}
+                modes={rows.length ? ['create', 'conflicts'] : ['create']}
                 draft={null}
                 library={library}
                 applyLabel={t('Abrir proposta no editor')}

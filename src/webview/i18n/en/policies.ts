@@ -1,6 +1,5 @@
 export const policies: Record<string, string> = {
   'Simular esta regra': 'Simulate this rule',
-  'Monte uma regra primeiro: o teste simula a regra escolhida.': 'Build a rule first: the test simulates the chosen rule.',
   'Regra a testar': 'Rule to test',
   desligada: 'off',
   'Testar as regras': 'Test the rules',
@@ -194,6 +193,7 @@ export const policies: Record<string, string> = {
   'Remover a regra "{name}"?': 'Remove the rule "{name}"?',
   'A regra deixa a lista. As versões anteriores ficam guardadas.': 'The rule leaves the list. Earlier versions are kept.',
   'Remover regra': 'Remove rule',
+  'Pedir sugestão à IA e reservas antigas': 'Ask the AI for a suggestion, and old fallbacks',
   'Testar as regras, pedir sugestão à IA e reservas antigas': 'Test the rules, ask the AI for a suggestion, and old fallbacks',
   'Pedir sugestão à IA': 'Ask the AI for a suggestion',
   'Cada reserva de regra antiga virou uma regra desligada e pendente de revisão. Nada troca de agente até você revisar e ligar a regra; as condições da regra de sugestão (campos e tipo do card) não foram copiadas.':

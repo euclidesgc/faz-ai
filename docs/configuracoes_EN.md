@@ -354,7 +354,8 @@ and nothing runs on another target. At the end of the section, **Testar as regra
 simulates the next run with the chosen rule (of the agent on the screen), without spending tokens or
 opening the CLI, and says **Passou** (passed) when that rule decided, the way it was configured, or
 **Não passou** (failed) with the reason (an earlier rule in the list decided, the rule does not apply
-to the scenario, or it applied but the board could not proceed). **Revisar conflitos** (review
+to the scenario, or it applied but the board could not proceed). Without a rule for the agent, the test and **Revisar conflitos** do not appear:
+the block only offers **Criar com ajuda de IA**. **Revisar conflitos** (review
 conflicts) looks at the rules of the agent on the screen: rules of different agents start from
 different models and never tie on the same failure, but a cycle that goes through another agent (Opus →
 Gemini Pro in one rule, Gemini Pro → Opus in another) shows up. Enabling the rule that closes a cycle

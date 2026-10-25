@@ -329,7 +329,8 @@ a falha bloqueia e nada roda noutro alvo. No fim da seção, **Testar as regras*
 execução com a regra escolhida (do agente da tela), sem gastar tokens nem abrir a CLI, e diz
 **Passou** quando foi ela que decidiu, do jeito que foi configurada, ou **Não passou** com o motivo
 (outra regra antes na lista decidiu, a regra não se aplica ao cenário, ou se aplicou mas não deu para
-seguir). **Revisar conflitos** olha as regras do agente da tela: regras de agentes diferentes partem de
+seguir). Sem regra do agente, o teste e o **Revisar conflitos** não aparecem: o bloco oferece só
+**Criar com ajuda de IA**. **Revisar conflitos** olha as regras do agente da tela: regras de agentes diferentes partem de
 modelos diferentes e não empatam na mesma falha, mas o ciclo que passa por outro agente (Opus → Gemini
 Pro numa regra, Gemini Pro → Opus noutra) aparece. Ligar a regra que fecha um ciclo não salva, e o erro
 diz o nome e o agente da outra regra. **Criar com ajuda de

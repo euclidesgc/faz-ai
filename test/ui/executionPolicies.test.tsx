@@ -231,12 +231,14 @@ it('Testar as regras: a regra escolhida vai como rascunho ligado, com o cenário
   );
   expect(screen.getByText(/Resultado desatualizado/)).toBeInTheDocument();
 });
-it('Testar as regras sem nenhuma regra: pede para montar uma antes e não simula', async () => {
+it('sem nenhuma regra do agente, o bloco não oferece testar nem revisar conflitos, só a IA', async () => {
   await open([]);
-  await userEvent.click(screen.getByText('Testar as regras, pedir sugestão à IA e reservas antigas'));
-  expect(screen.getByText('Monte uma regra primeiro: o teste simula a regra escolhida.')).toBeInTheDocument();
-  expect(screen.queryByRole('combobox', { name: 'Regra a testar' })).toBeNull();
-  expect(screen.getByRole('button', { name: 'Simular sem executar' })).toBeDisabled();
+  expect(screen.queryByText('Testar as regras, pedir sugestão à IA e reservas antigas')).toBeNull();
+  await userEvent.click(screen.getByText('Pedir sugestão à IA e reservas antigas'));
+  expect(screen.queryByRole('region', { name: 'Testar as regras' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Simular sem executar' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Revisar conflitos' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Criar com ajuda de IA' })).toBeInTheDocument();
 });
 it('Testar as regras avisa quando outra regra, antes na lista, decidiu no lugar da escolhida', async () => {
   await open([record(policy({ id: 'primeira', name: 'Primeira', priority: 5 })), record()]);
