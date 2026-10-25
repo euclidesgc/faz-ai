@@ -5217,9 +5217,16 @@ body[data-theme='dark'] img.agent-icon {
   cursor: pointer;
   font-size: var(--fs-sm);
 }
-.agent-row-lock {
-  margin-left: var(--sp-4);
-  color: var(--success);
+.context-tone {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.context-tone.closed {
+  color: var(--context-closed);
+}
+.context-tone.open {
+  color: var(--context-open);
 }
 .context-details > summary {
   cursor: pointer;

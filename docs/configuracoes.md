@@ -37,9 +37,11 @@ modelo valem para o board inteiro e ficam em **Harness › Ferramenta e execuç�
 
 A lista junta os agentes que o board executa (os que a extensão traz e os seus perfis) com o
 [registro oficial do ACP](https://agentclientprotocol.com/registry), de onde vêm o ícone, a descrição e a
-versão publicada de cada um. O agente padrão vem primeiro, depois os ligados e os desligados; cada linha
-diz o modo e a situação: conectado, ligado, desligado, não instalado, o Conectar em curso, à espera de
-você ou parado com erro. Os agentes do registro que o board ainda não executa ficam à parte, em **Outros
+versão publicada de cada um. O agente padrão vem primeiro; depois os conectados, os de **contexto
+fechado** antes dos que ainda não foram testados e estes antes dos de **contexto aberto**; depois o resto.
+Cada linha diz o modo e a situação: conectado, ligado, desligado, não instalado, o Conectar em curso, à
+espera de você ou parado com erro. Com o contexto do card conhecido, a situação ganha um cadeado: fechado
+e verde, ou aberto e laranja. Os agentes do registro que o board ainda não executa ficam à parte, em **Outros
 agentes do registro do ACP**: dá para entrar na conta e conversar com eles na sessão de teste, mas não
 usá-los nos cards. O registro é baixado uma vez e guardado por 6 horas na pasta de dados; sem rede, a
 lista segue com a cópia anterior e diz de quando ela é. **Atualizar** baixa a lista de novo e confere outra

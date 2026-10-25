@@ -42,6 +42,7 @@ olho.
 | `--warn-bg` / `--warn-border`                  | caixa de aviso                                                       |
 | `--warn-solid` / `--warn-solid-fg`             | selo de aviso preenchido                                             |
 | `--success`                                    | texto de confirmação                                                 |
+| `--context-closed` / `--context-open`          | contexto do card fechado (verde) ou aberto (laranja)                 |
 | `--shadow-color`, `--shadow-1/2/3`             | sombra de cards, menus e modais, do mais leve ao mais alto           |
 | `--shadow-select-2/1`                          | destaque de seleção: card selecionado ou marcado / linha selecionada |
 | `--focus-ring`                                 | `outline` de foco pelo teclado (`2px solid var(--accent)`)           |

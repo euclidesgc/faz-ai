@@ -267,12 +267,6 @@ export const agentConnect: Record<string, string> = {
   'Ainda não testado: o board não sabe o que este agente lê sozinho.':
     "Not tested yet: the board doesn't know what this agent reads on its own.",
   'O teste não terminou: {error}': "The test didn't finish: {error}",
-  'Contexto fechado · verificado em {date}: a IA usa só o que o card entrega.':
-    'Closed context · verified on {date}: the AI uses only what the card provides.',
-  'Contexto aberto · verificado em {date}: a IA também lê {list}.': 'Open context · verified on {date}: the AI also reads {list}.',
-  'Não deu para verificar ({date}): nenhum local teve prova.': "Couldn't verify ({date}): no location had proof.",
-  'O agente não disse onde lê ({date}); só os arquivos de instrução do projeto foram conferidos.':
-    "The agent didn't say where it reads ({date}); only the project's instruction files were checked.",
   'Testado na versão {old}; a atual é {now}. Teste de novo.': 'Tested on version {old}; the current one is {now}. Test again.',
   Caminho: 'Path',
   'Relativo à raiz do projeto, ou começando por ~/ na sua pasta pessoal. Aceita * e **.':
@@ -372,8 +366,20 @@ export const agentConnect: Record<string, string> = {
   'Manter assim': 'Keep it',
   '~1 token em todo card': '~1 token in every card',
   '~{n} tokens em todo card': '~{n} tokens in every card',
-  'Contexto aberto por escolha sua · verificado em {date}: você manteve {list}.':
-    'Open context by your choice · verified on {date}: you kept {list}.',
-  'Custa ~1 token em todo card.': 'Costs ~1 token in every card.',
-  'Custa ~{n} tokens em todo card.': 'Costs ~{n} tokens in every card.',
+  'Contexto aberto': 'Open context',
+  'Contexto fechado:': 'Closed context:',
+  'a IA usa só o que o card entrega.': 'the AI uses only what the card provides.',
+  'Contexto aberto por escolha sua:': 'Open context by your choice:',
+  'Contexto aberto:': 'Open context:',
+  'Não deu para verificar: nenhum local teve prova.': "Couldn't verify: no location had proof.",
+  'O agente não disse onde lê; só os arquivos de instrução do projeto foram conferidos.':
+    "The agent didn't say where it reads; only the project's instruction files were checked.",
+  'Verificado em {date}. Veja abaixo o que fazer com cada um.': 'Verified on {date}. See below what to do with each one.',
+  'Verificado em {date}.': 'Verified on {date}.',
+  'você manteve 1 local que entra em todo card.': 'you kept 1 location that enters every card.',
+  'você manteve {n} locais que entram em todo card.': 'you kept {n} locations that enter every card.',
+  '1 local entra sozinho em todo card': '1 location loads on its own in every card',
+  '{n} locais entram sozinhos em todo card': '{n} locations load on their own in every card',
+  '(~1 token).': '(~1 token).',
+  '(~{n} tokens).': '(~{n} tokens).',
 };

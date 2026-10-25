@@ -475,7 +475,8 @@ describe('Conectar agentes: o contexto do card', () => {
     ]);
     expect(within(row('Claude Code')).getByRole('img', { name: 'Contexto fechado' })).toBeInTheDocument();
     const scope = within(screen.getByLabelText('Contexto do card'));
-    expect(scope.getByRole('status')).toHaveTextContent('Contexto fechado · verificado em');
+    expect(scope.getByRole('status')).toHaveTextContent('Contexto fechado: a IA usa só o que o card entrega.');
+    expect(scope.getByText(/^Verificado em /)).toBeInTheDocument();
     await userEvent.click(scope.getByText('O que este agente lê sozinho (2 locais)'));
     const items = within(scope.getByRole('list', { name: 'Locais' }))
       .getAllByRole('listitem')
@@ -491,8 +492,10 @@ describe('Conectar agentes: o contexto do card', () => {
       connections: { claude: { profileId: 'claude', step: 'models', status: 'connected', summary: { version: '2.2.0' } } },
     });
     const scope = within(screen.getByLabelText('Contexto do card'));
-    expect(scope.getByRole('status')).toHaveTextContent('Contexto aberto · verificado em');
-    expect(scope.getByRole('status')).toHaveTextContent('a IA também lê CLAUDE.md.');
+    // a frase diz o estado e quantos; os caminhos ficam na lista logo abaixo
+    expect(scope.getByRole('status')).toHaveTextContent('Contexto aberto: 1 local entra sozinho em todo card.');
+    expect(scope.getByRole('status')).not.toHaveTextContent('CLAUDE.md');
+    expect(scope.getByText(/Veja abaixo o que fazer com cada um\.$/)).toBeInTheDocument();
     expect(scope.getByText('O que este agente lê sozinho (1 locais)').closest('details')).toHaveAttribute('open');
     expect(scope.getByText('Arquivos: CLAUDE.md, ../CLAUDE.md')).toBeInTheDocument();
     expect(scope.getByText('Testado na versão 2.1.296; a atual é 2.2.0. Teste de novo.')).toBeInTheDocument();
@@ -519,7 +522,7 @@ describe('Conectar agentes: o contexto do card', () => {
     show();
     withScope([leak({ verdict: { state: 'leaks', how: 'quote', files: ['CLAUDE.md'], tokens: [1200] } })]);
     const scope = within(screen.getByLabelText('Contexto do card'));
-    expect(scope.getByRole('status')).toHaveTextContent('Custa ~1200 tokens em todo card.');
+    expect(scope.getByRole('status')).toHaveTextContent('Contexto aberto: 1 local entra sozinho em todo card (~1200 tokens).');
     expect(scope.getByText(/Do projeto: leve o conteúdo para uma regra do board/)).toBeInTheDocument();
     await userEvent.click(scope.getByRole('button', { name: 'Abrir pasta' }));
     expect(lastSent('settings.aiProfiles.contextReveal')).toMatchObject({ id: 'claude', path: 'CLAUDE.md' });
@@ -608,12 +611,48 @@ describe('Conectar agentes: o contexto do card', () => {
     });
     confirmLast();
     withScope([loc], { contextKept: { claude: ['project:CLAUDE.md'] } });
-    expect(scope.getByRole('status')).toHaveTextContent('Contexto aberto por escolha sua');
+    expect(scope.getByRole('status')).toHaveTextContent('Contexto aberto por escolha sua: você manteve 1 local que entra em todo card.');
     expect(scope.getByText('Mantido por você: entra em todo card.')).toBeInTheDocument();
     expect(scope.queryByText(/Do projeto: leve o conteúdo/)).toBeNull();
     await userEvent.click(scope.getByRole('button', { name: 'Desfazer' }));
     expect(lastSent('settings.aiProfiles.contextKeep')).toMatchObject({ keep: false });
     confirmLast();
+  });
+
+  it('a lista põe o padrão primeiro, depois os conectados de contexto fechado, os sem teste e os abertos', () => {
+    show();
+    const scope = (state: 'controlled' | 'leaks') => ({
+      profileId: 'x',
+      version: '1',
+      at: 1,
+      discovered: true,
+      control: true,
+      locations: [leak({ verdict: state === 'leaks' ? { state, how: 'quote', files: ['CLAUDE.md'] } : { state, how: 'quote' } })],
+    });
+    const connected = (id: string) => ({ profileId: id, step: 'models' as const, status: 'connected' as const, summary: {} });
+    act(() =>
+      useBoardStore.setState((s) => {
+        const st = s.state!;
+        const on = ['cursor', 'kimi', 'codex-acp'];
+        const aiProfiles = st.board.aiProfiles.map((p) => (on.includes(p.id) ? { ...p, enabled: true } : p));
+        return {
+          state: {
+            ...st,
+            board: { ...st.board, aiProfiles },
+            connections: Object.fromEntries(on.map((id) => [id, connected(id)])),
+            contextScopes: { cursor: scope('leaks'), kimi: scope('controlled') },
+          },
+        };
+      }),
+    );
+    const names = within(screen.getByRole('list', { name: 'Agentes do board' }))
+      .getAllByRole('button')
+      .map((b) => b.querySelector('.agent-row-name')?.textContent);
+    expect(names.slice(0, 4)).toEqual(['Claude Code', 'Kimi Code', 'Codex', 'Cursor']);
+    // a situação leva a cor e o cadeado do contexto
+    expect(within(row('Kimi Code')).getByRole('img', { name: 'Contexto fechado' }).parentElement).toHaveClass('context-tone', 'closed');
+    expect(within(row('Cursor')).getByRole('img', { name: 'Contexto aberto' }).parentElement).toHaveClass('context-tone', 'open');
+    expect(within(row('Codex')).queryByRole('img')).toBeNull();
   });
 
   it('a pessoa acrescenta um local que o agente esqueceu e tira o que acrescentou', async () => {

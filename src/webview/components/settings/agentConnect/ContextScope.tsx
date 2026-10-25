@@ -17,7 +17,18 @@ import { formatDateTime, t, tn } from '../../../i18n';
 import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
 import { ContextLeak } from './ContextLeak';
-import { ActionButton, ActionIconButton, FormField, Hint, IconInfo, IconLock, IconPlus, IconTrash, IconWarning } from '../../ui';
+import {
+  ActionButton,
+  ActionIconButton,
+  FormField,
+  Hint,
+  IconInfo,
+  IconLock,
+  IconLockOpen,
+  IconPlus,
+  IconTrash,
+  IconWarning,
+} from '../../ui';
 
 const KIND_LABEL: Record<ContextLocationKind, string> = {
   instructions: 'instruções',
@@ -83,39 +94,46 @@ function Summary({ report, current, kept }: { report: ContextScopeReport | undef
   const leaking = allLeaking.filter((l) => !kept.includes(locationKey(l)));
   const cost = leaking.reduce((sum, l) => sum + leakTokens(l), 0);
   const outdated = report.version && current && report.version !== current;
+  // a frase diz o estado, quantos e quanto custa; os caminhos ficam na lista logo abaixo, com o que fazer em cada um
+  const headline =
+    state === 'closed' ? (
+      <>
+        <span className="context-tone closed">
+          <IconLock /> <strong>{t('Contexto fechado:')}</strong>
+        </span>{' '}
+        {t('a IA usa só o que o card entrega.')}
+      </>
+    ) : state === 'open' && !leaking.length ? (
+      <>
+        <IconInfo /> <strong>{t('Contexto aberto por escolha sua:')}</strong>{' '}
+        {tn(allLeaking.length, 'você manteve 1 local que entra em todo card.', 'você manteve {n} locais que entram em todo card.')}
+      </>
+    ) : state === 'open' ? (
+      <>
+        <span className="context-tone open">
+          <IconLockOpen /> <strong>{t('Contexto aberto:')}</strong>
+        </span>{' '}
+        {tn(leaking.length, '1 local entra sozinho em todo card', '{n} locais entram sozinhos em todo card')}
+        {cost > 0 ? ` ${tn(cost, '(~1 token).', '(~{n} tokens).')}` : '.'}
+      </>
+    ) : (
+      <>
+        <IconInfo />{' '}
+        {report.discovered
+          ? t('Não deu para verificar: nenhum local teve prova.')
+          : t('O agente não disse onde lê; só os arquivos de instrução do projeto foram conferidos.')}
+      </>
+    );
   return (
     <>
-      <p className="row" role="status">
-        {state === 'closed' ? (
-          <>
-            <IconLock /> {t('Contexto fechado · verificado em {date}: a IA usa só o que o card entrega.', { date: when })}
-          </>
-        ) : state === 'open' && !leaking.length ? (
-          <>
-            <IconInfo />{' '}
-            {t('Contexto aberto por escolha sua · verificado em {date}: você manteve {list}.', {
-              date: when,
-              list: allLeaking.map((l) => l.path).join(', '),
-            })}
-          </>
-        ) : state === 'open' ? (
-          <>
-            <IconWarning />{' '}
-            {t('Contexto aberto · verificado em {date}: a IA também lê {list}.', {
-              date: when,
-              list: leaking.map((l) => l.path).join(', '),
-            })}
-            {cost > 0 && ` ${tn(cost, 'Custa ~1 token em todo card.', 'Custa ~{n} tokens em todo card.')}`}
-          </>
-        ) : (
-          <>
-            <IconInfo />{' '}
-            {report.discovered
-              ? t('Não deu para verificar ({date}): nenhum local teve prova.', { date: when })
-              : t('O agente não disse onde lê ({date}); só os arquivos de instrução do projeto foram conferidos.', { date: when })}
-          </>
-        )}
+      <p className="row context-headline" role="status">
+        <span>{headline}</span>
       </p>
+      <Text as="p" size="1" color="gray">
+        {state === 'open' && leaking.length
+          ? t('Verificado em {date}. Veja abaixo o que fazer com cada um.', { date: when })
+          : t('Verificado em {date}.', { date: when })}
+      </Text>
       {outdated && (
         <Text as="p" size="1" color="amber">
           {t('Testado na versão {old}; a atual é {now}. Teste de novo.', { old: report.version!, now: current })}

@@ -40,9 +40,11 @@ execution).
 
 The list joins the agents the board runs (the ones the extension ships and your profiles) with the
 [official ACP registry](https://agentclientprotocol.com/registry), which provides each one's icon,
-description and published version. The default agent comes first, then the enabled and the disabled
-ones; each row tells the mode and the state: connected, enabled, disabled, not installed, Connect in
-progress, waiting for you or stopped with an error. Registry agents the board does not run yet stay
+description and published version. The default agent comes first; then the connected ones, those with a
+**closed context** before the ones not tested yet and these before those with an **open context**; then
+the rest. Each row tells the mode and the state: connected, enabled, disabled, not installed, Connect in
+progress, waiting for you or stopped with an error. With the card context known, the state gets a lock:
+closed and green, or open and orange. Registry agents the board does not run yet stay
 apart, under **Outros agentes do registro do ACP** (other agents from the ACP registry): you can sign in
 and talk to them in the test session, but not use them for cards. The registry is downloaded once and
 kept for 6 hours in the data folder; without a network, the list keeps the previous copy and says how old

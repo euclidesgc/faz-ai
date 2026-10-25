@@ -8,8 +8,8 @@ import { formatDateTime, t } from '../../../i18n';
 import { listenAgentConnect, useAgentConnectStore, type AgentTab } from '../../../store/agentConnectStore';
 import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
-import { closedByConstruction, contextScopeState } from '../../../../shared/contextScope';
-import { ActionButton, Hint, IconConnect, IconExternal, IconLock, IconPlus } from '../../ui';
+import { closedByConstruction, contextScopeState, type ContextScopeReport, type ContextScopeState } from '../../../../shared/contextScope';
+import { ActionButton, Hint, IconConnect, IconExternal, IconLock, IconLockOpen, IconPlus } from '../../ui';
 import { AiProfileForm } from '../AiProfileForm';
 import { PageHeader } from '../PageHeader';
 import { ExecutionPoliciesSettings } from '../policies/ExecutionPoliciesSettings';
@@ -17,7 +17,7 @@ import { AgentConnection } from './AgentConnection';
 import { AgentDetails } from './AgentDetails';
 import { AgentModels } from './AgentModels';
 import { AgentTest } from './AgentTest';
-import { STATE_COLOR, STATE_LABEL, agentState, profileHeadline } from './agentStatus';
+import { STATE_COLOR, STATE_LABEL, agentState, profileHeadline, type AgentState } from './agentStatus';
 
 /**
  * O ícone do registro: um SVG monocromático preto. Como `<img>` (a máscara CSS esbarra no CORS do CDN); no tema
@@ -27,22 +27,42 @@ function AgentIcon({ icon }: { icon: string | null }) {
   return icon ? <img className="agent-icon" src={icon} alt="" aria-hidden /> : <span className="agent-icon empty" aria-hidden />;
 }
 
+/** O contexto do card de um agente da lista: o modo API é fechado por construção; os outros, pelo último teste. */
+const contextOf = (item: AgentListItem, scopes: Record<string, ContextScopeReport> | undefined): ContextScopeState =>
+  !item.profile ? 'unverified' : closedByConstruction(item.profile) ? 'closed' : contextScopeState(scopes?.[item.profile.id]);
+
+/**
+ * A ordem da lista dos agentes do board: o padrão primeiro; depois os conectados, os de contexto fechado antes dos
+ * não verificados e estes antes dos abertos; o resto na ordem do catálogo (a ordenação é estável).
+ */
+function rankOf(item: AgentListItem, state: AgentState, context: ContextScopeState): number {
+  if (item.inUse) return 0;
+  if (state !== 'connected') return 4;
+  return context === 'closed' ? 1 : context === 'unverified' ? 2 : 3;
+}
+
 function AgentRow({ item, selected, onSelect }: { item: AgentListItem; selected: boolean; onSelect(): void }) {
   const connections = useBoardStore((s) => s.state!.connections);
   const installed = useAgentConnectStore((s) => s.installed);
-  const scope = useBoardStore((s) => (item.profile ? s.state!.contextScopes?.[item.profile.id] : undefined));
+  const scopes = useBoardStore((s) => s.state!.contextScopes);
   const state = agentState(item, connections, installed);
+  const context = contextOf(item, scopes);
   return (
     <button type="button" className={`agent-row ${selected ? 'selected' : ''}`} aria-pressed={selected} onClick={onSelect}>
       <AgentIcon icon={item.icon} />
       <span className="agent-row-text">
         <span className="agent-row-name">{item.name}</span>
         <span className="muted">
-          {item.profile ? modeLabel(item.profile.mode) : 'ACP'} · {t(STATE_LABEL[state])}
-          {/* o cadeado compara os agentes sem abrir cada um: o contexto fechado foi verificado */}
-          {(contextScopeState(scope) === 'closed' || (item.profile && closedByConstruction(item.profile))) && (
-            <span className="agent-row-lock" role="img" aria-label={t('Contexto fechado')}>
-              <IconLock />
+          {item.profile ? modeLabel(item.profile.mode) : 'ACP'} ·{' '}
+          {/* a situação ganha a cor e o cadeado do contexto: dá para comparar os agentes sem abrir cada um */}
+          {context === 'unverified' ? (
+            t(STATE_LABEL[state])
+          ) : (
+            <span className={`context-tone ${context}`}>
+              {t(STATE_LABEL[state])}
+              <span role="img" aria-label={t(context === 'closed' ? 'Contexto fechado' : 'Contexto aberto')}>
+                {context === 'closed' ? <IconLock /> : <IconLockOpen />}
+              </span>
             </span>
           )}
         </span>
@@ -75,7 +95,13 @@ function AgentList({
   onSelect(key: string): void;
   onNew(): void;
 }) {
-  const { listing, loadingRegistry, registryError } = useAgentConnectStore();
+  const { listing, loadingRegistry, registryError, installed } = useAgentConnectStore();
+  const connections = useBoardStore((s) => s.state!.connections);
+  const scopes = useBoardStore((s) => s.state!.contextScopes);
+  const ordered = useMemo(() => {
+    const rank = (i: AgentListItem) => rankOf(i, agentState(i, connections, installed), contextOf(i, scopes));
+    return [...board].sort((a, b) => rank(a) - rank(b));
+  }, [board, connections, installed, scopes]);
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
   const match = (i: AgentListItem) =>
@@ -90,7 +116,7 @@ function AgentList({
         onChange={(e) => setQuery(e.target.value)}
       />
       <div className="agent-rows" role="list" aria-label={t('Agentes do board')}>
-        {board.filter(match).map((i) => (
+        {ordered.filter(match).map((i) => (
           <AgentRow key={i.key} item={i} selected={selected === i.key} onSelect={() => onSelect(i.key)} />
         ))}
       </div>

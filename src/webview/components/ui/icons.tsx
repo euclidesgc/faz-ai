@@ -26,6 +26,7 @@ import {
   Heading,
   Info,
   Lock,
+  LockOpen,
   Italic,
   Link,
   List,
@@ -103,6 +104,7 @@ export const IconWarning = icon(TriangleAlert, 'IconWarning');
 /** aviso que qualifica um número (painel de métricas) */
 export const IconInfo = icon(Info, 'IconInfo');
 export const IconLock = icon(Lock, 'IconLock');
+export const IconLockOpen = icon(LockOpen, 'IconLockOpen');
 export const IconHeart = icon(Heart, 'IconHeart');
 export const IconYolo = icon(Zap, 'IconYolo');
 export const IconPlus = icon(Plus, 'IconPlus');

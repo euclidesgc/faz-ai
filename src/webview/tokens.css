@@ -111,6 +111,8 @@ body[data-theme='light'] {
   --warn-border: var(--amber-11);
   --warn-solid: var(--amber-9);
   --success: var(--green-11);
+  --context-closed: var(--green-11);
+  --context-open: var(--orange-11);
   --badge-bg: var(--slate-4);
   --badge-fg: var(--slate-12);
   --code-bg: var(--slate-3);
@@ -175,6 +177,8 @@ body[data-theme='dark'] {
   --warn-border: var(--amber-9);
   --warn-solid: var(--amber-9);
   --success: var(--green-11);
+  --context-closed: var(--green-11);
+  --context-open: var(--orange-11);
   --badge-bg: var(--slate-5);
   --badge-fg: var(--slate-12);
   --code-bg: var(--slate-4);
