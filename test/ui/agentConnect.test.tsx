@@ -162,11 +162,17 @@ describe('Conectar agentes: a lista e o agente padrão', () => {
     expect(cursor.getByRole('link', { name: 'Como instalar' })).toHaveAttribute('href', 'https://example.org/instalar');
   });
 
-  it('o pronto padrão não desliga, e o pronto não tem as ações de cópia e personalizado', async () => {
+  it('o pronto padrão não desliga (a dica diz por quê), e o pronto não tem as ações de cópia e personalizado', async () => {
     show();
     const claude = within(screen.getByLabelText('Claude Code'));
+    expect(claude.getByText('CLI · programa instalado no computador')).toBeInTheDocument();
+    // "Uso nos cards" vem antes da instalação, da conta e da conexão: é a decisão da aba
+    const use = claude.getByLabelText('Uso nos cards');
+    expect(use.compareDocumentPosition(claude.getByLabelText('Conta do agente')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(claude.getByRole('switch', { name: 'Ligado' })).toBeDisabled();
-    expect(claude.getByText('Padrão dos cards')).toBeInTheDocument();
+    await userEvent.hover(claude.getByRole('switch', { name: 'Ligado' }).closest('span[tabindex]')!);
+    expect((await screen.findAllByText('O agente padrão não pode ser desligado: torne outro agente padrão antes.'))[0]).toBeInTheDocument();
+    expect(claude.queryByText('Padrão dos cards')).toBeNull();
     await userEvent.click(tab('Detalhes'));
     expect(claude.queryByRole('button', { name: 'Editar' })).toBeNull();
     expect(claude.queryByRole('button', { name: 'Apagar' })).toBeNull();
@@ -177,7 +183,7 @@ describe('Conectar agentes: a lista e o agente padrão', () => {
   it('agente ACP pronto: desligado e ligável, com o tipo e o modo, sem Editar nem Apagar', async () => {
     show();
     const gemini = await openAgent('Gemini CLI');
-    expect(gemini.getByText('Gemini · ACP')).toBeInTheDocument();
+    expect(gemini.getByText('ACP · agente pelo protocolo ACP')).toBeInTheDocument();
     expect(gemini.getByRole('switch', { name: 'Ligado' })).not.toBeChecked();
     expect(gemini.getByRole('switch', { name: 'Ligado' })).toBeEnabled();
     expect(gemini.getByRole('button', { name: 'Tornar padrão' })).toBeDisabled();
@@ -295,7 +301,10 @@ describe('Conectar agentes: a conexão com o board', () => {
       summary: { version: null, signIn: 'api-key-checked', regime: 'exclusive', reviewed: null, models: 2, at: 1_700_000_000_000 },
     });
     confirmLast();
-    expect(await gemini.findByRole('status')).toHaveTextContent(/^Conectada · chave de API conferida · regime exclusivo · 2 modelos · /);
+    expect(await gemini.findByRole('status')).toHaveTextContent(/^Pronto para rodar cards · conferido em /);
+    expect(
+      gemini.getByText(/^chave de API conferida · a IA lê só o que o board prepara \(regime exclusivo\) · 2 modelos · /),
+    ).toBeInTheDocument();
     // o ACP, que não é o modo da conexão, não mostra o progresso dela
     await userEvent.click(gemini.getByRole('radio', { name: /^ACP/ }));
     expect(gemini.queryByRole('list', { name: 'Passos do Conectar' })).toBeNull();
@@ -340,14 +349,24 @@ describe('Conectar agentes: a conexão com o board', () => {
     });
   };
 
-  it('Conectada: o resumo (versão, login, regime, modelos, data) e o Reconectar', async () => {
+  it('Conectada: uma linha só; os passos, o resumo e a ficha do modo em "Ver detalhes"; Reconectar discreto', async () => {
     connected();
     show();
     expect(row('Gemini CLI')).toHaveTextContent('Conectado');
     const gemini = await openAgent('Gemini CLI');
-    expect(gemini.getByRole('status')).toHaveTextContent(
-      /Conectada · 0\.65\.0 · chave de API guardada · regime compatível \(ciência 1\) · 6 modelos · /,
-    );
+    expect(gemini.getByRole('status')).toHaveTextContent(/^Pronto para rodar cards · conferido em /);
+    const details = gemini.getByText('Ver detalhes').closest('details')!;
+    expect(details).not.toHaveAttribute('open');
+    expect(within(details).getByRole('list', { name: 'Passos do Conectar' })).toBeInTheDocument();
+    expect(
+      within(details).getByText(
+        /^0\.65\.0 · chave de API guardada · a IA também lê a configuração do próprio agente \(regime compatível, ciência 1\) · 6 modelos · /,
+      ),
+    ).toBeInTheDocument();
+    expect(within(details).getByText('Como funciona o modo ACP')).toBeInTheDocument();
+    expect(within(details).getByRole('button', { name: 'Revogar ciência' })).toBeInTheDocument();
+    // a ficha do modo sai de cima: conectado, ela só aparece nos detalhes
+    expect(gemini.getAllByText(/Como funciona o modo ACP/)).toHaveLength(1);
     await userEvent.click(gemini.getByRole('button', { name: 'Reconectar' }));
     expect(lastSent('settings.aiProfiles.connect')).toMatchObject({ id: 'gemini', mode: 'acp' });
     confirmLast();
@@ -376,7 +395,9 @@ describe('Conectar agentes: a conexão com o board', () => {
     board.router.handle({ type: 'settings.aiProfiles.review', id: 'gemini', accept: false });
     syncStore(board.router);
     confirmLast();
-    expect(await gemini.findByRole('status')).toHaveTextContent(/regime compatível, sem ciência: o perfil não roda/);
+    expect(await gemini.findByRole('status')).toHaveTextContent('Falta a sua ciência: o agente não roda cards até você dá-la.');
+    expect(gemini.getByText('Ver detalhes').closest('details')).toHaveAttribute('open');
+    expect(gemini.getByText(/sem a sua ciência: o perfil não roda/)).toBeInTheDocument();
     expect(gemini.queryByRole('button', { name: 'Revogar ciência' })).toBeNull();
     expect(gemini.getByText('Ciência do regime:').closest('li')).toHaveAttribute('data-state', 'waiting');
     await userEvent.click(gemini.getByRole('button', { name: 'Entendo o que a ferramenta carrega' }));
@@ -455,7 +476,9 @@ describe('Conectar agentes: a conta', () => {
     expect(panel.getByRole('button', { name: 'Verificar a conta' })).toBeDisabled();
     // o terminal fechou e o board conferiu: com login
     account('cursor', { status: 'signed-in', label: 'pessoa@exemplo.com', canLogout: true });
-    expect(panel.getByText('pessoa@exemplo.com')).toBeInTheDocument();
+    expect(panel.getByText('pe…@exemplo.com')).toBeInTheDocument();
+    // com login, conferir de novo é o que a entrada na tela e o Atualizar já fazem
+    expect(panel.queryByRole('button', { name: 'Verificar a conta' })).toBeNull();
     expect(panel.queryByRole('status')).toBeNull();
   });
 
@@ -464,7 +487,10 @@ describe('Conectar agentes: a conta', () => {
     account('claude', { status: 'signed-in', label: 'Claude Max · pessoa@exemplo.com', canLogout: true });
     const panel = within(screen.getByLabelText('Conta do agente'));
     expect(panel.getByText('Com login')).toBeInTheDocument();
-    expect(panel.getByText('Claude Max · pessoa@exemplo.com')).toBeInTheDocument();
+    // o e-mail aparece encurtado (a tela vai para capturas); o completo fica na dica
+    const label = panel.getByText('Claude Max · pe…@exemplo.com');
+    await userEvent.hover(label);
+    expect((await screen.findAllByText('Claude Max · pessoa@exemplo.com'))[0]).toBeInTheDocument();
     await userEvent.click(panel.getByRole('button', { name: 'Sair da conta' }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Sair da conta do Claude Code?');
@@ -571,7 +597,7 @@ describe('Conectar agentes: testar', () => {
         },
       },
     });
-    expect(session.getByText(/claude-agent-acp 0\.95\.0 · sessão sess-123 · Claude Max · pessoa@exemplo\.com/)).toBeInTheDocument();
+    expect(session.getByText(/claude-agent-acp 0\.95\.0 · sessão sess-123 · Claude Max · pe…@exemplo\.com/)).toBeInTheDocument();
     await choose(session.getByRole('combobox', { name: 'Model' }), 'Sonnet');
     expect(lastSent('agentConnect.test.setConfig')).toEqual({ type: 'agentConnect.test.setConfig', configId: 'model', value: 'sonnet' });
     confirmLast();

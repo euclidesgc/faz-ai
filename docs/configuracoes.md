@@ -49,11 +49,14 @@ personalizado ([abaixo](#perfil-personalizado-avançado)).
 
 ### A conta: entrar e sair
 
-A seção **Conta** da aba Conexão diz se o agente tem login e qual conta ele usa ("Claude Max ·
-pessoa@exemplo.com"), quando a ferramenta informa. A verificação é curta e não deixa processo aberto: nas
+A aba Conexão começa por **Uso nos cards** (veja abaixo) e segue com a instalação, a conta e a conexão
+com o board. A seção **Conta** diz se o agente tem login e qual conta ele usa ("Claude Max ·
+pe…@exemplo.com"), quando a ferramenta informa; o e-mail aparece encurtado, porque a tela vai parar em
+capturas e gravações, e o completo fica na dica ao passar o mouse. A verificação é curta e não deixa processo aberto: nas
 CLIs prontas, o status da própria CLI (`claude auth status`, `cursor-agent status`); nos agentes pelo
 ACP, o `initialize` e uma sessão nova sem pedido, que não gastam a conta. Ao abrir um agente ligado e
-instalado, a tela confere a conta sozinha; nos outros, pelo botão **Verificar a conta**.
+instalado, a tela confere a conta sozinha, e o **Atualizar** do topo confere de novo; sem login (ou sem
+verificação), o botão **Verificar a conta** confere na hora.
 
 Sem login, a seção mostra os jeitos de entrar que a ferramenta oferece:
 
@@ -104,19 +107,21 @@ mesmo id, as mesmas políticas, o mesmo catálogo de modelos e a mesma chave.
 5. **Ler os modelos**: os modelos que a ferramenta anuncia entram no catálogo, em todo campo de modelo
    (na API, os modelos da conta que respondem ao `generateContent`).
 
-No fim, **Conectada** com a versão, o login, o regime, quantos modelos e a data, e as ações **Trocar a
-chave** e **Revogar ciência**. Um erro fica preso ao passo em que ocorreu, com **Tentar de novo**, que
+No fim, uma linha só: **Pronto para rodar cards**, com a data em que o board conferiu. **Ver detalhes**
+abre os passos, o resumo técnico (a versão, o login, o regime, quantos modelos) e a ficha do modo, com
+**Revogar ciência**; **Trocar a chave** fica à vista. Sem a sua ciência, a linha diz que ela falta e os
+detalhes já abrem. Um erro fica preso ao passo em que ocorreu, com **Tentar de novo**, que
 retoma desse passo (a ciência e os modelos não refazem o login nem as sondas); se o agente recusar a
-chave no login, o campo volta com o que você colou. **Reconectar** refaz o login, a verificação e a
-leitura dos modelos. A ciência é de cada perfil e pode sair: **Revogar ciência** a tira (o perfil deixa
+chave no login, o campo volta com o que você colou. **Reconectar**, discreto porque é raro, refaz o
+login, a verificação e a leitura dos modelos: use se algo parou de funcionar. A ciência é de cada perfil e pode sair: **Revogar ciência** a tira (o perfil deixa
 de rodar no compatível até você dar a ciência de novo); reconectar um perfil que passa a provar o regime
 exclusivo a tira sozinho; e **importar um board não traz a ciência dos perfis**. Uma política de execução
 não troca o perfil por outro com regime diferente (`constraints-changed`).
 
-Abaixo do Conectar, **Ligado** diz se o board usa o agente: ligado, ele roda os cards com um modelo dele,
-junto com os outros agentes, e o campo Modelo dos cards, o chat e as regras oferecem os modelos dele.
-**Tornar padrão** o põe para rodar os cards sem modelo. O agente padrão não desliga: torne outro padrão
-antes. A verificação de capacidades não tem comando à parte: ela roda no Conectar e no Reconectar,
+No topo da aba, **Uso nos cards**: **Ligado** diz se o board usa o agente; ligado, ele roda os cards com
+um modelo dele, junto com os outros agentes, e o campo Modelo dos cards e o chat oferecem os modelos dele.
+**Tornar padrão** o põe para rodar os cards sem modelo. O agente padrão não desliga (a dica da chave diz
+isso): torne outro padrão antes. A verificação de capacidades não tem comando à parte: ela roda no Conectar e no Reconectar,
 sozinha quando você liga um agente ACP, e, nos perfis verificáveis que não passam pelo Conectar (a cópia
 do Claude Code e o personalizado ACP de uma versão anterior), pelo botão **Verificar capacidades** nos
 Detalhes do perfil. Nenhuma das sondas gasta a sua conta. Quando uma prova perde a validade (a CLI, o

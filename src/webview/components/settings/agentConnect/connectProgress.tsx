@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { Callout, TextField } from '@radix-ui/themes';
 import { MODE_SHEET_LINES, type ModeSheetLine, type ToolModeEntry } from '../../../../shared/aiTools';
-import { isReadyProfile, type AiProfile } from '../../../../shared/aiProfiles';
+import { isReadyProfile, modeLabel, type AiProfile } from '../../../../shared/aiProfiles';
 import { CONNECT_STEPS, type ConnectState, type ConnectStep, type ConnectSummary } from '../../../../shared/connect';
 import { settings, ui } from '../../../commands';
 import { formatDateTime, t, tn } from '../../../i18n';
@@ -59,13 +59,17 @@ export function connectionSummary(s: Partial<ConnectSummary>, review: number | n
             : 'login não verificado',
     ),
     s.regime === 'exclusive'
-      ? t('regime exclusivo')
+      ? t('a IA lê só o que o board prepara (regime exclusivo)')
       : s.regime === 'compatible'
         ? review
-          ? t('regime compatível (ciência {n})', { n: review })
-          : t('regime compatível, sem ciência: o perfil não roda até você dar a ciência')
-        : t('sem sonda de capacidades'),
-    s.models === null || s.models === undefined ? t('lista de modelos embutida') : tn(s.models, '1 modelo', '{n} modelos'),
+          ? t('a IA também lê a configuração do próprio agente (regime compatível, ciência {n})', { n: review })
+          : t(
+              'a IA também lê a configuração do próprio agente (regime compatível), sem a sua ciência: o perfil não roda até você dar a ciência',
+            )
+        : t('capacidades não verificadas'),
+    s.models === null || s.models === undefined
+      ? t('modelos da lista da extensão (o agente não informa os dele)')
+      : tn(s.models, '1 modelo', '{n} modelos'),
   ];
   if (s.at) parts.push(formatDateTime(s.at));
   return parts.join(' · ');
@@ -129,34 +133,66 @@ export function ConnectProgress({
     if (i > current) return t('a seguir');
     return t(state.status === 'running' ? 'em curso' : state.status === 'waiting' ? 'espera você' : 'falhou');
   };
+  const steps = (
+    <ol className="connect-steps" aria-label={t('Passos do Conectar')}>
+      {CONNECT_STEPS.map((step, i) => (
+        <li
+          key={step}
+          data-state={
+            reviewMissing && i === reviewIndex
+              ? 'waiting'
+              : state.status === 'connected' || i < current
+                ? 'done'
+                : i === current
+                  ? state.status
+                  : 'next'
+          }
+        >
+          {t(STEP_NAMES[step])}: <span className="muted">{stepState(i)}</span>
+        </li>
+      ))}
+    </ol>
+  );
   const sendKey = async () => {
     if (await connect.run({ apiKey })) setChanging(false);
   };
   return (
     <div className="connect-progress" aria-busy={state.status === 'running' || connect.busy}>
-      <ol className="connect-steps" aria-label={t('Passos do Conectar')}>
-        {CONNECT_STEPS.map((step, i) => (
-          <li
-            key={step}
-            data-state={
-              reviewMissing && i === reviewIndex
-                ? 'waiting'
-                : state.status === 'connected' || i < current
-                  ? 'done'
-                  : i === current
-                    ? state.status
-                    : 'next'
-            }
-          >
-            {t(STEP_NAMES[step])}: <span className="muted">{stepState(i)}</span>
-          </li>
-        ))}
-      </ol>
-      {state.status === 'connected' && (
+      {state.status === 'connected' ? (
         <>
+          {/* pronto, uma linha basta: os passos, o resumo técnico e a ficha do modo ficam em "Ver detalhes" */}
           <p role="status" className="row">
-            <IconCheck /> {t('Conectada')} · {connectionSummary(state.summary, review)}
+            {reviewMissing ? <IconWarning /> : <IconCheck />}
+            {reviewMissing
+              ? t('Falta a sua ciência: o agente não roda cards até você dá-la.')
+              : state.summary.at
+                ? t('Pronto para rodar cards · conferido em {date}', { date: formatDateTime(state.summary.at) })
+                : t('Pronto para rodar cards')}
           </p>
+          <details className="connect-details" open={reviewMissing}>
+            <summary>{t('Ver detalhes')}</summary>
+            {steps}
+            <p className="muted small">{connectionSummary(state.summary, review)}</p>
+            {mode && (
+              <>
+                <p className="muted small">{t('Como funciona o modo {mode}', { mode: modeLabel(mode.mode) })}</p>
+                <ModeSheetList mode={mode} />
+              </>
+            )}
+            {/* revogar é raro: fica com os detalhes do regime, não entre as ações da linha */}
+            {review !== null && (
+              <ActionButton
+                size="1"
+                variant="soft"
+                color="gray"
+                hint={t('Tira a sua ciência do regime compatível: o perfil deixa de rodar até você dar a ciência de novo.')}
+                loading={revoke.busy}
+                onClick={() => void revoke.run()}
+              >
+                {t('Revogar ciência')}
+              </ActionButton>
+            )}
+          </details>
           {reviewMissing && <p>{reviewText(profile.name)}</p>}
           <div className="row end">
             {reviewMissing && (
@@ -180,20 +216,10 @@ export function ConnectProgress({
                 {t('Trocar a chave')}
               </ActionButton>
             )}
-            {review !== null && (
-              <ActionButton
-                size="1"
-                variant="soft"
-                color="gray"
-                hint={t('Tira a sua ciência do regime compatível: o perfil deixa de rodar até você dar a ciência de novo.')}
-                loading={revoke.busy}
-                onClick={() => void revoke.run()}
-              >
-                {t('Revogar ciência')}
-              </ActionButton>
-            )}
           </div>
         </>
+      ) : (
+        steps
       )}
       {state.error && (
         <Callout.Root color={state.status === 'failed' ? 'red' : 'amber'} size="1" role="alert">

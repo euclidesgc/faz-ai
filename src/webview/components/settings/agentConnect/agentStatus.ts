@@ -1,7 +1,7 @@
 // A situação de cada agente na lista de Conectar agentes, numa palavra: o que a pessoa precisa saber para decidir o
 // próximo passo (instalar, conectar, ligar, testar). O "Padrão" fica à parte, num selo: ele se soma à situação.
 import type { AgentListItem } from '../../../../shared/agentConnect';
-import { isReadyProfile, modeLabel, toolLabel, type AiProfile } from '../../../../shared/aiProfiles';
+import { isReadyProfile, modeLabel, toolLabel, type AiProfile, type ProfileMode } from '../../../../shared/aiProfiles';
 import type { ConnectState } from '../../../../shared/connect';
 import { t } from '../../../i18n';
 
@@ -48,6 +48,21 @@ export function agentState(
   if (c?.status === 'failed') return 'failed';
   if (p.enabled) return c?.status === 'connected' ? 'connected' : 'enabled';
   return installed[p.id] === false ? 'missing' : 'off';
+}
+
+/** Como o board fala com o agente em cada modo, em palavras de quem não conhece CLI, ACP nem API. */
+const MODE_HOW: Record<ProfileMode, string> = {
+  cli: 'programa instalado no computador',
+  acp: 'agente pelo protocolo ACP',
+  api: 'direto pela API, sem programa instalado',
+};
+
+/**
+ * O subtítulo do agente na tela: no pronto, o modo e o que ele quer dizer ("CLI · programa instalado no computador"),
+ * já que o nome da ferramenta está no título; na cópia e no personalizado, o tipo (`profileKind`).
+ */
+export function profileHeadline(p: AiProfile): string {
+  return isReadyProfile(p) ? `${modeLabel(p.mode)} · ${t(MODE_HOW[p.mode])}` : profileKind(p);
 }
 
 /** "Claude Code · CLI", "Cópia de Claude Code · CLI", "Personalizado · CLI": o tipo do perfil e o modo. */

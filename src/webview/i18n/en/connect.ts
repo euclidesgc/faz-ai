@@ -16,7 +16,13 @@ export const connect: Record<string, string> = {
   Reconectar: 'Reconnect',
   'Acha a ferramenta, faz o login, verifica as capacidades e lê os modelos.':
     'Finds the tool, signs in, checks the capabilities, and reads the models.',
-  'Refaz o login, a verificação e a leitura dos modelos.': 'Redoes the sign-in, the check, and the model reading.',
+  'Use se algo parou de funcionar: refaz o login, a verificação e a leitura dos modelos.':
+    'Use it if something stopped working: redoes the sign-in, the check, and the model reading.',
+  'Pronto para rodar cards': 'Ready to run cards',
+  'Pronto para rodar cards · conferido em {date}': 'Ready to run cards · checked on {date}',
+  'Falta a sua ciência: o agente não roda cards até você dá-la.':
+    "Your acknowledgment is missing: the agent won't run cards until you give it.",
+  'Ver detalhes': 'See details',
   'O Conectar está em curso.': 'Connect is in progress.',
   'Achar a ferramenta': 'Find the tool',
   'Entrar na conta': 'Sign in',
@@ -54,8 +60,8 @@ export const connect: Record<string, string> = {
   'Confere a chave com a API, guarda no cofre e continua o Conectar.':
     'Checks the key with the API, stores it in the vault and continues Connect.',
   'Conferir e guardar a chave': 'Check and store the key',
-  'regime compatível, sem ciência: o perfil não roda até você dar a ciência':
-    'compatible regime, not acknowledged: the profile does not run until you acknowledge it',
+  'a IA também lê a configuração do próprio agente (regime compatível), sem a sua ciência: o perfil não roda até você dar a ciência':
+    "the AI also reads the agent's own configuration (compatible regime), without your acknowledgment: the profile does not run until you acknowledge it",
   'O Conectar espera você no passo "{step}": continue no cartão em Conectar ferramenta, acima.':
     'Connect is waiting for you at "{step}": continue on the card in Connect a tool, above.',
   'Trocar a chave': 'Change the key',
@@ -73,10 +79,12 @@ export const connect: Record<string, string> = {
   'Retoma o Conectar do passo em que parou.': 'Resumes Connect from the step where it stopped.',
   'login confirmado': 'signed in',
   'login não verificado': 'sign-in not verified',
-  'regime exclusivo': 'exclusive regime',
-  'regime compatível (ciência {n})': 'compatible regime (acknowledgment {n})',
+  'a IA lê só o que o board prepara (regime exclusivo)': 'the AI reads only what the board prepares (exclusive regime)',
+  'a IA também lê a configuração do próprio agente (regime compatível, ciência {n})':
+    "the AI also reads the agent's own configuration (compatible regime, acknowledgment {n})",
   'sem sonda de capacidades': 'no capability probe',
-  'lista de modelos embutida': 'built-in model list',
+  'capacidades não verificadas': 'capabilities not checked',
+  'modelos da lista da extensão (o agente não informa os dele)': "models from the extension's list (the agent doesn't report its own)",
   '1 modelo': '1 model',
   '{n} modelos': '{n} models',
   'Chave de API': 'API key',
@@ -101,8 +109,8 @@ export const connect: Record<string, string> = {
     'Turns off the board-wide compatible regime. Acknowledged profiles stay compatible; those that do not go through Connect (copies, custom profiles) get the acknowledgment in their details, in Connect agents.',
   'Voltar ao exclusivo': 'Back to exclusive',
   // as fichas dos modos (`TOOLS`)
-  'Chave de API do Gemini: cobrança por token, por projeto (há um nível gratuito).':
-    'Gemini API key: billed per token, per project (there is a free tier).',
+  'Usa uma chave de API do Gemini: cobrança por consumo, por projeto (há um nível gratuito).':
+    'Uses a Gemini API key: billed by usage, per project (there is a free tier).',
   'É o único modo em que o board sabe de antemão tudo o que o agente pode acessar e paga só pelo que pediu.':
     'It is the only mode in which the board knows in advance everything the agent can access and pays only for what it asked.',
   'MCP e permissões, pedido a pedido; o contexto o agente carrega por conta própria':
@@ -128,8 +136,8 @@ export const connect: Record<string, string> = {
   'chave de API do Gemini, guardada no cofre local': 'Gemini API key, kept in the local vault',
   'para a finalidade do board: prever o acesso e gastar só o pedido, em Refinar, Resumir e Trabalhar na fase, com qualquer permissão':
     'for the board’s purpose: knowing the access in advance and spending only on the request, in refine, summarize and work on the phase, with any permission',
-  'Assinatura do Claude pela CLI; uma chave de API da Anthropic é cobrança por token, fora da assinatura.':
-    'Claude subscription through the CLI; an Anthropic API key is billed per token, outside the subscription.',
+  'Usa a sua assinatura do Claude (Pro ou Max). Com uma chave de API da Anthropic, o uso é cobrado à parte, por consumo.':
+    'Uses your Claude subscription (Pro or Max). With an Anthropic API key, usage is billed separately, by consumption.',
   'É o único modo que usa a assinatura: o ACP do Claude exige cobrança por API.':
     'It is the only mode that uses the subscription: Claude’s ACP requires API billing.',
   'agente, ferramentas e MCP por parâmetros da linha de comando, no modo estrito':
@@ -143,7 +151,7 @@ export const connect: Record<string, string> = {
   'assinatura do Claude': 'Claude subscription',
   'é o único modo do Claude Code: o ACP dele exige cobrança por API, fora da assinatura':
     'it is Claude Code’s only mode: its ACP requires API billing, outside the subscription',
-  'Plano da conta do Cursor.': 'Your Cursor account plan.',
+  'Usa o plano da sua conta do Cursor.': 'Uses your Cursor account plan.',
   'É o modo que a extensão traz pronto para o Cursor, com o hook que nega o que o card não libera.':
     'It is the mode the extension ships ready for Cursor, with the hook that denies what the card does not allow.',
   'MCP, ferramentas e subagentes pelo hook do board, na hora do uso; o agente do card segue pelo pedido':
@@ -153,7 +161,7 @@ export const connect: Record<string, string> = {
   'tokens por execução, informados pela CLI': 'tokens per run, reported by the CLI',
   'plano do Cursor': 'Cursor plan',
   'é o modo pronto do {name}; o ACP dele fica para depois do teste real': 'it is the ready {name} mode; its ACP waits for the real test',
-  'Conta do Kimi Code.': 'Your Kimi Code account.',
+  'Usa a sua conta do Kimi Code.': 'Uses your Kimi Code account.',
   'É o modo que a extensão traz pronto para o Kimi Code e que mede os tokens.':
     'It is the mode the extension ships ready for Kimi Code, and it measures tokens.',
   'o modelo; agente, ferramentas e MCP seguem como orientação no pedido': 'the model; agent, tools, and MCP go as guidance in the prompt',
@@ -161,7 +169,8 @@ export const connect: Record<string, string> = {
   'o agente completo do Kimi Code, numa passada, com a permissão sempre automática':
     'the full Kimi Code agent, in a single pass, with permission always automatic',
   'conta do Kimi Code': 'Kimi Code account',
-  'Cobrança da conta da própria ferramenta; confira na página oficial.': 'The tool’s own account billing; check the official page.',
+  'Usa a conta da própria ferramenta; a cobrança está na página oficial dela.':
+    'Uses the tool’s own account; billing is on its official page.',
   'É o único modo que a extensão oferece para esta ferramenta.': 'It is the only mode the extension offers for this tool.',
   'tokens do último pedido do turno': 'tokens for the last request of the turn',
   'login da própria ferramenta, pelo protocolo ou no terminal': 'the tool’s own sign-in, through the protocol or in the terminal',

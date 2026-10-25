@@ -8,10 +8,10 @@ import { t } from '../../../i18n';
 import { useAgentConnectStore } from '../../../store/agentConnectStore';
 import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
-import { ActionButton, IconCheck, IconExternal, IconWarning, SwitchField } from '../../ui';
+import { ActionButton, Hint, IconCheck, IconExternal, IconWarning, SwitchField } from '../../ui';
 import { AccountPanel } from './AccountPanel';
 import { connectable } from './AgentDetails';
-import { ConnectProgress, ModeSheetList, connectionSummary } from './connectProgress';
+import { ConnectProgress, ModeSheetList } from './connectProgress';
 
 /** A ferramenta nesta máquina: achada (com a versão) ou não, com onde instalar. */
 function ToolStep({ item }: { item: AgentListItem }) {
@@ -74,6 +74,7 @@ function BoardConnection({ profile }: { profile: AiProfile }) {
   // a CLI pronta entra pelo login do terminal que o board acompanha: o passo do login que falhou leva a ele
   const cliLogin = profile.mode === 'cli' && ['claude', 'cursor', 'kimi'].includes(profile.base);
   const switching = mode !== profile.mode;
+  const connected = !switching && connection?.status === 'connected';
   return (
     <section className="agent-board-connection" aria-label={t('Conexão com o board')}>
       <Text size="2" weight="medium">
@@ -105,7 +106,8 @@ function BoardConnection({ profile }: { profile: AiProfile }) {
           {t(entry.recommended.reason)}
         </Text>
       )}
-      {modeEntry && (
+      {/* conectado, a ficha do modo vai para o "Ver detalhes" do progresso: aqui ela só ajuda a escolher e conectar */}
+      {modeEntry && connection?.status !== 'connected' && (
         <details className="agent-mode-sheet">
           <summary>{t('Como funciona o modo {mode}', { mode: modeLabel(mode) })}</summary>
           <ModeSheetList mode={modeEntry} />
@@ -126,12 +128,14 @@ function BoardConnection({ profile }: { profile: AiProfile }) {
         </Text>
       )}
       <div className="row end">
+        {/* conectado, refazer é raro: o botão fica discreto, e o azul cheio fica para quem ainda precisa conectar */}
         <ActionButton
+          {...(connected ? { size: '1' as const, variant: 'soft' as const, color: 'gray' as const } : {})}
           hint={
             switching
               ? t('Passa o agente para este modo quando o login der certo, com a mesma chave e os mesmos modelos.')
-              : connection?.status === 'connected'
-                ? t('Refaz o login, a verificação e a leitura dos modelos.')
+              : connected
+                ? t('Use se algo parou de funcionar: refaz o login, a verificação e a leitura dos modelos.')
                 : t('Acha a ferramenta, faz o login, verifica as capacidades e lê os modelos.')
           }
           disabled={raw?.status === 'running'}
@@ -139,35 +143,46 @@ function BoardConnection({ profile }: { profile: AiProfile }) {
           loading={connect.busy}
           onClick={() => void connect.run()}
         >
-          {switching
-            ? t('Conectar no modo {mode}', { mode: modeLabel(mode) })
-            : t(connection?.status === 'connected' ? 'Reconectar' : 'Conectar')}
+          {switching ? t('Conectar no modo {mode}', { mode: modeLabel(mode) }) : t(connected ? 'Reconectar' : 'Conectar')}
         </ActionButton>
       </div>
     </section>
   );
 }
 
-/** Ligar, desligar e tornar padrão: ligado, o board executa com este agente os cards com um modelo dele. */
+/**
+ * Ligar, desligar e tornar padrão: ligado, o board executa com este agente os cards com um modelo dele. Vem no topo da
+ * aba porque é a decisão da tela; a situação técnica fica nos blocos de baixo, sem repetir aqui.
+ */
 function ProfileUse({ profile }: { profile: AiProfile }) {
   const state = useBoardStore((s) => s.state)!;
   const standard = state.board.aiTool === profile.id;
   const pending = profile.credentials?.review === 'pending';
   const enabled = useAction((on: boolean) => settings.setAiProfileEnabled(profile.id, on));
   const useInCards = useAction(() => settings.updateBoard({ aiTool: profile.id }));
-  const summary = state.connections?.[profile.id]?.status === 'connected' ? state.connections[profile.id]!.summary : null;
+  const toggle = (
+    <SwitchField
+      label={t('Ligado')}
+      checked={profile.enabled}
+      disabled={standard || enabled.busy || pending}
+      onChange={(on) => void enabled.run(on)}
+    />
+  );
   return (
     <section className="agent-use" aria-label={t('Uso nos cards')}>
+      <Text size="2" weight="medium">
+        {t('Uso nos cards')}
+      </Text>
       <div className="row wrap">
-        <SwitchField
-          label={t('Ligado')}
-          checked={profile.enabled}
-          disabled={standard || enabled.busy || pending}
-          onChange={(on) => void enabled.run(on)}
-        />
+        {/* a chave travada do padrão diz por quê, para não parecer quebrada */}
         {standard ? (
-          <Badge color="indigo">{t('Padrão dos cards')}</Badge>
+          <Hint content={t('O agente padrão não pode ser desligado: torne outro agente padrão antes.')}>
+            <span tabIndex={0}>{toggle}</span>
+          </Hint>
         ) : (
+          toggle
+        )}
+        {!standard && (
           <ActionButton
             size="1"
             variant="soft"
@@ -187,16 +202,12 @@ function ProfileUse({ profile }: { profile: AiProfile }) {
       </div>
       <Text as="p" size="1" color="gray">
         {standard
-          ? t(
-              'Roda os cards sem modelo; os com o modelo de outro agente ligado rodam nele, ao mesmo tempo. Para desligá-lo, torne outro agente padrão antes.',
-            )
+          ? t('Roda os cards que não escolhem modelo. Os que escolhem um modelo de outro agente rodam nele, ao mesmo tempo.')
           : profile.enabled
             ? t(
-                'Ligado: roda os cards com um modelo dele, ao mesmo tempo que os outros agentes. O campo Modelo dos cards, o chat e as regras de sugestão oferecem os modelos dele.',
+                'Roda os cards que escolhem um modelo dele, ao mesmo tempo que os outros agentes. Os modelos dele aparecem no campo Modelo dos cards e no chat.',
               )
-            : t('Desligado: o board não roda nada com ele.')}
-        {summary &&
-          ` ${t('Conectado: {summary}.', { summary: connectionSummary(summary, state.board.runner.compatibilityReviews?.[profile.id] ?? null) })}`}
+            : t('Desligado: o board não usa este agente.')}
       </Text>
     </section>
   );
@@ -208,6 +219,7 @@ export function AgentConnection({ item }: { item: AgentListItem }) {
   const installed = useAgentConnectStore((s) => (p ? s.installed[p.id] : undefined));
   return (
     <div className="agent-connection">
+      {p && <ProfileUse profile={p} />}
       <ToolStep item={item} />
       <AccountPanel agentKey={item.key} name={item.name} profile={p} autoCheck={!!p && p.enabled && installed !== false} />
       {p && connectable(p) && <BoardConnection profile={p} />}
@@ -218,7 +230,6 @@ export function AgentConnection({ item }: { item: AgentListItem }) {
           )}
         </Text>
       )}
-      {p && <ProfileUse profile={p} />}
       {!p && (
         <Callout.Root color="gray" size="1">
           <Callout.Text>

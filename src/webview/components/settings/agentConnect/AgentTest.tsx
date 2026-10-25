@@ -8,6 +8,7 @@ import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
 import { ActionButton, IconRun, IconStop, IconWarning } from '../../ui';
 import { SectionHeader } from '../SectionHeader';
+import { maskEmail } from './AccountPanel';
 import { ProtocolLogPanel } from './ProtocolLogPanel';
 import { SessionOptions } from './SessionControls';
 
@@ -243,7 +244,7 @@ function LiveSession({ item }: { item: AgentListItem }) {
           {connection.agentInfo ? ` · ${connection.agentInfo.name} ${connection.agentInfo.version}` : ''}
           {connection.sessionId ? ` · ${t('sessão {id}', { id: connection.sessionId.slice(0, 8) })}` : ''}
           {connection.account && connection.account.kind !== 'none'
-            ? ` · ${[connection.account.label, connection.account.detail].filter(Boolean).join(' · ')}`
+            ? ` · ${maskEmail([connection.account.label, connection.account.detail].filter(Boolean).join(' · '))}`
             : ''}
           {connection.capabilities.length > 0 && ` · ${connection.capabilities.join(', ')}`}
         </Text>

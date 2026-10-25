@@ -53,12 +53,16 @@ profile form ([below](#custom-profile-advanced)).
 
 ### The account: signing in and out
 
-The **Conta** (account) section of the Connection tab tells whether the agent is signed in and which
-account it uses ("Claude Max · person@example.com"), when the tool reports it. The check is short and
+The Connection tab starts with **Uso nos cards** (use in cards, see below) and goes on with the
+installation, the account and the connection to the board. The **Conta** (account) section tells whether
+the agent is signed in and which account it uses ("Claude Max · pe…@example.com"), when the tool reports
+it; the email shows shortened, since the screen ends up in screenshots and recordings, and the full one is
+in the hint on hover. The check is short and
 leaves no process running: on the ready CLIs, the CLI's own status (`claude auth status`, `cursor-agent
 status`); on agents over ACP, `initialize` and a new session with no request, which do not spend your
-account. When you open an enabled, installed agent, the screen checks the account by itself; for the
-others, through the **Verificar a conta** (check the account) button.
+account. When you open an enabled, installed agent, the screen checks the account by itself, and the
+**Atualizar** (refresh) button at the top checks again; when signed out (or not checked), the
+**Verificar a conta** (check the account) button checks right away.
 
 When signed out, the section shows the ways in that the tool offers:
 
@@ -117,21 +121,25 @@ catalog and the same key.
 5. **Read the models**: the models the tool announces go into the catalog, in every model field (in
    API, the account's models that answer `generateContent`).
 
-At the end, **Conectada** (connected) with the version, the sign-in, the regime, how many models and the
-date, and the **Trocar a chave** (change the key) and **Revogar ciência** (revoke acknowledgment)
-actions. An error stays attached to the step where it happened, with **Tentar de novo** (try again),
+At the end, a single line: **Pronto para rodar cards** (ready to run cards), with the date the board
+checked. **Ver detalhes** (see details) opens the steps, the technical summary (the version, the sign-in,
+the regime, how many models) and the mode sheet, with **Revogar ciência** (revoke acknowledgment);
+**Trocar a chave** (change the key) stays in view. Without your acknowledgment, the line says it is
+missing and the details open already. An error stays attached to the step where it happened, with **Tentar de novo** (try again),
 which resumes from that step (the acknowledgment and the models do not redo the sign-in or the probes);
 if the agent refuses the key at sign-in, the field comes back with what you pasted. **Reconectar**
-(reconnect) redoes the sign-in, the check and the model reading. The acknowledgment belongs to each
+(reconnect), low-key because it is rare, redoes the sign-in, the check and the model reading: use it if
+something stopped working. The acknowledgment belongs to each
 profile and can go away: **Revogar ciência** removes it (the profile stops running in the compatible
 regime until you acknowledge again); reconnecting a profile that now proves the exclusive regime removes
 it by itself; and **importing a board does not bring the profiles' acknowledgments**. An execution policy
 does not swap the profile for another one with a different regime (`constraints-changed`).
 
-Below Connect, **Ligado** (enabled) tells whether the board uses the agent: when enabled, it runs the
-cards with one of its models, alongside the other agents, and the cards' Model field, the chat and the
-rules offer its models. **Tornar padrão** (make default) makes it run the cards with no model. The
-default agent cannot be disabled: make another one the default first. The capability check has no separate command: it
+At the top of the tab, **Uso nos cards** (use in cards): **Ligado** (enabled) tells whether the board
+uses the agent; when enabled, it runs the cards with one of its models, alongside the other agents, and
+the cards' Model field and the chat offer its models. **Tornar padrão** (make default) makes it run the
+cards with no model. The default agent cannot be disabled (the switch's hint says so): make another one
+the default first. The capability check has no separate command: it
 runs in Connect and Reconnect, by itself when you enable an ACP agent and, on the verifiable profiles
 that do not go through Connect (the Claude Code copy and a custom ACP profile from an earlier version),
 through the **Verificar capacidades** (check capabilities) button in the profile's Details. None of the

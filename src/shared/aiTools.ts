@@ -150,7 +150,7 @@ export const TOOLS: readonly AiToolEntry[] = [
     name: 'Gemini CLI',
     docs: 'https://geminicli.com/docs/',
     // desde 18/06/2026 a conta individual Google entra pelo Antigravity; o Gemini CLI segue com chave de API
-    billing: 'Chave de API do Gemini: cobrança por token, por projeto (há um nível gratuito).',
+    billing: 'Usa uma chave de API do Gemini: cobrança por consumo, por projeto (há um nível gratuito).',
     modes: [
       {
         mode: 'acp',
@@ -206,7 +206,7 @@ export const TOOLS: readonly AiToolEntry[] = [
     id: 'claude',
     name: 'Claude Code',
     docs: 'https://code.claude.com/docs/en/setup',
-    billing: 'Assinatura do Claude pela CLI; uma chave de API da Anthropic é cobrança por token, fora da assinatura.',
+    billing: 'Usa a sua assinatura do Claude (Pro ou Max). Com uma chave de API da Anthropic, o uso é cobrado à parte, por consumo.',
     modes: [
       {
         mode: 'cli',
@@ -231,7 +231,7 @@ export const TOOLS: readonly AiToolEntry[] = [
     id: 'cursor',
     name: 'Cursor',
     docs: 'https://cursor.com/docs/cli/installation',
-    billing: 'Plano da conta do Cursor.',
+    billing: 'Usa o plano da sua conta do Cursor.',
     modes: [
       {
         mode: 'cli',
@@ -256,7 +256,7 @@ export const TOOLS: readonly AiToolEntry[] = [
     id: 'kimi',
     name: 'Kimi Code',
     docs: 'https://www.kimi.com/code/docs/en/',
-    billing: 'Conta do Kimi Code.',
+    billing: 'Usa a sua conta do Kimi Code.',
     modes: [
       {
         mode: 'cli',
@@ -300,7 +300,7 @@ export const TOOLS: readonly AiToolEntry[] = [
     id: a.id,
     name: a.name,
     docs: a.docs,
-    billing: 'Cobrança da conta da própria ferramenta; confira na página oficial.',
+    billing: 'Usa a conta da própria ferramenta; a cobrança está na página oficial dela.',
     modes: [
       {
         mode: 'acp',

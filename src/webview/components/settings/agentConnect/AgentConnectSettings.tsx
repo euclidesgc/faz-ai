@@ -16,7 +16,7 @@ import { AgentConnection } from './AgentConnection';
 import { AgentDetails } from './AgentDetails';
 import { AgentModels } from './AgentModels';
 import { AgentTest } from './AgentTest';
-import { STATE_COLOR, STATE_LABEL, agentState, profileKind } from './agentStatus';
+import { STATE_COLOR, STATE_LABEL, agentState, profileHeadline } from './agentStatus';
 
 /**
  * O ícone do registro: um SVG monocromático preto. Como `<img>` (a máscara CSS esbarra no CORS do CDN); no tema
@@ -141,7 +141,7 @@ function AgentDetail({ item, onEdit }: { item: AgentListItem; onEdit(profile: Ai
             {item.name}
           </Heading>
           <Text size="1" color="gray">
-            {p ? profileKind(p) : t('Registro do ACP · {version}', { version: item.registry?.version ?? '?' })}
+            {p ? profileHeadline(p) : t('Registro do ACP · {version}', { version: item.registry?.version ?? '?' })}
           </Text>
         </div>
         {item.inUse && (

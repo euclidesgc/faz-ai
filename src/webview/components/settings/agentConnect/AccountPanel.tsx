@@ -9,7 +9,7 @@ import { accountOf, useAgentConnectStore } from '../../../store/agentConnectStor
 import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
 import { isWeb } from '../../../vscode';
-import { ActionButton, FormField, IconWarning } from '../../ui';
+import { ActionButton, FormField, Hint, IconWarning } from '../../ui';
 
 const STATUS_LABEL: Record<AccountStatus, string> = {
   checking: 'Verificando…',
@@ -25,6 +25,11 @@ const STATUS_COLOR: Record<AccountStatus, 'indigo' | 'amber' | 'gray' | 'red'> =
   unknown: 'gray',
   error: 'red',
 };
+
+/**
+ * O e-mail da conta encurtado ("eu…@gmail.com"): a tela aparece em capturas e gravações; o completo fica na dica.
+ */
+export const maskEmail = (text: string): string => text.replace(/([^\s@·]{2})[^\s@·]*@/g, '$1…@');
 
 /** Um jeito de entrar: no terminal (o board acompanha até ele fechar), pelo próprio agente ou com uma chave. */
 function LoginMethod({
@@ -156,7 +161,16 @@ export function AccountPanel({
           {t('Conta')}
         </Text>
         <Badge color={STATUS_COLOR[account.status]}>{t(STATUS_LABEL[account.status])}</Badge>
-        {account.label && <Text size="2">{account.label}</Text>}
+        {account.label &&
+          (maskEmail(account.label) === account.label ? (
+            <Text size="2">{account.label}</Text>
+          ) : (
+            <Hint content={account.label}>
+              <Text size="2" tabIndex={0}>
+                {maskEmail(account.label)}
+              </Text>
+            </Hint>
+          ))}
         {account.checkedAt && account.status !== 'checking' && (
           <Text size="1" color="gray">
             {t('verificada em {date}', { date: formatDateTime(account.checkedAt) })}
@@ -198,23 +212,26 @@ export function AccountPanel({
         </Text>
       )}
       <div className="row wrap">
-        <ActionButton
-          size="1"
-          variant="soft"
-          color="gray"
-          loading={account.status === 'checking'}
-          disabled={!!account.loggingIn}
-          disabledReason={t('Espere o login terminar')}
-          hint={t('Confere o login agora, sem gastar a sua conta: o status da CLI ou uma sessão do agente sem pedido.')}
-          onClick={() => void check.run()}
-        >
-          {t('Verificar a conta')}
-        </ActionButton>
+        {/* com login, conferir de novo é o que a entrada na tela e o Atualizar do topo já fazem */}
+        {account.status !== 'signed-in' && (
+          <ActionButton
+            size="1"
+            variant="soft"
+            color="gray"
+            loading={account.status === 'checking'}
+            disabled={!!account.loggingIn}
+            disabledReason={t('Espere o login terminar')}
+            hint={t('Confere o login agora, sem gastar a sua conta: o status da CLI ou uma sessão do agente sem pedido.')}
+            onClick={() => void check.run()}
+          >
+            {t('Verificar a conta')}
+          </ActionButton>
+        )}
         {account.canLogout && account.status === 'signed-in' && (
           <ActionButton
             size="1"
             variant="soft"
-            color="red"
+            color="gray"
             disabled={busy}
             disabledReason={t('Espere a operação em andamento')}
             loading={logout.busy}

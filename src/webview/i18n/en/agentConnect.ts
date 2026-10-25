@@ -59,17 +59,20 @@ export const agentConnect: Record<string, string> = {
   'Abre o login num terminal; quando ele fechar, o board confere a conta e retoma o Conectar sozinho.':
     'Opens the sign-in in a terminal; when it closes, the board checks the account and resumes Connect on its own.',
   'Uso nos cards': 'Use in cards',
-  'Padrão dos cards': 'Default for cards',
+  'O agente padrão não pode ser desligado: torne outro agente padrão antes.':
+    'The default agent cannot be disabled: make another agent the default first.',
   'Tornar padrão': 'Make default',
   'Ligue ou conecte o agente antes.': 'Enable or connect the agent first.',
   'Os cards sem modelo (nem no card, nem no agente, nem por uma regra) passam a rodar com este. Os outros seguem no agente do modelo deles.':
     "Cards with no model (not on the card, the agent or a rule) will run with this one. The others stay on their model's agent.",
-  'Roda os cards sem modelo; os com o modelo de outro agente ligado rodam nele, ao mesmo tempo. Para desligá-lo, torne outro agente padrão antes.':
-    "Runs the cards with no model; the ones with another enabled agent's model run on that agent, at the same time. To disable it, make another agent the default first.",
-  'Ligado: roda os cards com um modelo dele, ao mesmo tempo que os outros agentes. O campo Modelo dos cards, o chat e as regras de sugestão oferecem os modelos dele.':
-    "Enabled: runs the cards with one of its models, alongside the other agents. The cards' Model field, the chat and the suggestion rules offer its models.",
-  'Desligado: o board não roda nada com ele.': 'Disabled: the board runs nothing with it.',
-  'Conectado: {summary}.': 'Connected: {summary}.',
+  'Roda os cards que não escolhem modelo. Os que escolhem um modelo de outro agente rodam nele, ao mesmo tempo.':
+    "Runs the cards that don't choose a model. The ones that choose another agent's model run on that agent, at the same time.",
+  'Roda os cards que escolhem um modelo dele, ao mesmo tempo que os outros agentes. Os modelos dele aparecem no campo Modelo dos cards e no chat.':
+    "Runs the cards that choose one of its models, alongside the other agents. Its models show up in the cards' Model field and in the chat.",
+  'Desligado: o board não usa este agente.': "Disabled: the board doesn't use this agent.",
+  'programa instalado no computador': 'program installed on the computer',
+  'agente pelo protocolo ACP': 'agent over the ACP protocol',
+  'direto pela API, sem programa instalado': 'straight through the API, with no program installed',
   'Cópias e perfis personalizados não passam pelo Conectar: em Detalhes, verifique as capacidades e dê a ciência do regime; depois, ligue o perfil aqui.':
     'Copies and custom profiles do not go through Connect: in Details, check the capabilities and acknowledge the regime; then enable the profile here.',
   'O board ainda não executa cards com este agente: ele está no registro do ACP, mas não no catálogo da extensão. Dá para entrar na conta e conversar com ele na aba Testar.':
