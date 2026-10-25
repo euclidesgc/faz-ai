@@ -8,6 +8,7 @@ import { useBoardStore } from '../store/boardStore';
 import { ChipsEditor, IconExternal, OptionLabel, optionChip, SelectField, TextField } from './ui';
 import { isSkillsField } from './settings/fields/fieldKinds';
 import { SkillPicker } from './skills/SkillPicker';
+import { GroupedPicker } from './GroupedPicker';
 import { dt, getLocale, t } from '../i18n';
 
 /** O campo tem algo para mostrar no card (checkbox desmarcado e lista vazia não contam). */
@@ -154,9 +155,22 @@ export function ModelEditor({
       }}
     />
   ) : (
-    <Select.Root
+    <GroupedPicker
+      ariaLabel={t('Modelo')}
       value={current?.id ?? NO_MODEL}
-      onValueChange={(id) => {
+      head={[
+        { value: NO_MODEL, label: '—' },
+        ...(current && !option ? [{ value: current.id, label: t('{id} (fora do catálogo)', { id: current.id }) }] : []),
+      ]}
+      groups={groups.map((g) => ({
+        key: g.cli,
+        label: g.label,
+        options: [
+          ...g.options.map((o) => ({ value: o.id, label: o.label })),
+          ...(g.custom ? [{ value: `${OTHER_MODEL}${g.cli}`, label: t('Outro modelo…') }] : []),
+        ],
+      }))}
+      onChange={(id) => {
         if (id.startsWith(OTHER_MODEL)) {
           setOther(id.slice(OTHER_MODEL.length));
           return;
@@ -164,24 +178,7 @@ export function ModelEditor({
         const o = groups.flatMap((g) => g.options).find((x) => x.id === id);
         onChange(o ? modelValue(o.id, o.defaultEffort) : null);
       }}
-    >
-      <Select.Trigger aria-label={t('Modelo')} />
-      <Select.Content position="popper">
-        <Select.Item value={NO_MODEL}>—</Select.Item>
-        {current && !option && <Select.Item value={current.id}>{t('{id} (fora do catálogo)', { id: current.id })}</Select.Item>}
-        {groups.map((g) => (
-          <Select.Group key={g.cli}>
-            <Select.Label>{g.label}</Select.Label>
-            {g.options.map((o) => (
-              <Select.Item key={o.id} value={o.id}>
-                {o.label}
-              </Select.Item>
-            ))}
-            {g.custom && <Select.Item value={`${OTHER_MODEL}${g.cli}`}>{t('Outro modelo…')}</Select.Item>}
-          </Select.Group>
-        ))}
-      </Select.Content>
-    </Select.Root>
+    />
   );
   const effortSelect =
     option && option.efforts.length > 0 ? (

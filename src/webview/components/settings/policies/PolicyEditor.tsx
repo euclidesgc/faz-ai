@@ -25,12 +25,13 @@ import {
   ORIGIN_LABELS,
   defaultName,
   offTargetNote,
-  originChoices,
+  originGroups,
+  anyOriginChoice,
   originConditions,
   originOf,
   profileLabel,
   ruleSentence,
-  targetChoices,
+  targetGroups,
   targetKeyOf,
   targetName,
 } from './parts';
@@ -101,8 +102,8 @@ export function PolicyEditor({
     change({ targets });
   };
   const origin = originOf(draft.conditions);
-  const origins = originChoices(library);
-  const targets = targetChoices(library);
+  const origins = originGroups(library);
+  const targets = targetGroups(library);
   const originKey = origin !== null ? originConditions(origin) : null;
   const sameAsOrigin = (target: ExecutionTarget) =>
     !!originKey && originKey.profileIds[0] === target.profileId && (originKey.models.length === 0 || originKey.models[0] === target.model);
@@ -143,7 +144,8 @@ export function PolicyEditor({
         <Choice
           label={t('Modelo que falhou')}
           value={origin ?? MANY_ORIGINS}
-          choices={[...origins, ...(origin === null ? [{ value: MANY_ORIGINS, label: t('Várias origens (regra avançada)') }] : [])]}
+          choices={[anyOriginChoice(), ...(origin === null ? [{ value: MANY_ORIGINS, label: t('Várias origens (regra avançada)') }] : [])]}
+          groups={origins}
           onChange={(v) => {
             if (v !== MANY_ORIGINS) condition(originConditions(v));
           }}
@@ -162,7 +164,7 @@ export function PolicyEditor({
               const profile = library.profiles.find((p) => p.id === target.profileId);
               const option = library.models.find((m) => profile?.modelIds.includes(m.id) && m.model === target.model);
               const key = targetKeyOf(target);
-              const known = targets.some((c) => c.value === key);
+              const known = targets.some((g) => g.options.some((c) => c.value === key));
               const off = offTargetNote(library, target.profileId);
               return (
                 <li key={index} className="fallback-target">
@@ -170,10 +172,8 @@ export function PolicyEditor({
                   <Choice
                     label={t('Modelo {number}', { number: index + 1 })}
                     value={key}
-                    choices={[
-                      ...targets,
-                      ...(known ? [] : [{ value: key, label: t('Ausente: {name}', { name: targetName(library, target) }) }]),
-                    ]}
+                    choices={known ? [] : [{ value: key, label: t('Ausente: {name}', { name: targetName(library, target) }) }]}
+                    groups={targets}
                     onChange={(v) => {
                       const [profileId, model] = v.split('|');
                       const next = library.models.find(

@@ -206,6 +206,18 @@ describe('ModelEditor: catálogo de todos os perfis ligados', () => {
     expect(screen.getByRole('option', { name: 'Kimi K3' })).toBeInTheDocument();
   });
 
+  it('digitar no filtro deixa só os modelos com aquele nome, e o grupo do outro agente some', async () => {
+    setProfiles((id) => id === 'claude' || id === 'kimi');
+    await open(null);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Filtrar opções' }), 'k3');
+    expect(groupLabels()).toEqual(['Kimi Code']);
+    expect(screen.getByRole('option', { name: 'Kimi K3' })).toBeInTheDocument();
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Filtrar opções' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Filtrar opções' }), 'nenhum-modelo-assim');
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    expect(screen.getByText('Nada com esse nome.')).toBeInTheDocument();
+  });
+
   it('o perfil desligado some', async () => {
     setProfiles((id) => id === 'claude');
     await open(null);

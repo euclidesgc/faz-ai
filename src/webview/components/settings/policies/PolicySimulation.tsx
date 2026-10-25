@@ -9,7 +9,17 @@ import { requestExecutionPolicy } from '../../../request';
 import { useAction } from '../../../useAction';
 import { t } from '../../../i18n';
 import { useBoardStore } from '../../../store/boardStore';
-import { Choice, NumberField, ORIGIN_LABELS, FAILURE_LABELS, REASON_LABELS, offTargetNote, profileLabel, targetLabel } from './parts';
+import {
+  Choice,
+  NumberField,
+  ORIGIN_LABELS,
+  FAILURE_LABELS,
+  REASON_LABELS,
+  modelGroupsOf,
+  offTargetNote,
+  profileLabel,
+  targetLabel,
+} from './parts';
 
 /**
  * O simulador das regras: uma pergunta ("se este modelo esgotar a cota agora, o que o board faz?") com o
@@ -87,13 +97,7 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
   });
   const change = (patch: Partial<typeof scenario>) => setScenario({ ...scenario, ...patch });
   const context = (patch: Partial<PolicyScenario['context']>) => change({ context: { ...scenario.context, ...patch } });
-  const modelChoices = [
-    { value: '__default', label: t('Modelo padrão') },
-    ...library.models.map((m) => ({
-      value: `${m.tool}:${m.model}${m.defaultEffort ? `@${m.defaultEffort}` : ''}`,
-      label: `${profileLabel(library, m.tool)} · ${m.label}`,
-    })),
-  ];
+  const modelGroups = modelGroupsOf(library);
   const ruleName = (id: string) =>
     id === policy?.id ? policy.name : (library.snapshot.records.find((r) => r.policy.id === id)?.policy.name ?? id);
   const decision = result?.value.decision;
@@ -125,7 +129,8 @@ export function PolicySimulation({ policy, library }: { policy: ExecutionPolicy 
         <Choice
           label={t('Modelo que falha')}
           value={scenario.sourceValue || '__default'}
-          choices={modelChoices}
+          choices={[{ value: '__default', label: t('Modelo padrão') }]}
+          groups={modelGroups}
           onChange={(v) => change({ sourceValue: v === '__default' ? '' : v })}
         />
         <Choice

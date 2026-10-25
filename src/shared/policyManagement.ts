@@ -130,11 +130,17 @@ export function simulatePolicyScenario(state: BoardState, snapshot: ExecutionPol
     catalog: catalog.models,
   });
   const draft = scenario.draft;
-  const records = snapshot.records.filter((r) => r.policy.id !== draft?.id);
+  // O intervalo entre tentativas (backoffMs) vale durante o uso do board, não na simulação: a pessoa quer
+  // saber se a regra funciona, não esperar o intervalo. Só na cópia da simulação, por isso a cópia.
+  const timeless = (policy: ExecutionPolicy): ExecutionPolicy => ({
+    ...structuredClone(policy),
+    limits: { ...policy.limits, backoffMs: 0 },
+  });
+  const records = snapshot.records.filter((r) => r.policy.id !== draft?.id).map((r) => ({ ...r, policy: timeless(r.policy) }));
   if (draft) {
     const revision = (snapshot.records.find((r) => r.policy.id === draft.id)?.revision ?? 0) + 1;
     // Revisão admitida somente na cópia da simulação, sem alterar o registro pendente importado.
-    records.push({ policy: structuredClone(draft), revision, review: 'reviewed', updatedAt: 0 });
+    records.push({ policy: timeless(draft), revision, review: 'reviewed', updatedAt: 0 });
   }
   // A regra vencedora pode ser outra política salva; o cenário cobre todos os destinos distintos.
   const targets = [

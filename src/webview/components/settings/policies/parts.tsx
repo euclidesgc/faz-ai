@@ -6,6 +6,7 @@ import { AI_BASES } from '../../../../shared/harness';
 import type { PolicyLibrary } from '../../../../shared/policyManagement';
 import { t } from '../../../i18n';
 import { FormField } from '../../ui';
+import { GroupedPicker, type PickerGroup } from '../../GroupedPicker';
 
 export const FAILURE_LABELS: Record<PolicyFailure, string> = {
   auth: 'Autenticação',
@@ -108,17 +109,22 @@ export const originConditions = (origin: string): Pick<ExecutionPolicy['conditio
 };
 const offSuffix = (library: PolicyLibrary, profileId: string) =>
   library.profiles.find((p) => p.id === profileId)?.off ? ` (${t('desligado')})` : '';
-/** As origens que o select oferece: qualquer modelo, cada agente e cada modelo de cada agente. */
-export function originChoices(library: PolicyLibrary): { value: string; label: string }[] {
-  const choices = [{ value: ANY_ORIGIN, label: t('Qualquer modelo, de qualquer agente') }];
-  for (const p of library.profiles) {
+/** As origens que o seletor oferece, um grupo por agente: qualquer modelo dele e cada modelo dele. */
+export function originGroups(library: PolicyLibrary): PickerGroup[] {
+  return library.profiles.map((p) => {
     const name = profileLabel(library, p.id) + offSuffix(library, p.id);
-    choices.push({ value: `p:${p.id}`, label: t('Qualquer modelo de {agent}', { agent: name }) });
-    for (const m of library.models.filter((m) => p.modelIds.includes(m.id)))
-      choices.push({ value: `m:${p.id}:${m.model}`, label: `${name} · ${m.label}` });
-  }
-  return choices;
+    return {
+      key: p.id,
+      label: name,
+      options: [
+        { value: `p:${p.id}`, label: t('Qualquer modelo de {agent}', { agent: name }) },
+        ...library.models.filter((m) => p.modelIds.includes(m.id)).map((m) => ({ value: `m:${p.id}:${m.model}`, label: m.label })),
+      ],
+    };
+  });
 }
+/** A origem "qualquer modelo, de qualquer agente", fora dos grupos. */
+export const anyOriginChoice = () => ({ value: ANY_ORIGIN, label: t('Qualquer modelo, de qualquer agente') });
 export const originLabel = (library: PolicyLibrary, c: ExecutionPolicy['conditions']): string => {
   const origin = originOf(c);
   if (origin === ANY_ORIGIN) return t('qualquer modelo');
@@ -132,17 +138,31 @@ export const originLabel = (library: PolicyLibrary, c: ExecutionPolicy['conditio
     ? `${profileLabel(library, profileIds[0]!)} · ${modelName(library, profileIds[0]!, models[0]!)}`
     : t('qualquer modelo de {agent}', { agent: profileLabel(library, profileIds[0]!) });
 };
-/** Os destinos que o select oferece: cada modelo de cada agente, e o modelo padrão de cada agente. */
+/** Os destinos que o seletor oferece, um grupo por agente: cada modelo dele e o modelo padrão dele. */
 export const targetKeyOf = (target: Pick<ExecutionTarget, 'profileId' | 'model'>) => `${target.profileId}|${target.model ?? ''}`;
-export function targetChoices(library: PolicyLibrary): { value: string; label: string }[] {
-  const choices: { value: string; label: string }[] = [];
-  for (const p of library.profiles) {
-    const name = profileLabel(library, p.id) + offSuffix(library, p.id);
-    for (const m of library.models.filter((m) => p.modelIds.includes(m.id)))
-      choices.push({ value: targetKeyOf({ profileId: p.id, model: m.model }), label: `${name} · ${m.label}` });
-    choices.push({ value: targetKeyOf({ profileId: p.id, model: null }), label: `${name} · ${t('Modelo padrão')}` });
-  }
-  return choices;
+export function targetGroups(library: PolicyLibrary): PickerGroup[] {
+  return library.profiles.map((p) => ({
+    key: p.id,
+    label: profileLabel(library, p.id) + offSuffix(library, p.id),
+    options: [
+      ...library.models
+        .filter((m) => p.modelIds.includes(m.id))
+        .map((m) => ({ value: targetKeyOf({ profileId: p.id, model: m.model }), label: m.label })),
+      { value: targetKeyOf({ profileId: p.id, model: null }), label: t('Modelo padrão') },
+    ],
+  }));
+}
+/** Os modelos do catálogo, um grupo por agente, no valor `ferramenta:modelo[@esforço]` que o cenário usa. */
+export function modelGroupsOf(library: PolicyLibrary): PickerGroup[] {
+  return library.profiles
+    .map((p) => ({
+      key: p.id,
+      label: profileLabel(library, p.id) + offSuffix(library, p.id),
+      options: library.models
+        .filter((m) => p.modelIds.includes(m.id))
+        .map((m) => ({ value: `${m.tool}:${m.model}${m.defaultEffort ? `@${m.defaultEffort}` : ''}`, label: m.label })),
+    }))
+    .filter((g) => g.options.length);
 }
 /** A regra usa algo além do caminho simples (origem única, só a cota, trocar sozinho ou perguntar, sem outras condições). */
 export const isAdvanced = (p: ExecutionPolicy): boolean =>
@@ -197,27 +217,35 @@ export function Choice({
   label,
   value,
   choices,
+  groups,
   onChange,
 }: {
   label: string;
   value: string;
+  /** as opções soltas; com `groups`, elas ficam no topo, antes dos grupos */
   choices: { value: string; label: string }[];
+  /** com grupos (um por agente), o seletor ganha o filtro por nome */
+  groups?: PickerGroup[];
   onChange(value: string): void;
 }) {
   return (
     <FormField label={label}>
-      {(id) => (
-        <Select.Root value={value} onValueChange={onChange}>
-          <Select.Trigger id={id} />
-          <Select.Content>
-            {choices.map((o) => (
-              <Select.Item key={o.value} value={o.value}>
-                {o.label}
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Root>
-      )}
+      {(id) =>
+        groups ? (
+          <GroupedPicker id={id} value={value} head={choices} groups={groups} onChange={onChange} />
+        ) : (
+          <Select.Root value={value} onValueChange={onChange}>
+            <Select.Trigger id={id} />
+            <Select.Content>
+              {choices.map((o) => (
+                <Select.Item key={o.value} value={o.value}>
+                  {o.label}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+        )
+      }
     </FormField>
   );
 }

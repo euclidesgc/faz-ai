@@ -137,6 +137,15 @@ describe('host de políticas e simulação', () => {
       decision: { action: 'fallback', policy: { id: 'winner' }, target: { profileId: 'cursor', model: 'composer' } },
     });
   });
+  it('a simulação ignora o intervalo entre tentativas: a pessoa vê a decisão da regra sem esperar o backoff', () => {
+    const input = scenario();
+    input.draft!.limits = { ...input.draft!.limits, maxElapsedMs: 600_000, backoffMs: 300_000 };
+    // no uso do board, com a tentativa recém-terminada, o avaliador mandaria esperar os 5 minutos
+    expect(router.simulateExecutionPolicy(input)).toMatchObject({ decision: { action: 'fallback', reason: 'fallback-permitted' } });
+    // a regra salva continua com o intervalo: a cópia sem backoff é só da simulação
+    router.handle({ type: 'settings.executionPolicy.save', policy: input.draft!, expectedRevision: 0, reviewed: true });
+    expect(router.executionPolicyLibrary().snapshot.records[0]!.policy.limits.backoffMs).toBe(300_000);
+  });
   it('conflito de revisão e erro da ponte preservam a versão salva', async () => {
     save();
     await bridge.handle({

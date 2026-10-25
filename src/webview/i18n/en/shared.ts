@@ -1,6 +1,10 @@
 // Rótulos, dicas e descrições das constantes de src/shared que a interface exibe (pt-BR → inglês).
 
 export const shared: Record<string, string> = {
+  // seletor agrupado com filtro (GroupedPicker.tsx)
+  'Digite para filtrar': 'Type to filter',
+  'Filtrar opções': 'Filter options',
+  'Nada com esse nome.': 'Nothing by that name.',
   // aparência (appearance.ts)
   'Sistema (acompanha o editor ou o sistema)': 'System (follows the editor or the system)',
   Claro: 'Light',

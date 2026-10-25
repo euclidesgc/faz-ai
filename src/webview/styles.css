@@ -5375,3 +5375,62 @@ div.agent-log-row {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* seletor agrupado com filtro (GroupedPicker): o gatilho parece o Select; a lista rola e mantém o grupo visível */
+.picker-trigger {
+  width: 100%;
+  justify-content: space-between;
+  font-weight: 400;
+}
+.picker-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.picker-trigger::after {
+  content: '▾';
+  color: var(--muted);
+  margin-left: var(--sp-8);
+}
+.picker-content {
+  width: min(420px, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+.picker-list {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.picker-group-label {
+  position: sticky;
+  top: 0;
+  padding: var(--sp-6) var(--sp-8) var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  background: var(--card-bg);
+}
+.picker-option {
+  display: flex;
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+  padding: var(--sp-4) var(--sp-8);
+  background: transparent;
+  color: var(--fg);
+  border-radius: var(--radius);
+}
+.picker-option:hover,
+.picker-option:focus-visible {
+  background: var(--hover);
+}
+.picker-option[aria-selected='true'] {
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+}
+.picker-empty {
+  padding: var(--sp-8);
+  margin: 0;
+}
