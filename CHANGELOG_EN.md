@@ -62,6 +62,7 @@
 
 ### Fixed
 
+- Import finds the installed tools again, such as Claude Code.
 - Environment diagnostics now list the old copies of the board flow and of the factory agents (#1115).
 - Summarizing or refining a blocked card no longer leaves it "Em execução" forever.
 - A sub-task answered by the person runs again, and the story no longer stays stopped.

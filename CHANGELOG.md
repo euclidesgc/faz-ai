@@ -62,6 +62,7 @@
 
 ### Corrigido
 
+- O Importar volta a encontrar as ferramentas instaladas, como o Claude Code.
 - O Diagnóstico do ambiente passa a listar as cópias antigas do fluxo do board e dos agentes de fábrica (#1115).
 - Resumir ou refinar um card bloqueado não o deixa mais "Em execução" para sempre.
 - A sub-tarefa respondida pela pessoa volta a rodar, e a história não fica mais parada.

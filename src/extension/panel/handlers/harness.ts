@@ -1,7 +1,10 @@
 import * as fs from 'node:fs';
 import { ContextPlanningRepo } from '../../repositories/contextPlanningRepo';
 import { artifactLocation } from '../../../shared/artifacts';
-import { EMPTY_HARNESS, type Harness } from '../../../shared/harness';
+import { EMPTY_HARNESS, type Harness, type ToolInventory } from '../../../shared/harness';
+import { TOOL_ADAPTERS } from '../../toolAdapters';
+import type { ToolAdapter } from '../../toolAdapters/types';
+import { listToolSources } from '../../toolSources';
 import { MCPS_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../../shared/boardFields';
 import { selectedMcpNames, selectedRuleLocations, selectedSkillNames } from '../../../shared/harnessSelection';
 import { migrateExecProfiles, restoreSeedAgent, seedAgents } from '../../agentSeeds';
@@ -29,6 +32,28 @@ export class BoardHarness {
   constructor(private ctx: BoardContext) {}
 
   /**
+   * As ferramentas que têm o que importar nesta máquina (pasta da ferramenta ou arquivos dela no projeto ou no
+   * usuário): é o que liga cada botão de "Importar → Ferramenta instalada". Sem os itens: o board não varre essas
+   * pastas, só confere se há algo lá. Relido ao abrir o Harness, não a cada mudança.
+   */
+  private tools: ToolInventory[] = [];
+
+  private detectTools(): void {
+    const dirs = [
+      ['project', this.ctx.opts.workspaceDir ?? ''],
+      ['user', this.ctx.home],
+    ] as const;
+    const sources = { projectDir: this.ctx.opts.workspaceDir ?? '', homeDir: this.ctx.home };
+    this.tools = Object.values(TOOL_ADAPTERS)
+      .filter((a): a is ToolAdapter => !!a)
+      .map((adapter) => ({
+        tool: adapter.tool,
+        installed: dirs.some(([target, base]) => listToolSources(adapter, target, base, sources).length > 0),
+        items: [],
+      }));
+  }
+
+  /**
    * Relê a biblioteca do board. As opções dos campos "Skills" e "Rules" acompanham a marcação do Harness: só o que
    * está no board em "Pelo card" pode ser indicado num card (o "Sempre" já vai em toda execução).
    */
@@ -38,6 +63,7 @@ export class BoardHarness {
     this.ctx.library.ensureFlowSkills();
     this.current = {
       ...EMPTY_HARNESS,
+      inventory: this.tools,
       library: {
         directory: this.ctx.library.directory,
         preview: this.ctx.library.preview,
@@ -66,6 +92,7 @@ export class BoardHarness {
     if (!this.ctx.opts.workspaceDir) return;
     migrateExecProfiles(this.ctx);
     this.ctx.library.checkOrigins();
+    this.detectTools();
     this.load();
     if (this.ctx.opts.seedAgents && seedAgents(this.ctx).length) this.load();
   }
@@ -75,6 +102,7 @@ export class BoardHarness {
     const before = JSON.stringify(this.current);
     // reabrir o Harness é quando as origens são relidas: a lista mostra o que mudou desde a cópia
     this.ctx.library.checkOrigins();
+    this.detectTools();
     this.load();
     return JSON.stringify(this.current) !== before;
   }
