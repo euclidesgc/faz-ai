@@ -28,6 +28,7 @@ import {
   IconPlus,
   IconTrash,
   IconWarning,
+  Summary,
 } from '../../ui';
 
 const KIND_LABEL: Record<ContextLocationKind, string> = {
@@ -74,7 +75,7 @@ function Verdict({ loc }: { loc: ContextLocationResult }) {
 }
 
 /** A linha do resumo: fechado, aberto ou não verificado, e de onde vem a conclusão. */
-function Summary({ report, current, kept }: { report: ContextScopeReport | undefined; current: string | null; kept: string[] }) {
+function ScopeSummary({ report, current, kept }: { report: ContextScopeReport | undefined; current: string | null; kept: string[] }) {
   if (!report)
     return (
       <p className="row">
@@ -245,12 +246,12 @@ export function ContextScope({ profile }: { profile: AiProfile }) {
           {t('Testando o que o agente lê sozinho… Gasta alguns pedidos da conta dele.')}
         </p>
       ) : (
-        <Summary report={report} current={current} kept={kept} />
+        <ScopeSummary report={report} current={current} kept={kept} />
       )}
       {test.error && <p role="alert">{t(test.error)}</p>}
       {rows.length > 0 && (
         <details className="context-details" open={contextScopeState(report) === 'open'}>
-          <summary>{t('O que este agente lê sozinho ({n} locais)', { n: rows.length })}</summary>
+          <Summary>{t('O que este agente lê sozinho ({n} locais)', { n: rows.length })}</Summary>
           {/* uma lista, não uma tabela: o painel do agente é estreito e o veredito não pode ficar cortado */}
           <ul className="context-list" aria-label={t('Locais')}>
             {rows.map((loc) => (

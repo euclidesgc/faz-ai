@@ -12,6 +12,7 @@ import { requestRestoreArchived, requestTrashArchivedMany, requestUnarchiveMany 
 import { CardView } from './Card';
 import { FilterPanel } from './FilterPanel';
 import { Button } from './ui';
+import { PageHeader } from './settings/PageHeader';
 
 /**
  * Aba Arquivados: uma linha por workflow, na ordem do board, só com os cards arquivados dele (do mais recente ao
@@ -61,14 +62,11 @@ export function ArchivedView() {
 
   return (
     <div className="archived">
-      <div className="row">
-        <h2>{t('Arquivados')}</h2>
-      </div>
-      <p className="muted">
+      <PageHeader title={t('Arquivados')}>
         {t(
           'Cards arquivados ficam aqui, por workflow, do mais recente ao mais antigo. Restaurar leva o card para a primeira coluna do workflow dele.',
         )}
-      </p>
+      </PageHeader>
       <ArchivedFilterBar
         filters={filters}
         setFilters={setFilters}

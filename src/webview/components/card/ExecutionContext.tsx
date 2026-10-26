@@ -2,6 +2,7 @@ import type { ContextOrigin } from '../../../shared/contextSources';
 import type { ExecutionContextPreview } from '../../../shared/executionContext';
 import { t } from '../../i18n';
 import { formatNumber } from '../metrics/format';
+import { Summary } from '../ui';
 
 export const CONTEXT_ORIGINS: Record<ContextOrigin, string> = {
   board: 'Servidor obrigatório do board',
@@ -20,7 +21,7 @@ const KINDS = { agent: 'Agente', subagent: 'Subagente', rule: 'Rule', skill: 'Sk
 export function ExecutionContext({ preview, agent = false }: { preview: ExecutionContextPreview; agent?: boolean }) {
   return (
     <details className="execution-context">
-      <summary>{t('Contexto da execução')}</summary>
+      <Summary>{t('Contexto da execução')}</Summary>
       <p className="muted small">{t('Modo legado: os novos contratos são rascunhos e ainda não governam execuções.')}</p>
       <p className="muted small">
         {agent

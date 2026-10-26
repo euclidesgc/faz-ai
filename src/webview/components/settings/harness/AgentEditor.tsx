@@ -14,7 +14,7 @@ import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import { ModelEditor } from '../../FieldRenderer';
 import { SkillPicker } from '../../skills/SkillPicker';
-import { ChipsEditor, FormField } from '../../ui';
+import { ChipsEditor, FormField, Summary } from '../../ui';
 import { ToolChecklist } from './ToolChecklist';
 import { t } from '../../../i18n';
 import { AgentContractEditor } from './AgentContractEditor';
@@ -233,7 +233,7 @@ export function AgentEditor({ agent: a, tool, onClose }: { agent: Agent; tool: A
           >
             {() => (
               <details className="tool-denied" open={a.deniedTools.length > 0}>
-                <summary>{a.deniedTools.length ? t('{n} negadas', { n: a.deniedTools.length }) : t('Nenhuma negada')}</summary>
+                <Summary>{a.deniedTools.length ? t('{n} negadas', { n: a.deniedTools.length }) : t('Nenhuma negada')}</Summary>
                 <ToolChecklist
                   tool={tool.id}
                   deny

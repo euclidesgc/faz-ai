@@ -25,3 +25,13 @@ it('número com unidade é o `unit` do NumberField: a classe unit-field não é 
 it('espaço não vem de estilo inline: margem e padding ficam no CSS, e o espaço entre irmãos no gap do pai (Stack)', () => {
   expect(offenders((text) => /style=\{\{[^}]*\b(margin|padding)\w*\s*:/.test(text))).toEqual([]);
 });
+
+it('todo bloco recolhível usa o Summary (a seta do board), não o <summary> com o triângulo do navegador', () => {
+  expect(offenders((text, file) => file !== path.join('components', 'ui', 'Summary.tsx') && /<summary\b/.test(text))).toEqual([]);
+});
+
+it('ícone não vem de símbolo de texto no CSS (content: "▾"): é um ícone do board no componente', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8');
+  const symbols = [...css.matchAll(/content:\s*(['"])(.+?)\1/g)].map((m) => m[2]).filter((c) => c !== '');
+  expect(symbols).toEqual([]);
+});

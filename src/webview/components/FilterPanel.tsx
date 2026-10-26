@@ -3,6 +3,7 @@ import { useBoardStore } from '../store/boardStore';
 import { t, dt } from '../i18n';
 import { Checkbox, TextField } from '@radix-ui/themes';
 import { ChipsEditor, optionChip, SelectField } from './ui';
+import { MCPS_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
 /** O Select do Radix não aceita valor vazio: "qualquer data" usa este. */
 const ANY_DATE = '__any';
@@ -80,6 +81,11 @@ export function FilterPanel({
             }
             values={filters.fields[f.id] ?? []}
             onChange={(next) => setFilters({ fields: { ...filters.fields, [f.id]: next } })}
+            empty={
+              [RULES_FIELD, MCPS_FIELD, SKILLS_FIELD].some((n) => n.toLowerCase() === f.name.toLowerCase())
+                ? t('Nenhuma no board em "Pelo card" (Configurações › Harness).')
+                : undefined
+            }
           />
         </div>
       ))}

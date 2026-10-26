@@ -169,6 +169,21 @@ sem ajuste fino, e uma correção vale para todas as telas que usam o componente
   - a espera de um botão fica nele (`loading`);
   - o `body` nunca tem padding nem margem, porque a trava de rolagem do Radix os reescreve ao abrir um
     menu, e o espaço lateral fica no `#root`.
+- **Hierarquia de títulos.** Toda tela de topo (Configurações, Métricas, Arquivados, Lixeira,
+  Diagnóstico) abre com `PageHeader`, o maior título da tela (`--fs-xl`). Abaixo dele vem o
+  `SectionHeader` (`Heading` 3) e, dentro de um cartão, o `Heading` 2. Um título de seção nunca fica
+  maior que o da página.
+- **Texto sem margem própria.** `p` não tem a margem do navegador. O espaço entre parágrafos vem do
+  contêiner; só o texto formatado (`.markdown`) separa os próprios parágrafos.
+- **Nunca em branco.** Um campo, uma lista ou um grupo de filtro sem opção diz por quê, em texto
+  `muted` ("Nenhuma no board em "Pelo card""). O `ChipsEditor` faz isso sozinho (`empty`).
+- **Recolhível:** todo `<details>` usa `Summary` (a seta do board, que gira ao abrir), nunca o
+  triângulo do navegador.
+- **Tabela que não cabe vira lista.** Uma tabela larga num espaço estreito (o card aberto) passa a
+  uma lista de cartões por container query, com o título da coluna em `data-label` em cada célula
+  (ex.: o Plano de execução). Título de coluna quebra entre palavras, nunca no meio.
+- **Alinhamento em colunas.** Pares rótulo e controle em várias linhas usam `label-grid`, para os
+  controles começarem no mesmo ponto. Uma barra de filtros alinha os rótulos pelo topo.
 - `test/designRules.test.ts` confere as regras que dá para ver no código. Regra nova que dá para conferir
   ganha um teste ali.
 

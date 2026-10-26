@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { t } from '../../i18n';
 
 export interface ChipOption {
   value: string;
@@ -17,6 +18,8 @@ interface Props {
   before?: ReactNode;
   /** o que vem depois dos chips: avisos de lista vazia, botão de "escolher mais" */
   children?: ReactNode;
+  /** o que aparece sem nenhuma opção (o grupo nunca fica em branco); padrão: "Nenhuma opção cadastrada." */
+  empty?: ReactNode;
 }
 
 /** Um chip de alternância avulso, para listas que precisam de um chip com lógica própria. */
@@ -32,7 +35,7 @@ export function Chip({ on, title, onClick, children }: { on: boolean; title?: st
  * Grupo de chips de alternância (`.chips-editor`): cada opção liga e desliga com um clique.
  * É o padrão de todas as listas de opções fixas do front (tipos, campos de seleção, skills, servidores MCP).
  */
-export function ChipsEditor({ options, values, onChange, before, children }: Props) {
+export function ChipsEditor({ options, values, onChange, before, children, empty }: Props) {
   const toggle = (v: string) => onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
   return (
     <div className="chips-editor">
@@ -46,6 +49,7 @@ export function ChipsEditor({ options, values, onChange, before, children }: Pro
         );
       })}
       {children}
+      {options.length === 0 && !before && !children && <span className="muted small">{empty ?? t('Nenhuma opção cadastrada.')}</span>}
     </div>
   );
 }

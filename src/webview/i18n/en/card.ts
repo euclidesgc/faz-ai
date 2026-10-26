@@ -290,4 +290,6 @@ export const card: Record<string, string> = {
   'As respostas vão para a descrição do card e a vez volta para a IA.':
     'The answers go to the card description and the turn goes back to the AI.',
   'Enviar respostas': 'Send answers',
+  'Nenhuma no board em "Pelo card" (Configurações › Harness).': 'None on the board as "Per card" (Settings › Harness).',
+  'Nenhuma opção cadastrada.': 'No options yet.',
 };

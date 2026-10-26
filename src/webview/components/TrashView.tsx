@@ -9,6 +9,7 @@ import { formatDateTime, t, dt } from '../i18n';
 import { cards, trash } from '../commands';
 import { requestDeletePermanentMany, requestRestoreMany } from '../store/actions';
 import { Button, DeleteButton, IconParent } from './ui';
+import { PageHeader } from './settings/PageHeader';
 
 export function TrashView() {
   const state = useBoardStore((s) => s.state)!;
@@ -34,27 +35,30 @@ export function TrashView() {
 
   return (
     <div className="trash">
-      <div className="row">
-        <h2>{t('Lixeira')}</h2>
-        <span className="spacer" />
-        {/* botão sem classe de perigo de propósito: a confirmação é que é vermelha, não ele */}
-        <Button
-          disabled={!deleted.length}
-          onClick={() =>
-            ask({
-              title: t('Esvaziar a lixeira?'),
-              message: t('{n} card(s) serão apagados definitivamente, com comentários e anexos. Não dá para desfazer.', {
-                n: deleted.length,
-              }),
-              confirmLabel: t('Esvaziar lixeira'),
-              danger: true,
-              onConfirm: () => withOverlay(t('Esvaziando a lixeira…'), () => trash.empty()),
-            })
-          }
-        >
-          {t('Esvaziar lixeira')}
-        </Button>
-      </div>
+      <PageHeader
+        title={t('Lixeira')}
+        actions={
+          <>
+            {/* botão sem classe de perigo de propósito: a confirmação é que é vermelha, não ele */}
+            <Button
+              disabled={!deleted.length}
+              onClick={() =>
+                ask({
+                  title: t('Esvaziar a lixeira?'),
+                  message: t('{n} card(s) serão apagados definitivamente, com comentários e anexos. Não dá para desfazer.', {
+                    n: deleted.length,
+                  }),
+                  confirmLabel: t('Esvaziar lixeira'),
+                  danger: true,
+                  onConfirm: () => withOverlay(t('Esvaziando a lixeira…'), () => trash.empty()),
+                })
+              }
+            >
+              {t('Esvaziar lixeira')}
+            </Button>
+          </>
+        }
+      />
       {picked.length > 0 && (
         <div className="selectionbar">
           <span>{t('{n} selecionados', { n: picked.length })}</span>

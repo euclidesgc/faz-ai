@@ -18,6 +18,7 @@ import { useDescriptionDraft } from './card/useDescriptionDraft';
 import { WorkspaceBar } from './card/WorkspaceBar';
 import { YoloBar } from './card/YoloBar';
 import { StatusBar } from './StatusBar';
+import { Stack } from './ui';
 import { formatDateTime, t } from '../i18n';
 
 /** Painel lateral de um card: compõe as partes de components/card/. */
@@ -79,7 +80,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
         {tab === 'plan' && <ExecutionPlanPanel card={card} drafts={planDrafts} onDrafts={setPlanDrafts} />}
 
         {tab === 'details' && (
-          <>
+          <Stack gap="24">
             <FieldsSection card={card} />
             <DescriptionSection cardId={card.id} draft={draft} />
             {live && card.questions.length > 0 && (
@@ -88,7 +89,7 @@ export function CardDrawer({ cardId }: { cardId: string }) {
             <ChecklistSection cardId={card.id} />
             {isStory && <SubtasksSection story={card} />}
             <LinksSection key={card.id} card={card} />
-          </>
+          </Stack>
         )}
 
         <footer className="drawer-footer muted">

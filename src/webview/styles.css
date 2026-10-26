@@ -34,6 +34,11 @@ html,
 body {
   overflow: hidden;
 }
+/* Parágrafo sem a margem do navegador: o espaço entre blocos vem do gap do contêiner (DESIGN.md, Layout e
+   espaçamento). Só o texto formatado (.markdown, .hint-content) separa os próprios parágrafos. */
+p {
+  margin: 0;
+}
 h1,
 h2,
 h3 {
@@ -683,14 +688,11 @@ html body[data-scroll-locked] {
 .drawer-section {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-6);
+  gap: var(--sp-8);
 }
 .drawer-section h3 small {
   margin-left: var(--sp-6);
   font-weight: 400;
-}
-.questions {
-  margin-top: var(--sp-20);
 }
 .questions-title {
   margin: 0;
@@ -740,7 +742,6 @@ html body[data-scroll-locked] {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: var(--sp-20);
 }
 .fields-grid {
   display: grid;
@@ -768,6 +769,9 @@ html body[data-scroll-locked] {
   min-height: 48px;
   cursor: text;
   line-height: 1.5;
+}
+.markdown p {
+  margin: var(--sp-8) 0;
 }
 .markdown p:first-child {
   margin-top: 0;
@@ -937,6 +941,10 @@ html body[data-scroll-locked] {
   justify-content: space-between;
   gap: var(--sp-12);
   min-height: 30px;
+}
+/* o título da aba é o maior da tela; o da seção (SectionHeader) vem abaixo dele, e o do cartão abaixo deste */
+.page-header-row h2 {
+  font-size: var(--fs-xl);
 }
 .page-header-actions {
   display: flex;
@@ -1492,6 +1500,11 @@ button.ghost.on {
   display: flex;
   flex-direction: column;
   gap: var(--sp-16);
+}
+/* dentro de uma página (Arquivados) a barra de filtros alinha com o título: o recuo lateral é o da página */
+.archived > .filterbar {
+  padding-left: 0;
+  padding-right: 0;
 }
 .archived-row {
   display: flex;
@@ -2304,6 +2317,9 @@ button.heartbeat.stopped:hover {
 }
 .env-summary {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
 }
 .environment h3 {
   margin: var(--sp-8) 0 var(--sp-6);
@@ -2910,6 +2926,43 @@ body.host-web .drawer {
 .form-divider {
   border-top: 1px solid var(--border);
 }
+/* bloco recolhível (components/ui/Summary.tsx): a seta do board no lugar do triângulo do navegador, girando ao abrir */
+summary.disclosure {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  cursor: pointer;
+  list-style: none;
+}
+summary.disclosure::-webkit-details-marker {
+  display: none;
+}
+summary.disclosure > .disclosure-icon {
+  flex: none;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+details[open] > summary.disclosure > .disclosure-icon {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  summary.disclosure > .disclosure-icon {
+    transition: none;
+  }
+}
+/* pares rótulo + controle alinhados em colunas: o controle começa no mesmo ponto em todas as linhas */
+.label-grid {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  align-items: center;
+  gap: var(--sp-8) var(--sp-12);
+}
+.label-grid-row {
+  display: contents;
+}
+.label-grid-row > :first-child {
+  justify-self: start;
+}
 /* Stack (components/ui/Stack.tsx): o espaço entre irmãos vem só do gap do pai */
 .stack {
   display: flex;
@@ -3311,6 +3364,7 @@ body.host-web .drawer {
 }
 .board-empty {
   display: grid;
+  justify-items: start;
   gap: var(--sp-8);
   padding: var(--sp-8) 0;
 }
@@ -3432,10 +3486,12 @@ body.host-web .drawer {
 }
 
 /* escolha de skills: resumo e janela com busca */
+/* o resumo e o botão na mesma linha: o rótulo do campo fica alinhado com eles, como nos outros campos */
 .skill-picker {
   display: flex;
-  flex-direction: column;
-  gap: var(--sp-6);
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
 }
 .skill-summary,
 .skill-actions {
@@ -3802,19 +3858,23 @@ body.host-web .drawer {
 }
 
 /* vínculos entre cards */
+.link-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
 .link-group h4 {
-  margin: var(--sp-8) 0 var(--sp-2);
+  margin: 0;
   font-size: var(--fs-sm);
 }
 .link-add {
   display: flex;
   align-items: center;
   gap: var(--sp-8);
-  margin-top: var(--sp-8);
 }
 .link-results {
   list-style: none;
-  margin: var(--sp-4) 0 0;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -4047,11 +4107,15 @@ body.host-web .drawer {
   gap: var(--sp-8);
   min-width: 0;
 }
+/* os rótulos dos filtros na mesma altura (controles de alturas diferentes alinhados pelo topo); o Limpar fica embaixo */
 .metrics-filters-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: var(--sp-12);
+}
+.metrics-filters-row > .metrics-filters-clear {
+  align-self: flex-end;
 }
 .metrics-periods {
   display: flex;
@@ -4334,6 +4398,10 @@ body.host-web .drawer {
   text-align: left;
   overflow-wrap: anywhere;
   border-top: 1px solid var(--border);
+}
+/* o título da coluna quebra entre palavras, nunca no meio ("Perman-ências") */
+.metrics-table th {
+  overflow-wrap: normal;
 }
 .metrics-table td.is-number,
 .metrics-table th.is-number {
@@ -4766,10 +4834,15 @@ div.metrics-breakdown {
 }
 /* Aba Consumo do card aberto: a estimativa da próxima execução numa caixa, e o gasto por fase numa tabela */
 .usage-estimate {
-  max-width: 480px;
   padding: var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+}
+/* as seções da aba se afastam pelo gap, como no Detalhes */
+.usage-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-24);
 }
 .usage-table-wrap {
   overflow-x: auto;
@@ -4793,9 +4866,7 @@ div.metrics-breakdown {
 .usage-tab .context-notes {
   margin-top: var(--sp-8);
 }
-.usage-tab .drawer-section + .drawer-section {
-  margin-top: var(--sp-16);
-}
+
 /* o harness mudou enquanto o detalhe estava aberto (ou desde a última leitura): os números já foram refeitos */
 .context-changed {
   margin: 0;
@@ -5023,8 +5094,42 @@ div.metrics-breakdown {
 .context-plan-defaults {
   margin-top: var(--sp-24);
 }
+/* a tabela vira uma lista de cartões quando não cabe (o card aberto tem ~730px): cada célula leva o título da coluna */
 .context-plan-table-wrap {
   overflow-x: auto;
+  container-type: inline-size;
+}
+@container (max-width: 900px) {
+  .context-plan-table thead {
+    display: none;
+  }
+  .context-plan-table,
+  .context-plan-table tbody {
+    display: block;
+  }
+  .context-plan-table tr {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--sp-8) var(--sp-12);
+    padding: var(--sp-12) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .context-plan-table tr > td,
+  .context-plan-table tr > th {
+    grid-column: 2;
+    padding: 0;
+    border: 0;
+  }
+  .context-plan-table tr > td.plan-select {
+    grid-column: 1;
+    grid-row: 1 / span 6;
+  }
+  .context-plan-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: var(--fs-xs);
+  }
 }
 .context-plan-table {
   width: 100%;
@@ -5644,10 +5749,10 @@ div.agent-log-row {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.picker-trigger::after {
-  content: '▾';
+/* a mesma seta dos seletores do Radix (ícone do board, não um símbolo de texto) */
+.picker-trigger-icon {
+  flex: none;
   color: var(--muted);
-  margin-left: var(--sp-8);
 }
 .picker-content {
   width: min(420px, 92vw);

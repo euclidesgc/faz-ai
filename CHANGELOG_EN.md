@@ -63,6 +63,7 @@
 
 ### Fixed
 
+- Interface review: spacing, headings, empty fields, collapsible blocks and narrow tables are consistent across all screens.
 - The heartbeat and the other switches in Settings get the right spacing.
 - The import and export artifacts dialogs and the context editors no longer take up the whole screen.
 - Import finds the installed tools again, such as Claude Code.

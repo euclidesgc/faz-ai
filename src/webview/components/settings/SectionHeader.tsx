@@ -21,7 +21,7 @@ export function SectionHeader({
   return (
     <header id={id} className="section-header">
       <div className="section-header-row">
-        <Heading as="h3" size="4">
+        <Heading as="h3" size="3">
           {title}
         </Heading>
         {count !== undefined && (

@@ -149,7 +149,6 @@ export function LinksSection({ card }: { card: Card }) {
       )}
       <div className="link-add">
         <SelectField<Relation>
-          size="1"
           aria-label={t('Tipo de vínculo')}
           options={RELATIONS.map((r) => ({ ...r, label: t(r.label) }))}
           value={relation}
