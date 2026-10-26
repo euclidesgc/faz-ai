@@ -2,12 +2,6 @@
 
 # Changelog
 
-## Não lançado
-
-### Corrigido
-
-- **Diagnóstico do ambiente: cópias antigas do fluxo do board (#1115).** O item que antes listava só a cópia da skill `faz-ai-fluxo` agora lista as cópias antigas do fluxo que versões anteriores gravaram nas pastas das ferramentas, no projeto e no usuário: as seis skills do fluxo (`faz-ai-fluxo` e as `faz-ai-*` por assunto) e os agentes de fábrica do board. Cada arquivo aparece com o caminho, para você apagar à mão; o board não apaga nem sobrescreve nada. O item agora se chama **Cópias antigas do fluxo do board**.
-
 ## 0.48.0
 
 ### Adicionado
@@ -67,6 +61,7 @@
 
 ### Corrigido
 
+- **Diagnóstico do ambiente: cópias antigas do fluxo do board (#1115).** O item que antes listava só a cópia da skill `faz-ai-fluxo` agora lista as cópias antigas do fluxo que versões anteriores gravaram nas pastas das ferramentas, no projeto e no usuário: as seis skills do fluxo (`faz-ai-fluxo` e as `faz-ai-*` por assunto) e os agentes de fábrica do board. Cada arquivo aparece com o caminho, para você apagar à mão; o board não apaga nem sobrescreve nada. O item agora se chama **Cópias antigas do fluxo do board**.
 - **Resumir ou refinar um card bloqueado deixava o card "Em execução" para sempre.** No fim da execução, o board devolvia o bloqueio sem o motivo, recusava a própria mudança e não avisava a tela nem o autopiloto de que a execução tinha acabado. Agora o bloqueio volta com o motivo que tinha, e uma falha ao aplicar o fim de uma execução passa o card para a pessoa, com o motivo, em vez de prendê-lo.
 - **Sub-tarefa respondida pela pessoa não voltava a rodar, e a história ficava parada.** O board guardava que a sub-tarefa já tinha rodado na fase e nunca a executava de novo, mesmo depois de a pessoa respondê-la e ela voltar para "Pronto"; a história repetia "está parada: #N precisa de revisão". Agora a sub-tarefa roda de novo quando a pessoa a devolve à IA, respondendo nela ou na história.
 - **Claude Code: modelos pela documentação oficial, e o Haiku 5.5 com o nome certo.** A CLI não lista os modelos, e a lista embutida ainda dizia "Haiku 4.5", sem níveis de esforço e com janela de 200 mil tokens, embora o apelido `haiku` já rode o Haiku 5.5 desde a v2.1.293. Agora o Conectar e o **Detectar modelos** leem a página de modelos da documentação: o nome de cada apelido, os esforços, o padrão e a versão mínima da CLI. A aba **Modelos** avisa quando a CLI instalada é mais velha que a que o modelo pede, com o `claude update`. Sem rede, vale a lista embutida, já com o Haiku 5.5.

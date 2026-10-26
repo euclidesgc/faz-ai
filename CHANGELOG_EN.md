@@ -2,12 +2,6 @@
 
 # Changelog
 
-## Unreleased
-
-### Fixed
-
-- **Environment diagnostic: old copies of the board flow (#1115).** The item that used to list only the old copy of the `faz-ai-fluxo` skill now lists the old copies of the flow that earlier versions wrote in the tool folders, in the project and in the user folder: the six flow skills (`faz-ai-fluxo` and the per-topic `faz-ai-*` ones) and the board's factory agents. Each file appears with its path, for you to delete by hand; the board deletes and overwrites nothing. The item is now called **Old copies of the board flow**.
-
 ## 0.48.0
 
 ### Added
@@ -67,6 +61,7 @@
 
 ### Fixed
 
+- **Environment diagnostic: old copies of the board flow (#1115).** The item that used to list only the old copy of the `faz-ai-fluxo` skill now lists the old copies of the flow that earlier versions wrote in the tool folders, in the project and in the user folder: the six flow skills (`faz-ai-fluxo` and the per-topic `faz-ai-*` ones) and the board's factory agents. Each file appears with its path, for you to delete by hand; the board deletes and overwrites nothing. The item is now called **Old copies of the board flow**.
 - **Summarizing or refining a blocked card left it "Em execução" (running) forever.** At the end of the run, the board restored the block without its reason, refused its own change and didn't tell the screen or the autopilot that the run was over. Now the block comes back with the reason it had, and a failure to apply the end of a run hands the card to the person, with the reason, instead of leaving it stuck.
 - **A sub-task answered by the person didn't run again, and the story stayed stopped.** The board kept that the sub-task had already run in the phase and never ran it again, even after the person answered it and it went back to "Pronto"; the story repeated "is stopped: #N needs review". Now the sub-task runs again when the person hands it back to the AI, answering on it or in the story.
 - **Claude Code: models from the official documentation, and Haiku 5.5 with the right name.** The CLI doesn't list the models, and the built-in list still said "Haiku 4.5", with no effort levels and a 200 thousand token window, although the `haiku` alias has run Haiku 5.5 since v2.1.293. Now Connect and **Detectar modelos** (detect models) read the models page of the documentation: each alias's name, the effort levels, the default and the minimum CLI version. The **Modelos** (models) tab warns when the installed CLI is older than the model needs, with `claude update`. Without network, the built-in list applies, already with Haiku 5.5.
