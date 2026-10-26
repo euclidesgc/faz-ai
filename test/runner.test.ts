@@ -827,6 +827,21 @@ describe('executor da IA', () => {
       expect(lastMessage()!.body).toContain('não encontrado');
     });
 
+    it('no card bloqueado, o resumo devolve o bloqueio com o motivo, sem repeti-lo, e avisa o fim da execução', () => {
+      router.handle({ type: 'card.status.set', cardId: storyId, status: 'blocked', note: 'Falta decidir a base.' });
+      const ended: string[] = [];
+      runner.onDidFinish((id) => ended.push(id));
+      runner.start(storyId, 'manual', 'summarize');
+      ai({ type: 'comment.add', cardId: storyId, body: 'Resumo.', kind: 'summary' });
+      const before = router.snapshot().comments.length;
+      procs[0]!.exit(0);
+      // antes, o board recusava o bloqueio sem motivo e o card ficava "em execução" para sempre
+      expect(card()).toMatchObject({ status: 'blocked', statusReason: 'Falta decidir a base.' });
+      expect(router.snapshot().comments.length).toBe(before);
+      expect(runner.running).toEqual([]);
+      expect(ended).toEqual([storyId]);
+    });
+
     it('sem falha de processo e sem nova mensagem de IA, grava o aviso de "terminou sem escrever a mensagem"', () => {
       router.handle({ type: 'card.status.set', cardId: storyId, status: 'waiting_review' });
       runner.start(storyId, 'manual', 'summarize');

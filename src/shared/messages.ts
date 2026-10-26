@@ -178,7 +178,15 @@ export type WebviewToHost =
   | { type: 'card.workspace.open'; cardId: Id }
   /** muda o status de trabalho do card; `note` é o motivo do bloqueio ou o texto que vai junto para a conversa */
   /** `pending`: há algo que depende da pessoa; em modo autônomo o pedido de revisão não vira aprovação automática */
-  | { type: 'card.status.set'; cardId: Id; status: CardStatus | null; note?: string; pending?: boolean }
+  | {
+      type: 'card.status.set';
+      cardId: Id;
+      status: CardStatus | null;
+      note?: string;
+      pending?: boolean;
+      /** grava o motivo sem repeti-lo na conversa: a devolução de um bloqueio que já tinha sido explicado */
+      quiet?: boolean;
+    }
   /** muda o status de trabalho de vários cards de uma vez; aplica só aos cards vivos da lista e reusa o
    * fluxo de `card.status.set` (comentário do motivo, aprovação com avanço automático) */
   | { type: 'card.status.setMany'; cardIds: Id[]; status: BulkCardStatus; note?: string }

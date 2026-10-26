@@ -103,6 +103,8 @@ interface Run {
   exec: AiExecution;
   /** status que o card tinha antes de a execução começar */
   previous: CardStatus | null;
+  /** o motivo do bloqueio que o card tinha, para devolvê-lo junto com o status */
+  previousReason: string;
   /** últimas linhas que a ferramenta escreveu, para explicar uma falha no próprio card */
   tail: string[];
   mode: AiRunMode;
@@ -637,6 +639,7 @@ export class AiRunner {
       profile: structuredClone(target.cli),
       exec,
       previous: card.status,
+      previousReason: card.statusReason,
       mode,
       tail,
       info,
@@ -680,8 +683,18 @@ export class AiRunner {
       try {
         // o card continua "em execução" para o log enquanto o desfecho é aplicado: o bloqueio e a
         // mudança de status que explicam o fim da execução ficam ligados a ela
-        if (options.workId === undefined) retry = this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
-        else {
+        if (options.workId === undefined) {
+          try {
+            retry = this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
+          } catch (e) {
+            // o desfecho que falhou não pode deixar o card "em execução" sem execução, nem calar o fim para a tela
+            // e para o autopiloto: o card passa para a pessoa com o motivo
+            const reason = e instanceof Error ? e.message : String(e);
+            log(`O desfecho da execução não foi aplicado: ${reason}`);
+            if (this.router.snapshot().cards.find((c) => c.id === cardId)?.status === 'running')
+              this.block(cardId, `O board não conseguiu aplicar o fim da execução (${reason}). Confira a conversa e chame a IA de novo.`);
+          }
+        } else {
           const expired = end.authExpired || authFailed(run.profile, run.tail);
           if (expired) this.router.setAuthExpired(run.profile.id, true);
           else if (!end.stopped && !end.error && end.code === 0) this.router.setAuthExpired(run.profile.id, false);
@@ -750,6 +763,11 @@ export class AiRunner {
     };
   }
 
+  /** Publica de novo a lista das execuções em curso: a tela pode ter ficado com uma que já terminou. */
+  republish(): void {
+    this.publish();
+  }
+
   /** Interrompe a execução do card; o status volta ao que era. */
   stop(cardId: string): void {
     const run = this.runs.get(cardId);
@@ -772,11 +790,7 @@ export class AiRunner {
     // a IA (ou a pessoa) já mudou o status durante a execução: é ele que vale
     if (!card || card.status !== 'running') return;
     // restaurar não passa pelas regras da IA (o status anterior pode ser "Aprovado")
-    if (end.stopped)
-      return void this.router.handle(
-        { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
-        { author: RUNNER_AUTHOR },
-      );
+    if (end.stopped) return void this.restore(cardId, run);
     const toolId = run.profile.id;
     const expired = end.authExpired || authFailed(run.profile, run.tail);
     // falha de autenticação vale para o board inteiro, não só para este card: não bloqueia, e o aviso
@@ -792,10 +806,7 @@ export class AiRunner {
         },
         { author: RUNNER_AUTHOR, source: 'ai' },
       );
-      return void this.router.handle(
-        { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
-        { author: RUNNER_AUTHOR },
-      );
+      return void this.restore(cardId, run);
     }
     // a execução não falhou por autenticação: se o sinal estava ligado para esta ferramenta, ela voltou
     // a funcionar (RF9) — cobre o login que o probe não soube confirmar, que só tem este caminho
@@ -845,10 +856,7 @@ export class AiRunner {
         // leva para a primeira fase) ou pede ajustes na conversa
         if (run.origin === 'heartbeat') return void this.setStatus(cardId, 'waiting_review', toolLabel);
       }
-      return void this.router.handle(
-        { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
-        { author: RUNNER_AUTHOR },
-      );
+      return void this.restore(cardId, run);
     }
     // o limite de uso do plano esgotou (só o sinal estrutural do leitor da CLI, nunca o código de saída ou heurística do
     // runner), e a execução falhou ou terminou sem responder: uma execução que terminou bem não é refeita.
@@ -904,19 +912,12 @@ export class AiRunner {
         },
         { author: RUNNER_AUTHOR, source: 'ai' },
       );
-      return void this.router.handle(
-        { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
-        { author: RUNNER_AUTHOR },
-      );
+      return void this.restore(cardId, run);
     }
     if (failure) return void this.block(cardId, failure);
     // a execução de conflito terminou bem: não passa a vez nem reavalia a entrega, o card volta ao status
     // que tinha (quem confere se o conflito saiu é o MergeWatcher, na próxima consulta do pull request)
-    if (run.mode === 'conflict')
-      return void this.router.handle(
-        { type: 'card.status.set', cardId, status: run.previous === 'running' ? 'ready' : run.previous },
-        { author: RUNNER_AUTHOR },
-      );
+    if (run.mode === 'conflict') return void this.restore(cardId, run);
     // o pull request pode ter sido registrado antes do card chegar na última coluna da IA (ex.: a
     // mesma sessão fez a implementação e a homologação): reavalia a entrega agora, antes do fallback
     // de modo autônomo devolver o card para "ready".
@@ -980,6 +981,19 @@ export class AiRunner {
 
   private setStatus(cardId: string, status: CardStatus | null, author: string): void {
     this.router.handle({ type: 'card.status.set', cardId, status }, { author, source: 'ai' });
+  }
+
+  /**
+   * Devolve ao card o status que ele tinha antes da execução. O bloqueio volta com o motivo que já tinha, sem
+   * repeti-lo na conversa: sem o motivo, o board recusava o bloqueio e o card ficava "em execução" para sempre.
+   */
+  private restore(cardId: string, run: Run): void {
+    const status = run.previous === 'running' ? 'ready' : run.previous;
+    if (status === 'blocked' && !run.previousReason.trim()) return void this.setStatus(cardId, 'ready', RUNNER_AUTHOR);
+    this.router.handle(
+      { type: 'card.status.set', cardId, status, ...(status === 'blocked' ? { note: run.previousReason, quiet: true } : {}) },
+      { author: RUNNER_AUTHOR },
+    );
   }
 
   private block(cardId: string, reason: string): void {

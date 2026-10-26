@@ -57,6 +57,7 @@ import { ghProcess } from '../branchRename';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner, REPLY_BUSY } from '../runner';
+import { BOARD_AUTHOR } from '../../shared/gitflow';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
 import { driverFor, driverOf } from '../ai/drivers';
 import { baseInfo, type AiTool } from '../../shared/harness';
@@ -130,6 +131,8 @@ export interface BoardHost {
   heartbeat: Heartbeat;
   /** "Chamar IA": numa história que o board conduz, passa pelo orquestrador; nas demais, pelo executor */
   runAi(cardId: string, mode?: AiRunMode): Promise<void> | void;
+  /** "Parar" do card: interrompe a execução dele (numa história, também a da sub-tarefa em curso) ou libera o card preso */
+  stopAi(cardId: string): void;
   mergeWatcher: MergeWatcher;
   chat: ChatSession;
   /** toca sozinho as histórias em modo autônomo (YOLO) */
@@ -1229,6 +1232,30 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
         if (busy) throw new Error(REPLY_BUSY);
       }
       runner.start(cardId, 'manual', mode);
+    },
+    stopAi(cardId: string) {
+      const s = router.snapshot();
+      const card = s.cards.find((c) => c.id === cardId);
+      if (!card) return;
+      // na história, o Parar interrompe também a sub-tarefa que o board executa por ela: é o que a pessoa vê rodando
+      const targets = card.parentId ? [card.id] : [card.id, ...s.cards.filter((c) => c.parentId === card.id).map((c) => c.id)];
+      const running = targets.filter((id) => runner.running.includes(id));
+      for (const id of running) runner.stop(id);
+      if (running.length) return;
+      // "Em execução" sem nenhuma execução da IA (o fim de uma execução não foi aplicado): o card passa para a
+      // pessoa, e a mensagem dela na conversa devolve a vez à IA
+      const live = new Set(router.work.live().map((w) => w.cardId));
+      for (const c of s.cards.filter((k) => targets.includes(k.id) && k.status === 'running' && !live.has(k.id)))
+        router.handle(
+          {
+            type: 'card.status.set',
+            cardId: c.id,
+            status: 'blocked',
+            note: 'Parado pela pessoa: o card estava "Em execução" sem nenhuma execução da IA. Escreva na conversa para a IA seguir.',
+          },
+          { author: BOARD_AUTHOR, source: 'ai' },
+        );
+      runner.republish();
     },
     heartbeat,
     mergeWatcher,

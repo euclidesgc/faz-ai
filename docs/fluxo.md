@@ -157,6 +157,9 @@ continua visível mesmo quando o botão está bloqueado.
   fila (`release_card`), e o board a executa de novo, o que também acontece quando a pessoa responde
   na própria sub-tarefa. Com outra execução da mesma história em curso, a mensagem só fica na
   conversa. A resposta não conta como volta sem progresso no modo autônomo.
+- Enquanto a IA trabalha no card (ou, numa história, numa sub-tarefa dela), o **Enviar** vira **Parar**:
+  interrompe a execução e o card volta ao status que tinha. Um card que ficou "Em execução" sem nenhuma
+  execução da IA passa para a pessoa, com o motivo, e a mensagem dela devolve a vez à IA.
 - **Refinar com IA** só deixa o card claro e completo para quem vai trabalhar nele: reescreve título
   e descrição (sem inventar requisito; o que estiver ambíguo vira uma lista "Dúvidas em aberto"),
   revisa Tags, Esforço da atividade, Modelo e Skills mesmo que já tenham valor e acrescenta ao

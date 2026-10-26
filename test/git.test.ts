@@ -470,6 +470,20 @@ describe('branch e worktree por história', () => {
     expect(rev(repo, ws.branch)).toBe(rev(repo, 'origin/main'));
   });
 
+  it('set_base_branch troca a base da história (e o prBase do get_card); recusa sem branch, nome inválido ou a própria branch', async () => {
+    await call('create_card', { title: 'Crash', type: 'Hotfix', column: 'Implementação' });
+    expect((await call('set_base_branch', { card: 1, base: 'develop' })).text).toContain('ainda não tem branch');
+    const ws = (await call('prepare_workspace', { card: 1 })).data;
+    expect(ws).toMatchObject({ baseBranch: 'main', prBase: 'main' });
+    expect((await call('set_base_branch', { card: 1, base: 'a..b' })).text).toContain('não é um nome de branch válido');
+    expect((await call('set_base_branch', { card: 1, base: ws.branch })).text).toContain('própria branch');
+    const moved = await call('set_base_branch', { card: 1, base: 'develop' });
+    expect(moved.error).toBe(false);
+    expect(moved.data.workspace).toMatchObject({ branch: ws.branch, baseBranch: 'develop', prBase: 'develop' });
+    expect(moved.data.next).toContain('Traga a branch');
+    expect((await call('get_card', { card: 1 })).data.workspace.prBase).toBe('develop');
+  });
+
   it('RF15: histórias em modo autônomo se empilham: cada branch parte da anterior', async () => {
     const yolo = (n: number) => router.handle({ type: 'card.yolo.set', cardId: card(n).id, enabled: true });
     await call('create_card', { title: 'Base', column: 'Implementação' });

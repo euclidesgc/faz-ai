@@ -169,6 +169,10 @@ on keyboard focus, closes with Esc, and stays visible even when the button is bl
   which also happens when the person answers in the sub-task itself. With another run of the same
   story in progress, the message just stays in the conversation. The reply does not count as a turn
   without progress in autonomous mode.
+- While the AI works on the card (or, in a story, on one of its sub-tasks), **Enviar** turns into
+  **Parar** (stop): it interrupts the run and the card goes back to the status it had. A card left "Em
+  execução" with no AI run goes to the person, with the reason, and their message hands the turn back
+  to the AI.
 - **Refinar com IA** (refine with AI) only makes the card clear and complete for whoever will work
   on it: rewrites the title and description (without inventing requirements; whatever is ambiguous
   becomes a "Dúvidas em aberto" list), reviews Tags, Esforço da atividade, Modelo and Skills even if

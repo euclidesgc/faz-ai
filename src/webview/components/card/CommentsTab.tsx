@@ -12,7 +12,7 @@ import { formatDateTime, t, translateGitNotice } from '../../i18n';
 import { useAttachmentRefs } from './attachmentRefs';
 import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
 import { aiBlockedReason, cardToolLabel, runUnsupportedReason } from '../RequirementsBanner';
-import { Button, DeleteButton, Hint, IconRun, IconSuggest } from '../ui';
+import { Button, DeleteButton, Hint, IconRun, IconStop, IconSuggest } from '../ui';
 import { replyHint, summarizeHint, workHint } from '../aiHints';
 import { activeComments } from '../../../shared/conversation';
 
@@ -38,6 +38,11 @@ export function CommentsTab({
   const active = new Set(activeComments(state.comments, cardId).map((c) => c.id));
   const card = state.cards.find((c) => c.id === cardId);
   const running = state.aiRuns.includes(cardId);
+  // a IA trabalha neste card: a execução dele, a de uma sub-tarefa (numa história) ou o status que diz que há uma
+  const busy =
+    running ||
+    card?.status === 'running' ||
+    (!card?.parentId && state.cards.some((c) => c.parentId === cardId && state.aiRuns.includes(c.id)));
   // "Resumir a conversa" e "Trabalhar na fase" travam logo após o clique, até aiRuns refletir a execução (ou o tempo esgotar)
   const [, summarizing, markSummarizing] = usePending(running);
   const [, starting, markStarting] = usePending(running);
@@ -57,7 +62,7 @@ export function CommentsTab({
     const ok = await send.run(draft.trim());
     if (!ok) return false;
     setDraft('');
-    if (canCall && !running) {
+    if (canCall && !busy) {
       markStarting(true);
       void ai.reply(cardId);
     }
@@ -132,11 +137,19 @@ export function CommentsTab({
             <a onClick={() => openSettings('harness')}>{t('Mudar')}</a>
           </span>
           <span className="spacer" />
-          <Hint content={replyHint(toolLabel)} disabledReason={null}>
-            <Button variant="primary" disabled={!draft.trim()} loading={send.busy} onClick={() => void submit()}>
-              {t('Enviar')}
+          {busy ? (
+            // enquanto a IA trabalha, o lugar do Enviar é o Parar: interrompe a execução (ou libera o card preso nela).
+            // O vermelho sólido é o do botão destrutivo dos diálogos, com os tokens de cada tema
+            <Button variant="primary" className="danger-bg" onClick={() => void ai.stop(cardId)}>
+              <IconStop /> {t('Parar')}
             </Button>
-          </Hint>
+          ) : (
+            <Hint content={replyHint(toolLabel)} disabledReason={null}>
+              <Button variant="primary" disabled={!draft.trim()} loading={send.busy} onClick={() => void submit()}>
+                {t('Enviar')}
+              </Button>
+            </Hint>
+          )}
           <Hint content={workHint(toolLabel)} disabledReason={blocked}>
             <Button disabled={!canCall || running} loading={starting} onClick={callAi}>
               <IconRun /> {t('Trabalhar na fase')}

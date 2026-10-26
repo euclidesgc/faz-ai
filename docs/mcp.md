@@ -191,6 +191,13 @@ mensagem da pessoa no card ou na história dele escrita depois de o card passar 
 ferramenta recusa. É o que a resposta numa história usa para destravar uma sub-tarefa: o board a
 executa de novo.
 
+`set_base_branch` (`card`, `base`) troca a base da história: a branch de onde ela parte e para a qual
+o pull request vai (`workspace.prBase` do `get_card`). Serve quando a pessoa pede outra base, como a
+`develop` no lugar da principal. A ferramenta só registra a base; a IA traz a branch da história para
+ela na pasta de trabalho (sem trabalho feito, recria a branch a partir de `origin/<base>`; com trabalho,
+`git merge`, sem rebase nem push forçado). Recusa a história sem branch, um nome inválido e a própria
+branch da história.
+
 `move_card` aceita `comment`: a mensagem de conclusão (markdown) entra na conversa do card, assinada
 pela IA, depois do movimento aceito; um movimento recusado não grava nada. `create_card` aceita
 `profile` (o agente, pelo nome, validado antes de criar) e `checklist` (os itens, na ordem) e devolve o

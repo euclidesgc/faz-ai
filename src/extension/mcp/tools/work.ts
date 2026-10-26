@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { openPredecessors } from '../../../shared/links';
 import { cardRef } from '../../../shared/model';
 import { activityKindOf } from '../../../shared/activity';
+import { cleanBranchName } from '../../../shared/git';
 import { handedBackAt } from '../../../shared/orchestration';
 import { columnOf } from '../../../shared/selectors';
 import { statusInfo } from '../../../shared/status';
@@ -208,6 +209,28 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
       }
       router.handle({ type: 'card.workspace.prepare', cardId: card.id }, aiOrigin(ctx));
       return detail(router, card.id).workspace;
+    },
+  );
+
+  tool(
+    'set_base_branch',
+    'Troca a base da história (a branch de onde ela parte e para a qual o pull request vai): `workspace.prBase` do get_card passa a ser `base`. Use quando a pessoa pedir, por exemplo a develop no lugar da principal porque o código a alterar só existe nela. A ferramenta só registra a base: traga a branch da história para ela na pasta de trabalho (sem trabalho feito, recrie a branch a partir de origin/<base>; com trabalho, git merge origin/<base>, sem rebase nem push forçado) e diga na conversa o que fez.',
+    {
+      card: cardArg,
+      base: z.string().min(1).describe('A nova base, ex.: "develop"'),
+    },
+    (a, router) => {
+      const s = router.snapshot();
+      const story = storyOf(s, live(findCard(s, a.card))) ?? live(findCard(s, a.card));
+      const base = cleanBranchName(a.base, '');
+      if (!base) throw new Error(`"${a.base}" não é um nome de branch válido.`);
+      if (!story.branch) throw new Error(`${cardRef(story)} ainda não tem branch: chame prepare_workspace, que já parte da base do fluxo.`);
+      if (base === story.branch) throw new Error(`A base não pode ser a própria branch de ${cardRef(story)}.`);
+      router.handle({ type: 'card.baseBranch.set', cardId: story.id, base }, aiOrigin(ctx));
+      return {
+        workspace: detail(router, story.id).workspace,
+        next: `A base de ${cardRef(story)} agora é ${base}. Traga a branch ${story.branch} para ela na pasta de trabalho antes de seguir.`,
+      };
     },
   );
 
