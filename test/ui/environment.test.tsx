@@ -105,13 +105,15 @@ describe('Diagnóstico do ambiente', () => {
     expect(useBoardStore.getState().settingsTab).toBe('git');
   });
 
-  it('a cópia antiga da skill do fluxo lista os arquivos a apagar, sem botão que apague', () => {
+  it('as cópias antigas do fluxo listam os arquivos a apagar, sem botão que apague', () => {
     syncStore(router);
     renderThemed(<EnvironmentView />);
-    const file = '/home/u/.claude/skills/faz-ai-fluxo/SKILL.md';
-    show({ ...report(), recommended: [{ id: 'flow-skill-copy', status: 'missing', paths: [file] }] });
-    const row = item('Cópia antiga da skill do fluxo');
-    expect(within(row).getByText(file)).toBeInTheDocument();
+    const skill = '/home/u/.claude/skills/faz-ai-fluxo/SKILL.md';
+    const agent = '/home/u/.claude/agents/condutor-do-board.md';
+    show({ ...report(), recommended: [{ id: 'flow-skill-copy', status: 'missing', paths: [skill, agent] }] });
+    const row = item('Cópias antigas do fluxo do board');
+    expect(within(row).getByText(skill)).toBeInTheDocument();
+    expect(within(row).getByText(agent)).toBeInTheDocument();
     expect(within(row).queryByRole('button', { name: /apagar|excluir|delete/i })).not.toBeInTheDocument();
   });
 
@@ -119,7 +121,7 @@ describe('Diagnóstico do ambiente', () => {
     syncStore(router);
     renderThemed(<EnvironmentView />);
     show(report());
-    expect(screen.queryByText('Cópia antiga da skill do fluxo')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cópias antigas do fluxo do board')).not.toBeInTheDocument();
   });
 
   it('o nome da branch pronto não traz o botão', () => {

@@ -9,6 +9,7 @@ import { policiesOfProfile } from '../../../../shared/policyAssistant';
 import { requestExecutionPolicy } from '../../../request';
 import { useAction } from '../../../useAction';
 import { t } from '../../../i18n';
+import { IconCheck, IconClose } from '../../ui';
 import { useBoardStore } from '../../../store/boardStore';
 import {
   Choice,
@@ -280,7 +281,9 @@ export function PolicySimulation({
           )}
           {rule && (
             <p className={`fallback-verdict ${passed ? 'pass' : 'fail'}`}>
-              <strong>{passed ? `✓ ${t('Passou')}` : `✗ ${t('Não passou')}`}</strong>
+              <strong>
+                {passed ? <IconCheck /> : <IconClose />} {passed ? t('Passou') : t('Não passou')}
+              </strong>
               {passed
                 ? t('A regra {name} decidiu como você configurou.', { name: rule.name })
                 : decision.policy && decision.policy.id !== rule.id

@@ -2,6 +2,12 @@
 
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Environment diagnostic: old copies of the board flow (#1115).** The item that used to list only the old copy of the `faz-ai-fluxo` skill now lists the old copies of the flow that earlier versions wrote in the tool folders, in the project and in the user folder: the six flow skills (`faz-ai-fluxo` and the per-topic `faz-ai-*` ones) and the board's factory agents. Each file appears with its path, for you to delete by hand; the board deletes and overwrites nothing. The item is now called **Old copies of the board flow**.
+
 ## 0.48.0
 
 ### Added

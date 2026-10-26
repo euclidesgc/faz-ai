@@ -105,7 +105,9 @@ cada fase e move os cards conforme avança, sempre parando para a sua aprovaçã
   acompanhamento dos PRs) e **Code Review Graph** (grafo do código para a IA).
 
 O **Diagnóstico do ambiente** (**Configurações → Verificar ambiente**) confere cada item e mostra o
-comando oficial de instalação; o board não instala nada.
+comando oficial de instalação; o board não instala nada. Ele também lista as cópias antigas do fluxo
+que versões anteriores deixaram nas pastas das ferramentas (as skills `faz-ai-*` e os agentes de
+fábrica do board), com o caminho de cada arquivo, para você apagar à mão.
 
 ## Configurações
 

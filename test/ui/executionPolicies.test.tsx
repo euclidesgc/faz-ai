@@ -224,7 +224,8 @@ it('Testar as regras: a regra escolhida vai como rascunho ligado, com o cenário
     'executionPolicy.simulate',
   );
   await screen.findByText('É preciso reconciliar o trabalho antes de tentar novamente.');
-  expect(screen.getByText('✗ Não passou')).toBeInTheDocument();
+  // O veredito leva o ícone de falha junto do texto, não só a palavra.
+  expect(screen.getByText('Não passou').querySelector('svg.lucide-x')).not.toBeNull();
   expect(screen.getByText(/A regra não se aplica a este cenário/)).toBeInTheDocument();
   act(() =>
     useBoardStore.setState({ state: { ...useBoardStore.getState().state!, executionPolicyRevision: 'changed-in-another-window' } }),
@@ -269,7 +270,8 @@ it('Testar as regras avisa quando outra regra, antes na lista, decidiu no lugar 
     'executionPolicy.simulate',
   );
   await screen.findByText(/O board segue com/);
-  expect(screen.getByText('✗ Não passou')).toBeInTheDocument();
+  // O veredito leva o ícone de falha junto do texto, não só a palavra.
+  expect(screen.getByText('Não passou').querySelector('svg.lucide-x')).not.toBeNull();
   expect(screen.getByText('Quem decidiu foi a regra Primeira, que vem antes na lista.')).toBeInTheDocument();
 });
 it('Testar as regras diz que passou quando a regra escolhida decidiu como foi configurada', async () => {
@@ -299,7 +301,7 @@ it('Testar as regras diz que passou quando a regra escolhida decidiu como foi co
     },
     'executionPolicy.simulate',
   );
-  expect(await screen.findByText('✓ Passou')).toBeInTheDocument();
+  expect((await screen.findByText('Passou')).querySelector('svg.lucide-check')).not.toBeNull();
   expect(screen.getByText('A regra Quota da implementação decidiu como você configurou.')).toBeInTheDocument();
 });
 it('o editor simula o rascunho dentro de Avançado, sem gravar', async () => {

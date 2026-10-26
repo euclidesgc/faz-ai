@@ -1,5 +1,5 @@
 import { seedBoard, syncStore, type SeededBoard } from './setup';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { UsageLimitBanner } from '../../src/webview/components/UsageLimitBanner';
 import { setLocale } from '../../src/webview/i18n';
@@ -34,9 +34,16 @@ const pause = (...list: Partial<UsageLimitState>[]) => {
 
 describe('faixa da pausa por limite de uso no topo do board', () => {
   it('mostra o perfil e o horário enquanto a pausa vale', () => {
-    pause({});
-    render(<UsageLimitBanner />);
-    expect(screen.getByRole('status')).toHaveTextContent(/^Limite de uso do .+: a fila dele retoma às \d{2}:\d{2}\.$/);
+    // relógio fixo no meio do dia: perto da meia-noite a retomada cai no dia seguinte e a faixa mostra a data
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 25, 10, 0));
+    try {
+      pause({});
+      render(<UsageLimitBanner />);
+      expect(screen.getByRole('status')).toHaveTextContent(/^Limite de uso do .+: a fila dele retoma às \d{2}:\d{2}\.$/);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('sem horário na saída, diz que é uma nova tentativa', () => {
