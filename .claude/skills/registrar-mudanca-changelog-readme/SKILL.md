@@ -67,7 +67,7 @@ existir ganha `**Mudança de comportamento:**` no fim do item, em "Alterado" ou 
    Nunca descreva no README uma regra de borda, uma tela inteira ou a implementação. Repita no
    `README_EN.md`.
 5. MCP mudou (ferramenta, parâmetro, nota do `get_card`, status): atualize `docs/mcp.md` também.
-6. Rode `npm run format:check` (a formatação dos `.md` é conferida pelo `npm test`); se acusar,
+6. Rode `npm run format:check` (a formatação dos `.md` é conferida pelo `npm run validate`); se acusar,
    `npm run format`.
 7. Registre na conversa do card que a documentação foi atualizada, com os arquivos tocados.
 
