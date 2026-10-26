@@ -1,4 +1,4 @@
-import { Card, Text } from '@radix-ui/themes';
+import { Card } from '@radix-ui/themes';
 import { settings } from '../../../commands';
 import { t } from '../../../i18n';
 import { useBoardStore } from '../../../store/boardStore';
@@ -21,12 +21,10 @@ export function ModelSuggestion() {
           checked={modelRules.length > 0 && rules.autoApplyModelSuggestion}
           disabled={modelRules.length === 0}
           onChange={(autoApplyModelSuggestion) => settings.updateRules({ autoApplyModelSuggestion })}
-        />
-        <Text as="p" size="1" color="gray">
-          {t(
+          hint={t(
             'Ao criar ou mudar um card, preenche o campo "Modelo" com a sugestão das regras abaixo, se ele estiver vazio ou com a sugestão anterior. Um modelo escolhido à mão nunca é trocado.',
           )}
-        </Text>
+        />
         <DependsOn
           label={t('uma regra de sugestão de modelo')}
           satisfied={modelRules.length > 0}

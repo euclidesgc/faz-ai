@@ -2910,6 +2910,30 @@ body.host-web .drawer {
 .form-divider {
   border-top: 1px solid var(--border);
 }
+/* Stack (components/ui/Stack.tsx): o espaço entre irmãos vem só do gap do pai */
+.stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.stack-4 {
+  gap: var(--sp-4);
+}
+.stack-8 {
+  gap: var(--sp-8);
+}
+.stack-12 {
+  gap: var(--sp-12);
+}
+.stack-16 {
+  gap: var(--sp-16);
+}
+.stack-24 {
+  gap: var(--sp-24);
+}
+.stack-indent {
+  padding-left: var(--sp-24);
+}
 .unit-field {
   display: flex;
   align-items: center;

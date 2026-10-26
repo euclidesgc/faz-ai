@@ -63,6 +63,7 @@
 
 ### Fixed
 
+- The heartbeat and the other switches in Settings get the right spacing.
 - The import and export artifacts dialogs and the context editors no longer take up the whole screen.
 - Import finds the installed tools again, such as Claude Code.
 - Environment diagnostics now list the old copies of the board flow and of the factory agents (#1115).
