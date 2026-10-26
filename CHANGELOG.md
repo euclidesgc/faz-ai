@@ -2,6 +2,12 @@
 
 # Changelog
 
+## Não lançado
+
+### Corrigido
+
+- **Diagnóstico do ambiente: cópias antigas do fluxo do board (#1115).** O item que antes listava só a cópia da skill `faz-ai-fluxo` agora lista as cópias antigas do fluxo que versões anteriores gravaram nas pastas das ferramentas, no projeto e no usuário: as seis skills do fluxo (`faz-ai-fluxo` e as `faz-ai-*` por assunto) e os agentes de fábrica do board. Cada arquivo aparece com o caminho, para você apagar à mão; o board não apaga nem sobrescreve nada. O item agora se chama **Cópias antigas do fluxo do board**.
+
 ## 0.48.0
 
 ### Adicionado
