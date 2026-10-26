@@ -261,6 +261,17 @@ describe('biblioteca particular do board', () => {
     ).toThrow('skill do fluxo');
   });
 
+  it('"Importar → Ferramenta instalada" liga só a ferramenta que tem o que importar no projeto ou no usuário', () => {
+    const installed = () => Object.fromEntries(router.snapshot().harness.inventory.map((i) => [i.tool, i.installed]));
+    expect(installed()).toEqual({ claude: false, cursor: false, kimi: false });
+    write('project/CLAUDE.md', '# Convenções');
+    write('home/.cursor/mcp.json', JSON.stringify({ mcpServers: { github: { command: 'gh' } } }));
+    router.refreshHarness();
+    expect(installed()).toEqual({ claude: true, cursor: true, kimi: false });
+    // o board só confere se há algo: os itens não são varridos para o estado
+    expect(router.snapshot().harness.inventory.every((i) => i.items.length === 0)).toBe(true);
+  });
+
   it('troca a pasta sem apagar arquivos da pessoa e remove somente a cópia ao desmarcar', () => {
     const source = write('project/.claude/skills/react/SKILL.md', 'Particular');
     router.refreshHarness();
