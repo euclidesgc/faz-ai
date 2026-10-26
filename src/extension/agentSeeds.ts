@@ -195,6 +195,27 @@ export function seedAgents(ctx: BoardContext, force = false): string[] {
 }
 
 /**
+ * Volta um agente de fábrica ao que a extensão traz: descrição, instruções, ferramentas, skills e o modelo da regra
+ * de esforço. O nome, o modo e a marca de fábrica ficam; as edições feitas no board se perdem.
+ */
+export function restoreSeedAgent(ctx: BoardContext, name: string): void {
+  const seed = AGENT_SEEDS.find((s) => s.name === name);
+  if (!seed) throw new Error(`"${name}" não é um agente de fábrica do board.`);
+  ctx.library.updateAgent(
+    name,
+    {
+      description: seed.description,
+      model: modelFor(ctx.state(), seed.level),
+      tools: seed.tools,
+      deniedTools: [],
+      skills: seed.skills,
+      mcp: [],
+    },
+    seed.body,
+  );
+}
+
+/**
  * Converte os agentes que versões anteriores guardavam no banco (perfis de execução) em agentes do board,
  * disponíveis ("Pelo card"). Um agente de mesmo nome que já esteja no board é reaproveitado, nunca
  * sobrescrito. Colunas e cards passam a apontar pelo nome. Idempotente: só roda enquanto houver perfis no banco.

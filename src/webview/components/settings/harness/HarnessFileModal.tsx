@@ -24,7 +24,12 @@ export function HarnessFileModal() {
   const file = useBoardStore((s) => s.harnessFile);
   const close = useBoardStore((s) => s.closeHarnessFile);
   const generated = useBoardStore(
-    (s) => !!file && s.state?.harness.library?.artifacts.some((a) => a.kind === file.kind && a.name === file.name && a.generated === true),
+    (s) =>
+      !!file &&
+      (!!s.state?.harness.library?.artifacts.some((a) => a.kind === file.kind && a.name === file.name && a.generated === true) ||
+        (file.kind === 'skill' &&
+          !s.state?.harness.library?.artifacts.some((a) => a.kind === 'skill' && a.name === file.name) &&
+          !!s.state?.harness.library?.flowSkills?.some((f) => f.name === file.name))),
   );
   const read = useArtifactText(file?.kind ?? 'rule', file?.name, file?.file);
   // o que acabou de ser salvo vale no lugar da leitura, que só se repete ao abrir outro texto

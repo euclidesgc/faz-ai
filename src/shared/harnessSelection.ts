@@ -58,7 +58,8 @@ export function usageOptions(kind: SelectableKind): HarnessUsage[] {
     case 'instructions':
       return ['off', 'contextual', 'always'];
     case 'agent':
-      return ['contextual'];
+      // o agente não entra "Sempre": o card, a fase ou o padrão o escolhem; desligado, ninguém o escolhe
+      return ['contextual', 'off'];
     default:
       return ['contextual', 'always'];
   }

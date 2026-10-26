@@ -58,7 +58,7 @@ it('o banco do schema 47 abre, migra só as colunas e mantém perfis e execuçõ
   const runsBefore = all(db, 'SELECT * FROM ai_runs ORDER BY id');
   migrate(db);
   expect(version()).toBe(String(SCHEMA_VERSION));
-  expect(SCHEMA_VERSION).toBe(48);
+  expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(48);
   expect(columns('ai_profiles')).toEqual(expect.arrayContaining(['tool', 'mode']));
   expect(columns('ai_runs')).toContain('mode');
   // a migração não lê o cofre: só cria as colunas no padrão, e o kind segue o antigo até o repositório ler

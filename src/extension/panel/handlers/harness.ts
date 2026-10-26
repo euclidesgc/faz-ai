@@ -4,7 +4,8 @@ import { artifactLocation } from '../../../shared/artifacts';
 import { EMPTY_HARNESS, type Harness } from '../../../shared/harness';
 import { MCPS_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../../shared/boardFields';
 import { selectedMcpNames, selectedRuleLocations, selectedSkillNames } from '../../../shared/harnessSelection';
-import { migrateExecProfiles, seedAgents } from '../../agentSeeds';
+import { migrateExecProfiles, restoreSeedAgent, seedAgents } from '../../agentSeeds';
+import { FLOW_SKILLS } from '../../flowSkill';
 import type { BoardContext, HandlerMap } from './context';
 
 /** O aviso do resultado da importação de artefatos: o que entrou, o que foi pulado, os problemas e os servidores MCP a configurar. */
@@ -34,6 +35,7 @@ export class BoardHarness {
   load(): void {
     if (!this.ctx.opts.workspaceDir) return;
     this.ctx.library.migrate();
+    this.ctx.library.ensureFlowSkills();
     this.current = {
       ...EMPTY_HARNESS,
       library: {
@@ -42,6 +44,7 @@ export class BoardHarness {
         importResult: this.ctx.library.importResult,
         artifacts: this.ctx.library.materialize(),
         warnings: this.ctx.library.warnings,
+        flowSkills: FLOW_SKILLS.map((k) => ({ name: k.name, description: k.description })),
       },
     };
     const state = this.ctx.state();
@@ -62,6 +65,7 @@ export class BoardHarness {
   bootstrap(): void {
     if (!this.ctx.opts.workspaceDir) return;
     migrateExecProfiles(this.ctx);
+    this.ctx.library.checkOrigins();
     this.load();
     if (this.ctx.opts.seedAgents && seedAgents(this.ctx).length) this.load();
   }
@@ -69,6 +73,8 @@ export class BoardHarness {
   /** Relê a biblioteca e diz se algo mudou. */
   refresh(): boolean {
     const before = JSON.stringify(this.current);
+    // reabrir o Harness é quando as origens são relidas: a lista mostra o que mudou desde a cópia
+    this.ctx.library.checkOrigins();
     this.load();
     return JSON.stringify(this.current) !== before;
   }
@@ -190,6 +196,7 @@ export const harnessHandlers = {
     ctx.harness.load();
     return true;
   },
+  'harness.agent.restore': (msg, ctx) => ctx.harness.change(() => restoreSeedAgent(ctx, msg.name)),
   'harness.agents.seed': (msg, ctx) => {
     seedAgents(ctx, msg.force);
     ctx.harness.load();

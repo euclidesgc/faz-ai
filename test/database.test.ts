@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
 import initSqlJs from 'sql.js';
 import { openFile, retryBusy } from '../src/extension/db/database';
-import { migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
+import { DOWN_MIGRATIONS, migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { CardRepo } from '../src/extension/repositories/cardRepo';
 
@@ -737,5 +737,28 @@ describe('migração 47: a conferência da execução em ai_runs', () => {
     expect(
       fresh.exec("SELECT COUNT(*) FROM pragma_table_info('ai_runs') WHERE name IN ('check_status','check_detail')")[0]!.values[0]![0],
     ).toBe(2);
+  });
+});
+
+describe('migração 49: o resumo da origem das cópias da biblioteca', () => {
+  it('a partir do esquema 48 acrescenta a coluna vazia e preserva as cópias (nada é inventado); a volta tira a coluna', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 48);
+    old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    old.run(
+      "INSERT INTO board_artifacts (id, board_id, kind, name, body, origin, usage, created_at, updated_at) VALUES ('a1', 'b', 'skill', 'react', 'Corpo', '.claude/skills/react/SKILL.md', 'contextual', 1, 1)",
+    );
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(old.exec("SELECT body, origin, origin_digest FROM board_artifacts WHERE id = 'a1'")[0]!.values).toEqual([
+      ['Corpo', '.claude/skills/react/SKILL.md', ''],
+    ]);
+
+    old.exec(DOWN_MIGRATIONS[49]!);
+    expect(old.exec("SELECT COUNT(*) FROM pragma_table_info('board_artifacts') WHERE name = 'origin_digest'")[0]!.values[0]![0]).toBe(0);
+    expect(old.exec("SELECT body FROM board_artifacts WHERE id = 'a1'")[0]!.values).toEqual([['Corpo']]);
   });
 });

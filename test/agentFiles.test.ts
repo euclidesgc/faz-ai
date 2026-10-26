@@ -112,7 +112,7 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
       seedAgents,
     });
 
-  it('na primeira abertura cria os agentes de fábrica no board, sem arquivo na pasta da ferramenta, com o condutor como padrão; o apagado não volta, salvo por pedido', async () => {
+  it('na primeira abertura cria os agentes de fábrica no board, sem arquivo na pasta da ferramenta, com o condutor como padrão; eles não saem do board, mas desligam', async () => {
     const handle = await handleOf();
     const router = await open(handle, true);
     expect(fs.existsSync(path.join(home, '.claude', 'agents'))).toBe(false);
@@ -129,13 +129,36 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
       AGENT_SEEDS.find((a) => a.name === CONDUCTOR_AGENT)!.tools,
     );
 
-    router.handle({ type: 'harness.agent.delete', name: 'dados-sql', scope: 'user' });
-    expect(router.snapshot().harness.library!.artifacts.some((a) => a.name === 'dados-sql')).toBe(false);
+    // apagar é recusado, pela tela e pela marcação; desligar tira o agente do que o card e a fase escolhem
+    expect(() => router.handle({ type: 'harness.agent.delete', name: 'dados-sql', scope: 'user' })).toThrow('não apagado');
+    expect(() =>
+      router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: 'board:dados-sql' }], usage: null }),
+    ).toThrow('não apagado');
+    router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: 'board:dados-sql' }], usage: 'off' });
+    const off = router.snapshot();
+    expect(off.harness.library!.artifacts.find((a) => a.name === 'dados-sql')?.usage).toBe('off');
+    expect(off.board.execProfiles.some((p) => p.id === 'dados-sql')).toBe(false);
+    // o padrão só desliga depois que outro vira o padrão
+    expect(() =>
+      router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: `board:${CONDUCTOR_AGENT}` }], usage: 'off' }),
+    ).toThrow('antes de desligar');
     const reopened = await open(handle, true);
-    expect(reopened.snapshot().harness.library!.artifacts.some((a) => a.name === 'dados-sql')).toBe(false);
-    reopened.handle({ type: 'harness.agents.seed', force: true });
-    expect(reopened.snapshot().harness.library!.artifacts.some((a) => a.name === 'dados-sql')).toBe(true);
+    expect(reopened.snapshot().harness.library!.artifacts.find((a) => a.name === 'dados-sql')?.usage).toBe('off');
     expect(fs.existsSync(path.join(home, '.claude', 'agents'))).toBe(false);
+  });
+
+  it('"Restaurar o padrão" volta o agente de fábrica ao texto, às ferramentas e às skills de fábrica; o modo fica', async () => {
+    const router = await open(await handleOf(), true);
+    const seed = AGENT_SEEDS.find((a) => a.name === 'qa-testes')!;
+    router.handle({ type: 'harness.agent.update', name: 'qa-testes', patch: { description: 'Outra', tools: ['Read'] }, body: 'Editado.' });
+    router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: 'board:qa-testes' }], usage: 'off' });
+    expect(router.snapshot().harness.library!.artifacts.find((a) => a.name === 'qa-testes')?.body).toBe('Editado.');
+
+    router.handle({ type: 'harness.agent.restore', name: 'qa-testes' });
+    const a = router.snapshot().harness.library!.artifacts.find((x) => x.name === 'qa-testes')!;
+    expect(a).toMatchObject({ description: seed.description, body: seed.body, usage: 'off', agent: { seed: true } });
+    expect(a.agent?.tools.native.allow).toEqual(seed.tools);
+    expect(() => router.handle({ type: 'harness.agent.restore', name: 'meu' })).toThrow('não é um agente de fábrica');
   });
 
   it('na abertura, o board não regrava os arquivos de agente que estão nas pastas das ferramentas', async () => {
@@ -154,17 +177,17 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
     expect(router.snapshot().board.execProfiles.find((p) => p.id === CONDUCTOR_AGENT)?.tools).toEqual(['Read', 'Grep', 'Glob']);
   });
 
-  it('cada board tem os próprios agentes de fábrica: tirar um do board não é desfeito na próxima abertura nem afeta outro board', async () => {
+  it('cada board tem os próprios agentes de fábrica: desligar um não é desfeito na próxima abertura nem afeta outro board', async () => {
     const first = await open(await handleOf(), true);
     const second = await handleOf();
     const router = await open(second, true);
     const s = router.snapshot();
     expect(s.harnessSelection.filter((x) => x.kind === 'agent')).toHaveLength(AGENT_SEEDS.length);
     expect(s.board.execProfiles.find((p) => p.isDefault)?.id).toBe(CONDUCTOR_AGENT);
-    router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: 'board:dados-sql' }], usage: null });
+    router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: 'board:dados-sql' }], usage: 'off' });
     const again = await open(second, true);
-    expect(again.snapshot().harnessSelection.filter((x) => x.kind === 'agent')).toHaveLength(AGENT_SEEDS.length - 1);
-    expect(first.snapshot().harnessSelection.filter((x) => x.kind === 'agent')).toHaveLength(AGENT_SEEDS.length);
+    expect(again.snapshot().board.execProfiles).toHaveLength(AGENT_SEEDS.length - 1);
+    expect(first.snapshot().board.execProfiles).toHaveLength(AGENT_SEEDS.length);
   });
 
   it('os perfis que o banco guardava viram agentes do board, e colunas e cards passam a apontar pelo nome', async () => {

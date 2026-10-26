@@ -405,6 +405,8 @@ export type WebviewToHost =
   | { type: 'harness.agent.delete'; name: string; scope?: InstallScope }
   /** cria os agentes padrão de fábrica que ainda não existem (`force` recria também os que a pessoa apagou) */
   | { type: 'harness.agents.seed'; force?: boolean }
+  /** volta o agente de fábrica ao texto, às ferramentas e às skills de fábrica; o modo e o nome ficam */
+  | { type: 'harness.agent.restore'; name: string }
   /** a IA lê o projeto e propõe os agentes do board (cria, ajusta e marca); o resultado vai para o chat do board */
   | { type: 'ai.suggestAgents' }
   /** a IA lê o projeto e propõe de 3 a 5 regras, gravadas e enviadas ao board desligadas; o resultado vai para o chat */

@@ -9,7 +9,8 @@ import { useBoardStore } from '../../../store/boardStore';
 import { ActionButton, DeleteButton, IconPlus, IconRules, IconSkills } from '../../ui';
 import { AgentEditor } from './AgentEditor';
 import { AgentWizard } from './AgentWizard';
-import { AgentsToolbar, DefaultAgentBadge, DeleteAgentButton, MakeDefaultButton } from './AgentsToolbar';
+import { AgentsToolbar, DefaultAgentBadge, DeleteAgentButton, MakeDefaultButton, useDefaultAgent } from './AgentsToolbar';
+import { ArtifactBadges, RestoreAgentButton, UpdateFromOriginButton } from './ArtifactStatus';
 import { BulkActions } from './BulkActions';
 import { McpServerEditor } from './McpServerEditor';
 import { NewAgent } from './NewAgent';
@@ -55,6 +56,13 @@ export function ArtifactList({
   const state = useBoardStore((s) => s.state)!;
   const all = (state.harness.library?.artifacts ?? []).filter((a) => a.kind === kind);
   const items = all.filter((a) => matchesQuery(query, a.name, a.description));
+  // as skills do fluxo que não estão na biblioteca aparecem também, só para leitura: o board as entrega pelo get_skill
+  const flowSkills =
+    kind === 'skill'
+      ? (state.harness.library?.flowSkills ?? []).filter(
+          (f) => !all.some((a) => a.name === f.name) && matchesQuery(query, f.name, f.description),
+        )
+      : [];
   const chosen = all.filter((a) => picked.has(a.id));
   const tool = baseInfo(state.board.aiTool);
   // só uma coisa aberta por vez: o editor de uma linha, o formulário de novo ou um assistente
@@ -64,6 +72,7 @@ export function ArtifactList({
   const wizard = open !== null && 'wizard' in open ? open : null;
   const close = () => setOpen(null);
   const busy = state.chat.busy;
+  const defaultAgent = useDefaultAgent();
 
   const pick = (list: BoardArtifact[], checked: boolean) => {
     const next = new Set(picked);
@@ -239,11 +248,7 @@ export function ArtifactList({
                     <span className="item-name">{a.name}</span>
                   )}
                   {a.kind === 'agent' && <DefaultAgentBadge name={a.name} />}
-                  {a.kind === 'agent' && a.agent?.seed && (
-                    <Badge color="gray" variant="outline" title={t('Criado pelo board; pode ser editado ou apagado')}>
-                      {t('de fábrica')}
-                    </Badge>
-                  )}
+                  <ArtifactBadges artifact={a} />
                   {a.missing && (
                     <Badge color="amber" variant="soft">
                       {t('ausente')}
@@ -283,14 +288,24 @@ export function ArtifactList({
                 )}
               </div>
               <div className="row-actions">
-                {a.kind === 'agent' ? (
-                  <Badge color="gray" variant="outline" title={t('Os cards e as fases podem escolher este agente.')}>
-                    {t('Disponível no board')}
+                {(a.kind === 'agent' && a.name === defaultAgent) || generatedSkill ? (
+                  <Badge
+                    color="gray"
+                    variant="outline"
+                    title={
+                      generatedSkill
+                        ? t('O board entrega esta skill pelo get_skill, com o texto desta versão da extensão.')
+                        : t('O agente padrão executa quando nem o card nem a fase escolhem outro; para desligá-lo, torne outro o padrão.')
+                    }
+                  >
+                    {generatedSkill ? t('Entregue pelo board') : t('Disponível no board')}
                   </Badge>
                 ) : (
                   <UsageSelect artifact={a} />
                 )}
-                {a.kind === 'agent' && <MakeDefaultButton name={a.name} />}
+                {a.kind === 'agent' && a.usage !== 'off' && <MakeDefaultButton name={a.name} />}
+                <UpdateFromOriginButton artifact={a} />
+                <RestoreAgentButton artifact={a} />
                 {!generatedSkill && (
                   <ActionButton
                     variant="ghost"
@@ -302,7 +317,7 @@ export function ArtifactList({
                     {editing === a.id ? t('Fechar edição') : t('Editar')}
                   </ActionButton>
                 )}
-                {a.kind === 'agent' && <DeleteAgentButton name={a.name} location={artifactLocation(a)} />}
+                {a.kind === 'agent' && !a.agent?.seed && <DeleteAgentButton name={a.name} location={artifactLocation(a)} />}
                 {a.kind !== 'agent' && !generatedSkill && (
                   <DeleteButton
                     title={t('Apagar o artefato')}
@@ -319,6 +334,38 @@ export function ArtifactList({
             ...(editing === a.id ? [<li key={`${a.id}:edit`}>{editor(a)}</li>] : []),
           ];
         })}
+        {flowSkills.map((f) => (
+          <li key={`flow:${f.name}`} className="item-row">
+            <span className="item-check" />
+            <div className="item-main">
+              <div className="item-title">
+                <button
+                  type="button"
+                  className="path-link item-name"
+                  title={t('Abre o texto só para leitura')}
+                  onClick={() => useBoardStore.getState().openHarnessFile({ kind: 'skill', name: f.name })}
+                >
+                  {f.name}
+                </button>
+                <Badge color="gray" variant="outline" title={t('Vem com o board e acompanha a versão da extensão: só de leitura.')}>
+                  {t('de fábrica')}
+                </Badge>
+              </div>
+              <p className="item-hint" title={f.description}>
+                {f.description}
+              </p>
+            </div>
+            <div className="row-actions">
+              <Badge
+                color="gray"
+                variant="outline"
+                title={t('O board entrega esta skill pelo get_skill, com o texto desta versão da extensão.')}
+              >
+                {t('Entregue pelo board')}
+              </Badge>
+            </div>
+          </li>
+        ))}
       </ul>
     </div>
   );

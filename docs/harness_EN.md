@@ -369,7 +369,40 @@ hidden. The information icon shows the notice again.
 - **Pelo card** (per card): available to planning and the Skills, Rules and MCPs fields; included
   when the card or its agent selects it.
 - **Desligado** (off): kept in the library without taking part in runs. New rules start this way,
-  for review before activation.
+  for review before activation. An agent that is off is not offered to cards, phases or as the
+  default; the default agent can only be turned off after another one becomes the default.
+
+### Three contexts: global, project and library
+
+Artifacts live in three places: the **global** one (the tool's user folder, such as `~/.claude/`),
+the **project** (such as `.claude/` and `CLAUDE.md`) and the **board library**, kept in the database
+and outside the repository. Board runs use only the library, and only its items are suggested and
+offered in card fields. The board does not touch the global or project contexts: they belong to
+the person.
+
+Taking an artifact from one context to another is always a **copy that keeps its source**: the
+original stays where it is and the copy does not depend on it. When the Harness artifacts open, the
+board rereads each copy's source and marks the row:
+
+- **origem alterada** (source changed): the source changed since the copy. **Atualizar da origem**
+  (update from source) copies it again; if the copy was edited on the board, it asks first, because
+  the edit is lost;
+- **origem não encontrada** (source not found): the source is gone or unreadable; the copy still
+  applies;
+- **editado no board** (edited on the board): the copy was edited after it was copied.
+
+Copies made before 0.48.0 did not keep their source: the first check that finds source and copy
+equal starts keeping it; if they differ, the row shows **origem alterada**.
+
+### Factory artifacts
+
+The **de fábrica** (factory) badge marks what comes with the extension and stays in the library.
+**Factory agents** (the conductor and the specialists) can be edited, turned off and reset to the
+original text with **Restaurar o padrão** (restore default; the mode and name stay), but not
+deleted. The **flow skills** (`faz-ai-fluxo` and the topic `faz-ai-*` skills) show as **Entregue
+pelo board** (delivered by the board), read-only: they are the board's contract with the AI and
+follow the extension version, which rewrites them when the text changes. To change behavior, add a
+rule or skill of your own, which complements the flow.
 
 ### Import and export
 
@@ -422,10 +455,10 @@ on the tool.
 In **Skills**, select items individually or all visible items and apply **Sempre**, **Pelo card** or
 **Desligado** in bulk. The selection follows the search; **Limpar seleção** (clear selection) clears
 it. **Excluir selecionadas** (delete selected) asks for confirmation and preserves the source files.
-Subagents also support bulk selection and deletion or keeping them available on the board; MCPs
-support bulk mode changes and deletion. Skills, subagents and MCPs do not offer Update from source.
-The rules form only has Name and Content. Editing the library does not change the source; in Rules,
-**Atualizar da origem** (update from source) replaces the copy only after confirmation.
+Subagents also support bulk selection and deletion or making them available or off; MCPs support
+bulk mode changes and deletion. The rules form only has Name and Content. Editing the library does
+not change the source; **Atualizar da origem** (update from source) shows up on rules, skills and
+subagents when the source changed since the copy.
 
 ### Library folder
 
@@ -496,8 +529,8 @@ remove the agent from the library and send it again.
 A run selects the card's agent; without one, the phase's agent; then the default from **Harness →
 Ferramenta e execução** (Tool and execution). With no available agents, it uses the built-in agent,
 with no additional instructions. Removing an agent releases the card and phase selections that used
-it. Factory agents are created inside each board, in its database; one you deleted does not come
-back unless you ask to recreate them.
+it. Factory agents are created inside each board, in its database, and cannot be deleted: turn off
+the ones you do not want, or reset one to the original text with **Restaurar o padrão**.
 
 ### Creating and editing
 

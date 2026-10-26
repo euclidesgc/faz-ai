@@ -56,6 +56,13 @@ export interface BoardArtifact {
   mcpCredential?: { secretRef: string; available: boolean; review: 'pending' | 'reviewed'; transport: 'stdio' | 'http' | 'sse' | '' };
   /** só na skill: gerada pela extensão (skill do fluxo), regravada a cada abertura */
   generated?: boolean;
+  /**
+   * Conferência da cópia com a origem, feita ao abrir o Harness (as origens não são lidas a cada mudança):
+   * `changed` = a origem tem outro conteúdo; `missing` = a origem não pôde ser lida. Ausente = igual ou não conferida.
+   */
+  originState?: 'changed' | 'missing';
+  /** a cópia foi editada no board depois de copiada da origem: atualizar da origem desfaz a edição */
+  editedInBoard?: boolean;
   /** caminho da cópia de leitura (SKILL.md, arquivo da regra, arquivo do agente); '' no MCP. Preenchido pelo host */
   path: string;
   /** Tamanho do arquivo principal da cópia, para a estimativa de contexto. */
@@ -83,7 +90,16 @@ export interface ArtifactDraft {
   missing: boolean;
   skipped: BoardArtifact['skipped'];
   files: { path: string; content: string; encoding: 'utf8' | 'base64'; size: number }[];
+  /** resumo do conteúdo da origem na hora da cópia (`artifactDigest`); ausente = mantém o gravado */
+  originDigest?: string;
 }
+
+/**
+ * Artefato padrão do board: vem com a extensão e não sai da biblioteca. O agente de fábrica pode ser editado,
+ * restaurado ou desligado; a skill do fluxo é só de leitura.
+ */
+export const isDefaultArtifact = (a: Pick<BoardArtifact, 'kind' | 'agent' | 'generated'>): boolean =>
+  (a.kind === 'agent' && !!a.agent?.seed) || (a.kind === 'skill' && a.generated === true);
 
 export const ARTIFACT_LIMITS = { fileBytes: 512 * 1024, files: 100, totalBytes: 5 * 1024 * 1024 } as const;
 

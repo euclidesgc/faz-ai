@@ -265,4 +265,8 @@ export const harness = {
     req({ type: 'harness.agent.update', name, patch, ...(body !== undefined ? { body } : {}) }),
   deleteAgent: (name: string) => req({ type: 'harness.agent.delete', name }),
   seedAgents: (force = false) => req({ type: 'harness.agents.seed', force }),
+  /** Volta o agente de fábrica ao texto de fábrica (o modo e o nome ficam). */
+  restoreAgent: (name: string) => req({ type: 'harness.agent.restore', name }),
+  /** Regrava a cópia do board com o conteúdo atual da origem. */
+  updateFromOrigin: (id: string) => req({ type: 'harness.library.update', id }),
 };

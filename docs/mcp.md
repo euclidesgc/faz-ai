@@ -217,7 +217,9 @@ Um agente do board é uma cópia guardada no banco do board. `get_harness` lista
 board, com a marcação em `usage`. `get_agent` lê a cópia do board. `create_agent`,
 `update_agent` e `delete_agent` gravam só no board: `scope` é aceito e ignorado, e o agente criado já
 nasce disponível. Editar um agente copiado de um arquivo da ferramenta não altera o arquivo original;
-`delete_agent` tira o agente do board sem apagar o arquivo. `create_agent` e
+`delete_agent` tira o agente do board sem apagar o arquivo; o agente de fábrica não sai (desligue-o com
+`set_harness_selection` e `usage: "off"`). Em `get_harness`, cada cópia traz `originState` (`changed`
+ou `missing`) e `editedInBoard` quando a última conferência com a origem achou diferença. `create_agent` e
 `update_agent` aceitam, além das instruções, `description`, `model` (valor do campo Modelo, ex.:
 `claude:sonnet@medium`), `tools`, `deniedTools`, `skills` e `mcp`, e, no Cursor (que não tem lista de
 ferramentas, skills nem MCP por subagente), `readonly` e `background` (`readonly: true` e

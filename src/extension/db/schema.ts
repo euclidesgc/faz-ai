@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 48;
+export const SCHEMA_VERSION = 49;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -618,6 +618,12 @@ const MIGRATIONS: Record<number, string> = {
     -- o modo em que a execução rodou; NULL nas anteriores: não registrado, nada é inventado
     ALTER TABLE ai_runs ADD COLUMN mode TEXT;
   `,
+  49: `
+    -- A cópia de um artefato guarda o resumo do conteúdo da origem no momento da cópia: comparado com a
+    -- origem e com a cópia, diz se a origem mudou ou se a cópia foi editada no board. '' = sem resumo
+    -- (criado no board ou copiado antes desta versão); nada é inventado para as cópias anteriores.
+    ALTER TABLE board_artifacts ADD COLUMN origin_digest TEXT NOT NULL DEFAULT '';
+  `,
 };
 
 /**
@@ -638,6 +644,10 @@ export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
     ALTER TABLE ai_profiles DROP COLUMN mode;
     ALTER TABLE ai_profiles DROP COLUMN tool;
     ALTER TABLE ai_runs DROP COLUMN mode;
+  `,
+  49: `
+    -- o resumo da origem é só um aviso: a versão anterior não o conhece
+    ALTER TABLE board_artifacts DROP COLUMN origin_digest;
   `,
 };
 

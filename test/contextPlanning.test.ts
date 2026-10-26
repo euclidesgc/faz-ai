@@ -134,7 +134,7 @@ describe('contratos de contexto versionados', () => {
           r.meta_json = JSON.stringify({ server: { command: 'github', env: { TOKEN: 'segredo-local' } } });
         const keys = Object.keys(r).filter(
           (key) =>
-            (name !== 'board_artifacts' || !['revision', 'secret_ref', 'review_state'].includes(key)) &&
+            (name !== 'board_artifacts' || !['revision', 'secret_ref', 'review_state', 'origin_digest'].includes(key)) &&
             (name !== 'cards' || key !== 'questions_json'),
         );
         old.run(
@@ -151,7 +151,9 @@ describe('contratos de contexto versionados', () => {
     migrate(old);
     const after = executionState(old);
     expect(all(old, "SELECT * FROM board_artifacts WHERE kind != 'mcp'")).toEqual(
-      raw.filter((r) => r.kind !== 'mcp').map((row) => ({ ...row, revision: 1, secret_ref: null, review_state: 'legacy' })),
+      raw
+        .filter((r) => r.kind !== 'mcp')
+        .map((row) => ({ ...row, revision: 1, secret_ref: null, review_state: 'legacy', origin_digest: '' })),
     );
     expect(new ArtifactRepo(old).mcpDefinitions(router.boardId).github).toEqual({ command: 'github', env: { TOKEN: 'segredo-local' } });
     expect(after.fieldValues).toEqual(before.fieldValues);

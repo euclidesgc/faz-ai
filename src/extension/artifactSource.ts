@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ARTIFACT_LIMITS, isSafeRelPath, kindOfSelectable, toolCategories, type AgentMeta, type ArtifactDraft } from '../shared/artifacts';
@@ -290,11 +291,11 @@ export function readSource(
   try {
     switch (kind) {
       case 'rule':
-        return readRule(sel.location, dirs, tool);
+        return withDigest(readRule(sel.location, dirs, tool));
       case 'skill':
-        return readSkill(sel.location, dirs, tool, useBundledFlow);
+        return withDigest(readSkill(sel.location, dirs, tool, useBundledFlow));
       case 'agent':
-        return readAgent(sel.location, dirs, tool);
+        return withDigest(readAgent(sel.location, dirs, tool));
       case 'mcp':
         return readMcp(sel.location, dirs, tool);
     }
@@ -302,6 +303,24 @@ export function readSource(
     // erro inesperado (permissão, caminho estranho): a marcação fica, como ausente
   }
   return missing(base(kind, sel.location, sel.location, tool));
+}
+
+/**
+ * Resumo do conteúdo de uma regra, skill ou agente: descrição, texto e arquivos de apoio. É o que a cópia guarda
+ * da origem para saber depois se a origem mudou ou se a cópia foi editada no board. O MCP fica de fora: a
+ * definição dele vai para o cofre e não se compara.
+ */
+export function artifactDigest(d: Pick<ArtifactDraft, 'description' | 'body' | 'files'>): string {
+  const files = [...d.files].sort((a, b) => a.path.localeCompare(b.path)).map((f) => [f.path, f.encoding, f.content]);
+  return createHash('sha256')
+    .update(JSON.stringify([d.description, d.body, files]))
+    .digest('hex');
+}
+
+/** A cópia lida guarda o resumo da origem; a skill do fluxo é da extensão e não tem origem a conferir. */
+function withDigest(d: ArtifactDraft): ArtifactDraft {
+  if (d.missing || (d.meta as { generated?: unknown }).generated === true) return d;
+  return { ...d, originDigest: artifactDigest(d) };
 }
 
 /**

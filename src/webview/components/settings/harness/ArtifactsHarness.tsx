@@ -1,6 +1,7 @@
-import { useDeferredValue, useState } from 'react';
+import { useDeferredValue, useEffect, useState } from 'react';
 import { Badge, Callout, Tabs, TextField } from '@radix-ui/themes';
 import { HARNESS_TOPICS, usageCounts, type HarnessTopic } from '../../../../shared/harnessTopics';
+import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
 import { ActionButton, IconWarning } from '../../ui';
 import { ArtifactList } from './ArtifactList';
@@ -25,6 +26,8 @@ export function ArtifactsHarness() {
   const deferred = useDeferredValue(queries);
   const active = HARNESS_TOPICS.find((x) => x.id === topic) ?? HARNESS_TOPICS[0]!;
   const rules = usageCounts(artifacts, 'rule');
+  // abrir os artefatos relê as origens das cópias: a lista mostra o que mudou desde a cópia
+  useEffect(() => void harness.refresh(), []);
 
   return (
     <div className="scope-harness artifacts-harness">
