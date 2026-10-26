@@ -79,9 +79,9 @@ function texts(c: EnvCheck): { title: string; hint: string } {
       };
     case 'flow-skill-copy':
       return {
-        title: t('Cópia antiga da skill do fluxo'),
+        title: t('Cópias antigas do fluxo do board'),
         hint: t(
-          'Versões anteriores instalaram a skill faz-ai-fluxo nas pastas das ferramentas. O fluxo agora vem do board, e a cópia só confunde as sessões que não são do board. O board não apaga o arquivo: apague os listados abaixo se não precisar deles.',
+          'Versões anteriores instalaram as skills do fluxo (faz-ai-*) e os agentes de fábrica do board nas pastas das ferramentas. O fluxo agora vem do board, e essas cópias só confundem as sessões que não são do board. O board não apaga os arquivos: apague os listados abaixo se não precisar deles.',
         ),
       };
     case 'gh':

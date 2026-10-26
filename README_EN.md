@@ -111,7 +111,9 @@ in the Portuguese interface.
   tracking) and **Code Review Graph** (a code graph for the AI).
 
 The **Environment Diagnostics** (**Configurações → Verificar ambiente**) checks each item and shows
-the official install command; the board installs nothing.
+the official install command; the board installs nothing. It also lists the old copies of the flow
+that earlier versions left in the tool folders (the `faz-ai-*` skills and the board's factory
+agents), with each file's path, for you to delete by hand.
 
 ## Settings
 

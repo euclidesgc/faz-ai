@@ -316,9 +316,10 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   semantic search. While it is missing, Code Review Graph shows inside
   [uv](https://docs.astral.sh/uv/), in install order: uv installs Code Review Graph
   (`uv tool install code-review-graph`) and downloads Python 3.10 or newer just for it, if missing.
-  Earlier versions may have left a copy of the `faz-ai-fluxo` skill in the tool folders: the
-  environment check lists it here (**Cópia antiga da skill do fluxo**, old copy of the flow skill)
-  with each file's path (see [Import and export](#import-and-export)).
+  Earlier versions may have left old copies of the flow in the tool folders, in the project and in
+  the user folder: the flow skills (`faz-ai-fluxo` and the per-topic `faz-ai-*` ones) and the board's
+  factory agents. The environment check lists them here (**Cópias antigas do fluxo do board**, old
+  copies of the board flow) with each file's path (see [Import and export](#import-and-export)).
 
 The board installs nothing from third parties. Each program shows, in parentheses, the official site
 where you find how to install it and, while it is missing, the official install command to copy,
@@ -386,9 +387,10 @@ summary groups the conflicts and offers an explicit confirmation to overwrite th
 (`.claude/`, `.cursor/` or `.kimi-code/`, in the project and in the user folder), and **Pasta**
 (folder) recognizes those same folders inside it. Earlier versions may have left a copy of the
 `faz-ai-fluxo` skill in those folders: the environment check lists it under **Recomendados**
-(Recommended) as **Cópia antiga da skill do fluxo** (old copy of the flow skill) with each file's
-path. The board deletes nothing; to remove the copy, delete the listed `faz-ai-fluxo` folder (for
-example `rm -r .claude/skills/faz-ai-fluxo`). The flow comes from the board.
+(Recommended) as **Cópias antigas do fluxo do board** (old copies of the board flow) with each file's
+path. The board deletes nothing; to remove a copy, delete the listed skill folder or agent file (for
+example `rm -r .claude/skills/faz-ai-fluxo` or `rm .claude/agents/condutor-do-board.md`). The flow
+comes from the board.
 
 **Exportar para a ferramenta** (export to the tool, next to **Importar**) is the reverse path: it
 copies the board's rules, skills and agents into the folder of **Claude Code**, **Cursor** or **Kimi

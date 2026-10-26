@@ -304,9 +304,11 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   consulta em vez de ler arquivos inteiros, com o grafo do projeto e a busca semântica. Enquanto
   falta, o Code Review Graph aparece dentro do [uv](https://docs.astral.sh/uv/), na ordem de
   instalar: o uv instala o Code Review Graph (`uv tool install code-review-graph`) e baixa um Python
-  3.10 ou mais novo só para ele, se faltar. Versões anteriores podem ter deixado uma cópia da skill
-  `faz-ai-fluxo` nas pastas das ferramentas: o Diagnóstico a lista aqui (**Cópia antiga da skill do
-  fluxo**) com o caminho de cada arquivo (veja [Importar e exportar](#importar-e-exportar)).
+  3.10 ou mais novo só para ele, se faltar. Versões anteriores podem ter deixado nas pastas das
+  ferramentas, no projeto e no usuário, cópias antigas do fluxo: as skills do fluxo (`faz-ai-fluxo` e
+  as `faz-ai-*` por assunto) e os agentes de fábrica do board. O Diagnóstico as lista aqui (**Cópias
+  antigas do fluxo do board**) com o caminho de cada arquivo (veja
+  [Importar e exportar](#importar-e-exportar)).
 
 O board não instala nada de terceiros. Cada programa traz, entre parênteses, o site oficial onde
 você encontra como instalar e, enquanto falta, o comando de instalação oficial para copiar, só os
@@ -369,10 +371,11 @@ confirmação explícita para sobrescrevê-los.
 
 **Importar → Ferramenta instalada** lê só a pasta da ferramenta escolhida (`.claude/`, `.cursor/` ou
 `.kimi-code/`, no projeto e no usuário) e **Pasta** reconhece essas mesmas pastas dentro dela.
-Versões anteriores podem ter deixado uma cópia da skill `faz-ai-fluxo` nessas pastas: o Diagnóstico
-a lista em **Recomendados** (**Cópia antiga da skill do fluxo**) com o caminho de cada arquivo. O
-board não apaga nada; para remover a cópia, apague a pasta `faz-ai-fluxo` listada (por exemplo
-`rm -r .claude/skills/faz-ai-fluxo`). O fluxo vem do board.
+Versões anteriores podem ter deixado nessas pastas cópias antigas do fluxo (as skills `faz-ai-*` e os
+agentes de fábrica do board): o Diagnóstico as lista em **Recomendados** (**Cópias antigas do fluxo
+do board**) com o caminho de cada arquivo. O board não apaga nada; para remover uma cópia, apague a
+pasta da skill ou o arquivo do agente listado (por exemplo `rm -r .claude/skills/faz-ai-fluxo` ou
+`rm .claude/agents/condutor-do-board.md`). O fluxo vem do board.
 
 **Exportar para a ferramenta** (ao lado de **Importar**) faz o caminho inverso: copia regras, skills
 e agentes do board para a pasta de **Claude Code**, **Cursor** ou **Kimi Code**, no formato de cada
