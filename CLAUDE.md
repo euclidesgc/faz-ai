@@ -58,7 +58,8 @@ Não rode `npm test` nem `vitest run` sem filtro fora do release, nem em subagen
 - Toda mudança visível entra em `CHANGELOG.md` e `CHANGELOG_EN.md`, na seção da próxima versão
   (a mesma do `package.json`). O changelog segue o Keep a Changelog: uma seção por versão, com as
   subseções "Adicionado", "Alterado", "Removido" e "Corrigido" ("Added" / "Changed" / "Removed" /
-  "Fixed"), um item por mudança, com o título em negrito e o número da história. Não existe seção
+  "Fixed"), um item por mudança: uma frase curta, sem detalhes, com o número da história entre
+  parênteses quando houver (o detalhe vai para `docs/`). Não existe seção
   "Não lançado": a `develop` sobe a versão do `package.json` na primeira entrega da versão seguinte,
   e a seção do topo contém apenas entregas já integradas. O release roda com essa versão explícita:
   `npm run release -- <versão do topo>`.

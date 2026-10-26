@@ -21,23 +21,24 @@ O `npm run release -- <versão do topo>` confere o `.vsix` com `README.md`, `REA
 Uma seção por versão, da mais recente para a mais antiga, com os títulos padrão nesta ordem,
 omitidos os vazios: `### Adicionado` (capacidade nova), `### Alterado` (comportamento existente que
 mudou), `### Removido` (o que deixou de existir) e `### Corrigido` (defeito consertado). Um item por
-mudança, começando com o título em negrito e o número da história entre parênteses, seguido do que
-a pessoa vê de diferente:
+mudança, numa linha só: uma frase curta (até umas 15 palavras) dizendo o que a pessoa ganha ou o que
+mudou, sem negrito, sem detalhes e sem explicar o porquê, com o número da história entre parênteses
+no fim quando houver. O detalhe vai para o arquivo do assunto em `docs/`:
 
 ```
 ## 0.48.0
 
 ### Adicionado
 
-- **Aprovar chama a IA na hora (#475).** O card aprovado entra na fila sem esperar o heartbeat.
+- Aprovar chama a IA na hora (#475).
 
 ### Corrigido
 
-- **Aviso "Como usar o Harness" não volta (#283).** A escolha "Entendi, não mostrar de novo" fica guardada no host.
+- O aviso "Como usar o Harness" não volta depois de fechado (#283).
 ```
 
-Em inglês: `### Added`, `### Changed`, `### Removed` e `### Fixed`. Comportamento que deixou de
-existir ganha `**Mudança de comportamento:**` no fim do item, em "Alterado" ou "Removido".
+Em inglês: `### Added`, `### Changed`, `### Removed` e `### Fixed`, com o mesmo item traduzido na
+mesma posição.
 
 ## Onde vai o detalhe (docs/)
 
