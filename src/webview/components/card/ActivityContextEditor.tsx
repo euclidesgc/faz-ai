@@ -40,8 +40,7 @@ export function ActivityContextEditor({
   return (
     <Dialog.Root open onOpenChange={(open) => !open && onClose()}>
       <Dialog.Content
-        maxWidth="850px"
-        className="scope-harness board-library"
+        className="board-dialog-lg scope-harness board-library"
         onInteractOutside={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => {
           e.preventDefault();

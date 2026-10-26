@@ -3420,6 +3420,118 @@ body.host-web .drawer {
   flex-wrap: wrap;
   gap: var(--sp-6);
 }
+/*
+ * Diálogo do Radix (Dialog.Content) no board: a largura vem destas classes, porque as props `maxWidth`/`width` do
+ * Radix dependem do utilities.css, que não entra. Cabeçalho, corpo e rodapé com o mesmo respiro; o rodapé tem uma
+ * linha só, com a ação principal no fim, à direita.
+ */
+.board-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+  max-height: 88vh;
+}
+.board-dialog-sm {
+  max-width: min(520px, 94vw);
+}
+.board-dialog-md {
+  max-width: min(720px, 94vw);
+}
+.board-dialog-lg {
+  max-width: min(900px, 94vw);
+}
+.board-dialog-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.board-dialog-head .rt-DialogTitle,
+.board-dialog-head .rt-DialogDescription {
+  margin: 0;
+}
+.board-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+  min-height: 0;
+}
+.board-dialog-scroll {
+  overflow: auto;
+}
+.board-dialog-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding-top: var(--sp-12);
+  border-top: 1px solid var(--border);
+}
+/* opções de rádio lado a lado, quebrando quando não cabem */
+.radio-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--sp-8) var(--sp-20);
+}
+/* campo com um botão ao lado (Escolher pasta): o campo ocupa o resto da linha */
+.field-with-action {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.field-with-action > .rt-TextFieldRoot {
+  flex: 1;
+  min-width: 0;
+}
+/* lista de escolhas: uma linha por item, com nome, explicação e a ação ou a caixa de seleção */
+.choice-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.choice-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-8) var(--sp-12);
+}
+.choice-row + .choice-row {
+  border-top: 1px solid var(--border);
+}
+.choice-row.off .choice-name {
+  color: var(--muted);
+}
+.choice-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  flex: 1;
+  min-width: 0;
+}
+.choice-name {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-weight: 500;
+}
+.choice-check {
+  flex: none;
+  width: 16px;
+}
+.import-group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+.import-group legend {
+  padding: 0;
+  margin-bottom: var(--sp-6);
+  font-weight: 600;
+}
 .skill-dialog {
   max-width: 720px;
   display: flex;

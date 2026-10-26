@@ -46,7 +46,6 @@ export const harness: Record<string, string> = {
   desativado: 'disabled',
   'da organização': 'from the organization',
   'Selecionar todos': 'Select all',
-  'não encontrada nesta máquina': 'not found on this machine',
   'sob demanda': 'on demand',
   'Conteúdo do arquivo': 'File content',
   Apagar: 'Delete',
@@ -814,6 +813,18 @@ export const harness: Record<string, string> = {
   'Arquivo de exportação': 'Export file',
   'Caminho da pasta ou endereço do repositório': 'Folder path or repository address',
   'Subpasta (opcional)': 'Subfolder (optional)',
+  'De onde importar': 'Import from',
+  'Uma pasta neste computador ou o endereço de um repositório git.': 'A folder on this computer or the address of a git repository.',
+  '/caminho/da/pasta ou https://github.com/conta/repositorio': '/path/to/folder or https://github.com/account/repository',
+  'A pasta dentro da origem onde estão os artefatos.': 'The folder inside the source where the artifacts are.',
+  Ferramentas: 'Tools',
+  'Tem regras, skills, agentes ou MCPs para importar.': 'Has rules, skills, agents or MCPs to import.',
+  'Nada para importar nesta máquina.': 'Nothing to import on this machine.',
+  'Não há pasta nem arquivos desta ferramenta no projeto nem no usuário.':
+    'There is no folder or file of this tool in the project or in the user folder.',
+  'Examinar {tool}': 'Examine {tool}',
+  'Escolha um arquivo gerado por "Exportar o board" para ver o que há nele.':
+    'Pick a file made by "Export the board" to see what is in it.',
   'Informe o caminho da pasta ou o endereço do repositório.': 'Enter the folder path or the repository address.',
   'Lê a origem sem rodar nada e lista os artefatos encontrados.':
     'Reads the source without running anything and lists the artifacts found.',
@@ -835,7 +846,6 @@ export const harness: Record<string, string> = {
   'Substituir troca o conteúdo atual pelo importado. Pular os repetidos importa só o que é novo.':
     'Replace swaps the current content for the imported one. Skip the repeated ones imports only what is new.',
   'Pular os repetidos': 'Skip the repeated ones',
-  'Esta ferramenta não está instalada.': 'This tool is not installed.',
 
   // --- Artefatos do board (aba nova)
   'Artefatos do board': 'Board artifacts',
