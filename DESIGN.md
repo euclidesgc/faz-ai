@@ -113,8 +113,8 @@ olho.
 - As regras de elemento de `styles.css` (`button`, `input`, `select`, `textarea`, `a`) têm
   `:where(:not([class*='rt-']))`: valem só para os nossos controles e não mexem nos do Radix. Regra
   nova de elemento segue o mesmo padrão.
-- As props responsivas de tamanho (`maxWidth`, `width`) vêm do `utilities.css`, que não entra: limite
-  a largura de um `Dialog.Content` pelo CSS (ver `.skill-dialog`).
+- As props responsivas de tamanho (`maxWidth`, `width`) vêm do `utilities.css`, que não entra: nunca as
+  use. A largura de um diálogo vem das classes da seção "Diálogos" (`test/dialogWidth.test.ts` barra a prop).
 - Campo de formulário: `FormField` (`components/ui/FormField.tsx`), com o rótulo acima, o controle e
   uma linha de ajuda abaixo. O rótulo aponta para o controle pelo `id`.
 - Todas as telas de Configurações já usam o Radix. O padrão de cada aba é o mesmo:
@@ -133,6 +133,30 @@ olho.
   `ActionIconButton`, com `aria-label`. A toolbar é `.actions-toolbar` (gap `--sp-8` × `--sp-12`), e
   `.toolbar-group` separa a criação (Novo, Criar com ajuda) das ações de IA e de manutenção.
 - Seletores (`SelectField`), caixas de seleção, campos de busca e de adicionar, e a nota de status são do Radix em toda a interface, no board, no card aberto e nos filtros. Seguem nativos, de propósito, só os campos que têm de parecer texto (título do card, item da checklist, renomear coluna e workflow, o editor de markdown) e o seletor de cor (`<input type="color">`).
+
+## Diálogos
+
+Todo `Dialog.Content` do Radix segue a mesma forma (exemplo: `ImportDialog`):
+
+- **Largura:** `board-dialog` mais um tamanho: `board-dialog-sm` (520 px, confirmação curta),
+  `board-dialog-md` (720 px, formulário) ou `board-dialog-lg` (900 px, listas e editores).
+- **Cabeçalho** (`board-dialog-head`): `Dialog.Title` e `Dialog.Description` com uma frase que diz o
+  que acontece ao confirmar, sem repetir o título.
+- **Corpo** (`board-dialog-body`, com `board-dialog-scroll` quando a lista pode crescer): um campo
+  por `FormField`, com rótulo, `hint` curto abaixo e `placeholder` com um exemplo real. A escolha
+  entre poucas opções é um `RadioGroup` em linha (`radio-row`), com um rótulo que pergunta ("De onde
+  importar"). Uma lista de itens para escolher ou examinar é `choice-list`: uma linha por item, com o
+  nome, uma frase que explica o estado e a ação ou a caixa de seleção à direita.
+- **Ações:** a ação que pertence a um campo fica na linha dele (`field-with-action`, ex.: "Escolher
+  pasta"). As demais ficam todas no **rodapé** (`board-dialog-footer`), numa linha só: Voltar à
+  esquerda, depois o espaço, depois Fechar ou Cancelar (`soft` cinza) e por último a ação principal
+  (sólida). Nada de botão solto entre os campos nem segunda linha de botões.
+- **Hint e motivo:** todo botão é `ActionButton`, com `hint` dizendo o que o clique faz. Desabilitado,
+  `disabledReason` diz o que falta para habilitar, não só que está desabilitado ("Informe o caminho da
+  pasta…", e não "Indisponível"). Item que não dá para usar diz por quê na própria linha, em texto
+  `muted`, sem jargão ("Nada para importar nesta máquina.").
+- **Erro:** aparece no corpo, perto do que falhou, como `Text` vermelho com `role="alert"`; o que a
+  pessoa escreveu fica. Enter num campo de texto dispara a ação principal quando ela está habilitada.
 
 ## Estados de espera
 

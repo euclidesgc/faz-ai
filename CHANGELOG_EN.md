@@ -33,6 +33,7 @@
 
 ### Changed
 
+- The import artifacts dialog is better organized, with its actions in a single footer.
 - Factory agents can no longer be deleted, and any agent can be turned off.
 - **Send** always calls the AI, even with the card blocked, and turns into **Stop** while it works.
 - Bug now starts from `develop` instead of the main branch.
@@ -62,6 +63,7 @@
 
 ### Fixed
 
+- The import and export artifacts dialogs and the context editors no longer take up the whole screen.
 - Import finds the installed tools again, such as Claude Code.
 - Environment diagnostics now list the old copies of the board flow and of the factory agents (#1115).
 - Summarizing or refining a blocked card no longer leaves it "Em execução" forever.

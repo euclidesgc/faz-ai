@@ -54,9 +54,9 @@ describe('ImportDialog', () => {
   it('ferramenta: instalada envia o scan; a ausente fica marcada e desabilitada', async () => {
     renderThemed(<ImportDialog onClose={() => {}} />);
     await userEvent.click(screen.getByRole('radio', { name: 'Ferramenta instalada' }));
-    expect(screen.getAllByText('não encontrada nesta máquina').length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Cursor' })).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: 'Claude Code' }));
+    expect(screen.getAllByText('Nada para importar nesta máquina.').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Examinar Cursor' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Examinar Claude Code' }));
     expect(lastSent('harness.import.scan').source).toEqual({ from: 'tool', tool: 'claude' });
   });
 

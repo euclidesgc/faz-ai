@@ -95,7 +95,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog.Root open onOpenChange={(open) => !open && !applying && onClose()}>
-      <Dialog.Content maxWidth="760px" className="scope-harness" onInteractOutside={(e) => e.preventDefault()}>
+      <Dialog.Content className="board-dialog-md scope-harness" onInteractOutside={(e) => e.preventDefault()}>
         <Dialog.Title>{t('Exportar para a ferramenta')}</Dialog.Title>
         <Dialog.Description>{t('Copia regras, skills e agentes do board no formato de {tool}.', { tool: toolLabel })}</Dialog.Description>
 

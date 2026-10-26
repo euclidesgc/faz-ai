@@ -74,8 +74,7 @@ export function AgentContractEditor({ artifactId, onClose }: { artifactId: strin
   return (
     <Dialog.Root open onOpenChange={(open) => !open && !save.busy && onClose()}>
       <Dialog.Content
-        maxWidth="900px"
-        className="scope-harness board-library"
+        className="board-dialog-lg scope-harness board-library"
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => {
           if (save.busy) e.preventDefault();

@@ -33,6 +33,7 @@
 
 ### Alterado
 
+- O diálogo de importar artefatos fica mais organizado, com as ações num só rodapé.
 - Agentes de fábrica não podem mais ser apagados e todo agente pode ser desligado.
 - **Enviar** sempre chama a IA, mesmo com o card bloqueado, e vira **Parar** enquanto ela trabalha.
 - O Bug passa a partir da `develop`, em vez da principal.
@@ -62,6 +63,7 @@
 
 ### Corrigido
 
+- Os diálogos de importar e exportar artefatos e os editores de contexto não ocupam mais a tela inteira.
 - O Importar volta a encontrar as ferramentas instaladas, como o Claude Code.
 - O Diagnóstico do ambiente passa a listar as cópias antigas do fluxo do board e dos agentes de fábrica (#1115).
 - Resumir ou refinar um card bloqueado não o deixa mais "Em execução" para sempre.
