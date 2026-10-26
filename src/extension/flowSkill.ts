@@ -56,6 +56,9 @@ comentário**: ela entrega o card para a pessoa.
   insumo dos documentos. Pergunta sem resposta depois do envio: decida pelo padrão do projeto e registre
   a decisão na seção "Perguntas e respostas" (\`update_card\`) e na conversa.
 - Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\`.
+- A mensagem da pessoa devolve a vez à IA, com o card bloqueado ou não: leia, responda ou faça o pedido.
+  Numa história parada por uma sub-tarefa, é ali que ela destrava: responda o que a sub-tarefa pediu e
+  devolva-a à fila com \`release_card\`; quem a executa é o board.
 - Decidiu ou deixou algo em aberto que ela precisa avaliar: \`request_review\` com \`pending\`
   dizendo o que depende dela. Vale mesmo em coluna sem aprovação. No modo autônomo, não: ali nada
   segura o card (veja "Modo autônomo"), você decide e registra.
@@ -267,7 +270,10 @@ A entrega é para a pessoa testar, então o roteiro de testes é parte dela, em 
 Não faça o merge: ele depende da aprovação da pessoa. Com o merge automático ligado (Configurações →
 Git), a aprovação dela faz o merge e leva a história a Concluído; desligado, a IA move o card aprovado.
 
-Num hotfix (pull request para a principal), não abra pull request da principal para a \`develop\`: depois do merge, o board faz isso.
+Todo trabalho parte da \`develop\` (feature e bugfix, inclusive o Bug); só o tipo Hotfix parte da principal, que é a
+versão publicada. Num hotfix (pull request para a principal), suba a versão (patch) e registre a correção no
+changelog na própria branch, e não abra pull request da principal para a \`develop\` nem a release: depois do
+merge, o board leva a correção para a \`develop\` e cria a release a partir da principal.
 `;
 
 const AUTONOMO_BODY = `# Modo autônomo

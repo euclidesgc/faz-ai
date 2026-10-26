@@ -298,9 +298,10 @@ describe('atualização do board para o padrão atual', () => {
 
   it('versão 10: a Homologação com o texto da 0.39 passa a abrir o pull request com --base em workspace.prBase; a personalizada fica', () => {
     upgradeBoard(db, boardId);
-    expect(BOARD_TEMPLATE_VERSION).toBe(14);
+    expect(BOARD_TEMPLATE_VERSION).toBe(15);
     const settings = new SettingsRepo(db);
-    const v9 = PHASE_HISTORY['Homologação']!.instructions.at(-1)!;
+    // o texto da versão 9 é o segundo do histórico (o terceiro é o da 14, antes do passo do hotfix)
+    const v9 = PHASE_HISTORY['Homologação']!.instructions[1]!;
     // o texto de fábrica anterior é o atual sem a base do PR
     expect(v9).toContain('(ex.: gh pr create)');
     expect(v9).not.toContain('prBase');
@@ -381,6 +382,38 @@ describe('atualização do board para o padrão atual', () => {
     expect(PHASE_DEFAULTS['Plan']!.instruction).toContain('trilha curta');
     expect(PHASE_DEFAULTS['Plan']!.instruction).toContain('DISCOVERY.md');
     expect(col('Plan').aiInstruction).toBe('meu Plan');
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+  });
+
+  it('versão 15: o Bug ainda em hotfix passa a partir da develop e o tipo Hotfix entra; aplicar de novo não duplica', () => {
+    upgradeBoard(db, boardId);
+    const types = () => snap().cardTypes;
+    // o board novo já nasce com o Bug em bugfix e o Hotfix em hotfix
+    expect(types().find((t) => t.name === 'Bug')!.branchKind).toBe('bugfix');
+    expect(types().find((t) => t.name === 'Hotfix')!.branchKind).toBe('hotfix');
+    // como os boards anteriores: Bug em hotfix e sem o tipo Hotfix
+    run(db, "DELETE FROM card_types WHERE name = 'Hotfix'");
+    run(db, "UPDATE card_types SET branch_kind = 'hotfix' WHERE name = 'Bug'");
+    run(db, 'UPDATE boards SET template_version = 14 WHERE id = ?', [boardId]);
+    const pending = pendingUpgrade(db, boardId);
+    expect(pending).toHaveLength(2);
+    expect(pending.join(' ')).toContain('develop');
+    upgradeBoard(db, boardId);
+    expect(types().find((t) => t.name === 'Bug')!.branchKind).toBe('bugfix');
+    expect(types().filter((t) => t.name === 'Hotfix')).toHaveLength(1);
+    expect(types().find((t) => t.name === 'Hotfix')!.branchKind).toBe('hotfix');
+    // a Homologação com o texto da versão 14 ganha o passo do hotfix; a personalizada fica
+    const settings = new SettingsRepo(db);
+    settings.updateColumn(col('Homologação').id, { aiInstruction: PHASE_HISTORY['Homologação']!.instructions.at(-1)! });
+    run(db, 'UPDATE boards SET template_version = 14 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([`Coluna "Homologação": ${PHASE_HISTORY['Homologação']!.change}.`]);
+    upgradeBoard(db, boardId);
+    expect(col('Homologação').aiInstruction).toBe(PHASE_DEFAULTS['Homologação']!.instruction);
+    expect(col('Homologação').aiInstruction).toContain('Num hotfix (`workspace.hotfixNote` no get_card)');
+    // o Bug que a pessoa pôs em feature e um tipo Hotfix dela ficam como estão
+    run(db, "UPDATE card_types SET branch_kind = 'feature' WHERE name = 'Bug'");
+    run(db, "UPDATE card_types SET branch_kind = 'bugfix' WHERE name = 'Hotfix'");
+    run(db, 'UPDATE boards SET template_version = 14 WHERE id = ?', [boardId]);
     expect(pendingUpgrade(db, boardId)).toEqual([]);
   });
 

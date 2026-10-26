@@ -84,8 +84,9 @@ in the Portuguese interface.
   takes the story from Backlog to the pull request without asking, and the autopilot queues the
   stories. [Automation](docs/automacao_EN.md)
 - **Branch and pull request per story.** Each story gets its own branch and working folder, following
-  gitflow; Homologação opens the PR with **Como testar** (how to test), and the board detects the
-  merge, cleans up the branch and can record the decision in `docs/decisoes`.
+  gitflow: all work starts from `develop`, and only the **Hotfix** type starts from the main branch
+  and comes back with a release. Homologação opens the PR with **Como testar** (how to test), and the
+  board detects the merge, cleans up the branch and can record the decision in `docs/decisoes`.
   [Gitflow](docs/gitflow_EN.md)
 - **Usage metrics.** A ring on the card estimates the context of the next run; the **Consumo** tab
   and the **Métricas** panel show tokens, AI time, rework and what the AI used. Each run is also

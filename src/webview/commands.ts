@@ -87,6 +87,8 @@ export const chat = {
 
 export const ai = {
   run: (cardId: Id) => reqCard(cardId, { type: 'ai.run', cardId }),
+  /** a IA responde à última mensagem da pessoa (ou faz o pedido), mesmo com o card bloqueado */
+  reply: (cardId: Id) => reqCard(cardId, { type: 'ai.run', cardId, mode: 'reply' }),
   refine: (cardId: Id) => reqCard(cardId, { type: 'ai.run', cardId, mode: 'refine' }),
   summarize: (cardId: Id) => reqCard(cardId, { type: 'ai.run', cardId, mode: 'summarize' }),
   stop: (cardId: Id) => reqCard(cardId, { type: 'ai.stop', cardId }),

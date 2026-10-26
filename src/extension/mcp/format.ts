@@ -34,7 +34,7 @@ import { statusInfo } from '../../shared/status';
 import { isAtYoloStop, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../../shared/story';
 import { isBoardField } from '../../shared/boardFields';
 import { slug } from '../../shared/git';
-import { prBaseOf, type PrBase } from '../../shared/gitflow';
+import { branchKindOf, prBaseOf, type PrBase } from '../../shared/gitflow';
 import {
   cardRef,
   type BoardState,
@@ -484,6 +484,13 @@ function workspaceOf(s: BoardState, c: Card) {
         ),
         ...(story.prUrl ? { pullRequest: story.prUrl } : {}),
         ...(story.mergeCommit ? { mergeCommit: story.mergeCommit } : {}),
+        // o hotfix parte da principal (a versão publicada) e vira uma versão nova: a release sai da versão que ele sobe
+        ...(s.board.git.gitflow && branchKindOf(s, story) === 'hotfix'
+          ? {
+              hotfixNote:
+                'Hotfix: parte da principal, que é a versão publicada. Antes do pull request, suba a versão (patch) e registre a correção no changelog, na mesma branch. Depois do merge na principal, o board leva a correção para a develop e cria a release a partir da principal com essa versão.',
+            }
+          : {}),
         note:
           s.board.git.mode === 'worktree'
             ? `Altere o código só em ${story.worktreePath} (branch ${story.branch}) e faça os commits lá.`

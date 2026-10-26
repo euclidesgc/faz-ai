@@ -4,6 +4,7 @@ import {
   effectiveLimits,
   orchestrableSubtasks,
   reconcileOutcome,
+  stoppedReason,
   storyPlan,
   workKey,
   type WorkEvidence,
@@ -135,6 +136,42 @@ describe('plano puro de rodadas', () => {
     expect(workKey('closing', s, story, story)).toBe(key);
     s.cards.push(sub('d', story.id, 'finished', { number: 5 }));
     expect(workKey('closing', s, story, story)).not.toBe(key);
+  });
+  it('sub-tarefa que já rodou só roda de novo quando a pessoa a devolve, na conversa dela ou na da história', () => {
+    const s = state();
+    // só a sub-tarefa a fica aberta na fase
+    s.cards[2]!.columnId = 'finished';
+    s.cards[3]!.columnId = 'finished';
+    const say = (cardId: string, at: number, source: 'human' | 'ai' = 'human') =>
+      s.comments.push({ id: `m${at}`, cardId, author: source === 'human' ? 'a' : 'IA', source, body: 'x', createdAt: at, updatedAt: at });
+    const a = s.cards[1]!;
+    const ran = new Set([workKey('subtask', s, story, a)]);
+    // rodou e ficou aberta: a história para nela, com o que fazer
+    const paused = storyPlan(s, story, live, ran);
+    expect(paused).toMatchObject({ kind: 'paused' });
+    expect(paused.kind === 'paused' && paused.reason).toContain('Responda aqui na conversa da história');
+    // a mensagem da IA não devolve a vez: só a da pessoa
+    say(a.id, 10, 'ai');
+    expect(storyPlan(s, story, live, ran)).toMatchObject({ kind: 'paused' });
+    say(a.id, 20);
+    expect(storyPlan(s, story, live, ran)).toMatchObject({ kind: 'units', units: [{ cardId: 'a' }] });
+    // a resposta na história também devolve, e a chave nova roda uma vez só
+    const again = new Set([...ran, workKey('subtask', s, story, a)]);
+    expect(storyPlan(s, story, live, again)).toMatchObject({ kind: 'paused' });
+    say(story.id, 30);
+    expect(storyPlan(s, story, live, again)).toMatchObject({ kind: 'units', units: [{ cardId: 'a' }] });
+    // o status que a pessoa mesma definiu também conta; o da IA, não
+    const done = new Set([...again, workKey('subtask', s, story, a)]);
+    a.statusBy = 'Claude Code';
+    a.statusAt = 40;
+    expect(workKey('subtask', s, story, a)).toBe([...done].at(-1));
+    a.statusBy = 'a';
+    expect(done.has(workKey('subtask', s, story, a))).toBe(false);
+  });
+  it('a parada numa sub-tarefa com a pessoa traz o motivo dela', () => {
+    const blocked = sub('x', story.id, 'todo', { number: 9, status: 'blocked', statusReason: 'A base da história é a main.' });
+    expect(stoppedReason(story, blocked)).toContain('#9 está com você: A base da história é a main.');
+    expect(stoppedReason(story, { ...blocked, status: 'ready', statusReason: '' })).toContain('terminou sem concluir');
   });
   it('board sem campo Fase aceita as abertas com a IA e exclui as encerradas', () => {
     const s = state();

@@ -16,7 +16,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  fs.rmSync(dir, { recursive: true, force: true });
+  // a fila do rastreio pode gravar mais um arquivo durante a limpeza (ENOTEMPTY): tenta de novo, como os outros testes
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 });
 
 /** Espera a fila do rastreio gravar no disco. */

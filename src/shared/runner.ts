@@ -20,9 +20,10 @@ export type AdmissionRegime = 'exclusive' | 'compatible';
  * card e grava um resumo (Decisões/Observações/Pendências) como uma mensagem nova, sem mover o card
  * nem mudar o status; `conflict` atualiza a branch da história a partir da base do pull request em
  * conflito (merge, checagens, commit e push), sem trabalhar a fase, e no fim o card volta ao status
- * que tinha.
+ * que tinha; `reply` responde à última mensagem da pessoa (ou faz o que ela pede), mesmo com o card ou a
+ * história bloqueados, sem trabalhar a fase além do pedido.
  */
-export type AiRunMode = 'phase' | 'refine' | 'summarize' | 'conflict';
+export type AiRunMode = 'phase' | 'refine' | 'summarize' | 'conflict' | 'reply';
 
 export interface RunnerConfig {
   permission: RunnerPermission;

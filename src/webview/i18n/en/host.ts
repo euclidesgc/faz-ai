@@ -139,6 +139,17 @@ export const gitNotices: Record<string, string> = {
   'Volta da {main} para a {develop} depois do hotfix #{number}': 'Merge {main} back into {develop} after hotfix #{number}',
   'Aberto pelo Faz AI depois do merge de {pr}. Faça o merge com merge commit, não com squash: a {develop} precisa conter os commits da {main}.':
     "Opened by Faz AI after {pr} was merged. Merge it with a merge commit, not squash: {develop} must contain {main}'s commits.",
+  // release a partir da principal depois do hotfix
+  'Release {tag} criada a partir da {main} ({url}). Se o projeto publica numa loja, a publicação segue o processo de release dele.':
+    "Release {tag} created from {main} ({url}). If the project publishes to a store, publishing follows the project's release process.",
+  'A {main} já tem a release {tag} sobre o commit do hotfix: nada a criar.':
+    '{main} already has the release {tag} on the hotfix commit: nothing to create.',
+  '**Aviso:** A release não foi criada: a versão do package.json na {main} ({version}) já tem a tag {tag}. Suba a versão e gere a release a partir da {main} pelo processo do projeto.':
+    "**Warning:** The release was not created: the package.json version on {main} ({version}) already has the tag {tag}. Bump the version and create the release from {main} with the project's release process.",
+  '**Aviso:** A release não foi criada: a {main} não tem package.json nem tag de versão (vX.Y.Z) de onde tirar a próxima. Crie com: gh release create <versão> --target {main} --generate-notes':
+    '**Warning:** The release was not created: {main} has neither a package.json nor a version tag (vX.Y.Z) to derive the next one from. Create it with: gh release create <version> --target {main} --generate-notes',
+  '**Aviso:** A release {tag} não foi criada: {error}. Crie com: gh release create {tag} --target {sha} --title {tag} --generate-notes':
+    '**Warning:** The release {tag} was not created: {error}. Create it with: gh release create {tag} --target {sha} --title {tag} --generate-notes',
 };
 
 export const host: Record<string, string> = {

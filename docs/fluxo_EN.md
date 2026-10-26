@@ -159,8 +159,20 @@ on keyboard focus, closes with Esc, and stays visible even when the button is bl
   Implementação it writes the code (if the permission allows). It reads the conversation and answers
   it, and ends by handing over: asks for review, asks a question, blocks or moves the card. If Tags,
   Esforço da atividade, Modelo and Skills are all empty, it fills them first. It is in the card
-  header and in the conversation (with text typed, **Enviar e trabalhar na fase** sends the message
-  first).
+  header and in the conversation.
+- **Enviar** (send), in the conversation, saves the message and calls the AI to answer it or do what
+  it asks, without working the phase beyond the request. It works with the card **blocked**, waiting
+  for an answer or a review: the person's message hands the turn back to the AI (the card goes back
+  to "Pronto"), and if a decision of theirs is still missing, the AI asks or blocks again. In a story
+  stopped by a sub-task, the story is where you unblock it: its block says what the sub-task needs,
+  the AI answers and returns the sub-task to the queue (`release_card`), and the board runs it again,
+  which also happens when the person answers in the sub-task itself. With another run of the same
+  story in progress, the message just stays in the conversation. The reply does not count as a turn
+  without progress in autonomous mode.
+- While the AI works on the card (or, in a story, on one of its sub-tasks), **Enviar** turns into
+  **Parar** (stop): it interrupts the run and the card goes back to the status it had. A card left "Em
+  execução" with no AI run goes to the person, with the reason, and their message hands the turn back
+  to the AI.
 - **Refinar com IA** (refine with AI) only makes the card clear and complete for whoever will work
   on it: rewrites the title and description (without inventing requirements; whatever is ambiguous
   becomes a "Dúvidas em aberto" list), reviews Tags, Esforço da atividade, Modelo and Skills even if

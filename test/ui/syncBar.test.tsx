@@ -164,6 +164,23 @@ describe('espera no botão e no campo', () => {
     confirmLast();
     await act(async () => {});
     expect(editor).toHaveValue('');
+    // gravada a mensagem, a IA é chamada para respondê-la, mesmo que o card esteja bloqueado
+    expect(lastSent('ai.run')).toEqual({ type: 'ai.run', cardId: board.storyId, mode: 'reply' });
+    expect(screen.queryByRole('button', { name: 'Enviar e trabalhar na fase' })).toBeNull();
+  });
+
+  it('com a IA trabalhando no card, o Enviar vira Parar, que pede ao host para interromper', async () => {
+    board.router.handle({ type: 'card.status.set', cardId: board.storyId, status: 'running' }, { author: 'Claude Code', source: 'ai' });
+    syncStore(board.router);
+    render(
+      <Theme>
+        <CommentsTab cardId={board.storyId} />
+      </Theme>,
+    );
+    expect(screen.queryByRole('button', { name: 'Enviar' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Parar' }));
+    expect(lastSent('ai.stop')).toEqual({ type: 'ai.stop', cardId: board.storyId });
+    board.router.handle({ type: 'card.status.set', cardId: board.storyId, status: 'ready' }, { author: 'Claude Code', source: 'ai' });
   });
 });
 

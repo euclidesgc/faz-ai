@@ -488,9 +488,9 @@ export const settings: Record<string, string> = {
   'branch de integração': 'integration branch',
   'processo de release do projeto': "the project's release process",
   'nenhum tipo de card': 'no card type',
-  'Quando usar Retrabalho': 'When to use Rework',
-  '<b>Quando usar Retrabalho:</b> um defeito numa funcionalidade que ainda só está na <code>{develop}</code> é Retrabalho (bugfix), não Bug (hotfix). Bug é o defeito que já está na principal (<code>{main}</code>) e precisa de correção urgente.':
-    '<b>When to use Rework:</b> a defect in a feature that is still only on <code>{develop}</code> is Rework (bugfix), not Bug (hotfix). Bug is the defect that is already on the main branch (<code>{main}</code>) and needs an urgent fix.',
+  'Quando usar Hotfix': 'When to use Hotfix',
+  '<b>Quando usar Hotfix:</b> todo trabalho parte da <code>{develop}</code>, inclusive Retrabalho e Bug (bugfix). Hotfix é a correção urgente da versão publicada, a principal (<code>{main}</code>): parte dela e, depois do merge, a correção volta para a <code>{develop}</code> e vira uma release a partir da principal.':
+    '<b>When to use Hotfix:</b> all work starts from <code>{develop}</code>, including Rework and Bug (bugfix). Hotfix is the urgent fix of the published version, the main branch (<code>{main}</code>): it starts from it and, after the merge, the fix goes back to <code>{develop}</code> and becomes a release from the main branch.',
   'As branches saem da principal (<code>{main}</code>) e os pull requests vão para ela.':
     'Branches start from the main branch (<code>{main}</code>) and pull requests go to it.',
   'Usar o gitflow': 'Use gitflow',

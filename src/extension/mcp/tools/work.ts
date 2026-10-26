@@ -2,7 +2,10 @@ import { z } from 'zod';
 import { openPredecessors } from '../../../shared/links';
 import { cardRef } from '../../../shared/model';
 import { activityKindOf } from '../../../shared/activity';
+import { cleanBranchName } from '../../../shared/git';
+import { handedBackAt } from '../../../shared/orchestration';
 import { columnOf } from '../../../shared/selectors';
+import { statusInfo } from '../../../shared/status';
 import { isAtYoloStop, isDelivered, isYolo, storyOf } from '../../../shared/story';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { cardSummary, findCard } from '../format';
@@ -157,6 +160,37 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
   );
 
   tool(
+    'release_card',
+    'Devolve à fila da IA (status "ready") um card que estava com a pessoa (bloqueado, aguardando resposta ou revisão), quando ela já respondeu o que o travava. Use ao responder uma mensagem da pessoa numa história: a sub-tarefa liberada volta a ser executada pelo board. Só vale depois de uma mensagem da pessoa no card ou na história dele, escrita depois de o card passar para ela; nunca para destravar o próprio trabalho sem a resposta dela.',
+    {
+      card: cardArg,
+      note: z.string().min(1).describe('O que a pessoa decidiu e por que o card pode seguir (markdown), gravado na conversa do card'),
+    },
+    (a, router) => {
+      const s = router.snapshot();
+      const card = live(findCard(s, a.card));
+      if (!card.status || statusInfo(card.status).owner !== 'human')
+        throw new Error(`${cardRef(card)} não está com a pessoa (status "${card.status ?? 'nenhum'}"): não há o que devolver.`);
+      if (handedBackAt(s, card) <= (card.statusAt ?? 0))
+        throw new Error(
+          `A pessoa ainda não respondeu sobre ${cardRef(card)} depois de ele passar para ela: espere a mensagem dela no card ou na história.`,
+        );
+      router.handle({ type: 'card.status.set', cardId: card.id, status: 'ready' }, aiOrigin(ctx));
+      router.handle({ type: 'comment.add', cardId: card.id, body: a.note }, aiOrigin(ctx));
+      const after = router.snapshot();
+      return {
+        card: cardSummary(
+          after,
+          after.cards.find((c) => c.id === card.id)!,
+        ),
+        next: card.parentId
+          ? 'A sub-tarefa voltou para a fila: o board a executa quando a história seguir. Não a execute você.'
+          : 'O card voltou para a fila da IA.',
+      };
+    },
+  );
+
+  tool(
     'prepare_workspace',
     'Cria (ou reaproveita) a branch da história e a pasta em que o código dela deve ser alterado. Chame antes de mexer em código do projeto; pode ser chamada de uma sub-tarefa. Fora do modo worktree, só chame na fase de código (fase que só produz documento não precisa de branch). O nome da branch e a pasta são definidos pelo board: não crie branches por conta própria. A branch parte da base do fluxo (a develop, a principal ou a branch anterior da pilha) e a resposta traz `prBase`, a branch para a qual o pull request deve ser aberto.',
     { card: cardArg },
@@ -175,6 +209,28 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
       }
       router.handle({ type: 'card.workspace.prepare', cardId: card.id }, aiOrigin(ctx));
       return detail(router, card.id).workspace;
+    },
+  );
+
+  tool(
+    'set_base_branch',
+    'Troca a base da história (a branch de onde ela parte e para a qual o pull request vai): `workspace.prBase` do get_card passa a ser `base`. Use quando a pessoa pedir, por exemplo a develop no lugar da principal porque o código a alterar só existe nela. A ferramenta só registra a base: traga a branch da história para ela na pasta de trabalho (sem trabalho feito, recrie a branch a partir de origin/<base>; com trabalho, git merge origin/<base>, sem rebase nem push forçado) e diga na conversa o que fez.',
+    {
+      card: cardArg,
+      base: z.string().min(1).describe('A nova base, ex.: "develop"'),
+    },
+    (a, router) => {
+      const s = router.snapshot();
+      const story = storyOf(s, live(findCard(s, a.card))) ?? live(findCard(s, a.card));
+      const base = cleanBranchName(a.base, '');
+      if (!base) throw new Error(`"${a.base}" não é um nome de branch válido.`);
+      if (!story.branch) throw new Error(`${cardRef(story)} ainda não tem branch: chame prepare_workspace, que já parte da base do fluxo.`);
+      if (base === story.branch) throw new Error(`A base não pode ser a própria branch de ${cardRef(story)}.`);
+      router.handle({ type: 'card.baseBranch.set', cardId: story.id, base }, aiOrigin(ctx));
+      return {
+        workspace: detail(router, story.id).workspace,
+        next: `A base de ${cardRef(story)} agora é ${base}. Traga a branch ${story.branch} para ela na pasta de trabalho antes de seguir.`,
+      };
     },
   );
 

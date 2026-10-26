@@ -34,7 +34,7 @@ function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author:
   const atStop = byAi && msg.status === 'waiting_review' && !!state && !!card && isAtYoloStop(state, card);
   const autoApprove = byAi && msg.status === 'waiting_review' && yolo && !atStop;
   ctx.cards.setStatus(msg.cardId, autoApprove ? 'approved' : msg.status, msg.status === 'blocked' ? note : '', author);
-  if (note) ctx.comments.add(msg.cardId, author, note, byAi ? 'ai' : 'human');
+  if (note && !msg.quiet) ctx.comments.add(msg.cardId, author, note, byAi ? 'ai' : 'human');
   if (autoApprove && msg.pending)
     ctx.comments.add(
       msg.cardId,

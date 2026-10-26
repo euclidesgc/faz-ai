@@ -11,8 +11,10 @@ import { createMcpServer } from '../src/extension/mcp/server';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import {
   cleanUpStory,
+  nextPatchTag,
   parsePullRequestFacts,
   pendingWork,
+  releaseFromMain,
   updateDevelop,
   type CleanupDeps,
   type PullRequestFacts,
@@ -559,9 +561,9 @@ async function stackedOn(prev: Card, title = 'Parte 2'): Promise<Card> {
   return card(n);
 }
 
-/** Cria um Bug (hotfix/ a partir da principal) com commit e push. */
+/** Cria um Hotfix (hotfix/ a partir da principal) com commit e push. */
 async function hotfixWithWork(): Promise<Card> {
-  await call('create_card', { title: 'Crash', type: 'Bug', column: 'Implementação' });
+  await call('create_card', { title: 'Crash', type: 'Hotfix', column: 'Implementação' });
   const n = router.snapshot().cards.length;
   await call('prepare_workspace', { card: n });
   const c = card(n);
@@ -692,6 +694,73 @@ describe('pilha: PR da seguinte já mesclado', () => {
   });
 });
 
+describe('hotfix: release a partir da principal', () => {
+  /** Grava um arquivo na main do origin (como o merge do hotfix) e devolve o commit. */
+  const onMain = (file: string, content: string): string => {
+    const other = path.join(base, 'outro');
+    fs.rmSync(other, { recursive: true, force: true });
+    git(base, 'clone', '-q', origin, other);
+    identity(other);
+    commit(other, file, content);
+    git(other, 'push', '-q', 'origin', 'main');
+    return git(other, 'rev-parse', 'HEAD');
+  };
+  const facts = (sha: string): PullRequestFacts => ({
+    url: PR,
+    state: 'MERGED',
+    mergedAt: '2026-10-25T00:00:00Z',
+    mergeCommit: sha,
+    baseRefName: 'main',
+    headRefName: 'hotfix/1-x',
+    headRefOid: sha,
+    mergeable: '',
+  });
+
+  it('cria a tag e a GitHub Release sobre o commit do merge com a versão do package.json', async () => {
+    const sha = onMain('package.json', JSON.stringify({ name: 'app', version: '1.2.4' }));
+    const calls = fakeGh(() => 'https://github.com/acme/app/releases/tag/v1.2.4\n');
+    expect(await releaseFromMain(deps, 'main', facts(sha))).toBe(
+      'Release v1.2.4 criada a partir da main (https://github.com/acme/app/releases/tag/v1.2.4). Se o projeto publica numa loja, a publicação segue o processo de release dele.',
+    );
+    expect(calls).toEqual([['release', 'create', 'v1.2.4', '--target', sha, '--title', 'v1.2.4', '--generate-notes']]);
+  });
+
+  it('versão sem subir não vira release; a que já está no commit também não', async () => {
+    const sha = onMain('package.json', JSON.stringify({ version: '1.2.3' }));
+    git(repo, 'fetch', '-q', 'origin');
+    git(repo, 'tag', 'v1.2.3', 'origin/main~1');
+    git(repo, 'push', '-q', 'origin', 'v1.2.3');
+    const calls = fakeGh();
+    expect(await releaseFromMain(deps, 'main', facts(sha))).toContain('já tem a tag v1.2.3. Suba a versão');
+    git(repo, 'tag', 'v1.2.5', sha);
+    expect(await releaseFromMain(deps, 'main', facts(sha))).toContain('já tem a release v1.2.5');
+    expect(calls).toEqual([]);
+  });
+
+  it('sem package.json, a versão é a seguinte à última tag; sem tag, avisa', async () => {
+    const calls = fakeGh();
+    const sha = onMain('fix.txt', 'corrigido');
+    expect(await releaseFromMain(deps, 'main', facts(sha))).toContain('não tem package.json nem tag de versão');
+    git(repo, 'fetch', '-q', 'origin');
+    git(repo, 'tag', 'v0.4.1', 'origin/main~1');
+    git(repo, 'push', '-q', 'origin', 'v0.4.1');
+    expect(await releaseFromMain(deps, 'main', facts(sha))).toContain('Release v0.4.2 criada');
+    expect(calls.at(-1)).toEqual(['release', 'create', 'v0.4.2', '--target', sha, '--title', 'v0.4.2', '--generate-notes']);
+    expect(nextPatchTag('v9.0.9')).toBe('v9.0.10');
+    expect(nextPatchTag('release-1')).toBeNull();
+  });
+
+  it('a falha do gh vira aviso com o comando', async () => {
+    const sha = onMain('package.json', JSON.stringify({ version: '2.0.1' }));
+    fakeGh(() => {
+      throw new Error('gh: not logged in');
+    });
+    expect(await releaseFromMain(deps, 'main', facts(sha))).toBe(
+      `**Aviso:** A release v2.0.1 não foi criada: gh: not logged in. Crie com: gh release create v2.0.1 --target ${sha} --title v2.0.1 --generate-notes`,
+    );
+  });
+});
+
 describe('hotfix: volta da principal para a develop', () => {
   it('RF14: hotfix mesclado: abre gh pr create --base develop --head main, mescla com --merge (sem --delete-branch) e põe o link na conversa', async () => {
     const story = await hotfixWithWork();
@@ -814,7 +883,12 @@ describe('hotfix: volta da principal para a develop', () => {
     expect(remoteHas(story.branch)).toBe(false);
     expect(remoteHas('main')).toBe(true);
     expect(remoteHas('develop')).toBe(true);
-    expect(report(story.number).slice(0, 3)).toEqual([
+    // sem package.json nem tag no repositório de teste, a release vira aviso (coberto acima)
+    expect(
+      report(story.number)
+        .filter((l) => !l.includes('A release não foi criada'))
+        .slice(0, 3),
+    ).toEqual([
       `- pasta de trabalho ${story.worktreePath} removida`,
       `- branch local ${story.branch} apagada`,
       `- branch remota origin/${story.branch} apagada`,

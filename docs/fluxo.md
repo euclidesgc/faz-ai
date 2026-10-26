@@ -148,8 +148,18 @@ continua visível mesmo quando o botão está bloqueado.
   em Discovery analisa o problema, em PRD escreve o PRD, em Implementação escreve o código (se a
   permissão deixar). Lê a conversa e responde a ela, e termina passando a vez: pede revisão, faz uma
   pergunta, bloqueia ou move o card. Se Tags, Esforço da atividade, Modelo e Skills estiverem todos
-  vazios, ela os preenche antes. Fica no cabeçalho do card e na conversa (com texto escrito, **Enviar
-  e trabalhar na fase** manda a mensagem antes).
+  vazios, ela os preenche antes. Fica no cabeçalho do card e na conversa.
+- **Enviar**, na conversa, grava a mensagem e chama a IA para respondê-la ou fazer o que ela pede,
+  sem trabalhar a fase além do pedido. Vale com o card **bloqueado**, aguardando resposta ou revisão:
+  a mensagem da pessoa devolve a vez à IA (o card volta para "Pronto"), e se ainda faltar uma decisão
+  dela, a IA pergunta ou bloqueia de novo. Numa história parada por uma sub-tarefa, a história é onde
+  se destrava: o bloqueio dela diz o que a sub-tarefa pede, a IA responde e devolve a sub-tarefa à
+  fila (`release_card`), e o board a executa de novo, o que também acontece quando a pessoa responde
+  na própria sub-tarefa. Com outra execução da mesma história em curso, a mensagem só fica na
+  conversa. A resposta não conta como volta sem progresso no modo autônomo.
+- Enquanto a IA trabalha no card (ou, numa história, numa sub-tarefa dela), o **Enviar** vira **Parar**:
+  interrompe a execução e o card volta ao status que tinha. Um card que ficou "Em execução" sem nenhuma
+  execução da IA passa para a pessoa, com o motivo, e a mensagem dela devolve a vez à IA.
 - **Refinar com IA** só deixa o card claro e completo para quem vai trabalhar nele: reescreve título
   e descrição (sem inventar requisito; o que estiver ambíguo vira uma lista "Dúvidas em aberto"),
   revisa Tags, Esforço da atividade, Modelo e Skills mesmo que já tenham valor e acrescenta ao

@@ -1,5 +1,6 @@
 import type { Database } from 'sql.js';
 import { norm } from '../../shared/filters';
+import { DEFAULT_BRANCH_KINDS } from '../../shared/git';
 import type { ColumnCategory, WorkflowKind } from '../../shared/model';
 import { newId } from './ids';
 import {
@@ -15,7 +16,7 @@ import { all, bool, num, one, run, str, transaction } from './query';
  * Board padrão. Cada mudança no padrão sobe a versão; boards criados antes são atualizados no
  * lugar (com confirmação), sem recriar nada: os cards continuam na coluna em que estavam.
  */
-export const BOARD_TEMPLATE_VERSION = 14;
+export const BOARD_TEMPLATE_VERSION = 15;
 
 export interface TemplateColumn {
   name: string;
@@ -201,6 +202,7 @@ function steps(db: Database, boardId: string): Step[] {
   }
   if (version < 7) out.push(...reviewSteps(db, boardId));
   if (version < 11) out.push(...criticalityRemovalSteps(db, boardId));
+  if (version < 15) out.push(...hotfixTypeSteps(db, boardId));
   if (version < BOARD_TEMPLATE_VERSION) out.push(...phaseTextSteps(db, boardId));
   return out;
 }
@@ -280,6 +282,44 @@ function criticalityRemovalSteps(db: Database, boardId: string): Step[] {
       },
     },
   ];
+}
+
+/** O tipo de card que gera hotfix no board padrão: parte da principal e volta para ela e para a develop. */
+export const HOTFIX_TYPE = { name: 'Hotfix', color: '#d6409f' };
+
+/**
+ * Gitflow dos tipos (versão 15): todo trabalho parte da develop, inclusive o Bug, que até aqui gerava hotfix e
+ * fazia a correção partir da principal sem o código que só existe na develop. Só o tipo Hotfix novo parte da
+ * principal. O Bug ainda em "hotfix" é o padrão de fábrica antigo (como o padrão de branch antigo em
+ * `parseGit`) e vira bugfix; o tipo Hotfix só entra onde não há um tipo com esse nome.
+ */
+function hotfixTypeSteps(db: Database, boardId: string): Step[] {
+  const out: Step[] = [];
+  const types = () => all(db, 'SELECT id, name, branch_kind FROM card_types WHERE board_id = ?', [boardId]);
+  const bug = types().find((t) => norm(str(t.name)) === norm('Bug') && str(t.branch_kind) === 'hotfix');
+  if (bug)
+    out.push({
+      description: 'Tipo "Bug": a correção passa a partir da develop (bugfix) e volta para ela, como todo trabalho.',
+      apply: () => run(db, "UPDATE card_types SET branch_kind = 'bugfix' WHERE id = ?", [str(bug.id)]),
+    });
+  const parent = one(db, "SELECT id FROM workflows WHERE board_id = ? AND kind = 'parent' ORDER BY position LIMIT 1", [boardId]);
+  if (parent && !types().some((t) => norm(str(t.name)) === norm(HOTFIX_TYPE.name)))
+    out.push({
+      description:
+        'Novo tipo "Hotfix": parte da principal (a versão publicada) e, depois da homologação, a correção vai para a principal e para a develop, com uma release a partir da principal.',
+      apply: () => {
+        if (types().some((t) => norm(str(t.name)) === norm(HOTFIX_TYPE.name))) return;
+        run(db, 'INSERT INTO card_types(id, board_id, name, color, default_workflow_id, branch_kind) VALUES (?,?,?,?,?,?)', [
+          newId(),
+          boardId,
+          HOTFIX_TYPE.name,
+          HOTFIX_TYPE.color,
+          str(parent.id),
+          DEFAULT_BRANCH_KINDS[HOTFIX_TYPE.name]!,
+        ]);
+      },
+    });
+  return out;
 }
 
 /**

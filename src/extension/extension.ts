@@ -199,6 +199,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!(await getRouter()) || !runner) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
     try {
       if (action === 'start') await host?.runAi(cardId, opts?.mode);
+      else if (host) host.stopAi(cardId);
       else runner.stop(cardId);
     } catch (e) {
       if (opts?.fromBoard) throw e;
@@ -266,7 +267,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           connectAI: async (target) => (await h.connectAI(target)).message,
           fixProjectMcp: (file) => h.fixProjectServer(file),
           runAi: (cardId, mode) => h.runAi(cardId, mode),
-          stopAi: (cardId) => h.runner.stop(cardId),
+          stopAi: (cardId) => h.stopAi(cardId),
           pauseAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.pause'),
           resumeAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.resume'),
           runHeartbeat: () => vscode.commands.executeCommand('fazai.heartbeat.runNow'),

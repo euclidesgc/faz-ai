@@ -18,9 +18,11 @@ describe('skill', () => {
     }
   });
 
-  it('skill: Homologação diz que o board abre o PR da principal para a develop no hotfix', () => {
+  it('skill: Homologação diz que só o Hotfix parte da principal e que o board leva a correção à develop e cria a release', () => {
     const texto = homologacao.replace(/\s+/g, ' ');
-    expect(texto).toMatch(/Num hotfix[^.]*não abra pull request da principal para a `develop`/);
-    expect(texto).toContain('o board faz isso');
+    expect(texto).toContain('Todo trabalho parte da `develop` (feature e bugfix, inclusive o Bug)');
+    expect(texto).toMatch(/Num hotfix[^.]*suba a versão \(patch\)/);
+    expect(texto).toMatch(/não abra pull request da principal para a `develop` nem a release/);
+    expect(texto).toContain('o board leva a correção para a `develop` e cria a release a partir da principal');
   });
 });

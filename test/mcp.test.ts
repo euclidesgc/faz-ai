@@ -1197,16 +1197,16 @@ describe('status do card e checkpoint de revisão', () => {
     expect(ids(p.forYou.ready)).toEqual(['#2']);
     expect(ids(p.withPerson)).toEqual(['#1']);
 
-    // a pessoa escreve num card do Backlog e num que aguarda revisão: são mensagens sem resposta
+    // a pessoa escreve num card do Backlog (mensagem sem resposta) e num que aguarda revisão: esta devolve a vez à IA
     router.handle({ type: 'comment.add', cardId: card(3).id, body: 'Isso depende do #2?' });
     router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Por que essa abordagem?' });
     p = await pending();
-    // #1 está no PRD, à direita do #3 no Backlog: a ordem de execução segue a coluna mais adiantada
-    expect(ids(p.forYou.unanswered)).toEqual(['#1', '#3']);
-    expect(p.forYou.unanswered[1].lastMessage).toMatchObject({ author: 'Pessoa', body: 'Isso depende do #2?' });
+    expect(ids(p.forYou.unanswered)).toEqual(['#3']);
+    expect(ids(p.forYou.ready)).toEqual(['#2', '#1', '#4']);
+    expect(p.forYou.unanswered[0].lastMessage).toMatchObject({ author: 'Pessoa', body: 'Isso depende do #2?' });
     expect((await call('get_card', { card: 3 })).data.comments[0].from).toBe('human');
     await call('add_comment', { card: 3, body: 'Não depende.' });
-    expect(ids((await pending()).forYou.unanswered)).toEqual(['#1']);
+    expect(ids((await pending()).forYou.unanswered)).toEqual([]);
 
     // aprovado vai para a coluna seguinte (Spec), pronto, no topo da fila por estar mais à direita; bloqueio feito pela própria pessoa não gera aviso
     human(1, 'approved');
@@ -1367,6 +1367,32 @@ describe('status do card e checkpoint de revisão', () => {
     // sub-tarefas nascem prontas na coluna "A fazer"
     await call('create_card', { title: 'H2' });
     expect((await call('create_card', { title: 'Tarefa', parent: 2 })).data.work).toMatchObject({ status: 'ready' });
+  });
+
+  it('a mensagem da pessoa devolve a vez à IA também com o card bloqueado ou aguardando revisão', async () => {
+    await call('create_card', { title: 'Travado', column: 'Implementação' });
+    await call('block_card', { card: 1, reason: 'Falta a decisão da base' });
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Use a develop.' });
+    expect(card(1)).toMatchObject({ status: 'ready', statusReason: '' });
+    await call('request_review', { card: 1, summary: 'Pronto para ver' });
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Por que mudou isto?' });
+    expect(card(1).status).toBe('ready');
+  });
+
+  it('release_card devolve à fila só depois de a pessoa responder, no card ou na história dele', async () => {
+    await call('create_card', { title: 'História', column: 'Implementação' });
+    await call('create_card', { title: 'Sub', parent: 1 });
+    expect((await call('release_card', { card: 2, note: 'x' })).text).toContain('não está com a pessoa');
+    await call('block_card', { card: 2, reason: 'Base errada' });
+    expect((await call('release_card', { card: 2, note: 'x' })).text).toContain('ainda não respondeu');
+    // a resposta da pessoa na história vale para a sub-tarefa
+    await new Promise((r) => setTimeout(r, 5));
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Pode mudar a base para a develop.' });
+    const released = await call('release_card', { card: 2, note: 'A pessoa decidiu: base develop.' });
+    expect(released.error).toBe(false);
+    expect(released.data.next).toContain('o board a executa');
+    expect(card(2)).toMatchObject({ status: 'ready', statusReason: '' });
+    expect(router.snapshot().comments.some((m) => m.cardId === card(2).id && m.body === 'A pessoa decidiu: base develop.')).toBe(true);
   });
 
   it('ask_questions registra, substitui e expõe apenas as perguntas pendentes; recusa conteúdo inválido', async () => {

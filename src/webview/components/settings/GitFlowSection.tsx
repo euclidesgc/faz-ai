@@ -111,9 +111,9 @@ export function GitFlowSection() {
                 ))}
               </tbody>
             </table>
-            <p className="muted small" role="note" aria-label={t('Quando usar Retrabalho')}>
+            <p className="muted small" role="note" aria-label={t('Quando usar Hotfix')}>
               {rich(
-                '<b>Quando usar Retrabalho:</b> um defeito numa funcionalidade que ainda só está na <code>{develop}</code> é Retrabalho (bugfix), não Bug (hotfix). Bug é o defeito que já está na principal (<code>{main}</code>) e precisa de correção urgente.',
+                '<b>Quando usar Hotfix:</b> todo trabalho parte da <code>{develop}</code>, inclusive Retrabalho e Bug (bugfix). Hotfix é a correção urgente da versão publicada, a principal (<code>{main}</code>): parte dela e, depois do merge, a correção volta para a <code>{develop}</code> e vira uma release a partir da principal.',
                 { develop: git.developBranch, main: mainName },
               )}
             </p>

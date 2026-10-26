@@ -353,6 +353,6 @@ describe('orquestrador com processo, ponte, disco e trava reais', () => {
     await orchestrator.settled();
     await vi.waitFor(() => expect(blocked).toHaveLength(1));
     expect(blocked[0]![0]).toBe(storyId);
-    expect(blocked[0]![1]).toContain('precisa de revisão');
+    expect(blocked[0]![1]).toContain('está parada');
   });
 });

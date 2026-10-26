@@ -75,7 +75,7 @@ describe('ArtifactImporter: pasta', () => {
     write('origem/skills/revisar/refs/guia.md', 'guia');
     write('origem/agents/dev.md', agentMd('dev'));
     write('origem/rules/estilo.md', 'Use tabs');
-    write('origem/.mcp.json', JSON.stringify({ mcpServers: { github: { command: 'npx', args: ['gh'], env: { GH: 'abc' } } } }));
+    write('origem/.mcp.json', JSON.stringify({ mcpServers: { github: { command: 'npx', args: ['gh'], env: { GH: 'segredo-do-gh' } } } }));
   });
 
   it('monta a prévia com os quatro tipos e marca o que já existe', async () => {
@@ -118,7 +118,8 @@ describe('ArtifactImporter: pasta', () => {
     expect(result.mcpSecrets).toEqual(['github: revisão da configuração local']);
     const row = repo().get(ctx.boardId, 'mcp', 'github')!;
     expect(row.mcpCredential?.review).toBe('pending');
-    expect(JSON.stringify(row)).not.toContain('abc');
+    // o segredo tem letras fora do hexadecimal: "abc" aparecia por acaso dentro do secretRef (um hash)
+    expect(JSON.stringify(row)).not.toContain('segredo-do-gh');
   });
 
   it('repetido: substituir mantém o modo atual; pular não toca', async () => {

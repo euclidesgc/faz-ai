@@ -39,8 +39,8 @@ card define o tipo da branch, e cada tipo sai de um lugar e volta para outro:
 | principal (`main`, `master`...) | —                                   | —           | —             |
 | `develop`                       | —                                   | a principal | —             |
 | `feature/`                      | História e Débito técnico           | `develop`   | `develop`     |
-| `bugfix/`                       | Retrabalho                          | `develop`   | `develop`     |
-| `hotfix/`                       | Bug                                 | a principal | a principal   |
+| `bugfix/`                       | Retrabalho e Bug                    | `develop`   | `develop`     |
+| `hotfix/`                       | Hotfix                              | a principal | a principal   |
 | `release/`                      | nenhum tipo de card (só o prefixo)  | `develop`   | a principal   |
 
 - A **branch principal é detectada sozinha**, sem rede: o HEAD do `origin`; senão `main` ou `master`;
@@ -165,9 +165,20 @@ gitflow. Branches e worktrees que já sobraram de antes são tratadas em
 - **Merge commit para a principal.** O PR que entra na branch principal (hotfix ou release) é mesclado
   com merge commit, seja qual for o tipo de merge configurado. O commit de merge das histórias fica
   assim na tag, e o arquivamento das histórias publicadas depende disso.
+- **Todo trabalho parte da `develop`.** Inclusive o Bug, que até a versão 15 do board padrão gerava
+  hotfix (o "Atualizar board" o passa para bugfix). Só o tipo **Hotfix** parte da principal, que é a
+  versão publicada; o `get_card` de um hotfix pede à IA que suba a versão (patch) e registre a
+  correção no changelog na própria branch.
 - **Depois de um hotfix.** O board abre e mescla um PR `main → develop`, também com merge commit, para
   a `develop` receber a correção. Nunca há push direto. Se houver conflito, o PR fica aberto e a
   conversa do card avisa para você resolver.
+- **Release a partir da principal.** Em seguida o board cria a tag e a GitHub Release sobre o commit
+  do merge (`gh release create <tag> --target <commit> --generate-notes`). A versão é a do
+  `package.json` da principal; sem `package.json`, a seguinte (patch) à última tag `vX.Y.Z`. Se a
+  versão do `package.json` já tem tag (o hotfix não subiu a versão), ou se não há de onde tirar a
+  versão, nada é criado e a conversa avisa. A publicação numa loja continua com o processo de
+  release do projeto; neste repositório, `npm run release -- current --no-git`, rodado na principal atualizada, publica a versão que
+  já tem tag e release.
 
 ### Branches e worktrees órfãs
 

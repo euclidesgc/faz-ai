@@ -264,6 +264,7 @@ export const board: Record<string, string> = {
   Desbloquear: 'Unblock',
   'Interrompe o {tool}; o status volta ao que era': 'Stops {tool}; the status goes back to what it was',
   'Parar a IA': 'Stop the AI',
+  Parar: 'Stop',
   'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está.':
     'Runs {tool} in the background to do the work the phase asks for.',
   'Parte <b>só do que está no board</b>: as rules e skills marcadas no Harness e o agente do card (ou o padrão do board). No Claude Code o contexto vazio é imposto; nas outras CLIs, veja o que elas carregam sozinhas nos detalhes de cada agente, em Conectar agentes.':
@@ -277,6 +278,14 @@ export const board: Record<string, string> = {
   'Preenche Tags, Esforço, Modelo, Skills, <b>Rules</b> e o <b>agente</b> — só o que está marcado no Harness.':
     "Fills in Tags, Effort, Model, Skills, <b>Rules</b> and the <b>agent</b> — only what's marked in the Harness.",
   'Sugere o checklist.': 'Suggests the checklist.',
+  'Grava a mensagem e chama o {tool} para respondê-la ou fazer o que ela pede.':
+    'Saves the message and calls {tool} to answer it or do what it asks.',
+  'Vale com o card <b>bloqueado</b> ou aguardando você: a mensagem devolve a vez à IA. Se ainda faltar uma decisão sua, ela pergunta ou bloqueia de novo.':
+    'Works with the card <b>blocked</b> or waiting for you: the message hands the turn back to the AI. If a decision of yours is still missing, it asks or blocks again.',
+  'Numa história, é aqui que você destrava as sub-tarefas: a IA responde o que elas pediram e as devolve à fila do board.':
+    'In a story, this is where you unblock the sub-tasks: the AI answers what they asked and returns them to the board queue.',
+  'Não trabalha a fase além do pedido. Para isso, use Trabalhar na fase.':
+    "Doesn't work the phase beyond the request. For that, use Work on the phase.",
   'Refinar com IA': 'Refine with AI',
   'O que está impedindo o trabalho?': 'What is blocking the work?',
   Bloquear: 'Block',

@@ -1,7 +1,7 @@
 import { BUILTIN_PROFILES, isReadyCli } from '../../shared/aiProfiles';
 import type { Database } from 'sql.js';
 import type { WorkflowKind } from '../../shared/model';
-import { BOARD_TEMPLATE, BOARD_TEMPLATE_VERSION, STORY_PHASES, insertColumn } from './boardTemplate';
+import { BOARD_TEMPLATE, BOARD_TEMPLATE_VERSION, HOTFIX_TYPE, STORY_PHASES, insertColumn } from './boardTemplate';
 import { newId } from './ids';
 import { EFFORT_FIELD, EFFORT_LEVELS } from '../../shared/models';
 import { MCPS_FIELD, MODEL_FIELD, PHASE_FIELD, RULES_FIELD, SKILLS_FIELD, TAGS_FIELD } from '../../shared/boardFields';
@@ -36,6 +36,7 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
       [newId(), 'História', '#4c8dff', parentWf],
       [newId(), 'Retrabalho', '#f5a623', parentWf],
       [newId(), 'Bug', '#e5484d', parentWf],
+      [newId(), HOTFIX_TYPE.name, HOTFIX_TYPE.color, parentWf],
       [newId(), 'Débito técnico', '#9b59b6', parentWf],
       [subtaskType, 'Sub-tarefa', '#2ecc71', childWf],
     ];

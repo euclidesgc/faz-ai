@@ -21,6 +21,8 @@ import {
   consumptionLine,
   longRunNotice,
   refinePrompt,
+  replyPrompt,
+  REPLY_AUTONOMOUS_ADVICE,
   summarizePrompt,
   UsageLimitHeld,
   yoloStopAdvice,
@@ -342,6 +344,20 @@ it('summarizePrompt pede um resumo nas três seções e leva o contexto fixo e o
   expect(prompt).toContain('Este card exige também');
   expect(prompt.indexOf('Pendências')).toBeLessThan(prompt.indexOf('Contexto fixo deste board'));
   expect(prompt.indexOf('Contexto fixo deste board')).toBeLessThan(prompt.indexOf('Este card exige também'));
+});
+
+it('replyPrompt responde à última mensagem da pessoa, mesmo com o bloqueio, e destrava as sub-tarefas pela fila do board', () => {
+  const prompt = replyPrompt('#1', { always: ['Contexto fixo deste board.'], card: [] }, ['Aviso de permissão.'], true);
+  expect(prompt).toMatch(/^A pessoa escreveu na conversa do card #1 /);
+  expect(prompt).toContain('O bloqueio do card ou da história não impede');
+  expect(prompt).toContain('release_card');
+  expect(prompt).toContain('Não execute sub-tarefas, nem por subagente');
+  expect(prompt).toContain('Não trabalhe a fase além do que a mensagem pede');
+  expect(prompt).toContain(REPLY_AUTONOMOUS_ADVICE);
+  expect(prompt).not.toContain(AUTONOMOUS_ADVICE);
+  expect(prompt.indexOf('Contexto fixo deste board.')).toBeLessThan(prompt.indexOf('Leia o card'));
+  expect(prompt.indexOf('Aviso de permissão.')).toBeLessThan(prompt.indexOf('Trabalhe só neste card'));
+  expect(prompt).not.toContain('Faça o trabalho da fase');
 });
 
 it('conflictPrompt pede merge da base do PR, checagens e push sem força, e manda bloquear em vez de enviar pela metade (#747)', () => {
@@ -809,6 +825,21 @@ describe('executor da IA', () => {
       expect(card().status).toBe('waiting_answer');
       expect(lastMessage()!.body).toContain('O resumo da conversa não foi gerado.');
       expect(lastMessage()!.body).toContain('não encontrado');
+    });
+
+    it('no card bloqueado, o resumo devolve o bloqueio com o motivo, sem repeti-lo, e avisa o fim da execução', () => {
+      router.handle({ type: 'card.status.set', cardId: storyId, status: 'blocked', note: 'Falta decidir a base.' });
+      const ended: string[] = [];
+      runner.onDidFinish((id) => ended.push(id));
+      runner.start(storyId, 'manual', 'summarize');
+      ai({ type: 'comment.add', cardId: storyId, body: 'Resumo.', kind: 'summary' });
+      const before = router.snapshot().comments.length;
+      procs[0]!.exit(0);
+      // antes, o board recusava o bloqueio sem motivo e o card ficava "em execução" para sempre
+      expect(card()).toMatchObject({ status: 'blocked', statusReason: 'Falta decidir a base.' });
+      expect(router.snapshot().comments.length).toBe(before);
+      expect(runner.running).toEqual([]);
+      expect(ended).toEqual([storyId]);
     });
 
     it('sem falha de processo e sem nova mensagem de IA, grava o aviso de "terminou sem escrever a mensagem"', () => {

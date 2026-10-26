@@ -4,7 +4,10 @@
 
 type Params = Record<string, string | number>;
 
-/** As chaves da limpeza (#464), da pilha (`stack.*`) e da volta da principal no hotfix (`back.*`), estas da #480. */
+/**
+ * As chaves da limpeza (#464), da pilha (`stack.*`), da volta da principal no hotfix (`back.*`, #480) e da release
+ * a partir da principal depois do hotfix (`release.*`).
+ */
 export type GitNoticeKey =
   | 'cleanup.title'
   | 'cleanup.worktreeRemoved'
@@ -37,7 +40,12 @@ export type GitNoticeKey =
   | 'back.notMerged'
   | 'back.createFailed'
   | 'back.prTitle'
-  | 'back.prBody';
+  | 'back.prBody'
+  | 'release.created'
+  | 'release.already'
+  | 'release.notBumped'
+  | 'release.noVersion'
+  | 'release.failed';
 
 /** Os textos em português; os avisos já levam o prefixo `**Aviso:**`. */
 export const GIT_NOTICES: Record<GitNoticeKey, string> = {
@@ -89,6 +97,15 @@ export const GIT_NOTICES: Record<GitNoticeKey, string> = {
   'back.prTitle': 'Volta da {main} para a {develop} depois do hotfix #{number}',
   'back.prBody':
     'Aberto pelo Faz AI depois do merge de {pr}. Faça o merge com merge commit, não com squash: a {develop} precisa conter os commits da {main}.',
+  'release.created':
+    'Release {tag} criada a partir da {main} ({url}). Se o projeto publica numa loja, a publicação segue o processo de release dele.',
+  'release.already': 'A {main} já tem a release {tag} sobre o commit do hotfix: nada a criar.',
+  'release.notBumped':
+    '**Aviso:** A release não foi criada: a versão do package.json na {main} ({version}) já tem a tag {tag}. Suba a versão e gere a release a partir da {main} pelo processo do projeto.',
+  'release.noVersion':
+    '**Aviso:** A release não foi criada: a {main} não tem package.json nem tag de versão (vX.Y.Z) de onde tirar a próxima. Crie com: gh release create <versão> --target {main} --generate-notes',
+  'release.failed':
+    '**Aviso:** A release {tag} não foi criada: {error}. Crie com: gh release create {tag} --target {sha} --title {tag} --generate-notes',
 };
 
 /** O texto do aviso em português, com cada `{param}` no lugar. Parâmetro que falta fica como `{param}`. */
