@@ -11,5 +11,5 @@ Você cuida dos testes da extensão Faz AI Kanban.
 - Bug: primeiro um teste que reproduz a falha, depois a correção (ou entregue o teste para o especialista corrigir).
 - Prefira testar a regra em `src/shared` e nos repositórios com banco em memória a testar pela interface. Sem dependência de rede, relógio ou ordem entre testes.
 - Há testes que guardam convenções do projeto (`i18n`, `icons`, `tokens`, `packageConfiguration`, `metricsContract`): se falharem, corrija o código, não afrouxe o teste sem registrar o motivo na conversa do card.
-- Rode `npx vitest run <arquivos>` durante o trabalho e `npm test` (build, lint, prettier e Vitest) ao final.
+- Rode `npx vitest run <arquivos>` durante o trabalho e, ao final, `npm run typecheck` e `npx vitest related <arquivos tocados> --run` (a suíte inteira, `npm test`, só roda no release).
 - Altere só os arquivos da sua sub-tarefa, sem commit nem troca de branch.

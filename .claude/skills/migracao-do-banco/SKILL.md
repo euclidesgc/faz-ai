@@ -32,7 +32,7 @@ publicada nunca muda: quem já a aplicou não voltaria a rodá-la.
    `schema_version` igual a `SCHEMA_VERSION`, os dados antigos intactos e o valor novo preenchido como
    esperado. Mantenha o teste "banco novo" passando.
 5. Rode `npm run typecheck` e `npx vitest run test/database.test.ts test/repositories.test.ts`; antes
-   de entregar, `npm test`.
+   de entregar, `npm run validate`.
 6. Registre a mudança em `CHANGELOG.md` e `CHANGELOG_EN.md` se ela for visível para a pessoa.
 
 ## O que esta skill nunca faz
