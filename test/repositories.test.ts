@@ -312,12 +312,13 @@ describe('settings', () => {
     expect(() => settings.deleteType(t.id)).toThrow();
   });
 
-  it('o board novo traz o tipo de branch de cada tipo: Bug em hotfix, Retrabalho em bugfix, o resto em feature', () => {
+  it('o board novo traz o tipo de branch de cada tipo: Hotfix em hotfix, Retrabalho e Bug em bugfix, o resto em feature', () => {
     const kinds = Object.fromEntries(snap().cardTypes.map((t) => [t.name, t.branchKind]));
     expect(kinds).toEqual({
       História: 'feature',
       Retrabalho: 'bugfix',
-      Bug: 'hotfix',
+      Bug: 'bugfix',
+      Hotfix: 'hotfix',
       'Débito técnico': 'feature',
       'Sub-tarefa': 'feature',
     });
@@ -340,7 +341,7 @@ describe('settings', () => {
     for (const bad of ['release', 'develop', '']) {
       expect(() => settings.updateType(bug.id, { name: 'Outro', branchKind: bad as never })).toThrow(/Tipo de branch inválido/);
     }
-    expect(typeNamed('Bug')).toMatchObject({ name: 'Bug', branchKind: 'hotfix' });
+    expect(typeNamed('Bug')).toMatchObject({ name: 'Bug', branchKind: 'bugfix' });
   });
 
   it('cria e atualiza campo custom', () => {

@@ -68,8 +68,22 @@ export function orchestratesStory(s: BoardState, story: Card): boolean {
     phaseSubtasks(s, story).length > 0
   );
 }
+/**
+ * O último gesto da pessoa numa sub-tarefa, ou 0: mensagem na conversa dela ou na da história (é na história
+ * que a pessoa destrava as sub-tarefas) e o status que ela mesma definiu. Entra na chave da sub-tarefa: a que
+ * já rodou nesta fase só roda de novo quando a pessoa a devolve à IA. Sem isso, a sub-tarefa respondida voltava
+ * a "Pronto" e nunca mais era executada, e a história ficava parada esperando por ela.
+ */
+export function handedBackAt(s: BoardState, card: Card): number {
+  const where = new Set([card.id, card.parentId]);
+  const said = s.comments.filter((m) => where.has(m.cardId) && m.source === 'human').map((m) => m.createdAt);
+  const set = card.statusBy === s.currentUser && card.statusAt !== null ? [card.statusAt] : [];
+  return Math.max(0, ...said, ...set);
+}
 /** A serialização completa evita colisões; IDs e revisões, nunca nomes de fases, definem a rodada. */
 export function workKey(kind: WorkKind, s: BoardState, story: Card, card: Card): string {
+  // a chave antiga (sem o gesto da pessoa) continua valendo para a sub-tarefa que ela nunca tocou
+  const handBack = kind === 'subtask' ? handedBackAt(s, card) : 0;
   const closed =
     kind === 'closing'
       ? phaseSubtasks(s, story)
@@ -81,9 +95,20 @@ export function workKey(kind: WorkKind, s: BoardState, story: Card, card: Card):
     kind === 'closing'
       ? [kind, story.id, story.columnId, closed]
       : kind === 'subtask'
-        ? [kind, card.id, story.columnId]
+        ? [kind, card.id, story.columnId, ...(handBack ? [handBack] : [])]
         : [kind, story.id, story.columnId, card.updatedAt],
   );
+}
+/**
+ * Por que a história parou numa sub-tarefa, com o que a sub-tarefa pede: a história é onde a pessoa destrava.
+ * O motivo vai para o bloqueio da história, e responder ali chama a IA, que pode agir nas sub-tarefas.
+ */
+export function stoppedReason(story: Card, stopped: Card): string {
+  const why = isWithHuman(stopped) ? stopped.statusReason.trim() : '';
+  const detail = why
+    ? `#${stopped.number} está com você: ${why.length > 400 ? `${why.slice(0, 400)}…` : why}`
+    : `a execução de #${stopped.number} terminou sem concluir a sub-tarefa (o resultado está na conversa dela).`;
+  return `#${story.number} está parada: ${detail}\n\nResponda aqui na conversa da história (ou na da sub-tarefa): a IA lê a mensagem e resolve, mesmo com o bloqueio.`;
 }
 export function storyPlan(s: BoardState, story: Card, live: LiveWork, done: ReadonlySet<string>): StoryPlan {
   const phase = columnOf(s, story);
@@ -116,7 +141,7 @@ export function storyPlan(s: BoardState, story: Card, live: LiveWork, done: Read
       (c) => isWithHuman(c) || live.byCard.get(c.id)?.state === 'failed' || done.has(workKey('subtask', s, story, c)),
     );
     return stopped
-      ? { kind: 'paused', reason: `#${story.number} está parada: #${stopped.number} precisa de revisão.` }
+      ? { kind: 'paused', reason: stoppedReason(story, stopped) }
       : { kind: 'wait', reason: 'As sub-tarefas aguardam dependências ou liberação da posse.' };
   }
   if (children.length) {

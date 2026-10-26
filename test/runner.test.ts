@@ -21,6 +21,8 @@ import {
   consumptionLine,
   longRunNotice,
   refinePrompt,
+  replyPrompt,
+  REPLY_AUTONOMOUS_ADVICE,
   summarizePrompt,
   UsageLimitHeld,
   yoloStopAdvice,
@@ -342,6 +344,20 @@ it('summarizePrompt pede um resumo nas três seções e leva o contexto fixo e o
   expect(prompt).toContain('Este card exige também');
   expect(prompt.indexOf('Pendências')).toBeLessThan(prompt.indexOf('Contexto fixo deste board'));
   expect(prompt.indexOf('Contexto fixo deste board')).toBeLessThan(prompt.indexOf('Este card exige também'));
+});
+
+it('replyPrompt responde à última mensagem da pessoa, mesmo com o bloqueio, e destrava as sub-tarefas pela fila do board', () => {
+  const prompt = replyPrompt('#1', { always: ['Contexto fixo deste board.'], card: [] }, ['Aviso de permissão.'], true);
+  expect(prompt).toMatch(/^A pessoa escreveu na conversa do card #1 /);
+  expect(prompt).toContain('O bloqueio do card ou da história não impede');
+  expect(prompt).toContain('release_card');
+  expect(prompt).toContain('Não execute sub-tarefas, nem por subagente');
+  expect(prompt).toContain('Não trabalhe a fase além do que a mensagem pede');
+  expect(prompt).toContain(REPLY_AUTONOMOUS_ADVICE);
+  expect(prompt).not.toContain(AUTONOMOUS_ADVICE);
+  expect(prompt.indexOf('Contexto fixo deste board.')).toBeLessThan(prompt.indexOf('Leia o card'));
+  expect(prompt.indexOf('Aviso de permissão.')).toBeLessThan(prompt.indexOf('Trabalhe só neste card'));
+  expect(prompt).not.toContain('Faça o trabalho da fase');
 });
 
 it('conflictPrompt pede merge da base do PR, checagens e push sem força, e manda bloquear em vez de enviar pela metade (#747)', () => {

@@ -10,8 +10,11 @@ export const BRANCH_KINDS: { value: BranchKind; label: string }[] = [
   { value: 'bugfix', label: 'Bugfix' },
   { value: 'hotfix', label: 'Hotfix' },
 ];
-/** nomes guardados (sempre em português) dos tipos do board padrão que não geram feature */
-export const DEFAULT_BRANCH_KINDS: Record<string, BranchKind> = { Retrabalho: 'bugfix', Bug: 'hotfix' };
+/**
+ * nomes guardados (sempre em português) dos tipos do board padrão que não geram feature. Todo trabalho parte da
+ * develop; só o Hotfix parte da principal, que é a versão publicada
+ */
+export const DEFAULT_BRANCH_KINDS: Record<string, BranchKind> = { Retrabalho: 'bugfix', Bug: 'bugfix', Hotfix: 'hotfix' };
 
 /** De onde veio a branch principal: o HEAD do origin, o nome (main/master), a branch atual ou o nome configurado (`mainBranch`). */
 export type MainSource = 'origin' | 'name' | 'current' | 'config';

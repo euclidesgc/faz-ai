@@ -87,7 +87,6 @@ export const card: Record<string, string> = {
   'Permissão do {tool} ao ser chamado: {permission}.': '{tool} permission when called: {permission}.',
   Mudar: 'Change',
   Enviar: 'Send',
-  'Enviar e trabalhar na fase': 'Send and work on the phase',
   'Trabalhar na fase': 'Work on the phase',
   editado: 'edited',
   'Apagar esta mensagem?': 'Delete this message?',

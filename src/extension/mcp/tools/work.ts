@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { openPredecessors } from '../../../shared/links';
 import { cardRef } from '../../../shared/model';
 import { activityKindOf } from '../../../shared/activity';
+import { handedBackAt } from '../../../shared/orchestration';
 import { columnOf } from '../../../shared/selectors';
+import { statusInfo } from '../../../shared/status';
 import { isAtYoloStop, isDelivered, isYolo, storyOf } from '../../../shared/story';
 import type { MessageRouter } from '../../panel/messageRouter';
 import { cardSummary, findCard } from '../format';
@@ -154,6 +156,37 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
     'Marca o card como bloqueado por um impedimento que você não consegue resolver (acesso, dependência externa, erro de ambiente) e registra o motivo na conversa.',
     { card: cardArg, reason: z.string().min(1).describe('O que impede o trabalho e o que é preciso para destravar') },
     (a, router) => setStatus(router, a.card, 'blocked', a.reason, 'Pare aqui. Uma pessoa precisa desbloquear o card.'),
+  );
+
+  tool(
+    'release_card',
+    'Devolve à fila da IA (status "ready") um card que estava com a pessoa (bloqueado, aguardando resposta ou revisão), quando ela já respondeu o que o travava. Use ao responder uma mensagem da pessoa numa história: a sub-tarefa liberada volta a ser executada pelo board. Só vale depois de uma mensagem da pessoa no card ou na história dele, escrita depois de o card passar para ela; nunca para destravar o próprio trabalho sem a resposta dela.',
+    {
+      card: cardArg,
+      note: z.string().min(1).describe('O que a pessoa decidiu e por que o card pode seguir (markdown), gravado na conversa do card'),
+    },
+    (a, router) => {
+      const s = router.snapshot();
+      const card = live(findCard(s, a.card));
+      if (!card.status || statusInfo(card.status).owner !== 'human')
+        throw new Error(`${cardRef(card)} não está com a pessoa (status "${card.status ?? 'nenhum'}"): não há o que devolver.`);
+      if (handedBackAt(s, card) <= (card.statusAt ?? 0))
+        throw new Error(
+          `A pessoa ainda não respondeu sobre ${cardRef(card)} depois de ele passar para ela: espere a mensagem dela no card ou na história.`,
+        );
+      router.handle({ type: 'card.status.set', cardId: card.id, status: 'ready' }, aiOrigin(ctx));
+      router.handle({ type: 'comment.add', cardId: card.id, body: a.note }, aiOrigin(ctx));
+      const after = router.snapshot();
+      return {
+        card: cardSummary(
+          after,
+          after.cards.find((c) => c.id === card.id)!,
+        ),
+        next: card.parentId
+          ? 'A sub-tarefa voltou para a fila: o board a executa quando a história seguir. Não a execute você.'
+          : 'O card voltou para a fila da IA.',
+      };
+    },
   );
 
   tool(

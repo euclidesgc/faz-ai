@@ -80,7 +80,8 @@ cada fase e move os cards conforme avança, sempre parando para a sua aprovaçã
   conversas longas e cuida dos pull requests. Em modo autônomo, a IA leva a história do Backlog ao
   pull request sem perguntar, e o autopiloto enfileira as histórias. [Automação](docs/automacao.md)
 - **Branch e pull request por história.** Cada história ganha branch e pasta de trabalho próprias,
-  no gitflow; a Homologação abre o PR com **Como testar**, e o board detecta o merge, limpa a branch
+  no gitflow: todo trabalho parte da `develop`, e só o tipo **Hotfix** parte da principal e volta com
+  uma release. A Homologação abre o PR com **Como testar**, e o board detecta o merge, limpa a branch
   e pode registrar a decisão em `docs/decisoes`. [Gitflow](docs/gitflow.md)
 - **Métricas de consumo.** Um anel no card estima o contexto da próxima execução; a aba **Consumo** e
   o painel **Métricas** mostram tokens, tempo de IA, retrabalho e o que a IA usou. Cada execução também

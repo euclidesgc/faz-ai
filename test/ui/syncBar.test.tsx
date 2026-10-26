@@ -164,6 +164,9 @@ describe('espera no botão e no campo', () => {
     confirmLast();
     await act(async () => {});
     expect(editor).toHaveValue('');
+    // gravada a mensagem, a IA é chamada para respondê-la, mesmo que o card esteja bloqueado
+    expect(lastSent('ai.run')).toEqual({ type: 'ai.run', cardId: board.storyId, mode: 'reply' });
+    expect(screen.queryByRole('button', { name: 'Enviar e trabalhar na fase' })).toBeNull();
   });
 });
 

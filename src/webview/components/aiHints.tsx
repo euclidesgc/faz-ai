@@ -43,3 +43,14 @@ export const refineHint = (tool: string): ReactNode =>
 export const summarizeHint = (): ReactNode => (
   <p>{rich('A IA lê toda a conversa e escreve um resumo com decisões, observações e pendências.')}</p>
 );
+
+export const replyHint = (tool: string): ReactNode =>
+  hint(
+    'Grava a mensagem e chama o {tool} para respondê-la ou fazer o que ela pede.',
+    [
+      'Vale com o card <b>bloqueado</b> ou aguardando você: a mensagem devolve a vez à IA. Se ainda faltar uma decisão sua, ela pergunta ou bloqueia de novo.',
+      'Numa história, é aqui que você destrava as sub-tarefas: a IA responde o que elas pediram e as devolve à fila do board.',
+      'Não trabalha a fase além do pedido. Para isso, use Trabalhar na fase.',
+    ],
+    { tool },
+  );

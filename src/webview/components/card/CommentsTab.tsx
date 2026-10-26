@@ -13,7 +13,7 @@ import { useAttachmentRefs } from './attachmentRefs';
 import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
 import { aiBlockedReason, cardToolLabel, runUnsupportedReason } from '../RequirementsBanner';
 import { Button, DeleteButton, Hint, IconRun, IconSuggest } from '../ui';
-import { summarizeHint, workHint } from '../aiHints';
+import { replyHint, summarizeHint, workHint } from '../aiHints';
 import { activeComments } from '../../../shared/conversation';
 
 /** Conversa do card: é por aqui que a pessoa e a IA falam sobre o trabalho. */
@@ -48,16 +48,24 @@ export function CommentsTab({
   const blocked = aiBlockedReason(state, card);
   const canCall = !!card && isLive(card) && !blocked;
 
+  /**
+   * Envia a mensagem e chama a IA para respondê-la, com o card bloqueado ou não: a mensagem da pessoa vem antes
+   * do bloqueio. Sem IA disponível (ou com uma execução em curso), a mensagem só fica na conversa.
+   */
   const submit = async () => {
     if (!draft.trim()) return false;
     const ok = await send.run(draft.trim());
-    if (ok) setDraft('');
-    return ok;
+    if (!ok) return false;
+    setDraft('');
+    if (canCall && !running) {
+      markStarting(true);
+      void ai.reply(cardId);
+    }
+    return true;
   };
 
-  /** Envia o que estiver escrito e chama a IA para o card. */
-  const callAi = async () => {
-    if (draft.trim() && !(await submit())) return;
+  /** Chama a IA para trabalhar a fase do card. */
+  const callAi = () => {
     markStarting(true);
     void ai.run(cardId);
   };
@@ -124,18 +132,14 @@ export function CommentsTab({
             <a onClick={() => openSettings('harness')}>{t('Mudar')}</a>
           </span>
           <span className="spacer" />
-          <Button disabled={!draft.trim()} loading={send.busy} onClick={() => void submit()}>
-            {t('Enviar')}
-          </Button>
+          <Hint content={replyHint(toolLabel)} disabledReason={null}>
+            <Button variant="primary" disabled={!draft.trim()} loading={send.busy} onClick={() => void submit()}>
+              {t('Enviar')}
+            </Button>
+          </Hint>
           <Hint content={workHint(toolLabel)} disabledReason={blocked}>
-            <Button variant="primary" disabled={!canCall || running} loading={starting} onClick={() => void callAi()}>
-              {draft.trim() ? (
-                t('Enviar e trabalhar na fase')
-              ) : (
-                <>
-                  <IconRun /> {t('Trabalhar na fase')}
-                </>
-              )}
+            <Button disabled={!canCall || running} loading={starting} onClick={callAi}>
+              <IconRun /> {t('Trabalhar na fase')}
             </Button>
           </Hint>
         </div>

@@ -56,7 +56,7 @@ import { BaseConflictChecker } from '../baseConflict';
 import { ghProcess } from '../branchRename';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
-import { AiRunner } from '../runner';
+import { AiRunner, REPLY_BUSY } from '../runner';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
 import { driverFor, driverOf } from '../ai/drivers';
 import { baseInfo, type AiTool } from '../../shared/harness';
@@ -1220,6 +1220,13 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
         const result = await orchestrator.drive(story.id, 'manual');
         if (result.kind === 'paused' || result.kind === 'wait') throw new Error(result.reason ?? 'O board não tem o que executar agora.');
         return;
+      }
+      // a resposta à pessoa roda por fora da fila (a história pode estar parada), mas nunca junto de outra
+      // execução da mesma história: as duas escreveriam na mesma pasta
+      if (mode === 'reply' && story) {
+        const family = new Set([story.id, ...s.cards.filter((c) => c.parentId === story.id).map((c) => c.id)]);
+        const busy = runner.running.some((id) => family.has(id)) || router.work.live().some((w) => family.has(w.cardId ?? ''));
+        if (busy) throw new Error(REPLY_BUSY);
       }
       runner.start(cardId, 'manual', mode);
     },

@@ -178,12 +178,18 @@ Cada card em que a IA atua tem um status de trabalho, devolvido em `work` por `g
 
 | Status | Com quem | Como chega nele |
 | --- | --- | --- |
-| `ready` | IA | O card entrou numa coluna em que a IA atua, a pessoa pediu ajustes ou respondeu a uma pergunta |
+| `ready` | IA | O card entrou numa coluna em que a IA atua, a pessoa escreveu na conversa (com o card bloqueado, aguardando resposta ou revisão) ou a IA devolveu o card com `release_card` |
 | `running` | IA | `start_work` (numa sub-tarefa na primeira coluna do workflow filho, também a move para a coluna seguinte, quando é aberta e não exige aprovação) |
 | `waiting_answer` | Pessoa | `ask_question` ou `ask_questions` |
 | `waiting_review` | Pessoa | `request_review` |
 | `approved` | IA | A pessoa aprovou e o board não pôde mover o card (não há ferramenta para a IA aprovar; a aprovação normal já leva o card à próxima coluna) |
 | `blocked` | Pessoa | `block_card`, ou a pessoa bloqueou |
+
+`release_card` (`card`, `note`) devolve à fila da IA um card que estava com a pessoa, quando ela já
+respondeu: a nota entra na conversa do card e o status volta para `ready`. Só vale depois de uma
+mensagem da pessoa no card ou na história dele escrita depois de o card passar para ela; sem isso, a
+ferramenta recusa. É o que a resposta numa história usa para destravar uma sub-tarefa: o board a
+executa de novo.
 
 `move_card` aceita `comment`: a mensagem de conclusão (markdown) entra na conversa do card, assinada
 pela IA, depois do movimento aceito; um movimento recusado não grava nada. `create_card` aceita
@@ -325,6 +331,8 @@ Não há instalação da skill na pasta da ferramenta: a faixa de requisitos apo
 
 ### Execução pela conversa
 
+O botão "Enviar" da conversa chama a IA para responder à mensagem (modo de resposta: lê a última
+mensagem, responde ou faz o pedido, mesmo com o card bloqueado, sem trabalhar a fase além disso).
 O botão "Trabalhar na fase" (e o "Refinar com IA", sempre no nível mais restrito que a ferramenta aceita) roda a CLI da ferramenta do projeto na pasta do projeto, com um prompt que
 manda trabalhar no card. Os comandos, conforme a documentação de cada ferramenta em 2026-10-02:
 

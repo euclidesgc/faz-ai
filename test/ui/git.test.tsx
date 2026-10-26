@@ -150,9 +150,9 @@ describe('GitSettings', () => {
       expect(feature[1]).not.toHaveTextContent('Sub-tarefa');
       expect(feature[1]!.textContent).toBe('História, Débito técnico');
       expect([feature[2]!.textContent, feature[3]!.textContent]).toEqual(['dev', 'dev']);
-      expect(within(rowOf('bugfix/')).getAllByRole('cell')[1]).toHaveTextContent('Retrabalho');
+      expect(within(rowOf('bugfix/')).getAllByRole('cell')[1]!.textContent).toBe('Retrabalho, Bug');
       const hotfix = within(rowOf('fix/')).getAllByRole('cell');
-      expect(hotfix[1]).toHaveTextContent('Bug');
+      expect(hotfix[1]!.textContent).toBe('Hotfix');
       expect([hotfix[2]!.textContent, hotfix[3]!.textContent]).toEqual(['main', 'main']);
       const release = within(rowOf('release/')).getAllByRole('cell');
       expect(release[1]).toHaveTextContent('processo de release do projeto');
@@ -166,9 +166,9 @@ describe('GitSettings', () => {
       expect(within(table()).queryByText('feature/')).toBeNull();
     });
 
-    it('explica quando usar Retrabalho e quando usar Bug', () => {
+    it('explica que todo trabalho parte da develop e quando usar Hotfix', () => {
       show();
-      expect(screen.getByRole('note', { name: 'Quando usar Retrabalho' })).toHaveTextContent('Retrabalho (bugfix), não Bug (hotfix)');
+      expect(screen.getByRole('note', { name: 'Quando usar Hotfix' })).toHaveTextContent('inclusive Retrabalho e Bug (bugfix)');
     });
 
     it('os campos gravam ao sair do campo, e o vazio já mostra o padrão', async () => {
@@ -222,7 +222,8 @@ describe('GitSettings', () => {
 
     it('o select mostra feature, bugfix e hotfix, nunca release, e só os tipos das histórias', async () => {
       show();
-      expect(screen.getByRole('combobox', { name: 'Tipo de branch de Bug' })).toHaveTextContent('Hotfix');
+      expect(screen.getByRole('combobox', { name: 'Tipo de branch de Hotfix' })).toHaveTextContent('Hotfix');
+      expect(screen.getByRole('combobox', { name: 'Tipo de branch de Bug' })).toHaveTextContent('Bugfix');
       expect(screen.getByRole('combobox', { name: 'Tipo de branch de Retrabalho' })).toHaveTextContent('Bugfix');
       expect(screen.queryByRole('combobox', { name: /Tipo de branch de Sub-tarefa/ })).toBeNull();
       await userEvent.click(screen.getByRole('combobox', { name: 'Tipo de branch de História' }));
