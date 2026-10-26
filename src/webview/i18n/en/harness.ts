@@ -270,8 +270,35 @@ export const harness: Record<string, string> = {
   'Como este agente trabalha: padrões, comandos, o que nunca fazer': 'How this agent works: patterns, commands, what never to do',
   'Criar agente': 'Create agent',
   'Disponível no board': 'Available on the board',
-  'Criado pelo board; pode ser editado ou apagado': 'Created by the board; it can be edited or deleted',
   'de fábrica': 'factory',
+  'Vem com o board: pode ser editado, restaurado ou desligado, mas não apagado.':
+    'Comes with the board: it can be edited, restored or turned off, but not deleted.',
+  'Vem com o board e acompanha a versão da extensão: só de leitura.': 'Comes with the board and follows the extension version: read only.',
+  'A origem mudou desde a cópia. A cópia do board continua valendo até você atualizar.':
+    'The source changed since the copy. The board copy still applies until you update it.',
+  'origem alterada': 'source changed',
+  'A origem não foi encontrada. A cópia do board continua valendo.': 'The source was not found. The board copy still applies.',
+  'origem não encontrada': 'source not found',
+  'A cópia foi editada no board depois de copiada da origem.': 'The copy was edited on the board after it was copied from the source.',
+  'editado no board': 'edited on the board',
+  'Atualizar "{name}" da origem?': 'Update "{name}" from the source?',
+  'A cópia foi editada no board. Atualizar troca o conteúdo pelo da origem, e a edição do board se perde.':
+    'The copy was edited on the board. Updating replaces its content with the source, and the board edit is lost.',
+  'Atualizar da origem': 'Update from source',
+  'Atualizar da origem: {name}': 'Update from source: {name}',
+  'Copia de novo o conteúdo atual da origem para o board.': 'Copies the current source content to the board again.',
+  'Restaurar o padrão': 'Restore default',
+  'Restaurar o padrão: {name}': 'Restore default: {name}',
+  'Volta o agente ao que vem com o board; o modo e o nome ficam.': 'Resets the agent to what comes with the board; the mode and name stay.',
+  'Restaurar "{name}" ao padrão?': 'Restore "{name}" to the default?',
+  'As instruções, as ferramentas e as skills voltam às de fábrica, e as edições feitas no board se perdem.':
+    'The instructions, tools and skills go back to the factory ones, and the edits made on the board are lost.',
+  'O board entrega esta skill pelo get_skill, com o texto desta versão da extensão.':
+    'The board delivers this skill through get_skill, with the text of this extension version.',
+  'O agente padrão executa quando nem o card nem a fase escolhem outro; para desligá-lo, torne outro o padrão.':
+    'The default agent runs when neither the card nor the phase picks another; to turn it off, make another one the default.',
+  'Entregue pelo board': 'Delivered by the board',
+  'Abre o texto só para leitura': 'Opens the text read only',
   'Tornar padrão': 'Make default',
   // --- AgentEditor
   'Uma frase: é por ela que o "Refinar com IA" escolhe o agente de um card.':
@@ -304,7 +331,6 @@ export const harness: Record<string, string> = {
   'Buscar por nome ou descrição…': 'Search by name or description…',
   'Nada encontrado para a busca.': 'Nothing found for the search.',
   ausente: 'missing',
-  'Os cards e as fases podem escolher este agente.': 'Cards and phases may pick this agent.',
   'Importar artefatos': 'Import artifacts',
   Importar: 'Import',
 

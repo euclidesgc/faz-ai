@@ -42,7 +42,7 @@ describe('modos dos artefatos no board', () => {
     expect(usageOptions('instructions')).toEqual(['off', 'contextual', 'always']);
     expect(usageOptions('skill')).toEqual(['contextual', 'always']);
     expect(usageOptions('mcp')).toEqual(['contextual', 'always']);
-    expect(usageOptions('agent')).toEqual(['contextual']);
+    expect(usageOptions('agent')).toEqual(['contextual', 'off']);
     expect(defaultUsage('instructions')).toBe('off');
     expect(defaultUsage('skill')).toBe('contextual');
     expect(defaultUsage('mcp')).toBe('contextual');

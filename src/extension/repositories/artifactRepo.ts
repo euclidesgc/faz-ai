@@ -19,7 +19,7 @@ const transportOf = (s: Record<string, unknown>): 'stdio' | 'http' | 'sse' | '' 
   typeof s.command === 'string' ? 'stdio' : typeof s.url === 'string' ? (s.type === 'sse' ? 'sse' : 'http') : '';
 
 /** Um artefato lido do banco: o `BoardArtifact` sem o `path` (que o host preenche), com o corpo inteiro e o `meta` cru. */
-export type ArtifactRow = Omit<BoardArtifact, 'path'> & { meta: ArtifactDraft['meta'] };
+export type ArtifactRow = Omit<BoardArtifact, 'path'> & { meta: ArtifactDraft['meta']; originDigest?: string };
 
 const USAGES: readonly string[] = ['always', 'contextual', 'off'];
 const KINDS: readonly string[] = ['rule', 'skill', 'agent', 'mcp'];
@@ -103,7 +103,7 @@ export class ArtifactRepo {
       files.set(id, [...(files.get(id) ?? []), str(r.path)]);
     }
     return all(this.db, 'SELECT * FROM board_artifacts WHERE board_id = ? ORDER BY kind, name', [boardId]).map((r) => {
-      const { meta: _meta, ...a } = this.toRow(r, files.get(str(r.id)) ?? []);
+      const { meta: _meta, originDigest: _digest, ...a } = this.toRow(r, files.get(str(r.id)) ?? []);
       const publicBody = a.kind === 'agent' ? a.body : '';
       return { ...a, body: publicBody };
     });
@@ -149,6 +149,11 @@ export class ArtifactRepo {
     transaction(this.db, () => {
       for (const { draft, usage } of items) this.write(boardId, draft, usage);
     });
+  }
+
+  /** Grava o resumo da origem sem mexer na revisão: só registra que a cópia e a origem conferem. */
+  setOriginDigest(boardId: string, id: string, digest: string): void {
+    run(this.db, 'UPDATE board_artifacts SET origin_digest = ? WHERE id = ? AND board_id = ?', [digest, id, boardId]);
   }
 
   setUsage(boardId: string, id: string, usage: HarnessUsage): void {
@@ -216,7 +221,7 @@ export class ArtifactRepo {
     const t = now();
     const existing = one(
       this.db,
-      'SELECT id, usage, secret_ref, review_state FROM board_artifacts WHERE board_id = ? AND kind = ? AND name = ?',
+      'SELECT id, usage, secret_ref, review_state, origin FROM board_artifacts WHERE board_id = ? AND kind = ? AND name = ?',
       [boardId, d.kind, d.name],
     );
     const id = existing ? str(existing.id) : newId();
@@ -254,6 +259,9 @@ export class ArtifactRepo {
            skipped_json = ?, updated_at = ?, usage = ?, revision = revision + 1 WHERE id = ?`,
         [...common, keep, id],
       );
+      // sem resumo no rascunho (edição no board), fica o da última cópia; outra origem zera o anterior
+      if (d.originDigest !== undefined) run(this.db, 'UPDATE board_artifacts SET origin_digest = ? WHERE id = ?', [d.originDigest, id]);
+      else if (str(existing.origin) !== d.origin) run(this.db, "UPDATE board_artifacts SET origin_digest = '' WHERE id = ?", [id]);
       run(this.db, 'DELETE FROM board_artifact_files WHERE artifact_id = ?', [id]);
     } else {
       run(
@@ -262,6 +270,7 @@ export class ArtifactRepo {
            skipped_json, updated_at, usage, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [id, boardId, d.kind, d.name, ...common, usage ?? defaultUsage(selectableOfKind(d.kind)), t],
       );
+      if (d.originDigest) run(this.db, 'UPDATE board_artifacts SET origin_digest = ? WHERE id = ?', [d.originDigest, id]);
     }
     if (d.kind === 'mcp') run(this.db, 'UPDATE board_artifacts SET secret_ref = ?, review_state = ? WHERE id = ?', [ref, review, id]);
     for (const f of d.files) {
@@ -297,6 +306,7 @@ export class ArtifactRepo {
       files,
       body: str(row.body),
       meta,
+      originDigest: str(row.origin_digest),
       createdAt: num(row.created_at),
       updatedAt: num(row.updated_at),
       revision: num(row.revision),

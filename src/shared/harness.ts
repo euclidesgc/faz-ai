@@ -182,6 +182,8 @@ export interface Harness {
     directory: string;
     artifacts: BoardArtifact[];
     warnings?: { path: string; reason: 'duplicate' | 'invalid' | 'unreadable' }[];
+    /** as skills do fluxo, que vêm com a extensão: a lista as mostra só para leitura, estejam ou não na biblioteca */
+    flowSkills?: { name: string; description: string }[];
   };
   rules: RuleFile[];
   skills: Skill[];

@@ -5,11 +5,10 @@ import { SelectField } from '../../ui';
 import { t } from '../../../i18n';
 
 /**
- * O modo de um artefato do board: Sempre, Pelo card ou Desligado (só regras). O agente não tem modo: ele fica
- * disponível ao card, à fase e ao padrão, e a linha mostra isso em vez do seletor.
+ * O modo de um artefato do board: Sempre, Pelo card ou Desligado (as opções de cada tipo vêm de `usageOptions`; o
+ * agente só fica disponível ou desligado).
  */
 export function UsageSelect({ artifact }: { artifact: BoardArtifact }) {
-  if (artifact.kind === 'agent') return null;
   const kind = selectableOfKind(artifact.kind);
   const options = usageOptions(kind).map((id) => HARNESS_USAGES.find((u) => u.id === id)!);
   return (

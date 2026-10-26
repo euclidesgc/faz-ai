@@ -6,6 +6,8 @@
 
 ### Adicionado
 
+- **Biblioteca do board: o que é de fábrica e cópias que acompanham a origem.** Em Configurações → Harness, o selo **de fábrica** marca o que vem com a extensão: os agentes de fábrica podem ser editados, desligados ou voltados ao original com **Restaurar o padrão**, e as skills do fluxo aparecem todas, só de leitura, com o texto da versão instalada. Uma cópia trazida do projeto ou do global guarda a origem: ao abrir os artefatos, a linha mostra **origem alterada**, **origem não encontrada** ou **editado no board**, e **Atualizar da origem** passa a existir também em skills e agentes, com confirmação quando a cópia foi editada.
+
 - **Tipo de card Hotfix, com release a partir da principal.** O board padrão ganha o tipo **Hotfix**, o único que parte da principal (a versão publicada). A IA sobe a versão (patch) e registra a correção no changelog na própria branch; depois do merge na principal, o board leva a correção para a `develop`, como já fazia, e cria a tag e a GitHub Release sobre o commit do merge, com a versão do `package.json` (ou a seguinte à última tag `vX.Y.Z`). Versão sem subir ou sem de onde tirar não vira release: a conversa avisa. A publicação na loja continua com o processo de release do projeto. O "Atualizar board" acrescenta o tipo onde não há um com esse nome.
 - **`set_base_branch` no MCP.** Troca a base da história (de onde ela parte e para onde vai o pull request), quando a pessoa pede, por exemplo a `develop` no lugar da principal; a IA traz a branch para a nova base na pasta de trabalho.
 - **`release_card` no MCP.** Devolve à fila da IA um card que estava com a pessoa, depois de ela responder no card ou na história; a resposta numa história usa a ferramenta para destravar uma sub-tarefa, que o board executa de novo.
@@ -32,6 +34,8 @@
 - **Sombra no card selecionado (#1069).** O card selecionado ganha uma sombra que sai do canto superior esquerdo e o destaca dos demais, sem tirar o contorno de foco do teclado. Os cards marcados na seleção múltipla recebem o mesmo destaque, e as linhas selecionadas das listas (como as do Harness) recebem uma sombra mais discreta. Um card pendente selecionado mantém o anel da cor do status, e a sombra vai por cima dele.
 
 ### Alterado
+
+- **Agentes de fábrica não saem do board; agentes podem ser desligados.** Apagar um agente de fábrica é recusado, pela tela e pelo `delete_agent`: desligue-o. Todo agente ganha o modo **Desligado**, e o desligado não aparece para o card, a fase nem o padrão. **Mudança de comportamento:** antes o agente de fábrica podia ser apagado e não voltava sozinho.
 
 - **Enviar sempre chama a IA, mesmo com o card bloqueado.** Na conversa, **Enviar** grava a mensagem e chama a IA para respondê-la ou fazer o que ela pede, sem trabalhar a fase além do pedido. A mensagem da pessoa devolve a vez à IA com o card bloqueado, aguardando resposta ou revisão; se ainda faltar uma decisão, a IA pergunta ou bloqueia de novo. **Enviar e trabalhar na fase** sai: **Trabalhar na fase** fica como ação própria. Enquanto a IA trabalha no card (ou numa sub-tarefa da história), o **Enviar** vira **Parar**, que interrompe a execução ou libera o card que ficou "Em execução" sem execução. Numa história parada por uma sub-tarefa, o bloqueio diz o que a sub-tarefa pede e a resposta na história a destrava.
 - **Bug parte da develop.** Todo trabalho parte da `develop`, inclusive o Bug, que gerava hotfix e fazia a correção partir da principal, sem o código que só existe na `develop`. O "Atualizar board" passa o Bug ainda em hotfix para bugfix.

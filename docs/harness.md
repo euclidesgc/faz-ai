@@ -355,7 +355,36 @@ exibir mais. O ícone de informação permite exibir o aviso novamente.
 - **Pelo card**: fica disponível no planejamento e nos campos Skills, Rules e MCPs; entra quando o
   card ou seu agente o escolhe.
 - **Desligado**: permanece na biblioteca sem participar da execução. Regras novas entram assim,
-  para revisão antes da ativação.
+  para revisão antes da ativação. Um agente desligado não aparece para o card, a fase nem o padrão;
+  o agente padrão só desliga depois que outro vira o padrão.
+
+### Três contextos: global, projeto e biblioteca
+
+Há três lugares com artefatos: o **global** (a pasta da ferramenta no usuário, como `~/.claude/`), o
+do **projeto** (como `.claude/` e `CLAUDE.md`) e a **biblioteca do board**, guardada no banco e fora
+do repositório. As execuções do board usam só a biblioteca, e só os itens dela são sugeridos e
+oferecidos nos campos dos cards. O board não mexe no global nem no projeto: eles são da pessoa.
+
+Levar um artefato de um contexto para outro é sempre uma **cópia que guarda a origem**: o original
+fica onde está e a cópia não depende dele. Ao abrir os artefatos do Harness, o board relê a origem de
+cada cópia e marca a linha:
+
+- **origem alterada**: a origem mudou desde a cópia. **Atualizar da origem** copia de novo; se a
+  cópia foi editada no board, pede confirmação antes, porque a edição se perde;
+- **origem não encontrada**: a origem sumiu ou não pôde ser lida; a cópia continua valendo;
+- **editado no board**: a cópia foi editada depois de copiada.
+
+Cópias feitas antes da 0.48.0 não guardavam a origem: a primeira conferência que encontra origem e
+cópia iguais passa a guardá-la; se forem diferentes, a linha mostra **origem alterada**.
+
+### Artefatos de fábrica
+
+O selo **de fábrica** marca o que vem com a extensão e não sai da biblioteca. Os **agentes de
+fábrica** (o condutor e os especialistas) podem ser editados, desligados e voltados ao texto
+original com **Restaurar o padrão** (o modo e o nome ficam), mas não apagados. As **skills do fluxo**
+(`faz-ai-fluxo` e as `faz-ai-*` por assunto) aparecem como **Entregue pelo board**, só de leitura:
+são o contrato do board com a IA e acompanham a versão da extensão, que as regrava quando o texto
+muda. Para mudar o comportamento, acrescente uma regra ou skill sua, que complementa o fluxo.
 
 ### Importar e exportar
 
@@ -405,10 +434,10 @@ nativo a subagentes continua dependendo da ferramenta.
 Em **Skills**, selecione os itens individualmente ou todos os visíveis e aplique **Sempre**, **Pelo
 card** ou **Desligado** em massa. A seleção acompanha a busca; **Limpar seleção** a desfaz.
 **Excluir selecionadas** pede confirmação e preserva os arquivos de origem. Subagentes também
-permitem selecionar e excluir em massa ou manter disponíveis no board; MCPs permitem alterar o modo
-e excluir em massa. Skills, subagentes e MCPs não oferecem Atualizar da origem. O formulário de
-regras tem apenas Nome e Conteúdo. Editar a biblioteca não altera a origem; em Regras, **Atualizar
-da origem** substitui a cópia somente com confirmação.
+permitem selecionar e excluir em massa ou deixar disponíveis ou desligados; MCPs permitem alterar o
+modo e excluir em massa. O formulário de regras tem apenas Nome e Conteúdo. Editar a biblioteca não
+altera a origem; **Atualizar da origem** aparece em regras, skills e subagentes quando a origem mudou
+desde a cópia.
 
 ### Pasta da biblioteca
 
@@ -477,8 +506,8 @@ agente da biblioteca e enviá-lo de novo.
 A execução escolhe o agente do card; na ausência dele, o agente da fase; depois, o padrão de
 **Harness → Ferramenta e execução**. Sem agentes disponíveis, usa o agente embutido, sem instruções
 adicionais. Remover um agente libera as seleções dos cards e fases que o utilizavam. Os agentes de
-fábrica são criados em cada board, no banco; um que você apagou não volta, a menos que peça para
-recriá-los.
+fábrica são criados em cada board, no banco, e não podem ser apagados: desligue o que não quiser
+usar, ou volte-o ao texto original com **Restaurar o padrão**.
 
 ### Criar e editar
 

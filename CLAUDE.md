@@ -86,12 +86,11 @@ Revise com mais rigor o que mexe em `src/extension/db/**`, `src/extension/reposi
 
 ## Fluxo
 
-As histórias deste repositório passam pelo board do próprio Faz AI, com os agentes, as skills e a
-regra do harness do board (Configurações → Harness). O board é a fonte; o repositório guarda a cópia
-versionada dele, para outra máquina e para as sessões fora do board: agentes em `.claude/agents/`,
-skills do projeto em `.claude/skills/`, skills React em `board-harness/react/` e a regra em
-`board-harness/rules/convencoes-do-projeto.md`. Quem muda um lado atualiza o outro no mesmo PR.
-Agentes e skills de tecnologia que o projeto não usa ficam fora do board. Um pull request por história; uma funcionalidade grande vira histórias derivadas,
+As histórias deste repositório passam pelo board do próprio Faz AI. As execuções do board usam a
+biblioteca do board (Configurações → Harness), que fica fora do repositório; o `.claude/` é o harness
+próprio do projeto, usado pelas sessões fora do board, e os dois são independentes. Um item copiado
+de um contexto para o outro guarda a origem, e o board avisa quando a cópia e a origem divergem.
+Um pull request por história; uma funcionalidade grande vira histórias derivadas,
 com os PRs empilhados. A base de integração das novas funcionalidades é a `develop`; entregas em
 branches intermediárias precisam chegar a ela antes de constar nas notas da próxima release.
 Os registros de decisão ficam em [`docs/decisoes/`](docs/decisoes/README.md).

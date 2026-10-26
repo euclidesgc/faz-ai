@@ -607,12 +607,15 @@ export class MessageRouter {
     const { current } = this.ctx.harness;
     return {
       ...s,
-      // os agentes do board são as cópias guardadas no banco (escopo `board`): derivados aqui, nunca gravados
+      // os agentes do board são as cópias guardadas no banco (escopo `board`): derivados aqui, nunca gravados. O
+      // desligado fica na biblioteca, mas nenhum card, fase ou execução o escolhe
       board: {
         ...s.board,
         execProfiles: agentProfiles(
           current.library
-            ? current.library.artifacts.filter((a) => a.kind === 'agent' && !a.missing).map((a) => agentOfArtifact(a, s.board.aiTool))
+            ? current.library.artifacts
+                .filter((a) => a.kind === 'agent' && !a.missing && a.usage !== 'off')
+                .map((a) => agentOfArtifact(a, s.board.aiTool))
             : current.agents,
           s.harnessSelection,
           s.board.runner.defaultAgent,

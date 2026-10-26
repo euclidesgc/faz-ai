@@ -268,7 +268,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'delete_agent',
-    'Tira um agente do board; o arquivo de origem de um agente copiado não é apagado. Não pode ser desfeito pelo board. O agente padrão não sai: escolha outro antes.',
+    'Tira um agente do board; o arquivo de origem de um agente copiado não é apagado. Não pode ser desfeito pelo board. O agente padrão não sai: escolha outro antes. O agente de fábrica (seed) também não sai: desligue-o com set_harness_selection (usage "off").',
     { agent: agentArg },
     (a, router) => {
       boardItem(router, 'agent', a.agent);

@@ -109,6 +109,8 @@ export class LibraryDisk {
               name: existing.name,
               origin: existing.origin,
               originTool: existing.originTool,
+              // editar a cópia no disco é editar no board: o resumo da origem continua o da última cópia
+              originDigest: existing.originDigest,
               ...(draft.kind === 'agent' && atPath ? { meta: existing.meta } : {}),
             }
           : { ...draft, origin: this.mirror.pathOf({ ...draft, id: 'local' }) === item.file ? '' : item.file, originTool: '' };

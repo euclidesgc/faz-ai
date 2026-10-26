@@ -163,6 +163,104 @@ describe('biblioteca particular do board', () => {
     expect(fs.readFileSync(a.path, 'utf8')).toBe('Segunda versão');
   });
 
+  it('a cópia guarda a origem: ao reabrir, a linha diz se a origem mudou, se sumiu ou se a cópia foi editada no board', () => {
+    const source = write('project/.claude/skills/react/SKILL.md', '---\nname: react\ndescription: Componentes\n---\nPrimeira');
+    router.refreshHarness();
+    select('skill', '.claude/skills/react/SKILL.md');
+    const row = () => router.snapshot().harness.library!.artifacts.find((a) => a.name === 'react')!;
+    router.refreshHarness();
+    expect(row()).not.toHaveProperty('originState');
+    expect(row()).not.toHaveProperty('editedInBoard');
+
+    // editar no board marca a cópia na hora, sem reler a origem
+    router.handle({
+      type: 'harness.artifact.save',
+      kind: 'skill',
+      name: 'react',
+      previous: 'react',
+      body: '---\nname: react\ndescription: Componentes\n---\nEditada no board',
+    });
+    expect(row().editedInBoard).toBe(true);
+    expect(row()).not.toHaveProperty('originState');
+
+    // a origem só é relida ao reabrir os artefatos
+    fs.writeFileSync(source, '---\nname: react\ndescription: Componentes\n---\nSegunda');
+    expect(row()).not.toHaveProperty('originState');
+    router.refreshHarness();
+    expect(row()).toMatchObject({ originState: 'changed', editedInBoard: true });
+
+    // atualizar da origem traz a segunda versão e a cópia volta a conferir
+    router.handle({ type: 'harness.library.update', id: row().id });
+    expect(row()).not.toHaveProperty('originState');
+    expect(row()).not.toHaveProperty('editedInBoard');
+    expect(fs.readFileSync(row().path, 'utf8')).toContain('Segunda');
+
+    fs.rmSync(source);
+    router.refreshHarness();
+    expect(row().originState).toBe('missing');
+  });
+
+  it('a cópia anterior a esta versão, sem resumo da origem, ganha o resumo quando confere e mostra a diferença quando não confere', () => {
+    write('project/.claude/skills/igual/SKILL.md', '---\nname: igual\ndescription: A\n---\nIgual');
+    const diferente = write('project/.claude/skills/outra/SKILL.md', '---\nname: outra\ndescription: B\n---\nAntes');
+    router.refreshHarness();
+    select('skill', '.claude/skills/igual/SKILL.md');
+    select('skill', '.claude/skills/outra/SKILL.md');
+    handle.db.run("UPDATE board_artifacts SET origin_digest = ''");
+    fs.writeFileSync(diferente, '---\nname: outra\ndescription: B\n---\nDepois');
+    router.refreshHarness();
+    const s = router.snapshot().harness.library!.artifacts;
+    expect(s.find((a) => a.name === 'igual')).not.toHaveProperty('originState');
+    expect(s.find((a) => a.name === 'outra')?.originState).toBe('changed');
+    const digests = handle.db.exec(
+      "SELECT name, origin_digest <> '' FROM board_artifacts WHERE name IN ('igual','outra') ORDER BY name",
+    )[0]!;
+    expect(digests.values).toEqual([
+      ['igual', 1],
+      ['outra', 0],
+    ]);
+  });
+
+  it('as skills do fluxo não entram sozinhas na biblioteca, mas a lista as mostra e o texto vem da extensão; a cópia antiga acompanha a versão', () => {
+    const lib = () => router.snapshot().harness.library!;
+    expect(lib().artifacts.some((a) => a.kind === 'skill')).toBe(false);
+    expect(lib().flowSkills!.map((f) => f.name)).toEqual([
+      'faz-ai-fluxo',
+      'faz-ai-harness-do-card',
+      'faz-ai-workspace-e-pr',
+      'faz-ai-implementacao-rodadas',
+      'faz-ai-revisao-e-homologacao',
+      'faz-ai-modo-autonomo',
+    ]);
+    expect(router.readArtifact('skill', 'faz-ai-modo-autonomo').text).toContain('# Modo autônomo');
+
+    // a cópia que uma versão anterior pôs na biblioteca, com texto antigo, volta ao texto desta versão
+    new ArtifactRepo(handle.db).upsert(
+      router.snapshot().board.id,
+      {
+        kind: 'skill',
+        name: 'faz-ai-fluxo',
+        description: 'antiga',
+        body: 'texto antigo',
+        meta: { generated: true },
+        origin: '',
+        originTool: '',
+        missing: false,
+        skipped: [],
+        files: [],
+      },
+      'always',
+    );
+    router.refreshHarness();
+    const main = lib().artifacts.find((a) => a.name === 'faz-ai-fluxo')!;
+    expect(main).toMatchObject({ generated: true, usage: 'always' });
+    expect(fs.readFileSync(main.path, 'utf8')).toContain('release_card');
+    expect(router.readArtifact('skill', 'faz-ai-fluxo').text).toContain('release_card');
+    expect(() =>
+      router.handle({ type: 'harness.selection.set', items: [{ kind: 'skill', location: 'board:faz-ai-fluxo' }], usage: null }),
+    ).toThrow('skill do fluxo');
+  });
+
   it('troca a pasta sem apagar arquivos da pessoa e remove somente a cópia ao desmarcar', () => {
     const source = write('project/.claude/skills/react/SKILL.md', 'Particular');
     router.refreshHarness();

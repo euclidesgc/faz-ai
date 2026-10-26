@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { frontmatterOf, frontmatterValue } from './frontmatter';
+import { frontmatterOf, frontmatterValue, skillTemplate } from './frontmatter';
+import { FLOW_SKILLS, flowSkillMarkdown } from './flowSkill';
 import { scanLibraryFolder } from './libraryImport';
 import type { ArtifactKind, LibraryArtifactInput, LibraryImportPreview } from '../shared/artifacts';
 import { LibraryDisk } from './libraryDisk';
 import { ArtifactMirror } from './artifactMirror';
-import { agentInputOf, parseAgentFile, readSource, mcpServerNames } from './artifactSource';
+import { agentInputOf, artifactDigest, parseAgentFile, readSource, mcpServerNames } from './artifactSource';
 import { TOOL_ADAPTERS } from './toolAdapters';
 import type { ToolAdapter } from './toolAdapters/types';
 import { ArtifactRepo, type ArtifactRow } from './repositories/artifactRepo';
@@ -27,6 +28,9 @@ import { MCP_NAME_PATTERN, type McpServerInput } from '../shared/harnessCatalog'
 import { RULE_NAME_PATTERN, createUsage } from '../shared/artifactImport';
 import type { AgentInput, McpServerView } from '../shared/messages';
 import type { BoardContext } from './panel/handlers/context';
+
+/** Por que um agente de fábrica não sai do board, e o que fazer no lugar. */
+const SEED_AGENT_KEPT = 'Agente padrão do board: ele pode ser editado, restaurado ou desligado, mas não apagado.';
 
 /** Como achar a dependência (skill ou servidor MCP) de um agente copiado: pelo nome, na ferramenta dele. */
 interface DependencyResolver {
@@ -221,8 +225,75 @@ export class BoardLibrary {
     disk.record();
     return this.repo.list(this.ctx.boardId).map((a) => {
       const file = mirror.pathOf(a);
-      return { ...a, path: file, ...(!a.missing && file ? { size: fs.statSync(file).size } : {}) };
+      return { ...a, ...this.originView(a), path: file, ...(!a.missing && file ? { size: fs.statSync(file).size } : {}) };
     });
+  }
+
+  /**
+   * Resumo da origem lido na última conferência, por artefato: o conteúdo atual ou 'missing'. As origens só são
+   * lidas em `checkOrigins` (ao abrir o Harness) e ao atualizar da origem; a lista usa o que ficou guardado aqui.
+   */
+  private origins = new Map<string, string>();
+
+  /** Origem que dá para reler do disco: as cópias de um repositório remoto e o criado no board ficam de fora. */
+  private checkable(a: Pick<BoardArtifact, 'kind' | 'origin' | 'generated'>): boolean {
+    return a.kind !== 'mcp' && !a.generated && !!a.origin && !a.origin.startsWith('board:') && !a.origin.includes('://');
+  }
+
+  /** O resumo do que está no board, para saber se a cópia foi editada depois de copiada. */
+  private boardDigest(a: Pick<BoardArtifact, 'id' | 'description'>): string {
+    return artifactDigest({ ...this.repo.content(a.id), description: a.description });
+  }
+
+  /** Relê a origem de cada cópia e guarda o resumo dela. A cópia antiga que confere com a origem ganha o resumo. */
+  checkOrigins(): void {
+    this.origins.clear();
+    for (const a of this.repo.list(this.ctx.boardId)) {
+      if (!this.checkable(a)) continue;
+      const row = this.repo.get(this.ctx.boardId, a.kind, a.name);
+      if (!row) continue;
+      const draft = readSource(
+        { kind: a.kind === 'rule' ? 'instructions' : a.kind, location: a.origin },
+        this.dirs,
+        a.originTool || this.ownerOf(a.origin),
+      );
+      if (draft.missing || !draft.originDigest) {
+        this.origins.set(a.id, 'missing');
+        continue;
+      }
+      this.origins.set(a.id, draft.originDigest);
+      if (!row.originDigest && draft.originDigest === this.boardDigest(a))
+        this.repo.setOriginDigest(this.ctx.boardId, a.id, draft.originDigest);
+    }
+  }
+
+  private originView(a: Omit<BoardArtifact, 'path'>): Pick<BoardArtifact, 'originState' | 'editedInBoard'> {
+    if (!this.checkable(a) || a.missing) return {};
+    const stored = this.repo.get(this.ctx.boardId, a.kind, a.name)?.originDigest ?? '';
+    const current = stored ? this.boardDigest(a) : '';
+    const source = this.origins.get(a.id);
+    const edited = !!stored && current !== stored;
+    // sem resumo gravado (cópia anterior a esta versão), a origem diferente da cópia conta como alterada
+    const changed = source !== undefined && source !== 'missing' && source !== (stored || this.boardDigest(a));
+    return {
+      ...(source === 'missing' ? { originState: 'missing' as const } : changed ? { originState: 'changed' as const } : {}),
+      ...(edited ? { editedInBoard: true } : {}),
+    };
+  }
+
+  /**
+   * A cópia de uma skill do fluxo que versões anteriores puseram na biblioteca acompanha o texto desta versão da
+   * extensão: é regravada quando o texto muda, sem trocar o modo nem a origem. As que não estão na biblioteca não
+   * entram nela: o board as entrega pelo get_skill, e a lista do Harness as mostra só para leitura (`flowSkills`).
+   */
+  ensureFlowSkills(): void {
+    for (const flow of FLOW_SKILLS) {
+      const existing = this.repo.get(this.ctx.boardId, 'skill', flow.name);
+      if (!existing || (existing.meta as { generated?: unknown }).generated !== true) continue;
+      const body = skillTemplate(flow.name, flow.description, flow.body);
+      if (existing.description === flow.description && this.repo.content(existing.id).body === body) continue;
+      this.repo.upsert(this.ctx.boardId, { ...this.draftOf(existing), description: flow.description, body }, existing.usage);
+    }
   }
 
   setDirectory(input: string): void {
@@ -352,6 +423,14 @@ export class BoardLibrary {
 
   select(items: { kind: SelectableKind; location: string }[], usage: HarnessUsage | null): void {
     if (!usage) this.refuseRemoval(items);
+    if (usage === 'off') {
+      const defaultAgent = this.ctx.state().board.runner.defaultAgent;
+      for (const item of items) {
+        const a = this.repo.findByLocation(this.ctx.boardId, kindOfSelectable(item.kind), item.location);
+        if (a?.kind === 'agent' && defaultAgent && a.name === defaultAgent)
+          throw new Error('Escolha outro agente padrão antes de desligar este.');
+      }
+    }
     const drafts: { draft: ArtifactDraft; usage: HarnessUsage }[] = [];
     for (const item of items) {
       const existing = this.repo.findByLocation(this.ctx.boardId, kindOfSelectable(item.kind), item.location);
@@ -389,6 +468,7 @@ export class BoardLibrary {
       const a = this.repo.findByLocation(this.ctx.boardId, kindOfSelectable(item.kind), item.location);
       if (a?.kind === 'agent' && defaultAgent && a.name === defaultAgent)
         throw new Error('Escolha outro agente padrão antes de apagar este.');
+      if (a?.kind === 'agent' && (a.meta as AgentMeta).seed) throw new Error(SEED_AGENT_KEPT);
       if (a?.kind === 'skill' && (a.meta as { generated?: unknown }).generated === true)
         throw new Error('A skill do fluxo é da extensão: só o modo dela pode mudar.');
     }
@@ -577,6 +657,9 @@ export class BoardLibrary {
   /** O conteúdo para o editor: corpo da regra/skill/agente, um arquivo de apoio, ou o MCP com os segredos mascarados. */
   content(kind: ArtifactKind, name: string, file?: string): { text?: string; server?: McpServerView } {
     const a = this.repo.get(this.ctx.boardId, kind, name);
+    // a skill do fluxo que não está na biblioteca é lida da própria extensão, como o get_skill a entrega
+    const flow = kind === 'skill' && !file && (!a || a.generated) ? flowSkillMarkdown(name) : undefined;
+    if (flow !== undefined) return { text: flow };
     if (!a) throw new Error('Artefato não encontrado.');
     if (kind === 'mcp') {
       const s = this.repo.mcpServer(this.ctx.boardId, a.id) ?? {};
@@ -609,6 +692,7 @@ export class BoardLibrary {
     const kind = a.kind === 'rule' ? 'instructions' : a.kind;
     const draft = readSource({ kind, location: a.origin }, this.dirs, a.originTool);
     if (draft.missing) throw new Error('A origem não está disponível. A cópia do board foi preservada.');
+    if (draft.originDigest) this.origins.set(a.id, draft.originDigest);
     this.repo.upsertMany(this.ctx.boardId, this.withDependencies([{ draft, usage: a.usage }], this.adapterResolver()));
   }
 
@@ -731,6 +815,7 @@ export class BoardLibrary {
     const existing = this.repo.get(this.ctx.boardId, 'agent', name);
     if (!existing) throw new Error(`Agente "${name}" não está no board.`);
     if (name === this.ctx.state().board.runner.defaultAgent) throw new Error('Escolha outro agente padrão antes de apagar este.');
+    if ((existing.meta as AgentMeta).seed) throw new Error(SEED_AGENT_KEPT);
     this.repo.remove(this.ctx.boardId, existing.id);
   }
 
