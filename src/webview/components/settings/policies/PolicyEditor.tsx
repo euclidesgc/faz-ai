@@ -16,7 +16,7 @@ import { useBoardStore } from '../../../store/boardStore';
 import { executionPolicies } from '../../../commands';
 import { useAction } from '../../../useAction';
 import { t } from '../../../i18n';
-import { FormField, IconArrowDown, IconArrowUp, IconPlus, IconTrash, SwitchField } from '../../ui';
+import { FormField, IconArrowDown, IconArrowUp, IconPlus, IconTrash, SwitchField, Summary } from '../../ui';
 import {
   Checks,
   Choice,
@@ -310,7 +310,7 @@ export function PolicyEditor({
       </section>
 
       <details className="fallback-advanced">
-        <summary>{t('Avançado')}</summary>
+        <Summary>{t('Avançado')}</Summary>
         <div className="fallback-advanced-body">
           <Choice
             label={t('Ação')}

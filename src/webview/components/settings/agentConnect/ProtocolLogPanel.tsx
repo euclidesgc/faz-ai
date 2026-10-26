@@ -4,7 +4,7 @@ import type { ProtocolLogEntry } from '../../../../shared/agentConnect';
 import { agentConnect } from '../../../commands';
 import { t } from '../../../i18n';
 import { useAgentConnectStore } from '../../../store/agentConnectStore';
-import { ActionButton, IconFromAgent, IconProcess, IconToAgent, SwitchField, type Icon } from '../../ui';
+import { ActionButton, IconFromAgent, IconProcess, IconToAgent, SwitchField, type Icon, Summary } from '../../ui';
 import { SectionHeader } from '../SectionHeader';
 
 /** A partir de quanto tempo (ms) a resposta ganha destaque: um pedido lento é o primeiro suspeito. */
@@ -54,7 +54,7 @@ function LogRow({ entry }: { entry: ProtocolLogEntry }) {
   if (!entry.json) return <div className="agent-log-row">{head}</div>;
   return (
     <details className="agent-log-row">
-      <summary>{head}</summary>
+      <Summary>{head}</Summary>
       <pre className="agent-log-json">{pretty(entry.json)}</pre>
     </details>
   );

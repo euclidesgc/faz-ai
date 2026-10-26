@@ -154,7 +154,7 @@ export function McpServerEditor({ server, onClose }: { server?: BoardArtifact; o
           if (canSave) void submit();
         }}
       >
-        <Heading as="h4" size="3">
+        <Heading as="h4" size="2">
           {server ? t('Editar servidor MCP') : t('Servidor MCP novo')}
         </Heading>
         <FormField label={t('Nome')} hint={problem ?? read.error ?? (read.loading ? t('Lendo o servidor…') : undefined)}>

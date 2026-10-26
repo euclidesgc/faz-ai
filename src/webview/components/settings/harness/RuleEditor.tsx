@@ -55,7 +55,7 @@ export function RuleEditor({ rule, onClose }: { rule?: BoardArtifact; onClose: (
           if (canSave) void submit();
         }}
       >
-        <Heading as="h4" size="3">
+        <Heading as="h4" size="2">
           {rule ? t('Editar regra') : t('Nova regra')}
         </Heading>
         <FormField label={t('Nome da regra')} hint={problem ?? t('Letras minúsculas, números e hífen; .md é opcional.')}>

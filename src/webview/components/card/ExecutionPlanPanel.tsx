@@ -21,6 +21,7 @@ import { isProposalStale, type ContextProposal } from '../../../shared/contextPr
 import { getLocale, t } from '../../i18n';
 import { ActivityContextEditor } from './ActivityContextEditor';
 import { ContextDraftPreview, CONTEXT_DRAFT_ORIGINS } from './ContextDraftPreview';
+import { Summary } from '../ui';
 
 export type ExecutionPlanDrafts = Record<string, ActivityContextWrite>;
 /** O card guarda o rascunho acima das abas. Padrões sem card usam a mesma composição. */
@@ -169,7 +170,7 @@ export function ExecutionPlanPanel({
               const changed = !!drafts[key];
               return (
                 <tr key={key}>
-                  <td>
+                  <td className="plan-select">
                     <Checkbox
                       aria-label={t('Selecionar {activity}', { activity: name(target) })}
                       checked={picked.includes(key)}
@@ -181,14 +182,14 @@ export function ExecutionPlanPanel({
                     {name(target)}
                     {changed && <span className="muted small"> · {t('Rascunho')}</span>}
                   </th>
-                  <td>
+                  <td data-label={t('Agente e modelo')}>
                     {agent?.name ?? t('Sem agente válido')}
                     <br />
                     <span className="muted small">
                       {p.model.choice.mode === 'inherit' ? t('Herdar modelo') : p.model.choice.value || t('Vazio explícito')}
                     </span>
                   </td>
-                  <td>
+                  <td data-label={t('Recursos e resultado')}>
                     <dl>
                       <dt>{t('Skills')}</dt>
                       <dd>
@@ -213,12 +214,12 @@ export function ExecutionPlanPanel({
                       <dd>{p.expectedResult || t('Nenhum')}</dd>
                     </dl>
                   </td>
-                  <td>
+                  <td data-label={t('Contexto inicial conhecido')}>
                     {t('Cerca de {tokens} tokens conhecidos', { tokens: estimate.knownTokens })}
                     <br />
                     <span className="muted small">{t('{n} itens sem medida', { n: estimate.unknownIds.length })}</span>
                   </td>
-                  <td>
+                  <td data-label={t('Configuração')}>
                     <Button size="1" variant="soft" disabled={save.busy} onClick={() => setEditing(target)}>
                       {t('Configurar {activity}', { activity: name(target) })}
                     </Button>{' '}
@@ -234,7 +235,7 @@ export function ExecutionPlanPanel({
                       </Button>
                     )}
                     <details>
-                      <summary>{t('Origens e incompatibilidades')}</summary>
+                      <Summary>{t('Origens e incompatibilidades')}</Summary>
                       <ContextDraftPreview preview={p} />
                       <ul>
                         {p.trace

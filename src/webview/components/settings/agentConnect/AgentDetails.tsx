@@ -16,7 +16,7 @@ import { isolationText, leaksList } from '../../../isolation';
 import { useAgentConnectStore } from '../../../store/agentConnectStore';
 import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
-import { ActionButton, DeleteButton } from '../../ui';
+import { ActionButton, DeleteButton, Summary } from '../../ui';
 import { profileKind } from './agentStatus';
 import { reviewText } from './connectProgress';
 
@@ -153,7 +153,7 @@ export function AgentDetails({ item, onEdit }: { item: AgentListItem; onEdit(pro
         </div>
       )}
       <details className="ai-profile-evidence">
-        <summary>{t('Capacidades e evidências')}</summary>
+        <Summary>{t('Capacidades e evidências')}</Summary>
         <div className="ai-profile-capabilities">
           {PROFILE_CAPABILITIES.map((capability) => (
             <span key={capability}>

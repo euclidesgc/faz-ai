@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Button, Popover, TextField } from '@radix-ui/themes';
 import { t } from '../i18n';
+import { IconChevronDown } from './ui';
 
 export interface PickerOption {
   value: string;
@@ -76,6 +77,7 @@ export function GroupedPicker({
           disabled={disabled}
         >
           <span className="picker-trigger-label">{current?.label ?? placeholder ?? value}</span>
+          <IconChevronDown className="picker-trigger-icon" />
         </Button>
       </Popover.Trigger>
       <Popover.Content

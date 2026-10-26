@@ -34,7 +34,7 @@ export function MetricsView() {
 
   return (
     <section className="metrics" aria-labelledby="metrics-title">
-      <header className="metrics-header">
+      <header className="metrics-header page-header-row">
         <h2 id="metrics-title">{t('Métricas')}</h2>
         {loading && result && (
           <span className="metrics-updating">

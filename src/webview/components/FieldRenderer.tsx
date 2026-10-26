@@ -7,6 +7,7 @@ import { effortLabel, modelValue, parseModelValue } from '../../shared/models';
 import { useBoardStore } from '../store/boardStore';
 import { ChipsEditor, IconExternal, OptionLabel, optionChip, SelectField, TextField } from './ui';
 import { isSkillsField } from './settings/fields/fieldKinds';
+import { MCPS_FIELD, RULES_FIELD } from '../../shared/boardFields';
 import { SkillPicker } from './skills/SkillPicker';
 import { GroupedPicker } from './GroupedPicker';
 import { dt, getLocale, t } from '../i18n';
@@ -100,7 +101,16 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
       const current = Array.isArray(value) ? value : [];
       // o card só indica o que o Harness marcou como "usar quando fizer sentido"
       if (isSkillsField(field.name)) return <SkillPicker value={current} onChange={onChange} usage="contextual" />;
-      return <ChipsEditor options={field.options.map(optionChip)} values={current} onChange={onChange} />;
+      // sem opção, o campo diz por quê: Rules e MCPs vêm do Harness, os outros do próprio campo
+      const harnessField = [RULES_FIELD, MCPS_FIELD].some((n) => n.toLowerCase() === field.name.toLowerCase());
+      return (
+        <ChipsEditor
+          options={field.options.map(optionChip)}
+          values={current}
+          onChange={onChange}
+          empty={harnessField ? t('Nenhuma no board em "Pelo card" (Configurações › Harness).') : undefined}
+        />
+      );
     }
   }
 }

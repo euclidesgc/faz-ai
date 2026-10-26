@@ -7,7 +7,7 @@ import { executionPolicies } from '../../../commands';
 import { useAction } from '../../../useAction';
 import { useBoardStore } from '../../../store/boardStore';
 import { t } from '../../../i18n';
-import { ActionButton, IconArrowDown, IconArrowUp, IconEdit, IconPlus, IconTrash } from '../../ui';
+import { ActionButton, IconArrowDown, IconArrowUp, IconEdit, IconPlus, IconTrash, Summary } from '../../ui';
 import { SectionHeader } from '../SectionHeader';
 import { PolicyEditor } from './PolicyEditor';
 import { policiesOfProfile } from '../../../../shared/policyAssistant';
@@ -283,10 +283,10 @@ export function ExecutionPoliciesSettings({ profileId }: { profileId: string }) 
 
       {library && (
         <details className="fallback-extras">
-          <summary>
+          <Summary>
             {/* testar e revisar conflitos só fazem sentido com regra cadastrada: sem ela, o bloco oferece só a IA */}
             {rows.length ? t('Testar as regras, pedir sugestão à IA e reservas antigas') : t('Pedir sugestão à IA e reservas antigas')}
-          </summary>
+          </Summary>
           <div className="fallback-advanced-body">
             {rows.length > 0 && <PolicySimulation profileId={profileId} policy={null} library={library} />}
             <section>

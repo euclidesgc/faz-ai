@@ -32,7 +32,7 @@ export function WizardShell({ label, steps, step, onBack, onNext, onCancel, fini
         <Text size="1" color="gray">
           {t('Passo {n} de {total}', { n: step + 1, total: steps.length })}
         </Text>
-        <Heading as="h4" size="3">
+        <Heading as="h4" size="2">
           {t(steps[step]!)}
         </Heading>
         <ol className="wizard-steps" aria-label={t('Passos')}>

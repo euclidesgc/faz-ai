@@ -70,7 +70,7 @@ export function SkillEditor({ skill, onClose }: { skill?: BoardArtifact; onClose
           if (canSave) void submit();
         }}
       >
-        <Heading as="h4" size="3">
+        <Heading as="h4" size="2">
           {skill ? t('Editar skill') : t('Nova skill')}
         </Heading>
         {readonly && <p className="muted small">{t('Esta skill é gerada pela extensão e regravada a cada abertura: só o modo muda.')}</p>}

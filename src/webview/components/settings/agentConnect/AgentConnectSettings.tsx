@@ -9,7 +9,7 @@ import { listenAgentConnect, useAgentConnectStore, type AgentTab } from '../../.
 import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
 import { closedByConstruction, contextScopeState, type ContextScopeReport, type ContextScopeState } from '../../../../shared/contextScope';
-import { ActionButton, Hint, IconConnect, IconExternal, IconLock, IconLockOpen, IconPlus } from '../../ui';
+import { ActionButton, Hint, IconConnect, IconExternal, IconLock, IconLockOpen, IconPlus, Summary } from '../../ui';
 import { AiProfileForm } from '../AiProfileForm';
 import { PageHeader } from '../PageHeader';
 import { ExecutionPoliciesSettings } from '../policies/ExecutionPoliciesSettings';
@@ -124,9 +124,9 @@ function AgentList({
         <IconPlus /> {t('Agente personalizado (CLI)')}
       </ActionButton>
       <details className="agent-others" open={!!q && shownOthers.length > 0}>
-        <summary>
+        <Summary>
           {t('Outros agentes do registro do ACP')} <span className="muted">({shownOthers.length})</span>
-        </summary>
+        </Summary>
         <Text as="p" size="1" color="gray">
           {t('O board ainda não executa cards com eles: dá para entrar na conta e conversar com cada um na sessão de teste.')}
         </Text>
@@ -171,7 +171,7 @@ function AgentDetail({ item, onEdit }: { item: AgentListItem; onEdit(profile: Ai
       <div className="agent-detail-head">
         <AgentIcon icon={item.icon} />
         <div>
-          <Heading as="h4" size="3">
+          <Heading as="h4" size="2">
             {item.name}
           </Heading>
           <Text size="1" color="gray">

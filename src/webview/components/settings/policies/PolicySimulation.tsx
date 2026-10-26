@@ -9,7 +9,7 @@ import { policiesOfProfile } from '../../../../shared/policyAssistant';
 import { requestExecutionPolicy } from '../../../request';
 import { useAction } from '../../../useAction';
 import { t } from '../../../i18n';
-import { IconCheck, IconClose } from '../../ui';
+import { IconCheck, IconClose, Summary } from '../../ui';
 import { useBoardStore } from '../../../store/boardStore';
 import {
   Choice,
@@ -177,7 +177,7 @@ export function PolicySimulation({
         />
       </div>
       <details className="fallback-advanced">
-        <summary>{t('Mais condições do cenário')}</summary>
+        <Summary>{t('Mais condições do cenário')}</Summary>
         <div className="fallback-advanced-body">
           <div className="fallback-grid">
             <Choice
@@ -251,7 +251,7 @@ export function PolicySimulation({
             {t('Modelo escolhido à mão no card')}
           </label>
           <details className="fallback-advanced">
-            <summary>{t('Processos em andamento por agente')}</summary>
+            <Summary>{t('Processos em andamento por agente')}</Summary>
             <div className="fallback-advanced-body">
               <div className="fallback-grid">
                 {library.profiles.map((p) => (

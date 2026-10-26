@@ -163,20 +163,23 @@ export function GitFlowSection() {
         )}
       </SectionHeader>
       <Card className="form-card" aria-label={t('Tipo de branch por tipo de card')}>
-        {storyTypes.map((ct) => (
-          <div className="row" key={ct.id}>
-            <span className="type-badge" style={badgeStyle(ct.color)}>
-              {dt(ct.name)}
-            </span>
-            <SelectField<BranchKind>
-              aria-label={t('Tipo de branch de {name}', { name: dt(ct.name) })}
-              options={BRANCH_KINDS.map((k) => ({ value: k.value, label: t(k.label) }))}
-              value={ct.branchKind}
-              disabled={off || !git.gitflow}
-              onChange={(branchKind) => settings.updateType(ct.id, { branchKind })}
-            />
-          </div>
-        ))}
+        <div className="label-grid">
+          {storyTypes.map((ct) => (
+            <div className="label-grid-row" key={ct.id}>
+              <span className="type-badge" style={badgeStyle(ct.color)}>
+                {dt(ct.name)}
+              </span>
+              <SelectField<BranchKind>
+                aria-label={t('Tipo de branch de {name}', { name: dt(ct.name) })}
+                options={BRANCH_KINDS.map((k) => ({ value: k.value, label: t(k.label) }))}
+                value={ct.branchKind}
+                disabled={off || !git.gitflow}
+                onChange={(branchKind) => settings.updateType(ct.id, { branchKind })}
+                steady
+              />
+            </div>
+          ))}
+        </div>
       </Card>
     </>
   );

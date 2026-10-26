@@ -10,7 +10,7 @@ import { CopyCommand, RequirementFix, requirementTexts } from './RequirementsBan
 import type { ProfileHealth } from '../../shared/profileHealth';
 import { ProfileBlock } from './environment/ProfileBlock';
 import { NextRunSection } from './environment/NextRunSection';
-import { Button, Hint, IconExternal, IconMissing, IconOk, IconSkipped } from './ui';
+import { Button, Hint, IconExternal, IconMissing, IconOk, IconSkipped, Summary } from './ui';
 
 /** O nome do item e, no hint, como o board o usa; no idioma da interface. */
 function texts(c: EnvCheck): { title: string; hint: string } {
@@ -292,7 +292,7 @@ function ProfilesSection({ profiles, focus }: { profiles: ProfileHealth[]; focus
       ))}
       {off.length > 0 && (
         <details open={off.some((p) => p.id === focus)}>
-          <summary>{t('Desligados ({n})', { n: off.length })}</summary>
+          <Summary>{t('Desligados ({n})', { n: off.length })}</Summary>
           {off.map((p) => (
             <ProfileBlock key={p.id} health={p} focused={p.id === focus} />
           ))}
@@ -394,7 +394,9 @@ export function EnvironmentView() {
           'O que o board precisa para trabalhar com a IA: o Node.js, cada perfil de CLI (linha de comando, login e credenciais), o banco de artefatos e o que ele aproveita quando está instalado. Passe o mouse sobre um item para ver como o board o usa. O board não instala nada de terceiros: instale pelo comando ou pelo site indicado.',
         )}
       </PageHeader>
-      <p role="status" className="env-summary">
+      <p role="status" className="env-summary" aria-busy={!report && !check.error ? true : undefined}>
+        {/* a conferência leva alguns segundos: a espera aparece, como em toda ação que vai ao host */}
+        {!report && !check.error && <span className="spinner" aria-hidden />}
         <strong>{summary}</strong>
       </p>
       {report?.curlMissing && (

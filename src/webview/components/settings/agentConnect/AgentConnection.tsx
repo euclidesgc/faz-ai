@@ -8,7 +8,7 @@ import { t } from '../../../i18n';
 import { useAgentConnectStore } from '../../../store/agentConnectStore';
 import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
-import { ActionButton, Hint, IconCheck, IconExternal, IconWarning, SwitchField } from '../../ui';
+import { ActionButton, Hint, IconCheck, IconExternal, IconWarning, SwitchField, Summary } from '../../ui';
 import { AccountPanel } from './AccountPanel';
 import { connectable } from './AgentDetails';
 import { ConnectProgress, ModeSheetList } from './connectProgress';
@@ -110,7 +110,7 @@ function BoardConnection({ profile }: { profile: AiProfile }) {
       {/* conectado, a ficha do modo vai para o "Ver detalhes" do progresso: aqui ela só ajuda a escolher e conectar */}
       {modeEntry && connection?.status !== 'connected' && (
         <details className="agent-mode-sheet">
-          <summary>{t('Como funciona o modo {mode}', { mode: modeLabel(mode) })}</summary>
+          <Summary>{t('Como funciona o modo {mode}', { mode: modeLabel(mode) })}</Summary>
           <ModeSheetList mode={modeEntry} />
         </details>
       )}

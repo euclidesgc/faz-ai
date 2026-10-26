@@ -6,7 +6,7 @@ import { t } from '../../../i18n';
 import { useAgentConnectStore } from '../../../store/agentConnectStore';
 import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
-import { ActionButton, IconRun, IconStop, IconWarning } from '../../ui';
+import { ActionButton, IconRun, IconStop, IconWarning, Summary } from '../../ui';
 import { SectionHeader } from '../SectionHeader';
 import { maskEmail } from './AccountPanel';
 import { ProtocolLogPanel } from './ProtocolLogPanel';
@@ -39,7 +39,7 @@ function ConversationItem({ item }: { item: TestItem }) {
     case 'thought':
       return (
         <details className="agent-item agent-thought">
-          <summary>{t('Raciocínio')}</summary>
+          <Summary>{t('Raciocínio')}</Summary>
           <div>{item.text}</div>
         </details>
       );

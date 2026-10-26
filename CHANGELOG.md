@@ -63,6 +63,7 @@
 
 ### Corrigido
 
+- Revisão da interface: espaçamentos, títulos, campos vazios, blocos recolhíveis e tabelas estreitas ficam consistentes em todas as telas.
 - O heartbeat e os outros interruptores das Configurações ficam com o espaçamento certo.
 - Os diálogos de importar e exportar artefatos e os editores de contexto não ocupam mais a tela inteira.
 - O Importar volta a encontrar as ferramentas instaladas, como o Claude Code.

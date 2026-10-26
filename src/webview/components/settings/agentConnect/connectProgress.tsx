@@ -11,7 +11,7 @@ import { formatDateTime, t, tn } from '../../../i18n';
 import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
 import { isWeb } from '../../../vscode';
-import { ActionButton, IconCheck, IconWarning } from '../../ui';
+import { ActionButton, IconCheck, IconWarning, Summary } from '../../ui';
 
 /** Os rótulos das oito linhas da ficha, na ordem de `MODE_SHEET_LINES`. */
 export const SHEET_LABEL: Record<ModeSheetLine, string> = {
@@ -170,7 +170,7 @@ export function ConnectProgress({
                 : t('Pronto para rodar cards')}
           </p>
           <details className="connect-details" open={reviewMissing}>
-            <summary>{t('Ver detalhes')}</summary>
+            <Summary>{t('Ver detalhes')}</Summary>
             {steps}
             <p className="muted small">{connectionSummary(state.summary, review)}</p>
             {mode && (

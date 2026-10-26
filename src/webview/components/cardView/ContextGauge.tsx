@@ -14,7 +14,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { dt, t } from '../../i18n';
 import { formatCompact, formatNumber, intlLocale } from '../metrics/format';
 import { harness } from '../../commands';
-import { Button, IconChevronRight } from '../ui';
+import { Button, Summary } from '../ui';
 
 // o clique no anel e no painel não arrasta, não seleciona nem abre o card
 const keep = (e: SyntheticEvent) => e.stopPropagation();
@@ -167,13 +167,12 @@ export function ContextDetail({ estimate: e }: { estimate: ContextEstimate }) {
       <div className="context-groups">
         {e.groups.map((g) => (
           <details key={g.id} className="context-group">
-            <summary>
-              <IconChevronRight />
+            <Summary>
               <span className={`context-swatch ctx-${g.id}`} />
               <span className="context-name">{t(GROUP_LABELS[g.id])}</span>
               <span className="context-tokens">{formatCompact(g.tokens)}</span>
               <span className="context-share">{e.window ? formatShare(g.tokens, e.window) : ''}</span>
-            </summary>
+            </Summary>
             <ul className="context-entries">
               {g.entries.map((entry, i) => (
                 <li key={i} className={entry.onDemand ? 'on-demand' : undefined}>
