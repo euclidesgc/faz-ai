@@ -7,6 +7,7 @@ export { DeleteButton } from './DeleteButton';
 export { OptionLabel, TechLogo, optionChip } from './OptionLabel';
 export { AddInput } from './AddInput';
 export { NumberField } from './NumberField';
+export { Stack, type StackGap } from './Stack';
 export { TextField } from './TextField';
 export { FormField } from './FormField';
 export { Hint } from './Hint';

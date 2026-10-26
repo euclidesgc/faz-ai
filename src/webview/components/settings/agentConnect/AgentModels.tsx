@@ -177,12 +177,10 @@ export function AgentModels({ profile }: { profile: AiProfile }) {
             label={t('Incluir os modos rápidos')}
             checked={board.rules.includeFastModels}
             onChange={(includeFastModels) => settings.updateRules({ includeFastModels })}
-          />
-          <Text as="p" size="1" color="gray">
-            {t(
+            hint={t(
               'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"); desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.',
             )}
-          </Text>
+          />
         </div>
       )}
       {adding && (

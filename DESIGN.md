@@ -134,6 +134,44 @@ olho.
   `.toolbar-group` separa a criação (Novo, Criar com ajuda) das ações de IA e de manutenção.
 - Seletores (`SelectField`), caixas de seleção, campos de busca e de adicionar, e a nota de status são do Radix em toda a interface, no board, no card aberto e nos filtros. Seguem nativos, de propósito, só os campos que têm de parecer texto (título do card, item da checklist, renomear coluna e workflow, o editor de markdown) e o seletor de cor (`<input type="color">`).
 
+## Layout e espaçamento
+
+O espaço da tela segue poucas regras, e cada padrão tem um componente. Assim uma tela nova sai alinhada
+sem ajuste fino, e uma correção vale para todas as telas que usam o componente.
+
+- **O espaço entre irmãos vem do pai.** Um bloco é um `Stack` (`components/ui/Stack.tsx`), que põe o
+  `gap` entre os filhos. Nenhum componente tem margem externa para se afastar do vizinho, e nenhum
+  `div` sem classe agrupa campos: um `div` simples zera o espaço entre eles (foi assim que o "Refinar os
+  cards novos do Backlog" ficou colado no campo de cima).
+- **Escala única.** Só os valores de `--sp-*`: `4` dentro de um campo (rótulo, controle e ajuda), `8`
+  entre controles numa linha, `12` entre os campos de um bloco (o padrão do `Stack` e do `Card` de
+  formulário), `16` entre as seções de um diálogo ou painel e `24` entre grupos grandes. Nada de px
+  solto, nem de estilo inline com margem ou padding.
+- **Um componente por padrão (DRY).**
+  - Campo com rótulo: `FormField`, com a explicação no `hint`.
+  - Interruptor: `SwitchField`, com a explicação no `hint`, nunca num texto solto depois dele.
+  - Número com unidade: `NumberField` com `unit`.
+  - Escolha: `SelectField`.
+  - Ação: `ActionButton`.
+  - Campos que dependem de um interruptor ficam num `Stack indent` logo abaixo dele.
+
+  Um padrão que aparece pela segunda vez vira componente em `components/ui` antes do segundo uso.
+
+- **O mais simples que resolve (KISS).** Para alinhar, use flex com `gap`. Sem posicionamento absoluto, sem
+  margem negativa e sem número mágico para compensar outro elemento. Se algo precisa de exceção, o
+  componente está errado: corrija o componente, não a tela.
+- **Cada componente faz uma coisa (SOLID).** O componente de campo cuida do rótulo, do controle e da
+  ajuda; o `Stack` cuida do espaço; a tela só compõe. Um componente não conhece a tela onde está, e a
+  tela não refaz por fora o que o componente já faz.
+- **Tamanho estável.** Abrir um menu, trocar um valor ou mostrar uma espera não muda o tamanho nem a
+  posição de nada em volta:
+  - seletor em linha de lista usa `SelectField steady`;
+  - a espera de um botão fica nele (`loading`);
+  - o `body` nunca tem padding nem margem, porque a trava de rolagem do Radix os reescreve ao abrir um
+    menu, e o espaço lateral fica no `#root`.
+- `test/designRules.test.ts` confere as regras que dá para ver no código. Regra nova que dá para conferir
+  ganha um teste ali.
+
 ## Diálogos
 
 Todo `Dialog.Content` do Radix segue a mesma forma (exemplo: `ImportDialog`):
