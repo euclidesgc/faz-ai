@@ -1,5 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import { Button, Checkbox, Select } from '@radix-ui/themes';
+import { Button, Checkbox } from '@radix-ui/themes';
 import type { Card } from '../../../shared/model';
 import type { ActivityContextWrite, ContextActivityTarget } from '../../../shared/contextPlanning';
 import { CONTEXT_ACTIONS } from '../../../shared/contextPlanning';
@@ -413,26 +413,16 @@ export function ExecutionPlanPanel({
   );
 }
 
-/** Padrões do board/workflow usam o mesmo editor e resolvedor das seleções dos cards. */
-export function ContextPlanDefaults() {
-  const state = useBoardStore((s) => s.state)!;
-  const [scope, setScope] = useState('board');
+/**
+ * Os padrões do plano sem card, com o mesmo editor e resolvedor das seleções dos cards: o do board (no Harness) ou o de
+ * um workflow (no editor do workflow, em Workflows e colunas). Os rascunhos são de quem monta, um conjunto por escopo.
+ */
+export function ContextPlanDefaults({ workflowId = null }: { workflowId?: string | null }) {
   const [drafts, setDrafts] = useState<ExecutionPlanDrafts>({});
   return (
     <section className="context-plan-defaults">
-      <h3>{t('Padrões do plano de execução')}</h3>
-      <Select.Root value={scope} onValueChange={setScope}>
-        <Select.Trigger aria-label={t('Escopo do plano')} />
-        <Select.Content>
-          <Select.Item value="board">{t('Padrão do board')}</Select.Item>
-          {state.workflows.map((w) => (
-            <Select.Item key={w.id} value={w.id}>
-              {w.name}
-            </Select.Item>
-          ))}
-        </Select.Content>
-      </Select.Root>
-      <ExecutionPlanPanel workflowId={scope === 'board' ? null : scope} drafts={drafts} onDrafts={setDrafts} />
+      <h3>{workflowId ? t('Plano de contexto deste workflow') : t('Plano de contexto padrão do board')}</h3>
+      <ExecutionPlanPanel workflowId={workflowId} drafts={drafts} onDrafts={setDrafts} />
     </section>
   );
 }

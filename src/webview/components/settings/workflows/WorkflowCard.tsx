@@ -7,15 +7,20 @@ import { workflowDeleteBlocker } from '../../../../shared/selectors';
 import { useBoardStore } from '../../../store/boardStore';
 import { settings } from '../../../commands';
 import { DeleteButton, IconPlus } from '../../ui';
+import { ContextPlanDefaults } from '../../card/ExecutionPlanPanel';
 import { ColumnsTable } from './ColumnsTable';
 import { DragHandle } from './DragHandle';
 import { kindLabel } from './kinds';
 import { t } from '../../../i18n';
 
-/** Um workflow: o nome (editável), o papel, o botão Nova coluna e a tabela de colunas. */
+/**
+ * Um workflow: o nome (editável), o papel, o botão Nova coluna, a tabela de colunas e, aberto pelo botão, o plano de
+ * contexto padrão dele (o do board fica no Harness).
+ */
 export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep: (delta: number) => void }) {
   const state = useBoardStore((s) => s.state)!;
   const [adding, setAdding] = useState(false);
+  const [plan, setPlan] = useState(false);
   const blocker = workflowDeleteBlocker(state, workflow.id);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: workflow.id });
 
@@ -39,6 +44,9 @@ export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep:
             {t(kindLabel(workflow.kind))}
           </Badge>
           <span className="spacer" />
+          <Button variant="soft" color="gray" aria-expanded={plan} onClick={() => setPlan(!plan)}>
+            {plan ? t('Fechar o plano de contexto') : t('Plano de contexto')}
+          </Button>
           <Button disabled={adding} onClick={() => setAdding(true)}>
             <IconPlus /> {t('Nova coluna')}
           </Button>
@@ -52,6 +60,7 @@ export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep:
           />
         </div>
         <ColumnsTable workflow={workflow} adding={adding} onAddDone={() => setAdding(false)} />
+        {plan && <ContextPlanDefaults workflowId={workflow.id} />}
       </Card>
     </div>
   );

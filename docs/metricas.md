@@ -93,8 +93,9 @@ admissão por capacidades de #729 continua pendente; a prévia não autoriza exe
 
 A aba **Plano de execução** permite revisar agente, modelo, skills adicionais, MCPs ativos, anexos de
 entrada e resultado esperado por ação. Histórias incluem linhas por fase aberta; tarefas têm quatro
-ações independentes (trabalho, refino, resumo e conflito). Em **Configurações → Harness →
-Contexto e modelo**, os padrões do board e dos workflows usam o mesmo editor, incluindo conversa e
+ações independentes (trabalho, refino, resumo e conflito). O padrão do board (em **Configurações → Harness →
+Plano de contexto**) e o de cada workflow (no botão **Plano de contexto** do workflow, em Workflows e
+colunas) usam o mesmo editor, incluindo conversa e
 assistentes sem card. As origens e incompatibilidades ficam na prévia. O catálogo mostra descrições
 curtas, sem abrir os corpos dos especialistas.
 

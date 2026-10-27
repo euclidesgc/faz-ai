@@ -1,9 +1,9 @@
-// A organização da tela do Harness: duas abas (os artefatos do board, e o contexto e modelo) e, nos artefatos,
+// A organização da tela do Harness: duas abas (os artefatos do board, e o plano de contexto) e, nos artefatos,
 // uma aba por assunto. Lógica pura, para a tela e os testes.
 import type { ArtifactKind, BoardArtifact } from './artifacts';
 import type { HarnessUsage } from './harnessSelection';
 
-/** Abas de primeiro nível do Harness: os artefatos do board, ou o plano de contexto e a sugestão de modelo. */
+/** Abas de primeiro nível do Harness: os artefatos do board, ou o plano de contexto padrão do board. */
 export type HarnessTab = 'artifacts' | 'context';
 
 /** O assunto de uma aba de artefatos. */

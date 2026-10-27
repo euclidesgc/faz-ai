@@ -34,6 +34,7 @@
 
 ### Alterado
 
+- A sugestão de modelo passa para o fim de Conectar agentes, e o plano de contexto de cada workflow, para o próprio workflow em Workflows e colunas; no Harness fica o plano padrão do board.
 - O Harness abre nos Artefatos do board, e a aba Ferramenta e execução vira Contexto e modelo, só com o plano de contexto e a sugestão de modelo.
 - O padrão da aba Agentes do Harness passa a se chamar "padrão das instruções", e o "Tornar padrão" de Conectar agentes vira "Usar nos cards sem modelo".
 - O diálogo de importar artefatos fica mais organizado, com as ações num só rodapé.

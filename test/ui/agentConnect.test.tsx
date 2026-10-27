@@ -134,6 +134,12 @@ describe('Conectar agentes: a lista e o agente padrão', () => {
     expect(screen.getAllByRole('tab').map(label)).toEqual(['Conexão', 'Modelos', 'Testar']);
   });
 
+  it('a sugestão de modelo do board fica no fim da tela, fora do agente aberto', () => {
+    show();
+    expect(screen.getByRole('heading', { name: 'Sugestão de modelo' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Preencher o modelo sugerido automaticamente' })).toBeInTheDocument();
+  });
+
   it('sem cartão do agente padrão no topo: o selo "Padrão" do agente escolhido explica o que é', async () => {
     show();
     expect(screen.queryByLabelText('Agente padrão')).toBeNull();

@@ -4,18 +4,18 @@ import type { SettingsTab } from './settingsTab';
  * Onde uma seção de Configurações mora: a aba e, quando ela está dentro de Harness, a sub-aba.
  * Fonte única para resolver a navegação cruzada (`DependsOn`, `goToSection` no `boardStore`, e a
  * mensagem `ui.openSettings` vinda do Settings nativo) — evita que cada lugar precise saber, por
- * exemplo, que a sugestão de modelo fica na sub-aba "Contexto e modelo" de Harness.
+ * exemplo, que a sugestão de modelo fica em Conectar agentes e o heartbeat em Automação.
  */
 export interface SettingsSectionInfo {
   tab: SettingsTab;
-  /** Sub-aba de Harness, quando a seção está lá dentro: `artifacts` (Artefatos do board) ou `context` (Contexto e modelo). */
+  /** Sub-aba de Harness, quando a seção está lá dentro: `artifacts` (Artefatos do board) ou `context` (Plano de contexto). */
   harnessTab?: 'artifacts' | 'context';
   /** O assunto aberto na aba de artefatos (`HarnessTopic` de `harnessTopics.ts`). */
   harnessTopic?: 'rules' | 'skill' | 'agent' | 'mcp';
 }
 
 export const SETTINGS_SECTIONS: Record<string, SettingsSectionInfo> = {
-  'model-rules': { tab: 'harness', harnessTab: 'context' },
+  'model-rules': { tab: 'connect' },
   'execution-policies': { tab: 'connect' },
   heartbeat: { tab: 'automation' },
   // as âncoras da tela por ferramenta caem na aba de artefatos do board

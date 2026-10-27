@@ -327,8 +327,8 @@ levam ao Harness e ao terminal do login.
 
 O board gerencia uma **biblioteca particular**, independente da ferramenta de IA. Em
 **Configurações → Harness**, a aba **Artefatos do board** concentra o CRUD de **Regras**,
-**Skills**, **Agentes** e **Servidores MCP**. **Contexto e modelo** guarda o plano de contexto e a
-sugestão de modelo dos cards. As permissões, o tempo limite e o heartbeat ficam em **Automação**. O **agente padrão das
+**Skills**, **Agentes** e **Servidores MCP**. **Plano de contexto** guarda o padrão do board; o de cada
+workflow fica em **Workflows e colunas** e a sugestão de modelo, em **Conectar agentes**. As permissões, o tempo limite e o heartbeat ficam em **Automação**. O **agente padrão das
 instruções** se escolhe na própria lista de **Agentes** (**Tornar padrão das instruções**); o nome o
 separa do agente de IA padrão de Conectar agentes. O agente de IA padrão do
 board, a conexão de cada agente ao servidor MCP do board e o regime de admissão ficam em Conectar

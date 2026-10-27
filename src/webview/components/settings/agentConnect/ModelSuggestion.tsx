@@ -8,8 +8,8 @@ import { ModelRulesEditor } from '../ModelRulesEditor';
 
 /**
  * O modelo de cada card: as regras que sugerem o agente, o modelo e o esforço pelo tipo, pelos campos e pelas tags
- * do card, e o "preencher sozinho". Vale para o board inteiro, com qualquer agente conectado: por isso fica no
- * Harness, e não na tela de um agente.
+ * do card, e o "preencher sozinho". Fica em Conectar agentes, onde se escolhem os modelos, mas abaixo da lista e do
+ * agente aberto: vale para o board inteiro, com qualquer agente conectado, e não para um agente só.
  */
 export function ModelSuggestion() {
   const { modelRules, rules } = useBoardStore((s) => s.state!.board);

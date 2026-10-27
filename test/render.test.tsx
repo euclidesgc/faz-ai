@@ -22,7 +22,7 @@ import { AutomationSettings } from '../src/webview/components/settings/Automatio
 import { RuleBuilder } from '../src/webview/components/settings/ModelRulesEditor';
 import { AppearanceSettings } from '../src/webview/components/settings/AppearanceSettings';
 import { AgentModels } from '../src/webview/components/settings/agentConnect/AgentModels';
-import { ModelSuggestion } from '../src/webview/components/settings/harness/ModelSuggestion';
+import { ModelSuggestion } from '../src/webview/components/settings/agentConnect/ModelSuggestion';
 import { RulesSettings } from '../src/webview/components/settings/RulesSettings';
 import { Settings } from '../src/webview/components/settings/Settings';
 import { GitSettings } from '../src/webview/components/settings/GitSettings';
@@ -298,14 +298,9 @@ describe('telas montam sem erro', () => {
         return html(<HarnessSettings />);
       })
       .join('\n');
-    for (const text of [
-      'Artefatos do board',
-      // a sugestão de modelo vale para o board inteiro: mora no Harness, não na tela de um agente
-      'Sugestão de modelo',
-      'Preencher o modelo sugerido automaticamente',
-      'Contexto e modelo',
-    ])
-      expect(harness).toContain(text);
+    for (const text of ['Artefatos do board', 'Plano de contexto', 'Plano de contexto padrão do board']) expect(harness).toContain(text);
+    // a sugestão de modelo saiu do Harness: mora em Conectar agentes, abaixo da lista
+    for (const text of ['Preencher o modelo sugerido automaticamente', 'Contexto e modelo']) expect(harness).not.toContain(text);
     // a execução saiu do Harness: mora na seção Automação
     const automation = html(<AutomationSettings />);
     for (const text of [

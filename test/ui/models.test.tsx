@@ -4,7 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { AgentModels } from '../../src/webview/components/settings/agentConnect/AgentModels';
-import { ModelSuggestion } from '../../src/webview/components/settings/harness/ModelSuggestion';
+import { ModelSuggestion } from '../../src/webview/components/settings/agentConnect/ModelSuggestion';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 let board: SeededBoard;

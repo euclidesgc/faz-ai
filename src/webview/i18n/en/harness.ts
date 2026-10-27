@@ -15,7 +15,10 @@ export const harness: Record<string, string> = {
 
   // --- HarnessSettings
   Harness: 'Harness',
-  'Contexto e modelo': 'Context and model',
+  'Plano de contexto': 'Context plan',
+  'Fechar o plano de contexto': 'Close the context plan',
+  'Plano de contexto deste workflow': "This workflow's context plan",
+  'Plano de contexto padrão do board': "Board's default context plan",
   Automação: 'Automation',
   'Como o board executa a IA, com qualquer agente ligado: o que ela pode fazer, o tempo limite de cada execução, o heartbeat e quantas histórias andam ao mesmo tempo.':
     'How the board runs the AI, with any enabled agent: what it may do, the time limit of each run, the heartbeat and how many stories move at once.',
@@ -680,8 +683,6 @@ export const harness: Record<string, string> = {
   'Critérios e dependências são lidos do card; editar o plano não cria cópias.':
     'Criteria and dependencies are read from the card; editing the plan does not create copies.',
   'Depende de #{number}': 'Depends on #{number}',
-  'Padrões do plano de execução': 'Execution plan defaults',
-  'Escopo do plano': 'Plan scope',
   Trabalho: 'Work',
   Refino: 'Refinement',
   'Resolução de conflitos': 'Conflict resolution',
@@ -929,8 +930,8 @@ export const harness: Record<string, string> = {
     'The tool only runs with all five capabilities verified: the AI sees exactly the context the board built for the card.',
   'A ferramenta pode carregar os próprios arquivos de contexto (regras, skills, agentes, hooks e MCPs que o perfil declara em "O que a CLI carrega por conta própria"). Permissões, MCP e delegação continuam exigidos. É o único regime em que um agente ACP roda.':
     'The tool may load its own context files (the rules, skills, agents, hooks and MCPs the profile declares under "What the CLI loads on its own"). Permissions, MCP and delegation are still required. It is the only regime in which an ACP agent runs.',
-  'Os <b>Artefatos do board</b> (regras, skills, agentes e servidores MCP) valem com qualquer ferramenta de IA; a edição vale para as próximas execuções. <b>Contexto e modelo</b> guarda o plano de contexto e a sugestão de modelo dos cards. O que a IA pode fazer e o heartbeat ficam em <b>Automação</b>.':
-    "The <b>Artefatos do board</b> (board artifacts: rules, skills, agents and MCP servers) apply with any AI tool; edits apply to the next runs. <b>Contexto e modelo</b> (context and model) holds the context plan and the cards' model suggestion. What the AI may do and the heartbeat live in <b>Automação</b> (automation).",
+  'Os <b>Artefatos do board</b> (regras, skills, agentes e servidores MCP) valem com qualquer ferramenta de IA; a edição vale para as próximas execuções. O <b>Plano de contexto</b> é o padrão do board; o de cada workflow fica em Workflows e colunas. O que a IA pode fazer e o heartbeat ficam em <b>Automação</b>; a sugestão de modelo, em <b>Conectar agentes</b>.':
+    "The <b>Artefatos do board</b> (board artifacts: rules, skills, agents and MCP servers) apply with any AI tool; edits apply to the next runs. The <b>Plano de contexto</b> (context plan) is the board's default; each workflow's lives in Workflows and columns. What the AI may do and the heartbeat live in <b>Automação</b> (automation); the model suggestion, in <b>Conectar agentes</b> (connect agents).",
   'O botão "Trabalhar na fase" de um card roda a IA dele em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define o que ela pode fazer nessas execuções ("Refinar com IA" roda só com o board, quando a ferramenta tem esse nível; sem ele, o pedido proíbe mexer em arquivos). O agente de cada card precisa estar instalado, autenticado e ligado em Conectar agentes.':
     'A card\'s "Trabalhar na fase" (work on the phase) button runs its AI in the background in this folder, with no one approving each step. Here you set what it may do in those runs ("Refinar com IA" runs only with the board when the tool has that level; without it, the request forbids touching files). Each card\'s agent must be installed, signed in and enabled in Connect agents.',
 };
