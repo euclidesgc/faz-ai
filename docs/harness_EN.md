@@ -281,7 +281,7 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   profiles (Claude Code, Gemini over the CLI and the ready ACP agents) it is a step of **Connect** and
   **Reconnect**, in Connect agents; for the checkable profiles that do not go through Connect (a copy
   of Claude Code and a custom ACP profile from an earlier version), it runs through the
-  **Verificar capacidades** (check capabilities) button in the profile's Details, on the same screen. The "Verify the AI CLI
+  **Verificar capacidades** (check capabilities) button at the end of the profile's Conexão tab, on the same screen. The "Verify the AI CLI
   isolation" palette command is gone. For Claude Code, the CLI runs in a throwaway folder against a
   local API with a fake key; for an ACP agent, it is two handshakes in a throwaway folder. Neither
   spends your account. While a checkable profile has no receipts, its block says where to check it. For an ACP agent the artifacts capability

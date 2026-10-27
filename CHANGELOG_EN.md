@@ -54,6 +54,7 @@
 
 ### Removed
 
+- The Details tab in Connect agents is gone; the profile actions move to the end of the Connection tab.
 - The "Default agent" card at the top of Connect agents is gone.
 - The "This project's tool" section of the Harness is gone.
 - The **Recreate default board** item and the `reset_board` MCP tool are gone.

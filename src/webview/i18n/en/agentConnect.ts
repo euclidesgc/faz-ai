@@ -73,8 +73,9 @@ export const agentConnect: Record<string, string> = {
   'programa instalado no computador': 'program installed on the computer',
   'agente pelo protocolo ACP': 'agent over the ACP protocol',
   'direto pela API, sem programa instalado': 'straight through the API, with no program installed',
-  'Cópias e perfis personalizados não passam pelo Conectar: em Detalhes, verifique as capacidades e dê a ciência do regime; depois, ligue o perfil aqui.':
-    'Copies and custom profiles do not go through Connect: in Details, check the capabilities and acknowledge the regime; then enable the profile here.',
+  'Cópias e perfis personalizados não passam pelo Conectar: verifique as capacidades e dê a ciência do regime nas ações abaixo; depois, ligue o perfil.':
+    'Copies and custom profiles do not go through Connect: check the capabilities and acknowledge the regime with the actions below; then enable the profile.',
+  'Ações do perfil': 'Profile actions',
   'O board ainda não executa cards com este agente: ele está no registro do ACP, mas não no catálogo da extensão. Dá para entrar na conta e conversar com ele na aba Testar.':
     "The board does not run cards with this agent yet: it is in the ACP registry, but not in the extension's catalog. You can sign in and talk to it in the Test tab.",
 
@@ -204,16 +205,11 @@ export const agentConnect: Record<string, string> = {
   // os detalhes
   Tipo: 'Type',
   Isolamento: 'Isolation',
-  'Regime compatível': 'Compatible regime',
-  'com a sua ciência (revisão {n})': 'with your acknowledgment (revision {n})',
-  'sem ciência': 'not acknowledged',
   Versão: 'Version',
   Medição: 'Measurement',
-  'Registro do ACP': 'ACP registry',
   Autores: 'Authors',
   Distribuição: 'Distribution',
   binário: 'binary',
-  'Comando da sessão de teste': 'Test session command',
   'Personalizado pelo ACP: continua rodando como está. O caminho normal é conectar o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.':
     'Custom over ACP: it keeps running as it is. The usual path is to connect the catalog agent in ACP mode; new custom profiles are CLI only.',
   'Mostra o agente do catálogo deste perfil, para conectar.': "Shows this profile's catalog agent, to connect it.",

@@ -140,15 +140,15 @@ describe('faixa de requisitos do board', () => {
     expect(screen.queryByText(/Verificar o isolamento da CLI de IA/)).toBeNull();
     // o texto diz o mesmo que o botão ao lado, "Abrir Conectar agentes"
     expect(screen.getByText(/Abra Conectar agentes e conecte este perfil de novo/)).toBeInTheDocument();
-    expect(screen.getByText(/Clique em Verificar capacidades nos detalhes deste perfil, em Conectar agentes/)).toBeInTheDocument();
+    expect(screen.getByText(/Clique em Verificar capacidades na aba Conexão deste perfil, em Conectar agentes/)).toBeInTheDocument();
     expect(screen.getByText(/O board já está verificando de novo, sem gastar a sua conta/)).toBeInTheDocument();
     expect(region()).toHaveClass('warn');
     expect(region()).not.toHaveClass('error');
     expect(aiBlockedReason(useBoardStore.getState().state!)).toBeNull();
-    // a cópia vai aos detalhes dela, onde fica o "Verificar capacidades"; o pronto, à conexão
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir os detalhes do perfil' }));
+    // a cópia vai à aba Conexão dela, onde fica o "Verificar capacidades"; o pronto, ao Conectar
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir o perfil' }));
     expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'connect' });
-    expect(useAgentConnectStore.getState()).toMatchObject({ selected: 'claude-trabalho', tab: 'details' });
+    expect(useAgentConnectStore.getState()).toMatchObject({ selected: 'claude-trabalho', tab: 'connection' });
     await userEvent.click(screen.getByRole('button', { name: 'Abrir Conectar agentes' }));
     expect(useBoardStore.getState()).toMatchObject({ settingsTab: 'connect', connectTool: 'claude' });
   });

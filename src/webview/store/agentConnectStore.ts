@@ -19,7 +19,7 @@ export type ProfileStatus = Extract<HostToWebview, { type: 'aiProfiles.status' }
 export type QuickTest = Extract<HostToWebview, { type: 'aiProfiles.testResult' }>;
 
 /** As abas do agente escolhido na tela. */
-export type AgentTab = 'connection' | 'models' | 'test' | 'details';
+export type AgentTab = 'connection' | 'models' | 'test';
 
 /**
  * Conectar agentes: o que vem do host fica fora dos componentes, para não se perder quando a pessoa troca de aba

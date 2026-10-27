@@ -269,7 +269,7 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   valha (o resultado vai para Saída › Faz AI). Nos perfis do catálogo (o Claude Code, o Gemini pela CLI
   e os agentes ACP prontos), ela é um passo do **Conectar** e do **Reconectar**, em Conectar agentes;
   nos verificáveis que não passam pelo Conectar (a cópia do Claude Code e o personalizado ACP de uma
-  versão anterior), roda pelo botão **Verificar capacidades** nos Detalhes do perfil, na mesma tela. O comando da
+  versão anterior), roda pelo botão **Verificar capacidades** no fim da aba Conexão do perfil, na mesma tela. O comando da
   paleta "Verificar o isolamento da CLI de IA" saiu. No Claude Code, a CLI roda numa pasta descartável
   contra uma API local, com uma chave falsa; num agente ACP, são dois handshakes numa pasta
   descartável. Nenhuma das duas gasta a sua conta. Enquanto um perfil verificável não tem recibos, o

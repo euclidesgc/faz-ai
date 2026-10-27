@@ -24,7 +24,7 @@ export type RequirementAction =
    * Reconectar do perfil do catálogo cuja prova perdeu a validade (história 13)
    */
   | { kind: 'connect'; profile: AiTool }
-  /** Conectar agentes, nos detalhes do perfil: o "Verificar capacidades" do perfil verificável sem Conectar (história 13) */
+  /** Conectar agentes, na aba Conexão do perfil: o "Verificar capacidades" do perfil verificável sem Conectar (história 13) */
   | { kind: 'aiTools'; profile: AiTool };
 
 /**

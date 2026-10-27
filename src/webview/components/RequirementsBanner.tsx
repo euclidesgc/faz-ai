@@ -89,7 +89,7 @@ export function requirementTexts(r: BoardRequirement): { title: string; detail: 
                           'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Abra Conectar agentes e conecte este perfil de novo: a verificação faz parte do Conectar.',
                         )
                       : t(
-                          'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Verificar capacidades nos detalhes deste perfil, em Conectar agentes.',
+                          'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Verificar capacidades na aba Conexão deste perfil, em Conectar agentes.',
                         )
                   : r.problem === 'not-admissible'
                     ? t('O regime em vigor não admite este perfil. Veja o motivo no Diagnóstico do ambiente.')
@@ -249,18 +249,18 @@ export function RequirementFix({
           {t('Abrir Conectar agentes')}
         </Button>
       );
-    // o perfil verificável sem Conectar (a cópia do Claude Code): o "Verificar capacidades" fica nos detalhes dele
+    // o perfil verificável sem Conectar (a cópia do Claude Code): o "Verificar capacidades" fica na aba Conexão dele
     case 'aiTools':
       return (
         <Button
           size="small"
           variant={variant}
           onClick={() => {
-            useAgentConnectStore.getState().select(action.profile, 'details');
+            useAgentConnectStore.getState().select(action.profile, 'connection');
             openSettings('connect');
           }}
         >
-          {t('Abrir os detalhes do perfil')}
+          {t('Abrir o perfil')}
         </Button>
       );
   }

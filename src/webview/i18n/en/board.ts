@@ -463,10 +463,10 @@ export const board: Record<string, string> = {
     'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. The board is already checking again, without using your account; the result goes to Output › Faz AI.',
   'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Abra Conectar agentes e conecte este perfil de novo: a verificação faz parte do Conectar.':
     'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Open Connect agents and connect this profile again: the check is part of Connect.',
-  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Verificar capacidades nos detalhes deste perfil, em Conectar agentes.':
-    "The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Click Check capabilities in this profile's details, in Connect agents.",
+  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Verificar capacidades na aba Conexão deste perfil, em Conectar agentes.':
+    "The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Click Check capabilities in this profile's Connection tab, in Connect agents.",
   'Abrir Conectar agentes': 'Open Connect agents',
-  'Abrir os detalhes do perfil': 'Open the profile details',
+  'Abrir o perfil': 'Open the profile',
   '{name}: pendente de revisão': '{name}: pending review',
   'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 22 ou mais novo, e ele não está no PATH do terminal. Sem ele, a IA não alcança o board. Instale o Node.js e clique em Verificar de novo.':
     "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 22 or newer, and it is not on the terminal's PATH. Without it, the AI cannot reach the board. Install Node.js and click Check again.",

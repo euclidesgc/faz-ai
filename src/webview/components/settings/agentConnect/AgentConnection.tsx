@@ -10,7 +10,7 @@ import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
 import { ActionButton, Hint, IconCheck, IconExternal, IconWarning, SwitchField, Summary } from '../../ui';
 import { AccountPanel } from './AccountPanel';
-import { connectable } from './AgentDetails';
+import { ProfileActions, connectable } from './ProfileActions';
 import { ConnectProgress, ModeSheetList } from './connectProgress';
 import { ContextScope } from './ContextScope';
 
@@ -214,8 +214,8 @@ function ProfileUse({ profile }: { profile: AiProfile }) {
   );
 }
 
-/** A aba Conexão: a ferramenta nesta máquina, a conta, a conexão com o board e o uso nos cards. */
-export function AgentConnection({ item }: { item: AgentListItem }) {
+/** A aba Conexão: o uso nos cards, a ferramenta nesta máquina, a conta, a conexão com o board e as ações do perfil. */
+export function AgentConnection({ item, onEdit }: { item: AgentListItem; onEdit(profile: AiProfile): void }) {
   const p = item.profile;
   const installed = useAgentConnectStore((s) => (p ? s.installed[p.id] : undefined));
   return (
@@ -228,10 +228,11 @@ export function AgentConnection({ item }: { item: AgentListItem }) {
       {p && !connectable(p) && (
         <Text as="p" size="1" color="gray">
           {t(
-            'Cópias e perfis personalizados não passam pelo Conectar: em Detalhes, verifique as capacidades e dê a ciência do regime; depois, ligue o perfil aqui.',
+            'Cópias e perfis personalizados não passam pelo Conectar: verifique as capacidades e dê a ciência do regime nas ações abaixo; depois, ligue o perfil.',
           )}
         </Text>
       )}
+      {p && <ProfileActions profile={p} onEdit={onEdit} />}
       {!p && (
         <Callout.Root color="gray" size="1">
           <Callout.Text>
