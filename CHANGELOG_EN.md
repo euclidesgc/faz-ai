@@ -54,6 +54,7 @@
 
 ### Removed
 
+- The "Default agent" field in Harness › Tool and execution is gone; it repeated "Make default" in the Agents tab.
 - The Details tab in Connect agents is gone; the profile actions move to the end of the Connection tab.
 - The "Default agent" card at the top of Connect agents is gone.
 - The "This project's tool" section of the Harness is gone.
@@ -64,6 +65,7 @@
 
 ### Fixed
 
+- The heartbeat text says it calls each card's agent, not a single tool.
 - Old ACP protocol log files are now deleted along with the trace files, even with the window open for days.
 - The Hide session/update switch gets a hint explaining it only filters the list.
 - Interface review: spacing, headings, empty fields, collapsible blocks and narrow tables are consistent across all screens.

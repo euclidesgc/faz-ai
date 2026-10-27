@@ -54,6 +54,7 @@
 
 ### Removido
 
+- Saiu o "Agente padrão" de Harness › Ferramenta e execução, que repetia o "Tornar padrão" da aba Agentes.
 - A aba Detalhes de Conectar agentes sai; as ações do perfil passam para o fim da aba Conexão.
 - Saiu o cartão "Agente padrão" do topo de Conectar agentes.
 - Saiu a seção "Ferramenta deste projeto" do Harness.
@@ -64,6 +65,7 @@
 
 ### Corrigido
 
+- O texto do heartbeat diz que ele chama o agente de cada card, não uma ferramenta só.
 - Os arquivos antigos do log do protocolo ACP passam a ser apagados junto com os do rastreio, também com a janela aberta por dias.
 - O interruptor Ocultar session/update ganha um hint que explica que só filtra a lista.
 - Revisão da interface: espaçamentos, títulos, campos vazios, blocos recolhíveis e tabelas estreitas ficam consistentes em todas as telas.

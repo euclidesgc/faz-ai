@@ -1,4 +1,3 @@
-import { activeProfile, toolInfo } from '../../../shared/aiProfiles';
 import { Tabs } from '@radix-ui/themes';
 import { useBoardStore, type HarnessTab } from '../../store/boardStore';
 import { RunnerSettings } from './harness/RunnerSettings';
@@ -13,13 +12,11 @@ import { rich } from '../../i18n/rich';
  * Tela do harness. Toda execução do board parte só do que está no board (no Claude Code, contexto vazio imposto; nas outras
  * CLIs, o que elas carregam sozinhas aparece em Conectar agentes). A aba "Artefatos do board" organiza regras, skills,
  * agentes e servidores MCP; "Ferramenta e execução" define o que a IA pode fazer, o heartbeat, o plano de contexto e a
- * sugestão de modelo dos cards (do board inteiro, com qualquer agente). O agente padrão e as regras de fallback ficam em
- * Conectar agentes.
+ * sugestão de modelo dos cards (do board inteiro, com qualquer agente). O agente padrão do harness se escolhe na lista
+ * de Agentes; o agente de IA padrão e as regras de fallback ficam em Conectar agentes.
  */
 export function HarnessSettings() {
-  const board = useBoardStore((s) => s.state!.board);
   const tab = useBoardStore((s) => s.harnessTab);
-  const tool = toolInfo(activeProfile(board));
   return (
     <div>
       <PageHeader title={t('Harness')}>
@@ -36,7 +33,7 @@ export function HarnessSettings() {
           <ArtifactsHarness />
         </Tabs.Content>
         <Tabs.Content value="tool">
-          <RunnerSettings tool={tool} />
+          <RunnerSettings />
           <ContextPlanDefaults />
           <ModelSuggestion />
         </Tabs.Content>

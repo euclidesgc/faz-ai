@@ -90,7 +90,7 @@ mesmo tempo em qualquer modo de workspace, até **Histórias ao mesmo tempo** (d
 seis), mesmo com **Tocar histórias em paralelo** desligado. As atividades **com branch**
 (Implementação e Homologação) seguem o limite de antes: uma por vez fora do worktree.
 
-No modo "Worktree por história", **Tocar histórias em paralelo** (Configurações → Harness de IA ›
+No modo "Worktree por história", **Tocar histórias em paralelo** (Configurações → Harness ›
 Ferramenta e execução; nasce desligado) faz o heartbeat tocar várias histórias com branch ao mesmo
 tempo, cada uma na sua pasta de trabalho, até o mesmo **Histórias ao mesmo tempo**. Os dois tetos
 (texto e branch) contam separados; cada um conta toda execução em andamento, inclusive as chamadas à

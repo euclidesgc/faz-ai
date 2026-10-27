@@ -94,7 +94,7 @@ tempo** (two by default, up to six), even with **Tocar histórias em paralelo** 
 **with a branch** (Implementation and Homologation) keep the previous limit: one at a time outside
 the worktree.
 
-In "Worktree por história" mode, **Tocar histórias em paralelo** (Settings → AI Harness › Tool and
+In "Worktree por história" mode, **Tocar histórias em paralelo** (Settings → Harness › Tool and
 execution; off by default) makes the heartbeat drive several branch stories at once, each in its own
 working folder, up to the same **Histórias ao mesmo tempo**. The two caps (text and branch) are
 counted separately; each counts every run in progress, including the ones called by hand. In

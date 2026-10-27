@@ -2,7 +2,6 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
-import { baseInfo } from '../../src/shared/harness';
 import { lastSent, seedBoard, syncStore, type SeededBoard } from './setup';
 import { RunnerSettings } from '../../src/webview/components/settings/harness/RunnerSettings';
 
@@ -15,7 +14,7 @@ const show = () => {
   syncStore(board.router);
   return render(
     <Theme>
-      <RunnerSettings tool={baseInfo('claude')} />
+      <RunnerSettings />
     </Theme>,
   );
 };
@@ -41,6 +40,16 @@ describe('RunnerSettings dentro do editor', () => {
     await userEvent.clear(field);
     await userEvent.type(field, '3{Enter}');
     expect(lastSent('settings.board.update').patch).toEqual({ runner: { parallelStories: 3 } });
+  });
+
+  it('não repete o agente padrão: ele se escolhe na lista de Agentes do Harness', () => {
+    show();
+    expect(screen.queryByLabelText('Agente padrão')).toBeNull();
+  });
+
+  it('o heartbeat chama o agente de cada card, não uma ferramenta só', () => {
+    show();
+    expect(screen.getByText(/o board chama sozinho, a cada intervalo, o agente de cada card/)).toBeInTheDocument();
   });
 
   it('o regime de admissão saiu daqui: é de cada perfil, com a ciência no Conectar (história 7)', () => {
