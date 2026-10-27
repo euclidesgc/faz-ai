@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Badge, Checkbox } from '@radix-ui/themes';
 import { agentOfArtifact, artifactLocation, selectableOfKind, type ArtifactKind, type BoardArtifact } from '../../../../shared/artifacts';
 import type { AgentSuggestion } from '../../../../shared/agentSuggestions';
@@ -43,19 +43,25 @@ function originText(a: BoardArtifact): string | null {
 export function ArtifactList({
   kind,
   query,
+  onlyOff = false,
+  search,
   picked,
   onPick,
   onImport,
 }: {
   kind: ArtifactKind;
   query: string;
+  /** só os desligados (o filtro do aviso de regras desligadas) */
+  onlyOff?: boolean;
+  /** a busca do assunto, entre a barra de criação e a lista que ela filtra */
+  search?: ReactNode;
   picked: ReadonlySet<string>;
   onPick: (next: Set<string>) => void;
   onImport: () => void;
 }) {
   const state = useBoardStore((s) => s.state)!;
   const all = (state.harness.library?.artifacts ?? []).filter((a) => a.kind === kind);
-  const items = all.filter((a) => matchesQuery(query, a.name, a.description));
+  const items = all.filter((a) => (!onlyOff || a.usage === 'off') && matchesQuery(query, a.name, a.description));
   // as skills do fluxo que não estão na biblioteca aparecem também, só para leitura: o board as entrega pelo get_skill
   const flowSkills =
     kind === 'skill'
@@ -108,11 +114,11 @@ export function ArtifactList({
     const label = { rule: t('Nova regra'), skill: t('Nova skill'), mcp: t('Novo servidor') }[kind];
     return (
       <div className="actions-toolbar">
-        <ActionButton hint={t('Abre o formulário; o artefato é gravado no board ao salvar.')} onClick={() => toggle({ create: true })}>
-          <IconPlus /> {label}
-        </ActionButton>
-        {kind === 'rule' && (
-          <>
+        <span className="toolbar-group">
+          <ActionButton hint={t('Abre o formulário; o artefato é gravado no board ao salvar.')} onClick={() => toggle({ create: true })}>
+            <IconPlus /> {label}
+          </ActionButton>
+          {kind === 'rule' && (
             <ActionButton
               variant="soft"
               color="gray"
@@ -121,6 +127,20 @@ export function ArtifactList({
             >
               <IconRules /> {t('Criar regra com ajuda')}
             </ActionButton>
+          )}
+          {kind === 'skill' && (
+            <ActionButton
+              variant="soft"
+              color="gray"
+              hint={t('Um passo a passo para escrever uma skill; ela entra no board em "Pelo card".')}
+              onClick={() => toggle({ wizard: null })}
+            >
+              <IconSkills /> {t('Criar skill com ajuda')}
+            </ActionButton>
+          )}
+        </span>
+        {kind === 'rule' && (
+          <span className="toolbar-group">
             <ActionButton
               variant="soft"
               color="gray"
@@ -131,18 +151,10 @@ export function ArtifactList({
             >
               {t('Sugerir regras com IA')}
             </ActionButton>
-          </>
+          </span>
         )}
         {kind === 'skill' && (
-          <>
-            <ActionButton
-              variant="soft"
-              color="gray"
-              hint={t('Um passo a passo para escrever uma skill; ela entra no board em "Pelo card".')}
-              onClick={() => toggle({ wizard: null })}
-            >
-              <IconSkills /> {t('Criar skill com ajuda')}
-            </ActionButton>
+          <span className="toolbar-group">
             <ActionButton
               variant="soft"
               color="gray"
@@ -153,7 +165,7 @@ export function ArtifactList({
             >
               {t('Sugerir skills com IA')}
             </ActionButton>
-          </>
+          </span>
         )}
       </div>
     );
@@ -173,6 +185,7 @@ export function ArtifactList({
   return (
     <div className="artifact-list">
       {toolbar()}
+      {all.length > 0 && search}
       {creating && creator}
       {wizard && kind === 'rule' && <RuleWizard onClose={close} />}
       {wizard && kind === 'skill' && <SkillWizard onClose={close} />}

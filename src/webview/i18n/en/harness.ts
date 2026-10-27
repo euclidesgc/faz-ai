@@ -851,8 +851,17 @@ export const harness: Record<string, string> = {
     'No MCP server on the board. Register one or import the ones you already set up.',
 
   // --- Exportar para a ferramenta
-  'Copia regras, skills e agentes do board para a pasta de uma ferramenta (Claude Code, Cursor ou Kimi Code), no formato dela.':
-    "Copies board rules, skills and agents into a tool's folder (Claude Code, Cursor or Kimi Code), in its format.",
+  'Copia regras, skills e agentes do board para a pasta de uma ferramenta (Claude Code, Cursor ou Kimi Code), no formato dela. Os servidores MCP não vão: o Conectar registra o do board.':
+    "Copies board rules, skills and agents into a tool's folder (Claude Code, Cursor or Kimi Code), in its format. MCP servers don't go: Connect registers the board's own.",
+  'Volta a mostrar todas as regras do board.': 'Shows all the board rules again.',
+  'Mostra só as regras desligadas, para revisar uma a uma.': 'Shows only the rules that are off, to review them one by one.',
+  'Mostrar todas as regras': 'Show all rules',
+  'Mostrar só as desligadas': 'Show only the ones off',
+  'Buscar em {topic} por nome ou descrição': 'Search {topic} by name or description',
+  'Vale para os cards deste workflow; o que ficar em "Herdar" segue o padrão do board, em Harness › Plano de contexto.':
+    'Applies to the cards of this workflow; whatever stays on "Herdar" (inherit) follows the board default, in Harness › Plano de contexto (context plan).',
+  'O que cada atividade leva para a IA (agente, modelo, skills, MCPs e o resultado esperado) quando nem o card nem o workflow escolhem outra coisa. O de cada workflow fica no botão Plano de contexto dele, em Workflows e colunas.':
+    "What each activity brings to the AI (agent, model, skills, MCPs and the expected result) when neither the card nor the workflow picks something else. Each workflow's lives under its Plano de contexto (context plan) button, in Workflows and columns.",
   'Exportar para a ferramenta': 'Export to the tool',
   '{n} gravados': '{n} written',
   '{n} substituídos': '{n} replaced',

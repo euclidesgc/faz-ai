@@ -441,6 +441,13 @@ tool or CLI command for it (#623).
 
 ### The artifact tabs
 
+**Importar** (import) and **Exportar para a ferramenta** (export to the tool) sit above the tabs and
+apply to every topic. Inside each tab, the bar separates creating (**Nova regra**, **Criar regra com
+ajuda** and the equivalents for skills, agents and MCP servers) from asking the AI (**Sugerir … com
+IA**); right below is that topic's search, which filters the list and is kept when you switch tabs.
+With rules that are off, the Rules tab notice has **Mostrar só as desligadas** (show only the ones
+off), to review them one by one.
+
 Each tab offers **Criar** (create), search, counts and actions to **Editar** (edit), change the
 usage mode, update from source and remove with confirmation. Rules, skills and subagents also offer
 **Assistente guiado** (guided assistant: steps by section, hints, placeholders, editable examples

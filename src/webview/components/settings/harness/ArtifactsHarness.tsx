@@ -13,14 +13,16 @@ const EMPTY_PICKED = (): Record<HarnessTopic, Set<string>> => ({ rules: new Set(
 
 /**
  * A aba "Artefatos do board": as regras, skills, agentes e servidores MCP que o board guarda, uma aba por assunto.
- * A busca e a seleção são de cada assunto e ficam aqui, para trocar de aba não as perder; o editor de uma linha só
- * existe enquanto está aberto (monta na própria `ArtifactList`).
+ * Importar e exportar valem para todos os assuntos e ficam acima das abas; a busca é de cada assunto e fica dentro da
+ * aba dele. A busca, a seleção e o filtro das regras desligadas ficam aqui, para trocar de aba não os perder; o editor
+ * de uma linha só existe enquanto está aberto (monta na própria `ArtifactList`).
  */
 export function ArtifactsHarness() {
   const artifacts = useBoardStore((s) => s.state!.harness.library?.artifacts) ?? [];
   const topic = useBoardStore((s) => s.harnessTopic);
   const [queries, setQueries] = useState<Record<HarnessTopic, string>>({ rules: '', skill: '', agent: '', mcp: '' });
   const [picked, setPicked] = useState(EMPTY_PICKED);
+  const [onlyOffRules, setOnlyOffRules] = useState(false);
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const deferred = useDeferredValue(queries);
@@ -31,15 +33,7 @@ export function ArtifactsHarness() {
 
   return (
     <div className="scope-harness artifacts-harness">
-      <div className="topic-bar">
-        <TextField.Root
-          className="topic-search"
-          type="search"
-          aria-label={t('Buscar por nome ou descrição')}
-          placeholder={t('Buscar por nome ou descrição…')}
-          value={queries[active.id]}
-          onChange={(e) => setQueries({ ...queries, [active.id]: e.target.value })}
-        />
+      <div className="actions-toolbar">
         <ActionButton
           hint={t('Importa regras, skills, agentes e servidores MCP de uma pasta, de uma ferramenta instalada ou de um arquivo.')}
           onClick={() => setImporting(true)}
@@ -49,7 +43,7 @@ export function ArtifactsHarness() {
         <ActionButton
           variant="soft"
           hint={t(
-            'Copia regras, skills e agentes do board para a pasta de uma ferramenta (Claude Code, Cursor ou Kimi Code), no formato dela.',
+            'Copia regras, skills e agentes do board para a pasta de uma ferramenta (Claude Code, Cursor ou Kimi Code), no formato dela. Os servidores MCP não vão: o Conectar registra o do board.',
           )}
           onClick={() => setExporting(true)}
         >
@@ -90,11 +84,39 @@ export function ArtifactsHarness() {
                     'Há regras desligadas: elas estão no board, mas não entram em nenhuma execução. Leia o texto de cada uma e ative ou apague; regra ativa entra em toda execução.',
                   )}
                 </Callout.Text>
+                <div className="row end">
+                  <ActionButton
+                    size="1"
+                    variant="soft"
+                    aria-pressed={onlyOffRules}
+                    hint={
+                      onlyOffRules
+                        ? t('Volta a mostrar todas as regras do board.')
+                        : t('Mostra só as regras desligadas, para revisar uma a uma.')
+                    }
+                    onClick={() => setOnlyOffRules(!onlyOffRules)}
+                  >
+                    {onlyOffRules ? t('Mostrar todas as regras') : t('Mostrar só as desligadas')}
+                  </ActionButton>
+                </div>
               </Callout.Root>
             )}
             <ArtifactList
               kind={x.kind}
+              search={
+                <div className="topic-bar">
+                  <TextField.Root
+                    className="topic-search"
+                    type="search"
+                    aria-label={t('Buscar em {topic} por nome ou descrição', { topic: t(x.label) })}
+                    placeholder={t('Buscar por nome ou descrição…')}
+                    value={queries[x.id]}
+                    onChange={(e) => setQueries({ ...queries, [x.id]: e.target.value })}
+                  />
+                </div>
+              }
               query={deferred[x.id]}
+              onlyOff={x.id === 'rules' && onlyOffRules && rules.off > 0}
               picked={picked[x.id]}
               onPick={(next) => setPicked({ ...picked, [x.id]: next })}
               onImport={() => setImporting(true)}

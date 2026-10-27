@@ -5091,9 +5091,6 @@ div.metrics-breakdown {
   gap: var(--sp-12);
   min-width: 0;
 }
-.context-plan-defaults {
-  margin-top: var(--sp-24);
-}
 /* a tabela vira uma lista de cartões quando não cabe (o card aberto tem ~730px): cada célula leva o título da coluna */
 .context-plan-table-wrap {
   overflow-x: auto;

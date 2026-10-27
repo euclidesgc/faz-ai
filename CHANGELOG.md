@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- O aviso de regras desligadas do Harness ganha **Mostrar só as desligadas**, para revisá-las uma a uma.
 - Nova seção Automação nas Configurações, com a permissão da IA, o tempo limite, o heartbeat e o paralelismo, que saem do Harness.
 - A biblioteca do board marca o que é de fábrica e as cópias passam a acompanhar a origem.
 - Novo tipo de card Hotfix, que parte da principal e gera tag e GitHub Release.
@@ -34,6 +35,7 @@
 
 ### Alterado
 
+- Nos artefatos do Harness, a busca fica dentro de cada aba, e a barra separa criar de pedir à IA em todos os assuntos.
 - A sugestão de modelo passa para o fim de Conectar agentes, e o plano de contexto de cada workflow, para o próprio workflow em Workflows e colunas; no Harness fica o plano padrão do board.
 - O Harness abre nos Artefatos do board, e a aba Ferramenta e execução vira Contexto e modelo, só com o plano de contexto e a sugestão de modelo.
 - O padrão da aba Agentes do Harness passa a se chamar "padrão das instruções", e o "Tornar padrão" de Conectar agentes vira "Usar nos cards sem modelo".

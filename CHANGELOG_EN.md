@@ -6,6 +6,7 @@
 
 ### Added
 
+- The Harness notice about rules that are off gains **Show only the ones off**, to review them one by one.
 - New Automation section in Settings, with the AI permission, the time limit, the heartbeat and parallelism, which leave the Harness.
 - The board library marks what is factory-made, and copies now follow their source.
 - New Hotfix card type, which starts from the main branch and creates a tag and GitHub Release.
@@ -34,6 +35,7 @@
 
 ### Changed
 
+- In the Harness artifacts, search sits inside each tab, and the bar separates creating from asking the AI in every topic.
 - The model suggestion moves to the end of Connect agents, and each workflow's context plan to the workflow itself in Workflows and columns; the Harness keeps the board's default plan.
 - The Harness opens on the board artifacts, and the Tool and execution tab becomes Context and model, with only the context plan and the model suggestion.
 - The default in the Harness Agents tab is now called "default for instructions", and "Make default" in Connect agents becomes "Use for cards with no model".
