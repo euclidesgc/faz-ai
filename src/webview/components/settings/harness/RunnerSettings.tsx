@@ -1,23 +1,20 @@
 import { Callout, Card } from '@radix-ui/themes';
 import { HEARTBEAT_RANGE, PARALLEL_RANGE, RUNNER_PERMISSIONS, SUBTASK_PARALLEL_RANGE, TIMEOUT_RANGE } from '../../../../shared/runner';
 import { effectiveLimits } from '../../../../shared/orchestration';
-import type { AiToolInfo } from '../../../../shared/harnessProject';
 import { useBoardStore } from '../../../store/boardStore';
 import { ai, settings } from '../../../commands';
 import { ActionButton, FormField, IconWarning, NumberField, SelectField, Stack, SwitchField } from '../../ui';
 import { SectionHeader } from '../SectionHeader';
-import { DependsOn } from '../DependsOn';
 import { t } from '../../../i18n';
 
 /** O que a IA pode fazer quando o board a executa (pela conversa ou pelo heartbeat), o tempo limite e o heartbeat. */
-export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
+export function RunnerSettings() {
   const board = useBoardStore((s) => s.state!.board);
   const unsupported = useBoardStore((s) => s.state!.aiRunUnsupported);
   const runner = board.runner;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === runner.permission)!;
   const worktree = board.git.mode === 'worktree';
   const subtasks = effectiveLimits(runner, board.git.mode).subtasks;
-  const hasAvailableAgent = board.execProfiles.some((p) => p.scope !== 'builtin');
   return (
     <>
       <SectionHeader
@@ -94,33 +91,6 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
               </div>
             </Callout.Root>
           )}
-          <FormField
-            label={t('Agente padrão')}
-            hint={t('Executa os cards que não escolhem um agente, nem pela fase. Só os agentes marcados como disponíveis no Harness.')}
-          >
-            {(id) => (
-              <>
-                <SelectField
-                  id={id}
-                  aria-label={t('Agente padrão')}
-                  options={board.execProfiles.map((p) => ({
-                    value: p.id,
-                    label: p.scope === 'builtin' ? t('Agente embutido (sem instruções)') : p.id,
-                  }))}
-                  value={board.execProfiles.find((p) => p.isDefault)?.id ?? ''}
-                  onChange={(defaultAgent) => settings.updateBoard({ runner: { defaultAgent } })}
-                />
-                {!hasAvailableAgent && (
-                  <DependsOn
-                    label={t('agentes marcados como disponíveis')}
-                    satisfied={hasAvailableAgent}
-                    target={{ kind: 'board', section: 'harness-agents' }}
-                    targetHint={t('em Harness › Sub-agentes')}
-                  />
-                )}
-              </>
-            )}
-          </FormField>
           <FormField label={t('Tempo limite por execução')}>
             {(id) => (
               <NumberField
@@ -138,8 +108,7 @@ export function RunnerSettings({ tool }: { tool: AiToolInfo }) {
             <SwitchField
               label={t('Heartbeat ligado')}
               hint={t(
-                'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele trabalha nos cards prontos (um card aprovado vai para a próxima coluna na hora e é trabalhado na rodada seguinte), responde às mensagens pendentes, resume as conversas que cresceram, devolve para a IA os cards bloqueados por limite de uso, confere os pull requests mergeados e limpa branches e worktrees que sobraram, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.',
-                { tool: tool.label },
+                'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama sozinho, a cada intervalo, o agente de cada card: ele trabalha nos cards prontos (um card aprovado vai para a próxima coluna na hora e é trabalhado na rodada seguinte), responde às mensagens pendentes, resume as conversas que cresceram, devolve para a IA os cards bloqueados por limite de uso, confere os pull requests mergeados e limpa branches e worktrees que sobraram, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.',
               )}
               checked={runner.heartbeat}
               onChange={(heartbeat) => settings.updateBoard({ runner: { heartbeat } })}

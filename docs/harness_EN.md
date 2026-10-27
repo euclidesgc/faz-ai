@@ -338,20 +338,20 @@ terminal.
 ![Harness: board library](images/harness_en.png)
 
 The board manages a **private library**, independent of the AI tool. Under **Configurações →
-Harness** (Settings → Harness), the **Biblioteca do board** (Board library) tab provides CRUD for
-**Regras** (Rules), **Skills**, **Sub-agentes** (Sub-agents) and **MCPs**. **Ferramenta e
-execução** (Tool and execution) sets the permissions, the harness default agent, the timeout, the
-heartbeat, the context plan and the cards' model suggestion. The board's default agent, each agent's
-connection to the board's MCP server and the admission regime live in Conectar agentes (connect
-agents). Switching agents preserves artifacts and their selections.
+Harness** (Settings → Harness), the **Artefatos do board** (board artifacts) tab provides CRUD for
+**Regras** (Rules), **Skills**, **Agentes** (Agents) and **Servidores MCP** (MCP servers).
+**Ferramenta e execução** (Tool and execution) sets the permissions, the timeout, the heartbeat, the
+context plan and the cards' model suggestion. The harness default agent is picked in the **Agentes**
+list itself (**Tornar padrão**, make default). The board's default AI agent, each agent's connection
+to the board's MCP server and the admission regime live in Conectar agentes (connect agents). Switching agents preserves artifacts and their selections.
 
 The **admission regime** is the yardstick the board uses to decide whether the tool may run a card.
 **Exclusive** (the default) requires all five capabilities verified: the AI sees exactly the context
 the board built. **Compatible** accepts that the tool loads its own context files, what the profile
 declares under **O que a CLI carrega por conta própria** (what the CLI loads on its own);
-permissions, MCP and delegation are still required. Turning compatible on is your review: the board
-counts a review each time you turn it on and shows it in the option's notice. It is the only regime
-in which an ACP agent runs.
+permissions, MCP and delegation are still required. The regime belongs to each profile: the
+acknowledgement for compatible is given in **Conectar** (connect), in Conectar agentes. It is the
+only regime in which an ACP agent runs.
 
 Runs use only the copies stored in the board's database. An item marked in **Configurações →
 Harness** that exists only in the tool's folder and was never copied appears as missing and does not
@@ -439,7 +439,7 @@ nor delete what was exported, and MCP servers are not exported (**Conectar ao bo
 the board, registers the board's own). Export exists only on the Harness screen: there is no MCP
 tool or CLI command for it (#623).
 
-### The library tabs
+### The artifact tabs
 
 Each tab offers **Criar** (create), search, counts and actions to **Editar** (edit), change the
 usage mode, update from source and remove with confirmation. Rules, skills and subagents also offer
@@ -462,19 +462,16 @@ subagents when the source changed since the copy.
 
 ### Library folder
 
-**Pasta da biblioteca** (library folder) shows the destination, by default
-`~/faz-ai-library/<project>/`, outside the repository. Existing libraries keep their destination.
-The field accepts another name and path; **Selecionar pasta** (select folder) helps choose the
-location. **Abrir pasta** (open folder) opens the file manager; **Salvar pasta** (save folder)
-accepts an empty folder, recreates the copies there and preserves the previous folder. Skills pasted
-with their support files are recognized when returning to the screen or using **Atualizar lista**
-(refresh list). Private and unknown files are preserved. Each skill accepts 512 KB per file, 100
+The board writes reading copies of the artifacts to a folder of its own, by default
+`~/faz-ai-library/<project>/`, outside the repository; existing libraries keep their destination.
+The screen has no option to change this folder. Skills pasted there with their support files are
+recognized when the Harness artifacts are opened. Private and unknown files are preserved. Each skill accepts 512 KB per file, 100
 support files and 5 MB in total; skipped files are shown in the list. Private skills, including
 `board-harness/`, are not bundled with the extension.
 
-### MCPs
+### MCP servers
 
-**MCPs** display their saved functional description ahead of command or URL. On import, a
+**MCP servers** display their saved functional description ahead of command or URL. On import, a
 description present in the configuration is reused; if it is missing, use **Editar** (edit) to
 explain its purpose. The list does not connect to servers automatically to discover descriptions.
 
@@ -513,9 +510,9 @@ each item by `{ kind, name }`. To delete the `faz-ai-*` agents that older versio
 
 ## Agents
 
-![Agents: sub-agents of the board library](images/agents_en.png)
+![Agents: the agents among the board artifacts](images/agents_en.png)
 
-Subagents are **Biblioteca do board** (Board library) artifacts, with instructions, description,
+Agents are board artifacts (the **Agentes** tab of **Artefatos do board**), with instructions, description,
 optional model, tool categories and dependencies on skills and MCPs. Creating or editing through
 the Harness writes to the board and its reading copies, without creating files in the tool folders.
 Existing agents in those folders can be imported. Once copied, an agent does not depend on its
@@ -526,16 +523,16 @@ remove the agent from the library and send it again.
 
 ### Which agent runs
 
-A run selects the card's agent; without one, the phase's agent; then the default from **Harness →
-Ferramenta e execução** (Tool and execution). With no available agents, it uses the built-in agent,
+A run selects the card's agent; without one, the phase's agent; then the one marked as
+**padrão** (default) in the Harness **Agentes** tab. With no available agents, it uses the built-in agent,
 with no additional instructions. Removing an agent releases the card and phase selections that used
 it. Factory agents are created inside each board, in its database, and cannot be deleted: turn off
 the ones you do not want, or reset one to the original text with **Restaurar o padrão**.
 
 ### Creating and editing
 
-In the **Sub-agentes** (Sub-agents) tab, use **Criar** (create), **Assistente guiado** (guided
-assistant) or **Gerar com base no projeto** (generate from the project). The creation and editing
+In the **Agentes** (Agents) tab, use **Novo agente** (new agent), **Criar agente com ajuda** (create
+an agent with help) or **Sugerir agentes com IA** (suggest agents with AI). The creation and editing
 form opens in a modal with a dimmed background, separated from the list of existing agents.
 Clicking outside it keeps the draft open; use Cancelar (cancel) to leave. The editor lets you review
 the instructions, select skills and MCPs from the library itself and set the Leitura, Edição,

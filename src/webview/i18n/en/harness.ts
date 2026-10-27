@@ -7,7 +7,6 @@ export const harness: Record<string, string> = {
   Nenhum: 'None',
   'Recursos e resultado': 'Resources and result',
   'Importar {name}': 'Import {name}',
-  'Importar skills para o board': 'Import skills to the board',
 
   'Abrir pasta': 'Open folder',
 
@@ -17,7 +16,6 @@ export const harness: Record<string, string> = {
   // --- HarnessSettings
   Harness: 'Harness',
   'Ferramenta e execução': 'Tool and execution',
-  'Tudo que a ferramenta carrega': 'Everything the tool loads',
 
   // --- HarnessInventory
   'deste projeto': 'this project',
@@ -32,9 +30,6 @@ export const harness: Record<string, string> = {
   Fechar: 'Close',
   Salvar: 'Save',
   Cancelar: 'Cancel',
-
-  // --- InstallSkills
-  'Instalar no global': 'Install globally',
   'a sua pasta de usuário': 'your user folder',
   'o projeto': 'the project',
   Instalar: 'Install',
@@ -75,18 +70,13 @@ export const harness: Record<string, string> = {
   'Novo arquivo': 'New file',
   Novo: 'New',
   'no terminal': 'in the terminal',
-  'no Cursor (Customize → Plugins) ou numa sessão do agente': 'in Cursor (Customize → Plugins) or in an agent session',
-  'claude plugin marketplace add <dono/repositorio>': 'claude plugin marketplace add <owner/repository>',
-  'agent plugin marketplace add <endereço git>': 'agent plugin marketplace add <git URL>',
 
   // --- Escopos
   Projeto: 'Project',
   Global: 'Global',
   Importados: 'Imported',
   'Indicar artefatos': 'Suggest artifacts',
-  'Não há artefatos fora do board neste assunto.': 'There are no artifacts off the board in this subject.',
   'A IA não respondeu no formato esperado.': 'The AI did not answer in the expected format.',
-  'Indicar artefatos só vale para a ferramenta do projeto.': 'Suggesting artifacts only works for the project tool.',
   indicado: 'suggested',
   'Encontrados nas pastas que você importou; a ferramenta não os carrega sozinha.':
     'Found in the folders you imported; the tool does not load them on its own.',
@@ -99,7 +89,6 @@ export const harness: Record<string, string> = {
 
   // --- Modos de skill
   Automática: 'Automatic',
-  'Só quando indicada': 'Only when indicated',
 
   // --- NewHook
   Arquivo: 'File',
@@ -173,15 +162,12 @@ export const harness: Record<string, string> = {
   'Tempo limite por execução': 'Timeout per run',
   minutos: 'minutes',
   'Heartbeat ligado': 'Heartbeat on',
-  'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama o {tool} sozinho a cada intervalo: ele trabalha nos cards prontos (um card aprovado vai para a próxima coluna na hora e é trabalhado na rodada seguinte), responde às mensagens pendentes, resume as conversas que cresceram, devolve para a IA os cards bloqueados por limite de uso, confere os pull requests mergeados e limpa branches e worktrees que sobraram, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.':
-    'With the heartbeat on and the board open in this folder (in the editor or via the faz-ai command), the board calls {tool} on its own at each interval: it works on ready cards (an approved card moves to the next column right away and is worked on in the next round), answers pending messages, summarizes conversations that have grown, returns to the AI the cards blocked by a usage limit, checks merged pull requests and cleans up leftover branches and worktrees, one story at a time or several at once, up to the limit below. With nothing pending, nothing runs.',
+  'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama sozinho, a cada intervalo, o agente de cada card: ele trabalha nos cards prontos (um card aprovado vai para a próxima coluna na hora e é trabalhado na rodada seguinte), responde às mensagens pendentes, resume as conversas que cresceram, devolve para a IA os cards bloqueados por limite de uso, confere os pull requests mergeados e limpa branches e worktrees que sobraram, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.':
+    "With the heartbeat on and the board open in this folder (in the editor or via the faz-ai command), the board calls each card's agent on its own at each interval: it works on ready cards (an approved card moves to the next column right away and is worked on in the next round), answers pending messages, summarizes conversations that have grown, returns to the AI the cards blocked by a usage limit, checks merged pull requests and cleans up leftover branches and worktrees, one story at a time or several at once, up to the limit below. With nothing pending, nothing runs.",
   'Refinar os cards novos do Backlog': 'Refine new Backlog cards',
   'A cada rodada, o heartbeat refina os cards do Backlog ainda não refinados: a partir do título, a IA melhora a descrição, preenche os campos (modelo, skills, rules) e o checklist, e deixa o card aguardando a sua revisão. Aprovar leva o card para a primeira fase.':
     'On each round, the heartbeat refines the Backlog cards not yet refined: from the title, the AI improves the description, fills in the fields (model, skills, rules) and the checklist, and leaves the card waiting for your review. Approving moves the card to the first phase.',
   Intervalo: 'Interval',
-
-  // --- ScopeGroup
-  'A IA vê a descrição em toda sessão e decide quando usar': 'The AI sees the description in every session and decides when to use it',
   'Limpar seleção': 'Clear selection',
 
   // --- SkillFiles
@@ -199,10 +185,6 @@ export const harness: Record<string, string> = {
   // --- SkillRow
   Ligada: 'On',
   Desligada: 'Off',
-
-  // --- useItemActions e text.ts
-  'O arquivo fica na sua pasta de usuário e vale para todos os seus projetos.':
-    'The file stays in your user folder and applies to all your projects.',
   '{n} itens': '{n} items',
   Copiar: 'Copy',
   'Apagar "{name}"?': 'Delete "{name}"?',
@@ -219,32 +201,9 @@ export const harness: Record<string, string> = {
     'When on, the heartbeat drives several stories at once, each in its own folder (worktree). More stories in parallel use more memory and CPU and more of your account usage limit. Autonomous mode stays one at a time, because its stories are stacked.',
   'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.':
     'Only available in "Worktree por história" mode (Settings > Git). Outside it the stories share the same folder and would cause conflicts, so the heartbeat drives one at a time.',
-
-  // --- BoardInstall
-  'O registro será gravado em {where}.': 'The registration will be written to {where}.',
-  'A skill será instalada em {where}.': 'The skill will be installed in {where}.',
-  'Já existe uma skill "{name}" em {where}. Ela será substituída pela versão desta extensão, e o que foi ajustado nela se perde.':
-    'A "{name}" skill already exists in {where}. It will be replaced by this extension\'s version, and any changes made to it will be lost.',
-  'Instalar no global do {tool}?': 'Install globally in {tool}?',
   Substituir: 'Replace',
   'Servidor do board': 'Board server',
-  'Skill do fluxo': 'Flow skill',
-  'Servidor do board (faz-ai)': 'Board server (faz-ai)',
-  'Skill do fluxo (faz-ai-fluxo)': 'Flow skill (faz-ai-fluxo)',
-  'global: instalado': 'global: installed',
-  'global: não instalado': 'global: not installed',
-  'neste projeto: instalado': 'this project: installed',
-  'neste projeto: não instalado': 'this project: not installed',
-  'Deixa a IA ler e atualizar o board nas suas conversas. As execuções pelo board não dependem disso. Grava no global (<code>{user}</code>): vale em qualquer repositório aberto com o board, sem arquivo nenhum no projeto.':
-    'Lets the AI read and update the board in your conversations. Runs from the board do not depend on it. Writes to the global config (<code>{user}</code>): it works in any repository opened with the board, with no file in the project.',
-  'Ensina a IA a conduzir os cards pelo fluxo do board: fases, documentos, revisão e pendências. Instala em <code>{user}</code>, para todos os seus projetos.':
-    'Teaches the AI to move cards through the board flow: phases, documents, review and pending items. Installs to <code>{user}</code>, for all your projects.',
-  'Reinstalar (padrão da ferramenta)': 'Reinstall (tool default)',
-  'Instalar (padrão da ferramenta)': 'Install (tool default)',
-  'Reinstalar neste projeto': 'Reinstall in this project',
   'Instalar neste projeto': 'Install in this project',
-  'No Cursor, o servidor do board fica em <code>{project}</code>, fora do git. O global do Cursor é um processo só para todas as janelas e não sabe qual board atender. O board grava este registro sozinho ao abrir no Cursor; se o "faz-ai" aparecer desligado em Cursor Settings → MCP, ligue.':
-    'In Cursor, the board server lives in <code>{project}</code>, outside git. Cursor\'s global scope is a single process for all windows and cannot tell which board to serve. The board writes this registration on its own when it opens in Cursor; if "faz-ai" shows as off in Cursor Settings → MCP, turn it on.',
   // --- HarnessSettings (contexto vazio)
   Rules: 'Rules',
   // --- SelectionTable
@@ -308,22 +267,15 @@ export const harness: Record<string, string> = {
     'Read in every run with this agent, besides the ones on the card. Only those checked in the Harness.',
   'Além do servidor do board, que vai sempre. Nada marcado = só o board.':
     'Besides the board server, which always goes. Nothing checked = board only.',
-  // --- RunnerSettings (agente padrão)
-  'Executa os cards que não escolhem um agente, nem pela fase. Só os agentes marcados como disponíveis no Harness.':
-    'Runs the cards that pick no agent, not even through the phase. Only agents checked as available in the Harness.',
-  'Agente embutido (sem instruções)': 'Built-in agent (no instructions)',
   'Agente padrão': 'Default agent',
-  'agentes marcados como disponíveis': 'agents checked as available',
   // --- EXEC_ASPECTS
   'Skills e rules': 'Skills and rules',
   'Contexto vazio': 'Empty context',
   // --- Harness por ferramenta e por assunto
 
   'Entendi, não mostrar de novo': 'Got it, do not show again',
-  'Sub-agentes': 'Sub-agents',
   MCPs: 'MCPs',
   Comandos: 'Commands',
-  'em Harness › Sub-agentes': 'in Harness › Sub-agents',
   'Arquivos desta pasta; valem só aqui.': 'Files in this folder; they apply only here.',
   'Arquivos da sua pasta de usuário; valem em todos os projetos.': 'Files in your user folder; they apply to all projects.',
   'Buscar por nome ou descrição': 'Search by name or description',
@@ -586,11 +538,6 @@ export const harness: Record<string, string> = {
   'Arquivos de teste': 'Test files',
   'Pasta {name}': 'Folder {name}',
   'Fecha o editor; o que não foi salvo se perde.': 'Closes the editor; unsaved changes are lost.',
-  'Grava o registro do board em .cursor/mcp.json, na pasta do projeto.':
-    "Writes the board's entry to .cursor/mcp.json, in the project folder.",
-  'Registra o servidor do board no global da ferramenta: vale em todos os projetos, sem arquivo no repositório.':
-    "Registers the board server in the tool's global config: valid in every project, with no file in the repository.",
-  'Instala a skill na sua pasta de usuário: vale em todos os projetos.': 'Installs the skill in your user folder: valid in every project.',
   'Desmarca tudo; nada muda.': 'Unchecks everything; nothing changes.',
   'MCPs permitidos': 'Allowed MCPs',
   'Prévia do contrato': 'Contract preview',
@@ -834,8 +781,6 @@ export const harness: Record<string, string> = {
   'Escolher arquivo': 'Choose file',
   'Artefatos encontrados': 'Artifacts found',
   'Nenhum artefato encontrado': 'No artifacts found',
-  'A IA lê o projeto e marca o que faz mais sentido; você confirma antes de importar.':
-    'The AI reads the project and checks what makes the most sense; you confirm before importing.',
   'já está no board': 'already in the board',
   'Volta para escolher outra origem.': 'Goes back to choose another source.',
   'Fecha sem importar nada.': 'Closes without importing anything.',
@@ -980,8 +925,6 @@ export const harness: Record<string, string> = {
     'The tool only runs with all five capabilities verified: the AI sees exactly the context the board built for the card.',
   'A ferramenta pode carregar os próprios arquivos de contexto (regras, skills, agentes, hooks e MCPs que o perfil declara em "O que a CLI carrega por conta própria"). Permissões, MCP e delegação continuam exigidos. É o único regime em que um agente ACP roda.':
     'The tool may load its own context files (the rules, skills, agents, hooks and MCPs the profile declares under "What the CLI loads on its own"). Permissions, MCP and delegation are still required. It is the only regime in which an ACP agent runs.',
-  'Regime compatível ligado por você (revisão {n}). O contexto de cada execução pode ir além do que o board montou: confira em Ferramentas de IA o que o perfil padrão declara em "O que a CLI carrega por conta própria".':
-    'Compatible regime turned on by you (review {n}). The context of each run may go beyond what the board built: check in AI Tools what the default profile declares under "What the CLI loads on its own".',
   'Os <b>Artefatos do board</b> (regras, skills, agentes e servidores MCP) valem com qualquer ferramenta de IA; a edição vale para as próximas execuções. <b>Ferramenta e execução</b> define o que a IA pode fazer, o heartbeat, o plano de contexto e a sugestão de modelo dos cards.':
     "The <b>Artefatos do board</b> (board artifacts: rules, skills, agents and MCP servers) apply with any AI tool; edits apply to the next runs. <b>Ferramenta e execução</b> (tool and execution) sets what the AI may do, the heartbeat, the context plan and the cards' model suggestion.",
   'O botão "Trabalhar na fase" de um card roda a IA dele em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define o que ela pode fazer nessas execuções ("Refinar com IA" roda só com o board, quando a ferramenta tem esse nível; sem ele, o pedido proíbe mexer em arquivos). O agente de cada card precisa estar instalado, autenticado e ligado em Conectar agentes.':

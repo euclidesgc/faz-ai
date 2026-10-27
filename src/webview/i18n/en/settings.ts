@@ -10,9 +10,6 @@ export const settings: Record<string, string> = {
   'Personalizado · {mode}': 'Custom · {mode}',
   'Cópia de {base}': 'Copy of {base}',
   'Não encontrada': 'Not found',
-  'Encontrada · {version}': 'Found · {version}',
-  'Encontrada · {version} · login não verificado': 'Found · {version} · sign-in not verified',
-  'Testar o perfil "{name}"?': 'Test profile "{name}"?',
   'O teste roda a ferramenta e usa a sua assinatura. Uma resposta OK não comprova isolamento, permissões ou MCP.':
     'The test runs the tool and uses your subscription. An OK reply does not prove isolation, permissions, or MCP access.',
   Testar: 'Test',
@@ -310,7 +307,6 @@ export const settings: Record<string, string> = {
   'lida do comando kimi provider list --json, com os provedores configurados; sem a CLI, lista embutida na extensão':
     'read from the kimi provider list --json command, with the configured providers; without the CLI, the list built into the extension',
   '{count} modelo(s)': '{count} model(s)',
-  'Ao detectar: {source}. Modelos que você acrescentou à mão são mantidos.': 'On detect: {source}. Models you added by hand are kept.',
   'Esforços aceitos (separados por vírgula)': 'Accepted efforts (comma-separated)',
   'Esforço padrão': 'Default effort',
   'Nome de {model}': 'Name of {model}',
@@ -435,12 +431,10 @@ export const settings: Record<string, string> = {
   'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"); desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.':
     'Cursor has a fast version of many models: it answers sooner and charges more for the same tokens. When on, each one enters the catalog as a separate model (for example, "Claude Opus 5.5 1M Fast"); when off, they leave the catalog. The list comes from the cursor-agent models command, read with the CLI signed in.',
   'em Harness': 'in Harness',
-  'Mostrando os modelos do {tool}': 'Showing the {tool} models',
   'lista lida da ferramenta em {date}': 'list read from the tool on {date}',
   'lista lida da documentação em {date}': 'list read from the documentation on {date}',
   'Pede o Claude Code v{required} ou mais novo; o instalado é {installed}. Rode claude update.':
     'Needs Claude Code v{required} or newer; the installed one is {installed}. Run claude update.',
-  'Mostrando os agentes do {tool}': 'Showing the {tool} agents',
   'Preencher o modelo sugerido automaticamente': 'Fill in the suggested model automatically',
   'Ao criar ou mudar um card, preenche o campo "Modelo" com a sugestão das regras abaixo, se ele estiver vazio ou com a sugestão anterior. Um modelo escolhido à mão nunca é trocado.':
     'When a card is created or changed, fills in the "Model" field with the rules\' suggestion below, if it is empty or still has the previous suggestion. A hand-picked model is never replaced.',

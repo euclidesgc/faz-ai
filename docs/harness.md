@@ -326,18 +326,19 @@ levam ao Harness e ao terminal do login.
 ![Harness: biblioteca do board](images/harness.png)
 
 O board gerencia uma **biblioteca particular**, independente da ferramenta de IA. Em
-**Configurações → Harness**, a aba **Biblioteca do board** concentra o CRUD de **Regras**,
-**Skills**, **Sub-agentes** e **MCPs**. **Ferramenta e execução** define as permissões, o agente
-padrão do harness, o tempo limite, o heartbeat, o plano de contexto e a sugestão de modelo dos cards.
-O agente padrão do board, a conexão de cada agente ao servidor MCP do board e o regime de admissão
-ficam em Conectar agentes. Trocar de agente preserva os artefatos e suas seleções.
+**Configurações → Harness**, a aba **Artefatos do board** concentra o CRUD de **Regras**,
+**Skills**, **Agentes** e **Servidores MCP**. **Ferramenta e execução** define as permissões, o
+tempo limite, o heartbeat, o plano de contexto e a sugestão de modelo dos cards. O agente padrão do
+harness se escolhe na própria lista de **Agentes** (**Tornar padrão**). O agente de IA padrão do
+board, a conexão de cada agente ao servidor MCP do board e o regime de admissão ficam em Conectar
+agentes. Trocar de agente preserva os artefatos e suas seleções.
 
 O **regime de admissão** é a régua com que o board decide se deixa a ferramenta rodar um card.
 **Exclusivo** (o padrão) exige as cinco capacidades verificadas: a IA vê exatamente o contexto que o
 board montou. **Compatível** aceita que a ferramenta carregue os próprios arquivos de contexto, o
 que o perfil declara em **O que a CLI carrega por conta própria**; permissões, MCP e delegação
-continuam exigidos. Ligar o compatível é a sua revisão: o board conta a revisão a cada vez que você
-liga, e a mostra no aviso da opção. É o único regime em que um agente ACP roda.
+continuam exigidos. O regime é de cada perfil: a ciência do compatível é dada no **Conectar**, em
+Conectar agentes. É o único regime em que um agente ACP roda.
 
 Execuções usam só as cópias guardadas no banco do board. Um item marcado em **Configurações →
 Harness** que existe só na pasta da ferramenta, sem ter sido copiado, aparece como ausente e não
@@ -419,7 +420,7 @@ o que foi exportado, e os servidores MCP não são exportados (o **Conectar ao b
 board). A exportação existe só na tela do Harness: não há ferramenta MCP nem comando da CLI para
 ela (#623).
 
-### As abas da biblioteca
+### As abas dos artefatos
 
 Cada aba tem **Criar**, busca, quantidade e ações de **Editar**, mudar o modo de uso, atualizar da
 origem e remover com confirmação. Regras, skills e subagentes também oferecem **Assistente guiado**
@@ -441,18 +442,17 @@ desde a cópia.
 
 ### Pasta da biblioteca
 
-**Pasta da biblioteca** mostra o destino, por padrão `~/faz-ai-library/<projeto>/`, fora do
-repositório. Bibliotecas existentes preservam seu destino. O campo aceita outro nome e caminho;
-**Selecionar pasta** ajuda a escolher o local. **Abrir pasta** abre o gerenciador de arquivos;
-**Salvar pasta** aceita uma pasta vazia, recria as cópias ali e preserva a pasta anterior. Skills
-coladas com seus arquivos de apoio são reconhecidas ao voltar à tela ou usar **Atualizar lista**. Os
-arquivos particulares e desconhecidos são preservados. Cada skill aceita 512 KB por arquivo, 100
+O board grava cópias de leitura dos artefatos numa pasta só dele, por padrão
+`~/faz-ai-library/<projeto>/`, fora do repositório; bibliotecas existentes preservam seu destino. A
+tela não tem opção para trocar essa pasta. Skills coladas ali com seus arquivos de apoio são
+reconhecidas ao abrir os artefatos do Harness. Os arquivos particulares e desconhecidos são
+preservados. Cada skill aceita 512 KB por arquivo, 100
 arquivos de apoio e 5 MB no total; omissões aparecem na lista. As skills particulares, incluindo
 `board-harness/`, não são distribuídas com a extensão.
 
-### MCPs
+### Servidores MCP
 
-**MCPs** exibem a descrição funcional cadastrada, com prioridade sobre comando ou URL. Ao importar,
+Os **servidores MCP** exibem a descrição funcional cadastrada, com prioridade sobre comando ou URL. Ao importar,
 uma descrição presente na configuração é aproveitada; se faltar, use **Editar** para explicar a
 finalidade. A lista não conecta servidores automaticamente para descobrir descrições.
 
@@ -490,9 +490,9 @@ agentes `faz-ai-*` que versões antigas gravaram em `.claude/agents`, `.cursor/a
 
 ## Agentes
 
-![Agentes: sub-agentes da biblioteca do board](images/agents.png)
+![Agentes: os agentes dos artefatos do board](images/agents.png)
 
-Os subagentes são artefatos da **Biblioteca do board**, com instruções, descrição, modelo opcional,
+Os agentes são artefatos do board (aba **Agentes** de **Artefatos do board**), com instruções, descrição, modelo opcional,
 categorias de ferramentas e dependências de skills e MCPs. Criar ou editar pelo Harness grava no
 board e nas cópias de leitura, sem criar arquivos nas pastas das ferramentas. Agentes existentes
 nessas pastas podem ser importados. Depois de copiado, o agente não depende do arquivo original:
@@ -503,15 +503,15 @@ agente da biblioteca e enviá-lo de novo.
 
 ### Qual agente executa
 
-A execução escolhe o agente do card; na ausência dele, o agente da fase; depois, o padrão de
-**Harness → Ferramenta e execução**. Sem agentes disponíveis, usa o agente embutido, sem instruções
+A execução escolhe o agente do card; na ausência dele, o agente da fase; depois, o marcado como
+**padrão** na aba **Agentes** do Harness. Sem agentes disponíveis, usa o agente embutido, sem instruções
 adicionais. Remover um agente libera as seleções dos cards e fases que o utilizavam. Os agentes de
 fábrica são criados em cada board, no banco, e não podem ser apagados: desligue o que não quiser
 usar, ou volte-o ao texto original com **Restaurar o padrão**.
 
 ### Criar e editar
 
-Na aba **Sub-agentes**, use **Criar**, **Assistente guiado** ou **Gerar com base no projeto**. O
+Na aba **Agentes**, use **Novo agente**, **Criar agente com ajuda** ou **Sugerir agentes com IA**. O
 formulário de criação e edição abre em um modal com fundo escurecido, separado da lista de agentes
 existentes. Clicar fora dele mantém o rascunho aberto; use Cancelar para sair. O editor permite
 revisar as instruções, selecionar skills e MCPs da própria biblioteca e definir as categorias

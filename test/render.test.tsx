@@ -307,9 +307,10 @@ describe('telas montam sem erro', () => {
       'Tempo limite por execução',
       'Heartbeat ligado',
       'Rodar o heartbeat agora',
-      'Agente padrão',
     ])
       expect(harness).toContain(text);
+    // o agente padrão do harness se escolhe só na lista de Agentes, sem um segundo controle na execução
+    expect(harness).not.toContain('aria-label="Agente padrão"');
   });
 });
 
