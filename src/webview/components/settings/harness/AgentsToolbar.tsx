@@ -76,7 +76,7 @@ export function AgentsToolbar({
   );
 }
 
-/** O agente padrão do board: o valor de `runner.defaultAgent`, o mesmo que o Executor escolhe. */
+/** O agente padrão das instruções: o valor de `runner.defaultAgent`, o mesmo que o Executor escolhe. */
 export const useDefaultAgent = (): string => useBoardStore((s) => s.state!.board.runner.defaultAgent);
 
 /** O selo "padrão", só no agente que executa quando nem o card nem a fase escolhem um. */
@@ -85,23 +85,23 @@ export function DefaultAgentBadge({ name }: { name: string }) {
   if (!isDefault) return null;
   return (
     <Badge color="indigo" variant="soft">
-      {t('padrão')}
+      {t('padrão das instruções')}
     </Badge>
   );
 }
 
-/** "Tornar padrão": grava `runner.defaultAgent`; não aparece no que já é o padrão. */
+/** "Tornar padrão das instruções": grava `runner.defaultAgent`; não aparece no que já é o padrão. */
 export function MakeDefaultButton({ name }: { name: string }) {
   if (useDefaultAgent() === name) return null;
   return (
     <ActionButton
       variant="ghost"
       size="1"
-      aria-label={t('Tornar {name} o agente padrão', { name })}
+      aria-label={t('Tornar {name} o agente padrão das instruções', { name })}
       hint={t('Usado quando nem o card nem a coluna indicam um agente')}
       onClick={() => settings.updateBoard({ runner: { defaultAgent: name } })}
     >
-      {t('Tornar padrão')}
+      {t('Tornar padrão das instruções')}
     </ActionButton>
   );
 }
@@ -117,7 +117,7 @@ export function DeleteAgentButton({ name, location }: { name: string; location?:
         aria-label={t('Apagar o agente {name}', { name })}
         hint={t('Apagar o agente')}
         disabled
-        disabledReason={t('Este é o agente padrão. Torne outro agente o padrão antes de apagar este.')}
+        disabledReason={t('Este é o agente padrão das instruções. Torne outro agente o padrão das instruções antes de apagar este.')}
       >
         <IconTrash />
       </ActionIconButton>

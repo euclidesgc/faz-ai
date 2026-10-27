@@ -12,7 +12,7 @@ export const metrics: Record<string, string> = {
   'Agente da fase': 'Phase agent',
   'Agente da história': 'Story agent',
   'Agente da fase da história': 'Story phase agent',
-  'Agente padrão do board': 'Default board agent',
+  'Agente padrão das instruções': 'Default instructions agent',
   'Candidato à delegação nativa': 'Native delegation candidate',
   'Prévia do rascunho com os itens Sempre do board. O card e a fase podem acrescentar contexto na execução.':
     'Draft preview with the board’s Always items. The card and phase may add context at runtime.',

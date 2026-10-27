@@ -159,7 +159,10 @@ describe('i18n do host: mensagens preenchidas', () => {
     const cases: [string, string][] = [
       ['Arquivo maior que 512 KB.', 'File larger than 512 KB.'],
       ['A skill já tem 100 arquivos de apoio.', 'The skill already has 100 supporting files.'],
-      ['Escolha outro agente padrão antes de apagar este.', 'Choose another default agent before deleting this one.'],
+      [
+        'Escolha outro agente padrão das instruções antes de apagar este.',
+        'Choose another default instructions agent before deleting this one.',
+      ],
       ['A skill do fluxo é da extensão: só o modo dela pode mudar.', 'The flow skill belongs to the extension: only its mode can change.'],
       [
         'Já existe um artefato com este nome. Edite o existente ou escolha outro nome.',

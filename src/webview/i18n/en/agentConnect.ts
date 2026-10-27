@@ -8,8 +8,8 @@ export const agentConnect: Record<string, string> = {
   Atualizar: 'Refresh',
   'Confere de novo quais agentes estão instalados, a versão de cada um e se você está com a conta conectada. Use depois de instalar um agente, entrar na conta dele ou atualizá-lo fora do board.':
     "Checks again which agents are installed, each one's version and whether you are signed in to the account. Use it after installing an agent, signing in to it or updating it outside the board.",
-  'Roda os cards que não dizem qual modelo usar. Para trocar, use Tornar padrão na aba Conexão de outro agente.':
-    "Runs the cards that don't say which model to use. To change it, use Make default in another agent's Connection tab.",
+  'Roda os cards que não dizem qual modelo usar. Para trocar, use Usar nos cards sem modelo na aba Conexão de outro agente.':
+    "Runs the cards that don't say which model to use. To change it, use Use for cards with no model in another agent's Connection tab.",
 
   // a lista
   'Buscar agente': 'Search agents',
@@ -59,9 +59,9 @@ export const agentConnect: Record<string, string> = {
   'Abre o login num terminal; quando ele fechar, o board confere a conta e retoma o Conectar sozinho.':
     'Opens the sign-in in a terminal; when it closes, the board checks the account and resumes Connect on its own.',
   'Uso nos cards': 'Use in cards',
-  'O agente padrão não pode ser desligado: torne outro agente padrão antes.':
-    'The default agent cannot be disabled: make another agent the default first.',
-  'Tornar padrão': 'Make default',
+  'Este agente roda os cards sem modelo e não pode ser desligado: use "Usar nos cards sem modelo" em outro agente antes.':
+    'This agent runs the cards with no model and cannot be disabled: use "Usar nos cards sem modelo" (use for cards with no model) on another agent first.',
+  'Usar nos cards sem modelo': 'Use for cards with no model',
   'Ligue ou conecte o agente antes.': 'Enable or connect the agent first.',
   'Os cards sem modelo (nem no card, nem no agente, nem por uma regra) passam a rodar com este. Os outros seguem no agente do modelo deles.':
     "Cards with no model (not on the card, the agent or a rule) will run with this one. The others stay on their model's agent.",

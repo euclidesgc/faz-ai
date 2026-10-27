@@ -133,7 +133,7 @@ describe('BoardLibrary: gravar regra, skill e MCP no board', () => {
     lib().createAgent({ name: 'outro', description: 'd', body: 'b', model: '', tools: [], deniedTools: [], skills: [], mcp: [] } as never);
     ctx.boards.updateBoard(ctx.boardId, { runner: { defaultAgent: 'padrao' } });
     const sel = (name: string) => [{ kind: 'agent' as const, location: `board:${name}` }];
-    expect(() => lib().select(sel('padrao'), null)).toThrow('Escolha outro agente padrão antes de apagar este');
+    expect(() => lib().select(sel('padrao'), null)).toThrow('Escolha outro agente padrão das instruções antes de apagar este');
     expect(get('agent', 'padrao')).toBeDefined();
     lib().select(sel('outro'), null);
     expect(get('agent', 'outro')).toBeUndefined();
