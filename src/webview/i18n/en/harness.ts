@@ -16,7 +16,6 @@ export const harness: Record<string, string> = {
   // --- HarnessSettings
   Harness: 'Harness',
   'Plano de contexto': 'Context plan',
-  'Fechar o plano de contexto': 'Close the context plan',
   'Plano de contexto deste workflow': "This workflow's context plan",
   'Plano de contexto padrão do board': "Board's default context plan",
   Automação: 'Automation',
@@ -152,7 +151,6 @@ export const harness: Record<string, string> = {
   'Cursor e outras ferramentas': 'Cursor and other tools',
 
   // --- RunnerSettings
-  'Execução pela conversa e heartbeat': 'Run from chat and heartbeat',
   'Começa uma rodada agora, mesmo com o heartbeat desligado': 'Starts a round now, even with the heartbeat off',
   'Execução pela IA': 'Run by the AI',
   'O que a IA pode fazer': 'What the AI can do',
@@ -251,10 +249,10 @@ export const harness: Record<string, string> = {
   'Atualizar da origem': 'Update from source',
   'Atualizar da origem: {name}': 'Update from source: {name}',
   'Copia de novo o conteúdo atual da origem para o board.': 'Copies the current source content to the board again.',
-  'Restaurar o padrão': 'Restore default',
-  'Restaurar o padrão: {name}': 'Restore default: {name}',
+  'Restaurar o original': 'Restore original',
+  'Restaurar o original: {name}': 'Restore original: {name}',
   'Volta o agente ao que vem com o board; o modo e o nome ficam.': 'Resets the agent to what comes with the board; the mode and name stay.',
-  'Restaurar "{name}" ao padrão?': 'Restore "{name}" to the default?',
+  'Voltar "{name}" ao texto original?': 'Return "{name}" to its original text?',
   'As instruções, as ferramentas e as skills voltam às de fábrica, e as edições feitas no board se perdem.':
     'The instructions, tools and skills go back to the factory ones, and the edits made on the board are lost.',
   'O board entrega esta skill pelo get_skill, com o texto desta versão da extensão.':
@@ -263,7 +261,9 @@ export const harness: Record<string, string> = {
     'The default instructions agent runs when neither the card nor the phase picks another; to turn it off, make another one the default instructions agent.',
   'Entregue pelo board': 'Delivered by the board',
   'Abre o texto só para leitura': 'Opens the text read only',
-  'Tornar padrão das instruções': 'Make default for instructions',
+  'Tornar padrão': 'Make default',
+  'Torna este o agente padrão das instruções: ele conduz os cards que não indicam um agente, nem pela coluna.':
+    'Makes this the default instructions agent: it drives the cards that pick no agent, not even through the column.',
   'padrão das instruções': 'default for instructions',
   // --- AgentEditor
   'Uma frase: é por ela que o "Refinar com IA" escolhe o agente de um card.':
@@ -648,6 +648,10 @@ export const harness: Record<string, string> = {
   'Selecionar {activity}': 'Select {activity}',
   Rascunho: 'Draft',
   'Sem agente válido': 'No valid agent',
+  'Herdar agente': 'Inherit agent',
+  'Mostra ou esconde, abaixo das colunas, o plano de contexto padrão dos cards deste workflow.':
+    "Shows or hides, below the columns, the default context plan of this workflow's cards.",
+  Paralelismo: 'Parallelism',
   'Cerca de {tokens} tokens conhecidos': 'About {tokens} known tokens',
   '{n} itens sem medida': '{n} unmeasured items',
   'Configurar {activity}': 'Configure {activity}',
@@ -939,8 +943,8 @@ export const harness: Record<string, string> = {
     'The tool only runs with all five capabilities verified: the AI sees exactly the context the board built for the card.',
   'A ferramenta pode carregar os próprios arquivos de contexto (regras, skills, agentes, hooks e MCPs que o perfil declara em "O que a CLI carrega por conta própria"). Permissões, MCP e delegação continuam exigidos. É o único regime em que um agente ACP roda.':
     'The tool may load its own context files (the rules, skills, agents, hooks and MCPs the profile declares under "What the CLI loads on its own"). Permissions, MCP and delegation are still required. It is the only regime in which an ACP agent runs.',
-  'Os <b>Artefatos do board</b> (regras, skills, agentes e servidores MCP) valem com qualquer ferramenta de IA; a edição vale para as próximas execuções. O <b>Plano de contexto</b> é o padrão do board; o de cada workflow fica em Workflows e colunas. O que a IA pode fazer e o heartbeat ficam em <b>Automação</b>; a sugestão de modelo, em <b>Conectar agentes</b>.':
-    "The <b>Artefatos do board</b> (board artifacts: rules, skills, agents and MCP servers) apply with any AI tool; edits apply to the next runs. The <b>Plano de contexto</b> (context plan) is the board's default; each workflow's lives in Workflows and columns. What the AI may do and the heartbeat live in <b>Automação</b> (automation); the model suggestion, in <b>Conectar agentes</b> (connect agents).",
+  'O que entra no contexto das execuções, com qualquer ferramenta de IA: os <b>Artefatos do board</b> (regras, skills, agentes e servidores MCP) e o <b>Plano de contexto</b> padrão de cada atividade. A edição vale para as próximas execuções.':
+    'What goes into the context of the runs, with any AI tool: the <b>Artefatos do board</b> (board artifacts: rules, skills, agents and MCP servers) and the default <b>Plano de contexto</b> (context plan) of each activity. Edits apply to the next runs.',
   'O botão "Trabalhar na fase" de um card roda a IA dele em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define o que ela pode fazer nessas execuções ("Refinar com IA" roda só com o board, quando a ferramenta tem esse nível; sem ele, o pedido proíbe mexer em arquivos). O agente de cada card precisa estar instalado, autenticado e ligado em Conectar agentes.':
     'A card\'s "Trabalhar na fase" (work on the phase) button runs its AI in the background in this folder, with no one approving each step. Here you set what it may do in those runs ("Refinar com IA" runs only with the board when the tool has that level; without it, the request forbids touching files). Each card\'s agent must be installed, signed in and enabled in Connect agents.',
 };

@@ -77,7 +77,7 @@ export function UpdateFromOriginButton({ artifact: a }: { artifact: BoardArtifac
   );
 }
 
-/** "Restaurar o padrão" do agente de fábrica: volta ao texto, às ferramentas e às skills que vêm com o board. */
+/** "Restaurar o original" do agente de fábrica: volta ao texto, às ferramentas e às skills que vêm com o board. */
 export function RestoreAgentButton({ artifact: a }: { artifact: BoardArtifact }) {
   const ask = useBoardStore((s) => s.ask);
   const restore = useAction(() => harness.restoreAgent(a.name));
@@ -87,18 +87,18 @@ export function RestoreAgentButton({ artifact: a }: { artifact: BoardArtifact })
       variant="ghost"
       size="1"
       loading={restore.busy}
-      aria-label={t('Restaurar o padrão: {name}', { name: a.name })}
+      aria-label={t('Restaurar o original: {name}', { name: a.name })}
       hint={t('Volta o agente ao que vem com o board; o modo e o nome ficam.')}
       onClick={() =>
         ask({
-          title: t('Restaurar "{name}" ao padrão?', { name: a.name }),
+          title: t('Voltar "{name}" ao texto original?', { name: a.name }),
           message: t('As instruções, as ferramentas e as skills voltam às de fábrica, e as edições feitas no board se perdem.'),
-          confirmLabel: t('Restaurar o padrão'),
+          confirmLabel: t('Restaurar o original'),
           onConfirm: () => void restore.run(),
         })
       }
     >
-      {t('Restaurar o padrão')}
+      {t('Restaurar o original')}
     </ActionButton>
   );
 }

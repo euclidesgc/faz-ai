@@ -6,7 +6,7 @@ import type { Workflow } from '../../../../shared/model';
 import { workflowDeleteBlocker } from '../../../../shared/selectors';
 import { useBoardStore } from '../../../store/boardStore';
 import { settings } from '../../../commands';
-import { DeleteButton, IconPlus } from '../../ui';
+import { ActionButton, DeleteButton, IconChevronDown, IconChevronRight, IconPlus } from '../../ui';
 import { ContextPlanDefaults } from '../../card/ExecutionPlanPanel';
 import { ColumnsTable } from './ColumnsTable';
 import { DragHandle } from './DragHandle';
@@ -44,9 +44,15 @@ export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep:
             {t(kindLabel(workflow.kind))}
           </Badge>
           <span className="spacer" />
-          <Button variant="soft" color="gray" aria-expanded={plan} onClick={() => setPlan(!plan)}>
-            {plan ? t('Fechar o plano de contexto') : t('Plano de contexto')}
-          </Button>
+          {/* o rótulo não muda ao abrir: a seta diz o estado, e o botão não muda de largura */}
+          <ActionButton
+            variant="ghost"
+            aria-expanded={plan}
+            hint={t('Mostra ou esconde, abaixo das colunas, o plano de contexto padrão dos cards deste workflow.')}
+            onClick={() => setPlan(!plan)}
+          >
+            {plan ? <IconChevronDown /> : <IconChevronRight />} {t('Plano de contexto')}
+          </ActionButton>
           <Button disabled={adding} onClick={() => setAdding(true)}>
             <IconPlus /> {t('Nova coluna')}
           </Button>

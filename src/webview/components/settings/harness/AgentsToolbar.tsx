@@ -90,7 +90,7 @@ export function DefaultAgentBadge({ name }: { name: string }) {
   );
 }
 
-/** "Tornar padrão das instruções": grava `runner.defaultAgent`; não aparece no que já é o padrão. */
+/** "Tornar padrão" (das instruções, no rótulo acessível e na dica): grava `runner.defaultAgent`; não aparece no que já é o padrão. */
 export function MakeDefaultButton({ name }: { name: string }) {
   if (useDefaultAgent() === name) return null;
   return (
@@ -98,10 +98,10 @@ export function MakeDefaultButton({ name }: { name: string }) {
       variant="ghost"
       size="1"
       aria-label={t('Tornar {name} o agente padrão das instruções', { name })}
-      hint={t('Usado quando nem o card nem a coluna indicam um agente')}
+      hint={t('Torna este o agente padrão das instruções: ele conduz os cards que não indicam um agente, nem pela coluna.')}
       onClick={() => settings.updateBoard({ runner: { defaultAgent: name } })}
     >
-      {t('Tornar padrão das instruções')}
+      {t('Tornar padrão')}
     </ActionButton>
   );
 }

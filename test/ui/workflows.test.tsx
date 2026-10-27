@@ -43,7 +43,10 @@ describe('WorkflowsSettings', () => {
     expect(within(stories).getByText('Plano de contexto deste workflow')).toBeInTheDocument();
     expect(within(stories).getAllByRole('button', { name: /Configurar Histórias · / }).length).toBeGreaterThan(0);
     expect(within(cardOf('Sub-tarefas')).queryByText('Plano de contexto deste workflow')).toBeNull();
-    await userEvent.click(within(stories).getByRole('button', { name: 'Fechar o plano de contexto' }));
+    // o rótulo não muda ao abrir (a seta e o aria-expanded dizem o estado)
+    const toggle = within(stories).getByRole('button', { name: 'Plano de contexto' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(toggle);
     expect(within(stories).queryByText('Plano de contexto deste workflow')).toBeNull();
   });
 

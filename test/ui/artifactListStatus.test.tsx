@@ -67,8 +67,8 @@ describe('lista do Harness: de fábrica e origem', () => {
     expect(within(qa).getByText('de fábrica')).toBeInTheDocument();
     expect(within(qa).queryByRole('button', { name: /Apagar/ })).toBeNull();
     expect(within(qa).getByRole('combobox', { name: 'Modo no board: qa-testes' })).toBeInTheDocument();
-    await userEvent.click(within(qa).getByRole('button', { name: 'Restaurar o padrão: qa-testes' }));
-    expect(useBoardStore.getState().dialog?.title).toBe('Restaurar "qa-testes" ao padrão?');
+    await userEvent.click(within(qa).getByRole('button', { name: 'Restaurar o original: qa-testes' }));
+    expect(useBoardStore.getState().dialog?.title).toBe('Voltar "qa-testes" ao texto original?');
     confirmDialog();
     expect(lastSent('harness.agent.restore')).toMatchObject({ name: 'qa-testes' });
 
@@ -79,7 +79,7 @@ describe('lista do Harness: de fábrica e origem', () => {
 
     const mine = row('meu');
     expect(within(mine).queryByText('de fábrica')).toBeNull();
-    expect(within(mine).queryByRole('button', { name: 'Restaurar o padrão: meu' })).toBeNull();
+    expect(within(mine).queryByRole('button', { name: 'Restaurar o original: meu' })).toBeNull();
     expect(within(mine).getByRole('button', { name: /Apagar/ })).toBeInTheDocument();
   });
 

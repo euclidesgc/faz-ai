@@ -146,7 +146,8 @@ export function ExecutionPlanPanel({
   };
   return (
     <section className="execution-plan" aria-label={t('Plano de execução')}>
-      <h3>{t('Plano de execução')}</h3>
+      {/* sem card, o título é o da seção que monta o painel (ContextPlanDefaults) */}
+      {card && <h3>{t('Plano de execução')}</h3>}
       <p className="muted small">
         {t('Planeje cada ação separadamente. Os contratos ainda são rascunhos e não governam a execução legada.')}
       </p>
@@ -184,7 +185,7 @@ export function ExecutionPlanPanel({
                     {changed && <span className="muted small"> · {t('Rascunho')}</span>}
                   </th>
                   <td data-label={t('Agente e modelo')}>
-                    {agent?.name ?? t('Sem agente válido')}
+                    {agent?.name ?? (draftOf(target).selection.agent.mode === 'inherit' ? t('Herdar agente') : t('Sem agente válido'))}
                     <br />
                     <span className="muted small">
                       {p.model.choice.mode === 'inherit' ? t('Herdar modelo') : p.model.choice.value || t('Vazio explícito')}

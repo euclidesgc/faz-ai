@@ -17,21 +17,7 @@ export function RunnerSettings() {
   const subtasks = effectiveLimits(runner, board.git.mode).subtasks;
   return (
     <>
-      <SectionHeader
-        title={t('Execução pela conversa e heartbeat')}
-        actions={
-          !unsupported && (
-            <ActionButton
-              variant="soft"
-              color="gray"
-              hint={t('Começa uma rodada agora, mesmo com o heartbeat desligado')}
-              onClick={() => ai.runHeartbeat()}
-            >
-              {t('Rodar o heartbeat agora')}
-            </ActionButton>
-          )
-        }
-      >
+      <SectionHeader title={t('Execução pela IA')}>
         {t(
           'O botão "Trabalhar na fase" de um card roda a IA dele em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define o que ela pode fazer nessas execuções ("Refinar com IA" roda só com o board, quando a ferramenta tem esse nível; sem ele, o pedido proíbe mexer em arquivos). O agente de cada card precisa estar instalado, autenticado e ligado em Conectar agentes.',
         )}
@@ -103,93 +89,114 @@ export function RunnerSettings() {
               />
             )}
           </FormField>
-          <div className="form-divider" />
-          <Stack id="heartbeat">
-            <SwitchField
-              label={t('Heartbeat ligado')}
-              hint={t(
-                'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama sozinho, a cada intervalo, o agente de cada card: ele trabalha nos cards prontos (um card aprovado vai para a próxima coluna na hora e é trabalhado na rodada seguinte), responde às mensagens pendentes, resume as conversas que cresceram, devolve para a IA os cards bloqueados por limite de uso, confere os pull requests mergeados e limpa branches e worktrees que sobraram, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.',
-              )}
-              checked={runner.heartbeat}
-              onChange={(heartbeat) => settings.updateBoard({ runner: { heartbeat } })}
-            />
-            <Stack indent>
-              <FormField label={t('Intervalo')}>
-                {(id) => (
-                  <NumberField
-                    id={id}
-                    min={HEARTBEAT_RANGE.min}
-                    max={HEARTBEAT_RANGE.max}
-                    value={runner.heartbeatMinutes}
-                    unit={t('minutos')}
-                    disabled={!runner.heartbeat}
-                    onCommit={(heartbeatMinutes) => settings.updateBoard({ runner: { heartbeatMinutes } })}
-                  />
-                )}
-              </FormField>
+        </Card>
+      )}
+      {!unsupported && (
+        <>
+          <SectionHeader
+            id="heartbeat"
+            title={t('Heartbeat')}
+            actions={
+              <ActionButton
+                variant="soft"
+                color="gray"
+                hint={t('Começa uma rodada agora, mesmo com o heartbeat desligado')}
+                onClick={() => ai.runHeartbeat()}
+              >
+                {t('Rodar o heartbeat agora')}
+              </ActionButton>
+            }
+          />
+          <Card className="runner-settings form-card" aria-label={t('Heartbeat')}>
+            <Stack>
               <SwitchField
-                label={t('Refinar os cards novos do Backlog')}
+                label={t('Heartbeat ligado')}
                 hint={t(
-                  'A cada rodada, o heartbeat refina os cards do Backlog ainda não refinados: a partir do título, a IA melhora a descrição, preenche os campos (modelo, skills, rules) e o checklist, e deixa o card aguardando a sua revisão. Aprovar leva o card para a primeira fase.',
+                  'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama sozinho, a cada intervalo, o agente de cada card: ele trabalha nos cards prontos (um card aprovado vai para a próxima coluna na hora e é trabalhado na rodada seguinte), responde às mensagens pendentes, resume as conversas que cresceram, devolve para a IA os cards bloqueados por limite de uso, confere os pull requests mergeados e limpa branches e worktrees que sobraram, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.',
                 )}
-                checked={runner.heartbeatRefine}
-                disabled={!runner.heartbeat}
-                onChange={(heartbeatRefine) => settings.updateBoard({ runner: { heartbeatRefine } })}
+                checked={runner.heartbeat}
+                onChange={(heartbeat) => settings.updateBoard({ runner: { heartbeat } })}
               />
-            </Stack>
-          </Stack>
-          <div className="form-divider" />
-          <Stack>
-            <SwitchField
-              label={t('Tocar histórias em paralelo')}
-              hint={
-                worktree
-                  ? t(
-                      'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas.',
-                    )
-                  : t(
-                      'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.',
-                    )
-              }
-              checked={worktree && runner.parallel}
-              disabled={!worktree}
-              onChange={(parallel) => settings.updateBoard({ runner: { parallel } })}
-            />
-            {worktree && runner.parallel && (
               <Stack indent>
-                <FormField label={t('Histórias ao mesmo tempo')}>
+                <FormField label={t('Intervalo')}>
                   {(id) => (
                     <NumberField
                       id={id}
-                      min={PARALLEL_RANGE.min}
-                      max={PARALLEL_RANGE.max}
-                      value={runner.parallelStories}
-                      unit={t('histórias')}
-                      onCommit={(parallelStories) => settings.updateBoard({ runner: { parallelStories } })}
+                      min={HEARTBEAT_RANGE.min}
+                      max={HEARTBEAT_RANGE.max}
+                      value={runner.heartbeatMinutes}
+                      unit={t('minutos')}
+                      disabled={!runner.heartbeat}
+                      onCommit={(heartbeatMinutes) => settings.updateBoard({ runner: { heartbeatMinutes } })}
                     />
                   )}
                 </FormField>
-              </Stack>
-            )}
-            <FormField
-              label={t('Sub-tarefas em paralelo por história')}
-              hint={t('Efetivo: {effective}. As sub-tarefas escrevem na mesma pasta da história, então rodam uma por vez.', {
-                effective: subtasks.effective,
-              })}
-            >
-              {(id) => (
-                <NumberField
-                  id={id}
-                  min={SUBTASK_PARALLEL_RANGE.min}
-                  max={SUBTASK_PARALLEL_RANGE.max}
-                  value={runner.parallelSubtasks}
-                  unit={t('sub-tarefas')}
-                  onCommit={(parallelSubtasks) => settings.updateBoard({ runner: { parallelSubtasks } })}
+                <SwitchField
+                  label={t('Refinar os cards novos do Backlog')}
+                  hint={t(
+                    'A cada rodada, o heartbeat refina os cards do Backlog ainda não refinados: a partir do título, a IA melhora a descrição, preenche os campos (modelo, skills, rules) e o checklist, e deixa o card aguardando a sua revisão. Aprovar leva o card para a primeira fase.',
+                  )}
+                  checked={runner.heartbeatRefine}
+                  disabled={!runner.heartbeat}
+                  onChange={(heartbeatRefine) => settings.updateBoard({ runner: { heartbeatRefine } })}
                 />
+              </Stack>
+            </Stack>
+          </Card>
+          <SectionHeader title={t('Paralelismo')} />
+          <Card className="runner-settings form-card" aria-label={t('Paralelismo')}>
+            <Stack>
+              <SwitchField
+                label={t('Tocar histórias em paralelo')}
+                hint={
+                  worktree
+                    ? t(
+                        'Ligado, o heartbeat toca várias histórias ao mesmo tempo, cada uma na sua própria pasta (worktree). Mais histórias em paralelo usam mais memória e processador e gastam mais do limite de uso da sua conta. O modo autônomo continua uma por vez, porque as histórias dele são empilhadas.',
+                      )
+                    : t(
+                        'Só disponível no modo "Worktree por história" (Configurações > Git). Fora dele as histórias dividem a mesma pasta e causariam conflitos, então o heartbeat toca uma por vez.',
+                      )
+                }
+                checked={worktree && runner.parallel}
+                disabled={!worktree}
+                onChange={(parallel) => settings.updateBoard({ runner: { parallel } })}
+              />
+              {worktree && runner.parallel && (
+                <Stack indent>
+                  <FormField label={t('Histórias ao mesmo tempo')}>
+                    {(id) => (
+                      <NumberField
+                        id={id}
+                        min={PARALLEL_RANGE.min}
+                        max={PARALLEL_RANGE.max}
+                        value={runner.parallelStories}
+                        unit={t('histórias')}
+                        onCommit={(parallelStories) => settings.updateBoard({ runner: { parallelStories } })}
+                      />
+                    )}
+                  </FormField>
+                </Stack>
               )}
-            </FormField>
-          </Stack>
-        </Card>
+              <FormField
+                label={t('Sub-tarefas em paralelo por história')}
+                hint={t('Efetivo: {effective}. As sub-tarefas escrevem na mesma pasta da história, então rodam uma por vez.', {
+                  effective: subtasks.effective,
+                })}
+              >
+                {(id) => (
+                  <NumberField
+                    id={id}
+                    min={SUBTASK_PARALLEL_RANGE.min}
+                    max={SUBTASK_PARALLEL_RANGE.max}
+                    value={runner.parallelSubtasks}
+                    unit={t('sub-tarefas')}
+                    onCommit={(parallelSubtasks) => settings.updateBoard({ runner: { parallelSubtasks } })}
+                  />
+                )}
+              </FormField>
+            </Stack>
+          </Card>
+        </>
       )}
     </>
   );

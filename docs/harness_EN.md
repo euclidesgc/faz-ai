@@ -341,7 +341,7 @@ The board manages a **private library**, independent of the AI tool. Under **Con
 Harness** (Settings → Harness), the **Artefatos do board** (board artifacts) tab provides CRUD for
 **Regras** (Rules), **Skills**, **Agentes** (Agents) and **Servidores MCP** (MCP servers).
 **Plano de contexto** (context plan) holds the board's default; each workflow's lives in **Workflows e colunas** and the model suggestion in **Conectar agentes**. The permissions, the timeout and the heartbeat live in **Automação** (automation). The **default instructions agent** is picked in the
-**Agentes** list itself (**Tornar padrão das instruções**, make default for instructions); the name
+**Agentes** list itself (**Tornar padrão**, make default, on the agent row); the name
 sets it apart from the default AI agent in Conectar agentes. The board's default AI agent, each agent's connection
 to the board's MCP server and the admission regime live in Conectar agentes (connect agents). Switching agents preserves artifacts and their selections.
 
@@ -398,7 +398,7 @@ equal starts keeping it; if they differ, the row shows **origem alterada**.
 
 The **de fábrica** (factory) badge marks what comes with the extension and stays in the library.
 **Factory agents** (the conductor and the specialists) can be edited, turned off and reset to the
-original text with **Restaurar o padrão** (restore default; the mode and name stay), but not
+original text with **Restaurar o original** (restore original; the mode and name stay), but not
 deleted. The **flow skills** (`faz-ai-fluxo` and the topic `faz-ai-*` skills) show as **Entregue
 pelo board** (delivered by the board), read-only: they are the board's contract with the AI and
 follow the extension version, which rewrites them when the text changes. To change behavior, add a
@@ -534,7 +534,7 @@ A run selects the card's agent; without one, the phase's agent; then the one mar
 **padrão das instruções** (default for instructions) in the Harness **Agentes** tab. With no available agents, it uses the built-in agent,
 with no additional instructions. Removing an agent releases the card and phase selections that used
 it. Factory agents are created inside each board, in its database, and cannot be deleted: turn off
-the ones you do not want, or reset one to the original text with **Restaurar o padrão**.
+the ones you do not want, or reset one to the original text with **Restaurar o original** (restore original).
 
 ### Creating and editing
 
