@@ -31,7 +31,7 @@ goes to its model's agent (the card's, the harness agent's or the suggestion rul
 [Which CLI runs](#which-cli-runs)), with nothing to switch. The **default agent** runs the cards with no
 model and carries the **Padrão** (default) badge in the list and on its panel, which opens already selected
 when you enter the screen. On the left is the list of agents; on the right, the chosen agent, with
-the **Conexão** (connection), **Modelos** (models), **Testar** (test) and **Detalhes** (details) tabs.
+the **Conexão** (connection), **Modelos** (models) and **Testar** (test) tabs.
 The fallback rules of the agent chosen in the list sit at the end of the screen. The model
 suggestion rules apply to the whole board and live in **Harness › Ferramenta e execução** (tool and
 execution).
@@ -148,10 +148,10 @@ cards with no model. The default agent cannot be disabled (the switch's hint say
 the default first. The capability check has no separate command: it
 runs in Connect and Reconnect, by itself when you enable an ACP agent and, on the verifiable profiles
 that do not go through Connect (the Claude Code copy and a custom ACP profile from an earlier version),
-through the **Verificar capacidades** (check capabilities) button in the profile's Details. None of the
+through the **Verificar capacidades** (check capabilities) button at the end of the profile's Conexão tab. None of the
 probes spends your account. When a proof loses its validity (the CLI, the environment or the extension
 changed), the requirements banner says where to redo it: **Abrir Conectar agentes** (open Connect
-agents) on the catalog profile, **Abrir os detalhes do perfil** (open the profile details) on the copy.
+agents) on the catalog profile, **Abrir o perfil** (open the profile) on the copy.
 
 ### Card context: closed or open
 
@@ -296,7 +296,7 @@ The **Testar** (test) tab has three parts:
   **Ocultar session/update** (hide session/update) only filters the list, not what is recorded. Keys and access tokens never go in; the
   consumption counters (`inputTokens`, `totalTokens`) do.
 
-### Details: CLI profiles, copies and custom profiles
+### CLI profiles, copies and custom profiles
 
 Each board agent is a **CLI profile**: a tool the board can choose to run. The ready profiles are Claude
 Code, Cursor and Kimi Code, through the one-shot CLI, and the catalog's ACP agents (Gemini CLI, Codex,
@@ -306,11 +306,10 @@ credentials and verification. A **custom** profile accepts another CLI with text
 stay unknown. Imports stay disabled until reviewed locally. Saved configuration and credentials never
 come back to the screen or into the board export.
 
-The **Detalhes** (details) tab shows the profile type ("Claude Code · CLI", "Cópia de Claude Code ·
-CLI", "Personalizado · CLI"), the isolation badge, the compatible regime acknowledgment and the
-**Capacidades e evidências** (capabilities and evidence), with **Duplicar** (duplicate) on all of them
-and **Editar** (edit) and **Apagar** (delete) on copies and custom profiles (the profile in use cannot be
-deleted). Commands, arguments, environment and credentials stay in the local vault: export, screen and
+The profile actions sit at the end of the **Conexão** tab: **Duplicar** (duplicate) on all of them and,
+on copies and custom profiles, **Editar** (edit), **Apagar** (delete; the profile in use cannot be
+deleted), **Verificar capacidades** (check capabilities) and the compatible regime acknowledgment. Each
+profile's verified capabilities and isolation show in **Verificar ambiente** (check environment). Commands, arguments, environment and credentials stay in the local vault: export, screen and
 MCP show only references and state. Copies do not inherit isolation proofs, and a custom profile
 without a verified translation does not run.
 
@@ -352,7 +351,7 @@ The custom profile is the advanced path, for a command line the catalog does not
 agents come in through **Conectar**. The form opens from the **Agente personalizado (CLI)** (custom
 agent) button, below the list. A new custom profile is **CLI only**: the board refuses to turn a custom
 CLI into an ACP agent. Custom ACP profiles created in an earlier version (and a copy of a ready ACP
-agent) **keep running as they are**: their Details show a notice, with **Abrir o agente do catálogo**
+agent) **keep running as they are**: their Conexão tab shows a notice, with **Abrir o agente do catálogo**
 (open the catalog agent) and **Verificar capacidades** (check capabilities); editing shows the same
 notice and keeps the saved agent.
 

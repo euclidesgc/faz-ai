@@ -22,8 +22,6 @@ export const settings: Record<string, string> = {
   'Os cards que mencionam este perfil manterão o identificador antigo.': 'Cards referencing this profile will keep its old identifier.',
   Ligado: 'Enabled',
   Padrão: 'Default',
-  'Não mede tokens nem custo': 'Does not measure tokens or cost',
-  'Capacidades e evidências': 'Capabilities and evidence',
   'Conversa nova': 'Fresh conversation',
   'Controle de artefatos': 'Artifact control',
   Permissões: 'Permissions',
@@ -34,9 +32,6 @@ export const settings: Record<string, string> = {
   Verificado: 'Verified',
   Parcial: 'Partial',
   Desconhecido: 'Unknown',
-  'Fonte e versão da evidência: não informadas. Uma declaração da pessoa não recebe selo de verificação.':
-    'Evidence source and version: not provided. A person’s declaration does not receive a verified badge.',
-  'Fonte da situação: sonda local do host. Versão da CLI: {version}.': 'Status source: local host probe. CLI version: {version}.',
   desconhecida: 'unknown',
   'A resposta não comprova isolamento, permissões ou MCP.': 'The response does not prove isolation, permissions, or MCP access.',
   'Editar perfil {name}': 'Edit profile {name}',

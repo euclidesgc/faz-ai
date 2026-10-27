@@ -14,7 +14,6 @@ import { AiProfileForm } from '../AiProfileForm';
 import { PageHeader } from '../PageHeader';
 import { ExecutionPoliciesSettings } from '../policies/ExecutionPoliciesSettings';
 import { AgentConnection } from './AgentConnection';
-import { AgentDetails } from './AgentDetails';
 import { AgentModels } from './AgentModels';
 import { AgentTest } from './AgentTest';
 import { STATE_COLOR, STATE_LABEL, agentState, profileHeadline, type AgentState } from './agentStatus';
@@ -155,7 +154,7 @@ function AgentList({
   );
 }
 
-/** O agente escolhido: a descrição e as abas Conexão, Modelos, Testar e Detalhes. */
+/** O agente escolhido: a descrição e as abas Conexão, Modelos e Testar. */
 function AgentDetail({ item, onEdit }: { item: AgentListItem; onEdit(profile: AiProfile): void }) {
   const { tab, setTab } = useAgentConnectStore();
   const p = item.profile;
@@ -164,7 +163,7 @@ function AgentDetail({ item, onEdit }: { item: AgentListItem; onEdit(profile: Ai
   const entry = p ? toolEntry(p.tool) : undefined;
   const docs = entry?.docs ?? item.registry?.url ?? null;
   const description = p && p.mode !== 'acp' && entry ? t(entry.billing) : item.registry?.description || (entry ? t(entry.billing) : '');
-  const tabs: AgentTab[] = p ? ['connection', 'models', 'test', 'details'] : ['connection', 'test', 'details'];
+  const tabs: AgentTab[] = p ? ['connection', 'models', 'test'] : ['connection', 'test'];
   const current = tabs.includes(tab) ? tab : 'connection';
   return (
     <Card className="agent-detail" aria-label={item.name}>
@@ -197,10 +196,9 @@ function AgentDetail({ item, onEdit }: { item: AgentListItem; onEdit(profile: Ai
           <Tabs.Trigger value="connection">{t('Conexão')}</Tabs.Trigger>
           {p && <Tabs.Trigger value="models">{t('Modelos')}</Tabs.Trigger>}
           <Tabs.Trigger value="test">{t('Testar')}</Tabs.Trigger>
-          <Tabs.Trigger value="details">{t('Detalhes')}</Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="connection" className="agent-tab-content">
-          <AgentConnection item={item} />
+          <AgentConnection item={item} onEdit={onEdit} />
         </Tabs.Content>
         {p && (
           <Tabs.Content value="models" className="agent-tab-content">
@@ -209,9 +207,6 @@ function AgentDetail({ item, onEdit }: { item: AgentListItem; onEdit(profile: Ai
         )}
         <Tabs.Content value="test" className="agent-tab-content">
           <AgentTest item={item} />
-        </Tabs.Content>
-        <Tabs.Content value="details" className="agent-tab-content">
-          <AgentDetails item={item} onEdit={onEdit} />
         </Tabs.Content>
       </Tabs.Root>
     </Card>

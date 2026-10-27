@@ -29,7 +29,7 @@ com as regras de sugestão e as regras de fallback. O Harness e os agentes do bo
 IA). Todo agente ligado roda cards, ao mesmo tempo que os outros: cada card vai para o agente do modelo dele
 (o do card, o do agente do harness ou o da regra de sugestão; veja [Qual CLI executa](#qual-cli-executa)),
 sem trocar nada. O **agente padrão** roda os cards sem modelo e leva o selo **Padrão** na lista e no
-painel dele, que já abre selecionado ao entrar na tela. À esquerda fica a lista dos agentes; à direita, o agente escolhido, com as abas **Conexão**, **Modelos**, **Testar** e **Detalhes**.
+painel dele, que já abre selecionado ao entrar na tela. À esquerda fica a lista dos agentes; à direita, o agente escolhido, com as abas **Conexão**, **Modelos** e **Testar**.
 No fim da tela ficam as regras de fallback do agente escolhido na lista. As regras de sugestão de
 modelo valem para o board inteiro e ficam em **Harness › Ferramenta e execução**.
 
@@ -130,10 +130,10 @@ um modelo dele, junto com os outros agentes, e o campo Modelo dos cards e o chat
 **Tornar padrão** o põe para rodar os cards sem modelo. O agente padrão não desliga (a dica da chave diz
 isso): torne outro padrão antes. A verificação de capacidades não tem comando à parte: ela roda no Conectar e no Reconectar,
 sozinha quando você liga um agente ACP, e, nos perfis verificáveis que não passam pelo Conectar (a cópia
-do Claude Code e o personalizado ACP de uma versão anterior), pelo botão **Verificar capacidades** nos
-Detalhes do perfil. Nenhuma das sondas gasta a sua conta. Quando uma prova perde a validade (a CLI, o
+do Claude Code e o personalizado ACP de uma versão anterior), pelo botão **Verificar capacidades** no
+fim da aba Conexão do perfil. Nenhuma das sondas gasta a sua conta. Quando uma prova perde a validade (a CLI, o
 ambiente ou a extensão mudou), a faixa de requisitos diz onde refazer: **Abrir Conectar agentes** no
-perfil do catálogo, **Abrir os detalhes do perfil** na cópia.
+perfil do catálogo, **Abrir o perfil** na cópia.
 
 ### Contexto do card: fechado ou aberto
 
@@ -274,7 +274,7 @@ A aba **Testar** tem três partes:
   **Ocultar session/update** só filtra a lista, não a gravação. Chaves e tokens de acesso nunca entram; os contadores de consumo
   (`inputTokens`, `totalTokens`) entram.
 
-### Detalhes: perfis de CLI, cópias e personalizados
+### Perfis de CLI, cópias e personalizados
 
 Cada agente do board é um **perfil de CLI**: uma ferramenta que o board pode escolher para executar. Os
 perfis prontos são Claude Code, Cursor e Kimi Code, pela CLI de uma passada, e os agentes ACP do
@@ -284,10 +284,10 @@ mas mantém comando, credenciais e verificação próprios. Um **personalizado**
 em texto; tokens e custo ficam desconhecidos. Importações ficam desligadas até revisão local.
 Configuração e credenciais salvas não voltam à tela nem entram no export do board.
 
-A aba **Detalhes** mostra o tipo do perfil ("Claude Code · CLI", "Cópia de Claude Code · CLI",
-"Personalizado · CLI"), o selo de isolamento, a ciência do regime compatível e as **Capacidades e
-evidências**, com **Duplicar** em todos e **Editar** e **Apagar** nas cópias e nos personalizados (o
-perfil em uso não se apaga). Comandos, argumentos, ambiente e credenciais permanecem no cofre local:
+As ações do perfil ficam no fim da aba **Conexão**: **Duplicar** em todos e, nas cópias e nos
+personalizados, **Editar**, **Apagar** (o perfil em uso não se apaga), **Verificar capacidades** e a
+ciência do regime compatível. As capacidades verificadas e o isolamento de cada perfil aparecem em
+**Verificar ambiente**. Comandos, argumentos, ambiente e credenciais permanecem no cofre local:
 exportação, tela e MCP mostram apenas referências e estado. Cópias não herdam provas de isolamento, e
 um personalizado sem tradução verificada não executa.
 
@@ -329,7 +329,7 @@ O personalizado é o caminho avançado, para uma linha de comando que o catálog
 catálogo entram pelo **Conectar**. O formulário abre pelo botão **Agente personalizado (CLI)**, abaixo
 da lista. O personalizado novo é **só de CLI**: o board recusa transformar uma CLI personalizada em
 agente ACP. Os personalizados ACP criados numa versão anterior (e a cópia de um agente ACP pronto)
-**continuam rodando como estão**: os Detalhes mostram o aviso, com **Abrir o agente do catálogo** e
+**continuam rodando como estão**: a aba Conexão mostra o aviso, com **Abrir o agente do catálogo** e
 **Verificar capacidades**; editar mostra o mesmo aviso e mantém o agente salvo.
 
 Para criar um personalizado, informe o comando e um argumento por linha. Os marcadores `{prompt}`,

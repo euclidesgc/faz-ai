@@ -54,6 +54,7 @@
 
 ### Removido
 
+- A aba Detalhes de Conectar agentes sai; as ações do perfil passam para o fim da aba Conexão.
 - Saiu o cartão "Agente padrão" do topo de Conectar agentes.
 - Saiu a seção "Ferramenta deste projeto" do Harness.
 - Saiu o item **Recriar board padrão** e a ferramenta MCP `reset_board`.

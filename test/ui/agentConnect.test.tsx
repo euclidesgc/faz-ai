@@ -131,7 +131,7 @@ describe('Conectar agentes: a lista e o agente padrão', () => {
     ]);
     expect(others.getByRole('button', { name: /^Kilo/ })).toHaveTextContent('Só teste');
     expect(others.getByRole('button', { name: /^Amp/ })).toHaveTextContent('Indisponível');
-    expect(screen.getAllByRole('tab').map(label)).toEqual(['Conexão', 'Modelos', 'Testar', 'Detalhes']);
+    expect(screen.getAllByRole('tab').map(label)).toEqual(['Conexão', 'Modelos', 'Testar']);
   });
 
   it('sem cartão do agente padrão no topo: o selo "Padrão" do agente escolhido explica o que é', async () => {
@@ -175,11 +175,10 @@ describe('Conectar agentes: a lista e o agente padrão', () => {
     await userEvent.hover(claude.getByRole('switch', { name: 'Ligado' }).closest('span[tabindex]')!);
     expect((await screen.findAllByText('O agente padrão não pode ser desligado: torne outro agente padrão antes.'))[0]).toBeInTheDocument();
     expect(claude.queryByText('Padrão dos cards')).toBeNull();
-    await userEvent.click(tab('Detalhes'));
+    // as ações do perfil ficam no fim da Conexão: o pronto só duplica
     expect(claude.queryByRole('button', { name: 'Editar' })).toBeNull();
     expect(claude.queryByRole('button', { name: 'Apagar' })).toBeNull();
-    await userEvent.click(claude.getByText('Capacidades e evidências'));
-    expect(claude.getAllByText('Desconhecido').length).toBeGreaterThan(0);
+    expect(claude.getByRole('button', { name: 'Duplicar' })).toBeInTheDocument();
   });
 
   it('agente ACP pronto: desligado e ligável, com o tipo e o modo, sem Editar nem Apagar', async () => {
@@ -192,7 +191,6 @@ describe('Conectar agentes: a lista e o agente padrão', () => {
     await userEvent.click(gemini.getByRole('switch', { name: 'Ligado' }));
     expect(lastSent('settings.aiProfiles.setEnabled')).toMatchObject({ id: 'gemini', enabled: true });
     confirmLast();
-    await userEvent.click(tab('Detalhes'));
     expect(gemini.queryByRole('button', { name: 'Editar' })).toBeNull();
     expect(gemini.queryByRole('button', { name: 'Apagar' })).toBeNull();
   });
@@ -785,7 +783,7 @@ describe('Conectar agentes: a conta', () => {
     await userEvent.click(row('Kilo', 'Outros agentes do registro do ACP'));
     const kilo = within(screen.getByLabelText('Kilo'));
     expect(kilo.getByText(/O board ainda não executa cards com este agente/)).toBeInTheDocument();
-    expect(screen.getAllByRole('tab').map(label)).toEqual(['Conexão', 'Testar', 'Detalhes']);
+    expect(screen.getAllByRole('tab').map(label)).toEqual(['Conexão', 'Testar']);
     // o agente do registro não é conferido sozinho: só no clique (o npx pode baixar o pacote)
     expect(sentOf('agentConnect.check').some((m) => m.key === 'registry:kilo')).toBe(false);
     await userEvent.click(kilo.getByRole('button', { name: 'Verificar a conta' }));
@@ -963,7 +961,6 @@ describe('Conectar agentes: detalhes e perfis personalizados', () => {
     );
     const imported = await openAgent('Importada');
     expect(imported.getByRole('switch', { name: 'Ligado' })).toBeDisabled();
-    await userEvent.click(tab('Detalhes'));
     await userEvent.click(imported.getByRole('button', { name: 'Editar' }));
     const form = within(screen.getByLabelText('Editar perfil Importada'));
     expect(form.getByText('Os valores salvos não são mostrados. Deixe um campo vazio para manter o valor atual.')).toBeInTheDocument();
@@ -984,7 +981,6 @@ describe('Conectar agentes: detalhes e perfis personalizados', () => {
     await userEvent.click(card.getByRole('button', { name: 'Tornar padrão' }));
     expect(lastSent('settings.board.update')).toEqual({ type: 'settings.board.update', patch: { aiTool: custom.id } });
     confirmLast();
-    await userEvent.click(tab('Detalhes'));
     await userEvent.click(card.getByRole('button', { name: 'Duplicar' }));
     expect(lastSent('settings.aiProfiles.duplicate')).toMatchObject({ id: custom.id });
     confirmLast();
@@ -995,15 +991,8 @@ describe('Conectar agentes: detalhes e perfis personalizados', () => {
     confirmLast();
   });
 
-  it('o selo de isolamento não trata lista vazia como prova, e o formulário grava o que a pessoa marcar', async () => {
+  it('o formulário do perfil novo grava o isolamento que a pessoa marcar', async () => {
     show();
-    await userEvent.click(tab('Detalhes'));
-    const claude = within(screen.getByLabelText('Claude Code'));
-    expect(claude.getByText('Sem prova de isolamento')).toBeInTheDocument();
-    await userEvent.click(claude.getByText('Capacidades e evidências'));
-    expect(claude.getByText(/Conferido na documentação em 2026-10-16 · versão Claude Code/)).toBeInTheDocument();
-    const cursor = await openAgent('Cursor', 'Detalhes');
-    expect(cursor.getByText('Carrega por conta própria')).toBeInTheDocument();
     await openNewProfile();
     const form = within(screen.getByLabelText('Novo perfil de CLI'));
     await userEvent.type(form.getByRole('textbox', { name: 'Nome' }), 'Outra CLI');
@@ -1023,7 +1012,7 @@ describe('Conectar agentes: detalhes e perfis personalizados', () => {
       profile: { id: legacy.id, name: 'Gemini antigo', kind: 'custom', base: 'generic', enabled: true, position: 5, config: {} },
     });
     show();
-    const card = await openAgent('Gemini antigo', 'Detalhes');
+    const card = await openAgent('Gemini antigo');
     expect(card.getAllByText('Personalizado · ACP').length).toBeGreaterThan(0);
     expect(card.getByRole('note')).toHaveTextContent('Personalizado pelo ACP: continua rodando como está');
     await userEvent.click(card.getByRole('button', { name: 'Verificar capacidades' }));
@@ -1038,7 +1027,7 @@ describe('Conectar agentes: detalhes e perfis personalizados', () => {
     expect(lastSent('settings.aiProfiles.save').profile).toMatchObject({ id: legacy.id, kind: 'custom', config: {} });
     confirmLast();
     // o caminho normal: o agente do catálogo deste perfil
-    await openAgent('Gemini antigo', 'Detalhes');
+    await openAgent('Gemini antigo');
     await userEvent.click(screen.getByRole('button', { name: 'Abrir o agente do catálogo' }));
     expect(screen.getByLabelText('Gemini CLI')).toBeInTheDocument();
   });
@@ -1048,12 +1037,11 @@ describe('Conectar agentes: detalhes e perfis personalizados', () => {
     board.router.handle({ type: 'settings.aiProfiles.duplicate', id: 'claude' });
     const copy = board.router.snapshot().board.aiProfiles.find((p) => !before.includes(p.id))!;
     show();
-    await userEvent.click(tab('Detalhes'));
     expect(within(screen.getByLabelText('Claude Code')).queryByRole('button', { name: 'Verificar capacidades' })).toBeNull();
-    const cursor = await openAgent('Cursor', 'Detalhes');
+    const cursor = await openAgent('Cursor');
     expect(cursor.queryByRole('button', { name: 'Verificar capacidades' })).toBeNull();
     // a cópia nasce desligada e pendente de revisão: o botão espera, com o motivo
-    const card = await openAgent(copy.name, 'Detalhes');
+    const card = await openAgent(copy.name);
     expect(card.getByRole('button', { name: 'Verificar capacidades' })).toBeDisabled();
     await userEvent.hover(card.getByRole('button', { name: 'Verificar capacidades' }).parentElement!);
     expect(await screen.findByText('Revise o perfil antes: salve a configuração dele no formulário.')).toBeInTheDocument();
@@ -1083,7 +1071,7 @@ describe('Conectar agentes: detalhes e perfis personalizados', () => {
   it('o personalizado ACP desligado diz por que não verifica', async () => {
     show();
     withProfiles([custom('acp-desligado', { config: { acpAgent: 'gemini' }, enabled: false })]);
-    const card = await openAgent('acp-desligado', 'Detalhes');
+    const card = await openAgent('acp-desligado');
     expect(card.getByRole('button', { name: 'Verificar capacidades' })).toBeDisabled();
     await userEvent.hover(card.getByRole('button', { name: 'Verificar capacidades' }).parentElement!);
     expect(await screen.findByText('Ligue o perfil antes.')).toBeInTheDocument();
@@ -1093,7 +1081,7 @@ describe('Conectar agentes: detalhes e perfis personalizados', () => {
     show();
     withProfiles([custom('cursor-acp', { config: { acpAgent: 'cursor' } }), custom('kimi-acp', { config: { acpAgent: 'kimi' } })]);
     for (const name of ['cursor-acp', 'kimi-acp']) {
-      const card = await openAgent(name, 'Detalhes');
+      const card = await openAgent(name);
       expect(card.getByRole('note')).toHaveTextContent('Personalizado pelo ACP');
       expect(card.queryByRole('button', { name: 'Abrir o agente do catálogo' })).toBeNull();
     }
@@ -1114,14 +1102,14 @@ describe('Conectar agentes: detalhes e perfis personalizados', () => {
         credentials: { secretRef: 'x', review: 'pending', available: false },
       }),
     ]);
-    await userEvent.click((await openAgent('ACP sem cofre', 'Detalhes')).getByRole('button', { name: 'Editar' }));
+    await userEvent.click((await openAgent('ACP sem cofre')).getByRole('button', { name: 'Editar' }));
     let form = within(screen.getByLabelText('Editar perfil ACP sem cofre'));
     expect(form.getByText('Informe o agente ACP do perfil: a configuração dele não está nesta máquina.')).toBeInTheDocument();
     expect(form.getByRole('button', { name: 'Salvar perfil' })).toBeDisabled();
     await userEvent.type(form.getByRole('textbox', { name: 'Agente ACP' }), 'gemini');
     expect(form.getByRole('button', { name: 'Salvar perfil' })).toBeEnabled();
     await userEvent.click(form.getByRole('button', { name: 'Cancelar' }));
-    await userEvent.click((await openAgent('Importado antigo', 'Detalhes')).getByRole('button', { name: 'Editar' }));
+    await userEvent.click((await openAgent('Importado antigo')).getByRole('button', { name: 'Editar' }));
     form = within(screen.getByLabelText('Editar perfil Importado antigo'));
     expect(form.getByText(/se o perfil era de um agente ACP no board de origem/)).toBeInTheDocument();
     expect(form.getByRole('textbox', { name: 'Comando' })).toBeInTheDocument();
@@ -1142,8 +1130,7 @@ describe('Conectar agentes: detalhes e perfis personalizados', () => {
     // a cópia nasce pendente de revisão: revisada e ligada (com um nome só dela), a ação fica disponível
     board.router.handle({ type: 'settings.aiProfiles.save', profile: { ...copy, name: 'Claude da ciência', enabled: true } as never });
     show();
-    const card = await openAgent('Claude da ciência', 'Detalhes');
-    expect(card.getByText('sem ciência')).toBeInTheDocument();
+    const card = await openAgent('Claude da ciência');
     await userEvent.click(card.getByRole('button', { name: 'Usar com o contexto aberto' }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('O Claude da ciência roda com o contexto aberto');
