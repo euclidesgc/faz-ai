@@ -22,6 +22,7 @@ import { getLocale, t } from '../../i18n';
 import { ActivityContextEditor } from './ActivityContextEditor';
 import { ContextDraftPreview, CONTEXT_DRAFT_ORIGINS } from './ContextDraftPreview';
 import { Summary } from '../ui';
+import { SectionHeader } from '../settings/SectionHeader';
 
 export type ExecutionPlanDrafts = Record<string, ActivityContextWrite>;
 /** O card guarda o rascunho acima das abas. Padrões sem card usam a mesma composição. */
@@ -421,7 +422,13 @@ export function ContextPlanDefaults({ workflowId = null }: { workflowId?: string
   const [drafts, setDrafts] = useState<ExecutionPlanDrafts>({});
   return (
     <section className="context-plan-defaults">
-      <h3>{workflowId ? t('Plano de contexto deste workflow') : t('Plano de contexto padrão do board')}</h3>
+      <SectionHeader title={workflowId ? t('Plano de contexto deste workflow') : t('Plano de contexto padrão do board')}>
+        {workflowId
+          ? t('Vale para os cards deste workflow; o que ficar em "Herdar" segue o padrão do board, em Harness › Plano de contexto.')
+          : t(
+              'O que cada atividade leva para a IA (agente, modelo, skills, MCPs e o resultado esperado) quando nem o card nem o workflow escolhem outra coisa. O de cada workflow fica no botão Plano de contexto dele, em Workflows e colunas.',
+            )}
+      </SectionHeader>
       <ExecutionPlanPanel workflowId={workflowId} drafts={drafts} onDrafts={setDrafts} />
     </section>
   );

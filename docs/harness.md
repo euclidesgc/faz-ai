@@ -423,6 +423,12 @@ ela (#623).
 
 ### As abas dos artefatos
 
+**Importar** e **Exportar para a ferramenta** ficam acima das abas e valem para todos os assuntos.
+Dentro de cada aba, a barra separa criar (**Nova regra**, **Criar regra com ajuda** e os equivalentes
+de skills, agentes e servidores MCP) de pedir à IA (**Sugerir … com IA**); logo abaixo fica a busca
+daquele assunto, que filtra a lista e é guardada ao trocar de aba. Com regras desligadas, o aviso da
+aba Regras tem **Mostrar só as desligadas**, para revisá-las uma a uma.
+
 Cada aba tem **Criar**, busca, quantidade e ações de **Editar**, mudar o modo de uso, atualizar da
 origem e remover com confirmação. Regras, skills e subagentes também oferecem **Assistente guiado**
 (etapas por seção, dicas, placeholders, exemplos editáveis e revisão antes de salvar) e **Gerar com
