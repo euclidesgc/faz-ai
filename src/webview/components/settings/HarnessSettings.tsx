@@ -19,7 +19,7 @@ export function HarnessSettings() {
     <div>
       <PageHeader title={t('Harness')}>
         {rich(
-          'Os <b>Artefatos do board</b> (regras, skills, agentes e servidores MCP) valem com qualquer ferramenta de IA; a edição vale para as próximas execuções. O <b>Plano de contexto</b> é o padrão do board; o de cada workflow fica em Workflows e colunas. O que a IA pode fazer e o heartbeat ficam em <b>Automação</b>; a sugestão de modelo, em <b>Conectar agentes</b>.',
+          'O que entra no contexto das execuções, com qualquer ferramenta de IA: os <b>Artefatos do board</b> (regras, skills, agentes e servidores MCP) e o <b>Plano de contexto</b> padrão de cada atividade. A edição vale para as próximas execuções.',
         )}
       </PageHeader>
       <Tabs.Root value={tab} onValueChange={(harnessTab) => useBoardStore.setState({ harnessTab: harnessTab as HarnessTab })}>

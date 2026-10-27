@@ -15,24 +15,30 @@ export function ModelSuggestion() {
   const { modelRules, rules } = useBoardStore((s) => s.state!.board);
   return (
     <section className="model-suggestion">
-      <Card className="form-card" aria-label={t('Preencher o modelo sugerido')}>
-        <SwitchField
-          label={t('Preencher o modelo sugerido automaticamente')}
-          checked={modelRules.length > 0 && rules.autoApplyModelSuggestion}
-          disabled={modelRules.length === 0}
-          onChange={(autoApplyModelSuggestion) => settings.updateRules({ autoApplyModelSuggestion })}
-          hint={t(
-            'Ao criar ou mudar um card, preenche o campo "Modelo" com a sugestão das regras abaixo, se ele estiver vazio ou com a sugestão anterior. Um modelo escolhido à mão nunca é trocado.',
-          )}
-        />
-        <DependsOn
-          label={t('uma regra de sugestão de modelo')}
-          satisfied={modelRules.length > 0}
-          target={{ kind: 'board', section: 'model-rules' }}
-          targetHint={t('mais abaixo, nesta mesma aba')}
-        />
-      </Card>
-      <ModelRulesEditor />
+      {/* o preencher sozinho vem logo abaixo do título da seção, e não acima dele, colado nas regras de fallback */}
+      <ModelRulesEditor
+        intro={
+          <Card className="form-card" aria-label={t('Preencher o modelo sugerido')}>
+            <SwitchField
+              label={t('Preencher o modelo sugerido automaticamente')}
+              checked={modelRules.length > 0 && rules.autoApplyModelSuggestion}
+              disabled={modelRules.length === 0}
+              onChange={(autoApplyModelSuggestion) => settings.updateRules({ autoApplyModelSuggestion })}
+              hint={t(
+                'Ao criar ou mudar um card, preenche o campo "Modelo" com a sugestão das regras abaixo, se ele estiver vazio ou com a sugestão anterior. Um modelo escolhido à mão nunca é trocado.',
+              )}
+            />
+            {modelRules.length === 0 && (
+              <DependsOn
+                label={t('uma regra de sugestão de modelo')}
+                satisfied={false}
+                target={{ kind: 'board', section: 'model-rules' }}
+                targetHint={t('mais abaixo, nesta mesma aba')}
+              />
+            )}
+          </Card>
+        }
+      />
     </section>
   );
 }

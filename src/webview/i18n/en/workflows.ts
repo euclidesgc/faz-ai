@@ -104,7 +104,6 @@ export const workflows: Record<string, string> = {
   'Agente {name}': 'Agent {name}',
   'Nome do agente': 'Agent name',
   padrão: 'default',
-  'Usado quando nem o card nem a coluna indicam um agente': 'Used when neither the card nor the column specifies an agent',
   Fechar: 'Close',
   Editar: 'Edit',
   'Precisa haver ao menos um agente': 'There must be at least one agent',

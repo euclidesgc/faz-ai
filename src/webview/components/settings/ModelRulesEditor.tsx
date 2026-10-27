@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { modelDisplay } from '../../modelText';
 import { baseInfo } from '../../../shared/harness';
 import { EFFORT_FIELD, TYPE_CONDITION, describeRule, modelValue, type ModelRule, type RuleCondition } from '../../../shared/models';
@@ -166,7 +166,8 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
 }
 
 /** Lista das regras em uso (a ordem importa) e o montador de regras. */
-export function ModelRulesEditor() {
+/** `intro` fica entre o título da seção e a lista: o que vale para as regras todas (o preencher sozinho). */
+export function ModelRulesEditor({ intro }: { intro?: ReactNode } = {}) {
   const state = useBoardStore((s) => s.state)!;
   const { modelRules: rules, aiTool } = state.board;
   // modelos de todos os perfis ligados; o padrão do novo modelo é o do perfil padrão (o primeiro grupo)
@@ -236,6 +237,7 @@ export function ModelRulesEditor() {
           'Regras que sugerem um modelo a partir dos atributos do card. As regras são avaliadas de cima para baixo e a primeira ligada que casa vence. O resultado é sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento.',
         )}
       </SectionHeader>
+      {intro}
 
       {editing && <RuleBuilder key={editing.id} initial={editing} onSave={save} onCancel={() => setEditing(null)} />}
 

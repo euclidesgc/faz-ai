@@ -329,7 +329,7 @@ O board gerencia uma **biblioteca particular**, independente da ferramenta de IA
 **Configurações → Harness**, a aba **Artefatos do board** concentra o CRUD de **Regras**,
 **Skills**, **Agentes** e **Servidores MCP**. **Plano de contexto** guarda o padrão do board; o de cada
 workflow fica em **Workflows e colunas** e a sugestão de modelo, em **Conectar agentes**. As permissões, o tempo limite e o heartbeat ficam em **Automação**. O **agente padrão das
-instruções** se escolhe na própria lista de **Agentes** (**Tornar padrão das instruções**); o nome o
+instruções** se escolhe na própria lista de **Agentes** (**Tornar padrão**, na linha do agente); o nome o
 separa do agente de IA padrão de Conectar agentes. O agente de IA padrão do
 board, a conexão de cada agente ao servidor MCP do board e o regime de admissão ficam em Conectar
 agentes. Trocar de agente preserva os artefatos e suas seleções.
@@ -383,7 +383,7 @@ cópia iguais passa a guardá-la; se forem diferentes, a linha mostra **origem a
 
 O selo **de fábrica** marca o que vem com a extensão e não sai da biblioteca. Os **agentes de
 fábrica** (o condutor e os especialistas) podem ser editados, desligados e voltados ao texto
-original com **Restaurar o padrão** (o modo e o nome ficam), mas não apagados. As **skills do fluxo**
+original com **Restaurar o original** (o modo e o nome ficam), mas não apagados. As **skills do fluxo**
 (`faz-ai-fluxo` e as `faz-ai-*` por assunto) aparecem como **Entregue pelo board**, só de leitura:
 são o contrato do board com a IA e acompanham a versão da extensão, que as regrava quando o texto
 muda. Para mudar o comportamento, acrescente uma regra ou skill sua, que complementa o fluxo.
@@ -514,7 +514,7 @@ A execução escolhe o agente do card; na ausência dele, o agente da fase; depo
 **padrão das instruções** na aba **Agentes** do Harness. Sem agentes disponíveis, usa o agente embutido, sem instruções
 adicionais. Remover um agente libera as seleções dos cards e fases que o utilizavam. Os agentes de
 fábrica são criados em cada board, no banco, e não podem ser apagados: desligue o que não quiser
-usar, ou volte-o ao texto original com **Restaurar o padrão**.
+usar, ou volte-o ao texto original com **Restaurar o original**.
 
 ### Criar e editar
 

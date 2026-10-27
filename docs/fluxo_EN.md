@@ -209,7 +209,7 @@ context. The **Conversa** tab still shows everything.
 
 ### Permission, tool and failures
 
-- What the AI may do in these runs is set in Configurações → Automação → **Execução pela conversa**:
+- What the AI may do in these runs is set in Configurações → Automação → **Execução pela IA**:
   only the board (default), the board and project files, or no restrictions. The level in use is
   shown next to the button, with a shortcut to change it. The AI is told about the limit: if the work
   needs more than the level allows, it blocks the card saying which option to choose.

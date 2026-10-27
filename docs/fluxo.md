@@ -193,7 +193,7 @@ mostrando tudo.
 ### Permissão, ferramenta e falhas
 
 - O que a IA pode fazer nessas execuções se define em Configurações → Automação → **Execução pela
-  conversa**: só o board (padrão), board e arquivos do projeto, ou sem restrições. O nível em uso
+  IA**: só o board (padrão), board e arquivos do projeto, ou sem restrições. O nível em uso
   aparece ao lado do botão, com um atalho para mudar. A IA é avisada do limite: se o trabalho pedir
   mais do que o nível permite, ela bloqueia o card dizendo qual opção escolher.
 - O Cursor aceita os três níveis: em "só o board" e "board e arquivos" a sessão dele recebe só as

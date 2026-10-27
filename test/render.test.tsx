@@ -304,7 +304,8 @@ describe('telas montam sem erro', () => {
     // a execução saiu do Harness: mora na seção Automação
     const automation = html(<AutomationSettings />);
     for (const text of [
-      'Execução pela conversa e heartbeat',
+      'Execução pela IA',
+      'Paralelismo',
       'A IA lê o projeto e usa as ferramentas do board',
       'Tempo limite por execução',
       'Heartbeat ligado',
