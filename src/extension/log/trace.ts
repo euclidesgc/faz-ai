@@ -22,7 +22,10 @@ function day(at: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** Apaga os arquivos de rastreio com mais de `TRACE_KEEP_DAYS` dias. */
+/**
+ * Apaga os arquivos com mais de `TRACE_KEEP_DAYS` dias: o rastreio e o log do protocolo ACP (`acp-*`, e o
+ * `acp-poc-*` das versões antigas), que ficam na mesma pasta e, sem isso, só cresciam.
+ */
 export function pruneTrace(dir: string, now = Date.now()): void {
   const oldest = day(now - TRACE_KEEP_DAYS * 86_400_000);
   let names: string[] = [];
@@ -32,7 +35,7 @@ export function pruneTrace(dir: string, now = Date.now()): void {
     return;
   }
   for (const name of names) {
-    const m = /^trace-(\d{4}-\d{2}-\d{2})\.jsonl$/.exec(name);
+    const m = /^(?:trace|acp|acp-poc)-(\d{4}-\d{2}-\d{2})\.jsonl$/.exec(name);
     if (m && m[1]! < oldest) fs.rmSync(path.join(dir, name), { force: true });
   }
 }
@@ -46,6 +49,8 @@ export function createTrace(dir: string, log: (line: string) => void, mirror = f
   let buffer: string[] = [];
   let writing = false;
   let broken = false;
+  // a janela do editor fica aberta por dias: a limpeza roda ao abrir e de novo a cada dia novo
+  let prunedDay = day(Date.now());
   try {
     fs.mkdirSync(dir, { recursive: true });
     pruneTrace(dir);
@@ -59,6 +64,15 @@ export function createTrace(dir: string, log: (line: string) => void, mirror = f
     writing = true;
     const lines = buffer;
     buffer = [];
+    const today = day(Date.now());
+    if (today !== prunedDay) {
+      prunedDay = today;
+      try {
+        pruneTrace(dir);
+      } catch {
+        // um arquivo que não sai fica para a próxima: o rastreio continua
+      }
+    }
     // o arquivo é o do dia em que o lote é gravado: as linhas da virada da meia-noite caem no dia novo
     fs.appendFile(fileOf(Date.now()), lines.join(''), (err) => {
       writing = false;

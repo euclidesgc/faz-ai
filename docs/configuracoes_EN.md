@@ -292,7 +292,8 @@ The **Testar** (test) tab has three parts:
   sign-ins and the test session, in both directions, with each request's time, the slowest request,
   the lines the agent writes outside the protocol (`stderr`) and the start and exit of each process.
   The day's file (`acp-YYYY-MM-DD.jsonl`, in the board's trace folder) keeps everything, with the full
-  JSON; **Abrir arquivo** (open file) opens it in the editor. Keys and access tokens never go in; the
+  JSON; **Abrir arquivo** (open file) opens it in the editor; files older than seven days are deleted along with the trace files.
+  **Ocultar session/update** (hide session/update) only filters the list, not what is recorded. Keys and access tokens never go in; the
   consumption counters (`inputTokens`, `totalTokens`) do.
 
 ### Details: CLI profiles, copies and custom profiles

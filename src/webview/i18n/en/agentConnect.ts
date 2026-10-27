@@ -190,6 +190,8 @@ export const agentConnect: Record<string, string> = {
   'Cada mensagem JSON-RPC trocada com o agente, nos dois sentidos: a seta para a direita sai do board, a para a esquerda vem do agente. As respostas mostram o tempo do pedido.':
     'Each JSON-RPC message exchanged with the agent, in both directions: the right arrow leaves the board, the left arrow comes from the agent. Responses show how long the request took.',
   'Ocultar session/update': 'Hide session/update',
+  'Esconde da lista os avisos de progresso do agente. Só muda o que aparece aqui: o arquivo continua com tudo.':
+    "Hides the agent's progress notices from the list. It only changes what shows here: the file keeps everything.",
   'Pedido mais lento: {method} em {ms} ms': 'Slowest request: {method} in {ms} ms',
   'Nenhuma mensagem ainda. Verifique a conta de um agente ou abra uma sessão de teste para ver o initialize e o resto da conversa do protocolo.':
     "No messages yet. Check an agent's account or open a test session to see initialize and the rest of the protocol exchange.",

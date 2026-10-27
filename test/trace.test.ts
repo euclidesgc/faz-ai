@@ -95,6 +95,29 @@ describe('createTrace: o arquivo do dia', () => {
     pruneTrace(dir, now);
     expect(fs.readdirSync(dir).sort()).toEqual(['outro.txt', 'trace-2026-10-20.jsonl']);
   });
+
+  it('com a janela aberta de um dia para o outro, limpa de novo na primeira gravação do dia novo', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date(2026, 9, 16, 23, 0));
+      const trace = createTrace(dir, () => {});
+      fs.writeFileSync(path.join(dir, 'acp-2026-10-09.jsonl'), '');
+      vi.setSystemTime(new Date(2026, 9, 17, 9, 0));
+      trace.write({ src: 'ui', ev: 'click' });
+      await settle();
+      expect(fs.existsSync(path.join(dir, 'acp-2026-10-09.jsonl'))).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('apaga também o log do protocolo ACP antigo, inclusive o acp-poc das versões anteriores', () => {
+    const now = new Date(2026, 9, 23).getTime();
+    const names = ['acp-2026-10-10.jsonl', 'acp-2026-10-20.jsonl', 'acp-poc-2026-10-10.jsonl', 'acp-registry.json'];
+    for (const name of names) fs.writeFileSync(path.join(dir, name), '');
+    pruneTrace(dir, now);
+    expect(fs.readdirSync(dir).sort()).toEqual(['acp-2026-10-20.jsonl', 'acp-registry.json']);
+  });
 });
 
 describe('tracedRunLog: começo e fim das execuções de IA', () => {
