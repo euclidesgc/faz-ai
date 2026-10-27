@@ -399,13 +399,23 @@ describe('Settings: abas e navegação do host', () => {
       alvo.remove();
 
       // com uma seção registrada que mora numa sub-aba de Harness, goToSection troca a aba e a sub-aba
+      const agents = document.createElement('div');
+      agents.id = 'harness-agents';
+      agents.scrollIntoView = vi.fn();
+      document.body.append(agents);
+      act(() => useBoardStore.getState().goToSection('harness-agents'));
+      expect(useBoardStore.getState().settingsTab).toBe('harness');
+      expect(useBoardStore.getState().harnessTab).toBe('artifacts');
+      expect(useBoardStore.getState().harnessTopic).toBe('agent');
+      agents.remove();
+
+      // as regras de sugestão de modelo saíram do Harness: moram em Conectar agentes
       const rules = document.createElement('div');
       rules.id = 'model-rules';
       rules.scrollIntoView = vi.fn();
       document.body.append(rules);
       act(() => useBoardStore.getState().goToSection('model-rules'));
-      expect(useBoardStore.getState().settingsTab).toBe('harness');
-      expect(useBoardStore.getState().harnessTab).toBe('context');
+      expect(useBoardStore.getState().settingsTab).toBe('connect');
       rules.remove();
 
       // o heartbeat saiu do Harness: mora na seção Automação

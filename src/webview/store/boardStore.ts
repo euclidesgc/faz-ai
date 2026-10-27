@@ -41,7 +41,7 @@ export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
 
 /** `environment`: o Diagnóstico do ambiente, aberto pelas Configurações ou sozinho na primeira abertura */
 export type View = 'board' | 'archived' | 'trash' | 'settings' | 'metrics' | 'environment';
-/** Abas da tela de Harness: os artefatos do board, ou o contexto e modelo (ver `harnessTopics.ts`). */
+/** Abas da tela de Harness: os artefatos do board, ou o plano de contexto (ver `harnessTopics.ts`). */
 export type { HarnessTab };
 
 /** Qual texto a modal do harness abre: o de uma regra ou skill do board, ou um arquivo de apoio da skill. */

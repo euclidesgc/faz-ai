@@ -16,6 +16,7 @@ import { ExecutionPoliciesSettings } from '../policies/ExecutionPoliciesSettings
 import { AgentConnection } from './AgentConnection';
 import { AgentModels } from './AgentModels';
 import { AgentTest } from './AgentTest';
+import { ModelSuggestion } from './ModelSuggestion';
 import { STATE_COLOR, STATE_LABEL, agentState, profileHeadline, type AgentState } from './agentStatus';
 
 /**
@@ -276,7 +277,7 @@ export function AgentConnectSettings() {
         }
       >
         {t(
-          'Conecte os agentes de IA ao board, entre na conta de cada um e ajuste os modelos. Todo agente ligado roda cards, ao mesmo tempo que os outros: cada card vai para o agente do modelo dele (o do card, o do agente do harness ou o da regra de sugestão), e o padrão roda os cards sem modelo.',
+          'Conecte os agentes de IA ao board, entre na conta de cada um e ajuste os modelos. Todo agente ligado roda cards, ao mesmo tempo que os outros: cada card vai para o agente do modelo dele (o do card, o do agente do harness ou o da regra de sugestão, no fim desta tela), e o padrão roda os cards sem modelo.',
         )}
       </PageHeader>
       <div className="agents-grid">
@@ -307,6 +308,7 @@ export function AgentConnectSettings() {
       </div>
       {/* as regras de fallback são do agente escolhido: cada uma parte de um modelo dele que falha */}
       {item?.profile && <ExecutionPoliciesSettings key={item.profile.id} profileId={item.profile.id} />}
+      <ModelSuggestion />
     </div>
   );
 }

@@ -34,6 +34,7 @@
 
 ### Changed
 
+- The model suggestion moves to the end of Connect agents, and each workflow's context plan to the workflow itself in Workflows and columns; the Harness keeps the board's default plan.
 - The Harness opens on the board artifacts, and the Tool and execution tab becomes Context and model, with only the context plan and the model suggestion.
 - The default in the Harness Agents tab is now called "default for instructions", and "Make default" in Connect agents becomes "Use for cards with no model".
 - The import artifacts dialog is better organized, with its actions in a single footer.

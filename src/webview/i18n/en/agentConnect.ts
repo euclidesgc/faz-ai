@@ -3,8 +3,8 @@
 export const agentConnect: Record<string, string> = {
   // a página, o menu e o agente padrão
   'Conectar agentes': 'Connect agents',
-  'Conecte os agentes de IA ao board, entre na conta de cada um e ajuste os modelos. Todo agente ligado roda cards, ao mesmo tempo que os outros: cada card vai para o agente do modelo dele (o do card, o do agente do harness ou o da regra de sugestão), e o padrão roda os cards sem modelo.':
-    "Connect the AI agents to the board, sign in to each one and tune the models. Every enabled agent runs cards, alongside the others: each card goes to its model's agent (the card's, the harness agent's or the suggestion rule's), and the default one runs the cards with no model.",
+  'Conecte os agentes de IA ao board, entre na conta de cada um e ajuste os modelos. Todo agente ligado roda cards, ao mesmo tempo que os outros: cada card vai para o agente do modelo dele (o do card, o do agente do harness ou o da regra de sugestão, no fim desta tela), e o padrão roda os cards sem modelo.':
+    "Connect the AI agents to the board, sign in to each one and tune the models. Every enabled agent runs cards, alongside the others: each card goes to its model's agent (the card's, the harness agent's or the suggestion rule's, at the end of this screen), and the default one runs the cards with no model.",
   Atualizar: 'Refresh',
   'Confere de novo quais agentes estão instalados, a versão de cada um e se você está com a conta conectada. Use depois de instalar um agente, entrar na conta dele ou atualizá-lo fora do board.':
     "Checks again which agents are installed, each one's version and whether you are signed in to the account. Use it after installing an agent, signing in to it or updating it outside the board.",

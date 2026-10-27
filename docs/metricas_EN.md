@@ -94,7 +94,7 @@ Capability admission from #729 remains pending; previews do not authorize execut
 The **Plano de execução** (execution plan) tab lets you review the agent, model, additional skills,
 active MCPs, input attachments and expected result for each action. Stories include rows for open
 phases; tasks have four independent actions (work, refinement, summary and conflict resolution).
-Under **Settings → Harness → Contexto e modelo** (context and model), board and workflow defaults use the same editor, including
+The board default (under **Settings → Harness → Plano de contexto**, context plan) and each workflow's (the workflow's **Plano de contexto** button, in Workflows and columns) use the same editor, including
 conversation and assistants without a card. The preview shows sources and incompatibilities. The
 catalog shows short descriptions without opening specialists' instruction bodies.
 
