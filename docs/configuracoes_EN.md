@@ -18,8 +18,9 @@ board's agents are in [Harness, agents and AI tools](harness_EN.md).
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section                                     |
 | Regras do board       | Completion and phase-advance blocks, confirmations, short track for small stories (Baixo effort or Bug type skips PRD and Spec)                                                                                                                                                                                                                                                                                                                         |
 | Conectar agentes      | The AI agents that run the cards (every enabled agent, at the same time, and the default one for cards with no model); each one's account (sign in and out); **Conectar** (connect) with the board and the mode (CLI, ACP or API); each agent's models; the quick test, the test session and the protocol log; copies and custom profiles; each agent's fallback rules                                                                                                               |
-| Harness               | The board artifacts (rules, skills, agents and MCP servers), with typed imports, CRUD, assistants and the default instructions agent; permissions, heartbeat and the rules that suggest each card's model (see [Harness](harness_EN.md#harness) and [Agents](harness_EN.md#agents))                                                                                                                                                                                                                                                               |
-| Git                   | Mode, gitflow, branch names and prefixes, worktrees, automatic merge and decision records; editable in the editor and in the browser. "Tocar histórias em paralelo" (work on stories in parallel) lives in Harness › Ferramenta e execução                                                                                                                                                                                                                                      |
+| Harness               | The board artifacts (rules, skills, agents and MCP servers), with typed imports, CRUD, assistants and the default instructions agent; in **Contexto e modelo** (context and model), the context plan and the rules that suggest each card's model (see [Harness](harness_EN.md#harness) and [Agents](harness_EN.md#agents)) |
+| Automação             | How the board runs the AI, with any enabled agent: what the AI may do, the time limit, the heartbeat (and Backlog refinement), stories and sub-tasks in parallel (see [Heartbeat and autonomous mode](automacao_EN.md))                                                                                                                                                                                                                                                               |
+| Git                   | Mode, gitflow, branch names and prefixes, worktrees, automatic merge and decision records; editable in the editor and in the browser. "Tocar histórias em paralelo" (work on stories in parallel) lives in Automação (automation)                                                                                                                                                                                                                                      |
 | Aparência             | **Idioma** (language: automatic, Português (Brasil) or English), theme, font and size, per board, in the editor and in the browser; statuses (name and color, in the Fluxos tab; here only in browser mode)                                                                                                                                                                                                                                                                             |
 | Backup                | Export and import the board, in the Backup tab, in the editor and in the browser (in the editor, also through the command palette: `fazai.exportBoard`, `fazai.importBoard`)                                                                                                                                                                                                                                                                                                          |
 
@@ -33,8 +34,8 @@ model and carries the **Padrão** (default) badge in the list and on its panel, 
 when you enter the screen. On the left is the list of agents; on the right, the chosen agent, with
 the **Conexão** (connection), **Modelos** (models) and **Testar** (test) tabs.
 The fallback rules of the agent chosen in the list sit at the end of the screen. The model
-suggestion rules apply to the whole board and live in **Harness › Ferramenta e execução** (tool and
-execution).
+suggestion rules apply to the whole board and live in **Harness › Contexto e modelo** (context and
+model).
 
 ### The list
 
@@ -381,7 +382,7 @@ environment; Cursor and Kimi Code **not validated**).
 
 ## Model suggestion for each card
 
-In **Harness › Ferramenta e execução** (tool and execution), the **suggestion rules** combine conditions with AND and OR, for
+In **Harness › Contexto e modelo** (context and model), the **suggestion rules** combine conditions with AND and OR, for
 example `Esforço da atividade = Alto E Tags = backend`, and suggest the agent, the model and the effort.
 The result is always a suggestion: on the card, the model and the effort can be changed at any time. The
 rule editor has only name, conditions and suggested model. **Preencher o modelo sugerido
@@ -494,7 +495,7 @@ scrolls and highlights for 2 seconds, or click a link in the Settings to open th
 right section. In browser mode, the links to the Settings appear as text only.
 
 **"Preencher o modelo sugerido automaticamente"** (fill in the suggested model automatically) lives
-in Harness › Ferramenta e execução, next to the suggestion rules, not in Regras do board. The
+in Harness › Contexto e modelo, next to the suggestion rules, not in Regras do board. The
 Heartbeat interval field stays disabled when the heartbeat is off, with no additional dependency
 component.
 

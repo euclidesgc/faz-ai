@@ -1,10 +1,10 @@
-// A organização da tela do Harness: duas abas (a ferramenta e execução, e os artefatos do board) e, nos artefatos,
+// A organização da tela do Harness: duas abas (os artefatos do board, e o contexto e modelo) e, nos artefatos,
 // uma aba por assunto. Lógica pura, para a tela e os testes.
 import type { ArtifactKind, BoardArtifact } from './artifacts';
 import type { HarnessUsage } from './harnessSelection';
 
-/** Abas de primeiro nível do Harness: a ferramenta e a execução, ou os artefatos do board. */
-export type HarnessTab = 'tool' | 'artifacts';
+/** Abas de primeiro nível do Harness: os artefatos do board, ou o plano de contexto e a sugestão de modelo. */
+export type HarnessTab = 'artifacts' | 'context';
 
 /** O assunto de uma aba de artefatos. */
 export type HarnessTopic = 'rules' | 'skill' | 'agent' | 'mcp';
@@ -40,5 +40,8 @@ export function matchesQuery(query: string, ...texts: (string | undefined)[]): b
   return q === '' || texts.some((x) => !!x && plain(x).includes(q));
 }
 
-/** A aba que o valor guardado representa: qualquer valor antigo (uma ferramenta, `library`, `project`) cai em `tool`. */
-export const resolveHarnessTab = (value: string | null | undefined): HarnessTab => (value === 'artifacts' ? 'artifacts' : 'tool');
+/**
+ * A aba que o valor guardado representa: qualquer valor antigo (uma ferramenta, `library`, `project` e o `tool` de
+ * "Ferramenta e execução", que virou a seção Automação) cai nos artefatos, a aba principal.
+ */
+export const resolveHarnessTab = (value: string | null | undefined): HarnessTab => (value === 'context' ? 'context' : 'artifacts');

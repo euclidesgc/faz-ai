@@ -17,7 +17,7 @@ progress. Sub-tasks commit to the story's branch.
 - The card shows the branch and opens the working folder in a new window.
 - The mode (worktree, branch in the same folder, or off), the branch name pattern, the worktrees
   folder and automatic PR merge when approving acceptance live in **Settings → Git**, and **drive
-  stories in parallel** in **Settings → AI Harness › Tool and execution**, in the editor and in the
+  stories in parallel** in **Settings → Automação** (automation), in the editor and in the
   browser.
 - Each worktree is a working copy: dependencies have to be installed in it.
 

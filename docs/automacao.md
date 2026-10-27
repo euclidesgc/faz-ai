@@ -9,7 +9,7 @@ aprovação. Este documento descreve os dois em detalhe; o fluxo de uma históri
 
 ## Heartbeat
 
-Com o heartbeat ligado (Configurações → Harness), o board chama a IA sozinho a cada intervalo,
+Com o heartbeat ligado (Configurações → Automação), o board chama a IA sozinho a cada intervalo,
 enquanto o editor estiver aberto na pasta do projeto. O heartbeat em si não depende da IA: é um
 relógio do board que, a cada rodada, primeiro arruma o board e depois decide o que a IA faz.
 
@@ -90,8 +90,8 @@ mesmo tempo em qualquer modo de workspace, até **Histórias ao mesmo tempo** (d
 seis), mesmo com **Tocar histórias em paralelo** desligado. As atividades **com branch**
 (Implementação e Homologação) seguem o limite de antes: uma por vez fora do worktree.
 
-No modo "Worktree por história", **Tocar histórias em paralelo** (Configurações → Harness ›
-Ferramenta e execução; nasce desligado) faz o heartbeat tocar várias histórias com branch ao mesmo
+No modo "Worktree por história", **Tocar histórias em paralelo** (Configurações → Automação;
+nasce desligado) faz o heartbeat tocar várias histórias com branch ao mesmo
 tempo, cada uma na sua pasta de trabalho, até o mesmo **Histórias ao mesmo tempo**. Os dois tetos
 (texto e branch) contam separados; cada um conta toda execução em andamento, inclusive as chamadas à
 mão. No modo autônomo (cujas histórias são empilhadas), a ordem da fila vale para as histórias que
@@ -240,5 +240,5 @@ passar a vez (a janela do editor fechou com a IA rodando, a sessão da história
 sub-tarefa marcada por `start_work`, uma sessão fora do board caiu), o board o devolve para Pronto:
 na abertura, os cards das execuções que a sessão anterior deixou abertas (e as sub-tarefas deles);
 ao fim da sessão de uma história, as sub-tarefas dela; e, a cada minuto, qualquer card "Em execução"
-sem execução do board há mais tempo que o limite de uma execução (Configurações → Harness → tempo
-máximo), com a explicação na conversa.
+sem execução do board há mais tempo que o limite de uma execução (Configurações → Automação → tempo
+limite), com a explicação na conversa.

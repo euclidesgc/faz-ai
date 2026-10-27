@@ -6,6 +6,7 @@
 
 ### Added
 
+- New Automation section in Settings, with the AI permission, the time limit, the heartbeat and parallelism, which leave the Harness.
 - The board library marks what is factory-made, and copies now follow their source.
 - New Hotfix card type, which starts from the main branch and creates a tag and GitHub Release.
 - New MCP tool `set_base_branch` changes a story's base.
@@ -33,6 +34,7 @@
 
 ### Changed
 
+- The Harness opens on the board artifacts, and the Tool and execution tab becomes Context and model, with only the context plan and the model suggestion.
 - The default in the Harness Agents tab is now called "default for instructions", and "Make default" in Connect agents becomes "Use for cards with no model".
 - The import artifacts dialog is better organized, with its actions in a single footer.
 - Factory agents can no longer be deleted, and any agent can be turned off.

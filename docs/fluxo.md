@@ -134,7 +134,7 @@ das próximas mensagens (a escolha fica lembrada). Enter envia, Shift+Enter queb
 interrompe e **Limpar** apaga a conversa. O histórico fica guardado por projeto.
 
 O chat usa a mesma execução em segundo plano dos cards, então vale o limite de Configurações →
-Harness → "O que a IA pode fazer" (por padrão, só o board) e o tempo limite de lá.
+Automação → "O que a IA pode fazer" (por padrão, só o board) e o tempo limite de lá.
 
 ## Trabalhar na fase e Refinar com IA
 
@@ -192,7 +192,7 @@ mostrando tudo.
 
 ### Permissão, ferramenta e falhas
 
-- O que a IA pode fazer nessas execuções se define em Configurações → Harness → **Execução pela
+- O que a IA pode fazer nessas execuções se define em Configurações → Automação → **Execução pela
   conversa**: só o board (padrão), board e arquivos do projeto, ou sem restrições. O nível em uso
   aparece ao lado do botão, com um atalho para mudar. A IA é avisada do limite: se o trabalho pedir
   mais do que o nível permite, ela bloqueia o card dizendo qual opção escolher.
@@ -413,7 +413,7 @@ commit e mover a história.
 
 Nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica
 negada; no Cursor e no Kimi Code, sem bloqueio comprovado, a capacidade fica "desconhecida" e a
-admissão decide). Em **Configurações → Harness de IA** (e em `fazai.git.parallelSubtasks`, de 1 a 6)
+admissão decide). Em **Configurações → Automação** (e em `fazai.git.parallelSubtasks`, de 1 a 6)
 a pessoa define **"Sub-tarefas em paralelo por história"**; a tela mostra o pedido e o efetivo (hoje
 1). O texto do fluxo é o atual do board, servido pelo MCP; uma cópia da skill do fluxo já instalada
 na pasta da ferramenta não é substituída pelo board. Para a ferramenta não carregar o texto antigo

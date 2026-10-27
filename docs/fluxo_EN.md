@@ -143,7 +143,7 @@ and effort** for the next messages (the choice is remembered). Enter sends, Shif
 **Parar** (stop) interrupts and **Limpar** (clear) erases the conversation. The history is kept per
 project.
 
-The chat uses the same background run as the cards, so the limit under Configurações → Harness →
+The chat uses the same background run as the cards, so the limit under Configurações → Automação →
 "O que a IA pode fazer" applies (by default, the board only), and so does the time limit there.
 
 ## Work on the phase and Refine with AI
@@ -209,7 +209,7 @@ context. The **Conversa** tab still shows everything.
 
 ### Permission, tool and failures
 
-- What the AI may do in these runs is set in Configurações → Harness → **Execução pela conversa**:
+- What the AI may do in these runs is set in Configurações → Automação → **Execução pela conversa**:
   only the board (default), the board and project files, or no restrictions. The level in use is
   shown next to the button, with a shortcut to change it. The AI is told about the limit: if the work
   needs more than the level allows, it blocks the card saying which option to choose.

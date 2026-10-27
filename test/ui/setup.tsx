@@ -174,7 +174,7 @@ afterEach(() => {
     collapsed: {},
     view: 'board',
     // a aba e o assunto do Harness ficam no store: voltam ao padrão para um teste não enxergar a escolha do anterior
-    harnessTab: 'tool',
+    harnessTab: 'artifacts',
     harnessTopic: 'rules',
     harnessFile: null,
   });

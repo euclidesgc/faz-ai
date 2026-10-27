@@ -9,7 +9,7 @@ asking for approval. This document describes both in detail; the flow of a story
 
 ## Heartbeat
 
-With the heartbeat on (Configurações → Harness), the board calls the AI on its own at every
+With the heartbeat on (Configurações → Automação, settings → automation), the board calls the AI on its own at every
 interval, while the editor is open in the project folder. The heartbeat itself does not depend on
 the AI: it is a board clock that, on each round, first tidies the board and then decides what the AI
 does.
@@ -94,8 +94,8 @@ tempo** (two by default, up to six), even with **Tocar histórias em paralelo** 
 **with a branch** (Implementation and Homologation) keep the previous limit: one at a time outside
 the worktree.
 
-In "Worktree por história" mode, **Tocar histórias em paralelo** (Settings → Harness › Tool and
-execution; off by default) makes the heartbeat drive several branch stories at once, each in its own
+In "Worktree por história" mode, **Tocar histórias em paralelo** (Settings → Automação, automation;
+off by default) makes the heartbeat drive several branch stories at once, each in its own
 working folder, up to the same **Histórias ao mesmo tempo**. The two caps (text and branch) are
 counted separately; each counts every run in progress, including the ones called by hand. In
 autonomous mode (whose stories are stacked), the queue order applies to stories that need a branch;
@@ -249,5 +249,5 @@ without passing the turn (the editor window closed with the AI running, the stor
 with a sub-task marked by `start_work`, a session outside the board crashed), the board sends it back
 to Pronto (ready): when the board opens, the cards of runs the previous session left open (and their
 sub-tasks); when a story's session ends, its sub-tasks; and every minute, any card "Em execução" with
-no board run for longer than one run's time limit (Settings → Harness → maximum time), with the
+no board run for longer than one run's time limit (Settings → Automação → time limit), with the
 explanation in the conversation.

@@ -45,17 +45,16 @@ describe('DependsOn', () => {
     expect(p).not.toHaveTextContent('agora:');
   });
 
-  it('alvo no board: clicar em "abrir" troca a aba (e a sub-aba de Harness) conforme SETTINGS_SECTIONS', async () => {
+  it('alvo no board: clicar em "abrir" troca a aba conforme SETTINGS_SECTIONS (o heartbeat mora em Automação)', async () => {
     useBoardStore.setState({ settingsTab: 'columns', pendingSettingsSection: null });
     render(
       <Theme>
-        <DependsOn label="o heartbeat" satisfied={false} target={{ kind: 'board', section: 'heartbeat' }} targetHint="em Harness" />
+        <DependsOn label="o heartbeat" satisfied={false} target={{ kind: 'board', section: 'heartbeat' }} targetHint="em Automação" />
       </Theme>,
     );
     await userEvent.click(screen.getByRole('button', { name: /Abrir/ }));
     const s = useBoardStore.getState();
-    expect(s.settingsTab).toBe('harness');
-    expect(s.harnessTab).toBe('tool');
+    expect(s.settingsTab).toBe('automation');
     expect(s.pendingSettingsSection).toBe('heartbeat');
   });
 });
