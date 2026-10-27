@@ -17,7 +17,7 @@ commits na branch da história.
 - O card mostra a branch e abre a pasta de trabalho numa janela nova.
 - O modo (worktree, branch na própria pasta ou desligado), o padrão do nome da branch, a pasta das
   worktrees e o merge automático do PR ao aprovar a homologação ficam em **Configurações → Git**, e
-  **tocar histórias em paralelo** em **Configurações → Harness de IA › Ferramenta e execução**, no
+  **tocar histórias em paralelo** em **Configurações → Automação**, no
   editor e no navegador.
 - Cada worktree é uma cópia de trabalho: as dependências precisam ser instaladas nela.
 

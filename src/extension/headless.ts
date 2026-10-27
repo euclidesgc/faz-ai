@@ -23,7 +23,7 @@ export function headlessUnsupported(executor: AiExecutor, permission: RunnerPerm
     return 'O perfil não declara argumentos para esta permissão restrita.';
   // o Claude Code recusa pular as permissões rodando como root (contêiner, WSL como root)
   if (tool === 'claude' && permission === 'full' && uid === 0)
-    return 'O Claude Code não roda "Sem restrições" como root (comum em contêineres e no WSL como root), e o modo autônomo usa esse nível. Rode o editor com um usuário comum, ou escolha "Board e arquivos" em Configurações → Harness → Execução pela conversa.';
+    return 'O Claude Code não roda "Sem restrições" como root (comum em contêineres e no WSL como root), e o modo autônomo usa esse nível. Rode o editor com um usuário comum, ou escolha "Board e arquivos" em Configurações → Automação.';
   return null;
 }
 

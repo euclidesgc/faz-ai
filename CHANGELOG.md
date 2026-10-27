@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- Nova seção Automação nas Configurações, com a permissão da IA, o tempo limite, o heartbeat e o paralelismo, que saem do Harness.
 - A biblioteca do board marca o que é de fábrica e as cópias passam a acompanhar a origem.
 - Novo tipo de card Hotfix, que parte da principal e gera tag e GitHub Release.
 - Nova ferramenta MCP `set_base_branch` para trocar a base de uma história.
@@ -33,6 +34,7 @@
 
 ### Alterado
 
+- O Harness abre nos Artefatos do board, e a aba Ferramenta e execução vira Contexto e modelo, só com o plano de contexto e a sugestão de modelo.
 - O padrão da aba Agentes do Harness passa a se chamar "padrão das instruções", e o "Tornar padrão" de Conectar agentes vira "Usar nos cards sem modelo".
 - O diálogo de importar artefatos fica mais organizado, com as ações num só rodapé.
 - Agentes de fábrica não podem mais ser apagados e todo agente pode ser desligado.

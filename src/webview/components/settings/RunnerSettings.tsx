@@ -1,11 +1,11 @@
 import { Callout, Card } from '@radix-ui/themes';
-import { HEARTBEAT_RANGE, PARALLEL_RANGE, RUNNER_PERMISSIONS, SUBTASK_PARALLEL_RANGE, TIMEOUT_RANGE } from '../../../../shared/runner';
-import { effectiveLimits } from '../../../../shared/orchestration';
-import { useBoardStore } from '../../../store/boardStore';
-import { ai, settings } from '../../../commands';
-import { ActionButton, FormField, IconWarning, NumberField, SelectField, Stack, SwitchField } from '../../ui';
-import { SectionHeader } from '../SectionHeader';
-import { t } from '../../../i18n';
+import { HEARTBEAT_RANGE, PARALLEL_RANGE, RUNNER_PERMISSIONS, SUBTASK_PARALLEL_RANGE, TIMEOUT_RANGE } from '../../../shared/runner';
+import { effectiveLimits } from '../../../shared/orchestration';
+import { useBoardStore } from '../../store/boardStore';
+import { ai, settings } from '../../commands';
+import { ActionButton, FormField, IconWarning, NumberField, SelectField, Stack, SwitchField } from '../ui';
+import { SectionHeader } from './SectionHeader';
+import { t } from '../../i18n';
 
 /** O que a IA pode fazer quando o board a executa (pela conversa ou pelo heartbeat), o tempo limite e o heartbeat. */
 export function RunnerSettings() {

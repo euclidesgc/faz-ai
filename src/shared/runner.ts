@@ -45,7 +45,7 @@ export interface RunnerConfig {
   autopilotPaused: boolean;
   /** nome do agente (arquivo marcado no Harness) usado quando nem o card nem a fase indicam um; vazio = o primeiro marcado, ou o embutido */
   defaultAgent: string;
-  /** o regime de admissão escolhido pela pessoa em Harness › Ferramenta e execução */
+  /** o regime de admissão escolhido pela pessoa na antiga Harness › Ferramenta e execução (hoje Automação) */
   admissionRegime: AdmissionRegime;
   /**
    * quantas vezes a pessoa ligou o regime compatível: é a revisão que a admissão exige
@@ -76,7 +76,7 @@ export const ADMISSION_REGIMES: { value: AdmissionRegime; label: string; hint: s
 /**
  * O regime e a revisão que vão no pedido de admissão. Com o perfil, vale primeiro a ciência dele no Conectar
  * (`compatibilityReviews`, a revisão daquele perfil); sem ela, o regime do board, que até a história 7 a
- * pessoa escolhia em Harness › Ferramenta e execução e que segue valendo para quem o ligou. No compatível a
+ * pessoa escolhia na antiga Harness › Ferramenta e execução e que segue valendo para quem o ligou. No compatível a
  * revisão nunca é zero (`parseRunner` garante); a admissão recusa qualquer outro ator.
  */
 export const admissionRegimeOf = (
@@ -176,7 +176,7 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
     autopilotPaused: raw.autopilotPaused === true,
     defaultAgent: typeof raw.defaultAgent === 'string' ? raw.defaultAgent.trim() : '',
     heartbeat: raw.heartbeat === true,
-    // nasce ligado: quem não quer o refinamento automático desliga em Configurações → Harness
+    // nasce ligado: quem não quer o refinamento automático desliga em Configurações → Automação
     heartbeatRefine: raw.heartbeatRefine !== false,
     heartbeatMinutes:
       Number.isFinite(interval) && interval > 0

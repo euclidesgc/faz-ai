@@ -8,6 +8,7 @@ import { TypesSettings } from './TypesSettings';
 import { FieldsSettings } from './FieldsSettings';
 import { RulesSettings } from './RulesSettings';
 import { HarnessSettings } from './HarnessSettings';
+import { AutomationSettings } from './AutomationSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 import { GitSettings } from './GitSettings';
 import { BackupSettings } from './BackupSettings';
@@ -19,6 +20,7 @@ import {
   Hint,
   FormField,
   IconAppearance,
+  IconAutomation,
   IconBackup,
   IconBranch,
   IconColumns,
@@ -41,6 +43,7 @@ const TABS: [SettingsTab, string, Icon][] = [
   ['rules', 'Regras do board', IconRules],
   ['connect', 'Conectar agentes', IconConnect],
   ['harness', 'Harness', IconHarness],
+  ['automation', 'Automação', IconAutomation],
   ['git', 'Git', IconBranch],
   ['appearance', 'Aparência', IconAppearance],
   ['backup', 'Backup', IconBackup],
@@ -163,6 +166,7 @@ export function Settings() {
         {tab === 'rules' && <RulesSettings />}
         {tab === 'appearance' && <AppearanceSettings />}
         {tab === 'harness' && <HarnessSettings />}
+        {tab === 'automation' && <AutomationSettings />}
         {tab === 'connect' && <AgentConnectSettings />}
         {tab === 'git' && <GitSettings />}
         {tab === 'backup' && <BackupSettings />}

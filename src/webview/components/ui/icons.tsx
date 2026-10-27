@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlignLeft,
   ArrowDown,
   ArrowUp,
@@ -155,6 +156,7 @@ export const IconTypes = icon(Shapes, 'IconTypes');
 export const IconFields = icon(TextCursorInput, 'IconFields');
 export const IconRules = icon(Scale, 'IconRules');
 export const IconHarness = icon(BrainCircuit, 'IconHarness');
+export const IconAutomation = icon(Activity, 'IconAutomation');
 export const IconAgents = icon(UserCog, 'IconAgents');
 export const IconSkills = icon(BookOpen, 'IconSkills');
 export const IconModels = icon(Cpu, 'IconModels');

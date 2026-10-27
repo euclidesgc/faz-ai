@@ -18,6 +18,7 @@ import { TrashView } from '../src/webview/components/TrashView';
 import { WorkflowsSettings } from '../src/webview/components/settings/workflows/WorkflowsSettings';
 import { FieldsSettings } from '../src/webview/components/settings/FieldsSettings';
 import { HarnessSettings } from '../src/webview/components/settings/HarnessSettings';
+import { AutomationSettings } from '../src/webview/components/settings/AutomationSettings';
 import { RuleBuilder } from '../src/webview/components/settings/ModelRulesEditor';
 import { AppearanceSettings } from '../src/webview/components/settings/AppearanceSettings';
 import { AgentModels } from '../src/webview/components/settings/agentConnect/AgentModels';
@@ -286,7 +287,7 @@ describe('telas montam sem erro', () => {
     expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);
     // cada aba do Harness (e cada assunto da ferramenta) é montada por vez: juntamos o texto de todas
     const harness = [
-      { harnessTab: 'tool' as const, harnessTopic: 'rules' as const },
+      { harnessTab: 'context' as const, harnessTopic: 'rules' as const },
       ...(['rules', 'skill', 'agent', 'mcp'] as const).map((harnessTopic) => ({
         harnessTab: 'artifacts' as const,
         harnessTopic,
@@ -302,15 +303,24 @@ describe('telas montam sem erro', () => {
       // a sugestão de modelo vale para o board inteiro: mora no Harness, não na tela de um agente
       'Sugestão de modelo',
       'Preencher o modelo sugerido automaticamente',
+      'Contexto e modelo',
+    ])
+      expect(harness).toContain(text);
+    // a execução saiu do Harness: mora na seção Automação
+    const automation = html(<AutomationSettings />);
+    for (const text of [
       'Execução pela conversa e heartbeat',
       'A IA lê o projeto e usa as ferramentas do board',
       'Tempo limite por execução',
       'Heartbeat ligado',
       'Rodar o heartbeat agora',
-    ])
-      expect(harness).toContain(text);
+    ]) {
+      expect(automation).toContain(text);
+      expect(harness).not.toContain(text);
+    }
+    expect(harness).not.toContain('Ferramenta e execução');
     // o agente padrão do harness se escolhe só na lista de Agentes, sem um segundo controle na execução
-    expect(harness).not.toContain('aria-label="Agente padrão"');
+    expect(automation).not.toContain('aria-label="Agente padrão"');
   });
 });
 

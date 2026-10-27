@@ -3,7 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { lastSent, seedBoard, syncStore, type SeededBoard } from './setup';
-import { RunnerSettings } from '../../src/webview/components/settings/harness/RunnerSettings';
+import { RunnerSettings } from '../../src/webview/components/settings/RunnerSettings';
 
 let board: SeededBoard;
 beforeAll(async () => {

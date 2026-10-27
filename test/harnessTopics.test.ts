@@ -29,10 +29,10 @@ describe('harnessTopics: busca e abas', () => {
     expect(matchesQuery('zzz', 'revisar-spec', undefined)).toBe(false);
   });
 
-  it('só as duas abas novas valem; um valor antigo cai em Ferramenta e execução', () => {
+  it('só as duas abas valem; um valor antigo (inclusive o tool de Ferramenta e execução, hoje Automação) cai nos artefatos', () => {
     expect(resolveHarnessTab('artifacts')).toBe('artifacts');
-    expect(resolveHarnessTab('tool')).toBe('tool');
-    for (const old of ['claude', 'cursor', 'project', 'user', 'library', 'all', undefined, null])
-      expect(resolveHarnessTab(old)).toBe('tool');
+    expect(resolveHarnessTab('context')).toBe('context');
+    for (const old of ['tool', 'claude', 'cursor', 'project', 'user', 'library', 'all', undefined, null])
+      expect(resolveHarnessTab(old)).toBe('artifacts');
   });
 });

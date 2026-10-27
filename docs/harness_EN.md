@@ -300,7 +300,7 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   capacidades**). The admission preview on the card evaluates the profile
   that will run the card (the one from the card's model, the agent or the rule), not the board
   default.
-- **Next run and limits:** shows the regime chosen in Harness › Ferramenta e execução, the default
+- **Next run and limits:** shows each profile's regime (chosen in Conectar agentes), the default
   target (with the rule and version, or the block), the cards whose target is unavailable and the limits table with requested, effective and
   reason. It comes from the policy simulator and the effective limits; without them it shows
   "Unavailable in this version".
@@ -340,8 +340,7 @@ terminal.
 The board manages a **private library**, independent of the AI tool. Under **Configurações →
 Harness** (Settings → Harness), the **Artefatos do board** (board artifacts) tab provides CRUD for
 **Regras** (Rules), **Skills**, **Agentes** (Agents) and **Servidores MCP** (MCP servers).
-**Ferramenta e execução** (Tool and execution) sets the permissions, the timeout, the heartbeat, the
-context plan and the cards' model suggestion. The **default instructions agent** is picked in the
+**Contexto e modelo** (context and model) holds the context plan and the cards' model suggestion. The permissions, the timeout and the heartbeat live in **Automação** (automation). The **default instructions agent** is picked in the
 **Agentes** list itself (**Tornar padrão das instruções**, make default for instructions); the name
 sets it apart from the default AI agent in Conectar agentes. The board's default AI agent, each agent's connection
 to the board's MCP server and the admission regime live in Conectar agentes (connect agents). Switching agents preserves artifacts and their selections.

@@ -288,7 +288,7 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   **Verificar capacidades**). A prévia da
   admissão no card avalia o perfil que vai executar o card (o do modelo do card, do agente ou da
   regra), não o padrão do board.
-- **Próxima execução e limites:** mostra o regime escolhido em Harness › Ferramenta e execução, o
+- **Próxima execução e limites:** mostra o regime de cada perfil (escolhido em Conectar agentes), o
   alvo padrão (com a regra e a versão, ou o bloqueio), os cards cujo alvo está indisponível e a tabela de limites com pedido, efetivo e motivo.
   Vem do simulador de políticas e dos limites efetivos; sem eles, mostra "Indisponível nesta
   versão".
@@ -327,8 +327,8 @@ levam ao Harness e ao terminal do login.
 
 O board gerencia uma **biblioteca particular**, independente da ferramenta de IA. Em
 **Configurações → Harness**, a aba **Artefatos do board** concentra o CRUD de **Regras**,
-**Skills**, **Agentes** e **Servidores MCP**. **Ferramenta e execução** define as permissões, o
-tempo limite, o heartbeat, o plano de contexto e a sugestão de modelo dos cards. O **agente padrão das
+**Skills**, **Agentes** e **Servidores MCP**. **Contexto e modelo** guarda o plano de contexto e a
+sugestão de modelo dos cards. As permissões, o tempo limite e o heartbeat ficam em **Automação**. O **agente padrão das
 instruções** se escolhe na própria lista de **Agentes** (**Tornar padrão das instruções**); o nome o
 separa do agente de IA padrão de Conectar agentes. O agente de IA padrão do
 board, a conexão de cada agente ao servidor MCP do board e o regime de admissão ficam em Conectar
