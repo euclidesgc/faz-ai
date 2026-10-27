@@ -12,7 +12,7 @@ export const CONTEXT_ORIGINS: Record<ContextOrigin, string> = {
   phase: 'Agente da fase',
   story: 'Agente da história',
   'story-phase': 'Agente da fase da história',
-  default: 'Agente padrão do board',
+  default: 'Agente padrão das instruções',
 };
 
 const KINDS = { agent: 'Agente', subagent: 'Subagente', rule: 'Rule', skill: 'Skill', mcp: 'Servidor MCP' };

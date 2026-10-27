@@ -49,8 +49,8 @@ promise a percentage: it shows, in the inventory, what is being loaded.
    OpenCode…) come built in and switched off; you can also create copies and custom profiles. Every
    enabled agent runs cards, at the same time: the CLI of each run comes from the chosen model (see
    [Which CLI runs](configuracoes_EN.md#which-cli-runs)), and the default agent only runs the cards with
-   no model. In **Conectar agentes** (connect agents), **Tornar padrão** (make default) switches the
-   default agent.
+   no model. In **Conectar agentes** (connect agents), **Usar nos cards sem modelo** (use for cards with
+   no model) switches the default agent.
 2. In the **Projeto** (project) tab, in the **Servidores MCP** (MCP servers) group, click
    **Instalar (padrão da ferramenta)** (install, tool default). The board registers the `faz-ai`
    server in the global file the tool reads. This also happens on its own, silently, when the folder
@@ -341,8 +341,9 @@ The board manages a **private library**, independent of the AI tool. Under **Con
 Harness** (Settings → Harness), the **Artefatos do board** (board artifacts) tab provides CRUD for
 **Regras** (Rules), **Skills**, **Agentes** (Agents) and **Servidores MCP** (MCP servers).
 **Ferramenta e execução** (Tool and execution) sets the permissions, the timeout, the heartbeat, the
-context plan and the cards' model suggestion. The harness default agent is picked in the **Agentes**
-list itself (**Tornar padrão**, make default). The board's default AI agent, each agent's connection
+context plan and the cards' model suggestion. The **default instructions agent** is picked in the
+**Agentes** list itself (**Tornar padrão das instruções**, make default for instructions); the name
+sets it apart from the default AI agent in Conectar agentes. The board's default AI agent, each agent's connection
 to the board's MCP server and the admission regime live in Conectar agentes (connect agents). Switching agents preserves artifacts and their selections.
 
 The **admission regime** is the yardstick the board uses to decide whether the tool may run a card.
@@ -370,7 +371,7 @@ hidden. The information icon shows the notice again.
   when the card or its agent selects it.
 - **Desligado** (off): kept in the library without taking part in runs. New rules start this way,
   for review before activation. An agent that is off is not offered to cards, phases or as the
-  default; the default agent can only be turned off after another one becomes the default.
+  default; the default instructions agent can only be turned off after another one takes its place.
 
 ### Three contexts: global, project and library
 
@@ -524,7 +525,7 @@ remove the agent from the library and send it again.
 ### Which agent runs
 
 A run selects the card's agent; without one, the phase's agent; then the one marked as
-**padrão** (default) in the Harness **Agentes** tab. With no available agents, it uses the built-in agent,
+**padrão das instruções** (default for instructions) in the Harness **Agentes** tab. With no available agents, it uses the built-in agent,
 with no additional instructions. Removing an agent releases the card and phase selections that used
 it. Factory agents are created inside each board, in its database, and cannot be deleted: turn off
 the ones you do not want, or reset one to the original text with **Restaurar o padrão**.

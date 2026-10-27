@@ -253,11 +253,12 @@ export const harness: Record<string, string> = {
     'The instructions, tools and skills go back to the factory ones, and the edits made on the board are lost.',
   'O board entrega esta skill pelo get_skill, com o texto desta versão da extensão.':
     'The board delivers this skill through get_skill, with the text of this extension version.',
-  'O agente padrão executa quando nem o card nem a fase escolhem outro; para desligá-lo, torne outro o padrão.':
-    'The default agent runs when neither the card nor the phase picks another; to turn it off, make another one the default.',
+  'O agente padrão das instruções executa quando nem o card nem a fase escolhem outro; para desligá-lo, torne outro o padrão das instruções.':
+    'The default instructions agent runs when neither the card nor the phase picks another; to turn it off, make another one the default instructions agent.',
   'Entregue pelo board': 'Delivered by the board',
   'Abre o texto só para leitura': 'Opens the text read only',
-  'Tornar padrão': 'Make default',
+  'Tornar padrão das instruções': 'Make default for instructions',
+  'padrão das instruções': 'default for instructions',
   // --- AgentEditor
   'Uma frase: é por ela que o "Refinar com IA" escolhe o agente de um card.':
     'One sentence: it is how "Refine with AI" picks the agent for a card.',
@@ -736,10 +737,10 @@ export const harness: Record<string, string> = {
   'Abre o formulário de um agente novo; ele é gravado no board ao salvar.':
     'Opens the form for a new agent; it is saved in the board on save.',
   'Recriar os de fábrica': 'Recreate the built-in ones',
-  'Tornar {name} o agente padrão': 'Make {name} the default agent',
+  'Tornar {name} o agente padrão das instruções': 'Make {name} the default instructions agent',
   'Apagar o agente {name}': 'Delete the agent {name}',
-  'Este é o agente padrão. Torne outro agente o padrão antes de apagar este.':
-    'This is the default agent. Make another agent the default before deleting this one.',
+  'Este é o agente padrão das instruções. Torne outro agente o padrão das instruções antes de apagar este.':
+    'This is the default instructions agent. Make another agent the default instructions agent before deleting this one.',
   'O agente é removido do board{location}. Colunas e cards que o usam voltam ao padrão.':
     'The agent is removed from the board{location}. Columns and cards that use it go back to the default.',
   'No board, em "Pelo card": {name}': 'In the board, under "By the card": {name}',
@@ -895,7 +896,7 @@ export const harness: Record<string, string> = {
   'O esforço não vai para a cópia.': 'The effort does not go to the copy.',
   'O modo somente leitura não vai para a cópia.': 'Read-only mode does not go to the copy.',
   'A execução em segundo plano não vai para a cópia.': 'Background execution does not go to the copy.',
-  'O agente padrão do board não vai para a cópia.': "The board's default agent does not go to the copy.",
+  'O agente padrão das instruções não vai para a cópia.': 'The default instructions agent does not go to the copy.',
   'O modo (Sempre ou Pelo card) não vai para a cópia: a ferramenta decide pela descrição.':
     'The mode (Always or By card) does not go to the copy: the tool decides by the description.',
   'O cabeçalho original da regra não vai para a cópia.': "The rule's original header does not go to the copy.",

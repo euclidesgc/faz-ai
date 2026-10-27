@@ -487,9 +487,10 @@ export const host: Record<string, string> = {
   'Arquivo de apoio não encontrado.': 'Supporting file not found.',
   'Arquivo binário: não dá para editar como texto.': 'Binary file: it cannot be edited as text.',
   'Não foi possível ler o conteúdo.': 'Could not read the content.',
-  'Escolha outro agente padrão antes de apagar este.': 'Choose another default agent before deleting this one.',
-  'Escolha outro agente padrão antes de desligar este.': 'Choose another default agent before turning this one off.',
-  'Agente padrão do board: ele pode ser editado, restaurado ou desligado, mas não apagado.':
+  'Escolha outro agente padrão das instruções antes de apagar este.': 'Choose another default instructions agent before deleting this one.',
+  'Escolha outro agente padrão das instruções antes de desligar este.':
+    'Choose another default instructions agent before turning this one off.',
+  'Agente de fábrica do board: ele pode ser editado, restaurado ou desligado, mas não apagado.':
     'Board factory agent: it can be edited, restored or turned off, but not deleted.',
   'A skill do fluxo é da extensão: só o modo dela pode mudar.': 'The flow skill belongs to the extension: only its mode can change.',
   'Já existe um artefato com este nome. Edite o existente ou escolha outro nome.':

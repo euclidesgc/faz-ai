@@ -30,7 +30,7 @@ import type { AgentInput, McpServerView } from '../shared/messages';
 import type { BoardContext } from './panel/handlers/context';
 
 /** Por que um agente de fábrica não sai do board, e o que fazer no lugar. */
-const SEED_AGENT_KEPT = 'Agente padrão do board: ele pode ser editado, restaurado ou desligado, mas não apagado.';
+const SEED_AGENT_KEPT = 'Agente de fábrica do board: ele pode ser editado, restaurado ou desligado, mas não apagado.';
 
 /** Como achar a dependência (skill ou servidor MCP) de um agente copiado: pelo nome, na ferramenta dele. */
 interface DependencyResolver {
@@ -428,7 +428,7 @@ export class BoardLibrary {
       for (const item of items) {
         const a = this.repo.findByLocation(this.ctx.boardId, kindOfSelectable(item.kind), item.location);
         if (a?.kind === 'agent' && defaultAgent && a.name === defaultAgent)
-          throw new Error('Escolha outro agente padrão antes de desligar este.');
+          throw new Error('Escolha outro agente padrão das instruções antes de desligar este.');
       }
     }
     const drafts: { draft: ArtifactDraft; usage: HarnessUsage }[] = [];
@@ -467,7 +467,7 @@ export class BoardLibrary {
     for (const item of items) {
       const a = this.repo.findByLocation(this.ctx.boardId, kindOfSelectable(item.kind), item.location);
       if (a?.kind === 'agent' && defaultAgent && a.name === defaultAgent)
-        throw new Error('Escolha outro agente padrão antes de apagar este.');
+        throw new Error('Escolha outro agente padrão das instruções antes de apagar este.');
       if (a?.kind === 'agent' && (a.meta as AgentMeta).seed) throw new Error(SEED_AGENT_KEPT);
       if (a?.kind === 'skill' && (a.meta as { generated?: unknown }).generated === true)
         throw new Error('A skill do fluxo é da extensão: só o modo dela pode mudar.');
@@ -814,7 +814,8 @@ export class BoardLibrary {
   deleteAgent(name: string): void {
     const existing = this.repo.get(this.ctx.boardId, 'agent', name);
     if (!existing) throw new Error(`Agente "${name}" não está no board.`);
-    if (name === this.ctx.state().board.runner.defaultAgent) throw new Error('Escolha outro agente padrão antes de apagar este.');
+    if (name === this.ctx.state().board.runner.defaultAgent)
+      throw new Error('Escolha outro agente padrão das instruções antes de apagar este.');
     if ((existing.meta as AgentMeta).seed) throw new Error(SEED_AGENT_KEPT);
     this.repo.remove(this.ctx.boardId, existing.id);
   }

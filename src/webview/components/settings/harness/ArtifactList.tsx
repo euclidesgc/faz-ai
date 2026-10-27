@@ -295,7 +295,9 @@ export function ArtifactList({
                     title={
                       generatedSkill
                         ? t('O board entrega esta skill pelo get_skill, com o texto desta versão da extensão.')
-                        : t('O agente padrão executa quando nem o card nem a fase escolhem outro; para desligá-lo, torne outro o padrão.')
+                        : t(
+                            'O agente padrão das instruções executa quando nem o card nem a fase escolhem outro; para desligá-lo, torne outro o padrão das instruções.',
+                          )
                     }
                   >
                     {generatedSkill ? t('Entregue pelo board') : t('Disponível no board')}

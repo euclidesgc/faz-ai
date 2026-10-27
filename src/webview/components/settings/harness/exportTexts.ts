@@ -13,7 +13,7 @@ export function lossText(loss: FormatLoss): string {
     effort: t('O esforço não vai para a cópia.'),
     readonly: t('O modo somente leitura não vai para a cópia.'),
     background: t('A execução em segundo plano não vai para a cópia.'),
-    default: t('O agente padrão do board não vai para a cópia.'),
+    default: t('O agente padrão das instruções não vai para a cópia.'),
     usage: t('O modo (Sempre ou Pelo card) não vai para a cópia: a ferramenta decide pela descrição.'),
     'rule-header': t('O cabeçalho original da regra não vai para a cópia.'),
     'skipped-files': t('Arquivos que ficaram de fora na cópia para o board não vão para a cópia.'),

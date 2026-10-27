@@ -33,6 +33,7 @@
 
 ### Changed
 
+- The default in the Harness Agents tab is now called "default for instructions", and "Make default" in Connect agents becomes "Use for cards with no model".
 - The import artifacts dialog is better organized, with its actions in a single footer.
 - Factory agents can no longer be deleted, and any agent can be turned off.
 - **Send** always calls the AI, even with the card blocked, and turns into **Stop** while it works.

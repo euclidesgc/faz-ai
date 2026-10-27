@@ -178,7 +178,11 @@ function AgentDetail({ item, onEdit }: { item: AgentListItem; onEdit(profile: Ai
           </Text>
         </div>
         {item.inUse && (
-          <Hint content={t('Roda os cards que não dizem qual modelo usar. Para trocar, use Tornar padrão na aba Conexão de outro agente.')}>
+          <Hint
+            content={t(
+              'Roda os cards que não dizem qual modelo usar. Para trocar, use Usar nos cards sem modelo na aba Conexão de outro agente.',
+            )}
+          >
             <Badge color="indigo" tabIndex={0}>
               {t('Padrão')}
             </Badge>

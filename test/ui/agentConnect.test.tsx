@@ -143,7 +143,7 @@ describe('Conectar agentes: a lista e o agente padrão', () => {
     expect(
       (
         await screen.findAllByText(
-          'Roda os cards que não dizem qual modelo usar. Para trocar, use Tornar padrão na aba Conexão de outro agente.',
+          'Roda os cards que não dizem qual modelo usar. Para trocar, use Usar nos cards sem modelo na aba Conexão de outro agente.',
         )
       )[0],
     ).toBeInTheDocument();
@@ -173,7 +173,13 @@ describe('Conectar agentes: a lista e o agente padrão', () => {
     expect(use.compareDocumentPosition(claude.getByLabelText('Conta do agente')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(claude.getByRole('switch', { name: 'Ligado' })).toBeDisabled();
     await userEvent.hover(claude.getByRole('switch', { name: 'Ligado' }).closest('span[tabindex]')!);
-    expect((await screen.findAllByText('O agente padrão não pode ser desligado: torne outro agente padrão antes.'))[0]).toBeInTheDocument();
+    expect(
+      (
+        await screen.findAllByText(
+          'Este agente roda os cards sem modelo e não pode ser desligado: use "Usar nos cards sem modelo" em outro agente antes.',
+        )
+      )[0],
+    ).toBeInTheDocument();
     expect(claude.queryByText('Padrão dos cards')).toBeNull();
     // as ações do perfil ficam no fim da Conexão: o pronto só duplica
     expect(claude.queryByRole('button', { name: 'Editar' })).toBeNull();
@@ -187,7 +193,7 @@ describe('Conectar agentes: a lista e o agente padrão', () => {
     expect(gemini.getByText('ACP · agente pelo protocolo ACP')).toBeInTheDocument();
     expect(gemini.getByRole('switch', { name: 'Ligado' })).not.toBeChecked();
     expect(gemini.getByRole('switch', { name: 'Ligado' })).toBeEnabled();
-    expect(gemini.getByRole('button', { name: 'Tornar padrão' })).toBeDisabled();
+    expect(gemini.getByRole('button', { name: 'Usar nos cards sem modelo' })).toBeDisabled();
     await userEvent.click(gemini.getByRole('switch', { name: 'Ligado' }));
     expect(lastSent('settings.aiProfiles.setEnabled')).toMatchObject({ id: 'gemini', enabled: true });
     confirmLast();
@@ -978,7 +984,7 @@ describe('Conectar agentes: detalhes e perfis personalizados', () => {
     const custom = s.board.aiProfiles.find((p) => p.name === 'Perfil ações')!;
     show();
     const card = await openAgent('Perfil ações');
-    await userEvent.click(card.getByRole('button', { name: 'Tornar padrão' }));
+    await userEvent.click(card.getByRole('button', { name: 'Usar nos cards sem modelo' }));
     expect(lastSent('settings.board.update')).toEqual({ type: 'settings.board.update', patch: { aiTool: custom.id } });
     confirmLast();
     await userEvent.click(card.getByRole('button', { name: 'Duplicar' }));

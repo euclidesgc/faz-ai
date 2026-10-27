@@ -46,7 +46,7 @@ um percentual: ele mostra, no inventário, o que está sendo carregado.
    desligados; também é possível criar cópias e perfis personalizados. Todo agente ligado roda
    cards, ao mesmo tempo: a CLI de cada execução sai do modelo escolhido (veja
    [Qual CLI executa](configuracoes.md#qual-cli-executa)), e o agente padrão só roda os cards sem
-   modelo. Em **Conectar agentes**, **Tornar padrão** troca o agente padrão.
+   modelo. Em **Conectar agentes**, **Usar nos cards sem modelo** troca o agente padrão.
 2. Na aba **Projeto**, no grupo **Servidores MCP**, clique em **Instalar (padrão da ferramenta)**. O
    board registra o servidor `faz-ai` no arquivo global que a ferramenta lê. Isso também acontece
    sozinho, em silêncio, ao abrir a pasta (e a cada versão nova da extensão), sempre no escopo do
@@ -328,8 +328,9 @@ levam ao Harness e ao terminal do login.
 O board gerencia uma **biblioteca particular**, independente da ferramenta de IA. Em
 **Configurações → Harness**, a aba **Artefatos do board** concentra o CRUD de **Regras**,
 **Skills**, **Agentes** e **Servidores MCP**. **Ferramenta e execução** define as permissões, o
-tempo limite, o heartbeat, o plano de contexto e a sugestão de modelo dos cards. O agente padrão do
-harness se escolhe na própria lista de **Agentes** (**Tornar padrão**). O agente de IA padrão do
+tempo limite, o heartbeat, o plano de contexto e a sugestão de modelo dos cards. O **agente padrão das
+instruções** se escolhe na própria lista de **Agentes** (**Tornar padrão das instruções**); o nome o
+separa do agente de IA padrão de Conectar agentes. O agente de IA padrão do
 board, a conexão de cada agente ao servidor MCP do board e o regime de admissão ficam em Conectar
 agentes. Trocar de agente preserva os artefatos e suas seleções.
 
@@ -357,7 +358,7 @@ exibir mais. O ícone de informação permite exibir o aviso novamente.
   card ou seu agente o escolhe.
 - **Desligado**: permanece na biblioteca sem participar da execução. Regras novas entram assim,
   para revisão antes da ativação. Um agente desligado não aparece para o card, a fase nem o padrão;
-  o agente padrão só desliga depois que outro vira o padrão.
+  o agente padrão das instruções só desliga depois que outro vira o padrão das instruções.
 
 ### Três contextos: global, projeto e biblioteca
 
@@ -504,7 +505,7 @@ agente da biblioteca e enviá-lo de novo.
 ### Qual agente executa
 
 A execução escolhe o agente do card; na ausência dele, o agente da fase; depois, o marcado como
-**padrão** na aba **Agentes** do Harness. Sem agentes disponíveis, usa o agente embutido, sem instruções
+**padrão das instruções** na aba **Agentes** do Harness. Sem agentes disponíveis, usa o agente embutido, sem instruções
 adicionais. Remover um agente libera as seleções dos cards e fases que o utilizavam. Os agentes de
 fábrica são criados em cada board, no banco, e não podem ser apagados: desligue o que não quiser
 usar, ou volte-o ao texto original com **Restaurar o padrão**.

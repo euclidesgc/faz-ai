@@ -177,7 +177,11 @@ function ProfileUse({ profile }: { profile: AiProfile }) {
       <div className="row wrap">
         {/* a chave travada do padrão diz por quê, para não parecer quebrada */}
         {standard ? (
-          <Hint content={t('O agente padrão não pode ser desligado: torne outro agente padrão antes.')}>
+          <Hint
+            content={t(
+              'Este agente roda os cards sem modelo e não pode ser desligado: use "Usar nos cards sem modelo" em outro agente antes.',
+            )}
+          >
             <span tabIndex={0}>{toggle}</span>
           </Hint>
         ) : (
@@ -197,7 +201,7 @@ function ProfileUse({ profile }: { profile: AiProfile }) {
             )}
             onClick={() => void useInCards.run()}
           >
-            {t('Tornar padrão')}
+            {t('Usar nos cards sem modelo')}
           </ActionButton>
         )}
       </div>

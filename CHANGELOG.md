@@ -33,6 +33,7 @@
 
 ### Alterado
 
+- O padrão da aba Agentes do Harness passa a se chamar "padrão das instruções", e o "Tornar padrão" de Conectar agentes vira "Usar nos cards sem modelo".
 - O diálogo de importar artefatos fica mais organizado, com as ações num só rodapé.
 - Agentes de fábrica não podem mais ser apagados e todo agente pode ser desligado.
 - **Enviar** sempre chama a IA, mesmo com o card bloqueado, e vira **Parar** enquanto ela trabalha.

@@ -83,6 +83,19 @@ describe('lista do Harness: de fábrica e origem', () => {
     expect(within(mine).getByRole('button', { name: /Apagar/ })).toBeInTheDocument();
   });
 
+  it('o padrão da lista é o "padrão das instruções", para não se confundir com o agente de IA padrão de Conectar agentes', async () => {
+    library([
+      artifact({ kind: 'agent', name: 'condutor-do-board', agent: meta(true) }),
+      artifact({ kind: 'agent', name: 'meu', agent: meta(false) }),
+    ]);
+    list('agent');
+    expect(within(row('condutor-do-board')).getByText('padrão das instruções')).toBeInTheDocument();
+    const mine = row('meu');
+    expect(within(mine).queryByText('padrão das instruções')).toBeNull();
+    await userEvent.click(within(mine).getByRole('button', { name: 'Tornar meu o agente padrão das instruções' }));
+    expect(lastSent('settings.board.update').patch).toEqual({ runner: { defaultAgent: 'meu' } });
+  });
+
   it('as skills do fluxo aparecem só para leitura, também as que não estão na biblioteca', () => {
     library(
       [artifact({ kind: 'skill', name: 'faz-ai-fluxo', generated: true, usage: 'always' })],
