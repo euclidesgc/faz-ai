@@ -270,7 +270,8 @@ A aba **Testar** tem três partes:
   teste, nos dois sentidos, com o tempo de cada pedido, o pedido mais lento, as linhas que o agente
   escreve fora do protocolo (`stderr`) e o início e a saída de cada processo. O arquivo do dia
   (`acp-AAAA-MM-DD.jsonl`, na pasta do rastreio do board) guarda tudo, com o JSON completo; **Abrir
-  arquivo** o abre no editor. Chaves e tokens de acesso nunca entram; os contadores de consumo
+  arquivo** o abre no editor; os arquivos com mais de sete dias são apagados junto com os do rastreio.
+  **Ocultar session/update** só filtra a lista, não a gravação. Chaves e tokens de acesso nunca entram; os contadores de consumo
   (`inputTokens`, `totalTokens`) entram.
 
 ### Detalhes: perfis de CLI, cópias e personalizados

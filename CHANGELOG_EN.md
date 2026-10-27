@@ -63,6 +63,8 @@
 
 ### Fixed
 
+- Old ACP protocol log files are now deleted along with the trace files, even with the window open for days.
+- The Hide session/update switch gets a hint explaining it only filters the list.
 - Interface review: spacing, headings, empty fields, collapsible blocks and narrow tables are consistent across all screens.
 - The heartbeat and the other switches in Settings get the right spacing.
 - The import and export artifacts dialogs and the context editors no longer take up the whole screen.

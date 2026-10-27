@@ -63,6 +63,8 @@
 
 ### Corrigido
 
+- Os arquivos antigos do log do protocolo ACP passam a ser apagados junto com os do rastreio, também com a janela aberta por dias.
+- O interruptor Ocultar session/update ganha um hint que explica que só filtra a lista.
 - Revisão da interface: espaçamentos, títulos, campos vazios, blocos recolhíveis e tabelas estreitas ficam consistentes em todas as telas.
 - O heartbeat e os outros interruptores das Configurações ficam com o espaçamento certo.
 - Os diálogos de importar e exportar artefatos e os editores de contexto não ocupam mais a tela inteira.

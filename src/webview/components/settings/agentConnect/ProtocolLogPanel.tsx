@@ -104,7 +104,12 @@ export function ProtocolLogPanel() {
         )}
       </SectionHeader>
       <div className="row wrap agent-log-toolbar">
-        <SwitchField label={t('Ocultar session/update')} checked={hideUpdates} onChange={setHideUpdates} />
+        <SwitchField
+          label={t('Ocultar session/update')}
+          hint={t('Esconde da lista os avisos de progresso do agente. Só muda o que aparece aqui: o arquivo continua com tudo.')}
+          checked={hideUpdates}
+          onChange={setHideUpdates}
+        />
         {slowest && (
           <Text size="1" color="gray">
             {t('Pedido mais lento: {method} em {ms} ms', { method: slowest.method ?? '?', ms: slowest.ms ?? 0 })}
