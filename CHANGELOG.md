@@ -35,6 +35,7 @@
 
 ### Alterado
 
+- O Plan pede, na descrição de cada sub-tarefa, as seções Objetivo, Pronto quando, Pode tocar e Não pode tocar (#1110).
 - As sub-tarefas passam a ser a menor parte da entrega que se verifica sozinha, não um recorte por arquivo: a instrução do Plan, a skill do fluxo, as descrições do MCP e os agentes dizem que o board as executa uma por vez, na ordem das dependências (#1106).
 - Revisão de UX das telas de Harness, Automação, Conectar agentes e Workflows: Automação dividida em Execução, Heartbeat e Paralelismo; o "Preencher o modelo sugerido" fica sob o título da sugestão de modelo; o plano de contexto sem título repetido e com "Herdar agente"; ações mais curtas na lista de agentes ("Tornar padrão", "Restaurar o original").
 - Nos artefatos do Harness, a busca fica dentro de cada aba, e a barra separa criar de pedir à IA em todos os assuntos.

@@ -5,6 +5,7 @@ import type { Database } from 'sql.js';
 import { BOARD_TEMPLATE_VERSION, pendingUpgrade, upgradeBoard } from '../src/extension/db/boardTemplate';
 import { one, run, str } from '../src/extension/db/query';
 import { HOMOLOGATION_INSTRUCTION_V4, PHASE_DEFAULTS, PHASE_HISTORY } from '../src/shared/phaseDefaults';
+import { REQUIRED_BRIEF_SECTIONS, briefGaps, briefSkeleton } from '../src/shared/subtaskBrief';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
@@ -298,7 +299,7 @@ describe('atualização do board para o padrão atual', () => {
 
   it('versão 10: a Homologação com o texto da 0.39 passa a abrir o pull request com --base em workspace.prBase; a personalizada fica', () => {
     upgradeBoard(db, boardId);
-    expect(BOARD_TEMPLATE_VERSION).toBe(16);
+    expect(BOARD_TEMPLATE_VERSION).toBe(17);
     const settings = new SettingsRepo(db);
     // o texto da versão 9 é o segundo do histórico (o terceiro é o da 14, antes do passo do hotfix)
     const v9 = PHASE_HISTORY['Homologação']!.instructions[1]!;
@@ -356,7 +357,7 @@ describe('atualização do board para o padrão atual', () => {
     for (const n of ['Discovery', 'Spec']) expect(col(n).artifactTemplate).toContain('## Mapa do código');
     for (const n of ['Discovery', 'Spec', 'Plan']) expect(col(n).aiInstruction).toBe(PHASE_DEFAULTS[n]!.instruction);
     for (const n of ['PRD', 'Spec', 'Plan']) expect(PHASE_DEFAULTS[n]!.instruction).toContain('Mapa do código');
-    expect(PHASE_DEFAULTS['Plan']!.instruction).toContain('os arquivos que ela vai tocar');
+    expect(PHASE_DEFAULTS['Plan']!.instruction).toContain('"Pode tocar" e "Não pode tocar" saem do mapa do código');
     for (const d of Object.values(PHASE_DEFAULTS)) {
       expect(d.instruction).not.toContain('code-review-graph');
       expect(d.artifactTemplate).not.toContain('code-review-graph');
@@ -439,6 +440,45 @@ describe('atualização do board para o padrão atual', () => {
     expect(pendingUpgrade(db, boardId)).toEqual([]);
     upgradeBoard(db, boardId);
     expect(col('Plan').aiInstruction).toBe('meu Plan');
+  });
+
+  it('versão 17 (#1110): o Plan pede as seções na descrição da sub-tarefa; o Plan padrão v16 sobe e o personalizado fica', () => {
+    expect(BOARD_TEMPLATE_VERSION).toBe(17);
+    const plan = PHASE_DEFAULTS['Plan']!;
+    for (const name of REQUIRED_BRIEF_SECTIONS) expect(plan.instruction).toContain(`"${name}"`);
+    expect(plan.instruction).toContain(
+      'O board confere as quatro obrigatórias antes de executar e devolve ao condutor a sub-tarefa que não as tem',
+    );
+    expect(plan.instruction).not.toContain('os arquivos que ela vai tocar (tirados do mapa) e como verificar');
+    expect(plan.artifactTemplate).toContain('## Descrição de cada sub-tarefa');
+    expect(plan.artifactTemplate).toContain(briefSkeleton());
+    expect(plan.artifactTemplate.indexOf('## Descrição de cada sub-tarefa')).toBeLessThan(
+      plan.artifactTemplate.indexOf('## Pontos de atenção'),
+    );
+    const filled = briefSkeleton().replace(/<[^>]*>/g, 'texto');
+    expect(briefGaps(filled)).toEqual([]);
+    expect(briefGaps(briefSkeleton().replace(/<[^>]*>/g, ''))).toEqual([...REQUIRED_BRIEF_SECTIONS]);
+
+    const history = PHASE_HISTORY['Plan']!;
+    expect(history.instructions).not.toContain(plan.instruction);
+    expect(history.change).toContain('Pronto quando');
+
+    upgradeBoard(db, boardId);
+    const settings = new SettingsRepo(db);
+    settings.updateColumn(col('Plan').id, { aiInstruction: history.instructions.at(-1)!, artifactTemplate: history.templates.at(-1)! });
+    run(db, 'UPDATE boards SET template_version = 16 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([`Coluna "Plan": ${history.change}.`]);
+    upgradeBoard(db, boardId);
+    expect(col('Plan').aiInstruction).toBe(plan.instruction);
+    expect(col('Plan').artifactTemplate).toBe(plan.artifactTemplate);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+
+    settings.updateColumn(col('Plan').id, { aiInstruction: 'meu Plan', artifactTemplate: 'meu modelo' });
+    run(db, 'UPDATE boards SET template_version = 16 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+    upgradeBoard(db, boardId);
+    expect(col('Plan').aiInstruction).toBe('meu Plan');
+    expect(col('Plan').artifactTemplate).toBe('meu modelo');
   });
 
   it('pelo roteador: o board antigo avisa o que muda e é atualizado por mensagem, com cópia de segurança', () => {

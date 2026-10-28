@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FLOW_SKILL, FLOW_SKILLS, FLOW_SKILL_NAMES, flowSkillMarkdown, isFlowSkill } from '../src/extension/flowSkill';
 import { FLOW_TEXT } from './flowSkillText';
 import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
+import { BRIEF_SECTIONS, REQUIRED_BRIEF_SECTIONS } from '../src/shared/subtaskBrief';
 
 describe('conjunto de skills do fluxo (#588)', () => {
   it('explica o valor por perfil, sem lista fixa de CLIs', () => {
@@ -56,7 +57,7 @@ describe('conjunto de skills do fluxo (#588)', () => {
 
   it('a principal manda partir do mapa do código e pede os arquivos de cada sub-tarefa', () => {
     expect(FLOW_SKILL.body).toContain('Mapa do código');
-    expect(FLOW_SKILL.body).toContain('os arquivos que ela vai tocar');
+    expect(FLOW_SKILL.body).toContain('com os arquivos tirados do mapa do código');
     expect(FLOW_SKILL.body).not.toContain('code-review-graph');
   });
 });
@@ -144,5 +145,13 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(rodadas).not.toContain('o agente e o modelo (`set_card_profile`)');
     expect(rodadas).toMatch(/`start_work` \(que já leva a sub-tarefa para "Em andamento"\)/);
     expect(rodadas).toMatch(/`move_card` para a coluna de conclusão com `comment`/);
+  });
+  it('a skill do fluxo ensina as seções da descrição da sub-tarefa e a conferência do board (#1110)', () => {
+    for (const name of REQUIRED_BRIEF_SECTIONS) expect(FLOW_SKILL.body).toContain(`"${name}"`);
+    expect(FLOW_SKILL.body).toContain(BRIEF_SECTIONS.decisions);
+    expect(FLOW_SKILL.body).toContain(
+      'o board confere as quatro obrigatórias antes de executar e devolve ao condutor a sub-tarefa que não as tem',
+    );
+    expect(FLOW_SKILL.body).not.toContain('na descrição os arquivos que ela vai tocar');
   });
 });

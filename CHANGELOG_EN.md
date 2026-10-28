@@ -35,6 +35,7 @@
 
 ### Changed
 
+- The Plan asks for the sections Objetivo, Pronto quando, Pode tocar and Não pode tocar in each sub-task description (#1110).
 - Sub-tasks become the smallest part of the delivery that can be checked on its own, not a per-file split: the Plan instruction, the flow skill, the MCP descriptions and the agents say the board runs them one at a time, in dependency order (#1106).
 - UX review of the Harness, Automation, Connect agents and Workflows screens: Automation split into Run, Heartbeat and Parallelism; "Fill in the suggested model" sits under the model suggestion title; the context plan without a repeated title and with "Inherit agent"; shorter actions in the agents list ("Make default", "Restore original").
 - In the Harness artifacts, search sits inside each tab, and the bar separates creating from asking the AI in every topic.
