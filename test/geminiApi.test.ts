@@ -277,10 +277,14 @@ describe('Gemini pela API: o ciclo de chamadas de função', () => {
 
   it('404: o modelo que saiu da API diz para atualizar a lista e escolher outro', async () => {
     server = await fakeGemini([{ status: 404, json: { error: { code: 404, status: 'NOT_FOUND', message: 'models/x is not found' } } }]);
-    const { exit } = start({ connect: fakeMcp(TOOLS).connect });
+    const { exit, measured } = start({ connect: fakeMcp(TOOLS).connect });
     const end = await exit;
     expect(end.code).toBe(1);
-    expect(end.error?.message).toMatch(/^O modelo [\w.-]+ não está mais disponível na API do Gemini \(HTTP 404\)\. Use "Detectar modelos"/);
+    // a mensagem do Google vai junto, e o relatório leva o modelo para o board tirá-lo do catálogo
+    expect(end.error?.message).toMatch(
+      /^O modelo [\w.-]+ não está disponível para esta conta na API do Gemini \(HTTP 404: models\/x is not found\)\. O board o tirou da lista de modelos; escolha outro\.$/,
+    );
+    expect(measured.report().modelUnavailable).toMatch(/^[\w.-]+$/);
   });
 
   it('a mensagem da cota diária diz que é a do dia, quando volta e o que fazer até lá', () => {

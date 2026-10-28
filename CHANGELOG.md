@@ -87,7 +87,8 @@
 ### Corrigido
 
 - A lista de modelos do Gemini pela API não traz mais modelos de voz, imagem, música e pesquisa.
-- A mensagem de limite do Gemini diz qual cota acabou e a hora em que volta, e a de modelo que saiu da API diz como atualizar a lista.
+- A mensagem de limite do Gemini diz qual cota acabou e a hora em que volta.
+- O modelo que a API do Gemini lista mas recusa para a conta (HTTP 404) sai da lista de modelos e não volta pelo **Detectar modelos**; a mensagem traz o motivo do Google.
 - O resultado do teste rápido fica também no log "Faz AI".
 - A IA não conclui mais um card com o checklist em aberto: o `move_card` para a conclusão recusa, e a skill do fluxo manda marcar cada item ao concluí-lo.
 - O chat do board volta a responder pelos agentes ACP e pelo Gemini da API quando a permissão do board não é "Board".

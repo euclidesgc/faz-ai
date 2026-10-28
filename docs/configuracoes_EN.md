@@ -262,7 +262,9 @@ one. Without that line, the list is the built-in one or the one you built by han
 account changed plan, the tool dropped a model) is fixed by detecting again or reconnecting: the list
 read now replaces the previous one, and a model the tool no longer lists leaves the catalog; one added by
 hand stays. In API mode, **Detectar modelos** reads your account's model list with the key saved in
-Connect, without the voice, image, music and research models, which don't talk to the board's tools.
+Connect, without the voice, image, music and research models, which don't talk to the board's tools. The API list may carry a model the account can no longer use
+(Google closes it to new accounts and answers 404): on the first refusal the board removes it from the
+list and doesn't bring it back on the next Detect; adding it by hand with **Novo modelo** restores it.
 
 The model pickers (chat, the card's Modelo field, agents and rules) only offer agents that can answer
 now: one that is off, without the CLI, signed out, with a failed or half-done connection, or that the

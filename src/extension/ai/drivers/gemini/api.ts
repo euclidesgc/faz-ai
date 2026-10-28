@@ -274,6 +274,8 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
   let requests = 0;
   /** o limite de uso que a API devolveu (história 12); null quando a execução não esbarrou nele */
   let limit: FailureClass | null = null;
+  /** o modelo que a API respondeu como inexistente para a conta (404) */
+  let unavailable: string | null = null;
 
   const fail = (message: string): number => {
     const safe = scrub(message);
@@ -424,11 +426,14 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
           const found = classifyGeminiFailure({ message: err?.message || res.text, code: res.status, status: err?.status, body });
           if (found.usageLimitReached) limit = found;
           if (res.status === 429) return fail(limitMessage(model, found, Date.now()));
-          // o modelo saiu da API (ou a conta perdeu o acesso): o caminho é atualizar a lista e escolher outro
-          if (res.status === 404)
+          // o modelo não serve para esta conta, mesmo que a lista da API ainda o traga (o Google mantém na lista
+          // modelos fechados para contas novas): o board o tira do catálogo, e a mensagem do Google vai junto
+          if (res.status === 404) {
+            unavailable = model;
             return fail(
-              `O modelo ${model} não está mais disponível na API do Gemini (HTTP 404). Use "Detectar modelos" em Conectar agentes › Modelos para atualizar a lista e escolha outro.`,
+              `O modelo ${model} não está disponível para esta conta na API do Gemini (HTTP 404${err?.message ? `: ${cut(scrub(err.message), 200)}` : ''}). O board o tirou da lista de modelos; escolha outro.`,
             );
+          }
           return fail(
             `A API do Gemini recusou o pedido (HTTP ${res.status}${err?.status ? `, ${err.status}` : ''}): ${cut(scrub(err?.message || res.text), 300)}`,
           );
@@ -583,6 +588,7 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
       reason: null,
       usageLimitReached: !!limit,
       ...(limit?.usageLimitHint ? { usageLimitHint: limit.usageLimitHint } : {}),
+      ...(unavailable ? { modelUnavailable: unavailable } : {}),
     };
     if (measured)
       return {

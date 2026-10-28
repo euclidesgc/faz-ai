@@ -420,6 +420,36 @@ describe('cenário: o chat do board e o teste rápido pelo Gemini da API', () =>
     expect(calls).toBe(1);
   });
 
+  it('o modelo que a lista da API traz mas a conta não pode usar (404) sai da lista, com a mensagem do Google', async () => {
+    calls = 0;
+    server = await fakeGemini((_body, _n, url) =>
+      url.startsWith('/v1beta/models?')
+        ? modelsList(GEMINI_MODEL.model, 'gemini-2.5-flash')
+        : {
+            status: 404,
+            json: {
+              error: { code: 404, status: 'NOT_FOUND', message: 'This model models/gemini-2.5-pro is no longer available to new users.' },
+            },
+          },
+    );
+    world = await cardWorld({ profile: 'gemini-api', tools: CONDUTOR_TOOLS, permission: 'board', api: { endpoint: server.endpoint } });
+    const w = world;
+    await connectApi(w);
+    const chat = new ChatSession(w.router, { ...w.runnerDeps, file: path.join(w.root, 'chat.json') });
+    const geminiModels = () =>
+      w.router
+        .snapshot()
+        .board.modelCatalog.filter((o) => o.tool === 'gemini')
+        .map((o) => o.model);
+    expect(geminiModels()).toContain(GEMINI_MODEL.model);
+
+    chat.send('Olá', GEMINI_MODEL.id);
+    await vi.waitFor(() => expect(chat.busy).toBe(false));
+
+    expect(geminiModels()).toEqual(['gemini-2.5-flash']);
+    expect(JSON.stringify((chat as unknown as { messages: unknown }).messages)).toContain('no longer available to new users');
+  });
+
   it('o teste rápido no modo API roda no modelo escolhido na aba e recusa sem modelo, sem chamar a API', async () => {
     calls = 0;
     server = await fakeGemini(answer());

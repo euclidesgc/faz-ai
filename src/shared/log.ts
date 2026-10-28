@@ -213,6 +213,11 @@ export interface RunReport {
    * Gemini nos três modos); sem ela, a pausa usa o backoff
    */
   usageLimitHint?: UsageLimitHint;
+  /**
+   * o modelo que a ferramenta recusou como inexistente para esta conta (o 404 da API do Gemini): ela pode
+   * continuar a listá-lo (um modelo fechado para contas novas), e o board o tira do catálogo
+   */
+  modelUnavailable?: string;
 }
 
 /** Uma linha de `log_months`: o total de uma métrica (e, opcionalmente, um corte dela) num mês já arquivado. */

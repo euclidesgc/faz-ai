@@ -296,6 +296,8 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   const lines: string[] = [];
   const cliCommands: HeadlessCommand[] = [];
   const gateway = new AiGateway({
+    // como o host: o modelo recusado para a conta sai do catálogo
+    onModelUnavailable: (profile, model) => router.retireModel(profile.id, model),
     resolveProfile: (id) => profiles.resolveProfile(router.boardId, id),
     executorOf: pick,
     profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,

@@ -34,7 +34,7 @@ import { agentProfiles } from '../../shared/execution';
 import { columnsOf } from '../../shared/selectors';
 import type { AttachmentStore } from '../attachments';
 import { runUnsupported } from '../headless';
-import { isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
+import { catalogTool, isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
 import type { ConnectInput, ConnectState, ConnectSummary } from '../../shared/connect';
 import {
   parseUninstall,
@@ -68,7 +68,7 @@ import { addAttachment, cardContentHandlers } from './handlers/cardContent';
 import { questionHandlers } from './handlers/questions';
 import { cardHandlers, createCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
-import { initModels, modelHandlers, proposeLegacyFallbacks } from './handlers/models';
+import { initModels, modelHandlers, proposeLegacyFallbacks, retireModel } from './handlers/models';
 import { legacyFallbackNotes, parseLegacyFallbacks } from '../../shared/legacyFallback';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
 import { branchRenameHandlers } from './handlers/branchRename';
@@ -832,6 +832,12 @@ export class MessageRouter {
       },
       { author, source: 'ai' },
     );
+  }
+
+  /** A ferramenta recusou o modelo para esta conta: ele sai do catálogo e não volta pelo "Detectar modelos". */
+  retireModel(profileId: string, model: string): void {
+    const profile = this.snapshot().board.aiProfiles.find((p) => p.id === profileId);
+    if (profile && retireModel(this.ctx, catalogTool(profile), model)) this.changed();
   }
 
   /** A execução do perfil terminou sem esbarrar no limite: a pausa acaba. Devolve se havia uma. */

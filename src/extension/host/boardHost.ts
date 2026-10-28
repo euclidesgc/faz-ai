@@ -283,6 +283,11 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     apiKey: (profile) => profileApiKey(toolKeys, profile),
   });
   const gateway = new AiGateway({
+    // o modelo que a ferramenta recusou para a conta sai do catálogo: o seletor não o oferece de novo
+    onModelUnavailable: (profile, model) => {
+      router.retireModel(profile.id, model);
+      o.log(`Modelo ${model} recusado pelo ${profile.name} para esta conta: saiu da lista de modelos.`);
+    },
     resolveProfile: (id) => new AiProfileRepo(handle.db).resolveProfile(router.boardId, id),
     profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
     boardId: router.boardId,

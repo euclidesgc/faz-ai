@@ -101,6 +101,29 @@ describe('detectar e gravar o catálogo', () => {
     expect(cat.some((o) => o.id === 'claude:opus')).toBe(true);
   });
 
+  it('o modelo recusado para a conta sai do catálogo, não volta pelo Detectar e volta se a pessoa o cadastrar', () => {
+    seedCatalog([opt('gemini:gemini-2.5-flash', { fromTool: true }), opt('gemini:gemini-2.5-pro', { fromTool: true })]);
+    const router = new MessageRouter(dbHandle as never, opts());
+    const gemini = () =>
+      router
+        .snapshot()
+        .board.modelCatalog.filter((o) => o.tool === 'gemini')
+        .map((o) => o.model);
+    router.retireModel('gemini', 'gemini-2.5-flash');
+    expect(gemini()).toEqual(['gemini-2.5-pro']);
+    // a lista da API ainda o traz: o Detectar não o recoloca
+    rememberModels('gemini', [opt('gemini:gemini-2.5-flash', { fromTool: true }), opt('gemini:gemini-2.5-pro', { fromTool: true })]);
+    try {
+      router.handle({ type: 'settings.models.detect', tool: 'gemini' });
+      expect(gemini()).toEqual(['gemini-2.5-pro']);
+      router.handle({ type: 'settings.models.set', catalog: [...router.snapshot().board.modelCatalog, opt('gemini:gemini-2.5-flash')] });
+      router.handle({ type: 'settings.models.detect', tool: 'gemini' });
+      expect(gemini()).toEqual(['gemini-2.5-flash', 'gemini-2.5-pro']);
+    } finally {
+      forgetModels('gemini');
+    }
+  });
+
   it('settings.models.set grava a lista como a pessoa mandou', () => {
     const router = new MessageRouter(dbHandle as never, opts());
     const sent = [opt('claude:opus'), opt('claude:haiku', { label: 'Haiku meu' })];

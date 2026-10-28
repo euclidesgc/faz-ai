@@ -242,7 +242,9 @@ embutida ou a que você montou à mão. Uma lista velha (a conta mudou de plano,
 modelo) se corrige detectando de novo ou reconectando: a lista lida agora substitui a anterior, e o modelo
 que a ferramenta não lista mais sai do catálogo; o cadastrado à mão fica. No modo API, **Detectar modelos**
 lê a lista de modelos da sua conta pela chave guardada no Conectar, sem os modelos de voz, imagem, música
-e pesquisa, que não conversam com as ferramentas do board.
+e pesquisa, que não conversam com as ferramentas do board. A lista da API pode trazer um modelo que a
+conta não usa mais (o Google o fecha para contas novas e responde 404): na primeira recusa, o board o
+tira da lista e não o traz de volta no próximo Detectar; cadastrá-lo à mão em **Novo modelo** o recoloca.
 
 Os seletores de modelo (chat, campo Modelo do card, agentes e regras) só oferecem os agentes que podem
 responder agora: o desligado, sem a CLI, sem login, com a conexão falha ou pela metade, ou que o board não
