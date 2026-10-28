@@ -439,7 +439,14 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   // Code pelo comando): lê de novo antes de juntar ao catálogo, e não só a última leitura do Conectar
   router.onReadToolModels(async (profile) => {
     const driver = driverOf(profile);
-    if (!driver?.listModels || isAcpProfile(profile)) return;
+    if (isAcpProfile(profile)) return;
+    // o modo API lê a lista da conta pela chave do cofre: é o "Atualizar modelos" dele
+    if (driver?.apiModels) {
+      const apiKey = profileApiKey(toolKeys, profile);
+      if (apiKey) rememberModels(catalogTool(profile), await driver.apiModels(apiKey));
+      return;
+    }
+    if (!driver?.listModels) return;
     const exe = resolveProfileCommand(profile, pathEnv, homeDir);
     if (!exe) return;
     rememberModels(catalogTool(profile), await driver.listModels(exe, pathEnv));

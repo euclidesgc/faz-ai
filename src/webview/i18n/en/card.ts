@@ -162,6 +162,7 @@ export const card: Record<string, string> = {
   'Abrir o link': 'Open the link',
   Modelo: 'Model',
   '{id} (fora do catálogo)': '{id} (not in the catalog)',
+  '{id} (agente indisponível)': '{id} (agent unavailable)',
   'Este modelo não tem ajuste de esforço.': 'This model has no effort setting.',
   'Escolha um modelo primeiro.': 'Choose a model first.',
   baixo: 'low',

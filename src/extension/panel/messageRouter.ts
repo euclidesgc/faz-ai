@@ -1,3 +1,4 @@
+import { limitChoiceKey, type LimitChoice } from '../../shared/limitChoice';
 import { builtinPolicyCatalog, simulatePolicyScenario, type PolicyLibrary, type PolicyScenario } from '../../shared/policyManagement';
 import { resolveContextDraft, type ContextDraftResolution } from '../../shared/contextDraftResolution';
 import { applyAdmissionDecision, strictRequestFromDraft } from '../../shared/contextAdmissionPreview';
@@ -815,6 +816,22 @@ export class MessageRouter {
     this.persistUsageLimit();
     this.notify();
     return pause;
+  }
+
+  /**
+   * Pergunta à pessoa, no card, como seguir depois do limite de uso (`limitChoice`): a pergunta vai pelo caminho
+   * normal (o card fica esperando a resposta) e a escolha pendente fica no `meta`, para a resposta saber o que aplicar.
+   */
+  askLimitChoice(cardId: string, choice: LimitChoice, author: string): void {
+    this.ctx.boards.setMeta(limitChoiceKey(cardId), JSON.stringify(choice));
+    this.handle(
+      {
+        type: 'card.questions.set',
+        cardId,
+        questions: [{ question: choice.question, options: choice.options.map((o) => o.label), recommended: choice.recommended }],
+      },
+      { author, source: 'ai' },
+    );
   }
 
   /** A execução do perfil terminou sem esbarrar no limite: a pausa acaba. Devolve se havia uma. */

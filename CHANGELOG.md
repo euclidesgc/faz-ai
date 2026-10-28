@@ -40,6 +40,10 @@
 
 ### Alterado
 
+- Quando o modelo de um card esgota o limite de uso, o board pergunta se espera o limite voltar ou segue com outro modelo disponível, e grava a escolha no card; no modo autônomo vale a regra de fallback.
+- Os seletores de modelo (chat, card, agentes e regras) só oferecem os agentes que podem responder agora.
+- **Detectar modelos** substitui a lista pela que a ferramenta informa agora, tirando os modelos que ela não lista mais, e passa a existir também no modo API.
+- O chat pelo Gemini da API declara só as ferramentas do board que usa: 26 em vez de 81 a cada pedido.
 - Regras ativas entram em todo contexto de IA do board, e skills ativas só no card que as vincula; regras que estavam **Pelo card** passam a inativas, para revisão.
 - A exportação para o Claude Code grava `allowed-tools` nas skills e `tools` nos agentes a partir das tools escolhidas; Cursor e Kimi Code omitem o campo e avisam.
 - O Plan pede, na descrição de cada sub-tarefa, as seções Objetivo, Pronto quando, Pode tocar e Não pode tocar (#1110).
@@ -82,6 +86,9 @@
 
 ### Corrigido
 
+- A lista de modelos do Gemini pela API não traz mais modelos de voz, imagem, música e pesquisa.
+- A mensagem de limite do Gemini diz qual cota acabou e a hora em que volta, e a de modelo que saiu da API diz como atualizar a lista.
+- O resultado do teste rápido fica também no log "Faz AI".
 - A IA não conclui mais um card com o checklist em aberto: o `move_card` para a conclusão recusa, e a skill do fluxo manda marcar cada item ao concluí-lo.
 - O chat do board volta a responder pelos agentes ACP e pelo Gemini da API quando a permissão do board não é "Board".
 - O teste rápido do Gemini pela API ganha a escolha do modelo, que esse modo exige.

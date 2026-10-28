@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { pauseOf } from '../src/shared/usageLimit';
 
 // o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
 vi.mock('../src/shared/metrics', async (importOriginal) => ({
@@ -1604,6 +1605,8 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
   });
 
   it('controle: sem a ciência, os dois perfis estão no mesmo regime e a troca para o Cursor acontece', () => {
+    // no modo autônomo: com a pessoa no circuito, o card pergunta (teste seguinte)
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
     useSonnetMedium();
     addCursorModel();
     policyTo({ profileId: 'cursor', model: 'composer-2', effort: null });
@@ -1845,7 +1848,26 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(card().status).toBe('running');
   });
 
+  it('com a pessoa no circuito, o limite pergunta: esperar ou seguir com outro agente, o da regra recomendado', () => {
+    useSonnetMedium();
+    addCursorModel();
+    policyTo({ profileId: 'cursor', model: 'composer-2', effort: null });
+    runner.start(storyId, { origin: 'manual', onExit: vi.fn() });
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+
+    // nenhuma troca sozinha: a regra só valeria para esta execução, e a fase seguinte voltaria ao Sonnet esgotado
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('waiting_answer');
+    const [question] = card().questions;
+    expect(question!.options[0]).toMatch(/^Esperar o limite voltar \(às \d\d:\d\d\)$/);
+    expect(question!.options[1]).toMatch(/^Seguir com .+ \(Cursor\)$/);
+    expect(question!.recommended).toBe(question!.options[1]);
+    expect(pauseOf(router.snapshot(), 'claude')).not.toBeNull();
+  });
+
   it('RF11: a política troca para outro perfil de CLI, que passa a ser o alvo da execução (comando, log e atividade)', () => {
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
     addCursorModel();
     useSonnetMedium();
     const cursor = cursorModel();

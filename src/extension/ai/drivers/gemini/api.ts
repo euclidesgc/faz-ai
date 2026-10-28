@@ -39,12 +39,12 @@ import { libraryMcpTransport } from '../../../mcp/boardGateway';
 import { boardSelfTransport } from '../../../mcp/selfClient';
 import { boardDecision, type AcpDecision } from '../../acp/run';
 import { apiBinding, apiEndpoint } from '../../apiBinding';
-import type { ModelOption } from '../../../../shared/models';
+import { isTextModel, type ModelOption } from '../../../../shared/models';
 import { maskApiKey } from '../../../toolKeys';
 import { loginShellPath } from '../../../spawn';
 import { apiLocalTools, type ApiLocalTool } from '../../../../shared/apiTools';
 import { localDeclaration, processGone, realLocalRoots, runLocalTool, type LocalToolLimits, type LocalToolResult } from '../../apiTools';
-import type { FailureClass } from '../../../../shared/usageLimit';
+import { limitClock, resetAtOf, type FailureClass } from '../../../../shared/usageLimit';
 import type { ExecutorContext, ToolDriver } from '../types';
 import { classifyGeminiFailure } from './limit';
 
@@ -141,6 +141,19 @@ export function apiMcpServers(input: HeadlessInput): Record<string, Json> {
     if (def) out[name] = def;
   }
   return out;
+}
+
+/**
+ * O 429 em palavras de quem decide o que fazer: qual cota (a do dia ou a de curto prazo) e quando ela volta, no
+ * relógio local, em vez dos segundos crus do `retryDelay` ("tente de novo em 51679s").
+ */
+export function limitMessage(model: string, found: FailureClass, now: number): string {
+  const hint = found.usageLimitReached ? found.usageLimitHint : undefined;
+  const at = resetAtOf(hint, now);
+  const when = at ? ` Ela volta às ${limitClock(at, now)}.` : '';
+  return hint?.dailyResetZone
+    ? `A cota diária do modelo ${model} na API do Gemini acabou (HTTP 429).${when} Até lá, use outro modelo ou outro agente.`
+    : `A API do Gemini recusou o pedido por limite de uso do modelo ${model} (HTTP 429).${when}`;
 }
 
 /** O modelo da execução: o do card; o modo API não tem modelo padrão escondido. */
@@ -360,6 +373,8 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
         for (const tool of tools) {
           // a decisão antes de declarar: a ferramenta que o card não admite nunca chega ao modelo
           if (!apiCallDecision(input, names, server, tool.name).allow) continue;
+          // o recorte do chat: só diminui o que vai ao modelo, nunca amplia a decisão acima
+          if (server === BOARD_SERVER && input.exec?.declareOnly && !input.exec.declareOnly.includes(tool.name)) continue;
           const wanted = mcpOperation(server, tool.name);
           const name = FUNCTION_NAME.test(wanted) && !declared.some((d) => d.name === wanted) ? wanted : `mcp_fn_${declared.length + 1}`;
           declared.push({
@@ -408,9 +423,11 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
           }
           const found = classifyGeminiFailure({ message: err?.message || res.text, code: res.status, status: err?.status, body });
           if (found.usageLimitReached) limit = found;
-          if (res.status === 429)
+          if (res.status === 429) return fail(limitMessage(model, found, Date.now()));
+          // o modelo saiu da API (ou a conta perdeu o acesso): o caminho é atualizar a lista e escolher outro
+          if (res.status === 404)
             return fail(
-              `A API do Gemini recusou o pedido por limite de uso (HTTP 429${err?.status ? `, ${err.status}` : ''})${err?.retryDelay ? `; tente de novo em ${err.retryDelay}` : ''}.`,
+              `O modelo ${model} não está mais disponível na API do Gemini (HTTP 404). Use "Detectar modelos" em Conectar agentes › Modelos para atualizar a lista e escolha outro.`,
             );
           return fail(
             `A API do Gemini recusou o pedido (HTTP ${res.status}${err?.status ? `, ${err.status}` : ''}): ${cut(scrub(err?.message || res.text), 300)}`,
@@ -644,7 +661,8 @@ async function listApiModels(apiKey: string, o: Required<GeminiApiOptions>): Pro
     for (const raw of asList(data.models)) {
       const m = asObject(raw);
       const name = asText(m?.name)?.replace(/^models\//, '');
-      if (!m || !name || !asList(m.supportedGenerationMethods).includes('generateContent')) continue;
+      // só o que conversa com ferramentas: a lista traz também voz, imagem, música e pesquisa, que o board não usa
+      if (!m || !name || !asList(m.supportedGenerationMethods).includes('generateContent') || !isTextModel(name)) continue;
       options.push({
         id: `gemini:${name}`,
         tool: 'gemini',

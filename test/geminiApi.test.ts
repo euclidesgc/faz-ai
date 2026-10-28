@@ -11,10 +11,12 @@ import {
   MISSING_API_KEY,
   apiCallDecision,
   createGeminiApiDriver,
+  limitMessage,
   type McpConnect,
   type McpConnection,
   type McpTool,
 } from '../src/extension/ai/drivers/gemini/api';
+import { classifyGeminiFailure } from '../src/extension/ai/drivers/gemini/limit';
 import type { ExecutorContext } from '../src/extension/ai/drivers';
 import type { HeadlessInput } from '../src/extension/headless';
 import { API_CAPABILITY_CHECKS } from '../src/shared/executionAdmission';
@@ -258,8 +260,9 @@ describe('Gemini pela API: o ciclo de chamadas de função', () => {
 
     const end = await exit;
     expect(end.code).toBe(1);
-    expect(end.error?.message).toBe(
-      'A API do Gemini recusou o pedido por limite de uso (HTTP 429, RESOURCE_EXHAUSTED); tente de novo em 37s.',
+    // o relógio local de quando volta, não os segundos crus do retryDelay
+    expect(end.error?.message).toMatch(
+      /^A API do Gemini recusou o pedido por limite de uso do modelo [\w.-]+ \(HTTP 429\)\. Ela volta às \d\d:\d\d\.$/,
     );
     expect(server.requests).toHaveLength(1);
     expect(lines).toContain(end.error!.message);
@@ -270,6 +273,28 @@ describe('Gemini pela API: o ciclo de chamadas de função', () => {
       usageLimitHint: { retryAfterMs: 37_000 },
     });
     expect(measured.failure()).toBeInstanceOf(MeasureEndedError);
+  });
+
+  it('404: o modelo que saiu da API diz para atualizar a lista e escolher outro', async () => {
+    server = await fakeGemini([{ status: 404, json: { error: { code: 404, status: 'NOT_FOUND', message: 'models/x is not found' } } }]);
+    const { exit } = start({ connect: fakeMcp(TOOLS).connect });
+    const end = await exit;
+    expect(end.code).toBe(1);
+    expect(end.error?.message).toMatch(/^O modelo [\w.-]+ não está mais disponível na API do Gemini \(HTTP 404\)\. Use "Detectar modelos"/);
+  });
+
+  it('a mensagem da cota diária diz que é a do dia, quando volta e o que fazer até lá', () => {
+    const now = new Date(2026, 9, 28, 13, 38).getTime();
+    const daily = limitMessage(
+      'gemini-4-argon',
+      classifyGeminiFailure({ code: 429, message: 'You have exhausted your daily quota on this model.' }),
+      now,
+    );
+    expect(daily).toMatch(
+      /^A cota diária do modelo gemini-4-argon na API do Gemini acabou \(HTTP 429\)\. Ela volta às (\d\d\/\d\d )?\d\d:\d\d\./,
+    );
+    expect(daily).toContain('Até lá, use outro modelo ou outro agente.');
+    expect(daily).not.toMatch(/\d{4,}s/);
   });
 
   it('o erro do servidor que repete a chave chega ao log sem ela', async () => {
@@ -428,6 +453,11 @@ describe('Gemini pela API: recusas antes do primeiro pedido e o vínculo', () =>
               supportedGenerationMethods: ['generateContent', 'countTokens'],
             },
             { name: 'models/text-embedding-004', displayName: 'Embedding', supportedGenerationMethods: ['embedContent'] },
+            // geram voz, imagem ou música: a lista da API os traz com generateContent, mas o board não conversa com eles
+            { name: 'models/gemini-2.5-flash-preview-tts', supportedGenerationMethods: ['generateContent'] },
+            { name: 'models/gemini-3-pro-image', supportedGenerationMethods: ['generateContent'] },
+            { name: 'models/lyria-3.5', supportedGenerationMethods: ['generateContent'] },
+            { name: 'models/deep-research-preview-04-2026', supportedGenerationMethods: ['generateContent'] },
           ],
           nextPageToken: 'pagina-2',
         },

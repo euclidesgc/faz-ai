@@ -127,6 +127,8 @@ export const agentConnect: Record<string, string> = {
   'Teste rápido': 'Quick test',
   'Teste rápido pelo caminho dos cards': 'Quick test through the cards path',
   'Modelo do teste': 'Test model',
+  'a lista de modelos da sua conta na API, pela chave guardada no Conectar; o que a conta não lista mais sai do catálogo':
+    "your account's model list from the API, with the key saved in Connect; what the account no longer lists leaves the catalog",
   'No modo API a ferramenta não tem modelo padrão: o teste roda neste modelo.':
     'In API mode the tool has no default model: the test runs on this model.',
   'Nenhum modelo no catálogo: conecte o agente de novo na aba Conexão.':

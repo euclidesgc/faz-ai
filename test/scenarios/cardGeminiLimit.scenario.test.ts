@@ -15,7 +15,7 @@ import { cardWorld, CONDUTOR_TOOLS, GEMINI_MODEL, type CardWorld } from './cardW
 
 const KEY = 'AIzaChaveDoCenarioLimite-nunca-no-board-444555';
 const FIXTURES = path.join(__dirname, '..', 'fixtures');
-const LIMIT = 'O limite de uso do plano do';
+const LIMIT = 'O limite de uso de';
 
 /**
  * O relógio do cenário, congelado (só o `Date`; os temporizadores seguem reais, que o servidor HTTP e o agente
@@ -48,17 +48,21 @@ const nextPacificMidnight = (now: number) => {
 };
 
 /** O desfecho que o runner aplica no limite, o mesmo nos três modos. */
-function expectPaused(w: CardWorld, statusBefore: string | null, resumeAt: { min: number; max: number }) {
+function expectPaused(w: CardWorld, _statusBefore: string | null, resumeAt: { min: number; max: number }) {
   const card = w.router.snapshot().cards.find((c) => c.id === w.cardId)!;
-  // o limite renova sozinho: o card volta para a IA, sem bloqueio esperando a pessoa
-  expect(card.status).toBe(statusBefore);
   const pause = pauseOf(w.router.snapshot(), 'gemini');
   expect(pause).toMatchObject({ profileId: 'gemini', source: 'reset', attempts: 0 });
   expect(pause!.resumeAt).toBeGreaterThanOrEqual(resumeAt.min);
   expect(pause!.resumeAt).toBeLessThanOrEqual(resumeAt.max);
+  const clock = limitClock(pause!.resumeAt, Date.now());
+  // a pessoa está no circuito e há outro agente que responde (o Claude do mundo): o card pergunta como seguir
+  expect(card.status).toBe('waiting_answer');
+  expect(card.questions).toHaveLength(1);
+  expect(card.questions[0]!.options[0]).toBe(`Esperar o limite voltar (às ${clock})`);
+  expect(card.questions[0]!.options.slice(1).every((o) => o.startsWith('Seguir com '))).toBe(true);
   // a conversa diz até quando, no relógio da pausa gravada
   const comment = w.comments().find((b) => b.startsWith(LIMIT));
-  expect(comment).toContain(`ficam pausadas até as ${limitClock(pause!.resumeAt, Date.now())}`);
+  expect(comment).toContain(`ficam pausadas até as ${clock}`);
   expect(w.lines.some((l) => l.includes('Perfil Gemini') && l.includes('pausado pelo limite de uso'))).toBe(true);
   return pause!;
 }
@@ -74,6 +78,61 @@ function apiProfile(w: CardWorld) {
 }
 
 describe('cenário: o Gemini esgota o limite de uso, nos três modos', () => {
+  it('a resposta da pessoa: seguir com outro modelo grava no campo Modelo do card; esperar deixa o modelo como está', async () => {
+    const daily = JSON.parse(fs.readFileSync(path.join(FIXTURES, 'gemini-api-429-daily.json'), 'utf8'));
+    server = await fakeGemini(() => ({ status: 429, json: daily }));
+    world = await cardWorld({ profile: 'gemini-api', tools: CONDUTOR_TOOLS, permission: 'board', api: { endpoint: server.endpoint } });
+    const w = world;
+    apiProfile(w);
+    const field = w.router.snapshot().fieldDefs.find((f) => f.kind === 'model')!;
+    const modelOf = () => w.router.snapshot().fieldValues.find((v) => v.cardId === w.cardId && v.fieldId === field.id)?.value;
+    const card = () => w.router.snapshot().cards.find((c) => c.id === w.cardId)!;
+    const answer = (text: string) =>
+      w.router.handle({
+        type: 'card.questions.answer',
+        cardId: w.cardId,
+        answers: [{ questionId: card().questions[0]!.id, text, custom: false }],
+      });
+
+    await w.run();
+    const [wait, other] = card().questions[0]!.options;
+    expect(other).toMatch(/^Seguir com .+ \(Claude Code\)$/);
+    answer(other!);
+
+    expect(card()).toMatchObject({ status: 'ready', questions: [] });
+    expect(modelOf()).toMatch(/^claude:/);
+    expect(w.comments().at(-1)).toMatch(/escolheu: seguir com .+ O campo Modelo do card foi trocado, e o card voltou para a fila\.$/);
+    // a resposta é uma decisão de execução: não entra em "Perguntas e respostas" da descrição
+    expect(card().description).not.toContain('esgotou o limite de uso');
+
+    // de novo no Gemini: agora a pessoa espera, e o modelo do card não muda
+    w.router.handle({ type: 'field.setValue', cardId: w.cardId, fieldId: field.id, value: GEMINI_MODEL.id });
+    await w.run();
+    expect(card().questions[0]!.options[0]).toBe(wait);
+    answer(wait!);
+    expect(card()).toMatchObject({ status: 'ready', questions: [] });
+    expect(modelOf()).toBe(GEMINI_MODEL.id);
+    expect(w.comments().at(-1)).toContain('escolheu esperar o limite voltar');
+  });
+
+  it('no modo autônomo não há pergunta: o card volta para a IA e o perfil pausa', async () => {
+    const daily = JSON.parse(fs.readFileSync(path.join(FIXTURES, 'gemini-api-429-daily.json'), 'utf8'));
+    server = await fakeGemini(() => ({ status: 429, json: daily }));
+    world = await cardWorld({ profile: 'gemini-api', tools: CONDUTOR_TOOLS, permission: 'board', api: { endpoint: server.endpoint } });
+    apiProfile(world);
+    const story = world.router.snapshot().cards.find((c) => c.id === world!.cardId)!;
+    world.router.handle({ type: 'card.yolo.set', cardId: story.parentId ?? story.id, enabled: true });
+    const before = world.router.snapshot().cards.find((c) => c.id === world!.cardId)!.status;
+
+    await world.run();
+
+    const card = world.router.snapshot().cards.find((c) => c.id === world!.cardId)!;
+    expect(card.questions).toEqual([]);
+    expect(card.status).toBe(before);
+    expect(pauseOf(world.router.snapshot(), 'gemini')).not.toBeNull();
+    expect(world.comments().some((b) => b.startsWith('O limite de uso do plano do'))).toBe(true);
+  });
+
   it('API: o 429 por minuto (RetryInfo 41s) pausa o perfil por pouco tempo, sem nova tentativa', async () => {
     const minute = JSON.parse(fs.readFileSync(path.join(FIXTURES, 'gemini-api-429-minute.json'), 'utf8'));
     server = await fakeGemini(() => ({ status: 429, json: minute }));
@@ -239,6 +298,9 @@ describe('cenário: o Gemini esgota o limite de uso, nos três modos', () => {
       },
     });
 
+    // no modo autônomo a regra troca sozinha; com a pessoa no circuito, o card pergunta (ver o cenário seguinte)
+    const story = world.router.snapshot().cards.find((c) => c.id === world!.cardId)!;
+    world.router.handle({ type: 'card.yolo.set', cardId: story.parentId ?? story.id, enabled: true });
     const end = await world.run();
 
     const posts = server.requests.filter((r) => r.method === 'POST').map((r) => r.url);

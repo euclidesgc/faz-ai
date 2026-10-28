@@ -248,10 +248,17 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
       if (!meta) return fail('Perfil indisponível neste board.');
       if (!meta.enabled || !profileCanProbe(meta)) return fail('Perfil desativado ou pendente de revisão.');
       if (running.has(id)) return fail('Já existe um teste em curso para este perfil.');
+      // o resultado vai também para o canal "Faz AI": a tela o mostra só enquanto está aberta
+      const logTest = (r: Extract<HostToWebview, { type: 'aiProfiles.testResult' }>) => {
+        deps.log?.(
+          `Teste rápido do ${meta.name}${model ? ` (${model})` : ''}: ${r.ok ? 'respondeu' : `falhou: ${r.error ?? 'sem motivo'}`}`,
+        );
+        return r;
+      };
       // o modo API não tem modelo padrão da ferramenta: o teste roda no modelo que a pessoa escolheu na aba Testar
       const api = meta.mode === 'api';
       if (api && (!model || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(model)))
-        return fail('Escolha o modelo do teste: no modo API a ferramenta não tem modelo padrão.');
+        return logTest(fail('Escolha o modelo do teste: no modo API a ferramenta não tem modelo padrão.'));
       running.add(id);
       let profile: AiProfile | undefined;
       const tail: string[] = [];
@@ -308,7 +315,7 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
             }
           },
         });
-        return await new Promise<Extract<HostToWebview, { type: 'aiProfiles.testResult' }>>((resolve) => {
+        const result = await new Promise<Extract<HostToWebview, { type: 'aiProfiles.testResult' }>>((resolve) => {
           execution.onExit((end) =>
             resolve({
               type: 'aiProfiles.testResult',
@@ -326,9 +333,11 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
             }),
           );
         });
+        logTest(result);
+        return result;
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        return fail(redactCredentialValues(message, profile?.config));
+        return logTest(fail(redactCredentialValues(message, profile?.config)));
       } finally {
         running.delete(id);
       }

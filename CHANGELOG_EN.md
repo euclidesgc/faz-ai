@@ -40,6 +40,10 @@
 
 ### Changed
 
+- When a card's model runs out of its usage limit, the board asks whether to wait for the limit to come back or continue with another available model, and saves the choice on the card; autonomous mode keeps the fallback rule.
+- The model pickers (chat, card, agents and rules) only offer agents that can answer now.
+- **Detectar modelos** replaces the list with the one the tool reports now, dropping models it no longer lists, and is also available in API mode.
+- The chat over the Gemini API declares only the board tools it uses: 26 instead of 81 on each request.
 - Active rules go into every AI context of the board, and active skills only into the cards that link them; rules that were **Per card** become inactive, for review.
 - Exporting to Claude Code writes `allowed-tools` on skills and `tools` on agents from the chosen tools; Cursor and Kimi Code leave the field out and warn.
 - The Plan asks for the sections Objetivo, Pronto quando, Pode tocar and Não pode tocar in each sub-task description (#1110).
@@ -82,6 +86,9 @@
 
 ### Fixed
 
+- The Gemini over the API model list no longer brings voice, image, music and research models.
+- The Gemini limit message says which quota ran out and when it comes back, and the one for a model removed from the API says how to refresh the list.
+- The quick test result also goes to the "Faz AI" log.
 - The AI no longer completes a card with an open checklist: `move_card` to a done column refuses it, and the flow skill says to check each item as it is finished.
 - The board chat answers again through ACP agents and Gemini over the API when the board permission is not "Board".
 - The Gemini over the API quick test gets a model choice, which that mode requires.

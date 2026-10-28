@@ -130,10 +130,13 @@ export interface ModelGroup {
   custom: boolean;
 }
 
-/** Um grupo por catálogo dos perfis ligados. */
-export function modelGroups(board: TargetBoard): ModelGroup[] {
+/**
+ * Um grupo por catálogo dos perfis ligados. `available` deixa de fora os que não podem responder agora
+ * (`profileAvailable`): o seletor só oferece o que roda.
+ */
+export function modelGroups(board: TargetBoard, available?: (profileId: string) => boolean): ModelGroup[] {
   return board.aiProfiles
-    .filter((p) => p.enabled)
+    .filter((p) => p.enabled && (!available || available(p.id)))
     .map((p) => ({
       cli: p.id,
       label: profileLabel(board, p.id),

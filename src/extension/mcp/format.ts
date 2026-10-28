@@ -1,3 +1,4 @@
+import { profileAvailable } from '../../shared/profileAvailability';
 import { isFlowSkill } from '../flowSkill';
 import {
   catalogTool,
@@ -10,7 +11,7 @@ import {
 } from '../../shared/aiProfiles';
 import { orchestratesStory } from '../../shared/orchestration';
 import { cliOfValue, resolveRunTarget } from '../../shared/runTarget';
-import { cliProblem } from '../../shared/requirements';
+
 import { agentOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
@@ -259,7 +260,7 @@ export function modelsOverview(s: BoardState) {
       enabled: p.enabled,
       default: s.board.aiTool === p.id,
       // ligado, com a CLI e o login em dia e sem motivo para o board não rodar: pronto para os cards agora
-      ready: p.enabled && !s.aiRunUnsupportedBy?.[p.id] && cliProblem(s, p.id) === null,
+      ready: profileAvailable(s, p.id),
       measures: p.base === 'claude' ? 'cost' : p.base === 'generic' ? 'none' : 'tokens',
     })),
     catalog: s.board.modelCatalog.map((o) => ({

@@ -8,7 +8,7 @@ import type { SpawnFn } from '../../src/extension/aiOutput/measured';
 import { canDispatch, pauseOf } from '../../src/shared/usageLimit';
 import { cardWorld, CONDUTOR_TOOLS, type CardWorld } from './cardWorld';
 
-const LIMIT = 'O limite de uso do plano do';
+const LIMIT = 'O limite de uso de';
 const SESSION = '9356450d-ec17-46dd-93d5-fc15f3bf4190';
 
 /** O processo da CLI: o que o cursor-agent escreveu de verdade ao recusar por cota, saindo com 1. */
@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe('cenário: o Cursor esgota a cota do agente', () => {
-  it('sem regra: o card volta para a IA, o perfil Cursor pausa pelo backoff e os outros perfis seguem', async () => {
+  it('sem regra: o card pergunta como seguir, o perfil Cursor pausa pelo backoff e os outros perfis seguem', async () => {
     world = await cardWorld({ profile: 'cursor', tools: CONDUTOR_TOOLS, permission: 'board', spawn: refusing });
     const before = world.router.snapshot().cards.find((c) => c.id === world!.cardId)!.status;
 
@@ -48,8 +48,13 @@ describe('cenário: o Cursor esgota a cota do agente', () => {
     expect(end.report.usageLimitReached).toBe(true);
     expect(world.aiRun()).toMatchObject({ tool: 'cursor', mode: 'cli' });
     const card = world.router.snapshot().cards.find((c) => c.id === world!.cardId)!;
-    // o limite renova sozinho: o card volta para a IA, sem bloqueio esperando a pessoa
-    expect(card.status).toBe(before);
+    // a pessoa decide: esperar o limite voltar ou seguir com o Claude Code, que responde agora
+    expect(before).not.toBe('waiting_answer');
+    expect(card.status).toBe('waiting_answer');
+    expect(card.questions[0]!.options).toEqual([
+      expect.stringMatching(/^Esperar o limite voltar/),
+      expect.stringMatching(/\(Claude Code\)$/),
+    ]);
     const pause = pauseOf(world.router.snapshot(), 'cursor');
     expect(pause).toMatchObject({ profileId: 'cursor', source: 'backoff' });
     expect(world.comments().some((b) => b.startsWith(LIMIT))).toBe(true);
@@ -90,6 +95,9 @@ describe('cenário: o Cursor esgota a cota com uma regra de fallback', () => {
       },
     });
 
+    // no modo autônomo a regra troca sozinha; com a pessoa no circuito, o card pergunta
+    const story = world.router.snapshot().cards.find((c) => c.id === world!.cardId)!;
+    world.router.handle({ type: 'card.yolo.set', cardId: story.parentId ?? story.id, enabled: true });
     await world.run();
 
     // a CLI do Cursor recusou e a mesma execução seguiu no Claude Code, o segundo comando montado

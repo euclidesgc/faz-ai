@@ -16,7 +16,8 @@ import {
 } from './policyGate';
 import type { ContextAction } from '../shared/contextPlanning';
 import { cardRef } from '../shared/model';
-import { canDispatch, limitClock, limitHolds, pauseOf, resetAtOf } from '../shared/usageLimit';
+import { canDispatch, limitClock, limitHolds, nextPause, pauseOf, resetAtOf } from '../shared/usageLimit';
+import { limitChoice } from '../shared/limitChoice';
 import { activityKindOf } from '../shared/activity';
 import { STORY_SESSION_ADVICE } from './unitAdvice';
 import type { AiRunOrigin, RunReport } from '../shared/log';
@@ -29,7 +30,7 @@ import type { CardStatus } from '../shared/status';
 import { BOARD_SERVER, executionPlan } from './execution';
 import { runCheckLine, runCheckNotice } from '../shared/runCheck';
 import { runArtifactRequest } from './runArtifactSnapshot';
-import { modelDisplay, modelValue } from '../shared/models';
+import { modelDisplay, modelValue, suggestModelRule } from '../shared/models';
 import { effortTiers } from './models';
 import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
@@ -868,6 +869,9 @@ export class AiRunner {
       const evaluated = this.evaluatePolicy(run, end, replied);
       const decision = evaluated?.decision ?? null;
       if (decision) this.deps.log(`[${cardRef(card)}] ${describeDecision(decision)}`);
+      // com a pessoa no circuito (fora do modo autônomo e do autopiloto), quem decide é ela: a troca automática só
+      // levava a execução em curso para outro modelo, e a fase seguinte voltava ao modelo esgotado
+      if (decision?.action !== 'reconcile' && this.askOnLimit(cardId, run, end, decision, toolLabel, output)) return;
       const candidate =
         decision?.action === 'fallback' && decision.target ? runTargetOfPolicy(this.router.snapshot(), decision.target) : null;
       // destino de fallback com o limite esgotado também conta como "sem política aplicável"
@@ -938,6 +942,41 @@ export class AiRunner {
   }
 
   /** A decisão do avaliador único para o limite de uso que esgotou nesta execução (ver `evaluateRunPolicy`). */
+  /**
+   * O limite de uso esgotou num card com a pessoa no circuito: o perfil fica pausado (nenhuma execução automática
+   * volta a ele antes da renovação) e o card pergunta a ela se espera o limite voltar ou segue com outro modelo que
+   * responde agora (`limitChoice`). Os destinos da regra de fallback que casou vêm primeiro. Devolve false quando não
+   * cabe perguntar (modo autônomo, autopiloto, card sem campo Modelo ou nenhum outro modelo disponível): aí vale o
+   * caminho de antes.
+   */
+  private askOnLimit(cardId: string, run: Run, end: AiRunEnd, decision: PolicyDecision | null, toolLabel: string, output: string): boolean {
+    const state = this.router.snapshot();
+    const card = state.cards.find((c) => c.id === cardId);
+    if (!card || run.origin === 'autopilot' || isYolo(state, card)) return false;
+    const now = Date.now();
+    const preferred = [decision?.target, ...(decision?.alternatives ?? [])]
+      .filter((t): t is NonNullable<typeof t> => !!t)
+      .map((t) => runTargetOfPolicy(state, t))
+      .filter((t): t is RunTarget => !!t);
+    const resumeAt = nextPause(pauseOf(state, run.profile.id), run.profile.id, resetAtOf(end.report.usageLimitHint, now), now).resumeAt;
+    const choice = limitChoice(state, card, run.target, preferred, resumeAt, now, suggestModelRule(state, card)?.model ?? null);
+    if (!choice) return false;
+    const pause = this.router.recordUsageLimit(run.profile.id, resetAtOf(end.report.usageLimitHint, now), now);
+    this.deps.log(
+      `[${cardRef(card)}] Perfil ${toolLabel} pausado pelo limite de uso até ${limitClock(pause.resumeAt, now)}; o card pergunta como seguir.`,
+    );
+    this.router.handle(
+      {
+        type: 'comment.add',
+        cardId,
+        body: `O limite de uso de \`${targetDisplay(state, run.target)}\` no ${toolLabel} esgotou. As execuções automáticas desse agente ficam pausadas até as ${limitClock(pause.resumeAt, now)}. Responda à pergunta do card: esperar ou seguir com outro modelo.${output}`,
+      },
+      { author: RUNNER_AUTHOR, source: 'ai' },
+    );
+    this.router.askLimitChoice(cardId, choice, RUNNER_AUTHOR);
+    return true;
+  }
+
   private evaluatePolicy(run: Run, end: AiRunEnd, replied: boolean): { decision: PolicyDecision; attempt: PolicyAttempt } | null {
     return evaluateRunPolicy({
       state: this.router.snapshot(),

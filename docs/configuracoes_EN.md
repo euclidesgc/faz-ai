@@ -259,7 +259,14 @@ says which.
 Each model read from the tool (by **Detectar modelos** or by **Conectar**) keeps the date it was read,
 and the tab says "lista lida da ferramenta em …" (list read from the tool on …) with the most recent
 one. Without that line, the list is the built-in one or the one you built by hand. An old list (the
-account changed plan, the tool dropped a model) is fixed by detecting again or reconnecting.
+account changed plan, the tool dropped a model) is fixed by detecting again or reconnecting: the list
+read now replaces the previous one, and a model the tool no longer lists leaves the catalog; one added by
+hand stays. In API mode, **Detectar modelos** reads your account's model list with the key saved in
+Connect, without the voice, image, music and research models, which don't talk to the board's tools.
+
+The model pickers (chat, the card's Modelo field, agents and rules) only offer agents that can answer
+now: one that is off, without the CLI, signed out, with a failed or half-done connection, or that the
+board can't run is left out. A value already saved with such an agent shows as "(agente indisponível)".
 
 For Cursor, the list has one line per level of each model (`claude-opus-5-5-low`, `-medium`,
 `-high`…); the board groups the variants into one model with its levels. The fast versions (`-fast`,
@@ -393,7 +400,12 @@ by hand is never replaced.
 
 ## Fallback rules
 
-When a model runs out of usage quota, the board continues the card on another model, from any
+When a model runs out of usage quota on a card with you in the loop (outside autonomous mode and the
+autopilot), the board asks on the card how to go on: **wait for the limit to come back** (with the
+time) or **continue with** a model from another agent that answers now, one per agent, the fallback
+rule's first and recommended. Continuing saves the model in the Modelo field of the card and of the open
+sub-tasks that would run on the exhausted agent, and the card goes back to the queue; waiting keeps the
+model as it is. In autonomous mode, the board continues the card on another model by the rule, from any
 enabled agent. Without a rule, the card waits for the quota to renew. The signal comes from each
 tool's output reader: Claude Code's `rate_limit_event` and limit `result`, Gemini's 429, Kimi Code's
 quota 403 and Cursor's `ActionRequiredError: You've hit your usage limit` refusal (on the Free plan,

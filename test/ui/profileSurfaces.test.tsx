@@ -112,4 +112,24 @@ describe('Superfícies de perfis de CLI', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'Outro modelo' }), 'gemini-3-pro{Enter}');
     expect(value).toBe('local-cli:gemini-3-pro');
   });
+
+  it('o seletor de modelo só oferece agentes que respondem: o sem login ou com a conexão falha some, e o valor dele aparece como indisponível', async () => {
+    const state = useBoardStore.getState().state!;
+    useBoardStore.setState({
+      state: {
+        ...state,
+        board: { ...state.board, aiTool: 'claude' },
+        connections: { 'local-cli': { profileId: 'local-cli', step: 'verify', status: 'failed', error: 'falhou' } } as never,
+      },
+    });
+    render(
+      <Theme>
+        <ModelEditor value="local-cli:qualquer" onChange={() => {}} part="model" />
+      </Theme>,
+    );
+    await userEvent.click(screen.getByRole('combobox'));
+    expect(screen.queryByText('CLI local')).toBeNull();
+    expect(screen.getByText('Claude Code')).toBeInTheDocument();
+    expect(screen.getAllByText('local-cli:qualquer (fora do catálogo)').length).toBeGreaterThan(0);
+  });
 });

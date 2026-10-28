@@ -93,6 +93,39 @@ export function suggestSkillsPrompt(): string {
 }
 
 /**
+ * As ferramentas do servidor do board que o chat usa: consultar, criar, mover e vincular cards, resumir, e montar o
+ * harness (as sugestões de agentes, regras e skills). No modo API só elas vão declaradas ao modelo.
+ */
+export const CHAT_BOARD_TOOLS: readonly string[] = [
+  'get_board',
+  'get_pending_work',
+  'list_cards',
+  'get_card',
+  'create_card',
+  'update_card',
+  'move_card',
+  'link_cards',
+  'unlink_cards',
+  'archive_card',
+  'add_comment',
+  'add_checklist_item',
+  'update_checklist_item',
+  'generate_summary',
+  'get_metrics',
+  'get_models',
+  'get_harness',
+  'set_harness_selection',
+  'get_agent',
+  'create_agent',
+  'update_agent',
+  'get_skill',
+  'create_skill',
+  'update_skill',
+  'read_rule_file',
+  'write_rule_file',
+];
+
+/**
  * O alvo de uma execução do chat: o valor do Modelo escolhido decide a CLI (o prefixo do perfil). Sem escolha
  * vale o perfil padrão, que é também o das ações de apoio (sugerir regras, skills e agentes, "Indicar
  * artefatos"). Uma escolha explícita que não vale (perfil desligado, modelo fora do catálogo) bloqueia com
@@ -335,6 +368,8 @@ export class ChatSession {
     const tool = toolInfo(target.cli);
     // sem card não há agente: contexto vazio, só o servidor do board, os servidores em modo "Sempre" e o modelo escolhido
     const plan = bareExec(modelOf(state, target), boardServer(this.deps), state, this.router.libraryMcpDefinitions(), target.cli);
+    // no modo API cada ferramenta declarada viaja em todo pedido: o chat leva só as do que ele faz
+    plan.declareOnly = [...CHAT_BOARD_TOOLS];
     if (hooks.draftOnly) {
       plan.tools = ['Read', 'Glob', 'Grep'];
       plan.deniedTools = [];

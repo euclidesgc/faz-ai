@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Connector } from '../../src/extension/ai/connect';
-import { ChatSession } from '../../src/extension/chat';
+import { CHAT_BOARD_TOOLS, ChatSession } from '../../src/extension/chat';
 import { createAiProfileRuntime } from '../../src/extension/panel/handlers/aiProfiles';
 import { driverOf } from '../../src/extension/ai/drivers';
 import { profileApiKey } from '../../src/extension/ai/apiKey';
@@ -409,6 +409,12 @@ describe('cenário: o chat do board e o teste rápido pelo Gemini da API', () =>
     chat.send('Olá', GEMINI_MODEL.id);
     await vi.waitFor(() => expect(chat.busy).toBe(false));
 
+    // o chat declara ao modelo só as ferramentas do que ele faz, não as 81 do servidor do board
+    const declared = server!.requests
+      .filter((r) => r.url.includes(':generateContent'))
+      .flatMap((r) => ((r.body as any).tools?.[0]?.functionDeclarations ?? []).map((d: { name: string }) => d.name));
+    expect(declared.map((n: string) => n.replace('mcp__faz-ai__', '')).sort()).toEqual([...CHAT_BOARD_TOOLS].sort());
+
     expect(w.lines.some((l) => l.startsWith('[chat] Chamando Gemini (API): modelo gemini-2.5-pro'))).toBe(true);
     expect(w.router.snapshot().board.runner.permission).toBe('full');
     expect(calls).toBe(1);
@@ -420,6 +426,7 @@ describe('cenário: o chat do board e o teste rápido pelo Gemini da API', () =>
     world = await cardWorld({ profile: 'gemini-api', tools: CONDUTOR_TOOLS, permission: 'board', api: { endpoint: server.endpoint } });
     const w = world;
     await connectApi(w);
+    const logged: string[] = [];
     const runtime = createAiProfileRuntime({
       repo: new AiProfileRepo(w.db),
       gateway: w.runnerDeps.gateway,
@@ -429,6 +436,7 @@ describe('cenário: o chat do board e o teste rápido pelo Gemini da API', () =>
       pathEnv: () => undefined,
       runner: () => w.router.snapshot().board.runner,
       hasApiKey: () => true,
+      log: (line) => logged.push(line),
     });
 
     const missing = await runtime.test('gemini');
@@ -438,5 +446,10 @@ describe('cenário: o chat do board e o teste rápido pelo Gemini da API', () =>
     const done = await runtime.test('gemini', GEMINI_MODEL.model);
     expect(done).toMatchObject({ ok: true });
     expect(calls).toBe(1);
+    // o resultado fica no canal, não só na tela
+    expect(logged).toEqual([
+      'Teste rápido do Gemini CLI: falhou: Escolha o modelo do teste: no modo API a ferramenta não tem modelo padrão.',
+      `Teste rápido do Gemini CLI (${GEMINI_MODEL.model}): respondeu`,
+    ]);
   });
 });

@@ -20,7 +20,9 @@ does.
   with a notice in the conversation, and **warns once** about a card that has been with you for two
   days or more.
 - **Respects the usage-limit pause, profile by profile**: when a CLI profile runs out of the plan's
-  limit and no execution policy offers another destination, the card goes back to the AI and that
+  limit, that profile's queue pauses; with you in the loop, the card asks whether to wait or continue
+  with another model (see Fallback rules in `configuracoes_EN.md`). In autonomous mode, when no
+  execution policy offers another destination, the card goes back to the AI and that
   profile's queue pauses, in the heartbeat, the autopilot and the orchestrator, until the renewal the
   output reported (plus 3 minutes); with no time given, the wait is 5 minutes and doubles on each new
   failure, up to 60. Other profiles keep going, the round log says which profile waits and until

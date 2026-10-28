@@ -8,7 +8,7 @@ import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelOption, type ModelR
 import { cliOfValue } from '../../../shared/runTarget';
 import { valueOf } from '../../../shared/selectors';
 import { newId } from '../../db/ids';
-import { detectTools, effortTiers, fastBaseId, isFastVariant, modelsFor } from '../../models';
+import { detectTools, discoverModels, effortTiers, fastBaseId, isFastVariant, modelsFor } from '../../models';
 import type { BoardContext, HandlerMap } from './context';
 
 /**
@@ -62,14 +62,19 @@ export function useTool(ctx: BoardContext, tool: AiTool): void {
   suggestRules(ctx, base);
 }
 
-/** Junta ao catálogo os modelos atuais da ferramenta, atualizando os que já existem. */
+/**
+ * Junta ao catálogo os modelos atuais da ferramenta, atualizando os que já existem. Com uma lista lida agora da
+ * própria ferramenta, ela substitui a anterior: o modelo que a ferramenta deixou de listar sai do catálogo (senão
+ * ele ficava para sempre e só falhava na hora de rodar). O cadastrado à mão (sem `fromTool`) fica.
+ */
 function detectModels(ctx: BoardContext, tool: AiTool): void {
   const { board } = ctx.state();
+  const fresh = discoverModels(tool).length > 0;
   const all = modelsFor(tool);
   // as variantes rápidas do Cursor só entram com a regra ligada
   const found = all.filter((o) => board.rules.includeFastModels || !isFastVariant(o, all));
   const ids = new Set(found.map((o) => o.id));
-  const rest = board.modelCatalog.filter((o) => !ids.has(o.id));
+  const rest = board.modelCatalog.filter((o) => !ids.has(o.id) && !(fresh && o.tool === tool && o.fromTool));
   const at = rest.findIndex((o) => o.tool === tool);
   rest.splice(at < 0 ? rest.length : at, 0, ...found);
   ctx.boards.setModelCatalog(ctx.boardId, rest);
