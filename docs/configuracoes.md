@@ -243,8 +243,12 @@ modelo) se corrige detectando de novo ou reconectando: a lista lida agora substi
 que a ferramenta não lista mais sai do catálogo; o cadastrado à mão fica. No modo API, **Detectar modelos**
 lê a lista de modelos da sua conta pela chave guardada no Conectar, sem os modelos de voz, imagem, música
 e pesquisa, que não conversam com as ferramentas do board. A lista da API pode trazer um modelo que a
-conta não usa mais (o Google o fecha para contas novas e responde 404): na primeira recusa, o board o
-tira da lista e não o traz de volta no próximo Detectar; cadastrá-lo à mão em **Novo modelo** o recoloca.
+conta não usa mais (o Google o fecha para contas novas e responde 404). Por isso o **Detectar modelos** e o
+**Conectar** mandam a cada modelo listado um pedido mínimo (uma palavra, um token de resposta) e deixam de
+fora os que respondem 404; limite de uso ou falha de rede não tiram o modelo. No nível gratuito, cada
+detecção gasta um pedido da cota diária de cada modelo. Se um modelo ainda for recusado numa execução, o
+board o tira da lista na hora e não o traz de volta no próximo Detectar; cadastrá-lo à mão em **Novo
+modelo** o recoloca. O chat que estava nesse modelo passa para o mais novo do mesmo agente.
 
 Os seletores de modelo (chat, campo Modelo do card, agentes e regras) só oferecem os agentes que podem
 responder agora: o desligado, sem a CLI, sem login, com a conexão falha ou pela metade, ou que o board não

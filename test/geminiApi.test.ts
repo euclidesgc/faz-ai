@@ -486,6 +486,33 @@ describe('Gemini pela API: recusas antes do primeiro pedido e o vínculo', () =>
     );
   });
 
+  it('os modelos disponíveis: cada modelo listado recebe um pedido mínimo e só o 404 o tira', async () => {
+    const calls: string[] = [];
+    const listing = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.8-flash', 'gemini-flash-latest'].map((m) => ({
+      name: `models/${m}`,
+      supportedGenerationMethods: ['generateContent'],
+    }));
+    const fetchStub = (async (url: string, init?: RequestInit) => {
+      const path = new URL(url).pathname;
+      if (!init?.method) return new Response(JSON.stringify({ models: listing }), { status: 200 });
+      calls.push(`${path} ${String(init.body)}`);
+      if (path.includes('gemini-2.5-flash:')) return new Response('{"error":{"code":404}}', { status: 404 });
+      // o limite de uso e a falha de rede não provam que o modelo está fechado
+      if (path.includes('gemini-2.5-pro:')) return new Response('{"error":{"code":429}}', { status: 429 });
+      if (path.includes('gemini-flash-latest:')) throw new Error('rede caiu');
+      return new Response('{"candidates":[]}', { status: 200 });
+    }) as typeof fetch;
+    const driver = createGeminiApiDriver({ endpoint: 'https://api.test/v1beta', fetch: fetchStub });
+    const models = await driver.availableModels!(KEY);
+    expect(models.map((m) => m.model)).toEqual(['gemini-2.5-pro', 'gemini-3.8-flash', 'gemini-flash-latest']);
+    expect(calls).toHaveLength(4);
+    expect(calls.every((c) => c.includes(':generateContent') && c.includes('"maxOutputTokens":1'))).toBe(true);
+    // a conferência da chave continua só lendo a lista, sem gastar a conta
+    calls.length = 0;
+    expect(await driver.apiModels!(KEY)).toHaveLength(4);
+    expect(calls).toEqual([]);
+  });
+
   it('a conferência da chave: a chave ecoada atravessando o limite do corte sai mascarada inteira', async () => {
     server = await fakeGemini([{ status: 400, json: { error: { status: 'INVALID_ARGUMENT', message: `${'z'.repeat(292)} ${KEY}` } } }]);
     const refused = (await createGeminiApiDriver({ endpoint: server.endpoint }).apiModels!(KEY).catch((e: Error) => e)) as Error;

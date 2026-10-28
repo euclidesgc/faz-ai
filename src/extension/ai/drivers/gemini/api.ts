@@ -685,6 +685,42 @@ async function listApiModels(apiKey: string, o: Required<GeminiApiOptions>): Pro
   return options;
 }
 
+/** Quantos modelos a conferência chama ao mesmo tempo, e quanto espera por cada um. */
+const PROBE_CONCURRENCY = 4;
+const PROBE_TIMEOUT_MS = 20_000;
+
+/**
+ * Os modelos da conta que respondem de fato: a lista da API mantém modelos fechados para contas novas, que o
+ * `generateContent` recusa com 404 ("no longer available to new users"). Cada um recebe um pedido mínimo (uma
+ * palavra, um token de resposta); só o 404 tira o modelo. Limite de uso, falha de rede ou tempo esgotado não
+ * provam nada e o modelo fica.
+ */
+async function availableApiModels(apiKey: string, o: Required<GeminiApiOptions>): Promise<ModelOption[]> {
+  const listed = await listApiModels(apiKey, o);
+  const endpoint = apiEndpoint(o.endpoint);
+  const closed = new Set<string>();
+  const queue = [...listed];
+  const probe = async (): Promise<void> => {
+    for (let m = queue.shift(); m; m = queue.shift()) {
+      try {
+        const res = await o.fetch(`${endpoint}/models/${encodeURIComponent(m.model)}:generateContent`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'ok' }] }], generationConfig: { maxOutputTokens: 1 } }),
+          signal: AbortSignal.timeout(Math.min(o.requestTimeoutMs, PROBE_TIMEOUT_MS)),
+          redirect: 'error',
+        });
+        if (res.status === 404) closed.add(m.model);
+        await res.text().catch(() => '');
+      } catch {
+        // sem resposta não há prova de que o modelo está fechado
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: PROBE_CONCURRENCY }, probe));
+  return listed.filter((m) => !closed.has(m.model));
+}
+
 /** O driver do Gemini pela API. As opções são para o teste (servidor HTTP falso, MCP em memória). */
 export function createGeminiApiDriver(options: GeminiApiOptions = {}): ToolDriver {
   const o: Required<GeminiApiOptions> = {
@@ -712,6 +748,7 @@ export function createGeminiApiDriver(options: GeminiApiOptions = {}): ToolDrive
     // não tem como rodar (não há agente com login próprio), então a falta é "sem login", não "não verificado"
     signedIn: async (probe) => (probe.hasApiKey === undefined ? null : probe.hasApiKey),
     apiModels: (apiKey) => listApiModels(apiKey, o),
+    availableModels: (apiKey) => availableApiModels(apiKey, o),
     measure: 'tokens',
     enforcement: toolModeEntry('gemini', 'api')!.enforcement,
     transport: 'api',

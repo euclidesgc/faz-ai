@@ -89,6 +89,8 @@
 - The Gemini over the API model list no longer brings voice, image, music and research models.
 - The Gemini limit message says which quota ran out and when it comes back.
 - A model the Gemini API lists but refuses for the account (HTTP 404) leaves the model list and doesn't come back through **Detectar modelos**; the message carries Google's reason.
+- Gemini's **Detectar modelos** checks each model on the API and only lists the ones the account can use.
+- A chat on a model that left the catalog switches to the newest one of the same agent.
 - The quick test result also goes to the "Faz AI" log.
 - The AI no longer completes a card with an open checklist: `move_card` to a done column refuses it, and the flow skill says to check each item as it is finished.
 - The board chat answers again through ACP agents and Gemini over the API when the board permission is not "Board".

@@ -68,6 +68,12 @@ export interface ConnectionDriver {
    */
   apiModels?(apiKey: string): Promise<ModelOption[]>;
   /**
+   * Os modelos de `apiModels` que a conta de fato pode usar: a lista do provedor traz também os fechados para
+   * contas novas, que só a chamada recusa (HTTP 404). É o que entra no catálogo; `apiModels` fica para conferir
+   * a chave sem gastar a conta.
+   */
+  availableModels?(apiKey: string): Promise<ModelOption[]>;
+  /**
    * O servidor MCP do board na ferramenta, para a conversa da pessoa fora do board ("Conectar ao board"): como
    * registrar e onde ela lê (história 13; era um `switch` por ferramenta em `clientConfig.ts` e nos requisitos).
    * Ausente quando o board não registra nada nela (o Gemini recebe os servidores na home isolada da execução, e o

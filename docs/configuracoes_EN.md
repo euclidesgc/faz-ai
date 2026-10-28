@@ -263,8 +263,12 @@ account changed plan, the tool dropped a model) is fixed by detecting again or r
 read now replaces the previous one, and a model the tool no longer lists leaves the catalog; one added by
 hand stays. In API mode, **Detectar modelos** reads your account's model list with the key saved in
 Connect, without the voice, image, music and research models, which don't talk to the board's tools. The API list may carry a model the account can no longer use
-(Google closes it to new accounts and answers 404): on the first refusal the board removes it from the
-list and doesn't bring it back on the next Detect; adding it by hand with **Novo modelo** restores it.
+(Google closes it to new accounts and answers 404). So **Detectar modelos** and **Conectar** send each
+listed model a minimal request (one word, one output token) and leave out the ones that answer 404; a
+usage limit or a network failure doesn't remove a model. On the free tier, each detection spends one
+request of each model's daily quota. If a model is still refused in a run, the board removes it from the
+list right away and doesn't bring it back on the next Detect; adding it by hand with **Novo modelo**
+restores it. A chat set to that model switches to the newest one of the same agent.
 
 The model pickers (chat, the card's Modelo field, agents and rules) only offer agents that can answer
 now: one that is off, without the CLI, signed out, with a failed or half-done connection, or that the

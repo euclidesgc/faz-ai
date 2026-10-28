@@ -416,7 +416,8 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
         const driver = driverOf(profile)!;
         const apiKey = profileApiKey(toolKeys, profile);
         if (!apiKey) return null;
-        const found = await driver.apiModels!(apiKey);
+        // só os que a conta pode chamar: a lista da API traz também os fechados para contas novas
+        const found = await (driver.availableModels ?? driver.apiModels)!(apiKey);
         rememberModels(tool, found);
         count = found.length;
       } else {
@@ -448,7 +449,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     // o modo API lê a lista da conta pela chave do cofre: é o "Atualizar modelos" dele
     if (driver?.apiModels) {
       const apiKey = profileApiKey(toolKeys, profile);
-      if (apiKey) rememberModels(catalogTool(profile), await driver.apiModels(apiKey));
+      if (apiKey) rememberModels(catalogTool(profile), await (driver.availableModels ?? driver.apiModels)(apiKey));
       return;
     }
     if (!driver?.listModels) return;

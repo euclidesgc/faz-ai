@@ -1,5 +1,6 @@
 import { toolInfo, activeProfile } from '../../../shared/aiProfiles';
 import { cliOfValue } from '../../../shared/runTarget';
+import { modelValue, parseModelValue, testModels } from '../../../shared/models';
 import { useEffect, useRef, useState } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import { t } from '../../i18n';
@@ -29,6 +30,17 @@ export function ChatPanel() {
   const { messages, busy } = state.chat;
   // o rótulo é o do perfil do modelo escolhido, ou o do perfil padrão sem escolha
   const tool = toolInfo(cliOfValue(state.board, model) ?? activeProfile(state.board));
+
+  // o modelo escolhido que saiu do catálogo (a API o recusou para a conta) dá lugar ao mais novo do mesmo agente:
+  // a próxima mensagem não repete a recusa. O identificador livre de um perfil personalizado fica
+  const catalog = state.board.modelCatalog;
+  useEffect(() => {
+    const current = parseModelValue(model);
+    if (!current || catalog.some((o) => o.id === current.id)) return;
+    if (cliOfValue(state.board, model)?.kind === 'custom') return;
+    const next = testModels(catalog, current.id.slice(0, Math.max(current.id.indexOf(':'), 0)))[0];
+    setModel(next ? modelValue(next.id, next.defaultEffort) : null);
+  }, [model, catalog, state.board, setModel]);
 
   // acompanha a conversa: a mensagem nova fica à vista
   useEffect(() => {
