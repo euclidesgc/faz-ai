@@ -227,8 +227,8 @@ export interface ChecklistItem {
 /**
  * Como dois cards se relacionam. `child`: o card `fromId` é o pai de `toId` (o pai só termina quando os
  * filhos terminam). `related`: sem hierarquia, só referência (`fromId` e `toId` valem nos dois sentidos).
- * `precedes`: `fromId` precisa terminar antes de `toId` começar (`toId` depende de `fromId`); cards sem
- * dependência pendente entre si podem ser trabalhados ao mesmo tempo.
+ * `precedes`: `fromId` precisa terminar antes de `toId` começar (`toId` depende de `fromId`); é a ordem em
+ * que o board executa as sub-tarefas de uma história.
  */
 export type LinkKind = 'child' | 'related' | 'precedes';
 

@@ -586,8 +586,8 @@ export function cardDetail(
               fields: fieldsOf(s, k),
               ...(openPredecessors(s, k.id).length ? { waitingFor: openPredecessors(s, k.id).map(cardRef) } : {}),
             })),
-          // o que da Implementação pode rodar agora, ao mesmo tempo, o que espera outra sub-tarefa terminar e o
-          // que não é da IA agora (com a pessoa ou já rodando)
+          // o que da Implementação pode ser tocado agora (na fase de código o board executa uma por vez, na ordem), o
+          // que espera outra sub-tarefa terminar e o que não é da IA agora (com a pessoa ou já rodando)
           ...subtasksNow(s, c.id),
         }
       : {}),

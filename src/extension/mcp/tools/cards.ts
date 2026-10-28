@@ -24,7 +24,7 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
         .array(cardArg)
         .optional()
         .describe(
-          'Só em sub-tarefa: outras sub-tarefas que precisam terminar antes desta começar (as que ela usa, ou que mexem nos mesmos arquivos). Sem dependência pendente, as sub-tarefas podem ser executadas ao mesmo tempo.',
+          'Só em sub-tarefa: outras sub-tarefas que precisam terminar antes desta começar (as que ela usa, ou que mexem nos mesmos arquivos). O board executa as sub-tarefas de uma história uma por vez, nessa ordem.',
         ),
       autonomous_from: cardArg
         .optional()

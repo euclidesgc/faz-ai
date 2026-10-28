@@ -513,9 +513,33 @@ const shortTrack = (name: string, text: string): string => {
   return text;
 };
 
-/** Os textos padrão atuais (versão 14): os da versão 13 com a trilha curta no Discovery e no Plan. */
-export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+/** Os textos padrão da versão 14: os da versão 13 com a trilha curta no Discovery e no Plan. */
+const PHASE_DEFAULTS_V14: Record<string, PhaseDefault> = Object.fromEntries(
   Object.entries(PHASE_DEFAULTS_V13).map(([name, d]) => [name, { ...d, instruction: shortTrack(name, d.instruction) }]),
+);
+
+// A versão 16 recorta o Plan por entrega verificável (verifiableSlices): o board executa as sub-tarefas uma por vez,
+// cada uma numa execução nova da IA; as partes pequenas da mesma área e do mesmo agente se juntam.
+const VERIFIABLE_SLICES_PLAN_FIRST = 'Quebre a Spec aprovada em sub-tarefas, cada uma a menor parte da entrega que se verifica sozinha.';
+const VERIFIABLE_SLICES_PLAN_RULE =
+  'Cada sub-tarefa é uma parte inteligível da entrega, fácil de revisar sozinha, e diz como verificá-la (teste, typecheck, comando ou tela). O board executa as sub-tarefas de uma história uma por vez, na ordem das dependências, e cada uma é uma execução nova da IA: junte numa só as partes pequenas da mesma área e do mesmo agente, e separe quando o agente muda ou quando a parte é grande o bastante para ser revisada sozinha. Recortar por camada (dados, regras de negócio, tela) vale quando cada camada se verifica sozinha. A documentação pequena (uma entrada no changelog e um parágrafo) vai junto com a última sub-tarefa de código; só fica numa sub-tarefa própria quando é maior.';
+const verifiableSlices = (name: string, text: string): string =>
+  name === 'Plan'
+    ? text
+        .replace(
+          'Quebre a Spec aprovada em passos pequenos, que possam ser implementados e verificados um a um.',
+          VERIFIABLE_SLICES_PLAN_FIRST,
+        )
+        .replace(
+          'Cada passo é uma parte inteligível da entrega, fácil de revisar sozinha, e diz como verificá-la (teste, typecheck, comando ou tela). Recortar por camada (dados, regras de negócio, tela) vale, desde que cada parte seja verificável e fácil de revisar.',
+          VERIFIABLE_SLICES_PLAN_RULE,
+        )
+        .replace('crie uma sub-tarefa para cada passo', 'crie uma sub-tarefa para cada parte')
+    : text;
+
+/** Os textos padrão atuais (versão 16): os da versão 14 com o Plan recortado por entrega verificável. */
+export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+  Object.entries(PHASE_DEFAULTS_V14).map(([name, d]) => [name, { ...d, instruction: verifiableSlices(name, d.instruction) }]),
 );
 
 /** Textos padrão anteriores de uma fase e o que a versão atual traz de novo, para a atualização do board. */
@@ -549,10 +573,16 @@ export const PHASE_HISTORY: Record<string, PhaseHistory> = {
     change: 'o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
   },
   Plan: {
-    instructions: [PLAN_INSTRUCTION_V5, PLAN_INSTRUCTION_V11, PHASE_DEFAULTS_V12.Plan!.instruction, PHASE_DEFAULTS_V13.Plan!.instruction],
+    instructions: [
+      PLAN_INSTRUCTION_V5,
+      PLAN_INSTRUCTION_V11,
+      PHASE_DEFAULTS_V12.Plan!.instruction,
+      PHASE_DEFAULTS_V13.Plan!.instruction,
+      PHASE_DEFAULTS_V14.Plan!.instruction,
+    ],
     templates: [PLAN_TEMPLATE_V5, PLAN_TEMPLATE_V8, PHASE_DEFAULTS_V12.Plan!.artifactTemplate],
     change:
-      'o plano parte do DISCOVERY quando a história veio pela trilha curta, sem PRD nem Spec; o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
+      'as sub-tarefas passam a ser a menor parte da entrega que se verifica sozinha: as pequenas da mesma área e do mesmo agente se juntam, e a documentação pequena vai com a última de código; o plano parte do DISCOVERY quando a história veio pela trilha curta, sem PRD nem Spec; o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
   },
   Revisão: {
     instructions: [PHASE_DEFAULTS_V12.Revisão!.instruction],

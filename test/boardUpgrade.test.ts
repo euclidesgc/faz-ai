@@ -298,7 +298,7 @@ describe('atualização do board para o padrão atual', () => {
 
   it('versão 10: a Homologação com o texto da 0.39 passa a abrir o pull request com --base em workspace.prBase; a personalizada fica', () => {
     upgradeBoard(db, boardId);
-    expect(BOARD_TEMPLATE_VERSION).toBe(15);
+    expect(BOARD_TEMPLATE_VERSION).toBe(16);
     const settings = new SettingsRepo(db);
     // o texto da versão 9 é o segundo do histórico (o terceiro é o da 14, antes do passo do hotfix)
     const v9 = PHASE_HISTORY['Homologação']!.instructions[1]!;
@@ -415,6 +415,30 @@ describe('atualização do board para o padrão atual', () => {
     run(db, "UPDATE card_types SET branch_kind = 'bugfix' WHERE name = 'Hotfix'");
     run(db, 'UPDATE boards SET template_version = 14 WHERE id = ?', [boardId]);
     expect(pendingUpgrade(db, boardId)).toEqual([]);
+  });
+
+  it('versão 16 (#1106): o Plan recorta por entrega verificável; o board na 15 recebe a regra e o Plan personalizado fica', async () => {
+    const fresh = new BoardRepo(await openInMemory(WASM_DIR));
+    const plan = fresh.snapshot(fresh.getOrCreate('ws', 'Projeto').id).columns.find((c) => c.name === 'Plan')!.aiInstruction;
+    expect(plan).toContain('junte numa só as partes pequenas da mesma área e do mesmo agente');
+    expect(plan).toContain('crie uma sub-tarefa para cada parte');
+    expect(plan).not.toContain('passos pequenos');
+
+    upgradeBoard(db, boardId);
+    const settings = new SettingsRepo(db);
+    settings.updateColumn(col('Plan').id, { aiInstruction: PHASE_HISTORY['Plan']!.instructions.at(-1)! });
+    run(db, 'UPDATE boards SET template_version = 15 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([`Coluna "Plan": ${PHASE_HISTORY['Plan']!.change}.`]);
+    upgradeBoard(db, boardId);
+    expect(col('Plan').aiInstruction).toBe(PHASE_DEFAULTS['Plan']!.instruction);
+    expect(col('Plan').aiInstruction).toContain('a menor parte da entrega que se verifica sozinha');
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+
+    settings.updateColumn(col('Plan').id, { aiInstruction: 'meu Plan' });
+    run(db, 'UPDATE boards SET template_version = 15 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+    upgradeBoard(db, boardId);
+    expect(col('Plan').aiInstruction).toBe('meu Plan');
   });
 
   it('pelo roteador: o board antigo avisa o que muda e é atualizado por mensagem, com cópia de segurança', () => {

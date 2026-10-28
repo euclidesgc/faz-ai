@@ -97,9 +97,12 @@ code review quick later:
 - **Spec with the program design.** Besides the architecture, the Spec brings the new or changed
   types and signatures, the file of each one and who calls whom on the main path, with the feature
   flow in Mermaid diagrams. Discarded alternatives come with the reason for each one.
-- **Plan with parts that are easy to review.** Each step is an understandable part of the delivery
-  and says how to check it (test, typecheck, command or screen); splitting by layer is fine, as long
-  as each part can be checked. The plan estimates the lines of code of the delivery: above about 400,
+- **Plan with parts that are easy to review.** Each sub-task is the smallest part of the delivery
+  that can be checked on its own (test, typecheck, command or screen). The board runs them one at a
+  time, each in a fresh AI run: small parts of the same area and the same agent are merged, and they
+  are split when the agent changes or the part is big enough to be reviewed alone. Splitting by layer
+  is fine when each layer can be checked alone, and small documentation goes with the last code
+  sub-task. The plan estimates the lines of code of the delivery: above about 400,
   the AI keeps the first part in the story and creates the next ones as **derived stories**, in order
   (`create_card` with `derived_from` pointing to the previous part). The branch of each derived story
   starts from the branch of the previous part and its pull request is stacked on top of that one; the
@@ -414,14 +417,14 @@ The **Vínculos** section also shows, display-only, the sub-task relation: on a 
 section. This relation is read-only (no remove button) and does not enter the completion rule above,
 which still applies only to the manual parent/child link.
 
-### Dependencies and sub-tasks in parallel
+### Dependencies and sub-task order
 
 A card can **depend** on another: in **Vínculos**, pick "precisa terminar antes deste card" (the
 other one is a prerequisite) or "só começa depois deste card". The open card shows the groups
 **Depende de** (depends on, with how many dependencies are still open) and **Libera** (unblocks). The
 board refuses a dependency cycle.
 
-The AI uses this to speed up the Implementation. In Plan it declares the order between sub-tasks
+The AI uses this to order the Implementation. In Plan it declares the order between sub-tasks
 (`create_card` with `depends_on`, or `link_cards` with `depends_on`): one depends on another when it
 uses what the other produces or when both change the same files. In Implementation, the story's
 `get_card` returns in `subtasksNow` what the **board runs** (`byBoard`, in order) and what waits

@@ -9,7 +9,7 @@ Você levanta o mapa do código de uma história da extensão Faz AI Kanban para
 ## Quando é chamado
 
 - Discovery: registrar a seção "Mapa do código" da história.
-- Spec e Plan: completar o mapa com o que falta e medir o impacto do que vai mudar, para recortar as sub-tarefas por arquivo e declarar `depends_on` entre as que tocam os mesmos arquivos.
+- Spec e Plan: completar o mapa com o que falta e medir o impacto do que vai mudar, para recortar as sub-tarefas por entrega verificável e declarar `depends_on` entre as que tocam os mesmos arquivos ou usam o que a outra produz.
 
 ## Como trabalhar
 

@@ -93,9 +93,11 @@ servidores em "Sempre" já entram sozinhos, e o inativo não pode ser vinculado)
 nada do catálogo do projeto ou da máquina existe para a execução. Vale o mínimo: no máximo uma skill
 por assunto (a mais próxima do objetivo; pode haver mais de uma se forem de assuntos diferentes, como
 navegação e acesso a dados) e só os servidores MCP de que a tarefa precisa. Excesso de artefatos
-produz o efeito contrário. O mesmo vale para a história. Cada passo é uma parte inteligível da entrega, fácil de revisar sozinha, e diz como
-verificá-la (teste, typecheck, comando ou tela). Recortar por camada (dados, regras de negócio, tela)
-vale, desde que cada parte seja verificável.
+produz o efeito contrário. O mesmo vale para a história. Cada passo é a menor parte da entrega que se verifica sozinha e diz como
+verificá-la (teste, typecheck, comando ou tela). Junte numa sub-tarefa as partes pequenas da mesma área e
+do mesmo agente; separe quando o agente muda ou quando a parte é grande o bastante para ser revisada
+sozinha. Recortar por camada (dados, regras de negócio, tela) vale quando cada camada se verifica sozinha.
+A documentação pequena (entrada no changelog e um parágrafo) vai junto com a última sub-tarefa de código.
 
 Uma história é uma funcionalidade e vira um pull request. Estime o tamanho em linhas de código: se
 passar de umas 400, deixe nesta história a primeira parte e crie as seguintes como histórias
@@ -107,9 +109,9 @@ anterior (\`workspace.baseBranch\` e \`workspace.prBase\` no \`get_card\`). Quan
 
 Declare a ordem entre elas: em \`create_card\`, \`depends_on\` lista as sub-tarefas que precisam
 terminar antes (ou use \`link_cards\` com \`depends_on\` depois). Uma sub-tarefa depende de outra
-quando usa o que a outra produz **ou quando as duas alteram os mesmos arquivos**. Só deixe sem
-dependência as que são de fato independentes: elas serão executadas ao mesmo tempo. Entre recortes
-igualmente fáceis de revisar, prefira o que deixa cada passo em arquivos diferentes.
+quando usa o que a outra produz **ou quando as duas alteram os mesmos arquivos**. O board executa as
+sub-tarefas de uma história uma de cada vez, na ordem das dependências, e cada uma é uma execução nova
+da CLI: recortar mais fino não acelera nada e repete o custo de cada execução.
 
 ## Ao fechar uma fase ou sub-tarefa
 
