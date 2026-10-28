@@ -222,7 +222,7 @@ describe('tools neutras na exportação', () => {
   });
 
   it('Claude: o agente legado com lista nativa do claude mantém a nativa, mesmo com tools neutras', () => {
-    const native = { tool: 'claude', allow: ['Read', 'Grep'], deny: ['Bash'] } as const;
+    const native = { tool: 'claude' as const, allow: ['Read', 'Grep'], deny: ['Bash'] };
     const legacy = agent({ tools: { categories: [], native } });
     expect(text('claude', legacy)[0]).toContain('tools: Read, Grep');
     const mixed = agent({ tools: { categories: [], native } }, { tools: ['shell'] });

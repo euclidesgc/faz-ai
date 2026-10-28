@@ -28,7 +28,7 @@ const artifact = (kind: 'rule' | 'skill', name: string, usage: HarnessUsage): Bo
 
 function state(artifacts: BoardArtifact[], skillsOfCard: string[] = []): BoardState {
   const selection: HarnessSelection[] = artifacts.map((a) => ({
-    kind: itemOfArtifact(a).kind,
+    kind: itemOfArtifact(a).kind as HarnessSelection['kind'],
     location: artifactLocation(a),
     usage: a.usage,
   }));
