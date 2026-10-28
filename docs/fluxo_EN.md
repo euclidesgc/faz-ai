@@ -443,6 +443,18 @@ is still waiting for another. With no dependencies declared, all open sub-tasks 
 independent. When all of them finish, the board calls the AI once for the closing: verify the whole,
 commit and move the story.
 
+**Description check.** Before running a sub-task, the board checks that its description has the
+sections `Objetivo`, `Pronto quando`, `Pode tocar` and `Não pode tocar` (`Decisões anteriores` is
+optional). If any sub-task of the phase lacks one, the board **does not run it**: it records in the
+story conversation a note with the sub-tasks and the missing sections and opens a correction
+session with the conductor, which rewrites each description with `update_card`, without running or
+creating sub-tasks, and stops. When the session ends the board checks again: with the descriptions
+fixed, execution goes on; if a section is still missing, the story is **blocked** with the reason,
+without opening another correction. To unblock it, answer in the story conversation (or fix the
+description): the AI reads the message and a new correction may open. The manual **Work** on a
+sub-task skips the check. Stories already in Implementação with sub-tasks missing the sections go
+through this correction the next time the board drives them.
+
 No execution delegates to the tool's subagents (in Claude Code, `Agent` — formerly `Task` — is
 denied; Cursor and Kimi Code have no proven block, so the capability stays "unknown" and admission
 decides). In **Settings → AI Harness** (and `fazai.git.parallelSubtasks`, 1 to 6) the person sets

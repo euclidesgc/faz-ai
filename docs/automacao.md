@@ -176,6 +176,10 @@ oferece as fases que valem para todas as histórias marcadas. A IA lê o ponto d
   modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo, entram na fila e
   ganham um vínculo **relativo** com a história de origem (pulado em silêncio se já existir qualquer
   vínculo entre as duas). Ela nunca liga o modo numa história que você não ligou.
+- **Descrição das sub-tarefas conferida**: o autopiloto e o modo autônomo conduzem a história pelo
+  mesmo caminho do board, então uma sub-tarefa sem as seções obrigatórias não é executada: a IA a
+  corrige numa sessão da história e, se ainda faltar seção, a história é bloqueada com o motivo
+  (veja a conferência da descrição em `fluxo.md`).
 
 ### Fila e pilha de PRs
 

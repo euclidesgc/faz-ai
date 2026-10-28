@@ -32,6 +32,7 @@
 - When each run ends, the board checks what the AI used against what the card allowed (#972).
 - On Cursor, a hook ensures the run respects what the card allows (#965).
 - The selected card gets a shadow that sets it apart from the others (#1069).
+- The board checks a sub-task description before running it and sends it back to the conductor when sections are missing (#1138).
 
 ### Changed
 

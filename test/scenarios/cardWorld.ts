@@ -29,6 +29,8 @@ import { createRunLog } from '../../src/extension/log/runLog';
 import { AiRunRepo } from '../../src/extension/log/aiRunRepo';
 import { MessageRouter } from '../../src/extension/panel/messageRouter';
 import { AiRunner } from '../../src/extension/runner';
+import { RunArtifactSnapshots } from '../../src/extension/runArtifactSnapshot';
+import { ArtifactRepo } from '../../src/extension/repositories/artifactRepo';
 import type { AiRunEnd } from '../../src/extension/ai/gateway';
 import { ACP_CAPABILITY_CHECKS, CAPABILITY_CHECKS, EXECUTOR_CAPABILITIES } from '../../src/shared/executionAdmission';
 import type { SpawnFn } from '../../src/extension/aiOutput/measured';
@@ -130,6 +132,8 @@ export interface CardWorldOptions {
   viaConnect?: boolean;
   /** o gateway lê a chave do cofre também fora do Conectar (o ACP real do teste da história 14 autentica por ela) */
   gatewayKey?: boolean;
+  /** o gateway recebe o congelamento de artefatos que o host dá às unidades do orquestrador (`snapshots`) */
+  snapshots?: boolean;
 }
 
 export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
@@ -298,6 +302,9 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
     sessions: router.executions,
     redact: (text) => router.redactCredentials(text),
     admission,
+    ...(options.snapshots
+      ? { snapshots: new RunArtifactSnapshots(path.join(root, 'snapshots'), new ArtifactRepo(db), router.boardId) }
+      : {}),
     // a CLI de uma passada: guarda o comando montado e termina sem saída (o Claude Code real não roda aqui)
     spawn: (command, cwd, out, control) => {
       cliCommands.push(command);

@@ -1,5 +1,5 @@
 import { cardRef, type Card } from '../shared/model';
-import { REQUIRED_BRIEF_SECTIONS } from '../shared/subtaskBrief';
+import { briefSkeleton, REQUIRED_BRIEF_SECTIONS, type BriefFailure } from '../shared/subtaskBrief';
 
 /**
  * Pedidos extras à IA quando o board executa as unidades de uma história (Spec da #621, "Pedidos à IA").
@@ -20,3 +20,13 @@ export const closingAdvice = (story: Card): string =>
 export const STORY_SESSION_ADVICE =
   'Nesta fase de código o board executa as sub-tarefas, cada uma numa execução própria. Não execute sub-tarefas, nem por subagente (ferramenta Agent): crie-as, descreva-as e pare. A Revisão segue o mesmo caminho: crie a sub-tarefa de revisão com o agente `revisor-de-codigo` e pare. ' +
   BRIEF_ADVICE;
+
+/** A sessão de correção: a história reescreve as descrições reprovadas na conferência e para. */
+export const briefAdvice = (story: Card, failures: readonly BriefFailure[]): string =>
+  [
+    `O board não executou as sub-tarefas abaixo da história ${cardRef(story)} porque a descrição delas não tem as seções obrigatórias (${REQUIRED_BRIEF_SECTIONS.map((name) => `"${name}"`).join(', ')}):`,
+    ...failures.map((f) => `- ${cardRef(f.card)}: falta ${f.missing.join(', ')}.`),
+    `Cada descrição leva estas seções, como títulos markdown:\n\n${briefSkeleton()}`,
+    'Reescreva a descrição de cada sub-tarefa listada com update_card, mantendo o que ela já diz e completando as seções que faltam. Não execute sub-tarefas, nem por subagente (ferramenta Agent), não crie sub-tarefas novas e pare ao terminar.',
+    'Ao fim da sessão o board confere de novo; se a descrição ainda falhar, a história vai para a pessoa.',
+  ].join('\n\n');

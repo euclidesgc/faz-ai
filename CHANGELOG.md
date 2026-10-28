@@ -32,6 +32,7 @@
 - Ao fim de cada execução, o board confere o que a IA usou contra o que o card liberou (#972).
 - No Cursor, um hook garante que a execução respeite o que o card permite (#965).
 - O card selecionado ganha uma sombra que o destaca dos demais (#1069).
+- O board confere a descrição da sub-tarefa antes de executar e devolve ao condutor a que não tem as seções (#1138).
 
 ### Alterado
 

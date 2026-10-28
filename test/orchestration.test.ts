@@ -12,6 +12,8 @@ import {
 } from '../src/shared/orchestration';
 import { DEFAULT_RUNNER, parseRunner } from '../src/shared/runner';
 import { boardState, card, column, sub } from './fakes/board';
+import { validBrief } from './fixtures/subtaskBrief';
+import { isBriefKey } from '../src/shared/subtaskBrief';
 import { NOT_REPEATED } from '../src/extension/aiOutput/errors';
 
 describe('limites efetivos da orquestração', () => {
@@ -99,9 +101,9 @@ describe('decisão de reconciliação', () => {
 describe('plano puro de rodadas', () => {
   const story = card('story', { columnId: 'doing', number: 1 });
   function state() {
-    const a = sub('a', story.id, 'todo', { number: 2 });
-    const b = sub('b', story.id, 'todo', { number: 3 });
-    const c = sub('c', story.id, 'todo', { number: 4 });
+    const a = sub('a', story.id, 'todo', { number: 2, description: validBrief() });
+    const b = sub('b', story.id, 'todo', { number: 3, description: validBrief() });
+    const c = sub('c', story.id, 'todo', { number: 4, description: validBrief() });
     const s = boardState({ cards: [story, a, b, c], links: [{ id: 'dependency', fromId: a.id, toId: c.id, kind: 'precedes' }] });
     s.columns = s.columns.map((p) => ({ ...p, aiActive: p.id === 'doing' }));
     return s;
@@ -116,6 +118,41 @@ describe('plano puro de rodadas', () => {
     expect(storyPlan(s, story, live, new Set())).toMatchObject({ kind: 'units', units: [{ cardId: 'c' }] });
     s.cards[3]!.columnId = 'finished';
     expect(storyPlan(s, story, live, new Set())).toMatchObject({ kind: 'paused' });
+  });
+  it('sub-tarefa reprovada na conferência devolve a sessão de correção da história', () => {
+    const s = state();
+    s.cards[2]!.description = '';
+    const plan = storyPlan(s, story, live, new Set());
+    expect(plan).toMatchObject({ kind: 'units', units: [{ kind: 'story', cardId: story.id }] });
+    const key = plan.kind === 'units' ? plan.units[0]!.key : '';
+    expect(isBriefKey(key)).toBe(true);
+    expect(storyPlan(s, story, live, new Set([key]))).toMatchObject({ kind: 'paused' });
+    expect(storyPlan(s, story, { byCard: new Map([[story.id, { state: 'failed', key, kind: 'story' }]]) }, new Set())).toMatchObject({
+      kind: 'paused',
+    });
+  });
+  it('mensagem da pessoa ou sub-tarefa reprovada nova mudam a chave da correção', () => {
+    const s = state();
+    s.cards[2]!.description = '';
+    const keyOf = () => {
+      const plan = storyPlan(s, story, live, new Set());
+      return plan.kind === 'units' ? plan.units[0]!.key : '';
+    };
+    const first = keyOf();
+    s.comments.push({ id: 'm', cardId: story.id, source: 'human', createdAt: 5 } as (typeof s.comments)[number]);
+    const second = keyOf();
+    expect(second).not.toBe(first);
+    s.cards[3]!.description = '';
+    expect(keyOf()).not.toBe(second);
+  });
+  it('sub-tarefa válida segue como subtask; a que está com a pessoa ou falhou fica fora da conferência', () => {
+    const s = state();
+    expect(storyPlan(s, story, live, new Set())).toMatchObject({ units: [{ kind: 'subtask' }] });
+    s.cards[2]!.description = '';
+    s.cards[2]!.status = 'blocked';
+    s.cards[3]!.description = '';
+    const failedLive = { byCard: new Map([['c', { state: 'failed' as const, key: 'k', kind: 'subtask' as const }]]) };
+    expect(storyPlan(s, story, failedLive, new Set())).toMatchObject({ units: [{ kind: 'subtask', cardId: 'a' }] });
   });
   it('posse e reconciliação impedem outra unidade, e cancelar a história mantém filhas sem iniciar', () => {
     const s = state();
