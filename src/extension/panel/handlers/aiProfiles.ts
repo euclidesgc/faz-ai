@@ -253,7 +253,8 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
         deps.log?.(
           `Teste rápido do ${meta.name}${model ? ` (${model})` : ''}: ${r.ok ? 'respondeu' : `falhou: ${r.error ?? 'sem motivo'}`}`,
         );
-        return r;
+        // o modelo vai junto: a tela mostra o resultado só enquanto esse modelo está escolhido
+        return model ? { ...r, model } : r;
       };
       // o modo API não tem modelo padrão da ferramenta: o teste roda no modelo que a pessoa escolheu na aba Testar
       const api = meta.mode === 'api';
@@ -333,8 +334,7 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
             }),
           );
         });
-        logTest(result);
-        return result;
+        return logTest(result);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         return logTest(fail(redactCredentialValues(message, profile?.config)));

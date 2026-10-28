@@ -72,6 +72,19 @@ describe('modelos de texto', () => {
       'gemini-2.5-flash-preview-tts',
     ]);
   });
+
+  it('o teste rápido começa pelo modelo mais novo: o apelido -latest, depois a maior versão da família', () => {
+    const catalog = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemma-4-31b-it', 'gemini-3.8-flash', 'gemini-flash-latest'].map((m) =>
+      option('gemini', m),
+    );
+    expect(testModels(catalog as never, 'gemini').map((m) => m.model)).toEqual([
+      'gemini-flash-latest',
+      'gemini-3.8-flash',
+      'gemini-2.5-flash',
+      'gemini-2.5-pro',
+      'gemma-4-31b-it',
+    ]);
+  });
 });
 
 describe('limitChoice: a pergunta quando o modelo do card esgota', () => {

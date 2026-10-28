@@ -269,8 +269,24 @@ const NON_TEXT_MODEL =
 /** O modelo serve para o board (texto e ferramentas), pelo nome. */
 export const isTextModel = (model: string): boolean => !NON_TEXT_MODEL.test(model);
 
-/** Os modelos de uma ferramenta no catálogo para o teste rápido: os de texto primeiro, na ordem do catálogo. */
+// a versão no nome (gemini-3.5-flash → 3.5); o apelido -latest aponta sempre para a atual
+const versionOf = (model: string): number => (/-latest$/.test(model) ? 1e9 : Number(/(\d+(?:\.\d+)?)/.exec(model)?.[1] ?? -1));
+
+/**
+ * Os modelos de uma ferramenta no catálogo para o teste rápido: os de texto primeiro, da família da
+ * ferramenta e do mais novo ao mais antigo. A lista do provedor vem na ordem dele, com os antigos na frente, e um modelo antigo
+ * costuma estar fechado para contas novas.
+ */
 export function testModels(catalog: readonly ModelOption[], tool: string): ModelOption[] {
   const own = catalog.filter((m) => m.tool === tool);
-  return [...own.filter((m) => isTextModel(m.model)), ...own.filter((m) => !isTextModel(m.model))];
+  // a família da própria ferramenta (gemini-*) antes das outras que o provedor lista (gemma-*)
+  const rank = (m: ModelOption): [number, number] => [m.model.startsWith(tool) ? 1 : 0, versionOf(m.model)];
+  const text = own
+    .filter((m) => isTextModel(m.model))
+    .sort((a, b) => {
+      const [fa, va] = rank(a);
+      const [fb, vb] = rank(b);
+      return fb - fa || vb - va;
+    });
+  return [...text, ...own.filter((m) => !isTextModel(m.model))];
 }

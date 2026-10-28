@@ -431,7 +431,7 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
           if (res.status === 404) {
             unavailable = model;
             return fail(
-              `O modelo ${model} não está disponível para esta conta na API do Gemini (HTTP 404${err?.message ? `: ${cut(scrub(err.message), 200)}` : ''}). O board o tirou da lista de modelos; escolha outro.`,
+              `O modelo ${model} não está disponível para esta conta na API do Gemini (HTTP 404${err?.message ? `: ${cut(scrub(err.message), 400)}` : ''}). O board o tirou da lista de modelos; escolha outro.`,
             );
           }
           return fail(

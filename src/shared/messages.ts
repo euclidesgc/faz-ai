@@ -491,7 +491,7 @@ export type HostToWebview =
         }
       >;
     }
-  | { type: 'aiProfiles.testResult'; id: string; ok: boolean; output: string; error?: string }
+  | { type: 'aiProfiles.testResult'; id: string; ok: boolean; output: string; error?: string; model?: string }
   | { type: 'ui.openCard'; cardId: Id }
   | { type: 'viewState'; view: ViewState }
   | { type: 'prefs'; prefs: UiPrefs }

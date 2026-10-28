@@ -331,7 +331,7 @@ function QuickTest({ item }: { item: AgentListItem }) {
           {t('Testando…')}
         </p>
       )}
-      {result && !test.busy && (
+      {result && !test.busy && (!result.model || result.model === model) && (
         <div className={result.ok ? 'ai-profile-result' : 'ai-profile-error'} role={result.ok ? 'status' : 'alert'}>
           {result.error && <p>{t(result.error)}</p>}
           {result.output && <pre>{result.output}</pre>}
