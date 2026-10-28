@@ -132,6 +132,13 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(FLOW_SKILL.body).toMatch(/coluna de conclusão \(`move_card` com `comment`/);
   });
 
+  it('recorta as sub-tarefas por entrega verificável e diz que o board as executa uma de cada vez (#1106)', () => {
+    expect(FLOW_SKILL.body).toContain('menor parte da entrega que se verifica sozinha');
+    expect(FLOW_SKILL.body).toContain('uma de cada vez, na ordem das dependências');
+    expect(FLOW_TEXT).not.toContain('executadas ao mesmo tempo');
+    expect(FLOW_TEXT).not.toContain('arquivos diferentes');
+  });
+
   it('a skill das rodadas não manda mais mover para "Em andamento" depois do start_work', () => {
     expect(rodadas).not.toContain('`start_work`, mova para');
     expect(rodadas).not.toContain('o agente e o modelo (`set_card_profile`)');

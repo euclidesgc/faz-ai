@@ -91,9 +91,12 @@ do código rápida depois:
 - **Spec com o desenho do programa.** Além da arquitetura, a Spec traz os tipos e as assinaturas
   novos ou alterados, o arquivo de cada um e quem chama quem no caminho principal, com o fluxo da
   funcionalidade em diagramas Mermaid. As alternativas descartadas vêm com o motivo de cada uma.
-- **Plan com partes fáceis de revisar.** Cada passo é uma parte inteligível da entrega e diz como
-  verificá-la (teste, typecheck, comando ou tela); recortar por camada vale, desde que cada parte seja
-  verificável. O plano estima as linhas de código da entrega: acima de umas 400, a IA deixa na
+- **Plan com partes fáceis de revisar.** Cada sub-tarefa é a menor parte da entrega que se
+  verifica sozinha (teste, typecheck, comando ou tela). O board as executa uma por vez, cada uma numa
+  execução nova da IA: as partes pequenas da mesma área e do mesmo agente se juntam, e a separação vem
+  quando o agente muda ou a parte é grande o bastante para ser revisada sozinha. Recortar por camada
+  vale quando cada camada se verifica sozinha, e a documentação pequena vai com a última sub-tarefa de
+  código. O plano estima as linhas de código da entrega: acima de umas 400, a IA deixa na
   história a primeira parte e cria as seguintes como **histórias derivadas**, em ordem (`create_card`
   com `derived_from` apontando para a parte anterior). A branch de cada derivada parte da branch da
   parte anterior e o pull request dela é empilhado sobre o dela; o card mostra **Derivada de #N**. Se
@@ -388,14 +391,14 @@ grupo "Pai" com a história; numa história, a contagem de sub-tarefas com um at
 **Sub-tarefas**. Essa relação é somente leitura (sem botão de remover) e não entra na regra de
 conclusão acima, que continua valendo só para o vínculo manual de pai/filho.
 
-### Dependência e sub-tarefas em paralelo
+### Dependência e ordem das sub-tarefas
 
 Um card pode **depender** de outro: em **Vínculos**, escolha "precisa terminar antes deste card" (o
 outro é pré-requisito) ou "só começa depois deste card". O card aberto mostra os grupos **Depende
 de** (com quantas dependências ainda estão em aberto) e **Libera**. O board recusa ciclo de
 dependência.
 
-A IA usa isso para acelerar a Implementação. No Plan ela declara a ordem entre as sub-tarefas
+A IA usa isso para ordenar a Implementação. No Plan ela declara a ordem entre as sub-tarefas
 (`create_card` com `depends_on`, ou `link_cards` com `depends_on`): uma depende da outra quando usa o
 que ela produz ou quando as duas alteram os mesmos arquivos. Na Implementação, o `get_card` da
 história devolve em `subtasksNow` o que o **board executa** (`byBoard`, na ordem) e o que espera

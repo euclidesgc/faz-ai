@@ -209,6 +209,9 @@ describe('servidor MCP', () => {
     expect(description('get_board')).toContain('Configurações → Harness: não indique nada fora deles');
     expect(description('get_models')).toContain('"Esforço da atividade" do card é o tamanho da tarefa');
     expect(description('link_cards')).toMatch(/usa o que a outra produz ou quando as duas alteram os mesmos arquivos/);
+    expect(description('link_cards')).not.toContain('ao mesmo tempo');
+    const dependsOn = tools.find((t) => t.name === 'create_card')!.inputSchema.properties as Record<string, { description?: string }>;
+    expect(dependsOn.depends_on?.description).not.toContain('ao mesmo tempo');
     expect(description('add_attachment')).toContain('`artifact: true`');
     expect(description('get_harness')).toContain('contexto vazio');
   });
