@@ -86,7 +86,7 @@ function successorsOf(state: BoardState, id: Id): Set<Id> {
 
 /** As sub-tarefas em aberto de uma história, separadas pelo que a IA pode tocar agora. */
 export interface SubtaskWaves {
-  /** sem dependência pendente, nem com a pessoa nem rodando: podem começar agora, ao mesmo tempo */
+  /** sem dependência pendente, nem com a pessoa nem rodando: as próximas a executar (na fase de código, o board as executa uma por vez) */
   ready: Card[];
   /** esperam outra sub-tarefa (ou outro card) terminar */
   waiting: Card[];

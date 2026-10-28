@@ -66,7 +66,7 @@ describe('fases do fluxo na skill', () => {
 
   it('o Plan recorta em partes fáceis de revisar e divide em histórias derivadas o que passar de umas 400 linhas', () => {
     const plan = section('## Sub-tarefas de implementação', '## Ao fechar uma fase');
-    expect(plan).toMatch(/fácil de revisar sozinha/);
+    expect(plan).toMatch(/revisada\s+sozinha/);
     expect(plan).toMatch(/Recortar por camada/);
     expect(plan).toMatch(/400[\s\S]*`derived_from`/);
   });

@@ -35,6 +35,7 @@
 
 ### Alterado
 
+- As sub-tarefas passam a ser a menor parte da entrega que se verifica sozinha, não um recorte por arquivo: a instrução do Plan, a skill do fluxo, as descrições do MCP e os agentes dizem que o board as executa uma por vez, na ordem das dependências (#1106).
 - Revisão de UX das telas de Harness, Automação, Conectar agentes e Workflows: Automação dividida em Execução, Heartbeat e Paralelismo; o "Preencher o modelo sugerido" fica sob o título da sugestão de modelo; o plano de contexto sem título repetido e com "Herdar agente"; ações mais curtas na lista de agentes ("Tornar padrão", "Restaurar o original").
 - Nos artefatos do Harness, a busca fica dentro de cada aba, e a barra separa criar de pedir à IA em todos os assuntos.
 - A sugestão de modelo passa para o fim de Conectar agentes, e o plano de contexto de cada workflow, para o próprio workflow em Workflows e colunas; no Harness fica o plano padrão do board.
