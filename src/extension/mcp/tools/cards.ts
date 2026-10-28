@@ -1,16 +1,19 @@
 import { z } from 'zod';
 import { linkProblem } from '../../../shared/links';
 import { columnsOf } from '../../../shared/selectors';
+import { BRIEF_SECTIONS, REQUIRED_BRIEF_SECTIONS } from '../../../shared/subtaskBrief';
 import { cardStatus, cardSummary, findCard, findColumn, findType } from '../format';
 import { cardArg, fieldsArg } from './args';
 import { END, addChecklist, aiOrigin, detail, findProfile, live, setFields, validateFields } from './helpers';
 import type { DefineTool, ToolContext } from './registry';
 
+const BRIEF_TITLES = REQUIRED_BRIEF_SECTIONS.join(', ').replace(/, ([^,]*)$/, ' e $1');
+
 /** Cards: criar, alterar e mover entre colunas. */
 export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
   tool(
     'create_card',
-    'Cria um card. Com `parent`, cria uma sub-tarefa daquela história (no workflow filho); sem `parent`, cria uma história (no workflow pai). `profile` escolhe o agente e `checklist` cria os itens na mesma chamada. Devolve o card resumido (mais `checklistItems`, com ids, quando criou itens); o detalhe (phase, notas, workspace) vem pelo get_card.',
+    `Cria um card. Com \`parent\`, cria uma sub-tarefa daquela história (no workflow filho); sem \`parent\`, cria uma história (no workflow pai). \`profile\` escolhe o agente e \`checklist\` cria os itens na mesma chamada. Devolve o card resumido (mais \`checklistItems\`, com ids, quando criou itens); o detalhe (phase, notas, workspace) vem pelo get_card. Numa sub-tarefa de fase de código, use as seções ${BRIEF_TITLES} (e ${BRIEF_SECTIONS.decisions}, se houver): o board confere antes de executar.`,
     {
       title: z.string().min(1),
       description: z.string().optional().describe('Markdown'),

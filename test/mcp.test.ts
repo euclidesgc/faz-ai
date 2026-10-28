@@ -212,6 +212,8 @@ describe('servidor MCP', () => {
     expect(description('link_cards')).not.toContain('ao mesmo tempo');
     const dependsOn = tools.find((t) => t.name === 'create_card')!.inputSchema.properties as Record<string, { description?: string }>;
     expect(dependsOn.depends_on?.description).not.toContain('ao mesmo tempo');
+    for (const name of ['Objetivo', 'Pronto quando', 'Pode tocar', 'Não pode tocar']) expect(description('create_card')).toContain(name);
+    expect(description('create_card')).toContain('o board confere antes de executar');
     expect(description('add_attachment')).toContain('`artifact: true`');
     expect(description('get_harness')).toContain('contexto vazio');
   });

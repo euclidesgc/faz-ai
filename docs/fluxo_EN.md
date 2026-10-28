@@ -102,7 +102,10 @@ code review quick later:
   time, each in a fresh AI run: small parts of the same area and the same agent are merged, and they
   are split when the agent changes or the part is big enough to be reviewed alone. Splitting by layer
   is fine when each layer can be checked alone, and small documentation goes with the last code
-  sub-task. The plan estimates the lines of code of the delivery: above about 400,
+  sub-task. Each sub-task description carries the sections `Objetivo` (goal), `Pronto quando` (done
+  when: the check that says it is finished, preferably the command), `Pode tocar` (may touch) and
+  `Não pode tocar` (may not touch), and optionally `Decisões anteriores` (earlier decisions); the plan
+  template brings the skeleton, and the board checks the four required ones before running. The plan estimates the lines of code of the delivery: above about 400,
   the AI keeps the first part in the story and creates the next ones as **derived stories**, in order
   (`create_card` with `derived_from` pointing to the previous part). The branch of each derived story
   starts from the branch of the previous part and its pull request is stacked on top of that one; the

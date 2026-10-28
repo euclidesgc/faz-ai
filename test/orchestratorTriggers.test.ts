@@ -206,4 +206,12 @@ describe('pedidos à IA', () => {
     expect(STORY_SESSION_ADVICE).toMatch(/crie-as, descreva-as e pare/);
     expect(STORY_SESSION_ADVICE).toContain('revisor-de-codigo');
   });
+
+  it('os pedidos de fechamento e da sessão da história pedem as seções na descrição das sub-tarefas criadas (#1110)', () => {
+    const story = { id: 's', number: 1 } as never;
+    for (const text of [closingAdvice(story), STORY_SESSION_ADVICE]) {
+      for (const name of ['Objetivo', 'Pronto quando', 'Pode tocar', 'Não pode tocar']) expect(text).toContain(`"${name}"`);
+      expect(text).toContain('inclusive as de correção e as de revisão');
+    }
+  });
 });

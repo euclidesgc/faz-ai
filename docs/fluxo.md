@@ -96,7 +96,10 @@ do código rápida depois:
   execução nova da IA: as partes pequenas da mesma área e do mesmo agente se juntam, e a separação vem
   quando o agente muda ou a parte é grande o bastante para ser revisada sozinha. Recortar por camada
   vale quando cada camada se verifica sozinha, e a documentação pequena vai com a última sub-tarefa de
-  código. O plano estima as linhas de código da entrega: acima de umas 400, a IA deixa na
+  código. A descrição de cada sub-tarefa leva as seções `Objetivo`, `Pronto quando` (a checagem que diz
+  que acabou, de preferência o comando), `Pode tocar` e `Não pode tocar`, e opcionalmente `Decisões
+  anteriores`; o modelo do plano traz o esqueleto, e o board confere as quatro obrigatórias antes de
+  executar. O plano estima as linhas de código da entrega: acima de umas 400, a IA deixa na
   história a primeira parte e cria as seguintes como **histórias derivadas**, em ordem (`create_card`
   com `derived_from` apontando para a parte anterior). A branch de cada derivada parte da branch da
   parte anterior e o pull request dela é empilhado sobre o dela; o card mostra **Derivada de #N**. Se
