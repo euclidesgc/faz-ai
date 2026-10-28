@@ -6,6 +6,7 @@ import type { AiTool } from '../shared/harness';
 import type { HarnessUsage, SelectableKind } from '../shared/harnessSelection';
 import type { AgentInput } from '../shared/messages';
 import type { ImportSource, OnConflict } from '../shared/artifactImport';
+import type { LibraryArtifactInput } from '../shared/artifacts';
 import type { BulkCardStatus, CardStatus } from '../shared/status';
 import type { ModelOption, ModelRule } from '../shared/models';
 import type { BoardRules } from '../shared/rules';
@@ -269,4 +270,8 @@ export const harness = {
   restoreAgent: (name: string) => req({ type: 'harness.agent.restore', name }),
   /** Regrava a cópia do board com o conteúdo atual da origem. */
   updateFromOrigin: (id: string) => req({ type: 'harness.library.update', id }),
+  /** Grava um artefato pelo formulário da biblioteca (criar ou editar), com versão, pasta, tools e ativo. */
+  saveLibraryArtifact: (input: LibraryArtifactInput) => req({ type: 'harness.library.save', input }),
+  /** Cria uma pasta de skill vazia na biblioteca. */
+  addSkillFolder: (folder: string) => req({ type: 'harness.library.addFolder', folder }),
 };

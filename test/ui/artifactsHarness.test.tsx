@@ -1,5 +1,5 @@
 // A aba Artefatos do board: a busca de cada assunto fica na aba dele, entre a barra de criação e a lista; a barra
-// separa criar de pedir à IA; e o aviso de regras desligadas filtra a lista para revisar só elas.
+// junta o criar com IA e o criar à mão; o MCP não tem Criar com IA.
 import { renderThemed, seedBoard } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, screen, within } from '@testing-library/react';
@@ -46,7 +46,7 @@ beforeEach(async () => {
 });
 
 describe('Harness › Artefatos do board', () => {
-  it('a busca é de cada assunto, fica abaixo da barra de criação, e trocar de aba não a perde', async () => {
+  it('a busca é de cada assunto, fica abaixo da barra de criação, e trocar de aba não a perde nem ao filtro', async () => {
     withRules([rule('testes', 'always'), rule('estilo', 'always')]);
     renderThemed(<ArtifactsHarness />);
     const search = screen.getByRole('searchbox', { name: 'Buscar em Regras por nome ou descrição' });
@@ -55,31 +55,22 @@ describe('Harness › Artefatos do board', () => {
     expect(create.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await userEvent.type(search, 'test');
     expect(names().some((n) => n.includes('estilo'))).toBe(false);
+    await userEvent.click(screen.getByRole('radio', { name: 'Ativas' }));
 
     await userEvent.click(screen.getByRole('tab', { name: /Skills/ }));
     await userEvent.click(screen.getByRole('tab', { name: /Regras/ }));
     expect(screen.getByRole('searchbox', { name: 'Buscar em Regras por nome ou descrição' })).toHaveValue('test');
+    expect(screen.getByRole('radio', { name: 'Ativas' })).toBeChecked();
   });
 
-  it('criar e pedir à IA ficam em grupos separados da barra', () => {
+  it('criar com IA e criar à mão ficam juntos na barra, e o servidor MCP não tem Criar com IA', async () => {
     withRules([]);
     renderThemed(<ArtifactsHarness />);
     const create = screen.getByRole('button', { name: /Nova regra/ }).closest('.toolbar-group');
-    const ai = screen.getByRole('button', { name: 'Sugerir regras com IA' }).closest('.toolbar-group');
-    expect(create).not.toBeNull();
-    expect(within(create as HTMLElement).getByRole('button', { name: /Criar regra com ajuda/ })).toBeInTheDocument();
-    expect(ai).not.toBe(create);
-  });
-
-  it('com regras desligadas, o aviso filtra a lista para só elas e volta a mostrar todas', async () => {
-    withRules([rule('ligada', 'always'), rule('desligada', 'off')]);
-    renderThemed(<ArtifactsHarness />);
-    expect(names().some((n) => n.includes('ligada') && !n.includes('desligada'))).toBe(true);
-    await userEvent.click(screen.getByRole('button', { name: 'Mostrar só as desligadas' }));
-    expect(names().every((n) => !n.includes('ligada') || n.includes('desligada'))).toBe(true);
-    expect(names().some((n) => n.includes('desligada'))).toBe(true);
-    await userEvent.click(screen.getByRole('button', { name: 'Mostrar todas as regras' }));
-    expect(names().some((n) => n.includes('ligada') && !n.includes('desligada'))).toBe(true);
+    expect(within(create as HTMLElement).getByRole('button', { name: /Criar com IA/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: /Servidores MCP/ }));
+    expect(screen.getByRole('button', { name: /Novo servidor/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Criar com IA/ })).toBeNull();
   });
 
   it('o Exportar avisa que os servidores MCP não vão', async () => {

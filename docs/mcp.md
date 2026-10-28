@@ -279,11 +279,15 @@ ao board (Configurações → Harness): as rules, skills, agentes e servidores M
 Toda execução pelo board parte de contexto vazio: só entra o que está no board.
 `set_harness_selection` envia ao board rules (`instructions`), skills, agentes e servidores MCP
 (`mcp`), muda o modo deles ou os tira do board, e identifica cada item por `{ kind, name }`, como
-`get_harness` o mostra (o item é estrito: `location` dá erro): `always` (Sempre) entra em toda execução;
-`contextual` (Pelo card) vira opção dos campos "Rules", "Skills" e "MCPs" dos cards (e agente
-disponível); `off` (Desligado) fica no board sem entrar em nada, que é como as regras entram, para
-revisão; `null` tira do board. Os campos "Rules", "Skills" e "MCPs" dos cards só oferecem o que está em
-`contextual`; o servidor do board vai sempre, sem marcação. Em `get_card`, `requiredRules` e
+`get_harness` o mostra (o item é estrito: `location` dá erro). `off` é inativo: fica no board sem
+entrar em nada nem poder ser vinculado, que é como as regras entram, para revisão. Ativo, o tipo
+decide: regra usa `always` (entra em toda execução); skill e agente usam `contextual` (vinculáveis ao
+card: N skills pelo campo "Skills", um agente); servidor MCP usa `always` ou `contextual` (opção do
+campo "MCPs"). Uma regra enviada como `contextual` fica inativa, e uma skill ou um agente enviados como
+`always` ficam `contextual`. `null` tira do board; o servidor do board vai sempre, sem marcação. Em
+`get_harness`, cada artefato traz `version`, `folder` (skill) e `tools`, os ids neutros (`read`,
+`search`, `write`, `edit`, `shell`, `network`, `mcp`, `delegate`): na skill, o que ela precisa; no
+agente, o que ele concede. Em `get_card`, `requiredRules` e
 `requiredSkills` trazem o caminho de cada arquivo que o card exige. As skills do fluxo do board vêm sem
 `path`, com `{ scope: "board", via: "get_skill" }`, e se leem com `get_skill`; elas são sempre as do
 board. `create_skill` marca o que cria como `contextual`.

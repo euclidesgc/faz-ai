@@ -6,6 +6,10 @@
 
 ### Adicionado
 
+- Nova Biblioteca de artefatos do board em Configurações › Harness › Artefatos do board: cada regra, skill, agente e servidor MCP fica ativo ou inativo, com contador, busca, filtro e árvore de pastas das skills.
+- Os formulários **Nova regra**, **Nova skill** e **Novo agente** abrem com modelo, tools e frontmatter ao vivo, compatibilidade entre skill e agente e prévia da exportação.
+- O assistente **Criar com IA** faz perguntas sobre o projeto, uma por vez, com o rascunho do arquivo ao vivo.
+- O card avisa quando uma skill vinculada pede tools que o agente dele não concede.
 - O aviso de regras desligadas do Harness ganha **Mostrar só as desligadas**, para revisá-las uma a uma.
 - Nova seção Automação nas Configurações, com a permissão da IA, o tempo limite, o heartbeat e o paralelismo, que saem do Harness.
 - A biblioteca do board marca o que é de fábrica e as cópias passam a acompanhar a origem.
@@ -35,6 +39,8 @@
 
 ### Alterado
 
+- Regras ativas entram em todo contexto de IA do board, e skills ativas só no card que as vincula; regras que estavam **Pelo card** passam a inativas, para revisão.
+- A exportação para o Claude Code grava `allowed-tools` nas skills e `tools` nos agentes a partir das tools escolhidas; Cursor e Kimi Code omitem o campo e avisam.
 - Revisão de UX das telas de Harness, Automação, Conectar agentes e Workflows: Automação dividida em Execução, Heartbeat e Paralelismo; o "Preencher o modelo sugerido" fica sob o título da sugestão de modelo; o plano de contexto sem título repetido e com "Herdar agente"; ações mais curtas na lista de agentes ("Tornar padrão", "Restaurar o original").
 - Nos artefatos do Harness, a busca fica dentro de cada aba, e a barra separa criar de pedir à IA em todos os assuntos.
 - A sugestão de modelo passa para o fim de Conectar agentes, e o plano de contexto de cada workflow, para o próprio workflow em Workflows e colunas; no Harness fica o plano padrão do board.
@@ -61,6 +67,7 @@
 
 ### Removido
 
+- O campo Rules some do card: as regras ativas já valem em todo pedido.
 - Saiu o "Agente padrão" de Harness › Ferramenta e execução, que repetia o "Tornar padrão" da aba Agentes.
 - A aba Detalhes de Conectar agentes sai; as ações do perfil passam para o fim da aba Conexão.
 - Saiu o cartão "Agente padrão" do topo de Conectar agentes.

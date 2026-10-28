@@ -12,6 +12,7 @@ import { TOOL_ADAPTERS } from './toolAdapters';
 import type { ToolAdapter } from './toolAdapters/types';
 import { ArtifactRepo, type ArtifactRow } from './repositories/artifactRepo';
 import {
+  activeUsage,
   agentOfArtifact,
   kindOfSelectable,
   skillDocument,
@@ -26,6 +27,7 @@ import { type HarnessUsage, type SelectableKind } from '../shared/harnessSelecti
 import { baseInfo, SKILL_NAME_PATTERN, type AiTool, type Harness } from '../shared/harness';
 import { MCP_NAME_PATTERN, type McpServerInput } from '../shared/harnessCatalog';
 import { RULE_NAME_PATTERN, createUsage } from '../shared/artifactImport';
+import { categoriesFromNeutral, isFolderPath, isNeutralTool, isSemver, normalizeTools } from '../shared/artifactTools';
 import type { AgentInput, McpServerView } from '../shared/messages';
 import type { BoardContext } from './panel/handlers/context';
 
@@ -103,7 +105,22 @@ export class BoardLibrary {
       body: row.body,
       ...(row.agent ? { agent: row.agent } : {}),
       ...(row.kind === 'mcp' ? { mcpCredential: row.mcpCredential } : {}),
+      version: row.version ?? '',
+      folder: row.folder ?? '',
+      tools: row.tools ?? [],
     };
+  }
+
+  /** As pastas de skill do board, para a árvore da aba Skills. */
+  skillFolders(): string[] {
+    return this.repo.skillFolders(this.ctx.boardId);
+  }
+
+  addSkillFolder(folder: string): void {
+    const p = folder.trim().replace(/^\/+|\/+$/g, '');
+    if (!p || !isFolderPath(p))
+      throw new Error('Nome de pasta inválido: use letras minúsculas, números e hífens, com "/" entre os níveis.');
+    this.repo.addSkillFolder(this.ctx.boardId, p);
   }
 
   saveArtifact(input: LibraryArtifactInput): void {
@@ -154,6 +171,23 @@ export class BoardLibrary {
     }
     const body = input.kind === 'skill' ? skillDocument(input.body, name, input.description) : input.body;
     if (Buffer.byteLength(body, 'utf8') > ARTIFACT_LIMITS.fileBytes) throw new Error('Arquivo maior que 512 KB.');
+    const version = input.version?.trim();
+    if (version !== undefined && (input.kind === 'skill' || input.kind === 'agent') && !isSemver(version))
+      throw new Error('Versão inválida: use o formato 1.0.0.');
+    if (version !== undefined && input.kind === 'rule' && !/^[\w.-]{1,32}$/.test(version)) throw new Error('Versão inválida.');
+    const folder = input.kind === 'skill' ? input.folder?.trim().replace(/^\/+|\/+$/g, '') : undefined;
+    if (folder !== undefined && !isFolderPath(folder))
+      throw new Error('Nome de pasta inválido: use letras minúsculas, números e hífens, com "/" entre os níveis.');
+    if (input.tools !== undefined && (!Array.isArray(input.tools) || !input.tools.every(isNeutralTool)))
+      throw new Error('Tools inválidas.');
+    const tools = input.kind === 'skill' || input.kind === 'agent' ? input.tools && normalizeTools(input.kind, input.tools) : undefined;
+    // o agente guarda as categorias antigas junto, para a execução nas ferramentas sem mapa (Gemini) e para a versão anterior
+    if (input.kind === 'agent' && tools) {
+      const agent = meta as AgentMeta;
+      // a lista nativa da origem sai: as tools escolhidas no formulário passam a valer em toda ferramenta
+      meta = { ...agent, tools: { categories: categoriesFromNeutral(tools), native: { tool: '', allow: [], deny: [] } } };
+    }
+    const usage = existing ? existing.usage : input.active === undefined ? undefined : input.active ? activeUsage(input.kind) : 'off';
     this.repo.upsert(
       this.ctx.boardId,
       {
@@ -167,8 +201,11 @@ export class BoardLibrary {
         missing: false,
         skipped: existing?.skipped ?? [],
         files: existing ? this.repo.content(existing.id).files : [],
+        ...(version !== undefined ? { version } : {}),
+        ...(folder !== undefined ? { folder } : {}),
+        ...(tools ? { tools } : {}),
       },
-      existing?.usage,
+      usage,
       input.kind === 'mcp' && input.server !== undefined,
     );
   }

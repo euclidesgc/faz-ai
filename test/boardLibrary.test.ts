@@ -253,7 +253,7 @@ describe('biblioteca particular do board', () => {
     );
     router.refreshHarness();
     const main = lib().artifacts.find((a) => a.name === 'faz-ai-fluxo')!;
-    expect(main).toMatchObject({ generated: true, usage: 'always' });
+    expect(main).toMatchObject({ generated: true, usage: 'contextual' });
     expect(fs.readFileSync(main.path, 'utf8')).toContain('release_card');
     expect(router.readArtifact('skill', 'faz-ai-fluxo').text).toContain('release_card');
     expect(() =>

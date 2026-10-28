@@ -14,11 +14,13 @@ import {
   CircleArrowUp,
   Code,
   Columns3,
+  Copy,
   CornerDownRight,
   Cpu,
   DatabaseBackup,
   Ellipsis,
   ExternalLink,
+  Folder,
   GitBranch,
   GitPullRequest,
   GripVertical,
@@ -108,6 +110,8 @@ export const IconLock = icon(Lock, 'IconLock');
 export const IconLockOpen = icon(LockOpen, 'IconLockOpen');
 export const IconHeart = icon(Heart, 'IconHeart');
 export const IconYolo = icon(Zap, 'IconYolo');
+export const IconDuplicate = icon(Copy, 'IconDuplicate');
+export const IconFolder = icon(Folder, 'IconFolder');
 export const IconPlus = icon(Plus, 'IconPlus');
 export const IconPanelClose = icon(PanelLeftClose, 'IconPanelClose');
 export const IconPanelOpen = icon(PanelLeftOpen, 'IconPanelOpen');

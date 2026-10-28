@@ -363,14 +363,36 @@ server that is not there, the run does not start, and the error asks you to send
 Each kind of notice has an outlined button, below the text on the right, to dismiss it and keep it
 hidden. The information icon shows the notice again.
 
-### Usage modes
+### Active and inactive
 
-- **Sempre** (always): included in the context of every board run.
-- **Pelo card** (per card): available to planning and the Skills, Rules and MCPs fields; included
-  when the card or its agent selects it.
-- **Desligado** (off): kept in the library without taking part in runs. New rules start this way,
-  for review before activation. An agent that is off is not offered to cards, phases or as the
-  default; the default instructions agent can only be turned off after another one takes its place.
+Each artifact is **active** or **inactive** in the board, and its type decides what active means:
+
+- An **active rule** goes into every AI context of the board (phase, refine, chat).
+- An **active skill** can be linked to cards (as many as needed) and only goes into the context of
+  the linked cards. There is no automatic invocation.
+- An **active agent** can be picked on the card (one per card) and runs its action.
+- An **active MCP server** keeps **Sempre** (always: every run) or **Pelo card** (per card: when the
+  card names it).
+- **Inactive** stays in the library, is hidden from cards and cannot be linked. New rules start this
+  way, for review before activation; the default instructions agent can only be deactivated after
+  another one becomes the default.
+
+On upgrade, a rule that was **Pelo card** becomes inactive (the tab notice asks for review) and a
+skill that was **Sempre** only applies to the cards that link it: the context never grows by itself.
+
+### Skill and agent tools
+
+Skills and agents store neutral tools: `read`, `search`, `write`, `edit`, `shell` and `network`
+(sensitive), `mcp` (the active MCP servers) and `delegate` (agents only). A skill says what it needs;
+an agent says what it grants. The card's effective tools are the agent's tools that the linked skills
+ask for; when a skill asks for a tool the agent does not have, the form and the card warn, without
+blocking.
+
+On export, each tool translates them through its own map. In Claude Code: `read` → Read, `search` →
+Glob and Grep, `write` → Write, `edit` → Edit and NotebookEdit, `shell` → Bash, `network` → WebFetch
+and WebSearch, `mcp` → `mcp__<server>__*` and `delegate` → Agent. Skills follow the SKILL.md
+standard, with `allowed-tools` separated by spaces; agents get `tools`. Cursor and Kimi Code have no
+per-artifact list: the field is left out and the preview warns.
 
 ### Three contexts: global, project and library
 
@@ -442,11 +464,28 @@ tool or CLI command for it (#623).
 ### The artifact tabs
 
 **Importar** (import) and **Exportar para a ferramenta** (export to the tool) sit above the tabs and
-apply to every topic. Inside each tab, the bar separates creating (**Nova regra**, **Criar regra com
-ajuda** and the equivalents for skills, agents and MCP servers) from asking the AI (**Sugerir … com
-IA**); right below is that topic's search, which filters the list and is kept when you switch tabs.
-With rules that are off, the Rules tab notice has **Mostrar só as desligadas** (show only the ones
-off), to review them one by one.
+apply to every topic. Each tab (Rules, Skills, Agents and MCP servers) shows how many are active
+("3/5 ativas"), a short notice of what active does in that topic, its own search (name, description
+and, for skills, folder) and the **Todas / Ativas / Inativas** (all / active / inactive) filter.
+**Criar com IA** (create with AI) opens the assistant and **Nova regra**, **Nova skill** and **Novo
+agente** (new rule, skill, agent), the form. Each row has the active switch, name, version, state,
+description, tokens, folder, tools and how many cards link it, with **Editar**, **Duplicar** and
+**Excluir** (edit, duplicate, delete). In Skills, the folder panel (such as `frontend/react` or
+`backend/node`) filters the list and creates new folders.
+
+**Nova regra** opens the board's Markdown editor with an eight-section template (context, stack,
+folders, conventions, tests, git, prohibitions and definition of done); beside it, the checklist marks
+the sections that already have a heading, with tips and the token estimate. It saves inactive or
+active. **Nova skill** and **Novo agente** share one form: goal with **Sugerir configuração** (suggest
+configuration), name, folder (skill) or model (agent, `inherit` by default), version, description, the
+tools with their name in each tool, the agent's default skills and the body; on the right, the live
+generated frontmatter, compatibility with agents or skills and the export preview.
+
+**Criar com IA** shows the context it found (stack, manifests, artifacts and related cards) and asks
+questions written by the AI, one at a time, with options and a suggested one, while the file draft
+updates beside it. Earlier answers stay editable, and **Finalizar e revisar no editor** (finish and
+review in the editor) opens the filled-in form. In an empty project, a rule starts with the project's
+goal and audience.
 
 Each tab offers **Criar** (create), search, counts and actions to **Editar** (edit), change the
 usage mode, update from source and remove with confirmation. Rules, skills and subagents also offer

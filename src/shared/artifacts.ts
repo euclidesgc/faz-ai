@@ -5,6 +5,7 @@ import { AGENT_TOOLS } from './agentTools';
 import type { Agent, AiTool, HarnessItem } from './harness';
 import type { ExecProfile } from './execution';
 import type { HarnessSelection, HarnessUsage, SelectableKind } from './harnessSelection';
+import type { NeutralTool } from './artifactTools';
 
 /** Tipos de artefato do board, no vocabulário do board (não no de uma ferramenta). */
 export type ArtifactKind = 'rule' | 'skill' | 'agent' | 'mcp';
@@ -39,6 +40,13 @@ export interface BoardArtifact {
   name: string;
   description: string;
   usage: HarnessUsage;
+  /** a versão que a pessoa dá (`1` na regra, semver em skill e agente); a `revision` conta as gravações */
+  /** (ausente só em estados legados, como `revision`) */
+  version?: string;
+  /** só na skill: a pasta na biblioteca ('' = raiz), com '/' entre os níveis */
+  folder?: string;
+  /** skill: as tools que ela precisa; agente: as que ele concede. Ids neutros (`artifactTools.ts`) */
+  tools?: NeutralTool[];
   /** de onde foi copiado (a location do inventário, `arquivo#nome` no MCP); '' = criado no board */
   origin: string;
   originTool: AiTool | '';
@@ -92,7 +100,34 @@ export interface ArtifactDraft {
   files: { path: string; content: string; encoding: 'utf8' | 'base64'; size: number }[];
   /** resumo do conteúdo da origem na hora da cópia (`artifactDigest`); ausente = mantém o gravado */
   originDigest?: string;
+  /** ausentes = mantém o gravado (numa cópia nova: o padrão do tipo e, nas tools, a derivação da origem) */
+  version?: string;
+  folder?: string;
+  tools?: NeutralTool[];
 }
+
+/**
+ * Ativo é tudo que não está `off`; o tipo decide o que ativo quer dizer (docs/decisoes/biblioteca-de-artefatos-do-board.md):
+ * regra ativa vai em todo pedido, skill e agente ativos se vinculam ao card, o MCP guarda Sempre ou Pelo card.
+ */
+export const isActive = (a: Pick<BoardArtifact, 'usage'>): boolean => a.usage !== 'off';
+
+/** O modo de um artefato ativado: regra em todo pedido, skill e agente pelo card, MCP no modo que já tinha (ou pelo card). */
+export function activeUsage(kind: ArtifactKind, previous?: HarnessUsage): HarnessUsage {
+  if (kind === 'rule') return 'always';
+  if (kind === 'mcp') return previous && previous !== 'off' ? previous : 'contextual';
+  return 'contextual';
+}
+
+/** O modo que o tipo aceita: regra "Pelo card" vira inativa e skill ou agente "Sempre" vira "Pelo card" (a migração 50). */
+export function normalizeUsage(kind: ArtifactKind, usage: HarnessUsage): HarnessUsage {
+  if (kind === 'rule' && usage === 'contextual') return 'off';
+  if ((kind === 'skill' || kind === 'agent') && usage === 'always') return 'contextual';
+  return usage;
+}
+
+/** A versão de um artefato novo do tipo. */
+export const defaultVersion = (kind: ArtifactKind): string => (kind === 'rule' ? '1' : kind === 'mcp' ? '' : '1.0.0');
 
 /**
  * Artefato padrão do board: vem com a extensão e não sai da biblioteca. O agente de fábrica pode ser editado,
@@ -214,6 +249,11 @@ export interface LibraryArtifactInput {
   agent?: AgentMeta;
   server?: Record<string, unknown>;
   mcpCredential?: BoardArtifact['mcpCredential'];
+  version?: string;
+  folder?: string;
+  tools?: NeutralTool[];
+  /** só ao criar: entra ativo ("Salvar e ativar") ou inativo ("Salvar inativa"); ausente = o padrão do tipo */
+  active?: boolean;
 }
 export interface LibraryImportResult {
   imported: number;

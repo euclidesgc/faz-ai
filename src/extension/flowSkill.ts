@@ -85,10 +85,11 @@ conversa dizendo o que mudou e chame \`request_review\` de novo.
 
 No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, na descrição os arquivos que ela vai tocar (tirados do mapa do código), o campo "Esforço da
 atividade" avaliado (Baixo, Médio ou Alto; o modelo é sugerido a partir dele) e os artefatos que a
-execução pede: os campos Skills, Rules e MCPs, o agente (\`profile\` no \`create_card\`; \`set_card_profile\`
+execução pede: os campos Skills e MCPs, o agente (\`profile\` no \`create_card\`; \`set_card_profile\`
 só para trocar depois) e os itens do checklist (\`checklist\`), tudo no mesmo \`create_card\`. Ele devolve o
-card resumido: o detalhe do card criado vem pelo \`get_card\`. Escolha **só entre o
-que está no board em modo "Pelo card"** (\`get_harness\`; o que está em "Sempre" já entra sozinho):
+card resumido: o detalhe do card criado vem pelo \`get_card\`. Escolha **só entre as
+skills e os agentes ativos do board** e os servidores MCP em "Pelo card" (\`get_harness\`; as regras ativas e os
+servidores em "Sempre" já entram sozinhos, e o inativo não pode ser vinculado):
 nada do catálogo do projeto ou da máquina existe para a execução. Vale o mínimo: no máximo uma skill
 por assunto (a mais próxima do objetivo; pode haver mais de uma se forem de assuntos diferentes, como
 navegação e acesso a dados) e só os servidores MCP de que a tarefa precisa. Excesso de artefatos
@@ -165,7 +166,7 @@ O \`get_card\` devolve o que o card exige para a execução; leia antes de come�
 - \`requiredRules\`: leia cada arquivo em \`path\` antes de executar o card: são as instruções que o card exige, além do contexto fixo do board.
 - \`requiredSkills\`: leia o SKILL.md de cada skill em \`path\`; a que vier sem \`path\` se lê com \`get_skill <nome>\`. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em \`files\` estão os arquivos de apoio (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.
 - \`execution.cliLoads\`: o que a CLI da ferramenta carrega por conta própria (regras, skills, agentes, hooks e MCPs do projeto ou do usuário) e se o isolamento está imposto (\`contextEnforced\`). Lista vazia não prova isolamento. O que o board entregou pelo pedido e pelo MCP vale sobre o que a CLI leu sozinha; não afirme que a conversa começou sem artefatos externos sem \`contextEnforced\`.
-- Skills, rules, servidores MCP e agente do card: escolha só entre o que está no board em modo "Pelo card" (\`get_harness\`). O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.
+- Skills, servidores MCP e agente do card: escolha só entre as skills e os agentes ativos do board e os servidores MCP em "Pelo card" (\`get_harness\`); as regras ativas já vão em tudo. Uma skill cujas tools o agente não concede (\`tools\` de cada um) funciona pela metade: prefira um agente que as tenha. O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.
 `;
 
 const WORKSPACE_BODY = `# Pasta de trabalho e base do pull request

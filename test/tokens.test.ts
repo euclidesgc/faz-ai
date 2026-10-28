@@ -115,7 +115,8 @@ describe('styles.css consome só tokens', () => {
 
   it('só referencia tokens definidos em tokens.css (ou os que o JS define)', () => {
     const defined = new Set(Object.keys({ ...themes.light, ...themes.dark }));
-    // o Radix (Popper) define a altura livre do popover no próprio elemento, ao posicioná-lo
+    // o Radix (Popper) define a altura livre do popover no próprio elemento, ao posicioná-lo; a árvore de pastas das
+    // skills define o nível (`--depth`) em cada item, para o recuo
     const fromJs = new Set([
       '--text-font',
       '--text-size',
@@ -123,6 +124,7 @@ describe('styles.css consome só tokens', () => {
       '--vscode-font-family',
       '--vscode-editor-font-family',
       '--radix-popover-content-available-height',
+      '--depth',
     ]);
     const used = new Set([...stylesCss.matchAll(/var\((--[\w-]+)/g)].map((m) => m[1]!));
     const missing = [...used].filter((v) => !defined.has(v) && !fromJs.has(v));

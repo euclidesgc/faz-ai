@@ -351,14 +351,34 @@ um servidor que não está ali, a execução não começa, e o erro pede para en
 Os avisos de cada tipo têm um botão com contorno, abaixo do texto e à direita, para fechar e não
 exibir mais. O ícone de informação permite exibir o aviso novamente.
 
-### Modos de uso
+### Ativo e inativo
 
-- **Sempre**: entra no contexto de toda execução do board.
-- **Pelo card**: fica disponível no planejamento e nos campos Skills, Rules e MCPs; entra quando o
-  card ou seu agente o escolhe.
-- **Desligado**: permanece na biblioteca sem participar da execução. Regras novas entram assim,
-  para revisão antes da ativação. Um agente desligado não aparece para o card, a fase nem o padrão;
-  o agente padrão das instruções só desliga depois que outro vira o padrão das instruções.
+Cada artefato fica **ativo** ou **inativo** no board, e o tipo decide o que ativo quer dizer:
+
+- **Regra ativa** entra em todo contexto de IA do board (fase, refinar, chat).
+- **Skill ativa** pode ser vinculada a cards (quantas forem precisas) e só entra no contexto dos cards
+  vinculados. Não existe invocação automática.
+- **Agente ativo** pode ser escolhido no card (um por card) e executa a ação dele.
+- **Servidor MCP ativo** mantém **Sempre** (toda execução) ou **Pelo card** (quando o card o indica).
+- **Inativo** fica na biblioteca, some dos cards e não pode ser vinculado. Regras novas entram assim,
+  para revisão antes da ativação; o agente padrão das instruções só desativa depois que outro vira o
+  padrão.
+
+Na atualização, uma regra que estava **Pelo card** fica inativa (o aviso da aba pede revisão) e uma
+skill que estava **Sempre** passa a valer só nos cards que a vinculam: o contexto nunca cresce sozinho.
+
+### Tools das skills e dos agentes
+
+Skills e agentes guardam tools neutras: `read`, `search`, `write`, `edit`, `shell` e `network`
+(sensíveis), `mcp` (os servidores MCP ativos) e `delegate` (só agentes). A skill diz o que precisa; o
+agente diz o que concede. As ferramentas efetivas do card são as do agente que as skills vinculadas
+pedem; quando a skill pede uma tool que o agente não tem, o formulário e o card avisam, sem bloquear.
+
+Na exportação, cada ferramenta traduz as tools pelo próprio mapa. No Claude Code: `read` → Read,
+`search` → Glob e Grep, `write` → Write, `edit` → Edit e NotebookEdit, `shell` → Bash, `network` →
+WebFetch e WebSearch, `mcp` → `mcp__<servidor>__*` e `delegate` → Agent. A skill vai no padrão
+SKILL.md, com `allowed-tools` separado por espaço; o agente, com `tools`. Cursor e Kimi Code não têm a
+lista por artefato: o campo fica fora e a prévia avisa.
 
 ### Três contextos: global, projeto e biblioteca
 
@@ -424,10 +444,27 @@ ela (#623).
 ### As abas dos artefatos
 
 **Importar** e **Exportar para a ferramenta** ficam acima das abas e valem para todos os assuntos.
-Dentro de cada aba, a barra separa criar (**Nova regra**, **Criar regra com ajuda** e os equivalentes
-de skills, agentes e servidores MCP) de pedir à IA (**Sugerir … com IA**); logo abaixo fica a busca
-daquele assunto, que filtra a lista e é guardada ao trocar de aba. Com regras desligadas, o aviso da
-aba Regras tem **Mostrar só as desligadas**, para revisá-las uma a uma.
+Cada aba (Regras, Skills, Agentes e Servidores MCP) mostra quantos estão ativos ("3/5 ativas"), um
+aviso curto do que o ativo faz naquele assunto, a própria busca (nome, descrição e, em skills, pasta) e
+o filtro **Todas / Ativas / Inativas**. **Criar com IA** abre o assistente e **Nova regra**, **Nova
+skill** e **Novo agente**, o formulário. Cada linha tem a chave de ativo, o nome, a versão, o estado
+("Ativa · em todo contexto", "Ativa · vinculável a cards" ou "Inativa · oculta no board"), a
+descrição, os tokens, a pasta, as tools e quantos cards a vinculam, com **Editar**, **Duplicar** e
+**Excluir**. Em Skills, o painel de pastas (como `frontend/react` ou `backend/node`) filtra a lista e
+cria pastas novas.
+
+A **Nova regra** abre o editor de Markdown do board com um modelo de oito seções (contexto, stack,
+pastas, convenções, testes, git, proibições e definição de pronto); ao lado, o checklist marca as
+seções que já têm título, com dicas e a estimativa de tokens. Ela salva inativa ou ativa. A **Nova
+skill** e o **Novo agente** usam o mesmo formulário: objetivo com **Sugerir configuração**, nome, pasta
+(skill) ou modelo (agente, `inherit` por padrão), versão, descrição, as tools com o nome em cada
+ferramenta, as skills padrão do agente e o corpo; à direita, o frontmatter gerado ao vivo, a
+compatibilidade com os agentes ou as skills e a prévia da exportação.
+
+**Criar com IA** mostra o contexto que encontrou (stack, manifestos, artefatos e cards relacionados) e
+faz perguntas escritas pela IA, uma por vez, com opções e uma sugerida, enquanto o rascunho do arquivo
+se atualiza ao lado. As respostas anteriores continuam editáveis, e **Finalizar e revisar no editor**
+abre o formulário preenchido. Num projeto vazio, a regra começa pelo objetivo e pelo público.
 
 Cada aba tem **Criar**, busca, quantidade e ações de **Editar**, mudar o modo de uso, atualizar da
 origem e remover com confirmação. Regras, skills e subagentes também oferecem **Assistente guiado**

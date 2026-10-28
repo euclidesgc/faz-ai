@@ -412,7 +412,8 @@ describe('handlers do host: artefatos direto no board (#668)', () => {
     router.handle({ type: 'harness.artifact.save', kind: 'mcp', name: 'memoria', server: stdio() });
     expect(field('Skills')).toEqual(['revisar']);
     expect(field('MCPs')).toEqual(['memoria']);
-    expect(field('Rules')).toContain('estilo');
+    // regra não é mais indicada no card (as ativas vão em todo pedido): o campo Rules não oferece opção
+    expect(field('Rules')).toEqual([]);
 
     router.handle({ type: 'harness.artifact.save', kind: 'rule', name: 'estilo', body: 'use espaços' });
     expect((await read('rule', 'estilo')).text).toBe('use espaços');

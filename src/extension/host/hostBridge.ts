@@ -30,6 +30,7 @@ const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'harness.export.plan',
   'harness.export.apply',
   'harness.agent.assist',
+  'harness.artifact.assist',
   'metrics.query',
   'card.usage.query',
   'contextPlanning.preview',
@@ -601,6 +602,21 @@ export class HostBridge {
         } catch (error) {
           this.post({
             type: 'harness.agent.assistResult',
+            requestId: msg.requestId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      case 'harness.artifact.assist':
+        try {
+          this.post({
+            type: 'harness.artifact.assistResult',
+            requestId: msg.requestId,
+            result: await this.router.assistArtifact(msg.input),
+          });
+        } catch (error) {
+          this.post({
+            type: 'harness.artifact.assistResult',
             requestId: msg.requestId,
             error: error instanceof Error ? error.message : String(error),
           });

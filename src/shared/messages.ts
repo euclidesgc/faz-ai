@@ -5,6 +5,7 @@ import type { ExecutionPolicy } from './executionPolicies';
 import type { ContextDraftResolution } from './contextDraftResolution';
 import type { ContextActivityTarget, ContextPlanningWrite, ActivityContextWrite } from './contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from './agentAssistance';
+import type { ArtifactAssistInput, ArtifactAssistResult } from './artifactAssistant';
 import type { LibraryArtifactInput } from './artifacts';
 import type { ArtifactKind } from './artifacts';
 import type { ImportSource, OnConflict } from './artifactImport';
@@ -346,6 +347,10 @@ export type WebviewToHost =
   /** grava os artefatos escolhidos; a resposta é `harness.export.applyResult` */
   | { type: 'harness.export.apply'; requestId: string; tool: AiTool; target: ExportTarget; ids: string[]; replace: boolean }
   | { type: 'harness.agent.assist'; requestId: string; input: AgentAssistInput }
+  /** "Criar com IA" e "Sugerir configuração" da biblioteca: só leitura; a resposta volta em `harness.artifact.assistResult` */
+  | { type: 'harness.artifact.assist'; requestId: string; input: ArtifactAssistInput }
+  /** cria uma pasta de skill vazia na biblioteca (a árvore da aba Skills) */
+  | { type: 'harness.library.addFolder'; folder: string }
   /**
    * envia artefatos ao board com um modo, muda o modo dos que já estão nele, ou os tira do board (com
    * `usage` null): `location` é a identidade do item na marcação (`selectionKey`: o caminho como o
@@ -499,6 +504,7 @@ export type HostToWebview =
   /** resposta a `harness.project.profile`, correlacionada por `requestId` */
   | { type: 'harness.library.content'; input: LibraryArtifactInput }
   | { type: 'harness.agent.assistResult'; requestId: string; result?: AgentAssistResult; error?: string }
+  | { type: 'harness.artifact.assistResult'; requestId: string; result?: ArtifactAssistResult; error?: string }
   | { type: 'harness.library.directorySelected'; directory: string }
   | { type: 'harness.library.foldersResult'; directory: string; parent: string; folders: { name: string; path: string }[] }
   | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }

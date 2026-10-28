@@ -71,6 +71,7 @@ export class BoardHarness {
         artifacts: this.ctx.library.materialize(),
         warnings: this.ctx.library.warnings,
         flowSkills: FLOW_SKILLS.map((k) => ({ name: k.name, description: k.description })),
+        skillFolders: this.ctx.library.skillFolders(),
       },
     };
     const state = this.ctx.state();
@@ -189,6 +190,11 @@ export const harnessHandlers = {
   'harness.library.save': (msg, ctx, actor) => {
     if (actor.byAi && msg.input.kind === 'mcp') throw new Error('Configurações e credenciais MCP exigem revisão humana.');
     ctx.library.saveArtifact(msg.input);
+    ctx.harness.load();
+    return true;
+  },
+  'harness.library.addFolder': (msg, ctx) => {
+    ctx.library.addSkillFolder(msg.folder);
     ctx.harness.load();
     return true;
   },

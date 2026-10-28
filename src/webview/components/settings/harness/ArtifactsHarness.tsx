@@ -1,33 +1,33 @@
-import { useDeferredValue, useEffect, useState } from 'react';
-import { Badge, Callout, Tabs, TextField } from '@radix-ui/themes';
-import { HARNESS_TOPICS, usageCounts, type HarnessTopic } from '../../../../shared/harnessTopics';
+import { useEffect, useState } from 'react';
+import { Badge, Tabs } from '@radix-ui/themes';
+import { activeCounts, type StatusFilter } from '../../../../shared/artifactLibrary';
+import { HARNESS_TOPICS, type HarnessTopic } from '../../../../shared/harnessTopics';
 import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { ActionButton, IconWarning } from '../../ui';
+import { ActionButton } from '../../ui';
 import { ArtifactList } from './ArtifactList';
 import { ExportDialog } from './ExportDialog';
 import { ImportDialog } from './ImportDialog';
 import { t } from '../../../i18n';
 
-const EMPTY_PICKED = (): Record<HarnessTopic, Set<string>> => ({ rules: new Set(), skill: new Set(), agent: new Set(), mcp: new Set() });
+const BY_TOPIC = <T,>(v: T): Record<HarnessTopic, T> => ({ rules: v, skill: v, agent: v, mcp: v });
 
 /**
- * A aba "Artefatos do board": as regras, skills, agentes e servidores MCP que o board guarda, uma aba por assunto.
- * Importar e exportar valem para todos os assuntos e ficam acima das abas; a busca é de cada assunto e fica dentro da
- * aba dele. A busca, a seleção e o filtro das regras desligadas ficam aqui, para trocar de aba não os perder; o editor
- * de uma linha só existe enquanto está aberto (monta na própria `ArtifactList`).
+ * A aba "Artefatos do board", a biblioteca: as regras, skills, agentes e servidores MCP que o board guarda, uma aba por
+ * assunto. Importar e exportar valem para todos e ficam acima das abas; a busca, o filtro de estado e a pasta das skills
+ * são de cada assunto e ficam aqui, para trocar de aba não os perder. O formulário de uma linha só existe aberto (monta
+ * na própria `ArtifactList`).
  */
 export function ArtifactsHarness() {
   const artifacts = useBoardStore((s) => s.state!.harness.library?.artifacts) ?? [];
   const topic = useBoardStore((s) => s.harnessTopic);
-  const [queries, setQueries] = useState<Record<HarnessTopic, string>>({ rules: '', skill: '', agent: '', mcp: '' });
-  const [picked, setPicked] = useState(EMPTY_PICKED);
-  const [onlyOffRules, setOnlyOffRules] = useState(false);
+  const [queries, setQueries] = useState(() => BY_TOPIC(''));
+  const [statuses, setStatuses] = useState<Record<HarnessTopic, StatusFilter>>(() => BY_TOPIC<StatusFilter>('all'));
+  // a pasta selecionada nas skills (`null` = todas)
+  const [folder, setFolder] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const deferred = useDeferredValue(queries);
   const active = HARNESS_TOPICS.find((x) => x.id === topic) ?? HARNESS_TOPICS[0]!;
-  const rules = usageCounts(artifacts, 'rule');
   // abrir os artefatos relê as origens das cópias: a lista mostra o que mudou desde a cópia
   useEffect(() => void harness.refresh(), []);
 
@@ -53,19 +53,14 @@ export function ArtifactsHarness() {
       <Tabs.Root value={active.id} onValueChange={(next) => useBoardStore.setState({ harnessTopic: next as HarnessTopic })}>
         <Tabs.List className="harness-tabs">
           {HARNESS_TOPICS.map((x) => {
-            const counts = usageCounts(artifacts, x.kind);
-            const total = counts.always + counts.contextual + counts.off;
-            const parts = [
-              counts.always > 0 && t('{n} sempre', { n: counts.always }),
-              counts.contextual > 0 && t('{n} pelo card', { n: counts.contextual }),
-              counts.off > 0 && t('{n} desligadas', { n: counts.off }),
-            ].filter(Boolean);
+            const { active: on, total } = activeCounts(artifacts, x.kind);
+            const feminine = x.kind === 'rule' || x.kind === 'skill';
             return (
               <Tabs.Trigger key={x.id} value={x.id}>
                 {t(x.label)}
                 {total > 0 && (
-                  <Badge color={counts.off > 0 ? 'amber' : 'gray'} variant="soft" size="1" className="topic-badge">
-                    {x.kind === 'agent' ? total : parts.join(' · ')}
+                  <Badge color={on < total ? 'amber' : 'gray'} variant="soft" size="1" className="topic-badge">
+                    {feminine ? t('{on}/{total} ativas', { on, total }) : t('{on}/{total} ativos', { on, total })}
                   </Badge>
                 )}
               </Tabs.Trigger>
@@ -74,51 +69,15 @@ export function ArtifactsHarness() {
         </Tabs.List>
         {HARNESS_TOPICS.map((x) => (
           <Tabs.Content key={x.id} value={x.id} id={x.id === 'agent' ? 'harness-agents' : undefined}>
-            {x.id === 'rules' && rules.off > 0 && (
-              <Callout.Root color="amber" size="1" className="harness-callout">
-                <Callout.Icon>
-                  <IconWarning />
-                </Callout.Icon>
-                <Callout.Text>
-                  {t(
-                    'Há regras desligadas: elas estão no board, mas não entram em nenhuma execução. Leia o texto de cada uma e ative ou apague; regra ativa entra em toda execução.',
-                  )}
-                </Callout.Text>
-                <div className="row end">
-                  <ActionButton
-                    size="1"
-                    variant="soft"
-                    aria-pressed={onlyOffRules}
-                    hint={
-                      onlyOffRules
-                        ? t('Volta a mostrar todas as regras do board.')
-                        : t('Mostra só as regras desligadas, para revisar uma a uma.')
-                    }
-                    onClick={() => setOnlyOffRules(!onlyOffRules)}
-                  >
-                    {onlyOffRules ? t('Mostrar todas as regras') : t('Mostrar só as desligadas')}
-                  </ActionButton>
-                </div>
-              </Callout.Root>
-            )}
             <ArtifactList
               kind={x.kind}
-              search={
-                <div className="topic-bar">
-                  <TextField.Root
-                    className="topic-search"
-                    type="search"
-                    aria-label={t('Buscar em {topic} por nome ou descrição', { topic: t(x.label) })}
-                    placeholder={t('Buscar por nome ou descrição…')}
-                    value={queries[x.id]}
-                    onChange={(e) => setQueries({ ...queries, [x.id]: e.target.value })}
-                  />
-                </div>
-              }
-              query={deferred[x.id]}
-              onlyOff={x.id === 'rules' && onlyOffRules && rules.off > 0}
-              picked={picked[x.id]}
-              onPick={(next) => setPicked({ ...picked, [x.id]: next })}
+              topicLabel={t(x.label)}
+              query={queries[x.id]}
+              onQuery={(next) => setQueries({ ...queries, [x.id]: next })}
+              status={statuses[x.id]}
+              onStatus={(next) => setStatuses({ ...statuses, [x.id]: next })}
+              folder={folder}
+              onFolder={setFolder}
               onImport={() => setImporting(true)}
             />
           </Tabs.Content>

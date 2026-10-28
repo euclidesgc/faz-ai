@@ -211,6 +211,11 @@ describe('servidor MCP', () => {
     expect(description('link_cards')).toMatch(/usa o que a outra produz ou quando as duas alteram os mesmos arquivos/);
     expect(description('add_attachment')).toContain('`artifact: true`');
     expect(description('get_harness')).toContain('contexto vazio');
+    // ativo/inativo: o tipo decide o modo (regra always; skill e agente contextual; MCP os dois)
+    expect(description('set_harness_selection')).toContain('"off": inativo');
+    expect(description('set_harness_selection')).toContain('regra usa "always"');
+    expect(description('set_harness_selection')).toContain('skill e agente usam "contextual"');
+    expect(description('set_harness_selection')).not.toContain('campos Rules');
   });
 
   it('nenhum texto do MCP nem da skill do fluxo diz que o board lê os agentes da pasta da ferramenta (o board guarda a própria cópia)', async () => {
@@ -1797,7 +1802,9 @@ describe('vínculos entre cards', () => {
     console.log(`MEDIDA get_card #588: ${size} caracteres`);
     const notes = JSON.stringify(got, (k, v) => (k.endsWith('Note') ? v : typeof v === 'object' ? v : undefined));
     expect(notes.length).toBeLessThan(MAX_NOTES);
-    expect(got.harnessNote).toBeDefined();
+    expect(got.harnessNote).toContain('skills e agente só entre os ativos do board');
+    expect(got.harnessNote).toContain('regras ativas já vão em tudo');
+    expect(got.harnessNote).not.toContain('rules, MCPs e agente');
     expect(got.subtasksNowNote).toBeDefined();
     expect(got.phase.autonomousNote).toContain('faz-ai-modo-autonomo');
   });

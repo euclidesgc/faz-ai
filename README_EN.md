@@ -68,8 +68,10 @@ in the Portuguese interface.
   stops; it starts without rules, skills, agents or hooks you have not selected, and reads the
   attached documents only when needed. The conversation it reads holds at most 20 messages (or starts
   at the last summary). [Harness](docs/harness_EN.md)
-- **Board harness.** Rules, skills, agents and MCP servers live in a board library, in **Sempre**
-  (always), **Pelo card** (per card) or **Desligado** (off) mode, with import and export to the tool.
+- **Board harness.** Rules, skills, agents and MCP servers live in a board library,
+  each one active or inactive: an active rule goes into every context, active skills and agents are
+  linked to cards. Forms with neutral tools, a **Criar com IA** (create with AI) assistant and export
+  to the tool.
   Every run goes through an agent, with the minimum it needs.
   ![Board harness](docs/images/harness_en.png) [Harness](docs/harness_EN.md)
 - **Cursor guarantee through the board hook.** The board registers a global hook in `~/.cursor/hooks.json`.

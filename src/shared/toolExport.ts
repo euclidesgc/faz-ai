@@ -9,6 +9,7 @@ export type ExportKind = 'rule' | 'skill' | 'agent';
 /** o que o formato não expressa (perde), expressa de outro jeito (mapeado) ou só nomeia (configurar) */
 export type LossCode =
   | 'tools'
+  | 'allowed-tools'
   | 'board-tools'
   | 'mcpServers'
   | 'skills'

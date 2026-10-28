@@ -5,6 +5,7 @@ import type { ExecutionAdmissionDecision, StrictExecutionRequest } from '../../s
 import type { ContextActivityTarget } from '../../shared/contextPlanning';
 import type { PolicyAssistInput, PolicyAssistResult } from '../../shared/policyAssistant';
 import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
+import type { ArtifactAssistInput, ArtifactAssistResult } from '../../shared/artifactAssistant';
 import type { ContextProposal } from '../../shared/contextProposal';
 import { scanLibraryFolder } from '../libraryImport';
 import { agentOfArtifact, type ArtifactKind } from '../../shared/artifacts';
@@ -164,6 +165,7 @@ const bridgeOnly = {
   'harness.export.plan': viaBridge,
   'harness.export.apply': viaBridge,
   'harness.agent.assist': viaBridge,
+  'harness.artifact.assist': viaBridge,
   'harness.import.pick': viaBridge,
   'harness.import.scan': viaBridge,
   'harness.artifact.read': viaBridge,
@@ -983,6 +985,15 @@ export class MessageRouter {
   proposeContext(target: ContextActivityTarget, language: 'pt-BR' | 'en'): Promise<ContextProposal> {
     if (!this.contextProposeHandler) return Promise.reject(new Error('A assistência de IA não está disponível neste board.'));
     return this.contextProposeHandler(target, language);
+  }
+
+  private artifactAssistHandler?: (input: ArtifactAssistInput) => Promise<ArtifactAssistResult>;
+  setArtifactAssistHandler(handler: (input: ArtifactAssistInput) => Promise<ArtifactAssistResult>): void {
+    this.artifactAssistHandler = handler;
+  }
+  assistArtifact(input: ArtifactAssistInput): Promise<ArtifactAssistResult> {
+    if (!this.artifactAssistHandler) return Promise.reject(new Error('A assistência de IA não está disponível neste board.'));
+    return this.artifactAssistHandler(input);
   }
 
   private agentAssistHandler?: (input: AgentAssistInput) => Promise<AgentAssistResult>;

@@ -116,6 +116,44 @@ export function requestAgentAssistance(
   });
 }
 
+/** "Criar com IA" e "Sugerir configuração" da biblioteca: a próxima pergunta e o rascunho; só leitura, nunca grava. */
+export function requestArtifactAssistance(
+  input: import('../shared/artifactAssistant').ArtifactAssistInput,
+  timeout: number,
+): Promise<import('../shared/artifactAssistant').ArtifactAssistResult> {
+  const requestId = newRequestId();
+  const end = beginRequest();
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      off();
+      clearTimeout(timer);
+      pending.delete(cancel);
+      end();
+    };
+    const cancel = () => {
+      cleanup();
+      reject(new Error(REQUEST_CANCELLED_MESSAGE));
+    };
+    const off = onHostMessage((message) => {
+      if (message.type !== 'harness.artifact.assistResult' || message.requestId !== requestId) return;
+      cleanup();
+      if (message.result) resolve(message.result);
+      else reject(new Error(message.error ?? 'A IA não respondeu no formato esperado. Tente novamente.'));
+    });
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(REQUEST_TIMEOUT_MESSAGE));
+    }, timeout);
+    pending.add(cancel);
+    try {
+      postToHost({ type: 'harness.artifact.assist', requestId, input });
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
+}
+
 /** A proposta da IA para a configuração de uma atividade: pode demorar, é só leitura e nunca grava. */
 export function requestContextProposal(
   target: import('../shared/contextPlanning').ContextActivityTarget,

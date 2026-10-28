@@ -183,3 +183,60 @@ describe('tabela de equivalências e perdas (RF07)', () => {
     expect(text('claude', agent(claudeTools))[0]).not.toContain('mcp__faz-ai__');
   });
 });
+
+describe('tools neutras na exportação', () => {
+  const skillMd = '---\nname: s\ndescription: d\n---\n\nCorpo';
+  const lostValue = (tool: string, s: ExportSource) =>
+    adapterFor(tool)!
+      .losses(s)
+      .find((l) => l.code === 'allowed-tools');
+
+  it('Claude: a skill com tools ganha allowed-tools separado por espaço no SKILL.md', () => {
+    const out = text('claude', src('skill', 's', { tools: ['read', 'search'] }, skillMd))[0]!;
+    expect(out).toBe('---\nname: s\ndescription: d\nallowed-tools: Read Glob Grep\n---\n\nCorpo');
+    expect(lossCodes('claude', src('skill', 's', { tools: ['read'] }, skillMd))).not.toContain('allowed-tools');
+  });
+
+  it('Claude: o allowed-tools que já está no SKILL.md é trocado, não duplicado', () => {
+    const md = '---\nname: s\ndescription: d\nallowed-tools: Bash\n---\nX';
+    const out = text('claude', src('skill', 's', { tools: ['read'] }, md))[0]!;
+    expect(out.match(/allowed-tools/g)).toHaveLength(1);
+    expect(out).toContain('allowed-tools: Read\n');
+  });
+
+  it('Claude: a skill sem tools não ganha a linha', () => {
+    expect(text('claude', src('skill', 's', { tools: [] }, skillMd))[0]).toBe(skillMd);
+    expect(text('claude', src('skill', 's', {}, skillMd))[0]).toBe(skillMd);
+  });
+
+  it.each(['cursor', 'kimi'])('%s: a skill sai sem allowed-tools e a prévia avisa a perda', (tool) => {
+    const s = src('skill', 's', { tools: ['read', 'search'] }, skillMd);
+    expect(text(tool, s)[0]).toBe(skillMd);
+    expect(lostValue(tool, s)).toEqual({ code: 'allowed-tools', effect: 'lost', value: 'read search' });
+    expect(lostValue(tool, src('skill', 's', { tools: [] }, skillMd))).toBeUndefined();
+  });
+
+  it('Claude: o agente com tools neutras grava tools: Read, Glob, Grep, ...', () => {
+    const s = agent({ mcpServers: ['github'] }, { tools: ['read', 'search', 'shell', 'delegate', 'mcp'] });
+    expect(text('claude', s)[0]).toContain('tools: Read, Glob, Grep, Bash, Agent, mcp__github__*');
+  });
+
+  it('Claude: o agente legado com lista nativa do claude mantém a nativa, mesmo com tools neutras', () => {
+    const native = { tool: 'claude', allow: ['Read', 'Grep'], deny: ['Bash'] } as const;
+    const legacy = agent({ tools: { categories: [], native } });
+    expect(text('claude', legacy)[0]).toContain('tools: Read, Grep');
+    const mixed = agent({ tools: { categories: [], native } }, { tools: ['shell'] });
+    expect(text('claude', mixed)[0]).toContain('tools: Read, Grep');
+    expect(text('claude', mixed)[0]).not.toContain('Bash,');
+  });
+
+  it('Cursor e Kimi: o agente com tools neutras não grava tools: e avisa allowed-tools perdido', () => {
+    const s = agent({}, { tools: ['read', 'shell'] });
+    expect(text('cursor', s)[0]).not.toContain('tools:');
+    expect(text('kimi', s)[0]).not.toContain('tools:');
+    for (const tool of ['cursor', 'kimi']) {
+      expect(lostValue(tool, s)).toEqual({ code: 'allowed-tools', effect: 'lost', value: 'read shell' });
+      expect(lossCodes(tool, s)).not.toContain('tools');
+    }
+  });
+});

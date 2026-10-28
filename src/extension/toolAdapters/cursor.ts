@@ -6,6 +6,7 @@ import type { FormatLoss } from '../../shared/toolExport';
 import {
   agentMetaOf,
   commonLosses,
+  neutralToolLosses,
   modelLosses,
   modelParts,
   renderAgents,
@@ -61,11 +62,12 @@ export const cursorAdapter: ToolAdapter = {
         { code: 'rule-load', effect: 'mapped', value: a.usage === 'always' ? 'always' : 'intelligent' },
         ...ruleHeaderLoss(s, 'cursor'),
       ];
+    if (a.kind === 'skill') return [...out, ...neutralToolLosses(s, 'cursor')];
     if (a.kind !== 'agent') return out;
     const meta = agentMetaOf(s);
     return [
       ...out,
-      ...toolListLosses(meta, 'cursor', false),
+      ...toolListLosses(s, 'cursor', false),
       ...(meta.mcpServers.length ? [{ code: 'mcpServers' as const, effect: 'lost' as const, value: meta.mcpServers.join(', ') }] : []),
       ...(meta.skills.length ? [{ code: 'skills' as const, effect: 'lost' as const, value: meta.skills.join(', ') }] : []),
       ...modelLosses(meta, 'cursor', true, false),

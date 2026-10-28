@@ -6,6 +6,10 @@
 
 ### Added
 
+- New board artifact library in Settings › Harness › Board artifacts: each rule, skill, agent and MCP server is active or inactive, with counter, search, filter and a skill folder tree.
+- The **New rule**, **New skill** and **New agent** forms open with a template, tools and live frontmatter, skill and agent compatibility and an export preview.
+- The **Create with AI** assistant asks about the project one question at a time, with the file draft updating live.
+- The card warns when a linked skill asks for tools its agent does not grant.
 - The Harness notice about rules that are off gains **Show only the ones off**, to review them one by one.
 - New Automation section in Settings, with the AI permission, the time limit, the heartbeat and parallelism, which leave the Harness.
 - The board library marks what is factory-made, and copies now follow their source.
@@ -35,6 +39,8 @@
 
 ### Changed
 
+- Active rules go into every AI context of the board, and active skills only into the cards that link them; rules that were **Per card** become inactive, for review.
+- Exporting to Claude Code writes `allowed-tools` on skills and `tools` on agents from the chosen tools; Cursor and Kimi Code leave the field out and warn.
 - UX review of the Harness, Automation, Connect agents and Workflows screens: Automation split into Run, Heartbeat and Parallelism; "Fill in the suggested model" sits under the model suggestion title; the context plan without a repeated title and with "Inherit agent"; shorter actions in the agents list ("Make default", "Restore original").
 - In the Harness artifacts, search sits inside each tab, and the bar separates creating from asking the AI in every topic.
 - The model suggestion moves to the end of Connect agents, and each workflow's context plan to the workflow itself in Workflows and columns; the Harness keeps the board's default plan.
@@ -61,6 +67,7 @@
 
 ### Removed
 
+- The card's Rules field is gone: active rules already apply to every request.
 - The "Default agent" field in Harness › Tool and execution is gone; it repeated "Make default" in the Agents tab.
 - The Details tab in Connect agents is gone; the profile actions move to the end of the Connection tab.
 - The "Default agent" card at the top of Connect agents is gone.

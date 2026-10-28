@@ -6,6 +6,7 @@ import type { FormatLoss } from '../../shared/toolExport';
 import {
   agentMetaOf,
   commonLosses,
+  neutralToolLosses,
   flagLosses,
   modelLosses,
   renderAgents,
@@ -52,11 +53,12 @@ export const kimiAdapter: ToolAdapter = {
     const out: FormatLoss[] = commonLosses(s);
     if (a.kind === 'rule')
       return [...out, { code: 'rule-load', effect: 'mapped' }, { code: 'rules-merged', effect: 'mapped' }, ...ruleHeaderLoss(s, 'kimi')];
+    if (a.kind === 'skill') return [...out, ...neutralToolLosses(s, 'kimi')];
     if (a.kind !== 'agent') return out;
     const meta = agentMetaOf(s);
     return [
       ...out,
-      ...toolListLosses(meta, 'kimi', true),
+      ...toolListLosses(s, 'kimi', true),
       ...(meta.mcpServers.length ? [{ code: 'mcpServers' as const, effect: 'lost' as const, value: meta.mcpServers.join(', ') }] : []),
       ...(meta.skills.length ? [{ code: 'skills' as const, effect: 'lost' as const, value: meta.skills.join(', ') }] : []),
       ...modelLosses(meta, 'kimi', false, false),

@@ -64,8 +64,9 @@ cada fase e move os cards conforme avança, sempre parando para a sua aprovaçã
   para; começa sem regras, skills, agentes ou hooks que você não tenha marcado, e lê os documentos
   anexados só quando precisa. A conversa que ela lê tem no máximo 20 mensagens (ou começa no último
   resumo). [Harness](docs/harness.md)
-- **Harness do board.** Regras, skills, agentes e servidores MCP vivem numa biblioteca do board, no
-  modo **Sempre**, **Pelo card** ou **Desligado**, com importação e exportação para a ferramenta.
+- **Harness do board.** Regras, skills, agentes e servidores MCP vivem numa biblioteca do board, cada
+  um ativo ou inativo: regra ativa entra em todo contexto, skill e agente ativos se vinculam ao card.
+  Formulários com tools neutras, assistente **Criar com IA** e exportação para a ferramenta.
   Toda execução roda por um agente, com o mínimo de que ele precisa.
   ![Harness do board](docs/images/harness.png) [Harness](docs/harness.md)
 - **Garantia no Cursor pelo hook do board.** O board registra um hook global em `~/.cursor/hooks.json`.

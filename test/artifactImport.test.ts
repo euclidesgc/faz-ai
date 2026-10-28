@@ -7,8 +7,8 @@ describe('artifactImport: usage defaults', () => {
     for (const kind of ['skill', 'agent', 'mcp'] as const) expect(importUsage(kind)).toBe('contextual');
   });
 
-  it('creates AI/wizard rules disabled, but manual rules and other kinds contextual', () => {
-    expect(createUsage('rule', 'manual')).toBe('contextual');
+  it('creates every rule disabled (even manual), and other kinds contextual', () => {
+    expect(createUsage('rule', 'manual')).toBe('off');
     expect(createUsage('rule', 'wizard')).toBe('off');
     expect(createUsage('rule', 'ai')).toBe('off');
     for (const kind of ['skill', 'agent', 'mcp'] as const)
