@@ -963,6 +963,9 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     terminate: terminateProcessGroup,
     comment: (work, _outcome, body) => new CommentRepo(handle.db).add(work.storyId ?? work.cardId!, 'Faz AI', body, 'ai'),
     publish: () => publishOrchestrations(),
+    note: (storyId, body) => {
+      new CommentRepo(handle.db).add(storyId, 'Faz AI', body, 'ai');
+    },
     block: (storyId, reason) =>
       router.handle({ type: 'card.status.set', cardId: storyId, status: 'blocked', note: reason }, { author: 'Faz AI', source: 'ai' }),
     log: o.log,

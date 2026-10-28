@@ -1,4 +1,5 @@
 // Controlador separado para que SIGKILL realmente perca memória e deixe descendentes vivos.
+import { validBrief } from './subtaskBrief';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -133,6 +134,7 @@ async function main() {
       parentId: story,
       title: 'Órfã',
     });
+    board.handle({ type: 'card.update', cardId: card, patch: { description: validBrief() } }, { source: 'ai' });
     const phase = s.fieldDefs.find((f) => f.name === 'Fase');
     if (phase) board.handle({ type: 'field.setValue', cardId: card, fieldId: phase.id, value: column.name }, { source: 'ai' });
     await orchestrator.drive(story, 'manual');

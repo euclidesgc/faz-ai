@@ -5,8 +5,9 @@ import { Autopilot, type StoryDriver } from '../src/extension/autopilot';
 import { Heartbeat } from '../src/extension/heartbeat';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { closingAdvice, STORY_SESSION_ADVICE, subtaskAdvice } from '../src/extension/unitAdvice';
+import { briefAdvice, closingAdvice, STORY_SESSION_ADVICE, subtaskAdvice } from '../src/extension/unitAdvice';
 import { orchestratesStory } from '../src/shared/orchestration';
+import { briefFailures, briefSkeleton } from '../src/shared/subtaskBrief';
 import type { AiActivity } from '../src/shared/model';
 import type { AiRunOrigin } from '../src/shared/log';
 import type { AiRunMode } from '../src/shared/runner';
@@ -213,5 +214,18 @@ describe('pedidos à IA', () => {
       for (const name of ['Objetivo', 'Pronto quando', 'Pode tocar', 'Não pode tocar']) expect(text).toContain(`"${name}"`);
       expect(text).toContain('inclusive as de correção e as de revisão');
     }
+  });
+
+  it('a sessão de correção traz o esqueleto, as seções que faltam e a ordem de não executar', () => {
+    const id = story('Conduzida', 1);
+    const s = router.snapshot();
+    const parent = s.cards.find((c) => c.id === id)!;
+    const kid = s.cards.find((c) => c.parentId === id)!;
+    const text = briefAdvice(parent, briefFailures([kid]));
+    expect(text).toContain(`#${kid.number}`);
+    expect(text).toContain('falta Objetivo, Pronto quando, Pode tocar, Não pode tocar');
+    expect(text).toContain(briefSkeleton());
+    expect(text).toMatch(/update_card[\s\S]*Não execute sub-tarefas[\s\S]*não crie sub-tarefas[\s\S]*pare/);
+    expect(text).toMatch(/confere de novo[\s\S]*história vai para a pessoa/);
   });
 });
