@@ -36,11 +36,13 @@
 - When each run ends, the board checks what the AI used against what the card allowed (#972).
 - On Cursor, a hook ensures the run respects what the card allows (#965).
 - The selected card gets a shadow that sets it apart from the others (#1069).
+- The board checks a sub-task description before running it and sends it back to the conductor when sections are missing (#1138).
 
 ### Changed
 
 - Active rules go into every AI context of the board, and active skills only into the cards that link them; rules that were **Per card** become inactive, for review.
 - Exporting to Claude Code writes `allowed-tools` on skills and `tools` on agents from the chosen tools; Cursor and Kimi Code leave the field out and warn.
+- The Plan asks for the sections Objetivo, Pronto quando, Pode tocar and Não pode tocar in each sub-task description (#1110).
 - Sub-tasks become the smallest part of the delivery that can be checked on its own, not a per-file split: the Plan instruction, the flow skill, the MCP descriptions and the agents say the board runs them one at a time, in dependency order (#1106).
 - UX review of the Harness, Automation, Connect agents and Workflows screens: Automation split into Run, Heartbeat and Parallelism; "Fill in the suggested model" sits under the model suggestion title; the context plan without a repeated title and with "Inherit agent"; shorter actions in the agents list ("Make default", "Restore original").
 - In the Harness artifacts, search sits inside each tab, and the bar separates creating from asking the AI in every topic.

@@ -1,5 +1,8 @@
 import { FLOW_SKILL_NAME } from '../shared/harnessProject';
+import { BRIEF_SECTIONS, REQUIRED_BRIEF_SECTIONS } from '../shared/subtaskBrief';
 import { skillTemplate } from './frontmatter';
+
+const BRIEF_TITLES = REQUIRED_BRIEF_SECTIONS.map((name) => `"${name}"`).join(', ');
 
 /** Skill que ensina a IA a conduzir os cards pelo fluxo do board. É servida pelo `get_skill`, sem arquivo instalado na pasta de skills de nenhuma ferramenta. */
 export const FLOW_SKILL = {
@@ -83,7 +86,7 @@ conversa dizendo o que mudou e chame \`request_review\` de novo.
 
 ## Sub-tarefas de implementação
 
-No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, na descrição os arquivos que ela vai tocar (tirados do mapa do código), o campo "Esforço da
+No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, na descrição as seções ${BRIEF_TITLES} (e "${BRIEF_SECTIONS.decisions}", se houver; o board confere as quatro obrigatórias antes de executar e devolve ao condutor a sub-tarefa que não as tem), com os arquivos tirados do mapa do código, o campo "Esforço da
 atividade" avaliado (Baixo, Médio ou Alto; o modelo é sugerido a partir dele) e os artefatos que a
 execução pede: os campos Skills e MCPs, o agente (\`profile\` no \`create_card\`; \`set_card_profile\`
 só para trocar depois) e os itens do checklist (\`checklist\`), tudo no mesmo \`create_card\`. Ele devolve o

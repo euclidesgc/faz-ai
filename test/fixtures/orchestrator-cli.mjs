@@ -27,7 +27,7 @@ try {
   }
   await new Promise((resolve) => setTimeout(resolve, 30));
   if (mode === 'partial') process.exitCode = 1;
-  else {
+  else if (mode !== 'noop') {
     const config = JSON.parse(fs.readFileSync(configFile, 'utf8')).mcpServers['faz-ai'];
     const client = new Client({ name: 'fixture', version: '1' });
     try {

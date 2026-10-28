@@ -96,7 +96,10 @@ do código rápida depois:
   execução nova da IA: as partes pequenas da mesma área e do mesmo agente se juntam, e a separação vem
   quando o agente muda ou a parte é grande o bastante para ser revisada sozinha. Recortar por camada
   vale quando cada camada se verifica sozinha, e a documentação pequena vai com a última sub-tarefa de
-  código. O plano estima as linhas de código da entrega: acima de umas 400, a IA deixa na
+  código. A descrição de cada sub-tarefa leva as seções `Objetivo`, `Pronto quando` (a checagem que diz
+  que acabou, de preferência o comando), `Pode tocar` e `Não pode tocar`, e opcionalmente `Decisões
+  anteriores`; o modelo do plano traz o esqueleto, e o board confere as quatro obrigatórias antes de
+  executar. O plano estima as linhas de código da entrega: acima de umas 400, a IA deixa na
   história a primeira parte e cria as seguintes como **histórias derivadas**, em ordem (`create_card`
   com `derived_from` apontando para a parte anterior). A branch de cada derivada parte da branch da
   parte anterior e o pull request dela é empilhado sobre o dela; o card mostra **Derivada de #N**. Se
@@ -413,6 +416,18 @@ e `move_card` com `comment` conclui e registra o resultado; no Plan, `create_car
 outra. Sem dependências declaradas, todas as sub-tarefas em aberto são consideradas independentes.
 Quando todas terminam, o board chama a IA uma vez para o fechamento: verificar o conjunto, fazer o
 commit e mover a história.
+
+**Conferência da descrição.** Antes de executar uma sub-tarefa, o board confere se a descrição dela
+tem as seções `Objetivo`, `Pronto quando`, `Pode tocar` e `Não pode tocar` (`Decisões anteriores`
+é opcional). Se alguma sub-tarefa da fase não tem, o board **não a executa**: grava na conversa da
+história uma nota com as sub-tarefas e as seções que faltam e abre uma sessão de correção com o
+condutor, que reescreve cada descrição com `update_card`, sem executar nem criar sub-tarefas, e para.
+Ao fim da sessão o board confere de novo: com as descrições corrigidas, a execução segue; se ainda
+faltar seção, a história é **bloqueada** com o motivo, sem abrir outra correção. Para destravar,
+responda na conversa da história (ou corrija a descrição): a IA lê a mensagem e uma correção nova
+pode abrir. O **Trabalhar** manual numa sub-tarefa não passa pela conferência. As histórias que já
+estão em Implementação com sub-tarefas sem as seções passam por essa correção na próxima condução
+pelo board.
 
 Nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica
 negada; no Cursor e no Kimi Code, sem bloqueio comprovado, a capacidade fica "desconhecida" e a

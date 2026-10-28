@@ -165,6 +165,10 @@ true.
   question with the recommended option and records it in the **Perguntas e respostas** section of
   the description. Only a real impediment (access, environment, a failure it cannot fix) blocks the
   card.
+- **Sub-task descriptions checked**: the autopilot and the autonomous mode drive the story through
+  the same board path, so a sub-task missing the required sections is not run: the AI fixes it in a
+  story session and, if a section is still missing, the story is blocked with the reason (see the
+  description check in `fluxo_EN.md`).
 - **Conversation summarized between phases**: when the story moves to another column with three or
   more messages since the last summary (or two that add up to a lot of text; at least one from the
   AI), the autopilot runs **Resumir a conversa** (summarize the conversation) before the new phase:

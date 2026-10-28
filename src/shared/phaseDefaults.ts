@@ -1,3 +1,5 @@
+import { BRIEF_SECTIONS, REQUIRED_BRIEF_SECTIONS, briefSkeleton } from './subtaskBrief';
+
 /**
  * Fases padrão do fluxo: o que a IA faz quando um card entra na coluna e o modelo do documento que
  * a fase produz. É só o ponto de partida; tudo é editável em Configurações → Workflows e colunas.
@@ -537,9 +539,28 @@ const verifiableSlices = (name: string, text: string): string =>
         .replace('crie uma sub-tarefa para cada passo', 'crie uma sub-tarefa para cada parte')
     : text;
 
-/** Os textos padrão atuais (versão 16): os da versão 14 com o Plan recortado por entrega verificável. */
-export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+/** Os textos padrão da versão 16: os da versão 14 com o Plan recortado por entrega verificável. */
+const PHASE_DEFAULTS_V16: Record<string, PhaseDefault> = Object.fromEntries(
   Object.entries(PHASE_DEFAULTS_V14).map(([name, d]) => [name, { ...d, instruction: verifiableSlices(name, d.instruction) }]),
+);
+
+// A versão 17 pede a descrição da sub-tarefa em seções (subtaskBrief): o board confere as obrigatórias antes de executar.
+const SUBTASK_BRIEF_PLAN_LAST =
+  'A descrição de cada sub-tarefa deve bastar para executá-la: o que fazer, os arquivos que ela vai tocar (tirados do mapa) e como verificar.';
+const SUBTASK_BRIEF_PLAN_RULE = `Escreva a descrição de cada sub-tarefa nas seções ${REQUIRED_BRIEF_SECTIONS.map((n) => `"${n}"`).join(', ')} (e "${BRIEF_SECTIONS.decisions}", se houver, opcional), no esqueleto do modelo do plano: "${BRIEF_SECTIONS.done}" é a checagem que diz que acabou, de preferência o comando; "${BRIEF_SECTIONS.may}" e "${BRIEF_SECTIONS.mayNot}" saem do mapa do código. O board confere as quatro obrigatórias antes de executar e devolve ao condutor a sub-tarefa que não as tem.`;
+const SUBTASK_BRIEF_PLAN_SECTION = `## Descrição de cada sub-tarefa\nCada sub-tarefa leva na descrição:\n\n${briefSkeleton()}\n\n`;
+const subtaskBrief = (name: string, d: PhaseDefault): PhaseDefault =>
+  name === 'Plan'
+    ? {
+        ...d,
+        instruction: d.instruction.replace(SUBTASK_BRIEF_PLAN_LAST, SUBTASK_BRIEF_PLAN_RULE),
+        artifactTemplate: d.artifactTemplate.replace('## Pontos de atenção', `${SUBTASK_BRIEF_PLAN_SECTION}## Pontos de atenção`),
+      }
+    : d;
+
+/** Os textos padrão atuais (versão 17): os da versão 16 com o Plan pedindo a descrição da sub-tarefa em seções. */
+export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+  Object.entries(PHASE_DEFAULTS_V16).map(([name, d]) => [name, subtaskBrief(name, d)]),
 );
 
 /** Textos padrão anteriores de uma fase e o que a versão atual traz de novo, para a atualização do board. */
@@ -579,10 +600,11 @@ export const PHASE_HISTORY: Record<string, PhaseHistory> = {
       PHASE_DEFAULTS_V12.Plan!.instruction,
       PHASE_DEFAULTS_V13.Plan!.instruction,
       PHASE_DEFAULTS_V14.Plan!.instruction,
+      PHASE_DEFAULTS_V16.Plan!.instruction,
     ],
-    templates: [PLAN_TEMPLATE_V5, PLAN_TEMPLATE_V8, PHASE_DEFAULTS_V12.Plan!.artifactTemplate],
+    templates: [PLAN_TEMPLATE_V5, PLAN_TEMPLATE_V8, PHASE_DEFAULTS_V12.Plan!.artifactTemplate, PHASE_DEFAULTS_V16.Plan!.artifactTemplate],
     change:
-      'as sub-tarefas passam a ser a menor parte da entrega que se verifica sozinha: as pequenas da mesma área e do mesmo agente se juntam, e a documentação pequena vai com a última de código; o plano parte do DISCOVERY quando a história veio pela trilha curta, sem PRD nem Spec; o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
+      'a descrição de cada sub-tarefa passa a ter as seções Objetivo, Pronto quando, Pode tocar e Não pode tocar (Decisões anteriores é opcional), com o esqueleto no modelo do plano, e o board confere as quatro obrigatórias antes de executar; as sub-tarefas passam a ser a menor parte da entrega que se verifica sozinha: as pequenas da mesma área e do mesmo agente se juntam, e a documentação pequena vai com a última de código; o plano parte do DISCOVERY quando a história veio pela trilha curta, sem PRD nem Spec; o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
   },
   Revisão: {
     instructions: [PHASE_DEFAULTS_V12.Revisão!.instruction],

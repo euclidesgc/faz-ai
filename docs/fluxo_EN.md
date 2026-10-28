@@ -102,7 +102,10 @@ code review quick later:
   time, each in a fresh AI run: small parts of the same area and the same agent are merged, and they
   are split when the agent changes or the part is big enough to be reviewed alone. Splitting by layer
   is fine when each layer can be checked alone, and small documentation goes with the last code
-  sub-task. The plan estimates the lines of code of the delivery: above about 400,
+  sub-task. Each sub-task description carries the sections `Objetivo` (goal), `Pronto quando` (done
+  when: the check that says it is finished, preferably the command), `Pode tocar` (may touch) and
+  `Não pode tocar` (may not touch), and optionally `Decisões anteriores` (earlier decisions); the plan
+  template brings the skeleton, and the board checks the four required ones before running. The plan estimates the lines of code of the delivery: above about 400,
   the AI keeps the first part in the story and creates the next ones as **derived stories**, in order
   (`create_card` with `derived_from` pointing to the previous part). The branch of each derived story
   starts from the branch of the previous part and its pull request is stacked on top of that one; the
@@ -439,6 +442,18 @@ with `comment` completes it and records the result; in Plan, `create_card` alrea
 is still waiting for another. With no dependencies declared, all open sub-tasks are considered
 independent. When all of them finish, the board calls the AI once for the closing: verify the whole,
 commit and move the story.
+
+**Description check.** Before running a sub-task, the board checks that its description has the
+sections `Objetivo`, `Pronto quando`, `Pode tocar` and `Não pode tocar` (`Decisões anteriores` is
+optional). If any sub-task of the phase lacks one, the board **does not run it**: it records in the
+story conversation a note with the sub-tasks and the missing sections and opens a correction
+session with the conductor, which rewrites each description with `update_card`, without running or
+creating sub-tasks, and stops. When the session ends the board checks again: with the descriptions
+fixed, execution goes on; if a section is still missing, the story is **blocked** with the reason,
+without opening another correction. To unblock it, answer in the story conversation (or fix the
+description): the AI reads the message and a new correction may open. The manual **Work** on a
+sub-task skips the check. Stories already in Implementação with sub-tasks missing the sections go
+through this correction the next time the board drives them.
 
 No execution delegates to the tool's subagents (in Claude Code, `Agent` — formerly `Task` — is
 denied; Cursor and Kimi Code have no proven block, so the capability stays "unknown" and admission

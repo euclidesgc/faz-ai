@@ -36,11 +36,13 @@
 - Ao fim de cada execução, o board confere o que a IA usou contra o que o card liberou (#972).
 - No Cursor, um hook garante que a execução respeite o que o card permite (#965).
 - O card selecionado ganha uma sombra que o destaca dos demais (#1069).
+- O board confere a descrição da sub-tarefa antes de executar e devolve ao condutor a que não tem as seções (#1138).
 
 ### Alterado
 
 - Regras ativas entram em todo contexto de IA do board, e skills ativas só no card que as vincula; regras que estavam **Pelo card** passam a inativas, para revisão.
 - A exportação para o Claude Code grava `allowed-tools` nas skills e `tools` nos agentes a partir das tools escolhidas; Cursor e Kimi Code omitem o campo e avisam.
+- O Plan pede, na descrição de cada sub-tarefa, as seções Objetivo, Pronto quando, Pode tocar e Não pode tocar (#1110).
 - As sub-tarefas passam a ser a menor parte da entrega que se verifica sozinha, não um recorte por arquivo: a instrução do Plan, a skill do fluxo, as descrições do MCP e os agentes dizem que o board as executa uma por vez, na ordem das dependências (#1106).
 - Revisão de UX das telas de Harness, Automação, Conectar agentes e Workflows: Automação dividida em Execução, Heartbeat e Paralelismo; o "Preencher o modelo sugerido" fica sob o título da sugestão de modelo; o plano de contexto sem título repetido e com "Herdar agente"; ações mais curtas na lista de agentes ("Tornar padrão", "Restaurar o original").
 - Nos artefatos do Harness, a busca fica dentro de cada aba, e a barra separa criar de pedir à IA em todos os assuntos.

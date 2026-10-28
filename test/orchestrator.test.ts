@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { validBrief } from './fixtures/subtaskBrief';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -29,7 +30,8 @@ let orchestrator: Orchestrator;
 let options: OrchestratorOptions;
 let executions: Map<string, AiExecution>;
 let starts: string[];
-let mode: 'done' | 'partial' | 'hold';
+let mode: 'done' | 'partial' | 'hold' | 'fix' | 'nofix';
+let fixing: string[] = [];
 let logs: string[];
 const wasm = path.resolve(__dirname, '../node_modules/sql.js/dist');
 const fixture = path.resolve(__dirname, 'fixtures/orchestrator-cli.mjs');
@@ -56,6 +58,7 @@ beforeEach(async () => {
   starts = [];
   logs = [];
   mode = 'done';
+  fixing = [];
   stopMcp = await startMcpServer(socketPath(workspace), {
     getRouter: async () => router,
     getRunner: async () => undefined,
@@ -73,8 +76,17 @@ beforeEach(async () => {
       const card = state.cards.find((c) => c.id === id)!;
       const column = state.columns.find((c) => c.workflowId === card.workflowId && c.category === 'done')!;
       const config = command.args[command.args.indexOf('--mcp-config') + 1]!;
+      // a sessão da história só reescreve descrições (fix) ou termina sem tocar em nada (nofix); as sub-tarefas seguem como done
+      const session = id === storyId && (mode === 'fix' || mode === 'nofix');
+      if (session && mode === 'fix')
+        for (const sub of fixing)
+          router.handle(
+            { type: 'card.update', cardId: sub, patch: { description: validBrief() } },
+            { author: 'Claude Code', source: 'ai' },
+          );
+      const cliMode = session ? 'noop' : mode === 'fix' || mode === 'nofix' ? 'done' : mode;
       return spawnHeadless(
-        { command: process.execPath, args: [fixture, config, String(card.number), column.name, mode], format: command.format },
+        { command: process.execPath, args: [fixture, config, String(card.number), column.name, cliMode], format: command.format },
         cwd,
         out,
         undefined,
@@ -151,12 +163,13 @@ afterEach(async () => {
   await handle.close();
   fs.rmSync(dir, { recursive: true, force: true });
 });
-function subtask(title: string) {
+function subtask(title: string, description: string | null = validBrief()) {
   const state = router.snapshot();
   const child = state.workflows.find((w) => w.kind === 'child')!;
   const type = state.cardTypes.find((t) => t.defaultWorkflowId === child.id)!;
   const column = state.columns.find((c) => c.workflowId === child.id && c.category === 'open')!;
   const id = router.createCard({ typeId: type.id, columnId: column.id, parentId: storyId, title });
+  if (description !== null) router.handle({ type: 'card.update', cardId: id, patch: { description } }, { author: 'Fixture', source: 'ai' });
   const phase = state.fieldDefs.find((f) => f.name === 'Fase');
   if (phase)
     router.handle(
@@ -354,5 +367,87 @@ describe('orquestrador com processo, ponte, disco e trava reais', () => {
     await vi.waitFor(() => expect(blocked).toHaveLength(1));
     expect(blocked[0]![0]).toBe(storyId);
     expect(blocked[0]![1]).toContain('está parada');
+  });
+  describe('conferência da descrição das sub-tarefas', () => {
+    const number = (id: string) => router.snapshot().cards.find((c) => c.id === id)!.number;
+    const notes = () => router.snapshot().comments.filter((c) => c.cardId === storyId && c.author === 'Faz AI');
+    function spyAdvice() {
+      const advices: string[][] = [];
+      const realStart = options.starter.start.bind(options.starter);
+      options.starter.start = (id, opts) => {
+        advices.push(opts.advice ?? []);
+        realStart(id, opts);
+      };
+      return advices;
+    }
+
+    it('a sessão da história recebe as sub-tarefas reprovadas, as seções que faltam e a ordem de não executar', async () => {
+      const bad = subtask('Sem seções', '### Objetivo\nFazer.');
+      const advices = spyAdvice();
+      mode = 'nofix';
+      options.block = () => {};
+      await orchestrator.drive(storyId, 'manual');
+      expect(starts).toEqual([storyId]);
+      const text = advices[0]!.join('\n');
+      expect(text).toContain(`#${number(bad)}`);
+      expect(text).toContain('falta Pronto quando, Pode tocar, Não pode tocar');
+      expect(text).toContain('### Pronto quando');
+      expect(text).toMatch(/Não execute sub-tarefas[\s\S]*pare/);
+      expect(text).toContain('a história vai para a pessoa');
+      await completed(1);
+    });
+
+    it('a nota da recusa entra uma vez na conversa da história, mesmo com drive repetido', async () => {
+      const bad = subtask('Sem seções', null);
+      mode = 'hold';
+      options.block = () => {};
+      const noted: [string, string][] = [];
+      options.note = (id, body) => {
+        noted.push([id, body]);
+        new CommentRepo(handle.db).add(id, 'Faz AI', body, 'ai');
+      };
+      await orchestrator.drive(storyId, 'manual');
+      expect((await orchestrator.drive(storyId, 'heartbeat')).kind).toBe('wait');
+      expect((await orchestrator.drive(storyId, 'manual')).kind).toBe('wait');
+      expect(noted).toHaveLength(1);
+      expect(noted[0]![0]).toBe(storyId);
+      expect(noted[0]![1]).toContain(`#${number(bad)}`);
+      expect(noted[0]![1]).toContain('Pronto quando');
+      expect(notes().filter((c) => c.body.includes('descrição incompleta'))).toHaveLength(1);
+    });
+
+    it('a correção que reescreve a descrição fecha done e a sub-tarefa abre em seguida', async () => {
+      const bad = subtask('Corrigida', null);
+      fixing = [bad];
+      mode = 'fix';
+      const blocked: string[] = [];
+      options.block = (_id, reason) => blocked.push(reason);
+      await orchestrator.drive(storyId, 'manual');
+      await vi.waitFor(() => expect(starts).toContain(bad), { timeout: 10_000, interval: 50 });
+      await vi.waitFor(() => expect(router.work.records().filter((w) => w.state === 'done').length).toBeGreaterThanOrEqual(2), {
+        timeout: 10_000,
+        interval: 50,
+      });
+      await orchestrator.settled();
+      const first = router.work.records().find((w) => w.kind === 'story')!;
+      expect(first.state).toBe('done');
+      expect(starts.slice(0, 2)).toEqual([storyId, bad]);
+      expect(blocked).toEqual([]);
+    }, 20_000);
+
+    it('sem a correção, a história é bloqueada com o motivo e um novo drive não abre outra sessão', async () => {
+      const bad = subtask('Sem correção', null);
+      mode = 'nofix';
+      const blocked: [string, string][] = [];
+      options.block = (id, reason) => blocked.push([id, reason]);
+      await orchestrator.drive(storyId, 'manual');
+      await completed(1);
+      await vi.waitFor(() => expect(blocked).toHaveLength(1), { timeout: 10_000 });
+      expect(blocked[0]![0]).toBe(storyId);
+      expect(blocked[0]![1]).toContain(`#${number(bad)}`);
+      expect(blocked[0]![1]).toContain('descrição');
+      expect((await orchestrator.drive(storyId, 'manual')).kind).toBe('paused');
+      expect(starts).toEqual([storyId]);
+    }, 20_000);
   });
 });

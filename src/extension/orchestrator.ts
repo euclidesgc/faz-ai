@@ -5,6 +5,7 @@ import {
   admit,
   effectiveLimits,
   LIVE_WORK_STATES,
+  pendingSubtasks,
   reconcileOutcome,
   storyPlan,
   type PolicyLimits,
@@ -14,6 +15,7 @@ import {
 } from '../shared/orchestration';
 import { columnOf, isLive } from '../shared/selectors';
 import { isWithHuman } from '../shared/story';
+import { briefFailures, briefReason, isBriefKey } from '../shared/subtaskBrief';
 import { Autopilot } from './autopilot';
 import type { AiRunEnd } from './ai/gateway';
 import { MeasureEndedError, MeasureRefusedError } from './aiOutput/errors';
@@ -21,7 +23,7 @@ import type { RunOptions } from './runner';
 import type { WorkClaim, WorkRecord, WorkRepo } from './repositories/workRepo';
 import type { RunMcpSessions } from './mcp/runSessions';
 import { acquireWorkspace, adoptWorkspace, type WorkspaceLease } from './workspaceLock';
-import { closingAdvice, subtaskAdvice } from './unitAdvice';
+import { briefAdvice, closingAdvice, subtaskAdvice } from './unitAdvice';
 import { processGroupState, type ProcessIdentity } from './processIdentity';
 
 /** O mesmo runner das portas existentes; a fundação também pode ser exercitada com processos Node. */
@@ -48,6 +50,8 @@ export interface OrchestratorOptions {
   publish(): void;
   /** Bloqueia a história com o motivo (a parada do plano); sem ela, a parada só volta no resultado do `drive`. */
   block?(storyId: string, reason: string): void;
+  /** Grava uma nota do board na conversa da história (a recusa da conferência das sub-tarefas). */
+  note?(storyId: string, body: string): void;
   log(message: string): void;
   gitMode(): string;
   policy?(): PolicyLimits;
@@ -225,6 +229,8 @@ export class Orchestrator {
     if (!admission.ok) return { kind: 'wait', reason: admission.reason };
     const claim = this.options.repo().claim(unit, this.owner, workspace);
     if (!claim) return { kind: 'wait', reason: 'A unidade ou a pasta já está reservada.' };
+    // o claim é único por chave: a nota da recusa não se repete num drive repetido
+    if (isBriefKey(unit.key)) this.noteBrief(unit);
     let lease: WorkspaceLease | null = null;
     try {
       lease = acquireWorkspace(workspace, claim.work.id, claim.work.generation, this.owner, this.options.coordinationDir);
@@ -288,7 +294,23 @@ export class Orchestrator {
       throw error;
     }
   }
-  /** O pedido extra de cada unidade: o ciclo da sub-tarefa ou o fechamento da fase. */
+  /** As sub-tarefas reprovadas na conferência, recalculadas do estado atual com o mesmo filtro do plano. */
+  private briefFailuresOf(unit: WorkUnit) {
+    const state = this.options.state();
+    const story = state.cards.find((c) => c.id === unit.storyId);
+    if (!story) return null;
+    const repo = this.options.repo();
+    const records = repo.records();
+    const relevant = records.filter((w) => w.state === 'failed').concat(records.filter((w) => LIVE_WORK_STATES.includes(w.state)));
+    const live = { byCard: new Map(relevant.filter((w) => w.cardId).map((w) => [w.cardId!, w])) };
+    const done = new Set(records.filter((w) => w.state === 'done' || w.state === 'cancelled').map((w) => w.key));
+    return { story, failures: briefFailures(pendingSubtasks(state, story, live, done)) };
+  }
+  private noteBrief(unit: WorkUnit): void {
+    const found = this.briefFailuresOf(unit);
+    if (found && unit.storyId) this.options.note?.(unit.storyId, briefReason(found.story, found.failures));
+  }
+  /** O pedido extra de cada unidade: o ciclo da sub-tarefa, a correção da descrição ou o fechamento da fase. */
   private advice(unit: WorkUnit): string[] {
     const state = this.options.state();
     const story = state.cards.find((c) => c.id === unit.storyId);
@@ -296,6 +318,10 @@ export class Orchestrator {
     if (!story) return [];
     if (unit.kind === 'subtask' && card) return [subtaskAdvice(story, card)];
     if (unit.kind === 'closing') return [closingAdvice(story)];
+    if (unit.kind === 'story' && isBriefKey(unit.key)) {
+      const found = this.briefFailuresOf(unit);
+      return found ? [briefAdvice(found.story, found.failures)] : [];
+    }
     return [];
   }
   private revoke(claim: WorkClaim): void {
@@ -397,6 +423,9 @@ export class Orchestrator {
     if (gone && wasCancelled) outcome = { kind: 'cancelled' };
     else if (gone && this.startFailures.has(id)) outcome = { kind: 'needs-decision', reason: this.startFailures.get(id)! };
     else if (gone && newChildren && work.kind !== 'subtask' && end?.outcome === 'done' && !isWithHuman(card ?? { status: null }))
+      outcome = { kind: 'done' };
+    // a correção que terminou normalmente é done, tenha corrigido ou não: o storyPlan decide no continue
+    else if (gone && work.kind === 'story' && isBriefKey(work.key) && end?.outcome === 'done' && story && !isWithHuman(story))
       outcome = { kind: 'done' };
     const finished = repo.finish(id, work.generation, this.owner, outcome, () => this.result(work!, outcome));
     // O comentário e o desfecho chegam ao disco antes de liberar o escritor físico.

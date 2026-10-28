@@ -5,6 +5,7 @@ import { activityKindOf } from './activity';
 import { subtaskWaves } from './links';
 import { columnOf, isLive } from './selectors';
 import { isWithHuman } from './story';
+import { briefBlockedReason, briefFailures, briefKey } from './subtaskBrief';
 import { parallelLimit, textLimit, type RunnerConfig } from './runner';
 
 export type WorkKind = 'subtask' | 'story' | 'closing' | 'activity';
@@ -31,7 +32,7 @@ export interface LiveWork {
 }
 export type StoryPlan = { kind: 'units'; units: WorkUnit[] } | { kind: 'wait' | 'paused'; reason: string } | { kind: 'idle' };
 
-function phaseSubtasks(s: BoardState, story: Card): Card[] {
+export function phaseSubtasks(s: BoardState, story: Card): Card[] {
   const phase = columnOf(s, story);
   const field = s.fieldDefs.find((f) => f.name.toLowerCase() === 'fase' && f.kind === 'select');
   return s.cards.filter(
@@ -110,6 +111,16 @@ export function stoppedReason(story: Card, stopped: Card): string {
     : `a execução de #${stopped.number} terminou sem concluir a sub-tarefa (o resultado está na conversa dela).`;
   return `#${story.number} está parada: ${detail}\n\nResponda aqui na conversa da história (ou na da sub-tarefa): a IA lê a mensagem e resolve, mesmo com o bloqueio.`;
 }
+/** Sub-tarefas abertas da fase, sem as com a pessoa, as que falharam e as já concluídas (chave em `done`). */
+export function pendingSubtasks(s: BoardState, story: Card, live: LiveWork, done: ReadonlySet<string>): Card[] {
+  return phaseSubtasks(s, story).filter(
+    (c) =>
+      columnOf(s, c)?.category === 'open' &&
+      !isWithHuman(c) &&
+      live.byCard.get(c.id)?.state !== 'failed' &&
+      !done.has(workKey('subtask', s, story, c)),
+  );
+}
 export function storyPlan(s: BoardState, story: Card, live: LiveWork, done: ReadonlySet<string>): StoryPlan {
   const phase = columnOf(s, story);
   if (!isLive(story) || story.parentId || phase?.category !== 'open' || !phase.aiActive || activityKindOf(s, story) !== 'branch')
@@ -123,6 +134,14 @@ export function storyPlan(s: BoardState, story: Card, live: LiveWork, done: Read
   )
     return { kind: 'wait', reason: 'Há uma unidade da história em execução ou reconciliação.' };
   if (isWithHuman(story)) return { kind: 'paused', reason: `#${story.number} está com a pessoa.` };
+  const failures = briefFailures(pendingSubtasks(s, story, live, done));
+  if (failures.length) {
+    const key = briefKey(story, failures, handedBackAt(s, story));
+    const failed = live.byCard.get(story.id);
+    if (done.has(key) || (failed?.state === 'failed' && failed.key === key))
+      return { kind: 'paused', reason: briefBlockedReason(story, failures) };
+    return { kind: 'units', units: [{ kind: 'story', storyId: story.id, cardId: story.id, columnId: story.columnId, key }] };
+  }
   const children = phaseSubtasks(s, story);
   const open = children.filter((c) => columnOf(s, c)?.category === 'open');
   const waves = subtaskWaves(s, story.id);
