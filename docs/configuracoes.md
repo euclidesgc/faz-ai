@@ -256,7 +256,8 @@ A aba **Testar** tem três partes:
 
 - **Teste rápido pelo caminho dos cards**: um pedido curto pelo mesmo caminho das execuções (a CLI, o
   ACP ou a API do perfil), depois da confirmação, porque usa a sua assinatura. Uma resposta OK não
-  comprova isolamento, permissões nem MCP.
+  comprova isolamento, permissões nem MCP. No modo API, que não tem modelo padrão, o teste roda no
+  **Modelo do teste** escolhido ao lado do botão, entre os modelos do agente (os de texto primeiro).
 - **Sessão de teste pelo ACP**: abre o agente pelo SDK oficial do ACP e conversa com ele em tempo real: o
   texto, o raciocínio, as ferramentas, o plano e os pedidos de permissão, que você responde ali. O topo
   mostra o que o agente declarou (versão do protocolo, nome e versão do agente, a sessão, a conta e as

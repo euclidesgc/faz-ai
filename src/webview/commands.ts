@@ -183,7 +183,8 @@ export const settings = {
   duplicateAiProfile: (id: string) => req({ type: 'settings.aiProfiles.duplicate', id }),
   removeAiProfile: (id: string) => req({ type: 'settings.aiProfiles.remove', id }),
   probeAiProfiles: () => request({ type: 'settings.aiProfiles.probe' }, { timeout: 70_000 }),
-  testAiProfile: (id: string) => request({ type: 'settings.aiProfiles.test', id }, { timeout: 130_000 }),
+  testAiProfile: (id: string, model?: string) =>
+    request({ type: 'settings.aiProfiles.test', id, ...(model ? { model } : {}) }, { timeout: 130_000 }),
   // três rodadas de até cinco minutos cada: a descoberta e as duas citações
   testContextScope: (id: string) => request({ type: 'settings.aiProfiles.contextScope', id }, { timeout: 16 * 60_000 }),
   contextKeep: (id: string, location: Pick<ContextLocation, 'path' | 'scope'>, keep: boolean) =>

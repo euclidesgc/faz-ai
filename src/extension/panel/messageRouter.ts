@@ -410,9 +410,9 @@ export class MessageRouter {
     if (!this.aiProfileRuntime) throw new Error('Situação dos perfis indisponível neste host.');
     return this.aiProfileRuntime.probe().finally(() => this.invalidateSnapshot());
   }
-  testAiProfile(id: string) {
+  testAiProfile(id: string, model?: string) {
     if (!this.aiProfileRuntime) throw new Error('Teste de perfil indisponível neste host.');
-    return this.aiProfileRuntime.test(id).finally(() => this.invalidateSnapshot());
+    return this.aiProfileRuntime.test(id, model).finally(() => this.invalidateSnapshot());
   }
   private contextRunning = new Set<string>();
   // lidos da `meta` uma vez e guardados: o snapshot sai a cada mudança do board e não pode consultar o banco a mais

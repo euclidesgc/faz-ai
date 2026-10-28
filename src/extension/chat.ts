@@ -366,10 +366,10 @@ export class ChatSession {
         prepare: () => ({
           // runtime v1: contexto fechado, sem agente nem MCP além do contrato vazio (o chat não tem card)
           ...(this.deps.gateway.runtime === 'v1'
-            ? closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly)
+            ? closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly, permission)
             : // runtime legado: o perfil personalizado precisa da admissão; só o pedido, sem a configuração v1
               !isReadyCli(target.cli)
-              ? { strict: closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly).strict }
+              ? { strict: closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly, permission).strict }
               : {}),
           artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state) : undefined,
           config: {

@@ -6,6 +6,7 @@ import { admissionRegimeOf, DEFAULT_RUNNER, type RunnerConfig } from '../../../s
 import type { AiGateway, ContextRuntime } from '../../ai/gateway';
 import { NO_CARD } from '../../ai/gateway';
 import { closedV1 } from '../../ai/v1Prepare';
+import { bareExec } from '../../execution';
 import { profileCanProbe, profileSignedIn, profileVersion } from '../../cliProbe';
 import { resolveProfileCommand } from '../../cliResolve';
 import { redactCredentialValues } from '../../credentials';
@@ -150,7 +151,8 @@ export const aiProfileHandlers = {
 
 export interface AiProfileRuntime {
   probe(): Promise<Extract<HostToWebview, { type: 'aiProfiles.status' }>>;
-  test(id: string): Promise<Extract<HostToWebview, { type: 'aiProfiles.testResult' }>>;
+  /** `model`: o nome do modelo na API; só o modo API o usa, porque não tem modelo padrão */
+  test(id: string, model?: string): Promise<Extract<HostToWebview, { type: 'aiProfiles.testResult' }>>;
   /** O teste do contexto do card (descoberta pelo agente e citação); gasta pedidos da conta da ferramenta. */
   contextScope(id: string): Promise<ContextScopeReport>;
   /** Uma pergunta avulsa ao agente, sem ferramentas (o comando que desinstala um plugin); gasta um pedido. */
@@ -234,7 +236,7 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
       );
       return { type: 'aiProfiles.status', profiles: Object.fromEntries(results) };
     },
-    async test(id) {
+    async test(id, model) {
       const fail = (error: string): Extract<HostToWebview, { type: 'aiProfiles.testResult' }> => ({
         type: 'aiProfiles.testResult',
         id,
@@ -246,6 +248,10 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
       if (!meta) return fail('Perfil indisponível neste board.');
       if (!meta.enabled || !profileCanProbe(meta)) return fail('Perfil desativado ou pendente de revisão.');
       if (running.has(id)) return fail('Já existe um teste em curso para este perfil.');
+      // o modo API não tem modelo padrão da ferramenta: o teste roda no modelo que a pessoa escolheu na aba Testar
+      const api = meta.mode === 'api';
+      if (api && (!model || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(model)))
+        return fail('Escolha o modelo do teste: no modo API a ferramenta não tem modelo padrão.');
       running.add(id);
       let profile: AiProfile | undefined;
       const tail: string[] = [];
@@ -276,8 +282,23 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
             ...(isReadyCli(profile!) ? {} : { strict: { profileId: id, request: strict } }),
             // runtime v1: o teste do perfil também passa pelo contrato (fechado, sem MCP)
             ...(deps.gateway.runtime === 'v1' ? closedV1(id, 'chat', runner) : {}),
-            config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: true, skills: [], mcp: [] },
-            input: { prompt: 'Responda apenas com a palavra OK.', permission: 'board', structured: true },
+            config: {
+              model: api ? model! : null,
+              effort: null,
+              profile: null,
+              agent: null,
+              autonomous: false,
+              clean: true,
+              skills: [],
+              mcp: [],
+            },
+            input: {
+              prompt: 'Responda apenas com a palavra OK.',
+              permission: 'board',
+              structured: true,
+              // sem MCP nem ferramenta: só o modelo, que o modo API exige na execução
+              ...(api ? { exec: { ...bareExec({ name: model!, effort: null }), mcpConfig: JSON.stringify({ mcpServers: {} }) } } : {}),
+            },
           }),
           log: (line) => {
             for (const part of redactCredentialValues(line, profile?.config).split(/\r?\n/)) {

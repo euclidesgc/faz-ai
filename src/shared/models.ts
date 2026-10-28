@@ -258,3 +258,12 @@ export function parseJsonArray<T>(json: string | null | undefined): T[] {
     return [];
   }
 }
+
+/** Nomes de modelo que geram mídia, voz ou vetores, não texto: um "Responda OK" neles falha ou não diz nada. */
+const NON_TEXT_MODEL = /(tts|image|imagen|veo|embedding|aqa|audio|native-audio|live|banana|robotics|computer-use)/i;
+
+/** Os modelos de uma ferramenta no catálogo para o teste rápido: os de texto primeiro, na ordem do catálogo. */
+export function testModels(catalog: readonly ModelOption[], tool: string): ModelOption[] {
+  const own = catalog.filter((m) => m.tool === tool);
+  return [...own.filter((m) => !NON_TEXT_MODEL.test(m.model)), ...own.filter((m) => NON_TEXT_MODEL.test(m.model))];
+}

@@ -417,6 +417,11 @@ outra. Sem dependências declaradas, todas as sub-tarefas em aberto são conside
 Quando todas terminam, o board chama a IA uma vez para o fechamento: verificar o conjunto, fazer o
 commit e mover a história.
 
+O checklist é o registro do que foi feito: a IA marca cada item ao concluí-lo, na sub-tarefa e na
+história, e apaga o que não se aplica mais, dizendo o porquê na conversa. O `move_card` da IA para uma
+coluna de conclusão recusa o card com item em aberto; mover pela tela, o merge do pull request e o
+cancelamento não dependem do checklist.
+
 **Conferência da descrição.** Antes de executar uma sub-tarefa, o board confere se a descrição dela
 tem as seções `Objetivo`, `Pronto quando`, `Pode tocar` e `Não pode tocar` (`Decisões anteriores`
 é opcional). Se alguma sub-tarefa da fase não tem, o board **não a executa**: grava na conversa da

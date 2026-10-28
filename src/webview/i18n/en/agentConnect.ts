@@ -126,6 +126,13 @@ export const agentConnect: Record<string, string> = {
   // a sessão de teste
   'Teste rápido': 'Quick test',
   'Teste rápido pelo caminho dos cards': 'Quick test through the cards path',
+  'Modelo do teste': 'Test model',
+  'No modo API a ferramenta não tem modelo padrão: o teste roda neste modelo.':
+    'In API mode the tool has no default model: the test runs on this model.',
+  'Nenhum modelo no catálogo: conecte o agente de novo na aba Conexão.':
+    'No models in the catalog: connect the agent again in the Connection tab.',
+  'Escolha o modelo do teste: no modo API a ferramenta não tem modelo padrão.':
+    'Choose the test model: in API mode the tool has no default model.',
   'Um pedido curto pelo mesmo caminho das execuções dos cards, para conferir que o agente responde.':
     'A short request through the same path as card runs, to check that the agent answers.',
   'Executa um pedido curto como numa execução de card; usa a sua assinatura.':

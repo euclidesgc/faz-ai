@@ -7,10 +7,12 @@
 // servidor HTTP no próprio computador (ver cardWorld.ts). Na história 11, o mesmo card com as ferramentas
 // locais: editar um arquivo em edits, rodar um comando em full, a fuga da pasta negada, o deniedTools do card
 // valendo e a conferência sem desvio falso e com o desvio real. Os arquivos e o comando são de verdade.
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Connector } from '../../src/extension/ai/connect';
+import { ChatSession } from '../../src/extension/chat';
+import { createAiProfileRuntime } from '../../src/extension/panel/handlers/aiProfiles';
 import { driverOf } from '../../src/extension/ai/drivers';
 import { profileApiKey } from '../../src/extension/ai/apiKey';
 import { exportBoard } from '../../src/extension/db/boardExport';
@@ -390,5 +392,51 @@ describe('cenário: o card pela API com arquivos e comandos (história 11)', () 
     expect(fs.readFileSync(path.join(world.project, 'saida.txt'), 'utf8')).toBe('gravado');
     expect(end.check).toEqual({ status: 'deviation', deviations: [{ kind: 'tool', name: 'Write', calls: 1 }] });
     expect(world.comments().some((b) => b.startsWith(DEVIATION) && b.includes('ferramenta Write'))).toBe(true);
+  });
+});
+
+describe('cenário: o chat do board e o teste rápido pelo Gemini da API', () => {
+  const answer = () => api(() => modelTurn([{ text: 'OK\n' }], { promptTokenCount: 50, candidatesTokenCount: 2, totalTokenCount: 52 }));
+
+  it('o chat roda na permissão do board (aqui, full): o pedido de admissão sem card leva o nível dela, não "board"', async () => {
+    calls = 0;
+    server = await fakeGemini(answer());
+    world = await cardWorld({ profile: 'gemini-api', tools: CONDUTOR_TOOLS, permission: 'full', api: { endpoint: server.endpoint } });
+    const w = world;
+    await connectApi(w);
+    const chat = new ChatSession(w.router, { ...w.runnerDeps, file: path.join(w.root, 'chat.json') });
+
+    chat.send('Olá', GEMINI_MODEL.id);
+    await vi.waitFor(() => expect(chat.busy).toBe(false));
+
+    expect(w.lines.some((l) => l.startsWith('[chat] Chamando Gemini (API): modelo gemini-2.5-pro'))).toBe(true);
+    expect(w.router.snapshot().board.runner.permission).toBe('full');
+    expect(calls).toBe(1);
+  });
+
+  it('o teste rápido no modo API roda no modelo escolhido na aba e recusa sem modelo, sem chamar a API', async () => {
+    calls = 0;
+    server = await fakeGemini(answer());
+    world = await cardWorld({ profile: 'gemini-api', tools: CONDUTOR_TOOLS, permission: 'board', api: { endpoint: server.endpoint } });
+    const w = world;
+    await connectApi(w);
+    const runtime = createAiProfileRuntime({
+      repo: new AiProfileRepo(w.db),
+      gateway: w.runnerDeps.gateway,
+      boardId: () => w.router.boardId,
+      cwd: w.project,
+      homeDir: w.home,
+      pathEnv: () => undefined,
+      runner: () => w.router.snapshot().board.runner,
+      hasApiKey: () => true,
+    });
+
+    const missing = await runtime.test('gemini');
+    expect(missing).toMatchObject({ ok: false, error: 'Escolha o modelo do teste: no modo API a ferramenta não tem modelo padrão.' });
+    expect(calls).toBe(0);
+
+    const done = await runtime.test('gemini', GEMINI_MODEL.model);
+    expect(done).toMatchObject({ ok: true });
+    expect(calls).toBe(1);
   });
 });

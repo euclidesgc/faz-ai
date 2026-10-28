@@ -82,6 +82,9 @@
 
 ### Corrigido
 
+- A IA não conclui mais um card com o checklist em aberto: o `move_card` para a conclusão recusa, e a skill do fluxo manda marcar cada item ao concluí-lo.
+- O chat do board volta a responder pelos agentes ACP e pelo Gemini da API quando a permissão do board não é "Board".
+- O teste rápido do Gemini pela API ganha a escolha do modelo, que esse modo exige.
 - O texto do heartbeat diz que ele chama o agente de cada card, não uma ferramenta só.
 - Os arquivos antigos do log do protocolo ACP passam a ser apagados junto com os do rastreio, também com a janela aberta por dias.
 - O interruptor Ocultar session/update ganha um hint que explica que só filtra a lista.

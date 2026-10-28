@@ -82,6 +82,9 @@
 
 ### Fixed
 
+- The AI no longer completes a card with an open checklist: `move_card` to a done column refuses it, and the flow skill says to check each item as it is finished.
+- The board chat answers again through ACP agents and Gemini over the API when the board permission is not "Board".
+- The Gemini over the API quick test gets a model choice, which that mode requires.
 - The heartbeat text says it calls each card's agent, not a single tool.
 - Old ACP protocol log files are now deleted along with the trace files, even with the window open for days.
 - The Hide session/update switch gets a hint explaining it only filters the list.

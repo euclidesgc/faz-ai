@@ -281,7 +281,8 @@ export type WebviewToHost =
   /** Consulta a instalação e o login dos perfis sem devolver a configuração. */
   | { type: 'settings.aiProfiles.probe' }
   /** Faz um teste explícito, limitado a dois minutos, sem MCP nem ferramentas de alteração. */
-  | { type: 'settings.aiProfiles.test'; id: string }
+  /** `model`: o modelo do teste (o nome na API), obrigatório no modo API, que não tem modelo padrão */
+  | { type: 'settings.aiProfiles.test'; id: string; model?: string }
   /**
    * Testa o contexto do card do perfil (o que o agente carrega sozinho): o agente declara onde lê e o board confere
    * pedindo que ele cite linhas desses arquivos, rodando como um card. Gasta pedidos da conta da ferramenta.

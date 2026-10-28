@@ -2699,6 +2699,24 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(JSON.stringify(plain.data).length).toBeLessThan(1000);
   });
 
+  it('move_card para a conclusão recusa a sub-tarefa com item do checklist em aberto e aceita depois de marcado ou apagado', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: story.id, checklist: ['feito', 'não se aplica'] })).data;
+    const [done, dropped] = sub.checklistItems;
+    const refused = await call('move_card', { card: sub.id, column: 'Concluído', comment: 'pronto' });
+    expect(refused.error).toBe(true);
+    expect(refused.text).toContain('2 item(ns) do checklist em aberto');
+    expect(refused.text).toContain(done.itemId);
+    expect(await conversation(sub.id)).toHaveLength(0);
+    await call('update_checklist_item', { item_id: done.itemId, done: true });
+    await call('delete_checklist_item', { item_id: dropped.itemId });
+    const moved = (await call('move_card', { card: sub.id, column: 'Concluído' })).data;
+    expect(moved.card).toMatchObject({ column: 'Concluído', checklist: '1/1' });
+    // sair da conclusão ou ir para o cancelamento não depende do checklist
+    await call('add_checklist_item', { card: sub.id, text: 'novo' });
+    expect((await call('move_card', { card: sub.id, column: 'Em andamento' })).error).toBeFalsy();
+  });
+
   it('create_card com profile desconhecido é recusado antes de criar o card', async () => {
     const bad = await call('create_card', { title: 'x', profile: 'inexistente' });
     expect(bad.error).toBe(true);
@@ -2728,6 +2746,8 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(desc('move_card')).toContain('`comment`');
     expect(desc('create_card')).toContain('Devolve o card resumido');
     expect(desc('add_checklist_item')).toContain('`items`');
+    expect(desc('update_checklist_item')).toContain('recusa o card com item em aberto');
+    expect(desc('move_card')).toContain('o checklist do card não pode ter item em aberto');
     expect(desc('set_card_profile')).toContain('Devolve o card resumido');
   });
 });

@@ -435,7 +435,7 @@ export class HostBridge {
         void this.router.runContextScope(msg.id).catch(() => {});
         return;
       case 'settings.aiProfiles.test':
-        this.post(await this.router.testAiProfile(msg.id));
+        this.post(await this.router.testAiProfile(msg.id, msg.model));
         // o teste muda a evidência do perfil: o aviso do topo reflete o resultado sem recarregar
         await this.router.recheckRequirements();
         return;

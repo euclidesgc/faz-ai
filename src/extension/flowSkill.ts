@@ -79,7 +79,7 @@ Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela
    vai por \`ask_questions\` antes de escrever o documento; o documento não repete as perguntas e usa as
    respostas da seção "Perguntas e respostas" da descrição em modo afirmativo.
 3. Grave com \`add_attachment\` usando \`artifact: true\` e o nome em \`phase.artifact.filename\`. O arquivo fica anexado à história, mesmo enviado da sub-tarefa, e substitui a versão anterior.
-4. Mova a sub-tarefa para a coluna de conclusão (\`move_card\` com \`comment\` dizendo o que fez) e peça a revisão na história.
+4. Marque os itens do checklist da sub-tarefa (\`update_checklist_item\`), mova-a para a coluna de conclusão (\`move_card\` com \`comment\` dizendo o que fez) e peça a revisão na história.
 
 Quando a pessoa pedir ajustes, corrija o mesmo documento (mesmo nome, \`artifact: true\`), responda na
 conversa dizendo o que mudou e chame \`request_review\` de novo.
@@ -117,6 +117,11 @@ sub-tarefas de uma história uma de cada vez, na ordem das dependências, e cada
 da CLI: recortar mais fino não acelera nada e repete o custo de cada execução.
 
 ## Ao fechar uma fase ou sub-tarefa
+
+O checklist do card é o registro do que foi feito: marque cada item com \`update_checklist_item\` assim que o
+concluir, na sub-tarefa e na história. Antes do \`move_card\` para a coluna de conclusão, nenhum item fica
+aberto: o board recusa o card com item em aberto. O item que não se aplica mais, apague com
+\`delete_checklist_item\` e diga o porquê no \`comment\`.
 
 Ao registrar o resultado de uma fase ou sub-tarefa na conversa, resuma em três blocos (omita o que
 não houver):
@@ -213,13 +218,13 @@ A sua sessão na história faz só o trabalho de planejar:
    revisão ou bloqueio com a pessoa) e \`running\` (execução em curso).
 3. Quando todas as sub-tarefas terminam, o board chama você de novo, **uma vez**, para o fechamento:
    verifique o conjunto como o projeto define (typecheck e testes, com terminal), faça o commit na
-   branch da história e mova a história. Os resultados de cada sub-tarefa estão na conversa da
+   branch da história, marque os itens do checklist da história e mova a história. Os resultados de cada sub-tarefa estão na conversa da
    história. Se a verificação falhar, corrija ou crie uma sub-tarefa de correção com Fase = esta coluna
    e pare: o board a executa e chama você de novo.
 
 Quem executa **uma** sub-tarefa (o board chama você só nela) segue o ciclo: \`start_work\` (que já leva a sub-tarefa para "Em andamento"),
 faça o trabalho na pasta da história (\`workspace\` no \`get_card\`), verifique só a sua
-parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build), conclua com \`move_card\` para a coluna de conclusão com \`comment\` dizendo o que fez. Sem commit, sem trocar de branch e sem
+parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build), marque cada item do checklist com \`update_checklist_item\` assim que o concluir e conclua com \`move_card\` para a coluna de conclusão com \`comment\` dizendo o que fez. Sem commit, sem trocar de branch e sem
 executar outras sub-tarefas.
 
 Testes, build e commit dependem do terminal. Se você não pode rodar comandos nesta execução (permissão

@@ -276,7 +276,9 @@ The **Testar** (test) tab has three parts:
 
 - **Teste rápido pelo caminho dos cards** (quick test through the cards path): a short request through
   the same path as the runs (the profile's CLI, ACP or API), after a confirmation, because it uses your
-  subscription. An OK answer does not prove isolation, permissions or MCP.
+  subscription. An OK answer does not prove isolation, permissions or MCP. In API mode, which has no
+  default model, the test runs on the **Modelo do teste** (test model) chosen next to the button, among
+  the agent's models (text models first).
 - **Sessão de teste pelo ACP** (test session over ACP): opens the agent through the official ACP SDK
   and talks to it in real time: the text, the reasoning, the tools, the plan and the permission
   requests, which you answer there. The top shows what the agent declared (protocol version, the

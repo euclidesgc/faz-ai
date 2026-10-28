@@ -205,7 +205,9 @@ card resumido, como `move_card` e `start_work`, mais `checklistItems` (com ids) 
 detalhe (`phase`, `execution`, notas) vem pelo `get_card`. `set_card_profile` também devolve o resumo.
 A descrição do `create_card` pede, numa sub-tarefa de fase de código, as seções `Objetivo`, `Pronto quando`,
 `Pode tocar` e `Não pode tocar` (e `Decisões anteriores`, se houver): o board confere antes de executar.
-`add_checklist_item` aceita `text` (um item) ou `items` (vários, na ordem).
+`add_checklist_item` aceita `text` (um item) ou `items` (vários, na ordem). `move_card` para uma coluna de
+conclusão recusa o card com item do checklist em aberto e lista os itens com os ids: a IA marca o que fez
+com `update_checklist_item` e apaga o que não se aplica com `delete_checklist_item`.
 
 Nas colunas com `requiresApproval` (em `get_board`), `move_card` só leva o card para a frente quando
 o status é `approved`. Voltar de coluna ou cancelar é livre. No modo autônomo, `phase.requiresApproval`
