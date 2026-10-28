@@ -112,6 +112,16 @@ describe('Conectar agentes: os modelos do agente', () => {
     expect(lastSent('settings.models.set').catalog.find((x) => x.id === m.id)!.defaultEffort).toBe(other);
   });
 
+  it('o modelo padrão sai do seletor acima da tabela, e "A ferramenta escolhe" o tira', async () => {
+    show();
+    const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
+    const select = screen.getByRole('combobox', { name: 'Modelo padrão' });
+    expect(select).toHaveTextContent('A ferramenta escolhe');
+    await choose(select, m.label);
+    const marked = lastSent('settings.models.set').catalog.filter((x) => x.tool === tool() && x.default);
+    expect(marked.map((x) => x.id)).toEqual([m.id]);
+  });
+
   it('remover tira o modelo do catálogo, sem confirmação', async () => {
     show();
     const m = state().board.modelCatalog.find((x) => x.tool === tool())!;

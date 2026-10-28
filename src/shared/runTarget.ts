@@ -2,7 +2,7 @@
 // O valor do campo Modelo (`<perfil>:<modelo>@<esforço>`) carrega a CLI: o prefixo identifica o perfil.
 import { activeProfile, catalogTool, profileLabel, type AiProfile, isCatalogCopy } from './aiProfiles';
 import type { BoardState, Card } from './model';
-import { modelFieldOf, parseModelValue, suggestModelRule, type ModelOption } from './models';
+import { defaultModelOf, modelFieldOf, parseModelValue, suggestModelRule, type ModelOption } from './models';
 import { profileOf } from './execution';
 import { aiQueue, pendingWork } from './pending';
 import { valueOf } from './selectors';
@@ -13,7 +13,7 @@ export interface RunTarget {
   /** o perfil de CLI que executa (não confundir com `profileOf`, o agente) */
   cli: AiProfile;
   model: { name: string; effort: string | null } | null;
-  /** valor `<perfil>:<modelo>@<esforço>`; vazio no padrão */
+  /** valor `<perfil>:<modelo>@<esforço>`; vazio no padrão sem modelo padrão */
   value: string;
   source: RunTargetSource;
 }
@@ -80,8 +80,17 @@ export function targetOfValue(board: TargetBoard, value: string | null | undefin
   return name ? { cli, model: { name, effort: parsed.effort }, value, source } : null;
 }
 
-/** Sem nenhum modelo indicado vale o perfil padrão, sem modelo. */
-export const defaultTarget = (board: TargetBoard): RunTarget => ({ cli: activeProfile(board), model: null, value: '', source: 'default' });
+/**
+ * Sem nenhum modelo indicado vale o perfil padrão, com o modelo padrão dele (o marcado na tela de Modelos); sem
+ * modelo padrão, a ferramenta decide.
+ */
+export function defaultTarget(board: TargetBoard): RunTarget {
+  const cli = activeProfile(board);
+  const option = defaultModelOf(board.modelCatalog, catalogTool(cli));
+  return option
+    ? { cli, model: { name: option.model, effort: null }, value: option.id, source: 'default' }
+    : { cli, model: null, value: '', source: 'default' };
+}
 
 /**
  * Card → agente → regra (mesmo com "aplicar a sugestão" desligado) → padrão. A primeira escolha presente é

@@ -335,9 +335,12 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
       // cada tentativa termina uma vez: um segundo aviso de saída não repete nem revive nada
       if (exited) return;
       exited = true;
-      // O cursor-agent deixa um filho vivo por um instante depois de sair (ao recusar por cota, por exemplo). Fechar
-      // a execução nesse instante reteria o empréstimo MCP sem necessidade: antes de concluir, espera até 5 s pelo
-      // fim do grupo de processos, conferindo a cada 250 ms. Sem empréstimo, ou já confirmado, conclui na hora.
+      // O cursor-agent deixa processos no grupo depois de sair: um filho que vive um instante e o `worker-server`,
+      // que fica minutos com os servidores de linguagem. Enquanto o grupo vive, o empréstimo MCP fica retido e a
+      // execução falha com "árvore de processos", escondendo o erro real (o limite de uso, por exemplo). Com a CLI
+      // fora, o board encerra o que sobrou e espera até 5 s pelo fim do grupo, conferindo a cada 250 ms. Sem
+      // empréstimo, ou já confirmado, conclui na hora.
+      if (projectLease && proc.terminationConfirmed?.() !== true) proc.endLeftovers?.();
       const settle = (exitCode: number | null, exitError?: Error, waited = 0): void => {
         if (!projectLease || proc.terminationConfirmed?.() === true || waited >= (deps.treeEndWaitMs ?? TREE_END_WAIT_MS))
           return finish(exitCode, exitError);

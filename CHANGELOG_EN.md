@@ -37,6 +37,7 @@
 - On Cursor, a hook ensures the run respects what the card allows (#965).
 - The selected card gets a shadow that sets it apart from the others (#1069).
 - The board checks a sub-task description before running it and sends it back to the conductor when sections are missing (#1138).
+- In each agent's Models tab, the **Modelo padrão** (default model) applies when it runs with no model set: a card without a model, the chat on **Auto** and the quick test.
 
 ### Changed
 
@@ -87,6 +88,7 @@
 ### Fixed
 
 - The Gemini over the API model list no longer brings voice, image, music and research models.
+- In Cursor, the run error (such as the usage limit) is no longer hidden behind "the process tree shutdown is not confirmed yet".
 - The Gemini limit message says which quota ran out and when it comes back.
 - A model the Gemini API lists but refuses for the account (HTTP 404) leaves the model list and doesn't come back through **Detectar modelos**; the message carries Google's reason.
 - Gemini's **Detectar modelos** checks each model on the API and only lists the ones the account can use.

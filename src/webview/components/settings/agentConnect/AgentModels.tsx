@@ -2,7 +2,7 @@ import { useState, type KeyboardEvent } from 'react';
 import { Button, Card, IconButton, Text, TextField } from '@radix-ui/themes';
 import { catalogTool, isAcpProfile, isReadyCli, type AiBase, type AiProfile } from '../../../../shared/aiProfiles';
 import type { AiTool } from '../../../../shared/harness';
-import { modelId, type ModelOption } from '../../../../shared/models';
+import { defaultModelOf, modelId, withDefaultModel, type ModelOption } from '../../../../shared/models';
 import { olderThan } from '../../../../shared/claudeModelDocs';
 import { useAgentConnectStore } from '../../../store/agentConnectStore';
 import { settings } from '../../../commands';
@@ -27,6 +27,9 @@ const SOURCES: Record<AiBase, string> = {
 };
 
 const EMPTY_DRAFT = { model: '', label: '', efforts: '' };
+
+/** A opção sem modelo padrão: o Select do Radix não aceita valor vazio, e nenhum id de modelo começa com espaço. */
+const TOOL_DECIDES = ' tool';
 
 /** Rascunho do modelo novo: nome, identificador na ferramenta e os esforços aceitos. */
 function NewModelCard({
@@ -175,6 +178,28 @@ export function AgentModels({ profile }: { profile: AiProfile }) {
           </ActionButton>
         </div>
       </div>
+      {mine.length > 0 && (
+        <div className="models-default">
+          <FormField
+            label={t('Modelo padrão')}
+            hint={t(
+              'Usado quando este agente executa sem modelo indicado: card sem modelo, chat em "Auto" e o teste rápido. Sem modelo padrão, a ferramenta escolhe.',
+            )}
+          >
+            {(id) => (
+              <SelectField
+                id={id}
+                options={[
+                  { value: TOOL_DECIDES, label: t('A ferramenta escolhe') },
+                  ...mine.map((o) => ({ value: o.model, label: o.label })),
+                ]}
+                value={defaultModelOf(catalog, tool)?.model ?? TOOL_DECIDES}
+                onChange={(v) => setCatalog(withDefaultModel(sent.current(), tool, v === TOOL_DECIDES ? null : v))}
+              />
+            )}
+          </FormField>
+        </div>
+      )}
       {tool === 'cursor' && (
         <div className="models-fast">
           <SwitchField

@@ -248,7 +248,14 @@ conta não usa mais (o Google o fecha para contas novas e responde 404). Por iss
 fora os que respondem 404; limite de uso ou falha de rede não tiram o modelo. No nível gratuito, cada
 detecção gasta um pedido da cota diária de cada modelo. Se um modelo ainda for recusado numa execução, o
 board o tira da lista na hora e não o traz de volta no próximo Detectar; cadastrá-lo à mão em **Novo
-modelo** o recoloca. O chat que estava nesse modelo passa para o mais novo do mesmo agente.
+modelo** o recoloca. O chat que estava nesse modelo passa para o modelo padrão do mesmo agente ou, sem
+padrão, para o mais novo.
+
+**Modelo padrão**, acima da tabela, escolhe o modelo que o agente usa quando nada indica um: o card sem
+modelo (nem do card, nem do agente, nem de regra), o chat em **Auto** e o teste rápido da aba Testar. Com
+**A ferramenta escolhe**, vale o padrão da própria ferramenta, como antes. A escolha fica no catálogo e
+continua valendo depois do **Detectar modelos** e do **Conectar**, enquanto a ferramenta listar o modelo.
+Pelo MCP, o `get_models` marca o modelo padrão com `default`.
 
 Os seletores de modelo (chat, campo Modelo do card, agentes e regras) só oferecem os agentes que podem
 responder agora: o desligado, sem a CLI, sem login, com a conexão falha ou pela metade, ou que o board não

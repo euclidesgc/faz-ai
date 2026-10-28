@@ -118,7 +118,9 @@ O transporte que precisa de MCP por arquivo (Cursor e Kimi) usa um empréstimo c
 caminho real. O diário protegido em `~/.faz-ai/mcp-leases` precede a alteração; tentativas de
 formato reutilizam a mesma posse. Ao terminar com confirmação, o arquivo volta ao estado anterior,
 preservando servidores acrescentados pela pessoa. Alterações conflitantes da entrada `faz-ai` ou JSON
-inválido não são sobrescritos. Sem confirmação do fim da árvore de processos, o empréstimo fica
+inválido não são sobrescritos. Quando a CLI sai, o board encerra o que ela deixou no grupo de processos
+(o `cursor-agent` deixa um `worker-server` com servidores de linguagem, que viveria minutos) e espera
+até 5 s pelo fim do grupo. Sem confirmação do fim da árvore de processos, o empréstimo fica
 retido e uma nova execução no mesmo arquivo é recusada. O launcher recebe o comando da CLI somente
 depois de sua identidade ser gravada no diário. Na abertura, um dono comprovadamente morto permite
 recuperar preparações sem comando liberado e grupos registrados cujo término foi confirmado.

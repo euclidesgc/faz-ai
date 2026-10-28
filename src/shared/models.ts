@@ -31,6 +31,11 @@ export interface ModelOption {
    * avisa quando a CLI instalada é mais velha, porque aí o apelido roda um modelo anterior
    */
   requires?: string;
+  /**
+   * O modelo padrão do agente (um por catálogo de ferramenta), escolhido na tela de Modelos: vale quando o agente
+   * executa sem modelo indicado (card sem modelo, chat em "Auto", teste rápido). Sem ele, a ferramenta decide.
+   */
+  default?: true;
 }
 
 /** Campo especial usado em condições: o tipo do card. */
@@ -289,4 +294,17 @@ export function testModels(catalog: readonly ModelOption[], tool: string): Model
       return fb - fa || vb - va;
     });
   return [...text, ...own.filter((m) => !isTextModel(m.model))];
+}
+
+/** O modelo padrão do catálogo de uma ferramenta, escolhido na tela de Modelos; null quando a ferramenta decide. */
+export const defaultModelOf = (catalog: readonly ModelOption[], tool: string): ModelOption | null =>
+  catalog.find((m) => m.tool === tool && m.default) ?? null;
+
+/** O catálogo com `model` como o padrão da ferramenta (null tira o padrão); os das outras ferramentas ficam. */
+export function withDefaultModel(catalog: readonly ModelOption[], tool: string, model: string | null): ModelOption[] {
+  return catalog.map((m) => {
+    if (m.tool !== tool) return m;
+    const { default: _old, ...rest } = m;
+    return m.model === model ? { ...rest, default: true as const } : rest;
+  });
 }

@@ -8,7 +8,7 @@ import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
 import { ActionButton, IconRun, IconStop, IconWarning, SelectField, Summary } from '../../ui';
 import { catalogTool } from '../../../../shared/aiProfiles';
-import { testModels } from '../../../../shared/models';
+import { defaultModelOf, testModels } from '../../../../shared/models';
 import { SectionHeader } from '../SectionHeader';
 import { maskEmail } from './AccountPanel';
 import { ProtocolLogPanel } from './ProtocolLogPanel';
@@ -281,9 +281,16 @@ function QuickTest({ item }: { item: AgentListItem }) {
   // o modo API não tem modelo padrão da ferramenta: o teste roda no modelo escolhido aqui
   const api = profile.mode === 'api';
   const models = api ? testModels(catalog, catalogTool(profile)) : [];
+  // o modelo padrão do agente (tela de Modelos) vem escolhido; fora do modo API, sem ele, a ferramenta decide
+  const standard = defaultModelOf(catalog, catalogTool(profile))?.model ?? null;
   const [chosen, setChosen] = useState<string | null>(null);
-  const model = models.some((m) => m.model === chosen) ? chosen : (models[0]?.model ?? null);
-  const test = useAction(() => settings.testAiProfile(profile.id, api ? (model ?? undefined) : undefined));
+  const model = models.some((m) => m.model === chosen)
+    ? chosen
+    : models.some((m) => m.model === standard)
+      ? standard
+      : (models[0]?.model ?? null);
+  const testModel = api ? model : standard;
+  const test = useAction(() => settings.testAiProfile(profile.id, testModel ?? undefined));
   return (
     <section className="agent-quick-test" aria-label={t('Teste rápido')}>
       <SectionHeader
@@ -331,7 +338,7 @@ function QuickTest({ item }: { item: AgentListItem }) {
           {t('Testando…')}
         </p>
       )}
-      {result && !test.busy && (!result.model || result.model === model) && (
+      {result && !test.busy && (!result.model || result.model === testModel) && (
         <div className={result.ok ? 'ai-profile-result' : 'ai-profile-error'} role={result.ok ? 'status' : 'alert'}>
           {result.error && <p>{t(result.error)}</p>}
           {result.output && <pre>{result.output}</pre>}

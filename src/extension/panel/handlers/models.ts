@@ -4,7 +4,7 @@ import { legacyFallbackProposals, parseLegacyFallbacks } from '../../../shared/l
 import { builtinPolicyCatalog } from '../../../shared/policyManagement';
 import type { AiTool } from '../../../shared/harness';
 import type { FieldDef } from '../../../shared/model';
-import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelOption, type ModelRule } from '../../../shared/models';
+import { EFFORT_FIELD, defaultModelOf, modelFieldOf, suggestModel, type ModelOption, type ModelRule } from '../../../shared/models';
 import { cliOfValue } from '../../../shared/runTarget';
 import { valueOf } from '../../../shared/selectors';
 import { newId } from '../../db/ids';
@@ -73,7 +73,11 @@ function detectModels(ctx: BoardContext, tool: AiTool): void {
   const retired = new Set(retiredModels(ctx)[tool] ?? []);
   const all = modelsFor(tool).filter((o) => !retired.has(o.model));
   // as variantes rápidas do Cursor só entram com a regra ligada
-  const found = all.filter((o) => board.rules.includeFastModels || !isFastVariant(o, all));
+  // o modelo padrão escolhido pela pessoa continua padrão enquanto a ferramenta o listar
+  const standard = defaultModelOf(board.modelCatalog, tool)?.id;
+  const found = all
+    .filter((o) => board.rules.includeFastModels || !isFastVariant(o, all))
+    .map((o) => (o.id === standard ? { ...o, default: true as const } : o));
   const ids = new Set(found.map((o) => o.id));
   const rest = board.modelCatalog.filter((o) => !ids.has(o.id) && !(fresh && o.tool === tool && o.fromTool));
   const at = rest.findIndex((o) => o.tool === tool);

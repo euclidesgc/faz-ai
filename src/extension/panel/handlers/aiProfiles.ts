@@ -257,9 +257,11 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
         return model ? { ...r, model } : r;
       };
       // o modo API não tem modelo padrão da ferramenta: o teste roda no modelo que a pessoa escolheu na aba Testar
+      // fora dele, o modelo vem só quando o agente tem modelo padrão na tela de Modelos; sem ele, a ferramenta decide
       const api = meta.mode === 'api';
-      if (api && (!model || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(model)))
-        return logTest(fail('Escolha o modelo do teste: no modo API a ferramenta não tem modelo padrão.'));
+      const validModel = !!model && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(model);
+      if (api && !validModel) return logTest(fail('Escolha o modelo do teste: no modo API a ferramenta não tem modelo padrão.'));
+      if (model && !validModel) return logTest(fail('Modelo do teste inválido.'));
       running.add(id);
       let profile: AiProfile | undefined;
       const tail: string[] = [];
@@ -291,7 +293,7 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
             // runtime v1: o teste do perfil também passa pelo contrato (fechado, sem MCP)
             ...(deps.gateway.runtime === 'v1' ? closedV1(id, 'chat', runner) : {}),
             config: {
-              model: api ? model! : null,
+              model: model ?? null,
               effort: null,
               profile: null,
               agent: null,
@@ -304,8 +306,8 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
               prompt: 'Responda apenas com a palavra OK.',
               permission: 'board',
               structured: true,
-              // sem MCP nem ferramenta: só o modelo, que o modo API exige na execução
-              ...(api ? { exec: { ...bareExec({ name: model!, effort: null }), mcpConfig: JSON.stringify({ mcpServers: {} }) } } : {}),
+              // sem MCP nem ferramenta: só o modelo, que o modo API exige na execução (e o modelo padrão do agente)
+              ...(model ? { exec: { ...bareExec({ name: model, effort: null }), mcpConfig: JSON.stringify({ mcpServers: {} }) } } : {}),
             },
           }),
           log: (line) => {

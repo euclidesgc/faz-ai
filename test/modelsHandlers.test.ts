@@ -101,6 +101,19 @@ describe('detectar e gravar o catálogo', () => {
     expect(cat.some((o) => o.id === 'claude:opus')).toBe(true);
   });
 
+  it('o modelo padrão do agente continua padrão quando o Detectar relê a lista', () => {
+    seedCatalog([opt('cursor:auto', { fromTool: true, default: true }), opt('cursor:composer-2.5', { fromTool: true })]);
+    const router = new MessageRouter(dbHandle as never, opts());
+    rememberModels('cursor', [opt('cursor:auto', { fromTool: true }), opt('cursor:composer-2.5', { fromTool: true })]);
+    try {
+      router.handle({ type: 'settings.models.detect', tool: 'cursor' });
+    } finally {
+      forgetModels('cursor');
+    }
+    const cursor = router.snapshot().board.modelCatalog.filter((o) => o.tool === 'cursor');
+    expect(cursor.filter((o) => o.default).map((o) => o.id)).toEqual(['cursor:auto']);
+  });
+
   it('o modelo recusado para a conta sai do catálogo, não volta pelo Detectar e volta se a pessoa o cadastrar', () => {
     seedCatalog([opt('gemini:gemini-2.5-flash', { fromTool: true }), opt('gemini:gemini-2.5-pro', { fromTool: true })]);
     const router = new MessageRouter(dbHandle as never, opts());

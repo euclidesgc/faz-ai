@@ -228,6 +228,19 @@ export function spawnHeadless(
         return (e as NodeJS.ErrnoException).code === 'ESRCH';
       }
     },
+    endLeftovers: () => {
+      // só com a CLI já fora: o grupo é dela, e o que sobra nele não tem mais quem o use
+      if (!directClosed || !child.pid || process.platform === 'win32') return;
+      const signal = (sig: NodeJS.Signals) => {
+        try {
+          process.kill(-child.pid!, sig);
+        } catch {
+          /* o grupo já acabou */
+        }
+      };
+      signal('SIGTERM');
+      setTimeout(() => signal('SIGKILL'), 1000).unref();
+    },
     onExit: (fn) => listeners.push(fn),
     kill: () => {
       cancelled = true;

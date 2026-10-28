@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PROFILES, type AiProfile } from '../src/shared/aiProfiles';
 import type { BoardState, Card } from '../src/shared/model';
-import type { ModelOption, ModelRule } from '../src/shared/models';
+import { defaultModelOf, withDefaultModel, type ModelOption, type ModelRule } from '../src/shared/models';
 import {
   cliOfValue,
   defaultTarget,
@@ -145,6 +145,32 @@ describe('cliOfValue e targetOfValue', () => {
 
   it('defaultTarget usa o perfil padrão', () => {
     expect(defaultTarget({ ...state().board, aiTool: 'cursor' }).cli.id).toBe('cursor');
+  });
+
+  it('sem modelo indicado, vale o modelo padrão do agente; sem padrão, a ferramenta escolhe', () => {
+    const board = { ...state().board, aiTool: 'cursor' };
+    expect(defaultTarget(board)).toMatchObject({ model: null, value: '' });
+    const marked = withDefaultModel(board.modelCatalog, 'cursor', 'composer-2.5');
+    expect(defaultTarget({ ...board, modelCatalog: marked })).toMatchObject({
+      cli: { id: 'cursor' },
+      model: { name: 'composer-2.5', effort: null },
+      value: 'cursor:composer-2.5',
+      source: 'default',
+    });
+    // o padrão de outro agente não vale para este
+    expect(defaultTarget({ ...board, aiTool: 'claude', modelCatalog: marked }).model).toBeNull();
+    // o card sem modelo também cai no padrão do agente
+    const s = state({ aiTool: 'cursor' });
+    s.board.modelCatalog = marked;
+    expect(runTargetOf(s, s.cards[0]!)).toMatchObject({ model: { name: 'composer-2.5' }, source: 'default' });
+  });
+
+  it('withDefaultModel deixa um só padrão por ferramenta e null o tira', () => {
+    const one = withDefaultModel(catalog, 'claude', 'haiku');
+    const two = withDefaultModel(one, 'claude', 'opus');
+    expect(two.filter((o) => o.default).map((o) => o.id)).toEqual(['claude:opus']);
+    expect(withDefaultModel(two, 'claude', null).some((o) => o.default)).toBe(false);
+    expect(defaultModelOf(withDefaultModel(two, 'cursor', 'composer-2.5'), 'claude')?.id).toBe('claude:opus');
   });
 });
 

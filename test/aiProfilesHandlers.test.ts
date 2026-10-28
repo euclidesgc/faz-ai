@@ -145,6 +145,31 @@ it('Testar usa origem test, NO_CARD, permissão board e 60 linhas; recusa teste 
   expect((await runtime.test('missing')).ok).toBe(false);
 });
 
+it('Testar com o modelo padrão do agente: a CLI recebe o modelo, sem MCP; o resultado diz o modelo', async () => {
+  let finish: ((end: unknown) => void) | undefined;
+  let call: any;
+  const runtime = createAiProfileRuntime({
+    repo,
+    gateway: {
+      run: vi.fn((c: any) => {
+        call = c;
+        return { onExit: (fn: (end: unknown) => void) => (finish = fn) };
+      }),
+    } as never,
+    boardId: () => router.boardId,
+    cwd: dir,
+    homeDir: dir,
+    pathEnv: () => '/fake',
+  });
+  const pending = runtime.test('claude', 'haiku');
+  const prepared = call.prepare();
+  expect(prepared.config.model).toBe('haiku');
+  expect(prepared.input.exec).toMatchObject({ model: { name: 'haiku', effort: null }, mcpConfig: JSON.stringify({ mcpServers: {} }) });
+  finish!({ outcome: 'done', timedOut: false });
+  expect(await pending).toMatchObject({ ok: true, model: 'haiku' });
+  expect((await runtime.test('claude', 'não vale')).error).toBe('Modelo do teste inválido.');
+});
+
 it('Testar perfil custom envia contrato mínimo à admissão e oculta valores privados até no erro', async () => {
   const saved = repo.save(router.boardId, draft(), 'person');
   let finish: ((end: unknown) => void) | undefined;

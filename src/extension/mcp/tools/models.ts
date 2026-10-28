@@ -19,7 +19,7 @@ const profileOf = (router: MessageRouter, id?: string): AiProfile => {
 export function registerModelTools(tool: DefineTool): void {
   tool(
     'get_models',
-    'Catálogo de modelos de LLM e perfis de CLI do board, com os níveis de esforço e as regras de sugestão. `value` usa `<perfil>:<modelo>@<esforço>` e o prefixo escolhe o perfil de CLI que executa o card; quando nada indica um modelo (card, agente ou regra), vale o perfil padrão. Todo perfil ligado roda cards, ao mesmo tempo que os outros: `runsWith` em cada modelo do catálogo diz o perfil que o executa (null: nenhum ligado o roda) e `ready` em cada perfil diz se ele roda agora. Uma cópia usa o catálogo do perfil pronto de origem e um personalizado aceita modelo livre. O board não guarda preço: o custo de uma execução é o que o executor informa. ' +
+    'Catálogo de modelos de LLM e perfis de CLI do board, com os níveis de esforço e as regras de sugestão. `value` usa `<perfil>:<modelo>@<esforço>` e o prefixo escolhe o perfil de CLI que executa o card; quando nada indica um modelo (card, agente ou regra), vale o perfil padrão, no modelo padrão dele (`default` no catálogo, escolhido pela pessoa na tela de Modelos). Todo perfil ligado roda cards, ao mesmo tempo que os outros: `runsWith` em cada modelo do catálogo diz o perfil que o executa (null: nenhum ligado o roda) e `ready` em cada perfil diz se ele roda agora. Uma cópia usa o catálogo do perfil pronto de origem e um personalizado aceita modelo livre. O board não guarda preço: o custo de uma execução é o que o executor informa. ' +
       'O campo "Esforço da atividade" do card é o tamanho da tarefa, não o esforço do modelo: as regras sugerem o modelo a partir dele.',
     {},
     (_a, router) => models(router),
@@ -81,6 +81,8 @@ export function registerModelTools(tool: DefineTool): void {
         label: a.label ?? a.model,
         efforts,
         defaultEffort: a.default_effort ?? null,
+        // atualizar o modelo não tira dele a escolha de padrão da pessoa
+        ...(catalog[at]?.default ? { default: true as const } : {}),
       };
       if (at >= 0) catalog[at] = entry;
       else catalog.push(entry);

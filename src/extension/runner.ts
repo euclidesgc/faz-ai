@@ -47,6 +47,11 @@ export interface RunningProcess {
   readonly identity?: import('./processIdentity').ProcessIdentity;
   /** Prova do transporte de que a árvore encerrou; ausência não autoriza liberar recursos emprestados. */
   terminationConfirmed?(): boolean;
+  /**
+   * Encerra o que ficou no grupo de processos depois que a ferramenta saiu (só depois da saída; antes, nada faz).
+   * O cursor-agent deixa um `worker-server` no grupo dele, com servidores de linguagem, que vive minutos.
+   */
+  endLeftovers?(): void;
   /** chamado uma vez, com o código de saída ou o erro que impediu a execução */
   onExit(listener: (code: number | null, error?: Error) => void): void;
   kill(): void;

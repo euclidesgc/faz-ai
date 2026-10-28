@@ -37,6 +37,7 @@
 - No Cursor, um hook garante que a execução respeite o que o card permite (#965).
 - O card selecionado ganha uma sombra que o destaca dos demais (#1069).
 - O board confere a descrição da sub-tarefa antes de executar e devolve ao condutor a que não tem as seções (#1138).
+- Na aba Modelos de cada agente, o **Modelo padrão** vale quando ele executa sem modelo indicado: card sem modelo, chat em **Auto** e teste rápido.
 
 ### Alterado
 
@@ -87,6 +88,7 @@
 ### Corrigido
 
 - A lista de modelos do Gemini pela API não traz mais modelos de voz, imagem, música e pesquisa.
+- No Cursor, o erro da execução (como o limite de uso) não fica mais escondido atrás de "o encerramento da árvore de processos ainda não foi confirmado".
 - A mensagem de limite do Gemini diz qual cota acabou e a hora em que volta.
 - O modelo que a API do Gemini lista mas recusa para a conta (HTTP 404) sai da lista de modelos e não volta pelo **Detectar modelos**; a mensagem traz o motivo do Google.
 - O **Detectar modelos** do Gemini confere cada modelo na API e só lista os que a conta pode usar.
