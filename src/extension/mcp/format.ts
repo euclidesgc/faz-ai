@@ -270,6 +270,8 @@ export function modelsOverview(s: BoardState) {
       label: o.label,
       efforts: o.efforts,
       defaultEffort: o.defaultEffort,
+      // o modelo padrão do agente: roda quando nada indica um modelo
+      ...(o.default ? { default: true } : {}),
       // o perfil ligado que executa este valor (o mesmo que o runner escolhe), ou null: nenhum agente ligado o roda
       runsWith: cliOfValue(s.board, o.id)?.id ?? null,
     })),
@@ -280,7 +282,7 @@ export function modelsOverview(s: BoardState) {
       value: r.model,
       enabled: r.enabled,
     })),
-    note: 'Num card, `value` usa `<perfil>:<modelo>@<esforço>` (ex.: "claude:opus@high"). O board roda qualquer agente ligado ao mesmo tempo: cada card vai para o perfil do modelo dele (`runsWith`), e o padrão só roda os cards sem modelo. Escolha só modelos com `runsWith`; sem ele, nenhum agente ligado roda o modelo e o card fica bloqueado. A cópia usa o catálogo do perfil pronto de origem; o perfil personalizado aceita modelo livre (`<perfil>:<modelo>`).',
+    note: 'Num card, `value` usa `<perfil>:<modelo>@<esforço>` (ex.: "claude:opus@high"). O board roda qualquer agente ligado ao mesmo tempo: cada card vai para o perfil do modelo dele (`runsWith`), e o padrão só roda os cards sem modelo, no modelo padrão dele (`default` no catálogo) ou, sem ele, no que a ferramenta escolher. Escolha só modelos com `runsWith`; sem ele, nenhum agente ligado roda o modelo e o card fica bloqueado. A cópia usa o catálogo do perfil pronto de origem; o perfil personalizado aceita modelo livre (`<perfil>:<modelo>`).',
   };
 }
 

@@ -1,7 +1,7 @@
 // O transporte de bytes do processo: o que chega pelo pipe é UTF-8 cortado onde o sistema quiser,
 // inclusive no meio de um caractere acentuado. Roda um processo de verdade (o próprio Node) para que
 // os pedaços cheguem separados como chegariam da CLI.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { OutputStream } from '../src/extension/aiOutput/reader';
 import { cmdArg, launchSpec, spawnHeadless } from '../src/extension/spawn';
 
@@ -54,6 +54,19 @@ it('a confirmação de término só aparece após o fechamento real do processo'
   // O Windows ainda não dispõe de prova da árvore inteira; não recebe confirmação por encerrar só o pai.
   expect(proc.terminationConfirmed?.()).toBe(process.platform !== 'win32');
 });
+
+it.skipIf(process.platform === 'win32')(
+  'depois da saída, encerra o filho que ficou no grupo (o worker-server do cursor-agent)',
+  async () => {
+    // o pai sai e deixa um filho no mesmo grupo, sem os pipes, como o cursor-agent faz com o worker-server
+    const script = `require('node:child_process').spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { stdio: 'ignore' }).unref();`;
+    const proc = spawnHeadless({ command: process.execPath, args: ['-e', script], format: 'text' }, process.cwd(), () => {}, undefined);
+    await new Promise<void>((resolve) => proc.onExit(() => resolve()));
+    expect(proc.terminationConfirmed?.()).toBe(false);
+    proc.endLeftovers?.();
+    await vi.waitFor(() => expect(proc.terminationConfirmed?.()).toBe(true), { timeout: 3000, interval: 50 });
+  },
+);
 
 it('a chave do cofre chega ao processo só no ambiente, na variável que o comando declara', async () => {
   let out = '';

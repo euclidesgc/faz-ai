@@ -268,7 +268,14 @@ listed model a minimal request (one word, one output token) and leave out the on
 usage limit or a network failure doesn't remove a model. On the free tier, each detection spends one
 request of each model's daily quota. If a model is still refused in a run, the board removes it from the
 list right away and doesn't bring it back on the next Detect; adding it by hand with **Novo modelo**
-restores it. A chat set to that model switches to the newest one of the same agent.
+restores it. A chat set to that model switches to the same agent's default model or, with no default, to
+the newest one.
+
+**Modelo padrão** (default model), above the table, picks the model the agent uses when nothing sets one:
+a card with no model (not from the card, the agent or a rule), the chat on **Auto** and the quick test in
+the Testar tab. With **A ferramenta escolhe** (the tool chooses), the tool's own default applies, as
+before. The choice is kept in the catalog and still applies after **Detectar modelos** and **Conectar**,
+as long as the tool lists the model. Over MCP, `get_models` marks the default model with `default`.
 
 The model pickers (chat, the card's Modelo field, agents and rules) only offer agents that can answer
 now: one that is off, without the CLI, signed out, with a failed or half-done connection, or that the

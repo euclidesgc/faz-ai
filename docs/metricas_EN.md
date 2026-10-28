@@ -118,7 +118,9 @@ Transport that requires project MCP files (Cursor and Kimi) uses a lease coordin
 file path. A protected journal under `~/.faz-ai/mcp-leases` precedes mutation; format attempts
 reuse the same ownership. After confirmed termination, the previous configuration is restored while
 preserving servers added by the person. Conflicting changes to the `faz-ai` entry or invalid JSON
-are not overwritten. Without confirmation that the process tree has ended, the lease is retained and
+are not overwritten. When the CLI exits, the board ends what it left in its process group (the
+`cursor-agent` leaves a `worker-server` with language servers that would live for minutes) and waits up
+to 5 s for the group to end. Without confirmation that the process tree has ended, the lease is retained and
 a new run on that file is refused. The launcher receives the CLI command only after its identity is
 journaled. On startup, a demonstrably dead owner allows recovery of preparations whose command was
 never released and recorded process groups with confirmed termination. Old or ambiguous journals

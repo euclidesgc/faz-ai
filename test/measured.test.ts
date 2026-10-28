@@ -710,6 +710,41 @@ describe('empréstimo MCP no transporte medido', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+  it('o que sobra no grupo depois da saída (o worker-server do cursor-agent) é encerrado, e o erro real aparece', async () => {
+    const { dir, deps } = setup();
+    try {
+      let confirmed = false;
+      let ended = 0;
+      const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, {
+        ...deps,
+        treeEndWaitMs: 2000,
+        spawn: (...args) => {
+          const proc = spawn(...args);
+          return {
+            onExit: proc.onExit,
+            kill: proc.kill,
+            terminationConfirmed: () => confirmed,
+            endLeftovers: () => {
+              ended++;
+              setTimeout(() => (confirmed = true), 50);
+            },
+          };
+        },
+      });
+      const exits: { code: number | null; error?: Error }[] = [];
+      run.proc.onExit((code, error) => exits.push({ code, error }));
+      started[0]!.emit("ActionRequiredError: You've hit your usage limit\n", 'stderr');
+      started[0]!.exit(1);
+      await vi.waitFor(() => expect(exits).toHaveLength(1), { timeout: 1900, interval: 50 });
+      expect(ended).toBe(1);
+      // sem o erro da árvore, a falha que chega é a da ferramenta (o limite de uso, lido pelo leitor)
+      expect(exits[0]).toEqual({ code: 1, error: undefined });
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('pastas temporárias de execuções antigas', () => {

@@ -298,6 +298,10 @@ export const settings: Record<string, string> = {
   'Esforços aceitos': 'Accepted efforts',
   'Separados por vírgula; o primeiro é o padrão.': 'Comma-separated; the first is the default.',
   'Detectar modelos': 'Detect models',
+  'Modelo padrão': 'Default model',
+  'A ferramenta escolhe': 'The tool chooses',
+  'Usado quando este agente executa sem modelo indicado: card sem modelo, chat em "Auto" e o teste rápido. Sem modelo padrão, a ferramenta escolhe.':
+    'Used when this agent runs with no model set: a card without a model, the chat on "Auto" and the quick test. With no default model, the tool chooses.',
   'Novo modelo': 'New model',
   'Fonte: {source}': 'Source: {source}',
   'lida da página de modelos da documentação do Claude Code (a CLI não lista os modelos), com a versão mínima de cada um; sem rede, lista embutida na extensão':

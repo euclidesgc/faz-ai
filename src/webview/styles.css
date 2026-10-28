@@ -4705,7 +4705,8 @@ div.metrics-breakdown {
   overflow-x: auto;
 }
 
-/* Conectar agentes › Modelos: a chave dos modos rápidos do Cursor, acima da tabela */
+/* Conectar agentes › Modelos: o modelo padrão e a chave dos modos rápidos do Cursor, acima da tabela */
+.models-default,
 .models-fast {
   display: flex;
   flex-direction: column;
