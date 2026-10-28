@@ -6,6 +6,10 @@
 
 ### Added
 
+- New board artifact library in Settings › Harness › Board artifacts: each rule, skill, agent and MCP server is active or inactive, with counter, search, filter and a skill folder tree.
+- The **New rule**, **New skill** and **New agent** forms open with a template, tools and live frontmatter, skill and agent compatibility and an export preview.
+- The **Create with AI** assistant asks about the project one question at a time, with the file draft updating live.
+- The card warns when a linked skill asks for tools its agent does not grant.
 - The Harness notice about rules that are off gains **Show only the ones off**, to review them one by one.
 - New Automation section in Settings, with the AI permission, the time limit, the heartbeat and parallelism, which leave the Harness.
 - The board library marks what is factory-made, and copies now follow their source.
@@ -36,6 +40,12 @@
 
 ### Changed
 
+- When a card's model runs out of its usage limit, the board asks whether to wait for the limit to come back or continue with another available model, and saves the choice on the card; autonomous mode keeps the fallback rule.
+- The model pickers (chat, card, agents and rules) only offer agents that can answer now.
+- **Detectar modelos** replaces the list with the one the tool reports now, dropping models it no longer lists, and is also available in API mode.
+- The chat over the Gemini API declares only the board tools it uses: 26 instead of 81 on each request.
+- Active rules go into every AI context of the board, and active skills only into the cards that link them; rules that were **Per card** become inactive, for review.
+- Exporting to Claude Code writes `allowed-tools` on skills and `tools` on agents from the chosen tools; Cursor and Kimi Code leave the field out and warn.
 - The Plan asks for the sections Objetivo, Pronto quando, Pode tocar and Não pode tocar in each sub-task description (#1110).
 - Sub-tasks become the smallest part of the delivery that can be checked on its own, not a per-file split: the Plan instruction, the flow skill, the MCP descriptions and the agents say the board runs them one at a time, in dependency order (#1106).
 - UX review of the Harness, Automation, Connect agents and Workflows screens: Automation split into Run, Heartbeat and Parallelism; "Fill in the suggested model" sits under the model suggestion title; the context plan without a repeated title and with "Inherit agent"; shorter actions in the agents list ("Make default", "Restore original").
@@ -64,6 +74,7 @@
 
 ### Removed
 
+- The card's Rules field is gone: active rules already apply to every request.
 - The "Default agent" field in Harness › Tool and execution is gone; it repeated "Make default" in the Agents tab.
 - The Details tab in Connect agents is gone; the profile actions move to the end of the Connection tab.
 - The "Default agent" card at the top of Connect agents is gone.
@@ -75,6 +86,15 @@
 
 ### Fixed
 
+- The Gemini over the API model list no longer brings voice, image, music and research models.
+- The Gemini limit message says which quota ran out and when it comes back.
+- A model the Gemini API lists but refuses for the account (HTTP 404) leaves the model list and doesn't come back through **Detectar modelos**; the message carries Google's reason.
+- Gemini's **Detectar modelos** checks each model on the API and only lists the ones the account can use.
+- A chat on a model that left the catalog switches to the newest one of the same agent.
+- The quick test result also goes to the "Faz AI" log.
+- The AI no longer completes a card with an open checklist: `move_card` to a done column refuses it, and the flow skill says to check each item as it is finished.
+- The board chat answers again through ACP agents and Gemini over the API when the board permission is not "Board".
+- The Gemini over the API quick test gets a model choice, which that mode requires, starting with the newest.
 - The heartbeat text says it calls each card's agent, not a single tool.
 - Old ACP protocol log files are now deleted along with the trace files, even with the window open for days.
 - The Hide session/update switch gets a hint explaining it only filters the list.

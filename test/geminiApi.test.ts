@@ -11,10 +11,12 @@ import {
   MISSING_API_KEY,
   apiCallDecision,
   createGeminiApiDriver,
+  limitMessage,
   type McpConnect,
   type McpConnection,
   type McpTool,
 } from '../src/extension/ai/drivers/gemini/api';
+import { classifyGeminiFailure } from '../src/extension/ai/drivers/gemini/limit';
 import type { ExecutorContext } from '../src/extension/ai/drivers';
 import type { HeadlessInput } from '../src/extension/headless';
 import { API_CAPABILITY_CHECKS } from '../src/shared/executionAdmission';
@@ -258,8 +260,9 @@ describe('Gemini pela API: o ciclo de chamadas de função', () => {
 
     const end = await exit;
     expect(end.code).toBe(1);
-    expect(end.error?.message).toBe(
-      'A API do Gemini recusou o pedido por limite de uso (HTTP 429, RESOURCE_EXHAUSTED); tente de novo em 37s.',
+    // o relógio local de quando volta, não os segundos crus do retryDelay
+    expect(end.error?.message).toMatch(
+      /^A API do Gemini recusou o pedido por limite de uso do modelo [\w.-]+ \(HTTP 429\)\. Ela volta às \d\d:\d\d\.$/,
     );
     expect(server.requests).toHaveLength(1);
     expect(lines).toContain(end.error!.message);
@@ -270,6 +273,32 @@ describe('Gemini pela API: o ciclo de chamadas de função', () => {
       usageLimitHint: { retryAfterMs: 37_000 },
     });
     expect(measured.failure()).toBeInstanceOf(MeasureEndedError);
+  });
+
+  it('404: o modelo que saiu da API diz para atualizar a lista e escolher outro', async () => {
+    server = await fakeGemini([{ status: 404, json: { error: { code: 404, status: 'NOT_FOUND', message: 'models/x is not found' } } }]);
+    const { exit, measured } = start({ connect: fakeMcp(TOOLS).connect });
+    const end = await exit;
+    expect(end.code).toBe(1);
+    // a mensagem do Google vai junto, e o relatório leva o modelo para o board tirá-lo do catálogo
+    expect(end.error?.message).toMatch(
+      /^O modelo [\w.-]+ não está disponível para esta conta na API do Gemini \(HTTP 404: models\/x is not found\)\. O board o tirou da lista de modelos; escolha outro\.$/,
+    );
+    expect(measured.report().modelUnavailable).toMatch(/^[\w.-]+$/);
+  });
+
+  it('a mensagem da cota diária diz que é a do dia, quando volta e o que fazer até lá', () => {
+    const now = new Date(2026, 9, 28, 13, 38).getTime();
+    const daily = limitMessage(
+      'gemini-4-argon',
+      classifyGeminiFailure({ code: 429, message: 'You have exhausted your daily quota on this model.' }),
+      now,
+    );
+    expect(daily).toMatch(
+      /^A cota diária do modelo gemini-4-argon na API do Gemini acabou \(HTTP 429\)\. Ela volta às (\d\d\/\d\d )?\d\d:\d\d\./,
+    );
+    expect(daily).toContain('Até lá, use outro modelo ou outro agente.');
+    expect(daily).not.toMatch(/\d{4,}s/);
   });
 
   it('o erro do servidor que repete a chave chega ao log sem ela', async () => {
@@ -428,6 +457,11 @@ describe('Gemini pela API: recusas antes do primeiro pedido e o vínculo', () =>
               supportedGenerationMethods: ['generateContent', 'countTokens'],
             },
             { name: 'models/text-embedding-004', displayName: 'Embedding', supportedGenerationMethods: ['embedContent'] },
+            // geram voz, imagem ou música: a lista da API os traz com generateContent, mas o board não conversa com eles
+            { name: 'models/gemini-2.5-flash-preview-tts', supportedGenerationMethods: ['generateContent'] },
+            { name: 'models/gemini-3-pro-image', supportedGenerationMethods: ['generateContent'] },
+            { name: 'models/lyria-3.5', supportedGenerationMethods: ['generateContent'] },
+            { name: 'models/deep-research-preview-04-2026', supportedGenerationMethods: ['generateContent'] },
           ],
           nextPageToken: 'pagina-2',
         },
@@ -450,6 +484,33 @@ describe('Gemini pela API: recusas antes do primeiro pedido e o vínculo', () =>
     expect((refused as Error).message).toBe(
       'A API do Gemini recusou a chave (HTTP 400, INVALID_ARGUMENT): API key [chave da API] not valid. Please pass a valid API key.',
     );
+  });
+
+  it('os modelos disponíveis: cada modelo listado recebe um pedido mínimo e só o 404 o tira', async () => {
+    const calls: string[] = [];
+    const listing = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.8-flash', 'gemini-flash-latest'].map((m) => ({
+      name: `models/${m}`,
+      supportedGenerationMethods: ['generateContent'],
+    }));
+    const fetchStub = (async (url: string, init?: RequestInit) => {
+      const path = new URL(url).pathname;
+      if (!init?.method) return new Response(JSON.stringify({ models: listing }), { status: 200 });
+      calls.push(`${path} ${String(init.body)}`);
+      if (path.includes('gemini-2.5-flash:')) return new Response('{"error":{"code":404}}', { status: 404 });
+      // o limite de uso e a falha de rede não provam que o modelo está fechado
+      if (path.includes('gemini-2.5-pro:')) return new Response('{"error":{"code":429}}', { status: 429 });
+      if (path.includes('gemini-flash-latest:')) throw new Error('rede caiu');
+      return new Response('{"candidates":[]}', { status: 200 });
+    }) as typeof fetch;
+    const driver = createGeminiApiDriver({ endpoint: 'https://api.test/v1beta', fetch: fetchStub });
+    const models = await driver.availableModels!(KEY);
+    expect(models.map((m) => m.model)).toEqual(['gemini-2.5-pro', 'gemini-3.8-flash', 'gemini-flash-latest']);
+    expect(calls).toHaveLength(4);
+    expect(calls.every((c) => c.includes(':generateContent') && c.includes('"maxOutputTokens":1'))).toBe(true);
+    // a conferência da chave continua só lendo a lista, sem gastar a conta
+    calls.length = 0;
+    expect(await driver.apiModels!(KEY)).toHaveLength(4);
+    expect(calls).toEqual([]);
   });
 
   it('a conferência da chave: a chave ecoada atravessando o limite do corte sai mascarada inteira', async () => {

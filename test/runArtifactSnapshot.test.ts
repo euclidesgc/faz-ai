@@ -193,9 +193,9 @@ describe('snapshots de artefatos por execução', () => {
     expect(frozen.rewrite(input).prompt).toBe(`Leia ${bodyPath(frozen.directory)}`);
   });
 
-  it('a seleção sem card inclui Sempre e mantém opcionais fora do pedido', () => {
+  it('a seleção sem card inclui a regra ativa e mantém as skills (só vinculáveis a card) fora do pedido', () => {
     const boards = new BoardRepo(db);
-    repo.setUsage(boardId, id, 'always');
+    const rule = repo.upsert(boardId, { ...draft('Regra v1'), kind: 'rule', name: 'regra-fixa', files: [] }, 'always');
     repo.upsert(boardId, { ...draft(), name: 'opcional', files: [] });
     const state = boards.snapshot(boardId);
     const directory = path.join(dir, 'cache');
@@ -204,7 +204,7 @@ describe('snapshots de artefatos por execução', () => {
       ...state.harness,
       library: { directory, artifacts: repo.list(boardId).map((a) => ({ ...a, path: mirror.pathOf(a) })) },
     };
-    expect(runArtifactRequest(state)!.artifacts.map((a) => a.id)).toEqual([id]);
+    expect(runArtifactRequest(state)!.artifacts.map((a) => a.id)).toEqual([rule]);
   });
 });
 
@@ -279,7 +279,13 @@ describe('gateway com snapshot obrigatório', () => {
       attachmentsDir: path.join(dir, 'attachments'),
     });
     expect(router.boardId).toBe(boardId);
-    repo.setUsage(boardId, id, 'always');
+    // só a regra ativa entra no pedido sem card: é ela que o snapshot de cada execução congela
+    const ruleId = repo.upsert(boardId, { ...draft('Regra v1'), kind: 'rule', name: 'regra-fixa', files: [] }, 'always');
+    const ruleRel = () => {
+      const cache = request().directory;
+      const rule = repo.list(boardId).find((a) => a.id === ruleId)!;
+      return path.relative(cache, new ArtifactMirror(cache, repo, boardId).pathOf(rule));
+    };
     const originalSnapshot = router.snapshot.bind(router);
     vi.spyOn(router, 'snapshot').mockImplementation(() => {
       const state = originalSnapshot();
@@ -308,7 +314,7 @@ describe('gateway com snapshot obrigatório', () => {
       columnId: state.columns.find((c) => c.workflowId === type.defaultWorkflowId)!.id,
     });
     runner.start(cardId, 'manual');
-    repo.upsert(boardId, draft('Skill v2'));
+    repo.upsert(boardId, { ...draft('Regra v2'), kind: 'rule', name: 'regra-fixa', files: [] }, 'always');
     router.chatCommand({ type: 'chat.send', text: 'Revisar', model: null });
     const runs = new AiRunRepo(db).byMonth(monthOf(Date.now()));
     expect(runs).toHaveLength(2);
@@ -316,8 +322,8 @@ describe('gateway com snapshot obrigatório', () => {
     for (let i = 0; i < 2; i++) {
       const directory = path.join(dir, 'runs', boardId, runs[i]!.id);
       expect(commands[i]).toContain(directory);
-      expect(commands[i]).not.toContain(bodyPath(request().directory));
-      expect(fs.readFileSync(bodyPath(directory), 'utf8')).toBe(i === 0 ? 'Skill v1' : 'Skill v2');
+      expect(commands[i]).not.toContain(path.join(request().directory, ruleRel()));
+      expect(fs.readFileSync(path.join(directory, ruleRel()), 'utf8')).toBe(i === 0 ? 'Regra v1' : 'Regra v2');
     }
     for (const exit of exits) exit(0);
   });

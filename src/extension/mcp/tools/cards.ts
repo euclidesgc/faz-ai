@@ -118,7 +118,7 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'move_card',
-    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto, e um card só avança de uma coluna que exige aprovação (`requiresApproval` em get_board) quando o status dele é "approved". Um card arquivado é desarquivado ao ser movido. `comment` grava a mensagem de conclusão na conversa depois do movimento (equivale a move_card + add_comment); um movimento recusado não grava nada.',
+    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto, e um card só avança de uma coluna que exige aprovação (`requiresApproval` em get_board) quando o status dele é "approved". Para uma coluna de conclusão, o checklist do card não pode ter item em aberto: marque com update_checklist_item o que fez e apague com delete_checklist_item o que não se aplica. Um card arquivado é desarquivado ao ser movido. `comment` grava a mensagem de conclusão na conversa depois do movimento (equivale a move_card + add_comment); um movimento recusado não grava nada.',
     {
       card: cardArg,
       column: z.string().describe('Nome da coluna de destino'),
@@ -133,6 +133,12 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       const s = router.snapshot();
       const card = live(findCard(s, a.card));
       const column = findColumn(s, a.column, card.workflowId);
+      // o checklist é o registro do que foi feito: a IA não conclui o card deixando-o todo desmarcado
+      const open = s.checklistItems.filter((i) => i.cardId === card.id && !i.done);
+      if (column.category === 'done' && card.columnId !== column.id && open.length)
+        throw new Error(
+          `Não é possível concluir #${card.number}: ${open.length} item(ns) do checklist em aberto (${open.map((i) => `"${i.text}" [${i.id}]`).join(', ')}). Marque com update_checklist_item o que foi feito e apague com delete_checklist_item o que não se aplica; depois mova de novo.`,
+        );
       if (card.archivedAt !== null)
         router.handle({ type: 'card.unarchive', cardId: card.id, columnId: column.id, position: a.position ?? END }, aiOrigin(ctx));
       else

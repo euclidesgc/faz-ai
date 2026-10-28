@@ -1,6 +1,8 @@
 import { policies } from './policies';
 // Dicionário pt-BR → inglês. Um arquivo por área da interface; o texto em português é a chave.
 import { library } from './library';
+import { artifactLibrary } from './artifactLibrary';
+import { artifactForms } from './artifactForms';
 import { board } from './board';
 import { card } from './card';
 import { defaults } from './defaults';
@@ -16,6 +18,8 @@ import { agentConnect } from './agentConnect';
 
 export const EN: Record<string, string> = {
   ...library,
+  ...artifactLibrary,
+  ...artifactForms,
   ...policies,
   ...shared,
   ...host,

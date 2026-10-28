@@ -39,12 +39,12 @@ import { libraryMcpTransport } from '../../../mcp/boardGateway';
 import { boardSelfTransport } from '../../../mcp/selfClient';
 import { boardDecision, type AcpDecision } from '../../acp/run';
 import { apiBinding, apiEndpoint } from '../../apiBinding';
-import type { ModelOption } from '../../../../shared/models';
+import { isTextModel, type ModelOption } from '../../../../shared/models';
 import { maskApiKey } from '../../../toolKeys';
 import { loginShellPath } from '../../../spawn';
 import { apiLocalTools, type ApiLocalTool } from '../../../../shared/apiTools';
 import { localDeclaration, processGone, realLocalRoots, runLocalTool, type LocalToolLimits, type LocalToolResult } from '../../apiTools';
-import type { FailureClass } from '../../../../shared/usageLimit';
+import { limitClock, resetAtOf, type FailureClass } from '../../../../shared/usageLimit';
 import type { ExecutorContext, ToolDriver } from '../types';
 import { classifyGeminiFailure } from './limit';
 
@@ -141,6 +141,19 @@ export function apiMcpServers(input: HeadlessInput): Record<string, Json> {
     if (def) out[name] = def;
   }
   return out;
+}
+
+/**
+ * O 429 em palavras de quem decide o que fazer: qual cota (a do dia ou a de curto prazo) e quando ela volta, no
+ * relógio local, em vez dos segundos crus do `retryDelay` ("tente de novo em 51679s").
+ */
+export function limitMessage(model: string, found: FailureClass, now: number): string {
+  const hint = found.usageLimitReached ? found.usageLimitHint : undefined;
+  const at = resetAtOf(hint, now);
+  const when = at ? ` Ela volta às ${limitClock(at, now)}.` : '';
+  return hint?.dailyResetZone
+    ? `A cota diária do modelo ${model} na API do Gemini acabou (HTTP 429).${when} Até lá, use outro modelo ou outro agente.`
+    : `A API do Gemini recusou o pedido por limite de uso do modelo ${model} (HTTP 429).${when}`;
 }
 
 /** O modelo da execução: o do card; o modo API não tem modelo padrão escondido. */
@@ -261,6 +274,8 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
   let requests = 0;
   /** o limite de uso que a API devolveu (história 12); null quando a execução não esbarrou nele */
   let limit: FailureClass | null = null;
+  /** o modelo que a API respondeu como inexistente para a conta (404) */
+  let unavailable: string | null = null;
 
   const fail = (message: string): number => {
     const safe = scrub(message);
@@ -360,6 +375,8 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
         for (const tool of tools) {
           // a decisão antes de declarar: a ferramenta que o card não admite nunca chega ao modelo
           if (!apiCallDecision(input, names, server, tool.name).allow) continue;
+          // o recorte do chat: só diminui o que vai ao modelo, nunca amplia a decisão acima
+          if (server === BOARD_SERVER && input.exec?.declareOnly && !input.exec.declareOnly.includes(tool.name)) continue;
           const wanted = mcpOperation(server, tool.name);
           const name = FUNCTION_NAME.test(wanted) && !declared.some((d) => d.name === wanted) ? wanted : `mcp_fn_${declared.length + 1}`;
           declared.push({
@@ -408,10 +425,15 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
           }
           const found = classifyGeminiFailure({ message: err?.message || res.text, code: res.status, status: err?.status, body });
           if (found.usageLimitReached) limit = found;
-          if (res.status === 429)
+          if (res.status === 429) return fail(limitMessage(model, found, Date.now()));
+          // o modelo não serve para esta conta, mesmo que a lista da API ainda o traga (o Google mantém na lista
+          // modelos fechados para contas novas): o board o tira do catálogo, e a mensagem do Google vai junto
+          if (res.status === 404) {
+            unavailable = model;
             return fail(
-              `A API do Gemini recusou o pedido por limite de uso (HTTP 429${err?.status ? `, ${err.status}` : ''})${err?.retryDelay ? `; tente de novo em ${err.retryDelay}` : ''}.`,
+              `O modelo ${model} não está disponível para esta conta na API do Gemini (HTTP 404${err?.message ? `: ${cut(scrub(err.message), 400)}` : ''}). O board o tirou da lista de modelos; escolha outro.`,
             );
+          }
           return fail(
             `A API do Gemini recusou o pedido (HTTP ${res.status}${err?.status ? `, ${err.status}` : ''}): ${cut(scrub(err?.message || res.text), 300)}`,
           );
@@ -566,6 +588,7 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
       reason: null,
       usageLimitReached: !!limit,
       ...(limit?.usageLimitHint ? { usageLimitHint: limit.usageLimitHint } : {}),
+      ...(unavailable ? { modelUnavailable: unavailable } : {}),
     };
     if (measured)
       return {
@@ -644,7 +667,8 @@ async function listApiModels(apiKey: string, o: Required<GeminiApiOptions>): Pro
     for (const raw of asList(data.models)) {
       const m = asObject(raw);
       const name = asText(m?.name)?.replace(/^models\//, '');
-      if (!m || !name || !asList(m.supportedGenerationMethods).includes('generateContent')) continue;
+      // só o que conversa com ferramentas: a lista traz também voz, imagem, música e pesquisa, que o board não usa
+      if (!m || !name || !asList(m.supportedGenerationMethods).includes('generateContent') || !isTextModel(name)) continue;
       options.push({
         id: `gemini:${name}`,
         tool: 'gemini',
@@ -659,6 +683,42 @@ async function listApiModels(apiKey: string, o: Required<GeminiApiOptions>): Pro
     if (!pageToken) break;
   }
   return options;
+}
+
+/** Quantos modelos a conferência chama ao mesmo tempo, e quanto espera por cada um. */
+const PROBE_CONCURRENCY = 4;
+const PROBE_TIMEOUT_MS = 20_000;
+
+/**
+ * Os modelos da conta que respondem de fato: a lista da API mantém modelos fechados para contas novas, que o
+ * `generateContent` recusa com 404 ("no longer available to new users"). Cada um recebe um pedido mínimo (uma
+ * palavra, um token de resposta); só o 404 tira o modelo. Limite de uso, falha de rede ou tempo esgotado não
+ * provam nada e o modelo fica.
+ */
+async function availableApiModels(apiKey: string, o: Required<GeminiApiOptions>): Promise<ModelOption[]> {
+  const listed = await listApiModels(apiKey, o);
+  const endpoint = apiEndpoint(o.endpoint);
+  const closed = new Set<string>();
+  const queue = [...listed];
+  const probe = async (): Promise<void> => {
+    for (let m = queue.shift(); m; m = queue.shift()) {
+      try {
+        const res = await o.fetch(`${endpoint}/models/${encodeURIComponent(m.model)}:generateContent`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'ok' }] }], generationConfig: { maxOutputTokens: 1 } }),
+          signal: AbortSignal.timeout(Math.min(o.requestTimeoutMs, PROBE_TIMEOUT_MS)),
+          redirect: 'error',
+        });
+        if (res.status === 404) closed.add(m.model);
+        await res.text().catch(() => '');
+      } catch {
+        // sem resposta não há prova de que o modelo está fechado
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: PROBE_CONCURRENCY }, probe));
+  return listed.filter((m) => !closed.has(m.model));
 }
 
 /** O driver do Gemini pela API. As opções são para o teste (servidor HTTP falso, MCP em memória). */
@@ -688,6 +748,7 @@ export function createGeminiApiDriver(options: GeminiApiOptions = {}): ToolDrive
     // não tem como rodar (não há agente com login próprio), então a falta é "sem login", não "não verificado"
     signedIn: async (probe) => (probe.hasApiKey === undefined ? null : probe.hasApiKey),
     apiModels: (apiKey) => listApiModels(apiKey, o),
+    availableModels: (apiKey) => availableApiModels(apiKey, o),
     measure: 'tokens',
     enforcement: toolModeEntry('gemini', 'api')!.enforcement,
     transport: 'api',

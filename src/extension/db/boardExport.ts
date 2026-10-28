@@ -76,6 +76,8 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'execution_policies', where: 'board_id = ?', hasId: true, since: 41 },
   { name: 'execution_policy_versions', where: 'board_id = ?', hasId: false, since: 41 },
   { name: 'board_artifact_files', where: 'artifact_id IN (SELECT id FROM board_artifacts WHERE board_id = ?)', hasId: false, since: 34 },
+  // pastas de skill criadas vazias (as que têm skill vêm do próprio artefato)
+  { name: 'skill_folders', where: 'board_id = ?', hasId: false, since: 50 },
 ];
 
 /** Tabelas que ficam fora do arquivo mesmo tendo `board_id` (o teste do `sqlite_master` as ignora). */

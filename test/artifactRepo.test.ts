@@ -4,7 +4,7 @@ import type { Database } from 'sql.js';
 import { openInMemory } from '../src/extension/db/database';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { ArtifactRepo } from '../src/extension/repositories/artifactRepo';
-import type { ArtifactDraft } from '../src/shared/artifacts';
+import type { AgentMeta, ArtifactDraft } from '../src/shared/artifacts';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -44,15 +44,15 @@ describe('ArtifactRepo', () => {
     const id = repo.upsert(boardId, draft());
     const first = repo.get(boardId, 'skill', 'deploy')!;
     expect(first.usage).toBe('contextual');
-    repo.setUsage(boardId, id, 'always');
+    repo.setUsage(boardId, id, 'off');
     const again = repo.upsert(boardId, draft({ description: 'novo' }));
     const row = repo.get(boardId, 'skill', 'deploy')!;
     expect(again).toBe(id);
-    expect(row.usage).toBe('always');
+    expect(row.usage).toBe('off');
     expect(row.description).toBe('novo');
     expect(row.createdAt).toBe(first.createdAt);
-    repo.upsert(boardId, draft(), 'off');
-    expect(repo.get(boardId, 'skill', 'deploy')!.usage).toBe('off');
+    repo.upsert(boardId, draft(), 'contextual');
+    expect(repo.get(boardId, 'skill', 'deploy')!.usage).toBe('contextual');
     expect(count('board_artifacts')).toBe(1);
   });
 
@@ -173,5 +173,91 @@ describe('ArtifactRepo', () => {
       expect(count('board_artifacts')).toBe(0);
       expect(repo.legacySelection(boardId)).toHaveLength(2);
     });
+  });
+});
+
+describe('ArtifactRepo: biblioteca (ativo/inativo, tools, versão e pastas)', () => {
+  const agentMeta = (over: Partial<AgentMeta> = {}): AgentMeta => ({
+    skills: [],
+    mcpServers: [],
+    model: '',
+    tools: { categories: ['read', 'run'], native: { tool: '', allow: [], deny: [] } },
+    ...over,
+  });
+  const skillBody = (extra: string) => `---\nname: deploy\ndescription: d\n${extra}---\n# Deploy`;
+
+  it('sem tools gravadas, o agente deriva das categorias (e do mcp) e a skill do allowed-tools', () => {
+    repo.upsert(boardId, draft({ kind: 'agent', name: 'dev', files: [], meta: agentMeta({ mcpServers: ['github'] }) }));
+    repo.upsert(boardId, draft({ body: skillBody('allowed-tools: Read Grep Bash\n') }));
+    expect(repo.get(boardId, 'agent', 'dev')!.tools).toEqual(['read', 'search', 'shell', 'mcp']);
+    expect(repo.get(boardId, 'skill', 'deploy')!.tools).toEqual(['read', 'search', 'shell']);
+    // nada foi gravado na leitura: continua NULL no banco
+    expect(db.exec('SELECT COUNT(*) FROM board_artifacts WHERE tools_json IS NULL')[0]!.values[0]![0]).toBe(2);
+  });
+
+  it('grava tools, versão e pasta e relê; a lista gravada vale mesmo vazia', () => {
+    repo.upsert(boardId, draft({ tools: ['read', 'delegate', 'write'], version: '2.1.0', folder: 'frontend/react' }));
+    // delegate não existe na skill: sai na leitura
+    expect(repo.get(boardId, 'skill', 'deploy')).toMatchObject({ tools: ['read', 'write'], version: '2.1.0', folder: 'frontend/react' });
+    repo.upsert(boardId, draft({ tools: [], body: skillBody('allowed-tools: Read\n') }));
+    expect(repo.get(boardId, 'skill', 'deploy')!.tools).toEqual([]);
+    // sem tools/version/folder no upsert seguinte, mantém o gravado
+    repo.upsert(boardId, draft({ description: 'outra' }));
+    expect(repo.get(boardId, 'skill', 'deploy')).toMatchObject({ tools: [], version: '2.1.0', folder: 'frontend/react' });
+  });
+
+  it('o padrão de versão é do tipo e a pasta só existe na skill', () => {
+    repo.upsert(boardId, draft({ kind: 'rule', name: 'r.md', files: [], folder: 'x' }));
+    repo.upsert(boardId, draft({ kind: 'agent', name: 'dev', files: [], meta: agentMeta(), folder: 'x' }));
+    repo.upsert(boardId, draft({ name: 'sk' }));
+    expect(repo.get(boardId, 'rule', 'r.md')).toMatchObject({ version: '1', folder: '' });
+    expect(repo.get(boardId, 'agent', 'dev')).toMatchObject({ version: '1.0.0', folder: '' });
+    expect(repo.get(boardId, 'skill', 'sk')).toMatchObject({ version: '1.0.0', folder: '' });
+  });
+
+  it('setUsage e upsert normalizam o modo pelo tipo: regra pelo card é inativa, skill e agente sempre são pelo card', () => {
+    const rule = repo.upsert(boardId, draft({ kind: 'rule', name: 'r.md', files: [] }));
+    const skill = repo.upsert(boardId, draft());
+    const agent = repo.upsert(boardId, draft({ kind: 'agent', name: 'dev', files: [], meta: agentMeta() }));
+    const mcp = repo.upsert(boardId, draft({ kind: 'mcp', name: 'github', files: [], meta: { server: { command: 'gh' } } }));
+    repo.setUsage(boardId, rule, 'contextual');
+    repo.setUsage(boardId, skill, 'always');
+    repo.setUsage(boardId, agent, 'always');
+    repo.setUsage(boardId, mcp, 'always');
+    const usage = (kind: 'rule' | 'skill' | 'agent' | 'mcp', name: string) => repo.get(boardId, kind, name)!.usage;
+    expect([usage('rule', 'r.md'), usage('skill', 'deploy'), usage('agent', 'dev'), usage('mcp', 'github')]).toEqual([
+      'off',
+      'contextual',
+      'contextual',
+      'always',
+    ]);
+    repo.setUsage(boardId, rule, 'always');
+    expect(usage('rule', 'r.md')).toBe('always');
+    repo.upsert(boardId, draft({ kind: 'rule', name: 'r2.md', files: [] }), 'contextual');
+    repo.upsert(boardId, draft({ name: 'sk2' }), 'always');
+    expect([usage('rule', 'r2.md'), usage('skill', 'sk2')]).toEqual(['off', 'contextual']);
+  });
+
+  it('a leitura normaliza uma linha gravada por uma versão anterior', () => {
+    const id = repo.upsert(boardId, draft({ kind: 'rule', name: 'velha.md', files: [] }));
+    db.run("UPDATE board_artifacts SET usage = 'contextual' WHERE id = ?", [id]);
+    expect(repo.get(boardId, 'rule', 'velha.md')!.usage).toBe('off');
+  });
+
+  it('skillFolders devolve os níveis de cima, une as das skills com as vazias e removeSkillFolder tira só as vazias', () => {
+    repo.upsert(boardId, draft({ name: 'a', folder: 'frontend/react/hooks' }));
+    repo.upsert(boardId, draft({ name: 'b', folder: 'backend' }));
+    repo.upsert(boardId, draft({ name: 'c' }));
+    repo.addSkillFolder(boardId, 'docs/guias');
+    repo.addSkillFolder(boardId, 'docs/guias');
+    expect(repo.skillFolders(boardId)).toEqual(['backend', 'docs', 'docs/guias', 'frontend', 'frontend/react', 'frontend/react/hooks']);
+    // a pasta de outro board não aparece
+    const other = boards.getOrCreate('ws-2', 'Outro').id;
+    expect(repo.skillFolders(other)).toEqual([]);
+    repo.removeSkillFolder(boardId, 'docs');
+    expect(repo.skillFolders(boardId)).toEqual(['backend', 'frontend', 'frontend/react', 'frontend/react/hooks']);
+    // a que ainda tem skill continua pelas skills
+    repo.removeSkillFolder(boardId, 'backend');
+    expect(repo.skillFolders(boardId)).toContain('backend');
   });
 });

@@ -25,8 +25,18 @@ export function cardV1(state: BoardState, profileId: string, target: ContextActi
   return { context, strict: { profileId, request } };
 }
 
-/** Execução sem card (chat, assistentes, teste do perfil): contexto fechado, sem MCP além do contrato vazio. */
-export function closedV1(profileId: string, action: ContextAction, runner: RunnerConfig, readOnly = false): V1Fields {
+/**
+ * Execução sem card (chat, assistentes, teste do perfil): contexto fechado, sem MCP além do contrato vazio. O nível
+ * de MCP é o da permissão da execução: a admissão recusa como pedido inválido o nível que não é o dela, e o chat
+ * roda na permissão do board.
+ */
+export function closedV1(
+  profileId: string,
+  action: ContextAction,
+  runner: RunnerConfig,
+  readOnly = false,
+  permission: RunnerPermission = 'board',
+): V1Fields {
   const context: ContextDraftResolution = {
     target: { cardId: null, workflowId: null, phaseId: '', action },
     agent: null,
@@ -52,7 +62,7 @@ export function closedV1(profileId: string, action: ContextAction, runner: Runne
     mcpServers: [],
     mcpTools: [],
     boardMcpTools: [],
-    mcpLevel: { permission: 'board', tools: [] },
+    mcpLevel: { permission, tools: [] },
   };
   return { context, strict: { profileId, request } };
 }

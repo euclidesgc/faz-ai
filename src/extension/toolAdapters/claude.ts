@@ -5,6 +5,7 @@ import type { FormatLoss } from '../../shared/toolExport';
 import {
   agentMetaOf,
   commonLosses,
+  exportedTools,
   flagLosses,
   modelLosses,
   modelParts,
@@ -33,7 +34,7 @@ export const claudeAdapter: ToolAdapter = {
     }),
   mcpFiles: (target) => mcpLocations(target, ['.mcp.json'], ['.claude.json']),
   render(kind, sources) {
-    if (kind === 'skill') return renderSkills('.claude', sources);
+    if (kind === 'skill') return renderSkills('.claude', sources, (s) => exportedTools(s, 'claude'));
     // regra sem frontmatter nova: carregada em toda conversa; da mesma ferramenta vai como está
     if (kind === 'rule')
       return renderRuleFiles('.claude/rules', '.md', sources, (s) =>
@@ -43,7 +44,8 @@ export const claudeAdapter: ToolAdapter = {
       const out: string[] = [];
       const { native } = meta.tools;
       const sameTools = native.tool === 'claude';
-      if (sameTools && native.allow.length) out.push(`tools: ${native.allow.join(', ')}`);
+      const tools = exportedTools(s, 'claude') ?? [];
+      if (tools.length) out.push(`tools: ${tools.join(', ')}`);
       if (sameTools && native.deny.length) out.push(`disallowedTools: ${native.deny.join(', ')}`);
       const m = modelParts(meta.model);
       if (m.tool === 'claude' && m.id) out.push(`model: ${m.id}`);
@@ -61,7 +63,7 @@ export const claudeAdapter: ToolAdapter = {
     const meta = agentMetaOf(s);
     return [
       ...out,
-      ...toolListLosses(meta, 'claude', true),
+      ...toolListLosses(s, 'claude', true),
       ...(meta.mcpServers.length ? [{ code: 'mcpServers' as const, effect: 'configure' as const, value: meta.mcpServers.join(', ') }] : []),
       ...modelLosses(meta, 'claude', true, true),
       ...flagLosses(meta),

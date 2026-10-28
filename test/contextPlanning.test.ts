@@ -134,7 +134,8 @@ describe('contratos de contexto versionados', () => {
           r.meta_json = JSON.stringify({ server: { command: 'github', env: { TOKEN: 'segredo-local' } } });
         const keys = Object.keys(r).filter(
           (key) =>
-            (name !== 'board_artifacts' || !['revision', 'secret_ref', 'review_state', 'origin_digest'].includes(key)) &&
+            (name !== 'board_artifacts' ||
+              !['revision', 'secret_ref', 'review_state', 'origin_digest', 'version', 'folder', 'tools_json'].includes(key)) &&
             (name !== 'cards' || key !== 'questions_json'),
         );
         old.run(
@@ -145,7 +146,7 @@ describe('contratos de contexto versionados', () => {
     };
     insert('boards', [{ ...current.board, workspace_key: 'old' }]);
     for (const [name, rows] of Object.entries(current.tables))
-      if (!['agent_context_contracts', 'activity_context_selections', 'ai_profiles'].includes(name)) insert(name, rows);
+      if (!['agent_context_contracts', 'activity_context_selections', 'ai_profiles', 'skill_folders'].includes(name)) insert(name, rows);
     const before = executionState(db);
     const raw = all(old, 'SELECT * FROM board_artifacts');
     migrate(old);
@@ -153,7 +154,17 @@ describe('contratos de contexto versionados', () => {
     expect(all(old, "SELECT * FROM board_artifacts WHERE kind != 'mcp'")).toEqual(
       raw
         .filter((r) => r.kind !== 'mcp')
-        .map((row) => ({ ...row, revision: 1, secret_ref: null, review_state: 'legacy', origin_digest: '' })),
+        .map((row) => ({
+          ...row,
+          revision: 1,
+          secret_ref: null,
+          review_state: 'legacy',
+          origin_digest: '',
+          // migração 50: versão padrão do tipo, sem pasta e tools ainda não escolhidas
+          version: '1.0.0',
+          folder: '',
+          tools_json: null,
+        })),
     );
     expect(new ArtifactRepo(old).mcpDefinitions(router.boardId).github).toEqual({ command: 'github', env: { TOKEN: 'segredo-local' } });
     expect(after.fieldValues).toEqual(before.fieldValues);

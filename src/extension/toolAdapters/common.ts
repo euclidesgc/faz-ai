@@ -1,6 +1,7 @@
 // Funções comuns dos adaptadores do "Exportar para a ferramenta" (#623).
 import { isSafeRelPath, type AgentMeta } from '../../shared/artifacts';
 import { parseModelValue } from '../../shared/models';
+import { nativeTools, supportsToolList } from '../../shared/artifactTools';
 import type { AiTool } from '../../shared/harness';
 import type { FormatLoss, RefuseReason } from '../../shared/toolExport';
 import { isSafeSegment } from '../attachments';
@@ -55,9 +56,41 @@ export function modelParts(value: string): { tool: AiTool | ''; id: string; effo
 }
 
 /** Skills: o SKILL.md e os arquivos de apoio, iguais nas três ferramentas, só muda a pasta. */
+/** Grava (ou troca) `allowed-tools` no cabeçalho do SKILL.md, separado por espaço como pede o padrão SKILL.md. */
+export function withAllowedTools(content: string, names: readonly string[]): string {
+  if (!names.length || !FRONTMATTER.test(content)) return content;
+  const line = `allowed-tools: ${names.join(' ')}`;
+  const end = content.search(/\r?\n---/);
+  const head = content.slice(0, end);
+  return /^allowed-tools:.*$/m.test(head)
+    ? head.replace(/^allowed-tools:.*$/m, line) + content.slice(end)
+    : `${head}\n${line}${content.slice(end)}`;
+}
+
+/**
+ * As tools neutras da skill ou do agente no nome da ferramenta; `null` quando ela não tem o campo. O agente que veio
+ * da mesma ferramenta com a lista exata dela e ainda não foi salvo no formulário novo mantém essa lista.
+ */
+export function exportedTools(s: ExportSource, tool: AiTool): string[] | null {
+  const a = s.artifact;
+  const meta = a.kind === 'agent' ? agentMetaOf(s) : undefined;
+  if (meta && meta.tools.native.tool === tool && meta.tools.native.allow.length) return meta.tools.native.allow;
+  return nativeTools(tool, a.tools ?? [], meta?.mcpServers ?? []);
+}
+
+/** A ferramenta não tem `allowed-tools`/`tools`: o campo sai da cópia e a prévia avisa. */
+export function neutralToolLosses(s: ExportSource, tool: AiTool): FormatLoss[] {
+  const tools = s.artifact.tools ?? [];
+  if (!tools.length || supportsToolList(tool)) return [];
+  const meta = s.artifact.kind === 'agent' ? agentMetaOf(s) : undefined;
+  if (meta?.tools.native.tool === tool) return [];
+  return [{ code: 'allowed-tools', effect: 'lost', value: tools.join(' ') }];
+}
+
 export function renderSkills(
   root: string,
   sources: ExportSource[],
+  allowed?: (s: ExportSource) => string[] | null,
 ): { files: RenderedFile[]; refused: { id: string; reason: RefuseReason }[] } {
   const files: RenderedFile[] = [];
   const refused: { id: string; reason: RefuseReason }[] = [];
@@ -67,7 +100,8 @@ export function renderSkills(
     else if (!s.files.every((f) => isSafeRelPath(f.path))) refused.push({ id: a.id, reason: 'unsafe-path' });
     else {
       const dir = `${root}/skills/${a.name}`;
-      files.push({ rel: `${dir}/SKILL.md`, data: Buffer.from(ensureSkillFrontmatter(s.body, a.name, a.description)), from: [a.id] });
+      const md = ensureSkillFrontmatter(s.body, a.name, a.description);
+      files.push({ rel: `${dir}/SKILL.md`, data: Buffer.from(withAllowedTools(md, allowed?.(s) ?? [])), from: [a.id] });
       for (const f of s.files)
         files.push({ rel: `${dir}/${f.path}`, data: Buffer.from(f.content, f.encoding === 'base64' ? 'base64' : 'utf8'), from: [a.id] });
     }
@@ -146,13 +180,19 @@ export function renderAgents(
   return { files, refused };
 }
 
-/** Lista de ferramentas só quando é da mesma ferramenta; nome nativo de outra não é traduzido. */
-export function toolListLosses(meta: AgentMeta, tool: AiTool, supported: boolean): FormatLoss[] {
-  const { native } = meta.tools;
-  if (!native.allow.length && !native.deny.length) return [];
-  if (!supported || native.tool !== tool) return [{ code: 'tools', effect: 'lost' }];
+/**
+ * A lista de ferramentas do agente: as tools neutras vão traduzidas quando a ferramenta tem o campo (sem ele, avisa
+ * `neutralToolLosses`); a lista nativa de outra ferramenta não é traduzida.
+ */
+export function toolListLosses(s: ExportSource, tool: AiTool, supported: boolean): FormatLoss[] {
+  const { native } = agentMetaOf(s).tools;
+  const exported = supported ? exportedTools(s, tool) : null;
+  if (!exported?.length) {
+    if (s.artifact.tools?.length) return neutralToolLosses(s, tool);
+    return native.allow.length || native.deny.length ? [{ code: 'tools', effect: 'lost' }] : [];
+  }
   // lista fechada sem as ferramentas do servidor do board: não ampliamos a permissão em silêncio
-  return native.allow.length && !native.allow.some((t) => t.startsWith('mcp__faz-ai__'))
+  return !exported.some((t) => t.startsWith('mcp__faz-ai__'))
     ? [{ code: 'board-tools', effect: 'configure', value: 'mcp__faz-ai__*' }]
     : [];
 }

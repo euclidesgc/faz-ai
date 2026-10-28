@@ -1,6 +1,7 @@
 import { Checkbox, Select, TextField as RxTextField } from '@radix-ui/themes';
 import { useState } from 'react';
 import { modelGroups } from '../../shared/runTarget';
+import { profileAvailable } from '../../shared/profileAvailability';
 import { modelDisplay } from '../modelText';
 import type { FieldDef, FieldValue } from '../../shared/model';
 import { effortLabel, modelValue, parseModelValue } from '../../shared/models';
@@ -134,13 +135,16 @@ export function ModelEditor({
   part?: 'both' | 'model' | 'effort';
 }) {
   const board = useBoardStore((s) => s.state?.board);
+  const state = useBoardStore((s) => s.state);
   // o perfil personalizado que recebe o identificador livre; null com o campo fechado
   const [other, setOther] = useState<string | null>(null);
   const [otherName, setOtherName] = useState('');
   const current = parseModelValue(value);
   // um grupo por perfil ligado; o personalizado aparece mesmo sem modelo cadastrado, porque aceita um
   // identificador livre; o valor fora deles (perfil desligado, modelo apagado) continua visível
-  const groups = board ? modelGroups(board).filter((g) => g.options.length > 0 || g.custom) : [];
+  // só os agentes que podem responder agora: o desligado, sem CLI, sem login ou com a conexão falha fica de fora
+  const groups =
+    board && state ? modelGroups(board, (id) => profileAvailable(state, id)).filter((g) => g.options.length > 0 || g.custom) : [];
   const option = current ? groups.flatMap((g) => g.options).find((o) => o.id === current.id) : undefined;
   const submitOther = () => {
     const name = otherName.trim();
@@ -170,7 +174,17 @@ export function ModelEditor({
       value={current?.id ?? NO_MODEL}
       head={[
         { value: NO_MODEL, label: '—' },
-        ...(current && !option ? [{ value: current.id, label: t('{id} (fora do catálogo)', { id: current.id }) }] : []),
+        ...(current && !option
+          ? [
+              {
+                value: current.id,
+                label:
+                  board && board.modelCatalog.some((o) => o.id === current.id)
+                    ? t('{id} (agente indisponível)', { id: current.id })
+                    : t('{id} (fora do catálogo)', { id: current.id }),
+              },
+            ]
+          : []),
       ]}
       groups={groups.map((g) => ({
         key: g.cli,

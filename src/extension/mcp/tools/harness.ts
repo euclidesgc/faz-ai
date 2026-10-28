@@ -53,7 +53,7 @@ export function registerHarnessTools(tool: DefineTool): void {
 
   tool(
     'set_harness_selection',
-    'Envia rules, skills, agentes e servidores MCP ao board, muda o modo deles ou os tira do board. "always" (Sempre): entra em toda execução; "contextual" (Pelo card): disponível para indicar no card (campos Rules, Skills e MCPs) ou escolher como agente; "off" (Desligado): fica no board sem entrar em nada (é como as regras entram, para revisão); null: tira do board. Identifique cada item por `kind` e `name`, como get_harness o mostra.',
+    'Envia rules, skills, agentes e servidores MCP ao board, ativa, desativa ou os tira do board. "off": inativo, fica no board sem entrar em nada (é como as regras entram, para revisão). Ativo: regra usa "always" (entra em toda execução); skill e agente usam "contextual" (vinculáveis ao card); servidor MCP usa "always" ou "contextual" (só quando o card o indica). null: tira do board. Identifique cada item por `kind` e `name`, como get_harness o mostra.',
     {
       items: z
         .array(

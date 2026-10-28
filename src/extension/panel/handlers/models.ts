@@ -8,7 +8,7 @@ import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelOption, type ModelR
 import { cliOfValue } from '../../../shared/runTarget';
 import { valueOf } from '../../../shared/selectors';
 import { newId } from '../../db/ids';
-import { detectTools, effortTiers, fastBaseId, isFastVariant, modelsFor } from '../../models';
+import { detectTools, discoverModels, effortTiers, fastBaseId, isFastVariant, modelsFor } from '../../models';
 import type { BoardContext, HandlerMap } from './context';
 
 /**
@@ -62,14 +62,20 @@ export function useTool(ctx: BoardContext, tool: AiTool): void {
   suggestRules(ctx, base);
 }
 
-/** Junta ao catálogo os modelos atuais da ferramenta, atualizando os que já existem. */
+/**
+ * Junta ao catálogo os modelos atuais da ferramenta, atualizando os que já existem. Com uma lista lida agora da
+ * própria ferramenta, ela substitui a anterior: o modelo que a ferramenta deixou de listar sai do catálogo (senão
+ * ele ficava para sempre e só falhava na hora de rodar). O cadastrado à mão (sem `fromTool`) fica.
+ */
 function detectModels(ctx: BoardContext, tool: AiTool): void {
   const { board } = ctx.state();
-  const all = modelsFor(tool);
+  const fresh = discoverModels(tool).length > 0;
+  const retired = new Set(retiredModels(ctx)[tool] ?? []);
+  const all = modelsFor(tool).filter((o) => !retired.has(o.model));
   // as variantes rápidas do Cursor só entram com a regra ligada
   const found = all.filter((o) => board.rules.includeFastModels || !isFastVariant(o, all));
   const ids = new Set(found.map((o) => o.id));
-  const rest = board.modelCatalog.filter((o) => !ids.has(o.id));
+  const rest = board.modelCatalog.filter((o) => !ids.has(o.id) && !(fresh && o.tool === tool && o.fromTool));
   const at = rest.findIndex((o) => o.tool === tool);
   rest.splice(at < 0 ? rest.length : at, 0, ...found);
   ctx.boards.setModelCatalog(ctx.boardId, rest);
@@ -164,6 +170,33 @@ export function proposeLegacyFallbacks(ctx: BoardContext): void {
   if (proposals.length) ctx.executionPolicies.proposeMigrated(ctx.boardId, proposals);
 }
 
+/** Os modelos que a ferramenta recusou para esta conta, por ferramenta do catálogo (`retireModel`). */
+const RETIRED_KEY = 'retired_models';
+
+function retiredModels(ctx: BoardContext): Record<string, string[]> {
+  try {
+    const v: unknown = JSON.parse(ctx.boards.getMeta(RETIRED_KEY) ?? '{}');
+    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, string[]>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Tira do catálogo o modelo que a ferramenta recusou como inexistente para a conta (o 404 da API do Gemini) e o
+ * lembra: a lista da API pode continuar a trazê-lo, e o próximo "Detectar modelos" o traria de volta. A pessoa o
+ * recoloca cadastrando-o à mão. Devolve se o catálogo mudou.
+ */
+export function retireModel(ctx: BoardContext, tool: AiTool, model: string): boolean {
+  const all = retiredModels(ctx);
+  if (!all[tool]?.includes(model)) ctx.boards.setMeta(RETIRED_KEY, JSON.stringify({ ...all, [tool]: [...(all[tool] ?? []), model] }));
+  const { board } = ctx.state();
+  const catalog = board.modelCatalog.filter((o) => !(o.tool === tool && o.model === model));
+  if (catalog.length === board.modelCatalog.length) return false;
+  ctx.boards.setModelCatalog(ctx.boardId, catalog);
+  return true;
+}
+
 /** Catálogo de modelos e regras de sugestão. */
 export const modelHandlers = {
   'settings.executionPolicy.save': (msg, ctx, actor) => {
@@ -178,6 +211,15 @@ export const modelHandlers = {
     return true;
   },
   'settings.models.set': (msg, ctx) => {
+    // o modelo recolocado à mão volta a valer: sai da lista dos recusados
+    const retired = retiredModels(ctx);
+    const kept = Object.fromEntries(
+      Object.entries(retired).map(([tool, models]) => [
+        tool,
+        models.filter((m) => !msg.catalog.some((o) => o.tool === tool && o.model === m)),
+      ]),
+    );
+    if (JSON.stringify(kept) !== JSON.stringify(retired)) ctx.boards.setMeta(RETIRED_KEY, JSON.stringify(kept));
     ctx.boards.setModelCatalog(ctx.boardId, msg.catalog);
     return true;
   },

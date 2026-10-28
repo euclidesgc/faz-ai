@@ -65,6 +65,12 @@ export interface ExecInput {
   /** No contrato v1, [] é nenhuma ferramenta. Ausente preserva a semântica legada. */
   toolSet?: 'explicit';
   mcpTools?: string[];
+  /**
+   * No modo API, as ferramentas do servidor do board que vão declaradas ao modelo (pelo nome, sem o prefixo). Só
+   * reduz o que a decisão já admite: cada declaração viaja inteira em todo pedido (o chat com as 81 mandava ~15 mil
+   * tokens por pedido só nelas). Ausente = todas as admitidas.
+   */
+  declareOnly?: string[];
   deniedTools: string[];
   model: { name: string; effort: string | null } | null;
 }

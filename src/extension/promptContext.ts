@@ -1,6 +1,5 @@
 import { selectedItems, selectedMcpNames, selectedSkillNames, selectedRuleLocations } from '../shared/harnessSelection';
 import type { BoardState, Card } from '../shared/model';
-import { isFlowSkill } from './flowSkill';
 import { requiredRules, requiredSkills } from './mcp/format';
 
 /**
@@ -23,15 +22,12 @@ export interface ContextRef {
 
 const describe = (r: ContextRef) => `${r.kind} ${r.name} (${r.via ?? r.path})`;
 
-/** O contexto fixo do board: rules e skills marcadas como "incluir em todo contexto", pelo caminho. */
+/**
+ * O contexto fixo do board: as regras ativas, pelo caminho. Skill nunca entra aqui: ativa, ela só vai no card que a
+ * vincula (docs/decisoes/biblioteca-de-artefatos-do-board.md).
+ */
 export function alwaysRefs(s: BoardState): ContextRef[] {
-  return [
-    ...selectedItems(s, 'instructions', 'always').map((i): ContextRef => ({ kind: 'rule', name: i.location, path: i.path })),
-    // a skill do fluxo vem pelo get_skill (FLOW_LINE), mesmo instalada e marcada "Sempre"
-    ...selectedItems(s, 'skill', 'always')
-      .filter((i) => !isFlowSkill(i.name))
-      .map((i): ContextRef => ({ kind: 'skill', name: i.name, path: i.path })),
-  ];
+  return selectedItems(s, 'instructions', 'always').map((i): ContextRef => ({ kind: 'rule', name: i.location, path: i.path }));
 }
 
 /** O que o card exige além do contexto fixo: as rules e as skills indicadas nele e no agente, pelo caminho. */
@@ -63,13 +59,12 @@ export function contextLines(s: BoardState, c?: Card): { always: string[]; card:
 }
 
 /**
- * O que o "Refinar com IA" e o planejamento podem indicar num card: só os artefatos do board em modo
- * "Pelo card" (nunca o catálogo Global, Projeto ou Importados), e os agentes disponíveis. O que está em
- * modo "Sempre" já vai em toda execução e não precisa ser indicado.
+ * O que o "Refinar com IA" e o planejamento podem indicar num card: as skills e os agentes ativos do board e os
+ * servidores MCP em "Pelo card" (nunca o catálogo Global, Projeto ou Importados). Regra não se indica: a ativa já
+ * vai em toda execução, como o MCP em "Sempre".
  */
 export interface RefineCatalog {
   agents: { name: string; description: string; default: boolean }[];
-  rules: { location: string; description: string }[];
   skills: { name: string; description: string }[];
   mcps: { name: string; description: string }[];
   /** o que entra em toda execução deste board, só para a IA saber que já conta com isso */
@@ -83,7 +78,6 @@ export function refineCatalog(s: BoardState): RefineCatalog {
     agents: s.board.execProfiles
       .filter((p) => p.scope !== 'builtin')
       .map((p) => ({ name: p.id, description: p.purpose, default: p.isDefault })),
-    rules: selectedItems(s, 'instructions', 'contextual').map((i) => ({ location: i.location, description: i.description })),
     skills: selectedSkillNames(s, 'contextual').map((name) => ({
       name,
       description: skills.find((i) => i.name === name)?.description ?? '',
@@ -103,11 +97,10 @@ export function refineCatalog(s: BoardState): RefineCatalog {
 export function catalogLines(catalog: RefineCatalog): string[] {
   const item = (name: string, description: string) => (description ? `${name} (${description})` : name);
   return [
-    'Catálogo deste board: só os artefatos que a pessoa enviou ao board em modo "Pelo card". Só isto existe para você indicar num card; nada fora da lista, mesmo que exista no projeto ou na máquina:',
+    'Catálogo deste board: só as skills e os agentes ativos e os servidores MCP em "Pelo card". Só isto existe para você indicar num card; nada fora da lista, mesmo que exista no projeto ou na máquina:',
     `- Agentes (escolha um com set_card_profile): ${
       catalog.agents.map((a) => item(a.name, `${a.description}${a.default ? '; padrão' : ''}`)).join('; ') || 'nenhum além do agente padrão'
     }.`,
-    `- Rules (campo Rules; o valor é o caminho mostrado): ${catalog.rules.map((r) => item(r.location, r.description)).join('; ') || 'nenhuma'}.`,
     `- Skills (campo Skills): ${catalog.skills.map((k) => item(k.name, k.description)).join('; ') || 'nenhuma'}.`,
     `- Servidores MCP (campo MCPs; o do board vai sempre): ${catalog.mcps.map((m) => item(m.name, m.description)).join('; ') || 'nenhum'}.`,
     ...(catalog.always.length

@@ -1,25 +1,21 @@
-import { useState, type ReactNode } from 'react';
-import { Badge, Checkbox } from '@radix-ui/themes';
-import { agentOfArtifact, artifactLocation, selectableOfKind, type ArtifactKind, type BoardArtifact } from '../../../../shared/artifacts';
-import type { AgentSuggestion } from '../../../../shared/agentSuggestions';
-import { baseInfo } from '../../../../shared/harness';
+import { useState } from 'react';
+import { Callout, SegmentedControl, TextField } from '@radix-ui/themes';
+import type { ArtifactAssistDraft, AssistKind } from '../../../../shared/artifactAssistant';
+import { filterArtifacts, type StatusFilter } from '../../../../shared/artifactLibrary';
+import type { ArtifactKind, BoardArtifact } from '../../../../shared/artifacts';
 import { matchesQuery } from '../../../../shared/harnessTopics';
-import { ai, harness } from '../../../commands';
+import { harness } from '../../../commands';
 import { useBoardStore } from '../../../store/boardStore';
-import { ActionButton, DeleteButton, IconPlus, IconRules, IconSkills } from '../../ui';
-import { AgentEditor } from './AgentEditor';
-import { AgentWizard } from './AgentWizard';
-import { AgentsToolbar, DefaultAgentBadge, DeleteAgentButton, MakeDefaultButton, useDefaultAgent } from './AgentsToolbar';
-import { ArtifactBadges, RestoreAgentButton, UpdateFromOriginButton } from './ArtifactStatus';
-import { BulkActions } from './BulkActions';
+import { useAction } from '../../../useAction';
+import { ActionButton, IconAi, IconInfo, IconPlus } from '../../ui';
+import { ArtifactAssistant } from './ArtifactAssistant';
+import { ArtifactFormModal } from './ArtifactFormModal';
+import { ArtifactRow } from './ArtifactRow';
+import { FlowSkillRow } from './FlowSkillRow';
 import { McpServerEditor } from './McpServerEditor';
-import { NewAgent } from './NewAgent';
-import { RuleEditor } from './RuleEditor';
-import { RuleWizard } from './RuleWizard';
-import { SkillEditor } from './SkillEditor';
-import { SkillWizard } from './SkillWizard';
-import { UsageSelect } from './UsageSelect';
-import { t, tn } from '../../../i18n';
+import { RuleFormModal } from './RuleFormModal';
+import { SkillFolderTree } from './SkillFolderTree';
+import { t } from '../../../i18n';
 
 /** O que cada assunto diz quando está vazio; o "Novo…" e o "Importar" ficam ao lado. */
 const EMPTY_TEXT: Record<ArtifactKind, string> = {
@@ -29,169 +25,171 @@ const EMPTY_TEXT: Record<ArtifactKind, string> = {
   mcp: 'Nenhum servidor MCP no board. Cadastre um ou importe os que você já configurou.',
 };
 
-/** O texto de origem da linha: de onde veio a cópia, ou por que ela não vale. */
-function originText(a: BoardArtifact): string | null {
-  if (a.generated) return t('gerada pelo board');
-  if (a.missing) return t('origem ausente na cópia');
-  return a.origin ? t('importado de {origin}', { origin: a.origin }) : null;
+/** O que "ativo" quer dizer na aba, em uma frase. */
+const SCOPE_NOTE: Record<ArtifactKind, string> = {
+  rule: 'Regras ativas entram em todo contexto de IA deste board.',
+  skill: 'Skills ativas podem ser vinculadas a cards e só entram no contexto dos cards vinculados.',
+  agent: 'Agentes ativos podem ser escolhidos no card (um por card) e executam a ação dele.',
+  mcp: 'Servidores MCP ativos ficam em "Sempre" (em toda execução) ou "Pelo card" (só nos cards que os indicam).',
+};
+
+const NEW_LABEL: Record<ArtifactKind, string> = {
+  rule: 'Nova regra',
+  skill: 'Nova skill',
+  agent: 'Novo agente',
+  mcp: 'Novo servidor',
+};
+
+/** Rótulos do filtro: regras e skills são femininas, agentes e servidores masculinos. */
+function statusLabels(kind: ArtifactKind): Record<StatusFilter, string> {
+  return kind === 'rule' || kind === 'skill'
+    ? { all: t('Todas'), active: t('Ativas'), inactive: t('Inativas') }
+    : { all: t('Todos'), active: t('Ativos'), inactive: t('Inativos') };
 }
 
+/** O que está aberto na aba: um formulário (modal), o assistente "Criar com IA" ou o editor do servidor MCP (`''` = novo). */
+type Open =
+  { form: AssistKind; artifact?: BoardArtifact; initial?: Partial<ArtifactAssistDraft> } | { assist: AssistKind } | { mcp: string } | null;
+
 /**
- * A lista de um assunto do Harness: uma linha por artefato do board, com o modo, a origem, "Editar" (abre o editor na
- * própria linha, um por vez) e "Apagar". A busca e a seleção vêm de quem a monta, para sobreviverem à troca de aba.
+ * Uma aba da biblioteca: o aviso do que "ativo" quer dizer, os botões de criar, a busca e o filtro, e a lista. A
+ * busca, o filtro e a pasta vêm de quem a monta, para sobreviverem à troca de aba. Só uma coisa fica aberta por vez.
  */
 export function ArtifactList({
   kind,
+  topicLabel,
   query,
-  onlyOff = false,
-  search,
-  picked,
-  onPick,
+  onQuery,
+  status,
+  onStatus,
+  folder,
+  onFolder,
   onImport,
 }: {
   kind: ArtifactKind;
+  /** o nome da aba, já traduzido, para o rótulo da busca */
+  topicLabel: string;
   query: string;
-  /** só os desligados (o filtro do aviso de regras desligadas) */
-  onlyOff?: boolean;
-  /** a busca do assunto, entre a barra de criação e a lista que ela filtra */
-  search?: ReactNode;
-  picked: ReadonlySet<string>;
-  onPick: (next: Set<string>) => void;
+  onQuery: (next: string) => void;
+  status: StatusFilter;
+  onStatus: (next: StatusFilter) => void;
+  /** só nas skills: a pasta selecionada (`null` = todas) */
+  folder: string | null;
+  onFolder: (next: string | null) => void;
   onImport: () => void;
 }) {
   const state = useBoardStore((s) => s.state)!;
   const all = (state.harness.library?.artifacts ?? []).filter((a) => a.kind === kind);
-  const items = all.filter((a) => (!onlyOff || a.usage === 'off') && matchesQuery(query, a.name, a.description));
+  const items = filterArtifacts(all, { query, status, folder });
   // as skills do fluxo que não estão na biblioteca aparecem também, só para leitura: o board as entrega pelo get_skill
   const flowSkills =
-    kind === 'skill'
+    kind === 'skill' && folder === null && status !== 'inactive'
       ? (state.harness.library?.flowSkills ?? []).filter(
           (f) => !all.some((a) => a.name === f.name) && matchesQuery(query, f.name, f.description),
         )
       : [];
-  const chosen = all.filter((a) => picked.has(a.id));
-  const tool = baseInfo(state.board.aiTool);
-  // só uma coisa aberta por vez: o editor de uma linha, o formulário de novo ou um assistente
-  const [open, setOpen] = useState<{ edit: string } | { create: true } | { wizard: AgentSuggestion | null } | null>(null);
-  const editing = open && 'edit' in open ? open.edit : null;
-  const creating = open !== null && 'create' in open;
-  const wizard = open !== null && 'wizard' in open ? open : null;
+  const [open, setOpen] = useState<Open>(null);
   const close = () => setOpen(null);
-  const busy = state.chat.busy;
-  const defaultAgent = useDefaultAgent();
+  const labels = statusLabels(kind);
+  const seed = useAction(() => harness.seedAgents(true));
+  const aiKind: AssistKind | null = kind === 'mcp' ? null : kind;
+  const mcpOpen = open !== null && 'mcp' in open ? open.mcp : null;
 
-  const pick = (list: BoardArtifact[], checked: boolean) => {
-    const next = new Set(picked);
-    for (const a of list) {
-      if (checked) next.add(a.id);
-      else next.delete(a.id);
-    }
-    onPick(next);
-  };
+  const duplicate = (a: BoardArtifact) =>
+    setOpen({
+      form: a.kind as AssistKind,
+      initial: { name: `${a.name}-copia`, description: a.description, version: a.version, folder: a.folder, tools: a.tools },
+    });
 
-  const editor = (a: BoardArtifact) => {
-    switch (a.kind) {
-      case 'rule':
-        return <RuleEditor key={a.id} rule={a} onClose={close} />;
-      case 'skill':
-        return <SkillEditor key={a.id} skill={a} onClose={close} />;
-      case 'mcp':
-        return <McpServerEditor key={a.id} server={a} onClose={close} />;
-      case 'agent':
-        return <AgentEditor key={a.id} agent={agentOfArtifact(a, tool.id)} tool={tool} onClose={close} />;
-    }
-  };
+  const rows = (
+    <ul className="item-list">
+      {items.flatMap((a) => [
+        <ArtifactRow
+          key={a.id}
+          artifact={a}
+          kind={kind}
+          onEdit={() => setOpen(kind === 'mcp' ? { mcp: a.id } : { form: a.kind as AssistKind, artifact: a })}
+          onDuplicate={kind === 'mcp' ? undefined : () => duplicate(a)}
+        />,
+        ...(mcpOpen === a.id
+          ? [
+              <li key={`${a.id}:edit`}>
+                <McpServerEditor server={a} onClose={close} />
+              </li>,
+            ]
+          : []),
+      ])}
+      {flowSkills.map((f) => (
+        <FlowSkillRow key={`flow:${f.name}`} name={f.name} description={f.description} />
+      ))}
+    </ul>
+  );
 
-  const toolbar = () => {
-    if (kind === 'agent')
-      return (
-        <AgentsToolbar
-          onNew={() => setOpen(creating ? null : { create: true })}
-          onWizard={(preset) => setOpen({ wizard: preset ?? null })}
-        />
-      );
-    const toggle = (next: NonNullable<typeof open>) => setOpen(open && JSON.stringify(open) === JSON.stringify(next) ? null : next);
-    const label = { rule: t('Nova regra'), skill: t('Nova skill'), mcp: t('Novo servidor') }[kind];
-    return (
+  return (
+    <div className="artifact-list">
+      <Callout.Root color="gray" size="1" className="harness-callout">
+        <Callout.Icon>
+          <IconInfo />
+        </Callout.Icon>
+        <Callout.Text>{t(SCOPE_NOTE[kind])}</Callout.Text>
+      </Callout.Root>
       <div className="actions-toolbar">
         <span className="toolbar-group">
-          <ActionButton hint={t('Abre o formulário; o artefato é gravado no board ao salvar.')} onClick={() => toggle({ create: true })}>
-            <IconPlus /> {label}
+          {aiKind && (
+            <ActionButton
+              variant="soft"
+              color="gray"
+              hint={t('A IA faz perguntas, uma por vez, e monta o rascunho; nada é gravado até você revisar e salvar.')}
+              onClick={() => setOpen({ assist: aiKind })}
+            >
+              <IconAi /> {t('Criar com IA')}
+            </ActionButton>
+          )}
+          <ActionButton
+            hint={t('Abre o formulário; o artefato é gravado no board ao salvar.')}
+            onClick={() => setOpen(aiKind ? { form: aiKind } : mcpOpen === '' ? null : { mcp: '' })}
+          >
+            <IconPlus /> {t(NEW_LABEL[kind])}
           </ActionButton>
-          {kind === 'rule' && (
-            <ActionButton
-              variant="soft"
-              color="gray"
-              hint={t('Um passo a passo para escrever uma regra; ela entra no board desligada.')}
-              onClick={() => toggle({ wizard: null })}
-            >
-              <IconRules /> {t('Criar regra com ajuda')}
-            </ActionButton>
-          )}
-          {kind === 'skill' && (
-            <ActionButton
-              variant="soft"
-              color="gray"
-              hint={t('Um passo a passo para escrever uma skill; ela entra no board em "Pelo card".')}
-              onClick={() => toggle({ wizard: null })}
-            >
-              <IconSkills /> {t('Criar skill com ajuda')}
-            </ActionButton>
-          )}
         </span>
-        {kind === 'rule' && (
+        {kind === 'agent' && (
           <span className="toolbar-group">
             <ActionButton
-              variant="soft"
-              color="gray"
-              disabled={busy}
-              disabledReason={t('A IA ainda está respondendo no chat do board.')}
-              hint={t('A IA lê o projeto e escreve de 3 a 5 regras, desligadas no board; acompanhe no chat do board.')}
-              onClick={() => ai.suggestRules()}
+              variant="ghost"
+              loading={seed.busy}
+              hint={t('Cria de novo os agentes de fábrica que não existem mais; não mexe nos que existem.')}
+              onClick={() => void seed.run()}
             >
-              {t('Sugerir regras com IA')}
-            </ActionButton>
-          </span>
-        )}
-        {kind === 'skill' && (
-          <span className="toolbar-group">
-            <ActionButton
-              variant="soft"
-              color="gray"
-              disabled={busy}
-              disabledReason={t('A IA ainda está respondendo no chat do board.')}
-              hint={t('A IA lê o projeto e cria de 3 a 5 skills, em "Pelo card"; acompanhe no chat do board.')}
-              onClick={() => ai.suggestSkills()}
-            >
-              {t('Sugerir skills com IA')}
+              {t('Recriar os de fábrica')}
             </ActionButton>
           </span>
         )}
       </div>
-    );
-  };
-
-  const creator =
-    kind === 'rule' ? (
-      <RuleEditor onClose={close} />
-    ) : kind === 'skill' ? (
-      <SkillEditor onClose={close} />
-    ) : kind === 'mcp' ? (
-      <McpServerEditor onClose={close} />
-    ) : (
-      <NewAgent onClose={close} />
-    );
-
-  return (
-    <div className="artifact-list">
-      {toolbar()}
-      {all.length > 0 && search}
-      {creating && creator}
-      {wizard && kind === 'rule' && <RuleWizard onClose={close} />}
-      {wizard && kind === 'skill' && <SkillWizard onClose={close} />}
-      {wizard && kind === 'agent' && (
-        <AgentWizard key={wizard.wizard?.id ?? 'wizard'} tool={tool} preset={wizard.wizard ?? undefined} onClose={close} />
+      {all.length > 0 && (
+        <div className="topic-bar">
+          <TextField.Root
+            className="topic-search"
+            type="search"
+            aria-label={t('Buscar em {topic} por nome ou descrição', { topic: topicLabel })}
+            placeholder={kind === 'skill' ? t('Buscar por nome, descrição ou pasta…') : t('Buscar por nome ou descrição…')}
+            value={query}
+            onChange={(e) => onQuery(e.target.value)}
+          />
+          <SegmentedControl.Root
+            size="1"
+            value={status}
+            aria-label={t('Filtrar por estado')}
+            onValueChange={(v) => onStatus(v as StatusFilter)}
+          >
+            {(['all', 'active', 'inactive'] as const).map((s) => (
+              <SegmentedControl.Item key={s} value={s}>
+                {labels[s]}
+              </SegmentedControl.Item>
+            ))}
+          </SegmentedControl.Root>
+        </div>
       )}
+      {mcpOpen === '' && <McpServerEditor onClose={close} />}
       {all.length === 0 && (
         <div className="board-empty">
           <p className="muted small">{t(EMPTY_TEXT[kind])}</p>
@@ -206,182 +204,32 @@ export function ArtifactList({
           </ActionButton>
         </div>
       )}
-      {all.length > 0 && items.length === 0 && <p className="muted small scope-empty">{t('Nada encontrado para a busca.')}</p>}
-      {all.length > 0 && (
-        <div className="item-list-head" role="group" aria-label={t('Ações em lote')}>
-          <label className="item-check-all">
-            <Checkbox
-              aria-label={t('Selecionar todos os visíveis')}
-              disabled={items.length === 0}
-              checked={
-                items.length > 0 && items.every((a) => picked.has(a.id))
-                  ? true
-                  : items.some((a) => picked.has(a.id))
-                    ? 'indeterminate'
-                    : false
-              }
-              onCheckedChange={(checked) => pick(items, checked === true)}
-            />
-            <span className="muted small">{t('Selecionar todos')}</span>
-          </label>
-          {chosen.length > 0 && (
-            <>
-              <span className="muted small">{tn(chosen.length, 'um selecionado', '{n} selecionados')}</span>
-              <BulkActions kind={kind} items={chosen} onDone={() => onPick(new Set())} />
-            </>
-          )}
-        </div>
+      {all.length > 0 && items.length === 0 && flowSkills.length === 0 && (
+        <p className="muted small scope-empty">{t('Nada encontrado para a busca.')}</p>
       )}
-      <ul className="item-list">
-        {items.flatMap((a) => {
-          const origin = originText(a);
-          const generatedSkill = a.kind === 'skill' && a.generated === true;
-          const mcp = a.mcpCredential;
-          return [
-            <li key={a.id} className={`item-row${picked.has(a.id) ? ' selected' : ''}`}>
-              <span className="item-check">
-                <Checkbox
-                  aria-label={t('Selecionar: {name}', { name: a.name })}
-                  checked={picked.has(a.id)}
-                  onCheckedChange={(checked) => pick([a], checked === true)}
-                />
-              </span>
-              <div className="item-main">
-                <div className="item-title">
-                  {a.kind === 'rule' || a.kind === 'skill' ? (
-                    <button
-                      type="button"
-                      className="path-link item-name"
-                      title={t('Abre o texto no board, para ler e editar')}
-                      onClick={() => useBoardStore.getState().openHarnessFile({ kind: a.kind as 'rule' | 'skill', name: a.name })}
-                    >
-                      {a.name}
-                    </button>
-                  ) : (
-                    <span className="item-name">{a.name}</span>
-                  )}
-                  {a.kind === 'agent' && <DefaultAgentBadge name={a.name} />}
-                  <ArtifactBadges artifact={a} />
-                  {a.missing && (
-                    <Badge color="amber" variant="soft">
-                      {t('ausente')}
-                    </Badge>
-                  )}
-                  {mcp?.review === 'pending' && (
-                    <Badge color="amber" variant="soft">
-                      {t('Revisão humana pendente')}
-                    </Badge>
-                  )}
-                  {mcp && mcp.available === false && (
-                    <Badge color="amber" variant="soft">
-                      {t('Configuração local ausente')}
-                    </Badge>
-                  )}
-                  {a.revision !== undefined && (
-                    <span className="muted small" title={t('Versão do artefato no board')}>
-                      {t('v{n}', { n: a.revision })}
-                    </span>
-                  )}
-                </div>
-                {(a.description || a.mcpSummary) && (
-                  <p className="item-hint" title={a.description}>
-                    {a.description || a.mcpSummary}
-                  </p>
-                )}
-                {origin && <p className="muted small">{origin}</p>}
-                {a.skipped.length > 0 && (
-                  <p className="muted small" role="status">
-                    {tn(
-                      a.skipped.length,
-                      'Um arquivo ficou de fora pelos limites: {files}',
-                      '{n} arquivos ficaram de fora pelos limites: {files}',
-                      { files: a.skipped.map((x) => x.path).join(', ') },
-                    )}
-                  </p>
-                )}
-              </div>
-              <div className="row-actions">
-                {(a.kind === 'agent' && a.name === defaultAgent) || generatedSkill ? (
-                  <Badge
-                    color="gray"
-                    variant="outline"
-                    title={
-                      generatedSkill
-                        ? t('O board entrega esta skill pelo get_skill, com o texto desta versão da extensão.')
-                        : t(
-                            'O agente padrão das instruções executa quando nem o card nem a fase escolhem outro; para desligá-lo, torne outro o padrão das instruções.',
-                          )
-                    }
-                  >
-                    {generatedSkill ? t('Entregue pelo board') : t('Disponível no board')}
-                  </Badge>
-                ) : (
-                  <UsageSelect artifact={a} />
-                )}
-                {a.kind === 'agent' && a.usage !== 'off' && <MakeDefaultButton name={a.name} />}
-                <UpdateFromOriginButton artifact={a} />
-                <RestoreAgentButton artifact={a} />
-                {!generatedSkill && (
-                  <ActionButton
-                    variant="ghost"
-                    size="1"
-                    aria-label={editing === a.id ? t('Fechar edição: {name}', { name: a.name }) : t('Editar: {name}', { name: a.name })}
-                    hint={editing === a.id ? t('Fecha o editor; o que não foi salvo se perde.') : t('Abre o editor logo abaixo da linha.')}
-                    onClick={() => setOpen(editing === a.id ? null : { edit: a.id })}
-                  >
-                    {editing === a.id ? t('Fechar edição') : t('Editar')}
-                  </ActionButton>
-                )}
-                {a.kind === 'agent' && !a.agent?.seed && <DeleteAgentButton name={a.name} location={artifactLocation(a)} />}
-                {a.kind !== 'agent' && !generatedSkill && (
-                  <DeleteButton
-                    title={t('Apagar o artefato')}
-                    aria-label={t('Apagar: {name}', { name: a.name })}
-                    question={t('Apagar "{name}"?', { name: a.name })}
-                    message={t(
-                      'A cópia do board é apagada e a ação não pode ser desfeita; o arquivo de origem fica. Os cards e os agentes que citam este artefato deixam de recebê-lo.',
-                    )}
-                    onConfirm={() => void harness.setSelection([{ kind: selectableOfKind(a.kind), location: artifactLocation(a) }], null)}
-                  />
-                )}
-              </div>
-            </li>,
-            ...(editing === a.id ? [<li key={`${a.id}:edit`}>{editor(a)}</li>] : []),
-          ];
-        })}
-        {flowSkills.map((f) => (
-          <li key={`flow:${f.name}`} className="item-row">
-            <span className="item-check" />
-            <div className="item-main">
-              <div className="item-title">
-                <button
-                  type="button"
-                  className="path-link item-name"
-                  title={t('Abre o texto só para leitura')}
-                  onClick={() => useBoardStore.getState().openHarnessFile({ kind: 'skill', name: f.name })}
-                >
-                  {f.name}
-                </button>
-                <Badge color="gray" variant="outline" title={t('Vem com o board e acompanha a versão da extensão: só de leitura.')}>
-                  {t('de fábrica')}
-                </Badge>
-              </div>
-              <p className="item-hint" title={f.description}>
-                {f.description}
-              </p>
-            </div>
-            <div className="row-actions">
-              <Badge
-                color="gray"
-                variant="outline"
-                title={t('O board entrega esta skill pelo get_skill, com o texto desta versão da extensão.')}
-              >
-                {t('Entregue pelo board')}
-              </Badge>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {kind === 'skill' ? (
+        <div className="library-split">
+          <SkillFolderTree folders={state.harness.library?.skillFolders ?? []} skills={all} selected={folder} onSelect={onFolder} />
+          {rows}
+        </div>
+      ) : (
+        all.length > 0 && rows
+      )}
+      {open && 'form' in open && open.form === 'rule' && (
+        <RuleFormModal rule={open.artifact} initial={open.initial} onClose={close} onAssist={() => setOpen({ assist: 'rule' })} />
+      )}
+      {open && 'form' in open && open.form !== 'rule' && (
+        <ArtifactFormModal
+          kind={open.form}
+          artifact={open.artifact}
+          initial={open.initial}
+          onClose={close}
+          onAssist={() => setOpen({ assist: open.form })}
+        />
+      )}
+      {open && 'assist' in open && (
+        <ArtifactAssistant kind={open.assist} onClose={close} onFinish={(draft) => setOpen({ form: open.assist, initial: draft })} />
+      )}
     </div>
   );
 }

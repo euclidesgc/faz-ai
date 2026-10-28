@@ -657,6 +657,41 @@ describe('artefatos do board no export e no import', () => {
     expect(Buffer.from(str(rows.files[0]!.content), 'base64')).toEqual(BIN);
   });
 
+  it('as pastas de skill criadas vazias, a versão, a pasta e as tools da biblioteca fazem ida e volta no backup', () => {
+    seedArtifacts();
+    run(db, "UPDATE board_artifacts SET version = '2.0.0', folder = 'ops/ci', tools_json = '[\"read\",\"shell\"]' WHERE id = 'a-skill'");
+    run(db, 'INSERT INTO skill_folders (board_id, path) VALUES (?, ?)', [router.boardId, 'docs/guias']);
+    const { file } = doExport();
+    expect(file.tables.skill_folders).toEqual([{ board_id: router.boardId, path: 'docs/guias' }]);
+    run(db, 'DELETE FROM skill_folders');
+    run(db, "UPDATE board_artifacts SET version = '', folder = '', tools_json = NULL WHERE id = 'a-skill'");
+    importBoard(target(router), parseExportFile(JSON.stringify(file)));
+    expect(all(db, 'SELECT path FROM skill_folders')).toEqual([{ path: 'docs/guias' }]);
+    expect(all(db, "SELECT version, folder, tools_json FROM board_artifacts WHERE id = 'a-skill'")).toEqual([
+      { version: '2.0.0', folder: 'ops/ci', tools_json: '["read","shell"]' },
+    ]);
+  });
+
+  it('backup de antes da biblioteca (schema 49): sem skill_folders vale vazio e o import migra os modos antigos', () => {
+    seedArtifacts();
+    const f = doExport().file as any;
+    f.schemaVersion = 49;
+    delete f.tables.skill_folders;
+    for (const r of f.tables.board_artifacts) {
+      delete r.version;
+      delete r.folder;
+      delete r.tools_json;
+    }
+    // no schema 49 a skill "Sempre" existia
+    expect(f.tables.board_artifacts.find((r: any) => r.kind === 'skill').usage).toBe('always');
+    const parsed = parseExportFile(JSON.stringify(f));
+    expect(parsed.tables.skill_folders).toEqual([]);
+    importBoard(target(router), parsed);
+    const skill = all(db, "SELECT usage, version, folder, tools_json FROM board_artifacts WHERE kind = 'skill'")[0]!;
+    expect(skill).toEqual({ usage: 'contextual', version: '1.0.0', folder: '', tools_json: null });
+    expect(all(db, 'SELECT * FROM skill_folders')).toEqual([]);
+  });
+
   it('export de versão anterior à 33: as tabelas novas valem vazias', () => {
     const f = doExport().file as any;
     f.schemaVersion = 32;

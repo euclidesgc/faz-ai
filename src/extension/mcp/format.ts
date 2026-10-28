@@ -1,3 +1,4 @@
+import { profileAvailable } from '../../shared/profileAvailability';
 import { isFlowSkill } from '../flowSkill';
 import {
   catalogTool,
@@ -10,7 +11,7 @@ import {
 } from '../../shared/aiProfiles';
 import { orchestratesStory } from '../../shared/orchestration';
 import { cliOfValue, resolveRunTarget } from '../../shared/runTarget';
-import { cliProblem } from '../../shared/requirements';
+
 import { agentOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
@@ -259,7 +260,7 @@ export function modelsOverview(s: BoardState) {
       enabled: p.enabled,
       default: s.board.aiTool === p.id,
       // ligado, com a CLI e o login em dia e sem motivo para o board não rodar: pronto para os cards agora
-      ready: p.enabled && !s.aiRunUnsupportedBy?.[p.id] && cliProblem(s, p.id) === null,
+      ready: profileAvailable(s, p.id),
       measures: p.base === 'claude' ? 'cost' : p.base === 'generic' ? 'none' : 'tokens',
     })),
     catalog: s.board.modelCatalog.map((o) => ({
@@ -544,7 +545,7 @@ export function cardDetail(
     ...(target ? { model: { ...target, note: MODEL_NOTE } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
     harnessNote:
-      'Escolha skills, rules, MCPs e agente só entre o que está em "Pelo card" (get_harness), o mínimo necessário. Skill faz-ai-harness-do-card.',
+      'Escolha skills e agente só entre os ativos do board e MCPs só entre os em "Pelo card" (get_harness), o mínimo necessário; regras ativas já vão em tudo. Skill faz-ai-harness-do-card.',
     ...(rules.length ? { requiredRules: rules, requiredRulesNote: 'Leia cada arquivo em `path` antes de executar.' } : {}),
     ...(skills.length
       ? {
@@ -754,7 +755,7 @@ export function harnessOverview(s: BoardState) {
     aiTool: s.board.aiTool,
     cliLoads: cliLoadsOf(s),
     defaultAgent: s.board.execProfiles.find((p) => p.isDefault)?.id ?? null,
-    note: 'Só o que está no board (Configurações → Harness): é tudo o que as execuções do board usam. `usage` "always" (Sempre) entra em toda execução; "contextual" (Pelo card) só quando indicado no card (campos Rules, Skills e MCPs) ou escolhido no planejamento e no refinar; "off" (Desligado) está no board sem entrar em nada.',
+    note: 'Só o que está no board (Configurações → Harness): é tudo o que as execuções do board usam. `usage` "off" é inativo: não entra em nada nem pode ser vinculado. Ativo, o tipo decide: regra ("always") entra em toda execução; skill e agente ("contextual") só no card que os vincula (N skills, 1 agente); servidor MCP em "always" entra em toda execução e em "contextual" só quando o card o indica. `tools` são ids neutros: na skill, o que ela precisa; no agente, o que ele concede.',
     // as regras do board, pelo nome que read_rule_file e write_rule_file usam
     rules: (s.harness.library?.artifacts ?? [])
       .filter((a) => a.kind === 'rule' && !a.missing)

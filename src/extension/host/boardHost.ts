@@ -283,6 +283,11 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     apiKey: (profile) => profileApiKey(toolKeys, profile),
   });
   const gateway = new AiGateway({
+    // o modelo que a ferramenta recusou para a conta sai do catálogo: o seletor não o oferece de novo
+    onModelUnavailable: (profile, model) => {
+      router.retireModel(profile.id, model);
+      o.log(`Modelo ${model} recusado pelo ${profile.name} para esta conta: saiu da lista de modelos.`);
+    },
     resolveProfile: (id) => new AiProfileRepo(handle.db).resolveProfile(router.boardId, id),
     profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
     boardId: router.boardId,
@@ -411,7 +416,8 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
         const driver = driverOf(profile)!;
         const apiKey = profileApiKey(toolKeys, profile);
         if (!apiKey) return null;
-        const found = await driver.apiModels!(apiKey);
+        // só os que a conta pode chamar: a lista da API traz também os fechados para contas novas
+        const found = await (driver.availableModels ?? driver.apiModels)!(apiKey);
         rememberModels(tool, found);
         count = found.length;
       } else {
@@ -439,7 +445,14 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   // Code pelo comando): lê de novo antes de juntar ao catálogo, e não só a última leitura do Conectar
   router.onReadToolModels(async (profile) => {
     const driver = driverOf(profile);
-    if (!driver?.listModels || isAcpProfile(profile)) return;
+    if (isAcpProfile(profile)) return;
+    // o modo API lê a lista da conta pela chave do cofre: é o "Atualizar modelos" dele
+    if (driver?.apiModels) {
+      const apiKey = profileApiKey(toolKeys, profile);
+      if (apiKey) rememberModels(catalogTool(profile), await (driver.availableModels ?? driver.apiModels)(apiKey));
+      return;
+    }
+    if (!driver?.listModels) return;
     const exe = resolveProfileCommand(profile, pathEnv, homeDir);
     if (!exe) return;
     rememberModels(catalogTool(profile), await driver.listModels(exe, pathEnv));

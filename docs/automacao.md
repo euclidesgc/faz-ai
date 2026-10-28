@@ -19,7 +19,9 @@ relógio do board que, a cada rodada, primeiro arruma o board e depois decide o 
   sozinho), com um aviso na conversa, e **avisa uma vez** o card que está com você há dois dias ou
   mais.
 - **Respeita a pausa por limite de uso, perfil a perfil**: quando um perfil de CLI esgota o limite do
-  plano e nenhuma política de execução oferece outro destino, o card volta para a IA e a fila daquele
+  plano, a fila daquele perfil pausa; com você no circuito, o card pergunta se espera ou segue com
+  outro modelo (ver Regras de fallback em `configuracoes.md`). No modo autônomo, sem política de
+  execução que ofereça outro destino, o card volta para a IA e a fila daquele
   perfil pausa, no heartbeat, no autopiloto e no orquestrador, até a renovação que a saída informou
   (mais 3 minutos); sem horário, a espera é de 5 minutos e dobra a cada nova falha, até 60. Os outros
   perfis seguem, o log da rodada diz qual perfil espera e até que horas, e o topo do board mostra uma

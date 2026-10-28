@@ -323,8 +323,8 @@ await server.connect(new StdioServerTransport());`,
     router.executions.bind(c.token, c.work.id, runId);
     const library = router.snapshot().harness.library!;
     const rule = library.artifacts.find((a) => a.kind === 'rule' && a.name === 'CLAUDE.md')!;
-    // Rules novas nascem desligadas; a pessoa as seleciona antes da execução.
-    artifacts.setUsage(router.boardId, rule.id, 'contextual');
+    // Rules novas nascem inativas; a pessoa ativa (always) a regra antes da execução.
+    artifacts.setUsage(router.boardId, rule.id, 'always');
     router.refreshHarness();
     const current = router.snapshot().harness.library!;
     const snapshot = snapshots.capture(runId, {

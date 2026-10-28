@@ -239,7 +239,20 @@ aceita; o agente que não aceita nenhum dos dois segue com o modelo dele, e o lo
 Cada modelo lido da ferramenta (pelo **Detectar modelos** ou pelo **Conectar**) guarda a data da
 leitura, e a aba diz "lista lida da ferramenta em …" com a mais recente. Sem essa linha, a lista é a
 embutida ou a que você montou à mão. Uma lista velha (a conta mudou de plano, a ferramenta tirou um
-modelo) se corrige detectando de novo ou reconectando.
+modelo) se corrige detectando de novo ou reconectando: a lista lida agora substitui a anterior, e o modelo
+que a ferramenta não lista mais sai do catálogo; o cadastrado à mão fica. No modo API, **Detectar modelos**
+lê a lista de modelos da sua conta pela chave guardada no Conectar, sem os modelos de voz, imagem, música
+e pesquisa, que não conversam com as ferramentas do board. A lista da API pode trazer um modelo que a
+conta não usa mais (o Google o fecha para contas novas e responde 404). Por isso o **Detectar modelos** e o
+**Conectar** mandam a cada modelo listado um pedido mínimo (uma palavra, um token de resposta) e deixam de
+fora os que respondem 404; limite de uso ou falha de rede não tiram o modelo. No nível gratuito, cada
+detecção gasta um pedido da cota diária de cada modelo. Se um modelo ainda for recusado numa execução, o
+board o tira da lista na hora e não o traz de volta no próximo Detectar; cadastrá-lo à mão em **Novo
+modelo** o recoloca. O chat que estava nesse modelo passa para o mais novo do mesmo agente.
+
+Os seletores de modelo (chat, campo Modelo do card, agentes e regras) só oferecem os agentes que podem
+responder agora: o desligado, sem a CLI, sem login, com a conexão falha ou pela metade, ou que o board não
+sabe rodar fica de fora. O valor já gravado com um agente assim aparece como "(agente indisponível)".
 
 No Cursor, a lista traz uma linha por nível de cada modelo (`claude-opus-5-5-low`, `-medium`,
 `-high`…); o board junta as variantes num modelo com os níveis dele. As versões rápidas (`-fast`,
@@ -256,7 +269,10 @@ A aba **Testar** tem três partes:
 
 - **Teste rápido pelo caminho dos cards**: um pedido curto pelo mesmo caminho das execuções (a CLI, o
   ACP ou a API do perfil), depois da confirmação, porque usa a sua assinatura. Uma resposta OK não
-  comprova isolamento, permissões nem MCP.
+  comprova isolamento, permissões nem MCP. No modo API, que não tem modelo padrão, o teste roda no
+  **Modelo do teste** escolhido ao lado do botão, entre os modelos do agente: os de texto primeiro, da
+  família do agente e do mais novo ao mais antigo, porque os antigos costumam estar fechados para contas
+  novas. O resultado fica na tela enquanto o modelo testado está escolhido.
 - **Sessão de teste pelo ACP**: abre o agente pelo SDK oficial do ACP e conversa com ele em tempo real: o
   texto, o raciocínio, as ferramentas, o plano e os pedidos de permissão, que você responde ali. O topo
   mostra o que o agente declarou (versão do protocolo, nome e versão do agente, a sessão, a conta e as
@@ -366,8 +382,13 @@ sugestão anterior; um modelo escolhido à mão nunca é trocado.
 
 ## Regras de fallback
 
-Quando um modelo esgota o limite de uso (a cota), o board segue o card em outro modelo, de qualquer
-agente ligado. Sem regra, o card espera a cota renovar. O sinal vem do leitor da saída de cada
+Quando um modelo esgota o limite de uso (a cota) num card com você no circuito (fora do modo autônomo e
+do autopiloto), o board pergunta no card como seguir: **esperar o limite voltar** (com a hora) ou
+**seguir com** um modelo de outro agente que responde agora, um por agente, o da regra de fallback
+primeiro e recomendado. Seguir grava o modelo no campo Modelo do card e das sub-tarefas abertas que
+rodariam no agente esgotado, e o card volta para a fila; esperar deixa o modelo como está. No modo
+autônomo, o board segue o card em outro modelo pela regra, de qualquer agente ligado. Sem regra, o card
+espera a cota renovar. O sinal vem do leitor da saída de cada
 ferramenta: o `rate_limit_event` e o `result` de limite do Claude Code, o 429 do Gemini, o 403 de
 cota do Kimi Code e a recusa `ActionRequiredError: You've hit your usage limit` do Cursor (no plano
 Free, a cota do agente é separada da barra de uso do painel: ela pode acabar com a barra pela

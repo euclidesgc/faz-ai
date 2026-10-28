@@ -822,6 +822,32 @@ describe('Conectar agentes: testar', () => {
     expect(claude.getByText('A resposta não comprova isolamento, permissões ou MCP.')).toBeInTheDocument();
   });
 
+  it('no modo API o teste rápido roda no modelo escolhido na aba, de texto por padrão', async () => {
+    show();
+    const option = (model: string) => ({ id: `gemini:${model}`, tool: 'gemini', model, label: model, efforts: [], defaultEffort: null });
+    act(() =>
+      useBoardStore.setState((s) => {
+        const st = s.state!;
+        const aiProfiles = st.board.aiProfiles.map((p) => (p.id === 'gemini' ? { ...p, enabled: true, mode: 'api' as const } : p));
+        const modelCatalog = [
+          ...st.board.modelCatalog.filter((m) => m.tool !== 'gemini'),
+          option('gemini-2.5-flash-preview-tts'),
+          option('gemini-2.5-flash'),
+        ];
+        return { state: { ...st, board: { ...st.board, aiProfiles, modelCatalog } } };
+      }),
+    );
+    const gemini = await openAgent('Gemini CLI');
+    await userEvent.click(tab('Testar'));
+    const quick = within(gemini.getByLabelText('Teste rápido'));
+    expect(quick.getByRole('combobox', { name: 'Modelo do teste' })).toHaveTextContent('gemini-2.5-flash');
+    await userEvent.click(quick.getByRole('button', { name: 'Testar' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Testar' }));
+    expect(lastSent('settings.aiProfiles.test')).toMatchObject({ id: 'gemini', model: 'gemini-2.5-flash' });
+    send({ type: 'aiProfiles.testResult', id: 'gemini', ok: true, output: 'OK' });
+    confirmLast();
+  });
+
   it('a sessão de teste: abre pelo ACP, mostra as opções e os pedidos de permissão, e avisa quando fecha', async () => {
     show();
     await userEvent.click(tab('Testar'));

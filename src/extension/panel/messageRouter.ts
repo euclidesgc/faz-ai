@@ -1,3 +1,4 @@
+import { limitChoiceKey, type LimitChoice } from '../../shared/limitChoice';
 import { builtinPolicyCatalog, simulatePolicyScenario, type PolicyLibrary, type PolicyScenario } from '../../shared/policyManagement';
 import { resolveContextDraft, type ContextDraftResolution } from '../../shared/contextDraftResolution';
 import { applyAdmissionDecision, strictRequestFromDraft } from '../../shared/contextAdmissionPreview';
@@ -5,6 +6,7 @@ import type { ExecutionAdmissionDecision, StrictExecutionRequest } from '../../s
 import type { ContextActivityTarget } from '../../shared/contextPlanning';
 import type { PolicyAssistInput, PolicyAssistResult } from '../../shared/policyAssistant';
 import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
+import type { ArtifactAssistInput, ArtifactAssistResult } from '../../shared/artifactAssistant';
 import type { ContextProposal } from '../../shared/contextProposal';
 import { scanLibraryFolder } from '../libraryImport';
 import { agentOfArtifact, type ArtifactKind } from '../../shared/artifacts';
@@ -32,7 +34,7 @@ import { agentProfiles } from '../../shared/execution';
 import { columnsOf } from '../../shared/selectors';
 import type { AttachmentStore } from '../attachments';
 import { runUnsupported } from '../headless';
-import { isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
+import { catalogTool, isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
 import type { ConnectInput, ConnectState, ConnectSummary } from '../../shared/connect';
 import {
   parseUninstall,
@@ -66,7 +68,7 @@ import { addAttachment, cardContentHandlers } from './handlers/cardContent';
 import { questionHandlers } from './handlers/questions';
 import { cardHandlers, createCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
-import { initModels, modelHandlers, proposeLegacyFallbacks } from './handlers/models';
+import { initModels, modelHandlers, proposeLegacyFallbacks, retireModel } from './handlers/models';
 import { legacyFallbackNotes, parseLegacyFallbacks } from '../../shared/legacyFallback';
 import { aiWorkDirs, workspaceHandlers } from './handlers/workspace';
 import { branchRenameHandlers } from './handlers/branchRename';
@@ -164,6 +166,7 @@ const bridgeOnly = {
   'harness.export.plan': viaBridge,
   'harness.export.apply': viaBridge,
   'harness.agent.assist': viaBridge,
+  'harness.artifact.assist': viaBridge,
   'harness.import.pick': viaBridge,
   'harness.import.scan': viaBridge,
   'harness.artifact.read': viaBridge,
@@ -408,9 +411,9 @@ export class MessageRouter {
     if (!this.aiProfileRuntime) throw new Error('Situação dos perfis indisponível neste host.');
     return this.aiProfileRuntime.probe().finally(() => this.invalidateSnapshot());
   }
-  testAiProfile(id: string) {
+  testAiProfile(id: string, model?: string) {
     if (!this.aiProfileRuntime) throw new Error('Teste de perfil indisponível neste host.');
-    return this.aiProfileRuntime.test(id).finally(() => this.invalidateSnapshot());
+    return this.aiProfileRuntime.test(id, model).finally(() => this.invalidateSnapshot());
   }
   private contextRunning = new Set<string>();
   // lidos da `meta` uma vez e guardados: o snapshot sai a cada mudança do board e não pode consultar o banco a mais
@@ -815,6 +818,28 @@ export class MessageRouter {
     return pause;
   }
 
+  /**
+   * Pergunta à pessoa, no card, como seguir depois do limite de uso (`limitChoice`): a pergunta vai pelo caminho
+   * normal (o card fica esperando a resposta) e a escolha pendente fica no `meta`, para a resposta saber o que aplicar.
+   */
+  askLimitChoice(cardId: string, choice: LimitChoice, author: string): void {
+    this.ctx.boards.setMeta(limitChoiceKey(cardId), JSON.stringify(choice));
+    this.handle(
+      {
+        type: 'card.questions.set',
+        cardId,
+        questions: [{ question: choice.question, options: choice.options.map((o) => o.label), recommended: choice.recommended }],
+      },
+      { author, source: 'ai' },
+    );
+  }
+
+  /** A ferramenta recusou o modelo para esta conta: ele sai do catálogo e não volta pelo "Detectar modelos". */
+  retireModel(profileId: string, model: string): void {
+    const profile = this.snapshot().board.aiProfiles.find((p) => p.id === profileId);
+    if (profile && retireModel(this.ctx, catalogTool(profile), model)) this.changed();
+  }
+
   /** A execução do perfil terminou sem esbarrar no limite: a pausa acaba. Devolve se havia uma. */
   clearUsageLimit(profileId: string): boolean {
     if (!this.usageLimit.some((p) => p.profileId === profileId)) return false;
@@ -983,6 +1008,15 @@ export class MessageRouter {
   proposeContext(target: ContextActivityTarget, language: 'pt-BR' | 'en'): Promise<ContextProposal> {
     if (!this.contextProposeHandler) return Promise.reject(new Error('A assistência de IA não está disponível neste board.'));
     return this.contextProposeHandler(target, language);
+  }
+
+  private artifactAssistHandler?: (input: ArtifactAssistInput) => Promise<ArtifactAssistResult>;
+  setArtifactAssistHandler(handler: (input: ArtifactAssistInput) => Promise<ArtifactAssistResult>): void {
+    this.artifactAssistHandler = handler;
+  }
+  assistArtifact(input: ArtifactAssistInput): Promise<ArtifactAssistResult> {
+    if (!this.artifactAssistHandler) return Promise.reject(new Error('A assistência de IA não está disponível neste board.'));
+    return this.artifactAssistHandler(input);
   }
 
   private agentAssistHandler?: (input: AgentAssistInput) => Promise<AgentAssistResult>;

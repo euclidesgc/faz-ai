@@ -46,7 +46,19 @@ function library(artifacts: BoardArtifact[], flowSkills: { name: string; descrip
 }
 
 const list = (kind: BoardArtifact['kind']) =>
-  renderThemed(<ArtifactList kind={kind} query="" picked={new Set()} onPick={() => {}} onImport={() => {}} />);
+  renderThemed(
+    <ArtifactList
+      kind={kind}
+      topicLabel="Artefatos"
+      query=""
+      onQuery={() => {}}
+      status="all"
+      onStatus={() => {}}
+      folder={null}
+      onFolder={() => {}}
+      onImport={() => {}}
+    />,
+  );
 /** Confirma o diálogo do board aberto pelo clique (a tela monta o Dialog à parte). */
 const confirmDialog = () => act(() => useBoardStore.getState().dialog!.onConfirm());
 const row = (name: string) => screen.getAllByRole('listitem').find((li) => within(li).queryByText(name, { exact: true }))!;
@@ -66,16 +78,15 @@ describe('lista do Harness: de fábrica e origem', () => {
     const qa = row('qa-testes');
     expect(within(qa).getByText('de fábrica')).toBeInTheDocument();
     expect(within(qa).queryByRole('button', { name: /Apagar/ })).toBeNull();
-    expect(within(qa).getByRole('combobox', { name: 'Modo no board: qa-testes' })).toBeInTheDocument();
+    expect(within(qa).getByRole('switch', { name: 'Ativo: qa-testes' })).toBeChecked();
     await userEvent.click(within(qa).getByRole('button', { name: 'Restaurar o original: qa-testes' }));
     expect(useBoardStore.getState().dialog?.title).toBe('Voltar "qa-testes" ao texto original?');
     confirmDialog();
     expect(lastSent('harness.agent.restore')).toMatchObject({ name: 'qa-testes' });
 
-    // o padrão mostra o selo em vez do seletor: para desligá-lo, outro vira o padrão
+    // o padrão não desliga: o interruptor fica travado, e para desativá-lo outro vira o padrão
     const conductor = row('condutor-do-board');
-    expect(within(conductor).queryByRole('combobox')).toBeNull();
-    expect(within(conductor).getByText('Disponível no board')).toBeInTheDocument();
+    expect(within(conductor).getByRole('switch', { name: 'Ativo: condutor-do-board' })).toBeDisabled();
 
     const mine = row('meu');
     expect(within(mine).queryByText('de fábrica')).toBeNull();
@@ -110,7 +121,8 @@ describe('lista do Harness: de fábrica e origem', () => {
       const r = row(name);
       expect(within(r).getByText('de fábrica')).toBeInTheDocument();
       expect(within(r).getByText('Entregue pelo board')).toBeInTheDocument();
-      expect(within(r).queryByRole('button', { name: /Editar|Apagar/ })).toBeNull();
+      expect(within(r).queryByRole('button', { name: /Editar|Apagar|Duplicar/ })).toBeNull();
+      expect(within(r).queryByRole('switch')).toBeNull();
     }
   });
 

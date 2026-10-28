@@ -259,7 +259,20 @@ says which.
 Each model read from the tool (by **Detectar modelos** or by **Conectar**) keeps the date it was read,
 and the tab says "lista lida da ferramenta em …" (list read from the tool on …) with the most recent
 one. Without that line, the list is the built-in one or the one you built by hand. An old list (the
-account changed plan, the tool dropped a model) is fixed by detecting again or reconnecting.
+account changed plan, the tool dropped a model) is fixed by detecting again or reconnecting: the list
+read now replaces the previous one, and a model the tool no longer lists leaves the catalog; one added by
+hand stays. In API mode, **Detectar modelos** reads your account's model list with the key saved in
+Connect, without the voice, image, music and research models, which don't talk to the board's tools. The API list may carry a model the account can no longer use
+(Google closes it to new accounts and answers 404). So **Detectar modelos** and **Conectar** send each
+listed model a minimal request (one word, one output token) and leave out the ones that answer 404; a
+usage limit or a network failure doesn't remove a model. On the free tier, each detection spends one
+request of each model's daily quota. If a model is still refused in a run, the board removes it from the
+list right away and doesn't bring it back on the next Detect; adding it by hand with **Novo modelo**
+restores it. A chat set to that model switches to the newest one of the same agent.
+
+The model pickers (chat, the card's Modelo field, agents and rules) only offer agents that can answer
+now: one that is off, without the CLI, signed out, with a failed or half-done connection, or that the
+board can't run is left out. A value already saved with such an agent shows as "(agente indisponível)".
 
 For Cursor, the list has one line per level of each model (`claude-opus-5-5-low`, `-medium`,
 `-high`…); the board groups the variants into one model with its levels. The fast versions (`-fast`,
@@ -276,7 +289,11 @@ The **Testar** (test) tab has three parts:
 
 - **Teste rápido pelo caminho dos cards** (quick test through the cards path): a short request through
   the same path as the runs (the profile's CLI, ACP or API), after a confirmation, because it uses your
-  subscription. An OK answer does not prove isolation, permissions or MCP.
+  subscription. An OK answer does not prove isolation, permissions or MCP. In API mode, which has no
+  default model, the test runs on the **Modelo do teste** (test model) chosen next to the button, among
+  the agent's models: text models first, the agent's own family first and newest to oldest, because
+  older models are often closed to new accounts. The result stays on screen while the tested model is
+  selected.
 - **Sessão de teste pelo ACP** (test session over ACP): opens the agent through the official ACP SDK
   and talks to it in real time: the text, the reasoning, the tools, the plan and the permission
   requests, which you answer there. The top shows what the agent declared (protocol version, the
@@ -391,7 +408,12 @@ by hand is never replaced.
 
 ## Fallback rules
 
-When a model runs out of usage quota, the board continues the card on another model, from any
+When a model runs out of usage quota on a card with you in the loop (outside autonomous mode and the
+autopilot), the board asks on the card how to go on: **wait for the limit to come back** (with the
+time) or **continue with** a model from another agent that answers now, one per agent, the fallback
+rule's first and recommended. Continuing saves the model in the Modelo field of the card and of the open
+sub-tasks that would run on the exhausted agent, and the card goes back to the queue; waiting keeps the
+model as it is. In autonomous mode, the board continues the card on another model by the rule, from any
 enabled agent. Without a rule, the card waits for the quota to renew. The signal comes from each
 tool's output reader: Claude Code's `rate_limit_event` and limit `result`, Gemini's 429, Kimi Code's
 quota 403 and Cursor's `ActionRequiredError: You've hit your usage limit` refusal (on the Free plan,

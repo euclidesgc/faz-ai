@@ -79,7 +79,7 @@ Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela
    vai por \`ask_questions\` antes de escrever o documento; o documento não repete as perguntas e usa as
    respostas da seção "Perguntas e respostas" da descrição em modo afirmativo.
 3. Grave com \`add_attachment\` usando \`artifact: true\` e o nome em \`phase.artifact.filename\`. O arquivo fica anexado à história, mesmo enviado da sub-tarefa, e substitui a versão anterior.
-4. Mova a sub-tarefa para a coluna de conclusão (\`move_card\` com \`comment\` dizendo o que fez) e peça a revisão na história.
+4. Marque os itens do checklist da sub-tarefa (\`update_checklist_item\`), mova-a para a coluna de conclusão (\`move_card\` com \`comment\` dizendo o que fez) e peça a revisão na história.
 
 Quando a pessoa pedir ajustes, corrija o mesmo documento (mesmo nome, \`artifact: true\`), responda na
 conversa dizendo o que mudou e chame \`request_review\` de novo.
@@ -88,10 +88,11 @@ conversa dizendo o que mudou e chame \`request_review\` de novo.
 
 No Plan, crie uma sub-tarefa para cada passo, com Fase = Implementação, na descrição as seções ${BRIEF_TITLES} (e "${BRIEF_SECTIONS.decisions}", se houver; o board confere as quatro obrigatórias antes de executar e devolve ao condutor a sub-tarefa que não as tem), com os arquivos tirados do mapa do código, o campo "Esforço da
 atividade" avaliado (Baixo, Médio ou Alto; o modelo é sugerido a partir dele) e os artefatos que a
-execução pede: os campos Skills, Rules e MCPs, o agente (\`profile\` no \`create_card\`; \`set_card_profile\`
+execução pede: os campos Skills e MCPs, o agente (\`profile\` no \`create_card\`; \`set_card_profile\`
 só para trocar depois) e os itens do checklist (\`checklist\`), tudo no mesmo \`create_card\`. Ele devolve o
-card resumido: o detalhe do card criado vem pelo \`get_card\`. Escolha **só entre o
-que está no board em modo "Pelo card"** (\`get_harness\`; o que está em "Sempre" já entra sozinho):
+card resumido: o detalhe do card criado vem pelo \`get_card\`. Escolha **só entre as
+skills e os agentes ativos do board** e os servidores MCP em "Pelo card" (\`get_harness\`; as regras ativas e os
+servidores em "Sempre" já entram sozinhos, e o inativo não pode ser vinculado):
 nada do catálogo do projeto ou da máquina existe para a execução. Vale o mínimo: no máximo uma skill
 por assunto (a mais próxima do objetivo; pode haver mais de uma se forem de assuntos diferentes, como
 navegação e acesso a dados) e só os servidores MCP de que a tarefa precisa. Excesso de artefatos
@@ -116,6 +117,11 @@ sub-tarefas de uma história uma de cada vez, na ordem das dependências, e cada
 da CLI: recortar mais fino não acelera nada e repete o custo de cada execução.
 
 ## Ao fechar uma fase ou sub-tarefa
+
+O checklist do card é o registro do que foi feito: marque cada item com \`update_checklist_item\` assim que o
+concluir, na sub-tarefa e na história. Antes do \`move_card\` para a coluna de conclusão, nenhum item fica
+aberto: o board recusa o card com item em aberto. O item que não se aplica mais, apague com
+\`delete_checklist_item\` e diga o porquê no \`comment\`.
 
 Ao registrar o resultado de uma fase ou sub-tarefa na conversa, resuma em três blocos (omita o que
 não houver):
@@ -170,7 +176,7 @@ O \`get_card\` devolve o que o card exige para a execução; leia antes de come�
 - \`requiredRules\`: leia cada arquivo em \`path\` antes de executar o card: são as instruções que o card exige, além do contexto fixo do board.
 - \`requiredSkills\`: leia o SKILL.md de cada skill em \`path\`; a que vier sem \`path\` se lê com \`get_skill <nome>\`. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em \`files\` estão os arquivos de apoio (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.
 - \`execution.cliLoads\`: o que a CLI da ferramenta carrega por conta própria (regras, skills, agentes, hooks e MCPs do projeto ou do usuário) e se o isolamento está imposto (\`contextEnforced\`). Lista vazia não prova isolamento. O que o board entregou pelo pedido e pelo MCP vale sobre o que a CLI leu sozinha; não afirme que a conversa começou sem artefatos externos sem \`contextEnforced\`.
-- Skills, rules, servidores MCP e agente do card: escolha só entre o que está no board em modo "Pelo card" (\`get_harness\`). O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.
+- Skills, servidores MCP e agente do card: escolha só entre as skills e os agentes ativos do board e os servidores MCP em "Pelo card" (\`get_harness\`); as regras ativas já vão em tudo. Uma skill cujas tools o agente não concede (\`tools\` de cada um) funciona pela metade: prefira um agente que as tenha. O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.
 `;
 
 const WORKSPACE_BODY = `# Pasta de trabalho e base do pull request
@@ -212,13 +218,13 @@ A sua sessão na história faz só o trabalho de planejar:
    revisão ou bloqueio com a pessoa) e \`running\` (execução em curso).
 3. Quando todas as sub-tarefas terminam, o board chama você de novo, **uma vez**, para o fechamento:
    verifique o conjunto como o projeto define (typecheck e testes, com terminal), faça o commit na
-   branch da história e mova a história. Os resultados de cada sub-tarefa estão na conversa da
+   branch da história, marque os itens do checklist da história e mova a história. Os resultados de cada sub-tarefa estão na conversa da
    história. Se a verificação falhar, corrija ou crie uma sub-tarefa de correção com Fase = esta coluna
    e pare: o board a executa e chama você de novo.
 
 Quem executa **uma** sub-tarefa (o board chama você só nela) segue o ciclo: \`start_work\` (que já leva a sub-tarefa para "Em andamento"),
 faça o trabalho na pasta da história (\`workspace\` no \`get_card\`), verifique só a sua
-parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build), conclua com \`move_card\` para a coluna de conclusão com \`comment\` dizendo o que fez. Sem commit, sem trocar de branch e sem
+parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build), marque cada item do checklist com \`update_checklist_item\` assim que o concluir e conclua com \`move_card\` para a coluna de conclusão com \`comment\` dizendo o que fez. Sem commit, sem trocar de branch e sem
 executar outras sub-tarefas.
 
 Testes, build e commit dependem do terminal. Se você não pode rodar comandos nesta execução (permissão

@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import type { ModelOption } from '../src/shared/models';
+import { forgetModels, rememberModels } from '../src/extension/models';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -76,6 +77,51 @@ describe('detectar e gravar o catálogo', () => {
     const cat = router.snapshot().board.modelCatalog;
     expect(cat.some((o) => o.id === 'claude:sonnet')).toBe(true);
     expect(JSON.stringify(cat)).not.toContain('price');
+  });
+
+  it('com a lista lida agora da ferramenta, o modelo que ela não lista mais sai; o cadastrado à mão fica', () => {
+    seedCatalog([
+      opt('gemini:gemini-velho', { fromTool: true }),
+      opt('gemini:meu-modelo'),
+      opt('gemini:gemini-2.5-pro', { fromTool: true, label: 'Pro antigo' }),
+      opt('claude:opus'),
+    ]);
+    const router = new MessageRouter(dbHandle as never, opts());
+    rememberModels('gemini', [opt('gemini:gemini-2.5-pro', { fromTool: true, label: 'Gemini 2.5 Pro' })]);
+    try {
+      router.handle({ type: 'settings.models.detect', tool: 'gemini' });
+    } finally {
+      forgetModels('gemini');
+    }
+    const cat = router.snapshot().board.modelCatalog;
+    expect(cat.filter((o) => o.tool === 'gemini').map((o) => [o.id, o.label])).toEqual([
+      ['gemini:gemini-2.5-pro', 'Gemini 2.5 Pro'],
+      ['gemini:meu-modelo', 'meu-modelo'],
+    ]);
+    expect(cat.some((o) => o.id === 'claude:opus')).toBe(true);
+  });
+
+  it('o modelo recusado para a conta sai do catálogo, não volta pelo Detectar e volta se a pessoa o cadastrar', () => {
+    seedCatalog([opt('gemini:gemini-2.5-flash', { fromTool: true }), opt('gemini:gemini-2.5-pro', { fromTool: true })]);
+    const router = new MessageRouter(dbHandle as never, opts());
+    const gemini = () =>
+      router
+        .snapshot()
+        .board.modelCatalog.filter((o) => o.tool === 'gemini')
+        .map((o) => o.model);
+    router.retireModel('gemini', 'gemini-2.5-flash');
+    expect(gemini()).toEqual(['gemini-2.5-pro']);
+    // a lista da API ainda o traz: o Detectar não o recoloca
+    rememberModels('gemini', [opt('gemini:gemini-2.5-flash', { fromTool: true }), opt('gemini:gemini-2.5-pro', { fromTool: true })]);
+    try {
+      router.handle({ type: 'settings.models.detect', tool: 'gemini' });
+      expect(gemini()).toEqual(['gemini-2.5-pro']);
+      router.handle({ type: 'settings.models.set', catalog: [...router.snapshot().board.modelCatalog, opt('gemini:gemini-2.5-flash')] });
+      router.handle({ type: 'settings.models.detect', tool: 'gemini' });
+      expect(gemini()).toEqual(['gemini-2.5-flash', 'gemini-2.5-pro']);
+    } finally {
+      forgetModels('gemini');
+    }
   });
 
   it('settings.models.set grava a lista como a pessoa mandou', () => {

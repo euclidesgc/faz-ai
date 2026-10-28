@@ -366,6 +366,10 @@ describe('Sugerir regras e skills com IA', () => {
   it('o pedido de regras cria de 3 a 5 regras do board, desligadas, sem tocar nos arquivos de regras do projeto', () => {
     const prompt = suggestRulesPrompt();
     expect(prompt).toContain('de 3 a 5 regras');
+    // a regra ativa entra em todo pedido: não existe mais "Pelo card" para regra
+    expect(prompt).toContain('entra em todo pedido de IA do board enquanto estiver ativa');
+    expect(prompt).not.toContain('modo "Sempre"');
+    expect(prompt).not.toContain('Pelo card');
     expect(prompt).toContain('write_rule_file');
     expect(prompt).toContain('minúsculas e hífens');
     expect(prompt).toContain('read_rule_file');

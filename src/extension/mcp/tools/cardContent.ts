@@ -47,7 +47,7 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
 
   tool(
     'update_checklist_item',
-    'Marca/desmarca ou renomeia um item do checklist.',
+    'Marca/desmarca ou renomeia um item do checklist. Marque cada item assim que o concluir: o move_card para uma coluna de conclusão recusa o card com item em aberto.',
     { item_id: z.string().describe('itemId, como aparece em get_card'), done: z.boolean().optional(), text: z.string().min(1).optional() },
     (a, router) => {
       const item = router.snapshot().checklistItems.find((i) => i.id === a.item_id);
@@ -57,12 +57,17 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
     },
   );
 
-  tool('delete_checklist_item', 'Remove um item do checklist.', { item_id: z.string() }, (a, router) => {
-    const item = router.snapshot().checklistItems.find((i) => i.id === a.item_id);
-    if (!item) throw new Error('Item de checklist não encontrado.');
-    router.handle({ type: 'checklist.delete', itemId: item.id });
-    return 'Item removido.';
-  });
+  tool(
+    'delete_checklist_item',
+    'Remove um item do checklist; use para o item que não se aplica mais, dizendo o porquê na conversa.',
+    { item_id: z.string() },
+    (a, router) => {
+      const item = router.snapshot().checklistItems.find((i) => i.id === a.item_id);
+      if (!item) throw new Error('Item de checklist não encontrado.');
+      router.handle({ type: 'checklist.delete', itemId: item.id });
+      return 'Item removido.';
+    },
+  );
 
   tool(
     'add_comment',

@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 49;
+export const SCHEMA_VERSION = 50;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -624,6 +624,28 @@ const MIGRATIONS: Record<number, string> = {
     -- (criado no board ou copiado antes desta versão); nada é inventado para as cópias anteriores.
     ALTER TABLE board_artifacts ADD COLUMN origin_digest TEXT NOT NULL DEFAULT '';
   `,
+  50: `
+    -- Biblioteca de artefatos: cada artefato fica só ativo ou inativo (usage 'off'), e o tipo decide o que
+    -- ativo quer dizer (docs/decisoes/biblioteca-de-artefatos-do-board.md). Regra ativa vai em todo pedido;
+    -- skill e agente ativos se vinculam ao card. A conversão é conservadora: a regra "Pelo card" fica
+    -- inativa e a skill "Sempre" passa a ir só pelo card, para o contexto nunca crescer na atualização.
+    UPDATE board_artifacts SET usage = 'off' WHERE kind = 'rule' AND usage = 'contextual';
+    UPDATE board_artifacts SET usage = 'contextual' WHERE kind IN ('skill', 'agent') AND usage = 'always';
+    -- versão que a pessoa dá ao artefato (a revision segue contando gravações)
+    ALTER TABLE board_artifacts ADD COLUMN version TEXT NOT NULL DEFAULT '';
+    UPDATE board_artifacts SET version = CASE kind WHEN 'rule' THEN '1' WHEN 'mcp' THEN '' ELSE '1.0.0' END;
+    -- pasta da skill na biblioteca ('' = raiz), com '/' entre os níveis
+    ALTER TABLE board_artifacts ADD COLUMN folder TEXT NOT NULL DEFAULT '';
+    -- tools neutras da skill e do agente (JSON); NULL = ainda não escolhidas: a leitura deriva das
+    -- categorias antigas do agente ou do allowed-tools da skill, sem inventar nada no banco
+    ALTER TABLE board_artifacts ADD COLUMN tools_json TEXT;
+    -- pastas de skill criadas vazias (as que têm skill vêm do próprio artefato)
+    CREATE TABLE skill_folders (
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      path TEXT NOT NULL,
+      PRIMARY KEY (board_id, path)
+    );
+  `,
 };
 
 /**
@@ -648,6 +670,13 @@ export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
   49: `
     -- o resumo da origem é só um aviso: a versão anterior não o conhece
     ALTER TABLE board_artifacts DROP COLUMN origin_digest;
+  `,
+  50: `
+    -- a versão anterior lê o mesmo usage; versão, pasta e tools neutras se perdem com as colunas
+    DROP TABLE skill_folders;
+    ALTER TABLE board_artifacts DROP COLUMN tools_json;
+    ALTER TABLE board_artifacts DROP COLUMN folder;
+    ALTER TABLE board_artifacts DROP COLUMN version;
   `,
 };
 

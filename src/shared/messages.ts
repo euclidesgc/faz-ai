@@ -5,6 +5,7 @@ import type { ExecutionPolicy } from './executionPolicies';
 import type { ContextDraftResolution } from './contextDraftResolution';
 import type { ContextActivityTarget, ContextPlanningWrite, ActivityContextWrite } from './contextPlanning';
 import type { AgentAssistInput, AgentAssistResult } from './agentAssistance';
+import type { ArtifactAssistInput, ArtifactAssistResult } from './artifactAssistant';
 import type { LibraryArtifactInput } from './artifacts';
 import type { ArtifactKind } from './artifacts';
 import type { ImportSource, OnConflict } from './artifactImport';
@@ -280,7 +281,8 @@ export type WebviewToHost =
   /** Consulta a instalação e o login dos perfis sem devolver a configuração. */
   | { type: 'settings.aiProfiles.probe' }
   /** Faz um teste explícito, limitado a dois minutos, sem MCP nem ferramentas de alteração. */
-  | { type: 'settings.aiProfiles.test'; id: string }
+  /** `model`: o modelo do teste (o nome na API), obrigatório no modo API, que não tem modelo padrão */
+  | { type: 'settings.aiProfiles.test'; id: string; model?: string }
   /**
    * Testa o contexto do card do perfil (o que o agente carrega sozinho): o agente declara onde lê e o board confere
    * pedindo que ele cite linhas desses arquivos, rodando como um card. Gasta pedidos da conta da ferramenta.
@@ -346,6 +348,10 @@ export type WebviewToHost =
   /** grava os artefatos escolhidos; a resposta é `harness.export.applyResult` */
   | { type: 'harness.export.apply'; requestId: string; tool: AiTool; target: ExportTarget; ids: string[]; replace: boolean }
   | { type: 'harness.agent.assist'; requestId: string; input: AgentAssistInput }
+  /** "Criar com IA" e "Sugerir configuração" da biblioteca: só leitura; a resposta volta em `harness.artifact.assistResult` */
+  | { type: 'harness.artifact.assist'; requestId: string; input: ArtifactAssistInput }
+  /** cria uma pasta de skill vazia na biblioteca (a árvore da aba Skills) */
+  | { type: 'harness.library.addFolder'; folder: string }
   /**
    * envia artefatos ao board com um modo, muda o modo dos que já estão nele, ou os tira do board (com
    * `usage` null): `location` é a identidade do item na marcação (`selectionKey`: o caminho como o
@@ -485,7 +491,7 @@ export type HostToWebview =
         }
       >;
     }
-  | { type: 'aiProfiles.testResult'; id: string; ok: boolean; output: string; error?: string }
+  | { type: 'aiProfiles.testResult'; id: string; ok: boolean; output: string; error?: string; model?: string }
   | { type: 'ui.openCard'; cardId: Id }
   | { type: 'viewState'; view: ViewState }
   | { type: 'prefs'; prefs: UiPrefs }
@@ -499,6 +505,7 @@ export type HostToWebview =
   /** resposta a `harness.project.profile`, correlacionada por `requestId` */
   | { type: 'harness.library.content'; input: LibraryArtifactInput }
   | { type: 'harness.agent.assistResult'; requestId: string; result?: AgentAssistResult; error?: string }
+  | { type: 'harness.artifact.assistResult'; requestId: string; result?: ArtifactAssistResult; error?: string }
   | { type: 'harness.library.directorySelected'; directory: string }
   | { type: 'harness.library.foldersResult'; directory: string; parent: string; folders: { name: string; path: string }[] }
   | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }

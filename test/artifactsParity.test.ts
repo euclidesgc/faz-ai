@@ -128,14 +128,14 @@ async function buildExecutionState(): Promise<Fixture> {
   mark('skill', [SKILL], 'contextual');
   mark('skill', ['faz-ai-fluxo'], 'always');
   mark('instructions', ['CLAUDE.md'], 'always');
-  mark('instructions', [RULE], 'contextual');
+  mark('instructions', [RULE], 'always');
   mark('mcp', ['memoria', 'github'], 'contextual');
   for (const [name, server] of Object.entries({ memoria: MEMORIA, github: GITHUB })) {
     const item = router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'mcp' && a.name === name)!;
     router.handle({ type: 'harness.library.save', input: { ...router.readLibraryArtifact(item.id), server } });
   }
 
-  // um card com a rule indicada no campo Rules
+  // um card qualquer: a regra ativa vai em todo pedido, sem precisar do campo Rules (que não tem mais efeito)
   const s0 = router.snapshot();
   const wf = s0.workflows.find((w) => w.kind === 'parent')!;
   const cardId = router.createCard({
@@ -144,8 +144,6 @@ async function buildExecutionState(): Promise<Fixture> {
     parentId: null,
     title: 'Revisar',
   });
-  const rulesField = router.snapshot().fieldDefs.find((f) => f.kind === 'multiselect' && f.name.toLowerCase() === 'rules')!;
-  router.handle({ type: 'field.setValue', cardId, fieldId: rulesField.id, value: [selectionLocation(locations, 'instructions', RULE)] });
 
   const s = router.snapshot();
   return {
@@ -223,25 +221,25 @@ function expectSameExecution(f: Fixture) {
   const skill = skills[0]! as { path: string; files?: string[] };
   expect(path.basename(skill.path)).toBe('SKILL.md');
   expect((skill.files ?? []).map((p) => path.basename(p)).sort()).toEqual(['logo.png', 'referencia.md']);
-  expect(manifest.rules).toEqual([`.claude/rules/${RULE}.md`]);
-  expect(rules.map((r) => r.name)).toEqual([`.claude/rules/${RULE}.md`]);
-  expect(rules[0]).toMatchObject({ scope: 'project' });
-  expect(path.basename((rules[0] as { path: string }).path)).toBe(`${RULE}.md`);
+  // a regra não é mais vinculada ao card: a ativa entra no contexto fixo
+  expect(manifest.rules).toEqual([]);
+  expect(rules).toEqual([]);
 
   // o pedido: CLAUDE.md em "Sempre" no contexto fixo; skill e rule do card no contexto do card
   expect(lines.always).toHaveLength(2);
   expect(lines.always[0]).toBe(FLOW_LINE);
   expect(lines.always[1]).toContain('Contexto fixo deste board');
   expect(lines.always[1]).toContain('rule CLAUDE.md (');
+  expect(lines.always[1]).toContain(`rule .claude/rules/${RULE}.md (`);
   expect(lines.card).toHaveLength(1);
   expect(lines.card[0]).toContain(`skill ${SKILL} (`);
-  expect(lines.card[0]).toContain(`rule .claude/rules/${RULE}.md (`);
+  expect(lines.card[0]).not.toContain('rule ');
   expect(lines.card[0]).toContain('SKILL.md)');
 
   // resumo e orientações do log da execução
   expect(plan.summary).toContain('Agente do board: revisor (inline)');
   expect(plan.summary).toContain('Fluxo do board: faz-ai-fluxo (pelo MCP)');
-  expect(plan.summary).toContain('Contexto fixo: rule CLAUDE.md (pelo pedido)');
+  expect(plan.summary).toContain('Contexto fixo: rule .claude/rules/estilo.md, rule CLAUDE.md (pelo pedido)');
   expect(plan.summary).toContain(`Skills: ${SKILL} (pelo pedido)`);
   expect(plan.summary).toContain('Servidores MCP: faz-ai, memoria (imposto pela CLI)');
   expect(plan.summary).toContain('Ferramentas: Read, Grep, Glob (imposto pela CLI)');

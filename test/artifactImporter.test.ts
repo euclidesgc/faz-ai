@@ -122,8 +122,8 @@ describe('ArtifactImporter: pasta', () => {
     expect(JSON.stringify(row)).not.toContain('segredo-do-gh');
   });
 
-  it('repetido: substituir mantém o modo atual; pular não toca', async () => {
-    repo().upsert(ctx.boardId, draft('skill', 'revisar', { body: skillMd('revisar', 'antiga') }), 'always');
+  it('repetido: substituir mantém o estado atual (ativo/inativo); pular não toca', async () => {
+    repo().upsert(ctx.boardId, draft('skill', 'revisar', { body: skillMd('revisar', 'antiga') }), 'contextual');
     repo().upsert(ctx.boardId, draft('rule', 'estilo.md', { body: 'Antiga' }), 'always');
     const importer = new ArtifactImporter(ctx);
     let preview = await importer.scan({ from: 'folder', path: path.join(root, 'origem') });
@@ -140,7 +140,7 @@ describe('ArtifactImporter: pasta', () => {
       'replace',
     );
     expect(replaced.imported).toHaveLength(2);
-    expect(repo().get(ctx.boardId, 'skill', 'revisar')).toMatchObject({ usage: 'always', description: 'Faz algo' });
+    expect(repo().get(ctx.boardId, 'skill', 'revisar')).toMatchObject({ usage: 'contextual', description: 'Faz algo' });
     expect(repo().get(ctx.boardId, 'rule', 'estilo.md')).toMatchObject({ usage: 'always', body: 'Use tabs' });
   });
 

@@ -186,6 +186,8 @@ export interface AiGatewayDeps {
    * teste do perfil, o runner legado); o gateway sabe, e aplica aqui, num lugar só.
    */
   regimeOf?(profileId: string): Pick<StrictExecutionRequest, 'regime' | 'compatibilityReview'>;
+  /** a ferramenta recusou o modelo como inexistente para a conta (`modelUnavailable`): o host o tira do catálogo */
+  onModelUnavailable?(profile: AiProfile, model: string): void;
   /** inicia o comando da CLI; é o único lugar que recebe um */
   spawn: SpawnFn;
 }
@@ -493,6 +495,7 @@ export class AiGateway {
         call.log(redact(`Conferência da execução indisponível: ${e instanceof Error ? e.message : String(e)}`));
       }
       runLog.measure(runId, report, check);
+      if (report.modelUnavailable && profile) this.deps.onModelUnavailable?.(profile, report.modelUnavailable);
       const end: AiRunEnd = {
         ...(privateAuthFailed ? { authExpired: true } : {}),
         code,

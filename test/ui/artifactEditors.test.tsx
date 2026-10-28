@@ -7,7 +7,6 @@ import type { HostToWebview } from '../../src/shared/messages';
 import type { BoardState } from '../../src/shared/model';
 import { McpServerEditor } from '../../src/webview/components/settings/harness/McpServerEditor';
 import { RuleEditor } from '../../src/webview/components/settings/harness/RuleEditor';
-import { SkillEditor } from '../../src/webview/components/settings/harness/SkillEditor';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 const artifact = (kind: ArtifactKind, name: string, patch: Partial<BoardArtifact> = {}): BoardArtifact => ({
@@ -109,120 +108,6 @@ describe('editor de regra', () => {
       previous: 'commits',
       body: 'Commits em português.',
       via: 'manual',
-    });
-  });
-});
-
-describe('editor de skill', () => {
-  const skill = artifact('skill', 'migrar', { files: ['references/exemplo.md'], revision: 3 });
-
-  it('carrega o SKILL.md pelo readResult e salva com nome, descrição e corpo', async () => {
-    setArtifacts([skill]);
-    renderThemed(<SkillEditor skill={skill} onClose={() => {}} />);
-    replyRead('---\nname: migrar\ndescription: "Migrar o banco"\nallowed-tools: Read\n---\n\n# migrar\n\nPasso a passo.\n', {
-      kind: 'skill',
-      name: 'migrar',
-    });
-    expect(screen.getByRole('textbox', { name: 'Descrição' })).toHaveValue('Migrar o banco');
-    expect(screen.getByRole('textbox', { name: 'Corpo do SKILL.md' })).toHaveValue('# migrar\n\nPasso a passo.\n');
-    expect(screen.getByText(/Versão 3\./)).toBeInTheDocument();
-    await userEvent.type(screen.getByRole('textbox', { name: 'Descrição' }), ' com segurança');
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
-    const save = lastSent('harness.artifact.save');
-    expect(save).toMatchObject({ kind: 'skill', name: 'migrar', via: 'manual' });
-    expect(save).not.toHaveProperty('previous');
-    expect(save.body).toBe(
-      '---\nname: migrar\ndescription: "Migrar o banco com segurança"\nallowed-tools: Read\n---\n\n# migrar\n\nPasso a passo.\n',
-    );
-  });
-
-  it('ignora o readResult de outro requestId', async () => {
-    setArtifacts([skill]);
-    renderThemed(<SkillEditor skill={skill} onClose={() => {}} />);
-    act(() => {
-      window.dispatchEvent(
-        new MessageEvent('message', {
-          data: { type: 'harness.artifact.readResult', requestId: 'outro', text: '---\nname: x\n---\nx' } satisfies HostToWebview,
-        }),
-      );
-    });
-    expect(screen.getByRole('textbox', { name: 'Corpo do SKILL.md' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Salvar' })).toBeDisabled();
-  });
-
-  it('adiciona, edita e apaga arquivos de apoio com harness.skillFile.write e harness.skillFile.delete', async () => {
-    setArtifacts([skill]);
-    renderThemed(<SkillEditor skill={skill} onClose={() => {}} />);
-    replyRead('---\nname: migrar\ndescription: "x"\n---\n\ncorpo\n');
-    posted.mockClear();
-
-    // adicionar: pasta + nome, citando no SKILL.md
-    await userEvent.type(screen.getByRole('textbox', { name: 'Nome do arquivo' }), 'ultima.md');
-    await userEvent.click(screen.getByRole('button', { name: 'Novo arquivo' }));
-    expect(lastSent('harness.skillFile.write')).toEqual({
-      type: 'harness.skillFile.write',
-      skill: 'migrar',
-      file: 'references/ultima.md',
-      content: '',
-      link: true,
-    });
-    confirmLast();
-    await act(async () => {});
-
-    // editar um arquivo que já existe: lê pelo host e grava o texto
-    await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
-    replyRead('texto antigo', { kind: 'skill', name: 'migrar', file: 'references/exemplo.md' });
-    const area = screen.getByRole('textbox', { name: 'Conteúdo de references/exemplo.md' });
-    expect(area).toHaveValue('texto antigo');
-    await userEvent.type(area, ' novo');
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar arquivo' }));
-    expect(lastSent('harness.skillFile.write')).toEqual({
-      type: 'harness.skillFile.write',
-      skill: 'migrar',
-      file: 'references/exemplo.md',
-      content: 'texto antigo novo',
-    });
-    confirmLast();
-    await act(async () => {});
-
-    // apagar: confirmação do board e depois a mensagem
-    await userEvent.click(screen.getByRole('button', { name: 'Apagar o arquivo' }));
-    expect(useBoardStore.getState().dialog?.title).toBe('Apagar "references/exemplo.md"?');
-    act(() => void useBoardStore.getState().dialog!.onConfirm());
-    expect(lastSent('harness.skillFile.delete')).toEqual({
-      type: 'harness.skillFile.delete',
-      skill: 'migrar',
-      file: 'references/exemplo.md',
-    });
-  });
-
-  it('o erro de limite do host aparece ao adicionar um arquivo', async () => {
-    setArtifacts([skill]);
-    renderThemed(<SkillEditor skill={skill} onClose={() => {}} />);
-    replyRead('---\nname: migrar\ndescription: "x"\n---\n\ncorpo\n');
-    await userEvent.type(screen.getByRole('textbox', { name: 'Nome do arquivo' }), 'grande.md');
-    await userEvent.click(screen.getByRole('button', { name: 'Novo arquivo' }));
-    confirmLast(false, 'Arquivo acima de 512 KB.');
-    expect(await screen.findByText('Arquivo acima de 512 KB.')).toBeInTheDocument();
-  });
-
-  it('skill nova: nome inválido desabilita Salvar e os arquivos esperam a skill existir', async () => {
-    renderThemed(<SkillEditor onClose={() => {}} />);
-    expect(screen.getByText('Salve a skill para acrescentar arquivos de apoio.')).toBeInTheDocument();
-    await userEvent.type(screen.getByRole('textbox', { name: 'Nome da skill' }), 'Nome Ruim');
-    await userEvent.type(screen.getByRole('textbox', { name: 'Descrição' }), 'Faz algo.');
-    await userEvent.type(screen.getByRole('textbox', { name: 'Corpo do SKILL.md' }), '# corpo');
-    expect(screen.getByText('Use letras minúsculas, números e hífen (até 64).')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Salvar' })).toBeDisabled();
-    const name = screen.getByRole('textbox', { name: 'Nome da skill' });
-    await userEvent.clear(name);
-    await userEvent.type(name, 'nova-skill');
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
-    expect(lastSent('harness.artifact.save')).toMatchObject({
-      kind: 'skill',
-      name: 'nova-skill',
-      via: 'manual',
-      body: '---\nname: nova-skill\ndescription: "Faz algo."\n---\n\n# corpo\n',
     });
   });
 });

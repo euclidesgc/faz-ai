@@ -128,12 +128,16 @@ export function AgentModels({ profile }: { profile: AiProfile }) {
     setCatalog(sent.current().map((o) => (o.id === id ? { ...o, ...patch } : o)));
   // o agente ACP anuncia os modelos ao abrir a sessão: o "Detectar" vale para ele como para as CLIs prontas
   const acp = isAcpProfile(profile);
-  const detectable = isReadyCli(profile) || acp;
+  // no modo API a lista vem da conta, pela chave guardada no Conectar
+  const api = profile.mode === 'api';
+  const detectable = isReadyCli(profile) || acp || api;
   const source = acp
     ? t('lida do agente ao abrir uma sessão ACP (session/new), sem gastar a sua conta; o agente precisa estar instalado e com login')
-    : profile.kind === 'custom'
-      ? t('cadastrada à mão')
-      : t(SOURCES[profile.base as AiBase] ?? 'cadastrada à mão');
+    : api
+      ? t('a lista de modelos da sua conta na API, pela chave guardada no Conectar; o que a conta não lista mais sai do catálogo')
+      : profile.kind === 'custom'
+        ? t('cadastrada à mão')
+        : t(SOURCES[profile.base as AiBase] ?? 'cadastrada à mão');
   const mine = catalog.filter((o) => o.tool === tool);
   // a leitura mais recente da lista da ferramenta; sem ela, a lista é a embutida ou a sua
   const readAt = Math.max(0, ...mine.map((o) => o.readAt ?? 0));

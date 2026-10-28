@@ -27,9 +27,8 @@ export type OnConflict = 'replace' | 'skip';
 /** Imported rules wait for review; other imported artifacts are available per card. */
 export const importUsage = (kind: ArtifactKind): HarnessUsage => (kind === 'rule' ? 'off' : 'contextual');
 
-/** Manually created artifacts are contextual; AI/wizard rules wait for review. */
-export const createUsage = (kind: ArtifactKind, via: 'manual' | 'wizard' | 'ai'): HarnessUsage =>
-  kind === 'rule' && via !== 'manual' ? 'off' : 'contextual';
+/** Regra entra inativa (ativa vai em todo pedido: a pessoa revisa antes); skill e agente, vinculáveis ao card. */
+export const createUsage = (kind: ArtifactKind, _via: 'manual' | 'wizard' | 'ai'): HarnessUsage => (kind === 'rule' ? 'off' : 'contextual');
 
 /** Same base naming as skills, with an optional Markdown extension for rules. */
 export const RULE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}(?:\.md)?$/;

@@ -3,6 +3,8 @@
 import type { Database } from 'sql.js';
 import {
   artifactLocation,
+  defaultVersion,
+  normalizeUsage,
   selectableOfKind,
   type AgentMeta,
   type ArtifactDraft,
@@ -11,6 +13,7 @@ import {
 } from '../../shared/artifacts';
 import { defaultUsage, type HarnessSelection, type HarnessUsage } from '../../shared/harnessSelection';
 import { isAiBase, type AiTool } from '../../shared/harness';
+import { allowedToolsOf, neutralFromCategories, neutralFromNative, normalizeTools, type NeutralTool } from '../../shared/artifactTools';
 import { all, bool, num, one, run, str, transaction, type Row } from '../db/query';
 import { newId, now } from '../db/ids';
 import { credentialsFor, validSecretRef } from '../credentials';
@@ -62,6 +65,19 @@ export function protectImportedMcpRow(db: Database, row: Row): Row {
     : credentialsFor(db).put(credentialOwner(str(row.board_id), str(row.id)), server);
   const transport = ['stdio', 'http', 'sse'].includes(String(meta.transport)) ? meta.transport : transportOf(server);
   return { ...row, secret_ref: ref, review_state: 'pending', meta_json: JSON.stringify({ server: { secretRef: ref }, transport }) };
+}
+
+/**
+ * As tools neutras gravadas ou, sem elas (NULL: artefato anterior à biblioteca), derivadas da origem: as categorias
+ * do agente ou o `allowed-tools` do SKILL.md. Nada é gravado na leitura.
+ */
+function toolsOf(kind: 'skill' | 'agent', raw: unknown, meta: ArtifactDraft['meta'], body: string): NeutralTool[] {
+  if (typeof raw === 'string') return normalizeTools(kind, parseJson<unknown[]>(raw, []));
+  if (kind === 'agent') {
+    const m = meta as Partial<AgentMeta>;
+    return normalizeTools(kind, neutralFromCategories(m.tools?.categories ?? [], m.mcpServers ?? []));
+  }
+  return normalizeTools(kind, neutralFromNative(allowedToolsOf(body)));
 }
 
 export class ArtifactRepo {
@@ -157,12 +173,37 @@ export class ArtifactRepo {
   }
 
   setUsage(boardId: string, id: string, usage: HarnessUsage): void {
+    const kind = str(one(this.db, 'SELECT kind FROM board_artifacts WHERE id = ? AND board_id = ?', [id, boardId])?.kind) as ArtifactKind;
     run(this.db, 'UPDATE board_artifacts SET usage = ?, updated_at = ?, revision = revision + 1 WHERE id = ? AND board_id = ?', [
-      usage,
+      normalizeUsage(kind, usage),
       now(),
       id,
       boardId,
     ]);
+  }
+
+  /** As pastas de skill do board: as criadas vazias e as que alguma skill usa, com os níveis de cima. */
+  skillFolders(boardId: string): string[] {
+    const paths = new Set<string>();
+    const add = (p: string) => {
+      const parts = p.split('/');
+      for (let i = 1; i <= parts.length; i++) paths.add(parts.slice(0, i).join('/'));
+    };
+    for (const r of all(this.db, 'SELECT path FROM skill_folders WHERE board_id = ?', [boardId])) add(str(r.path));
+    for (const r of all(this.db, "SELECT DISTINCT folder FROM board_artifacts WHERE board_id = ? AND kind = 'skill' AND folder <> ''", [
+      boardId,
+    ]))
+      add(str(r.folder));
+    return [...paths].filter(Boolean).sort();
+  }
+
+  addSkillFolder(boardId: string, path: string): void {
+    run(this.db, 'INSERT OR IGNORE INTO skill_folders (board_id, path) VALUES (?, ?)', [boardId, path]);
+  }
+
+  /** Tira a pasta vazia; a que ainda tem skill (nela ou abaixo) continua existindo pelas skills. */
+  removeSkillFolder(boardId: string, path: string): void {
+    run(this.db, 'DELETE FROM skill_folders WHERE board_id = ? AND (path = ? OR path LIKE ?)', [boardId, path, `${path}/%`]);
   }
 
   /** Os arquivos de apoio saem pelo ON DELETE CASCADE. */
@@ -221,9 +262,10 @@ export class ArtifactRepo {
     const t = now();
     const existing = one(
       this.db,
-      'SELECT id, usage, secret_ref, review_state, origin FROM board_artifacts WHERE board_id = ? AND kind = ? AND name = ?',
+      'SELECT id, usage, secret_ref, review_state, origin, version, folder, tools_json FROM board_artifacts WHERE board_id = ? AND kind = ? AND name = ?',
       [boardId, d.kind, d.name],
     );
+    if (usage) usage = normalizeUsage(d.kind, usage);
     const id = existing ? str(existing.id) : newId();
     let meta = d.meta;
     let ref: string | null = null;
@@ -263,6 +305,12 @@ export class ArtifactRepo {
       if (d.originDigest !== undefined) run(this.db, 'UPDATE board_artifacts SET origin_digest = ? WHERE id = ?', [d.originDigest, id]);
       else if (str(existing.origin) !== d.origin) run(this.db, "UPDATE board_artifacts SET origin_digest = '' WHERE id = ?", [id]);
       run(this.db, 'DELETE FROM board_artifact_files WHERE artifact_id = ?', [id]);
+      run(this.db, 'UPDATE board_artifacts SET version = ?, folder = ?, tools_json = ? WHERE id = ?', [
+        d.version ?? str(existing.version),
+        d.kind === 'skill' ? (d.folder ?? str(existing.folder)) : '',
+        d.tools ? JSON.stringify(d.tools) : (existing.tools_json as string | null),
+        id,
+      ]);
     } else {
       run(
         this.db,
@@ -271,6 +319,12 @@ export class ArtifactRepo {
         [id, boardId, d.kind, d.name, ...common, usage ?? defaultUsage(selectableOfKind(d.kind)), t],
       );
       if (d.originDigest) run(this.db, 'UPDATE board_artifacts SET origin_digest = ? WHERE id = ?', [d.originDigest, id]);
+      run(this.db, 'UPDATE board_artifacts SET version = ?, folder = ?, tools_json = ? WHERE id = ?', [
+        d.version ?? defaultVersion(d.kind),
+        d.kind === 'skill' ? (d.folder ?? '') : '',
+        d.tools ? JSON.stringify(d.tools) : null,
+        id,
+      ]);
     }
     if (d.kind === 'mcp') run(this.db, 'UPDATE board_artifacts SET secret_ref = ?, review_state = ? WHERE id = ?', [ref, review, id]);
     for (const f of d.files) {
@@ -292,7 +346,7 @@ export class ArtifactRepo {
   private toRow(row: Row, files: string[]): ArtifactRow {
     const kind = (KINDS.includes(str(row.kind)) ? str(row.kind) : 'rule') as ArtifactKind;
     const meta = parseJson<ArtifactDraft['meta']>(str(row.meta_json), {});
-    const usage = (USAGES.includes(str(row.usage)) ? str(row.usage) : 'off') as HarnessUsage;
+    const usage = normalizeUsage(kind, (USAGES.includes(str(row.usage)) ? str(row.usage) : 'off') as HarnessUsage);
     const a: ArtifactRow = {
       id: str(row.id),
       kind,
@@ -310,6 +364,9 @@ export class ArtifactRepo {
       createdAt: num(row.created_at),
       updatedAt: num(row.updated_at),
       revision: num(row.revision),
+      version: str(row.version) || defaultVersion(kind),
+      folder: kind === 'skill' ? str(row.folder) : '',
+      tools: kind === 'skill' || kind === 'agent' ? toolsOf(kind, row.tools_json, meta, str(row.body)) : [],
     };
     if (kind === 'agent') a.agent = meta as AgentMeta;
     if (kind === 'mcp') {

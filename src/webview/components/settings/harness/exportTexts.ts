@@ -7,6 +7,7 @@ export function lossText(loss: FormatLoss): string {
   if (loss.effect === 'configure') return t('Configurar na ferramenta: {value}', { value });
   const lost: Partial<Record<LossCode, string>> = {
     tools: t('A restrição de ferramentas não vai para a cópia: o agente herda todas as ferramentas da sessão.'),
+    'allowed-tools': t('Esta ferramenta não tem lista de tools por artefato: o campo ({value}) fica fora da cópia.', { value }),
     mcpServers: t('Os servidores MCP do agente não vão para a cópia: ele usa os da sessão.'),
     skills: t('As skills do agente não vão para a cópia.'),
     model: t('O modelo não vai para a cópia: o agente usa o da sessão.'),

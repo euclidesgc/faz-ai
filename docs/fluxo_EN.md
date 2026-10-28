@@ -443,6 +443,11 @@ is still waiting for another. With no dependencies declared, all open sub-tasks 
 independent. When all of them finish, the board calls the AI once for the closing: verify the whole,
 commit and move the story.
 
+The checklist is the record of what was done: the AI checks each item as it finishes it, on the
+sub-task and on the story, and deletes what no longer applies, saying why in the conversation. The
+AI's `move_card` to a done column refuses a card with an open item; moving on screen, the pull
+request merge and cancelling don't depend on the checklist.
+
 **Description check.** Before running a sub-task, the board checks that its description has the
 sections `Objetivo`, `Pronto quando`, `Pode tocar` and `Não pode tocar` (`Decisões anteriores` is
 optional). If any sub-task of the phase lacks one, the board **does not run it**: it records in the

@@ -6,6 +6,10 @@
 
 ### Adicionado
 
+- Nova Biblioteca de artefatos do board em Configurações › Harness › Artefatos do board: cada regra, skill, agente e servidor MCP fica ativo ou inativo, com contador, busca, filtro e árvore de pastas das skills.
+- Os formulários **Nova regra**, **Nova skill** e **Novo agente** abrem com modelo, tools e frontmatter ao vivo, compatibilidade entre skill e agente e prévia da exportação.
+- O assistente **Criar com IA** faz perguntas sobre o projeto, uma por vez, com o rascunho do arquivo ao vivo.
+- O card avisa quando uma skill vinculada pede tools que o agente dele não concede.
 - O aviso de regras desligadas do Harness ganha **Mostrar só as desligadas**, para revisá-las uma a uma.
 - Nova seção Automação nas Configurações, com a permissão da IA, o tempo limite, o heartbeat e o paralelismo, que saem do Harness.
 - A biblioteca do board marca o que é de fábrica e as cópias passam a acompanhar a origem.
@@ -36,6 +40,12 @@
 
 ### Alterado
 
+- Quando o modelo de um card esgota o limite de uso, o board pergunta se espera o limite voltar ou segue com outro modelo disponível, e grava a escolha no card; no modo autônomo vale a regra de fallback.
+- Os seletores de modelo (chat, card, agentes e regras) só oferecem os agentes que podem responder agora.
+- **Detectar modelos** substitui a lista pela que a ferramenta informa agora, tirando os modelos que ela não lista mais, e passa a existir também no modo API.
+- O chat pelo Gemini da API declara só as ferramentas do board que usa: 26 em vez de 81 a cada pedido.
+- Regras ativas entram em todo contexto de IA do board, e skills ativas só no card que as vincula; regras que estavam **Pelo card** passam a inativas, para revisão.
+- A exportação para o Claude Code grava `allowed-tools` nas skills e `tools` nos agentes a partir das tools escolhidas; Cursor e Kimi Code omitem o campo e avisam.
 - O Plan pede, na descrição de cada sub-tarefa, as seções Objetivo, Pronto quando, Pode tocar e Não pode tocar (#1110).
 - As sub-tarefas passam a ser a menor parte da entrega que se verifica sozinha, não um recorte por arquivo: a instrução do Plan, a skill do fluxo, as descrições do MCP e os agentes dizem que o board as executa uma por vez, na ordem das dependências (#1106).
 - Revisão de UX das telas de Harness, Automação, Conectar agentes e Workflows: Automação dividida em Execução, Heartbeat e Paralelismo; o "Preencher o modelo sugerido" fica sob o título da sugestão de modelo; o plano de contexto sem título repetido e com "Herdar agente"; ações mais curtas na lista de agentes ("Tornar padrão", "Restaurar o original").
@@ -64,6 +74,7 @@
 
 ### Removido
 
+- O campo Rules some do card: as regras ativas já valem em todo pedido.
 - Saiu o "Agente padrão" de Harness › Ferramenta e execução, que repetia o "Tornar padrão" da aba Agentes.
 - A aba Detalhes de Conectar agentes sai; as ações do perfil passam para o fim da aba Conexão.
 - Saiu o cartão "Agente padrão" do topo de Conectar agentes.
@@ -75,6 +86,15 @@
 
 ### Corrigido
 
+- A lista de modelos do Gemini pela API não traz mais modelos de voz, imagem, música e pesquisa.
+- A mensagem de limite do Gemini diz qual cota acabou e a hora em que volta.
+- O modelo que a API do Gemini lista mas recusa para a conta (HTTP 404) sai da lista de modelos e não volta pelo **Detectar modelos**; a mensagem traz o motivo do Google.
+- O **Detectar modelos** do Gemini confere cada modelo na API e só lista os que a conta pode usar.
+- O chat num modelo que saiu do catálogo passa para o mais novo do mesmo agente.
+- O resultado do teste rápido fica também no log "Faz AI".
+- A IA não conclui mais um card com o checklist em aberto: o `move_card` para a conclusão recusa, e a skill do fluxo manda marcar cada item ao concluí-lo.
+- O chat do board volta a responder pelos agentes ACP e pelo Gemini da API quando a permissão do board não é "Board".
+- O teste rápido do Gemini pela API ganha a escolha do modelo, que esse modo exige, começando pelo mais novo.
 - O texto do heartbeat diz que ele chama o agente de cada card, não uma ferramenta só.
 - Os arquivos antigos do log do protocolo ACP passam a ser apagados junto com os do rastreio, também com a janela aberta por dias.
 - O interruptor Ocultar session/update ganha um hint que explica que só filtra a lista.

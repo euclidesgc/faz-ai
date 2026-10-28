@@ -28,7 +28,7 @@ import { AiProfileRepo } from '../../src/extension/repositories/aiProfileRepo';
 import { createRunLog } from '../../src/extension/log/runLog';
 import { AiRunRepo } from '../../src/extension/log/aiRunRepo';
 import { MessageRouter } from '../../src/extension/panel/messageRouter';
-import { AiRunner } from '../../src/extension/runner';
+import { AiRunner, type RunnerDeps } from '../../src/extension/runner';
 import { RunArtifactSnapshots } from '../../src/extension/runArtifactSnapshot';
 import { ArtifactRepo } from '../../src/extension/repositories/artifactRepo';
 import type { AiRunEnd } from '../../src/extension/ai/gateway';
@@ -82,6 +82,8 @@ export interface CardWorld {
   keys: ToolKeys;
   router: MessageRouter;
   runner: AiRunner;
+  /** as dependências do runner, para montar o chat do board sobre o mesmo gateway */
+  runnerDeps: RunnerDeps;
   /** no modo API: o driver de verdade apontado para o servidor HTTP falso (o Conectar o usa para conferir a chave) */
   apiDriver: ToolDriver | null;
   cardId: string;
@@ -294,6 +296,8 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   const lines: string[] = [];
   const cliCommands: HeadlessCommand[] = [];
   const gateway = new AiGateway({
+    // como o host: o modelo recusado para a conta sai do catálogo
+    onModelUnavailable: (profile, model) => router.retireModel(profile.id, model),
     resolveProfile: (id) => profiles.resolveProfile(router.boardId, id),
     executorOf: pick,
     profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
@@ -324,14 +328,15 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
         ? { apiKey: (profile: AiProfile) => profileApiKey(keys, profile) }
         : {}),
   });
-  const runner = new AiRunner(router, {
+  const runnerDeps: RunnerDeps = {
     gateway,
     cwd: project,
     homeDir: home,
     bridgePath: path.join(root, 'dist', 'mcp-bridge.js'),
     nodePath: 'node',
     log: (line) => lines.push(line),
-  });
+  };
+  const runner = new AiRunner(router, runnerDeps);
   served.runner = runner;
 
   // uma história numa fase de texto da IA do fluxo principal (a primeira em que a IA trabalha)
@@ -355,6 +360,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
     keys,
     router,
     runner,
+    runnerDeps,
     apiDriver,
     cardId,
     lines,

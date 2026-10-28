@@ -123,6 +123,14 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(FLOW_SKILL.body).toMatch(/`start_work`[^.]*já a leva para a coluna de andamento/);
   });
 
+  it('a principal manda marcar o checklist antes de concluir, na sub-tarefa e na história', () => {
+    expect(FLOW_SKILL.body).toMatch(/marque cada item com `update_checklist_item` assim que o\s+concluir, na sub-tarefa e na história/);
+    expect(FLOW_SKILL.body).toMatch(/o board recusa o card com item em aberto/);
+    expect(FLOW_SKILL.body).toMatch(/apague com\s+`delete_checklist_item`/);
+    expect(rodadas).toContain('marque os itens do checklist da história e mova a história');
+    expect(rodadas).toMatch(/marque cada item do checklist com `update_checklist_item` assim que o concluir/);
+  });
+
   it('a principal escolhe o agente e o checklist no create_card e manda ler o detalhe pelo get_card', () => {
     expect(FLOW_SKILL.body).toMatch(/`profile` no `create_card`/);
     expect(FLOW_SKILL.body).toMatch(/`set_card_profile`\s+só para trocar depois/);

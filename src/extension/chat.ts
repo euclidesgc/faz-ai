@@ -6,6 +6,8 @@ import type { AgentAssistInput, AgentAssistResult } from '../shared/agentAssista
 import type { PolicyAssistInput, PolicyAssistResult } from '../shared/policyAssistant';
 import { policyAssistancePrompt, parsePolicyAssistance } from './policyAssistant';
 import { agentAssistancePrompt, parseAgentAssistance } from './agentAssistance';
+import { artifactAssistancePrompt, assistContext, parseArtifactAssistance } from './artifactAssistance';
+import type { ArtifactAssistInput, ArtifactAssistResult } from '../shared/artifactAssistant';
 import { contextProposalPrompt, parseContextProposal } from './contextProposal';
 import type { ContextProposal } from '../shared/contextProposal';
 import type { ContextActivityTarget } from '../shared/contextPlanning';
@@ -68,7 +70,7 @@ export function suggestAgentsPrompt(): string {
  */
 export function suggestRulesPrompt(): string {
   return [
-    'Você vai propor regras para este projeto, pelas ferramentas do servidor MCP "faz-ai". Uma regra do board é uma instrução curta, guardada no próprio board, que a IA lê quando o card ou o modo "Sempre" a indica.',
+    'Você vai propor regras para este projeto, pelas ferramentas do servidor MCP "faz-ai". Uma regra do board é uma instrução curta, guardada no próprio board, que entra em todo pedido de IA do board enquanto estiver ativa.',
     'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, scripts de teste, lint e formatação, README, linguagens e frameworks) e o que o board já tem: get_harness e read_rule_file para ler uma regra existente.',
     'Proponha de 3 a 5 regras que façam sentido para ESTE projeto, uma por assunto (por exemplo testes, estilo, commits, estrutura de pastas): convenções que se vê no código, comandos de teste, lint e formatação, padrões de commit e o que nunca fazer. Cada regra com frases diretas, no imperativo, sem repetir regra que já existe no board. Nada que mande ignorar o board, o servidor MCP, as aprovações ou as branches por história: o fluxo do board vale acima das regras.',
     'Crie cada regra com write_rule_file, com o nome em letras minúsculas e hífens (ex.: "testes-e-lint"). Depois de criar, deixe cada uma desligada com set_harness_selection (kind "instructions", usage "off"), para a pessoa revisar e ativar em "Desligado"; se uma regra do mesmo nome já existir no board, não mude o modo dela.',
@@ -89,6 +91,39 @@ export function suggestSkillsPrompt(): string {
     'Não altere outros arquivos do projeto nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: nome → tarefa e quando usar.',
   ].join('\n');
 }
+
+/**
+ * As ferramentas do servidor do board que o chat usa: consultar, criar, mover e vincular cards, resumir, e montar o
+ * harness (as sugestões de agentes, regras e skills). No modo API só elas vão declaradas ao modelo.
+ */
+export const CHAT_BOARD_TOOLS: readonly string[] = [
+  'get_board',
+  'get_pending_work',
+  'list_cards',
+  'get_card',
+  'create_card',
+  'update_card',
+  'move_card',
+  'link_cards',
+  'unlink_cards',
+  'archive_card',
+  'add_comment',
+  'add_checklist_item',
+  'update_checklist_item',
+  'generate_summary',
+  'get_metrics',
+  'get_models',
+  'get_harness',
+  'set_harness_selection',
+  'get_agent',
+  'create_agent',
+  'update_agent',
+  'get_skill',
+  'create_skill',
+  'update_skill',
+  'read_rule_file',
+  'write_rule_file',
+];
 
 /**
  * O alvo de uma execução do chat: o valor do Modelo escolhido decide a CLI (o prefixo do perfil). Sem escolha
@@ -127,6 +162,7 @@ export class ChatSession {
   ) {
     this.messages = this.load();
     router.setAgentAssistHandler((input) => this.assistAgent(input));
+    router.setArtifactAssistHandler((input) => this.assistArtifact(input));
     router.setPolicyAssistHandler((input) => this.assistPolicy(input));
     router.setContextProposeHandler((target, language) => this.proposeContext(target, language));
     router.setChatHandler((msg) => {
@@ -212,6 +248,31 @@ export class ChatSession {
         },
         failed: (error) => reject(new Error(error)),
       });
+    });
+  }
+
+  /** "Criar com IA" e "Sugerir configuração" da biblioteca: a IA só lê e devolve a próxima pergunta e o rascunho. */
+  assistArtifact(input: ArtifactAssistInput): Promise<ArtifactAssistResult> {
+    return new Promise((resolve, reject) => {
+      try {
+        const state = this.router.snapshot();
+        const profile = this.router.projectProfile();
+        const context = assistContext(state, profile, input.goal);
+        const prompt = artifactAssistancePrompt(input, state, profile);
+        this.start(prompt, 'board', null, `harness-${input.kind}` as 'harness-rule' | 'harness-skill' | 'harness-agent', {
+          draftOnly: true,
+          done: (text) => {
+            try {
+              resolve(parseArtifactAssistance(text, input, this.router.snapshot(), context));
+            } catch (error) {
+              reject(error);
+            }
+          },
+          failed: (error) => reject(new Error(error)),
+        });
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
@@ -307,6 +368,8 @@ export class ChatSession {
     const tool = toolInfo(target.cli);
     // sem card não há agente: contexto vazio, só o servidor do board, os servidores em modo "Sempre" e o modelo escolhido
     const plan = bareExec(modelOf(state, target), boardServer(this.deps), state, this.router.libraryMcpDefinitions(), target.cli);
+    // no modo API cada ferramenta declarada viaja em todo pedido: o chat leva só as do que ele faz
+    plan.declareOnly = [...CHAT_BOARD_TOOLS];
     if (hooks.draftOnly) {
       plan.tools = ['Read', 'Glob', 'Grep'];
       plan.deniedTools = [];
@@ -338,10 +401,10 @@ export class ChatSession {
         prepare: () => ({
           // runtime v1: contexto fechado, sem agente nem MCP além do contrato vazio (o chat não tem card)
           ...(this.deps.gateway.runtime === 'v1'
-            ? closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly)
+            ? closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly, permission)
             : // runtime legado: o perfil personalizado precisa da admissão; só o pedido, sem a configuração v1
               !isReadyCli(target.cli)
-              ? { strict: closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly).strict }
+              ? { strict: closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly, permission).strict }
               : {}),
           artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state) : undefined,
           config: {

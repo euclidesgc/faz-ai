@@ -43,11 +43,11 @@ afterEach(async () => {
 });
 
 describe('BoardLibrary: gravar regra, skill e MCP no board', () => {
-  it('regra: modo inicial por origem, edição mantém o modo, renomear e nome repetido', () => {
+  it('regra: nasce inativa em qualquer origem, edição mantém o modo, renomear e nome repetido', () => {
     lib().saveRule('estilo', 'a', { via: 'manual' });
     lib().saveRule('revisao', 'b', { via: 'wizard' });
     lib().saveRule('ia', 'c', { via: 'ai' });
-    expect([get('rule', 'estilo')!.usage, get('rule', 'revisao')!.usage, get('rule', 'ia')!.usage]).toEqual(['contextual', 'off', 'off']);
+    expect([get('rule', 'estilo')!.usage, get('rule', 'revisao')!.usage, get('rule', 'ia')!.usage]).toEqual(['off', 'off', 'off']);
     const id = get('rule', 'revisao')!.id;
     lib().saveRule('revisao', 'b2', { via: 'manual' });
     expect(get('rule', 'revisao')).toMatchObject({ id, usage: 'off', body: 'b2' });
@@ -60,17 +60,17 @@ describe('BoardLibrary: gravar regra, skill e MCP no board', () => {
     expect(lib().content('rule', 'estilo')).toEqual({ text: 'x' });
   });
 
-  it('skill: cria "Pelo card", edita mantendo o modo e os arquivos, renomeia e recusa nome repetido', () => {
+  it('skill: cria ativa (vinculável), edita mantendo o estado e os arquivos, renomeia e recusa nome repetido', () => {
     lib().saveSkill('deploy', '---\nname: deploy\ndescription: Faz deploy\n---\nCorpo', { via: 'manual' });
     expect(get('skill', 'deploy')).toMatchObject({ usage: 'contextual', description: 'Faz deploy' });
     lib().writeSkillFile('deploy', 'ref/a.md', 'apoio');
-    lib().repo.setUsage(ctx.boardId, get('skill', 'deploy')!.id, 'always');
+    lib().repo.setUsage(ctx.boardId, get('skill', 'deploy')!.id, 'off');
     lib().saveSkill('deploy', '---\nname: deploy\ndescription: Novo\n---\nC2', { via: 'manual' });
-    expect(get('skill', 'deploy')).toMatchObject({ usage: 'always', description: 'Novo', files: ['ref/a.md'] });
+    expect(get('skill', 'deploy')).toMatchObject({ usage: 'off', description: 'Novo', files: ['ref/a.md'] });
     lib().saveSkill('publicar', '---\nname: deploy\ndescription: Novo\n---\nC2', { previous: 'deploy', via: 'manual' });
     expect(get('skill', 'deploy')).toBeUndefined();
     const renamed = get('skill', 'publicar')!;
-    expect(renamed).toMatchObject({ usage: 'always', files: ['ref/a.md'] });
+    expect(renamed).toMatchObject({ usage: 'off', files: ['ref/a.md'] });
     expect(lib().content('skill', 'publicar').text).toContain('name: "publicar"');
     expect(lib().content('skill', 'publicar', 'ref/a.md')).toEqual({ text: 'apoio' });
     lib().saveSkill('outra', 'x', { via: 'manual' });
@@ -166,5 +166,96 @@ describe('BoardLibrary: gravar regra, skill e MCP no board', () => {
       .find((a) => a.name === 's')!;
     expect(fs.existsSync(path.join(path.dirname(mirrored.path), 'a.md'))).toBe(true);
     expect(mirrored.path.startsWith(path.join(root, 'project'))).toBe(false);
+  });
+});
+
+describe('BoardLibrary.saveArtifact: ativo/inativo, versão, pasta e tools', () => {
+  const save = (over: Record<string, unknown>) =>
+    lib().saveArtifact({ kind: 'skill', name: 'deploy', description: 'Faz deploy', body: 'Corpo', ...over } as never);
+
+  it('ao criar, active define o modo pelo tipo: regra ativa em todo pedido, skill e agente pelo card, inativa fora de tudo', () => {
+    save({ kind: 'rule', name: 'r-ativa', active: true });
+    save({ kind: 'rule', name: 'r-inativa', active: false });
+    save({ kind: 'rule', name: 'r-padrao' });
+    save({ name: 's-ativa', active: true });
+    save({ name: 's-inativa', active: false });
+    save({ kind: 'agent', name: 'a-ativo', active: true });
+    save({ kind: 'agent', name: 'a-inativo', active: false });
+    const usage = (kind: 'rule' | 'skill' | 'agent', name: string) => get(kind, name)!.usage;
+    expect([usage('rule', 'r-ativa'), usage('rule', 'r-inativa'), usage('rule', 'r-padrao')]).toEqual(['always', 'off', 'off']);
+    expect([usage('skill', 's-ativa'), usage('skill', 's-inativa')]).toEqual(['contextual', 'off']);
+    expect([usage('agent', 'a-ativo'), usage('agent', 'a-inativo')]).toEqual(['contextual', 'off']);
+  });
+
+  it('editar não muda o modo, mesmo com active no pedido', () => {
+    save({ kind: 'rule', name: 'r', active: true });
+    const id = get('rule', 'r')!.id;
+    save({ id, kind: 'rule', name: 'r', body: 'novo', active: false });
+    expect(get('rule', 'r')).toMatchObject({ usage: 'always', body: 'novo' });
+    save({ name: 's', active: false });
+    save({ id: get('skill', 's')!.id, name: 's', active: true });
+    expect(get('skill', 's')!.usage).toBe('off');
+  });
+
+  it('grava versão, pasta e tools da skill; delegate sai; o padrão de versão é do tipo', () => {
+    save({ version: '1.2.0', folder: '/frontend/react/', tools: ['shell', 'read', 'delegate', 'read'] });
+    expect(get('skill', 'deploy')).toMatchObject({ version: '1.2.0', folder: 'frontend/react', tools: ['read', 'shell'] });
+    save({ kind: 'rule', name: 'r.md', version: '3' });
+    expect(get('rule', 'r.md')!.version).toBe('3');
+    save({ kind: 'rule', name: 'r2.md' });
+    save({ name: 'outra' });
+    expect([get('rule', 'r2.md')!.version, get('skill', 'outra')!.version]).toEqual(['1', '1.0.0']);
+    expect(lib().skillFolders()).toEqual(['frontend', 'frontend/react']);
+  });
+
+  it('recusa versão, pasta e tool inválidas sem gravar nada', () => {
+    expect(() => save({ version: '1.0' })).toThrow(/Versão inválida/);
+    expect(() => save({ kind: 'agent', name: 'a', version: 'v1' })).toThrow(/Versão inválida/);
+    expect(() => save({ kind: 'rule', name: 'r', version: 'com espaço' })).toThrow(/Versão inválida/);
+    expect(() => save({ folder: 'Frontend' })).toThrow(/pasta inválido/);
+    expect(() => save({ folder: 'a//b' })).toThrow(/pasta inválido/);
+    expect(() => save({ folder: '../fora' })).toThrow(/pasta inválido/);
+    expect(() => save({ tools: ['read', 'rm-rf'] })).toThrow(/Tools inválidas/);
+    expect(() => save({ tools: 'read' })).toThrow(/Tools inválidas/);
+    expect(get('skill', 'deploy')).toBeUndefined();
+    expect(get('rule', 'r')).toBeUndefined();
+  });
+
+  it('o agente guarda as categorias derivadas das tools e limpa a lista nativa da origem', () => {
+    save({
+      kind: 'agent',
+      name: 'dev',
+      tools: ['read', 'search', 'shell', 'delegate'],
+      agent: {
+        skills: [],
+        mcpServers: [],
+        model: '',
+        tools: { categories: ['edit'], native: { tool: 'claude', allow: ['Read', 'Bash'], deny: ['Write'] } },
+      },
+    });
+    const row = get('agent', 'dev')!;
+    expect(row.tools).toEqual(['read', 'search', 'shell', 'delegate']);
+    expect(row.agent!.tools).toEqual({ categories: ['read', 'run', 'agents'], native: { tool: '', allow: [], deny: [] } });
+  });
+
+  it('sem tools no pedido, o agente mantém as categorias e a lista nativa como vieram', () => {
+    const agent = {
+      skills: [],
+      mcpServers: [],
+      model: '',
+      tools: { categories: ['read'], native: { tool: 'claude', allow: ['Read'], deny: [] } },
+    };
+    save({ kind: 'agent', name: 'dev', agent });
+    expect(get('agent', 'dev')!.agent!.tools).toEqual(agent.tools);
+    // a derivação continua: categorias read viram read e search
+    expect(get('agent', 'dev')!.tools).toEqual(['read', 'search']);
+  });
+
+  it('addSkillFolder valida o caminho, aceita níveis e não duplica', () => {
+    lib().addSkillFolder(' /docs/guias/ ');
+    lib().addSkillFolder('docs/guias');
+    expect(lib().skillFolders()).toEqual(['docs', 'docs/guias']);
+    for (const bad of ['', '  ', 'Docs', 'a b', 'a//b', '../x', 'a_b']) expect(() => lib().addSkillFolder(bad)).toThrow(/pasta inválido/);
+    expect(lib().skillFolders()).toEqual(['docs', 'docs/guias']);
   });
 });

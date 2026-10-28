@@ -1,6 +1,6 @@
 import type { Card, FieldDef, FieldValue } from '../../../shared/model';
 import { modelDisplay } from '../../modelText';
-import { boardFieldNamed, isBoardField } from '../../../shared/boardFields';
+import { RULES_FIELD, boardFieldNamed, isBoardField } from '../../../shared/boardFields';
 import { MODEL_EFFORT_LABEL, suggestModel } from '../../../shared/models';
 import { fieldsForType, valueOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
@@ -14,7 +14,8 @@ import { t, dt } from '../../i18n';
 export function FieldsSection({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
   const fields = fieldsForType(state, card.typeId);
-  const board = fields.filter(isBoardField);
+  // o campo Rules não tem mais efeito: as regras ativas entram em todo contexto (o valor guardado fica)
+  const board = fields.filter((f) => isBoardField(f) && f.name.trim().toLowerCase() !== RULES_FIELD.toLowerCase());
   const custom = fields.filter((f) => !isBoardField(f));
 
   return (

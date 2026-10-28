@@ -78,6 +78,7 @@ export const geminiCliDriver: ToolDriver = {
   // a CLI não tem comando que liste modelos (0.65.0): a lista é a da API, com a mesma chave e o mesmo leitor do
   // modo API
   apiModels: (apiKey) => geminiApiDriver.apiModels!(apiKey),
+  availableModels: (apiKey) => geminiApiDriver.availableModels!(apiKey),
   measure: geminiCliProvider.measure,
   enforcement: toolModeEntry('gemini', 'cli')!.enforcement,
   transport: 'cli',

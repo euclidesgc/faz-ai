@@ -216,6 +216,11 @@ describe('servidor MCP', () => {
     expect(description('create_card')).toContain('o board confere antes de executar');
     expect(description('add_attachment')).toContain('`artifact: true`');
     expect(description('get_harness')).toContain('contexto vazio');
+    // ativo/inativo: o tipo decide o modo (regra always; skill e agente contextual; MCP os dois)
+    expect(description('set_harness_selection')).toContain('"off": inativo');
+    expect(description('set_harness_selection')).toContain('regra usa "always"');
+    expect(description('set_harness_selection')).toContain('skill e agente usam "contextual"');
+    expect(description('set_harness_selection')).not.toContain('campos Rules');
   });
 
   it('nenhum texto do MCP nem da skill do fluxo diz que o board lê os agentes da pasta da ferramenta (o board guarda a própria cópia)', async () => {
@@ -1802,7 +1807,9 @@ describe('vínculos entre cards', () => {
     console.log(`MEDIDA get_card #588: ${size} caracteres`);
     const notes = JSON.stringify(got, (k, v) => (k.endsWith('Note') ? v : typeof v === 'object' ? v : undefined));
     expect(notes.length).toBeLessThan(MAX_NOTES);
-    expect(got.harnessNote).toBeDefined();
+    expect(got.harnessNote).toContain('skills e agente só entre os ativos do board');
+    expect(got.harnessNote).toContain('regras ativas já vão em tudo');
+    expect(got.harnessNote).not.toContain('rules, MCPs e agente');
     expect(got.subtasksNowNote).toBeDefined();
     expect(got.phase.autonomousNote).toContain('faz-ai-modo-autonomo');
   });
@@ -2692,6 +2699,24 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(JSON.stringify(plain.data).length).toBeLessThan(1000);
   });
 
+  it('move_card para a conclusão recusa a sub-tarefa com item do checklist em aberto e aceita depois de marcado ou apagado', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: story.id, checklist: ['feito', 'não se aplica'] })).data;
+    const [done, dropped] = sub.checklistItems;
+    const refused = await call('move_card', { card: sub.id, column: 'Concluído', comment: 'pronto' });
+    expect(refused.error).toBe(true);
+    expect(refused.text).toContain('2 item(ns) do checklist em aberto');
+    expect(refused.text).toContain(done.itemId);
+    expect(await conversation(sub.id)).toHaveLength(0);
+    await call('update_checklist_item', { item_id: done.itemId, done: true });
+    await call('delete_checklist_item', { item_id: dropped.itemId });
+    const moved = (await call('move_card', { card: sub.id, column: 'Concluído' })).data;
+    expect(moved.card).toMatchObject({ column: 'Concluído', checklist: '1/1' });
+    // sair da conclusão ou ir para o cancelamento não depende do checklist
+    await call('add_checklist_item', { card: sub.id, text: 'novo' });
+    expect((await call('move_card', { card: sub.id, column: 'Em andamento' })).error).toBeFalsy();
+  });
+
   it('create_card com profile desconhecido é recusado antes de criar o card', async () => {
     const bad = await call('create_card', { title: 'x', profile: 'inexistente' });
     expect(bad.error).toBe(true);
@@ -2721,6 +2746,8 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(desc('move_card')).toContain('`comment`');
     expect(desc('create_card')).toContain('Devolve o card resumido');
     expect(desc('add_checklist_item')).toContain('`items`');
+    expect(desc('update_checklist_item')).toContain('recusa o card com item em aberto');
+    expect(desc('move_card')).toContain('o checklist do card não pode ter item em aberto');
     expect(desc('set_card_profile')).toContain('Devolve o card resumido');
   });
 });
