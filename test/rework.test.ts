@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { aiSignalsOf, panelRework, reworkOf, type BashSignalRow, type ReworkEventRow } from '../src/extension/log/rework';
+import { aiSignalsOf, panelRework, reworkOf, unfinishedOf, type BashSignalRow, type ReworkEventRow } from '../src/extension/log/rework';
 import { openInMemory } from '../src/extension/db/database';
 import path from 'node:path';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 import { formatRework } from '../src/extension/mcp/tools/metrics';
-import { EMPTY_REWORK, ZERO_SIGNAL } from '../src/shared/metrics';
+import { EMPTY_DELIVERY, EMPTY_REWORK, ZERO_SIGNAL, type MetricsDelivery } from '../src/shared/metrics';
 
 // Os sinais da IA (#605) são contas de outra função: nas fases do `reworkOf` vêm zerados.
 const noSignals = EMPTY_REWORK.aiSignals;
@@ -29,6 +29,7 @@ const row = (
   to,
   source: to === 'waiting_review' ? 'ai' : 'human',
   model: '',
+  agent: '',
   ...over,
 });
 
@@ -98,11 +99,110 @@ describe('reworkOf', () => {
   });
 });
 
+describe('reworkOf: o corte por agente (RF6) e os ajustes', () => {
+  const rows = [
+    row(1, 'PRD', 1100, 'running', 'waiting_review', { model: 'opus', agent: 'backend-node' }),
+    row(1, 'PRD', 1200, 'waiting_review', 'ready'),
+    row(2, 'PRD', 1100, 'running', 'waiting_review', { model: 'opus', agent: 'backend-node' }),
+    row(2, 'PRD', 1200, 'waiting_review', 'approved'),
+    row(3, 'PRD', 1100, 'running', 'waiting_review', { model: 'opus', agent: 'frontend-web' }),
+    row(3, 'PRD', 1200, 'waiting_review', 'approved'),
+    row(4, 'PRD', 1100, 'running', 'waiting_review'),
+    row(4, 'PRD', 1200, 'waiting_review', 'ready'),
+    // aprovação automática do modo autônomo: fora da conta
+    row(5, 'PRD', 1100, 'running', 'approved', { source: 'ai', agent: 'backend-node' }),
+  ];
+
+  it('conta revisões e ajustes por agente; "" = sem agente', () => {
+    const { agents } = reworkOf(rows, PERIOD);
+    expect(agents).toEqual([
+      { agent: 'backend-node', reviews: 2, adjusted: 1 },
+      { agent: '', reviews: 1, adjusted: 1 },
+      { agent: 'frontend-web', reviews: 1, adjusted: 0 },
+    ]);
+  });
+
+  it('adjustments traz também o ajuste anterior ao período, e nada depois do fim', () => {
+    const { adjustments, agents } = reworkOf(
+      [
+        row(7, 'Spec', 100, 'running', 'waiting_review', { model: 'opus', agent: 'backend-node' }),
+        row(7, 'Spec', 200, 'waiting_review', 'ready'),
+        row(8, 'Spec', 1100, 'running', 'waiting_review', { model: 'sonnet', agent: 'frontend-web' }),
+        row(8, 'Spec', 1200, 'waiting_review', 'ready'),
+      ],
+      PERIOD,
+    );
+    expect(adjustments).toEqual([
+      { cardNumber: 7, model: 'opus', agent: 'backend-node' },
+      { cardNumber: 8, model: 'sonnet', agent: 'frontend-web' },
+    ]);
+    // o corte por agente só conta o período
+    expect(agents).toEqual([{ agent: 'frontend-web', reviews: 1, adjusted: 1 }]);
+  });
+});
+
+describe('unfinishedOf (RF7)', () => {
+  it('3 de 10 sem resultado; unsupported e unknown entram só no total', () => {
+    const { models, agents } = unfinishedOf([
+      { model: 'opus', agent: 'a', outcome: 'completed', n: 4 },
+      { model: 'opus', agent: 'a', outcome: 'failed', n: 1 },
+      { model: 'opus', agent: 'b', outcome: 'timeout', n: 1 },
+      { model: 'opus', agent: 'b', outcome: 'stopped', n: 1 },
+      { model: 'opus', agent: 'b', outcome: 'unsupported', n: 2 },
+      { model: 'opus', agent: 'b', outcome: 'unknown', n: 1 },
+      { model: 'sonnet', agent: 'b', outcome: 'completed', n: 5 },
+    ]);
+    expect(models[0]).toEqual({ value: 'opus', runs: 10, unfinished: 3, failed: 1, timeout: 1, stopped: 1 });
+    expect(models[1]).toEqual({ value: 'sonnet', runs: 5, unfinished: 0, failed: 0, timeout: 0, stopped: 0 });
+    expect(agents.map((a) => [a.value, a.runs, a.unfinished])).toEqual([
+      ['b', 10, 2],
+      ['a', 5, 1],
+    ]);
+  });
+});
+
 describe('formatRework', () => {
+  it('traz por agente, execuções sem resultado, custo por entrega e a visão cruzada; null sai como "-"', () => {
+    const unfinished = (value: string, runs: number, n: number) => ({ value, runs, unfinished: n, failed: n, timeout: 0, stopped: 0 });
+    const delivery: MetricsDelivery = {
+      stories: 2,
+      measured: 1,
+      tokens: 1800,
+      groups: [{ type: 'Bug', effort: '', stories: 2, measured: 1, tokens: 1800, meanTokens: 1800, medianTokens: null }],
+      byModel: [{ type: 'Bug', value: 'sonnet', stories: 2, measured: 1, tokens: 1800, tokensPerStory: 1800, adjusted: 1 }],
+      byAgent: [{ type: 'Bug', value: '', stories: 2, measured: 0, tokens: null, tokensPerStory: null, adjusted: 0 }],
+      omitted: { groups: 0, byModel: 3, byAgent: 0 },
+    };
+    const text = formatRework(
+      {
+        ...EMPTY_REWORK,
+        phases: [{ phase: 'PRD', reviews: 3, approved: 2, adjusted: 1, resolved: 2, firstPass: 1, ...noSignals }],
+        agents: [{ agent: '', reviews: 2, adjusted: 1 }],
+        unfinished: { models: [unfinished('sonnet', 10, 3)], agents: [unfinished('backend-node', 4, 1)] },
+      },
+      delivery,
+    );
+    expect(text).toContain('por agente da execução que pediu a revisão');
+    expect(text).toContain('sem agente');
+    expect(text).toContain('execuções sem resultado (aproximação: falha, tempo esgotado ou interrompida;');
+    expect(text).toContain('3 de 10');
+    expect(text).toContain('1 de 4');
+    expect(text).toContain('custo por entrega: 2 histórias concluídas, 1 medidas, 1800 tokens (detalhe guardado');
+    expect(text).toMatch(/Bug\s+não definido\s+2\s+1\s+1800\s+1800\s+-/);
+    expect(text).toContain('visão cruzada (uma história com vários modelos/agentes conta para cada um)');
+    expect(text).toContain('+3 linha(s) fora do limite');
+    // sem história concluída, o custo por entrega e a visão cruzada viram uma linha só
+    const empty = formatRework(EMPTY_REWORK, EMPTY_DELIVERY);
+    expect(empty).toContain('custo por entrega: nenhuma história concluída no período');
+    expect(empty).not.toContain('visão cruzada');
+  });
+
   it('tabela compacta por fase e por modelo, e as histórias com bug', () => {
     const text = formatRework({
       phases: [{ phase: 'PRD', reviews: 3, approved: 2, adjusted: 1, resolved: 2, firstPass: 1, ...noSignals }],
       models: [{ model: '', reviews: 3, adjusted: 1 }],
+      agents: [],
+      unfinished: EMPTY_REWORK.unfinished,
       escapes: { ...noEscapes, stories: 4, withBugs: 1, bugs: 2 },
       aiSignals: EMPTY_REWORK.aiSignals,
     });
@@ -137,6 +237,8 @@ describe('formatRework', () => {
         },
       ],
       models: [],
+      agents: [],
+      unfinished: EMPTY_REWORK.unfinished,
       escapes: { stories: 4, withBugs: 1, bugs: 2, autonomousStories: 3, autonomousWithBugs: 1, autonomousBugs: 2 },
       aiSignals: { bashRuns: 5, reviewFixes: signal(3, 2, 1, 1), testFailures: signal(1, 1, 1, 1), commitsAfterPr: signal(2, 1, 0, 0) },
     });
@@ -282,5 +384,40 @@ describe('panelRework com banco: os sinais da IA e a parte autônoma dos escapes
     expect(rework.escapes).toEqual({ stories: 2, withBugs: 1, bugs: 1, autonomousStories: 1, autonomousWithBugs: 1, autonomousBugs: 1 });
     // fora do período: nada medido
     expect(panelRework(db, 'b', { start: 5000, end: 6000 }, '').aiSignals.bashRuns).toBe(0);
+  });
+});
+
+describe('panelRework com banco: agentes e execuções sem resultado', () => {
+  it('devolve agents e unfinished, ignora execução em andamento e respeita o workflow', async () => {
+    const db = await openInMemory(WASM_DIR);
+    db.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    const run = (id: string, model: string, agent: string, outcome: string | null, workflow: string, startedAt = 1500) =>
+      db.run(
+        'INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission, model, agent, outcome, workflow) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+        [id, 'b', startedAt, '2026-10', 'manual', 'claude', 'x', model, agent, outcome, workflow],
+      );
+    run('r1', 'opus', 'backend-node', 'completed', 'Histórias');
+    run('r2', 'opus', 'backend-node', 'failed', 'Histórias');
+    run('r3', 'opus', '', 'stopped', 'Sub-tarefas');
+    run('r4', 'opus', 'backend-node', null, 'Histórias');
+    run('r5', 'opus', 'backend-node', 'failed', 'Histórias', 5000);
+    const event = (id: string, at: number, from: string, to: string, runId: string | null, source: string) =>
+      db.run(
+        "INSERT INTO card_events (id, board_id, at, month, kind, card_id, card_number, card_title, card_type, workflow, author, source, column_name, from_value, to_value, run_id) VALUES (?,?,?,?,'status_changed','c',1,'x','História','Histórias','a',?,'PRD',?,?,?)",
+        [id, 'b', at, '2026-10', source, from, to, runId],
+      );
+    event('e1', 1100, 'running', 'waiting_review', 'r1', 'ai');
+    event('e2', 1200, 'waiting_review', 'ready', null, 'human');
+
+    const all = panelRework(db, 'b', PERIOD, '');
+    expect(all.agents).toEqual([{ agent: 'backend-node', reviews: 1, adjusted: 1 }]);
+    expect(all.unfinished.models).toEqual([{ value: 'opus', runs: 3, unfinished: 2, failed: 1, timeout: 0, stopped: 1 }]);
+    expect(all.unfinished.agents.map((a) => [a.value, a.runs, a.unfinished])).toEqual([
+      ['backend-node', 2, 1],
+      ['', 1, 1],
+    ]);
+    const sub = panelRework(db, 'b', PERIOD, 'Sub-tarefas');
+    expect(sub.agents).toEqual([]);
+    expect(sub.unfinished.models).toEqual([{ value: 'opus', runs: 1, unfinished: 1, failed: 0, timeout: 0, stopped: 1 }]);
   });
 });

@@ -15,6 +15,7 @@ commits na branch da história.
 - A branch é criada quando a IA começa a implementação (ela chama `prepare_workspace`) ou pelo
   botão **Criar branch da história** no card.
 - O card mostra a branch e abre a pasta de trabalho numa janela nova.
+- Abaixo da branch, a seção **Commits por fase** lista os commits da história (até 200) agrupados pela fase, com hash, assunto, data, card e run, lidos dos trailers `Faz-AI-Card`, `Faz-AI-Phase` e `Faz-AI-Run`. Commits sem fase ficam em **Sem fase**, por último. A lista é lida ao abrir o card e quando a branch muda, sem atualização periódica, e a seção some se não houver commits.
 - O modo (worktree, branch na própria pasta ou desligado), o padrão do nome da branch, a pasta das
   worktrees e o merge automático do PR ao aprovar a homologação ficam em **Configurações → Git**, e
   **tocar histórias em paralelo** em **Configurações → Automação**, no

@@ -1,3 +1,4 @@
+import type { CostBuckets } from './cost';
 import type { UsageLimitHint } from './usageLimit';
 
 // Vocabulário e tipos puros do log de utilização do board: eventos do card e execuções de IA.
@@ -130,13 +131,12 @@ export interface AiRunConsumption extends AiRunTokens {
   /** soma dos turnos de todos os segmentos; null = a ferramenta não informa */
   turns: number | null;
   sessionId: string | null;
-  /** null = não há custo: a ferramenta não o informou (o board nunca calcula por tabela de preços) */
+  /** informado pela ferramenta ou estimado pelo preço cadastrado no catálogo; null = sem custo */
   costUsd: number | null;
-  /**
-   * Só linhas antigas: true = o custo foi calculado pela tabela de preços que o board tinha. Nenhum leitor
-   * preenche isto mais; ausente = informado pela ferramenta.
-   */
+  /** true = `costUsd` foi estimado pelo preço do catálogo (o gateway, no fim da execução); ausente = informado pela ferramenta */
   costEstimated?: boolean;
+  /** custo de cada bucket pelo preço do catálogo, sempre estimativa; ausente/null = modelo sem preço, e null no bucket = sem preço nele */
+  costBuckets?: CostBuckets | null;
 }
 
 /** O que uma linha do inventário da execução conta. */

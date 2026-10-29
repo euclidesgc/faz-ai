@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
 vi.mock('../src/shared/metrics', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/shared/metrics')>()),
-  SHOW_COST: true,
   METRICS_MEASURES: ['cost', 'tokens', 'runs', 'duration'],
 }));
 import * as path from 'node:path';
@@ -186,7 +184,7 @@ describe('tokens medidos, custo não medido', () => {
 describe('formatMetrics: tokens medidos, custo não medido', () => {
   it('tokens com número, custo "-" e a nota de custo não medido', () => {
     run(at(2026, 6, 2), 1000, { tokens: 1234 });
-    const text = formatMetrics(getMetrics(db, boardId, RANGE), undefined);
+    const text = formatMetrics(getMetrics(db, boardId, RANGE), undefined, true);
     const line = text.split('\n').find((l) => l.startsWith('total'))!;
     expect(line).toMatch(/\b1234\b/);
     expect(line.trimEnd()).toMatch(/-$/);
@@ -198,7 +196,7 @@ describe('formatMetrics: tokens medidos, custo não medido', () => {
     run(at(2026, 6, 2), 1000, { tokens: 10, costUsd: 0.1 });
     run(at(2026, 6, 3), 1000, { tokens: 10 });
     run(at(2026, 6, 4), 1000);
-    const text = formatMetrics(getMetrics(db, boardId, RANGE), undefined);
+    const text = formatMetrics(getMetrics(db, boardId, RANGE), undefined, true);
     expect(text).toContain('custo parcial');
     expect(text).toContain('tokens parciais');
   });

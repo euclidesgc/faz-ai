@@ -481,6 +481,38 @@ const withoutNativeDelegation = <T extends { args: string[] }>(command: T): T =>
   return { ...command, args: [...command.args.slice(0, at), '--disallowedTools', 'Agent', 'Task', ...command.args.slice(at)] };
 };
 
+describe('consumptionLine: custo em dólar', () => {
+  const report = (costUsd: number | null, costEstimated?: boolean) =>
+    ({
+      measure: 'full',
+      consumption: {
+        inputTokens: 1,
+        outputTokens: 2,
+        cacheReadTokens: 3,
+        cacheWriteTokens: 4,
+        turns: null,
+        sessionId: null,
+        costUsd,
+        ...(costEstimated === undefined ? {} : { costEstimated }),
+      },
+      inventory: [],
+      answer: '',
+      reason: null,
+      usageLimitReached: false,
+    }) as never;
+
+  it('informado: US$ sem marca; estimado: US$ com (estimado)', () => {
+    expect(consumptionLine(report(0.12, false), {}, true)).toMatch(/ · US\$ 0,12$/);
+    expect(consumptionLine(report(0.12, true), {}, true)).toMatch(/ · US\$ 0,12 \(estimado\)$/);
+  });
+
+  it('sem a regra (ou sem custo) a linha não tem US$', () => {
+    expect(consumptionLine(report(0.12, true), {}, false)).not.toContain('US$');
+    expect(consumptionLine(report(0.12, true))).not.toContain('US$');
+    expect(consumptionLine(report(null), {}, true)).not.toContain('US$');
+  });
+});
+
 describe('executor da IA', () => {
   it('roda a ferramenta do projeto para o card e marca "Em execução"', () => {
     runner.start(storyId);
@@ -1643,6 +1675,65 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(card().status).toBe('waiting_answer');
   });
 
+  describe('posição na cadeia de fallback entre execuções (#1100)', () => {
+    const modelArg = (i: number) => {
+      const args = procs[i]!.command.args;
+      return args[args.indexOf('--model') + 1];
+    };
+    const mark = () => router.recordModelLimit('claude', 'sonnet', null, Date.now());
+
+    it('a troca automática grava a marca do modelo esgotado', () => {
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+      useSonnetMedium();
+      policyToFable();
+      runner.start(storyId, { origin: 'manual', onExit: vi.fn() });
+      procs[0]!.emit(usageLimitResult());
+      procs[0]!.exit(1);
+      expect(procs).toHaveLength(2);
+      expect(router.modelLimitList()).toMatchObject([{ profileId: 'claude', model: 'sonnet' }]);
+    });
+
+    it('terminar bem limpa a marca do modelo', () => {
+      useSonnetMedium();
+      mark();
+      runner.start(storyId, 'manual');
+      ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
+      procs[0]!.exit(0);
+      expect(router.modelLimitList()).toEqual([]);
+    });
+
+    it('a execução manual com marca chama o modelo pedido', () => {
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+      useSonnetMedium();
+      policyToFable();
+      mark();
+      runner.start(storyId, 'manual');
+      expect(modelArg(0)).toBe('sonnet');
+    });
+
+    it('o autopiloto com marca começa no destino e explica na conversa', () => {
+      useSonnetMedium();
+      policyToFable();
+      mark();
+      runner.start(storyId, 'autopilot');
+      expect(procs).toHaveLength(1);
+      expect(modelArg(0)).toBe('fable');
+      expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
+      expect(lastMessage()!.body).toMatch(
+        /^O `Sonnet 5\.5 - médio` está com o limite esgotado até as \d{2}:\d{2}; a execução começa com `Fable 5\.1 - baixo` pela regra de fallback\.$/,
+      );
+      expect(log.some((l) => l.includes('Política de execução: fallback'))).toBe(true);
+    });
+
+    it('com a pessoa no circuito (fora do modo autônomo e do autopiloto) a marca não muda o início', () => {
+      useSonnetMedium();
+      policyToFable();
+      mark();
+      runner.start(storyId, 'heartbeat');
+      expect(modelArg(0)).toBe('sonnet');
+    });
+  });
+
   it('a regra de modelo não troca nada sem política: o card volta para a IA (#551), sem segunda chamada', () => {
     useSonnetMedium();
     router.handle({
@@ -2046,7 +2137,7 @@ describe('consumptionLine', () => {
   });
 
   it('números em português, "turno" no singular, custo com duas a quatro casas', () => {
-    expect(consumptionLine(report())).toBe(
+    expect(consumptionLine(report(), {}, true)).toBe(
       'Consumo: 1.234 entrada · 5 saída · 0 leitura de cache · 1.000.000 criação de cache · 1 turno · US$ 1,50',
     );
   });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_METRICS_FILTERS,
+  EMPTY_DELIVERY,
   EMPTY_REWORK,
   ZERO_SIGNAL,
   resolvePeriod,
@@ -77,6 +78,20 @@ describe('resolvePeriod', () => {
 });
 
 describe('contrato do Retrabalho (#605)', () => {
+  it('EMPTY_REWORK traz os cortes por agente e as execuções sem resultado vazios; EMPTY_DELIVERY tem tokens null, nunca 0', () => {
+    expect(EMPTY_REWORK.agents).toEqual([]);
+    expect(EMPTY_REWORK.unfinished).toEqual({ models: [], agents: [] });
+    expect(EMPTY_DELIVERY).toEqual({
+      stories: 0,
+      measured: 0,
+      tokens: null,
+      groups: [],
+      byModel: [],
+      byAgent: [],
+      omitted: { groups: 0, byModel: 0, byAgent: 0 },
+    });
+  });
+
   it('EMPTY_REWORK traz os sinais da IA e a parte autônoma dos escapes zerados, com bashRuns = 0 (não medido)', () => {
     expect(EMPTY_REWORK.aiSignals).toEqual({
       bashRuns: 0,

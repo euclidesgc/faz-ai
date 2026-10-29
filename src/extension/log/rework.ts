@@ -10,8 +10,10 @@ import {
   ZERO_SIGNAL,
   type MetricsAiSignal,
   type MetricsRework,
+  type MetricsReworkAgent,
   type MetricsReworkModel,
   type MetricsReworkPhase,
+  type MetricsUnfinishedRow,
 } from '../../shared/metrics';
 import { all, num, str } from '../db/query';
 
@@ -25,6 +27,31 @@ export interface ReworkEventRow {
   to: string;
   source: 'human' | 'ai';
   model: string;
+  /** o agente da execução (`ai_runs.agent`); '' = sem agente */
+  agent: string;
+}
+
+/** Um ajuste pedido pela pessoa, com o modelo e o agente da execução que pediu a revisão. */
+export interface ReworkAdjustment {
+  cardNumber: number;
+  model: string;
+  agent: string;
+}
+
+/** Uma história concluída no período (a primeira conclusão cai nele), com o tipo atual. */
+export interface DoneStory {
+  id: string;
+  number: number;
+  doneAt: number;
+  type: string;
+}
+
+/** Execuções terminadas agrupadas por modelo, agente e resultado. */
+export interface UnfinishedRunRow {
+  model: string;
+  agent: string;
+  outcome: string;
+  n: number;
 }
 
 /** O período em ms, inclusive nas duas pontas. */
@@ -135,33 +162,44 @@ const emptyPhase = (phase: string): MetricsReworkPhase => ({
  * modelo da execução que pediu a revisão respondida. Os eventos antes do período só dão o contexto (o
  * modelo, se a fase já teve resposta): contam só os que caem nele.
  */
-export function reworkOf(rows: ReworkEventRow[], period: ReworkPeriod): Pick<MetricsRework, 'phases' | 'models'> {
+export function reworkOf(
+  rows: ReworkEventRow[],
+  period: ReworkPeriod,
+): Pick<MetricsRework, 'phases' | 'models' | 'agents'> & { adjustments: ReworkAdjustment[] } {
   const phases = new Map<string, MetricsReworkPhase>();
   const models = new Map<string, MetricsReworkModel>();
   const phaseOf = (name: string) => phases.get(name) ?? phases.set(name, emptyPhase(name)).get(name)!;
   const modelOf = (name: string) => models.get(name) ?? models.set(name, { model: name, reviews: 0, adjusted: 0 }).get(name)!;
-  const seen = new Map<string, { model: string; answered: boolean }>();
+  const agents = new Map<string, MetricsReworkAgent>();
+  const agentOf = (name: string) => agents.get(name) ?? agents.set(name, { agent: name, reviews: 0, adjusted: 0 }).get(name)!;
+  const adjustments: ReworkAdjustment[] = [];
+  const seen = new Map<string, { model: string; agent: string; answered: boolean }>();
   const sorted = [...rows].sort((a, b) => a.cardNumber - b.cardNumber || a.at - b.at);
   for (const row of sorted) {
     const key = `${row.cardNumber}\u0000${row.phase}`;
-    const passage = seen.get(key) ?? seen.set(key, { model: '', answered: false }).get(key)!;
+    const passage = seen.get(key) ?? seen.set(key, { model: '', agent: '', answered: false }).get(key)!;
     const inPeriod = row.at >= period.start && row.at <= period.end;
     if (row.to === 'waiting_review') {
       passage.model = row.model;
+      passage.agent = row.agent;
       if (inPeriod) {
         phaseOf(row.phase).reviews++;
         modelOf(row.model).reviews++;
+        agentOf(row.agent).reviews++;
       }
       continue;
     }
     const answer = row.from === 'waiting_review' && row.source === 'human' && (row.to === 'approved' || row.to === 'ready');
     if (!answer) continue;
+    // o ajuste conta para a visão cruzada em qualquer data até o fim do período
+    if (row.to === 'ready') adjustments.push({ cardNumber: row.cardNumber, model: passage.model, agent: passage.agent });
     if (inPeriod) {
       const p = phaseOf(row.phase);
       if (row.to === 'approved') p.approved++;
       else {
         p.adjusted++;
         modelOf(passage.model).adjusted++;
+        agentOf(passage.agent).adjusted++;
       }
       if (!passage.answered) {
         p.resolved++;
@@ -173,7 +211,48 @@ export function reworkOf(rows: ReworkEventRow[], period: ReworkPeriod): Pick<Met
   return {
     phases: [...phases.values()].filter((p) => p.reviews || p.approved || p.adjusted),
     models: [...models.values()].filter((m) => m.reviews || m.adjusted).sort((a, b) => b.adjusted - a.adjusted || b.reviews - a.reviews),
+    agents: [...agents.values()].filter((a) => a.reviews || a.adjusted).sort((a, b) => b.adjusted - a.adjusted || b.reviews - a.reviews),
+    adjustments,
   };
+}
+
+/**
+ * As execuções sem resultado por modelo e por agente. Só entram as com `outcome` (as em andamento não):
+ * `failed`, `timeout` e `stopped` são "sem resultado"; `unsupported` e `unknown` contam só no total.
+ * Ordem: mais sem resultado primeiro, depois mais execuções.
+ */
+export function unfinishedOf(rows: UnfinishedRunRow[]): MetricsRework['unfinished'] {
+  const pack = (key: 'model' | 'agent'): MetricsUnfinishedRow[] => {
+    const map = new Map<string, MetricsUnfinishedRow>();
+    for (const r of rows) {
+      const value = r[key];
+      const row = map.get(value) ?? map.set(value, { value, runs: 0, unfinished: 0, failed: 0, timeout: 0, stopped: 0 }).get(value)!;
+      row.runs += r.n;
+      if (r.outcome === 'failed' || r.outcome === 'timeout' || r.outcome === 'stopped') {
+        row[r.outcome] += r.n;
+        row.unfinished += r.n;
+      }
+    }
+    return [...map.values()].sort((a, b) => b.unfinished - a.unfinished || b.runs - a.runs);
+  };
+  return { models: pack('model'), agents: pack('agent') };
+}
+
+/**
+ * As histórias cuja primeira conclusão cai no período, com o tipo atual (Bug incluídos), no recorte de
+ * workflow do evento `done`. Quem precisa de outro recorte filtra o resultado.
+ */
+export function doneStories(db: Database, boardId: string, period: ReworkPeriod, workflow: string): DoneStory[] {
+  const wf = workflow ? ' AND e.workflow = ?' : '';
+  return all(
+    db,
+    `SELECT e.card_id AS id, c.number AS number, MIN(e.at) AS done_at, t.name AS type FROM card_events e
+     JOIN cards c ON c.id = e.card_id JOIN card_types t ON t.id = c.type_id
+     WHERE e.board_id = ? AND e.kind = 'done' AND c.parent_id IS NULL AND c.deleted_at IS NULL${wf} GROUP BY e.card_id`,
+    [boardId, ...(workflow ? [workflow] : [])],
+  )
+    .map((r) => ({ id: str(r.id), number: num(r.number), doneAt: num(r.done_at), type: str(r.type) }))
+    .filter((r) => r.doneAt >= period.start && r.doneAt <= period.end);
 }
 
 /**
@@ -184,15 +263,8 @@ export function reworkOf(rows: ReworkEventRow[], period: ReworkPeriod): Pick<Met
  * dela terminar, não.
  */
 function escapes(db: Database, boardId: string, period: ReworkPeriod, workflow: string): MetricsRework['escapes'] {
-  const wf = workflow ? ' AND e.workflow = ?' : '';
-  const stories = all(
-    db,
-    `SELECT e.card_id AS id, MIN(e.at) AS done_at, t.name AS type FROM card_events e
-     JOIN cards c ON c.id = e.card_id JOIN card_types t ON t.id = c.type_id
-     WHERE e.board_id = ? AND e.kind = 'done' AND c.parent_id IS NULL AND c.deleted_at IS NULL${wf} GROUP BY e.card_id`,
-    [boardId, ...(workflow ? [workflow] : [])],
-  ).filter((r) => num(r.done_at) >= period.start && num(r.done_at) <= period.end && norm(str(r.type)) !== 'bug');
-  const doneAt = new Map(stories.map((r) => [str(r.id), num(r.done_at)]));
+  const stories = doneStories(db, boardId, period, workflow).filter((r) => norm(r.type) !== 'bug');
+  const doneAt = new Map(stories.map((r) => [r.id, r.doneAt]));
   if (!doneAt.size) return { stories: 0, withBugs: 0, bugs: 0, autonomousStories: 0, autonomousWithBugs: 0, autonomousBugs: 0 };
   const bugsOf = new Map<string, Set<string>>();
   const ids = [...doneAt.keys()];
@@ -236,24 +308,24 @@ function escapes(db: Database, boardId: string, period: ReworkPeriod, workflow: 
 }
 
 /**
- * O retrabalho do período, no recorte de workflow do painel (`card_events` guarda o workflow). Duas
+ * Os eventos de status que valem para o retrabalho, até `end`, no recorte de workflow ('' = todos). Duas
  * mudanças de status não são resposta à revisão: a que vem de mover o card de coluna (o status recomeça
  * na coluna nova; arrastar o card que aguardava revisão não é aprovar nem pedir ajuste) e a que vem de
  * ligar o modo autônomo (que libera a revisão pendente sem ninguém ler). Elas saem pelo `column_changed`
  * ou `yolo_changed` gravado junto, na mesma mensagem (mesmo card, mesmo instante). A exceção é a aprovação:
  * desde a #441 ela leva o card à coluna seguinte na mesma mensagem, e continua sendo a resposta da pessoa.
  */
-export function panelRework(db: Database, boardId: string, period: ReworkPeriod, workflow: string): MetricsRework {
+export function reviewEventRows(db: Database, boardId: string, end: number, workflow: string): ReworkEventRow[] {
   const wf = workflow ? ' AND e.workflow = ?' : '';
   const events = all(
     db,
-    `SELECT e.kind, e.card_number, e.column_name, e.at, e.from_value, e.to_value, e.source, r.model
+    `SELECT e.kind, e.card_number, e.column_name, e.at, e.from_value, e.to_value, e.source, r.model, r.agent
      FROM card_events e LEFT JOIN ai_runs r ON r.id = e.run_id
      WHERE e.board_id = ? AND e.kind IN ('status_changed', 'column_changed', 'yolo_changed') AND e.at <= ?${wf}`,
-    [boardId, period.end, ...(workflow ? [workflow] : [])],
+    [boardId, end, ...(workflow ? [workflow] : [])],
   );
   const moves = new Set(events.filter((r) => str(r.kind) !== 'status_changed').map((r) => `${num(r.card_number)}:${num(r.at)}`));
-  const rows: ReworkEventRow[] = events
+  return events
     .filter((r) => str(r.kind) === 'status_changed' && (str(r.to_value) === 'approved' || !moves.has(`${num(r.card_number)}:${num(r.at)}`)))
     .map((r) => ({
       cardNumber: num(r.card_number),
@@ -263,8 +335,14 @@ export function panelRework(db: Database, boardId: string, period: ReworkPeriod,
       to: str(r.to_value),
       source: str(r.source) === 'ai' ? 'ai' : 'human',
       model: str(r.model),
+      agent: str(r.agent),
     }));
-  const { phases, models } = reworkOf(rows, period);
+}
+
+/** O retrabalho do período, no recorte de workflow do painel (`card_events` guarda o workflow). */
+export function panelRework(db: Database, boardId: string, period: ReworkPeriod, workflow: string): MetricsRework {
+  const rows = reviewEventRows(db, boardId, period.end, workflow);
+  const { phases, models, agents } = reworkOf(rows, period);
   const { total, byPhase } = aiSignalsOf(bashSignalRows(db, boardId, period, workflow), period);
   // funde os sinais nas fases das revisões; uma fase só com sinal de Bash entra também
   const merged = new Map(phases.map((p) => [p.phase, p]));
@@ -272,7 +350,14 @@ export function panelRework(db: Database, boardId: string, period: ReworkPeriod,
     if (signals.bashRuns === 0) continue;
     merged.set(phase, { ...(merged.get(phase) ?? emptyPhase(phase)), ...signals });
   }
-  return { phases: [...merged.values()], models, escapes: escapes(db, boardId, period, workflow), aiSignals: total };
+  return {
+    phases: [...merged.values()],
+    models,
+    agents,
+    unfinished: unfinishedOf(unfinishedRunRows(db, boardId, period, workflow)),
+    escapes: escapes(db, boardId, period, workflow),
+    aiSignals: total,
+  };
 }
 
 /**
@@ -304,4 +389,16 @@ function bashSignalRows(db: Database, boardId: string, period: ReworkPeriod, wor
     failed: num(r.failed),
     ...(r.pr_at == null ? {} : { prAt: num(r.pr_at) }),
   }));
+}
+
+/** As execuções com resultado registrado, iniciadas no período, agrupadas por modelo, agente e resultado. */
+function unfinishedRunRows(db: Database, boardId: string, period: ReworkPeriod, workflow: string): UnfinishedRunRow[] {
+  const wf = workflow ? ' AND r.workflow = ?' : '';
+  return all(
+    db,
+    `SELECT r.model, r.agent, r.outcome, COUNT(*) AS n FROM ai_runs r
+     WHERE r.board_id = ? AND r.outcome IS NOT NULL AND r.started_at >= ? AND r.started_at <= ?${wf}
+     GROUP BY r.model, r.agent, r.outcome`,
+    [boardId, period.start, period.end, ...(workflow ? [workflow] : [])],
+  ).map((r) => ({ model: str(r.model), agent: str(r.agent), outcome: str(r.outcome), n: num(r.n) }));
 }

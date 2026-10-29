@@ -1,11 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-// o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
-vi.mock('../src/shared/metrics', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../src/shared/metrics')>()),
-  SHOW_COST: true,
-  METRICS_MEASURES: ['cost', 'tokens', 'runs', 'duration'],
-}));
 import { formatMetrics, isoDateArg } from '../src/extension/mcp/tools/metrics';
 import type { MetricsResult } from '../src/extension/log/metrics';
 
@@ -22,7 +16,7 @@ const BASE: MetricsResult = {
 describe('formatMetrics', () => {
   it('nunca produz JSON (RF-08): sem chaves nem colchetes de abertura', () => {
     const result: MetricsResult = { ...BASE, rows: [{ label: 'total', runs: 2, durationMs: 4000, tokens: 300, costUsd: 0.03 }] };
-    const text = formatMetrics(result, undefined);
+    const text = formatMetrics(result, undefined, true);
     expect(text.trimStart()).not.toMatch(/^[{[]/);
     expect(text).toContain('total');
   });
@@ -32,7 +26,7 @@ describe('formatMetrics', () => {
       ...BASE,
       rows: [{ label: 'sql-queries', runs: 2, durationMs: 0, tokens: undefined, costUsd: undefined, calls: 3 }],
     };
-    const text = formatMetrics(result, 'skill');
+    const text = formatMetrics(result, 'skill', true);
     expect(text).not.toMatch(/tokens|custo/);
     expect(text).toContain('usos');
   });
@@ -43,22 +37,36 @@ describe('formatMetrics', () => {
       rows: [{ label: 'PRD', runs: 1, durationMs: 0, tokens: null, costUsd: null }],
       costPartial: true,
     };
-    const text = formatMetrics(result, 'phase');
+    const text = formatMetrics(result, 'phase', true);
     const line = text.split('\n').find((l) => l.startsWith('PRD'))!;
     expect(line).toContain('-');
     expect(line).not.toMatch(/\b0\b/);
   });
 
   it('sem linhas, declara a cobertura em vez de devolver vazio', () => {
-    const text = formatMetrics(BASE, undefined);
+    const text = formatMetrics(BASE, undefined, true);
     expect(text).toContain('nenhum grupo no recorte');
     expect(text).toContain('2026-01-01');
   });
 
   it('declara meses arquivados e parciais quando existem', () => {
     const result: MetricsResult = { ...BASE, archivedMonths: ['2024-03'], partialMonths: ['2024-03'] };
-    const text = formatMetrics(result, undefined);
+    const text = formatMetrics(result, undefined, true);
     expect(text).toContain('2024-03');
+  });
+});
+
+describe('formatMetrics: regra "Mostrar custo em dólar"', () => {
+  const rows = [{ label: 'PRD', runs: 1, durationMs: 0, tokens: 100, costUsd: 0.5 }];
+  it('ligada: coluna custo e a linha do estimado', () => {
+    const text = formatMetrics({ ...BASE, rows }, 'phase', true, 0.2);
+    expect(text.split('\n')[0]).toMatch(/custo/);
+    expect(text).toContain('US$ 0.50');
+    expect(text).toContain('estimado pelo preço do catálogo: US$ 0.20');
+  });
+  it('desligada: sem coluna de custo nem linha do estimado', () => {
+    const text = formatMetrics({ ...BASE, rows }, 'phase', false, 0.2);
+    expect(text).not.toMatch(/custo|US\$|estimado/);
   });
 });
 
@@ -69,7 +77,7 @@ describe('formatMetrics: dimensões de configuração e inventário (#169)', () 
       rows: [{ label: 'alto', runs: 1, durationMs: 0, tokens: null, costUsd: null }],
       costPartial: true,
     };
-    const text = formatMetrics(result, dim);
+    const text = formatMetrics(result, dim, true);
     expect(text).toMatch(/tokens/);
     expect(text).toMatch(/custo/);
     const line = text.split('\n').find((l) => l.startsWith('alto'))!;
@@ -82,7 +90,7 @@ describe('formatMetrics: dimensões de configuração e inventário (#169)', () 
       ...BASE,
       rows: [{ label: 'Bash', runs: 2, durationMs: 0, tokens: undefined, costUsd: undefined, calls: 5 }],
     };
-    const text = formatMetrics(result, 'used_tool');
+    const text = formatMetrics(result, 'used_tool', true);
     expect(text).toContain('usos');
     expect(text).not.toMatch(/tokens|custo|servidor/);
   });
@@ -92,7 +100,7 @@ describe('formatMetrics: dimensões de configuração e inventário (#169)', () 
       ...BASE,
       rows: [{ label: 'get_card', server: 'faz-ai', runs: 2, durationMs: 0, tokens: undefined, costUsd: undefined, calls: 4 }],
     };
-    const text = formatMetrics(result, 'mcp_tool');
+    const text = formatMetrics(result, 'mcp_tool', true);
     expect(text.split('\n')[0]).toMatch(/^grupo\s+servidor\s+execuções\s+usos/);
     expect(text.split('\n')[1]).toMatch(/^get_card\s+faz-ai\s+2\s+4/);
   });
@@ -102,7 +110,7 @@ describe('formatMetrics: dimensões de configuração e inventário (#169)', () 
       ...BASE,
       rows: [{ label: 'x', server: '', runs: 1, durationMs: 0, tokens: undefined, costUsd: undefined, calls: 1 }],
     };
-    expect(formatMetrics(result, 'mcp_tool')).toContain('servidor não registrado');
+    expect(formatMetrics(result, 'mcp_tool', true)).toContain('servidor não registrado');
   });
 });
 

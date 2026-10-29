@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 51;
+export const SCHEMA_VERSION = 52;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -652,6 +652,14 @@ const MIGRATIONS: Record<number, string> = {
     DROP TABLE IF EXISTS activity_context_selections;
     DROP TABLE IF EXISTS agent_context_contracts;
   `,
+  52: `
+    -- #1104: custo de cada bucket pelo preço do catálogo, congelado no fim da execução (RF-30). NULL = sem
+    -- preço naquele bucket, ou execução anterior a esta versão: nada é recalculado nem inventado.
+    ALTER TABLE ai_runs ADD COLUMN cost_input_usd REAL;
+    ALTER TABLE ai_runs ADD COLUMN cost_output_usd REAL;
+    ALTER TABLE ai_runs ADD COLUMN cost_cache_read_usd REAL;
+    ALTER TABLE ai_runs ADD COLUMN cost_cache_write_usd REAL;
+  `,
 };
 
 /**
@@ -708,6 +716,14 @@ export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
     );
     CREATE UNIQUE INDEX activity_context_target ON activity_context_selections
       (board_id, COALESCE(card_id, ''), COALESCE(workflow_id, ''), phase_id, action);
+  `,
+  52: `
+    -- a versão anterior não lê o custo por bucket; cost_usd e cost_estimated seguem como estão (as execuções
+    -- com custo estimado continuam legíveis nela, que só as esconde)
+    ALTER TABLE ai_runs DROP COLUMN cost_cache_write_usd;
+    ALTER TABLE ai_runs DROP COLUMN cost_cache_read_usd;
+    ALTER TABLE ai_runs DROP COLUMN cost_output_usd;
+    ALTER TABLE ai_runs DROP COLUMN cost_input_usd;
   `,
 };
 

@@ -12,16 +12,17 @@ import {
   newChain,
   runTargetOfPolicy,
   scopeDigest,
+  startPosition,
   type Chain,
+  type StartPosition,
 } from './policyGate';
 import type { ContextAction } from '../shared/executionAction';
 import { cardRef } from '../shared/model';
-import { canDispatch, limitClock, limitHolds, nextPause, pauseOf, resetAtOf } from '../shared/usageLimit';
+import { canDispatch, limitClock, limitHolds, modelLimitHolds, modelLimitOf, nextPause, pauseOf, resetAtOf } from '../shared/usageLimit';
 import { limitChoice } from '../shared/limitChoice';
 import { activityKindOf } from '../shared/activity';
 import { STORY_SESSION_ADVICE } from './unitAdvice';
 import type { AiRunOrigin, RunReport } from '../shared/log';
-import { SHOW_COST } from '../shared/metrics';
 import { exceedsRunLimit, RUN_CACHE_READ_LIMIT } from '../shared/runLimit';
 import { columnOf, isLive } from '../shared/selectors';
 import { isAtYoloStop, isWithHuman, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../shared/story';
@@ -179,7 +180,7 @@ const USD = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFr
  * terminou antes do fim); `explained` diz que o motivo já foi escrito no canal (a volta para texto)
  * e não precisa se repetir; sem nenhum dos dois vale o motivo do relatório.
  */
-export function consumptionLine(report: RunReport, why: { reason?: string | null; explained?: boolean } = {}): string {
+export function consumptionLine(report: RunReport, why: { reason?: string | null; explained?: boolean } = {}, showCost = false): string {
   const c = report.consumption;
   if (c) {
     const parts = [
@@ -188,7 +189,7 @@ export function consumptionLine(report: RunReport, why: { reason?: string | null
       `${COUNT.format(c.cacheReadTokens)} leitura de cache`,
       `${COUNT.format(c.cacheWriteTokens)} criação de cache`,
       ...(c.turns !== null ? [`${COUNT.format(c.turns)} ${c.turns === 1 ? 'turno' : 'turnos'}`] : []),
-      ...(SHOW_COST && c.costUsd !== null ? [`US$ ${USD.format(c.costUsd)}`] : []),
+      ...(showCost && c.costUsd !== null ? [`US$ ${USD.format(c.costUsd)}${c.costEstimated ? ' (estimado)' : ''}`] : []),
     ];
     return `${report.measure === 'partial' ? 'Consumo parcial' : 'Consumo'}: ${parts.join(' · ')}`;
   }
@@ -335,6 +336,36 @@ const MODE_ACTION: Record<AiRunMode, ContextAction> = {
   reply: 'work',
 };
 
+/** A troca por limite acontece sem perguntar à pessoa: autopiloto ou modo autônomo. */
+const switchesAlone = (state: BoardState, card: Card, origin: AiRunOrigin): boolean => origin === 'autopilot' || isYolo(state, card);
+
+/**
+ * O que a troca por política precisa preservar: permissão, regime e o escopo (agente, skills, MCPs, ferramentas).
+ * Usada na execução e na posição de partida, para as duas não divergirem. `executionPlan` precisa continuar puro
+ * (sem efeito colateral), porque a partida o calcula antes do spawn.
+ */
+function constraintsOf(
+  state: BoardState,
+  plan: ReturnType<typeof executionPlan>,
+  permission: RunnerPermission,
+  target: RunTarget,
+): ExecutionConstraints {
+  return {
+    permission,
+    // o regime do perfil que roda esta tentativa (a ciência dele no Conectar, ou o do board)
+    regime: admissionRegimeOf(state.board.runner, target.cli.id).regime,
+    agentId: plan.manifest.agent && SAFE_ID.test(plan.manifest.agent) ? plan.manifest.agent : null,
+    scopeDigest: scopeDigest([
+      plan.manifest.agent,
+      plan.manifest.skills,
+      plan.manifest.rules,
+      plan.manifest.mcpServers,
+      plan.manifest.tools,
+      plan.manifest.deniedTools,
+    ]),
+  };
+}
+
 /** O que a IA recebe ao ser chamada para um card. O ciclo completo está na skill do fluxo e nas instruções do servidor MCP. */
 export const cardPrompt = (
   ref: string,
@@ -437,7 +468,7 @@ export class AiRunner {
         `${resolved.block.message} A execução não troca de perfil nem de modelo sozinha: corrija ${SOURCE_LABEL[resolved.block.source]}.`,
       );
     // o resumo roda na faixa "Alto" do perfil do card, qualquer que seja o Esforço dele (RF12)
-    const target = mode === 'summarize' && !forceTarget ? highTierTarget(state, resolved.target) : resolved.target;
+    let target = mode === 'summarize' && !forceTarget ? highTierTarget(state, resolved.target) : resolved.target;
     // CLI ausente ou sem login confirmado pelo probe (preventivo, RF1): só os cards deste perfil recusam, e nenhum gatilho gasta
     // uma execução. O sinal reativo (`expired`) não recusa a manual: heartbeat.ts/autopilot.ts o recusam por conta própria
     // (RF8), e a execução manual que dá certo o limpa (RF9, em settle()) — sem essa válvula, ele nunca mais sairia de `true`
@@ -450,12 +481,57 @@ export class AiRunner {
     const gated = origin !== 'manual' && !forceTarget;
     const held = pauseOf(state, target.cli.id);
     if (gated && held && !canDispatch(state, target.cli.id, Date.now())) throw new UsageLimitHeld(target.cli.id, held.resumeAt, toolName);
-    const tool = toolInfo(target.cli);
-    const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
     const refine = mode === 'refine';
     const summarize = mode === 'summarize';
     const conflict = mode === 'conflict';
     const reply = mode === 'reply';
+    // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo.
+    // A execução de conflito segue a permissão (e o modelo) da fase: precisa de git e das checagens, como ela
+    const autonomous = !refine && !summarize && isYolo(state, card);
+    // refinar e resumir não mexem em arquivos: rodam só com o board
+    const permission: RunnerPermission = autonomous ? 'full' : refine || summarize ? 'board' : state.board.runner.permission;
+    const safe = (id: string | null | undefined): string | null => (id && SAFE_ID.test(id) ? id : null);
+    const phaseId = safe(columnOf(state, storyOf(state, card) ?? card)?.id);
+    // a posição de partida (#1100): o modelo pedido esgotou e a regra de fallback já trocava sozinha; a execução começa no
+    // destino. Só onde a troca já é automática; a manual testa o pedido e o "seguir com" da pessoa não é desviado
+    let position: StartPosition | null = null;
+    if (!forceTarget && !options.chain && origin !== 'manual' && switchesAlone(state, card, origin)) {
+      const now = Date.now();
+      const marks = this.router.modelLimitList();
+      if (modelLimitHolds(marks, target.cli.id, target.model?.name ?? null, now)) {
+        try {
+          // `executionPlan` precisa continuar puro (sem efeito colateral): aqui ele roda uma vez a mais, só para as restrições
+          const plan = executionPlan(
+            state,
+            card,
+            this.router.libraryMcpDefinitions(),
+            boardServer(this.deps),
+            target,
+            this.deps.gateway.cursorHookReady?.(),
+          );
+          position = startPosition({
+            state,
+            snapshot: this.router.executionPolicyLibrary().snapshot,
+            requested: target,
+            exhausted: (t) => modelLimitHolds(marks, t.cli.id, t.model?.name ?? null, now) || limitHolds(state, t.cli.id, now),
+            now,
+            action: MODE_ACTION[mode],
+            origin,
+            agentId: plan.manifest.agent && SAFE_ID.test(plan.manifest.agent) ? plan.manifest.agent : null,
+            phaseId,
+            cardTypeId: safe(card.typeId),
+            constraints: constraintsOf(state, plan, permission, target),
+            runningProfiles: [...this.runs.values()].map((r) => r.profile.id),
+          });
+        } catch {
+          position = null;
+        }
+      }
+    }
+    const requestedTarget = target;
+    if (position) target = position.target;
+    const tool = toolInfo(target.cli);
+    const log = (text: string) => this.deps.log(`[${cardRef(card)}] ${text}`);
     const messagesBefore = this.aiMessages(cardId);
     const tail: string[] = [];
     // conhecidos antes do gateway.run, para a projeção publicada depois (ver `info` abaixo)
@@ -468,11 +544,10 @@ export class AiRunner {
     let activityModel: string | null = null;
     let activityEffort: string | null = null;
     // o contexto que as políticas casam e as restrições da execução (a troca precisa mantê-las), preenchidas com o plano
-    const safe = (id: string | null | undefined): string | null => (id && SAFE_ID.test(id) ? id : null);
     const policy: Run['policy'] = {
       action: MODE_ACTION[mode],
       agentId: null,
-      phaseId: safe(columnOf(state, story ?? card)?.id),
+      phaseId,
       cardTypeId: safe(card.typeId),
       constraints: null,
     };
@@ -506,11 +581,6 @@ export class AiRunner {
             target,
             this.deps.gateway.cursorHookReady?.(),
           );
-          // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo.
-          // A execução de conflito segue a permissão (e o modelo) da fase: precisa de git e das checagens, como ela
-          const autonomous = !refine && !summarize && isYolo(state, card);
-          // refinar e resumir não mexem em arquivos: rodam só com o board
-          const permission = autonomous ? 'full' : refine || summarize ? 'board' : state.board.runner.permission;
           const permissionAdvice = refine || summarize ? null : PERMISSION_ADVICE[permission];
           const stopAdvice = autonomous && !conflict ? yoloStopAdvice(state, card) : null;
           // a sessão da história numa fase de código só cria as sub-tarefas: quem as executa é o board
@@ -528,20 +598,7 @@ export class AiRunner {
           activityEffort = plan.manifest.model?.effort ?? null;
           policy.agentId = plan.manifest.agent && SAFE_ID.test(plan.manifest.agent) ? plan.manifest.agent : null;
           // o que a troca por política precisa preservar: permissão, regime e o escopo (agente, skills, MCPs, ferramentas)
-          policy.constraints = {
-            permission,
-            // o regime do perfil que roda esta tentativa (a ciência dele no Conectar, ou o do board)
-            regime: admissionRegimeOf(state.board.runner, target.cli.id).regime,
-            agentId: policy.agentId,
-            scopeDigest: scopeDigest([
-              plan.manifest.agent,
-              plan.manifest.skills,
-              plan.manifest.rules,
-              plan.manifest.mcpServers,
-              plan.manifest.tools,
-              plan.manifest.deniedTools,
-            ]),
-          };
+          policy.constraints = constraintsOf(state, plan, permission, target);
           return {
             // o perfil personalizado (inclusive ACP) precisa da admissão por capacidades
             ...(!isReadyCli(target.cli)
@@ -642,13 +699,14 @@ export class AiRunner {
       tail,
       info,
       target,
-      chain: options.chain ?? newChain(target, exec.startedAt),
+      chain: options.chain ?? position?.chain ?? newChain(target, exec.startedAt),
       policy,
       origin,
     };
     this.runs.set(cardId, run);
+    if (position) this.announcePosition(cardId, state, requestedTarget, position, log);
     // a primeira execução depois da pausa é o teste: as outras do perfil esperam ela terminar
-    const probing = gated && !!held;
+    const probing = gated && !!held && !position;
     if (probing) this.router.setLimitProbe(target.cli.id, cardId);
     this.setStatus(cardId, 'running', tool.label);
     this.publish();
@@ -673,6 +731,8 @@ export class AiRunner {
             : end.format !== 'text' && (end.stopped || end.timedOut || end.error || end.code !== 0)
               ? { reason: 'a execução terminou antes de informar o consumo.' }
               : {},
+          // a regra é lida no fim da execução: ligar ou desligar vale da próxima linha em diante
+          this.router.snapshot().board.rules.showCost,
         ),
       );
       log(runCheckLine(end.check));
@@ -699,6 +759,9 @@ export class AiRunner {
         }
         // terminou sem esbarrar no limite: a pausa do perfil acaba (a execução manual também a limpa)
         if (!end.report.usageLimitReached && !end.stopped && !end.error && end.code === 0) this.router.clearUsageLimit(run.profile.id);
+        // o modelo respondeu sem esbarrar no limite: a marca dele sai (é assim que a execução manual o testa)
+        if (!end.report.usageLimitReached && !end.stopped && !end.error && end.code === 0)
+          this.router.clearModelLimit(run.target.cli.id, run.target.model?.name ?? null);
       } finally {
         if (probing) this.router.setLimitProbe(run.profile.id, null);
         // a limpeza precisa acontecer antes da retentativa: start() recusa começar com o card ainda em `this.runs`
@@ -878,6 +941,11 @@ export class AiRunner {
         const principal = targetDisplay(state, run.target);
         const fallback = targetDisplay(state, next);
         const crossed = run.target.cli.id !== next.cli.id;
+        // a próxima execução automática começa no destino, sem chamar o modelo esgotado de novo (#1100)
+        if (run.target.model) {
+          const at = Date.now();
+          this.router.recordModelLimit(run.target.cli.id, run.target.model.name, resetAtOf(end.report.usageLimitHint, at), at);
+        }
         this.router.handle(
           {
             type: 'comment.add',
@@ -938,7 +1006,32 @@ export class AiRunner {
     this.block(cardId, `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card.${output}`);
   }
 
-  /** A decisão do avaliador único para o limite de uso que esgotou nesta execução (ver `evaluateRunPolicy`). */
+  /** O log e a conversa explicam por que a execução começa noutro modelo que o pedido (RF11, RF12). */
+  private announcePosition(
+    cardId: string,
+    state: BoardState,
+    requested: RunTarget,
+    position: StartPosition,
+    log: (text: string) => void,
+  ): void {
+    log(describeDecision(position.decision));
+    const first = position.skipped[0] ?? requested;
+    const now = Date.now();
+    const mark = modelLimitOf(this.router.modelLimitList(), first.cli.id, first.model?.name ?? null);
+    const resumeAt = mark?.resumeAt ?? pauseOf(state, first.cli.id)?.resumeAt ?? now;
+    const crossed = first.cli.id !== position.target.cli.id;
+    const from = `\`${targetDisplay(state, first)}\`${crossed ? ` do ${profileLabel(state.board, first.cli.id)}` : ''}`;
+    const to = `\`${targetDisplay(state, position.target)}\`${crossed ? ` no ${profileLabel(state.board, position.target.cli.id)}` : ''}`;
+    this.router.handle(
+      {
+        type: 'comment.add',
+        cardId,
+        body: `O ${from} está com o limite esgotado até as ${limitClock(resumeAt, now)}; a execução começa com ${to} pela regra de fallback.`,
+      },
+      { author: RUNNER_AUTHOR, source: 'ai' },
+    );
+  }
+
   /**
    * O limite de uso esgotou num card com a pessoa no circuito: o perfil fica pausado (nenhuma execução automática
    * volta a ele antes da renovação) e o card pergunta a ela se espera o limite voltar ou segue com outro modelo que
@@ -949,7 +1042,7 @@ export class AiRunner {
   private askOnLimit(cardId: string, run: Run, end: AiRunEnd, decision: PolicyDecision | null, toolLabel: string, output: string): boolean {
     const state = this.router.snapshot();
     const card = state.cards.find((c) => c.id === cardId);
-    if (!card || run.origin === 'autopilot' || isYolo(state, card)) return false;
+    if (!card || switchesAlone(state, card, run.origin)) return false;
     const now = Date.now();
     const preferred = [decision?.target, ...(decision?.alternatives ?? [])]
       .filter((t): t is NonNullable<typeof t> => !!t)

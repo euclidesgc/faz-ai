@@ -149,14 +149,16 @@ cache, o número de turnos e o id da sessão da ferramenta. Registra também o *
 IA usou: ferramentas nativas, ferramentas de MCP (com o servidor de cada uma), subagentes e skills,
 com a contagem de chamadas.
 
-- **O consumo é medido em tokens; o board não mostra custo em dólar.** As duas ferramentas informam
-  os tokens: no Claude Code, entrada, saída, leitura e criação de cache, por modelo, com os subagentes;
-  no Cursor, os mesmos quatro contadores. Só o Claude Code informa também o custo em dólar, e o Cursor
-  não; um total em dólar que cobrisse só parte das execuções confundiria mais do que ajudaria, e uma
-  tabela de preços envelheceria a cada mudança de tarifa. Por isso, por enquanto, o board mostra só
-  tokens. O valor em dólar que o Claude Code informa continua gravado no banco, para poder voltar
-  depois sem perder o histórico. Onde aparecer "não medido" é isso, falta de medição, e nunca
-  consumo zero.
+- **O consumo é medido em tokens e, com a regra "Mostrar custo em dólar" ligada, também em dólar.** As
+  duas ferramentas informam os tokens: no Claude Code, entrada, saída, leitura e criação de cache, por
+  modelo, com os subagentes; no Cursor, os mesmos quatro contadores. Só o Claude Code informa também o
+  custo em dólar. Quando a ferramenta não informa, o board estima o custo pelo preço por milhão de
+  tokens que a pessoa cadastrou para o modelo no catálogo (`upsert_model`, ou a tela de Modelos), bucket
+  por bucket (entrada, saída, leitura e criação de cache); o preço vale da próxima execução em diante, e
+  um bucket com tokens e sem preço deixa o total estimado em branco. O custo informado pela ferramenta
+  sempre vale mais que o estimado. A regra **Mostrar custo em dólar** (`showCost` em `update_rules`)
+  vem ligada; desligada, o dólar some (quem usa assinatura costuma preferir só tokens), mas os dados
+  seguem gravados. Onde aparecer "não medido" é isso, falta de medição, e nunca consumo zero.
 - **Toda execução passa por uma única porta.** O executor de cards (manual, heartbeat e modo
   autônomo) e o chat do board chamam a IA pelo mesmo ponto do código (`AiGateway`), que abre a linha
   no log antes de rodar, fecha com o desfecho e grava o consumo. Cada ferramenta tem um provider
@@ -293,12 +295,17 @@ economizar tokens.
 - Nas dimensões **agent**, **skill**, **used_tool**, **mcp_tool** e **bash_command** a tabela mostra
   só a contagem de execuções e de usos (sem tokens, que não é possível repartir entre componentes de
   uma execução). `effort`, `profile` e `mode` têm tokens.
-- Tokens contam em toda execução medida, do Claude Code e do Cursor. A tabela não traz custo em dólar.
+- Tokens contam em toda execução medida, do Claude Code e do Cursor. Com a regra "Mostrar custo em dólar" ligada, a tabela ganha a coluna `custo` e, abaixo dela, a linha do estimado pelo preço do catálogo (só sem filtro de card, fase, tipo, modelo ou ferramenta); desligada, não traz dólar.
 - Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`. O retrabalho está:
   com `rework: true` (e, se quiser, `start_date` e `end_date`), a resposta traz as revisões, as
-  aprovações de primeira e os pedidos de ajuste por fase e por modelo, as histórias concluídas com bug
+  aprovações de primeira e os pedidos de ajuste por fase, por modelo e por agente, as histórias concluídas com bug
   vinculado e os sinais da IA (correções na Revisão, `npm test` com falha, commits depois do PR), cada
-  um com a parte do modo autônomo; "não medidos" quando não há execução com registro de Bash.
+  um com a parte do modo autônomo; "não medidos" quando não há execução com registro de Bash. Vêm também
+  as execuções sem resultado por modelo e por agente (`3 de 10`; é uma aproximação: falha, tempo esgotado ou
+  interrompida, e uma interrompida pode ter deixado trabalho útil) e o custo por entrega: os tokens por história
+  concluída, por tipo e esforço, e a visão tipo × modelo e tipo × agente. Avisos: o detalhe guardado vale só dentro
+  da retenção (histórias antigas podem ter consumo parcial), o esforço é o valor atual do campo e uma
+  história com vários modelos ou agentes conta para cada um. Sem história concluída, essas duas partes viram uma linha só.
 - Valores não medidos aparecem como "-" (nunca 0).
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
   (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm
