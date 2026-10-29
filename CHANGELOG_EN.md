@@ -6,6 +6,7 @@
 
 ### Added
 
+- After a model runs out of limit and the rule switches on its own, the next runs and chats already start at the destination (#1100).
 - A per-model price in the catalog (`upsert_model`) estimates the US$ cost of runs without a reported cost; the "Show cost in dollars" rule turns it off for subscription users (#1104).
 - The US$ cost shows in the Usage tab and in Metrics, with the estimate marked, and each model's price is edited in Settings › Connect agents (#1195).
 - The open card shows the story branch commits grouped by phase (hash, subject, date, card and run), read from the `Faz-AI-*` trailers; the section is hidden when there are no commits.

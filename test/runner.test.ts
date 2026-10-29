@@ -1669,6 +1669,65 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(card().status).toBe('waiting_answer');
   });
 
+  describe('posição na cadeia de fallback entre execuções (#1100)', () => {
+    const modelArg = (i: number) => {
+      const args = procs[i]!.command.args;
+      return args[args.indexOf('--model') + 1];
+    };
+    const mark = () => router.recordModelLimit('claude', 'sonnet', null, Date.now());
+
+    it('a troca automática grava a marca do modelo esgotado', () => {
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+      useSonnetMedium();
+      policyToFable();
+      runner.start(storyId, { origin: 'manual', onExit: vi.fn() });
+      procs[0]!.emit(usageLimitResult());
+      procs[0]!.exit(1);
+      expect(procs).toHaveLength(2);
+      expect(router.modelLimitList()).toMatchObject([{ profileId: 'claude', model: 'sonnet' }]);
+    });
+
+    it('terminar bem limpa a marca do modelo', () => {
+      useSonnetMedium();
+      mark();
+      runner.start(storyId, 'manual');
+      ai({ type: 'comment.add', cardId: storyId, body: 'Feito.' });
+      procs[0]!.exit(0);
+      expect(router.modelLimitList()).toEqual([]);
+    });
+
+    it('a execução manual com marca chama o modelo pedido', () => {
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+      useSonnetMedium();
+      policyToFable();
+      mark();
+      runner.start(storyId, 'manual');
+      expect(modelArg(0)).toBe('sonnet');
+    });
+
+    it('o autopiloto com marca começa no destino e explica na conversa', () => {
+      useSonnetMedium();
+      policyToFable();
+      mark();
+      runner.start(storyId, 'autopilot');
+      expect(procs).toHaveLength(1);
+      expect(modelArg(0)).toBe('fable');
+      expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
+      expect(lastMessage()!.body).toMatch(
+        /^O `Sonnet 5\.5 - médio` está com o limite esgotado até as \d{2}:\d{2}; a execução começa com `Fable 5\.1 - baixo` pela regra de fallback\.$/,
+      );
+      expect(log.some((l) => l.includes('Política de execução: fallback'))).toBe(true);
+    });
+
+    it('com a pessoa no circuito (fora do modo autônomo e do autopiloto) a marca não muda o início', () => {
+      useSonnetMedium();
+      policyToFable();
+      mark();
+      runner.start(storyId, 'heartbeat');
+      expect(modelArg(0)).toBe('sonnet');
+    });
+  });
+
   it('a regra de modelo não troca nada sem política: o card volta para a IA (#551), sem segunda chamada', () => {
     useSonnetMedium();
     router.handle({

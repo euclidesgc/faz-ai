@@ -414,6 +414,14 @@ Opus 5.5 esgota a cota"), o que o board **usa no lugar** ("Gemini · API · Pro,
 Auto") e **como** (troca sozinho ou pergunta antes), com o interruptor para ligar e desligar, subir,
 descer, editar e remover.
 
+Quando a regra troca sozinha, o board guarda que aquele modelo esgotou, até a renovação do limite (ou
+pelo tempo de espera, quando a ferramenta não informa a hora). As execuções automáticas seguintes
+(autopiloto e modo autônomo) e as conversas do chat já começam no destino da regra, sem chamar o modelo
+esgotado de novo, e o card explica na conversa por que rodou noutro modelo. Esgotado o destino também, o
+board segue a lista da regra; depois do horário, a primeira execução volta ao modelo pedido. A execução
+manual sempre testa o modelo pedido, e uma execução que termina bem nele tira a marca. Com a pessoa no
+circuito, a marca não muda o início, e **seguir com** continua valendo como escolhido.
+
 **Montar nova regra** abre o editor na própria tela, em três passos:
 
 1. **Quando este modelo esgotar a cota**: o modelo que falha, entre os modelos do agente da tela.

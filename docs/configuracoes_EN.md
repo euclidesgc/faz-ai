@@ -441,6 +441,15 @@ shows **when** ("Claude Code · CLI · Opus 5.5 runs out of quota"), what the bo
 ("Gemini · API · Pro, then Cursor · CLI · Auto") and **how** (switches by itself or asks first), with
 the switch to enable and disable, move up, move down, edit and remove.
 
+When the rule switches by itself, the board remembers that the model ran out, until the limit renews
+(or for the wait time, when the tool does not report the hour). The next automatic runs (autopilot and
+autonomous mode) and chat conversations already start at the rule's target, without calling the
+exhausted model again, and the card explains in the conversation why it ran on another model. If the
+target is exhausted too, the board follows the rule's list; after the time, the first run goes back to
+the requested model. A manual run always tests the requested model, and a run that finishes well on it
+clears the mark. With a person in the loop, the mark does not change the start, and **continue with**
+still holds as chosen.
+
 **Montar nova regra** (build new rule) opens the editor on the same screen, in three steps:
 
 1. **When this model runs out of quota**: the model that fails, among the models of the agent on the
