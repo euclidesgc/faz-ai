@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EMPTY_REWORK } from '../src/shared/metrics';
+import { formatRework } from '../src/extension/mcp/tools/metrics';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -1910,6 +1911,13 @@ describe('retrabalho pelo get_metrics e no painel', () => {
     expect(text).toContain('retrabalho por fase');
     expect(text).toContain('1 de 2');
     expect(text).toContain('histórias concluídas no período: 2; com bug vinculado: 1 (1 bug(s))');
+
+    // RF14: as seções novas vêm do mesmo cálculo do painel, no mesmo período
+    const { delivery } = router.panelMetrics({}).sections;
+    expect(delivery.stories).toBeGreaterThan(0);
+    expect(text).toContain(`custo por entrega: ${delivery.stories} histórias concluídas, ${delivery.measured} medidas, - tokens`);
+    expect(text).toContain('visão cruzada (uma história com vários modelos/agentes conta para cada um)');
+    expect(formatRework(rework, delivery)).toBe(text);
   });
 });
 

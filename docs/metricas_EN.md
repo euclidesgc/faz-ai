@@ -380,9 +380,14 @@ tokens.
 - Tokens count in every measured run, from Claude Code and from Cursor. With the "Show cost in dollars" rule on, the table gains a `custo` column and, below it, the line estimated from the catalog price (only without card, phase, type, model or tool filters); when off, it has no dollar figure.
 - The panel's times (permanence per phase and lead time) are not in `get_metrics`. Rework is: with
   `rework: true` (and, if you want, `start_date` and `end_date`), the answer brings the reviews, the
-  first-try approvals and the change requests per phase and per model, the done stories with a
+  first-try approvals and the change requests per phase, per model and per agent, the done stories with a
   linked bug and the AI signals (fixes in Review, failed `npm test`, commits after the PR), each with
-  the autonomous-mode part; "not measured" when there is no run with recorded Bash.
+  the autonomous-mode part; "not measured" when there is no run with recorded Bash. It also brings the
+  runs without a result per model and per agent (`3 de 10`; an approximation: failed, timed out or
+  stopped, and a stopped run may have left useful work) and the delivery cost: tokens per done story, by
+  type and effort, and the type × model and type × agent view. Notes: the kept detail only holds within
+  the retention window (old stories may have partial consumption), effort is the field's current value and
+  a story with several models or agents counts for each one. With no done story, these two parts become a single line.
 - Unmeasured values appear as "-" (never 0).
 - Always tells you when the board's history started and which periods have only monthly totals
   (without per-run detail). Periods outside the retention window (6 months by default) have no
