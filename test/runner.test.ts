@@ -36,6 +36,7 @@ import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { gatewayFor } from './helpers/gateway';
 import { executionPlan } from '../src/extension/execution';
+import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from '../src/extension/unitAdvice';
 import { FLOW_LINE } from '../src/extension/promptContext';
 
 /** O contexto de um pedido sem nada marcado no board: só a linha do fluxo. */
@@ -482,6 +483,31 @@ const withoutNativeDelegation = <T extends { args: string[] }>(command: T): T =>
 };
 
 describe('executor da IA', () => {
+  it('a sessão da história na Implementação: a elegível à trilha direta recebe o pedido de implementar; a que não é (ou na Revisão) recebe o de criar sub-tarefas', () => {
+    const prompt = () => {
+      const c = procs.at(-1)!.command as { stdin?: string; args: string[] };
+      return `${c.stdin ?? ''}\n${c.args.join('\n')}`;
+    };
+    const s = router.snapshot();
+    const wf = s.workflows.find((w) => w.kind === 'parent')!;
+    const bug = s.cardTypes.find((t) => t.name === 'Bug')!;
+    const story = s.cardTypes.find((t) => t.defaultWorkflowId === wf.id && t.name !== 'Bug')!;
+    const column = (name: string) => s.columns.find((c) => c.workflowId === wf.id && c.name === name)!.id;
+    const start = (typeId: string, columnName: string) => {
+      const id = router.createCard({ typeId, columnId: column(columnName), parentId: null, title: columnName });
+      router.handle({ type: 'card.update', cardId: id, patch: {} });
+      runner.start(id);
+      return prompt();
+    };
+    router.handle({ type: 'settings.rules.update', patch: { shortTrack: true } });
+    expect(start(bug.id, 'Implementação')).toContain(DIRECT_TRACK_ADVICE);
+    expect(start(story.id, 'Implementação')).toContain(STORY_SESSION_ADVICE);
+    expect(start(story.id, 'Implementação')).not.toContain(DIRECT_TRACK_ADVICE);
+    expect(start(bug.id, 'Revisão')).toContain(STORY_SESSION_ADVICE);
+    router.handle({ type: 'settings.rules.update', patch: { shortTrack: false } });
+    expect(start(bug.id, 'Implementação')).toContain(STORY_SESSION_ADVICE);
+  });
+
   it('roda a ferramenta do projeto para o card e marca "Em execução"', () => {
     runner.start(storyId);
     expect(procs).toHaveLength(1);

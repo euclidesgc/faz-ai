@@ -162,6 +162,12 @@ export function registerBoardRulesTools(tool: DefineTool): void {
         .describe('História não avança de coluna enquanto houver sub-tarefas em aberto cuja Fase é a coluna atual'),
       onCancelParent: z.enum(['ask', 'cascade', 'keep']).optional().describe('Sub-tarefas em aberto quando a história é cancelada'),
       onAllChildrenDone: z.enum(['ask', 'auto', 'off']).optional().describe('História quando a última sub-tarefa em aberto é concluída'),
+      shortTrack: z
+        .boolean()
+        .optional()
+        .describe(
+          'Trilha curta: história de esforço Baixo ou do tipo Bug pula o PRD e a Spec e, com plano de até uns 3 arquivos, é implementada sem sub-tarefas',
+        ),
       confirmTrash: z.enum(['whenDependents', 'always', 'never']).optional(),
       confirmArchive: z.enum(['whenDependents', 'always', 'never']).optional(),
       autoApplyModelSuggestion: z

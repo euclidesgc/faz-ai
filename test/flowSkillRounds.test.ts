@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FLOW_TEXT } from './flowSkillText';
 import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 import { MCP_INSTRUCTIONS } from '../src/extension/mcp/server';
+import { FLOW_SKILLS } from '../src/extension/flowSkill';
 
 // As rodadas da Implementação, como a skill do fluxo e a nota de `subtasksNow` no get_card as ensinam.
 
@@ -14,6 +15,14 @@ describe('rodadas da Implementação', () => {
     expect(implementacao).toContain('byBoard');
     expect(implementacao).toContain('withPerson');
     expect(implementacao).toMatch(/uma vez\*\*, para o fechamento/);
+  });
+
+  it('a skill das rodadas abre a exceção da trilha direta antes do "crie-as", com o limite de uns 3 arquivos e o motivo na conversa', () => {
+    const rodadas = FLOW_SKILLS.find((s) => s.name === 'faz-ai-implementacao-rodadas')!;
+    expect(rodadas.description).toContain('trilha direta');
+    expect(rodadas.body).toContain('exceto na trilha direta');
+    expect(rodadas.body.indexOf('Na trilha direta')).toBeLessThan(rodadas.body.indexOf('crie-as a partir da descrição'));
+    expect(rodadas.body).toMatch(/Na trilha direta[\s\S]*implementa[\s\S]*uns 3 arquivos[\s\S]*registre o motivo na conversa/);
   });
 
   it('nenhum texto que a IA lê manda executar sub-tarefa pela ferramenta Agent ou por subagente', () => {
