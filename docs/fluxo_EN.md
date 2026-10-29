@@ -86,7 +86,8 @@ turn back to the AI.
 The instructions and document templates of the default board ask, in each phase, for what makes the
 code review quick later:
 
-- **Short track for small stories.** With the rule on (Settings → Rules; off by default), a story
+- **Short track for small stories.** With the rule on (Settings → Rules; a new board starts with it on and existing boards keep the
+  person's choice), a story
   with **Baixo** (low) effort or of type **Bug** approved in Discovery, or advanced by the autopilot,
   goes straight to Plan, skipping PRD and Spec, and the Plan starts from the DISCOVERY. The rule reads
   the current effort and type at each advance: if Discovery finds the story is bigger than it looked,
@@ -94,6 +95,14 @@ code review quick later:
   story, drag it (or ask the AI to move it with `move_card`) to PRD or Spec: an explicit move is never
   redirected. The skipped columns are recognized by the document they produce (PRD.md and SPEC.md),
   so renaming them does not turn the rule off.
+- **Direct track.** In a short-track story whose plan touches up to about 3 files, the Plan creates
+  no sub-tasks. In Implementation, the story session itself prepares the workspace, implements,
+  verifies as the project defines, commits and moves the story to Review. If the change grows beyond
+  that, the AI creates the sub-tasks with Fase = Implementation, records the reason in the
+  conversation and stops, and the board follows the normal flow. The independent Review still
+  applies. If the session ends without advancing the story or creating work, the story pauses with
+  the usual notice. Implementation is recognized by position (the first code column, without a
+  document), so renaming the columns changes nothing.
 - **Spec with the program design.** Besides the architecture, the Spec brings the new or changed
   types and signatures, the file of each one and who calls whom on the main path, with the feature
   flow in Mermaid diagrams. Discarded alternatives come with the reason for each one.

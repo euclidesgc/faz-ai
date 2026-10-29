@@ -80,14 +80,22 @@ a IA.
 As instruções e os modelos de documento do board padrão pedem, em cada fase, o que deixa a revisão
 do código rápida depois:
 
-- **Trilha curta para histórias pequenas.** Com a regra ligada (Configurações → Regras; desligada
-  por padrão), uma história de esforço **Baixo** ou do tipo **Bug** aprovada no Discovery, ou levada
+- **Trilha curta para histórias pequenas.** Com a regra ligada (Configurações → Regras; o board novo
+  nasce com ela ligada e os boards existentes mantêm a escolha da pessoa), uma história de esforço **Baixo** ou do tipo **Bug** aprovada no Discovery, ou levada
   adiante pelo autopiloto, vai direto ao Plan, sem PRD nem Spec, e o Plan parte do DISCOVERY. A regra
   lê o esforço e o tipo atuais a cada avanço: se o Discovery descobre que a história é maior do que
   parecia, a IA sobe o esforço e a história segue a trilha completa. Para forçar a trilha completa
   numa história pequena, arraste-a (ou peça à IA que a mova com `move_card`) para o PRD ou a Spec: o
   movimento explícito nunca é redirecionado. As colunas puladas são reconhecidas pelo documento que
   produzem (PRD.md e SPEC.md), então renomeá-las não desliga a regra.
+- **Trilha direta.** Numa história da trilha curta, quando o plano toca até uns 3 arquivos, o Plan
+  não cria sub-tarefas. Na Implementação, a própria sessão da história prepara a pasta de trabalho,
+  implementa, verifica como o projeto define, faz o commit e move a história para a Revisão. Se a
+  mudança crescer além disso, a IA cria as sub-tarefas com Fase = Implementação, registra o motivo
+  na conversa e para, e o board segue o fluxo normal. A Revisão independente continua valendo. Se a
+  sessão terminar sem avançar a história nem criar trabalho, a história pausa com o aviso de sempre.
+  A Implementação é reconhecida pela posição (a primeira coluna de código, sem documento), então
+  renomear as colunas não muda nada.
 - **Spec com o desenho do programa.** Além da arquitetura, a Spec traz os tipos e as assinaturas
   novos ou alterados, o arquivo de cada um e quem chama quem no caminho principal, com o fluxo da
   funcionalidade em diagramas Mermaid. As alternativas descartadas vêm com o motivo de cada uma.
