@@ -72,6 +72,7 @@
 - The isolation proof now counts for every permission and survives an editor restart.
 - **Refine with AI** no longer keeps the previous description text (#1076).
 - The AI receives at most the last 20 conversation messages (#1076).
+- The selected card stands out in relief, with a shadow to the right and below.
 
 ### Removed
 
