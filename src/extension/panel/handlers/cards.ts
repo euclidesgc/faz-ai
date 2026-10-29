@@ -27,6 +27,12 @@ function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author:
   const note = msg.note?.trim() ?? '';
   if (msg.status === 'approved' && byAi) throw new Error('Só uma pessoa pode aprovar um card.');
   if (msg.status === 'blocked' && !note) throw new Error('Informe o motivo do bloqueio.');
+  // a devolução do status anterior (`restore` do runner) só grava o status: não é aprovação nova, então não
+  // dispara o merge nem avança a história, e não mexe no modo autônomo (#1102)
+  if (msg.restore && !byAi) {
+    ctx.cards.setStatus(msg.cardId, msg.status, msg.status === 'blocked' ? note : '', author);
+    return;
+  }
   // a história chegou à coluna até onde a pessoa liberou o modo autônomo: o pedido de revisão é para ela
   const yolo = ctx.cards.isYolo(msg.cardId);
   const state = yolo ? ctx.state() : null;

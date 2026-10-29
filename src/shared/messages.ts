@@ -186,6 +186,12 @@ export type WebviewToHost =
       pending?: boolean;
       /** grava o motivo sem repeti-lo na conversa: a devolução de um bloqueio que já tinha sido explicado */
       quiet?: boolean;
+      /**
+       * devolve o status que o card tinha antes de uma execução interrompida: só grava o status, sem aprovação
+       * nova (o `approved` restaurado não dispara o merge nem avança a história) e sem mexer no modo autônomo.
+       * Só o runner marca; a IA, pelo MCP, não repassa esta marca.
+       */
+      restore?: boolean;
     }
   /** muda o status de trabalho de vários cards de uma vez; aplica só aos cards vivos da lista e reusa o
    * fluxo de `card.status.set` (comentário do motivo, aprovação com avanço automático) */

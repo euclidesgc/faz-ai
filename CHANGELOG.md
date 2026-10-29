@@ -107,6 +107,7 @@
 - No Cursor, o erro da execução (como o limite de uso) não fica mais escondido atrás de "o encerramento da árvore de processos ainda não foi confirmado".
 - A mensagem de limite do Gemini diz qual cota acabou e a hora em que volta.
 - O modelo que a API do Gemini lista mas recusa para a conta (HTTP 404) sai da lista de modelos e não volta pelo **Detectar modelos**; a mensagem traz o motivo do Google.
+- Uma execução interrompida não aprova a história de novo nem a avança no modo autônomo (#1102).
 - O **Detectar modelos** do Gemini confere cada modelo na API e só lista os que a conta pode usar.
 - O chat num modelo que saiu do catálogo passa para o mais novo do mesmo agente.
 - O resultado do teste rápido fica também no log "Faz AI".

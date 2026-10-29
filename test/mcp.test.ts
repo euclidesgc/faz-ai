@@ -2046,6 +2046,17 @@ describe('modo autônomo (YOLO)', () => {
     expect((await call('move_card', { card: 1, column: 'Plan' })).error).toBe(true);
   });
 
+  it('até onde: na coluna de parada, a IA só sai depois de a pessoa aprovar (status approved)', async () => {
+    await call('create_card', { title: 'Login', column: 'Spec' });
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('Spec').id });
+    expect((await call('move_card', { card: 1, column: 'Plan' })).error).toBe(true);
+
+    // a aprovação que o board não pôde avançar deixa o status `approved`: aí a IA pode mover
+    (router as any).ctx.cards.setStatus(card(1).id, 'approved', '', 'Pessoa');
+    expect((await call('move_card', { card: 1, column: 'Plan' })).error).toBe(false);
+    expect(card(1).columnId).toBe(column('Plan').id);
+  });
+
   it('até onde: só colunas da IA da atual em diante; a última vale como "até o fim"; com o modo ligado, só muda a parada', async () => {
     await call('create_card', { title: 'Login', column: 'Spec' });
     expect(() => router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('PRD').id })).toThrow(
