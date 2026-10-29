@@ -10,6 +10,7 @@
 - At the end of a Codex (ACP agent) run, the board reads the quota usage (5 h and weekly windows) from the newest rollout in `$CODEX_HOME/sessions` (or `~/.codex/sessions`) and hands it over in the run report for early switching; any read failure becomes "unknown" (#1210).
 - After a model runs out of limit and the rule switches on its own, the next runs and chats already start at the destination (#1100).
 - A per-model price in the catalog (`upsert_model`) estimates the US$ cost of runs without a reported cost; the "Show cost in dollars" rule turns it off for subscription users (#1104).
+- The US$ cost shows in the Usage tab and in Metrics, with the estimate marked, and each model's price is edited in Settings › Connect agents (#1195).
 - The open card shows the story branch commits grouped by phase (hash, subject, date, card and run), read from the `Faz-AI-*` trailers; the section is hidden when there are no commits.
 - New board artifact library in Settings › Harness › Board artifacts: each rule, skill, agent and MCP server is active or inactive, with counter, search, filter and a skill folder tree.
 - The **New rule**, **New skill** and **New agent** forms open with a template, tools and live frontmatter, skill and agent compatibility and an export preview.

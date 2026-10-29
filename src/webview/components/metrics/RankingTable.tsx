@@ -30,7 +30,7 @@
  * `CardRanking` e `PhaseRanking`, no fim do arquivo, são os dois usos com `MetricsCell`.
  */
 import { useMemo, useState, type ReactNode } from 'react';
-import { METRICS_ROW_CAP, SHOW_COST, type MetricsCell } from '../../../shared/metrics';
+import { METRICS_ROW_CAP, type MetricsCell } from '../../../shared/metrics';
 import { t, tn } from '../../i18n';
 import type { MetricsSort } from '../../store/boardStore';
 import { Button, IconArrowDown, IconArrowUp } from '../ui';
@@ -249,17 +249,18 @@ export function othersOf(covered: Measures, shown: Measures[]): Measures {
 }
 
 /**
- * O critério padrão de um ranking (RF-22): o consumo medido do período (custo, com `SHOW_COST`; senão
+ * O critério padrão de um ranking (RF-22): o consumo medido do período (custo, com a regra `showCost` ligada; senão
  * tokens), e o tempo de IA quando nada foi medido. Decidido aqui, a partir do coberto da própria
  * resposta, e escrito na tela com o motivo (RF-21).
  */
-export function defaultCellSort(covered: Measures): MetricsSort {
-  if (hasMeasuredCost(covered)) return { key: 'cost', dir: 'desc' };
-  return hasMeasuredTokens(covered) ? { key: 'tokens', dir: 'desc' } : { key: 'duration', dir: 'desc' };
+export function defaultCellSort(covered: Measures, showCost: boolean): MetricsSort {
+  if (hasMeasuredCost(covered, showCost)) return { key: 'cost', dir: 'desc' };
+  return hasMeasuredTokens(covered, showCost) ? { key: 'tokens', dir: 'desc' } : { key: 'duration', dir: 'desc' };
 }
 
-const hasMeasuredCost = (covered: Measures): boolean => SHOW_COST && covered.costedRuns > 0 && covered.costUsd !== null;
-const hasMeasuredTokens = (covered: Measures): boolean => !SHOW_COST && covered.measuredRuns > 0 && covered.tokens !== null;
+const hasMeasuredCost = (covered: Measures, showCost: boolean): boolean => showCost && covered.costedRuns > 0 && covered.costUsd !== null;
+const hasMeasuredTokens = (covered: Measures, showCost: boolean): boolean =>
+  !showCost && covered.measuredRuns > 0 && covered.tokens !== null;
 
 interface RankingSortProps {
   /** `null` = o padrão do bloco (`defaultCellSort`) */
@@ -268,6 +269,7 @@ interface RankingSortProps {
 }
 
 interface CellRankingProps extends RankingSortProps {
+  showCost: boolean;
   caption: string;
   labelHeader: string;
   /** o rótulo da categoria `''` ("sem card", "fase não definida") */
@@ -279,22 +281,22 @@ interface CellRankingProps extends RankingSortProps {
 }
 
 /** Ranking de categorias com as quatro medidas, "outros" no rodapé e o critério escrito (cards e fases). */
-function CellRanking({ caption, labelHeader, emptyLabel, cells, covered, omitted, sort, onSort }: CellRankingProps) {
+function CellRanking({ caption, labelHeader, emptyLabel, cells, covered, omitted, sort, onSort, showCost }: CellRankingProps) {
   if (cells.length === 0 && covered.runs === 0) return <p className="metrics-block-intro">{t('Nenhum registro no período.')}</p>;
-  const effective = sort ?? defaultCellSort(covered);
+  const effective = sort ?? defaultCellSort(covered, showCost);
   const reason = sort
     ? undefined
-    : hasMeasuredCost(covered)
+    : hasMeasuredCost(covered, showCost)
       ? t('É o padrão quando o período tem custo medido.')
-      : hasMeasuredTokens(covered)
+      : hasMeasuredTokens(covered, showCost)
         ? t('É o padrão quando o período tem tokens medidos.')
-        : SHOW_COST
+        : showCost
           ? t('É o padrão enquanto o período não tem custo medido.')
           : t('É o padrão enquanto o período não tem tokens medidos.');
   const label = (c: MetricsCell): string => c.value || emptyLabel;
   const columns: RankingColumn<MetricsCell>[] = [
     { key: 'label', header: labelHeader, rowHeader: true, cell: (c) => <span title={label(c)}>{label(c)}</span> },
-    ...(SHOW_COST
+    ...(showCost
       ? [
           {
             key: 'cost',
@@ -344,7 +346,7 @@ function CellRanking({ caption, labelHeader, emptyLabel, cells, covered, omitted
 }
 
 /** Ranking por card (RF-18 a RF-22): `cells[].value` é '#N título'; '' são as execuções sem card (RF-20). */
-export function CardRanking({ sections, sort, onSort }: MetricsBlockProps & RankingSortProps) {
+export function CardRanking({ sections, sort, onSort, showCost }: MetricsBlockProps & RankingSortProps & { showCost: boolean }) {
   const { cards } = sections;
   return (
     <CellRanking
@@ -356,12 +358,13 @@ export function CardRanking({ sections, sort, onSort }: MetricsBlockProps & Rank
       omitted={cards.omitted}
       sort={sort}
       onSort={onSort}
+      showCost={showCost}
     />
   );
 }
 
 /** Ranking de fases: o corte por fase, que alcança a série inteira (RF-24). '' é a fase não definida (RF-04). */
-export function PhaseRanking({ sections, sort, onSort }: MetricsBlockProps & RankingSortProps) {
+export function PhaseRanking({ sections, sort, onSort, showCost }: MetricsBlockProps & RankingSortProps & { showCost: boolean }) {
   const phase = sections.breakdowns.find((b) => b.dim === 'phase');
   if (!phase) return null;
   return (
@@ -374,6 +377,7 @@ export function PhaseRanking({ sections, sort, onSort }: MetricsBlockProps & Ran
       omitted={0}
       sort={sort}
       onSort={onSort}
+      showCost={showCost}
     />
   );
 }

@@ -91,7 +91,7 @@ in the Portuguese interface.
   board detects the merge, cleans up the branch and can record the decision in `docs/decisoes`.
   [Gitflow](docs/gitflow_EN.md)
 - **Usage metrics.** A ring on the card estimates the context of the next run; the **Consumo** tab
-  and the **Métricas** panel show tokens, AI time, rework and what the AI used. Each run is also
+  and the **Métricas** panel show tokens, US$ cost (with an editable price per model, the estimate marked and an option to hide it), AI time, rework and what the AI used. Each run is also
   checked against what the card allowed: **no deviation**, **with deviation** (the card warns in the
   conversation, and the panel counts per AI tool) or **not checked** (the tool did not report what it
   used). The AI queries the same with `get_metrics`. [Metrics](docs/metricas_EN.md)

@@ -1,12 +1,6 @@
 import { renderThemed } from './setup';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-// o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
-vi.mock('../../src/shared/metrics', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../src/shared/metrics')>()),
-  SHOW_COST: true,
-  METRICS_MEASURES: ['cost', 'tokens', 'runs', 'duration'],
-}));
 import { act, screen, within } from '@testing-library/react';
 import { EMPTY_METRICS_FILTERS, type MetricsMonth, type MetricsPanelResult } from '../../src/shared/metrics';
 import { setLocale } from '../../src/webview/i18n';
@@ -60,7 +54,7 @@ const SERIES = 'Alcança toda a série do período, inclusive os meses já arqui
 
 describe('MetricsBlocks: os cinco blocos', () => {
   it('mostra os cinco títulos, cada bloco com o seu texto explicativo', () => {
-    renderThemed(<MetricsBlocks result={result()} />);
+    renderThemed(<MetricsBlocks showCost result={result()} />);
     for (const title of [
       'Onde o consumo aconteceu',
       'Quanto tempo o card fica na fase',
@@ -74,7 +68,7 @@ describe('MetricsBlocks: os cinco blocos', () => {
   });
 
   it('o aviso de horizonte está nos quatro que dependem do detalhe (RF-29)', () => {
-    renderThemed(<MetricsBlocks result={result()} />);
+    renderThemed(<MetricsBlocks showCost result={result()} />);
     for (const name of ['Quanto tempo o card fica na fase', 'Lead time', 'Cards mais caros', 'O que a IA usou']) {
       expect(within(block(name)).getByText(DETAIL)).toBeInTheDocument();
       expect(within(block(name)).queryByText(SERIES)).toBeNull();
@@ -82,7 +76,7 @@ describe('MetricsBlocks: os cinco blocos', () => {
   });
 
   it('os cortes e o ranking de fases não têm o aviso do detalhe e dizem que alcançam a série (RF-29)', () => {
-    renderThemed(<MetricsBlocks result={result()} />);
+    renderThemed(<MetricsBlocks showCost result={result()} />);
     for (const name of ['Onde o consumo aconteceu', 'Fases mais caras']) {
       expect(within(block(name)).queryByText(DETAIL)).toBeNull();
       expect(within(block(name)).getByText(SERIES)).toBeInTheDocument();
@@ -90,7 +84,7 @@ describe('MetricsBlocks: os cinco blocos', () => {
   });
 
   it('os dois rankings ficam lado a lado e cada um diz até onde alcança (RF-24)', () => {
-    renderThemed(<MetricsBlocks result={result()} />);
+    renderThemed(<MetricsBlocks showCost result={result()} />);
     const group = block('Mais caros e mais demorados');
     expect(within(group).getByRole('region', { name: 'Fases mais caras' })).toBeInTheDocument();
     expect(within(group).getByRole('region', { name: 'Cards mais caros' })).toBeInTheDocument();
@@ -98,7 +92,7 @@ describe('MetricsBlocks: os cinco blocos', () => {
   });
 
   it('sem detalhe guardado, o aviso diz que ele ainda não existe', () => {
-    renderThemed(<MetricsBlocks result={result({ detailFrom: '' })} />);
+    renderThemed(<MetricsBlocks showCost result={result({ detailFrom: '' })} />);
     expect(
       within(block('Lead time')).getByText('Este bloco depende do detalhe guardado, e o board ainda não tem nenhum.'),
     ).toBeInTheDocument();
@@ -106,7 +100,7 @@ describe('MetricsBlocks: os cinco blocos', () => {
 
   it('em inglês traduz títulos e avisos', () => {
     setLocale('en');
-    renderThemed(<MetricsBlocks result={result()} />);
+    renderThemed(<MetricsBlocks showCost result={result()} />);
     expect(screen.getByRole('heading', { name: 'What the AI used' })).toBeInTheDocument();
     expect(within(block('Lead time')).getByText(/Only covers the stored detail, since September 2026/)).toBeInTheDocument();
   });
