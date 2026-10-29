@@ -23,6 +23,7 @@ export type McpServerView = Omit<McpServerInput, 'env' | 'headers'> & {
 };
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { CardUsage } from './cardUsage';
+import type { StoryCommit } from './commits';
 import type { QuestionInput } from './questions';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
@@ -205,6 +206,8 @@ export type WebviewToHost =
   | { type: 'metrics.query'; requestId: string; query: MetricsPanelQuery }
   /** consulta o que o card já gastou nas execuções de IA (o log); não altera nada, a resposta é `card.usage.result` */
   | { type: 'card.usage.query'; requestId: string; cardId: Id }
+  /** consulta os commits da branch da história (trailers Faz-AI-*); a resposta é `card.commits.result` */
+  | { type: 'card.commits.query'; requestId: string; cardId: Id }
   /** diálogo nativo de "salvar como" (só no editor; na web a modal faz o download direto) */
   | { type: 'attachment.saveAs'; attachmentId: Id }
   | { type: 'attachment.delete'; attachmentId: Id }
@@ -511,6 +514,8 @@ export type HostToWebview =
   | ({ type: 'executionPolicy.result'; requestId: string } & PolicyReply)
   /** resposta a `card.usage.query`, correlacionada por `requestId` */
   | { type: 'card.usage.result'; requestId: string; usage?: CardUsage; error?: string }
+  /** resposta a `card.commits.query`, correlacionada por `requestId` */
+  | { type: 'card.commits.result'; requestId: string; commits?: StoryCommit[]; error?: string }
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */
   | { type: 'backup.import.summary'; token: string; summary: ImportSummary }
   /** a exportação ou a escolha do arquivo terminou (com sucesso ou porque a pessoa desistiu): a interface sai do estado "ocupado" */

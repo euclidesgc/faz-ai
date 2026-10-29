@@ -53,6 +53,9 @@ import { boardServerFootprint } from '../mcp/footprint';
 import type { RunResolver } from '../log/eventLog';
 import { getMetrics, getPanelMetrics, type MetricsQuery, type MetricsResult } from '../log/metrics';
 import { cardUsage } from '../log/cardUsage';
+import { storyCommits } from '../git';
+import { storyOf } from '../../shared/story';
+import type { StoryCommit } from '../../shared/commits';
 import type { CardUsage } from '../../shared/cardUsage';
 import type { MetricsPanelQuery, MetricsPanelResult } from '../../shared/metrics';
 import { NO_TRACE, type Trace } from '../log/trace';
@@ -178,6 +181,7 @@ const bridgeOnly = {
   // ler o log não muda o board: a `HostBridge` responde por `panelMetrics`, sem passar por `handle`
   'metrics.query': viaBridge,
   'card.usage.query': viaBridge,
+  'card.commits.query': viaBridge,
   'executionPolicy.read': viaBridge,
   'executionPolicy.simulate': viaBridge,
   'executionPolicy.assist': viaBridge,
@@ -1050,6 +1054,16 @@ export class MessageRouter {
     // o que foi gasto não some: as sub-tarefas na lixeira também contam
     const subtasks = s.cards.filter((c) => c.parentId === card.id).map((c) => c.number);
     return cardUsage(this.ctx.dbHandle.db, this.ctx.boardId, card.number, phases, subtasks);
+  }
+
+  /** Commits da branch da história do card (`base..branch`); [] sem branch, pasta ou base. */
+  storyCommits(cardId: string): StoryCommit[] {
+    const s = this.ctx.state();
+    const card = s.cards.find((c) => c.id === cardId);
+    const story = card ? storyOf(s, card) : undefined;
+    if (!story?.branch) return [];
+    const dir = story.worktreePath || this.ctx.opts.workspaceDir || '';
+    return storyCommits(dir, story.baseBranch || this.ctx.mainBranch()?.name || '', story.branch);
   }
 
   /** Copia arquivos do disco como anexos do card (usado pelo seletor de arquivos). */
