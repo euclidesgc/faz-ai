@@ -330,3 +330,20 @@ export function limitClock(at: number, now: number): string {
   const sameDay = d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
   return sameDay ? time : `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${time}`;
 }
+
+/** Uma janela de cota lida da ferramenta (ex.: a de 5 h ou a semanal do Codex). */
+export interface QuotaWindow {
+  /** 0–100 */
+  usedPercent: number;
+  windowMinutes: number | null;
+  /** epoch em segundos */
+  resetsAt: number | null;
+}
+
+/** A cota lida ao fim de uma execução ACP; as duas janelas podem faltar. */
+export interface AgentQuota {
+  primary: QuotaWindow | null;
+  secondary: QuotaWindow | null;
+  /** epoch em ms */
+  readAt: number;
+}

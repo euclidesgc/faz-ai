@@ -14,6 +14,7 @@
 //
 // O código de saída que o gateway recebe é o do protocolo, não o do processo: quem fecha o agente no
 // fim é o board, e um agente encerrado por nós não sai com o código do trabalho.
+import * as os from 'node:os';
 import type { RunnerPermission } from '../../../shared/runner';
 import type { MeasuredDeps, Measured } from '../../aiOutput/measured';
 import { lineSplitter } from '../../aiOutput/lines';
@@ -184,6 +185,8 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
   const graceMs = deps.graceMs ?? GRACE_MS;
   const listeners: ((code: number | null, error?: Error) => void)[] = [];
   let sessionId: string | null = null;
+  /** o início da execução: o rollout do Codex com mtime anterior é de outra */
+  const startedAt = Date.now();
   /** o código que o protocolo deu ao trabalho; null enquanto o prompt não respondeu */
   let result: number | null = null;
   let failure: Error | undefined;
@@ -356,7 +359,10 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
       },
     },
     report: () => {
-      const report = reader.report(sessionId);
+      const base = reader.report(sessionId);
+      // a cota é da conta e já foi gasta, mesmo com a execução cancelada ou falha; falha de leitura = sem campo
+      const quota = agent.readQuota?.({ since: startedAt, env: process.env, homeDir: deps.homeDir ?? os.homedir() }) ?? null;
+      const report = quota ? { ...base, quota } : base;
       if (report.measure !== 'none') return report;
       return { ...report, reason: new MeasureBrokenError(agent.label).message };
     },

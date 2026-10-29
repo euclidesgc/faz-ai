@@ -13,6 +13,7 @@ import { asNumber, asObject } from '../../aiOutput/json';
 import { classifyGeminiFailure } from '../drivers/gemini/limit';
 import { GEMINI_TOOL_EQUIVALENTS } from '../../../shared/agentTools';
 import type { AcpAgent } from './provider';
+import { readCodexQuota } from './codexQuota';
 
 /**
  * O nome da ferramenta no `toolCallId` do Gemini CLI: o `Turn` (core) monta o id da chamada como
@@ -155,6 +156,8 @@ export const ACP_AGENTS: readonly AcpAgent[] = [
     // relatado na 1.6.2: o `usage` traz só o último pedido do turno, e o custo vem nulo
     usage: { tokens: 'last_request', cost: false },
     fullMode: 'agent-full-access',
+    // a cota por janela (5 h e semanal) está no rollout de sessão do Codex, não no protocolo
+    readQuota: (ctx) => readCodexQuota(ctx),
   },
   {
     id: 'cursor',

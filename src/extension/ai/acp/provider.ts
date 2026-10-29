@@ -7,7 +7,7 @@
 // - os servidores MCP vão no `session/new`, e não num arquivo do projeto — exceto no agente que,
 //   pela documentação, ainda só lê o arquivo dele (`projectMcpFile`).
 import type { AiRunTokens } from '../../../shared/log';
-import type { FailureClass, ToolFailure } from '../../../shared/usageLimit';
+import type { AgentQuota, FailureClass, ToolFailure } from '../../../shared/usageLimit';
 import type { Json } from '../../aiOutput/json';
 import type { OutputStream } from '../../aiOutput/reader';
 import type { RunningProcess } from '../../runner';
@@ -121,6 +121,8 @@ export interface AcpAgent {
    * uma falha comum, sem pausa por limite (o board não adivinha pelo texto de um agente que não conhece).
    */
   classifyFailure?(failure: ToolFailure): FailureClass;
+  /** a cota (janelas de uso) lida ao fim da execução, fora do protocolo; qualquer falha devolve null */
+  readQuota?(ctx: { since: number; env: NodeJS.ProcessEnv; homeDir: string }): AgentQuota | null;
 }
 
 /**

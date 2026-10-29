@@ -369,6 +369,12 @@ creates a custom profile with the same agent, to change the environment or the n
 the PATH and its version, with the install link. Cursor and Kimi Code stay on the ready one-shot CLIs,
 which measure tokens; Claude Code keeps running through the `claude` CLI.
 
+**Codex quota.** At the end of each Codex run, the board reads quota usage from the newest session
+rollout written during that run (`$CODEX_HOME/sessions`, or `~/.codex/sessions`; only the end of the
+file) and keeps the 5 h and weekly windows in the run report, for early model switching. The rollout
+format belongs to the Codex CLI and is not a documented contract: if the file is missing, empty or its
+format changes, the quota stays "unknown" and nothing is blocked.
+
 ### Custom profile (Advanced)
 
 The custom profile is the advanced path, for a command line the catalog does not include: the catalog

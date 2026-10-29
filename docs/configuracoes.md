@@ -347,6 +347,12 @@ catálogo de modelos. A situação diz se o comando do agente está no PATH e a 
 instalação. Cursor e Kimi Code ficam nas CLIs prontas de uma passada, que medem tokens; o Claude Code
 segue pela CLI `claude`.
 
+**Cota do Codex.** Ao fim de cada execução do Codex, o board lê o uso da cota no rollout de sessão mais
+recente da própria execução (`$CODEX_HOME/sessions`, ou `~/.codex/sessions`; só o final do arquivo) e
+guarda as janelas de 5 h e semanal no relatório da execução, para a troca antecipada de modelo. O
+formato do rollout é o da CLI do Codex, não um contrato documentado: se o arquivo não existir, estiver
+vazio ou mudar de formato, a cota fica "desconhecida" e nada é bloqueado.
+
 ### Perfil personalizado (Avançado)
 
 O personalizado é o caminho avançado, para uma linha de comando que o catálogo não traz: os agentes do
