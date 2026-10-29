@@ -15,9 +15,6 @@ export const harness: Record<string, string> = {
 
   // --- HarnessSettings
   Harness: 'Harness',
-  'Plano de contexto': 'Context plan',
-  'Plano de contexto deste workflow': "This workflow's context plan",
-  'Plano de contexto padrão do board': "Board's default context plan",
   Automação: 'Automation',
   'Como o board executa a IA, com qualquer agente ligado: o que ela pode fazer, o tempo limite de cada execução, o heartbeat e quantas histórias andam ao mesmo tempo.':
     'How the board runs the AI, with any enabled agent: what it may do, the time limit of each run, the heartbeat and how many stories move at once.',
@@ -649,8 +646,6 @@ export const harness: Record<string, string> = {
   Rascunho: 'Draft',
   'Sem agente válido': 'No valid agent',
   'Herdar agente': 'Inherit agent',
-  'Mostra ou esconde, abaixo das colunas, o plano de contexto padrão dos cards deste workflow.':
-    "Shows or hides, below the columns, the default context plan of this workflow's cards.",
   Paralelismo: 'Parallelism',
   'Cerca de {tokens} tokens conhecidos': 'About {tokens} known tokens',
   '{n} itens sem medida': '{n} unmeasured items',
@@ -862,10 +857,6 @@ export const harness: Record<string, string> = {
   'Mostrar todas as regras': 'Show all rules',
   'Mostrar só as desligadas': 'Show only the ones off',
   'Buscar em {topic} por nome ou descrição': 'Search {topic} by name or description',
-  'Vale para os cards deste workflow; o que ficar em "Herdar" segue o padrão do board, em Harness › Plano de contexto.':
-    'Applies to the cards of this workflow; whatever stays on "Herdar" (inherit) follows the board default, in Harness › Plano de contexto (context plan).',
-  'O que cada atividade leva para a IA (agente, modelo, skills, MCPs e o resultado esperado) quando nem o card nem o workflow escolhem outra coisa. O de cada workflow fica no botão Plano de contexto dele, em Workflows e colunas.':
-    "What each activity brings to the AI (agent, model, skills, MCPs and the expected result) when neither the card nor the workflow picks something else. Each workflow's lives under its Plano de contexto (context plan) button, in Workflows and columns.",
   'Exportar para a ferramenta': 'Export to the tool',
   '{n} gravados': '{n} written',
   '{n} substituídos': '{n} replaced',

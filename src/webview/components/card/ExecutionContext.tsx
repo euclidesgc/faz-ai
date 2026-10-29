@@ -22,7 +22,6 @@ export function ExecutionContext({ preview, agent = false }: { preview: Executio
   return (
     <details className="execution-context">
       <Summary>{t('Contexto da execução')}</Summary>
-      <p className="muted small">{t('Modo legado: os novos contratos são rascunhos e ainda não governam execuções.')}</p>
       <p className="muted small">
         {agent
           ? t('Prévia do rascunho com os itens Sempre do board. O card e a fase podem acrescentar contexto na execução.')
