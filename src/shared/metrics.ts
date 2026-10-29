@@ -139,15 +139,11 @@ export const METRICS_BREAKDOWN_DIMS: MetricsBreakdownDim[] = ['phase', 'card_typ
 export type MetricsMeasure = 'cost' | 'tokens' | 'runs' | 'duration';
 
 /**
- * Mostrar o custo em dólar. Por enquanto o board mostra só tokens: o Claude Code informa o custo, mas o
- * Cursor não, e um total em dólar que cobre só parte das execuções confunde mais do que ajuda. O valor
- * informado continua gravado no log (`cost_usd`); ligar de novo é só trocar esta constante.
+ * As medidas que o seletor oferece: as quatro, ou sem `cost` quando a regra do board "Mostrar custo em
+ * dólar" (`showCost`) está desligada. O valor informado segue gravado no log (`cost_usd`).
  */
-export const SHOW_COST = false;
-
-export const METRICS_MEASURES: MetricsMeasure[] = (['cost', 'tokens', 'runs', 'duration'] as MetricsMeasure[]).filter(
-  (m) => SHOW_COST || m !== 'cost',
-);
+export const metricsMeasures = (showCost: boolean): MetricsMeasure[] =>
+  (['cost', 'tokens', 'runs', 'duration'] as MetricsMeasure[]).filter((m) => showCost || m !== 'cost');
 
 /** A conferência da execução (o que foi usado contra o que o card pediu) contada por estado. */
 export interface RunChecks {

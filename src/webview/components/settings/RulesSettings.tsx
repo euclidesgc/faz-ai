@@ -168,6 +168,18 @@ export function RulesSettings() {
       />
 
       <Rule
+        title={t('Mostrar custo em dólar')}
+        active={rules.showCost}
+        when={t('o consumo de uma execução, de um card ou do mês é exibido (aba Consumo e Métricas)')}
+        then={
+          rules.showCost
+            ? t('mostrar o custo em US$, marcado como estimado quando vem do preço do catálogo.')
+            : t('esconder o custo em US$. Os dados seguem gravados e voltam ao ligar a regra.')
+        }
+        control={<SwitchField label={t('Mostrar')} checked={rules.showCost} onChange={(showCost) => set({ showCost })} />}
+      />
+
+      <Rule
         title={t('Cancelar história com sub-tarefas em aberto')}
         active={rules.onCancelParent !== 'keep'}
         when={t('uma história é movida para uma coluna de cancelamento ({names}) e ainda tem sub-tarefas em aberto', {
