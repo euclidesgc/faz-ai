@@ -45,6 +45,7 @@
 - In each agent's Models tab, the **Modelo padrão** (default model) applies when it runs with no model set: a card without a model, the chat on **Auto** and the quick test.
 - New direct track: a short-track story whose plan touches up to about 3 files is implemented by the story session itself, without sub-tasks (#1107).
 - The `update_rules` MCP tool accepts the `shortTrack` rule (#1107).
+- Commits made in a board run get the `Faz-AI-*` trailers with card, phase and run (#1101).
 
 ### Changed
 

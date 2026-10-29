@@ -116,6 +116,31 @@ the field, with the explanation of what the rename does and what it doesn't chan
 doesn't block) stays pending while a request is waiting, with the local clone command and the
 **Abrir a tela Git** (Open the Git screen) button.
 
+## Tracing trailers in commits
+
+Every commit made by a board card run carries three trailers at the end of the message:
+
+- `Faz-AI-Card`: the card the run executes (the sub-task, or the story);
+- `Faz-AI-Phase`: the story's column at the start of the run;
+- `Faz-AI-Run`: the run id, the same one stored in `ai_runs`.
+
+- They apply to CLI, ACP and API, and only to card runs: chat and suggestions get no trailers.
+- Commits made by the person outside a run do not change. Nothing is written to `.git`: the setting
+  applies only to the run's process and goes away with it.
+- `--no-verify` does not remove the trailers. An `--amend` keeps one occurrence of each, with the
+  values of the current run.
+- The repository hooks (for example, husky) keep running, and a failure in one of them still blocks
+  the commit.
+- Needs git 2.31 or newer. Below that, the channel warns once and the run goes on without trailers.
+- Implementation detail: the run receives `FAZ_AI_TRAILER_CARD`, `FAZ_AI_TRAILER_PHASE`,
+  `FAZ_AI_TRAILER_RUN` and `FAZ_AI_GIT_CONFIG_COUNT`, and the `GIT_CONFIG_*` pairs that point
+  `core.hooksPath` to a temporary folder of the run itself. The `GIT_CONFIG_*` pairs the person
+  already had are kept.
+- Unvalidated risks: if the tool's sandbox cannot read the temporary folder, the commit goes out
+  without trailers, and the repository hooks do not run in that run either. If the tool clears the
+  environment of child processes, the commit goes out without trailers and with git's normal
+  configuration.
+
 ## Pull request and merge in Homologação
 
 In Homologação the AI writes the **"Como testar"** (how to test) script (what was built, the steps
