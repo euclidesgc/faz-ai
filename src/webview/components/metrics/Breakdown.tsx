@@ -1,16 +1,17 @@
 import { useId, useState } from 'react';
 import {
   METRICS_BREAKDOWN_DIMS,
-  METRICS_MEASURES,
-  SHOW_COST,
+  metricsMeasures,
   type MetricsBreakdown,
   type MetricsBreakdownDim,
   type MetricsCell,
   type MetricsMeasure,
 } from '../../../shared/metrics';
+import type { CostBuckets } from '../../../shared/cost';
 import { t, tn } from '../../i18n';
 import { FormField, SelectField } from '../ui';
 import {
+  costBucketsTitle,
   formatCompact,
   formatCost,
   formatDuration,
@@ -197,11 +198,11 @@ function rowLabel(row: BreakdownRow, dim: MetricsBreakdownDim): string {
  * As marcas da linha, em palavras e não em cor (RF-37, RF-38): custo e tokens não medidos ou parciais, com
  * a contagem das execuções sem medição (RF-30), a parte estimada do custo (RF-31) e o nome ambíguo (RF-07).
  */
-export function rowMarks(row: BreakdownRow): string[] {
+export function rowMarks(row: BreakdownRow, showCost: boolean): string[] {
   const c = row.cell;
   const out: string[] = [];
   if (row.ambiguous) out.push(t('nome em mais de um workflow'));
-  const noCost = SHOW_COST ? c.runs - c.costedRuns : 0;
+  const noCost = showCost ? c.runs - c.costedRuns : 0;
   if (noCost > 0) {
     if (c.costedRuns > 0) out.push(t('custo parcial'));
     out.push(tn(noCost, '{n} execução sem custo medido', '{n} execuções sem custo medido'));
@@ -211,12 +212,22 @@ export function rowMarks(row: BreakdownRow): string[] {
     if (c.measuredRuns > 0) out.push(t('tokens parciais'));
     out.push(tn(noTokens, '{n} execução sem tokens medidos', '{n} execuções sem tokens medidos'));
   }
-  if (SHOW_COST && c.costUsd !== null && c.costEstimatedUsd !== null) {
+  if (showCost && c.costUsd !== null && c.costEstimatedUsd !== null) {
     if (c.costEstimatedUsd >= c.costUsd - EPS) out.push(t('estimado por tabela de preços'));
     else if (c.costEstimatedUsd > 0)
       out.push(t('parte estimada por tabela de preços: {estimated}', { estimated: formatMoney(c.costEstimatedUsd) }));
   }
   return out;
+}
+
+/**
+ * A dica da célula de custo: os quatro buckets em US$. Mês arquivado não guarda buckets (só o total) e fica
+ * sem dica. O total é "informado" quando a parte estimada pelo catálogo não o cobre inteiro.
+ */
+function costTitle(cell: Totals): string | undefined {
+  const buckets: CostBuckets | undefined = cell.costBuckets;
+  if (!buckets || cell.costUsd === null) return undefined;
+  return costBucketsTitle(buckets, (cell.costEstimatedUsd ?? 0) < cell.costUsd - EPS);
 }
 
 /** O valor exato na unidade da medida, para a escala. */
@@ -242,6 +253,8 @@ const BAR = 6;
 const ROW_EM = 1.75;
 
 interface Props extends MetricsBlockProps {
+  /** a regra do board "Mostrar custo em dólar": desligada, a tela some com o custo e a medida cai em tokens */
+  showCost: boolean;
   dim: MetricsBreakdownDim;
   measure: MetricsMeasure;
   onChange: (patch: { dim?: MetricsBreakdownDim; measure?: MetricsMeasure }) => void;
@@ -259,7 +272,10 @@ interface Props extends MetricsBlockProps {
  * Trocar a dimensão ou a medida redesenha no lugar, sem pedir nada ao host (as seis dimensões já vieram), e
  * é anunciado na região `aria-live` do bloco sem mover o foco nem rolar a página (RF-39).
  */
-export function Breakdown({ result, sections, dim, measure, onChange }: Props) {
+export function Breakdown({ result, sections, dim, measure: picked, onChange, showCost }: Props) {
+  const measures = metricsMeasures(showCost);
+  // a medida guardada na store pode ser `cost` com a regra desligada: ali vale tokens
+  const measure: MetricsMeasure = measures.includes(picked) ? picked : 'tokens';
   const uid = useId();
   const titleId = `${uid}-title`;
   const [announcement, setAnnouncement] = useState('');
@@ -297,7 +313,7 @@ export function Breakdown({ result, sections, dim, measure, onChange }: Props) {
             <SelectField
               id={id}
               size="2"
-              options={METRICS_MEASURES.map((m) => ({ value: m, label: measureLabel(m) }))}
+              options={measures.map((m) => ({ value: m, label: measureLabel(m) }))}
               value={measure}
               onChange={(m) => change({ measure: m })}
             />
@@ -403,7 +419,7 @@ export function Breakdown({ result, sections, dim, measure, onChange }: Props) {
               <thead className="metrics-sticky-head">
                 <tr>
                   <th scope="col">{dimLabel(dim)}</th>
-                  {SHOW_COST && (
+                  {showCost && (
                     <th scope="col" className="is-number">
                       {t('Custo')}
                     </th>
@@ -437,7 +453,11 @@ export function Breakdown({ result, sections, dim, measure, onChange }: Props) {
                 {rows.map((r) => (
                   <tr key={r.key} data-category={r.other ? 'other' : r.value}>
                     <th scope="row">{rowLabel(r, dim)}</th>
-                    {SHOW_COST && <td className="is-number">{formatCost(r.cell.costUsd)}</td>}
+                    {showCost && (
+                      <td className="is-number" title={costTitle(r.cell)}>
+                        {formatCost(r.cell.costUsd)}
+                      </td>
+                    )}
                     <td className="is-number">{formatTokens(r.cell.tokens)}</td>
                     <td className="is-number">{formatNumber(r.cell.runs)}</td>
                     <td className="is-number">{formatDuration(r.cell.durationMs)}</td>
@@ -448,7 +468,7 @@ export function Breakdown({ result, sections, dim, measure, onChange }: Props) {
                         <td className="is-number">{r.cell.checks ? formatNumber(r.cell.checks.unchecked) : '–'}</td>
                       </>
                     )}
-                    <td>{rowMarks(r).join('; ')}</td>
+                    <td>{rowMarks(r, showCost).join('; ')}</td>
                   </tr>
                 ))}
               </tbody>

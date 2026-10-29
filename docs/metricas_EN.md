@@ -141,6 +141,15 @@ progress counts when it ends, and the tab updates on its own. Runs from months p
 retention stay only in the board's monthly totals, and the tab says up to when. As everywhere else
 on the board, usage is in tokens, with no dollar cost.
 
+With the **Mostrar custo em dólar** (show cost in dollars) rule on (the default), the table gains a
+**Custo** (cost) column after **Total**, in US$. When part of the value comes from the price
+registered in the catalog rather than from the tool, the cell carries the **estimado** (estimated) mark.
+When only some of the row's runs have a cost, the cell warns **cobre X de Y execuções** (covers X of Y
+runs) instead of adding up as if it were all. The cell tooltip shows the four buckets (input, output,
+cache read and cache write); a bucket with no price shows as "—", and when the total came from the
+tool, the tooltip says the buckets are an estimate from the catalog price. A row with no cost at all
+shows "—". With the rule off, the column disappears and the tab goes back to tokens only.
+
 ## Consumption and inventory of each run
 
 Every time the AI runs (from the conversation, the heartbeat or autonomous mode), the board records
@@ -224,14 +233,21 @@ and also in the board opened in the browser.
 
 ### Usage
 
+- **Cost in US$.** With the **Mostrar custo em dólar** (show cost in dollars) rule on, the **cost**
+  measure becomes the default when the period has measured cost, and the monthly chart and the rankings
+  show dollars. What was estimated from the catalog price carries the **estimado** (estimated) mark,
+  and a row with cost for only some of its runs warns **custo parcial** (partial cost). In the
+  breakdown table, the cost cell tooltip shows the four buckets (input, output, cache read and cache
+  write); an archived month keeps only the total, so it has no buckets. The estimate uses the run's
+  main model. With the rule off, the **cost** measure does not exist and no screen shows "US$".
 - **Tokens per month.** A bar chart with each month's tokens. The month in progress is hatched,
   because it has not ended yet; a month with no data at all is a gap marked "sem dado" (no data),
   not a zero-height bar. Below the chart a table has the same numbers and a notes column (partial,
   no data, monthly total only).
 - **Where the usage happened** ("Onde o consumo aconteceu"). The period's usage split by **phase,
   card type, model, AI tool, tool mode, effort or profile** (the **Recortar por** / break down by
-  selector), as horizontal bars in the measure chosen in **Medida da barra** (bar measure): tokens,
-  runs or AI time. The **tool mode** ("Modo da ferramenta") is how the board talked to the tool (CLI,
+  selector), as horizontal bars in the measure chosen in **Medida da barra** (bar measure): cost (US$, with the
+  **Mostrar custo em dólar** rule on), tokens, runs or AI time. The **tool mode** ("Modo da ferramenta") is how the board talked to the tool (CLI,
   ACP or API): the same Gemini measures differently in each mode, and the tool row adds the three up.
   Runs from before the mode was recorded (and months archived before it) show as "não definido" (not
   defined). The table with the three measures sits beside it. Categories past the limit add up in an

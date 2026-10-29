@@ -16,7 +16,7 @@ com as regras de sugestão e as regras de fallback. O Harness e os agentes do bo
 | Workflows e colunas   | Quantos workflows quiser (cards independentes ou sub-tarefas), com nome editável e posição que você muda arrastando; **Nova coluna** em cada um; nomes, ordem (arrastando) e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento). Abrir e fechar workflows e colunas é feito no próprio board e fica lembrado                                                                                        |
 | Tipos de card         | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria                                                 |
-| Regras do board       | Bloqueios de conclusão e de avanço de fase, confirmações, trilha curta para histórias pequenas (esforço Baixo ou tipo Bug pula o PRD e a Spec)                                                                                                                                                                                                                                                                                                              |
+| Regras do board       | Bloqueios de conclusão e de avanço de fase, confirmações, trilha curta para histórias pequenas (esforço Baixo ou tipo Bug pula o PRD e a Spec), **Mostrar custo em dólar** (ligada por padrão; desligada, nenhuma tela mostra US$, útil para quem usa assinatura)                                                                                                                                                                                                                                                                                                              |
 | Conectar agentes      | Os agentes de IA que rodam os cards (todo agente ligado, ao mesmo tempo, e o padrão para os cards sem modelo); a conta de cada um (entrar e sair); o **Conectar** com o board e o modo (CLI, ACP ou API); os modelos de cada agente; o teste rápido, a sessão de teste e o log do protocolo; cópias e perfis personalizados; as regras de fallback; a sugestão de modelo de cada card                                                                                                                                 |
 | Harness               | Artefatos do board (regras, skills, agentes e servidores MCP), com importação por tipo, CRUD, assistentes e o agente padrão das instruções(ver [Harness](harness.md#harness) e [Agentes](harness.md#agentes)) |
 | Automação             | Como o board executa a IA, com qualquer agente ligado: o que a IA pode fazer, o tempo limite, o heartbeat (e o refino do Backlog), as histórias e sub-tarefas em paralelo (ver [Heartbeat e modo autônomo](automacao.md))                                                                                                                                                                                                                                                                     |
@@ -219,6 +219,12 @@ de sugestão oferecem para ele, com os níveis de esforço de cada um. Cada mode
 na ferramenta, esforços aceitos e esforço padrão; **Novo modelo** cadastra à mão e a lixeira tira do
 catálogo, sem confirmação.
 
+A ação **Preço**, em cada linha, abre quatro campos em US$ por milhão de tokens: **Entrada**, **Saída**,
+**Leitura de cache** e **Escrita de cache**. Campo vazio é "sem preço" (nunca zero), e o preço vale da
+próxima execução em diante. O board usa esse preço para estimar o custo das execuções que a ferramenta
+não informa, e avisa: "Preço informado por você; o board não confere com o provedor". Perfil com modelo
+livre, sem catálogo, não tem a ação.
+
 **Detectar modelos** lê a lista da ferramenta: no Cursor, dos modelos da sua conta, pelo comando
 `cursor-agent models`, lido ao abrir o board com a CLI autenticada, e a primeira lista lida
 substitui a embutida uma vez só. O Claude Code não tem comando que liste os modelos: no Conectar e no
@@ -407,6 +413,14 @@ ordem é a prioridade (a primeira que casar vence), cada linha mostra **quando**
 Opus 5.5 esgota a cota"), o que o board **usa no lugar** ("Gemini · API · Pro, depois Cursor · CLI ·
 Auto") e **como** (troca sozinho ou pergunta antes), com o interruptor para ligar e desligar, subir,
 descer, editar e remover.
+
+Quando a regra troca sozinha, o board guarda que aquele modelo esgotou, até a renovação do limite (ou
+pelo tempo de espera, quando a ferramenta não informa a hora). As execuções automáticas seguintes
+(autopiloto e modo autônomo) e as conversas do chat já começam no destino da regra, sem chamar o modelo
+esgotado de novo, e o card explica na conversa por que rodou noutro modelo. Esgotado o destino também, o
+board segue a lista da regra; depois do horário, a primeira execução volta ao modelo pedido. A execução
+manual sempre testa o modelo pedido, e uma execução que termina bem nele tira a marca. Com a pessoa no
+circuito, a marca não muda o início, e **seguir com** continua valendo como escolhido.
 
 **Montar nova regra** abre o editor na própria tela, em três passos:
 

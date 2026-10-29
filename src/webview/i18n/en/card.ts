@@ -267,6 +267,9 @@ export const card: Record<string, string> = {
   Consumo: 'Usage',
   'Próxima execução': 'Next run',
   'Gasto até agora': 'Spent so far',
+  'cobre {costed} de {runs} execuções': 'covers {costed} of {runs} runs',
+  'O total é o informado pela ferramenta; os buckets são estimativa pelo preço do catálogo.':
+    'The total is the one reported by the tool; the buckets are estimated from the catalog price.',
   Tempo: 'Time',
   Total: 'Total',
   'sem fase': 'no phase',

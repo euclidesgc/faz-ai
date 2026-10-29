@@ -262,6 +262,61 @@ export function parsePauses(json: string | undefined): UsageLimitPause[] {
   }
 }
 
+/** Um modelo de um perfil que esgotou o limite e foi trocado sozinho pela regra de fallback (#1100). */
+export interface ModelLimit {
+  profileId: string;
+  model: string;
+  /** até quando a marca vale (ms): a renovação + a folga, ou o fim do backoff */
+  resumeAt: number;
+  source: 'reset' | 'backoff';
+  attempts: number;
+}
+export const MODEL_LIMIT_META_KEY = 'usage_limit_models';
+
+/** A marca depois de mais um esgotamento do modelo: mesma regra de `nextPause` (renovação + folga, ou backoff). */
+export function nextModelLimit(prev: ModelLimit | null, profileId: string, model: string, resetAt: number | null, now: number): ModelLimit {
+  const current = prev && prev.profileId === profileId && prev.model === model ? prev : null;
+  const pause = nextPause(current, profileId, resetAt, now);
+  return { profileId, model, resumeAt: pause.resumeAt, source: pause.source, attempts: pause.attempts };
+}
+
+/** A marca do modelo, valendo ou vencida; null quando não há. */
+export function modelLimitOf(list: readonly ModelLimit[], profileId: string, model: string | null): ModelLimit | null {
+  if (model === null) return null;
+  return list.find((l) => l.profileId === profileId && l.model === model) ?? null;
+}
+
+/** A marca segura o modelo agora. Modelo null (o padrão do perfil) nunca é marcado. */
+export function modelLimitHolds(list: readonly ModelLimit[], profileId: string, model: string | null, now: number): boolean {
+  const mark = modelLimitOf(list, profileId, model);
+  return !!mark && mark.resumeAt > now;
+}
+
+/** Lê a lista da `meta`; inválido, corrompido ou duplicado (mesmo perfil + modelo) vira "sem marca". */
+export function parseModelLimits(json: string | undefined): ModelLimit[] {
+  if (!json) return [];
+  try {
+    const v: unknown = JSON.parse(json);
+    if (!Array.isArray(v)) return [];
+    const seen = new Set<string>();
+    const out: ModelLimit[] = [];
+    for (const item of v) {
+      if (!item || typeof item !== 'object') continue;
+      const m = item as Partial<ModelLimit>;
+      if (typeof m.model !== 'string' || !m.model) continue;
+      const pause = parsePause({ profileId: m.profileId, resumeAt: m.resumeAt, source: m.source, attempts: m.attempts });
+      if (!pause) continue;
+      const key = JSON.stringify([pause.profileId, m.model]);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ ...pause, model: m.model });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /**

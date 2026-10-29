@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react';
+import { Fragment, useState, type KeyboardEvent } from 'react';
 import { Button, Card, IconButton, Text, TextField } from '@radix-ui/themes';
 import { catalogTool, isAcpProfile, isReadyCli, type AiBase, type AiProfile } from '../../../../shared/aiProfiles';
 import type { AiTool } from '../../../../shared/harness';
@@ -11,6 +11,7 @@ import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
 import { ActionButton, FormField, IconPlus, IconTrash, SelectField, SwitchField } from '../../ui';
 import { useSentList } from '../useSentList';
+import { ModelPricing } from './ModelPricing';
 
 const splitList = (s: string): string[] =>
   s
@@ -123,6 +124,7 @@ export function AgentModels({ profile }: { profile: AiProfile }) {
   const connected = useBoardStore((s) => s.state?.connections?.[profile.id]?.summary.version);
   const installed = probed ?? connected;
   const [adding, setAdding] = useState(false);
+  const [pricingOf, setPricingOf] = useState<string | null>(null);
   const detect = useAction(() => settings.detectModels(tool));
   // as mudanças partem da última lista enviada (ver useSentList)
   const sent = useSentList(catalog, settings.setModels);
@@ -232,70 +234,89 @@ export function AgentModels({ profile }: { profile: AiProfile }) {
         </thead>
         <tbody>
           {mine.map((o) => (
-            <tr key={o.id}>
-              <td>
-                <TextField.Root
-                  aria-label={t('Nome de {model}', { model: o.model })}
-                  key={o.label}
-                  defaultValue={o.label}
-                  onBlur={(e) =>
-                    e.target.value.trim() && e.target.value.trim() !== o.label && patchModel(o.id, { label: e.target.value.trim() })
-                  }
-                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                />
-                {/* a CLI mais velha que a documentação pede: o apelido roda um modelo anterior a este */}
-                {o.requires && olderThan(installed, o.requires) && (
-                  <Text as="p" size="1" color="amber" className="model-requires">
-                    {t('Pede o Claude Code v{required} ou mais novo; o instalado é {installed}. Rode claude update.', {
-                      required: o.requires,
-                      installed: installed ?? '?',
-                    })}
-                  </Text>
-                )}
-              </td>
-              <td>
-                <code>{o.model}</code>
-              </td>
-              <td>
-                <TextField.Root
-                  aria-label={t('Esforços de {model}', { model: o.model })}
-                  key={o.efforts.join()}
-                  defaultValue={o.efforts.join(', ')}
-                  placeholder={t('sem ajuste de esforço')}
-                  onBlur={(e) => {
-                    const efforts = splitList(e.target.value);
-                    if (efforts.join() !== o.efforts.join())
-                      patchModel(o.id, {
-                        efforts,
-                        defaultEffort: o.defaultEffort && efforts.includes(o.defaultEffort) ? o.defaultEffort : (efforts[0] ?? null),
-                      });
-                  }}
-                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                />
-              </td>
-              <td className="narrow">
-                {o.efforts.length > 0 && (
-                  <SelectField
-                    aria-label={t('Esforço padrão de {model}', { model: o.model })}
-                    options={o.efforts.map((e) => ({ value: e, label: e }))}
-                    value={o.defaultEffort && o.efforts.includes(o.defaultEffort) ? o.defaultEffort : o.efforts[0]!}
-                    onChange={(defaultEffort) => patchModel(o.id, { defaultEffort })}
+            <Fragment key={o.id}>
+              <tr>
+                <td>
+                  <TextField.Root
+                    aria-label={t('Nome de {model}', { model: o.model })}
+                    key={o.label}
+                    defaultValue={o.label}
+                    onBlur={(e) =>
+                      e.target.value.trim() && e.target.value.trim() !== o.label && patchModel(o.id, { label: e.target.value.trim() })
+                    }
+                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                   />
-                )}
-              </td>
-              {/* sem confirmação de propósito: a lista pode ser refeita com "Detectar modelos" */}
-              <td className="narrow">
-                <IconButton
-                  variant="ghost"
-                  color="red"
-                  title={t('Remover do catálogo')}
-                  aria-label={t('Remover {model} do catálogo', { model: o.model })}
-                  onClick={() => setCatalog(sent.current().filter((x) => x.id !== o.id))}
-                >
-                  <IconTrash />
-                </IconButton>
-              </td>
-            </tr>
+                  {/* a CLI mais velha que a documentação pede: o apelido roda um modelo anterior a este */}
+                  {o.requires && olderThan(installed, o.requires) && (
+                    <Text as="p" size="1" color="amber" className="model-requires">
+                      {t('Pede o Claude Code v{required} ou mais novo; o instalado é {installed}. Rode claude update.', {
+                        required: o.requires,
+                        installed: installed ?? '?',
+                      })}
+                    </Text>
+                  )}
+                </td>
+                <td>
+                  <code>{o.model}</code>
+                </td>
+                <td>
+                  <TextField.Root
+                    aria-label={t('Esforços de {model}', { model: o.model })}
+                    key={o.efforts.join()}
+                    defaultValue={o.efforts.join(', ')}
+                    placeholder={t('sem ajuste de esforço')}
+                    onBlur={(e) => {
+                      const efforts = splitList(e.target.value);
+                      if (efforts.join() !== o.efforts.join())
+                        patchModel(o.id, {
+                          efforts,
+                          defaultEffort: o.defaultEffort && efforts.includes(o.defaultEffort) ? o.defaultEffort : (efforts[0] ?? null),
+                        });
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                  />
+                </td>
+                <td className="narrow">
+                  {o.efforts.length > 0 && (
+                    <SelectField
+                      aria-label={t('Esforço padrão de {model}', { model: o.model })}
+                      options={o.efforts.map((e) => ({ value: e, label: e }))}
+                      value={o.defaultEffort && o.efforts.includes(o.defaultEffort) ? o.defaultEffort : o.efforts[0]!}
+                      onChange={(defaultEffort) => patchModel(o.id, { defaultEffort })}
+                    />
+                  )}
+                </td>
+                {/* sem confirmação de propósito: a lista pode ser refeita com "Detectar modelos" */}
+                <td className="narrow">
+                  <Button
+                    size="1"
+                    variant="ghost"
+                    color="gray"
+                    aria-label={t('Preço de {model}', { model: o.model })}
+                    aria-expanded={pricingOf === o.id}
+                    onClick={() => setPricingOf(pricingOf === o.id ? null : o.id)}
+                  >
+                    {t('Preço')}
+                  </Button>
+                  <IconButton
+                    variant="ghost"
+                    color="red"
+                    title={t('Remover do catálogo')}
+                    aria-label={t('Remover {model} do catálogo', { model: o.model })}
+                    onClick={() => setCatalog(sent.current().filter((x) => x.id !== o.id))}
+                  >
+                    <IconTrash />
+                  </IconButton>
+                </td>
+              </tr>
+              {pricingOf === o.id && (
+                <tr>
+                  <td colSpan={5}>
+                    <ModelPricing option={o} onSave={(pricing) => patchModel(o.id, { pricing })} onDone={() => setPricingOf(null)} />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
           {mine.length === 0 && (
             <tr>

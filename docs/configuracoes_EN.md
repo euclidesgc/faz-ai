@@ -16,7 +16,7 @@ board's agents are in [Harness, agents and AI tools](harness_EN.md).
 | Workflows e colunas   | As many workflows as you want (independent cards or sub-tasks), with editable names and a position you change by dragging; **Nova coluna** (new column) on each one; names, order (drag) and meaning of the columns; where the AI works and which ones require approval; each column's phase (AI instruction and document template). Opening and closing workflows and columns happens on the board itself and is remembered                                                     |
 | Tipos de card         | Story, Bug, Sub-task…, with color and default field values per type                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section                                     |
-| Regras do board       | Completion and phase-advance blocks, confirmations, short track for small stories (Baixo effort or Bug type skips PRD and Spec)                                                                                                                                                                                                                                                                                                                         |
+| Regras do board       | Completion and phase-advance blocks, confirmations, short track for small stories (Baixo effort or Bug type skips PRD and Spec), **Mostrar custo em dólar** (on by default; off, no screen shows US$, useful for subscription users)                                                                                                                                                                                                                                                                                                                         |
 | Conectar agentes      | The AI agents that run the cards (every enabled agent, at the same time, and the default one for cards with no model); each one's account (sign in and out); **Conectar** (connect) with the board and the mode (CLI, ACP or API); each agent's models; the quick test, the test session and the protocol log; copies and custom profiles; each agent's fallback rules; each card's model suggestion                                                                                                               |
 | Harness               | The board artifacts (rules, skills, agents and MCP servers), with typed imports, CRUD, assistants and the default instructions agent(see [Harness](harness_EN.md#harness) and [Agents](harness_EN.md#agents)) |
 | Automação             | How the board runs the AI, with any enabled agent: what the AI may do, the time limit, the heartbeat (and Backlog refinement), stories and sub-tasks in parallel (see [Heartbeat and autonomous mode](automacao_EN.md))                                                                                                                                                                                                                                                               |
@@ -237,6 +237,13 @@ the suggestion rules offer for it, with each one's effort levels. Each model has
 the tool, accepted efforts and a default effort; **Novo modelo** (new model) registers one by hand and the
 trash icon removes it from the catalog, without confirmation.
 
+The **Preço** (price) action, on each row, opens four fields in US$ per million tokens: **Entrada**
+(input), **Saída** (output), **Leitura de cache** (cache read) and **Escrita de cache** (cache write).
+An empty field means "no price" (never zero), and the price applies from the next run onwards. The board
+uses this price to estimate the cost of runs the tool does not report, and warns: "Price entered by you;
+the board does not check it with the provider". A profile with a free-form model, with no catalog, does
+not have the action.
+
 **Detectar modelos** (detect models) reads the tool's list: for Cursor, the models of your account,
 through the `cursor-agent models` command, read when the board opens with the CLI signed in, and the
 first list read replaces the built-in one only once. Claude Code has no command that lists the models: on
@@ -433,6 +440,15 @@ agent). They sit in a list: the order is the priority (the first matching rule w
 shows **when** ("Claude Code · CLI · Opus 5.5 runs out of quota"), what the board **uses instead**
 ("Gemini · API · Pro, then Cursor · CLI · Auto") and **how** (switches by itself or asks first), with
 the switch to enable and disable, move up, move down, edit and remove.
+
+When the rule switches by itself, the board remembers that the model ran out, until the limit renews
+(or for the wait time, when the tool does not report the hour). The next automatic runs (autopilot and
+autonomous mode) and chat conversations already start at the rule's target, without calling the
+exhausted model again, and the card explains in the conversation why it ran on another model. If the
+target is exhausted too, the board follows the rule's list; after the time, the first run goes back to
+the requested model. A manual run always tests the requested model, and a run that finishes well on it
+clears the mark. With a person in the loop, the mark does not change the start, and **continue with**
+still holds as chosen.
 
 **Montar nova regra** (build new rule) opens the editor on the same screen, in three steps:
 

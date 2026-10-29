@@ -1,3 +1,4 @@
+import { DEFAULT_RULES } from '../../../shared/rules';
 import { t } from '../../i18n';
 import { useBoardStore } from '../../store/boardStore';
 import { Button, Placeholder } from '../ui';
@@ -22,6 +23,8 @@ import { useMetricsQuery } from './useMetricsQuery';
  */
 export function MetricsView() {
   const filters = useBoardStore((s) => s.metricsFilters);
+  // a regra do board "Mostrar custo em dólar", lida uma vez aqui e passada por prop às telas; sem o estado, vale o padrão
+  const showCost = useBoardStore((s) => s.state?.board.rules.showCost) ?? DEFAULT_RULES.showCost;
   const { result, loading, error, refresh } = useMetricsQuery(filters);
   const empty = result !== null && isEmptyResult(result);
   const period = result ? formatRange(result.range) : '';
@@ -67,10 +70,10 @@ export function MetricsView() {
             <EmptyPeriod logSince={result.logSince} />
           ) : (
             <>
-              <Totals result={result} />
-              <MonthSeries result={result} />
+              <Totals result={result} showCost={showCost} />
+              <MonthSeries result={result} showCost={showCost} />
               <Horizon result={result} workflow={filters.workflow} />
-              <MetricsBlocks result={result} />
+              <MetricsBlocks result={result} showCost={showCost} />
             </>
           )}
           <RetentionCard result={result} onChanged={refresh} />{' '}

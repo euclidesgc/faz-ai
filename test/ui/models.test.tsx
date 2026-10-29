@@ -166,10 +166,10 @@ describe('Conectar agentes: os modelos do agente', () => {
     expect(lastSent('settings.modelRules.set').rules[0]!.enabled).toBe(false);
   });
 
-  it('a tabela de modelos não tem coluna nem campo de preço', () => {
+  it('cada modelo do catálogo tem a ação Preço, fechada até a pessoa abrir', () => {
     show();
-    expect(screen.queryByText(/Preço/)).toBeNull();
-    expect(screen.queryByLabelText(/^Preço de /)).toBeNull();
+    expect(screen.getAllByRole('button', { name: /^Preço de / }).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Salvar preço')).toBeNull();
   });
 });
 

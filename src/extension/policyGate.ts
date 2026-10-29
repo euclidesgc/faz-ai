@@ -129,55 +129,147 @@ export interface GateInput {
 export function evaluateRunPolicy(input: GateInput): { decision: PolicyDecision; attempt: PolicyAttempt } | null {
   if (!input.constraints) return null;
   try {
-    const { state, snapshot, chain } = input;
-    const constraints = input.constraints;
-    const requestedSource = chain.requested.source;
-    const targets = new Map<string, ExecutionTarget>();
-    for (const r of snapshot.records) for (const t of r.policy.targets) targets.set(JSON.stringify([t.profileId, t.model, t.effort]), t);
-    const perProfile: Record<string, number> = {};
-    for (const id of input.runningProfiles) perProfile[id] = (perProfile[id] ?? 0) + 1;
-    const attempt = attemptOf(state, input.target, chain, input.execStartedAt, input.end);
-    const decision = evaluateExecutionPolicy({
-      snapshot,
-      requested: {
-        state: 'resolved',
-        target: executionTargetOf(state, chain.requested),
-        from: POLICY_SOURCE[requestedSource],
-        explicit: requestedSource === 'card' || requestedSource === 'chat',
-      },
-      context: {
-        action: input.action,
-        agentId: input.agentId,
-        phaseId: input.phaseId,
-        cardTypeId: input.cardTypeId,
-        origin: input.origin,
-      },
+    const attempt = attemptOf(input.state, input.target, input.chain, input.execStartedAt, input.end);
+    const decision = decide({
+      state: input.state,
+      snapshot: input.snapshot,
+      chain: input.chain,
+      attempt,
       failure: input.failure,
       effects: input.acted ? 'partial' : 'none',
-      constraints,
-      candidates: [...targets.values()].map((target) => {
-        const next = runTargetOfPolicy(state, target);
-        const profile = next?.cli;
-        return {
-          target,
-          available: !!next && cliProblem(state, next.cli.id) === null,
-          credential:
-            profile?.credentials?.review === 'pending'
-              ? ('pending' as const)
-              : profile && !isReadyCli(profile) && !(profile.credentials?.review === 'reviewed' && profile.credentials.available)
-                ? ('missing' as const)
-                : ('reviewed' as const),
-          admission: 'admitted' as const,
-          // o regime é de cada perfil (a ciência no Conectar, história 7): trocar para um perfil com outro regime
-          // muda o que a execução pode carregar, e a política recusa (`constraints-changed`)
-          constraints: { ...constraints, regime: admissionRegimeOf(state.board.runner, target.profileId).regime },
-        };
-      }),
-      trace: { startedAt: chain.startedAt, attempts: [...chain.attempts, attempt], budget: chain.budget },
-      running: { global: input.runningProfiles.length, perProfile },
-      now: attempt.endedAt,
+      action: input.action,
+      origin: input.origin,
+      agentId: input.agentId,
+      phaseId: input.phaseId,
+      cardTypeId: input.cardTypeId,
+      constraints: input.constraints,
+      runningProfiles: input.runningProfiles,
     });
     return { decision, attempt };
+  } catch {
+    return null;
+  }
+}
+
+/** O contexto que as políticas casam e o que a troca precisa manter; comum à falha real e à posição de partida. */
+interface DecideInput {
+  state: BoardState;
+  snapshot: ExecutionPolicySnapshot;
+  chain: Chain;
+  attempt: PolicyAttempt;
+  failure: PolicyFailure;
+  effects: 'none' | 'partial';
+  action: ContextAction;
+  origin: AiRunOrigin;
+  agentId: string | null;
+  phaseId: string | null;
+  cardTypeId: string | null;
+  constraints: ExecutionConstraints;
+  runningProfiles: string[];
+}
+
+/** O núcleo: chama o avaliador único com a tentativa pronta e os destinos que o board realmente consegue executar. */
+function decide(input: DecideInput): PolicyDecision {
+  const { state, snapshot, chain, attempt, constraints } = input;
+  const requestedSource = chain.requested.source;
+  const targets = new Map<string, ExecutionTarget>();
+  for (const r of snapshot.records) for (const t of r.policy.targets) targets.set(JSON.stringify([t.profileId, t.model, t.effort]), t);
+  const perProfile: Record<string, number> = {};
+  for (const id of input.runningProfiles) perProfile[id] = (perProfile[id] ?? 0) + 1;
+  return evaluateExecutionPolicy({
+    snapshot,
+    requested: {
+      state: 'resolved',
+      target: executionTargetOf(state, chain.requested),
+      from: POLICY_SOURCE[requestedSource],
+      explicit: requestedSource === 'card' || requestedSource === 'chat',
+    },
+    context: {
+      action: input.action,
+      agentId: input.agentId,
+      phaseId: input.phaseId,
+      cardTypeId: input.cardTypeId,
+      origin: input.origin,
+    },
+    failure: input.failure,
+    effects: input.effects,
+    constraints,
+    candidates: [...targets.values()].map((target) => {
+      const next = runTargetOfPolicy(state, target);
+      const profile = next?.cli;
+      return {
+        target,
+        available: !!next && cliProblem(state, next.cli.id) === null,
+        credential:
+          profile?.credentials?.review === 'pending'
+            ? ('pending' as const)
+            : profile && !isReadyCli(profile) && !(profile.credentials?.review === 'reviewed' && profile.credentials.available)
+              ? ('missing' as const)
+              : ('reviewed' as const),
+        admission: 'admitted' as const,
+        // o regime é de cada perfil (a ciência no Conectar, história 7): trocar para um perfil com outro regime
+        // muda o que a execução pode carregar, e a política recusa (`constraints-changed`)
+        constraints: { ...constraints, regime: admissionRegimeOf(state.board.runner, target.profileId).regime },
+      };
+    }),
+    trace: { startedAt: chain.startedAt, attempts: [...chain.attempts, attempt], budget: chain.budget },
+    running: { global: input.runningProfiles.length, perProfile },
+    now: attempt.endedAt,
+  });
+}
+
+export interface StartInput extends Omit<GateInput, 'target' | 'chain' | 'execStartedAt' | 'end' | 'failure' | 'acted' | 'constraints'> {
+  /** as restrições do plano do alvo pedido */
+  constraints: ExecutionConstraints | null;
+  /** o alvo que a execução pediria (já resolvido) */
+  requested: RunTarget;
+  /** o alvo está esgotado agora (marca do modelo ou pausa do perfil) */
+  exhausted: (target: RunTarget) => boolean;
+  now: number;
+}
+
+export interface StartPosition {
+  /** onde a execução começa */
+  target: RunTarget;
+  /** a cadeia com as tentativas sintéticas dos esgotados */
+  chain: Chain;
+  decision: PolicyDecision;
+  /** os esgotados pulados, em ordem (o primeiro é o pedido) */
+  skipped: RunTarget[];
+}
+
+/**
+ * Onde a execução começa quando o alvo pedido está esgotado: o destino que o avaliador único escolhe para uma
+ * tentativa sintética do esgotado (falha `quota`, efeitos `none`). Destino também esgotado vira mais uma tentativa
+ * sintética, até a cadeia acabar. null quando o pedido não está esgotado, sem restrições, ou a decisão não é `fallback`.
+ */
+export function startPosition(input: StartInput): StartPosition | null {
+  const { constraints, requested, now } = input;
+  if (!constraints || !input.exhausted(requested)) return null;
+  try {
+    let chain = newChain(requested, now);
+    let current = requested;
+    const skipped: RunTarget[] = [];
+    for (let step = 0; step < 100; step++) {
+      const attempt: PolicyAttempt = { target: executionTargetOf(input.state, current), startedAt: now, endedAt: now, consumption: null };
+      const decision = decide({
+        ...input,
+        constraints,
+        chain,
+        attempt,
+        failure: 'quota',
+        effects: 'none',
+        runningProfiles: input.runningProfiles,
+      });
+      if (decision.action !== 'fallback' || !decision.target) return null;
+      const next = runTargetOfPolicy(input.state, decision.target);
+      if (!next) return null;
+      skipped.push(current);
+      chain = chainAfter(chain, attempt, decision);
+      if (!input.exhausted(next)) return { target: next, chain, decision, skipped };
+      current = next;
+    }
+    return null;
   } catch {
     return null;
   }

@@ -112,4 +112,59 @@ describe('aba Consumo do card', () => {
     act(() => useBoardStore.setState({ state: { ...s, aiRuns: [] } }));
     expect(sentOf('card.usage.query')).toHaveLength(3);
   });
+
+  describe('coluna Custo', () => {
+    const buckets = { input: 0.1, output: 0.2, cacheRead: 0.05, cacheWrite: null };
+    const costed = (cost: CardUsageRow['cost'], over: Partial<CardUsageRow> = {}) => row('', { costedRuns: 1, cost, ...over });
+    const show = (phases: CardUsageRow[], total: CardUsageRow) => reply({ phases, subtasks: null, total, archivedUntil: '' });
+    const setShowCost = (showCost: boolean) => {
+      const s = useBoardStore.getState().state!;
+      act(() => useBoardStore.setState({ state: { ...s, board: { ...s.board, rules: { ...s.board.rules, showCost } } } }));
+    };
+
+    it('custo informado: valor e dica com os buckets e o aviso da ferramenta', async () => {
+      setShowCost(true);
+      await openUsage(board.storyId);
+      const c = costed({ totalUsd: 1.5, estimatedUsd: 0, buckets });
+      show([{ ...c, phase: 'Discovery' }], c);
+      const table = screen.getByRole('table');
+      expect(within(table).getByRole('columnheader', { name: 'Custo' })).toBeInTheDocument();
+      const cell = within(table)
+        .getAllByText(/US\$\s?1,50/)[0]!
+        .closest('td')!;
+      expect(cell.title).toContain('Entrada: ');
+      expect(cell.title).toContain('Escrita de cache: —');
+      expect(cell.title).toContain('o informado pela ferramenta');
+      expect(cell).not.toHaveTextContent('estimado');
+    });
+
+    it('custo estimado: marca estimado, sem aviso da ferramenta na dica', async () => {
+      setShowCost(true);
+      await openUsage(board.storyId);
+      const c = costed({ totalUsd: 0.4, estimatedUsd: 0.4, buckets });
+      show([{ ...c, phase: 'PRD' }], c);
+      expect(screen.getAllByText('estimado por tabela de preços').length).toBeGreaterThan(0);
+      const cell = screen.getAllByText(/US\$\s?0,40/)[0]!.closest('td')!;
+      expect(cell.title).not.toContain('informado pela ferramenta');
+    });
+
+    it('custo parcial avisa quantas execuções ele cobre; linha sem custo mostra "—"', async () => {
+      setShowCost(true);
+      await openUsage(board.storyId);
+      const c = costed({ totalUsd: 1, estimatedUsd: 0, buckets }, { runs: 3 });
+      show([{ ...c, phase: 'Spec' }, row('Plan')], c);
+      expect(screen.getAllByText('cobre 1 de 3 execuções').length).toBeGreaterThan(0);
+      const plan = screen.getByRole('rowheader', { name: 'Plan' }).closest('tr')!;
+      expect(plan).toHaveTextContent('—');
+    });
+
+    it('com a regra desligada a coluna não existe', async () => {
+      setShowCost(false);
+      await openUsage(board.storyId);
+      const c = costed({ totalUsd: 1.5, estimatedUsd: 0, buckets });
+      show([{ ...c, phase: 'Discovery' }], c);
+      expect(screen.queryByRole('columnheader', { name: 'Custo' })).toBeNull();
+      expect(screen.getByRole('table')).not.toHaveTextContent('US$');
+    });
+  });
 });

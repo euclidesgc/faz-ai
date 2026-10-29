@@ -1,12 +1,6 @@
 import { lastSent, renderThemed } from './setup';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-// o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
-vi.mock('../../src/shared/metrics', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../src/shared/metrics')>()),
-  SHOW_COST: true,
-  METRICS_MEASURES: ['cost', 'tokens', 'runs', 'duration'],
-}));
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HostToWebview } from '../../src/shared/messages';
@@ -90,7 +84,7 @@ const cells = (m: string) => [...row(m).children].map((c) => plain(c.textContent
 
 describe('MonthSeries: lacuna, zero e parcial', () => {
   it('mês sem dado é espaço rotulado "sem dado", não barra; mês zero é barra de altura zero com o valor (RF-13)', () => {
-    const { container } = renderThemed(<MonthSeries result={panel(fourMonths)} />);
+    const { container } = renderThemed(<MonthSeries showCost result={panel(fourMonths)} />);
     expect(bar(container, '2026-08')).toBeNull();
     const label = container.querySelector('.metrics-series-labels li[data-month="2026-08"]')!;
     expect(label).toHaveTextContent('sem dado');
@@ -105,7 +99,7 @@ describe('MonthSeries: lacuna, zero e parcial', () => {
   });
 
   it('mês parcial: hachura e contorno no gráfico e a palavra "parcial" na tabela, nada só na cor (RF-17, RF-28)', () => {
-    const { container } = renderThemed(<MonthSeries result={panel(fourMonths)} />);
+    const { container } = renderThemed(<MonthSeries showCost result={panel(fourMonths)} />);
     const current = bar(container, '2026-10')!;
     expect(current).toHaveClass('is-partial');
     const fill = current.getAttribute('fill')!;
@@ -122,7 +116,7 @@ describe('MonthSeries: lacuna, zero e parcial', () => {
   });
 
   it('mês arquivado diz "só total mensal" na tabela', () => {
-    renderThemed(<MonthSeries result={panel([month('2026-09', { archived: true }), month('2026-10', { partial: true })])} />);
+    renderThemed(<MonthSeries showCost result={panel([month('2026-09', { archived: true }), month('2026-10', { partial: true })])} />);
     expect(cells('2026-09')[2]).toBe('só total mensal');
   });
 
@@ -138,7 +132,7 @@ describe('MonthSeries: lacuna, zero e parcial', () => {
     const points = seriesPoints(months, 'cost');
     expect(points.map((p) => p.costPartial)).toEqual([true, false]);
     expect(seriesPoints(months, 'tokens').map((p) => p.costPartial)).toEqual([false, false]);
-    const { container } = renderThemed(<MonthSeries result={panel(months)} />);
+    const { container } = renderThemed(<MonthSeries showCost result={panel(months)} />);
     expect(cells('2026-09')[2]).toBe('custo parcial');
     expect(bar(container, '2026-09')).toHaveClass('is-partial');
     expect(cells('2026-10')[2]).toBe('');
@@ -160,7 +154,7 @@ describe('MonthSeries: lacuna, zero e parcial', () => {
 
 describe('MonthSeries: gráfico e tabela equivalente', () => {
   it('tabela visível com um valor por mês, batendo com as barras (RF-30)', () => {
-    const { container } = renderThemed(<MonthSeries result={panel(fourMonths)} />);
+    const { container } = renderThemed(<MonthSeries showCost result={panel(fourMonths)} />);
     const table = screen.getByRole('table');
     expect(table).toBeVisible();
     expect(table).not.toHaveClass('sr-only');
@@ -182,7 +176,7 @@ describe('MonthSeries: gráfico e tabela equivalente', () => {
   });
 
   it('o <svg> é role="img" com aria-label resumindo a série, e não tem texto dentro', () => {
-    const { container } = renderThemed(<MonthSeries result={panel(fourMonths)} />);
+    const { container } = renderThemed(<MonthSeries showCost result={panel(fourMonths)} />);
     const svg = screen.getByRole('img');
     expect(svg.tagName.toLowerCase()).toBe('svg');
     expect(svg).toHaveAttribute('preserveAspectRatio', 'none');
@@ -196,7 +190,7 @@ describe('MonthSeries: gráfico e tabela equivalente', () => {
   });
 
   it('um mês só: uma barra, gráfico estreito, sem fingir tendência (RF-15)', () => {
-    const { container } = renderThemed(<MonthSeries result={panel([month('2026-10', { partial: true, costUsd: 3 })])} />);
+    const { container } = renderThemed(<MonthSeries showCost result={panel([month('2026-10', { partial: true, costUsd: 3 })])} />);
     expect(bars(container)).toHaveLength(1);
     expect(container.querySelector('.metrics-series-chart')).toHaveClass('is-single');
     expect(container.querySelector('polyline, path')).toBeNull();
@@ -206,7 +200,7 @@ describe('MonthSeries: gráfico e tabela equivalente', () => {
 
   it('nenhum mês medido: aviso no lugar das barras, e a tabela diz "não medido" (nunca zero)', () => {
     const { container } = renderThemed(
-      <MonthSeries result={panel([month('2026-09', { costUsd: null }), month('2026-10', { costUsd: null })])} />,
+      <MonthSeries showCost result={panel([month('2026-09', { costUsd: null }), month('2026-10', { costUsd: null })])} />,
     );
     expect(container.querySelector('svg.metrics-series-svg')).toBeNull();
     expect(screen.getByText(/Nenhum mês deste período tem custo medido/)).toBeInTheDocument();
@@ -217,7 +211,7 @@ describe('MonthSeries: gráfico e tabela equivalente', () => {
 
 describe('MonthSeries: alternador Custo / Tokens (RF-16)', () => {
   it('troca a série: título, unidade, cabeçalho da tabela, valores e barras mudam juntos', async () => {
-    const { container } = renderThemed(<MonthSeries result={panel(fourMonths)} />);
+    const { container } = renderThemed(<MonthSeries showCost result={panel(fourMonths)} />);
     const cost = screen.getByRole('button', { name: 'Custo' });
     const tok = screen.getByRole('button', { name: 'Tokens' });
     expect(cost).toHaveAttribute('aria-pressed', 'true');
@@ -239,7 +233,7 @@ describe('MonthSeries: alternador Custo / Tokens (RF-16)', () => {
 
   it('em inglês', async () => {
     setLocale('en');
-    renderThemed(<MonthSeries result={panel(fourMonths)} />);
+    renderThemed(<MonthSeries showCost result={panel(fourMonths)} />);
     expect(screen.getByRole('heading', { name: 'Cost per month' })).toBeInTheDocument();
     expect(cells('2026-08')[2]).toBe('no data');
     expect(cells('2026-10')).toEqual(['Oct 2026', '$12.50', 'partial']);

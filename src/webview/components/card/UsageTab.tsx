@@ -7,7 +7,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { dt, t, tn } from '../../i18n';
 import { ContextDetail } from '../cardView/ContextGauge';
 import { Placeholder } from '../ui';
-import { formatCompact, formatDuration, formatMonth, formatNumber, unmeasured } from '../metrics/format';
+import { costBucketsTitle, formatCompact, formatCost, formatDuration, formatMonth, formatNumber, unmeasured } from '../metrics/format';
 import { useCardUsage } from './useCardUsage';
 
 /** Tokens compactos na célula, com o número exato na dica; "não medido" quando a linha não tem medição. */
@@ -20,7 +20,21 @@ function TokenCell({ value }: { value: number | undefined }) {
   );
 }
 
-function UsageLine({ label, row, total = false }: { label: string; row: CardUsageRow; total?: boolean }) {
+/** Custo da linha: valor, marca de estimado, aviso de parcial e os buckets na dica; "—" sem custo. */
+function CostCell({ row }: { row: CardUsageRow }) {
+  const cost = row.cost;
+  if (!cost) return <td className="is-number muted">—</td>;
+  const partial = row.costedRuns < row.runs;
+  return (
+    <td className="is-number" title={costBucketsTitle(cost.buckets, cost.estimatedUsd < cost.totalUsd)}>
+      {formatCost(cost.totalUsd)}
+      {cost.estimatedUsd > 0 && <div className="muted">{t('estimado por tabela de preços')}</div>}
+      {partial && <div className="muted">{t('cobre {costed} de {runs} execuções', { costed: row.costedRuns, runs: row.runs })}</div>}
+    </td>
+  );
+}
+
+function UsageLine({ label, row, total = false, showCost }: { label: string; row: CardUsageRow; total?: boolean; showCost: boolean }) {
   const tk = row.tokens ?? undefined;
   return (
     <tr className={total ? 'usage-total' : undefined}>
@@ -32,6 +46,7 @@ function UsageLine({ label, row, total = false }: { label: string; row: CardUsag
       <TokenCell value={tk?.cacheRead} />
       <TokenCell value={tk?.cacheWrite} />
       <TokenCell value={tk?.total} />
+      {showCost && <CostCell row={row} />}
     </tr>
   );
 }
@@ -42,6 +57,7 @@ function UsageLine({ label, row, total = false }: { label: string; row: CardUsag
  */
 export function UsageTab({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
+  const showCost = state.board.rules.showCost;
   const preview = useMemo(() => executionContextOf(state, card), [state, card]);
   // uma execução do card (ou de uma sub-tarefa) que começa ou termina muda o que já foi gasto
   const childIds = state.cards.filter((c) => c.parentId === card.id).map((c) => c.id);
@@ -90,16 +106,21 @@ export function UsageTab({ card }: { card: Card }) {
                     <th scope="col" className="is-number">
                       {t('Total')}
                     </th>
+                    {showCost && (
+                      <th scope="col" className="is-number">
+                        {t('Custo')}
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
                   {usage.phases.map((row) => (
-                    <UsageLine key={row.phase} label={row.phase ? dt(row.phase) : t('sem fase')} row={row} />
+                    <UsageLine key={row.phase} label={row.phase ? dt(row.phase) : t('sem fase')} row={row} showCost={showCost} />
                   ))}
-                  {usage.subtasks && <UsageLine label={t('Sub-tarefas')} row={usage.subtasks} />}
+                  {usage.subtasks && <UsageLine label={t('Sub-tarefas')} row={usage.subtasks} showCost={showCost} />}
                 </tbody>
                 <tfoot>
-                  <UsageLine label={t('Total')} row={usage.total} total />
+                  <UsageLine label={t('Total')} row={usage.total} total showCost={showCost} />
                 </tfoot>
               </table>
             </div>
