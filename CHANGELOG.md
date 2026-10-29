@@ -10,6 +10,7 @@
 - Ao fim de uma execução do Codex (agente ACP), o board lê o uso da cota (janelas de 5 h e semanal) do rollout mais recente em `$CODEX_HOME/sessions` (ou `~/.codex/sessions`) e o entrega no relatório da execução, para a troca antecipada; qualquer falha na leitura vira "desconhecido" (#1210).
 - Depois que um modelo esgota o limite e a regra troca sozinha, as execuções e o chat seguintes já começam no destino (#1100).
 - Preço por modelo no catálogo (`upsert_model`) estima o custo em US$ das execuções sem custo informado; a regra "Mostrar custo em dólar" o desliga para quem usa assinatura (#1104).
+- O custo em US$ aparece na aba Consumo e nas Métricas, com o estimado marcado, e o preço de cada modelo se edita em Configurações › Conectar agentes (#1195).
 - O card aberto mostra os commits da branch da história agrupados por fase (hash, assunto, data, card e run), lidos dos trailers `Faz-AI-*`; a seção some quando não há commits.
 - Nova Biblioteca de artefatos do board em Configurações › Harness › Artefatos do board: cada regra, skill, agente e servidor MCP fica ativo ou inativo, com contador, busca, filtro e árvore de pastas das skills.
 - Os formulários **Nova regra**, **Nova skill** e **Novo agente** abrem com modelo, tools e frontmatter ao vivo, compatibilidade entre skill e agente e prévia da exportação.
@@ -45,6 +46,7 @@
 - Na aba Modelos de cada agente, o **Modelo padrão** vale quando ele executa sem modelo indicado: card sem modelo, chat em **Auto** e teste rápido.
 - Nova trilha direta: a história da trilha curta com plano de até uns 3 arquivos é implementada pela própria sessão, sem sub-tarefas (#1107).
 - A ferramenta MCP `update_rules` aceita a regra `shortTrack` (#1107).
+- Os commits feitos numa execução do board ganham os trailers `Faz-AI-*` com card, fase e execução (#1101).
 
 ### Alterado
 

@@ -1,12 +1,6 @@
 import { choose, posted, renderThemed } from './setup';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-// o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
-vi.mock('../../src/shared/metrics', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../src/shared/metrics')>()),
-  SHOW_COST: true,
-  METRICS_MEASURES: ['cost', 'tokens', 'runs', 'duration'],
-}));
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -113,7 +107,7 @@ function Connected({ sections }: { sections: MetricsPanelSections }) {
   const blocks = useBoardStore((s) => s.metricsBlocks);
   const setBlocks = useBoardStore((s) => s.setMetricsBlocks);
   const r = result(sections);
-  return <Breakdown result={r} sections={r.sections} dim={blocks.dim} measure={blocks.measure} onChange={setBlocks} />;
+  return <Breakdown showCost result={r} sections={r.sections} dim={blocks.dim} measure={blocks.measure} onChange={setBlocks} />;
 }
 
 const PERIOD = '1 de setembro de 2026 a 4 de outubro de 2026';
@@ -385,8 +379,33 @@ describe('Breakdown: período vazio e idioma', () => {
   });
 
   it('MetricsBlocks monta o corte dentro de "Onde o consumo aconteceu"', () => {
-    renderThemed(<MetricsBlocks result={result(sectionsWith(phases()))} />);
+    renderThemed(<MetricsBlocks showCost result={result(sectionsWith(phases()))} />);
     const region = screen.getByRole('region', { name: 'Onde o consumo aconteceu' });
     expect(within(region).getByRole('img', { name: `Custo por fase, ${PERIOD}` })).toBeInTheDocument();
+  });
+
+  it('a célula de custo traz os quatro buckets na dica; sem buckets (mês arquivado) não há dica', () => {
+    const buckets = { input: 1, output: 0.5, cacheRead: 0.25, cacheWrite: null };
+    renderThemed(
+      <Connected
+        sections={sectionsWith(
+          cut('phase', [cell('Implementação', { costUsd: 3, costBuckets: buckets }), cell('Revisão', { costUsd: 2 })]),
+        )}
+      />,
+    );
+    const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+    const withBuckets = within(rows[0]!).getAllByRole('cell')[0]!;
+    expect(withBuckets.getAttribute('title')).toMatch(/Entrada: US\$\s1,00/);
+    expect(withBuckets.getAttribute('title')).toContain('Escrita de cache: —');
+    expect(within(rows[1]!).getAllByRole('cell')[0]!.hasAttribute('title')).toBe(false);
+  });
+
+  it('com showCost falso o corte não oferece custo e a medida guardada como custo cai em tokens', () => {
+    const r = result(sectionsWith(phases()));
+    const { container } = renderThemed(
+      <Breakdown showCost={false} result={r} sections={r.sections} dim="phase" measure="cost" onChange={() => {}} />,
+    );
+    expect(screen.getByRole('combobox', { name: 'Medida da barra' })).toHaveTextContent('Tokens');
+    expect(container.textContent).not.toMatch(/US\$|Custo/);
   });
 });

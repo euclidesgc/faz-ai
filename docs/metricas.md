@@ -138,8 +138,15 @@ O gasto é histórico e só cresce: apagar mensagens da conversa, desmarcar uma 
 diminui as próximas execuções (a estimativa), nunca o que já foi gasto. Uma execução sem medição conta
 nas execuções e aparece como **não medido**, nunca como zero; uma execução em andamento entra quando
 termina, e a aba se atualiza sozinha. As execuções de meses que passaram da retenção do detalhe ficam
-só nos totais mensais do board e a aba avisa até quando. Como no resto do board, o consumo é em
-tokens, sem custo em dólar.
+só nos totais mensais do board e a aba avisa até quando.
+
+Com a regra **Mostrar custo em dólar** ligada (o padrão), a tabela ganha a coluna **Custo**, depois de
+**Total**, em US$. Quando parte do valor vem do preço cadastrado no catálogo, e não da ferramenta, a
+célula leva a marca **estimado**. Quando só algumas execuções da linha têm custo, a célula avisa
+**cobre X de Y execuções**, em vez de somar como se fosse tudo. A dica da célula mostra os quatro
+buckets (entrada, saída, leitura e escrita de cache); um bucket sem preço aparece como "—", e, quando o
+total veio da ferramenta, a dica diz que os buckets são estimativa pelo preço do catálogo. Uma linha
+sem nenhum custo mostra "—". Desligada a regra, a coluna some e a aba volta a mostrar só tokens.
 
 ## Consumo e inventário de cada execução
 
@@ -217,13 +224,20 @@ pelo navegador.
 
 ### Consumo
 
+- **Custo em US$.** Com a regra **Mostrar custo em dólar** ligada, a medida **custo** vira a padrão
+  quando o período tem custo medido, e o gráfico mensal e os rankings passam a mostrar dólares. O
+  que foi estimado pelo preço do catálogo leva a marca **estimado**, e uma linha com custo só de parte
+  das execuções avisa **custo parcial**. Na tabela do detalhamento, a dica da célula de custo traz os
+  quatro buckets (entrada, saída, leitura e escrita de cache); o mês arquivado guarda só o total,
+  então não tem buckets. A estimativa usa o modelo principal da execução. Com a regra desligada, a
+  medida **custo** não existe e nenhuma tela mostra "US$".
 - **Tokens por mês.** Gráfico de barras com os tokens de cada mês. O mês em andamento aparece com
   hachura, porque ainda não terminou; um mês sem nenhum dado é um espaço marcado "sem dado", não uma
   barra de altura zero. Abaixo do gráfico fica uma tabela com os mesmos números e uma coluna de
   observação (parcial, sem dado, só total mensal).
 - **Onde o consumo aconteceu.** O consumo do período repartido por **fase, tipo de card, modelo,
   ferramenta de IA, modo da ferramenta, esforço ou perfil** (seletor **Recortar por**), em barras
-  horizontais na medida escolhida em **Medida da barra**: tokens, execuções ou tempo de IA. O **modo da
+  horizontais na medida escolhida em **Medida da barra**: custo (US$, com a regra **Mostrar custo em dólar** ligada), tokens, execuções ou tempo de IA. O **modo da
   ferramenta** é como o board falou com ela (CLI, ACP ou API): o mesmo Gemini mede de formas
   diferentes em cada modo, e a linha da ferramenta soma os três. Execuções anteriores ao registro do
   modo (e os meses arquivados antes dele) aparecem como "não definido". Ao lado fica a tabela com

@@ -571,6 +571,8 @@ export class AiRunner {
           phase,
         },
         cwd: this.deps.cwd,
+        // a coluna da história, não a do card (numa sub-tarefa seria "Em andamento")
+        commitTrailers: { card: card.number, phase: storyPhase },
         timeoutMinutes: state.board.runner.timeoutMinutes,
         beforeStart: options.beforeStart,
         prepare: () => {

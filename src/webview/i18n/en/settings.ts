@@ -184,6 +184,24 @@ export const settings: Record<string, string> = {
     'skip the PRD and Spec columns and take the story straight to Plan. Dragging the story, or the AI moving it, to PRD or Spec still works and forces the full track.',
   'seguir coluna a coluna, como as demais histórias.': 'go column by column, like the other stories.',
   Ligar: 'Turn on',
+  'Mostrar custo em dólar': 'Show cost in dollars',
+  'o consumo de uma execução, de um card ou do mês é exibido (aba Consumo e Métricas)':
+    'the usage of a run, a card or the month is shown (Usage tab and Metrics)',
+  'mostrar o custo em US$, marcado como estimado quando vem do preço do catálogo.':
+    'show the cost in US$, marked as estimated when it comes from the catalog price.',
+  'esconder o custo em US$. Os dados seguem gravados e voltam ao ligar a regra.':
+    'hide the cost in US$. The data stays saved and returns when the rule is turned on.',
+  'Preço de {model}': 'Price of {model}',
+  Preço: 'Price',
+  Entrada: 'Input',
+  'Leitura de cache': 'Cache read',
+  'Escrita de cache': 'Cache write',
+  'sem preço': 'no price',
+  'Informe um número maior ou igual a zero, ou deixe vazio.': 'Enter a number greater than or equal to zero, or leave it empty.',
+  'US$ por milhão de tokens. Campo vazio = sem preço. O preço vale da próxima execução em diante.':
+    'US$ per million tokens. Empty field = no price. The price applies from the next run onwards.',
+  'Preço informado por você; o board não confere com o provedor.': 'Price entered by you; the board does not check it with the provider.',
+  'Salvar preço': 'Save price',
   'Cancelar história com sub-tarefas em aberto': 'Cancel a story with open sub-tasks',
   'uma história é movida para uma coluna de cancelamento ({names}) e ainda tem sub-tarefas em aberto':
     'a story is moved to a cancelled column ({names}) and still has open sub-tasks',

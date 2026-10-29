@@ -108,6 +108,30 @@ campo, com a explicação do que a renomeação faz e do que não altera. No **D
 o item **Nome da branch principal/develop** (recomendação, não bloqueia) fica pendente enquanto houver
 pedido à espera, com o comando do clone local e o botão **Abrir a tela Git**.
 
+## Trailers de rastreio nos commits
+
+Todo commit feito por uma execução de card do board leva três trailers no fim da mensagem:
+
+- `Faz-AI-Card`: o card que a execução roda (a sub-tarefa, ou a história);
+- `Faz-AI-Phase`: a coluna da história no início da execução;
+- `Faz-AI-Run`: o id da execução, o mesmo que está em `ai_runs`.
+
+- Valem para CLI, ACP e API, e só para execuções de card: o chat e as sugestões não recebem trailers.
+- Commits feitos pela pessoa fora de uma execução não mudam. Nada é gravado no `.git`: a configuração
+  vale só para o processo da execução e some com ele.
+- `--no-verify` não tira os trailers. Um `--amend` deixa uma ocorrência de cada, com os valores da
+  execução atual.
+- Os hooks do repositório (por exemplo, husky) continuam rodando, e a falha de um deles continua
+  impedindo o commit.
+- Precisa de git 2.31 ou mais novo. Abaixo disso, o canal avisa uma vez e a execução segue sem trailers.
+- Detalhe de implementação: a execução recebe `FAZ_AI_TRAILER_CARD`, `FAZ_AI_TRAILER_PHASE`,
+  `FAZ_AI_TRAILER_RUN` e `FAZ_AI_GIT_CONFIG_COUNT`, e os pares `GIT_CONFIG_*` que apontam
+  `core.hooksPath` para uma pasta temporária da própria execução. Os pares `GIT_CONFIG_*` que a
+  pessoa já tinha são preservados.
+- Riscos não validados: se a sandbox da ferramenta não lê a pasta temporária, o commit sai sem
+  trailer, e os hooks do repositório também não rodam naquela execução. Se a ferramenta limpa o
+  ambiente dos processos filhos, o commit sai sem trailer e com a configuração normal do git.
+
 ## Pull request e merge na Homologação
 
 Na Homologação a IA escreve o roteiro **"Como testar"** (o que foi construído, os passos para

@@ -1,12 +1,6 @@
 import { renderThemed } from './setup';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-// o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
-vi.mock('../../src/shared/metrics', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../src/shared/metrics')>()),
-  SHOW_COST: true,
-  METRICS_MEASURES: ['cost', 'tokens', 'runs', 'duration'],
-}));
 import { screen, within } from '@testing-library/react';
 import { EMPTY_METRICS_FILTERS, type MetricsPanelResult } from '../../src/shared/metrics';
 import { setLocale } from '../../src/webview/i18n';
@@ -53,19 +47,19 @@ const card = (name: string) => screen.getByRole('group', { name });
 
 describe('Totals: execuções acima do limite de consumo', () => {
   it('mostra a contagem quando é maior que zero', () => {
-    renderThemed(<Totals result={result({ overLimitRuns: 3 })} />);
+    renderThemed(<Totals showCost result={result({ overLimitRuns: 3 })} />);
     expect(within(card('Execuções de IA')).getByText('3 acima do limite de consumo')).toBeInTheDocument();
   });
 
   it.each([0, undefined])('não mostra a linha com %s', (overLimitRuns) => {
-    renderThemed(<Totals result={result({ overLimitRuns })} />);
+    renderThemed(<Totals showCost result={result({ overLimitRuns })} />);
     expect(within(card('Execuções de IA')).queryByText(/acima do limite/)).toBeNull();
   });
 });
 
 describe('Totals: os cinco totais', () => {
   it('mostra os cinco valores da resposta (RF-09)', () => {
-    renderThemed(<Totals result={result()} />);
+    renderThemed(<Totals showCost result={result()} />);
     expect(within(card('Atividades concluídas')).getByText('7')).toBeInTheDocument();
     expect(within(card('Execuções de IA')).getByText('11')).toBeInTheDocument();
     expect(within(card('Tokens')).getByText('10.000')).toBeInTheDocument();
@@ -74,7 +68,7 @@ describe('Totals: os cinco totais', () => {
   });
 
   it('cada rótulo diz o que conta, e o de tempo diz que é soma (RF-10)', () => {
-    renderThemed(<Totals result={result()} />);
+    renderThemed(<Totals showCost result={result()} />);
     expect(within(card('Atividades concluídas')).getByText(/coluna de conclusão/)).toBeInTheDocument();
     expect(within(card('Execuções de IA')).getByText(/acionada/)).toBeInTheDocument();
     expect(within(card('Tempo de IA')).getByText(/^Soma da duração/)).toBeInTheDocument();
@@ -82,18 +76,18 @@ describe('Totals: os cinco totais', () => {
   });
 
   it('execuções em andamento aparecem à parte e ficam fora do tempo (RF-11)', () => {
-    renderThemed(<Totals result={result({ runsOpen: 2 })} />);
+    renderThemed(<Totals showCost result={result({ runsOpen: 2 })} />);
     expect(within(card('Execuções de IA')).getByText('2 em andamento')).toBeInTheDocument();
     expect(within(card('Tempo de IA')).getByText('2 em andamento, fora desta soma')).toBeInTheDocument();
   });
 
   it('sem execução aberta não escreve "em andamento"', () => {
-    renderThemed(<Totals result={result()} />);
+    renderThemed(<Totals showCost result={result()} />);
     expect(screen.queryByText(/^\d+ em andamento/)).toBeNull();
   });
 
   it('a quebra dos tokens traz os quatro tipos, somando o total exibido (RF-12)', () => {
-    renderThemed(<Totals result={result()} />);
+    renderThemed(<Totals showCost result={result()} />);
     const box = within(card('Tokens'));
     const shown = ['Entrada', 'Saída', 'Leitura de cache', 'Escrita de cache'].map((label) => {
       const dt = box.getByText(label);
@@ -106,6 +100,7 @@ describe('Totals: os cinco totais', () => {
   it('tokens e custo null viram "não medido", nunca 0 nem US$ 0,00 (RF-18)', () => {
     renderThemed(
       <Totals
+        showCost
         result={result({ tokens: null, costUsd: null, costEstimatedUsd: null, costInformedUsd: null, measuredRuns: 0, costedRuns: 0 })}
       />,
     );
@@ -120,38 +115,38 @@ describe('Totals: os cinco totais', () => {
   });
 
   it('o aviso do "não medido" é a descrição do número (aria-describedby)', () => {
-    renderThemed(<Totals result={result({ tokens: null, costUsd: null, measuredRuns: 0, costedRuns: 0 })} />);
+    renderThemed(<Totals showCost result={result({ tokens: null, costUsd: null, measuredRuns: 0, costedRuns: 0 })} />);
     const value = within(card('Custo')).getByText('não medido');
     const note = document.getElementById(value.getAttribute('aria-describedby')!);
     expect(note).toHaveTextContent(/Nenhuma das 11 execuções/);
   });
 
   it('medido em parte traz o número com o aviso de parcialidade (RF-18)', () => {
-    renderThemed(<Totals result={result({ runs: 11, measuredRuns: 8, costedRuns: 8 })} />);
+    renderThemed(<Totals showCost result={result({ runs: 11, measuredRuns: 8, costedRuns: 8 })} />);
     expect(within(card('Custo')).getByText('US$ 12,50')).toBeInTheDocument();
     expect(within(card('Custo')).getByText(/3 de 11 execuções não foram medidas/)).toBeInTheDocument();
     expect(within(card('Tokens')).getByText(/3 de 11 execuções não foram medidas/)).toBeInTheDocument();
   });
 
   it('tudo medido não traz aviso de parcialidade', () => {
-    renderThemed(<Totals result={result()} />);
+    renderThemed(<Totals showCost result={result()} />);
     expect(screen.queryByText(/não foram medidas/)).toBeNull();
   });
 
   it('a parte estimada do custo é marcada como estimada (RF-19)', () => {
-    renderThemed(<Totals result={result({ costUsd: 15, costEstimatedUsd: 12.5, costInformedUsd: 2.5 })} />);
+    renderThemed(<Totals showCost result={result({ costUsd: 15, costEstimatedUsd: 12.5, costInformedUsd: 2.5 })} />);
     expect(
       within(card('Custo')).getByText(/Estimado por tabela de preços: US\$ 12,50; informado pela ferramenta: US\$ 2,50/),
     ).toBeInTheDocument();
   });
 
   it('custo todo informado não leva marca de estimado', () => {
-    renderThemed(<Totals result={result({ costUsd: 3, costEstimatedUsd: 0, costInformedUsd: 3 })} />);
+    renderThemed(<Totals showCost result={result({ costUsd: 3, costEstimatedUsd: 0, costInformedUsd: 3 })} />);
     expect(screen.queryByText(/Estimado/)).toBeNull();
   });
 
   it('custo não medido com tokens medidos: o aviso do custo se explica e o aria-describedby aponta para ele', () => {
-    renderThemed(<Totals result={result({ costUsd: null, costEstimatedUsd: null, costInformedUsd: null, costedRuns: 0 })} />);
+    renderThemed(<Totals showCost result={result({ costUsd: null, costEstimatedUsd: null, costInformedUsd: null, costedRuns: 0 })} />);
     const cost = within(card('Custo'));
     const value = cost.getByText('não medido');
     expect(cost.getByText(/Nenhuma das 11 execuções teve custo medido/)).toBeInTheDocument();
@@ -162,7 +157,7 @@ describe('Totals: os cinco totais', () => {
   });
 
   it('custo parcial (costedRuns < runs) avisa no custo mesmo com todos os tokens medidos', () => {
-    renderThemed(<Totals result={result({ costedRuns: 4 })} />);
+    renderThemed(<Totals showCost result={result({ costedRuns: 4 })} />);
     const cost = within(card('Custo'));
     expect(cost.getByText(/7 de 11 execuções não foram medidas/)).toBeInTheDocument();
     const value = cost.getByText('US$ 12,50');
@@ -171,14 +166,14 @@ describe('Totals: os cinco totais', () => {
   });
 
   it('o aria-describedby de todo total aponta para um id que existe', () => {
-    renderThemed(<Totals result={result({ costUsd: null, costEstimatedUsd: null, costedRuns: 0, measuredRuns: 5 })} />);
+    renderThemed(<Totals showCost result={result({ costUsd: null, costEstimatedUsd: null, costedRuns: 0, measuredRuns: 5 })} />);
     for (const el of document.querySelectorAll('[aria-describedby]')) {
       expect(document.getElementById(el.getAttribute('aria-describedby')!)).not.toBeNull();
     }
   });
 
   it('a lista de tokens usa as classes próprias, sem colidir com o corte por dimensão', () => {
-    const { container } = renderThemed(<Totals result={result()} />);
+    const { container } = renderThemed(<Totals showCost result={result()} />);
     expect(container.querySelector('dl.metrics-token-breakdown')).not.toBeNull();
     expect(container.querySelectorAll('.metrics-token-breakdown-row')).toHaveLength(4);
     expect(container.querySelector('.metrics-breakdown, .metrics-breakdown-row')).toBeNull();
@@ -186,7 +181,7 @@ describe('Totals: os cinco totais', () => {
 
   it('em inglês os rótulos e avisos saem traduzidos', () => {
     setLocale('en');
-    renderThemed(<Totals result={result({ tokens: null, costUsd: null, measuredRuns: 0, costedRuns: 0, runsOpen: 1 })} />);
+    renderThemed(<Totals showCost result={result({ tokens: null, costUsd: null, measuredRuns: 0, costedRuns: 0, runsOpen: 1 })} />);
     expect(card('AI time')).toBeInTheDocument();
     expect(within(card('Cost')).getByText('not measured')).toBeInTheDocument();
     expect(within(card('AI runs')).getByText('1 in progress')).toBeInTheDocument();

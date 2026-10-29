@@ -85,3 +85,14 @@ describe('RulesSettings: sem o aviso sobre a aba Modelos', () => {
     expect(screen.queryByRole('switch', { name: 'Preencher o modelo sugerido automaticamente' })).toBeNull();
   });
 });
+
+describe('RulesSettings: Mostrar custo em dólar', () => {
+  it('nasce ligada e o interruptor desliga e liga a regra showCost', async () => {
+    show();
+    const card = rule('Mostrar custo em dólar');
+    expect(rules().showCost).toBe(true);
+    expect(within(card).getByText('Ativa')).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole('switch', { name: 'Mostrar' }));
+    expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { showCost: false } });
+  });
+});
