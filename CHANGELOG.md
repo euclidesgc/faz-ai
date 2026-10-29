@@ -97,6 +97,8 @@
 
 ### Corrigido
 
+- A história parada numa sub-tarefa diz o motivo real e os passos para destravar, sem repetir a mesma mensagem na conversa.
+- A sub-tarefa que falhou ao começar volta a rodar depois que a pessoa responde, em vez de bloquear a história de novo.
 - A lista de modelos do Gemini pela API não traz mais modelos de voz, imagem, música e pesquisa.
 - No Cursor, o erro da execução (como o limite de uso) não fica mais escondido atrás de "o encerramento da árvore de processos ainda não foi confirmado".
 - A mensagem de limite do Gemini diz qual cota acabou e a hora em que volta.

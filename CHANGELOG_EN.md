@@ -97,6 +97,8 @@
 
 ### Fixed
 
+- A story stopped at a sub-task gives the real reason and the steps to unblock it, without repeating the same message in the conversation.
+- A sub-task that failed to start runs again after the person replies, instead of blocking the story again.
 - The Gemini over the API model list no longer brings voice, image, music and research models.
 - In Cursor, the run error (such as the usage limit) is no longer hidden behind "the process tree shutdown is not confirmed yet".
 - The Gemini limit message says which quota ran out and when it comes back.
