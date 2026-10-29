@@ -23,7 +23,7 @@ const consumption = (over: Partial<NonNullable<RunReport['consumption']>> = {}):
 const report = (measure: RunReport['measure'], c: RunReport['consumption']): RunReport =>
   ({ measure, consumption: c, inventory: [], answer: '', reason: null }) as unknown as RunReport;
 
-describe('custo por bucket em ai_runs (migração 51)', () => {
+describe('custo por bucket em ai_runs (migração 52)', () => {
   let db: Database;
   let runs: AiRunRepo;
   let boardId: string;
@@ -80,11 +80,11 @@ describe('custo por bucket em ai_runs (migração 51)', () => {
   });
 });
 
-describe('migração 50 → 51 (custo por bucket)', () => {
-  it('sobe com as colunas NULL nas execuções antigas e desce de volta para 50', async () => {
+describe('migração 51 → 52 (custo por bucket)', () => {
+  it('sobe com as colunas NULL nas execuções antigas e desce de volta para 51', async () => {
     const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
     const old = new SQL.Database();
-    migrate(old, 50);
+    migrate(old, 51);
     old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
     old.run(
       "INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission, cost_usd, cost_estimated) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x', 0.5, 0)",
@@ -97,7 +97,7 @@ describe('migração 50 → 51 (custo por bucket)', () => {
 
     migrate(old);
 
-    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(51);
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(52);
     expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
     expect(cols()).toBe(4);
     expect(
@@ -106,9 +106,9 @@ describe('migração 50 → 51 (custo por bucket)', () => {
       )[0]!.values,
     ).toEqual([[0.5, 0, null, null, null, null]]);
 
-    expect(DOWN_MIGRATIONS[51]).toBeDefined();
-    migrateDown(old, 50);
-    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe('50');
+    expect(DOWN_MIGRATIONS[52]).toBeDefined();
+    migrateDown(old, 51);
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe('51');
     expect(cols()).toBe(0);
     expect(old.exec('SELECT cost_usd FROM ai_runs')[0]!.values).toEqual([[0.5]]);
   });

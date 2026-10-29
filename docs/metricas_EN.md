@@ -59,59 +59,6 @@ instructions and explains that rule and skill contents are not compared. Unknown
 unmeasured; initial context size does not predict total task usage. This delivery makes current
 behavior visible; configuration per action and new authorization boundaries are not active yet.
 
-## Context contracts and v1 runtime
-
-This section describes the foundation, still under construction, that will govern the context of
-each run per action. The new contracts are drafts and do not govern the runtime yet, except with
-the opt-in v1 runtime described at the end.
-
-### Persistence and migration
-
-Persistence now separates **version 1** context contracts from legacy fields, with revisions and
-selections keyed by action and phase ID. Inheritance and explicit empty selections are distinct.
-New contracts are drafts and do not govern runtime execution yet. The preview identifies legacy
-mode. Migration to schema 35 preserves original fields; its compatibility view identifies agent
-skills as essential and card skills as selected, including missing references. Legacy MCP
-selections do not become permissions in the new contract. Export/import preserves drafts and
-versions without embedding MCP definitions in these contracts; exports contain only local references
-to MCP configurations, without their values.
-
-### A subagent's contract
-
-When editing a saved library subagent, **Editar contrato de contexto (rascunho)** (edit context
-contract, draft) opens the v1 contract: role, instructions, essential skills, suggested skills,
-allowed MCPs and tool restrictions. The contract has a separate save action, without AI and with
-optimistic revisions; it does not automatically copy legacy permissions. The preview shows
-essentials and Always items, keeps optional resources inactive and explains missing resources or
-incompatible MCPs. Missing references remain available for review.
-
-The host–webview protocol and the `preview_context_draft` MCP tool preview saved drafts: they
-resolve inheritance, sources and conflicts without inference and return artifact metadata.
-Capability admission from #729 remains pending; previews do not authorize execution.
-
-### Execution plan tab
-
-The **Plano de execução** (execution plan) tab lets you review the agent, model, additional skills,
-active MCPs, input attachments and expected result for each action. Stories include rows for open
-phases; tasks have four independent actions (work, refinement, summary and conflict resolution).
-The board default (under **Settings → Harness → Plano de contexto**, context plan) and each workflow's (the workflow's **Plano de contexto** button, in Workflows and columns) use the same editor, including
-conversation and assistants without a card. The preview shows sources and incompatibilities. The
-catalog shows short descriptions without opening specialists' instruction bodies.
-
-Changes remain drafts until **Comparar alterações** (compare changes) and **Aplicar rascunhos
-revisados** (apply reviewed drafts), with differences, reasons and an estimate of the known context
-portion. Copying between activities also requires comparison. Criteria and dependencies reference
-the original card. Schema 37 stores reasons; the host saves the batch in one transaction and rejects
-stale revisions without partial writes. Failures preserve drafts, which also survive switching card
-tabs. This configuration prepares the plan; execution remains on the legacy path until E5
-activation.
-
-**AI proposal.** On each Execution plan action that already has a valid agent, **Propor com IA**
-(propose with AI) asks for the minimal configuration (additional skills and active MCPs, within the
-agent contract, with a reason for each). The reply is validated in the host and becomes a draft only
-with **Usar como rascunho** (use as draft); the comparison and **Aplicar rascunhos revisados** stay
-yours. If the card, the agent or the catalog change, the proposal shows as outdated.
-
 ### Project MCP file lease (Cursor and Kimi)
 
 Transport that requires project MCP files (Cursor and Kimi) uses a lease coordinated by the real
@@ -175,25 +122,6 @@ an on-disk database cover three sequential children, one closing run, partial wo
 with a descendant and a real controller restart. Host creation and trigger integration remain
 pending, along with human return cycles and stable phase association. This does not activate the v1
 plan or validate real AI CLIs yet.
-
-### Capability admission and v1 runtime
-
-The v1 gateway admission foundation distinguishes conversation, artifacts, permissions, MCP and
-delegation, requiring local receipts bound to the current configuration. Decisions are recorded in
-history (schema 36), and export/import does not turn them into authorization. An empty list means no
-tools; strict Claude mapping uses exact tools and MCP operations without bypassing permissions. The
-capability check (in the profile's **Connect** and **Reconnect**, or **Verificar capacidades**, check
-capabilities, for a copy) runs the Claude CLI in a disposable fixture against a local API and records
-the receipts (valid for 14 days); only an ACP agent is verified automatically, when turned on. The activity's resolved configuration is validated before the
-process opens and frozen in the run snapshot (`manifest.context`): editing the library later does
-not change a run in progress, and an MCP outside the activity's configuration is refused. The plan
-governs executions only with the v1 runtime, which is opt-in; without it, execution stays legacy.
-
-**v1 runtime (opt-in).** With `FAZ_AI_CONTEXT_RUNTIME=v1` in the environment that opens the editor,
-the gateway only runs with the resolved configuration and capability admission: runner (phase,
-refine, summary, conflict), chat, Harness assistants and profile test. Without an agent with a valid
-contract or without receipts (recorded by the profile's **Connect**, or by **Verificar capacidades**,
-check capabilities, in Connect agents; valid for 14 days), the process does not start. The legacy runtime remains the default.
 
 ## Card Usage tab
 

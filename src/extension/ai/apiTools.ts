@@ -89,6 +89,8 @@ export interface LocalToolContext {
   limits?: Partial<LocalToolLimits>;
   /** cada processo iniciado, para o laço saber se ainda há algo rodando (`terminationConfirmed`) */
   processes?: Set<ChildProcess>;
+  /** as variáveis dos trailers de rastreio, somadas ao ambiente do comando DEPOIS do filtro (`commandEnv`) */
+  commitEnv?(base: Readonly<Record<string, string | undefined>>): Record<string, string>;
 }
 
 /** O que a ferramenta devolve: a `response` do `functionResponse` e, para o comando, o termo do inventário. */
@@ -681,6 +683,8 @@ async function runCommand(args: Json, ctx: LocalToolContext): Promise<LocalToolR
   const dir = confinePath(ctx, asText(args.cwd) ?? '.', 'read');
   if (!fs.statSync(dir.real).isDirectory()) throw new LocalToolError(`Não é uma pasta: ${dir.shown}`);
   const env = commandEnv(ctx.baseEnv ?? process.env, ctx.pathEnv, ctx.apiKey);
+  // o filtro tirou os GIT_CONFIG_* da pessoa: o par do board entra no índice 0, sem referência a um ausente
+  if (ctx.commitEnv) Object.assign(env, ctx.commitEnv(env));
   const pathOf = Object.entries(env).find(([n]) => n.toUpperCase() === 'PATH')?.[1];
   // o programa: com barra, um arquivo a partir da pasta do comando; sem barra, procurado só no PATH
   const executable = /[\\/]/.test(command)

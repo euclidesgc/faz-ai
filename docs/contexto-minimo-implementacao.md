@@ -1,5 +1,7 @@
 # Implementação do contexto mínimo por execução
 
+> **Histórico.** O Plano de contexto e o runtime v1 foram aposentados (#1144–#1147; migração 51 remove as tabelas `agent_context_contracts` e `activity_context_selections`). Este documento registra o que existiu e não descreve o produto atual.
+
 Referência: [plano](plano-contexto-minimo-por-execucao.md).
 
 ## E1 — Contexto efetivo atual

@@ -19,7 +19,7 @@ derivada #1195.
   `priceRun` (`src/shared/cost.ts`). O mesmo relatório vai para o log e para o runner, então a linha da
   conversa recebe a estimativa sem fazer outro cálculo. Se `priceOf` falhar, o erro vai para o log e a
   execução segue normalmente.
-- **Custo congelado (RF-30)**: a migração 51 cria `cost_input_usd`, `cost_output_usd`,
+- **Custo congelado (RF-30)**: a migração 52 cria `cost_input_usd`, `cost_output_usd`,
   `cost_cache_read_usd` e `cost_cache_write_usd` em `ai_runs`, com `DOWN_MIGRATIONS[51]`. As execuções
   antigas não são recalculadas.
 - **Precedência do informado**: no total vale o custo informado pela CLI. Sem ele, o total estimado é a
@@ -59,7 +59,7 @@ derivada #1195.
   informado, então o erro fica só nos buckets.
 - Uma execução com `measure: 'partial'` também ganha estimativa, e o valor sai abaixo do real. Isso
   ficou registrado como sugestão da revisão (#1207).
-- A versão anterior abre o banco pela volta da migração 51, que só remove as quatro colunas.
+- A versão anterior abre o banco pela volta da migração 52, que só remove as quatro colunas.
 
 ## Diagramas
 ```mermaid

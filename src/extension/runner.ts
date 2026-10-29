@@ -14,7 +14,7 @@ import {
   scopeDigest,
   type Chain,
 } from './policyGate';
-import type { ContextAction } from '../shared/contextPlanning';
+import type { ContextAction } from '../shared/executionAction';
 import { cardRef } from '../shared/model';
 import { canDispatch, limitClock, limitHolds, nextPause, pauseOf, resetAtOf } from '../shared/usageLimit';
 import { limitChoice } from '../shared/limitChoice';
@@ -494,6 +494,8 @@ export class AiRunner {
           phase,
         },
         cwd: this.deps.cwd,
+        // a coluna da história, não a do card (numa sub-tarefa seria "Em andamento")
+        commitTrailers: { card: card.number, phase: storyPhase },
         timeoutMinutes: state.board.runner.timeoutMinutes,
         beforeStart: options.beforeStart,
         prepare: () => {
