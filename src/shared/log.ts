@@ -1,5 +1,6 @@
 import type { CostBuckets } from './cost';
 import type { UsageLimitHint } from './usageLimit';
+import type { UsageWindowsHint } from './quotaReading';
 
 // Vocabulário e tipos puros do log de utilização do board: eventos do card e execuções de IA.
 // Sem dependência de banco nem de VSCode, como o resto de `shared`. O que grava e lê este vocabulário
@@ -213,6 +214,8 @@ export interface RunReport {
    * Gemini nos três modos); sem ela, a pausa usa o backoff
    */
   usageLimitHint?: UsageLimitHint;
+  /** a leitura de uso das janelas da cota que o leitor achou (crua, sem relógio); ausente sem porcentagem */
+  usageReading?: UsageWindowsHint;
   /**
    * o modelo que a ferramenta recusou como inexistente para esta conta (o 404 da API do Gemini): ela pode
    * continuar a listá-lo (um modelo fechado para contas novas), e o board o tira do catálogo

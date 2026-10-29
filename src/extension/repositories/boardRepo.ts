@@ -534,6 +534,7 @@ export class BoardRepo {
       requirementsCheckedAt: 0,
       authExpired: [],
       usageLimit: [],
+      usageReadings: [],
       orphans: EMPTY_ORPHANS,
       environment: null,
       environmentFirstRun: false,
