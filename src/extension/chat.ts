@@ -1,6 +1,6 @@
 import { toolInfo, catalogTool, contextEnforced, profileLabel, isReadyCli } from '../shared/aiProfiles';
 import { cliProblem } from '../shared/requirements';
-import type { ContextAction } from '../shared/contextPlanning';
+import type { ContextAction } from '../shared/executionAction';
 import { defaultTarget, targetOfValue, type RunTarget } from '../shared/runTarget';
 import type { AgentAssistInput, AgentAssistResult } from '../shared/agentAssistance';
 import type { PolicyAssistInput, PolicyAssistResult } from '../shared/policyAssistant';

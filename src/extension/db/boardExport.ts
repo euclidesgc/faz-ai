@@ -1,9 +1,7 @@
 import { validateProfileRows } from '../repositories/aiProfileRepo';
 import { ExecutionPolicyRepo } from '../repositories/executionPolicyRepo';
 import { validateExecutionPolicy } from '../../shared/executionPolicies';
-import { ContextPlanningRepo } from '../repositories/contextPlanningRepo';
 import { ArtifactRepo, protectImportedMcpRow } from '../repositories/artifactRepo';
-import { validateActivityContext, validateAgentContext, validateContextTarget, validateContextReason } from '../../shared/contextPlanning';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Database, SqlValue } from 'sql.js';
@@ -70,8 +68,6 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   // as pastas importadas são caminhos absolutos desta máquina: vão junto, e na outra máquina os artefatos ficam ausentes até a pessoa reimportar
   // Os artefatos do board (#615) exportam somente referências às configurações MCP locais.
   { name: 'board_artifacts', where: 'board_id = ?', hasId: true, since: 34 },
-  { name: 'agent_context_contracts', where: 'board_id = ?', hasId: false, since: 35 },
-  { name: 'activity_context_selections', where: 'board_id = ?', hasId: true, since: 35 },
   { name: 'ai_profiles', where: 'board_id = ?', hasId: false, since: 42, columns: { tool: 48, mode: 48 } },
   { name: 'execution_policies', where: 'board_id = ?', hasId: true, since: 41 },
   { name: 'execution_policy_versions', where: 'board_id = ?', hasId: false, since: 41 },
@@ -122,7 +118,6 @@ export function exportBoard(
   const boardRow = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
   if (!boardRow) throw new Error('Board não encontrado');
   new ArtifactRepo(db).protectLegacy();
-  new ContextPlanningRepo(db).validateBoard(boardId);
   new ExecutionPolicyRepo(db).validateBoard(boardId);
   validateAdmissionRows(all(db, 'SELECT * FROM ai_runs WHERE board_id = ?', [boardId]));
   const board: Row = {};
@@ -287,17 +282,6 @@ export function parseExportFile(text: string): BoardExportFile {
   }
   for (const f of tables.board_artifact_files as Row[])
     if (typeof f.path !== 'string' || !isSafeRelPath(f.path)) throw invalid('caminho de arquivo de apoio inválido.');
-  for (const r of tables.agent_context_contracts as Row[]) {
-    validateAgentContext(JSON.parse(str(r.contract_json)));
-    if (typeof r.artifact_id !== 'string' || !r.artifact_id || !Number.isSafeInteger(r.revision) || Number(r.revision) < 1)
-      throw invalid('contrato de agente inválido.');
-  }
-  for (const r of tables.activity_context_selections as Row[]) {
-    validateContextReason(r.review_reason);
-    validateActivityContext(JSON.parse(str(r.selection_json)));
-    validateContextTarget({ cardId: r.card_id, workflowId: r.workflow_id, phaseId: r.phase_id, action: r.action });
-    if (!Number.isSafeInteger(r.revision) || Number(r.revision) < 1) throw invalid('revisão de atividade inválida.');
-  }
   for (const table of ['execution_policies', 'execution_policy_versions'])
     for (const row of tables[table] as Row[]) validateExecutionPolicy(JSON.parse(str(row.policy_json)));
   if (!Array.isArray(f.files)) throw invalid('falta a lista de arquivos dos anexos.');
@@ -415,7 +399,6 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
       insertRows(mem, t.name, t.name === 'cards' ? parentsFirst(rows) : rows);
     }
     migrate(mem);
-    new ContextPlanningRepo(mem).validateBoard(newBoardId);
     new ExecutionPolicyRepo(mem).validateBoard(newBoardId);
     validateProfileRows(all(mem, 'SELECT * FROM ai_profiles WHERE board_id = ?', [newBoardId]), newBoardId);
     run(mem, "UPDATE ai_profiles SET enabled = 0, review_state = 'pending' WHERE board_id = ?", [newBoardId]);

@@ -78,6 +78,7 @@
 ### Removido
 
 - O runtime v1 do Plano de contexto (`FAZ_AI_CONTEXT_RUNTIME`), o resolvedor de rascunho, a admissão de rascunho e a proposta de contexto saem do host; a execução segue só pelo caminho atual (#1146).
+- As tabelas `agent_context_contracts` e `activity_context_selections`, o repositório do Plano de contexto e os validadores de `contextPlanning` saem do banco e do código (migração 51). Um backup antigo que ainda traga as tabelas continua importável; elas são ignoradas (#1147).
 - O campo Rules some do card: as regras ativas já valem em todo pedido.
 - Saiu o "Agente padrão" de Harness › Ferramenta e execução, que repetia o "Tornar padrão" da aba Agentes.
 - A aba Detalhes de Conectar agentes sai; as ações do perfil passam para o fim da aba Conexão.

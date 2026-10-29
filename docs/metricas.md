@@ -59,59 +59,6 @@ não medidos; a estimativa inicial não prevê o consumo total de uma tarefa. Es
 comportamento atual visível; configurações por ação e novos limites de autorização ainda não estão
 ativos.
 
-## Contratos de contexto e runtime v1
-
-Esta seção descreve a base, ainda em construção, que vai governar o contexto de cada execução por
-ação. Os contratos novos são rascunhos e ainda não governam o runtime, salvo com o runtime v1
-opcional descrito no fim.
-
-### Persistência e migração
-
-A persistência já separa contratos de contexto **versão 1** dos campos legados, com revisões e
-seleções por ação e ID de fase. Herança e seleção vazia são valores distintos. Os contratos novos
-são rascunhos e ainda não governam o runtime. A prévia identifica esse modo legado. A migração para
-o schema 35 mantém os campos originais; sua leitura de compatibilidade identifica skills dos agentes
-como essenciais e skills dos cards como selecionadas, inclusive referências ausentes. MCPs legados
-não viram autorizações do contrato novo. Exportar e importar preserva os rascunhos e suas versões,
-sem incluir definições MCP nesses contratos; a exportação contém somente referências locais das
-configurações MCP, sem seus valores.
-
-### Contrato de um subagente
-
-Ao editar um subagente já salvo na biblioteca, **Editar contrato de contexto (rascunho)** abre o
-contrato v1: papel, instruções, skills essenciais, skills sugeridas, MCPs permitidos e restrições de
-ferramentas. O contrato tem salvamento próprio, sem IA e com revisão otimista; não copia
-automaticamente autorizações legadas. A prévia mostra essenciais e itens Sempre, mantém opcionais
-inativos e explica recursos ausentes ou MCPs incompatíveis. Referências ausentes permanecem
-revisáveis.
-
-O protocolo host–webview e o MCP `preview_context_draft` oferecem a prévia dos rascunhos salvos:
-resolvem herança, origens e incompatibilidades sem inferência e retornam metadados dos artefatos. A
-admissão por capacidades de #729 continua pendente; a prévia não autoriza execução.
-
-### Aba Plano de execução
-
-A aba **Plano de execução** permite revisar agente, modelo, skills adicionais, MCPs ativos, anexos de
-entrada e resultado esperado por ação. Histórias incluem linhas por fase aberta; tarefas têm quatro
-ações independentes (trabalho, refino, resumo e conflito). O padrão do board (em **Configurações → Harness →
-Plano de contexto**) e o de cada workflow (no botão **Plano de contexto** do workflow, em Workflows e
-colunas) usam o mesmo editor, incluindo conversa e
-assistentes sem card. As origens e incompatibilidades ficam na prévia. O catálogo mostra descrições
-curtas, sem abrir os corpos dos especialistas.
-
-As alterações ficam em rascunho até **Comparar alterações** e **Aplicar rascunhos revisados**, com
-diferenças, justificativa e estimativa da parcela conhecida do contexto. Copiar entre atividades
-também exige comparação. Critérios e dependências referenciam o card original. O schema 37 guarda
-justificativas; o host salva o lote em uma transação e recusa revisões atrasadas sem gravar
-parcialmente. Falhas preservam os rascunhos, que também sobrevivem à troca de abas do card. Essa
-configuração prepara o plano; a execução continua legada até a ativação da E5.
-
-**Proposta da IA.** Em cada ação do Plano de execução que já tem um agente válido, **Propor com IA**
-pede a configuração mínima (skills adicionais e MCPs ativos, dentro do contrato do agente, com a
-justificativa de cada um). A resposta é validada no host e só vira rascunho com **Usar como
-rascunho**; a comparação e o **Aplicar rascunhos revisados** continuam com você. Se o card, o agente
-ou o catálogo mudarem, a proposta aparece como desatualizada.
-
 ### Empréstimo do MCP por arquivo (Cursor e Kimi)
 
 O transporte que precisa de MCP por arquivo (Cursor e Kimi) usa um empréstimo coordenado pelo
@@ -175,27 +122,6 @@ banco em disco cobrem três filhas em sequência, fechamento único, trabalho pa
 descendente e reinício real do controlador. A criação no host e a ligação aos gatilhos continuam
 pendentes, assim como os ciclos de devolução humana e a associação estável da Fase. Isso ainda não
 ativa o plano v1 nem valida CLIs reais de IA.
-
-### Admissão por capacidades e runtime v1
-
-A base de admissão v1 no gateway distingue conversa, artefatos, permissões, MCP e delegação e exige
-recibos locais vinculados à configuração atual. A decisão fica no histórico (schema 36), sem virar
-autorização ao exportar/importar. Lista vazia significa nenhuma ferramenta; o mapeamento estrito do
-Claude usa ferramentas e operações MCP exatas, sem pular permissões. A verificação de capacidades (no
-**Conectar** e no **Reconectar** do perfil, ou em **Verificar capacidades**, na cópia) roda a CLI do
-Claude numa fixture descartável contra uma API local e grava os recibos (validade de 14 dias); só o
-agente ACP é verificado automaticamente, ao ser ligado. A configuração
-resolvida da atividade é validada antes de abrir o processo e congelada no snapshot da execução
-(`manifest.context`): editar a biblioteca depois não muda uma execução em curso, e um MCP fora da
-configuração da atividade é recusado. O plano só governa as execuções com o runtime v1, que é
-opcional; sem ele, a execução continua legada.
-
-**Runtime v1 (opcional).** Com `FAZ_AI_CONTEXT_RUNTIME=v1` no ambiente que abre o editor, o gateway
-só executa com a configuração resolvida e a admissão por capacidades: runner (fase, refinar, resumo,
-conflito), chat, assistentes do Harness e teste do perfil. Sem agente com contrato válido ou sem
-recibos (gravados no **Conectar** do perfil, ou em **Verificar capacidades** em Conectar agentes,
-validade de 14 dias), o processo
-não abre. O legado continua o padrão.
 
 ## Aba Consumo do card
 

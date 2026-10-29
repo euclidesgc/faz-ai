@@ -2,7 +2,7 @@
 // (conversa, assistentes e sugestões) passam por aqui, sem cada um montar a própria avaliação nem decidir troca de alvo.
 import { createHash } from 'node:crypto';
 import { catalogTool, isReadyCli } from '../shared/aiProfiles';
-import type { ContextAction } from '../shared/contextPlanning';
+import type { ContextAction } from '../shared/executionAction';
 import { effortToRun } from '../shared/execution';
 import {
   evaluateExecutionPolicy,
