@@ -317,10 +317,34 @@ export interface MetricsReworkModel {
   adjusted: number;
 }
 
+/** Os pedidos de revisão e de ajuste pelo agente da execução que pediu a revisão; '' = sem agente. */
+export interface MetricsReworkAgent {
+  agent: string;
+  reviews: number;
+  adjusted: number;
+}
+
+/** Execuções terminadas do período por modelo ou agente, e quantas não terminaram com resultado (RF7). */
+export interface MetricsUnfinishedRow {
+  /** o modelo ou o agente; '' = não definido / sem agente */
+  value: string;
+  /** execuções do período com resultado registrado (`outcome` não nulo; as em andamento não entram) */
+  runs: number;
+  /** destas, as com `outcome` failed, timeout ou stopped */
+  unfinished: number;
+  failed: number;
+  timeout: number;
+  stopped: number;
+}
+
 /** O retrabalho do período: o sinal de qualidade que o consumo e o tempo não mostram. */
 export interface MetricsRework {
   phases: MetricsReworkPhase[];
   models: MetricsReworkModel[];
+  /** o mesmo corte pelo agente da execução (RF6) */
+  agents: MetricsReworkAgent[];
+  /** execuções sem resultado por modelo e por agente (RF7; aproximação) */
+  unfinished: { models: MetricsUnfinishedRow[]; agents: MetricsUnfinishedRow[] };
   /**
    * histórias concluídas no período e quantas delas já têm um bug vinculado (o defeito que escapou);
    * `autonomous*` é a parte das histórias que tiveram alguma execução em modo autônomo
@@ -347,8 +371,64 @@ export interface MetricsRework {
 export const EMPTY_REWORK: MetricsRework = {
   phases: [],
   models: [],
+  agents: [],
+  unfinished: { models: [], agents: [] },
   escapes: { stories: 0, withBugs: 0, bugs: 0, autonomousStories: 0, autonomousWithBugs: 0, autonomousBugs: 0 },
   aiSignals: { bashRuns: 0, reviewFixes: ZERO_SIGNAL, testFailures: ZERO_SIGNAL, commitsAfterPr: ZERO_SIGNAL },
+};
+
+/** Um grupo de histórias concluídas: tipo × "Esforço da atividade" (RF2–RF4). */
+export interface MetricsDeliveryGroup {
+  /** o tipo atual da história */
+  type: string;
+  /** o valor atual do "Esforço da atividade"; '' = não definido */
+  effort: string;
+  stories: number;
+  /** histórias com pelo menos uma execução medida (`measure <> 'none'`) */
+  measured: number;
+  /** null = nenhuma história medida, nunca 0 */
+  tokens: number | null;
+  meanTokens: number | null;
+  medianTokens: number | null;
+}
+
+/** Um par tipo × modelo ou tipo × agente entre as histórias concluídas (RF9–RF10). */
+export interface MetricsDeliveryCross {
+  type: string;
+  /** o modelo ou o agente; '' = não definido / sem agente */
+  value: string;
+  /** histórias em que o modelo/agente rodou (a história e as sub-tarefas) */
+  stories: number;
+  /** destas, as com alguma execução medida dele */
+  measured: number;
+  tokens: number | null;
+  /** tokens / measured; null sem medida */
+  tokensPerStory: number | null;
+  /** pedidos de ajuste nas revisões pedidas por execuções dele nessas histórias */
+  adjusted: number;
+}
+
+export interface MetricsDelivery {
+  /** histórias concluídas no período e no workflow (RF1) */
+  stories: number;
+  measured: number;
+  /** soma das histórias medidas; null = nenhuma */
+  tokens: number | null;
+  groups: MetricsDeliveryGroup[];
+  byModel: MetricsDeliveryCross[];
+  byAgent: MetricsDeliveryCross[];
+  /** linhas além de METRICS_ROW_CAP, por tabela (RF13) */
+  omitted: { groups: number; byModel: number; byAgent: number };
+}
+
+export const EMPTY_DELIVERY: MetricsDelivery = {
+  stories: 0,
+  measured: 0,
+  tokens: null,
+  groups: [],
+  byModel: [],
+  byAgent: [],
+  omitted: { groups: 0, byModel: 0, byAgent: 0 },
 };
 
 /** As seções que acompanham `MetricsPanelResult`. */
@@ -360,6 +440,7 @@ export interface MetricsPanelSections {
   cards: MetricsRanking;
   inventory: MetricsInventory;
   rework: MetricsRework;
+  delivery: MetricsDelivery;
 }
 
 /** Teto de linhas por tabela, no host. Acima dele a resposta conta o que ficou fora (RF-33). */

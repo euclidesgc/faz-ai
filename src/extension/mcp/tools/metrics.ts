@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import type { MetricsDim, MetricsResult, MetricsRow } from '../../log/metrics';
 import type { DefineTool } from './registry';
-import { type MetricsAiSignal, type MetricsRework } from '../../../shared/metrics';
+import {
+  EMPTY_DELIVERY,
+  type MetricsAiSignal,
+  type MetricsDelivery,
+  type MetricsDeliveryCross,
+  type MetricsRework,
+  type MetricsUnfinishedRow,
+} from '../../../shared/metrics';
 
 const GROUP_BY = [
   'phase',
@@ -144,11 +151,56 @@ export function formatMetrics(
   )}\n\n${coverage}`;
 }
 
+const dash = (v: number | null): string => (v == null ? '-' : String(Math.round(v)));
+const omittedLine = (omitted: number): string => (omitted > 0 ? `\n+${omitted} linha(s) fora do limite` : '');
+
+function unfinishedTable(label: string, rows: MetricsUnfinishedRow[]): string {
+  return table(
+    [label, 'sem resultado'],
+    rows.map((r) => [r.value || (label === 'agente' ? 'sem agente' : 'não definido'), `${r.unfinished} de ${r.runs}`]),
+  );
+}
+
+function crossTable(label: string, rows: MetricsDeliveryCross[], omitted: number): string {
+  return `${table(
+    ['tipo', label, 'histórias', 'tokens', 'tokens/história', 'ajustes'],
+    rows.map((r) => [
+      r.type,
+      r.value || (label === 'agente' ? 'sem agente' : 'não definido'),
+      String(r.stories),
+      dash(r.tokens),
+      dash(r.tokensPerStory),
+      String(r.adjusted),
+    ]),
+  )}${omittedLine(omitted)}`;
+}
+
+/** O custo por entrega (tokens por história concluída) e a visão cruzada, em texto compacto. */
+function formatDelivery(d: MetricsDelivery): string[] {
+  if (!d.stories) return ['custo por entrega: nenhuma história concluída no período'];
+  return [
+    `custo por entrega: ${d.stories} histórias concluídas, ${d.measured} medidas, ${dash(d.tokens)} tokens (detalhe guardado: histórias antigas podem ter consumo parcial; esforço = valor atual do campo)\n${table(
+      ['tipo', 'esforço', 'histórias', 'medidas', 'tokens', 'média', 'mediana'],
+      d.groups.map((g) => [
+        g.type,
+        g.effort || 'não definido',
+        String(g.stories),
+        String(g.measured),
+        dash(g.tokens),
+        dash(g.meanTokens),
+        dash(g.medianTokens),
+      ]),
+    )}${omittedLine(d.omitted.groups)}`,
+    `visão cruzada (uma história com vários modelos/agentes conta para cada um)\n${crossTable('modelo', d.byModel, d.omitted.byModel)}\n\n${crossTable('agente', d.byAgent, d.omitted.byAgent)}`,
+  ];
+}
+
 /**
  * O retrabalho em texto compacto: por fase (revisões pedidas, aprovadas de primeira, ajustes), por modelo
- * e as histórias concluídas com bug vinculado.
+ * e por agente, as execuções sem resultado, as histórias concluídas com bug vinculado, os sinais da IA e o
+ * custo por entrega.
  */
-export function formatRework(rework: MetricsRework): string {
+export function formatRework(rework: MetricsRework, delivery: MetricsDelivery = EMPTY_DELIVERY): string {
   const parts: string[] = [];
   if (rework.phases.length)
     parts.push(
@@ -170,6 +222,22 @@ export function formatRework(rework: MetricsRework): string {
         rework.models.map((m) => [m.model || 'não definido', String(m.reviews), String(m.adjusted)]),
       )}`,
     );
+  if (rework.agents.length)
+    parts.push(
+      `por agente da execução que pediu a revisão\n${table(
+        ['agente', 'revisões', 'ajustes'],
+        rework.agents.map((m) => [m.agent || 'sem agente', String(m.reviews), String(m.adjusted)]),
+      )}`,
+    );
+  const u = rework.unfinished;
+  if (u.models.length || u.agents.length)
+    parts.push(
+      [
+        'execuções sem resultado (aproximação: falha, tempo esgotado ou interrompida; uma interrompida pode ter deixado trabalho útil)',
+        ...(u.models.length ? [unfinishedTable('modelo', u.models)] : []),
+        ...(u.agents.length ? [unfinishedTable('agente', u.agents)] : []),
+      ].join('\n'),
+    );
   const e = rework.escapes;
   parts.push(
     e.stories
@@ -190,6 +258,7 @@ export function formatRework(rework: MetricsRework): string {
         ].join('\n')
       : 'sinais da IA: não medidos (nenhuma execução com registro de Bash no período)',
   );
+  parts.push(...formatDelivery(delivery));
   if (!rework.phases.length) parts.unshift('nenhuma revisão no recorte.');
   return parts.join('\n\n');
 }
@@ -220,13 +289,16 @@ export function registerMetricsTools(tool: DefineTool): void {
         .boolean()
         .optional()
         .describe(
-          'Em vez do consumo, o retrabalho do período: revisões pedidas, aprovadas de primeira e pedidos de ajuste por fase e por modelo, as histórias concluídas com bug vinculado e os sinais da IA (correções na Revisão, npm test com falha, commits depois do PR), cada um com a parte do modo autônomo. Usa só start_date e end_date.',
+          'Em vez do consumo, o retrabalho do período: revisões pedidas, aprovadas de primeira e pedidos de ajuste por fase, por modelo e por agente, execuções sem resultado (aproximação), tokens por história concluída por tipo e esforço e a visão tipo × modelo e tipo × agente, as histórias concluídas com bug vinculado e os sinais da IA (correções na Revisão, npm test com falha, commits depois do PR), cada um com a parte do modo autônomo. Usa só start_date e end_date.',
         ),
     },
     (a, router) => {
       if (a.start_date && a.end_date && a.end_date < a.start_date)
         throw new Error(`end_date (${a.end_date}) anterior a start_date (${a.start_date}).`);
-      if (a.rework) return formatRework(router.panelMetrics({ startDate: a.start_date, endDate: a.end_date }).sections.rework);
+      if (a.rework) {
+        const { sections } = router.panelMetrics({ startDate: a.start_date, endDate: a.end_date });
+        return formatRework(sections.rework, sections.delivery);
+      }
       const result = router.metrics({
         groupBy: a.group_by,
         startDate: a.start_date,

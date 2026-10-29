@@ -56,6 +56,8 @@ describe('bloco Retrabalho', () => {
         { phase: 'Spec', reviews: 1, approved: 0, adjusted: 0, resolved: 0, firstPass: 0, ...noSignals },
       ],
       models: [{ model: '', reviews: 4, adjusted: 1 }],
+      agents: [],
+      unfinished: EMPTY_REWORK.unfinished,
       escapes: { ...EMPTY_REWORK.escapes, stories: 4, withBugs: 1, bugs: 2 },
       aiSignals: EMPTY_REWORK.aiSignals,
     });
@@ -99,6 +101,8 @@ describe('bloco Retrabalho', () => {
         },
       ],
       models: [],
+      agents: [],
+      unfinished: EMPTY_REWORK.unfinished,
       escapes: { stories: 4, withBugs: 1, bugs: 2, autonomousStories: 3, autonomousWithBugs: 1, autonomousBugs: 2 },
       aiSignals: { bashRuns: 5, reviewFixes: signal(3, 2, 1, 1), testFailures: signal(1, 1, 1, 1), commitsAfterPr: signal(2, 1, 0, 0) },
     });
@@ -126,6 +130,8 @@ describe('bloco Retrabalho', () => {
     show({
       phases: [{ phase: 'PRD', reviews: 1, approved: 1, adjusted: 0, resolved: 1, firstPass: 1, ...noSignals }],
       models: [],
+      agents: [],
+      unfinished: EMPTY_REWORK.unfinished,
       escapes: EMPTY_REWORK.escapes,
       aiSignals: EMPTY_REWORK.aiSignals,
     });
