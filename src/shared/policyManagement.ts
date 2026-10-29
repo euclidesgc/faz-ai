@@ -2,7 +2,7 @@ import { catalogTool, isReadyProfile, modeLabel, toolLabel } from './aiProfiles'
 import { ALL_AI_BASES, baseInfo } from './harness';
 import type { BoardState } from './model';
 import type { ModelOption } from './models';
-import { CONTEXT_ACTIONS } from './contextPlanning';
+import { CONTEXT_ACTIONS } from './executionAction';
 import {
   POLICY_FAILURES,
   executionPolicyProblems,

@@ -1,8 +1,8 @@
 import { isReadyCli } from '../../../shared/aiProfiles';
 import type { AiProfile } from '../../../shared/aiProfiles';
 import type { HostToWebview } from '../../../shared/messages';
-import type { StrictExecutionRequest } from '../../../shared/executionAdmission';
-import { admissionRegimeOf, DEFAULT_RUNNER, type RunnerConfig } from '../../../shared/runner';
+import { closedAdmissionRequest } from '../../ai/admissionRequest';
+import { DEFAULT_RUNNER, type RunnerConfig } from '../../../shared/runner';
 import type { AiGateway } from '../../ai/gateway';
 import { NO_CARD } from '../../ai/gateway';
 import { bareExec } from '../../execution';
@@ -267,19 +267,6 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
       try {
         profile = deps.repo.resolveProfile(deps.boardId(), id);
         const runner = deps.runner?.() ?? DEFAULT_RUNNER;
-        const strict: StrictExecutionRequest = {
-          version: 1,
-          ...admissionRegimeOf(runner),
-          agentTools: { categories: [], native: { tool: '', allow: [], deny: [] } },
-          boardTools: { mode: 'explicit', value: [] },
-          activeMcpIds: [],
-          allowedMcpIds: [],
-          boardMcpIds: [],
-          mcpServers: [],
-          mcpTools: [],
-          boardMcpTools: [],
-          mcpLevel: { permission: 'board', tools: [] },
-        };
         const execution = deps.gateway.run({
           origin: 'test',
           tool: id,
@@ -288,7 +275,7 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
           cwd: deps.cwd,
           timeoutMinutes: 2,
           prepare: () => ({
-            ...(isReadyCli(profile!) ? {} : { strict: { profileId: id, request: strict } }),
+            ...(isReadyCli(profile!) ? {} : { strict: { profileId: id, request: closedAdmissionRequest(runner) } }),
             config: {
               model: model ?? null,
               effort: null,

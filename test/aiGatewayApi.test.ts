@@ -12,7 +12,7 @@ import { ExecutionAdmission } from '../src/extension/ai/admission';
 import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
 import { executorOf } from '../src/extension/ai/drivers';
 import { createGeminiApiDriver, type McpConnect, type McpTool } from '../src/extension/ai/drivers/gemini/api';
-import { legacyStrictRequest } from '../src/extension/ai/admission';
+import { cardAdmissionRequest } from '../src/extension/ai/admissionRequest';
 import { profileApiKey } from '../src/extension/ai/apiKey';
 import { ToolKeys } from '../src/extension/toolKeys';
 import { credentialsFor } from '../src/extension/credentials';
@@ -142,7 +142,7 @@ function world(permission: RunnerPermission = 'board', deniedTools: string[] = [
     cwd: dir,
     timeoutMinutes: 30,
     prepare: () => ({
-      strict: { profileId: 'gemini', request: legacyStrictRequest(router.snapshot().board.runner, permission, ['docs']) },
+      strict: { profileId: 'gemini', request: cardAdmissionRequest(router.snapshot().board.runner, permission, ['docs']) },
       conference: { manifest: { agent: '', skills: [], mcpServers: ['docs'], tools: [], deniedTools }, boardServer: 'faz-ai' },
       input,
       config: {

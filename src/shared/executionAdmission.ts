@@ -3,8 +3,14 @@ import { NATIVE_AGENT_TOOLS, agentToolsOf } from './agentTools';
 import { API_TOOL_GROUPS } from './apiTools';
 import type { AiTool } from './harness';
 import type { ToolCategory } from './artifacts';
-import type { AgentContextContract, ContextChoice } from './contextPlanning';
 import type { RunnerPermission } from './runner';
+
+/** Vazio explícito é diferente de herança, inclusive para listas. */
+export type AdmissionChoice<T> = { mode: 'inherit' } | { mode: 'explicit'; value: T };
+export interface AdmissionAgentTools {
+  categories: ToolCategory[];
+  native: { tool: AiTool | ''; allow: string[]; deny: string[] };
+}
 
 export const EXECUTOR_CAPABILITIES = ['conversation', 'artifacts', 'permissions', 'mcp', 'delegation'] as const;
 export type ExecutorCapability = (typeof EXECUTOR_CAPABILITIES)[number];
@@ -80,9 +86,9 @@ export interface StrictExecutionRequest {
   /** O regime é lido da configuração humana pelo preparador do host, nunca de uma proposta da IA. */
   regime: 'exclusive' | 'compatible';
   compatibilityReview?: { actor: 'person'; revision: number };
-  agentTools: AgentContextContract['tools'];
+  agentTools: AdmissionAgentTools;
   /** Ausente não equivale a lista vazia; o preparador precisa declarar herança explicitamente. */
-  boardTools: ContextChoice<ToolCategory[]>;
+  boardTools: AdmissionChoice<ToolCategory[]>;
   activeMcpIds: string[];
   allowedMcpIds: string[];
   boardMcpIds: string[];
