@@ -75,6 +75,7 @@
 
 ### Removed
 
+- The Context plan v1 runtime (`FAZ_AI_CONTEXT_RUNTIME`), the draft resolver, draft admission and the context proposal leave the host; execution follows the current path only (#1146).
 - The card's Rules field is gone: active rules already apply to every request.
 - The "Default agent" field in Harness › Tool and execution is gone; it repeated "Make default" in the Agents tab.
 - The Details tab in Connect agents is gone; the profile actions move to the end of the Connection tab.
