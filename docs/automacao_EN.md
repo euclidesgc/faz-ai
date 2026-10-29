@@ -167,8 +167,9 @@ true.
   question with the recommended option and records it in the **Perguntas e respostas** section of
   the description. Only a real impediment (access, environment, a failure it cannot fix) blocks the
   card.
-- **Interrupting, failing or timing out does not approve**: a run that is interrupted, fails or hits
-  the time limit puts the card back to the status it had, without approving it or moving the story on.
+- **Interrupting, failing or timing out does not approve**: an interrupted run puts the card back to
+  the status it had, without approving it again or moving the story on; a run that fails or hits the
+  time limit blocks the card in the same column, with the reason.
 - **Sub-task descriptions checked**: the autopilot and the autonomous mode drive the story through
   the same board path, so a sub-task missing the required sections is not run: the AI fixes it in a
   story session and, if a section is still missing, the story is blocked with the reason (see the
