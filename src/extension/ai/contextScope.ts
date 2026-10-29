@@ -29,8 +29,8 @@ import {
   type LocationVerdict,
   type QuoteProbe,
 } from '../../shared/contextScope';
-import type { StrictExecutionRequest } from '../../shared/executionAdmission';
-import { admissionRegimeOf, DEFAULT_RUNNER, type RunnerConfig } from '../../shared/runner';
+import { closedAdmissionRequest } from './admissionRequest';
+import { DEFAULT_RUNNER, type RunnerConfig } from '../../shared/runner';
 import { bareExec } from '../execution';
 import type { AiProfileRepo } from '../repositories/aiProfileRepo';
 import { NO_CARD, type AiGateway } from './gateway';
@@ -372,19 +372,6 @@ export async function askContextQuestion(deps: ContextScopeDeps, profileId: stri
 function askAgent(deps: ContextScopeDeps, profile: AiProfile, prompt: string, cwd: string): Promise<Answer> {
   const runner = deps.runner?.() ?? DEFAULT_RUNNER;
   const id = profile.id;
-  const strict: StrictExecutionRequest = {
-    version: 1,
-    ...admissionRegimeOf(runner),
-    agentTools: { categories: [], native: { tool: '', allow: [], deny: [] } },
-    boardTools: { mode: 'explicit', value: [] },
-    activeMcpIds: [],
-    allowedMcpIds: [],
-    boardMcpIds: [],
-    mcpServers: [],
-    mcpTools: [],
-    boardMcpTools: [],
-    mcpLevel: { permission: 'board', tools: [] },
-  };
   // sem ferramentas e com a lista de MCP vazia: a do Claude Code leva o `--strict-mcp-config`, como num card
   const exec = {
     ...bareExec(null),
@@ -401,7 +388,7 @@ function askAgent(deps: ContextScopeDeps, profile: AiProfile, prompt: string, cw
       cwd,
       timeoutMinutes: 5,
       prepare: () => ({
-        ...(isReadyCli(profile) ? {} : { strict: { profileId: id, request: strict } }),
+        ...(isReadyCli(profile) ? {} : { strict: { profileId: id, request: closedAdmissionRequest(runner) } }),
         config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: true, skills: [], mcp: [] },
         input: { prompt, permission: 'board', structured: true, exec, draftOnly: true },
       }),

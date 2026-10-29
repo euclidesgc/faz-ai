@@ -8,8 +8,8 @@ import {
   type ExecutionPolicyRecord,
   type ExecutionTarget,
 } from '../../../../shared/executionPolicies';
-import { CONTEXT_ACTIONS } from '../../../../shared/contextPlanning';
-import { CONTEXT_ACTION_LABELS } from '../../../../shared/contextPlanning';
+import { CONTEXT_ACTIONS } from '../../../../shared/executionAction';
+import { CONTEXT_ACTION_LABELS } from '../../../../shared/executionAction';
 import type { PolicyLibrary } from '../../../../shared/policyManagement';
 import { requestExecutionPolicy } from '../../../request';
 import { useBoardStore } from '../../../store/boardStore';

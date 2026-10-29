@@ -14,7 +14,7 @@ import {
   scopeDigest,
   type Chain,
 } from './policyGate';
-import type { ContextAction } from '../shared/contextPlanning';
+import type { ContextAction } from '../shared/executionAction';
 import { cardRef } from '../shared/model';
 import { canDispatch, limitClock, limitHolds, nextPause, pauseOf, resetAtOf } from '../shared/usageLimit';
 import { limitChoice } from '../shared/limitChoice';
@@ -34,7 +34,7 @@ import { modelDisplay, modelValue, suggestModelRule } from '../shared/models';
 import { effortTiers } from './models';
 import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
-import { legacyStrictRequest } from './ai/admission';
+import { cardAdmissionRequest } from './ai/admissionRequest';
 import { AiGateway, type AiCall, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
@@ -548,7 +548,7 @@ export class AiRunner {
               ? {
                   strict: {
                     profileId: target.cli.id,
-                    request: legacyStrictRequest(state.board.runner, permission, plan.manifest.mcpServers),
+                    request: cardAdmissionRequest(state.board.runner, permission, plan.manifest.mcpServers),
                   },
                 }
               : {}),

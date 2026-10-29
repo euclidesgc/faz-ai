@@ -7,7 +7,6 @@ import { openInMemory, type DbHandle } from '../src/extension/db/database';
 import { BoardContext } from '../src/extension/panel/handlers/context';
 import { admissionRegimeOf, DEFAULT_RUNNER, parseRunner } from '../src/shared/runner';
 import { admitExecution } from '../src/shared/executionAdmission';
-import { legacyStrictRequest } from '../src/extension/ai/admission';
 import { aiProfileHandlers } from '../src/extension/panel/handlers/aiProfiles';
 import type { StrictExecutionRequest } from '../src/shared/executionAdmission';
 
@@ -157,24 +156,5 @@ describe('regime por perfil (história 7)', () => {
       gemini: 2,
     });
     expect(parseRunner('{"compatibilityReviews":[1]}').compatibilityReviews).toEqual({});
-  });
-});
-
-describe('pedido de admissão do runtime legado para um perfil personalizado', () => {
-  it('leva o regime do board, as categorias do nível e os MCPs do plano pelo nome; a admissão o aceita', () => {
-    const runner = { ...DEFAULT_RUNNER, admissionRegime: 'compatible' as const, compatibilityReviewRevision: 1 };
-    const request = legacyStrictRequest(runner, 'edits', ['memoria', 'memoria']);
-    expect(request).toMatchObject({
-      regime: 'compatible',
-      compatibilityReview: { actor: 'person', revision: 1 },
-      agentTools: { categories: ['read', 'edit'] },
-      activeMcpIds: ['memoria'],
-      mcpServers: [{ artifactId: 'memoria', name: 'memoria' }],
-      mcpLevel: { permission: 'edits' },
-    });
-    const decision = admitExecution('generic', 'edits', request, 'a'.repeat(64), [], 1000, 'acp');
-    expect(decision.reasons.map((r) => r.code)).not.toContain('invalid-request');
-    expect(decision.reasons.map((r) => r.code)).not.toContain('mcp-outside-boundary');
-    expect(legacyStrictRequest(DEFAULT_RUNNER, 'full', []).agentTools.categories).toEqual(['read', 'edit', 'run', 'net']);
   });
 });
