@@ -910,3 +910,43 @@ describe('detectMainBranch (RF09, sem rede)', () => {
     expect(rev(repo, 'x/1')).toBe(rev(repo, 'origin/main'));
   });
 });
+
+describe('storyCommits', () => {
+  it('lê os trailers, devolve [] sem base/branch e limita a quantidade', async () => {
+    const { storyCommits } = await import('../src/extension/git');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'faz-commits-'));
+    try {
+      git(dir, 'init', '-q', '-b', 'main');
+      git(dir, 'config', 'user.email', 't@t');
+      git(dir, 'config', 'user.name', 't');
+      git(dir, 'commit', '-q', '--allow-empty', '-m', 'base');
+      git(dir, 'checkout', '-q', '-b', 'feat');
+      git(
+        dir,
+        'commit',
+        '-q',
+        '--allow-empty',
+        '-m',
+        'um',
+        '--trailer',
+        'Faz-AI-Card: #7',
+        '--trailer',
+        'Faz-AI-Phase: Plan',
+        '--trailer',
+        'Faz-AI-Run: abc',
+      );
+      git(dir, 'commit', '-q', '--allow-empty', '-m', 'dois');
+      const all = storyCommits(dir, 'main', 'feat');
+      expect(all.map((x) => x.subject)).toEqual(['dois', 'um']);
+      expect(all[1]).toMatchObject({ card: '#7', phase: 'Plan', run: 'abc' });
+      expect(all[0]).toMatchObject({ card: '', phase: '', run: '' });
+      expect(storyCommits(dir, 'main', 'feat', 1)).toHaveLength(1);
+      expect(storyCommits(dir, 'nada', 'feat')).toEqual([]);
+      expect(storyCommits(dir, 'main', 'nada')).toEqual([]);
+      expect(storyCommits(dir, '', 'feat')).toEqual([]);
+      expect(storyCommits(path.join(dir, 'x'), 'main', 'feat')).toEqual([]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

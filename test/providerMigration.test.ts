@@ -21,8 +21,19 @@ it('origem test preserva execuções/inventário/Bash e mantém cascatas após a
     run(db, "INSERT INTO ai_run_bash(run_id,command,calls) VALUES ('run','echo oi',1)");
     const before = all(db, 'SELECT * FROM ai_runs');
     migrate(db);
-    // as colunas da conferência e do modo (migrações posteriores) nascem nulas; o resto da linha não muda
-    expect(all(db, 'SELECT * FROM ai_runs')).toEqual(before.map((r) => ({ ...r, check_status: null, check_detail: null, mode: null })));
+    // as colunas da conferência, do modo e do custo por bucket (migrações posteriores) nascem nulas; o resto da linha não muda
+    expect(all(db, 'SELECT * FROM ai_runs')).toEqual(
+      before.map((r) => ({
+        ...r,
+        check_status: null,
+        check_detail: null,
+        mode: null,
+        cost_input_usd: null,
+        cost_output_usd: null,
+        cost_cache_read_usd: null,
+        cost_cache_write_usd: null,
+      })),
+    );
     expect(all(db, 'SELECT * FROM ai_run_usage')).toHaveLength(1);
     expect(all(db, 'SELECT * FROM ai_run_bash')).toHaveLength(1);
     run(

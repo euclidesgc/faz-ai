@@ -481,6 +481,38 @@ const withoutNativeDelegation = <T extends { args: string[] }>(command: T): T =>
   return { ...command, args: [...command.args.slice(0, at), '--disallowedTools', 'Agent', 'Task', ...command.args.slice(at)] };
 };
 
+describe('consumptionLine: custo em dólar', () => {
+  const report = (costUsd: number | null, costEstimated?: boolean) =>
+    ({
+      measure: 'full',
+      consumption: {
+        inputTokens: 1,
+        outputTokens: 2,
+        cacheReadTokens: 3,
+        cacheWriteTokens: 4,
+        turns: null,
+        sessionId: null,
+        costUsd,
+        ...(costEstimated === undefined ? {} : { costEstimated }),
+      },
+      inventory: [],
+      answer: '',
+      reason: null,
+      usageLimitReached: false,
+    }) as never;
+
+  it('informado: US$ sem marca; estimado: US$ com (estimado)', () => {
+    expect(consumptionLine(report(0.12, false), {}, true)).toMatch(/ · US\$ 0,12$/);
+    expect(consumptionLine(report(0.12, true), {}, true)).toMatch(/ · US\$ 0,12 \(estimado\)$/);
+  });
+
+  it('sem a regra (ou sem custo) a linha não tem US$', () => {
+    expect(consumptionLine(report(0.12, true), {}, false)).not.toContain('US$');
+    expect(consumptionLine(report(0.12, true))).not.toContain('US$');
+    expect(consumptionLine(report(null), {}, true)).not.toContain('US$');
+  });
+});
+
 describe('executor da IA', () => {
   it('roda a ferramenta do projeto para o card e marca "Em execução"', () => {
     runner.start(storyId);
@@ -2046,7 +2078,7 @@ describe('consumptionLine', () => {
   });
 
   it('números em português, "turno" no singular, custo com duas a quatro casas', () => {
-    expect(consumptionLine(report())).toBe(
+    expect(consumptionLine(report(), {}, true)).toBe(
       'Consumo: 1.234 entrada · 5 saída · 0 leitura de cache · 1.000.000 criação de cache · 1 turno · US$ 1,50',
     );
   });

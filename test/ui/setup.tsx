@@ -37,6 +37,7 @@ const { requestIds, SELF_ANSWERING } = vi.hoisted(() => ({
     'harness.agent.assist',
     'metrics.query',
     'card.usage.query',
+    'card.commits.query',
     'executionPolicy.read',
     'executionPolicy.simulate',
     'executionPolicy.assist',

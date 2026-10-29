@@ -33,6 +33,7 @@ const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'harness.artifact.assist',
   'metrics.query',
   'card.usage.query',
+  'card.commits.query',
   'executionPolicy.read',
   'executionPolicy.simulate',
   'executionPolicy.assist',
@@ -742,6 +743,14 @@ export class HostBridge {
           this.post({ type: 'card.usage.result', requestId: msg.requestId, usage: this.router.cardUsage(msg.cardId) });
         } catch (e) {
           this.post({ type: 'card.usage.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'card.commits.query': {
+        try {
+          this.post({ type: 'card.commits.result', requestId: msg.requestId, commits: this.router.storyCommits(msg.cardId) });
+        } catch (e) {
+          this.post({ type: 'card.commits.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
         }
         return;
       }

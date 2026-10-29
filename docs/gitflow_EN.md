@@ -15,6 +15,7 @@ progress. Sub-tasks commit to the story's branch.
 - The branch is created when the AI starts the implementation (it calls `prepare_workspace`) or with
   the **Criar branch da história** (create the story's branch) button on the card.
 - The card shows the branch and opens the working folder in a new window.
+- Below the branch, the **Commits by phase** section lists the story's commits (up to 200) grouped by phase, with hash, subject, date, card and run, read from the `Faz-AI-Card`, `Faz-AI-Phase` and `Faz-AI-Run` trailers. Commits without a phase go under **No phase**, last. The list is read when the card opens and when the branch changes, with no periodic refresh, and the section is hidden when there are no commits.
 - The mode (worktree, branch in the same folder, or off), the branch name pattern, the worktrees
   folder and automatic PR merge when approving acceptance live in **Settings → Git**, and **drive
   stories in parallel** in **Settings → Automação** (automation), in the editor and in the

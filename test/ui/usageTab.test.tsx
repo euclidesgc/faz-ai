@@ -42,6 +42,8 @@ const row = (phase: string, over: Partial<CardUsageRow> = {}): CardUsageRow => (
   measuredRuns: 1,
   durationMs: 60_000,
   tokens: { input: 1000, output: 2000, cacheRead: 30_000, cacheWrite: 4000, total: 37_000 },
+  costedRuns: 0,
+  cost: null,
   ...over,
 });
 

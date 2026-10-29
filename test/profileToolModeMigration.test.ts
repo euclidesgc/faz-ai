@@ -64,7 +64,16 @@ it('o banco do schema 47 abre, migra só as colunas e mantém perfis e execuçõ
   // a migração não lê o cofre: só cria as colunas no padrão, e o kind segue o antigo até o repositório ler
   expect(all(db, 'SELECT * FROM ai_profiles ORDER BY id')).toEqual(profilesBefore.map((r) => ({ ...r, tool: '', mode: 'cli' })));
   // execução anterior: o modo não foi registrado, e nada é inventado
-  expect(all(db, 'SELECT * FROM ai_runs ORDER BY id')).toEqual(runsBefore.map((r) => ({ ...r, mode: null })));
+  expect(all(db, 'SELECT * FROM ai_runs ORDER BY id')).toEqual(
+    runsBefore.map((r) => ({
+      ...r,
+      mode: null,
+      cost_input_usd: null,
+      cost_output_usd: null,
+      cost_cache_read_usd: null,
+      cost_cache_write_usd: null,
+    })),
+  );
   expect(all(db, 'SELECT * FROM ai_run_usage')).toHaveLength(1);
 });
 

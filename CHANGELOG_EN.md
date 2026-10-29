@@ -6,6 +6,8 @@
 
 ### Added
 
+- A per-model price in the catalog (`upsert_model`) estimates the US$ cost of runs without a reported cost; the "Show cost in dollars" rule turns it off for subscription users (#1104).
+- The open card shows the story branch commits grouped by phase (hash, subject, date, card and run), read from the `Faz-AI-*` trailers; the section is hidden when there are no commits.
 - New board artifact library in Settings › Harness › Board artifacts: each rule, skill, agent and MCP server is active or inactive, with counter, search, filter and a skill folder tree.
 - The **New rule**, **New skill** and **New agent** forms open with a template, tools and live frontmatter, skill and agent compatibility and an export preview.
 - The **Create with AI** assistant asks about the project one question at a time, with the file draft updating live.

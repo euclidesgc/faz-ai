@@ -12,6 +12,7 @@ import type {
   InventoryKind,
   RunReport,
 } from '../../shared/log';
+import type { CostBuckets } from '../../shared/cost';
 import { monthOf, truncateTitle, type BashCommandItem } from '../../shared/log';
 import { runCheckDetail, runCheckFrom, type RunCheck } from '../../shared/runCheck';
 import { newId } from '../db/ids';
@@ -57,8 +58,10 @@ export interface AiRun {
   cacheReadTokens: number | null;
   cacheWriteTokens: number | null;
   costUsd: number | null;
-  /** true = custo calculado por uma tabela de preços (só execuções antigas); false = informado pela ferramenta; null = sem custo */
+  /** true = custo estimado pelo preço do catálogo, no fim da execução; false = informado pela ferramenta; null = sem custo */
   costEstimated: boolean | null;
+  /** custo por bucket pelo preço do catálogo, congelado no fim da execução; `null` = sem preço (ou execução anterior à migração 51) */
+  costBuckets: CostBuckets | null;
   turns: number | null;
   sessionId: string | null;
   /** linha gravada antes da migração 24 lê 'none' (RF-16) */
@@ -68,6 +71,17 @@ export interface AiRun {
 }
 
 const numOrNull = (v: Row[string] | undefined): number | null => (v == null ? null : num(v));
+
+/** Os quatro custos por bucket de uma linha; `null` quando nenhum foi gravado (modelo sem preço ou linha anterior à migração 51). */
+function costBucketsOf(r: Row): CostBuckets | null {
+  const buckets: CostBuckets = {
+    input: numOrNull(r.cost_input_usd),
+    output: numOrNull(r.cost_output_usd),
+    cacheRead: numOrNull(r.cost_cache_read_usd),
+    cacheWrite: numOrNull(r.cost_cache_write_usd),
+  };
+  return Object.values(buckets).every((v) => v === null) ? null : buckets;
+}
 
 function toRun(r: Row): AiRun {
   const mcpJson = strOrNull(r.mcp_json);
@@ -117,6 +131,7 @@ function toRun(r: Row): AiRun {
     cacheWriteTokens: numOrNull(r.cache_write_tokens),
     costUsd: numOrNull(r.cost_usd),
     costEstimated: r.cost_estimated == null ? null : num(r.cost_estimated) === 1,
+    costBuckets: costBucketsOf(r),
     turns: numOrNull(r.turns),
     sessionId: strOrNull(r.session_id),
     measure: str(r.measure) as AiRunMeasure,
@@ -212,7 +227,7 @@ export class AiRunRepo {
    * a cada gravação).
    *
    * `measure: 'none'` deixa tokens, custo, turnos e sessão NULL e não escreve inventário: "não medido"
-   * não é "zero" (RF-14). `partial` sem consumo grava o inventário com os tokens NULL. O custo é congelado aqui (RF-30): nada o recalcula depois, e mudar o preço
+   * não é "zero" (RF-14). `partial` sem consumo grava o inventário com os tokens NULL. O custo (total e por bucket, já completado pelo gateway) é congelado aqui (RF-30): nada o recalcula depois, e mudar o preço
    * vale da próxima execução em diante. O inventário usa `INSERT OR REPLACE` sobre a chave
    * `(run_id, kind, name)`: uma segunda chamada com o mesmo inventário não duplica linha.
    */
@@ -225,7 +240,8 @@ export class AiRunRepo {
       run(
         this.db,
         `UPDATE ai_runs SET input_tokens = ?, output_tokens = ?, cache_read_tokens = ?, cache_write_tokens = ?,
-           cost_usd = ?, cost_estimated = ?, turns = ?, session_id = ?, measure = ?,
+           cost_usd = ?, cost_estimated = ?, cost_input_usd = ?, cost_output_usd = ?, cost_cache_read_usd = ?,
+           cost_cache_write_usd = ?, turns = ?, session_id = ?, measure = ?,
            check_status = ?, check_detail = ?
          WHERE id = ?`,
         [
@@ -235,6 +251,10 @@ export class AiRunRepo {
           c ? c.cacheWriteTokens : null,
           c ? c.costUsd : null,
           c && c.costUsd != null ? (c.costEstimated ? 1 : 0) : null,
+          c?.costBuckets?.input ?? null,
+          c?.costBuckets?.output ?? null,
+          c?.costBuckets?.cacheRead ?? null,
+          c?.costBuckets?.cacheWrite ?? null,
           c ? c.turns : null,
           c ? c.sessionId : null,
           report.measure,
