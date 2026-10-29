@@ -15,9 +15,6 @@ export const harness: Record<string, string> = {
 
   // --- HarnessSettings
   Harness: 'Harness',
-  'Plano de contexto': 'Context plan',
-  'Plano de contexto deste workflow': "This workflow's context plan",
-  'Plano de contexto padrão do board': "Board's default context plan",
   Automação: 'Automation',
   'Como o board executa a IA, com qualquer agente ligado: o que ela pode fazer, o tempo limite de cada execução, o heartbeat e quantas histórias andam ao mesmo tempo.':
     'How the board runs the AI, with any enabled agent: what it may do, the time limit of each run, the heartbeat and how many stories move at once.',
@@ -649,8 +646,6 @@ export const harness: Record<string, string> = {
   Rascunho: 'Draft',
   'Sem agente válido': 'No valid agent',
   'Herdar agente': 'Inherit agent',
-  'Mostra ou esconde, abaixo das colunas, o plano de contexto padrão dos cards deste workflow.':
-    "Shows or hides, below the columns, the default context plan of this workflow's cards.",
   Paralelismo: 'Parallelism',
   'Cerca de {tokens} tokens conhecidos': 'About {tokens} known tokens',
   '{n} itens sem medida': '{n} unmeasured items',
@@ -862,10 +857,6 @@ export const harness: Record<string, string> = {
   'Mostrar todas as regras': 'Show all rules',
   'Mostrar só as desligadas': 'Show only the ones off',
   'Buscar em {topic} por nome ou descrição': 'Search {topic} by name or description',
-  'Vale para os cards deste workflow; o que ficar em "Herdar" segue o padrão do board, em Harness › Plano de contexto.':
-    'Applies to the cards of this workflow; whatever stays on "Herdar" (inherit) follows the board default, in Harness › Plano de contexto (context plan).',
-  'O que cada atividade leva para a IA (agente, modelo, skills, MCPs e o resultado esperado) quando nem o card nem o workflow escolhem outra coisa. O de cada workflow fica no botão Plano de contexto dele, em Workflows e colunas.':
-    "What each activity brings to the AI (agent, model, skills, MCPs and the expected result) when neither the card nor the workflow picks something else. Each workflow's lives under its Plano de contexto (context plan) button, in Workflows and columns.",
   'Exportar para a ferramenta': 'Export to the tool',
   '{n} gravados': '{n} written',
   '{n} substituídos': '{n} replaced',
@@ -943,8 +934,8 @@ export const harness: Record<string, string> = {
     'The tool only runs with all five capabilities verified: the AI sees exactly the context the board built for the card.',
   'A ferramenta pode carregar os próprios arquivos de contexto (regras, skills, agentes, hooks e MCPs que o perfil declara em "O que a CLI carrega por conta própria"). Permissões, MCP e delegação continuam exigidos. É o único regime em que um agente ACP roda.':
     'The tool may load its own context files (the rules, skills, agents, hooks and MCPs the profile declares under "What the CLI loads on its own"). Permissions, MCP and delegation are still required. It is the only regime in which an ACP agent runs.',
-  'O que entra no contexto das execuções, com qualquer ferramenta de IA: os <b>Artefatos do board</b> (regras, skills, agentes e servidores MCP) e o <b>Plano de contexto</b> padrão de cada atividade. A edição vale para as próximas execuções.':
-    'What goes into the context of the runs, with any AI tool: the <b>Artefatos do board</b> (board artifacts: rules, skills, agents and MCP servers) and the default <b>Plano de contexto</b> (context plan) of each activity. Edits apply to the next runs.',
+  'O que entra no contexto das execuções, com qualquer ferramenta de IA: os <b>Artefatos do board</b> (regras, skills, agentes e servidores MCP). A edição vale para as próximas execuções.':
+    'What goes into the context of the runs, with any AI tool: the <b>Artefatos do board</b> (board artifacts: rules, skills, agents and MCP servers). Edits apply to the next runs.',
   'O botão "Trabalhar na fase" de um card roda a IA dele em segundo plano nesta pasta, sem ninguém aprovando cada passo. Aqui se define o que ela pode fazer nessas execuções ("Refinar com IA" roda só com o board, quando a ferramenta tem esse nível; sem ele, o pedido proíbe mexer em arquivos). O agente de cada card precisa estar instalado, autenticado e ligado em Conectar agentes.':
     'A card\'s "Trabalhar na fase" (work on the phase) button runs its AI in the background in this folder, with no one approving each step. Here you set what it may do in those runs ("Refinar com IA" runs only with the board when the tool has that level; without it, the request forbids touching files). Each card\'s agent must be installed, signed in and enabled in Connect agents.',
 };

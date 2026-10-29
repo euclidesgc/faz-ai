@@ -1,7 +1,5 @@
 // Painel de métricas (src/webview/components/metrics/). Os blocos do painel acrescentam aqui o texto deles.
 export const metrics: Record<string, string> = {
-  'Modo legado: os novos contratos são rascunhos e ainda não governam execuções.':
-    'Legacy mode: new contracts are drafts and do not govern executions yet.',
   'Contexto inicial estimado: cerca de {tokens} tokens, sem os itens não medidos.':
     'Estimated initial context: about {tokens} tokens, excluding unmeasured items.',
   'Contexto da execução': 'Run context',

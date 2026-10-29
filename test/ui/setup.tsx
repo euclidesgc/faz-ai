@@ -40,7 +40,6 @@ const { requestIds, SELF_ANSWERING } = vi.hoisted(() => ({
     'executionPolicy.read',
     'executionPolicy.simulate',
     'executionPolicy.assist',
-    'contextPlanning.propose',
     'agentConnect.registry',
   ]),
 }));
