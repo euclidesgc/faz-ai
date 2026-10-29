@@ -1,4 +1,5 @@
 import {
+  EMPTY_DELIVERY,
   EMPTY_REWORK,
   METRICS_BREAKDOWN_DIMS,
   type MetricsBreakdown,
@@ -34,6 +35,11 @@ export function emptySections(): MetricsPanelSections {
     lead: { medianMs: null, meanMs: null, counted: 0, unknown: 0, rows: [], omitted: 0 },
     cards: { cells: [], covered: { ...emptyCovered }, omitted: 0 },
     inventory: { measured: false, tools: [], mcpTools: [], agents: [], skills: [] },
-    rework: { ...EMPTY_REWORK, escapes: { ...EMPTY_REWORK.escapes } },
+    rework: {
+      ...EMPTY_REWORK,
+      unfinished: { models: [], agents: [] },
+      escapes: { ...EMPTY_REWORK.escapes },
+    },
+    delivery: { ...EMPTY_DELIVERY, omitted: { ...EMPTY_DELIVERY.omitted } },
   };
 }

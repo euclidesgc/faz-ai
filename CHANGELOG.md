@@ -6,6 +6,8 @@
 
 ### Adicionado
 
+- `get_metrics` com `rework: true` traz o custo por entrega (tokens por história concluída, por tipo e esforço, e a visão tipo × modelo e tipo × agente) e o retrabalho por agente, com as execuções sem resultado (#1113).
+- Ao fim de uma execução do Codex (agente ACP), o board lê o uso da cota (janelas de 5 h e semanal) do rollout mais recente em `$CODEX_HOME/sessions` (ou `~/.codex/sessions`) e o entrega no relatório da execução, para a troca antecipada; qualquer falha na leitura vira "desconhecido" (#1210).
 - Depois que um modelo esgota o limite e a regra troca sozinha, as execuções e o chat seguintes já começam no destino (#1100).
 - Preço por modelo no catálogo (`upsert_model`) estima o custo em US$ das execuções sem custo informado; a regra "Mostrar custo em dólar" o desliga para quem usa assinatura (#1104).
 - O card aberto mostra os commits da branch da história agrupados por fase (hash, assunto, data, card e run), lidos dos trailers `Faz-AI-*`; a seção some quando não há commits.
