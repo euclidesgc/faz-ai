@@ -101,6 +101,7 @@
 - In Cursor, the run error (such as the usage limit) is no longer hidden behind "the process tree shutdown is not confirmed yet".
 - The Gemini limit message says which quota ran out and when it comes back.
 - A model the Gemini API lists but refuses for the account (HTTP 404) leaves the model list and doesn't come back through **Detectar modelos**; the message carries Google's reason.
+- An interrupted run no longer approves the story again or moves it on in autonomous mode (#1102).
 - Gemini's **Detectar modelos** checks each model on the API and only lists the ones the account can use.
 - A chat on a model that left the catalog switches to the newest one of the same agent.
 - The quick test result also goes to the "Faz AI" log.

@@ -1122,8 +1122,15 @@ export class AiRunner {
   private restore(cardId: string, run: Run): void {
     const status = run.previous === 'running' ? 'ready' : run.previous;
     if (status === 'blocked' && !run.previousReason.trim()) return void this.setStatus(cardId, 'ready', RUNNER_AUTHOR);
+    // `restore`: o status anterior volta sem ser uma aprovação nova, mesmo quando era `approved` (#1102)
     this.router.handle(
-      { type: 'card.status.set', cardId, status, ...(status === 'blocked' ? { note: run.previousReason, quiet: true } : {}) },
+      {
+        type: 'card.status.set',
+        cardId,
+        status,
+        restore: true,
+        ...(status === 'blocked' ? { note: run.previousReason, quiet: true } : {}),
+      },
       { author: RUNNER_AUTHOR },
     );
   }

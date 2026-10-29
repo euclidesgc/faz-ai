@@ -160,6 +160,8 @@ oferece as fases que valem para todas as histórias marcadas. A IA lê o ponto d
   decisão e o motivo na conversa. `ask_questions` é aceita: o board responde cada pergunta com a
   indicada e a registra na seção **Perguntas e respostas** da descrição. Só um impedimento real
   (acesso, ambiente, falha que ela não resolve) bloqueia o card.
+- **Interromper, errar ou estourar o tempo não aprova**: uma execução interrompida, com erro ou com o
+  tempo limite estourado devolve o card ao status que tinha, sem aprová-lo nem avançar a história.
 - **Conversa resumida entre as fases**: ao passar para outra coluna com três ou mais mensagens desde
   o último resumo (ou duas que somem muito texto; ao menos uma da IA), o autopiloto roda **Resumir a
   conversa** antes da fase nova: as mensagens anteriores ao resumo ficam na conversa, mas
