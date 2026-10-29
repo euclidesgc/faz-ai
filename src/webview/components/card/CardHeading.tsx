@@ -42,9 +42,6 @@ export function CardHeading({ card }: { card: Card }) {
         </div>
       )}
 
-      <div className="drawer-id" title={t('ID do card')}>
-        {cardRef(card)}
-      </div>
       <input
         className="drawer-title"
         value={title}
