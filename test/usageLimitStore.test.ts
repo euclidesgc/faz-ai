@@ -3,7 +3,15 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { LIMIT_SLACK_MS, USAGE_LIMIT_META_KEY, canDispatch, limitHolds } from '../src/shared/usageLimit';
+import {
+  LIMIT_SLACK_MS,
+  USAGE_LIMIT_META_KEY,
+  canDispatch,
+  limitHolds,
+  modelLimitHolds,
+  nextModelLimit,
+  parseModelLimits,
+} from '../src/shared/usageLimit';
 
 // A pausa por limite de uso fica gravada na `meta` do board, uma entrada por perfil de CLI (história #1047): reabrir o
 // editor não solta a fila antes da hora, e a execução de teste em curso não sobrevive a reabrir.
@@ -75,5 +83,62 @@ describe('pausa por limite de uso gravada no board', () => {
     expect(open().snapshot().usageLimit).toEqual([]);
     router.setMeta(USAGE_LIMIT_META_KEY, 'lixo');
     expect(open().snapshot().usageLimit).toEqual([]);
+  });
+});
+
+describe('marca de modelo esgotado (#1100)', () => {
+  it('nextModelLimit: renovação + folga, backoff e a mais tarde vence', () => {
+    const a = nextModelLimit(null, 'claude', 'opus', at(15, 0), at(13, 45));
+    expect(a).toEqual({ profileId: 'claude', model: 'opus', resumeAt: at(15, 3), source: 'reset', attempts: 0 });
+    expect(nextModelLimit(a, 'claude', 'opus', at(14, 0), at(13, 50)).resumeAt).toBe(at(15, 3));
+    expect(nextModelLimit(a, 'claude', 'opus', at(16, 0), at(13, 50)).resumeAt).toBe(at(16, 3));
+    const b = nextModelLimit(null, 'claude', 'opus', null, at(13, 45));
+    expect(b).toMatchObject({ source: 'backoff', attempts: 1, resumeAt: at(13, 45) + 5 * 60_000 });
+    // marca de outro modelo não conta como anterior
+    expect(nextModelLimit(a, 'claude', 'sonnet', null, at(13, 45)).attempts).toBe(1);
+  });
+
+  it('parseModelLimits: inválido, corrompido e par duplicado viram "sem marca"', () => {
+    const ok = { profileId: 'claude', model: 'opus', resumeAt: 10, source: 'reset', attempts: 0 };
+    expect(parseModelLimits(undefined)).toEqual([]);
+    expect(parseModelLimits('lixo')).toEqual([]);
+    expect(parseModelLimits('{}')).toEqual([]);
+    expect(
+      parseModelLimits(
+        JSON.stringify([ok, { ...ok, model: '' }, { ...ok, resumeAt: 'x' }, { ...ok, resumeAt: 99 }, { ...ok, model: 'sonnet' }]),
+      ),
+    ).toEqual([ok, { ...ok, model: 'sonnet' }]);
+  });
+
+  it('modelLimitHolds: vencida, modelo null e outro modelo do mesmo perfil', () => {
+    const list = [{ profileId: 'claude', model: 'opus', resumeAt: at(15, 3), source: 'reset' as const, attempts: 0 }];
+    expect(modelLimitHolds(list, 'claude', 'opus', at(14, 0))).toBe(true);
+    expect(modelLimitHolds(list, 'claude', 'opus', at(15, 3))).toBe(false);
+    expect(modelLimitHolds(list, 'claude', null, at(14, 0))).toBe(false);
+    expect(modelLimitHolds(list, 'claude', 'sonnet', at(14, 0))).toBe(false);
+    expect(modelLimitHolds(list, 'cursor', 'opus', at(14, 0))).toBe(false);
+  });
+
+  it('record e clear gravam na meta e releem; vencidas saem na gravação; não entram no snapshot', () => {
+    const router = open();
+    router.recordModelLimit('claude', 'opus', at(15, 0), at(13, 45));
+    router.recordModelLimit('claude', 'sonnet', at(14, 0), at(13, 45));
+    expect(
+      open()
+        .modelLimitList()
+        .map((l) => l.model),
+    ).toEqual(['opus', 'sonnet']);
+    expect('modelLimits' in router.snapshot()).toBe(false);
+    // gravar às 14:30 descarta a do sonnet (vencida às 14:03)
+    router.recordModelLimit('claude', 'opus', at(16, 0), at(14, 30));
+    expect(
+      open()
+        .modelLimitList()
+        .map((l) => [l.model, l.resumeAt]),
+    ).toEqual([['opus', at(16, 3)]]);
+    expect(router.clearModelLimit('claude', null, at(14, 30))).toBe(false);
+    expect(router.clearModelLimit('claude', 'opus', at(14, 30))).toBe(true);
+    expect(router.clearModelLimit('claude', 'opus', at(14, 30))).toBe(false);
+    expect(open().modelLimitList()).toEqual([]);
   });
 });

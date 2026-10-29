@@ -23,7 +23,17 @@ import { runArtifactRequest } from './runArtifactSnapshot';
 import { isCliNoise } from './cliNoise';
 import type { MessageRouter } from './panel/messageRouter';
 import { boardServer, PERMISSION_ADVICE, type RunnerDeps } from './runner';
-import { chainAfter, describeDecision, evaluateRunPolicy, newChain, runTargetOfPolicy, scopeDigest, type Chain } from './policyGate';
+import {
+  chainAfter,
+  describeDecision,
+  evaluateRunPolicy,
+  newChain,
+  runTargetOfPolicy,
+  scopeDigest,
+  startPosition,
+  type Chain,
+} from './policyGate';
+import { limitHolds, modelLimitHolds, resetAtOf } from '../shared/usageLimit';
 
 /** Quantas mensagens anteriores entram no prompt, e o tamanho máximo de cada uma. */
 const HISTORY = 12;
@@ -358,6 +368,34 @@ export class ChatSession {
       agentId: null,
       scopeDigest: scopeDigest([plan.tools, plan.deniedTools, plan.mcpAllowed, !!hooks.draftOnly]),
     };
+    // a posição de partida (#1100): o modelo pedido esgotou e a regra de fallback já trocava sozinha (no chat a troca é
+    // sempre automática); a conversa começa no destino. Sem conversa de card: a explicação vai para o log
+    if (!retry) {
+      const now = Date.now();
+      const marks = this.router.modelLimitList();
+      if (modelLimitHolds(marks, target.cli.id, target.model?.name ?? null, now)) {
+        const position = startPosition({
+          state,
+          snapshot: this.router.executionPolicyLibrary().snapshot,
+          requested: target,
+          exhausted: (t) => modelLimitHolds(marks, t.cli.id, t.model?.name ?? null, now) || limitHolds(state, t.cli.id, now),
+          now,
+          action,
+          origin: 'chat',
+          agentId: null,
+          phaseId: null,
+          cardTypeId: null,
+          constraints,
+          runningProfiles: [],
+        });
+        if (position) {
+          this.deps.log(
+            `[chat] O modelo pedido está com o limite esgotado; a conversa começa com ${position.target.model?.name ?? profileLabel(state.board, position.target.cli.id)}. ${describeDecision(position.decision)}`,
+          );
+          return this.start(prompt, permission, model, action, hooks, { target: position.target, chain: position.chain });
+        }
+      }
+    }
     try {
       // o chat é a quarta origem de execução, e a única sem card: nenhuma execução nasce da conversa de
       // um card (ela devolve o card para "pronto" e quem executa depois é o heartbeat ou o autopiloto)
@@ -456,6 +494,11 @@ export class ChatSession {
         if (decision) this.deps.log(`[chat] ${describeDecision(decision)}`);
         const next = decision?.action === 'fallback' && decision.target ? runTargetOfPolicy(this.router.snapshot(), decision.target) : null;
         if (decision && evaluated && next) {
+          // a próxima conversa começa no destino, sem chamar o modelo esgotado de novo
+          if (target.model) {
+            const at = Date.now();
+            this.router.recordModelLimit(target.cli.id, target.model.name, resetAtOf(end.report.usageLimitHint, at), at);
+          }
           try {
             this.start(
               prompt,
@@ -489,7 +532,11 @@ export class ChatSession {
         // caiu antes do primeiro evento e o board não repetiu: a pessoa confere o que ficou feito
         const notRepeated = end.measureError instanceof MeasureEndedError ? ` ${NOT_REPEATED}` : '';
         hooks.failed(`O ${tool.label} terminou com erro (código ${end.code}).${notRepeated}${lines ? `\n\n${lines}` : ''}`);
-      } else hooks.done(text);
+      } else {
+        // o modelo respondeu sem esbarrar no limite: a marca dele sai
+        this.router.clearModelLimit(target.cli.id, target.model?.name ?? null);
+        hooks.done(text);
+      }
     });
   }
 
