@@ -555,7 +555,7 @@ button.active {
   font-size: var(--fs-md);
   font-weight: 600;
   color: var(--link);
-  padding: 0 var(--sp-4);
+  white-space: nowrap;
 }
 .card-title {
   font-weight: 500;

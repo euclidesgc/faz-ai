@@ -52,6 +52,15 @@ const snap = () => board.router.snapshot();
 const card = (id: string) => snap().cards.find((c) => c.id === id)!;
 
 describe('CardDrawer', () => {
+  it('o número do card fica na barra do topo, logo depois do LED', () => {
+    const { container } = openStory();
+    const header = container.querySelector('.drawer-header')!;
+    const id = within(header as HTMLElement).getByTitle('ID do card');
+    expect(id.textContent).toBe(cardRef(card(board.storyId)));
+    expect(header.querySelector('.ai-led')!.nextElementSibling).toBe(id);
+    expect(container.querySelectorAll('.drawer-id')).toHaveLength(1);
+  });
+
   it('editar o título e sair do campo envia card.update', async () => {
     openStory();
     const title = screen.getByDisplayValue('Login com Google');
