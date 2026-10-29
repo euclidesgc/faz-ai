@@ -4,6 +4,7 @@ import { norm } from './filters';
 import { AI_BASES, type AiTool } from './harness';
 import type { BoardState, Card, FieldDef, FieldValue, Id } from './model';
 import { valueOf } from './selectors';
+import type { ModelPricing } from './cost';
 
 /** Um modelo de LLM disponível em uma ferramenta, com os níveis de esforço que ele aceita. */
 export interface ModelOption {
@@ -36,6 +37,12 @@ export interface ModelOption {
    * executa sem modelo indicado (card sem modelo, chat em "Auto", teste rápido). Sem ele, a ferramenta decide.
    */
   default?: true;
+  /**
+   * US$ por milhão de tokens em cada bucket, cadastrado pela pessoa (o board não confere com o provedor): estima o
+   * custo das execuções sem custo informado pela ferramenta, da próxima execução em diante. Bucket ausente = sem
+   * preço. Não é o `price` que o board guardou antes da #187 (`withoutPrices` o continua descartando).
+   */
+  pricing?: ModelPricing;
 }
 
 /** Campo especial usado em condições: o tipo do card. */

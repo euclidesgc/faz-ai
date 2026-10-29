@@ -21,7 +21,6 @@ import { limitChoice } from '../shared/limitChoice';
 import { activityKindOf } from '../shared/activity';
 import { STORY_SESSION_ADVICE } from './unitAdvice';
 import type { AiRunOrigin, RunReport } from '../shared/log';
-import { SHOW_COST } from '../shared/metrics';
 import { exceedsRunLimit, RUN_CACHE_READ_LIMIT } from '../shared/runLimit';
 import { columnOf, isLive } from '../shared/selectors';
 import { isAtYoloStop, isWithHuman, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../shared/story';
@@ -179,7 +178,7 @@ const USD = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFr
  * terminou antes do fim); `explained` diz que o motivo já foi escrito no canal (a volta para texto)
  * e não precisa se repetir; sem nenhum dos dois vale o motivo do relatório.
  */
-export function consumptionLine(report: RunReport, why: { reason?: string | null; explained?: boolean } = {}): string {
+export function consumptionLine(report: RunReport, why: { reason?: string | null; explained?: boolean } = {}, showCost = false): string {
   const c = report.consumption;
   if (c) {
     const parts = [
@@ -188,7 +187,7 @@ export function consumptionLine(report: RunReport, why: { reason?: string | null
       `${COUNT.format(c.cacheReadTokens)} leitura de cache`,
       `${COUNT.format(c.cacheWriteTokens)} criação de cache`,
       ...(c.turns !== null ? [`${COUNT.format(c.turns)} ${c.turns === 1 ? 'turno' : 'turnos'}`] : []),
-      ...(SHOW_COST && c.costUsd !== null ? [`US$ ${USD.format(c.costUsd)}`] : []),
+      ...(showCost && c.costUsd !== null ? [`US$ ${USD.format(c.costUsd)}${c.costEstimated ? ' (estimado)' : ''}`] : []),
     ];
     return `${report.measure === 'partial' ? 'Consumo parcial' : 'Consumo'}: ${parts.join(' · ')}`;
   }
@@ -673,6 +672,8 @@ export class AiRunner {
             : end.format !== 'text' && (end.stopped || end.timedOut || end.error || end.code !== 0)
               ? { reason: 'a execução terminou antes de informar o consumo.' }
               : {},
+          // a regra é lida no fim da execução: ligar ou desligar vale da próxima linha em diante
+          this.router.snapshot().board.rules.showCost,
         ),
       );
       log(runCheckLine(end.check));

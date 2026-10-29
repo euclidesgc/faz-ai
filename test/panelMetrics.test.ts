@@ -8,6 +8,7 @@ import { getPanelMetrics } from '../src/extension/log/metrics';
 import { consolidate } from '../src/extension/log/rollup';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { RUN_CACHE_READ_LIMIT } from '../src/shared/runLimit';
+import type { CostBuckets } from '../src/shared/cost';
 import type { MetricsMonth, MetricsPanelResult } from '../src/shared/metrics';
 
 // #155: `getPanelMetrics`, a consulta do painel de métricas (#71). Um teste por requisito do PRD; a
@@ -47,6 +48,8 @@ interface Consumption {
   costUsd?: number;
   /** padrão true (preço do catálogo); false = informado pela ferramenta */
   estimated?: boolean;
+  /** o custo por bucket pelo preço do catálogo; omitido = sem preço */
+  buckets?: CostBuckets;
 }
 
 interface RunOpts {
@@ -90,6 +93,7 @@ function run(startedAt: number, durationMs: number, opts: RunOpts = {}): string 
         sessionId: null,
         costUsd: c.costUsd ?? null,
         costEstimated: c.estimated ?? true,
+        costBuckets: c.buckets ?? null,
       },
       inventory: [{ kind: 'tool', name: 'Read', calls: 1 }],
       answer: '',
@@ -130,6 +134,37 @@ const month = (result: MetricsPanelResult, m: string): MetricsMonth => {
   if (!found) throw new Error(`mês ${m} fora da espinha`);
   return found;
 };
+
+describe('getPanelMetrics: custo por bucket', () => {
+  it('soma os buckets por grupo no detalhe; bucket que nenhuma execução tinha fica null; sem buckets, o campo some', () => {
+    run(at(2026, 6, 1), 1000, {
+      workflow: 'A',
+      consumption: { input: 1, costUsd: 3, buckets: { input: 1, output: 2, cacheRead: null, cacheWrite: null } },
+    });
+    run(at(2026, 6, 2), 1000, {
+      workflow: 'A',
+      consumption: { input: 1, costUsd: 1, buckets: { input: 0.5, output: 0.5, cacheRead: null, cacheWrite: null } },
+    });
+    run(at(2026, 6, 3), 1000, { workflow: 'B', consumption: { input: 1, costUsd: 1 } });
+    const r = getPanelMetrics(db, boardId, { startDate: '2026-06-01', endDate: '2026-06-30' });
+    const cells = r.sections.breakdowns.find((b) => b.dim === 'tool')!.cells;
+    expect(cells).toHaveLength(1);
+    expect(cells[0]!.costBuckets).toEqual({ input: 1.5, output: 2.5, cacheRead: null, cacheWrite: null });
+  });
+
+  it('o mês arquivado vem sem costBuckets', () => {
+    db.run("INSERT INTO log_months (board_id, month, metric, dim, value, n, total) VALUES (?, '2026-02', 'runs', 'tool', 'claude', 2, 0)", [
+      boardId,
+    ]);
+    db.run("INSERT INTO log_months (board_id, month, metric, dim, value, n, total) VALUES (?, '2026-02', 'cost', 'tool', 'claude', 2, 4)", [
+      boardId,
+    ]);
+    const r = getPanelMetrics(db, boardId, { startDate: '2026-02-01', endDate: '2026-02-28' });
+    const cell = r.sections.breakdowns.find((b) => b.dim === 'tool')!.cells[0]!;
+    expect(cell.costUsd).toBe(4);
+    expect(cell.costBuckets).toBeUndefined();
+  });
+});
 
 describe('getPanelMetrics', () => {
   it('RF-04: data final antes da inicial lança', () => {

@@ -1,4 +1,5 @@
 import { profileAvailable } from '../../shared/profileAvailability';
+import { pricingOf } from '../../shared/cost';
 import { isFlowSkill } from '../flowSkill';
 import {
   catalogTool,
@@ -272,6 +273,8 @@ export function modelsOverview(s: BoardState) {
       defaultEffort: o.defaultEffort,
       // o modelo padrão do agente: roda quando nada indica um modelo
       ...(o.default ? { default: true } : {}),
+      // US$ por milhão de tokens por bucket, cadastrado pela pessoa; ausente = sem preço
+      ...(pricingOf(o) ? { pricing: pricingOf(o) } : {}),
       // o perfil ligado que executa este valor (o mesmo que o runner escolhe), ou null: nenhum agente ligado o roda
       runsWith: cliOfValue(s.board, o.id)?.id ?? null,
     })),
