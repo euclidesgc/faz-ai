@@ -404,7 +404,7 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
       if (byModel) {
         const tokens = [...byModel.values()].reduce(addTokens, ZERO);
         // o custo é sempre o que a CLI informou: `total_cost_usd` (cumulativo, o último vale). Sem ele a
-        // execução fica sem custo — o board não calcula nada por tabela de preços
+        // execução fica sem custo aqui — o gateway estima pelo preço do catálogo, se houver
         const informed = reversed.find((r) => r.costUsd !== null)?.costUsd ?? null;
         return {
           measure: 'full',

@@ -3,10 +3,12 @@ import { catalogTool, isAcpProfile, type AiProfile } from '../../../shared/aiPro
 import { TYPE_CONDITION, modelId, resolveModelInput, type ModelRule } from '../../../shared/models';
 import { newId } from '../../db/ids';
 import type { MessageRouter } from '../../panel/messageRouter';
+import { pricingOf, type CostBucket, type ModelPricing } from '../../../shared/cost';
 import { findField, modelsOverview } from '../format';
 import type { DefineTool } from './registry';
 
 const toolArg = z.string().min(1).describe('Id de um perfil de CLI do board (veja profiles em get_models)');
+const priceArg = z.number().min(0).nullable().optional().describe('US$ por milhão de tokens; null limpa o bucket, ausente mantém');
 const models = (router: MessageRouter) => modelsOverview(router.snapshot());
 const profileOf = (router: MessageRouter, id?: string): AiProfile => {
   const selected = id ?? router.snapshot().board.aiTool;
@@ -15,11 +17,21 @@ const profileOf = (router: MessageRouter, id?: string): AiProfile => {
   return profile;
 };
 
+/** Aplica o pedido ao preço gravado: número grava o bucket, null o limpa, ausente o mantém. */
+function mergePricing(current: ModelPricing | null, change: Partial<Record<CostBucket, number | null | undefined>>): ModelPricing | null {
+  const out: ModelPricing = { ...current };
+  for (const [bucket, value] of Object.entries(change) as [CostBucket, number | null | undefined][]) {
+    if (value === null) delete out[bucket];
+    else if (value !== undefined) out[bucket] = value;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 /** Modelos de LLM: catálogo e regras de sugestão de modelo. */
 export function registerModelTools(tool: DefineTool): void {
   tool(
     'get_models',
-    'Catálogo de modelos de LLM e perfis de CLI do board, com os níveis de esforço e as regras de sugestão. `value` usa `<perfil>:<modelo>@<esforço>` e o prefixo escolhe o perfil de CLI que executa o card; quando nada indica um modelo (card, agente ou regra), vale o perfil padrão, no modelo padrão dele (`default` no catálogo, escolhido pela pessoa na tela de Modelos). Todo perfil ligado roda cards, ao mesmo tempo que os outros: `runsWith` em cada modelo do catálogo diz o perfil que o executa (null: nenhum ligado o roda) e `ready` em cada perfil diz se ele roda agora. Uma cópia usa o catálogo do perfil pronto de origem e um personalizado aceita modelo livre. O board não guarda preço: o custo de uma execução é o que o executor informa. ' +
+    'Catálogo de modelos de LLM e perfis de CLI do board, com os níveis de esforço e as regras de sugestão. `value` usa `<perfil>:<modelo>@<esforço>` e o prefixo escolhe o perfil de CLI que executa o card; quando nada indica um modelo (card, agente ou regra), vale o perfil padrão, no modelo padrão dele (`default` no catálogo, escolhido pela pessoa na tela de Modelos). Todo perfil ligado roda cards, ao mesmo tempo que os outros: `runsWith` em cada modelo do catálogo diz o perfil que o executa (null: nenhum ligado o roda) e `ready` em cada perfil diz se ele roda agora. Uma cópia usa o catálogo do perfil pronto de origem e um personalizado aceita modelo livre. `pricing` (quando houver) é o preço em US$ por milhão de tokens (`input`, `output`, `cacheRead`, `cacheWrite`) que a pessoa cadastrou: serve para estimar o custo das execuções sem custo informado pela CLI e vale da próxima execução em diante; bucket ausente = sem preço. ' +
       'O campo "Esforço da atividade" do card é o tamanho da tarefa, não o esforço do modelo: as regras sugerem o modelo a partir dele.',
     {},
     (_a, router) => models(router),
@@ -55,7 +67,7 @@ export function registerModelTools(tool: DefineTool): void {
 
   tool(
     'upsert_model',
-    'Cria ou atualiza um modelo no catálogo. Use para registrar os modelos e níveis de esforço que você (a ferramenta de IA em uso) realmente tem disponíveis. `model` é o id que a CLI da ferramenta lista (ex.: "claude-opus-5-5") e o modelo fica no board como `<ferramenta>:<model>`; as variantes rápidas (`-fast`), quando a ferramenta as tem, são modelos à parte, com id próprio.',
+    'Cria ou atualiza um modelo no catálogo. Use para registrar os modelos e níveis de esforço que você (a ferramenta de IA em uso) realmente tem disponíveis. `model` é o id que a CLI da ferramenta lista (ex.: "claude-opus-5-5") e o modelo fica no board como `<ferramenta>:<model>`; as variantes rápidas (`-fast`), quando a ferramenta as tem, são modelos à parte, com id próprio. Preço em US$ por milhão de tokens (`price_input`, `price_output`, `price_cache_read`, `price_cache_write`, >= 0): ausente mantém o valor gravado, `null` limpa o bucket.',
     {
       tool: toolArg,
       model: z.string().min(1).describe('Identificador usado pela ferramenta para escolher o modelo, ex.: "opus", "k3", "gpt-6.1-sol"'),
@@ -65,6 +77,10 @@ export function registerModelTools(tool: DefineTool): void {
         .optional()
         .describe('Níveis de esforço/raciocínio aceitos, do menor para o maior; vazio se o modelo não tem esse ajuste'),
       default_effort: z.string().optional(),
+      price_input: priceArg,
+      price_output: priceArg,
+      price_cache_read: priceArg,
+      price_cache_write: priceArg,
     },
     (a, router) => {
       const catalog = [...router.snapshot().board.modelCatalog];
@@ -74,6 +90,12 @@ export function registerModelTools(tool: DefineTool): void {
       const efforts = a.efforts ?? [];
       if (a.default_effort && !efforts.includes(a.default_effort)) throw new Error('default_effort precisa ser um dos efforts.');
       const at = catalog.findIndex((o) => o.id === id);
+      const pricing = mergePricing(pricingOf(catalog[at]), {
+        input: a.price_input,
+        output: a.price_output,
+        cacheRead: a.price_cache_read,
+        cacheWrite: a.price_cache_write,
+      });
       const entry = {
         id,
         tool: catalogId,
@@ -83,6 +105,7 @@ export function registerModelTools(tool: DefineTool): void {
         defaultEffort: a.default_effort ?? null,
         // atualizar o modelo não tira dele a escolha de padrão da pessoa
         ...(catalog[at]?.default ? { default: true as const } : {}),
+        ...(pricing ? { pricing } : {}),
       };
       if (at >= 0) catalog[at] = entry;
       else catalog.push(entry);

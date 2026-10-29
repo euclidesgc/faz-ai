@@ -24,6 +24,7 @@ import { Verifications } from '../ai/verifications';
 import * as path from 'node:path';
 import { openFile, type DbHandle } from '../db/database';
 import { dayOf } from '../../shared/log';
+import { pricingOf } from '../../shared/cost';
 import { Autopilot } from '../autopilot';
 import { Orchestrator } from '../orchestrator';
 import { orchestratesStory, effectiveLimits, LIVE_WORK_STATES } from '../../shared/orchestration';
@@ -286,6 +287,11 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       router.retireModel(profile.id, model);
       o.log(`Modelo ${model} recusado pelo ${profile.name} para esta conta: saiu da lista de modelos.`);
     },
+    // o preço do catálogo para o modelo da execução, achado como o limitChoice acha o modelo (o catálogo do perfil de origem)
+    priceOf: (profile, model) =>
+      model === null
+        ? null
+        : pricingOf(router.snapshot().board.modelCatalog.find((o) => o.tool === catalogTool(profile) && o.model === model)),
     resolveProfile: (id) => new AiProfileRepo(handle.db).resolveProfile(router.boardId, id),
     profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
     boardId: router.boardId,

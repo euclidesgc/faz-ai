@@ -30,9 +30,9 @@ export function initModels(ctx: BoardContext): void {
 }
 
 /**
- * O board já guardou preço, origem do preço e "preço variável" em cada modelo do catálogo. Nada disso
- * é usado mais — o custo é o que a ferramenta informa —, então sai do catálogo gravado. Roda a cada
- * abertura do board e só grava quando algo mudou.
+ * O board já guardou preço, origem do preço e "preço variável" em cada modelo do catálogo (a tabela embutida,
+ * aposentada na #187). Nada disso é usado mais, então sai do catálogo gravado. O `pricing` (o preço que a pessoa
+ * cadastra por bucket) é outro campo e fica. Roda a cada abertura do board e só grava quando algo mudou.
  */
 export function dropSavedPrices(ctx: BoardContext): void {
   const { board } = ctx.state();
@@ -40,7 +40,7 @@ export function dropSavedPrices(ctx: BoardContext): void {
   if (JSON.stringify(next) !== JSON.stringify(board.modelCatalog)) ctx.boards.setModelCatalog(ctx.boardId, next);
 }
 
-/** O modelo sem os campos de preço que catálogos gravados em versões anteriores ainda podem trazer. */
+/** O modelo sem os campos da tabela de preços antiga que catálogos gravados em versões anteriores ainda podem trazer (mantém `pricing`). */
 function withoutPrices(o: ModelOption): ModelOption {
   const {
     price: _price,
@@ -77,7 +77,12 @@ function detectModels(ctx: BoardContext, tool: AiTool): void {
   const standard = defaultModelOf(board.modelCatalog, tool)?.id;
   const found = all
     .filter((o) => board.rules.includeFastModels || !isFastVariant(o, all))
-    .map((o) => (o.id === standard ? { ...o, default: true as const } : o));
+    .map((o) => (o.id === standard ? { ...o, default: true as const } : o))
+    // a entrada nova da ferramenta substitui a anterior; o preço é da pessoa, não da ferramenta, e não se perde
+    .map((o) => {
+      const pricing = board.modelCatalog.find((x) => x.id === o.id)?.pricing;
+      return pricing ? { ...o, pricing } : o;
+    });
   const ids = new Set(found.map((o) => o.id));
   const rest = board.modelCatalog.filter((o) => !ids.has(o.id) && !(fresh && o.tool === tool && o.fromTool));
   const at = rest.findIndex((o) => o.tool === tool);

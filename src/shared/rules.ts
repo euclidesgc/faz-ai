@@ -29,6 +29,8 @@ export interface BoardRules {
   logRetentionMonths: number;
   /** história de esforço Baixo ou do tipo Bug pula as colunas de PRD e Spec no avanço calculado (aprovação da pessoa e autopiloto) */
   shortTrack: boolean;
+  /** mostra o custo em US$ (informado pela ferramenta ou estimado pelo preço do catálogo); desligada, os dados seguem gravados */
+  showCost: boolean;
 }
 
 export const DEFAULT_RULES: BoardRules = {
@@ -42,6 +44,7 @@ export const DEFAULT_RULES: BoardRules = {
   includeFastModels: false,
   logRetentionMonths: DEFAULT_LOG_RETENTION_MONTHS,
   shortTrack: false,
+  showCost: true,
 };
 
 /** Lê o JSON salvo, completando com os padrões o que faltar ou for inválido. */
@@ -78,5 +81,6 @@ export function parseRules(json: string | null | undefined): BoardRules {
         ? raw.logRetentionMonths
         : DEFAULT_RULES.logRetentionMonths,
     shortTrack: typeof raw.shortTrack === 'boolean' ? raw.shortTrack : DEFAULT_RULES.shortTrack,
+    showCost: typeof raw.showCost === 'boolean' ? raw.showCost : DEFAULT_RULES.showCost,
   };
 }

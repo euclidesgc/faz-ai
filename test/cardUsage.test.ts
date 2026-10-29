@@ -5,6 +5,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { cardUsage } from '../src/extension/log/cardUsage';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
+import type { CostBuckets } from '../src/shared/cost';
 import type { RunReport } from '../src/shared/log';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -63,6 +64,32 @@ function run(cardNumber: number, phase: string, report?: RunReport): void {
   runs.measure(id, report);
   runs.finish(id, 'done', 0);
 }
+
+/** Uma execução com custo (informado ou estimado) e os buckets pelo preço do catálogo. */
+const costed = (usd: number | null, estimated: boolean, buckets: CostBuckets | null): RunReport => {
+  const base = tokens(10, 10, 10, 10);
+  return { ...base, consumption: { ...base.consumption!, costUsd: usd, costEstimated: estimated, costBuckets: buckets } };
+};
+
+describe('custo de um card', () => {
+  it('soma o custo, a parte estimada e os buckets por fase; costedRuns conta só as execuções com custo', () => {
+    run(1, 'Discovery', costed(1, true, { input: 0.5, output: 0.25, cacheRead: 0.125, cacheWrite: 0.125 }));
+    run(1, 'Discovery', costed(2, false, { input: 1, output: 0.5, cacheRead: null, cacheWrite: null }));
+    run(1, 'Discovery', tokens(1, 1, 1, 1)); // medida, sem custo
+    run(1, 'PRD', tokens(1, 1, 1, 1));
+    const u = cardUsage(db, boardId, 1, ['Discovery', 'PRD']);
+    expect(u.phases[0]).toMatchObject({ runs: 3, costedRuns: 2 });
+    expect(u.phases[0]!.cost).toEqual({
+      totalUsd: 3,
+      estimatedUsd: 1,
+      buckets: { input: 1.5, output: 0.75, cacheRead: 0.125, cacheWrite: 0.125 },
+    });
+    // fase sem nenhum custo: null, nunca zero
+    expect(u.phases[1]).toMatchObject({ costedRuns: 0, cost: null });
+    expect(u.total.costedRuns).toBe(2);
+    expect(u.total.cost).toMatchObject({ totalUsd: 3, estimatedUsd: 1 });
+  });
+});
 
 describe('consumo de um card', () => {
   it('soma por fase, na ordem das colunas; execução sem medição conta nas execuções e não nos tokens', () => {

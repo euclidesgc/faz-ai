@@ -17,13 +17,14 @@
 // `archivedMonths`, para a resposta nunca fingir silêncio.
 import type { Database } from 'sql.js';
 import { monthRange, monthSpan } from '../../shared/log';
-import { all, num, str } from '../db/query';
+import { all, num, str, type Row } from '../db/query';
 import { RUN_CACHE_READ_LIMIT } from '../../shared/runLimit';
 import { splitMcpName, type InventoryKind } from '../../shared/log';
 import { detailMonths } from './rollup';
 import { dayOf, monthOf } from '../../shared/log';
 import type { MetricsMonth, MetricsPanelQuery, MetricsPanelResult, MetricsTokens, RunChecks } from '../../shared/metrics';
 import { parseRules } from '../../shared/rules';
+import { COST_BUCKETS, type CostBucket, type CostBuckets } from '../../shared/cost';
 // #172: os tempos e o inventário do painel
 import type { CardEventKind } from '../../shared/log';
 import {
@@ -183,10 +184,50 @@ interface Accumulator {
   /** a parte estimada de `costUsd` e quantas execuções a tiveram (o painel marca a linha estimada, RF-31) */
   estimatedRuns: number;
   costEstimatedUsd: number;
+  /** soma do custo por bucket e quantas execuções o tinham; só o detalhe (`ai_runs`) preenche, o mês arquivado não */
+  bucketUsd: Record<CostBucket, number>;
+  bucketRuns: Record<CostBucket, number>;
 }
 
+const zeroBuckets = (): Record<CostBucket, number> => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+
 function newAcc(): Accumulator {
-  return { runs: 0, measuredRuns: 0, costedRuns: 0, durationMs: 0, tokens: 0, costUsd: 0, calls: 0, estimatedRuns: 0, costEstimatedUsd: 0 };
+  return {
+    runs: 0,
+    measuredRuns: 0,
+    costedRuns: 0,
+    durationMs: 0,
+    tokens: 0,
+    costUsd: 0,
+    calls: 0,
+    estimatedRuns: 0,
+    costEstimatedUsd: 0,
+    bucketUsd: zeroBuckets(),
+    bucketRuns: zeroBuckets(),
+  };
+}
+
+/** As colunas de `ai_runs` do custo de cada bucket. */
+const BUCKET_COLUMN: Record<CostBucket, string> = {
+  input: 'cost_input_usd',
+  output: 'cost_output_usd',
+  cacheRead: 'cost_cache_read_usd',
+  cacheWrite: 'cost_cache_write_usd',
+};
+
+/** A soma de cada bucket (`b_<bucket>`) e quantas execuções o tinham (`bn_<bucket>`); NULL não é zero. */
+const BUCKET_SUMS = COST_BUCKETS.map(
+  (b) => `SUM(COALESCE(${BUCKET_COLUMN[b]},0)) AS b_${b}, SUM(CASE WHEN ${BUCKET_COLUMN[b]} IS NOT NULL THEN 1 ELSE 0 END) AS bn_${b}`,
+).join(',\n            ');
+
+function bucketPatch(r: Row): Pick<Accumulator, 'bucketUsd' | 'bucketRuns'> {
+  const bucketUsd = zeroBuckets();
+  const bucketRuns = zeroBuckets();
+  for (const b of COST_BUCKETS) {
+    bucketUsd[b] = num(r[`b_${b}`]);
+    bucketRuns[b] = num(r[`bn_${b}`]);
+  }
+  return { bucketUsd, bucketRuns };
 }
 
 function bump(map: Map<string, Accumulator>, label: string, patch: Partial<Accumulator>): void {
@@ -200,6 +241,10 @@ function bump(map: Map<string, Accumulator>, label: string, patch: Partial<Accum
   acc.calls += patch.calls ?? 0;
   acc.estimatedRuns += patch.estimatedRuns ?? 0;
   acc.costEstimatedUsd += patch.costEstimatedUsd ?? 0;
+  for (const b of COST_BUCKETS) {
+    acc.bucketUsd[b] += patch.bucketUsd?.[b] ?? 0;
+    acc.bucketRuns[b] += patch.bucketRuns?.[b] ?? 0;
+  }
   map.set(label, acc);
 }
 
@@ -1081,7 +1126,12 @@ const PANEL_DIMS = METRICS_BREAKDOWN_DIMS;
  * mês arquivado conta como estimada (ver `panelArchiveDims`).
  */
 function panelCell(value: string, a: Accumulator): MetricsCell {
+  // buckets sem nenhuma execução com o bucket = null; sem nenhum bucket (mês arquivado, execução antiga) = campo ausente
+  const hasBuckets = COST_BUCKETS.some((b) => a.bucketRuns[b] > 0);
+  const costBuckets = {} as CostBuckets;
+  for (const b of COST_BUCKETS) costBuckets[b] = a.bucketRuns[b] > 0 ? a.bucketUsd[b] : null;
   return {
+    ...(hasBuckets ? { costBuckets } : {}),
     value,
     runs: a.runs,
     measuredRuns: a.measuredRuns,
@@ -1155,7 +1205,8 @@ function panelBreakdowns(db: Database, boardId: string, q: MetricsQuery, archive
             COUNT(*) AS n, SUM(COALESCE(duration_ms,0)) AS ms,
             ${MEASURED_SUMS},
             ${TOKENS_SUM} AS tok,
-            SUM(COALESCE(cost_usd,0)) AS cost, ${ESTIMATED_SUMS}
+            SUM(COALESCE(cost_usd,0)) AS cost, ${ESTIMATED_SUMS},
+            ${BUCKET_SUMS}
      FROM ai_runs WHERE ${where}
      GROUP BY workflow, phase, card_type, model, tool, mode, effort, profile`,
     params,
@@ -1169,6 +1220,7 @@ function panelBreakdowns(db: Database, boardId: string, q: MetricsQuery, archive
       costUsd: num(r.cost),
       estimatedRuns: num(r.est_n),
       costEstimatedUsd: num(r.est),
+      ...bucketPatch(r),
     };
     for (const dim of PANEL_DIMS) bump(byDim.get(dim)!, str(r[RUN_COLUMN[dim]]), patch);
     const phase = str(r.phase);

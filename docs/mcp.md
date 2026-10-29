@@ -121,8 +121,8 @@ de primeira, pedidos de ajuste, histórias concluídas com bug e os sinais da IA
 `npm test` com falha e commits depois do PR — cada um com a parte do modo autônomo, "não medidos" sem
 registro de Bash). Com `group_by` `tool`, cada linha traz também a conferência das execuções: quantas
 ficaram conferidas sem desvio, quantas tiveram desvio e quantas ficaram não conferidas (execuções anteriores
-à conferência contam como não conferidas). Também pelo MCP: catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
-`set_model_rules`), padrões por tipo de card (`update_card_type`) e o
+à conferência contam como não conferidas). Com a regra `showCost` ligada (padrão; `update_rules`), `get_metrics` traz a coluna `custo` e a linha do estimado pelo preço do catálogo. Também pelo MCP: catálogo e regras de modelos (`get_models`, `detect_models`, `upsert_model`,
+`set_model_rules`; o preço por milhão de tokens de cada modelo (`pricing` em `get_models`) se grava com `price_input`, `price_output`, `price_cache_read` e `price_cache_write` em `upsert_model` (número >= 0 grava, `null` limpa o bucket, ausente mantém) e vale da próxima execução em diante), padrões por tipo de card (`update_card_type`) e o
 harness inteiro (`get_harness`, `read_rule_file`, `write_rule_file`, `create_skill`, `update_skill`,
 `delete_skill`…).
 

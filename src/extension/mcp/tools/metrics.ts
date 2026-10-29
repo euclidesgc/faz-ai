@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { MetricsDim, MetricsResult, MetricsRow } from '../../log/metrics';
 import type { DefineTool } from './registry';
-import { SHOW_COST, type MetricsAiSignal, type MetricsRework } from '../../../shared/metrics';
+import { type MetricsAiSignal, type MetricsRework } from '../../../shared/metrics';
 
 const GROUP_BY = [
   'phase',
@@ -59,18 +59,17 @@ function formatCost(usd: number): string {
 
 type TableVariant = 'normal' | 'inventory' | 'mcp' | 'tool';
 
-const HEADERS: Record<TableVariant, string[]> = {
-  normal: SHOW_COST ? ['grupo', 'execuções', 'duração', 'tokens', 'custo'] : ['grupo', 'execuções', 'duração', 'tokens'],
+const COST_HEADERS = ['grupo', 'execuções', 'duração', 'tokens', 'custo'];
+
+/** As colunas da tabela; `custo` só com a regra "Mostrar custo em dólar" ligada. */
+function headersOf(variant: TableVariant, showCost: boolean): string[] {
+  const base = showCost ? COST_HEADERS : COST_HEADERS.slice(0, 4);
   // por ferramenta de IA: as colunas normais e a conferência da execução (o que usou contra o que o card pediu)
-  tool: [
-    ...(SHOW_COST ? ['grupo', 'execuções', 'duração', 'tokens', 'custo'] : ['grupo', 'execuções', 'duração', 'tokens']),
-    'conferidas',
-    'com desvio',
-    'não conferidas',
-  ],
-  inventory: ['grupo', 'execuções', 'usos'],
-  mcp: ['grupo', 'servidor', 'execuções', 'usos'],
-};
+  if (variant === 'tool') return [...base, 'conferidas', 'com desvio', 'não conferidas'];
+  if (variant === 'inventory') return ['grupo', 'execuções', 'usos'];
+  if (variant === 'mcp') return ['grupo', 'servidor', 'execuções', 'usos'];
+  return base;
+}
 
 function variantOf(groupBy: MetricsDim | undefined): TableVariant {
   if (groupBy === 'mcp_tool') return 'mcp';
@@ -78,7 +77,7 @@ function variantOf(groupBy: MetricsDim | undefined): TableVariant {
   return INVENTORY_DIMS.has(groupBy) ? 'inventory' : 'normal';
 }
 
-function formatRow(r: MetricsRow, variant: TableVariant): string[] {
+function formatRow(r: MetricsRow, variant: TableVariant, showCost: boolean): string[] {
   if (variant === 'inventory') return [r.label, String(r.runs), String(r.calls ?? 0)];
   if (variant === 'mcp') {
     // A linha "outros" não tem servidor (soma de vários): "-". Vazio = servidor não registrado (RF-26).
@@ -90,7 +89,7 @@ function formatRow(r: MetricsRow, variant: TableVariant): string[] {
     String(r.runs),
     formatDuration(r.durationMs),
     r.tokens == null ? '-' : String(r.tokens),
-    ...(SHOW_COST ? [r.costUsd == null ? '-' : formatCost(r.costUsd)] : []),
+    ...(showCost ? [r.costUsd == null ? '-' : formatCost(r.costUsd)] : []),
     // "conferidas" = sem desvio; execução anterior à conferência ou sem inventário conta em "não conferidas"
     ...(variant === 'tool'
       ? r.checks
@@ -107,7 +106,7 @@ function table(headers: string[], rows: string[][]): string {
   return [line(headers), ...rows.map(line)].join('\n');
 }
 
-function formatCoverage(result: MetricsResult): string {
+function formatCoverage(result: MetricsResult, showCost: boolean, estimatedUsd: number | null | undefined): string {
   const lines: string[] = [];
   lines.push(result.logSince ? `log desde ${result.logSince}` : 'nenhum dado de log neste board ainda');
   if (result.archivedMonths.length) lines.push(`sem detalhe (só total mensal): ${result.archivedMonths.join(', ')}`);
@@ -116,7 +115,7 @@ function formatCoverage(result: MetricsResult): string {
   if (result.othersCount > 0) lines.push(`"outros" soma ${result.othersCount} grupo(s) fora do limite`);
   // tokens e custo têm cada um a sua cobertura: só o Claude Code informa o custo, então uma execução do Cursor tem tokens e não tem custo
   if (result.tokensPartial) lines.push('tokens parciais: parte das execuções do recorte não tem consumo medido');
-  if (!SHOW_COST) return lines.join('\n');
+  if (!showCost) return lines.join('\n');
   const hasCost = result.rows.some((r) => r.costUsd != null);
   if (result.costPartial)
     lines.push(
@@ -125,17 +124,24 @@ function formatCoverage(result: MetricsResult): string {
         : 'custo não medido: nenhuma execução do recorte tem custo informado pela ferramenta (nem toda ferramenta informa o custo)',
     );
   else if (hasCost) lines.push('custo informado pela ferramenta');
+  if (estimatedUsd) lines.push(`estimado pelo preço do catálogo: ${formatCost(estimatedUsd)} (já somado no custo)`);
   return lines.join('\n');
 }
 
 /** Formata a resposta de `get_metrics`: tabela compacta + a cobertura do período (RF-05/RF-06/RF-08). */
-export function formatMetrics(result: MetricsResult, groupBy: MetricsDim | undefined): string {
-  if (result.rows.length === 0) return `nenhum grupo no recorte.\n${formatCoverage(result)}`;
+export function formatMetrics(
+  result: MetricsResult,
+  groupBy: MetricsDim | undefined,
+  showCost = false,
+  estimatedUsd?: number | null,
+): string {
+  const coverage = formatCoverage(result, showCost, estimatedUsd);
+  if (result.rows.length === 0) return `nenhum grupo no recorte.\n${coverage}`;
   const variant = variantOf(groupBy);
   return `${table(
-    HEADERS[variant],
-    result.rows.map((r) => formatRow(r, variant)),
-  )}\n\n${formatCoverage(result)}`;
+    headersOf(variant, showCost),
+    result.rows.map((r) => formatRow(r, variant, showCost)),
+  )}\n\n${coverage}`;
 }
 
 /**
@@ -191,15 +197,10 @@ export function formatRework(rework: MetricsRework): string {
 export function registerMetricsTools(tool: DefineTool): void {
   tool(
     'get_metrics',
-    SHOW_COST
-      ? 'Uso, custo e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
-          'com filtros de período e card. Resposta em tabela compacta; o custo é o que a própria ferramenta informou (nem toda ferramenta informa o custo; o board não calcula custo por tabela de preços) e os tokens são os medidos; ambos vêm como "-" quando não medidos (nunca 0). ' +
-          '"tool" é a ferramenta de IA que rodou (o perfil de CLI, ex.: claude); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só das ferramentas que informam). ' +
-          'Nas dimensões "agent", "skill", "used_tool", "mcp_tool" e "bash_command" não há tokens/custo (não é possível repartir o custo de uma execução entre o que ela usou); "effort" e "profile" têm.'
-      : 'Uso, tokens e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
-          'com filtros de período e card. Resposta em tabela compacta; os tokens são os medidos (entrada, saída e cache) e vêm como "-" quando não medidos (nunca 0). O board não mostra custo em dólar. ' +
-          '"tool" é a ferramenta de IA que rodou (o perfil de CLI, ex.: claude); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só das ferramentas que informam). ' +
-          'Nas dimensões "agent", "skill", "used_tool", "mcp_tool" e "bash_command" não há tokens (não é possível repartir o consumo de uma execução entre o que ela usou); "effort" e "profile" têm.',
+    'Uso, tokens, custo e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
+      'com filtros de período e card. Resposta em tabela compacta; os tokens são os medidos (entrada, saída e cache) e vêm como "-" quando não medidos (nunca 0). O custo em US$ aparece quando a regra "Mostrar custo em dólar" está ligada: o informado pela CLI ou, sem ele, o estimado pelo preço do catálogo (marcado à parte). ' +
+      '"tool" é a ferramenta de IA que rodou (o perfil de CLI, ex.: claude); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só das ferramentas que informam). ' +
+      'Nas dimensões "agent", "skill", "used_tool", "mcp_tool" e "bash_command" não há tokens/custo (não é possível repartir o consumo de uma execução entre o que ela usou); "effort" e "profile" têm.',
     {
       group_by: z.enum(GROUP_BY).optional().describe('Dimensão de agrupamento; omitido = total do recorte'),
       start_date: isoDateArg.optional().describe('AAAA-MM-DD, inclusive'),
@@ -237,7 +238,12 @@ export function registerMetricsTools(tool: DefineTool): void {
         tool: a.tool,
         limit: a.limit,
       });
-      return formatMetrics(result, a.group_by);
+      const showCost = router.snapshot().board.rules.showCost;
+      // o estimado vem do total do painel; com filtro de card, fase, tipo, modelo ou ferramenta o recorte não é o mesmo, então a linha sai
+      const unfiltered = a.card === undefined && !a.phase && !a.card_type && !a.model && !a.tool;
+      const estimatedUsd =
+        showCost && unfiltered ? router.panelMetrics({ startDate: a.start_date, endDate: a.end_date }).totals.costEstimatedUsd : null;
+      return formatMetrics(result, a.group_by, showCost, estimatedUsd);
     },
     true,
   );

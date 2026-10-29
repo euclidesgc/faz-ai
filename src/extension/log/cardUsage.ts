@@ -1,5 +1,6 @@
 import type { Database } from 'sql.js';
 import type { CardUsage, CardUsageRow } from '../../shared/cardUsage';
+import { COST_BUCKETS, type CostBuckets } from '../../shared/cost';
 import { all, num, str, type Row } from '../db/query';
 import { detailMonths } from './rollup';
 
@@ -14,10 +15,18 @@ const SUMS = `COUNT(*) AS n,
   SUM(CASE WHEN measure <> 'none' THEN COALESCE(input_tokens,0) ELSE 0 END) AS input,
   SUM(CASE WHEN measure <> 'none' THEN COALESCE(output_tokens,0) ELSE 0 END) AS output,
   SUM(CASE WHEN measure <> 'none' THEN COALESCE(cache_read_tokens,0) ELSE 0 END) AS cache_read,
-  SUM(CASE WHEN measure <> 'none' THEN COALESCE(cache_write_tokens,0) ELSE 0 END) AS cache_write`;
+  SUM(CASE WHEN measure <> 'none' THEN COALESCE(cache_write_tokens,0) ELSE 0 END) AS cache_write,
+  SUM(CASE WHEN cost_usd IS NOT NULL THEN 1 ELSE 0 END) AS costed,
+  SUM(COALESCE(cost_usd,0)) AS cost,
+  SUM(CASE WHEN cost_usd IS NOT NULL AND COALESCE(cost_estimated, 1) <> 0 THEN cost_usd ELSE 0 END) AS cost_est,
+  SUM(COALESCE(cost_input_usd,0)) AS b_input,
+  SUM(COALESCE(cost_output_usd,0)) AS b_output,
+  SUM(COALESCE(cost_cache_read_usd,0)) AS b_cacheRead,
+  SUM(COALESCE(cost_cache_write_usd,0)) AS b_cacheWrite`;
 
 const rowOf = (phase: string, r: Row): CardUsageRow => {
   const measured = num(r.measured);
+  const costed = num(r.costed);
   const input = num(r.input);
   const output = num(r.output);
   const cacheRead = num(r.cache_read);
@@ -29,12 +38,21 @@ const rowOf = (phase: string, r: Row): CardUsageRow => {
     measuredRuns: measured,
     durationMs: num(r.ms),
     tokens: measured ? { input, output, cacheRead, cacheWrite, total: input + output + cacheRead + cacheWrite } : null,
+    costedRuns: costed,
+    cost: costed
+      ? {
+          totalUsd: num(r.cost),
+          estimatedUsd: num(r.cost_est),
+          buckets: { input: num(r.b_input), output: num(r.b_output), cacheRead: num(r.b_cacheRead), cacheWrite: num(r.b_cacheWrite) },
+        }
+      : null,
   };
 };
 
 /** Junta linhas numa só (o total, ou as sub-tarefas). */
 function sumRows(phase: string, rows: CardUsageRow[]): CardUsageRow {
   const measured = rows.filter((r) => r.tokens);
+  const costed = rows.filter((r) => r.cost);
   const add = (pick: (t: NonNullable<CardUsageRow['tokens']>) => number) => measured.reduce((n, r) => n + pick(r.tokens!), 0);
   return {
     phase,
@@ -49,6 +67,16 @@ function sumRows(phase: string, rows: CardUsageRow[]): CardUsageRow {
           cacheRead: add((t) => t.cacheRead),
           cacheWrite: add((t) => t.cacheWrite),
           total: add((t) => t.total),
+        }
+      : null,
+    costedRuns: rows.reduce((n, r) => n + r.costedRuns, 0),
+    cost: costed.length
+      ? {
+          totalUsd: costed.reduce((n, r) => n + r.cost!.totalUsd, 0),
+          estimatedUsd: costed.reduce((n, r) => n + r.cost!.estimatedUsd, 0),
+          buckets: Object.fromEntries(
+            COST_BUCKETS.map((b) => [b, costed.reduce((n, r) => n + (r.cost!.buckets[b] ?? 0), 0)]),
+          ) as CostBuckets,
         }
       : null,
   };
