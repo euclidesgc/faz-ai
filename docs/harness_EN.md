@@ -340,7 +340,7 @@ terminal.
 The board manages a **private library**, independent of the AI tool. Under **Configurações →
 Harness** (Settings → Harness), the **Artefatos do board** (board artifacts) tab provides CRUD for
 **Regras** (Rules), **Skills**, **Agentes** (Agents) and **Servidores MCP** (MCP servers).
-**Plano de contexto** (context plan) holds the board's default; each workflow's lives in **Workflows e colunas** and the model suggestion in **Conectar agentes**. The permissions, the timeout and the heartbeat live in **Automação** (automation). The **default instructions agent** is picked in the
+The model suggestion lives in **Conectar agentes**. The permissions, the timeout and the heartbeat live in **Automação** (automation). The **default instructions agent** is picked in the
 **Agentes** list itself (**Tornar padrão**, make default, on the agent row); the name
 sets it apart from the default AI agent in Conectar agentes. The board's default AI agent, each agent's connection
 to the board's MCP server and the admission regime live in Conectar agentes (connect agents). Switching agents preserves artifacts and their selections.

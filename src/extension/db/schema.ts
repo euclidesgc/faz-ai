@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 50;
+export const SCHEMA_VERSION = 51;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -646,6 +646,12 @@ const MIGRATIONS: Record<number, string> = {
       PRIMARY KEY (board_id, path)
     );
   `,
+  51: `
+    -- O Plano de contexto foi aposentado: as duas tabelas nunca influenciaram a execução.
+    DROP INDEX IF EXISTS activity_context_target;
+    DROP TABLE IF EXISTS activity_context_selections;
+    DROP TABLE IF EXISTS agent_context_contracts;
+  `,
 };
 
 /**
@@ -677,6 +683,31 @@ export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
     ALTER TABLE board_artifacts DROP COLUMN tools_json;
     ALTER TABLE board_artifacts DROP COLUMN folder;
     ALTER TABLE board_artifacts DROP COLUMN version;
+  `,
+  51: `
+    -- recria as tabelas vazias do Plano de contexto (formato das migrações 35 e 37); o conteúdo não volta
+    CREATE TABLE agent_context_contracts (
+      artifact_id TEXT PRIMARY KEY REFERENCES board_artifacts(id) ON DELETE CASCADE,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      contract_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE activity_context_selections (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      card_id TEXT REFERENCES cards(id) ON DELETE CASCADE,
+      workflow_id TEXT REFERENCES workflows(id) ON DELETE CASCADE,
+      phase_id TEXT NOT NULL DEFAULT '',
+      action TEXT NOT NULL,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      selection_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      review_reason TEXT NOT NULL DEFAULT '',
+      CHECK (card_id IS NULL OR workflow_id IS NULL)
+    );
+    CREATE UNIQUE INDEX activity_context_target ON activity_context_selections
+      (board_id, COALESCE(card_id, ''), COALESCE(workflow_id, ''), phase_id, action);
   `,
 };
 
