@@ -16,6 +16,17 @@ export const CONTEXT_ACTIONS = [
   'harness-suggest',
 ] as const;
 export type ContextAction = (typeof CONTEXT_ACTIONS)[number];
+export const CONTEXT_ACTION_LABELS: Record<ContextAction, string> = {
+  work: 'Trabalho',
+  refine: 'Refino',
+  summary: 'Resumo',
+  conflict: 'Resolução de conflitos',
+  chat: 'Conversa do board',
+  'harness-agent': 'Assistente de agentes',
+  'harness-rule': 'Assistente de rules',
+  'harness-skill': 'Assistente de skills',
+  'harness-suggest': 'Sugestões do Harness',
+};
 /** Vazio explícito é diferente de herança, inclusive para listas. */
 export type ContextChoice<T> = { mode: 'inherit' } | { mode: 'explicit'; value: T };
 export interface AgentContextContract {

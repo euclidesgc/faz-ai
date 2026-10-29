@@ -1,5 +1,4 @@
 import * as fs from 'node:fs';
-import { ContextPlanningRepo } from '../../repositories/contextPlanningRepo';
 import { artifactLocation } from '../../../shared/artifacts';
 import { EMPTY_HARNESS, type Harness, type ToolInventory } from '../../../shared/harness';
 import { TOOL_ADAPTERS } from '../../toolAdapters';
@@ -165,16 +164,6 @@ export const harnessHandlers = {
   },
   'harness.import.cancel': (_msg, ctx) => {
     ctx.importer.cancel();
-    return true;
-  },
-  'contextPlanning.save': (msg, ctx, actor) => {
-    if (actor.byAi) throw new Error('Contratos de contexto exigem revisão humana; a IA não pode alterar autorizações.');
-    new ContextPlanningRepo(ctx.dbHandle.db).save(ctx.boardId, msg.input);
-    return true;
-  },
-  'contextPlanning.saveBatch': (msg, ctx, actor) => {
-    if (actor.byAi) throw new Error('Contratos de contexto exigem revisão humana; a IA não pode alterar autorizações.');
-    new ContextPlanningRepo(ctx.dbHandle.db).saveBatch(ctx.boardId, msg.inputs);
     return true;
   },
   'harness.library.scan': (msg, ctx) => {

@@ -53,10 +53,6 @@ export const agentConnect = {
   closeTest: () => req({ type: 'agentConnect.test.close' }),
   openLog: () => req({ type: 'agentConnect.openLog' }),
 };
-export const contextPlanning = {
-  saveBatch: (inputs: import('../shared/contextPlanning').ActivityContextWrite[]) => req({ type: 'contextPlanning.saveBatch', inputs }),
-  save: (input: import('../shared/contextPlanning').ContextPlanningWrite) => req({ type: 'contextPlanning.save', input }),
-};
 /** Como `req`, e o card fica marcado como ocupado (spinner no board e no card aberto) até a resposta. */
 const reqCard = (cardId: Id, msg: WebviewToHost): Promise<void> => trackCard(cardId, request(msg));
 

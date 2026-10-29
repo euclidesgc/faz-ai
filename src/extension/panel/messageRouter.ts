@@ -1,13 +1,8 @@
 import { limitChoiceKey, type LimitChoice } from '../../shared/limitChoice';
 import { builtinPolicyCatalog, simulatePolicyScenario, type PolicyLibrary, type PolicyScenario } from '../../shared/policyManagement';
-import { resolveContextDraft, type ContextDraftResolution } from '../../shared/contextDraftResolution';
-import { applyAdmissionDecision, strictRequestFromDraft } from '../../shared/contextAdmissionPreview';
-import type { ExecutionAdmissionDecision, StrictExecutionRequest } from '../../shared/executionAdmission';
-import type { ContextActivityTarget } from '../../shared/contextPlanning';
 import type { PolicyAssistInput, PolicyAssistResult } from '../../shared/policyAssistant';
 import type { AgentAssistInput, AgentAssistResult } from '../../shared/agentAssistance';
 import type { ArtifactAssistInput, ArtifactAssistResult } from '../../shared/artifactAssistant';
-import type { ContextProposal } from '../../shared/contextProposal';
 import { scanLibraryFolder } from '../libraryImport';
 import { agentOfArtifact, type ArtifactKind } from '../../shared/artifacts';
 import type { ImportSource } from '../../shared/artifactImport';
@@ -183,8 +178,6 @@ const bridgeOnly = {
   // ler o log não muda o board: a `HostBridge` responde por `panelMetrics`, sem passar por `handle`
   'metrics.query': viaBridge,
   'card.usage.query': viaBridge,
-  'contextPlanning.preview': viaBridge,
-  'contextPlanning.propose': viaBridge,
   'executionPolicy.read': viaBridge,
   'executionPolicy.simulate': viaBridge,
   'executionPolicy.assist': viaBridge,
@@ -232,9 +225,6 @@ const HANDLERS: HandlerMap = {
   ...aiProfileHandlers,
   ...harnessHandlers,
 };
-
-/** A leitura da admissão do host para a prévia: o pedido e o alvo (card, fase e ação) que ele avalia. */
-type AdmissionReader = (request: StrictExecutionRequest, target: ContextActivityTarget) => ExecutionAdmissionDecision | null;
 
 /** Aplica mensagens do webview no banco. Não depende da API do VSCode. */
 export class MessageRouter {
@@ -301,14 +291,6 @@ export class MessageRouter {
   /** O rastreio do board, compartilhado pelas interfaces e pelo servidor MCP; sem um nas opções, não grava. */
   get trace(): Trace {
     return this.ctx.opts.trace ?? NO_TRACE;
-  }
-  private admissionReader: AdmissionReader | null = null;
-  /**
-   * Leitura da admissão real (recibos do host) para a prévia; sem ela a prévia diz que a admissão está
-   * indisponível. Recebe o alvo para avaliar o perfil que vai executar o card, não o padrão do board.
-   */
-  setAdmissionReader(reader: AdmissionReader): void {
-    this.admissionReader = reader;
   }
   private profileEnabledListeners: ((profileId: string) => void)[] = [];
   /** Avisa quando a pessoa liga um perfil: o host verifica as capacidades do perfil ACP recém-ligado. */
@@ -1000,15 +982,6 @@ export class MessageRouter {
     if (!this.policyAssistHandler) return Promise.reject(new Error('A assistência de IA não está disponível neste board.'));
     return this.policyAssistHandler(input);
   }
-  private contextProposeHandler?: (target: ContextActivityTarget, language: 'pt-BR' | 'en') => Promise<ContextProposal>;
-  setContextProposeHandler(handler: (target: ContextActivityTarget, language: 'pt-BR' | 'en') => Promise<ContextProposal>): void {
-    this.contextProposeHandler = handler;
-  }
-  /** Proposta de configuração mínima pela IA: um rascunho para a pessoa revisar; nada é gravado. */
-  proposeContext(target: ContextActivityTarget, language: 'pt-BR' | 'en'): Promise<ContextProposal> {
-    if (!this.contextProposeHandler) return Promise.reject(new Error('A assistência de IA não está disponível neste board.'));
-    return this.contextProposeHandler(target, language);
-  }
 
   private artifactAssistHandler?: (input: ArtifactAssistInput) => Promise<ArtifactAssistResult>;
   setArtifactAssistHandler(handler: (input: ArtifactAssistInput) => Promise<ArtifactAssistResult>): void {
@@ -1066,31 +1039,6 @@ export class MessageRouter {
   /** Consulta do painel de métricas: só lê o log (sem sonda, sem registro, sem `notify` nem gravação do banco). */
   panelMetrics(query: MetricsPanelQuery): MetricsPanelResult {
     return getPanelMetrics(this.ctx.dbHandle.db, this.ctx.boardId, query);
-  }
-
-  /** Metadados do rascunho a partir do banco do host; só lê a admissão (recibos locais), sem inferência nem probes. */
-  /** O estado com o catálogo atual da biblioteca (do banco), o que a prévia e a proposta da IA leem. */
-  contextDraftState(): BoardState {
-    // cópia: o snapshot é compartilhado (cache) e não pode ser alterado
-    const state = this.snapshot();
-    return {
-      ...state,
-      harness: {
-        ...state.harness,
-        library: {
-          directory: state.harness.library?.directory ?? '',
-          artifacts: this.ctx.library.repo.list(this.ctx.boardId).map((a) => ({ ...a, path: '' })),
-        },
-      },
-    };
-  }
-
-  previewContextDraft(target: ContextActivityTarget): ContextDraftResolution {
-    const state = this.contextDraftState();
-    const resolved = resolveContextDraft(state, target);
-    const request = this.admissionReader ? strictRequestFromDraft(state, resolved) : null;
-    const decision = request ? this.admissionReader!(request, resolved.target) : null;
-    return decision ? applyAdmissionDecision(resolved, decision) : resolved;
   }
 
   /** O que o card gastou até agora, por fase (e, numa história, as sub-tarefas), lido do log das execuções. */

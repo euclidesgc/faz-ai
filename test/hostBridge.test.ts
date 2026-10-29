@@ -535,33 +535,6 @@ describe('HostBridge: metrics.query', () => {
   });
 });
 
-describe('HostBridge: prévia dos rascunhos de contexto', () => {
-  it('responde com correlação e admissão indisponível, sem gravar ou iniciar IA', async () => {
-    let changes = 0;
-    router.onDidChange(() => void changes++);
-    saves = 0;
-    const runs = rawDb.exec('SELECT COUNT(*) FROM ai_runs')[0]!.values[0]![0];
-    await bridge.handle({
-      type: 'contextPlanning.preview',
-      requestId: 'context-1',
-      target: { cardId: null, workflowId: null, phaseId: '', action: 'chat' },
-    });
-    expect(sent).toHaveLength(1);
-    expect(sent[0]).toMatchObject({
-      type: 'contextPlanning.preview.result',
-      requestId: 'context-1',
-      preview: {
-        canExecute: false,
-        admission: { state: 'unavailable', dependency: 729 },
-        diagnostics: [{ code: 'admission-unavailable' }, { code: 'agent-required' }],
-      },
-    });
-    expect(rawDb.exec('SELECT COUNT(*) FROM ai_runs')[0]!.values[0]![0]).toBe(runs);
-    expect(changes).toBe(0);
-    expect(saves).toBe(0);
-  });
-});
-
 describe('HostBridge: card.usage.query', () => {
   it('responde card.usage.result com o mesmo requestId e o consumo do card, sem mudar o board', async () => {
     const s = router.snapshot();
@@ -705,15 +678,6 @@ describe('MessageRouter: cache do snapshot (#1066)', () => {
     newCard('Vista pelo ouvinte');
     expect(seen).toHaveLength(1);
     expect(seen[0]).toBe(router.snapshot());
-  });
-
-  it('a prévia do contrato de contexto não altera o snapshot compartilhado', () => {
-    const before = router.snapshot();
-    const draft = router.contextDraftState();
-    expect(draft).not.toBe(before);
-    expect(router.snapshot()).toBe(before);
-    expect(before.harness.library).toBe(router.snapshot().harness.library);
-    expect(draft.harness.library?.artifacts.every((a) => a.path === '')).toBe(true);
   });
 });
 

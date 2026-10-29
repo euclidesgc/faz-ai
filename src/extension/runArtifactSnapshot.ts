@@ -6,7 +6,6 @@ import type { BoardArtifact, LibraryArtifactInput } from '../shared/artifacts';
 import { ARTIFACT_LIMITS, isSafeRelPath } from '../shared/artifacts';
 import { manifestOf } from '../shared/execution';
 import type { ArtifactRepo } from './repositories/artifactRepo';
-import type { ContextDraftResolution } from '../shared/contextDraftResolution';
 import type { HeadlessInput } from './headless';
 import type { AiRunConfig } from '../shared/log';
 import { alwaysRefs, cardRefs } from './promptContext';
@@ -28,11 +27,6 @@ export interface RunArtifactManifest {
    * o log guarda: o snapshot se explica sozinho na auditoria. Sem corpos, definições MCP nem credenciais.
    */
   config?: RunArtifactConfig;
-  /**
-   * A configuração v1 resolvida antes do spawn, com o mesmo resolvedor da prévia. Só metadados (IDs, nomes,
-   * origens e razões): editar a biblioteca ou o plano depois não muda uma execução já iniciada.
-   */
-  context?: ContextDraftResolution;
   artifacts: {
     id: string;
     name: string;
@@ -115,12 +109,7 @@ export class RunArtifactSnapshots {
     private boardId: string,
   ) {}
 
-  capture(
-    runId: string,
-    request: RunArtifactRequest = { directory: '', artifacts: [] },
-    config?: RunArtifactConfig,
-    context?: ContextDraftResolution,
-  ): FrozenRunArtifacts {
+  capture(runId: string, request: RunArtifactRequest = { directory: '', artifacts: [] }, config?: RunArtifactConfig): FrozenRunArtifacts {
     request = structuredClone(request);
     if (!isSafeSegment(runId) || !runId || !isSafeSegment(this.boardId)) throw new Error('Identidade de snapshot inválida.');
     if (new Set(request.artifacts.map((a) => a.id)).size !== request.artifacts.length) throw new Error('Artefato repetido no snapshot.');
@@ -148,7 +137,6 @@ export class RunArtifactSnapshots {
         runId,
         createdAt: Date.now(),
         ...(config ? { config: structuredClone(config) } : {}),
-        ...(context ? { context: structuredClone(context) } : {}),
         artifacts: [],
       };
       for (const ref of request.artifacts) {

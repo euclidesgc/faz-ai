@@ -3,7 +3,7 @@ import { commentCountOf } from '../../../shared/webviewState';
 import { Button } from '../ui';
 import { t } from '../../i18n';
 
-export type CardTab = 'details' | 'comments' | 'attachments' | 'usage' | 'plan';
+export type CardTab = 'details' | 'comments' | 'attachments' | 'usage';
 
 /** Abas do drawer; Conversa e Anexos mostram quantos itens o card tem, e Consumo o contexto e o gasto de IA. */
 export function CardTabs({ cardId, tab, onChange }: { cardId: string; tab: CardTab; onChange: (tab: CardTab) => void }) {
@@ -23,9 +23,6 @@ export function CardTabs({ cardId, tab, onChange }: { cardId: string; tab: CardT
       <Button active={tab === 'attachments'} onClick={() => onChange('attachments')}>
         {t('Anexos')}
         {attachmentCount > 0 && ` (${attachmentCount})`}
-      </Button>
-      <Button active={tab === 'plan'} onClick={() => onChange('plan')}>
-        {t('Plano de execução')}
       </Button>
       <Button active={tab === 'usage'} onClick={() => onChange('usage')}>
         {t('Consumo')}

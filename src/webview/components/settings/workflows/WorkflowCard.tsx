@@ -6,21 +6,18 @@ import type { Workflow } from '../../../../shared/model';
 import { workflowDeleteBlocker } from '../../../../shared/selectors';
 import { useBoardStore } from '../../../store/boardStore';
 import { settings } from '../../../commands';
-import { ActionButton, DeleteButton, IconChevronDown, IconChevronRight, IconPlus } from '../../ui';
-import { ContextPlanDefaults } from '../../card/ExecutionPlanPanel';
+import { DeleteButton, IconPlus } from '../../ui';
 import { ColumnsTable } from './ColumnsTable';
 import { DragHandle } from './DragHandle';
 import { kindLabel } from './kinds';
 import { t } from '../../../i18n';
 
 /**
- * Um workflow: o nome (editável), o papel, o botão Nova coluna, a tabela de colunas e, aberto pelo botão, o plano de
- * contexto padrão dele (o do board fica no Harness).
+ * Um workflow: o nome (editável), o papel, o botão Nova coluna, a tabela de colunas.
  */
 export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep: (delta: number) => void }) {
   const state = useBoardStore((s) => s.state)!;
   const [adding, setAdding] = useState(false);
-  const [plan, setPlan] = useState(false);
   const blocker = workflowDeleteBlocker(state, workflow.id);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: workflow.id });
 
@@ -44,15 +41,6 @@ export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep:
             {t(kindLabel(workflow.kind))}
           </Badge>
           <span className="spacer" />
-          {/* o rótulo não muda ao abrir: a seta diz o estado, e o botão não muda de largura */}
-          <ActionButton
-            variant="ghost"
-            aria-expanded={plan}
-            hint={t('Mostra ou esconde, abaixo das colunas, o plano de contexto padrão dos cards deste workflow.')}
-            onClick={() => setPlan(!plan)}
-          >
-            {plan ? <IconChevronDown /> : <IconChevronRight />} {t('Plano de contexto')}
-          </ActionButton>
           <Button disabled={adding} onClick={() => setAdding(true)}>
             <IconPlus /> {t('Nova coluna')}
           </Button>
@@ -66,7 +54,6 @@ export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep:
           />
         </div>
         <ColumnsTable workflow={workflow} adding={adding} onAddDone={() => setAdding(false)} />
-        {plan && <ContextPlanDefaults workflowId={workflow.id} />}
       </Card>
     </div>
   );

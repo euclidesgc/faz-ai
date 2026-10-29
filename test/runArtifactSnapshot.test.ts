@@ -81,15 +81,6 @@ describe('snapshots de artefatos por execução', () => {
     b.validate();
   });
 
-  it('congela a configuração v1 resolvida no manifesto, sem seguir edições posteriores (E5.1)', () => {
-    const context = { agent: { artifactId: 'dev', revision: 1 }, items: [{ artifactId: 'x', kind: 'skill', name: 'x', origins: [] }] };
-    const frozen = snapshots.capture('run-ctx', request(), undefined, context as never);
-    context.items.push({ artifactId: 'y', kind: 'skill', name: 'y', origins: [] });
-    expect(frozen.manifest.context).toMatchObject({ agent: { artifactId: 'dev' }, items: [{ artifactId: 'x' }] });
-    expect(frozen.manifest.context!.items).toHaveLength(1);
-    frozen.validate();
-  });
-
   it('recusa metadados atrasados mesmo com edições no mesmo milissegundo', () => {
     vi.useFakeTimers();
     vi.setSystemTime(100);

@@ -7,7 +7,7 @@ import { openInMemory, type DbHandle } from '../src/extension/db/database';
 import { BoardContext } from '../src/extension/panel/handlers/context';
 import { admissionRegimeOf, DEFAULT_RUNNER, parseRunner } from '../src/shared/runner';
 import { admitExecution } from '../src/shared/executionAdmission';
-import { legacyStrictRequest } from '../src/extension/ai/v1Prepare';
+import { legacyStrictRequest } from '../src/extension/ai/admission';
 import { aiProfileHandlers } from '../src/extension/panel/handlers/aiProfiles';
 import type { StrictExecutionRequest } from '../src/shared/executionAdmission';
 

@@ -34,7 +34,7 @@ import { modelDisplay, modelValue, suggestModelRule } from '../shared/models';
 import { effortTiers } from './models';
 import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
-import { cardV1, legacyStrictRequest } from './ai/v1Prepare';
+import { legacyStrictRequest } from './ai/admission';
 import { AiGateway, type AiCall, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
@@ -543,23 +543,15 @@ export class AiRunner {
             ]),
           };
           return {
-            // runtime v1: o contrato do agente e a seleção da atividade decidem; sem eles a execução não parte
-            ...(this.deps.gateway.runtime === 'v1'
-              ? cardV1(state, target.cli.id, {
-                  cardId,
-                  workflowId: card.workflowId,
-                  phaseId: columnOf(state, card)?.id ?? '',
-                  action: MODE_ACTION[mode],
-                })
-              : // runtime legado: o perfil personalizado (inclusive ACP) ainda precisa da admissão por capacidades
-                !isReadyCli(target.cli)
-                ? {
-                    strict: {
-                      profileId: target.cli.id,
-                      request: legacyStrictRequest(state.board.runner, permission, plan.manifest.mcpServers),
-                    },
-                  }
-                : {}),
+            // o perfil personalizado (inclusive ACP) precisa da admissão por capacidades
+            ...(!isReadyCli(target.cli)
+              ? {
+                  strict: {
+                    profileId: target.cli.id,
+                    request: legacyStrictRequest(state.board.runner, permission, plan.manifest.mcpServers),
+                  },
+                }
+              : {}),
             ...(options.token !== undefined ? { work: { id: options.workId!, token: options.token } } : {}),
             artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state, card) : undefined,
             conference: { manifest: plan.manifest, boardServer: BOARD_SERVER },

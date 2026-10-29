@@ -35,21 +35,6 @@ describe('WorkflowsSettings', () => {
     expect(screen.queryByText('Arquivados')).toBeNull();
   });
 
-  it('o plano de contexto de cada workflow abre no próprio card dele; o do board fica no Harness', async () => {
-    show();
-    const stories = cardOf('Histórias');
-    expect(within(stories).queryByText('Plano de contexto deste workflow')).toBeNull();
-    await userEvent.click(within(stories).getByRole('button', { name: 'Plano de contexto' }));
-    expect(within(stories).getByText('Plano de contexto deste workflow')).toBeInTheDocument();
-    expect(within(stories).getAllByRole('button', { name: /Configurar Histórias · / }).length).toBeGreaterThan(0);
-    expect(within(cardOf('Sub-tarefas')).queryByText('Plano de contexto deste workflow')).toBeNull();
-    // o rótulo não muda ao abrir (a seta e o aria-expanded dizem o estado)
-    const toggle = within(stories).getByRole('button', { name: 'Plano de contexto' });
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await userEvent.click(toggle);
-    expect(within(stories).queryByText('Plano de contexto deste workflow')).toBeNull();
-  });
-
   it('renomear o workflow grava ao sair do campo', async () => {
     show();
     const name = within(cardOf('Histórias')).getByLabelText('Nome do workflow');
