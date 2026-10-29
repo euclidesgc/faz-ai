@@ -80,6 +80,7 @@
 - A prova de isolamento vale para todas as permissões e sobrevive ao reinício do editor.
 - O **Refinar com IA** não guarda mais o texto anterior da descrição (#1076).
 - A IA recebe no máximo as últimas 20 mensagens da conversa (#1076).
+- O card selecionado aparece em relevo, com sombra à direita e embaixo.
 
 ### Removido
 
