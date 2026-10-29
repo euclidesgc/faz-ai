@@ -1,5 +1,7 @@
 # Auditoria de conclusão do plano de contexto mínimo
 
+> **Histórico.** O Plano de contexto e o runtime v1 foram aposentados (#1144–#1147; migração 51 remove as tabelas `agent_context_contracts` e `activity_context_selections`). Este documento registra o que existiu e não descreve o produto atual.
+
 Fonte de requisitos: `plano-contexto-minimo-por-execucao.md`, inclusive dependências, decisões de produto, indicadores e aceites. Esta auditoria mantém o escopo integral; uma base de protocolo ou teste com CLI falsa não encerra uma entrega de runtime ou o piloto.
 
 ## Estado verificável

@@ -5,7 +5,8 @@ import { choose, confirmLast, lastSent, posted, renderThemed, seedBoard, sentOf 
 import { ExecutionPoliciesSettings } from '../../src/webview/components/settings/policies/ExecutionPoliciesSettings';
 import { builtinPolicyCatalog } from '../../src/shared/policyManagement';
 import { useBoardStore } from '../../src/webview/store/boardStore';
-import { setLocale } from '../../src/webview/i18n';
+import { setLocale, translation } from '../../src/webview/i18n';
+import { CONTEXT_ACTION_LABELS } from '../../src/shared/executionAction';
 import { record, policy } from '../fixtures/executionPolicy';
 import type { PolicyReply } from '../../src/shared/policyManagement';
 import type { ExecutionPolicyRecord } from '../../src/shared/executionPolicies';
@@ -383,4 +384,8 @@ it('o erro de ciclo do host chega com o nome da outra regra, também traduzido',
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'This rule closes a cycle with "Volta" (Cursor · CLI): the card would go back to a model that already failed.',
   );
+});
+it('todo rótulo de ação de execução tem tradução em inglês', () => {
+  setLocale('en');
+  for (const label of Object.values(CONTEXT_ACTION_LABELS)) expect(translation(label), label).toBeTruthy();
 });
