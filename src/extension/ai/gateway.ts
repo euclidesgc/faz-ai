@@ -18,6 +18,7 @@ import { cursorToolNames, type CursorManifest } from './cursorManifest';
 //
 // O custo gravado é o que a CLI informa, nunca um cálculo do board: ver `aiOutput/claude.ts`.
 import type { AiTool } from '../../shared/harness';
+import { priceRun, type ModelPricing } from '../../shared/cost';
 import type { AiRunConfig, AiRunOrigin, AiRunOutcome, AiRunStart, RunReport } from '../../shared/log';
 import type { MeasureError } from '../aiOutput/errors';
 import type { Measured, SpawnFn } from '../aiOutput/measured';
@@ -173,6 +174,12 @@ export interface AiGatewayDeps {
   regimeOf?(profileId: string): Pick<StrictExecutionRequest, 'regime' | 'compatibilityReview'>;
   /** a ferramenta recusou o modelo como inexistente para a conta (`modelUnavailable`): o host o tira do catálogo */
   onModelUnavailable?(profile: AiProfile, model: string): void;
+  /**
+   * O preço cadastrado no catálogo para o modelo da execução (null = sem preço ou modelo fora do catálogo). O
+   * gateway completa com ele o consumo de toda execução (`priceRun`), antes de gravar no log e de entregar o
+   * relatório; uma falha aqui não derruba a execução.
+   */
+  priceOf?(profile: AiProfile, model: string | null): ModelPricing | null;
   /** inicia o comando da CLI; é o único lugar que recebe um */
   spawn: SpawnFn;
 }
@@ -245,6 +252,8 @@ export class AiGateway {
     let format: OutputFormat = 'text';
     let workToken: string | undefined;
     let profile: AiProfile | undefined;
+    /** o modelo do plano (o mesmo que o log grava em `ai_runs.model`); fora do `try` para o preço no fim */
+    let runModel: string | null = null;
     let privateAuthFailed = false;
     let conference: AiPrepared['conference'];
     const authTails = { stdout: '', stderr: '' };
@@ -286,6 +295,7 @@ export class AiGateway {
       if (!isReadyCli(profile) && prepared.strict?.profileId !== profile.id)
         throw new Error('A admissão não corresponde ao perfil solicitado.');
       const { config } = prepared;
+      runModel = config.model;
       conference = prepared.conference;
       let input = prepared.input;
       if (prepared.work) {
@@ -450,7 +460,17 @@ export class AiGateway {
           ? { bashCommands: rawReport.bashCommands.map((item) => ({ ...item, command: redact(item.command) })) }
           : {}),
       };
-      const report = this.deps.sessions?.sanitize(safeReport) ?? safeReport;
+      const sanitized = this.deps.sessions?.sanitize(safeReport) ?? safeReport;
+      // o custo pelo preço do catálogo nunca derruba a execução: se falhar, segue sem estimativa
+      let report = sanitized;
+      try {
+        if (profile && sanitized.measure !== 'none' && sanitized.consumption) {
+          const pricing = this.deps.priceOf?.(profile, runModel) ?? null;
+          if (pricing) report = { ...sanitized, consumption: priceRun(sanitized.consumption, pricing) };
+        }
+      } catch (e) {
+        call.log(redact(`Custo da execução indisponível: ${e instanceof Error ? e.message : String(e)}`));
+      }
       // a conferência nunca derruba a execução: se falhar, grava "não conferida" e segue
       let check: RunCheck = { status: 'unchecked', reason: report.measure === 'none' ? 'not_measured' : 'no_inventory' };
       try {

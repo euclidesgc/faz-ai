@@ -74,10 +74,19 @@ describe('auditoria persistida da admissão', () => {
     const before = old.exec('SELECT * FROM ai_runs')[0]!;
     migrate(old);
     const after = old.exec('SELECT * FROM ai_runs')[0]!;
-    // admission_json (36) e as colunas da conferência (posteriores) nascem nulas
-    expect(after.columns).toEqual([...before.columns, 'admission_json', 'check_status', 'check_detail', 'mode']);
+    // admission_json (36) e as colunas posteriores (conferência, modo, custo por bucket) nascem nulas
+    const later = [
+      'check_status',
+      'check_detail',
+      'mode',
+      'cost_input_usd',
+      'cost_output_usd',
+      'cost_cache_read_usd',
+      'cost_cache_write_usd',
+    ];
+    expect(after.columns).toEqual([...before.columns, 'admission_json', ...later]);
     expect(after.values[0]!.slice(0, before.columns.length)).toEqual(before.values[0]);
-    expect(after.values[0]!.slice(before.columns.length)).toEqual([null, null, null, null]);
+    expect(after.values[0]!.slice(before.columns.length)).toEqual(new Array(8).fill(null));
     expect(new AiRunRepo(old).byMonth('2026-10')[0]?.id).toBe(id);
   });
   it('exporta e importa a decisão como auditoria, sem convertê-la em recibo local de capacidade', () => {

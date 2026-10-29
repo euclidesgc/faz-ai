@@ -789,21 +789,39 @@ describe('modelos de IA', () => {
     expect(rules.error).toBe(false);
   });
 
-  it('upsert_model grava o modelo; get_models não devolve preço nenhum, e o board não aceita preço', async () => {
+  it('upsert_model grava o modelo; get_models devolve o preço cadastrado, null limpa o bucket e ausente mantém', async () => {
     const entry = async (value: string) => (await call('get_models')).data.catalog.find((o: any) => o.value === value);
-    expect(await entry('claude:opus')).not.toHaveProperty('price');
-    expect(await entry('claude:opus')).not.toHaveProperty('priceSource');
+    expect(await entry('claude:opus')).not.toHaveProperty('pricing');
 
     await call('upsert_model', { tool: 'claude', model: 'opus', label: 'Opus', efforts: ['low', 'high'], default_effort: 'high' });
     expect(await entry('claude:opus')).toMatchObject({ label: 'Opus', efforts: ['low', 'high'], defaultEffort: 'high' });
-    expect(JSON.stringify(router.snapshot().board.modelCatalog)).not.toContain('price');
+    expect(await entry('claude:opus')).not.toHaveProperty('pricing');
+
+    await call('upsert_model', { tool: 'claude', model: 'opus', price_input: 15, price_output: 75, price_cache_read: 1.5 });
+    expect((await entry('claude:opus')).pricing).toEqual({ input: 15, output: 75, cacheRead: 1.5 });
+    // ausente mantém; null limpa só o bucket
+    await call('upsert_model', { tool: 'claude', model: 'opus', price_output: null, price_cache_write: 18.75 });
+    expect((await entry('claude:opus')).pricing).toEqual({ input: 15, cacheRead: 1.5, cacheWrite: 18.75 });
+    // negativo é recusado
+    expect((await call('upsert_model', { tool: 'claude', model: 'opus', price_input: -1 })).error).toBe(true);
+    expect((await entry('claude:opus')).pricing.input).toBe(15);
+    // limpar tudo tira o campo
+    await call('upsert_model', { tool: 'claude', model: 'opus', price_input: null, price_cache_read: null, price_cache_write: null });
+    expect(await entry('claude:opus')).not.toHaveProperty('pricing');
 
     // "Detectar modelos" e a remoção continuam como antes
+    await call('upsert_model', { tool: 'claude', model: 'opus', price_input: 3 });
     await call('detect_models');
-    expect(await entry('claude:opus')).toBeDefined();
-    expect(JSON.stringify(router.snapshot().board.modelCatalog)).not.toContain('price');
+    expect((await entry('claude:opus')).pricing).toEqual({ input: 3 });
     const after = await call('delete_model', { model: 'claude:opus' });
     expect(after.data.catalog.some((o: any) => o.value === 'claude:opus')).toBe(false);
+  });
+
+  it('update_rules liga e desliga showCost; get_metrics mostra a coluna de custo só com a regra ligada', async () => {
+    expect((await call('update_rules', { showCost: false })).data.showCost).toBe(false);
+    expect((await call('get_metrics', { group_by: 'phase' })).text).not.toContain('custo');
+    expect((await call('update_rules', { showCost: true })).data.showCost).toBe(true);
+    expect((await call('get_metrics', { group_by: 'phase' })).text).toMatch(/nenhum grupo|custo/);
   });
 
   it('sugere o modelo pelo esforço da tarefa sem trocar uma escolha manual', async () => {

@@ -192,6 +192,16 @@ describe('regras configuráveis', () => {
     expect(snap().board.rules.shortTrack).toBe(true);
   });
 
+  it('mostrar custo em dólar: nasce ligada, só booleano vale e updateRules a persiste', () => {
+    expect(DEFAULT_RULES.showCost).toBe(true);
+    // banco anterior à regra: sem a chave
+    expect(parseRules('{"confirmTrash":"never"}').showCost).toBe(true);
+    expect(parseRules('{"showCost":"false"}').showCost).toBe(true);
+    expect(parseRules('{"showCost":false}').showCost).toBe(false);
+    boards.updateRules(boardId, { showCost: false });
+    expect(snap().board.rules.showCost).toBe(false);
+  });
+
   it('updateRules persiste só o que foi alterado', () => {
     boards.updateRules(boardId, { onCancelParent: 'cascade' });
     boards.updateRules(boardId, { confirmArchive: 'always' });

@@ -221,14 +221,17 @@ creation tokens, the number of turns and the tool's session id. It also records 
 of what the AI used: native tools, MCP tools (with the server of each one), subagents and skills,
 with the number of calls.
 
-- **Usage is measured in tokens; the board does not show cost in dollars.** Both tools report the
-  tokens: Claude Code reports input, output, cache read and cache creation, per model, subagents
-  included; Cursor reports the same four counters. Only Claude Code also reports a dollar cost, and
-  Cursor does not; a dollar total covering only part of the runs would confuse more than help, and a
-  price table would go stale with every rate change. So, for now, the board shows only tokens. The
-  dollar value Claude Code reports is still stored in the database, so it can come back later without
-  losing history. Wherever you see "não medido" (not measured), this is why: missing measurement,
-  never zero consumption.
+- **Usage is measured in tokens and, with the "Show cost in dollars" rule on, also in dollars.** Both
+  tools report the tokens: Claude Code reports input, output, cache read and cache creation, per
+  model, subagents included; Cursor reports the same four counters. Only Claude Code also reports a
+  dollar cost. When the tool does not report it, the board estimates the cost from the per-million-token
+  price the person registered for the model in the catalog (`upsert_model`, or the Models screen), bucket
+  by bucket (input, output, cache read and cache write); the price applies from the next run on, and a
+  bucket with tokens and no price leaves the estimated total empty. The cost reported by the tool always
+  wins over the estimate. The **Show cost in dollars** rule (`showCost` in `update_rules`) is on by
+  default; when off, the dollar figure disappears (people on a subscription may prefer tokens only), but
+  the data stays stored. Wherever you see "não medido" (not measured), this is why: missing
+  measurement, never zero consumption.
 - **Every run goes through a single door.** The card runner (manual, heartbeat and autonomous mode)
   and the board chat call the AI through the same point in the code (`AiGateway`), which opens the
   log row before running, closes it with the outcome and stores the consumption. Each tool has its
@@ -374,7 +377,7 @@ tokens.
 - On the **agent**, **skill**, **used_tool**, **mcp_tool** and **bash_command** dimensions the table
   shows only the count of runs and uses (no tokens, which cannot be split among a run's components).
   `effort`, `profile` and `mode` have tokens.
-- Tokens count in every measured run, from Claude Code and from Cursor. The table has no dollar cost.
+- Tokens count in every measured run, from Claude Code and from Cursor. With the "Show cost in dollars" rule on, the table gains a `custo` column and, below it, the line estimated from the catalog price (only without card, phase, type, model or tool filters); when off, it has no dollar figure.
 - The panel's times (permanence per phase and lead time) are not in `get_metrics`. Rework is: with
   `rework: true` (and, if you want, `start_date` and `end_date`), the answer brings the reviews, the
   first-try approvals and the change requests per phase and per model, the done stories with a

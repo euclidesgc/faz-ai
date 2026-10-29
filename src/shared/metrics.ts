@@ -1,4 +1,5 @@
 import { presetRange } from './filters';
+import type { CostBuckets } from './cost';
 import { dayOf } from './log';
 
 /** Os sete períodos do painel. Os quatro primeiros são o vocabulário de `filters.ts`. */
@@ -181,6 +182,11 @@ export interface MetricsCell {
   costUsd: number | null;
   /** a parte estimada do custo, no vocabulário de #71 (RF-31) */
   costEstimatedUsd: number | null;
+  /**
+   * Custo por bucket de token (soma pelo preço do catálogo), só no detalhe (`ai_runs`). Ausente no mês
+   * arquivado, que guarda só o total por origem; null no bucket = nenhuma execução o tinha.
+   */
+  costBuckets?: CostBuckets;
   /** só no corte por ferramenta de IA: execuções conferidas, com desvio e não conferidas (as sem conferência contam em não conferidas) */
   checks?: RunChecks;
 }

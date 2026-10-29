@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Database } from 'sql.js';
-import { AiGateway, NO_CARD, missingProfileCommand, type AiCall, type AiRunEnd } from '../src/extension/ai/gateway';
+import { AiGateway, NO_CARD, missingProfileCommand, type AiCall, type AiGatewayDeps, type AiRunEnd } from '../src/extension/ai/gateway';
 import { commandNotFound } from '../src/extension/cliResolve';
 import { SpawnNotStartedError } from '../src/extension/processIdentity';
 import { MeasureEndedError } from '../src/extension/aiOutput/errors';
@@ -357,6 +357,77 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     expect(rows()).toHaveLength(1);
     expect(rows()[0]).toMatchObject({ tool: 'claude', outcome: 'unsupported' });
     expect(procs).toHaveLength(0);
+  });
+});
+
+describe('o gateway completa o consumo com o custo pelo preço do catálogo', () => {
+  const priced = (priceOf: AiGatewayDeps['priceOf']) =>
+    new AiGateway({ boardId: router.boardId, runLog: createRunLog(db), spawn, priceOf });
+  const withModel = (): AiCall =>
+    call({
+      tool: 'cursor',
+      prepare: () => ({
+        input: { prompt: 'oi', permission: 'board' },
+        config: { model: 'auto', effort: null, profile: null, agent: null, autonomous: false, clean: false, skills: [], mcp: null },
+      }),
+    });
+  const cursorResult = `${JSON.stringify({
+    type: 'result',
+    subtype: 'success',
+    result: 'ok',
+    usage: { inputTokens: 1_000_000, outputTokens: 500_000, cacheReadTokens: 0, cacheWriteTokens: 0 },
+  })}\n`;
+
+  it('sem custo informado, o log e o AiRunEnd recebem o total estimado e os buckets', () => {
+    const asked: unknown[] = [];
+    const run = priced((profile, model) => {
+      asked.push([profile.id, model]);
+      return { input: 2, output: 10 };
+    }).run(withModel());
+    const ends: AiRunEnd[] = [];
+    run.onExit((e) => ends.push(e));
+    procs[0]!.write(cursorResult);
+    procs[0]!.exit(0);
+
+    expect(asked).toEqual([['cursor', 'auto']]);
+    expect(ends[0]!.report.consumption).toMatchObject({ costUsd: 7, costEstimated: true, costBuckets: { input: 2, output: 5 } });
+    expect(rows()[0]).toMatchObject({
+      costUsd: 7,
+      costEstimated: true,
+      costBuckets: { input: 2, output: 5, cacheRead: null, cacheWrite: null },
+    });
+  });
+
+  it('o custo informado pela CLI vale; os buckets são estimativa', () => {
+    const run = priced(() => ({ input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 })).run(call({ ...withModel(), tool: 'claude' }));
+    run.onExit(() => {});
+    procs[0]!.write(CLAUDE_OUTPUT);
+    procs[0]!.exit(0);
+    expect(rows()[0]!.costUsd).toBeCloseTo(0.06478465, 8);
+    expect(rows()[0]!.costEstimated).toBe(false);
+    expect(rows()[0]!.costBuckets?.input).toBeCloseTo((54 * 3) / 1e6, 10);
+  });
+
+  it('sem preço para o modelo, o consumo segue como veio', () => {
+    priced(() => null).run(withModel());
+    procs[0]!.write(cursorResult);
+    procs[0]!.exit(0);
+    expect(rows()[0]).toMatchObject({ costUsd: null, costBuckets: null });
+  });
+
+  it('um priceOf que lança não derruba a execução: grava sem estimativa e avisa no canal', () => {
+    const lines: string[] = [];
+    const run = priced(() => {
+      throw new Error('catálogo ilegível');
+    }).run({ ...withModel(), log: (l) => lines.push(l) });
+    const ends: AiRunEnd[] = [];
+    run.onExit((e) => ends.push(e));
+    procs[0]!.write(cursorResult);
+    procs[0]!.exit(0);
+
+    expect(ends).toHaveLength(1);
+    expect(rows()[0]).toMatchObject({ outcome: 'done', measure: 'full', inputTokens: 1_000_000, costUsd: null, costBuckets: null });
+    expect(lines.join('\n')).toContain('Custo da execução indisponível: catálogo ilegível');
   });
 });
 

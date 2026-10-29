@@ -601,7 +601,7 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
           cacheWriteTokens: 0,
           turns: requests,
           sessionId: null,
-          // o board nunca calcula custo: a API não o informa
+          // a API não informa custo: se o modelo tiver preço no catálogo, o gateway o estima
           costUsd: null,
         },
       };
