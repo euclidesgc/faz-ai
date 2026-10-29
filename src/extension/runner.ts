@@ -34,7 +34,7 @@ import { modelDisplay, modelValue, suggestModelRule } from '../shared/models';
 import { effortTiers } from './models';
 import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
-import { cardAdmissionRequest } from './ai/admissionRequest';
+import { legacyStrictRequest } from './ai/admission';
 import { AiGateway, type AiCall, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
@@ -548,7 +548,7 @@ export class AiRunner {
               ? {
                   strict: {
                     profileId: target.cli.id,
-                    request: cardAdmissionRequest(state.board.runner, permission, plan.manifest.mcpServers),
+                    request: legacyStrictRequest(state.board.runner, permission, plan.manifest.mcpServers),
                   },
                 }
               : {}),

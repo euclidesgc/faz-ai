@@ -15,7 +15,7 @@ import { admissionRegimeOf, type RunnerPermission } from '../shared/runner';
 import { effortToRun } from '../shared/execution';
 import type { BoardState } from '../shared/model';
 import { NO_CARD, type AiExecution } from './ai/gateway';
-import { closedAdmissionRequest } from './ai/admissionRequest';
+import { closedStrictRequest } from './ai/admission';
 import { MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { BOARD_SERVER, bareExec, type ExecInput } from './execution';
 import { contextLines } from './promptContext';
@@ -372,7 +372,7 @@ export class ChatSession {
         prepare: () => ({
           // o perfil personalizado precisa da admissão; o chat não tem card nem MCP
           ...(!isReadyCli(target.cli)
-            ? { strict: { profileId: target.cli.id, request: closedAdmissionRequest(state.board.runner, !!hooks.draftOnly, permission) } }
+            ? { strict: { profileId: target.cli.id, request: closedStrictRequest(state.board.runner, !!hooks.draftOnly, permission) } }
             : {}),
           artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state) : undefined,
           config: {
