@@ -7,6 +7,8 @@ import { columnOf, isLive } from './selectors';
 import { isWithHuman } from './story';
 import { briefBlockedReason, briefFailures, briefKey } from './subtaskBrief';
 import { parallelLimit, textLimit, type RunnerConfig } from './runner';
+import { resolveRunTarget, type RunTargetSource } from './runTarget';
+import { suggestModelRule } from './models';
 
 export type WorkKind = 'subtask' | 'story' | 'closing' | 'activity';
 export type WorkState = 'prepared' | 'started' | 'waiting' | 'reconciling' | 'done' | 'failed' | 'cancelled';
@@ -28,7 +30,8 @@ export interface WorkUnit {
   key: string;
 }
 export interface LiveWork {
-  byCard: ReadonlyMap<string, { state: WorkState; key: string; kind: WorkKind }>;
+  /** `reason`: por que a unidade terminou como terminou (na falha, o erro que impediu a execução) */
+  byCard: ReadonlyMap<string, { state: WorkState; key: string; kind: WorkKind; reason?: string }>;
 }
 export type StoryPlan = { kind: 'units'; units: WorkUnit[] } | { kind: 'wait' | 'paused'; reason: string } | { kind: 'idle' };
 
@@ -100,16 +103,105 @@ export function workKey(kind: WorkKind, s: BoardState, story: Card, card: Card):
         : [kind, story.id, story.columnId, card.updatedAt],
   );
 }
+/** Onde a pessoa corrige o modelo, conforme de onde ele veio. */
+const TARGET_PLACE: Record<RunTargetSource, (ref: string) => string> = {
+  card: (ref) => `abra ${ref} e, no campo Modelo, escolha um modelo da lista`,
+  agent: (ref) => `troque o modelo do agente de ${ref} (Configurações → Harness → Agentes) por um da lista`,
+  rule: (ref) =>
+    `corrija o modelo da regra de sugestão que casa com ${ref} (Configurações → Conectar agentes → Sugestão de modelo para cada card)`,
+  default: () => 'escolha o agente e o modelo padrão em Configurações → Conectar agentes',
+  chat: (ref) => `abra ${ref} e, no campo Modelo, escolha um modelo da lista`,
+  fallback: () => 'corrija o modelo indicado em Configurações → Conectar agentes → Regras de fallback',
+};
 /**
- * Por que a história parou numa sub-tarefa, com o que a sub-tarefa pede: a história é onde a pessoa destrava.
- * O motivo vai para o bloqueio da história, e responder ali chama a IA, que pode agir nas sub-tarefas.
+ * O que a pessoa faz, passo a passo, para a sub-tarefa voltar a rodar. O alvo inválido (modelo fora do catálogo,
+ * esforço que o modelo não aceita, agente desligado) é diagnosticado aqui, pelo estado atual: era o motivo mais
+ * comum de uma sub-tarefa nem começar, e o texto genérico não dizia o que mudar.
  */
-export function stoppedReason(story: Card, stopped: Card): string {
+function unblockSteps(s: BoardState, stopped: Card, failure: string): string[] {
+  const ref = `#${stopped.number}`;
+  const steps: string[] = [];
+  const target = resolveRunTarget(s, stopped);
+  if (target.blocked) {
+    const { block } = target;
+    if (block.reason === 'profile-unavailable')
+      steps.push(
+        `Ligue o agente de "${block.value}" em Configurações → Conectar agentes, ou ${TARGET_PLACE[block.source](ref)} de um agente ligado.`,
+      );
+    else {
+      const problem = block.reason === 'effort-invalid' ? `pede um esforço que o modelo não aceita` : `não existe no catálogo do agente`;
+      steps.push(`Para corrigir o modelo, ${TARGET_PLACE[block.source](ref)}: o valor atual, "${block.value}", ${problem}.`);
+    }
+    // o valor errado veio da sugestão do board: sem corrigir a regra, as próximas sub-tarefas nascem com ele
+    if (block.source === 'card' && suggestModelRule(s, stopped)?.model === block.value)
+      steps.push(
+        `Corrija também a regra de sugestão que propôs "${block.value}" (Configurações → Conectar agentes → Sugestão de modelo para cada card), senão as próximas sub-tarefas recebem o mesmo valor.`,
+      );
+  } else if (isWithHuman(stopped)) steps.push(`Abra ${ref} e faça o que o motivo acima pede.`);
+  else if (failure) steps.push('Corrija o que o motivo acima aponta.');
+  else steps.push(`Abra ${ref} e leia a última mensagem da conversa dela: ali está o que a IA fez e onde parou.`);
+  steps.push(
+    `Responda aqui na conversa da história (ou na de ${ref}) dizendo o que mudou: a resposta devolve a vez à IA, e o board roda ${ref} de novo. Só tirar o bloqueio, sem mudar a causa, faz a história parar outra vez no mesmo ponto.`,
+  );
+  return steps;
+}
+/**
+ * Por que a história parou numa sub-tarefa, com o que a sub-tarefa pede e os passos para destravar: a história é
+ * onde a pessoa destrava. O motivo vai para o bloqueio da história, e responder ali chama a IA, que pode agir nas
+ * sub-tarefas. `failure` é o motivo da execução que falhou (o erro que a impediu de começar, por exemplo).
+ */
+export function stoppedReason(s: BoardState, story: Card, stopped: Card, failure = ''): string {
+  const ref = `#${stopped.number}`;
+  const cut = (text: string) => (text.length > 400 ? `${text.slice(0, 400)}…` : text);
   const why = isWithHuman(stopped) ? stopped.statusReason.trim() : '';
+  const reason = failure.trim();
   const detail = why
-    ? `#${stopped.number} está com você: ${why.length > 400 ? `${why.slice(0, 400)}…` : why}`
-    : `a execução de #${stopped.number} terminou sem concluir a sub-tarefa (o resultado está na conversa dela).`;
-  return `#${story.number} está parada: ${detail}\n\nResponda aqui na conversa da história (ou na da sub-tarefa): a IA lê a mensagem e resolve, mesmo com o bloqueio.`;
+    ? `${ref} está com você: ${cut(why)}`
+    : reason
+      ? `a execução de ${ref} terminou sem concluir a sub-tarefa.\n\nMotivo: ${cut(reason)}`
+      : `a execução de ${ref} terminou sem concluir a sub-tarefa (o resultado está na conversa dela).`;
+  const steps = unblockSteps(s, stopped, reason).map((step, i) => `${i + 1}. ${step}`);
+  return `#${story.number} está parada: ${detail}\n\nPara destravar:\n${steps.join('\n')}`;
+}
+/**
+ * A nota do bloqueio da história sem repetir o que a conversa já diz. A mesma nota, sem gesto da pessoa desde
+ * a última vez, só atualiza o motivo do bloqueio (`quiet`). Se a pessoa agiu (respondeu ou tirou o bloqueio) e a
+ * história parou de novo pelo mesmo motivo, a nota vem uma vez na versão que explica o que aconteceu e o que
+ * costuma faltar; depois disso, também só o motivo. Repetir a mesma mensagem não ajuda quem já tentou.
+ */
+export function blockNote(s: BoardState, story: Card, reason: string): { note: string; quiet: boolean } {
+  const again = repeatedBlockNote(story, reason);
+  const sent = s.comments
+    .filter((c) => c.cardId === story.id && c.source === 'ai' && (c.body.trim() === reason.trim() || c.body.trim() === again.trim()))
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .at(-1);
+  if (!sent) return { note: reason, quiet: false };
+  if (sent.body.trim() === again.trim()) return { note: again, quiet: true };
+  const family = new Set([story.id, ...s.cards.filter((c) => c.parentId === story.id).map((c) => c.id)]);
+  const acted =
+    s.comments.some((c) => family.has(c.cardId) && c.source === 'human' && c.createdAt > sent.createdAt) ||
+    (story.statusBy === s.currentUser && (story.statusAt ?? 0) > sent.createdAt);
+  return acted ? { note: again, quiet: false } : { note: reason, quiet: true };
+}
+/**
+ * O id da última mensagem da conversa quando ela é do board e diz exatamente `body`: o resultado de uma tentativa
+ * que repete o da anterior aponta para a mensagem que já está lá, em vez de empilhar outra igual.
+ */
+export function sameAsLastNote(s: BoardState, cardId: string, body: string): string | null {
+  const last = s.comments
+    .filter((c) => c.cardId === cardId)
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .at(-1);
+  return last && last.source === 'ai' && last.author === 'Faz AI' && last.body.trim() === body.trim() ? last.id : null;
+}
+/** A versão da nota para quem já tentou destravar e viu a história parar no mesmo ponto. */
+export function repeatedBlockNote(story: Card, reason: string): string {
+  return [
+    `#${story.number} continua parada pelo mesmo motivo de antes.`,
+    'O que aconteceu: depois da sua última ação, o board tentou seguir e parou no mesmo ponto. A causa ainda está lá; tirar o bloqueio ou responder sem mudar a causa não basta.',
+    'O que costuma faltar: fazer a correção no lugar indicado no passo 1 (é ela que o board confere antes de rodar) e só então responder aqui dizendo o que mudou.',
+    `Abaixo, o motivo e os passos de novo:\n\n${reason}`,
+  ].join('\n\n');
 }
 /** Sub-tarefas abertas da fase, sem as com a pessoa, as que falharam e as já concluídas (chave em `done`). */
 export function pendingSubtasks(s: BoardState, story: Card, live: LiveWork, done: ReadonlySet<string>): Card[] {
@@ -153,14 +245,19 @@ export function storyPlan(s: BoardState, story: Card, live: LiveWork, done: Read
     columnId: story.columnId,
     key: workKey(kind, s, story, card),
   });
-  const next = ready.find((c) => !done.has(workKey('subtask', s, story, c)) && live.byCard.get(c.id)?.state !== 'failed');
+  // a falha vale para a chave em que aconteceu: devolvida pela pessoa (chave nova), a sub-tarefa roda de novo.
+  // Sem isso, a que falhou ao iniciar nunca mais rodava, e a história bloqueava de novo a cada resposta
+  const failedNow = (c: Card) => {
+    const row = live.byCard.get(c.id);
+    return row?.state === 'failed' && row.key === workKey('subtask', s, story, c);
+  };
+  const next = ready.find((c) => !done.has(workKey('subtask', s, story, c)) && !failedNow(c));
   if (next) return { kind: 'units', units: [unit('subtask', next)] };
   if (open.length) {
-    const stopped = open.find(
-      (c) => isWithHuman(c) || live.byCard.get(c.id)?.state === 'failed' || done.has(workKey('subtask', s, story, c)),
-    );
+    const stopped = open.find((c) => isWithHuman(c) || failedNow(c) || done.has(workKey('subtask', s, story, c)));
+    const failure = stopped && failedNow(stopped) ? (live.byCard.get(stopped.id)?.reason ?? '') : '';
     return stopped
-      ? { kind: 'paused', reason: stoppedReason(story, stopped) }
+      ? { kind: 'paused', reason: stoppedReason(s, story, stopped, failure) }
       : { kind: 'wait', reason: 'As sub-tarefas aguardam dependências ou liberação da posse.' };
   }
   if (children.length) {

@@ -434,6 +434,15 @@ pode abrir. O **Trabalhar** manual numa sub-tarefa não passa pela conferência.
 estão em Implementação com sub-tarefas sem as seções passam por essa correção na próxima condução
 pelo board.
 
+**Sub-tarefa parada.** Quando uma sub-tarefa termina sem concluir ou nem consegue começar, a história é
+bloqueada com uma nota que diz o motivo real (por exemplo, o modelo do card fora do catálogo do agente) e
+os passos para destravar: onde corrigir (o campo Modelo da sub-tarefa ou a regra de sugestão que propôs
+o valor) e responder na conversa da história. A resposta devolve a vez à IA, e o board roda a sub-tarefa
+de novo, inclusive a que falhou ao começar; só tirar o bloqueio, sem mudar a causa, faz a história parar
+outra vez. A mesma nota não se repete na conversa: sem nada novo, o board só atualiza o motivo do
+bloqueio. Se a pessoa agiu e a história parou pelo mesmo motivo, vem uma vez a versão que explica o que
+aconteceu e o que costuma faltar. O resultado de uma tentativa igual ao da anterior também não se repete.
+
 Nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica
 negada; no Cursor e no Kimi Code, sem bloqueio comprovado, a capacidade fica "desconhecida" e a
 admissão decide). Em **Configurações → Automação** (e em `fazai.git.parallelSubtasks`, de 1 a 6)

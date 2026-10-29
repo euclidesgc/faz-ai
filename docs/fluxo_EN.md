@@ -460,6 +460,16 @@ description): the AI reads the message and a new correction may open. The manual
 sub-task skips the check. Stories already in Implementação with sub-tasks missing the sections go
 through this correction the next time the board drives them.
 
+**Stopped sub-task.** When a sub-task ends without finishing, or cannot even start, the story is blocked
+with a note that gives the real reason (for example, the card's model is not in the agent's catalog)
+and the steps to unblock it: where to fix it (the sub-task's Modelo field, or the suggestion rule that
+proposed the value) and replying in the story conversation. The reply hands the turn back to the AI,
+and the board runs the sub-task again, including one that failed to start; only removing the block,
+without changing the cause, stops the story again. The same note is not repeated in the conversation:
+with nothing new, the board only updates the block reason. If the person acted and the story stopped
+for the same reason, the version that explains what happened and what is usually missing comes once.
+A try whose result matches the previous one is not repeated either.
+
 No execution delegates to the tool's subagents (in Claude Code, `Agent` — formerly `Task` — is
 denied; Cursor and Kimi Code have no proven block, so the capability stays "unknown" and admission
 decides). In **Settings → AI Harness** (and `fazai.git.parallelSubtasks`, 1 to 6) the person sets
