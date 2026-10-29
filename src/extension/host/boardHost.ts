@@ -28,7 +28,7 @@ import { dayOf } from '../../shared/log';
 import { pricingOf } from '../../shared/cost';
 import { Autopilot } from '../autopilot';
 import { Orchestrator } from '../orchestrator';
-import { orchestratesStory, effectiveLimits, LIVE_WORK_STATES } from '../../shared/orchestration';
+import { orchestratesStory, effectiveLimits, LIVE_WORK_STATES, sameAsLastNote } from '../../shared/orchestration';
 import { terminateProcessGroup } from '../processIdentity';
 import { CommentRepo } from '../repositories/commentRepo';
 import type { AiActivity } from '../../shared/model';
@@ -973,13 +973,20 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       }
     },
     terminate: terminateProcessGroup,
-    comment: (work, _outcome, body) => new CommentRepo(handle.db).add(work.storyId ?? work.cardId!, 'Faz AI', body, 'ai'),
+    // o resultado igual à última mensagem da conversa não se repete: a tentativa aponta para a que já está lá
+    comment: (work, _outcome, body) => {
+      const target = work.storyId ?? work.cardId!;
+      return sameAsLastNote(router.snapshot(), target, body) ?? new CommentRepo(handle.db).add(target, 'Faz AI', body, 'ai');
+    },
     publish: () => publishOrchestrations(),
     note: (storyId, body) => {
       new CommentRepo(handle.db).add(storyId, 'Faz AI', body, 'ai');
     },
-    block: (storyId, reason) =>
-      router.handle({ type: 'card.status.set', cardId: storyId, status: 'blocked', note: reason }, { author: 'Faz AI', source: 'ai' }),
+    block: (storyId, reason, quiet) =>
+      router.handle(
+        { type: 'card.status.set', cardId: storyId, status: 'blocked', note: reason, ...(quiet ? { quiet } : {}) },
+        { author: 'Faz AI', source: 'ai' },
+      ),
     log: o.log,
     gitMode: () => router.snapshot().board.git.mode,
     // as execuções do runner fora das unidades (chat de fase, refinar, resumir) também ocupam a pasta e o teto

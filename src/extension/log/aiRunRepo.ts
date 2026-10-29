@@ -60,7 +60,7 @@ export interface AiRun {
   costUsd: number | null;
   /** true = custo estimado pelo preço do catálogo, no fim da execução; false = informado pela ferramenta; null = sem custo */
   costEstimated: boolean | null;
-  /** custo por bucket pelo preço do catálogo, congelado no fim da execução; `null` = sem preço (ou execução anterior à migração 52) */
+  /** custo por bucket pelo preço do catálogo, congelado no fim da execução; `null` = sem preço (ou execução anterior à migração 51) */
   costBuckets: CostBuckets | null;
   turns: number | null;
   sessionId: string | null;
@@ -72,7 +72,7 @@ export interface AiRun {
 
 const numOrNull = (v: Row[string] | undefined): number | null => (v == null ? null : num(v));
 
-/** Os quatro custos por bucket de uma linha; `null` quando nenhum foi gravado (modelo sem preço ou linha anterior à migração 52). */
+/** Os quatro custos por bucket de uma linha; `null` quando nenhum foi gravado (modelo sem preço ou linha anterior à migração 51). */
 function costBucketsOf(r: Row): CostBuckets | null {
   const buckets: CostBuckets = {
     input: numOrNull(r.cost_input_usd),

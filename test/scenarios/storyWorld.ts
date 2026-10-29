@@ -5,6 +5,7 @@ import * as fs from 'node:fs';
 import type { HeadlessCommand } from '../../src/extension/headless';
 import type { SpawnFn } from '../../src/extension/aiOutput/measured';
 import { Orchestrator } from '../../src/extension/orchestrator';
+import { sameAsLastNote } from '../../src/shared/orchestration';
 import { terminateProcessGroup } from '../../src/extension/processIdentity';
 import { CommentRepo } from '../../src/extension/repositories/commentRepo';
 import { cardWorld, CONDUTOR_TOOLS, type CardWorld } from './cardWorld';
@@ -60,13 +61,19 @@ export async function storyWorld(act: (cardId: string, world: StoryWorld, comman
     workspace: async () => base.project,
     fingerprint: async () => 'fixo',
     terminate: terminateProcessGroup,
-    comment: (work, _outcome, body) => new CommentRepo(db).add(work.storyId ?? work.cardId!, 'Faz AI', body, 'ai'),
+    comment: (work, _outcome, body) => {
+      const target = work.storyId ?? work.cardId!;
+      return sameAsLastNote(router.snapshot(), target, body) ?? new CommentRepo(db).add(target, 'Faz AI', body, 'ai');
+    },
     publish: () => {},
     note: (id, body) => {
       new CommentRepo(db).add(id, 'Faz AI', body, 'ai');
     },
-    block: (id, reason) =>
-      router.handle({ type: 'card.status.set', cardId: id, status: 'blocked', note: reason }, { author: 'Faz AI', source: 'ai' }),
+    block: (id, reason, quiet) =>
+      router.handle(
+        { type: 'card.status.set', cardId: id, status: 'blocked', note: reason, ...(quiet ? { quiet } : {}) },
+        { author: 'Faz AI', source: 'ai' },
+      ),
     log: (line) => base.lines.push(line),
     gitMode: () => router.snapshot().board.git.mode,
     otherProcesses: () => [],

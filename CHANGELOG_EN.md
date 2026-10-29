@@ -6,6 +6,9 @@
 
 ### Added
 
+- `get_metrics` with `rework: true` brings the delivery cost (tokens per done story, by type and effort, and the type × model and type × agent view) and rework per agent, with runs without a result (#1113).
+- At the end of a Codex (ACP agent) run, the board reads the quota usage (5 h and weekly windows) from the newest rollout in `$CODEX_HOME/sessions` (or `~/.codex/sessions`) and hands it over in the run report for early switching; any read failure becomes "unknown" (#1210).
+- After a model runs out of limit and the rule switches on its own, the next runs and chats already start at the destination (#1100).
 - A per-model price in the catalog (`upsert_model`) estimates the US$ cost of runs without a reported cost; the "Show cost in dollars" rule turns it off for subscription users (#1104).
 - The open card shows the story branch commits grouped by phase (hash, subject, date, card and run), read from the `Faz-AI-*` trailers; the section is hidden when there are no commits.
 - New board artifact library in Settings › Harness › Board artifacts: each rule, skill, agent and MCP server is active or inactive, with counter, search, filter and a skill folder tree.
@@ -40,9 +43,12 @@
 - The selected card gets a shadow that sets it apart from the others (#1069).
 - The board checks a sub-task description before running it and sends it back to the conductor when sections are missing (#1138).
 - In each agent's Models tab, the **Modelo padrão** (default model) applies when it runs with no model set: a card without a model, the chat on **Auto** and the quick test.
+- New direct track: a short-track story whose plan touches up to about 3 files is implemented by the story session itself, without sub-tasks (#1107).
+- The `update_rules` MCP tool accepts the `shortTrack` rule (#1107).
 
 ### Changed
 
+- A new board starts with the Short track rule on; existing boards keep their choice (#1107).
 - When a card's model runs out of its usage limit, the board asks whether to wait for the limit to come back or continue with another available model, and saves the choice on the card; autonomous mode keeps the fallback rule.
 - The model pickers (chat, card, agents and rules) only offer agents that can answer now.
 - **Detectar modelos** replaces the list with the one the tool reports now, dropping models it no longer lists, and is also available in API mode.
@@ -74,6 +80,7 @@
 - The isolation proof now counts for every permission and survives an editor restart.
 - **Refine with AI** no longer keeps the previous description text (#1076).
 - The AI receives at most the last 20 conversation messages (#1076).
+- The selected card stands out in relief, with a shadow to the right and below.
 
 ### Removed
 
@@ -91,6 +98,8 @@
 
 ### Fixed
 
+- A story stopped at a sub-task gives the real reason and the steps to unblock it, without repeating the same message in the conversation.
+- A sub-task that failed to start runs again after the person replies, instead of blocking the story again.
 - The Gemini over the API model list no longer brings voice, image, music and research models.
 - In Cursor, the run error (such as the usage limit) is no longer hidden behind "the process tree shutdown is not confirmed yet".
 - The Gemini limit message says which quota ran out and when it comes back.

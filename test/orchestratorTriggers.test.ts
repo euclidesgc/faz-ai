@@ -5,7 +5,7 @@ import { Autopilot, type StoryDriver } from '../src/extension/autopilot';
 import { Heartbeat } from '../src/extension/heartbeat';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { briefAdvice, closingAdvice, STORY_SESSION_ADVICE, subtaskAdvice } from '../src/extension/unitAdvice';
+import { briefAdvice, closingAdvice, DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE, subtaskAdvice } from '../src/extension/unitAdvice';
 import { orchestratesStory } from '../src/shared/orchestration';
 import { briefFailures, briefSkeleton } from '../src/shared/subtaskBrief';
 import type { AiActivity } from '../src/shared/model';
@@ -206,6 +206,16 @@ describe('pedidos à IA', () => {
     expect(STORY_SESSION_ADVICE).toMatch(/Não execute sub-tarefas, nem por subagente/);
     expect(STORY_SESSION_ADVICE).toMatch(/crie-as, descreva-as e pare/);
     expect(STORY_SESSION_ADVICE).toContain('revisor-de-codigo');
+  });
+
+  it('a trilha direta manda a sessão da história implementar, com o limite de uns 3 arquivos e a volta às sub-tarefas com o motivo', () => {
+    expect(DIRECT_TRACK_ADVICE).toContain('prepare_workspace');
+    expect(DIRECT_TRACK_ADVICE).toMatch(/faça o commit[\s\S]*mova a história para a próxima coluna/);
+    expect(DIRECT_TRACK_ADVICE).toContain('uns 3 arquivos');
+    expect(DIRECT_TRACK_ADVICE).toMatch(/crie as sub-tarefas com Fase = esta coluna, registre o motivo na conversa e pare/);
+    expect(DIRECT_TRACK_ADVICE).toMatch(/Não execute sub-tarefas, nem por subagente/);
+    for (const name of ['Objetivo', 'Pronto quando', 'Pode tocar', 'Não pode tocar']) expect(DIRECT_TRACK_ADVICE).toContain(`"${name}"`);
+    expect(STORY_SESSION_ADVICE).not.toContain('prepare_workspace');
   });
 
   it('os pedidos de fechamento e da sessão da história pedem as seções na descrição das sub-tarefas criadas (#1110)', () => {

@@ -21,7 +21,18 @@ import type { ImportSummary } from '../../shared/backup';
 import type { AiActivity, Attachment, Autopilot, BoardState } from '../../shared/model';
 import type { WebviewToHost } from '../../shared/messages';
 import type { AiTool } from '../../shared/harness';
-import { nextPause, parsePauses, USAGE_LIMIT_META_KEY, type UsageLimitPause, type UsageLimitState } from '../../shared/usageLimit';
+import {
+  MODEL_LIMIT_META_KEY,
+  modelLimitOf,
+  nextModelLimit,
+  nextPause,
+  parseModelLimits,
+  parsePauses,
+  USAGE_LIMIT_META_KEY,
+  type ModelLimit,
+  type UsageLimitPause,
+  type UsageLimitState,
+} from '../../shared/usageLimit';
 import type { ProjectProfile } from '../../shared/projectProfile';
 import { readProjectProfile } from '../projectProfile';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
@@ -252,6 +263,8 @@ export class MessageRouter {
   private requirementsCheck: (() => Promise<void>) | null = null;
   private authExpired: AiTool[] = [];
   private usageLimit: UsageLimitState[] = [];
+  /** Marcas de modelo esgotado (#1100): só o host lê; ficam na `meta`, fora do `BoardState`. */
+  private modelLimits: ModelLimit[] = [];
   private openTerminalHook: ((command: string) => void) | null = null;
   private environment: EnvironmentReport | null = null;
   private environmentFirstRun = false;
@@ -280,6 +293,7 @@ export class MessageRouter {
     });
     this.store = this.ctx.store;
     this.usageLimit = parsePauses(this.ctx.boards.getMeta(USAGE_LIMIT_META_KEY)).map((p) => ({ ...p, probe: null }));
+    this.modelLimits = parseModelLimits(this.ctx.boards.getMeta(MODEL_LIMIT_META_KEY));
     this.ctx.harness.load();
     initModels(this.ctx);
     // os agentes de fábrica usam as regras de modelo, que initModels acabou de criar
@@ -791,6 +805,39 @@ export class MessageRouter {
     } catch {
       // sem gravar, a pausa vale só nesta sessão do editor
     }
+  }
+
+  /** Grava as marcas de modelo na `meta`, sem as vencidas; falha vira só memória. */
+  private persistModelLimits(now: number): void {
+    this.modelLimits = this.modelLimits.filter((l) => l.resumeAt > now);
+    try {
+      this.ctx.boards.setMeta(MODEL_LIMIT_META_KEY, JSON.stringify(this.modelLimits));
+    } catch {
+      // sem gravar, a marca vale só nesta sessão do editor
+    }
+  }
+
+  /** As marcas de modelo esgotado (só o host lê). */
+  modelLimitList(): readonly ModelLimit[] {
+    return this.modelLimits;
+  }
+
+  /** O modelo esgotou e a regra trocou sozinha: grava a marca (renovação + folga, ou backoff) e devolve-a. */
+  recordModelLimit(profileId: string, model: string, resetAt: number | null, now: number): ModelLimit {
+    const prev = modelLimitOf(this.modelLimits, profileId, model);
+    const mark = nextModelLimit(prev, profileId, model, resetAt, now);
+    this.modelLimits = [...this.modelLimits.filter((l) => l !== prev), mark];
+    this.persistModelLimits(now);
+    return mark;
+  }
+
+  /** O modelo respondeu sem esbarrar no limite: a marca sai. Devolve se havia uma. */
+  clearModelLimit(profileId: string, model: string | null, now: number = Date.now()): boolean {
+    const prev = modelLimitOf(this.modelLimits, profileId, model);
+    if (!prev) return false;
+    this.modelLimits = this.modelLimits.filter((l) => l !== prev);
+    this.persistModelLimits(now);
+    return true;
   }
 
   /** O perfil `profileId` esgotou o limite de uso: grava a pausa (renovação + folga, ou backoff) e devolve-a. */

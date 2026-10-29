@@ -41,7 +41,9 @@ describe('RulesSettings', () => {
     });
   });
 
-  it('Trilha curta: o cartão nasce desligado, o interruptor liga a regra e o selo acompanha', async () => {
+  it('Trilha curta: com a regra desligada, o cartão diz Desligada e o interruptor liga a regra', async () => {
+    board.router.handle({ type: 'settings.rules.update', patch: { shortTrack: false } });
+    syncStore(board.router);
     show();
     const card = rule('Trilha curta para histórias pequenas');
     expect(rules().shortTrack).toBe(false);

@@ -86,7 +86,8 @@ turn back to the AI.
 The instructions and document templates of the default board ask, in each phase, for what makes the
 code review quick later:
 
-- **Short track for small stories.** With the rule on (Settings → Rules; off by default), a story
+- **Short track for small stories.** With the rule on (Settings → Rules; a new board starts with it on and existing boards keep the
+  person's choice), a story
   with **Baixo** (low) effort or of type **Bug** approved in Discovery, or advanced by the autopilot,
   goes straight to Plan, skipping PRD and Spec, and the Plan starts from the DISCOVERY. The rule reads
   the current effort and type at each advance: if Discovery finds the story is bigger than it looked,
@@ -94,6 +95,14 @@ code review quick later:
   story, drag it (or ask the AI to move it with `move_card`) to PRD or Spec: an explicit move is never
   redirected. The skipped columns are recognized by the document they produce (PRD.md and SPEC.md),
   so renaming them does not turn the rule off.
+- **Direct track.** In a short-track story whose plan touches up to about 3 files, the Plan creates
+  no sub-tasks. In Implementation, the story session itself prepares the workspace, implements,
+  verifies as the project defines, commits and moves the story to Review. If the change grows beyond
+  that, the AI creates the sub-tasks with Fase = Implementation, records the reason in the
+  conversation and stops, and the board follows the normal flow. The independent Review still
+  applies. If the session ends without advancing the story or creating work, the story pauses with
+  the usual notice. Implementation is recognized by position (the first code column, without a
+  document), so renaming the columns changes nothing.
 - **Spec with the program design.** Besides the architecture, the Spec brings the new or changed
   types and signatures, the file of each one and who calls whom on the main path, with the feature
   flow in Mermaid diagrams. Discarded alternatives come with the reason for each one.
@@ -459,6 +468,16 @@ without opening another correction. To unblock it, answer in the story conversat
 description): the AI reads the message and a new correction may open. The manual **Work** on a
 sub-task skips the check. Stories already in Implementação with sub-tasks missing the sections go
 through this correction the next time the board drives them.
+
+**Stopped sub-task.** When a sub-task ends without finishing, or cannot even start, the story is blocked
+with a note that gives the real reason (for example, the card's model is not in the agent's catalog)
+and the steps to unblock it: where to fix it (the sub-task's Modelo field, or the suggestion rule that
+proposed the value) and replying in the story conversation. The reply hands the turn back to the AI,
+and the board runs the sub-task again, including one that failed to start; only removing the block,
+without changing the cause, stops the story again. The same note is not repeated in the conversation:
+with nothing new, the board only updates the block reason. If the person acted and the story stopped
+for the same reason, the version that explains what happened and what is usually missing comes once.
+A try whose result matches the previous one is not repeated either.
 
 No execution delegates to the tool's subagents (in Claude Code, `Agent` — formerly `Task` — is
 denied; Cursor and Kimi Code have no proven block, so the capability stays "unknown" and admission

@@ -336,7 +336,9 @@ button.active {
   overflow: hidden;
   cursor: grab;
   user-select: none;
-  transition: box-shadow 0.1s;
+  transition:
+    box-shadow 0.1s,
+    translate 0.1s;
 }
 .card:hover {
   box-shadow: var(--shadow-1);
@@ -481,6 +483,17 @@ button.active {
 .card.selected,
 .card.chosen {
   box-shadow: var(--shadow-select-2);
+}
+/* o card selecionado sobe um pouco para cima e para a esquerda, junto com a sombra, para parecer em relevo.
+   translate, e não transform: o transform é do arrastar (dnd-kit, inline) e os dois se somam sem conflito */
+.card.selected:not(.overlay),
+.card.chosen:not(.overlay) {
+  translate: -2px -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: box-shadow 0.1s;
+  }
 }
 /* pendência e seleção juntas: o anel de status continua e a sombra de seleção vem por cima.
    :not(.overlay) deixa o card arrastado com a elevação de .card.overlay, que é mais específica que .card.selected */

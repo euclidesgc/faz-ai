@@ -21,6 +21,14 @@ export const STORY_SESSION_ADVICE =
   'Nesta fase de código o board executa as sub-tarefas, cada uma numa execução própria. Não execute sub-tarefas, nem por subagente (ferramenta Agent): crie-as, descreva-as e pare. A Revisão segue o mesmo caminho: crie a sub-tarefa de revisão com o agente `revisor-de-codigo` e pare. ' +
   BRIEF_ADVICE;
 
+/**
+ * A sessão da história na trilha direta (Implementação de uma história da trilha curta, sem sub-tarefas na fase):
+ * ela mesma implementa; só passa às sub-tarefas se a mudança crescer.
+ */
+export const DIRECT_TRACK_ADVICE =
+  'Esta história está na trilha direta: não há sub-tarefas e você mesmo a implementa. Chame prepare_workspace, altere o código só na pasta da história, verifique como o projeto define, faça o commit na branch e mova a história para a próxima coluna. Se a mudança passar de uns 3 arquivos, não a implemente: crie as sub-tarefas com Fase = esta coluna, registre o motivo na conversa e pare; o board as executa. Não execute sub-tarefas, nem por subagente (ferramenta Agent). ' +
+  BRIEF_ADVICE;
+
 /** A sessão de correção: a história reescreve as descrições reprovadas na conferência e para. */
 export const briefAdvice = (story: Card, failures: readonly BriefFailure[]): string =>
   [

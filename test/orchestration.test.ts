@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   admit,
+  blockNote,
   effectiveLimits,
   orchestrableSubtasks,
   reconcileOutcome,
+  repeatedBlockNote,
   stoppedReason,
   storyPlan,
   workKey,
@@ -205,10 +207,110 @@ describe('plano puro de rodadas', () => {
     a.statusBy = 'a';
     expect(done.has(workKey('subtask', s, story, a))).toBe(false);
   });
-  it('a parada numa sub-tarefa com a pessoa traz o motivo dela', () => {
+  it('a parada numa sub-tarefa com a pessoa traz o motivo dela e os passos para destravar', () => {
+    const s = state();
     const blocked = sub('x', story.id, 'todo', { number: 9, status: 'blocked', statusReason: 'A base da história é a main.' });
-    expect(stoppedReason(story, blocked)).toContain('#9 está com você: A base da história é a main.');
-    expect(stoppedReason(story, { ...blocked, status: 'ready', statusReason: '' })).toContain('terminou sem concluir');
+    const reason = stoppedReason(s, story, blocked);
+    expect(reason).toContain('#9 está com você: A base da história é a main.');
+    expect(reason).toContain('Para destravar:\n1. Abra #9');
+    expect(reason).toContain('2. Responda aqui na conversa da história');
+    const ran = stoppedReason(s, story, { ...blocked, status: 'ready', statusReason: '' });
+    expect(ran).toContain('terminou sem concluir');
+    expect(ran).toContain('leia a última mensagem da conversa dela');
+  });
+  describe('sub-tarefa que falhou ao iniciar', () => {
+    const haiku = { id: 'claude:haiku', tool: 'claude', model: 'haiku', label: 'Haiku', efforts: ['medium'], defaultEffort: null };
+    // o caso do board: a regra de sugestão propôs um modelo fora do catálogo e a sub-tarefa nasceu com ele
+    function withBadModel() {
+      const s = state();
+      s.board.aiProfiles = s.board.aiProfiles.map((p) => ({ ...p, enabled: p.id === 'claude' }));
+      s.board.aiTool = 'claude';
+      s.board.modelCatalog = [haiku] as typeof s.board.modelCatalog;
+      s.cardTypes = [{ id: 'sub', name: 'Sub-tarefa' }] as typeof s.cardTypes;
+      s.fieldDefs = [{ id: 'modelo', name: 'Modelo', kind: 'model', appliesToTypes: null }] as typeof s.fieldDefs;
+      s.fieldValues = [{ cardId: 'a', fieldId: 'modelo', value: 'claude:claude-haiku-5-5@medium' }] as typeof s.fieldValues;
+      s.board.modelRules = [
+        {
+          id: 'r',
+          name: 'r',
+          enabled: true,
+          groups: [[{ fieldId: '@type', op: 'is', value: 'Sub-tarefa' }]],
+          model: 'claude:claude-haiku-5-5@medium',
+        },
+      ];
+      s.cards[2]!.columnId = 'finished';
+      s.cards[3]!.columnId = 'finished';
+      return s;
+    }
+    const failure = 'Não foi possível iniciar a execução: O modelo "claude:claude-haiku-5-5" não está no catálogo de Claude Code.';
+    it('diz o motivo real e onde corrigir o modelo, inclusive a regra que o sugeriu', () => {
+      const s = withBadModel();
+      const a = s.cards[1]!;
+      const failed = {
+        byCard: new Map([
+          ['a', { state: 'failed' as const, key: workKey('subtask', s, story, a), kind: 'subtask' as const, reason: failure }],
+        ]),
+      };
+      const plan = storyPlan(s, story, failed, new Set());
+      expect(plan.kind).toBe('paused');
+      const reason = plan.kind === 'paused' ? plan.reason : '';
+      expect(reason).toContain(`Motivo: ${failure}`);
+      expect(reason).toContain('1. Para corrigir o modelo, abra #2 e, no campo Modelo, escolha um modelo da lista');
+      expect(reason).toContain('"claude:claude-haiku-5-5@medium", não existe no catálogo do agente');
+      expect(reason).toContain('2. Corrija também a regra de sugestão');
+      expect(reason).toContain('3. Responda aqui');
+      expect(reason).not.toContain('confira o ambiente');
+    });
+    it('volta a rodar quando a pessoa responde, em vez de bloquear a história de novo', () => {
+      const s = withBadModel();
+      const a = s.cards[1]!;
+      const failed = {
+        byCard: new Map([
+          ['a', { state: 'failed' as const, key: workKey('subtask', s, story, a), kind: 'subtask' as const, reason: failure }],
+        ]),
+      };
+      expect(storyPlan(s, story, failed, new Set())).toMatchObject({ kind: 'paused' });
+      s.comments.push({ id: 'r', cardId: story.id, author: 'a', source: 'human', body: 'troquei o modelo', createdAt: 50, updatedAt: 50 });
+      expect(storyPlan(s, story, failed, new Set())).toMatchObject({ kind: 'units', units: [{ cardId: 'a' }] });
+    });
+  });
+  describe('nota do bloqueio sem repetição', () => {
+    const say = (s: ReturnType<typeof state>, body: string, at: number, source: 'human' | 'ai' = 'ai', cardId = story.id) =>
+      s.comments.push({ id: `m${at}`, cardId, author: source === 'ai' ? 'Faz AI' : 'a', source, body, createdAt: at, updatedAt: at });
+    const reason = '#1 está parada: x\n\nPara destravar:\n1. y';
+    it('a primeira vez vai para a conversa', () => {
+      expect(blockNote(state(), story, reason)).toEqual({ note: reason, quiet: false });
+    });
+    it('a mesma nota, sem gesto da pessoa, só atualiza o motivo', () => {
+      const s = state();
+      say(s, reason, 10);
+      say(s, 'Resultado de #2: concluída.', 20);
+      expect(blockNote(s, story, reason)).toEqual({ note: reason, quiet: true });
+    });
+    it('depois de a pessoa agir, vem uma vez a versão que explica; depois, silêncio', () => {
+      const s = state();
+      say(s, reason, 10);
+      say(s, 'feito', 20, 'human', 'a');
+      const again = blockNote(s, story, reason);
+      expect(again).toEqual({ note: repeatedBlockNote(story, reason), quiet: false });
+      expect(again.note).toContain('continua parada pelo mesmo motivo');
+      expect(again.note).toContain('O que costuma faltar');
+      expect(again.note).toContain(reason);
+      say(s, again.note, 30);
+      say(s, 'de novo', 40, 'human');
+      expect(blockNote(s, story, reason)).toMatchObject({ quiet: true });
+    });
+    it('tirar o bloqueio também conta como gesto da pessoa', () => {
+      const s = state();
+      say(s, reason, 10);
+      const unblocked = { ...story, statusBy: s.currentUser, statusAt: 20 };
+      expect(blockNote(s, unblocked, reason).quiet).toBe(false);
+    });
+    it('um motivo diferente vai para a conversa normalmente', () => {
+      const s = state();
+      say(s, reason, 10);
+      expect(blockNote(s, story, 'outro motivo')).toEqual({ note: 'outro motivo', quiet: false });
+    });
   });
   it('board sem campo Fase aceita as abertas com a IA e exclui as encerradas', () => {
     const s = state();

@@ -243,6 +243,7 @@ export const host: Record<string, string> = {
   'A tentativa precisa estar vinculada ao log antes de iniciar.': 'The attempt must be linked to the log before starting.',
   'Não foi possível preparar ou iniciar a execução; confira o ambiente antes de tentar de novo.':
     'The run could not be prepared or started; check the environment before trying again.',
+  'Não foi possível iniciar a execução: {reason}': 'The run could not start: {reason}',
   'Não foi possível reservar a pasta antes de executar.': 'The workspace could not be reserved before running.',
   'A unidade não iniciou: {reason}': 'The work unit did not start: {reason}',
   'A unidade viva ainda reserva a pasta.': 'The live work unit still reserves the workspace.',

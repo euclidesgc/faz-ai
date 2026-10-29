@@ -6,6 +6,9 @@
 
 ### Adicionado
 
+- `get_metrics` com `rework: true` traz o custo por entrega (tokens por história concluída, por tipo e esforço, e a visão tipo × modelo e tipo × agente) e o retrabalho por agente, com as execuções sem resultado (#1113).
+- Ao fim de uma execução do Codex (agente ACP), o board lê o uso da cota (janelas de 5 h e semanal) do rollout mais recente em `$CODEX_HOME/sessions` (ou `~/.codex/sessions`) e o entrega no relatório da execução, para a troca antecipada; qualquer falha na leitura vira "desconhecido" (#1210).
+- Depois que um modelo esgota o limite e a regra troca sozinha, as execuções e o chat seguintes já começam no destino (#1100).
 - Preço por modelo no catálogo (`upsert_model`) estima o custo em US$ das execuções sem custo informado; a regra "Mostrar custo em dólar" o desliga para quem usa assinatura (#1104).
 - O card aberto mostra os commits da branch da história agrupados por fase (hash, assunto, data, card e run), lidos dos trailers `Faz-AI-*`; a seção some quando não há commits.
 - Nova Biblioteca de artefatos do board em Configurações › Harness › Artefatos do board: cada regra, skill, agente e servidor MCP fica ativo ou inativo, com contador, busca, filtro e árvore de pastas das skills.
@@ -40,9 +43,12 @@
 - O card selecionado ganha uma sombra que o destaca dos demais (#1069).
 - O board confere a descrição da sub-tarefa antes de executar e devolve ao condutor a que não tem as seções (#1138).
 - Na aba Modelos de cada agente, o **Modelo padrão** vale quando ele executa sem modelo indicado: card sem modelo, chat em **Auto** e teste rápido.
+- Nova trilha direta: a história da trilha curta com plano de até uns 3 arquivos é implementada pela própria sessão, sem sub-tarefas (#1107).
+- A ferramenta MCP `update_rules` aceita a regra `shortTrack` (#1107).
 
 ### Alterado
 
+- O board novo nasce com a regra Trilha curta ligada; os boards existentes mantêm a escolha (#1107).
 - Quando o modelo de um card esgota o limite de uso, o board pergunta se espera o limite voltar ou segue com outro modelo disponível, e grava a escolha no card; no modo autônomo vale a regra de fallback.
 - Os seletores de modelo (chat, card, agentes e regras) só oferecem os agentes que podem responder agora.
 - **Detectar modelos** substitui a lista pela que a ferramenta informa agora, tirando os modelos que ela não lista mais, e passa a existir também no modo API.
@@ -74,6 +80,7 @@
 - A prova de isolamento vale para todas as permissões e sobrevive ao reinício do editor.
 - O **Refinar com IA** não guarda mais o texto anterior da descrição (#1076).
 - A IA recebe no máximo as últimas 20 mensagens da conversa (#1076).
+- O card selecionado aparece em relevo, com sombra à direita e embaixo.
 
 ### Removido
 
@@ -91,6 +98,8 @@
 
 ### Corrigido
 
+- A história parada numa sub-tarefa diz o motivo real e os passos para destravar, sem repetir a mesma mensagem na conversa.
+- A sub-tarefa que falhou ao começar volta a rodar depois que a pessoa responde, em vez de bloquear a história de novo.
 - A lista de modelos do Gemini pela API não traz mais modelos de voz, imagem, música e pesquisa.
 - No Cursor, o erro da execução (como o limite de uso) não fica mais escondido atrás de "o encerramento da árvore de processos ainda não foi confirmado".
 - A mensagem de limite do Gemini diz qual cota acabou e a hora em que volta.

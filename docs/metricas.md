@@ -298,9 +298,14 @@ economizar tokens.
 - Tokens contam em toda execução medida, do Claude Code e do Cursor. Com a regra "Mostrar custo em dólar" ligada, a tabela ganha a coluna `custo` e, abaixo dela, a linha do estimado pelo preço do catálogo (só sem filtro de card, fase, tipo, modelo ou ferramenta); desligada, não traz dólar.
 - Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`. O retrabalho está:
   com `rework: true` (e, se quiser, `start_date` e `end_date`), a resposta traz as revisões, as
-  aprovações de primeira e os pedidos de ajuste por fase e por modelo, as histórias concluídas com bug
+  aprovações de primeira e os pedidos de ajuste por fase, por modelo e por agente, as histórias concluídas com bug
   vinculado e os sinais da IA (correções na Revisão, `npm test` com falha, commits depois do PR), cada
-  um com a parte do modo autônomo; "não medidos" quando não há execução com registro de Bash.
+  um com a parte do modo autônomo; "não medidos" quando não há execução com registro de Bash. Vêm também
+  as execuções sem resultado por modelo e por agente (`3 de 10`; é uma aproximação: falha, tempo esgotado ou
+  interrompida, e uma interrompida pode ter deixado trabalho útil) e o custo por entrega: os tokens por história
+  concluída, por tipo e esforço, e a visão tipo × modelo e tipo × agente. Avisos: o detalhe guardado vale só dentro
+  da retenção (histórias antigas podem ter consumo parcial), o esforço é o valor atual do campo e uma
+  história com vários modelos ou agentes conta para cada um. Sem história concluída, essas duas partes viram uma linha só.
 - Valores não medidos aparecem como "-" (nunca 0).
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
   (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm

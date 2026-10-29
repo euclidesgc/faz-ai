@@ -117,7 +117,7 @@ O valor da Fase de uma sub-tarefa é gravado pela IA (`create_card` ou `update_c
 Também pelo MCP: uso, tokens e tempo do log (`get_metrics`, com `group_by` por fase, modelo, ferramenta,
 modo da ferramenta (`mode`: `cli`, `acp` ou `api`), agente, skill, ferramenta usada, ferramenta MCP ou `bash_command`: o comando-base de cada chamada de
 Bash, sem argumentos, só do Claude Code; com `rework: true`, o retrabalho do período: revisões, aprovações
-de primeira, pedidos de ajuste, histórias concluídas com bug e os sinais da IA — correções na Revisão,
+de primeira, pedidos de ajuste (por fase, modelo e agente), execuções sem resultado (aproximação), tokens por história concluída por tipo e esforço e a visão tipo × modelo e tipo × agente, histórias concluídas com bug e os sinais da IA — correções na Revisão,
 `npm test` com falha e commits depois do PR — cada um com a parte do modo autônomo, "não medidos" sem
 registro de Bash). Com `group_by` `tool`, cada linha traz também a conferência das execuções: quantas
 ficaram conferidas sem desvio, quantas tiveram desvio e quantas ficaram não conferidas (execuções anteriores
@@ -430,9 +430,12 @@ fase da história e `storyArtifacts` lista os documentos já anexados a ela. Uma
 movida direto para uma fase adiante recebe em `phase.missingArtifacts` os documentos das fases
 anteriores que não existem: a IA trabalha a partir da descrição e da conversa, sem criá-los.
 Com a regra **Trilha curta** ligada (`shortTrack` em `update_rules` e nas `rules` de `get_board`;
-desligada por padrão), a aprovação da pessoa e o autopiloto levam uma história de esforço Baixo ou
+ligada no board novo), a aprovação da pessoa e o autopiloto levam uma história de esforço Baixo ou
 do tipo Bug do Discovery direto ao Plan, que parte do DISCOVERY; `move_card` com a coluna continua
 livre e, para o PRD ou a Spec, força a trilha completa.
+Na trilha direta, a história da trilha curta na Implementação sem sub-tarefas é executada pela
+própria sessão, que recebe o pedido de implementar, verificar, fazer o commit e mover; se a mudança
+passar de uns 3 arquivos, ela cria as sub-tarefas e para.
 
 O documento é construído numa sub-tarefa (campo Fase = nome da coluna), mas fica na história:
 `add_attachment` com `artifact: true` grava o arquivo no card da história, mesmo quando chamado na

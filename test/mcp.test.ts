@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EMPTY_REWORK } from '../src/shared/metrics';
+import { formatRework } from '../src/extension/mcp/tools/metrics';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -393,6 +394,12 @@ describe('servidor MCP', () => {
     board = (await call('update_field', { field: 'Tags', options: ['web', 'mobile'], display: 'inline' })).data;
     expect(board.fields.find((f: any) => f.name === 'Tags')).toMatchObject({ board: true, options: ['web', 'mobile'], display: 'inline' });
     expect((await call('update_rules', { blockDoneWithOpenChildren: false })).data.blockDoneWithOpenChildren).toBe(false);
+    // shortTrack liga e desliga sem mexer nas outras regras
+    const before = (await call('update_rules', { shortTrack: true })).data;
+    expect(before.shortTrack).toBe(true);
+    expect(before.blockDoneWithOpenChildren).toBe(false);
+    const off = (await call('update_rules', { shortTrack: false })).data;
+    expect(off).toEqual({ ...before, shortTrack: false });
   });
 });
 
@@ -1910,6 +1917,13 @@ describe('retrabalho pelo get_metrics e no painel', () => {
     expect(text).toContain('retrabalho por fase');
     expect(text).toContain('1 de 2');
     expect(text).toContain('histórias concluídas no período: 2; com bug vinculado: 1 (1 bug(s))');
+
+    // RF14: as seções novas vêm do mesmo cálculo do painel, no mesmo período
+    const { delivery } = router.panelMetrics({}).sections;
+    expect(delivery.stories).toBeGreaterThan(0);
+    expect(text).toContain(`custo por entrega: ${delivery.stories} histórias concluídas, ${delivery.measured} medidas, - tokens`);
+    expect(text).toContain('visão cruzada (uma história com vários modelos/agentes conta para cada um)');
+    expect(formatRework(rework, delivery)).toBe(text);
   });
 });
 
