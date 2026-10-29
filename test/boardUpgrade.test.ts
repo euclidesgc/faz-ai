@@ -299,7 +299,7 @@ describe('atualização do board para o padrão atual', () => {
 
   it('versão 10: a Homologação com o texto da 0.39 passa a abrir o pull request com --base em workspace.prBase; a personalizada fica', () => {
     upgradeBoard(db, boardId);
-    expect(BOARD_TEMPLATE_VERSION).toBe(17);
+    expect(BOARD_TEMPLATE_VERSION).toBe(18);
     const settings = new SettingsRepo(db);
     // o texto da versão 9 é o segundo do histórico (o terceiro é o da 14, antes do passo do hotfix)
     const v9 = PHASE_HISTORY['Homologação']!.instructions[1]!;
@@ -443,7 +443,7 @@ describe('atualização do board para o padrão atual', () => {
   });
 
   it('versão 17 (#1110): o Plan pede as seções na descrição da sub-tarefa; o Plan padrão v16 sobe e o personalizado fica', () => {
-    expect(BOARD_TEMPLATE_VERSION).toBe(17);
+    expect(BOARD_TEMPLATE_VERSION).toBe(18);
     const plan = PHASE_DEFAULTS['Plan']!;
     for (const name of REQUIRED_BRIEF_SECTIONS) expect(plan.instruction).toContain(`"${name}"`);
     expect(plan.instruction).toContain(
@@ -479,6 +479,48 @@ describe('atualização do board para o padrão atual', () => {
     upgradeBoard(db, boardId);
     expect(col('Plan').aiInstruction).toBe('meu Plan');
     expect(col('Plan').artifactTemplate).toBe('meu modelo');
+  });
+
+  it('versão 18 (#1107): o Plan e a Implementação trazem a trilha direta; o texto padrão v17 sobe, o personalizado fica e as regras não mudam', () => {
+    const plan = PHASE_DEFAULTS['Plan']!.instruction;
+    const impl = PHASE_DEFAULTS['Implementação']!.instruction;
+    expect(plan).toContain('Na trilha curta');
+    expect(plan).toContain('uns 3 arquivos');
+    expect(plan).toContain('não crie sub-tarefas');
+    expect(impl).toContain('Na trilha direta');
+    expect(impl).toContain('crie as sub-tarefas com Fase = esta coluna, registre o motivo na conversa');
+    for (const name of ['Plan', 'Implementação']) {
+      const history = PHASE_HISTORY[name]!;
+      expect(history.instructions).not.toContain(PHASE_DEFAULTS[name]!.instruction);
+      expect(history.instructions.at(-1)).not.toContain('trilha direta');
+      expect(history.change).toContain('uns 3 arquivos');
+    }
+
+    upgradeBoard(db, boardId);
+    const settings = new SettingsRepo(db);
+    const rules = () => one(db, 'SELECT rules_json FROM boards WHERE id = ?', [boardId])!.rules_json;
+    boards.updateRules(boardId, { shortTrack: true });
+    const before = rules();
+    for (const name of ['Plan', 'Implementação'])
+      settings.updateColumn(col(name).id, { aiInstruction: PHASE_HISTORY[name]!.instructions.at(-1)! });
+    settings.updateColumn(col('Revisão').id, { aiInstruction: 'minha revisão' });
+    run(db, 'UPDATE boards SET template_version = 17 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([
+      `Coluna "Plan": ${PHASE_HISTORY['Plan']!.change}.`,
+      `Coluna "Implementação": ${PHASE_HISTORY['Implementação']!.change}.`,
+    ]);
+    upgradeBoard(db, boardId);
+    expect(col('Plan').aiInstruction).toBe(plan);
+    expect(col('Implementação').aiInstruction).toBe(impl);
+    expect(col('Revisão').aiInstruction).toBe('minha revisão');
+    expect(rules()).toBe(before);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+
+    settings.updateColumn(col('Implementação').id, { aiInstruction: 'minha implementação' });
+    run(db, 'UPDATE boards SET template_version = 17 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+    upgradeBoard(db, boardId);
+    expect(col('Implementação').aiInstruction).toBe('minha implementação');
   });
 
   it('pelo roteador: o board antigo avisa o que muda e é atualizado por mensagem, com cópia de segurança', () => {

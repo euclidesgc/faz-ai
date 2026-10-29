@@ -207,9 +207,11 @@ agente, o modelo, as skills e os MCPs do card dela, uma depois da outra na pasta
 escritor por vez), na ordem das dependências. Nenhuma sub-tarefa roda sozinha por você, e você não as
 executa, nem por subagente (ferramenta \`Agent\`).
 
-A sua sessão na história faz só o trabalho de planejar:
+A sua sessão na história faz só o trabalho de planejar, exceto na trilha direta (item 1):
 
-1. Se a história não tem sub-tarefas na fase, crie-as a partir da descrição e da conversa, cada uma
+1. Na trilha direta (história da trilha curta, de esforço Baixo ou do tipo Bug, que chega sem sub-tarefas na fase) a sessão da
+   história implementa: verifique como o projeto define, faça o commit e mova a história. Se a mudança passar de uns 3 arquivos,
+   registre o motivo na conversa e crie as sub-tarefas como abaixo. Fora da trilha direta, se a história não tem sub-tarefas na fase, crie-as a partir da descrição e da conversa, cada uma
    com Fase = a coluna, os arquivos que vai tocar, o agente e o modelo (\`profile\` do \`create_card\`) e as
    dependências (\`depends_on\`, \`link_cards\`); as que mexem nos mesmos arquivos dependem uma da outra.
    Depois **pare**: o board começa a executar.
@@ -346,7 +348,7 @@ export const FLOW_SKILLS: readonly { name: string; description: string; body: st
   {
     name: 'faz-ai-implementacao-rodadas',
     description:
-      'Use na fase de Implementação de uma história com sub-tarefas: a Implementação executada pelo board (subtasksNow), o ciclo de cada sub-tarefa, o fechamento e o que fazer sem terminal.',
+      'Use na fase de Implementação de uma história com sub-tarefas, ou da trilha direta (história pequena implementada sem sub-tarefas): a Implementação executada pelo board (subtasksNow), o ciclo de cada sub-tarefa, o fechamento e o que fazer sem terminal.',
     body: RODADAS_BODY,
   },
   {

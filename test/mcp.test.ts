@@ -394,6 +394,12 @@ describe('servidor MCP', () => {
     board = (await call('update_field', { field: 'Tags', options: ['web', 'mobile'], display: 'inline' })).data;
     expect(board.fields.find((f: any) => f.name === 'Tags')).toMatchObject({ board: true, options: ['web', 'mobile'], display: 'inline' });
     expect((await call('update_rules', { blockDoneWithOpenChildren: false })).data.blockDoneWithOpenChildren).toBe(false);
+    // shortTrack liga e desliga sem mexer nas outras regras
+    const before = (await call('update_rules', { shortTrack: true })).data;
+    expect(before.shortTrack).toBe(true);
+    expect(before.blockDoneWithOpenChildren).toBe(false);
+    const off = (await call('update_rules', { shortTrack: false })).data;
+    expect(off).toEqual({ ...before, shortTrack: false });
   });
 });
 

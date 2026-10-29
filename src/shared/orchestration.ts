@@ -1,7 +1,8 @@
 import type { BoardState, Card } from './model';
 import type { AiRunOutcome } from './log';
 import type { ActivityKind } from './activity';
-import { activityKindOf } from './activity';
+import { activityKindOf, codeColumnOf } from './activity';
+import { isShortTrackStory } from './advance';
 import { subtaskWaves } from './links';
 import { columnOf, isLive } from './selectors';
 import { isWithHuman } from './story';
@@ -40,6 +41,21 @@ export function phaseSubtasks(s: BoardState, story: Card): Card[] {
       c.parentId === story.id &&
       isLive(c) &&
       (!field || s.fieldValues.some((v) => v.cardId === c.id && v.fieldId === field.id && v.value === phase?.name)),
+  );
+}
+/**
+ * Trilha direta: história elegível à trilha curta (regra ligada, sem pai, Baixo ou Bug) parada na
+ * Implementação e ainda sem sub-tarefas na fase, que a sessão da história implementa sozinha. A
+ * Implementação é reconhecida pela estrutura (`codeColumnOf`), nunca pelo nome da coluna, para sobreviver
+ * a renomeações; a Revisão e as demais colunas ficam de fora.
+ */
+export function isDirectTrackStory(s: BoardState, story: Card): boolean {
+  return (
+    s.board.rules.shortTrack &&
+    !story.parentId &&
+    isShortTrackStory(s, story) &&
+    story.columnId === codeColumnOf(s, story.workflowId)?.id &&
+    phaseSubtasks(s, story).length === 0
   );
 }
 export function orchestrableSubtasks(s: BoardState, story: Card): Card[] {

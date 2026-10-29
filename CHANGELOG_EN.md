@@ -43,9 +43,12 @@
 - The selected card gets a shadow that sets it apart from the others (#1069).
 - The board checks a sub-task description before running it and sends it back to the conductor when sections are missing (#1138).
 - In each agent's Models tab, the **Modelo padrão** (default model) applies when it runs with no model set: a card without a model, the chat on **Auto** and the quick test.
+- New direct track: a short-track story whose plan touches up to about 3 files is implemented by the story session itself, without sub-tasks (#1107).
+- The `update_rules` MCP tool accepts the `shortTrack` rule (#1107).
 
 ### Changed
 
+- A new board starts with the Short track rule on; existing boards keep their choice (#1107).
 - When a card's model runs out of its usage limit, the board asks whether to wait for the limit to come back or continue with another available model, and saves the choice on the card; autonomous mode keeps the fallback rule.
 - The model pickers (chat, card, agents and rules) only offer agents that can answer now.
 - **Detectar modelos** replaces the list with the one the tool reports now, dropping models it no longer lists, and is also available in API mode.

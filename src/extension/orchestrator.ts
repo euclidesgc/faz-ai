@@ -4,6 +4,7 @@ import type { AiRunOrigin } from '../shared/log';
 import {
   admit,
   effectiveLimits,
+  isDirectTrackStory,
   LIVE_WORK_STATES,
   pendingSubtasks,
   reconcileOutcome,
@@ -13,6 +14,7 @@ import {
   type WorkRuntime,
   type WorkUnit,
 } from '../shared/orchestration';
+import { activityKindOf } from '../shared/activity';
 import { columnOf, isLive } from '../shared/selectors';
 import { isWithHuman } from '../shared/story';
 import { briefFailures, briefReason, isBriefKey } from '../shared/subtaskBrief';
@@ -23,7 +25,7 @@ import type { RunOptions } from './runner';
 import type { WorkClaim, WorkRecord, WorkRepo } from './repositories/workRepo';
 import type { RunMcpSessions } from './mcp/runSessions';
 import { acquireWorkspace, adoptWorkspace, type WorkspaceLease } from './workspaceLock';
-import { briefAdvice, closingAdvice, subtaskAdvice } from './unitAdvice';
+import { briefAdvice, closingAdvice, DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE, subtaskAdvice } from './unitAdvice';
 import { processGroupState, type ProcessIdentity } from './processIdentity';
 
 /** O mesmo runner das portas existentes; a fundação também pode ser exercitada com processos Node. */
@@ -322,6 +324,9 @@ export class Orchestrator {
       const found = this.briefFailuresOf(unit);
       return found ? [briefAdvice(found.story, found.failures)] : [];
     }
+    // a sessão da história numa fase de código (o runner só a acrescenta fora do orquestrador, sem unidade)
+    if (unit.kind === 'story' && activityKindOf(state, story, 'phase') === 'branch')
+      return [isDirectTrackStory(state, story) ? DIRECT_TRACK_ADVICE : STORY_SESSION_ADVICE];
     return [];
   }
   private revoke(claim: WorkClaim): void {

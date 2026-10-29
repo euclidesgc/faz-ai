@@ -43,9 +43,12 @@
 - O card selecionado ganha uma sombra que o destaca dos demais (#1069).
 - O board confere a descrição da sub-tarefa antes de executar e devolve ao condutor a que não tem as seções (#1138).
 - Na aba Modelos de cada agente, o **Modelo padrão** vale quando ele executa sem modelo indicado: card sem modelo, chat em **Auto** e teste rápido.
+- Nova trilha direta: a história da trilha curta com plano de até uns 3 arquivos é implementada pela própria sessão, sem sub-tarefas (#1107).
+- A ferramenta MCP `update_rules` aceita a regra `shortTrack` (#1107).
 
 ### Alterado
 
+- O board novo nasce com a regra Trilha curta ligada; os boards existentes mantêm a escolha (#1107).
 - Quando o modelo de um card esgota o limite de uso, o board pergunta se espera o limite voltar ou segue com outro modelo disponível, e grava a escolha no card; no modo autônomo vale a regra de fallback.
 - Os seletores de modelo (chat, card, agentes e regras) só oferecem os agentes que podem responder agora.
 - **Detectar modelos** substitui a lista pela que a ferramenta informa agora, tirando os modelos que ela não lista mais, e passa a existir também no modo API.

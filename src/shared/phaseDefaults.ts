@@ -558,9 +558,26 @@ const subtaskBrief = (name: string, d: PhaseDefault): PhaseDefault =>
       }
     : d;
 
-/** Os textos padrão atuais (versão 17): os da versão 16 com o Plan pedindo a descrição da sub-tarefa em seções. */
-export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+/** Os textos padrão da versão 17: os da versão 16 com o Plan pedindo a descrição da sub-tarefa em seções. */
+const PHASE_DEFAULTS_V17: Record<string, PhaseDefault> = Object.fromEntries(
   Object.entries(PHASE_DEFAULTS_V16).map(([name, d]) => [name, subtaskBrief(name, d)]),
+);
+
+// A versão 18 explica a trilha direta (regra shortTrack): a história pequena, com plano de até uns 3 arquivos, é
+// implementada pela própria sessão da história, sem sub-tarefas; se crescer, volta às sub-tarefas com o motivo na conversa.
+const DIRECT_TRACK_PLAN =
+  'Na trilha curta (história de esforço Baixo ou do tipo Bug, com a regra ligada), se o plano couber em até uns 3 arquivos, registre o plano no artefato e não crie sub-tarefas: a Implementação implementa a história direto.';
+const DIRECT_TRACK_IMPLEMENTATION =
+  'Na trilha direta (história da trilha curta, sem sub-tarefas na fase) você implementa a história: altere o código, verifique como o projeto define, faça o commit e mova a história para a próxima coluna. Se a mudança passar de uns 3 arquivos, crie as sub-tarefas com Fase = esta coluna, registre o motivo na conversa e pare: o board as executa.';
+const directTrack = (name: string, d: PhaseDefault): PhaseDefault => {
+  if (name === 'Plan') return { ...d, instruction: `${d.instruction}\n${DIRECT_TRACK_PLAN}` };
+  if (name === 'Implementação') return { ...d, instruction: `${d.instruction}\n${DIRECT_TRACK_IMPLEMENTATION}` };
+  return d;
+};
+
+/** Os textos padrão atuais (versão 18): os da versão 17 com a trilha direta no Plan e na Implementação. */
+export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+  Object.entries(PHASE_DEFAULTS_V17).map(([name, d]) => [name, directTrack(name, d)]),
 );
 
 /** Textos padrão anteriores de uma fase e o que a versão atual traz de novo, para a atualização do board. */
@@ -601,17 +618,23 @@ export const PHASE_HISTORY: Record<string, PhaseHistory> = {
       PHASE_DEFAULTS_V13.Plan!.instruction,
       PHASE_DEFAULTS_V14.Plan!.instruction,
       PHASE_DEFAULTS_V16.Plan!.instruction,
+      PHASE_DEFAULTS_V17.Plan!.instruction,
     ],
     templates: [PLAN_TEMPLATE_V5, PLAN_TEMPLATE_V8, PHASE_DEFAULTS_V12.Plan!.artifactTemplate, PHASE_DEFAULTS_V16.Plan!.artifactTemplate],
     change:
-      'a descrição de cada sub-tarefa passa a ter as seções Objetivo, Pronto quando, Pode tocar e Não pode tocar (Decisões anteriores é opcional), com o esqueleto no modelo do plano, e o board confere as quatro obrigatórias antes de executar; as sub-tarefas passam a ser a menor parte da entrega que se verifica sozinha: as pequenas da mesma área e do mesmo agente se juntam, e a documentação pequena vai com a última de código; o plano parte do DISCOVERY quando a história veio pela trilha curta, sem PRD nem Spec; o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
+      'na trilha curta, com plano de até uns 3 arquivos, o plano é registrado e a história é implementada sem sub-tarefas; a descrição de cada sub-tarefa passa a ter as seções Objetivo, Pronto quando, Pode tocar e Não pode tocar (Decisões anteriores é opcional), com o esqueleto no modelo do plano, e o board confere as quatro obrigatórias antes de executar; as sub-tarefas passam a ser a menor parte da entrega que se verifica sozinha: as pequenas da mesma área e do mesmo agente se juntam, e a documentação pequena vai com a última de código; o plano parte do DISCOVERY quando a história veio pela trilha curta, sem PRD nem Spec; o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
   },
   Revisão: {
     instructions: [PHASE_DEFAULTS_V12.Revisão!.instruction],
     templates: [],
     change: 'o achado que muda o comportamento combinado vira pergunta por ask_questions',
   },
-  Implementação: { instructions: [IMPLEMENTATION_INSTRUCTION_V5], templates: [], change: 'a fase pode começar sem sub-tarefas do Plan' },
+  Implementação: {
+    instructions: [IMPLEMENTATION_INSTRUCTION_V5, PHASE_DEFAULTS_V17.Implementação!.instruction],
+    templates: [],
+    change:
+      'na trilha direta (história da trilha curta, sem sub-tarefas) você implementa a história; se a mudança passar de uns 3 arquivos, cria as sub-tarefas e registra o motivo na conversa; a fase pode começar sem sub-tarefas do Plan',
+  },
   Homologação: {
     instructions: [HOMOLOGATION_INSTRUCTION_V5, HOMOLOGATION_INSTRUCTION_V9, HOMOLOGATION_INSTRUCTION_V14],
     templates: [],

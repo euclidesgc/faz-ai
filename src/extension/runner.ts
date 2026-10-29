@@ -21,7 +21,8 @@ import { cardRef } from '../shared/model';
 import { canDispatch, limitClock, limitHolds, modelLimitHolds, modelLimitOf, nextPause, pauseOf, resetAtOf } from '../shared/usageLimit';
 import { limitChoice } from '../shared/limitChoice';
 import { activityKindOf } from '../shared/activity';
-import { STORY_SESSION_ADVICE } from './unitAdvice';
+import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from './unitAdvice';
+import { isDirectTrackStory } from '../shared/orchestration';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { exceedsRunLimit, RUN_CACHE_READ_LIMIT } from '../shared/runLimit';
 import { columnOf, isLive } from '../shared/selectors';
@@ -586,7 +587,9 @@ export class AiRunner {
           // a sessão da história numa fase de código só cria as sub-tarefas: quem as executa é o board
           const storySessionAdvice =
             options.workId === undefined && !card.parentId && mode === 'phase' && activityKindOf(state, card, 'phase') === 'branch'
-              ? STORY_SESSION_ADVICE
+              ? isDirectTrackStory(state, card)
+                ? DIRECT_TRACK_ADVICE
+                : STORY_SESSION_ADVICE
               : null;
           if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
           if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
