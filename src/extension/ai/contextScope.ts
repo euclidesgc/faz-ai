@@ -33,12 +33,11 @@ import type { StrictExecutionRequest } from '../../shared/executionAdmission';
 import { admissionRegimeOf, DEFAULT_RUNNER, type RunnerConfig } from '../../shared/runner';
 import { bareExec } from '../execution';
 import type { AiProfileRepo } from '../repositories/aiProfileRepo';
-import { NO_CARD, type AiGateway, type ContextRuntime } from './gateway';
-import { closedV1 } from './v1Prepare';
+import { NO_CARD, type AiGateway } from './gateway';
 
 export interface ContextScopeDeps {
   repo: Pick<AiProfileRepo, 'resolveProfile'>;
-  gateway: Pick<AiGateway, 'run'> & { runtime?: ContextRuntime };
+  gateway: Pick<AiGateway, 'run'>;
   boardId: () => string;
   cwd: string;
   homeDir: string;
@@ -403,7 +402,6 @@ function askAgent(deps: ContextScopeDeps, profile: AiProfile, prompt: string, cw
       timeoutMinutes: 5,
       prepare: () => ({
         ...(isReadyCli(profile) ? {} : { strict: { profileId: id, request: strict } }),
-        ...(deps.gateway.runtime === 'v1' ? closedV1(id, 'chat', runner) : {}),
         config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: true, skills: [], mcp: [] },
         input: { prompt, permission: 'board', structured: true, exec, draftOnly: true },
       }),

@@ -239,7 +239,6 @@ export class RunMcpSessions {
       'projectProfile',
       // só leitura das políticas salvas; simular, salvar e ativar não entram na sessão MCP
       'executionPolicyLibrary',
-      'previewContextDraft',
       'readLibraryArtifact',
       'libraryMcpDefinitions',
       // o detect_models de um perfil ACP abre a sessão do agente antes de juntar ao catálogo

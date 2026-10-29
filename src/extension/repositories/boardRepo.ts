@@ -1,7 +1,5 @@
 import { AiProfileRepo } from './aiProfileRepo';
 import { createHash } from 'node:crypto';
-import { ContextPlanningRepo } from './contextPlanningRepo';
-import { legacyContextPlanning } from '../../shared/contextPlanning';
 import { ArtifactRepo } from './artifactRepo';
 import { selectionOf } from '../../shared/artifacts';
 import { EMPTY_CHAT } from '../../shared/chat';
@@ -510,11 +508,6 @@ export class BoardRepo {
 
     return {
       executionPolicyRevision: createHash('sha256').update(str(b.policy_revision)).digest('hex'),
-      contextPlanning: {
-        runtime: 'legacy',
-        legacy: legacyContextPlanning({ cards, fieldDefs, fieldValues }, new ArtifactRepo(db).list(boardId)),
-        ...new ContextPlanningRepo(db).read(boardId),
-      },
       board,
       workflows,
       columns,

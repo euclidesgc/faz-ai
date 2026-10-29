@@ -1,6 +1,5 @@
 import type { AiProfile } from './aiProfiles';
 import type { ImportPreview } from './artifactImport';
-import type { ContextPlanningState } from './contextPlanning';
 import type { OrphanReport } from './orphans';
 import type { BoardRequirement } from './requirements';
 import type { EnvironmentReport } from './environment';
@@ -269,8 +268,6 @@ export interface Autopilot {
 export interface BoardState {
   /** Invalida cenários quando as políticas salvas mudam em outra janela. */
   executionPolicyRevision?: string;
-  /** Rascunhos versionados, separados do manifesto legado ainda em execução. */
-  contextPlanning?: ContextPlanningState;
   board: Board;
   workflows: Workflow[];
   columns: Column[];

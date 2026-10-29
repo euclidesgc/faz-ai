@@ -9,7 +9,7 @@ import {
   type ExecutionTarget,
 } from '../../../../shared/executionPolicies';
 import { CONTEXT_ACTIONS } from '../../../../shared/contextPlanning';
-import { CONTEXT_ACTION_LABELS } from '../../../../shared/contextPlan';
+import { CONTEXT_ACTION_LABELS } from '../../../../shared/contextPlanning';
 import type { PolicyLibrary } from '../../../../shared/policyManagement';
 import { requestExecutionPolicy } from '../../../request';
 import { useBoardStore } from '../../../store/boardStore';

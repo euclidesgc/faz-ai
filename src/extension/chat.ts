@@ -8,9 +8,6 @@ import { policyAssistancePrompt, parsePolicyAssistance } from './policyAssistant
 import { agentAssistancePrompt, parseAgentAssistance } from './agentAssistance';
 import { artifactAssistancePrompt, assistContext, parseArtifactAssistance } from './artifactAssistance';
 import type { ArtifactAssistInput, ArtifactAssistResult } from '../shared/artifactAssistant';
-import { contextProposalPrompt, parseContextProposal } from './contextProposal';
-import type { ContextProposal } from '../shared/contextProposal';
-import type { ContextActivityTarget } from '../shared/contextPlanning';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { MAX_CHAT_MESSAGES, type ChatMessage } from '../shared/chat';
@@ -18,7 +15,7 @@ import { admissionRegimeOf, type RunnerPermission } from '../shared/runner';
 import { effortToRun } from '../shared/execution';
 import type { BoardState } from '../shared/model';
 import { NO_CARD, type AiExecution } from './ai/gateway';
-import { closedV1 } from './ai/v1Prepare';
+import { closedStrictRequest } from './ai/admission';
 import { MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { BOARD_SERVER, bareExec, type ExecInput } from './execution';
 import { contextLines } from './promptContext';
@@ -164,7 +161,6 @@ export class ChatSession {
     router.setAgentAssistHandler((input) => this.assistAgent(input));
     router.setArtifactAssistHandler((input) => this.assistArtifact(input));
     router.setPolicyAssistHandler((input) => this.assistPolicy(input));
-    router.setContextProposeHandler((target, language) => this.proposeContext(target, language));
     router.setChatHandler((msg) => {
       if (msg.type === 'chat.send') this.send(msg.text, msg.model);
       else if (msg.type === 'ai.suggestAgents') this.suggestAgents();
@@ -277,31 +273,6 @@ export class ChatSession {
   }
 
   /**
-   * Proposta de configuração mínima da atividade: a IA só lê (rascunho, sem ferramentas) e a resposta passa pelo
-   * validador do host. Falha ou cancelamento rejeitam sem tocar no rascunho da pessoa; nada é gravado aqui.
-   */
-  proposeContext(target: ContextActivityTarget, language: 'pt-BR' | 'en'): Promise<ContextProposal> {
-    return new Promise((resolve, reject) => {
-      try {
-        const prompt = contextProposalPrompt(this.router.contextDraftState(), target, language);
-        this.start(prompt, 'board', null, 'harness-suggest', {
-          draftOnly: true,
-          done: (text) => {
-            try {
-              resolve(parseContextProposal(text, this.router.contextDraftState(), target));
-            } catch (error) {
-              reject(error);
-            }
-          },
-          failed: (error) => reject(new Error(error)),
-        });
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  /**
    * Assistente de políticas: a IA só lê o pedido e devolve uma proposta, que passa pelo validador antes de chegar à
    * tela. O mesmo `start` das demais ações de apoio avalia a política JÁ SALVA (quota, fallback e admissão do
    * executor); o rascunho nunca entra no snapshot. Sem executor admissível o erro volta e o editor manual segue livre.
@@ -399,13 +370,10 @@ export class ChatSession {
         timeoutMinutes: state.board.runner.timeoutMinutes,
         // no chat não há agente do board nem subagente escolhido: `null` é "não definido", não "vazio"
         prepare: () => ({
-          // runtime v1: contexto fechado, sem agente nem MCP além do contrato vazio (o chat não tem card)
-          ...(this.deps.gateway.runtime === 'v1'
-            ? closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly, permission)
-            : // runtime legado: o perfil personalizado precisa da admissão; só o pedido, sem a configuração v1
-              !isReadyCli(target.cli)
-              ? { strict: closedV1(target.cli.id, action, state.board.runner, !!hooks.draftOnly, permission).strict }
-              : {}),
+          // o perfil personalizado precisa da admissão; o chat não tem card nem MCP
+          ...(!isReadyCli(target.cli)
+            ? { strict: { profileId: target.cli.id, request: closedStrictRequest(state.board.runner, !!hooks.draftOnly, permission) } }
+            : {}),
           artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state) : undefined,
           config: {
             model: plan.model?.name ?? null,

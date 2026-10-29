@@ -13,7 +13,6 @@ import {
   isReadyAcp,
   isReadyCli,
 } from '../../shared/aiProfiles';
-import { admissionModelOf, admissionProfileOf } from '../../shared/contextAdmissionPreview';
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
 import { profileCanProbe, profileSignedIn, profileVersion } from '../cliProbe';
@@ -34,7 +33,6 @@ import type { AiActivity } from '../../shared/model';
 import { admissionRegimeOf, type AiRunMode } from '../../shared/runner';
 import { columnOf } from '../../shared/selectors';
 import { Heartbeat } from '../heartbeat';
-import { contextRuntimeFromEnv } from '../ai/v1Prepare';
 import { AiGateway } from '../ai/gateway';
 import { RunArtifactSnapshots } from '../runArtifactSnapshot';
 import { ArtifactRepo } from '../repositories/artifactRepo';
@@ -296,7 +294,6 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     redact: (text) => router.redactCredentials(text),
     snapshots: new RunArtifactSnapshots(path.join(o.storageDir, 'run-artifacts'), new ArtifactRepo(handle.db), router.boardId),
     admission,
-    runtime: contextRuntimeFromEnv(),
     cursorHook: {
       dir: defaultManifestDir(homeDir),
       status: () => cursorHookStatus({ homeDir, scriptPath: path.join(path.dirname(o.bridgePath), 'cursor-hook.js') }),
@@ -307,21 +304,6 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     apiKey: (profile) => profileApiKey(toolKeys, profile),
     // a ciência do perfil no Conectar vale para ele; sem ela, o regime do board
     regimeOf: (profileId) => admissionRegimeOf(router.snapshot().board.runner, profileId),
-  });
-  router.setAdmissionReader((request, target) => {
-    try {
-      // o perfil que vai executar o card: as evidências de cada perfil ficam no vínculo dele
-      const profileId = admissionProfileOf(router.snapshot(), target);
-      if (!profileId) return null;
-      const profile = new AiProfileRepo(handle.db).resolveProfile(router.boardId, profileId);
-      // o mesmo regime que o gateway aplica: a ciência do perfil, ou o regime do board
-      const { regime: _regime, compatibilityReview: _review, ...rest } = request;
-      const strict = { ...rest, ...admissionRegimeOf(router.snapshot().board.runner, profileId) };
-      // no modo API a prova é do modelo da execução: a prévia avalia a do modelo do alvo do card
-      return admission.preview(profile, profile.id, strict, o.folderPath, admissionModelOf(router.snapshot(), target));
-    } catch {
-      return null;
-    }
   });
   router.setAiProfileRuntime(
     createAiProfileRuntime({

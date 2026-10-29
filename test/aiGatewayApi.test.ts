@@ -12,7 +12,7 @@ import { ExecutionAdmission } from '../src/extension/ai/admission';
 import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
 import { executorOf } from '../src/extension/ai/drivers';
 import { createGeminiApiDriver, type McpConnect, type McpTool } from '../src/extension/ai/drivers/gemini/api';
-import { legacyStrictRequest } from '../src/extension/ai/v1Prepare';
+import { legacyStrictRequest } from '../src/extension/ai/admission';
 import { profileApiKey } from '../src/extension/ai/apiKey';
 import { ToolKeys } from '../src/extension/toolKeys';
 import { credentialsFor } from '../src/extension/credentials';

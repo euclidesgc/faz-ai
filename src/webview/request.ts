@@ -154,45 +154,6 @@ export function requestArtifactAssistance(
   });
 }
 
-/** A proposta da IA para a configuração de uma atividade: pode demorar, é só leitura e nunca grava. */
-export function requestContextProposal(
-  target: import('../shared/contextPlanning').ContextActivityTarget,
-  language: import('../shared/language').Locale,
-  timeout: number,
-): Promise<import('../shared/contextProposal').ContextProposal> {
-  const requestId = newRequestId();
-  const end = beginRequest();
-  return new Promise((resolve, reject) => {
-    const cleanup = () => {
-      off();
-      clearTimeout(timer);
-      pending.delete(cancel);
-      end();
-    };
-    const cancel = () => {
-      cleanup();
-      reject(new Error(REQUEST_CANCELLED_MESSAGE));
-    };
-    const off = onHostMessage((message) => {
-      if (message.type !== 'contextPlanning.propose.result' || message.requestId !== requestId) return;
-      cleanup();
-      if (message.proposal) resolve(message.proposal);
-      else reject(new Error(message.error ?? 'A IA não respondeu no formato esperado. Tente novamente.'));
-    });
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error(REQUEST_TIMEOUT_MESSAGE));
-    }, timeout);
-    pending.add(cancel);
-    try {
-      postToHost({ type: 'contextPlanning.propose', requestId, target, language });
-    } catch (error) {
-      cleanup();
-      reject(error);
-    }
-  });
-}
-
 /** Leituras e simulações compartilham correlação, cancelamento e limite de tempo com as ações. */
 export function requestExecutionPolicy(
   input:

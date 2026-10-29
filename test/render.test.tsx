@@ -298,7 +298,7 @@ describe('telas montam sem erro', () => {
         return html(<HarnessSettings />);
       })
       .join('\n');
-    for (const text of ['Artefatos do board', 'Plano de contexto', 'Plano de contexto padrão do board']) expect(harness).toContain(text);
+    for (const text of ['Artefatos do board']) expect(harness).toContain(text);
     // a sugestão de modelo saiu do Harness: mora em Conectar agentes, abaixo da lista
     for (const text of ['Preencher o modelo sugerido automaticamente', 'Contexto e modelo']) expect(harness).not.toContain(text);
     // a execução saiu do Harness: mora na seção Automação

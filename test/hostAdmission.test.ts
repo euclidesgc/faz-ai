@@ -8,9 +8,7 @@ import { CAPABILITY_CHECKS, EXECUTOR_CAPABILITIES, type StrictExecutionRequest }
 import { headlessCommand, type HeadlessInput } from '../src/extension/headless';
 import { materialize } from '../src/extension/aiOutput/measured';
 import { verifyExecutor } from '../src/extension/ai/capabilityVerifier';
-import { admissionProfileOf } from '../src/shared/contextAdmissionPreview';
 import { BUILTIN_PROFILES, type AiProfile } from '../src/shared/aiProfiles';
-import type { ContextActivityTarget } from '../src/shared/contextPlanning';
 import type { BoardState } from '../src/shared/model';
 import { referenceBinding } from './helpers/bindingReference';
 let dir: string;
@@ -263,21 +261,11 @@ describe('prévia da admissão pelo perfil do alvo do card', () => {
       links: [],
       comments: [],
     }) as unknown as BoardState;
-  const target = (cardId: string | null): ContextActivityTarget => ({ cardId, workflowId: null, phaseId: 'col', action: 'work' });
   const compatible = (): StrictExecutionRequest => ({
     ...request(),
     regime: 'compatible',
     compatibilityReview: { actor: 'person', revision: 1 },
     mcpLevel: { permission: 'board', tools: [] },
-  });
-
-  it('o card com modelo de outro perfil é avaliado por esse perfil; sem card ou sem modelo, pelo padrão', () => {
-    const s = state([{ id: 'acp', model: 'gemini:gemini-2.5-pro' }, { id: 'livre' }, { id: 'quebrado', model: 'kimi:k3' }]);
-    expect(admissionProfileOf(s, target('acp'))).toBe('gemini');
-    expect(admissionProfileOf(s, target('livre'))).toBe('claude');
-    expect(admissionProfileOf(s, target(null))).toBe('claude');
-    // a escolha explícita bloqueada não vira o padrão: a prévia não finge avaliar outro perfil
-    expect(admissionProfileOf(s, target('quebrado'))).toBeNull();
   });
 
   it('os recibos do perfil do card valem para a prévia dele, não para o padrão do board', async () => {
@@ -300,7 +288,7 @@ describe('prévia da admissão pelo perfil do alvo do card', () => {
       }),
     });
     const s = state([{ id: 'acp', model: 'gemini:gemini-2.5-pro' }]);
-    const id = admissionProfileOf(s, target('acp'))!;
+    const id = 'gemini';
     const profile = s.board.aiProfiles.find((p) => p.id === id)!;
     expect(admission.preview(profile, id, compatible(), dir).state).toBe('admitted');
     // o padrão (Claude) não herda a prova do agente

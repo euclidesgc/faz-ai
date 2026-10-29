@@ -171,17 +171,7 @@ describe('contratos de contexto versionados', () => {
     expect(manifestOf(before, before.cards[0]!).skills).toContain('testes');
     expect(manifestOf(before, before.cards[0]!).mcpServers).toContain('github');
     expect(manifestOf(after, after.cards[0]!)).toEqual(manifestOf(before, before.cards[0]!));
-    expect(after.contextPlanning?.runtime).toBe('legacy');
-    expect(after.contextPlanning?.legacy.agents[0]).toEqual({
-      artifactId: agentId,
-      essentialSkills: [
-        { artifactId: skillId, name: 'testes' },
-        { artifactId: null, name: 'ausente' },
-      ],
-      legacyMcps: [{ artifactId: mcpId, name: 'github' }],
-    });
-    expect(after.contextPlanning?.legacy.cards[0]?.selectedSkills).toHaveLength(2);
-    expect(after.contextPlanning?.agents).toEqual([]);
+    expect(new ContextPlanningRepo(old).read(router.boardId).agents).toEqual([]);
     old.close();
   });
 
@@ -191,19 +181,11 @@ describe('contratos de contexto versionados', () => {
     saveAgent();
     saveActivity();
     const after = executionState(db);
-    expect(after.contextPlanning?.agents[0]?.contract).toEqual(contract());
-    expect(after.contextPlanning?.activities[0]?.selection).toEqual(selection());
-    expect(after.contextPlanning?.activities[0]?.phaseId).toBe(phaseId);
-    expect(after.contextPlanning?.legacy.cards[0]?.legacyMcps[0]?.name).toBe('github');
+    const saved = repo.read(router.boardId);
+    expect(saved.agents[0]?.contract).toEqual(contract());
+    expect(saved.activities[0]?.selection).toEqual(selection());
+    expect(saved.activities[0]?.phaseId).toBe(phaseId);
     expect(manifestOf(after, after.cards[0]!)).toEqual(before);
-  });
-
-  it('não perde o legado quando seus campos mudam depois de um rascunho', () => {
-    saveAgent();
-    const fieldId = router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.id;
-    router.handle({ type: 'field.setValue', cardId, fieldId, value: ['nova-skill'] });
-    expect(router.snapshot().contextPlanning?.legacy.cards[0]?.selectedSkills).toEqual([{ artifactId: null, name: 'nova-skill' }]);
-    expect(repo.read(router.boardId).agents[0]?.contract).toEqual(contract());
   });
 
   it('salva revisões e rejeita gravação atrasada atomicamente', () => {
@@ -272,20 +254,6 @@ describe('contratos de contexto versionados', () => {
     expect(repo.read(router.boardId)).toEqual({ agents: [], activities: [] });
   });
 
-  it('valida no host e recusa que a IA altere contratos', () => {
-    expect(() =>
-      router.handle(
-        { type: 'contextPlanning.save', input: { kind: 'agent', artifactId: agentId, expectedRevision: 0, contract: contract() } },
-        { source: 'ai' },
-      ),
-    ).toThrow('revisão humana');
-    const next = router.handle({
-      type: 'contextPlanning.save',
-      input: { kind: 'agent', artifactId: agentId, expectedRevision: 0, contract: contract() },
-    });
-    expect(next.contextPlanning?.agents[0]?.revision).toBe(1);
-  });
-
   it('salva lote revisado por ação e preserva justificativa no export/import', () => {
     const inputs = (['work', 'refine'] as const).map((action) => ({
       kind: 'activity' as const,
@@ -294,7 +262,7 @@ describe('contratos de contexto versionados', () => {
       selection: { ...selection(), expectedResult: action },
       reason: `Revisado para ${action}`,
     }));
-    router.handle({ type: 'contextPlanning.saveBatch', inputs });
+    repo.saveBatch(router.boardId, inputs);
     const before = repo.read(router.boardId).activities;
     expect(before).toHaveLength(2);
     expect(before.every((a) => a.revision === 1 && a.reason === `Revisado para ${a.action}`)).toBe(true);
@@ -314,11 +282,10 @@ describe('contratos de contexto versionados', () => {
     expect(repo.read(router.boardId)).toEqual(before);
   });
 
-  it('recusa duplicação de alvos mesmo com ordem diferente das propriedades e escrita por IA', () => {
+  it('recusa duplicação de alvos mesmo com ordem diferente das propriedades', () => {
     const input = { kind: 'activity' as const, target: target(), expectedRevision: 0, selection: selection() };
     const reordered = { action: 'work' as const, phaseId, workflowId: null, cardId };
     expect(() => repo.saveBatch(router.boardId, [input, { ...input, target: reordered }])).toThrow('mesma atividade');
-    expect(() => router.handle({ type: 'contextPlanning.saveBatch', inputs: [input] }, { source: 'ai' })).toThrow('revisão humana');
     expect(repo.read(router.boardId).activities).toEqual([]);
   });
 
@@ -355,11 +322,11 @@ describe('contratos de contexto versionados', () => {
     saveAgent();
     saveAgent(contract(), 1);
     saveActivity();
-    const before = router.snapshot().contextPlanning;
+    const before = repo.read(router.boardId);
     const file = exported();
     expect(JSON.stringify(file)).not.toContain('segredo-local');
     importFile(parseExportFile(JSON.stringify(file)));
-    expect(router.snapshot().contextPlanning).toEqual(before);
+    expect(repo.read(router.boardId)).toEqual(before);
     expect(repo.read(router.boardId).agents[0]?.revision).toBe(2);
   });
 
@@ -374,18 +341,6 @@ describe('contratos de contexto versionados', () => {
     expect(() => parseExportFile(JSON.stringify(file))).toThrow('revisão de artefato');
   });
 
-  it('a prévia do host usa contratos salvos e retorna somente metadados dos artefatos', () => {
-    saveAgent();
-    saveActivity();
-    const preview = router.previewContextDraft(target());
-    expect(preview.agent).toEqual({ artifactId: agentId, revision: 1 });
-    expect(preview.items.some((a) => a.artifactId === skillId)).toBe(true);
-    expect(preview.canExecute).toBe(false);
-    expect(JSON.stringify(preview)).not.toContain('segredo-local');
-    expect(JSON.stringify(preview)).not.toContain('Implemente e valide.');
-    expect(JSON.stringify(preview)).not.toContain('Instruções');
-  });
-
   it('import antigo sem tabelas novas permanece legado', () => {
     const file = exported();
     file.schemaVersion = 34;
@@ -395,7 +350,6 @@ describe('contratos de contexto versionados', () => {
     delete file.tables.ai_profiles;
     importFile(parseExportFile(JSON.stringify(file)));
     expect(repo.read(router.boardId)).toEqual({ agents: [], activities: [] });
-    expect(router.snapshot().contextPlanning?.legacy.cards[0]?.selectedSkills).toHaveLength(2);
   });
 
   it('import inválido falha antes de substituir o board, inclusive sem passar pelo parser', () => {
