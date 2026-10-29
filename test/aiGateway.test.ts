@@ -20,6 +20,8 @@ import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AiRunner } from '../src/extension/runner';
+import { CommitTrailers } from '../src/extension/commitTrailers';
+import type { Executor } from '../src/extension/ai/drivers/types';
 import { providerFor } from '../src/extension/ai/providers';
 import { ExecutionAdmission, AdmissionBlockedError } from '../src/extension/ai/admission';
 import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
@@ -677,5 +679,197 @@ it('perfil configurável sem contrato não inicia CLI nem assume o provider base
     measure: 'none',
     inputTokens: null,
     costUsd: null,
+  });
+});
+
+describe('os trailers de rastreio dos commits da run', () => {
+  let tempRoot: string;
+  beforeEach(() => {
+    tempRoot = fs.mkdtempSync(path.join(dir, 'kits-'));
+  });
+  const kits = () => fs.readdirSync(tempRoot);
+  const trailers = () => new CommitTrailers({ gitVersion: () => 'git version 2.39.3', tempRoot });
+  /** uma decisão que o log aceita; a admissão falsa dos testes abaixo só confere o comando */
+  const decision = {
+    version: 1,
+    regime: 'exclusive',
+    state: 'admitted',
+    capabilities: EXECUTOR_CAPABILITIES.map((capability) => ({ capability, state: 'verified', reason: 'verified' })),
+    reasons: [],
+    tools: [],
+    deniedTools: [],
+    mcpTools: [],
+    activeMcpIds: [],
+    binding: 'a'.repeat(64),
+  };
+  const forCard = (over: Partial<AiCall> = {}) => call({ commitTrailers: { card: 7, phase: 'Implementação' }, ...over });
+
+  it('sem commitTrailers (chat) o processo não recebe variável nenhuma e nenhuma pasta nasce', () => {
+    const seen: Record<string, string>[] = [];
+    const gw = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn: (command, cwd, out) => {
+        seen.push({ ...command.env });
+        return spawn(command, cwd, out);
+      },
+      commitTrailers: trailers(),
+    });
+    gw.run(call());
+    expect(Object.keys(seen[0]!).filter((n) => /^(GIT_CONFIG|FAZ_AI_)/.test(n))).toEqual([]);
+    expect(kits()).toEqual([]);
+  });
+
+  it('o spawn recebe os trailers com o id da run e a pasta some quando a execução termina', () => {
+    const seen: Record<string, string | undefined>[] = [];
+    const gw = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn: (command, cwd, out) => {
+        seen.push({ ...command.env });
+        return spawn(command, cwd, out);
+      },
+      commitTrailers: trailers(),
+    });
+    const run = gw.run(forCard());
+    expect(seen[0]).toMatchObject({ FAZ_AI_TRAILER_CARD: '#7', FAZ_AI_TRAILER_PHASE: 'Implementação', FAZ_AI_TRAILER_RUN: run.runId });
+    expect(seen[0]!.GIT_CONFIG_KEY_0).toBe('core.hooksPath');
+    expect(kits()).toHaveLength(1);
+    expect(seen[0]!.GIT_CONFIG_VALUE_0).toBe(path.join(tempRoot, kits()[0]!));
+    procs[0]!.exit(0);
+    expect(kits()).toEqual([]);
+  });
+
+  it('a pasta some também quando a execução nem chega a começar (unsupported)', () => {
+    const gw = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn: () => {
+        throw new Error('spawn falhou');
+      },
+      commitTrailers: trailers(),
+    });
+    expect(() => gw.run(forCard())).toThrow('spawn falhou');
+    expect(rows()[0]).toMatchObject({ outcome: 'unsupported' });
+    expect(kits()).toEqual([]);
+  });
+
+  it('git que não serve: a run segue sem variáveis e o aviso vai ao canal uma vez', () => {
+    const seen: Record<string, string>[] = [];
+    const logs: string[] = [];
+    const gw = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn: (command, cwd, out) => {
+        seen.push({ ...command.env });
+        return spawn(command, cwd, out);
+      },
+      commitTrailers: new CommitTrailers({ gitVersion: () => 'git version 2.30.0', tempRoot }),
+    });
+    gw.run(forCard({ log: (l) => logs.push(l) }));
+    expect(Object.keys(seen[0]!).filter((n) => /^(GIT_CONFIG|FAZ_AI_)/.test(n))).toEqual([]);
+    expect(logs.filter((l) => l.includes('Trailers de rastreio desligados'))).toHaveLength(1);
+    expect(kits()).toEqual([]);
+  });
+
+  it('a admissão confere o comando original, sem as variáveis, e o spawn recebe o conferido mais as variáveis', () => {
+    const base = forCard();
+    const strictCall: AiCall = {
+      ...base,
+      prepare: () => ({
+        ...base.prepare(),
+        strict: {
+          profileId: 'claude',
+          request: {
+            version: 1,
+            mcpLevel: { permission: 'board', tools: [] },
+            regime: 'exclusive',
+            boardTools: { mode: 'inherit' },
+            agentTools: { categories: ['read'], native: { tool: '', allow: [], deny: [] } },
+            activeMcpIds: [],
+            allowedMcpIds: [],
+            boardMcpIds: [],
+            mcpServers: [],
+            mcpTools: [],
+            boardMcpTools: [],
+          },
+        },
+      }),
+    };
+    const checkedEnvs: (Record<string, string> | undefined)[] = [];
+    const admission = {
+      prepare: (_p: unknown, _id: string, input: unknown) => ({
+        input,
+        decision,
+        transport: 'cli',
+        command: (c: { env?: Record<string, string> }) => {
+          checkedEnvs.push(c.env);
+          return c;
+        },
+        acpCommand: (c: unknown) => c,
+        api: () => {},
+      }),
+    };
+    const seen: Record<string, string | undefined>[] = [];
+    const runLog = createRunLog(db);
+    const gw = new AiGateway({
+      boardId: router.boardId,
+      runLog,
+      spawn: (command, cwd, out) => {
+        seen.push({ ...command.env });
+        return spawn(command, cwd, out);
+      },
+      admission: admission as never,
+      commitTrailers: trailers(),
+    });
+    gw.run(strictCall);
+    expect(checkedEnvs.length).toBeGreaterThan(0);
+    for (const env of checkedEnvs) expect(Object.keys(env ?? {}).filter((n) => /^(GIT_CONFIG|FAZ_AI_)/.test(n))).toEqual([]);
+    expect(seen[0]).toMatchObject({ FAZ_AI_TRAILER_CARD: '#7', GIT_CONFIG_COUNT: expect.any(String) });
+    procs[0]!.exit(0);
+  });
+
+  it('no ACP, o spawnAcp recebe as variáveis e o acpCommand da admissão recebe o comando sem env', () => {
+    const base = forCard();
+    const strictCall: AiCall = { ...base, prepare: () => ({ ...base.prepare(), strict: { profileId: 'claude', request: {} as never } }) };
+    const checked: unknown[] = [];
+    const admission = {
+      prepare: (_p: unknown, _id: string, input: unknown) => ({
+        input,
+        decision,
+        transport: 'acp',
+        command: (c: unknown) => c,
+        acpCommand: (c: { env?: unknown }) => {
+          checked.push(c.env);
+          return c;
+        },
+        api: () => {},
+      }),
+    };
+    const acp: Executor = {
+      transport: 'acp',
+      run: (_input, ctx) => {
+        ctx.spawnAcp!({ command: 'agente', args: [] }, ctx.cwd, () => {});
+        return { proc: { onExit: () => {}, kill: () => {} }, report: () => ({}), failure: () => null } as never;
+      },
+      bindingContext: () => ({ invocation: {}, command: 'agente' }),
+    };
+    const seen: { env?: Record<string, string> }[] = [];
+    const gw = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn,
+      spawnAcp: (command) => {
+        seen.push(command);
+        return { write: () => {}, onExit: () => {}, kill: () => {} } as never;
+      },
+      executorOf: () => acp,
+      admission: admission as never,
+      commitTrailers: trailers(),
+    });
+    const run = gw.run(strictCall);
+    expect(checked).toEqual([undefined]);
+    expect(seen[0]!.env).toMatchObject({ FAZ_AI_TRAILER_CARD: '#7', FAZ_AI_TRAILER_RUN: run.runId, GIT_CONFIG_KEY_0: 'core.hooksPath' });
+    expect(kits()).toHaveLength(1);
   });
 });

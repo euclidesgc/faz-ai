@@ -12,8 +12,10 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import type { Database } from 'sql.js';
 import { AiGateway } from '../../src/extension/ai/gateway';
+import { CommitTrailers } from '../../src/extension/commitTrailers';
 import { ExecutionAdmission } from '../../src/extension/ai/admission';
 import { CapabilityEvidenceStore } from '../../src/extension/ai/capabilityEvidence';
 import type { AcpSpawnFn } from '../../src/extension/ai/acp/provider';
@@ -91,6 +93,8 @@ export interface CardWorld {
   lines: string[];
   /** os comandos que o `spawn` da CLI recebeu (perfis que não são ACP) */
   cliCommands: HeadlessCommand[];
+  /** as pastas dos hooks dos trailers que ainda existem (a opção `commitTrailers`); vazia depois do fim da execução */
+  kits(): string[];
   /** inicia a execução do card e espera o fim, com o desfecho que o gateway entregou ao runner */
   run(): Promise<AiRunEnd>;
   /** as mensagens da conversa do card */
@@ -136,6 +140,11 @@ export interface CardWorldOptions {
   gatewayKey?: boolean;
   /** o gateway recebe o congelamento de artefatos que o host dá às unidades do orquestrador (`snapshots`) */
   snapshots?: boolean;
+  /**
+   * O gateway recebe os trailers de rastreio dos commits, como o host, com a versão real do git da máquina; as
+   * pastas dos hooks nascem numa pasta do mundo (`kits()`), para o cenário ver que somem no fim.
+   */
+  commitTrailers?: boolean;
 }
 
 export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
@@ -293,6 +302,8 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
       });
   }
 
+  const kitsDir = path.join(root, 'kits');
+  fs.mkdirSync(kitsDir);
   const lines: string[] = [];
   const cliCommands: HeadlessCommand[] = [];
   const gateway = new AiGateway({
@@ -306,6 +317,14 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
     sessions: router.executions,
     redact: (text) => router.redactCredentials(text),
     admission,
+    ...(options.commitTrailers
+      ? {
+          commitTrailers: new CommitTrailers({
+            gitVersion: () => execFileSync('git', ['--version'], { encoding: 'utf8', timeout: 5000 }),
+            tempRoot: kitsDir,
+          }),
+        }
+      : {}),
     ...(options.snapshots
       ? { snapshots: new RunArtifactSnapshots(path.join(root, 'snapshots'), new ArtifactRepo(db), router.boardId) }
       : {}),
@@ -365,6 +384,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
     cardId,
     lines,
     cliCommands,
+    kits: () => fs.readdirSync(kitsDir),
     run: () =>
       new Promise<AiRunEnd>((resolve, reject) => {
         try {

@@ -315,6 +315,39 @@ describe('run_command: sem shell, ambiente filtrado, tempo limite e Parar', () =
     expect(env).toEqual({ PATH: '/usr/bin:/bin', HOME: '/h', LANG: 'C', NO_PROXY: 'localhost', TMPDIR: '/tmp', GIT_TERMINAL_PROMPT: '0' });
   });
 
+  it('os GIT_CONFIG_* da base não passam pelo filtro; o commitEnv do board entra depois dele, sobre o ambiente já filtrado', async () => {
+    const base = { PATH: '/bin', GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'user.name', GIT_CONFIG_VALUE_0: 'fulano' };
+    expect(Object.keys(commandEnv(base, '/bin', undefined)).filter((n) => n.startsWith('GIT_CONFIG'))).toEqual([]);
+
+    const printEnv = { command: process.execPath, args: ['-e', 'process.stdout.write(JSON.stringify(process.env))'] };
+    const seen: Record<string, string | undefined>[] = [];
+    const withKit = await runLocalTool(tool('run_command'), printEnv, {
+      ...ctx,
+      pathEnv: process.env.PATH,
+      baseEnv: { ...process.env, ...base },
+      commitEnv: (filtered) => {
+        seen.push({ ...filtered });
+        return { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.hooksPath', GIT_CONFIG_VALUE_0: '/kit', FAZ_AI_TRAILER_RUN: 'r1' };
+      },
+    });
+    // o board recebeu o ambiente já filtrado: sem o par da pessoa
+    expect(seen[0]!.GIT_CONFIG_COUNT).toBeUndefined();
+    expect(JSON.parse(String(withKit.response.stdout))).toMatchObject({
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'core.hooksPath',
+      GIT_CONFIG_VALUE_0: '/kit',
+      FAZ_AI_TRAILER_RUN: 'r1',
+    });
+
+    const without = await runLocalTool(tool('run_command'), printEnv, {
+      ...ctx,
+      pathEnv: process.env.PATH,
+      baseEnv: { ...process.env, ...base },
+    });
+    const env = JSON.parse(String(without.response.stdout)) as Record<string, string>;
+    expect(Object.keys(env).filter((n) => /^(GIT_CONFIG|FAZ_AI_)/.test(n))).toEqual([]);
+  });
+
   it('o programa fora do PATH é recusado; a pasta do comando também é confinada; o tempo limite encerra', async () => {
     const run = (args: unknown, c: LocalToolContext = ctx) => runLocalTool(tool('run_command'), args, { ...c, pathEnv: process.env.PATH });
     expect((await run({ command: 'programa-que-nao-existe-faz-ai' })).response.error).toMatch(/Programa não encontrado/);

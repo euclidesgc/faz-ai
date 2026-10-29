@@ -1,6 +1,7 @@
 import { collectClaudeEnvironment } from '../ai/environmentEvidence';
 import { defaultManifestDir } from '../ai/cursorManifest';
 import { cursorHookStatus } from '../mcp/cursorHooks';
+import { CommitTrailers } from '../commitTrailers';
 import {
   BUILTIN_PROFILES,
   PROFILE_CAPABILITIES,
@@ -16,7 +17,7 @@ import {
 import { AiProfileRepo } from '../repositories/aiProfileRepo';
 import { createAiProfileRuntime } from '../panel/handlers/aiProfiles';
 import { profileCanProbe, profileSignedIn, profileVersion } from '../cliProbe';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import { createHash } from 'node:crypto';
@@ -294,6 +295,16 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     redact: (text) => router.redactCredentials(text),
     snapshots: new RunArtifactSnapshots(path.join(o.storageDir, 'run-artifacts'), new ArtifactRepo(handle.db), router.boardId),
     admission,
+    // lê a versão do git na primeira run de card e guarda; o git que não serve desliga os trailers com um aviso
+    commitTrailers: new CommitTrailers({
+      gitVersion: () => {
+        try {
+          return execFileSync('git', ['--version'], { encoding: 'utf8', timeout: 5000 });
+        } catch {
+          return null;
+        }
+      },
+    }),
     cursorHook: {
       dir: defaultManifestDir(homeDir),
       status: () => cursorHookStatus({ homeDir, scriptPath: path.join(path.dirname(o.bridgePath), 'cursor-hook.js') }),

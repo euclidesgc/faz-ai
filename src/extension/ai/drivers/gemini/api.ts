@@ -515,6 +515,7 @@ function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<Ge
                   baseEnv: o.baseEnv,
                   limits: o.localLimits,
                   processes,
+                  commitEnv: ctx.commitEnv,
                 });
               } catch (e) {
                 stopped();
