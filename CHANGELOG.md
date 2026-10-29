@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- Depois que um modelo esgota o limite e a regra troca sozinha, as execuções e o chat seguintes já começam no destino (#1100).
 - Preço por modelo no catálogo (`upsert_model`) estima o custo em US$ das execuções sem custo informado; a regra "Mostrar custo em dólar" o desliga para quem usa assinatura (#1104).
 - O card aberto mostra os commits da branch da história agrupados por fase (hash, assunto, data, card e run), lidos dos trailers `Faz-AI-*`; a seção some quando não há commits.
 - Nova Biblioteca de artefatos do board em Configurações › Harness › Artefatos do board: cada regra, skill, agente e servidor MCP fica ativo ou inativo, com contador, busca, filtro e árvore de pastas das skills.

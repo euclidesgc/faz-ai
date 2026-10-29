@@ -514,6 +514,35 @@ describe('ChatSession: política de execução no limite de uso', () => {
     expect(messages().at(-1)).toMatchObject({ role: 'assistant', text: 'Pronto.' });
   });
 
+  it('a troca automática grava a marca; a conversa seguinte começa no destino e o sucesso limpa a marca (#1100)', () => {
+    const fable = option('fable');
+    policyTo('fable', fable.efforts[0]!);
+    sendSonnet();
+    spawned[0]!.raw(`${usageLimit}\n`);
+    spawned[0]!.exit(1);
+    expect(router.modelLimitList()).toMatchObject([{ profileId: 'claude', model: 'sonnet' }]);
+    spawned[1]!.emit('Pronto.');
+    spawned[1]!.exit(0);
+
+    sendSonnet();
+    expect(spawned).toHaveLength(3);
+    expect(spawned[2]!.command.args[spawned[2]!.command.args.indexOf('--model') + 1]).toBe('fable');
+    expect(logs.some((l) => l.includes('[chat] O modelo pedido está com o limite esgotado'))).toBe(true);
+    spawned[2]!.emit('Pronto.');
+    spawned[2]!.exit(0);
+    // a marca é do sonnet: o destino respondendo bem não a limpa
+    expect(router.modelLimitList()).toHaveLength(1);
+  });
+
+  it('sem regra de fallback a marca não muda o início da conversa (#1100)', () => {
+    router.recordModelLimit('claude', 'sonnet', null, Date.now());
+    sendSonnet();
+    expect(spawned[0]!.command.args[spawned[0]!.command.args.indexOf('--model') + 1]).toBe('sonnet');
+    spawned[0]!.emit('Pronto.');
+    spawned[0]!.exit(0);
+    expect(router.modelLimitList()).toEqual([]);
+  });
+
   it('sem política o limite esgotado vira aviso e nada é executado noutro alvo', () => {
     sendSonnet();
     spawned[0]!.raw(`${usageLimit}\n`);
