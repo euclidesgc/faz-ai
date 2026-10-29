@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { samePath } from './samePath';
 import type { GitConfig, MainBranch, WorkspaceMode } from '../shared/git';
 import type { GitNotice } from '../shared/gitflow';
+import { COMMIT_TRAILERS, MAX_STORY_COMMITS, type StoryCommit } from '../shared/commits';
 
 /**
  * Falha de um comando externo das rotinas de fundo (o `run()` do boardHost): a mensagem continua a do
@@ -313,4 +314,25 @@ export function removeWorktree(projectDir: string, worktreePath: string, force =
     tryGit(projectDir, ['worktree', 'prune']);
     throw e;
   }
+}
+
+/**
+ * Commits de `<base>..<branch>` com os trailers Faz-AI-*, do mais novo ao mais antigo. Nunca lança:
+ * sem pasta, branch ou base resolvível, ou com erro do git, devolve [].
+ */
+export function storyCommits(dir: string, base: string, branch: string, limit = MAX_STORY_COMMITS): StoryCommit[] {
+  if (!dir || !base || !branch) return [];
+  const tr = (key: string) => `%(trailers:key=${key},valueonly,separator=)`;
+  const format = ['%h', '%s', '%aI', tr(COMMIT_TRAILERS.card), tr(COMMIT_TRAILERS.phase), tr(COMMIT_TRAILERS.run)].join('%x1f') + '%x1e';
+  for (const ref of [base, branch]) if (tryGit(dir, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]) === null) return [];
+  const out = tryGit(dir, ['log', `--max-count=${limit}`, `--format=${format}`, `${base}..${branch}`]);
+  if (!out) return [];
+  const commits: StoryCommit[] = [];
+  for (const rec of out.split('\x1e')) {
+    const f = rec.split('\x1f').map((x) => x.trim());
+    if (f.length !== 6 || !f[0]) continue;
+    const [hash = '', subject = '', date = '', card = '', phase = '', run = ''] = f;
+    commits.push({ hash, subject, date, card, phase, run });
+  }
+  return commits;
 }

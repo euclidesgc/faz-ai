@@ -42,6 +42,8 @@ import { ToolKeys } from '../../src/extension/toolKeys';
 import { credentialsFor } from '../../src/extension/credentials';
 import { monthOf } from '../../src/shared/log';
 import type { ModelOption } from '../../src/shared/models';
+import { pricingOf, type ModelPricing } from '../../src/shared/cost';
+import { catalogTool } from '../../src/shared/aiProfiles';
 
 const WASM_DIR = path.resolve(__dirname, '../../node_modules/sql.js/dist');
 
@@ -138,6 +140,8 @@ export interface CardWorldOptions {
   viaConnect?: boolean;
   /** o gateway lê a chave do cofre também fora do Conectar (o ACP real do teste da história 14 autentica por ela) */
   gatewayKey?: boolean;
+  /** o preço por milhão de tokens do modelo Auto do Cursor no catálogo (com `profile: 'cursor'`); sem ele, o modelo vem sem preço */
+  cursorPricing?: ModelPricing;
   /** o gateway recebe o congelamento de artefatos que o host dá às unidades do orquestrador (`snapshots`) */
   snapshots?: boolean;
   /**
@@ -196,7 +200,13 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   const gemini = options.profile !== 'claude' && !cursor;
   if (cursor) {
     router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'cursor', enabled: true });
-    router.handle({ type: 'settings.models.set', catalog: [...router.snapshot().board.modelCatalog, CURSOR_MODEL] });
+    router.handle({
+      type: 'settings.models.set',
+      catalog: [
+        ...router.snapshot().board.modelCatalog,
+        options.cursorPricing ? { ...CURSOR_MODEL, pricing: options.cursorPricing } : CURSOR_MODEL,
+      ],
+    });
   }
   if (gemini && !connect) {
     router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: true });
@@ -312,6 +322,11 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
     resolveProfile: (id) => profiles.resolveProfile(router.boardId, id),
     executorOf: pick,
     profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
+    // como o host: o preço do catálogo para o modelo da execução
+    priceOf: (profile, model) =>
+      model === null
+        ? null
+        : pricingOf(router.snapshot().board.modelCatalog.find((o) => o.tool === catalogTool(profile) && o.model === model)),
     boardId: router.boardId,
     runLog: createRunLog(db),
     sessions: router.executions,

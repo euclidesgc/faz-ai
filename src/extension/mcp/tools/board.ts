@@ -174,6 +174,12 @@ export function registerBoardRulesTools(tool: DefineTool): void {
         .describe(
           'Incluir no catálogo as variantes rápidas dos modelos, nas ferramentas que as têm (respondem mais rápido e cobram mais pelos mesmos tokens). Ligar acrescenta as da última lista lida da ferramenta; desligar as tira do catálogo.',
         ),
+      showCost: z
+        .boolean()
+        .optional()
+        .describe(
+          'Mostrar custo em dólar ("Mostrar custo em dólar"): o informado pela CLI ou, sem ele, o estimado pelo preço do catálogo. Desligada, o US$ some das telas, do get_metrics e da conversa; os dados seguem gravados. Ligada por padrão.',
+        ),
     },
     (a, router) => {
       const patch = Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined));

@@ -70,6 +70,18 @@ describe('catálogo gravado quando o board guardava preços', () => {
 });
 
 describe('detectar e gravar o catálogo', () => {
+  it('settings.models.detect preserva o preço (pricing) cadastrado; a tabela antiga continua saindo', () => {
+    const pricing = { input: 3, output: 15 };
+    seedCatalog([opt('claude:sonnet', { pricing, ...OLD_PRICE_FIELDS })]);
+    const router = new MessageRouter(dbHandle as never, opts());
+    // abrir o board só limpa a tabela antiga
+    expect(router.snapshot().board.modelCatalog.find((o) => o.id === 'claude:sonnet')).toEqual(opt('claude:sonnet', { pricing }));
+    router.handle({ type: 'settings.models.detect', tool: 'claude' });
+    const sonnet = router.snapshot().board.modelCatalog.find((o) => o.id === 'claude:sonnet')!;
+    expect(sonnet.pricing).toEqual(pricing);
+    expect(JSON.stringify(sonnet)).not.toContain('"price"');
+  });
+
   it('settings.models.detect junta os modelos da ferramenta e não traz preço nenhum', () => {
     seedCatalog([opt('claude:opus', OLD_PRICE_FIELDS)]);
     const router = new MessageRouter(dbHandle as never, opts());

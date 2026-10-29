@@ -3,6 +3,8 @@
  * Apagar mensagens ou mudar o que está marcado diminui a estimativa das próximas execuções, nunca isto.
  */
 
+import type { CostBuckets } from './cost';
+
 /** Os quatro contadores de token somados, e o total deles. */
 export interface UsageTokens {
   input: number;
@@ -23,6 +25,10 @@ export interface CardUsageRow {
   durationMs: number;
   /** null = nenhuma execução da linha tem consumo medido (nunca 0 por falta de medição) */
   tokens: UsageTokens | null;
+  /** execuções da linha com custo (`cost_usd` gravado); 0 => `cost` null */
+  costedRuns: number;
+  /** null = nenhuma execução da linha tem custo (nunca 0 por falta de preço) */
+  cost: { totalUsd: number; estimatedUsd: number; buckets: CostBuckets } | null;
 }
 
 export interface CardUsage {
