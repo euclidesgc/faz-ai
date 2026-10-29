@@ -16,7 +16,7 @@ import {
   type Chain,
   type StartPosition,
 } from './policyGate';
-import type { ContextAction } from '../shared/contextPlanning';
+import type { ContextAction } from '../shared/executionAction';
 import { cardRef } from '../shared/model';
 import { canDispatch, limitClock, limitHolds, modelLimitHolds, modelLimitOf, nextPause, pauseOf, resetAtOf } from '../shared/usageLimit';
 import { limitChoice } from '../shared/limitChoice';

@@ -3,7 +3,7 @@ import { parseModelValue, type ModelOption } from './models';
 import { effortToRun } from './execution';
 import type { AiTool } from './harness';
 import type { RunnerPermission } from './runner';
-import { CONTEXT_ACTIONS, type ContextAction } from './contextPlanning';
+import { CONTEXT_ACTIONS, type ContextAction } from './executionAction';
 import type { AiRunOrigin } from './log';
 
 export const POLICY_FAILURES = [
