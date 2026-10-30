@@ -113,6 +113,9 @@
 
 ### Fixed
 
+- A story session that creates the phase sub-tasks and stops goes back to the queue instead of blocking with "ended without replying".
+- A story the AI creates in autonomous mode from another one, outside a stack, depends on it: it no longer starts before the origin reaches the base.
+- Splitting an autonomous story no longer resumes the autopilot the person paused.
 - An autonomous story whose working folder was deleted stops with the reason, instead of the autopilot calling the AI nonstop.
 - Reloading the window or reinstalling the extension no longer reports the board as open elsewhere.
 - A window that does not serve the board refuses to call the AI with the reason, instead of starting a run that cannot reach the board, and takes over the board when the other one closes.
