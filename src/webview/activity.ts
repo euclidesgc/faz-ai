@@ -51,7 +51,11 @@ const whatOf = (activity: AiActivity): string =>
       ? t('refinando')
       : activity.mode === 'conflict'
         ? t('resolvendo conflito')
-        : t('resumindo');
+        : activity.mode === 'unblock'
+          ? t('desbloqueando')
+          : activity.mode === 'reply'
+            ? t('respondendo')
+            : t('resumindo');
 
 interface Entry {
   activity: AiActivity;

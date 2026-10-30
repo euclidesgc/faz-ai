@@ -478,6 +478,8 @@ without changing the cause, stops the story again. The same note is not repeated
 with nothing new, the board only updates the block reason. If the person acted and the story stopped
 for the same reason, the version that explains what happened and what is usually missing comes once.
 A try whose result matches the previous one is not repeated either.
+Before waiting for the person, the heartbeat tries to unblock the story: the AI looks for the cause and
+fixes what it can (details in [automacao_EN.md](automacao_EN.md)).
 
 No execution delegates to the tool's subagents (in Claude Code, `Agent` — formerly `Task` — is
 denied; Cursor and Kimi Code have no proven block, so the capability stays "unknown" and admission

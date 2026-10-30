@@ -50,6 +50,7 @@
 - New direct track: a short-track story whose plan touches up to about 3 files is implemented by the story session itself, without sub-tasks (#1107).
 - The `update_rules` MCP tool accepts the `shortTrack` rule (#1107).
 - Commits made in a board run get the `Faz-AI-*` trailers with card, phase and run (#1101).
+- The heartbeat tries to unblock blocked stories: the AI looks for the cause, fixes what it can and returns the work to the queue; only what depends on you stays blocked.
 
 ### Changed
 
@@ -57,6 +58,7 @@
 - When a card's model runs out of its usage limit, the board asks whether to wait for the limit to come back or continue with another available model, and saves the choice on the card; autonomous mode keeps the fallback rule.
 - The model pickers (chat, card, agents and rules) only offer agents that can answer now.
 - **Detectar modelos** replaces the list with the one the tool reports now, dropping models it no longer lists, and is also available in API mode.
+- A sub-task with no terminal finishes by saying what is left to run, instead of blocking; a story that uses another's code records the dependency on it.
 - The chat over the Gemini API declares only the board tools it uses: 26 instead of 81 on each request.
 - Active rules go into every AI context of the board, and active skills only into the cards that link them; rules that were **Per card** become inactive, for review.
 - Exporting to Claude Code writes `allowed-tools` on skills and `tools` on agents from the chosen tools; Cursor and Kimi Code leave the field out and warn.

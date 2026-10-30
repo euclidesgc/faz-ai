@@ -1,7 +1,7 @@
 ---
 name: "documentacao-tecnica"
 description: "Use para a documentação do Faz AI: entrada no CHANGELOG, o detalhe no arquivo certo de docs/ e, quando a mudança cria ou remove um recurso, o README, sempre em português e inglês."
-tools: Read, Grep, Glob, Edit, Write, mcp__faz-ai__*
+tools: Read, Grep, Glob, Edit, Write, Bash, mcp__faz-ai__*
 model: haiku
 faz-ai-model: "claude:haiku"
 ---

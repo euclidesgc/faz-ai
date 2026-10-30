@@ -50,6 +50,7 @@
 - Nova trilha direta: a história da trilha curta com plano de até uns 3 arquivos é implementada pela própria sessão, sem sub-tarefas (#1107).
 - A ferramenta MCP `update_rules` aceita a regra `shortTrack` (#1107).
 - Os commits feitos numa execução do board ganham os trailers `Faz-AI-*` com card, fase e execução (#1101).
+- O heartbeat tenta destravar as histórias bloqueadas: a IA procura a causa, resolve o que consegue e devolve o trabalho à fila; só fica bloqueada a que depende de você.
 
 ### Alterado
 
@@ -57,6 +58,7 @@
 - Quando o modelo de um card esgota o limite de uso, o board pergunta se espera o limite voltar ou segue com outro modelo disponível, e grava a escolha no card; no modo autônomo vale a regra de fallback.
 - Os seletores de modelo (chat, card, agentes e regras) só oferecem os agentes que podem responder agora.
 - **Detectar modelos** substitui a lista pela que a ferramenta informa agora, tirando os modelos que ela não lista mais, e passa a existir também no modo API.
+- Sub-tarefa sem terminal conclui dizendo o que falta rodar, em vez de bloquear; a história que usa o código de outra registra a dependência com ela.
 - O chat pelo Gemini da API declara só as ferramentas do board que usa: 26 em vez de 81 a cada pedido.
 - Regras ativas entram em todo contexto de IA do board, e skills ativas só no card que as vincula; regras que estavam **Pelo card** passam a inativas, para revisão.
 - A exportação para o Claude Code grava `allowed-tools` nas skills e `tools` nos agentes a partir das tools escolhidas; Cursor e Kimi Code omitem o campo e avisam.

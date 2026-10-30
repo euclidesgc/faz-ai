@@ -222,6 +222,8 @@ export const board: Record<string, string> = {
   refinando: 'refining',
   resumindo: 'summarizing',
   'resolvendo conflito': 'resolving conflict',
+  desbloqueando: 'unblocking',
+  respondendo: 'replying',
   agora: 'now',
   'há {n} min': '{n} min ago',
   'há {n} h': '{n} h ago',
