@@ -6,6 +6,7 @@
 
 ### Added
 
+- Each column gets a list of checks (name, command and timeout), edited in Settings › Workflows and read by the AI in `get_board`; running them arrives in a later version (#1096).
 - **Quota usage** block for Claude Code, with the critical limit that brings forward the switch to the reserve (#1114).
 - Metrics panel gains the Cost per delivery block, by type, effort, model and agent (#1224).
 - The Rework block in the Metrics panel shows rework by agent and runs without a result (#1224).
