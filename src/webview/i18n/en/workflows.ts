@@ -179,6 +179,16 @@ export const workflows: Record<string, string> = {
   'Tempo limite da nova checagem': 'Timeout of the new check',
   'Acrescenta a checagem ao fim da lista': 'Adds the check to the end of the list',
   'Adicionar checagem': 'Add check',
+  'Sugerir pelo projeto': 'Suggest from the project',
+  'Propõe checagens a partir dos scripts do projeto; nada é gravado até você aceitar':
+    'Proposes checks from the project scripts; nothing is saved until you accept',
+  'Nenhuma checagem reconhecida neste projeto.': 'No check recognized in this project.',
+  'Não foi possível ler o projeto.': 'Could not read the project.',
+  'Checagens sugeridas': 'Suggested checks',
+  'Sugeridas pelo projeto (ainda não gravadas):': 'Suggested by the project (not saved yet):',
+  'Adicionar sugeridas': 'Add suggested',
+  'Grava as checagens sugeridas ao fim da lista': 'Saves the suggested checks at the end of the list',
+  'Descarta a sugestão sem gravar nada': 'Discards the suggestion without saving anything',
   'Ex.: Tipos': 'E.g.: Types',
   'Ex.: npm run typecheck': 'E.g.: npm run typecheck',
 };

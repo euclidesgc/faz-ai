@@ -1,6 +1,6 @@
 import { choose, confirmLast, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
@@ -278,5 +278,88 @@ describe('checagens da coluna (#1096)', () => {
     await userEvent.click(within(rowOf('Revisão')).getByRole('button', { name: /Adicionar|checagem\(ns\)/ }));
     expect(screen.queryByLabelText('Instrução para a IA')).toBeNull();
     expect(screen.getByLabelText('Nome da nova checagem')).toBeInTheDocument();
+  });
+
+  describe('Sugerir pelo projeto (#1254)', () => {
+    /** O host responde ao último pedido de perfil, como o hostBridge faria. */
+    const answer = (reply: { profile?: unknown; error?: string }) => {
+      const sent = lastSent('harness.project.profile');
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent('message', { data: { type: 'harness.project.profileResult', requestId: sent.requestId, ...reply } }),
+        );
+      });
+    };
+    const profile = {
+      languages: [],
+      scripts: { typecheck: 'tsc', lint: 'eslint', test: 'vitest' },
+      tools: ['vitest'],
+      folders: [],
+      readme: '',
+    };
+    const resetChecks = () => {
+      board.router.handle({
+        type: 'settings.column.update',
+        columnId: state().columns.find((c) => c.name === 'Revisão')!.id,
+        patch: { checks: [{ name: 'Lint', command: 'npm run lint', timeoutSec: 600 }] },
+      });
+      syncStore(board.router);
+    };
+
+    it('propõe só os comandos que faltam e não grava até a pessoa aceitar', async () => {
+      resetChecks();
+      await open();
+      const before = sentOf('settings.column.update').length;
+      await userEvent.click(screen.getByRole('button', { name: /Sugerir pelo projeto/ }));
+      answer({ profile });
+      const group = await screen.findByRole('group', { name: 'Checagens sugeridas' });
+      expect(
+        within(group)
+          .getAllByRole('listitem')
+          .map((li) => li.textContent),
+      ).toEqual(['npm run typecheck', 'npx vitest related {changed_files} --run', 'npm run test']);
+      expect(sentOf('settings.column.update')).toHaveLength(before);
+
+      await userEvent.click(within(group).getByRole('button', { name: 'Adicionar sugeridas' }));
+      const patch = apply().patch.checks!;
+      expect(patch.map((c) => c.command)).toEqual([
+        'npm run lint',
+        'npm run typecheck',
+        'npx vitest related {changed_files} --run',
+        'npm run test',
+      ]);
+      expect(screen.queryByRole('group', { name: 'Checagens sugeridas' })).toBeNull();
+    });
+
+    it('descartar não grava nada', async () => {
+      resetChecks();
+      await open();
+      const before = sentOf('settings.column.update').length;
+      await userEvent.click(screen.getByRole('button', { name: /Sugerir pelo projeto/ }));
+      answer({ profile });
+      await userEvent.click(await screen.findByRole('button', { name: 'Descartar' }));
+      expect(screen.queryByRole('group', { name: 'Checagens sugeridas' })).toBeNull();
+      expect(sentOf('settings.column.update')).toHaveLength(before);
+    });
+
+    it('sem checagem reconhecida avisa e deixa a lista intacta', async () => {
+      resetChecks();
+      await open();
+      const before = sentOf('settings.column.update').length;
+      await userEvent.click(screen.getByRole('button', { name: /Sugerir pelo projeto/ }));
+      answer({ profile: { ...profile, scripts: { build: 'x' }, tools: [] } });
+      expect(await screen.findByText('Nenhuma checagem reconhecida neste projeto.')).toBeInTheDocument();
+      expect(sentOf('settings.column.update')).toHaveLength(before);
+      expect(reviewChecks().map((c) => c.command)).toEqual(['npm run lint']);
+    });
+
+    it('erro ao ler o projeto avisa e deixa a lista intacta', async () => {
+      resetChecks();
+      await open();
+      await userEvent.click(screen.getByRole('button', { name: /Sugerir pelo projeto/ }));
+      answer({ error: 'falhou' });
+      expect(await screen.findByText('Não foi possível ler o projeto.')).toBeInTheDocument();
+      expect(reviewChecks()).toHaveLength(1);
+    });
   });
 });
