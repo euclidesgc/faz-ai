@@ -1084,6 +1084,42 @@ describe('executor da IA', () => {
     });
   });
 
+  describe('card Verificando (portão das checagens)', () => {
+    /** a IA pede a revisão numa coluna com checagens durante a execução: o card fica `verifying` */
+    const gateDuringRun = () => {
+      const columnId = card().columnId;
+      router.handle({
+        type: 'settings.column.update',
+        columnId,
+        patch: { checks: [{ name: 'Typecheck', command: 'true', timeoutSec: 30 }] },
+      });
+      runner.start(storyId);
+      expect(card().status).toBe('running');
+      ai({ type: 'card.status.set', cardId: storyId, status: 'waiting_review', note: 'Resumo' });
+      expect(card().status).toBe('verifying');
+      return columnId;
+    };
+
+    it('o fim da execução (settle) não sobrescreve o verifying, com saída limpa ou com falha', () => {
+      const columnId = gateDuringRun();
+      procs[0]!.exit(0);
+      expect(card()).toMatchObject({ status: 'verifying', columnId });
+    });
+
+    it('a execução interrompida (restore) também mantém o verifying', () => {
+      const columnId = gateDuringRun();
+      runner.stop(storyId);
+      expect(card()).toMatchObject({ status: 'verifying', columnId });
+    });
+
+    it('a devolução do status anterior (restore) fixa o status quando o card não está verifying', () => {
+      (router as any).ctx.cards.setStatus(storyId, 'blocked', 'motivo', 'Pessoa');
+      runner.start(storyId);
+      runner.stop(storyId);
+      expect(card().status).toBe('blocked');
+    });
+  });
+
   describe('portões que falham fechados (#1102)', () => {
     let approvals: string[];
     beforeEach(() => {

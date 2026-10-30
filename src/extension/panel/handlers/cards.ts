@@ -5,6 +5,7 @@ import { nextColumnFor } from '../../../shared/advance';
 import { columnOf, isLive } from '../../../shared/selectors';
 import { isAtYoloStop, lastAiColumn, yoloStopOptions } from '../../../shared/story';
 import { fieldValueBlocker } from '../../../shared/boardFields';
+import { gateApplies, type GateKind } from '../../../shared/gate';
 import { settleDelivery } from '../../delivery';
 
 import type { BoardState, Card } from '../../../shared/model';
@@ -12,38 +13,53 @@ import type { BoardContext, HandlerMap, MessageOf } from './context';
 import { applySuggestion, suggestionFor } from './models';
 
 /**
- * Muda o status de trabalho do card. Aprovar é só da pessoa; bloquear exige o motivo. Em modo autônomo
- * (YOLO) o pedido de revisão da IA vira aprovação na hora: ninguém vai revisar, e o resumo fica na conversa.
- * A única exceção, em que o card fica mesmo em "waiting_review", é a coluna até onde a pessoa liberou o
- * modo: ali o modo se desliga e a revisão é dela. Nem `pending` segura a fila
- * (#441): no modo autônomo a IA decide o que ficou em aberto e registra a decisão.
- *
- * A aprovação da pessoa numa história leva o card para a próxima coluna na hora (#441): esperar a IA
- * mover deixava o card na mesma coluna, e ela refazia a fase e pedia a revisão de novo. Ficam para a IA
- * só os casos em que o board não pode mover sozinho: a aprovação que faz o merge automático (a
- * conclusão é do `AutoMerger`) e a conclusão recusada (sub-tarefa em aberto).
+ * Portão das checagens da coluna: quando a IA tenta sair de uma coluna que as tem (mover para a frente ou pedir a
+ * revisão), o card não se move nem é entregue. Cria o `gate_runs`, põe o card em `verifying` e registra o id em
+ * `ctx.gates`; o router avisa o executor depois de gravar. Devolve true se interceptou.
  */
-function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author: string, byAi: boolean): void {
-  const note = msg.note?.trim() ?? '';
-  if (msg.status === 'approved' && byAi) throw new Error('Só uma pessoa pode aprovar um card.');
-  if (msg.status === 'blocked' && !note) throw new Error('Informe o motivo do bloqueio.');
-  // a devolução do status anterior (`restore` do runner) só grava o status: não é aprovação nova, então não
-  // dispara o merge nem avança a história, e não mexe no modo autônomo (#1102)
-  if (msg.restore && !byAi) {
-    ctx.cards.setStatus(msg.cardId, msg.status, msg.status === 'blocked' ? note : '', author);
-    return;
+function startGate(ctx: BoardContext, a: { cardId: string; kind: GateKind; targetColumnId: string | null; author: string }): boolean {
+  const state = ctx.state();
+  const card = state.cards.find((c) => c.id === a.cardId);
+  if (!card) return false;
+  // o card já está sendo verificado: um segundo pedido não abre outro portão (nem move o card por fora dele)
+  if (card.status === 'verifying') {
+    const column = state.columns.find((c) => c.id === card.columnId);
+    if (column && column.checks.length > 0 && gateApplies(state, { ...card, status: 'ready' }, a.kind, a.targetColumnId, true))
+      throw new Error('O card já está sendo verificado.');
+    return false;
   }
+  if (!gateApplies(state, card, a.kind, a.targetColumnId, true)) return false;
+  const gate = ctx.gateRuns.start({ cardId: card.id, columnId: card.columnId, targetColumnId: a.targetColumnId, kind: a.kind });
+  ctx.cards.setStatus(card.id, 'verifying', '', a.author);
+  ctx.gates.push(gate.id);
+  return true;
+}
+
+/**
+ * A decisão do pedido de revisão da IA: em modo autônomo (YOLO) vira aprovação na hora (ninguém vai revisar, e o
+ * resumo fica na conversa); na coluna até onde a pessoa liberou o modo, o card fica mesmo em "waiting_review", o
+ * modo se desliga e a revisão é dela. Nem `pending` segura a fila (#441): a IA decide o que ficou em aberto e
+ * registra a decisão. Exportada porque o desfecho do portão (`completeGate`) entrega o card por aqui.
+ */
+export function applyReviewStatus(
+  ctx: BoardContext,
+  cardId: string,
+  author: string,
+  note: string,
+  pending: boolean | undefined,
+  byAi: boolean,
+): void {
   // a história chegou à coluna até onde a pessoa liberou o modo autônomo: o pedido de revisão é para ela
-  const yolo = ctx.cards.isYolo(msg.cardId);
+  const yolo = ctx.cards.isYolo(cardId);
   const state = yolo ? ctx.state() : null;
-  const card = state?.cards.find((c) => c.id === msg.cardId);
-  const atStop = byAi && msg.status === 'waiting_review' && !!state && !!card && isAtYoloStop(state, card);
-  const autoApprove = byAi && msg.status === 'waiting_review' && yolo && !atStop;
-  ctx.cards.setStatus(msg.cardId, autoApprove ? 'approved' : msg.status, msg.status === 'blocked' ? note : '', author);
-  if (note && !msg.quiet) ctx.comments.add(msg.cardId, author, note, byAi ? 'ai' : 'human');
-  if (autoApprove && msg.pending)
+  const card = state?.cards.find((c) => c.id === cardId);
+  const atStop = byAi && !!state && !!card && isAtYoloStop(state, card);
+  const autoApprove = byAi && yolo && !atStop;
+  ctx.cards.setStatus(cardId, autoApprove ? 'approved' : 'waiting_review', '', author);
+  if (note) ctx.comments.add(cardId, author, note, byAi ? 'ai' : 'human');
+  if (autoApprove && pending)
     ctx.comments.add(
-      msg.cardId,
+      cardId,
       author,
       'Modo autônomo: a pendência acima não segura a história. Decida você mesmo (registre a decisão e o motivo na conversa e no documento da fase) e siga.',
       'ai',
@@ -57,6 +73,38 @@ function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author:
       'ai',
     );
   }
+}
+
+/**
+ * Muda o status de trabalho do card. Aprovar é só da pessoa; bloquear exige o motivo. O pedido de revisão da IA
+ * passa antes pelo portão da coluna (`startGate`) e, depois dele, por `applyReviewStatus`.
+ *
+ * A aprovação da pessoa numa história leva o card para a próxima coluna na hora (#441): esperar a IA
+ * mover deixava o card na mesma coluna, e ela refazia a fase e pedia a revisão de novo. Ficam para a IA
+ * só os casos em que o board não pode mover sozinho: a aprovação que faz o merge automático (a
+ * conclusão é do `AutoMerger`) e a conclusão recusada (sub-tarefa em aberto).
+ */
+function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author: string, byAi: boolean): void {
+  const note = msg.note?.trim() ?? '';
+  if (msg.status === 'approved' && byAi) throw new Error('Só uma pessoa pode aprovar um card.');
+  if (msg.status === 'blocked' && !note) throw new Error('Informe o motivo do bloqueio.');
+  // a devolução do status anterior (`restore` do runner) só grava o status: não é aprovação nova, então não
+  // dispara o merge nem avança a história, e não mexe no modo autônomo (#1102). Também não passa pelo portão
+  if (msg.restore && !byAi) {
+    ctx.cards.setStatus(msg.cardId, msg.status, msg.status === 'blocked' ? note : '', author);
+    return;
+  }
+  if (byAi && msg.status === 'waiting_review') {
+    // o resumo da IA fica na conversa antes do portão: as checagens podem levar minutos e falhar
+    if (startGate(ctx, { cardId: msg.cardId, kind: 'review', targetColumnId: null, author })) {
+      if (note && !msg.quiet) ctx.comments.add(msg.cardId, author, note, 'ai');
+      return;
+    }
+    applyReviewStatus(ctx, msg.cardId, author, msg.quiet ? '' : note, msg.pending, true);
+    return;
+  }
+  ctx.cards.setStatus(msg.cardId, msg.status, msg.status === 'blocked' ? note : '', author);
+  if (note && !msg.quiet) ctx.comments.add(msg.cardId, author, note, byAi ? 'ai' : 'human');
   // só a aprovação de uma pessoa dispara o merge automático: a do modo autônomo não passa por aqui
   if (msg.status === 'approved') {
     ctx.approved.push(msg.cardId);
@@ -347,7 +395,9 @@ export const cardHandlers = {
     ctx.cards.update(msg.cardId, msg.patch);
     return true;
   },
-  'card.move': (msg, ctx, { byAi }) => {
+  'card.move': (msg, ctx, { byAi, author }) => {
+    // a IA saindo para a frente de uma coluna com checagens não move: o card fica "Verificando" e o board decide
+    if (byAi && startGate(ctx, { cardId: msg.cardId, kind: 'move', targetColumnId: msg.columnId, author })) return true;
     ctx.cards.move(msg.cardId, msg.columnId, msg.position, {
       cancelChildren: msg.cancelChildren,
       byAi,

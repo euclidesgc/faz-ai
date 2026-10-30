@@ -59,6 +59,8 @@ import { ChatSession } from '../chat';
 import { AiRunner, NOT_SERVING_BOARD, REPLY_BUSY } from '../runner';
 import { BOARD_AUTHOR } from '../../shared/gitflow';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
+import { GateExecutor } from '../gate';
+import { GateRepo } from '../repositories/gateRepo';
 import { driverFor, driverOf } from '../ai/drivers';
 import { baseInfo, type AiTool } from '../../shared/harness';
 import { checkRequirements, profileInstallUrl } from '../requirements';
@@ -1047,6 +1049,24 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     return ready;
   };
   if (ownsBoard) void ensureOrchestrator().catch((e: unknown) => o.log(`Orquestrador: ${e instanceof Error ? e.message : String(e)}`));
+  // o portão das checagens da coluna: quando a IA tenta sair de uma coluna que as tem, o executor roda os comandos na
+  // pasta da história e devolve o desfecho ao router. Existe em toda janela, mas só a dona executa e recupera
+  // (`ownsBoard` é conferido a cada chamada)
+  const gateExecutor = new GateExecutor({
+    repo: new GateRepo(handle.db),
+    router,
+    runner,
+    state: () => router.snapshot(),
+    ownsBoard: ownsNow,
+    workspaceOf: (story) => story.worktreePath || o.folderPath,
+    instance: router.executions.owner,
+    log: o.log,
+    git,
+    shellPath: async () => pathEnv,
+  });
+  router.onGate((gateRunId) => void gateExecutor.run(gateRunId));
+  // a janela que fechou no meio de um portão deixou o card "Verificando" sem executor: volta para a IA na abertura
+  maintain('liberar as verificações que ficaram abertas', () => gateExecutor.recoverAfterRestart());
   const driver = {
     drive: async (storyId: string, origin: 'manual' | 'autopilot' | 'heartbeat') => {
       await ensureOrchestrator();
@@ -1109,7 +1129,16 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     log: o.log,
     // como o heartbeat e o autopiloto, só a janela dona do board faz a manutenção: duas janelas
     // concluiriam em dobro e mexeriam nas mesmas branches. Nas outras, a fila da IA não espera nada
-    onRound: () => (!o.ownsBoard || o.ownsBoard() ? maintenance.run() : undefined),
+    onRound: () => {
+      if (o.ownsBoard && !o.ownsBoard()) return undefined;
+      // o card "Verificando" preso (a outra janela caiu no meio do portão) volta para a IA na rodada
+      try {
+        gateExecutor.sweep(Date.now());
+      } catch (e) {
+        o.log(`Não foi possível varrer as verificações presas: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      return maintenance.run();
+    },
     act,
     // os conflitos de PR ainda sem tentativa da IA entram no começo da fila como execuções de conflito (#747)
     conflicts: () => mergeWatcher.pendingConflicts(),
@@ -1232,6 +1261,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     sweepStaleRuns: () => {
       if (!o.ownsBoard || o.ownsBoard()) {
         sweepStaleRuns(router, runner.running, Date.now(), o.log);
+        gateExecutor.sweep(Date.now());
         if (reconciledOnce)
           void orchestrator.sweep().catch((e: unknown) => o.log(`Orquestrador: ${e instanceof Error ? e.message : String(e)}`));
       }
@@ -1321,6 +1351,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       await orphanSweeper.idle();
       autopilot.stop(); // fechar o editor não é uma pausa da pessoa: na reabertura a fila retoma
       heartbeat.stop();
+      gateExecutor.dispose();
       runner.dispose();
       chat.dispose();
       await handle.close();
