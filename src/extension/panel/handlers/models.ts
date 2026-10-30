@@ -9,6 +9,7 @@ import {
   defaultModelOf,
   isHandPicked,
   modelFieldOf,
+  parseModelValue,
   suggestModel,
   type ModelOption,
   type ModelRule,
@@ -266,6 +267,20 @@ export const modelHandlers = {
       throw new Error('Escada de modelos inválida.');
     }
     ctx.boards.setModelLadder(ctx.boardId, msg.tool, ladder);
+    return true;
+  },
+  'settings.reviewerModel.set': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('O modelo do revisor só pode ser alterado pela pessoa.');
+    const value: unknown = msg.value;
+    if (value !== null) {
+      if (typeof value !== 'string' || value === '') throw new Error('O modelo do revisor deve ser um valor tool:modelo@esforço ou nulo.');
+      const parsed = parseModelValue(value);
+      const option = parsed ? ctx.state().board.modelCatalog.find((o) => o.id === parsed.id) : undefined;
+      if (!parsed || !option || (parsed.effort !== null && !option.efforts.includes(parsed.effort))) {
+        throw new Error('Modelo do revisor fora do catálogo.');
+      }
+    }
+    ctx.boards.setReviewerModel(value);
     return true;
   },
   'settings.modelRules.suggest': (msg, ctx) => {

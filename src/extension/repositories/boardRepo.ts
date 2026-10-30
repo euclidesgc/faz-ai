@@ -1,4 +1,7 @@
 import { MODEL_LADDERS_KEY, parseLadders, type ModelLadders } from '../../shared/modelLadder';
+
+/** A chave, na tabela meta, do modelo do revisor configurado (texto vazio = automático). */
+export const REVIEWER_MODEL_KEY = 'reviewer_model';
 import { AiProfileRepo } from './aiProfileRepo';
 import { createHash } from 'node:crypto';
 import { ArtifactRepo } from './artifactRepo';
@@ -77,6 +80,16 @@ export class BoardRepo {
     this.setMeta(MODEL_LADDERS_KEY, JSON.stringify(next));
   }
 
+  /** O modelo do revisor configurado (meta `reviewer_model`), ou null quando a pessoa deixou em "Automático". */
+  reviewerModel(): string | null {
+    return this.getMeta(REVIEWER_MODEL_KEY) || null;
+  }
+
+  /** Grava o modelo do revisor; null volta ao automático (a chave fica vazia). */
+  setReviewerModel(value: string | null): void {
+    this.setMeta(REVIEWER_MODEL_KEY, value ?? '');
+  }
+
   /**
    * A ciência do regime compatível de um perfil, no passo do Conectar: sobe a revisão daquele perfil e
    * devolve a nova. É um ato da pessoa na tela, que o host grava; não há mensagem da tela que a escreva.
@@ -149,6 +162,7 @@ export class BoardRepo {
       modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)),
       modelRules: parseModelRules(str(row.model_rules_json)),
       modelLadders: this.modelLadders(str(row.id)),
+      reviewerModel: this.reviewerModel(),
       appearance: parseAppearance(str(row.appearance_json)),
       templateVersion: num(row.template_version),
       runner: parseRunner(str(row.runner_json)),
@@ -379,6 +393,7 @@ export class BoardRepo {
       modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)),
       modelRules: parseModelRules(str(b.model_rules_json)),
       modelLadders: this.modelLadders(boardId),
+      reviewerModel: this.reviewerModel(),
       appearance: parseAppearance(str(b.appearance_json)),
       templateVersion: num(b.template_version),
       runner: parseRunner(str(b.runner_json)),

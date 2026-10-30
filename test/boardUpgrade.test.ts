@@ -299,7 +299,7 @@ describe('atualização do board para o padrão atual', () => {
 
   it('versão 10: a Homologação com o texto da 0.39 passa a abrir o pull request com --base em workspace.prBase; a personalizada fica', () => {
     upgradeBoard(db, boardId);
-    expect(BOARD_TEMPLATE_VERSION).toBe(19);
+    expect(BOARD_TEMPLATE_VERSION).toBe(20);
     const settings = new SettingsRepo(db);
     // o texto da versão 9 é o segundo do histórico (o terceiro é o da 14, antes do passo do hotfix)
     const v9 = PHASE_HISTORY['Homologação']!.instructions[1]!;
@@ -443,7 +443,7 @@ describe('atualização do board para o padrão atual', () => {
   });
 
   it('versão 17 (#1110): o Plan pede as seções na descrição da sub-tarefa; o Plan padrão v16 sobe e o personalizado fica', () => {
-    expect(BOARD_TEMPLATE_VERSION).toBe(19);
+    expect(BOARD_TEMPLATE_VERSION).toBe(20);
     const plan = PHASE_DEFAULTS['Plan']!;
     for (const name of REQUIRED_BRIEF_SECTIONS) expect(plan.instruction).toContain(`"${name}"`);
     expect(plan.instruction).toContain(
@@ -530,12 +530,12 @@ describe('atualização do board para o padrão atual', () => {
     expect(review).toContain('volta para ready com a saída na conversa');
     const history = PHASE_HISTORY['Revisão']!;
     expect(history.instructions).not.toContain(review);
-    expect(history.instructions.at(-1)).not.toContain('Verificando');
+    expect(history.instructions.at(-2)).not.toContain('Verificando');
     expect(history.change).toContain('Verificando');
 
     upgradeBoard(db, boardId);
     const settings = new SettingsRepo(db);
-    settings.updateColumn(col('Revisão').id, { aiInstruction: history.instructions.at(-1)! });
+    settings.updateColumn(col('Revisão').id, { aiInstruction: history.instructions.at(-2)! });
     run(db, 'UPDATE boards SET template_version = 18 WHERE id = ?', [boardId]);
     expect(pendingUpgrade(db, boardId)).toEqual([`Coluna "Revisão": ${history.change}.`]);
     upgradeBoard(db, boardId);
@@ -543,6 +543,32 @@ describe('atualização do board para o padrão atual', () => {
 
     settings.updateColumn(col('Revisão').id, { aiInstruction: 'minha revisão' });
     run(db, 'UPDATE boards SET template_version = 18 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+    upgradeBoard(db, boardId);
+    expect(col('Revisão').aiInstruction).toBe('minha revisão');
+  });
+
+  it('versão 20 (#1111): a Revisão diz que o board escolhe o modelo do revisor; o texto da v19 sobe e o personalizado fica', () => {
+    const review = PHASE_DEFAULTS['Revisão']!.instruction;
+    expect(review).toContain('o board escolhe o modelo do revisor (outro, nunca o barato)');
+    expect(review).toContain('não defina Modelo');
+    expect(review).toContain('não houve revisor independente');
+    const history = PHASE_HISTORY['Revisão']!;
+    const v19 = history.instructions.at(-1)!;
+    expect(v19).toContain('Verificando');
+    expect(v19).not.toContain('escolhe o modelo do revisor');
+    expect(history.change).toContain('modelo do revisor');
+
+    upgradeBoard(db, boardId);
+    const settings = new SettingsRepo(db);
+    settings.updateColumn(col('Revisão').id, { aiInstruction: v19 });
+    run(db, 'UPDATE boards SET template_version = 19 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([`Coluna "Revisão": ${history.change}.`]);
+    upgradeBoard(db, boardId);
+    expect(col('Revisão').aiInstruction).toBe(review);
+
+    settings.updateColumn(col('Revisão').id, { aiInstruction: 'minha revisão' });
+    run(db, 'UPDATE boards SET template_version = 19 WHERE id = ?', [boardId]);
     expect(pendingUpgrade(db, boardId)).toEqual([]);
     upgradeBoard(db, boardId);
     expect(col('Revisão').aiInstruction).toBe('minha revisão');

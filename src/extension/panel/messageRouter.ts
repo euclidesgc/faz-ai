@@ -43,6 +43,7 @@ import { columnsOf, isLive } from '../../shared/selectors';
 import { BOARD_AUTHOR } from '../../shared/gitflow';
 import { applyPending, onGateFailed, type EscalationDeps } from '../modelEscalation';
 import { EscalationRepo } from '../repositories/escalationRepo';
+import { applyReviewerModel } from '../reviewerModelApply';
 import type { AttachmentStore } from '../attachments';
 import { runUnsupported } from '../headless';
 import { catalogTool, isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
@@ -1005,6 +1006,15 @@ export class MessageRouter {
     } catch (e) {
       this.escalation.log(`Subida de modelo pendente não aplicada a ${cardId}: ${e instanceof Error ? e.message : String(e)}`);
     }
+    this.changed();
+  }
+
+  /**
+   * A sub-tarefa de Revisão recém-criada recebe do board o modelo do revisor (outro, nunca o barato). `aiSetModel`: a
+   * IA informou `fields.Modelo`, que conta como dela e não como escolha à mão. Nunca lança.
+   */
+  applyReviewerModelToNewCard(cardId: string, aiSetModel = false): void {
+    applyReviewerModel({ ctx: this.ctx, log: this.escalation.log }, cardId, aiSetModel);
     this.changed();
   }
 

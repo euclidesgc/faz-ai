@@ -273,7 +273,7 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
    tem checagens, o portão do fluxo vale ao mover a história ou pedir a revisão (passo 4).
 2. Revise o diff da história contra a base com um olhar independente: crie uma
    sub-tarefa de revisão (Fase = Revisão) com o agente \`revisor-de-codigo\`, se ele estiver nos agentes
-   do board, e pare: o board a executa e chama você de novo; sem o agente, revise você mesmo. Além dos defeitos,
+   do board, e pare: o board a executa e chama você de novo e escolhe o modelo do revisor (outro, nunca o barato): não defina \`Modelo\` nela. Sem o agente, revise você mesmo. Se a conversa disser que não houve revisor independente, registre isso no "Como revisar" do pull request. Além dos defeitos,
    procure o código que só passa no teste: teste novo que já passa no commit base, teste existente
    alterado junto com o código que ele cobre, try/catch que engole erro, cast forçado e acoplamento
    novo entre módulos.
