@@ -92,7 +92,7 @@ const INVENTORY_KIND: Partial<Record<MetricsDim, InventoryKind | 'bash'>> = {
 const ARCHIVE_DIMS = new Set<MetricsDim>(['phase', 'card_type', 'model', 'tool', 'mode', 'effort', 'profile', 'failure_class']);
 
 /** Coluna de `ai_runs` por dimensão, para as que vêm direto de lá (não de `ai_run_usage`). */
-const RUN_COLUMN: Record<MetricsBreakdownDim | 'failure_class', string> = {
+const RUN_COLUMN: Record<MetricsBreakdownDim, string> = {
   phase: 'phase',
   card_type: 'card_type',
   model: 'model',
@@ -1209,14 +1209,14 @@ function panelBreakdowns(db: Database, boardId: string, q: MetricsQuery, archive
   const workflowsByPhase = new Map<string, Set<string>>();
   for (const r of all(
     db,
-    `SELECT workflow, phase, card_type, model, tool, mode, effort, profile,
+    `SELECT workflow, phase, card_type, model, tool, mode, effort, profile, failure_class,
             COUNT(*) AS n, SUM(COALESCE(duration_ms,0)) AS ms,
             ${MEASURED_SUMS},
             ${TOKENS_SUM} AS tok,
             SUM(COALESCE(cost_usd,0)) AS cost, ${ESTIMATED_SUMS},
             ${BUCKET_SUMS}
      FROM ai_runs WHERE ${where}
-     GROUP BY workflow, phase, card_type, model, tool, mode, effort, profile`,
+     GROUP BY workflow, phase, card_type, model, tool, mode, effort, profile, failure_class`,
     params,
   )) {
     const patch: Partial<Accumulator> = {

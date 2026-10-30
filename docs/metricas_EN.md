@@ -198,7 +198,8 @@ with the number of calls.
 - **The failure class is kept in the record.** Each run that did not end well records its class:
   `transient`, `deterministic` (such as the timeout and the watchdog), `budget` (usage limit) or
   `canceled` (interrupted). Runs that ended well, or that have no recorded outcome, have no class. The
-  `get_metrics` tool groups by `failure_class` (see [MCP](mcp.md)).
+  `get_metrics` tool groups by `failure_class` (see [MCP](mcp.md)), the Metrics panel has a **Failure class**
+  breakdown and the card Usage tab shows a **Failure class** column per phase.
 - **Gemini in the three modes.** Each run records the mode it ran in (CLI, ACP or API), and Consumo
   (usage) separates the three through the **Modo da ferramenta** (tool mode) cut. In the CLI the tokens
   come from `stream-json`, per model; in ACP, from the `usage` the agent reports each turn; in the API,

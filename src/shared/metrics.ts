@@ -129,11 +129,13 @@ export interface MetricsPanelResult {
  * As dimensões do seletor (RF-01). `phase` é a única fonte de "fase" (RF-05). `mode` (história 12) é o modo em que
  * a ferramenta rodou (`cli`, `acp`, `api`): o mesmo Gemini mede de formas diferentes em cada um, e misturar os três
  * na linha da ferramenta esconderia de onde veio o consumo. Execução anterior à migração 48 fica sem modo ('').
+ * `failure_class` (#1099) é a classe da falha da execução (transient, deterministic, budget, canceled); '' = terminou
+ * bem, sessão sem desfecho ou execução anterior à migração 55.
  */
-export type MetricsBreakdownDim = 'phase' | 'card_type' | 'model' | 'tool' | 'mode' | 'effort' | 'profile';
+export type MetricsBreakdownDim = 'phase' | 'card_type' | 'model' | 'tool' | 'mode' | 'effort' | 'profile' | 'failure_class';
 
 /** Na ordem do seletor. */
-export const METRICS_BREAKDOWN_DIMS: MetricsBreakdownDim[] = ['phase', 'card_type', 'model', 'tool', 'mode', 'effort', 'profile'];
+export const METRICS_BREAKDOWN_DIMS: MetricsBreakdownDim[] = ['phase', 'card_type', 'model', 'tool', 'mode', 'effort', 'profile', 'failure_class'];
 
 /** As quatro medidas de cada categoria (RF-02). A barra mostra uma; as quatro vão em texto. */
 export type MetricsMeasure = 'cost' | 'tokens' | 'runs' | 'duration';

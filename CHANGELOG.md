@@ -59,6 +59,7 @@
 - `npm run eval` avalia um modelo em histórias de referência e grava o placar (#1105).
 - Cinco histórias de referência para a avaliação de modelos, com a prova de que o aceite falha sem a solução e passa com ela (#1233).
 - Cada execução grava a classe da falha (transitória, determinística, limite de uso ou interrompida), e `get_metrics` agrupa por `failure_class` (#1099).
+- O painel de Métricas ganha o corte por classe da falha, e a aba Consumo do card, a coluna Classe da falha (#1298).
 
 ### Alterado
 

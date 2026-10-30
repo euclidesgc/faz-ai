@@ -193,7 +193,8 @@ com a contagem de chamadas.
 - **A classe da falha fica no registro.** Cada execução que não terminou bem grava a sua classe:
   `transient` (transitória), `deterministic` (determinística, como o tempo limite e o watchdog), `budget`
   (limite de uso) ou `canceled` (interrompida). Execuções que terminaram bem, ou que não têm desfecho
-  registrado, ficam sem classe. O `get_metrics` agrupa por `failure_class` (ver [MCP](mcp.md)).
+  registrado, ficam sem classe. O `get_metrics` agrupa por `failure_class` (ver [MCP](mcp.md)), o painel de Métricas
+  tem o corte **Classe da falha** e a aba Consumo do card mostra a coluna **Classe da falha** por fase.
 - **O Gemini nos três modos.** Cada execução guarda o modo em que rodou (CLI, ACP ou API), e o
   Consumo separa os três pelo corte **Modo da ferramenta**. Na CLI os tokens vêm do `stream-json`, por
   modelo; no ACP, do `usage` que o agente informa a cada turno; na API, do `usageMetadata` de cada

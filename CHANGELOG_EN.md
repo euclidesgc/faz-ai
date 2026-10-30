@@ -59,6 +59,7 @@
 - `npm run eval` evaluates a model on reference stories and writes the scoreboard (#1105).
 - Five reference stories for model evaluation, with the proof that the acceptance fails without the solution and passes with it (#1233).
 - Each run records its failure class (transient, deterministic, usage limit or interrupted), and `get_metrics` groups by `failure_class` (#1099).
+- The Metrics panel gains a failure-class breakdown, and the card Usage tab a Failure class column (#1298).
 
 ### Changed
 

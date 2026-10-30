@@ -3,11 +3,12 @@ import * as path from 'node:path';
 import type { Database } from 'sql.js';
 import { openInMemory } from '../src/extension/db/database';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
-import { getMetrics, type MetricsResult } from '../src/extension/log/metrics';
+import { getMetrics, getPanelMetrics, type MetricsResult } from '../src/extension/log/metrics';
 import { consolidate } from '../src/extension/log/rollup';
 import { formatMetrics } from '../src/extension/mcp/tools/metrics';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import type { FailureClass } from '../src/shared/failureClass';
+import type { MetricsBreakdown } from '../src/shared/metrics';
 import type { AiRunOutcome } from '../src/shared/log';
 import { DEFAULT_LOG_RETENTION_MONTHS } from '../src/shared/rules';
 
@@ -94,6 +95,26 @@ describe('getMetrics: failure_class', () => {
     expect(result.archivedMonths).toEqual(['2025-01']);
     expect(row(result, 'transient')).toMatchObject({ runs: 3, durationMs: 3700 });
     expect(row(result, 'deterministic')).toMatchObject({ runs: 1, durationMs: 500 });
+  });
+});
+
+describe('painel de Métricas: corte por failure_class', () => {
+  it('traz a dimensão no painel, com a classe vazia contada, e ela segue igual depois de consolidar', () => {
+    db.run('UPDATE boards SET log_since = ? WHERE id = ?', [at(2025, 1, 1), boardId]);
+    run(at(2025, 1), 1000, 'transient');
+    run(at(2026, 6), 2000, 'transient');
+    run(at(2026, 6), 500, 'deterministic');
+    run(at(2026, 6), 300, null, 'done');
+    const value = (b: MetricsBreakdown) => Object.fromEntries(b.cells.map((c) => [c.value, c.runs]));
+    const before = getPanelMetrics(db, boardId, { startDate: '2025-01-01', endDate: '2026-06-30' }, TODAY).sections.breakdowns.find(
+      (b) => b.dim === 'failure_class',
+    )!;
+    expect(value(before)).toMatchObject({ transient: 2, deterministic: 1, '': 1 });
+    consolidateNow();
+    const after = getPanelMetrics(db, boardId, { startDate: '2025-01-01', endDate: '2026-06-30' }, TODAY).sections.breakdowns.find(
+      (b) => b.dim === 'failure_class',
+    )!;
+    expect(value(after)).toEqual(value(before));
   });
 });
 
