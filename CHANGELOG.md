@@ -117,6 +117,7 @@
 
 ### Corrigido
 
+- O fechamento da fase (ou a sessão da história) que falhou para a história com o motivo, em vez de o autopiloto chamar a IA sem fim com "a unidade ou a pasta já está reservada".
 - A sessão da história que cria as sub-tarefas da fase e para volta para a fila, em vez de bloquear por "encerrou sem responder".
 - A história que a IA cria em modo autônomo a partir de outra, fora de uma pilha, depende dela: não começa antes de a origem chegar à base.
 - Dividir uma história em modo autônomo não religa mais o autopiloto que a pessoa pausou.
