@@ -8,7 +8,8 @@ describe('conjunto de skills do fluxo (#588)', () => {
   it('o portão de checagens: parar em Verificando e, se falhar, ready com a saída na conversa (#1274)', () => {
     expect(FLOW_SKILL.body).toContain('Verificando');
     expect(FLOW_SKILL.body).toContain('**pare**');
-    expect(FLOW_SKILL.body).toContain('volta para \`ready\` com a saída na conversa'.replace(/\\/g, ''));
+    expect(FLOW_SKILL.body).toContain('volta para `ready` com a saída na conversa');
+    expect(FLOW_SKILL.body).toContain('não é gravado enquanto o card está em Verificando');
     const revisao = FLOW_SKILLS.find((k) => k.name === 'faz-ai-revisao-e-homologacao')!;
     expect(revisao.body).toContain('portão do fluxo');
   });

@@ -50,7 +50,8 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
    pede a revisão (a pessoa que arrasta o card não passa por ele). A resposta da ferramenta diz que o card foi a
    Verificando: **pare** e não chame mais nada nele, só o board mexe enquanto ele está nesse status. Se as
    checagens falharem, o card volta para \`ready\` com a saída na conversa: leia-a, corrija e tente de novo.
-   Se passarem, o board conclui o movimento ou o pedido de revisão e registra o commit verificado.
+   Se passarem, o board conclui o movimento ou o pedido de revisão e registra o commit verificado. O \`comment\`
+   do \`move_card\` não é gravado enquanto o card está em Verificando: grave-o de novo quando o card chegar ao destino.
 
 ## Pendências com a pessoa
 

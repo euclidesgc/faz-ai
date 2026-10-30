@@ -16,7 +16,8 @@ import { shellQuote } from '../../src/shared/gate';
 import type { WebviewToHost } from '../../src/shared/messages';
 
 const WASM_DIR = path.resolve(__dirname, '../../node_modules/sql.js/dist');
-const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], { cwd, encoding: 'utf8' }).trim();
+const git = (cwd: string, ...args: string[]) =>
+  execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], { cwd, encoding: 'utf8' }).trim();
 
 interface World {
   root: string;
@@ -91,7 +92,8 @@ async function gateWorld(command: (marker: string) => string): Promise<World> {
     workspaceOf: () => project,
     instance: 'cenario',
     log: () => {},
-    git: (args, cwd) => new Promise((resolve, reject) => execFile('git', args, { cwd }, (e, out) => (e ? reject(e) : resolve(String(out))))),
+    git: (args, cwd) =>
+      new Promise((resolve, reject) => execFile('git', args, { cwd }, (e, out) => (e ? reject(e) : resolve(String(out))))),
     shellPath: async () => undefined,
     coordinationDir: path.join(root, 'locks'),
     acquireTries: 2,
@@ -111,7 +113,10 @@ async function gateWorld(command: (marker: string) => string): Promise<World> {
     card,
     column,
     columnName: () => snap().columns.find((c) => c.id === card().columnId)!.name,
-    comments: () => snap().comments.filter((c) => c.cardId === cardId).map((c) => c.body),
+    comments: () =>
+      snap()
+        .comments.filter((c) => c.cardId === cardId)
+        .map((c) => c.body),
     ai,
     human,
   };
