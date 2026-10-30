@@ -39,7 +39,8 @@ import type { ProjectProfile } from '../../shared/projectProfile';
 import { readProjectProfile } from '../projectProfile';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
 import { agentProfiles } from '../../shared/execution';
-import { columnsOf } from '../../shared/selectors';
+import { columnsOf, isLive } from '../../shared/selectors';
+import { BOARD_AUTHOR } from '../../shared/gitflow';
 import type { AttachmentStore } from '../attachments';
 import { runUnsupported } from '../headless';
 import { catalogTool, isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
@@ -77,7 +78,7 @@ import { boardBackupHandlers } from './handlers/boardBackup';
 import { boardSettingsHandlers } from './handlers/boardSettings';
 import { addAttachment, cardContentHandlers } from './handlers/cardContent';
 import { questionHandlers } from './handlers/questions';
-import { cardHandlers, createCard } from './handlers/cards';
+import { applyReviewStatus, cardHandlers, createCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
 import { initModels, modelHandlers, proposeLegacyFallbacks, retireModel } from './handlers/models';
 import { legacyFallbackNotes, parseLegacyFallbacks } from '../../shared/legacyFallback';
@@ -251,6 +252,7 @@ export class MessageRouter {
   private errorListeners = new Set<(message: string) => void>();
   private approveListeners: ((cardId: string) => void)[] = [];
   private cancelListeners: ((cardIds: string[]) => void)[] = [];
+  private gateListeners: ((gateRunId: string) => void)[] = [];
   /** o que o executor informou (`setAiRuns`) e o que o orquestrador conduz entre as rodadas (`setOrchestrations`) */
   private runnerRuns: AiActivity[] = [];
   private orchestrations: AiActivity[] = [];
@@ -976,6 +978,73 @@ export class MessageRouter {
     this.notify();
   }
 
+  /** O portão em andamento do card, ou null: o MCP devolve o id à IA quando o card ficou em "Verificando". */
+  runningGate(cardId: string): { id: string } | null {
+    const gate = this.ctx.gateRuns.runningFor(cardId);
+    return gate ? { id: gate.id } : null;
+  }
+
+  /** Avisa quando a IA tenta sair de uma coluna com checagens: o executor do portão roda as checagens (`gate.ts`). */
+  onGate(fn: (gateRunId: string) => void): void {
+    this.gateListeners.push(fn);
+  }
+
+  /**
+   * Desfecho do portão: as checagens passaram em `sha`. Método interno do host, fora de `WebviewToHost` e do MCP:
+   * a IA não forja o "passou". O card só segue se continua `verifying` na coluna em que o portão abriu; o movimento
+   * passa por todas as regras da IA (aprovação, sub-tarefas, conclusão) e, se for recusado, o card volta para `ready`.
+   */
+  completeGate(gateRunId: string, sha: string): void {
+    const ctx = this.ctx;
+    const gate = ctx.gateRuns.get(gateRunId);
+    if (!gate || gate.result !== 'running') return;
+    const card = ctx.state().cards.find((c) => c.id === gate.cardId);
+    if (!card || !isLive(card) || card.status !== 'verifying' || card.columnId !== gate.columnId) {
+      ctx.gateRuns.finish(gate.id, 'interrupted', 'O card mudou durante a verificação; nada foi movido.');
+      this.changed();
+      return;
+    }
+    ctx.gateRuns.finish(gate.id, 'passed', '');
+    ctx.comments.add(card.id, BOARD_AUTHOR, `Checagens passaram em \`${sha}\`.`, 'ai');
+    try {
+      if (gate.kind === 'move' && gate.targetColumnId) {
+        ctx.cards.setStatus(card.id, 'ready', '', BOARD_AUTHOR);
+        ctx.cards.move(card.id, gate.targetColumnId, Number.MAX_SAFE_INTEGER, { byAi: true });
+        const storyId = ctx.cards.yoloStoryIdOf(card.id);
+        if (storyId) settleDelivery(ctx, storyId);
+      } else {
+        applyReviewStatus(ctx, card.id, BOARD_AUTHOR, '', undefined, true);
+      }
+    } catch (e) {
+      // nunca aprova nem move por fora das regras: o card volta para a IA com o motivo na conversa
+      ctx.cards.setStatus(card.id, 'ready', '', BOARD_AUTHOR);
+      ctx.comments.add(
+        card.id,
+        BOARD_AUTHOR,
+        `As checagens passaram em \`${sha}\`, mas ${gate.kind === 'move' ? 'o movimento' : 'o pedido de revisão'} foi recusado: ${e instanceof Error ? e.message : String(e)}`,
+        'ai',
+      );
+    }
+    this.changed();
+  }
+
+  /**
+   * Desfecho do portão: uma checagem falhou, estourou o tempo ou a verificação foi interrompida. O card volta para
+   * `ready` na coluna de origem com o fim da saída na conversa; se já saiu de `verifying`, só o registro é fechado.
+   */
+  failGate(gateRunId: string, result: 'failed' | 'interrupted', body: string): void {
+    const ctx = this.ctx;
+    const gate = ctx.gateRuns.get(gateRunId);
+    if (!gate || gate.result !== 'running') return;
+    ctx.gateRuns.finish(gate.id, result, body);
+    const card = ctx.state().cards.find((c) => c.id === gate.cardId);
+    if (card && isLive(card) && card.status === 'verifying' && card.columnId === gate.columnId) {
+      ctx.comments.add(card.id, BOARD_AUTHOR, body, 'ai');
+      ctx.cards.setStatus(card.id, 'ready', '', BOARD_AUTHOR);
+    }
+    this.changed();
+  }
+
   /** Avisa quando cards vão para uma coluna de cancelamento (o orquestrador interrompe as execuções deles). */
   onCardsCancelled(fn: (cardIds: string[]) => void): void {
     this.cancelListeners.push(fn);
@@ -1237,6 +1306,8 @@ export class MessageRouter {
     this.notify();
     // avisa das aprovações só depois de o board estar gravado e os webviews atualizados
     for (const cardId of this.ctx.approved.splice(0)) this.approveListeners.forEach((fn) => fn(cardId));
+    // o portão só começa depois de o card `verifying` estar gravado
+    for (const gateRunId of this.ctx.gates.splice(0)) this.gateListeners.forEach((fn) => fn(gateRunId));
     return this.snapshot();
   }
 }

@@ -311,10 +311,20 @@ export class Autopilot {
     this.resume();
   }
 
-  /** Liga sozinho quando uma pessoa liga o modo numa história; ligar de novo também desfaz a pausa dela. */
+  /**
+   * Liga sozinho quando uma pessoa liga o modo numa história; ligar de novo também desfaz a pausa dela. A história
+   * que a IA cria a partir de outra em modo autônomo (`autonomous_from`, `derived_from`) não é gesto da pessoa: com
+   * o autopiloto pausado, ela espera na fila. Sem isso, dividir uma história em partes religava a fila que a pessoa
+   * tinha pausado.
+   */
   private onBoardChange(): void {
-    const now = new Set(yoloStories(this.router.snapshot()).map((c) => c.id));
-    const added = [...now].some((id) => !this.known.has(id));
+    const s = this.router.snapshot();
+    const now = new Set(yoloStories(s).map((c) => c.id));
+    const fromKnown = (id: string) => {
+      const card = s.cards.find((c) => c.id === id);
+      return (!!card?.derivedFrom && this.known.has(card.derivedFrom)) || openPredecessors(s, id).some((p) => this.known.has(p.id));
+    };
+    const added = [...now].some((id) => !this.known.has(id) && !(this.paused() && fromKnown(id)));
     this.known = now;
     if (added && !this.active && !this.stopping && this.canRun()) return void this.resume();
     if (!this.active) this.autoResume();
