@@ -145,6 +145,7 @@ describe('suggestModelRule e suggestModel', () => {
     artifactImport: null,
     authExpired: [],
     usageLimit: [],
+    usageReadings: [],
     orphans: { items: [], failed: {}, scannedAt: null },
     mainBranch: null,
     branchRenames: [],

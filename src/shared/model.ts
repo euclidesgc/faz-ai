@@ -16,6 +16,7 @@ import type { AiRunMode, RunnerConfig } from './runner';
 import type { AiRunOrigin } from './log';
 import type { BranchKind, GitConfig, MainBranch } from './git';
 import type { UsageLimitState } from './usageLimit';
+import type { UsageReading } from './quotaReading';
 import type { BranchRenamePending, RenameOutcome } from './branchRename';
 import type { ConnectState } from './connect';
 import type { ContextAdvice, ContextLocation, ContextScopeReport } from './contextScope';
@@ -319,6 +320,8 @@ export interface BoardState {
   authExpired: AiTool[];
   /** a pausa por limite de uso, uma entrada por perfil de CLI (a fila automática daquele perfil espera; a lista vem da `meta`) */
   usageLimit: UsageLimitState[];
+  /** a leitura de uso da cota mais recente de cada perfil (a tela mostra; o host decide com ela) */
+  usageReadings: UsageReading[];
   /** branches e worktrees órfãs, varridas pelo host; vazio antes da primeira varredura (runtime, não vai para o banco) */
   orphans: OrphanReport;
   /** o último Diagnóstico do ambiente; null antes de rodar a primeira vez */

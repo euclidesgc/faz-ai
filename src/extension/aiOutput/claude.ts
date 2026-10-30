@@ -28,6 +28,7 @@
 import { USAGE_LIMIT_TEXT as SHARED_USAGE_LIMIT_TEXT } from '../../shared/conversation';
 import { bashCommandTerms } from '../../shared/bashCommand';
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
+import type { UsageWindowHint } from '../../shared/quotaReading';
 import { asList, asNumber, asObject, asText, cut, type Json } from './json';
 import type { OutputReader, OutputStream, ReaderDeps } from './reader';
 
@@ -82,6 +83,31 @@ function exhaustedResetsAt(info: Json): number | null {
     if (utilization !== null && utilization >= 1 && resetsAt !== null && (latest === null || resetsAt > latest)) latest = resetsAt;
   }
   return latest ?? own;
+}
+
+/**
+ * As janelas de uso que o `rate_limit_event` traz, para a leitura da cota (`RunReport.usageReading`).
+ * Primeiro `unifiedWindows`, uma entrada por janela com `utilization` numérica, que é a forma da saída
+ * real; sem isso, o `utilization` do topo com a janela `rateLimitType` (ou `unknown`), que é a forma da
+ * documentação do Agent SDK. Fração 0–1: acima de 1 vale 1; negativo é descartado. Sem porcentagem, [].
+ */
+function usageWindowsOf(info: Json): UsageWindowHint[] {
+  const windows: UsageWindowHint[] = [];
+  for (const [window, raw] of Object.entries(asObject(info.unifiedWindows) ?? {})) {
+    const entry = asObject(raw);
+    const utilization = fractionOf(asNumber(entry?.utilization));
+    if (utilization !== null) windows.push({ window, utilization, resetsAt: asNumber(entry?.resetsAt) });
+  }
+  if (windows.length) return windows;
+  const utilization = fractionOf(asNumber(info.utilization));
+  if (utilization === null) return [];
+  return [{ window: asText(info.rateLimitType) ?? 'unknown', utilization, resetsAt: asNumber(info.resetsAt) }];
+}
+
+/** A fração de uso limitada a 1; negativa ou ausente, null (o `asNumber` já descarta NaN e infinito). */
+function fractionOf(value: number | null): number | null {
+  if (value === null || value < 0) return null;
+  return Math.min(value, 1);
 }
 
 /**
@@ -185,6 +211,8 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
   // a dica de renovação que acompanhou o limite, crua: o leitor não tem relógio (`resetAtOf` a resolve)
   let limitResetsAt: number | null = null;
   let limitText: string | null = null;
+  // a última leitura de janelas com porcentagem: monitoramento sem `utilization` não a apaga
+  let usageWindows: UsageWindowHint[] | null = null;
   const results: ResultEvent[] = [];
   /** `tool_use_id` → nome da ferramenta, para a linha que explica o erro dela */
   const calledTools = new Map<string, string>();
@@ -364,6 +392,8 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
             usageLimitReached = true;
             limitResetsAt = exhaustedResetsAt(info) ?? limitResetsAt;
           }
+          const windows = info ? usageWindowsOf(info) : [];
+          if (windows.length) usageWindows = windows;
           // o monitoramento de rotina (`status: "allowed"`) não vira linha, só o sinal estrutural
           return [];
         }
@@ -392,6 +422,8 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
       // está trabalhando" e o segundo trazia a resposta de verdade
       const reversed = [...results].reverse();
       const answer = reversed.find((r) => r.text)?.text ?? saidText.join('\n');
+      // a leitura da cota vale em qualquer caso de medição: só some quando nenhum evento trouxe porcentagem
+      const usage = usageWindows ? { usageReading: { windows: usageWindows } } : {};
 
       // o consumo da sessão: `modelUsage` do ÚLTIMO `result` (é cumulativo e igual nos dois) e, de
       // reserva, a soma dos `usage` dos segmentos — que não cobre o subagente, mas é melhor que nada
@@ -419,6 +451,7 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
           answer,
           reason: null,
           ...limit,
+          ...usage,
         };
       }
 
@@ -438,14 +471,16 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
           answer,
           reason: null,
           ...limit,
+          ...usage,
         };
       }
 
       // leu eventos e chamadas de ferramenta, mas nenhum número: o inventário vale, o consumo não
       // existe. `none` só quando não há nem uma coisa nem a outra — é a invariante que impede "não
       // medido" de parecer "medido e zero".
-      if (items.length) return { measure: 'partial', consumption: null, inventory: items, bashCommands, answer, reason: null, ...limit };
-      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, ...limit };
+      if (items.length)
+        return { measure: 'partial', consumption: null, inventory: items, bashCommands, answer, reason: null, ...limit, ...usage };
+      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, ...limit, ...usage };
     },
 
     get sawEvent(): boolean {

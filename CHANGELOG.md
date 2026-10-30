@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- Tela **Uso da cota** no Claude Code, com o limite crítico que antecipa a troca para o reserva (#1114).
 - Painel Métricas ganha o bloco Custo por entrega, por tipo, esforço, modelo e agente (#1224).
 - O bloco Retrabalho do painel Métricas mostra o retrabalho por agente e as execuções sem resultado (#1224).
 - `get_metrics` com `rework: true` traz o custo por entrega (tokens por história concluída, por tipo e esforço, e a visão tipo × modelo e tipo × agente) e o retrabalho por agente, com as execuções sem resultado (#1113).

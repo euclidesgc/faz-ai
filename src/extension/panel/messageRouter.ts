@@ -28,11 +28,13 @@ import {
   nextPause,
   parseModelLimits,
   parsePauses,
+  RESET_MAX_AHEAD_MS,
   USAGE_LIMIT_META_KEY,
   type ModelLimit,
   type UsageLimitPause,
   type UsageLimitState,
 } from '../../shared/usageLimit';
+import { USAGE_READINGS_META_KEY, parseReadings, type UsageReading } from '../../shared/quotaReading';
 import type { ProjectProfile } from '../../shared/projectProfile';
 import { readProjectProfile } from '../projectProfile';
 import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
@@ -265,6 +267,8 @@ export class MessageRouter {
   private usageLimit: UsageLimitState[] = [];
   /** Marcas de modelo esgotado (#1100): só o host lê; ficam na `meta`, fora do `BoardState`. */
   private modelLimits: ModelLimit[] = [];
+  /** A leitura de uso da cota mais recente de cada perfil (#1114): fica na `meta` e vai para a tela. */
+  private usageReadings: UsageReading[] = [];
   private openTerminalHook: ((command: string) => void) | null = null;
   private environment: EnvironmentReport | null = null;
   private environmentFirstRun = false;
@@ -294,6 +298,7 @@ export class MessageRouter {
     this.store = this.ctx.store;
     this.usageLimit = parsePauses(this.ctx.boards.getMeta(USAGE_LIMIT_META_KEY)).map((p) => ({ ...p, probe: null }));
     this.modelLimits = parseModelLimits(this.ctx.boards.getMeta(MODEL_LIMIT_META_KEY));
+    this.usageReadings = parseReadings(this.ctx.boards.getMeta(USAGE_READINGS_META_KEY));
     this.ctx.harness.load();
     initModels(this.ctx);
     // os agentes de fábrica usam as regras de modelo, que initModels acabou de criar
@@ -636,6 +641,7 @@ export class MessageRouter {
       requirementsCheckedAt: this.requirementsCheckedAt,
       authExpired: this.authExpired,
       usageLimit: this.usageLimit,
+      usageReadings: this.usageReadings,
       environment: this.environment,
       ...(this.connections ? { connections: this.connections } : {}),
       contextScopes: this.savedContextScopes(),
@@ -815,6 +821,29 @@ export class MessageRouter {
     } catch {
       // sem gravar, a marca vale só nesta sessão do editor
     }
+  }
+
+  /** Grava as leituras de uso na `meta`, sem as de mais de 7 dias; falha vira só memória. */
+  private persistUsageReadings(): void {
+    const oldest = Date.now() - RESET_MAX_AHEAD_MS;
+    this.usageReadings = this.usageReadings.filter((r) => r.readAt > oldest);
+    try {
+      this.ctx.boards.setMeta(USAGE_READINGS_META_KEY, JSON.stringify(this.usageReadings));
+    } catch {
+      // sem gravar, a leitura vale só nesta sessão do editor
+    }
+  }
+
+  /** As leituras de uso da cota (o host decide com elas). */
+  usageReadingList(): readonly UsageReading[] {
+    return this.usageReadings;
+  }
+
+  /** Substitui a leitura do perfil, grava na `meta` (falha vira só memória) e publica para a tela. */
+  recordUsageReading(reading: UsageReading): void {
+    this.usageReadings = [...this.usageReadings.filter((r) => r.profileId !== reading.profileId), reading];
+    this.persistUsageReadings();
+    this.notify();
   }
 
   /** As marcas de modelo esgotado (só o host lê). */

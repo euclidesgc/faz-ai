@@ -13,6 +13,7 @@ import { AccountPanel } from './AccountPanel';
 import { ProfileActions, connectable } from './ProfileActions';
 import { ConnectProgress, ModeSheetList } from './connectProgress';
 import { ContextScope } from './ContextScope';
+import { QuotaReading } from './QuotaReading';
 
 /** A ferramenta nesta máquina: achada (com a versão) ou não, com onde instalar. */
 function ToolStep({ item }: { item: AgentListItem }) {
@@ -228,6 +229,7 @@ export function AgentConnection({ item, onEdit }: { item: AgentListItem; onEdit(
       <ToolStep item={item} />
       <AccountPanel agentKey={item.key} name={item.name} profile={p} autoCheck={!!p && p.enabled && installed !== false} />
       {p && connectable(p) && <BoardConnection profile={p} />}
+      {p && p.tool === 'claude' && <QuotaReading profile={p} />}
       {p && <ContextScope profile={p} />}
       {p && !connectable(p) && (
         <Text as="p" size="1" color="gray">

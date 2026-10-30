@@ -58,6 +58,8 @@ export interface RunnerConfig {
    * perfil dela; quem grava é o host, no Conectar (a tela não manda o número, `BoardRepo` o descarta).
    */
   compatibilityReviews: Record<string, number>;
+  /** o limite crítico de uso da cota por perfil, em % (1–100); ausente = 80. Acima dele, a execução automática começa no reserva */
+  quotaCritical: Record<string, number>;
 }
 
 export const ADMISSION_REGIMES: { value: AdmissionRegime; label: string; hint: string }[] = [
@@ -98,6 +100,22 @@ function parseReviews(raw: unknown): Record<string, number> {
   ) as Record<string, number>;
 }
 
+export const QUOTA_CRITICAL_RANGE = { min: 1, max: 100 };
+
+/** O limite crítico por perfil: só ids de perfil válidos com inteiro na faixa. */
+function parseQuotaCritical(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return Object.fromEntries(
+    Object.entries(raw).filter(
+      ([id, n]) =>
+        /^[a-z0-9][a-z0-9-]{0,31}$/.test(id) &&
+        Number.isInteger(n) &&
+        (n as number) >= QUOTA_CRITICAL_RANGE.min &&
+        (n as number) <= QUOTA_CRITICAL_RANGE.max,
+    ),
+  ) as Record<string, number>;
+}
+
 export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint: string }[] = [
   {
     value: 'board',
@@ -135,6 +153,7 @@ export const DEFAULT_RUNNER: RunnerConfig = {
   admissionRegime: 'exclusive',
   compatibilityReviewRevision: 0,
   compatibilityReviews: {},
+  quotaCritical: {},
 };
 
 /**
@@ -173,6 +192,7 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
     // compatível sem revisão não existe: a configuração gravada à mão vale como a primeira revisão
     compatibilityReviewRevision: Number.isSafeInteger(revision) && revision > 0 ? revision : regime === 'compatible' ? 1 : 0,
     compatibilityReviews: parseReviews(raw.compatibilityReviews),
+    quotaCritical: parseQuotaCritical(raw.quotaCritical),
     autopilotPaused: raw.autopilotPaused === true,
     defaultAgent: typeof raw.defaultAgent === 'string' ? raw.defaultAgent.trim() : '',
     heartbeat: raw.heartbeat === true,

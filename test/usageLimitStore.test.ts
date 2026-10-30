@@ -142,3 +142,30 @@ describe('marca de modelo esgotado (#1100)', () => {
     expect(open().modelLimitList()).toEqual([]);
   });
 });
+
+describe('leitura de uso da cota gravada no board', () => {
+  const reading = (profileId: string, percent: number) => ({
+    profileId,
+    readAt: Date.now(),
+    windows: [{ window: 'five_hour', percent, resetAt: null }],
+  });
+
+  it('substitui a leitura do perfil, persiste na meta e recarrega', () => {
+    const router = open();
+    router.recordUsageReading(reading('claude', 40));
+    router.recordUsageReading(reading('cursor', 10));
+    const second = reading('claude', 86);
+    router.recordUsageReading(second);
+    expect(router.usageReadingList()).toHaveLength(2);
+    expect(router.snapshot().usageReadings.find((r) => r.profileId === 'claude')).toEqual(second);
+    const reopened = open().snapshot().usageReadings;
+    expect(reopened).toHaveLength(2);
+    expect(reopened.find((r) => r.profileId === 'claude')?.windows[0]?.percent).toBe(86);
+  });
+
+  it('descarta a leitura de mais de 7 dias ao gravar', () => {
+    const router = open();
+    router.recordUsageReading({ ...reading('old', 90), readAt: Date.now() - 8 * 24 * 60 * 60_000 });
+    expect(router.usageReadingList()).toEqual([]);
+  });
+});

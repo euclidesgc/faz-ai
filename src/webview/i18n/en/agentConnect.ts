@@ -32,6 +32,21 @@ export const agentConnect: Record<string, string> = {
   'Só teste': 'Test only',
   Indisponível: 'Unavailable',
 
+  // o uso da cota (Claude Code)
+  'Uso da cota': 'Quota usage',
+  'Janela de 5 h': '5 h window',
+  'Janela semanal': 'Weekly window',
+  'Janela {name}': '{name} window',
+  '{window}: {percent}%': '{window}: {percent}%',
+  '{window}: {percent}% · renova {date}': '{window}: {percent}% · renews {date}',
+  'Lido há {n} min': 'Read {n} min ago',
+  'Uso desconhecido': 'Usage unknown',
+  'O board lê o uso no fim de cada execução; a leitura vale por 30 minutos.':
+    'The board reads the usage at the end of each run; a reading is valid for 30 minutes.',
+  'Limite crítico (%)': 'Critical limit (%)',
+  'Acima dele, as execuções automáticas começam no reserva da regra de fallback.':
+    "Above it, automatic runs start on the fallback rule's reserve.",
+
   // o agente escolhido
   'Registro do ACP · {version}': 'ACP registry · {version}',
   'Página do agente': 'Agent page',

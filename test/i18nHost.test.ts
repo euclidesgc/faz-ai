@@ -234,6 +234,7 @@ describe('i18n do host: mensagens preenchidas', () => {
         admissionRegime: 'exclusive',
         compatibilityReviewRevision: 0,
         compatibilityReviews: {},
+        quotaCritical: {},
       },
       { offline: true, unsupported: null },
     );

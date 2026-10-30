@@ -6,6 +6,7 @@
 
 ### Added
 
+- **Quota usage** block for Claude Code, with the critical limit that brings forward the switch to the reserve (#1114).
 - Metrics panel gains the Cost per delivery block, by type, effort, model and agent (#1224).
 - The Rework block in the Metrics panel shows rework by agent and runs without a result (#1224).
 - `get_metrics` with `rework: true` brings the delivery cost (tokens per done story, by type and effort, and the type × model and type × agent view) and rework per agent, with runs without a result (#1113).

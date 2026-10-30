@@ -136,6 +136,15 @@ fim da aba Conexão do perfil. Nenhuma das sondas gasta a sua conta. Quando uma 
 ambiente ou a extensão mudou), a faixa de requisitos diz onde refazer: **Abrir Conectar agentes** no
 perfil do catálogo, **Abrir o perfil** na cópia.
 
+### Uso da cota (Claude Code)
+
+Na aba Conexão dos perfis do Claude Code, o bloco **Uso da cota** mostra a última leitura do uso: uma
+linha por janela (por exemplo, "Janela de 5 h: 86% · renova 29/10 14:30") e "Lido há N min". O board lê o
+uso no fim de cada execução e a leitura vale por 30 minutos; sem leitura fresca, o bloco diz **Uso
+desconhecido**. O campo **Limite crítico (%)** (1 a 100, padrão 80) define a partir de quanto a janela é
+crítica: acima dele, as execuções automáticas começam no reserva da regra de fallback (veja
+[Regras de fallback](#regras-de-fallback)). Voltar ao padrão (80) tira o valor guardado do perfil.
+
 ### Contexto do card: fechado ou aberto
 
 Um card gasta menos e sai mais preciso quando a IA usa só o que o board entrega (a história, a fase, as
@@ -484,6 +493,14 @@ salvar. A IA também consulta as regras pelo MCP (`get_execution_policies`, só 
 Por baixo, cada regra continua uma política de execução versionada (schema 41): toda gravação gera uma
 versão, as versões anteriores ficam guardadas, e o host recusa duas regras ligadas empatadas na
 prioridade ou um destino fora do catálogo.
+
+### Troca antes de a cota acabar
+
+Quando o perfil do modelo tem leitura de uso fresca (até 30 minutos) com uma janela no limite crítico ou
+acima dele (o **Limite crítico (%)** da aba Conexão do agente, padrão 80), as execuções automáticas
+(Trabalhar na fase, heartbeat e modo autônomo) já começam no reserva da regra de fallback, sem esperar o
+limite esgotar. A troca só vale nas execuções automáticas e só pela cadeia da regra de fallback; sem
+leitura fresca, ou se a janela já renovou, nada muda.
 
 ### O modelo reserva antigo
 

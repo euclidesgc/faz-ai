@@ -5508,6 +5508,7 @@ body[data-theme='dark'] img.agent-icon {
 }
 .agent-account,
 .agent-board-connection,
+.agent-quota,
 .context-scope,
 .agent-use + .agent-step {
   padding-top: var(--sp-12);
@@ -5515,11 +5516,17 @@ body[data-theme='dark'] img.agent-icon {
 }
 .agent-account,
 .agent-board-connection,
+.agent-quota,
 .context-scope,
 .agent-use {
   display: flex;
   flex-direction: column;
   gap: var(--sp-8);
+}
+.agent-quota-windows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .agent-login-methods {
   display: flex;
