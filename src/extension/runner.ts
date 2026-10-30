@@ -23,6 +23,14 @@ import { canDispatch, limitClock, limitHolds, modelLimitHolds, modelLimitOf, nex
 import { limitChoice } from '../shared/limitChoice';
 import { MAX_TRANSIENT_RETRIES, retryDelay, type FailureClass } from '../shared/failureClass';
 import { activityKindOf } from '../shared/activity';
+import {
+  MAX_OUTCOME_REPAIRS,
+  PHASE_OUTCOME_ADVICE,
+  outcomeEffect,
+  readPhaseOutcome,
+  repairRequest,
+  type OutcomeRead,
+} from '../shared/phaseOutcome';
 import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from './unitAdvice';
 import { isDirectTrackStory, phaseSubtasks } from '../shared/orchestration';
 import type { AiRunOrigin, RunReport } from '../shared/log';
@@ -102,6 +110,20 @@ export interface RunOptions {
   chain?: Chain;
   /** de uso interno: quantas retentativas por falha transitória já houve nesta cadeia (ver `transientRetry`) */
   transientRetries?: number;
+  /** de uso interno: o reparo do bloco final, na mesma sessão da CLI (ver `outcomeRepair`); quem chama de fora nunca informa */
+  resume?: OutcomeResume;
+}
+
+/** O pedido de reparo do bloco final: a sessão a retomar, o turno e o status do card antes da execução original. */
+interface OutcomeResume {
+  sessionId: string;
+  /** 1 ou 2: quantos pedidos de reparo já houve, contando este */
+  turn: number;
+  /** o que estava errado na resposta anterior, para o pedido dizer */
+  read: Exclude<OutcomeRead, { kind: 'valid' }>;
+  /** o status e o motivo que o card tinha antes da execução original: interromper o reparo os devolve */
+  previous: CardStatus | null;
+  previousReason: string;
 }
 
 /** A execução automática do card espera a retentativa por falha transitória (o backoff ainda não venceu). */
@@ -116,6 +138,8 @@ export class RetryHeld extends Error {
 interface Retry {
   target: RunTarget;
   chain: Chain;
+  /** o reparo do bloco final: a mesma sessão, com o pedido de reparo no lugar do prompt */
+  resume?: OutcomeResume;
 }
 
 interface Run {
@@ -139,6 +163,8 @@ interface Run {
   transientRetries: number;
   /** o pedido que começou a execução, para repeti-la igual (sem o `onExit`, que já avisou o fim desta) */
   options: RunOptions;
+  /** o board aplicou o bloco final desta execução (para a linha de conformidade no log) */
+  outcomeApplied: boolean;
   /** o contexto que as políticas casam: ação, agente, fase e tipo do card */
   policy: {
     action: ContextAction;
@@ -391,6 +417,8 @@ export const cardPrompt = (
   advice: string[] = [],
   autonomous = false,
   triage = false,
+  /** pede o bloco final da resposta (a execução da história ou do card, não a sub-tarefa do orquestrador) */
+  outcomeBlock = false,
 ): string =>
   [
     `Trabalhe no card ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai".`,
@@ -401,6 +429,7 @@ export const cardPrompt = (
     'Faça o trabalho da fase em que o card está e termine passando a vez: request_review quando houver algo para revisar, ask_questions (com opções) ou ask_question (pergunta aberta) quando precisar de uma resposta, block_card se houver um impedimento, ou mova o card se a fase não exigir aprovação.',
     ...(autonomous ? [AUTONOMOUS_ADVICE] : []),
     ...advice,
+    ...(outcomeBlock ? [PHASE_OUTCOME_ADVICE] : []),
     'Trabalhe só neste card e nas sub-tarefas dele. Não pergunte nada fora da conversa do card: ninguém está acompanhando esta sessão.',
   ].join('\n');
 
@@ -419,7 +448,13 @@ export const REPLY_BUSY =
  * O que a IA recebe quando a pessoa envia uma mensagem na conversa do card: responder ou fazer o pedido, com
  * o card bloqueado ou não. A história é onde a pessoa destrava as sub-tarefas, então a resposta pode agir nelas.
  */
-export const replyPrompt = (ref: string, context: PromptContext = NO_CONTEXT, advice: string[] = [], autonomous = false): string =>
+export const replyPrompt = (
+  ref: string,
+  context: PromptContext = NO_CONTEXT,
+  advice: string[] = [],
+  autonomous = false,
+  outcomeBlock = false,
+): string =>
   [
     `A pessoa escreveu na conversa do card ${ref} do board Faz AI. Use as ferramentas do servidor MCP "faz-ai".`,
     ...context.always,
@@ -430,6 +465,7 @@ export const replyPrompt = (ref: string, context: PromptContext = NO_CONTEXT, ad
     // o pedido do modo autônomo manda terminar a fase e mover o card: na resposta, a fase fica para o board seguir
     ...(autonomous ? [REPLY_AUTONOMOUS_ADVICE] : []),
     ...advice,
+    ...(outcomeBlock ? [PHASE_OUTCOME_ADVICE] : []),
     'Trabalhe só neste card e nas sub-tarefas dele. Não pergunte nada fora da conversa do card: ninguém está acompanhando esta sessão.',
   ].join('\n');
 
@@ -645,6 +681,8 @@ export class AiRunner {
             this.deps.gateway.cursorHookReady?.(),
           );
           const permissionAdvice = refine || summarize ? null : PERMISSION_ADVICE[permission];
+          // o bloco final é da execução do card (fase ou resposta); a sub-tarefa do orquestrador fica de fora
+          const outcomeBlock = options.workId === undefined;
           const stopAdvice = autonomous && !conflict && !unblock ? yoloStopAdvice(state, card) : null;
           // a sessão da história numa fase de código só cria as sub-tarefas: quem as executa é o board
           const storySessionAdvice =
@@ -653,6 +691,8 @@ export class AiRunner {
                 ? DIRECT_TRACK_ADVICE
                 : STORY_SESSION_ADVICE
               : null;
+          if (options.resume)
+            log(`Reparo do bloco final (${options.resume.turn} de ${MAX_OUTCOME_REPAIRS}): retoma a sessão e pede só o bloco.`);
           if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
           if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
           if (summarize) log('Resumir a conversa: lê as mensagens e grava um resumo, sem mover o card nem mudar o status.');
@@ -691,40 +731,46 @@ export class AiRunner {
               mcp: plan.manifest.mcpServers,
             },
             input: {
-              prompt: refine
-                ? refinePrompt(cardRef(card), contextLines(state, card), refineCatalog(state))
-                : summarize
-                  ? summarizePrompt(cardRef(card), contextLines(state, card))
-                  : reply
-                    ? replyPrompt(
-                        cardRef(card),
-                        contextLines(state, card),
-                        [...(stopAdvice ? [stopAdvice] : []), ...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
-                        autonomous,
-                      )
-                    : conflict
-                      ? conflictPrompt(cardRef(card), contextLines(state, card), [
-                          ...plan.advice,
-                          ...(permissionAdvice ? [permissionAdvice] : []),
-                        ])
-                      : unblock
-                        ? unblockPrompt(cardRef(card), contextLines(state, card), [
+              // o reparo retoma a sessão: o prompt é só o pedido do bloco, e a conversa anterior vem da CLI
+              ...(options.resume ? { resume: { sessionId: options.resume.sessionId } } : {}),
+              prompt: options.resume
+                ? repairRequest(options.resume.read)
+                : refine
+                  ? refinePrompt(cardRef(card), contextLines(state, card), refineCatalog(state))
+                  : summarize
+                    ? summarizePrompt(cardRef(card), contextLines(state, card))
+                    : reply
+                      ? replyPrompt(
+                          cardRef(card),
+                          contextLines(state, card),
+                          [...(stopAdvice ? [stopAdvice] : []), ...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
+                          autonomous,
+                          outcomeBlock,
+                        )
+                      : conflict
+                        ? conflictPrompt(cardRef(card), contextLines(state, card), [
                             ...plan.advice,
                             ...(permissionAdvice ? [permissionAdvice] : []),
                           ])
-                        : cardPrompt(
-                            cardRef(card),
-                            contextLines(state, card),
-                            [
-                              ...(stopAdvice ? [stopAdvice] : []),
-                              ...(storySessionAdvice ? [storySessionAdvice] : []),
+                        : unblock
+                          ? unblockPrompt(cardRef(card), contextLines(state, card), [
                               ...plan.advice,
                               ...(permissionAdvice ? [permissionAdvice] : []),
-                              ...(options.advice ?? []),
-                            ],
-                            autonomous,
-                            needsTriage(state, card),
-                          ),
+                            ])
+                          : cardPrompt(
+                              cardRef(card),
+                              contextLines(state, card),
+                              [
+                                ...(stopAdvice ? [stopAdvice] : []),
+                                ...(storySessionAdvice ? [storySessionAdvice] : []),
+                                ...plan.advice,
+                                ...(permissionAdvice ? [permissionAdvice] : []),
+                                ...(options.advice ?? []),
+                              ],
+                              autonomous,
+                              needsTriage(state, card),
+                              outcomeBlock,
+                            ),
               permission,
               addDirs: this.router.aiWorkDirs(),
               exec: plan.input,
@@ -764,8 +810,9 @@ export class AiRunner {
     const run: Run = {
       profile: structuredClone(target.cli),
       exec,
-      previous: card.status,
-      previousReason: card.statusReason,
+      // o reparo herda o status de antes da execução original: o card já está "running" quando ele começa
+      previous: options.resume ? options.resume.previous : card.status,
+      previousReason: options.resume ? options.resume.previousReason : card.statusReason,
       mode,
       tail,
       info,
@@ -773,6 +820,7 @@ export class AiRunner {
       chain: options.chain ?? position?.chain ?? newChain(target, exec.startedAt),
       transientRetries: options.transientRetries ?? 0,
       options,
+      outcomeApplied: false,
       policy,
       origin,
     };
@@ -820,8 +868,11 @@ export class AiRunner {
         // o card continua "em execução" para o log enquanto o desfecho é aplicado: o bloqueio e a
         // mudança de status que explicam o fim da execução ficam ligados a ela
         if (options.workId === undefined) {
+          const replied = this.aiMessages(cardId) > messagesBefore;
+          // a ferramenta do board (ou a pessoa) mudou o card durante a execução, ou a IA respondeu na conversa
+          const toolActed = replied || this.router.snapshot().cards.find((c) => c.id === cardId)?.status !== 'running';
           try {
-            retry = this.settle(cardId, run, end, this.aiMessages(cardId) > messagesBefore, tool.label);
+            retry = this.settle(cardId, run, end, replied, tool.label);
           } catch (e) {
             // o desfecho que falhou não pode deixar o card "em execução" sem execução, nem calar o fim para a tela
             // e para o autopiloto: o card passa para a pessoa com o motivo
@@ -830,6 +881,7 @@ export class AiRunner {
             if (this.router.snapshot().cards.find((c) => c.id === cardId)?.status === 'running')
               this.block(cardId, `O board não conseguiu aplicar o fim da execução (${reason}). Confira a conversa e chame a IA de novo.`);
           }
+          if (mode === 'phase' || mode === 'reply') log(this.outcomeLine(cardId, run, end, toolActed));
         } else {
           const expired = end.authExpired || authFailed(run.profile, run.tail);
           if (expired) this.router.setAuthExpired(run.profile.id, true);
@@ -851,13 +903,20 @@ export class AiRunner {
       if (retry) {
         // a política autorizou a troca de alvo: uma nova execução assume, sem publicar nem avisar o fim
         // desta (quem decide o desfecho final é a execução do destino)
+        // o reparo do bloco final é igual: a mesma sessão, no mesmo alvo, com o pedido de reparo no lugar do prompt
         try {
-          this.start(cardId, { ...options, mode, chain: retry.chain }, mode, retry.target);
+          this.start(cardId, { ...options, mode, chain: retry.chain, resume: retry.resume }, mode, retry.target);
           return;
         } catch (e) {
           // a retentativa nem começou (card arquivado, gateway recusou): o card não pode ficar "em
           // execução" sem execução, e quem espera o fim precisa ser avisado como em qualquer outro fim
-          this.block(cardId, `Não foi possível repetir a execução no destino da política: ${e instanceof Error ? e.message : String(e)}`);
+          const why = e instanceof Error ? e.message : String(e);
+          this.block(
+            cardId,
+            retry.resume
+              ? `Não foi possível pedir de novo o bloco final da resposta: ${why}`
+              : `Não foi possível repetir a execução no destino da política: ${why}`,
+          );
         }
       }
       try {
@@ -1127,7 +1186,73 @@ export class AiRunner {
     const currentCard = current.cards.find((c) => c.id === cardId);
     const currentStory = currentCard && storyOf(current, currentCard);
     if (currentStory && isYolo(current, currentCard) && isWithHuman(currentStory)) return;
-    this.block(cardId, `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card.${output}`);
+    return this.settleOutcome(cardId, run, end, toolLabel, output);
+  }
+
+  /**
+   * A execução terminou bem sem a IA passar a vez: o bloco final da resposta decide (#1098). Válido, o board aplica
+   * o desfecho como a ferramenta faria; ausente ou inválido, pede o bloco de novo na mesma sessão (até
+   * `MAX_OUTCOME_REPAIRS` vezes, devolvendo o `Retry` do reparo); esgotado ou sem retomada, bloqueia como antes.
+   * As ferramentas vencem o bloco: quem chega aqui já passou pelo retorno cedo de `settle` (status mudado).
+   */
+  private settleOutcome(cardId: string, run: Run, end: AiRunEnd, toolLabel: string, output: string): Retry | undefined {
+    const silent = `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card`;
+    // só a execução do card que terminou bem tem bloco a ler (falha, limite de uso e outros modos já saíram em `settle`)
+    if ((run.mode !== 'phase' && run.mode !== 'reply') || end.failureClass != null || end.report.usageLimitReached)
+      return void this.block(cardId, `${silent}.${output}`);
+    const read = readPhaseOutcome(end.report.answer);
+    const state = this.router.snapshot();
+    const card = state.cards.find((c) => c.id === cardId);
+    if (read.kind === 'valid' && card) {
+      const effect = outcomeEffect(read.value, {
+        yolo: isYolo(state, card),
+        columnRequiresApproval: !!columnOf(state, card)?.requiresApproval,
+      });
+      run.outcomeApplied = true;
+      if (effect.status === 'blocked')
+        return void this.block(cardId, `Bloqueio informado no bloco final da resposta (a IA não chamou block_card):\n\n${effect.reason}`);
+      this.router.handle({ type: 'comment.add', cardId, body: effect.comment }, { author: RUNNER_AUTHOR, source: 'ai' });
+      return void this.setStatus(cardId, effect.status, toolLabel);
+    }
+    if (read.kind === 'valid') return void this.block(cardId, `${silent}.${output}`);
+    const problem = read.kind === 'missing' ? 'estava ausente' : `era inválido: ${read.problem}`;
+    const turn = run.options.resume?.turn ?? 0;
+    const sessionId = end.report.consumption?.sessionId;
+    const stop = !this.deps.gateway.canResume(run.profile)
+      ? 'esta ferramenta não retoma a sessão'
+      : !sessionId
+        ? 'a ferramenta não informou a sessão para retomar'
+        : turn >= MAX_OUTCOME_REPAIRS
+          ? `após ${turn} ${turn === 1 ? 'pedido' : 'pedidos'} de reparo`
+          : null;
+    if (stop || !sessionId) return void this.block(cardId, `${silent}, e o bloco final ${problem} (${stop}).${output}`);
+    this.deps.log(
+      `[${card ? cardRef(card) : cardId}] O bloco final ${problem}: pede de novo na mesma sessão (${turn + 1} de ${MAX_OUTCOME_REPAIRS}).`,
+    );
+    return {
+      target: run.target,
+      chain: run.chain,
+      resume: { sessionId, turn: turn + 1, read, previous: run.previous, previousReason: run.previousReason },
+    };
+  }
+
+  /**
+   * A linha de conformidade do bloco final, ao fim de toda execução de card: como veio o bloco, se a ferramenta agiu,
+   * se o board o aplicou e quantos reparos houve. "divergente" quando a ferramenta passou a vez e o bloco diz outra coisa
+   * sobre o bloqueio. Só log.
+   */
+  private outcomeLine(cardId: string, run: Run, end: AiRunEnd, toolActed: boolean): string {
+    const read = readPhaseOutcome(end.report.answer);
+    const status = this.router.snapshot().cards.find((c) => c.id === cardId)?.status ?? null;
+    const divergent = toolActed && read.kind === 'valid' && (read.value.outcome === 'BLOCKED') !== (status === 'blocked');
+    const kind = read.kind === 'valid' ? 'válido' : read.kind === 'missing' ? 'ausente' : 'inválido';
+    return [
+      `Bloco final: ${kind}`,
+      `ferramenta chamada: ${toolActed ? 'sim' : 'não'}`,
+      `aplicado: ${run.outcomeApplied ? 'sim' : 'não'}`,
+      `reparos: ${run.options.resume?.turn ?? 0}`,
+      ...(divergent ? ['divergente'] : []),
+    ].join('; ');
   }
 
   /**

@@ -89,7 +89,9 @@ describe('cenário: a execução seguinte começa no destino da cadeia de fallba
     });
     const story = w.router.snapshot().cards.find((c) => c.id === w.cardId)!;
     w.router.handle({ type: 'card.yolo.set', cardId: story.parentId ?? story.id, enabled: true });
-    const models = () => w.cliCommands.map((c) => modelOf(c.args));
+    // os pedidos de reparo do bloco final (#1098) retomam a sessão no mesmo alvo: não são uma execução nova
+    const starts = () => w.cliCommands.filter((c) => !c.args.includes('--resume'));
+    const models = () => starts().map((c) => modelOf(c.args));
 
     // 1ª execução: o opus esgota o limite e a regra troca, na mesma execução, para o sonnet
     const first = await runAuto(w);
@@ -98,7 +100,7 @@ describe('cenário: a execução seguinte começa no destino da cadeia de fallba
     expect(w.comments().some((b) => b.includes('esgotou o limite; a execução segue com'))).toBe(true);
 
     // 2ª execução do mesmo card: começa no sonnet, sem chamar o opus
-    const before = w.cliCommands.length;
+    const before = starts().length;
     const second = await runAuto(w);
     expect(second.code).toBe(0);
     expect(models().slice(before)).toEqual(['sonnet']);
@@ -109,8 +111,8 @@ describe('cenário: a execução seguinte começa no destino da cadeia de fallba
 
     // depois da renovação do limite, a posição de partida não vale mais: volta ao opus
     vi.setSystemTime(AFTER);
-    const mid = w.cliCommands.length;
+    const mid = starts().length;
     await runAuto(w);
-    expect(modelOf(w.cliCommands[mid]!.args)).toBe('opus');
+    expect(modelOf(starts()[mid]!.args)).toBe('opus');
   });
 });

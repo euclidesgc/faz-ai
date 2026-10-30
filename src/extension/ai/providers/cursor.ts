@@ -44,6 +44,8 @@ export function cursorModelId(name: string, effort: string | null): string {
 export const cursorProvider: AiProvider = {
   tool: 'cursor',
   measure: 'tokens',
+  // sem `resumable`: a documentação oficial (cursor.com/docs/cli, 2026-10-30) lista `--resume [chatId]`, mas não
+  // diz que vale junto de `-p`; sem confirmação, o reparo na mesma sessão não é pedido ao Cursor
   command: ({ prompt, permission, addDirs = [], exec, boardServer, structured, draftOnly }) => {
     // `--force` aprova sem perguntar o que a sessão pode usar; nos níveis menores, `--allowed-tools`
     // tira da sessão todo o resto (o modelo nem vê as outras ferramentas)

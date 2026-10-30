@@ -38,17 +38,18 @@ const CLIENT_NAMES: Record<string, string> = {
  */
 export const MCP_INSTRUCTIONS =
   'Board kanban do projeto (Faz AI). Antes de trabalhar nele, leia o fluxo com get_skill faz-ai-fluxo e siga-o. As histórias (workflow pai) passam pelas fases do fluxo, que são as colunas, uma por vez até a conclusão; ' +
-  'as sub-tarefas (workflow filho) ficam ligadas a uma história. Cards: pelo número (#12). Sinalize o progresso com move_card. ' +
-  'Sem pedido específico, comece por get_pending_work: ele lista o que está com você. get_board (colunas, tipos, campos, agentes): Plan, refinar, editar board. ' +
+  'as sub-tarefas (workflow filho) ficam ligadas a uma história. Sinalize o progresso com move_card. ' +
+  'Sem pedido, comece por get_pending_work: ele lista o que está com você. get_board: Plan, refinar, editar board. ' +
   '`work`: "ready" e "approved" estão com você ("verifying": só o board mexe); "waiting_review", "waiting_answer" e "blocked", com a pessoa. ' +
   'Ao começar um card chame start_work (numa sub-tarefa, já a move para Em andamento) e siga `phase` do get_card; conclua com move_card e `comment`. Nas colunas com `requiresApproval`, ao terminar o trabalho da fase chame request_review e PARE: ' +
   'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +
-  '`model` do get_card é o modelo que deve executar o card, e `tool` o perfil de CLI da execução (o do modelo do card, do agente ou da regra; sem modelo, o perfil padrão): se for outro, avise a pessoa. ' +
-  'Antes de executar, leia as `requiredRules` do get_card (arquivo em `path`) e as `requiredSkills` (o arquivo em `path` ou, sem `path`, por get_skill), mesmo as fora da sua lista. ' +
+  '`model` do get_card é o modelo que deve executar o card, e `tool` o perfil de CLI da execução: se for outro, avise a pessoa. ' +
+  'Antes de executar, leia as `requiredRules` do get_card e as `requiredSkills` (o arquivo em `path` ou, sem `path`, por get_skill). ' +
   'Toda conversa com a pessoa sobre um card acontece na conversa do card (add_comment, request_review, ask_questions); registre ali decisões e resultados. ' +
   'Pergunta com alternativas: ask_questions; aberta: ask_question. Impedimento que você não resolve: block_card. ' +
   'Ponto em aberto da pessoa: request_review e `pending`. No modo autônomo nada disso segura o card: decida, registre e siga. ' +
   'Pull request: sempre com --base em workspace.prBase do get_card. ' +
+  'Termine a resposta de um card com um bloco JSON {"outcome": DONE|DONE_WITH_CONCERNS|NEEDS_CONTEXT|BLOCKED, "summary", "failure_reason", "pending"}; as ferramentas vencem, o bloco é conferido no fim. ' +
   'Uso: get_metrics. Regras, skills, agentes e MCPs do board: get_harness. Perfil de CLI e modelos: get_models. ' +
   'O detalhe vem na descrição de cada ferramenta, nas notas do get_card e nas skills faz-ai-* (get_skill).';
 

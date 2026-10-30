@@ -15,7 +15,9 @@ const MCP_CONFIG = 'mcp.json';
 export const claudeProvider: AiProvider = {
   tool: 'claude',
   measure: 'cost',
-  command: ({ prompt, permission, addDirs = [], exec, boardServer, structured }) => {
+  // `claude -p ... --resume <session_id>` (docs "Run Claude Code programmatically › Continue conversations", 2026-10-30)
+  resumable: true,
+  command: ({ prompt, permission, addDirs = [], exec, boardServer, structured, resume }) => {
     // sem pasta confiada, o `-p` ignora as permissões do projeto: elas vão todas na linha de comando
     const modes: Record<RunnerPermission, string[]> = {
       // dontAsk nega tudo o que não está liberado: só o board e a leitura do projeto
@@ -30,7 +32,13 @@ export const claudeProvider: AiProvider = {
     const permissions = strict
       ? ['--permission-mode', 'dontAsk', '--allowedTools', [...exec.tools, ...(exec.mcpTools ?? [])].join(',')]
       : modes[permission];
-    const args = ['-p', ...(structured ? ['--output-format', 'stream-json', '--verbose'] : []), ...permissions];
+    // a retomada logo depois do `-p`; permissões, isolamento, MCP, agente e modelo valem de novo a cada execução
+    const args = [
+      '-p',
+      ...(resume ? ['--resume', resume.sessionId] : []),
+      ...(structured ? ['--output-format', 'stream-json', '--verbose'] : []),
+      ...permissions,
+    ];
     // os servidores liberados no agente também rodam sem pedir aprovação
     // o Claude Code troca por `_` o que não for letra, número, `_` ou `-` no nome do servidor
     if (!strict && exec?.mcpAllowed.length && permission !== 'full')

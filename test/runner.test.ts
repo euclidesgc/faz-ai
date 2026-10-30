@@ -33,6 +33,8 @@ import { gatewayFor } from './helpers/gateway';
 import { executionPlan } from '../src/extension/execution';
 import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from '../src/extension/unitAdvice';
 import { FLOW_LINE } from '../src/extension/promptContext';
+import { PHASE_OUTCOME_ADVICE } from '../src/shared/phaseOutcome';
+import type { AiRunEnd } from '../src/extension/ai/gateway';
 
 /** O contexto de um pedido sem nada marcado no board: só a linha do fluxo. */
 const FLOW_ONLY = { always: [FLOW_LINE], card: [] as string[] };
@@ -558,7 +560,7 @@ describe('executor da IA', () => {
     expect(procs[0]!.command).toEqual(
       withoutNativeDelegation(
         headlessCommand('claude', {
-          prompt: cardPrompt('#1', FLOW_ONLY, [PERMISSION_ADVICE.board!], false, true),
+          prompt: cardPrompt('#1', FLOW_ONLY, [PERMISSION_ADVICE.board!], false, true, true),
           permission: 'board',
           addDirs: [`${dir}.worktrees`],
           structured: true,
@@ -618,7 +620,7 @@ describe('executor da IA', () => {
       expect(procs[0]!.command).toEqual(
         withoutNativeDelegation(
           headlessCommand('claude', {
-            prompt: cardPrompt('#1', FLOW_ONLY, [], true, true),
+            prompt: cardPrompt('#1', FLOW_ONLY, [], true, true, true),
             permission: 'full',
             addDirs: [`${dir}.worktrees`],
             structured: true,
@@ -2607,5 +2609,163 @@ describe('retentativa por falha transitória (#1099)', () => {
     expect(runner.usageHold(storyId)).toBeNull();
     vi.advanceTimersByTime(600_000);
     expect(procs).toHaveLength(1);
+  });
+});
+
+describe('bloco final da fase e reparo na mesma sessão (#1098)', () => {
+  /** o `result` do Claude Code com o texto da resposta e o id da sessão */
+  const result = (text: string, session = 'sessao-1') =>
+    `${JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: text, session_id: session, num_turns: 1, usage: { input_tokens: 2, output_tokens: 1 } })}\n`;
+  const block = (outcome: string, extra: Record<string, unknown> = {}) =>
+    `Fiz a fase.\n\n${JSON.stringify({ outcome, summary: 'Mapa do código pronto.', failure_reason: null, pending: null, ...extra })}`;
+  /** o processo `n` responde `text` e termina bem */
+  const answer = (n: number, text: string, session?: string) => {
+    procs[n]!.emit(result(text, session));
+    procs[n]!.exit(0);
+  };
+  const prompt = (n: number) => {
+    const c = procs[n]!.command as { stdin?: string; args: string[] };
+    return `${c.stdin ?? ''}\n${c.args.join('\n')}`;
+  };
+  const discoveryApproval = () => router.snapshot().columns.find((c) => c.id === card().columnId)!.requiresApproval;
+
+  it('o pedido da fase e o da resposta à pessoa pedem o bloco final; sem o pedido, o prompt não muda', () => {
+    expect(cardPrompt('#1', undefined, [], false, false, true)).toContain(PHASE_OUTCOME_ADVICE);
+    expect(cardPrompt('#1')).not.toContain(PHASE_OUTCOME_ADVICE);
+    expect(replyPrompt('#1', undefined, [], false, true)).toContain(PHASE_OUTCOME_ADVICE);
+    expect(replyPrompt('#1')).not.toContain(PHASE_OUTCOME_ADVICE);
+    runner.start(storyId);
+    expect(prompt(0)).toContain(PHASE_OUTCOME_ADVICE);
+    procs[0]!.exit(1);
+    runner.start(storyId, { origin: 'manual' }, 'reply');
+    expect(prompt(1)).toContain(PHASE_OUTCOME_ADVICE);
+  });
+
+  it('bloco DONE válido, sem ferramenta: o board comenta o resumo e passa a vez como a ferramenta faria', () => {
+    runner.start(storyId);
+    answer(0, block('DONE'));
+    expect(procs).toHaveLength(1);
+    expect(lastMessage()!.body).toMatch(/^Desfecho informado no bloco final[\s\S]*Mapa do código pronto\./);
+    expect(card().status).toBe(discoveryApproval() ? 'waiting_review' : 'waiting_answer');
+    expect(log.join('\n')).toContain('Bloco final: válido; ferramenta chamada: não; aplicado: sim; reparos: 0');
+  });
+
+  it('bloco BLOCKED bloqueia com o motivo; NEEDS_CONTEXT no modo autônomo devolve para a IA', () => {
+    runner.start(storyId);
+    answer(0, block('BLOCKED', { failure_reason: 'Sem acesso ao repositório.' }));
+    expect(card().status).toBe('blocked');
+    expect(card().statusReason).toContain('Sem acesso ao repositório.');
+    expect(card().statusReason).toContain('Mapa do código pronto.');
+
+    router.handle({ type: 'card.status.set', cardId: storyId, status: 'ready' }, { author: 'Pessoa' });
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+    runner.start(storyId);
+    answer(1, block('NEEDS_CONTEXT', { pending: 'a URL da API' }));
+    expect(card().status).toBe('ready');
+    expect(lastMessage()!.body).toContain('Preciso de: a URL da API');
+  });
+
+  it('a ferramenta vence o bloco: o status que a IA deu fica, e a discordância vai para o log', () => {
+    runner.start(storyId);
+    ai({ type: 'card.status.set', cardId: storyId, status: 'waiting_review' });
+    answer(0, block('BLOCKED', { failure_reason: 'x' }));
+    expect(card().status).toBe('waiting_review');
+    expect(procs).toHaveLength(1);
+    expect(log.join('\n')).toContain('Bloco final: válido; ferramenta chamada: sim; aplicado: não; reparos: 0; divergente');
+  });
+
+  it('bloco ausente: pede de novo na mesma sessão, só o bloco, e aplica o que vier no reparo', () => {
+    runner.start(storyId);
+    answer(0, 'Terminei, mas esqueci o bloco.', 'sessao-7');
+    expect(procs).toHaveLength(2);
+    expect(card().status).toBe('running');
+    const args = procs[1]!.command.args;
+    expect(args.slice(args.indexOf('--resume'), args.indexOf('--resume') + 2)).toEqual(['--resume', 'sessao-7']);
+    expect(prompt(1)).toContain('A sua última resposta não terminou com o bloco final válido');
+    expect(prompt(1)).not.toContain('Trabalhe no card');
+    answer(1, block('DONE'));
+    expect(lastMessage()!.body).toMatch(/^Desfecho informado no bloco final/);
+    expect(log.join('\n')).toContain('Bloco final: ausente; ferramenta chamada: não; aplicado: não; reparos: 0');
+    expect(log.join('\n')).toContain('Bloco final: válido; ferramenta chamada: não; aplicado: sim; reparos: 1');
+  });
+
+  it('bloco ausente e inválido nos reparos: depois de 2 pedidos, bloqueia dizendo o que faltou', () => {
+    const finished: string[] = [];
+    runner.onDidFinish((id) => finished.push(id));
+    runner.start(storyId);
+    answer(0, 'sem bloco');
+    answer(1, '{"outcome": "TALVEZ", "summary": "x"}');
+    expect(prompt(2)).toContain('"outcome" deve ser DONE');
+    expect(finished).toEqual([]); // o reparo continua a mesma execução para quem espera o fim
+    answer(2, 'ainda sem bloco');
+    expect(procs).toHaveLength(3);
+    expect(card().status).toBe('blocked');
+    expect(card().statusReason).toMatch(/encerrou sem responder[\s\S]*bloco final estava ausente \(após 2 pedidos de reparo\)/);
+    expect(finished).toEqual([storyId]);
+  });
+
+  it('CLI sem retomada: bloqueia direto, sem pedir o reparo', () => {
+    vi.spyOn(deps.gateway, 'canResume').mockReturnValue(false);
+    runner.start(storyId);
+    answer(0, 'sem bloco');
+    expect(procs).toHaveLength(1);
+    expect(card().statusReason).toContain('o bloco final estava ausente (esta ferramenta não retoma a sessão)');
+  });
+
+  it('falha do processo não repara: segue o bloqueio de antes', () => {
+    runner.start(storyId);
+    procs[0]!.emit(result('sem bloco'));
+    procs[0]!.exit(1);
+    expect(procs).toHaveLength(1);
+    expect(card().status).toBe('blocked');
+    expect(card().statusReason).not.toContain('bloco final');
+  });
+
+  it('interromper durante o reparo devolve o status de antes da execução original', () => {
+    router.handle({ type: 'card.status.set', cardId: storyId, status: 'waiting_answer' }, { author: 'Pessoa' });
+    runner.start(storyId);
+    answer(0, 'sem bloco');
+    expect(procs).toHaveLength(2);
+    runner.stop(storyId);
+    expect(procs[1]!.killed).toBe(true);
+    expect(card().status).toBe('waiting_answer');
+  });
+
+  it('a sub-tarefa do orquestrador (workId) não recebe o pedido do bloco nem é reparada', () => {
+    // a identidade MCP da unidade não existe neste board de teste: o gateway é interceptado, e o pedido vem do `prepare`
+    const c = router.work.claim(
+      { kind: 'story', key: 'one', storyId, cardId: storyId, columnId: card().columnId },
+      router.executions.owner,
+      null,
+    )!;
+    let ended!: (end: AiRunEnd) => void;
+    let input: { prompt: string } | undefined;
+    const run = vi.spyOn(deps.gateway, 'run').mockImplementation((call) => {
+      input = call.prepare().input;
+      return { runId: '', startedAt: Date.now(), stop: () => {}, onExit: (fn) => void (ended = fn) };
+    });
+    runner.start(storyId, { origin: 'manual', workId: c.work.id, token: c.token });
+    expect(input!.prompt).not.toContain(PHASE_OUTCOME_ADVICE);
+    ended({
+      code: 0,
+      stopped: false,
+      timedOut: false,
+      stalled: false,
+      failureClass: null,
+      attempts: 1,
+      format: 'stream-json',
+      check: { status: 'ok' },
+      report: {
+        measure: 'full',
+        consumption: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, turns: 1, sessionId: 's', costUsd: null },
+        inventory: [],
+        answer: 'sem bloco',
+        reason: null,
+        usageLimitReached: false,
+      },
+    } as unknown as AiRunEnd);
+    expect(run).toHaveBeenCalledOnce();
+    expect(runner.isRunning(storyId)).toBe(false);
+    expect(card().status).toBe('running'); // o desfecho é do orquestrador
   });
 });

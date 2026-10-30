@@ -1,4 +1,4 @@
-import type { AiBase } from '../src/shared/aiProfiles';
+import { BUILTIN_PROFILES, type AiBase } from '../src/shared/aiProfiles';
 // A garantia de que nenhuma chamada à IA escapa do log de uso: toda execução passa por `AiGateway`, e
 // o gateway grava a linha de `ai_runs` sozinho. Três camadas:
 //   1. o gateway, sozinho: o que ele grava em cada desfecho;
@@ -569,6 +569,33 @@ describe('um provider por ferramenta', () => {
       reader.push(hello[tool], 'stdout');
       expect(reader.sawEvent, tool).toBe(true);
     }
+  });
+});
+
+describe('canResume', () => {
+  const profileOf = (id: string, mode: 'cli' | 'acp' = 'cli') => ({ ...structuredClone(BUILTIN_PROFILES.find((p) => p.id === id)!), mode });
+
+  it('só o perfil resumable pela CLI retoma: Claude sim; Cursor, Kimi e Gemini não', () => {
+    const g = gateway();
+    expect(g.canResume(profileOf('claude'))).toBe(true);
+    expect(g.canResume(profileOf('cursor'))).toBe(false);
+    expect(g.canResume(profileOf('kimi'))).toBe(false);
+    expect(g.canResume(profileOf('gemini'))).toBe(false);
+  });
+
+  it('fora do transporte CLI não há sessão de CLI para retomar', () => {
+    expect(
+      new AiGateway({
+        boardId: router.boardId,
+        runLog: createRunLog(db),
+        spawn,
+        executorOf: () => ({ transport: 'acp' }) as never,
+      }).canResume(profileOf('claude')),
+    ).toBe(false);
+  });
+
+  it('perfil inválido não retoma, sem lançar', () => {
+    expect(gateway().canResume({ id: '', name: '' } as never)).toBe(false);
   });
 });
 

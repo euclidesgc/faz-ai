@@ -1,7 +1,7 @@
 import type { AcpSpawnFn } from './acp/provider';
 import { classifyFailure, type FailureClass } from '../../shared/failureClass';
 import { executorOf, type Executor } from './drivers';
-import { executorProfile } from './providers';
+import { executorProfile, providerFor } from './providers';
 import { redactCredentialValues } from '../credentials';
 import { authFailed } from './profileAuth';
 import { profileInstallUrl } from '../requirements';
@@ -245,6 +245,18 @@ export class AiGateway {
   /** O hook do Cursor está instalado e atual: só então MCP e ferramentas são impostos no Cursor. */
   cursorHookReady(): boolean {
     return !!this.deps.cursorHook && this.deps.cursorHook.status() === null;
+  }
+
+  /**
+   * O perfil retoma a sessão da CLI: o provider declara `resumable` (só o que a documentação oficial confirma)
+   * e a execução vai pela CLI; ACP e API não têm sessão de CLI para retomar. Perfil inválido não retoma.
+   */
+  canResume(profile: AiProfile): boolean {
+    try {
+      return providerFor(profile).resumable === true && (this.deps.executorOf ?? executorOf)(profile).transport === 'cli';
+    } catch {
+      return false;
+    }
   }
 
   get supportsSnapshots(): boolean {

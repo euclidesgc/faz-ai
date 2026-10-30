@@ -147,6 +147,12 @@ Se "Travado em mim" tiver qualquer item, o resumo vai no \`request_review\` com 
 \`pending\` (ou em \`ask_questions\`/\`ask_question\`/\`block_card\`, conforme o caso), não num \`add_comment\`:
 o card precisa ficar com a pessoa.
 
+Ao terminar a execução de um card, feche a resposta com um único bloco JSON, sem texto depois dele:
+\`{"outcome":"DONE|DONE_WITH_CONCERNS|NEEDS_CONTEXT|BLOCKED","summary":"...","failure_reason":null,"pending":null}\`.
+\`DONE\` é o trabalho feito; \`DONE_WITH_CONCERNS\`, feito com ressalvas em \`pending\`; \`NEEDS_CONTEXT\`, falta algo
+da pessoa, em \`pending\`; \`BLOCKED\`, impedimento em \`failure_reason\`. As ferramentas vencem e o bloco é conferido no fim: o bloco não substitui
+\`request_review\`, \`ask_questions\` nem \`block_card\`, e só age quando elas não mudaram o card; se ele faltar ou for inválido, o board pede a correção na mesma sessão.
+
 Ao revisar código (Implementação, Revisão ou Homologação), concentre-se no diff da branch da história e no
 contexto necessário dos arquivos tocados; releia o projeto inteiro só quando o pedido pedir
 expressamente uma auditoria geral.
