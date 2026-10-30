@@ -575,9 +575,23 @@ const directTrack = (name: string, d: PhaseDefault): PhaseDefault => {
   return d;
 };
 
-/** Os textos padrão atuais (versão 18): os da versão 17 com a trilha direta no Plan e na Implementação. */
-export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+/** Os textos padrão da versão 18: os da versão 17 com a trilha direta no Plan e na Implementação. */
+const PHASE_DEFAULTS_V18: Record<string, PhaseDefault> = Object.fromEntries(
   Object.entries(PHASE_DEFAULTS_V17).map(([name, d]) => [name, directTrack(name, d)]),
+);
+
+// A versão 19 explica o portão de checagens na Revisão: o board as roda ao mover a história ou pedir a revisão, o card
+// fica em Verificando (a IA para) e, se falharem, volta para ready com a saída na conversa.
+const REVIEW_GATE_RERUN =
+  '4. Depois das correções, rode as checagens de novo e faça o commit na branch da história. Sem permissão para rodar comandos, revise lendo o código e registre na conversa o que falta rodar.';
+const REVIEW_GATE_NEW =
+  '4. Depois das correções, rode as checagens de novo e faça o commit na branch da história. Sem permissão para rodar comandos, revise lendo o código e registre na conversa o que falta rodar. Se a coluna tem checagens, o board as roda de novo quando você move a história: o card vai a Verificando, então pare e não chame mais nada nele; se falharem, ele volta para ready com a saída na conversa, e você corrige e tenta de novo.';
+const reviewGate = (name: string, d: PhaseDefault): PhaseDefault =>
+  name === 'Revisão' ? { ...d, instruction: d.instruction.replace(REVIEW_GATE_RERUN, REVIEW_GATE_NEW) } : d;
+
+/** Os textos padrão atuais (versão 19): os da versão 18 com o portão de checagens na Revisão. */
+export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+  Object.entries(PHASE_DEFAULTS_V18).map(([name, d]) => [name, reviewGate(name, d)]),
 );
 
 /** Textos padrão anteriores de uma fase e o que a versão atual traz de novo, para a atualização do board. */
@@ -625,9 +639,10 @@ export const PHASE_HISTORY: Record<string, PhaseHistory> = {
       'na trilha curta, com plano de até uns 3 arquivos, o plano é registrado e a história é implementada sem sub-tarefas; a descrição de cada sub-tarefa passa a ter as seções Objetivo, Pronto quando, Pode tocar e Não pode tocar (Decisões anteriores é opcional), com o esqueleto no modelo do plano, e o board confere as quatro obrigatórias antes de executar; as sub-tarefas passam a ser a menor parte da entrega que se verifica sozinha: as pequenas da mesma área e do mesmo agente se juntam, e a documentação pequena vai com a última de código; o plano parte do DISCOVERY quando a história veio pela trilha curta, sem PRD nem Spec; o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
   },
   Revisão: {
-    instructions: [PHASE_DEFAULTS_V12.Revisão!.instruction],
+    instructions: [PHASE_DEFAULTS_V12.Revisão!.instruction, PHASE_DEFAULTS_V18.Revisão!.instruction],
     templates: [],
-    change: 'o achado que muda o comportamento combinado vira pergunta por ask_questions',
+    change:
+      'o achado que muda o comportamento combinado vira pergunta por ask_questions; se a coluna tem checagens, o board as roda ao mover a história, o card vai a Verificando (a IA para) e, se falharem, volta para ready com a saída na conversa',
   },
   Implementação: {
     instructions: [IMPLEMENTATION_INSTRUCTION_V5, PHASE_DEFAULTS_V17.Implementação!.instruction],

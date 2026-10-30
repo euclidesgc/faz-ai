@@ -216,6 +216,8 @@ só vem verdadeiro na coluna até onde a pessoa liberou o modo; `request_review`
 vira aprovação na hora nas outras, e a IA é mandada decidir e seguir. `update_column` liga e desliga
 `ai_active` e `requires_approval`.
 
+Em coluna com checagens (`checks` em `get_board`), `move_card` para a frente e `request_review` feitos pela IA não entregam o card na hora: o card fica em `verifying`, a resposta traz `gate` (com `id` e `status: "verifying"`) e a IA para, sem mover o card nem continuar o trabalho dele. O board roda as checagens; passando, o movimento ou o pedido de revisão segue; falhando, o card volta para `ready` com o fim da saída na conversa. Enquanto o card está em `verifying`, o `comment` de `move_card` não entra na conversa. Voltar de coluna ou cancelar não passa pelo portão.
+
 ### Agentes
 
 Um agente do board é uma cópia guardada no banco do board. `get_harness` lista só o que está no
