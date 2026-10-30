@@ -242,6 +242,24 @@ iniciar a ferramenta de IA, o autopiloto não religa sozinho até você retomar.
 ferramenta vencido, o autopiloto e o heartbeat esperam o login voltar, sem gastar execuções. O
 heartbeat não toca histórias em modo autônomo; elas são do autopiloto.
 
+## Execução parada sem atividade (watchdog)
+
+Além do tempo limite por execução, o board encerra a execução de um card quando a ferramenta passa
+**N minutos sem nenhuma saída** (stdout ou stderr). Qualquer saída zera a contagem, então uma execução
+longa que segue trabalhando não é afetada. O valor se ajusta em Configurações → Automação, em
+**Encerrar sem atividade após** (padrão 20 min, de 0 a 240; 0 desliga).
+
+- **Onde vale:** nas execuções de card com stream (Claude Code, Cursor, Kimi e Gemini em `stream-json`)
+  e no transporte ACP. A saída em texto (inclusive a volta para texto), o modo API, o chat e os testes
+  de perfil e de contexto ficam só com o tempo limite.
+- **Como aparece:** a conversa do card traz "A execução do … ficou sem atividade por N min e foi
+  encerrada", com o fim da saída; o log do canal diz "Encerrada por falta de atividade."; no log de uso
+  e nas métricas o desfecho continua `timeout`.
+- **O que acontece com o card:** fica bloqueado. Nem no modo autônomo ele é aprovado nem avança.
+- **Tempo limite menor:** se o tempo limite vence antes, vale o tempo limite.
+- **Limite conhecido:** o teto de um comando de terminal no Cursor não foi validado. Se um comando
+  passar do valor sem emitir saída, aumente o valor ou use 0.
+
 ## Card preso em "Em execução"
 
 Um card só fica "Em execução" enquanto há uma sessão de IA nele. Se a sessão que o marcou acabou sem
