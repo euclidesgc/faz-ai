@@ -24,7 +24,11 @@ export interface StoryWorld extends CardWorld {
 }
 
 /** `act(cardId, command)` roda no lugar do processo da CLI (antes de ele terminar com sucesso, sem saída). */
-export async function storyWorld(act: (cardId: string, world: StoryWorld, command: HeadlessCommand) => void): Promise<StoryWorld> {
+export async function storyWorld(
+  act: (cardId: string, world: StoryWorld, command: HeadlessCommand) => void,
+  /** a pasta de trabalho da história; sem ela, a do projeto */
+  workspace?: () => string,
+): Promise<StoryWorld> {
   // `world` só existe depois do `cardWorld`; o spawn é chamado mais tarde, com ele já montado
   const held: { world?: StoryWorld } = {};
   const starts: string[] = [];
@@ -58,7 +62,7 @@ export async function storyWorld(act: (cardId: string, world: StoryWorld, comman
     },
     ownsBoard: () => true,
     flush: async () => {},
-    workspace: async () => base.project,
+    workspace: async () => workspace?.() ?? base.project,
     fingerprint: async () => 'fixo',
     terminate: terminateProcessGroup,
     comment: (work, _outcome, body) => {

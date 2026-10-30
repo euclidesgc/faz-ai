@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { openFile, type DbHandle } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { Orchestrator, type OrchestratorOptions } from '../src/extension/orchestrator';
+import { missingWorkspaceNote, Orchestrator, type OrchestratorOptions } from '../src/extension/orchestrator';
 import { AiGateway, NO_CARD, type AiExecution } from '../src/extension/ai/gateway';
 import { ArtifactRepo } from '../src/extension/repositories/artifactRepo';
 import { CommentRepo } from '../src/extension/repositories/commentRepo';
@@ -344,6 +344,19 @@ describe('orquestrador com processo, ponte, disco e trava reais', () => {
     const next = acquireWorkspace(workspace, 'seguinte', 1, 'seguinte', options.coordinationDir)!;
     expect(next).not.toBeNull();
     expect(next.release()).toBe(true);
+  });
+  it('a pasta da história apagada para a história com o motivo, sem reservar nem chamar a IA', async () => {
+    subtask('Sem pasta');
+    const gone = path.join(dir, 'worktree-apagada');
+    options.workspace = async () => gone;
+    const blocked: [string, string][] = [];
+    options.block = (id, reason) => blocked.push([id, reason]);
+    const result = await orchestrator.drive(storyId, 'heartbeat');
+    expect(result).toEqual({ kind: 'paused', reason: missingWorkspaceNote(gone) });
+    expect(blocked).toEqual([[storyId, missingWorkspaceNote(gone)]]);
+    expect(missingWorkspaceNote(gone)).toContain(`não existe mais: ${gone}`);
+    expect(starts).toEqual([]);
+    expect(router.work.live()).toEqual([]);
   });
   it('cada unidade recebe o pedido do ciclo da sub-tarefa; a parada do plano bloqueia a história com o motivo', async () => {
     const child = subtask('Com pedido');

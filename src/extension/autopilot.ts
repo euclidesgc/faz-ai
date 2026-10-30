@@ -188,6 +188,14 @@ function progressOf(s: BoardState, story: Card): string {
 }
 
 /**
+ * Como a história estava na recusa: muda quando ela anda ou quando a pessoa responde na conversa (liberar pede uma
+ * resposta). As notas da IA não contam: a própria recusa pode gravar uma, e isso voltaria a disparar a chamada.
+ */
+function refusalKey(s: BoardState, story: Card): string {
+  return `${progressOf(s, story)}|${s.comments.filter((c) => c.cardId === story.id && c.source !== 'ai').length}`;
+}
+
+/**
  * Toca sozinho as histórias em modo autônomo (YOLO): leva a primeira da fila do Backlog ao fim, uma
  * execução da IA após a outra, sem esperar o intervalo do heartbeat, e só então passa à próxima. Divide o
  * limite de execuções simultâneas com o heartbeat: começa numa vaga livre e, quando as duas filas
@@ -419,6 +427,9 @@ export class Autopilot {
           // sozinho, a pessoa resolve; só essa história espera, as dos outros perfis seguem. O perfil que o board não
           // roda (personalizado de CLI, permissão sem argumento) também espera: a execução seria recusada
           if (cardCliProblem(s, r.story) || cardRunUnsupported(s, r.story)) continue;
+          // o orquestrador recusou esta história: só tenta de novo quando ela mudar (a nota da recusa muda o
+          // board e voltava aqui na hora, chamando a IA várias vezes por segundo)
+          if (this.driving.has(r.story.id) || this.refused.get(r.story.id) === refusalKey(s, r.story)) continue;
           // a história passou de fase desde a última execução e a conversa está cheia: primeiro o resumo (uma
           // execução de texto), depois a fase. Uma história que ainda não rodou nesta sessão segue direto
           const from = this.lastRunColumn.get(r.story.id);
@@ -441,6 +452,10 @@ export class Autopilot {
   }
 
   private heldLogged = new Set<string>();
+  /** história recusada pelo orquestrador → como ela estava na recusa */
+  private refused = new Map<string, string>();
+  /** histórias com a condução do orquestrador ainda em andamento: uma reavaliação no meio não a chama de novo */
+  private driving = new Set<string>();
 
   private start(story: Card): void {
     try {
@@ -472,12 +487,17 @@ export class Autopilot {
 
   /** O orquestrador conduz a história; uma recusa dele (outra janela, reconciliação) vai para o log e a nota, sem desligar a fila. */
   private drive(driver: StoryDriver, story: Card): void {
+    this.driving.add(story.id);
     driver
       .drive(story.id, 'autopilot')
+      .finally(() => this.driving.delete(story.id))
       .then((result) => {
+        this.refused.delete(story.id);
         if (result.kind === 'paused' && result.reason) this.publish(result.reason);
       })
       .catch((e: unknown) => {
+        const now = this.router.snapshot().cards.find((c) => c.id === story.id) ?? story;
+        this.refused.set(story.id, refusalKey(this.router.snapshot(), now));
         const reason = e instanceof Error ? e.message : String(e);
         this.deps.log(`Autopiloto: ${cardRef(story)}: ${reason}`);
         this.publish(reason);

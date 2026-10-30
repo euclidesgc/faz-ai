@@ -134,6 +134,34 @@ describe('autopiloto', () => {
     expect(router.snapshot().autopilot.note).toBe(Autopilot.NOT_OWNER_NOTE);
     expect(autopilot.isActive).toBe(true);
   });
+
+  it('a recusa não volta a chamar a IA na hora: só tenta de novo quando a história muda', async () => {
+    const id = story('Sem pasta', 1);
+    yolo(id);
+    let calls = 0;
+    const refusing: StoryDriver = {
+      drive: () => {
+        calls++;
+        return Promise.reject(new Error("ENOENT: no such file or directory, lstat '/sem/pasta'"));
+      },
+    };
+    // o adiamento roda na hora, como a reavaliação que a nota da recusa dispara a cada mudança do board
+    const autopilot = new Autopilot(router, runner, { log: (l) => logs.push(l), driver: refusing, defer: (f) => f() });
+    autopilot.resume();
+    for (let i = 0; i < 5; i++) {
+      await new Promise((r) => setTimeout(r, 0));
+      autopilot.evaluate();
+    }
+    // uma nota da IA na conversa não reabre a tentativa
+    ai({ type: 'comment.add', cardId: id, body: 'A execução foi recusada.' });
+    autopilot.evaluate();
+    expect(calls).toBe(1);
+    expect(logs.filter((l) => l.includes('chamando a IA'))).toHaveLength(1);
+    // a pessoa responde na conversa (recriou a pasta): a fila tenta de novo
+    router.handle({ type: 'comment.add', cardId: id, body: 'Recriei a pasta, pode seguir.' });
+    autopilot.evaluate();
+    expect(calls).toBe(2);
+  });
 });
 
 describe('heartbeat', () => {
