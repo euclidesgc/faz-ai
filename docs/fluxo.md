@@ -20,7 +20,7 @@ você responde no card, o que os botões de IA fazem e como os cards se relacion
   outro cliente MCP podem consultar e editar tudo o que a interface permite, e as mudanças aparecem
   no board na hora.
 - **Saber com quem está cada card.** Todo card em que a IA atua tem um status (Pronto, Em execução,
-  Aguardando resposta, Aguardando revisão, Aprovado, Bloqueado) que mostra se a pendência está com
+  Verificando, Aguardando resposta, Aguardando revisão, Aprovado, Bloqueado) que mostra se a pendência está com
   você ou com a IA.
 - **Revisar antes de a IA avançar.** Nas colunas que exigem aprovação (Discovery, PRD, Spec, Plan e
   Homologação, por padrão), a IA termina o trabalho, pede a revisão e para. Ela só move o card depois

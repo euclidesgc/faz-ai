@@ -21,7 +21,7 @@ asks for, how you answer on the card, what the AI buttons do and how cards relat
   Cursor or any other MCP client can read and edit everything the interface allows, and the changes
   show up on the board right away.
 - **Know who has each card.** Every card the AI works on has a status: Pronto (ready), Em execução
-  (running), Aguardando resposta (waiting for an answer), Aguardando revisão (waiting for review),
+  (running), Verificando (verifying, the board is running the column checks), Aguardando resposta (waiting for an answer), Aguardando revisão (waiting for review),
   Aprovado (approved) or Bloqueado (blocked). It shows whether the next move is yours or the AI's.
 - **Review before the AI moves on.** In columns that require approval (Discovery, PRD, Spec, Plan and
   Homologação by default), the AI finishes the work, asks for review and stops. It only moves the
