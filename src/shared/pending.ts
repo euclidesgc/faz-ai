@@ -41,7 +41,7 @@ export function pendingWork(s: BoardState): PendingWork {
       ready: withStatus('ready').filter((c) => (!c.parentId || !withHuman(byId.get(c.parentId))) && openPredecessors(s, c.id).length === 0),
       // card bloqueado fica parado até a pessoa desbloquear, mesmo que o motivo esteja na conversa
       unanswered: cards.filter(
-        (c) => lastSource.get(c.id) === 'human' && !['ready', 'approved', 'running', 'blocked'].includes(c.status ?? ''),
+        (c) => lastSource.get(c.id) === 'human' && !['ready', 'approved', 'running', 'verifying', 'blocked'].includes(c.status ?? ''),
       ),
     },
     human: {

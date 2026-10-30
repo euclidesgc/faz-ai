@@ -276,6 +276,7 @@ export const settings: Record<string, string> = {
   'com você': 'with you',
   'A IA pode trabalhar no card': 'The AI can work on the card',
   'Uma sessão de IA está trabalhando no card': 'An AI session is working on the card',
+  'O board está rodando as checagens da coluna': 'The board is running the column checks',
   'A IA fez uma pergunta na conversa': 'The AI asked a question in the conversation',
   'O card segue para a próxima coluna': 'The card moves on to the next column',
   'Há um impedimento': 'There is a blocker',

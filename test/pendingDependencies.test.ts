@@ -34,3 +34,16 @@ describe('fila da IA e dependências', () => {
     expect(pendingWork(s).ai.ready.map((c) => c.id)).toEqual(['b']);
   });
 });
+
+describe('status verifying', () => {
+  it('fica fora da fila da IA e não conta como esperando a pessoa', () => {
+    const s = boardState({ cards: [card('a', { number: 1, status: 'verifying' }), card('b', { number: 2, status: 'ready' })] });
+    const p = pendingWork(s);
+    expect(p.ai.ready.map((c) => c.id)).toEqual(['b']);
+    expect(p.ai.approved).toEqual([]);
+    expect(p.ai.unanswered).toEqual([]);
+    expect(p.human.waitingReview).toEqual([]);
+    expect(p.human.waitingAnswer).toEqual([]);
+    expect(p.human.blocked).toEqual([]);
+  });
+});

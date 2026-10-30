@@ -9,7 +9,8 @@ export const isLive = (c: Card): boolean => c.deletedAt === null && c.archivedAt
 export const isArchived = (c: Card): boolean => c.deletedAt === null && c.archivedAt !== null;
 
 /** A IA está trabalhando no card: uma execução disparada pela extensão ou uma sessão que marcou "Em execução". */
-export const isAiWorking = (state: BoardState, card: Card): boolean => card.status === 'running' || state.aiRuns.includes(card.id);
+export const isAiWorking = (state: BoardState, card: Card): boolean =>
+  card.status === 'running' || card.status === 'verifying' || state.aiRuns.includes(card.id);
 
 /** Quantas sub-tarefas vivas do card a IA está trabalhando: a história acende o LED enquanto qualquer uma delas roda. */
 export const aiWorkingChildren = (state: BoardState, card: Card): number =>

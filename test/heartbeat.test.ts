@@ -184,6 +184,13 @@ describe('heartbeat', () => {
     expect(runner.started.map(number)).toEqual([1, 3, 2]);
   });
 
+  it('história Verificando (o board roda as checagens) não entra na fila nem é reexecutada', () => {
+    create('A', 'PRD'); // #1
+    create('B', 'Spec'); // #2
+    setStatus(2, 'verifying');
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1]);
+  });
+
   it('escolhe uma execução por história, na ordem da fila', () => {
     create('A', 'PRD'); // #1 pronto
     create('Sub de A', 'A fazer', 1); // #2: tratada junto com #1

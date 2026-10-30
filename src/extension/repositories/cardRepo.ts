@@ -454,7 +454,13 @@ export class CardRepo {
   deletePermanent(cardId: string): string[] {
     const ids = all(this.db, 'SELECT id FROM cards WHERE id = ? OR parent_id = ?', [cardId, cardId]).map((r) => str(r.id));
     run(this.db, 'DELETE FROM cards WHERE id = ?', [cardId]);
+    this.deleteGateRuns(ids);
     return ids;
+  }
+
+  /** gate_runs não tem chave estrangeira: o registro das checagens sai junto com o card. */
+  private deleteGateRuns(cardIds: string[]): void {
+    for (const id of cardIds) run(this.db, 'DELETE FROM gate_runs WHERE card_id = ?', [id]);
   }
 
   emptyTrash(boardId: string): string[] {
@@ -467,6 +473,7 @@ export class CardRepo {
         [boardId, boardId],
       ).map((r) => str(r.id));
       run(db, 'DELETE FROM cards WHERE board_id = ? AND deleted_at IS NOT NULL', [boardId]);
+      this.deleteGateRuns(ids);
       return ids;
     });
   }

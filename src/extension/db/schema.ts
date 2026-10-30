@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 53;
+export const SCHEMA_VERSION = 54;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -665,6 +665,24 @@ const MIGRATIONS: Record<number, string> = {
     -- defaults_json). A tabela gate_runs entra com o executor, que é quem grava nela.
     ALTER TABLE columns ADD COLUMN checks_json TEXT NOT NULL DEFAULT '[]';
   `,
+  54: `
+    -- #1253: cada execução do portão (checagens da coluna na saída do card). Sem chave estrangeira: o
+    -- repositório de cards apaga os gate_runs do card por conta própria. signature fica vazia até a #1097.
+    CREATE TABLE gate_runs (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL,
+      column_id TEXT NOT NULL,
+      target_column_id TEXT,
+      kind TEXT NOT NULL CHECK (kind IN ('move','review')),
+      sha TEXT NOT NULL DEFAULT '',
+      result TEXT NOT NULL CHECK (result IN ('running','passed','failed','interrupted')),
+      output_tail TEXT NOT NULL DEFAULT '',
+      signature TEXT NOT NULL DEFAULT '',
+      started_at INTEGER NOT NULL,
+      finished_at INTEGER
+    );
+    CREATE INDEX gate_runs_card ON gate_runs (card_id, started_at);
+  `,
 };
 
 /**
@@ -733,6 +751,11 @@ export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
   53: `
     -- a versão anterior não conhece as checagens da coluna; elas se perdem com a coluna
     ALTER TABLE columns DROP COLUMN checks_json;
+  `,
+  54: `
+    -- a versão anterior não conhece o registro das checagens; a tabela e o histórico dela saem
+    DROP INDEX IF EXISTS gate_runs_card;
+    DROP TABLE IF EXISTS gate_runs;
   `,
 };
 
