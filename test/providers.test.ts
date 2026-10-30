@@ -300,3 +300,52 @@ it('Gemini pela CLI e pelo ACP: a chave recusada pela API é login vencido', () 
   expect(authFailed({ ...geminiCli(), tool: 'opencode', id: 'opencode', mode: 'acp' }, acpTail)).toBe(false);
   expect(authFailed(geminiCli(), ['Terminou com erro: [API Error: You have exhausted your daily quota on this model.]'])).toBe(false);
 });
+
+// Retomada de sessão (reparo do bloco final): só o Claude Code tem `--resume` confirmado com `-p` na documentação oficial.
+it('só o Claude Code é resumable; Cursor, Kimi, Gemini e genérico ficam sem retomada', () => {
+  expect(Object.fromEntries(ALL_AI_BASES.map((t) => [t, providerFor(t).resumable === true]))).toEqual({
+    claude: true,
+    cursor: false,
+    kimi: false,
+  });
+  expect(providerFor(geminiCli()).resumable).toBeUndefined();
+  expect(providerFor(custom({})).resumable).toBeUndefined();
+});
+it('cópia do Claude não herda a retomada e ignora `resume` ao montar o comando', () => {
+  const copy = {
+    ...custom({ command: '/claude-alternativo' }),
+    id: 'claude-work',
+    kind: 'catalog' as const,
+    tool: 'claude',
+    mode: 'cli' as const,
+    base: 'claude' as const,
+  };
+  const input: HeadlessInput = { prompt: 'oi', permission: 'board', structured: true };
+  expect(providerFor(copy).resumable).toBe(false);
+  expect(providerFor(copy).command({ ...input, resume: { sessionId: 's-1' } }).args).not.toContain('--resume');
+});
+it('Claude com resume leva --resume <id> logo após -p e mantém o isolamento, o MCP e as ferramentas', () => {
+  const base: HeadlessInput = {
+    prompt: 'repare',
+    permission: 'edits',
+    structured: true,
+    exec,
+    addDirs: ['/pasta adicional'],
+    boardServer: { command: 'node', args: ['bridge.js'] },
+  };
+  const plain = providerFor('claude').command(base);
+  const resumed = providerFor('claude').command({ ...base, resume: { sessionId: 'sessao-123' } });
+  expect(resumed.args.slice(0, 3)).toEqual(['-p', '--resume', 'sessao-123']);
+  // fora o par da retomada, o comando é o mesmo: nada do isolamento, MCP, agente, ferramentas e modelo se perde
+  expect(resumed.args).toEqual(['-p', '--resume', 'sessao-123', ...plain.args.slice(1)]);
+  expect(resumed.args).toEqual(expect.arrayContaining(['--strict-mcp-config', '--mcp-config', '{tmp:mcp.json}', '--tools', 'Read']));
+  expect(resumed.args).toEqual(expect.arrayContaining(['--setting-sources', '--model', 'modelo-fixo']));
+  expect(resumed.stdin).toBe('repare');
+  expect(resumed.tempFiles).toEqual(plain.tempFiles);
+  expect(resumed.format).toBe(plain.format);
+});
+it('Claude sem resume: o comando não muda', () => {
+  const input: HeadlessInput = { prompt: 'oi', permission: 'board', structured: true };
+  expect(providerFor('claude').command(input).args).not.toContain('--resume');
+  expect(providerFor('claude').command({ ...input, resume: undefined })).toEqual(providerFor('claude').command(input));
+});

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { FLOW_SKILL, FLOW_SKILLS, FLOW_SKILL_NAMES, flowSkillMarkdown, isFlowSkill } from '../src/extension/flowSkill';
 import { FLOW_TEXT } from './flowSkillText';
+import { MCP_INSTRUCTIONS } from '../src/extension/mcp/server';
+import { PHASE_OUTCOMES } from '../src/shared/phaseOutcome';
 import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 import { BRIEF_SECTIONS, REQUIRED_BRIEF_SECTIONS } from '../src/shared/subtaskBrief';
 
@@ -175,5 +177,19 @@ describe('ciclo do card em menos chamadas (#601)', () => {
       'o board confere as quatro obrigatórias antes de executar e devolve ao condutor a sub-tarefa que não as tem',
     );
     expect(FLOW_SKILL.body).not.toContain('na descrição os arquivos que ela vai tocar');
+  });
+
+  it('o bloco final da resposta: campos, os 4 valores e "as ferramentas vencem", na skill e nas instruções do MCP (#1303)', () => {
+    expect(PHASE_OUTCOMES).toEqual(['DONE', 'DONE_WITH_CONCERNS', 'NEEDS_CONTEXT', 'BLOCKED']);
+    for (const text of [FLOW_SKILL.body, MCP_INSTRUCTIONS]) {
+      for (const outcome of PHASE_OUTCOMES) expect(text).toContain(outcome);
+      for (const field of ['outcome', 'summary', 'failure_reason', 'pending']) expect(text).toContain(field);
+      expect(text.toLowerCase()).toContain('as ferramentas vencem');
+      expect(text).toContain('o bloco é conferido no fim');
+    }
+    expect(FLOW_SKILL.body).toContain('Ao terminar a execução de um card, feche a resposta com um único bloco JSON');
+    expect(FLOW_SKILL.body).toContain('o bloco não substitui');
+    expect(FLOW_SKILL.body.indexOf('bloco JSON')).toBeGreaterThan(FLOW_SKILL.body.indexOf('## Ao fechar uma fase'));
+    expect(FLOW_SKILL.body.indexOf('bloco JSON')).toBeLessThan(FLOW_SKILL.body.indexOf('## Quando parar'));
   });
 });
