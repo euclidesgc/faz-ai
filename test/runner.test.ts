@@ -11,6 +11,7 @@ import {
   AiRunner,
   AUTONOMOUS_ADVICE,
   PERMISSION_ADVICE,
+  waitAdvice,
   cardPrompt,
   conflictPrompt,
   consumptionLine,
@@ -620,7 +621,7 @@ describe('executor da IA', () => {
       expect(procs[0]!.command).toEqual(
         withoutNativeDelegation(
           headlessCommand('claude', {
-            prompt: cardPrompt('#1', FLOW_ONLY, [], true, true, true),
+            prompt: cardPrompt('#1', FLOW_ONLY, [waitAdvice(20)!], true, true, true),
             permission: 'full',
             addDirs: [`${dir}.worktrees`],
             structured: true,
@@ -631,6 +632,14 @@ describe('executor da IA', () => {
       expect(procs[0]!.command.stdin).toContain('MODO AUTÔNOMO');
       expect(procs[0]!.command.stdin).toContain('Não faça o merge');
       expect(log.join('\n')).toContain('Modo autônomo (YOLO)');
+    });
+
+    it('quem roda comandos recebe o limite de inatividade e o pedido de conferir comando longo em intervalos curtos', () => {
+      yolo();
+      runner.start(storyId);
+      const stdin = procs[0]!.command.stdin as string;
+      expect(stdin).toContain('O board encerra a execução que fica 20 min sem atividade');
+      expect(stdin).toContain('confira o arquivo a cada 5 min no máximo');
     });
 
     it('sem o modo, o prompt e a permissão seguem o board', () => {
@@ -2406,6 +2415,18 @@ describe('parseRunner', () => {
 
   it('autopilotPaused: true é lido', () => {
     expect(parseRunner(JSON.stringify({ autopilotPaused: true })).autopilotPaused).toBe(true);
+  });
+});
+
+describe('waitAdvice', () => {
+  it('o intervalo de conferência fica bem abaixo do limite, entre 1 e 5 min', () => {
+    expect(waitAdvice(20)).toContain('a cada 5 min no máximo');
+    expect(waitAdvice(6)).toContain('a cada 2 min no máximo');
+    expect(waitAdvice(1)).toContain('a cada 1 min no máximo');
+    expect(waitAdvice(240)).toContain('a cada 5 min no máximo');
+  });
+  it('sem limite de inatividade não há aviso', () => {
+    expect(waitAdvice(0)).toBeNull();
   });
 });
 

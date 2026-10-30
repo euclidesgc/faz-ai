@@ -64,6 +64,7 @@
 
 ### Changed
 
+- The AI runs a long command (validation, tests, build) in the background and checks its output at short intervals, so the wait does not bring the run down on the inactivity limit.
 - A transient failure with no effect (network, 5xx error, overload) is retried on its own, up to 3 times, waiting 30 s, 2 min and 5 min, instead of blocking the card; in the Implementation phase, the unit too (#1099).
 - A new board starts with the Short track rule on; existing boards keep their choice (#1107).
 - When a card's model runs out of its usage limit, the board asks whether to wait for the limit to come back or continue with another available model, and saves the choice on the card; autonomous mode keeps the fallback rule.

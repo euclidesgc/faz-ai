@@ -15,6 +15,12 @@ describe('conjunto de skills do fluxo (#588)', () => {
     const revisao = FLOW_SKILLS.find((k) => k.name === 'faz-ai-revisao-e-homologacao')!;
     expect(revisao.body).toContain('portão do fluxo');
   });
+  it('comando longo roda em segundo plano e é conferido em intervalos curtos, sem espera calada', () => {
+    expect(FLOW_SKILL.body).toContain('rode-o em segundo plano com a saída num arquivo');
+    expect(FLOW_SKILL.body).toContain('intervalos curtos');
+    expect(FLOW_SKILL.body).toContain('limite de inatividade');
+    expect(FLOW_SKILL.body).toContain('o comando travou: encerre-o');
+  });
   it('explica o valor por perfil, sem lista fixa de CLIs', () => {
     const harness = FLOW_SKILLS.find((k) => k.name === 'faz-ai-harness-do-card')!;
     expect(harness.body).toContain('<perfil>:<modelo>@<esforço>');

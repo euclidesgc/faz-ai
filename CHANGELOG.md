@@ -64,6 +64,7 @@
 
 ### Alterado
 
+- A IA roda comando longo (validação, testes, build) em segundo plano e confere a saída em intervalos curtos, para a espera não derrubar a execução pelo limite de inatividade.
 - Falha transitória sem efeito (rede, erro 5xx, sobrecarga) é repetida sozinha, até 3 vezes com espera de 30 s, 2 min e 5 min, em vez de bloquear o card; na Implementação, a unidade também (#1099).
 - O board novo nasce com a regra Trilha curta ligada; os boards existentes mantêm a escolha (#1107).
 - Quando o modelo de um card esgota o limite de uso, o board pergunta se espera o limite voltar ou segue com outro modelo disponível, e grava a escolha no card; no modo autônomo vale a regra de fallback.
