@@ -11,5 +11,7 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 90_000,
     hookTimeout: 30_000,
+    // o worker sai quando o Vitest principal cai, em vez de ficar órfão rodando testes
+    setupFiles: ['test/workerParent.ts'],
   },
 });

@@ -9,6 +9,10 @@ import { commandNotFound, resolveCommand } from './cliResolve';
 import { randomUUID } from 'node:crypto';
 import { processBirth, processGroupState, SpawnNotStartedError, type SpawnControl, type ProcessIdentity } from './processIdentity';
 import { SPAWN_GATE } from './spawnGate';
+import { trackEscapedProcesses } from './processTree';
+
+/** De quanto em quanto tempo a árvore da CLI é anotada: o que cair fora do grupo dela ainda é encerrado no fim. */
+const ESCAPED_RECORD_MS = 10_000;
 
 /**
  * As variáveis da sessão do Claude Code que abriu o editor: a execução do board é uma sessão própria e
@@ -167,8 +171,15 @@ export function spawnHeadless(
     listeners.forEach((fn) => fn(code, error));
   };
   child.on('error', (e: NodeJS.ErrnoException) => finish(null, e.code === 'ENOENT' ? new Error(commandNotFound(command.command)) : e));
+  // o que sai do grupo da CLI (os comandos do terminal do Claude Code têm grupo próprio) escapa do sinal
+  // ao grupo: anotado enquanto ela vive e encerrado quando ela sai ou é parada (processTree.ts)
+  const escaped = child.pid && process.platform !== 'win32' ? trackEscapedProcesses(child.pid) : undefined;
+  const watch = escaped ? setInterval(() => void escaped.record(), ESCAPED_RECORD_MS) : undefined;
+  watch?.unref();
   child.on('close', (code) => {
     directClosed = true;
+    clearInterval(watch);
+    void escaped?.end();
     finish(code, startError);
   });
   if (control && child.pid) {
@@ -240,6 +251,7 @@ export function spawnHeadless(
       };
       signal('SIGTERM');
       setTimeout(() => signal('SIGKILL'), 1000).unref();
+      void escaped?.end();
     },
     onExit: (fn) => listeners.push(fn),
     kill: () => {
@@ -256,6 +268,13 @@ export function spawnHeadless(
       };
       if (process.platform === 'win32' && child.pid)
         execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], (err) => err && child.kill());
+      // a árvore é anotada antes do sinal: com a CLI morta, o que estava fora do grupo dela vira órfão
+      // e já não aponta para ela
+      else if (escaped)
+        void escaped.record().finally(() => {
+          signal('SIGTERM');
+          void escaped.end();
+        });
       else signal('SIGTERM');
       // se a ferramenta ignorar o pedido, encerra à força; e se nem assim o processo fechar (um neto
       // segurando a saída), a execução termina para o board, em vez de ocupar a vaga para sempre

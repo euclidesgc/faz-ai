@@ -5,7 +5,7 @@
 // isolados não pegam (#364). Não é a suíte inteira (`npm test`), que fica para o release.
 //
 // Uso: `npm run validate` (base `origin/develop`) ou `npm run validate -- --base <ref>`.
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 
 const argBase = process.argv.indexOf('--base');
@@ -35,17 +35,43 @@ function summary(failed) {
   console.log(failed ? `\nFalhou em: ${failed}. Corrija e rode de novo.` : '\nTudo certo.');
 }
 
+/** O passo em curso: o sinal que encerra o validate encerra também o grupo dele (ver `forward`). */
+let running = null;
+
+/**
+ * Quem roda o validate pode encerrá-lo no meio (o terminal da IA estoura o tempo, Ctrl+C). Sem repassar
+ * o sinal, o passo seguiria sozinho, e os workers do Vitest ficariam órfãos ocupando CPU e memória.
+ */
+function forward(signal) {
+  if (running?.pid) {
+    try {
+      if (WIN) running.kill(signal);
+      else process.kill(-running.pid, signal);
+    } catch {
+      /* o passo já acabou */
+    }
+  }
+  process.exit(128 + ({ SIGHUP: 1, SIGINT: 2, SIGTERM: 15 }[signal] ?? 0));
+}
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => forward(signal));
+
 /** Roda um passo; na falha imprime o resumo e encerra com o código do passo. */
-function step(name, command, args, note) {
+async function step(name, command, args, note) {
   console.log(`\n== ${name} ==\n$ ${command} ${args.join(' ')}`);
   const started = Date.now();
-  const r = spawnSync(command, args, { stdio: 'inherit', shell: WIN });
+  // fora do Windows, num grupo próprio: o sinal repassado alcança o passo e tudo o que ele iniciou
+  running = spawn(command, args, { stdio: 'inherit', shell: WIN, detached: !WIN });
+  const status = await new Promise((resolve) => {
+    running.once('error', () => resolve(1));
+    running.once('close', (code) => resolve(code));
+  });
+  running = null;
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
-  const ok = r.status === 0;
+  const ok = status === 0;
   results.push({ name, status: ok ? 'ok' : 'FALHOU', note: [note, `${seconds}s`].filter(Boolean).join(', ') });
   if (!ok) {
     summary(name);
-    process.exit(r.status || 1);
+    process.exit(status || 1);
   }
 }
 
@@ -68,21 +94,21 @@ try {
 }
 console.log(`Arquivos alterados contra ${BASE}: ${changed.length ? `\n  ${changed.join('\n  ')}` : 'nenhum'}`);
 
-step('typecheck', 'npm', ['run', 'typecheck']);
+await step('typecheck', 'npm', ['run', 'typecheck']);
 
 const lint = changed.filter((f) => LINTED.test(f));
-if (lint.length) step('eslint', 'npx', ['eslint', '--no-warn-ignored', ...lint], `${lint.length} arquivo(s)`);
+if (lint.length) await step('eslint', 'npx', ['eslint', '--no-warn-ignored', ...lint], `${lint.length} arquivo(s)`);
 else skip('eslint', 'nenhum arquivo que o eslint cobre');
 
 const format = changed.filter((f) => FORMATTED.test(f));
-if (format.length) step('prettier', 'npx', ['prettier', '--check', '--ignore-unknown', ...format], `${format.length} arquivo(s)`);
+if (format.length) await step('prettier', 'npx', ['prettier', '--check', '--ignore-unknown', ...format], `${format.length} arquivo(s)`);
 else skip('prettier', 'nenhum arquivo que o prettier cobre');
 
 const related = changed.filter((f) => RELATED.test(f));
 if (related.length)
-  step('vitest related', 'npx', ['vitest', 'related', '--run', '--passWithNoTests', ...related], `${related.length} arquivo(s)`);
+  await step('vitest related', 'npx', ['vitest', 'related', '--run', '--passWithNoTests', ...related], `${related.length} arquivo(s)`);
 else skip('vitest related', 'nenhum arquivo de src/ ou test/ alterado');
 
-step('cenários (test/scenarios)', 'npx', ['vitest', 'run', 'test/scenarios']);
+await step('cenários (test/scenarios)', 'npx', ['vitest', 'run', 'test/scenarios']);
 
 summary(null);

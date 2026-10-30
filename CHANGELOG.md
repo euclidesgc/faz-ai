@@ -103,6 +103,7 @@
 
 ### Corrigido
 
+- Ao parar ou terminar uma execução, o board encerra também os processos que a IA abriu fora do grupo dela, como os workers de teste de um comando que estourou o tempo, que antes ficavam órfãos ocupando CPU e memória.
 - A história parada numa sub-tarefa diz o motivo real e os passos para destravar, sem repetir a mesma mensagem na conversa.
 - A sub-tarefa que falhou ao começar volta a rodar depois que a pessoa responde, em vez de bloquear a história de novo.
 - A lista de modelos do Gemini pela API não traz mais modelos de voz, imagem, música e pesquisa.
