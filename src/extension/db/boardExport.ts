@@ -76,8 +76,11 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'skill_folders', where: 'board_id = ?', hasId: false, since: 50 },
 ];
 
-/** Tabelas que ficam fora do arquivo mesmo tendo `board_id` (o teste do `sqlite_master` as ignora). */
-export const NOT_EXPORTED = ['boards', 'log_months', 'ai_work', 'ai_work_attempts'];
+/**
+ * Tabelas que ficam fora do arquivo mesmo tendo `board_id` (o teste do `sqlite_master` as ignora).
+ * `gate_runs` é o registro local das checagens (sha e saída de uma pasta desta máquina): não viaja.
+ */
+export const NOT_EXPORTED = ['boards', 'log_months', 'ai_work', 'ai_work_attempts', 'gate_runs'];
 
 /** Colunas de `boards` que nunca saem no arquivo: `workspace_key` liga o board à pasta desta máquina. */
 export const OMIT_BOARD_KEYS = ['workspace_key'];
