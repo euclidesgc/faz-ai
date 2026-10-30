@@ -5,7 +5,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { bindBranchRenamePrompt } from './branchRenamePrompt';
 import { createBoardHost, type BoardHost } from './host/boardHost';
-import { SERVED_ELSEWHERE, startMcpServerWhenFree } from './mcp/server';
+import { SERVED_ELSEWHERE, startMcpServer, startMcpServerWhenFree, watchBoardRelease } from './mcp/server';
 import { readBridgeVersion, socketPath, stableBridgePath, workspaceKey, writeBridgeVersion } from './mcp/socketPath';
 import { registerCursorProject } from './mcp/clientConfig';
 import { installCursorHook } from './mcp/cursorHooks';
@@ -413,6 +413,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // servidor MCP: deixa uma IA consultar e editar o board desta pasta (o banco só é aberto no primeiro uso)
   const f = folder();
   if (f) {
+    const address = socketPath(f.uri.fsPath);
+    const mcpOptions = {
+      getRouter,
+      getRunner: async () => {
+        await getRouter();
+        return runner ?? undefined;
+      },
+      workspaceDir: f.uri.fsPath,
+      version: String((context.extension.packageJSON as { version?: string }).version ?? '0'),
+    };
     try {
       fs.mkdirSync(path.dirname(bridgePath), { recursive: true });
       fs.copyFileSync(path.join(context.extensionPath, 'dist', 'mcp-bridge.js'), bridgePath);
@@ -425,20 +435,36 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       void installBoardCursorHook(context, bridgePath, output, editorName !== 'cursor');
       // em segundo plano: a CLI da ferramenta pode demorar, e o servidor do board não depende dela
       ensureUserInstall(context, f.uri.fsPath, bridgePath, output, []);
-      const starting = startMcpServerWhenFree(socketPath(f.uri.fsPath), {
-        getRouter,
-        getRunner: async () => {
-          await getRouter();
-          return runner ?? undefined;
-        },
-        workspaceDir: f.uri.fsPath,
-        version: String((context.extension.packageJSON as { version?: string }).version ?? '0'),
-      });
+      const starting = startMcpServerWhenFree(address, mcpOptions);
       mcpStarting = starting.catch(() => undefined);
       stopMcp = await starting;
     } catch (e) {
       servedElsewhere = e instanceof Error && e.message === SERVED_ELSEWHERE;
       console.warn(`Faz AI: servidor MCP não iniciado: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (servedElsewhere) {
+      const stopWatching = watchBoardRelease(address, {
+        // com o board ainda não carregado nesta janela, não há nada desatualizado: ela passa a servir sozinha
+        canTakeOver: () => !routerPromise,
+        takeOver: async () => {
+          const starting = startMcpServer(address, mcpOptions);
+          mcpStarting = starting.catch(() => undefined);
+          stopMcp = await starting;
+          servedElsewhere = false;
+          output.appendLine(
+            `${new Date().toLocaleTimeString()} O outro lugar que atendia o board desta pasta fechou: esta janela passou a atendê-lo.`,
+          );
+        },
+        // o board carregado aqui pode não ter o que a outra janela gravou: assumir sem recarregar sobrescreveria
+        released: () =>
+          void vscode.window
+            .showWarningMessage(
+              'Faz AI: o outro lugar que atendia o board desta pasta fechou. Recarregue esta janela para ela passar a atender o board; até lá, a IA não roda por aqui.',
+              'Recarregar janela',
+            )
+            .then((choice) => choice && vscode.commands.executeCommand('workbench.action.reloadWindow')),
+      });
+      context.subscriptions.push({ dispose: stopWatching });
     }
     // com o heartbeat ligado nesta pasta, o board precisa estar carregado para a rotina rodar sem ninguém abri-lo
     if (context.workspaceState.get<boolean>(HEARTBEAT_KEY)) void getRouter();

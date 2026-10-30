@@ -12,7 +12,9 @@ folder and go into git as usual. Agents, skills, rules and MCP definitions are s
 database (the credentials of MCP definitions stay in the local vault); the library folder holds a
 readable copy, and each execution gets its own snapshot under `run-artifacts/`. Avoid opening the
 same folder in two editor windows at the same time: the last one to save wins (the extension warns
-when that happens).
+when that happens). Only the window serving the board calls the AI: in the other one, Call AI,
+Summarize and Refine refuse with the reason. When the serving window closes, the other one takes
+over by itself if it has not opened the board yet; if it has, it asks for a reload.
 
 **Updating the extension updates the database.** When the board opens, the extension applies by
 itself, in order, the format changes the database is missing, each in a transaction: if one fails,
