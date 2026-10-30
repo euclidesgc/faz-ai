@@ -12,7 +12,10 @@ export const boardSettingsHandlers = {
     ctx.settings.createColumn(msg.workflowId, msg.name, msg.position);
     return true;
   },
-  'settings.column.update': (msg, ctx) => {
+  'settings.column.update': (msg, ctx, actor) => {
+    // o portão é da pessoa: a IA não afrouxa a própria checagem
+    if (actor.byAi && msg.patch.checks !== undefined)
+      throw new Error('As checagens da coluna são definidas só pela pessoa, em Configurações.');
     ctx.settings.updateColumn(msg.columnId, msg.patch);
     return true;
   },

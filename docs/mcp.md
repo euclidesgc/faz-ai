@@ -441,7 +441,8 @@ O documento é construído numa sub-tarefa (campo Fase = nome da coluna), mas fi
 `add_attachment` com `artifact: true` grava o arquivo no card da história, mesmo quando chamado na
 sub-tarefa, e substitui a versão anterior de mesmo nome. A fase de cada coluna é editável em
 Configurações → Workflows e colunas ou por `update_column` (`ai_instruction`, `artifact_name`,
-`artifact_template`).
+`artifact_template`). As checagens da coluna (Configurações → Workflows e colunas) aparecem em
+`get_board` e não se alteram pelo MCP: o `update_column` não as aceita.
 
 Ao ler um card (`get_card`), a IA recebe a ferramenta, o **modelo** e o **esforço** que devem executá-lo e as **Skills**
 obrigatórias com o caminho de cada `SKILL.md` (as do fluxo vêm sem caminho, para ler com `get_skill`). Ela é instruída a carregar essas skills antes de

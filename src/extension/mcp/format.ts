@@ -699,6 +699,8 @@ export function boardOverview(s: BoardState) {
           ...(c.aiActive ? { aiActive: true } : {}),
           ...(c.requiresApproval ? { requiresApproval: true } : {}),
           ...(c.artifactName ? { artifact: c.artifactName } : {}),
+          // as checagens só se leem: a pessoa as define em Configurações
+          ...(c.checks.length ? { checks: c.checks.map((k) => ({ name: k.name, command: k.command, timeoutSec: k.timeoutSec })) } : {}),
           ...(profileName(s, c.execProfile) ? { execProfile: profileName(s, c.execProfile) } : {}),
         })),
     })),

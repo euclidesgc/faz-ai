@@ -1963,6 +1963,25 @@ code {
   gap: var(--sp-8);
   padding: var(--sp-8) var(--sp-4) var(--sp-12);
 }
+/* checagens da coluna: nome, comando, tempo limite e ações numa linha */
+.checks-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.check-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(200px, 3fr) auto auto;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.check-row-error {
+  grid-column: 1 / -1;
+  font-size: var(--fs-xs);
+}
 .story-artifacts {
   margin-bottom: var(--sp-12);
 }

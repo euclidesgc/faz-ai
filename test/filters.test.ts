@@ -80,6 +80,7 @@ const state: BoardState = {
       artifactName: '',
       artifactTemplate: '',
       execProfile: null,
+      checks: [],
     },
     {
       id: 'c-todo',
@@ -95,6 +96,7 @@ const state: BoardState = {
       artifactName: '',
       artifactTemplate: '',
       execProfile: null,
+      checks: [],
     },
     {
       id: 'c-done',
@@ -110,6 +112,7 @@ const state: BoardState = {
       artifactName: '',
       artifactTemplate: '',
       execProfile: null,
+      checks: [],
     },
   ],
   cardTypes: [],

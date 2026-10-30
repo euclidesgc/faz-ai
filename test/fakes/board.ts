@@ -58,6 +58,7 @@ export const column = (id: string, workflowId: string, position: number, categor
   artifactName: '',
   artifactTemplate: '',
   execProfile: null,
+  checks: [],
 });
 
 /**

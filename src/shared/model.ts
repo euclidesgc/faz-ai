@@ -76,6 +76,15 @@ export interface Workflow {
   collapsed: boolean;
 }
 
+/** Uma checagem determinística da coluna: o comando que o board roda na pasta da história. */
+export interface ColumnCheck {
+  name: string;
+  /** guardado literalmente; `{base}` e `{changed_files}` só o executor substitui */
+  command: string;
+  /** de 1 a 3600 segundos */
+  timeoutSec: number;
+}
+
 export interface Column {
   id: Id;
   workflowId: Id;
@@ -98,6 +107,8 @@ export interface Column {
   artifactTemplate: string;
   /** agente de execução dos cards desta coluna; null = o padrão do board */
   execProfile: Id | null;
+  /** checagens que o board roda quando a IA tenta sair da coluna para a frente; só a pessoa as edita */
+  checks: ColumnCheck[];
 }
 
 export interface CardType {

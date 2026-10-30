@@ -55,7 +55,7 @@ export interface AgentInput {
 }
 import type { SettingsTab } from './settingsTab';
 import type { TraceEntry } from './trace';
-import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, LinkKind, WorkflowKind } from './model';
+import type { BoardState, ColumnCategory, ColumnCheck, FieldDisplay, FieldKind, FieldValue, Id, LinkKind, WorkflowKind } from './model';
 
 export type WebviewToHost =
   | { type: 'ready' }
@@ -243,6 +243,8 @@ export type WebviewToHost =
         artifactName?: string;
         artifactTemplate?: string;
         execProfile?: Id | null;
+        /** a lista inteira, na ordem; só a pessoa altera (a IA é recusada) */
+        checks?: ColumnCheck[];
       };
     }
   | { type: 'settings.column.delete'; columnId: Id; moveCardsTo: Id }

@@ -725,3 +725,50 @@ describe('artefatos do board no export e no import', () => {
     }
   });
 });
+
+describe('checagens da coluna no export e no import (#1096)', () => {
+  const reviewId = () => router.snapshot().columns.find((c) => c.name === 'Revisão')!.id;
+  const checks = [
+    { name: 'Tipos', command: 'npm run typecheck', timeoutSec: 300 },
+    { name: 'Testes', command: 'npx vitest related {changed_files} --run', timeoutSec: 600 },
+  ];
+
+  it('ida e volta: a ordem e o conteúdo das checagens voltam iguais', () => {
+    router.handle({ type: 'settings.column.update', columnId: reviewId(), patch: { checks } });
+    const text = JSON.stringify(doExport().file);
+    wipe();
+    importBoard(target(router), parseExportFile(text));
+    const col = openRouter(db, 'ws-a', 'A')
+      .snapshot()
+      .columns.find((c) => c.name === 'Revisão')!;
+    expect(col.checks).toEqual(checks);
+  });
+
+  it('o handler recusa as checagens vindas da IA e grava as da pessoa', () => {
+    const patch = { checks };
+    expect(() => router.handle({ type: 'settings.column.update', columnId: reviewId(), patch }, { author: 'IA', source: 'ai' })).toThrow(
+      'As checagens da coluna são definidas só pela pessoa, em Configurações.',
+    );
+    expect(router.snapshot().columns.find((c) => c.id === reviewId())!.checks).toEqual([]);
+    // a IA segue podendo mexer no resto da coluna
+    router.handle({ type: 'settings.column.update', columnId: reviewId(), patch: { aiActive: false } }, { author: 'IA', source: 'ai' });
+    router.handle({ type: 'settings.column.update', columnId: reviewId(), patch }, { author: 'Pessoa', source: 'ui' } as never);
+    expect(router.snapshot().columns.find((c) => c.id === reviewId())!.checks).toEqual(checks);
+  });
+
+  it('arquivo do schema 52, sem checks_json, importa com a lista vazia', () => {
+    const legacy = structuredClone(doExport().file);
+    legacy.schemaVersion = 52;
+    for (const row of legacy.tables.columns!) delete row.checks_json;
+    importBoard(target(router), parseExportFile(JSON.stringify(legacy)));
+    const cols = openRouter(db, 'ws-a', 'A').snapshot().columns;
+    expect(cols.length).toBeGreaterThan(5);
+    expect(cols.every((c) => c.checks.length === 0)).toBe(true);
+  });
+
+  it('arquivo do schema 53 sem a coluna checks_json é recusado', () => {
+    const broken = structuredClone(doExport().file);
+    delete broken.tables.columns![0]!.checks_json;
+    expect(() => parseExportFile(JSON.stringify(broken))).toThrow('falta a coluna "checks_json" em "columns"');
+  });
+});

@@ -35,6 +35,7 @@ import type { HarnessSelection, HarnessUsage, SelectableKind } from '../../share
 import { BRANCH_KINDS, parseGit, type BranchKind, type GitConfig } from '../../shared/git';
 import { parseAppearance, type Appearance } from '../../shared/appearance';
 import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
+import { parseColumnChecks } from '../../shared/columnChecks';
 import { parseQuestions } from '../../shared/questions';
 import { EMPTY_HARNESS, parseAiTool, type AiTool } from '../../shared/harness';
 import { RENAME_PENDING_KEY, RENAME_RESULT_KEY, parsePending, parseResult } from '../../shared/branchRename';
@@ -397,6 +398,7 @@ export class BoardRepo {
       artifactName: str(r.artifact_name),
       artifactTemplate: str(r.artifact_template),
       execProfile: r.exec_profile == null ? null : str(r.exec_profile),
+      checks: parseColumnChecks(str(r.checks_json)),
     }));
 
     const cardTypes: CardType[] = all(db, 'SELECT * FROM card_types WHERE board_id = ? ORDER BY rowid', [boardId]).map((r) => ({
