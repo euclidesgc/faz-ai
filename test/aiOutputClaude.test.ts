@@ -463,3 +463,28 @@ describe('usageLimitReached: detecção do limite de uso esgotado', () => {
     });
   });
 });
+
+describe('claudeReader: transientFailure', () => {
+  const run = (event: Record<string, unknown>) => {
+    const reader = claudeReader({ model: 'haiku' });
+    reader.push(JSON.stringify({ type: 'result', ...event }), 'stdout');
+    return reader.report();
+  };
+
+  it('result de erro com sobrecarga (529) liga o sinal', () => {
+    const r = run({ subtype: 'success', is_error: true, api_error_status: 529, result: 'API Error: 529 overloaded_error' });
+    expect(r.transientFailure).toBe(true);
+    expect(r.usageLimitReached).toBe(false);
+  });
+
+  it('execução bem-sucedida que cita "overloaded" não liga o sinal', () => {
+    const r = run({ subtype: 'success', is_error: false, result: 'Tratei o overloaded_error e o ECONNRESET no cliente.' });
+    expect(r.transientFailure).toBeUndefined();
+  });
+
+  it('limite de uso não vira transitório', () => {
+    const r = run({ subtype: 'success', is_error: true, result: "You've hit your session limit · resets 1:50pm (America/Sao_Paulo)" });
+    expect(r.usageLimitReached).toBe(true);
+    expect(r.transientFailure).toBeUndefined();
+  });
+});

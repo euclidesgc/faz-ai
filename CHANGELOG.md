@@ -57,9 +57,11 @@
 - O heartbeat tenta destravar as histórias bloqueadas: a IA procura a causa, resolve o que consegue e devolve o trabalho à fila; só fica bloqueada a que depende de você.
 - `npm run eval` avalia um modelo em histórias de referência e grava o placar (#1105).
 - Cinco histórias de referência para a avaliação de modelos, com a prova de que o aceite falha sem a solução e passa com ela (#1233).
+- Cada execução grava a classe da falha (transitória, determinística, limite de uso ou interrompida), e `get_metrics` agrupa por `failure_class` (#1099).
 
 ### Alterado
 
+- Falha transitória sem efeito (rede, erro 5xx, sobrecarga) é repetida sozinha, até 3 vezes com espera de 30 s, 2 min e 5 min, em vez de bloquear o card; na Implementação, a unidade também (#1099).
 - O board novo nasce com a regra Trilha curta ligada; os boards existentes mantêm a escolha (#1107).
 - Quando o modelo de um card esgota o limite de uso, o board pergunta se espera o limite voltar ou segue com outro modelo disponível, e grava a escolha no card; no modo autônomo vale a regra de fallback.
 - Os seletores de modelo (chat, card, agentes e regras) só oferecem os agentes que podem responder agora.

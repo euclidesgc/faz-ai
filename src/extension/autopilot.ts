@@ -11,7 +11,8 @@ import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
 import { orchestratesStory } from '../shared/orchestration';
 import { autopilotQueue } from '../shared/autopilotQueue';
 import { commentsSinceSummary } from '../shared/conversation';
-import { UsageLimitHeld } from './runner';
+import { RetryHeld, UsageLimitHeld } from './runner';
+import type { FailureClass } from '../shared/failureClass';
 import type { MessageRouter } from './panel/messageRouter';
 
 const AUTHOR = 'Faz AI';
@@ -34,7 +35,9 @@ export interface AutopilotRunner {
   readonly running: string[];
   start(cardId: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(cardId: string): void;
-  onDidFinish(listener: (cardId: string, mode?: AiRunMode) => void): void;
+  onDidFinish(listener: (cardId: string, mode?: AiRunMode, failureClass?: FailureClass | null) => void): void;
+  /** o motivo da espera da retentativa por falha transitória do card, ou null; a história que espera não é candidata */
+  retryHold?(cardId: string): string | null;
 }
 
 /** Quem conduz uma história rodada após rodada (o `Orchestrator`): o autopiloto e o heartbeat só pedem que ela siga. */
@@ -231,7 +234,7 @@ export class Autopilot {
   ) {
     this.known = new Set(yoloStories(router.snapshot()).map((c) => c.id));
     router.onDidChange(() => this.onBoardChange());
-    runner.onDidFinish((cardId, mode) => this.onRunFinished(cardId, mode));
+    runner.onDidFinish((cardId, mode, failureClass) => this.onRunFinished(cardId, mode, failureClass));
     // histórias que já estavam em modo autônomo ao abrir o editor continuam sozinhas: a pessoa ligou o
     // modo para não precisar voltar ao board; só a pausa dela segura a fila (#240)
     (deps.defer ?? queueMicrotask)(() => this.autoResume());
@@ -327,7 +330,7 @@ export class Autopilot {
     });
   }
 
-  private onRunFinished(cardId: string, mode?: AiRunMode): void {
+  private onRunFinished(cardId: string, mode?: AiRunMode, failureClass?: FailureClass | null): void {
     const s = this.router.snapshot();
     const card = s.cards.find((c) => c.id === cardId);
     const story = card && (card.parentId ? s.cards.find((c) => c.id === card.parentId) : card);
@@ -341,7 +344,9 @@ export class Autopilot {
       mode !== 'summarize' &&
       mode !== 'conflict' &&
       mode !== 'reply' &&
-      mode !== 'unblock'
+      mode !== 'unblock' &&
+      // a falha transitória é do serviço, não da IA: a retentativa (ou o bloqueio, se esgotou) não conta como volta sem progresso
+      failureClass !== 'transient'
     )
       this.checkProgress(s, story);
     // decide depois dos demais ouvintes do fim da execução: o heartbeat guarda a vaga para o autopiloto
@@ -438,6 +443,8 @@ export class Autopilot {
           // o orquestrador recusou esta história: só tenta de novo quando ela mudar (a nota da recusa muda o
           // board e voltava aqui na hora, chamando a IA várias vezes por segundo)
           if (this.driving.has(r.story.id) || this.refused.get(r.story.id) === refusalKey(s, r.story)) continue;
+          // a retentativa por falha transitória já está agendada no runner: ela é quem volta a chamar a IA, depois do backoff
+          if (this.runner.retryHold?.(r.story.id)) continue;
           // a história passou de fase desde a última execução e a conversa está cheia: primeiro o resumo (uma
           // execução de texto), depois a fase. Uma história que ainda não rodou nesta sessão segue direto
           const from = this.lastRunColumn.get(r.story.id);
@@ -476,6 +483,8 @@ export class Autopilot {
     } catch (e) {
       // perfil pausado pelo limite de uso: não é falha; a história espera a pausa vencer e os outros perfis seguem
       if (e instanceof UsageLimitHeld) return this.logHeld(e);
+      // espera da retentativa transitória: o runner volta a chamar a IA sozinho
+      if (e instanceof RetryHeld) return;
       const reason = e instanceof Error ? e.message : String(e);
       this.deps.log(`Autopiloto: ${reason}`);
       // sem como executar a ferramenta, insistir não adianta

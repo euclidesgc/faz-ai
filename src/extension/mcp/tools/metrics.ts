@@ -24,6 +24,7 @@ const GROUP_BY = [
   'used_tool',
   'mcp_tool',
   'bash_command',
+  'failure_class',
 ] as const;
 const INVENTORY_DIMS = new Set<MetricsDim | undefined>(['agent', 'skill', 'used_tool', 'mcp_tool', 'bash_command']);
 
@@ -135,6 +136,9 @@ function formatCoverage(result: MetricsResult, showCost: boolean, estimatedUsd: 
   return lines.join('\n');
 }
 
+/** O rótulo da linha `failure_class` vazia (ver `formatMetrics`). */
+const SEM_CLASSE = 'sem classe';
+
 /** Formata a resposta de `get_metrics`: tabela compacta + a cobertura do período (RF-05/RF-06/RF-08). */
 export function formatMetrics(
   result: MetricsResult,
@@ -145,9 +149,11 @@ export function formatMetrics(
   const coverage = formatCoverage(result, showCost, estimatedUsd);
   if (result.rows.length === 0) return `nenhum grupo no recorte.\n${coverage}`;
   const variant = variantOf(groupBy);
+  // a execução sem classe (terminou bem, sem desfecho gravado ou anterior à migração 55) tem o valor vazio: sem rótulo, a linha some na tabela
+  const rows = groupBy === 'failure_class' ? result.rows.map((r) => ({ ...r, label: r.label || SEM_CLASSE })) : result.rows;
   return `${table(
     headersOf(variant, showCost),
-    result.rows.map((r) => formatRow(r, variant, showCost)),
+    rows.map((r) => formatRow(r, variant, showCost)),
   )}\n\n${coverage}`;
 }
 
@@ -268,7 +274,7 @@ export function registerMetricsTools(tool: DefineTool): void {
     'get_metrics',
     'Uso, tokens, custo e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
       'com filtros de período e card. Resposta em tabela compacta; os tokens são os medidos (entrada, saída e cache) e vêm como "-" quando não medidos (nunca 0). O custo em US$ aparece quando a regra "Mostrar custo em dólar" está ligada: o informado pela CLI ou, sem ele, o estimado pelo preço do catálogo (marcado à parte). ' +
-      '"tool" é a ferramenta de IA que rodou (o perfil de CLI, ex.: claude); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só das ferramentas que informam). ' +
+      '"tool" é a ferramenta de IA que rodou (o perfil de CLI, ex.: claude); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só das ferramentas que informam); "failure_class" é a classe da falha da execução (transient, deterministic, budget ou canceled); "sem classe" = terminou bem, sem desfecho gravado ou anterior à classificação. ' +
       'Nas dimensões "agent", "skill", "used_tool", "mcp_tool" e "bash_command" não há tokens/custo (não é possível repartir o consumo de uma execução entre o que ela usou); "effort" e "profile" têm.',
     {
       group_by: z.enum(GROUP_BY).optional().describe('Dimensão de agrupamento; omitido = total do recorte'),

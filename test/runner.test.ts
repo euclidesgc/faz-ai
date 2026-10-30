@@ -2400,3 +2400,138 @@ describe('consumptionLine', () => {
     expect(consumptionLine(none, { explained: true })).toBe('Consumo não medido.');
   });
 });
+
+describe('retentativa por falha transitória (#1099)', () => {
+  /** o `result` de erro que o leitor do Claude Code reconhece como falha de rede/serviço (nunca limite de uso) */
+  const transientResult = () => `${JSON.stringify({ type: 'result', is_error: true, result: 'API Error: 529 overloaded_error' })}\n`;
+  const toolUse = () =>
+    `${JSON.stringify({
+      type: 'assistant',
+      message: { id: 'm1', model: 'claude-sonnet-4-5', content: [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'ls' } }] },
+    })}\n`;
+  const comments = () =>
+    router
+      .snapshot()
+      .comments.filter((c) => c.cardId === storyId)
+      .map((c) => c.body);
+  /** o processo `n` cai com falha transitória, sem ter feito nada */
+  const fail = (n: number) => {
+    procs[n]!.emit(transientResult());
+    procs[n]!.exit(1);
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T12:00:00'));
+  });
+
+  it('sem efeito: comenta, devolve o status e repete depois da espera, informando-a em usageHold', () => {
+    runner.start(storyId, { origin: 'autopilot' });
+    fail(0);
+
+    expect(card().status).not.toBe('blocked');
+    expect(comments().at(-1)).toMatch(/Falha transitória no .*Nova execução às 12:00 \(tentativa 1 de 3\)/);
+    expect(runner.isRunning(storyId)).toBe(false);
+    expect(runner.usageHold(storyId)).toMatch(/Aguardando nova tentativa às 12:00/);
+
+    // o início automático respeita a espera
+    expect(() => runner.start(storyId, { origin: 'autopilot' })).toThrow(/Aguardando nova tentativa/);
+
+    vi.advanceTimersByTime(29_999);
+    expect(procs).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(procs).toHaveLength(2);
+    expect(runner.usageHold(storyId)).toBeNull();
+  });
+
+  it('respeita o backoff de 30 s, 2 min e 5 min e, na quarta falha, bloqueia dizendo que esgotou as tentativas', () => {
+    runner.start(storyId, { origin: 'autopilot' });
+    fail(0);
+    vi.advanceTimersByTime(30_000);
+    expect(procs).toHaveLength(2);
+
+    fail(1);
+    expect(comments().at(-1)).toMatch(/tentativa 2 de 3/);
+    vi.advanceTimersByTime(119_999);
+    expect(procs).toHaveLength(2);
+    vi.advanceTimersByTime(1);
+    expect(procs).toHaveLength(3);
+
+    fail(2);
+    expect(comments().at(-1)).toMatch(/tentativa 3 de 3/);
+    vi.advanceTimersByTime(299_999);
+    expect(procs).toHaveLength(3);
+    vi.advanceTimersByTime(1);
+    expect(procs).toHaveLength(4);
+
+    fail(3);
+    expect(card().status).toBe('blocked');
+    expect(card().statusReason).toMatch(/esgotou as 3 tentativas/);
+    vi.advanceTimersByTime(600_000);
+    expect(procs).toHaveLength(4);
+  });
+
+  it('com efeito (a IA chamou uma ferramenta): bloqueia dizendo que ela já agiu e não repete', () => {
+    runner.start(storyId, { origin: 'autopilot' });
+    procs[0]!.emit(toolUse());
+    fail(0);
+
+    expect(card().status).toBe('blocked');
+    expect(card().statusReason).toMatch(/a IA já agiu neste card; o board não repete sozinho/);
+    vi.advanceTimersByTime(600_000);
+    expect(procs).toHaveLength(1);
+  });
+
+  it('falha de código (deterministic) segue o caminho de antes: bloqueia sem repetir', () => {
+    runner.start(storyId, { origin: 'autopilot' });
+    procs[0]!.emit(`${JSON.stringify({ type: 'result', is_error: true, result: 'Invalid argument' })}\n`);
+    procs[0]!.exit(1);
+
+    expect(card().status).toBe('blocked');
+    expect(card().statusReason).not.toMatch(/transitória/);
+    vi.advanceTimersByTime(600_000);
+    expect(procs).toHaveLength(1);
+  });
+
+  it('stop durante a espera cancela a retentativa e libera o usageHold', () => {
+    runner.start(storyId, { origin: 'autopilot' });
+    fail(0);
+    expect(runner.usageHold(storyId)).not.toBeNull();
+
+    runner.stop(storyId);
+    expect(runner.usageHold(storyId)).toBeNull();
+    vi.advanceTimersByTime(600_000);
+    expect(procs).toHaveLength(1);
+  });
+
+  it('a pessoa mexeu no card durante a espera: a retentativa não acontece', () => {
+    runner.start(storyId, { origin: 'autopilot' });
+    fail(0);
+    router.handle({ type: 'card.status.set', cardId: storyId, status: 'blocked', note: 'esperar' }, { author: 'Pessoa' });
+    vi.advanceTimersByTime(600_000);
+    expect(procs).toHaveLength(1);
+  });
+
+  it('avisa o fim da execução com a classe da falha, e a execução manual durante a espera substitui a retentativa', () => {
+    const finished: unknown[] = [];
+    runner.onDidFinish((_id, _mode, failureClass) => finished.push(failureClass));
+    runner.start(storyId, { origin: 'autopilot' });
+    fail(0);
+    expect(finished).toEqual(['transient']);
+
+    runner.start(storyId, { origin: 'manual' });
+    expect(procs).toHaveLength(2);
+    expect(runner.usageHold(storyId)).toBeNull();
+    // o timer antigo não dispara uma terceira execução
+    vi.advanceTimersByTime(600_000);
+    expect(procs).toHaveLength(2);
+  });
+
+  it('refinar não repete: o card volta ao status e a falha fica na conversa', () => {
+    runner.start(storyId, { origin: 'manual' }, 'refine');
+    fail(0);
+    expect(runner.usageHold(storyId)).toBeNull();
+    vi.advanceTimersByTime(600_000);
+    expect(procs).toHaveLength(1);
+  });
+});

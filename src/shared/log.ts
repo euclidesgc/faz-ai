@@ -210,6 +210,11 @@ export interface RunReport {
    */
   usageLimitReached: boolean;
   /**
+   * true = o leitor detectou, na saída da CLI, uma falha passageira (rede, 5xx, sobrecarga) que não é
+   * limite de uso. Alimenta `classifyFailure`; ausente = não detectou.
+   */
+  transientFailure?: boolean;
+  /**
    * a dica de renovação que o leitor achou na saída (o horário do Claude Code; a cota diária ou o `retryDelay` do
    * Gemini nos três modos); sem ela, a pausa usa o backoff
    */

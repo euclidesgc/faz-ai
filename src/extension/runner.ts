@@ -21,6 +21,7 @@ import { cardRef } from '../shared/model';
 import { criticalWindow, nextReading, windowLabel, type UsageWindow } from '../shared/quotaReading';
 import { canDispatch, limitClock, limitHolds, modelLimitHolds, modelLimitOf, nextPause, pauseOf, resetAtOf } from '../shared/usageLimit';
 import { limitChoice } from '../shared/limitChoice';
+import { MAX_TRANSIENT_RETRIES, retryDelay, type FailureClass } from '../shared/failureClass';
 import { activityKindOf } from '../shared/activity';
 import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from './unitAdvice';
 import { isDirectTrackStory } from '../shared/orchestration';
@@ -99,6 +100,16 @@ export interface RunOptions {
   onExit?(end: AiRunEnd): void;
   /** de uso interno: a cadeia de tentativas de uma troca por política (ver `Chain`); quem chama de fora nunca informa */
   chain?: Chain;
+  /** de uso interno: quantas retentativas por falha transitória já houve nesta cadeia (ver `transientRetry`) */
+  transientRetries?: number;
+}
+
+/** A execução automática do card espera a retentativa por falha transitória (o backoff ainda não venceu). */
+export class RetryHeld extends Error {
+  constructor(readonly message: string) {
+    super(message);
+    this.name = 'RetryHeld';
+  }
 }
 
 /** O que a execução pede para continuar noutro alvo: o destino da política e a cadeia atualizada. */
@@ -124,6 +135,10 @@ interface Run {
   /** o alvo desta execução (perfil de CLI e modelo); é nele que o gateway, o login e a troca por política se apoiam */
   target: RunTarget;
   chain: Chain;
+  /** quantas retentativas por falha transitória já ocorreram nesta cadeia (0 na primeira execução) */
+  transientRetries: number;
+  /** o pedido que começou a execução, para repeti-la igual (sem o `onExit`, que já avisou o fim desta) */
+  options: RunOptions;
   /** o contexto que as políticas casam: ação, agente, fase e tipo do card */
   policy: {
     action: ContextAction;
@@ -449,7 +464,9 @@ export const REPLY_AUTONOMOUS_ADVICE =
  */
 export class AiRunner {
   private runs = new Map<string, Run>();
-  private finishListeners: ((cardId: string, mode: AiRunMode) => void)[] = [];
+  private finishListeners: ((cardId: string, mode: AiRunMode, failureClass: FailureClass | null) => void)[] = [];
+  /** cards esperando a retentativa por falha transitória; em memória: fechar o editor a descarta (o card já voltou ao status anterior) */
+  private retryHolds = new Map<string, { until: number; timer: NodeJS.Timeout; attempt: number }>();
   /** a última execução terminou por limite de uso do plano: o heartbeat não insiste até uma execução voltar a funcionar */
   usageLimited = false;
 
@@ -494,6 +511,10 @@ export class AiRunner {
     const card = state.cards.find((c) => c.id === cardId);
     if (!card || !isLive(card)) throw new Error('Card não encontrado.');
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
+    // o início automático respeita a espera da retentativa; o manual a substitui (o timer não dispara depois de uma execução)
+    const hold = this.retryHold(cardId);
+    if (hold && origin !== 'manual') throw new RetryHeld(hold);
+    this.clearRetryHold(cardId);
     const resolved = forceTarget ? { blocked: false as const, target: forceTarget } : resolveRunTarget(state, card);
     if (resolved.blocked)
       throw new Error(
@@ -750,6 +771,8 @@ export class AiRunner {
       info,
       target,
       chain: options.chain ?? position?.chain ?? newChain(target, exec.startedAt),
+      transientRetries: options.transientRetries ?? 0,
+      options,
       policy,
       origin,
     };
@@ -854,12 +877,14 @@ export class AiRunner {
       }
       this.publish();
       options.onExit?.(end);
-      this.finishListeners.forEach((fn) => fn(cardId, run.mode));
+      this.finishListeners.forEach((fn) => fn(cardId, run.mode, end.failureClass));
     });
   }
 
   /** O motivo da pausa por limite de uso que recusaria o início automático do card agora, ou null (alvo inválido não é pausa). */
   usageHold(cardId: string): string | null {
+    const waiting = this.retryHold(cardId);
+    if (waiting) return waiting;
     const state = this.router.snapshot();
     const card = state.cards.find((c) => c.id === cardId);
     if (!card) return null;
@@ -871,8 +896,24 @@ export class AiRunner {
     return new UsageLimitHeld(id, held.resumeAt, profileLabel(state.board, id)).message;
   }
 
-  /** Avisa quando a execução de um card termina, seja como for. Devolve uma função para cancelar o aviso. */
-  onDidFinish(listener: (cardId: string, mode: AiRunMode) => void): () => void {
+  /** O motivo da espera da retentativa por falha transitória do card, ou null quando ele não espera. */
+  retryHold(cardId: string): string | null {
+    const hold = this.retryHolds.get(cardId);
+    return hold ? `Aguardando nova tentativa às ${limitClock(hold.until, Date.now())} (falha transitória).` : null;
+  }
+
+  private clearRetryHold(cardId: string): void {
+    const hold = this.retryHolds.get(cardId);
+    if (!hold) return;
+    clearTimeout(hold.timer);
+    this.retryHolds.delete(cardId);
+  }
+
+  /**
+   * Avisa quando a execução de um card termina, seja como for (com a classe da falha: o autopiloto não conta a
+   * tentativa transitória como volta sem progresso). Devolve uma função para cancelar o aviso.
+   */
+  onDidFinish(listener: (cardId: string, mode: AiRunMode, failureClass?: FailureClass | null) => void): () => void {
     this.finishListeners.push(listener);
     return () => {
       this.finishListeners = this.finishListeners.filter((l) => l !== listener);
@@ -886,12 +927,15 @@ export class AiRunner {
 
   /** Interrompe a execução do card; o status volta ao que era. */
   stop(cardId: string): void {
+    // interromper durante a espera da retentativa a cancela
+    this.clearRetryHold(cardId);
     const run = this.runs.get(cardId);
     if (!run) return;
     run.exec.stop();
   }
 
   dispose(): void {
+    for (const id of [...this.retryHolds.keys()]) this.clearRetryHold(id);
     for (const id of this.running) this.stop(id);
   }
 
@@ -1051,6 +1095,13 @@ export class AiRunner {
       );
       return void this.restore(cardId, run);
     }
+    // falha transitória (rede, 5xx, sobrecarga): só repete se a IA não deixou efeito e as tentativas não esgotaram;
+    // refinar, resumir, desbloquear e resolver conflito já saíram acima ou não repetem
+    if (failure && end.failureClass === 'transient' && (run.mode === 'phase' || run.mode === 'reply')) {
+      const verdict = this.transientRetry(cardId, run, end, replied, toolLabel, failure);
+      if (verdict === 'scheduled') return;
+      return void this.block(cardId, verdict);
+    }
     if (failure) return void this.block(cardId, failure);
     // a execução de conflito terminou bem: não passa a vez nem reavalia a entrega, o card volta ao status
     // que tinha (quem confere se o conflito saiu é o MergeWatcher, na próxima consulta do pull request)
@@ -1072,6 +1123,68 @@ export class AiRunner {
     const currentStory = currentCard && storyOf(current, currentCard);
     if (currentStory && isYolo(current, currentCard) && isWithHuman(currentStory)) return;
     this.block(cardId, `O ${toolLabel} encerrou sem responder na conversa nem mudar o status do card.${output}`);
+  }
+
+  /**
+   * A IA deixou efeito no card ou na pasta? Resposta na conversa, ferramenta ou comando contam; sem medição de
+   * ferramentas (Cursor, Copilot) o efeito é desconhecido e conta como efeito, salvo quando a própria CLI informou
+   * a falha transitória de forma estrutural.
+   */
+  private acted(end: AiRunEnd, replied: boolean): boolean {
+    const r = end.report;
+    return replied || r.inventory.length > 0 || (r.bashCommands?.length ?? 0) > 0 || (r.measure === 'none' && !r.transientFailure);
+  }
+
+  /**
+   * Falha transitória sem efeito e com tentativas sobrando: comenta, devolve o status anterior e agenda uma nova
+   * execução depois do backoff (30 s, 2 min, 5 min). Devolve 'scheduled' ou o motivo do bloqueio (com efeito, ou
+   * esgotado) para quem chama bloquear o card.
+   */
+  private transientRetry(
+    cardId: string,
+    run: Run,
+    end: AiRunEnd,
+    replied: boolean,
+    toolLabel: string,
+    failure: string,
+  ): 'scheduled' | string {
+    const why = end.error ? cut(end.error.message, 120) : `código ${end.code}`;
+    const head = `Falha transitória no ${toolLabel} (${why})`;
+    if (this.acted(end, replied))
+      return `${head}, mas a IA já agiu neste card; o board não repete sozinho. Confira o que ficou feito e chame a IA de novo.\n\n${failure}`;
+    if (run.transientRetries >= MAX_TRANSIENT_RETRIES) return `${head}: esgotou as ${MAX_TRANSIENT_RETRIES} tentativas.\n\n${failure}`;
+    const attempt = run.transientRetries + 1;
+    const now = Date.now();
+    const until = now + retryDelay(attempt);
+    this.router.handle(
+      {
+        type: 'comment.add',
+        cardId,
+        body: `${head}. Nova execução às ${limitClock(until, now)} (tentativa ${attempt} de ${MAX_TRANSIENT_RETRIES}).`,
+      },
+      { author: RUNNER_AUTHOR, source: 'ai' },
+    );
+    this.restore(cardId, run);
+    const restored = this.router.snapshot().cards.find((c) => c.id === cardId)?.status ?? null;
+    this.clearRetryHold(cardId);
+    const timer = setTimeout(() => {
+      this.retryHolds.delete(cardId);
+      const current = this.router.snapshot().cards.find((c) => c.id === cardId);
+      // a pessoa mexeu no card durante a espera (arquivou, bloqueou, mudou o status): a retentativa não vale mais
+      if (!current || !isLive(current) || current.status !== restored || this.runs.has(cardId)) return;
+      try {
+        const { onExit: _onExit, ...again } = run.options;
+        this.start(cardId, { ...again, transientRetries: attempt }, run.mode);
+      } catch (e) {
+        this.block(cardId, `Não foi possível repetir a execução após a falha transitória: ${e instanceof Error ? e.message : String(e)}`);
+        this.publish();
+        this.finishListeners.forEach((fn) => fn(cardId, run.mode, 'transient'));
+      }
+    }, retryDelay(attempt));
+    // não segura o processo do Node aberto só para repetir
+    timer.unref?.();
+    this.retryHolds.set(cardId, { until, timer, attempt });
+    return 'scheduled';
   }
 
   /** O log e a conversa explicam por que a execução começa noutro modelo que o pedido (RF11, RF12). */

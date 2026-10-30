@@ -132,3 +132,28 @@ describe('leitor do Gemini: casos de borda', () => {
     expect(geminiMcpName('read_file')).toBeNull();
   });
 });
+
+describe('geminiReader: transientFailure', () => {
+  const errorResult = (message: string) => JSON.stringify({ type: 'result', status: 'error', error: { type: 'Error', message } });
+
+  it('result de erro 503 UNAVAILABLE liga o sinal', () => {
+    const reader = geminiReader();
+    reader.push(errorResult('503 UNAVAILABLE: The model is overloaded'), 'stdout');
+    expect(reader.report().transientFailure).toBe(true);
+  });
+
+  it('result de sucesso, mesmo com aviso de tentativa refeita, não liga o sinal', () => {
+    const reader = geminiReader();
+    reader.push('Attempt 1 failed: fetch failed. Retrying', 'stderr');
+    reader.push(JSON.stringify({ type: 'result', status: 'success', stats: {} }), 'stdout');
+    expect(reader.report().transientFailure).toBeUndefined();
+  });
+
+  it('cota diária continua limite de uso, não transitória', () => {
+    const reader = geminiReader();
+    reader.push(errorResult('TerminalQuotaError: You have exhausted your daily quota on this model.'), 'stdout');
+    const r = reader.report();
+    expect(r.usageLimitReached).toBe(true);
+    expect(r.transientFailure).toBeUndefined();
+  });
+});

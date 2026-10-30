@@ -2,6 +2,7 @@
 // (`describe`) e ao desfecho (`finish`). A ligação com o executor é do passo 4 (`runLog.ts` /
 // `runner.ts`); aqui é só o repositório.
 import type { Database } from 'sql.js';
+import type { FailureClass } from '../../shared/failureClass';
 import type {
   AiRunConfig,
   AiRunMeasure,
@@ -32,6 +33,8 @@ export interface AiRun {
   month: string;
   outcome: AiRunOutcome | null;
   exitCode: number | null;
+  /** a classe da falha; null = terminou bem, ou execução anterior à migração 55 */
+  failureClass: FailureClass | null;
   origin: AiRunOrigin;
   cardId: string | null;
   cardNumber: number | null;
@@ -105,6 +108,7 @@ function toRun(r: Row): AiRun {
     month: str(r.month),
     outcome: strOrNull(r.outcome) as AiRunOutcome | null,
     exitCode: r.exit_code == null ? null : num(r.exit_code),
+    failureClass: strOrNull(r.failure_class) as FailureClass | null,
     origin: str(r.origin) as AiRunOrigin,
     cardId: strOrNull(r.card_id),
     cardNumber: r.card_number == null ? null : num(r.card_number),
@@ -207,16 +211,17 @@ export class AiRunRepo {
   }
 
   /** Grava o desfecho: `ended_at`, `duration_ms` (nulo quando `outcome` é `unknown`) e `exit_code`. */
-  finish(id: string, outcome: AiRunOutcome, exitCode?: number | null): void {
+  finish(id: string, outcome: AiRunOutcome, exitCode?: number | null, failureClass?: FailureClass | null): void {
     const row = one(this.db, 'SELECT started_at FROM ai_runs WHERE id = ?', [id]);
     if (!row) throw new Error('Execução de IA não encontrada');
     const endedAt = Date.now();
     const durationMs = outcome === 'unknown' ? null : endedAt - num(row.started_at);
-    run(this.db, 'UPDATE ai_runs SET ended_at = ?, duration_ms = ?, outcome = ?, exit_code = ? WHERE id = ?', [
+    run(this.db, 'UPDATE ai_runs SET ended_at = ?, duration_ms = ?, outcome = ?, exit_code = ?, failure_class = ? WHERE id = ?', [
       endedAt,
       durationMs,
       outcome,
       exitCode ?? null,
+      failureClass ?? null,
       id,
     ]);
   }

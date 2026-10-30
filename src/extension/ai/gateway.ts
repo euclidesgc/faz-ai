@@ -1,4 +1,5 @@
 import type { AcpSpawnFn } from './acp/provider';
+import { classifyFailure, type FailureClass } from '../../shared/failureClass';
 import { executorOf, type Executor } from './drivers';
 import { executorProfile } from './providers';
 import { redactCredentialValues } from '../credentials';
@@ -119,6 +120,8 @@ export interface AiRunEnd {
   timedOut: boolean;
   /** o relógio que encerrou foi o da falta de atividade; implica `timedOut` */
   stalled: boolean;
+  /** a classe da falha (a mesma gravada em `ai_runs.failure_class`); null = terminou bem */
+  failureClass: FailureClass | null;
   /** o consumo e o inventário medidos, os mesmos que foram para o log */
   report: RunReport;
   /** a conferência do inventário contra o que o card liberou, a mesma que foi para o log */
@@ -278,6 +281,11 @@ export class AiGateway {
     /** a pasta dos hooks desta run, apagada no fim ou na falha ao começar */
     let kit: CommitTrailerKit | null = null;
     const authTails = { stdout: '', stderr: '' };
+    /** o fim da saída (últimas linhas, de qualquer fluxo) para `classifyFailure` */
+    let outputTail: string[] = [];
+    const keepTail = (text: string) => {
+      outputTail = [...outputTail, ...text.split(/\r?\n/).filter((l) => l.trim() !== '')].slice(-40);
+    };
     /** a chave do cofre desta execução: mascarada aqui mesmo, sem depender de o cofre já a conhecer */
     let apiKey: string | undefined;
     const redact = (text: string) => {
@@ -415,6 +423,7 @@ export class AiGateway {
             // o comando e os argumentos do agente são os admitidos; o executável é o do vínculo
             const checked = admitted?.acpCommand(command) ?? command;
             return spawnProcess(withTrailers(checked), cwd, (text, stream) => {
+              keepTail(text);
               watch(text, stream);
               out(text, stream);
             });
@@ -436,6 +445,7 @@ export class AiGateway {
             withTrailers(checked),
             cwd,
             (text, stream) => {
+              keepTail(text);
               watch(text, stream);
               out(text, stream);
             },
@@ -498,8 +508,18 @@ export class AiGateway {
         if (error.stack) error.stack = redact(error.stack);
       }
       const outcome = outcomeOf({ stopped, timedOut, code, error });
-      runLog.finish(runId, outcome, code);
       const rawReport = measured.report();
+      const failureClass = classifyFailure({
+        stopped,
+        timedOut,
+        stalled,
+        code,
+        hasError: !!error,
+        usageLimitReached: rawReport.usageLimitReached,
+        transientFailure: rawReport.transientFailure === true,
+        tail: outputTail,
+      });
+      runLog.finish(runId, outcome, code, failureClass);
       const safeReport = {
         ...rawReport,
         answer: redact(rawReport.answer),
@@ -539,6 +559,7 @@ export class AiGateway {
         stopped,
         timedOut,
         stalled,
+        failureClass,
         report,
         check,
         attempts,

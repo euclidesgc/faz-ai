@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 54;
+export const SCHEMA_VERSION = 55;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -683,6 +683,11 @@ const MIGRATIONS: Record<number, string> = {
     );
     CREATE INDEX gate_runs_card ON gate_runs (card_id, started_at);
   `,
+  55: `
+    -- #1099: classe da falha da execução (transient|deterministic|budget|canceled). NULL = terminou bem,
+    -- sessão fechada sem desfecho (unknown) ou execução anterior a esta versão.
+    ALTER TABLE ai_runs ADD COLUMN failure_class TEXT;
+  `,
 };
 
 /**
@@ -756,6 +761,10 @@ export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
     -- a versão anterior não conhece o registro das checagens; a tabela e o histórico dela saem
     DROP INDEX IF EXISTS gate_runs_card;
     DROP TABLE IF EXISTS gate_runs;
+  `,
+  55: `
+    -- a versão anterior não conhece a classe da falha; ela se perde com a coluna
+    ALTER TABLE ai_runs DROP COLUMN failure_class;
   `,
 };
 

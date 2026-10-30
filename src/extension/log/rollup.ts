@@ -33,6 +33,8 @@ const RUN_DIMS: [dim: string, column: string][] = [
   ['mode', 'mode'],
   ['effort', 'effort'],
   ['profile', 'profile'],
+  // a classe da falha (#1099); a execução que terminou bem, sem desfecho ou anterior à migração 55 arquiva com ''
+  ['failure_class', 'failure_class'],
 ];
 
 /**
@@ -126,7 +128,7 @@ function totalsFromDetail(db: Database, boardId: string, month: string): LogMetr
   // existe; só o 0 conta como informado — na dúvida, "estimado" é a afirmação mais fraca
   for (const r of all(
     db,
-    `SELECT workflow, outcome, phase, card_type, model, tool, mode, effort, profile,
+    `SELECT workflow, outcome, phase, card_type, model, tool, mode, effort, profile, failure_class,
             COUNT(*) AS n, SUM(COALESCE(duration_ms, 0)) AS ms,
             SUM(CASE WHEN measure <> 'none' THEN 1 ELSE 0 END) AS measured,
             SUM(CASE WHEN measure <> 'none' THEN COALESCE(input_tokens, 0) ELSE 0 END) AS input,
@@ -139,7 +141,7 @@ function totalsFromDetail(db: Database, boardId: string, month: string): LogMetr
             SUM(CASE WHEN cost_usd IS NOT NULL AND COALESCE(cost_estimated, 1) <> 0 THEN cost_usd ELSE 0 END) AS estimated
      FROM ai_runs
      WHERE board_id = ? AND month = ?
-     GROUP BY workflow, outcome, phase, card_type, model, tool, mode, effort, profile`,
+     GROUP BY workflow, outcome, phase, card_type, model, tool, mode, effort, profile, failure_class`,
     [boardId, month],
   )) {
     const n = num(r.n);

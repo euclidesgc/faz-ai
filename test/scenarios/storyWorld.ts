@@ -23,19 +23,28 @@ export interface StoryWorld extends CardWorld {
   story(): { status: string | null; columnId: string };
 }
 
+/** O que o `act` devolve para o processo falso falhar: escreve `stdout` e sai com `code` (sem retorno, sai com 0 e sem saída). */
+export interface ProcessFailure {
+  stdout: string;
+  code: number;
+}
+
 /** `act(cardId, command)` roda no lugar do processo da CLI (antes de ele terminar com sucesso, sem saída). */
 export async function storyWorld(
-  act: (cardId: string, world: StoryWorld, command: HeadlessCommand) => void,
+  act: (cardId: string, world: StoryWorld, command: HeadlessCommand) => void | ProcessFailure,
   /** a pasta de trabalho da história; sem ela, a do projeto */
   workspace?: () => string,
 ): Promise<StoryWorld> {
   // `world` só existe depois do `cardWorld`; o spawn é chamado mais tarde, com ele já montado
   const held: { world?: StoryWorld } = {};
   const starts: string[] = [];
-  const spawn: SpawnFn = (command) => {
-    act(starts.at(-1)!, held.world!, command);
+  const spawn: SpawnFn = (command, _cwd, out) => {
+    const failure = act(starts.at(-1)!, held.world!, command);
     let exit: (code: number | null) => void = () => {};
-    queueMicrotask(() => exit(0));
+    queueMicrotask(() => {
+      if (failure) out(failure.stdout, 'stdout');
+      exit(failure ? failure.code : 0);
+    });
     return { kill: () => exit(143), onExit: (fn) => (exit = fn) };
   };
   const base = await cardWorld({ profile: 'claude', tools: CONDUTOR_TOOLS, spawn, snapshots: true });

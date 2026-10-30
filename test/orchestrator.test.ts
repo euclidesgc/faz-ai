@@ -30,7 +30,7 @@ let orchestrator: Orchestrator;
 let options: OrchestratorOptions;
 let executions: Map<string, AiExecution>;
 let starts: string[];
-let mode: 'done' | 'partial' | 'hold' | 'fix' | 'nofix';
+let mode: 'done' | 'partial' | 'hold' | 'fix' | 'nofix' | 'transient';
 let fixing: string[] = [];
 let logs: string[];
 const wasm = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -186,6 +186,26 @@ async function completed(count: number) {
   await orchestrator.settled();
 }
 describe('orquestrador com processo, ponte, disco e trava reais', () => {
+  it('falha transitória sem efeito vira retry-safe, espera o backoff e roda de novo', async () => {
+    const a = subtask('A');
+    mode = 'transient';
+    await orchestrator.drive(storyId, 'heartbeat');
+    await vi.waitFor(() => expect(router.work.records().find((w) => w.cardId === a)?.state).toBe('waiting'), { timeout: 10_000, interval: 50 });
+    await orchestrator.settled();
+    expect(router.work.latest(router.work.records().find((w) => w.cardId === a)!.id)?.outcome).toBe('retry-safe');
+    mode = 'done';
+    const early = await orchestrator.continue(storyId);
+    expect(early).toMatchObject({ kind: 'wait', reason: expect.stringContaining('nova tentativa') });
+    expect(starts).toEqual([a]);
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 31_000 });
+    try {
+      expect((await orchestrator.continue(storyId)).kind).toBe('started');
+    } finally {
+      vi.useRealTimers();
+    }
+    await completed(2);
+    expect(starts[1]).toBe(a);
+  });
   it('dois gatilhos disputam uma posse; três filhas escrevem em sequência e o fechamento roda uma vez', async () => {
     const a = subtask('A');
     const b = subtask('B');

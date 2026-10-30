@@ -113,3 +113,30 @@ describe('migração 50 → 51 (custo por bucket)', () => {
     expect(old.exec('SELECT cost_usd FROM ai_runs')[0]!.values).toEqual([[0.5]]);
   });
 });
+
+describe('migração 54 → 55 (classe da falha)', () => {
+  it('sobe com failure_class NULL nas execuções antigas, grava pelo finish e desce para 54', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 54);
+    old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    old.run(
+      "INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x')",
+    );
+    const has = () => old.exec("SELECT COUNT(*) FROM pragma_table_info('ai_runs') WHERE name = 'failure_class'")[0]!.values[0]![0];
+    expect(has()).toBe(0);
+
+    migrate(old);
+
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(55);
+    expect(has()).toBe(1);
+    expect(old.exec("SELECT failure_class FROM ai_runs WHERE id = 'r1'")[0]!.values).toEqual([[null]]);
+    new AiRunRepo(old).finish('r1', 'failed', 1, 'transient');
+    expect(old.exec("SELECT failure_class FROM ai_runs WHERE id = 'r1'")[0]!.values).toEqual([['transient']]);
+
+    expect(DOWN_MIGRATIONS[55]).toBeDefined();
+    migrateDown(old, 54);
+    expect(has()).toBe(0);
+    expect(old.exec('SELECT outcome FROM ai_runs')[0]!.values).toEqual([['failed']]);
+  });
+});

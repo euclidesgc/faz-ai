@@ -247,6 +247,56 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     expect(rows().map((r) => r.outcome)).toEqual(['failed', 'stopped', 'timeout']);
   });
 
+  describe('classe da falha', () => {
+    const finishWith = (code: number, text?: string) => {
+      const run = gateway().run(call());
+      let end: AiRunEnd | undefined;
+      run.onExit((e) => (end = e));
+      if (text) procs[0]!.write(text);
+      procs[0]!.exit(code);
+      return end!;
+    };
+
+    it('sucesso: null no AiRunEnd e na coluna', () => {
+      const end = finishWith(0, CLAUDE_OUTPUT);
+      expect(end.failureClass).toBeNull();
+      expect(rows()[0]!.failureClass).toBeNull();
+    });
+
+    it('rede caiu (texto no fim da saída): transient, gravada e entregue', () => {
+      const end = finishWith(1, 'Error: socket hang up\n');
+      expect(end.failureClass).toBe('transient');
+      expect(rows()[0]!.failureClass).toBe('transient');
+    });
+
+    it('erro comum: deterministic', () => {
+      const end = finishWith(1, 'Error: arquivo inexistente\n');
+      expect(end.failureClass).toBe('deterministic');
+      expect(rows()[0]!.failureClass).toBe('deterministic');
+    });
+
+    it('stop: canceled', () => {
+      const run = gateway().run(call());
+      let end: AiRunEnd | undefined;
+      run.onExit((e) => (end = e));
+      run.stop();
+      procs[0]!.exit(143);
+      expect(end!.failureClass).toBe('canceled');
+      expect(rows()[0]!.failureClass).toBe('canceled');
+    });
+
+    it('stalled: deterministic', () => {
+      vi.useFakeTimers();
+      const run = gateway().run(call({ idleMinutes: 2 }));
+      let end: AiRunEnd | undefined;
+      run.onExit((e) => (end = e));
+      vi.advanceTimersByTime(2 * 60_000 + 1);
+      expect(end!.stalled).toBe(true);
+      expect(end!.failureClass).toBe('deterministic');
+      expect(rows()[0]!.failureClass).toBe('deterministic');
+    });
+  });
+
   describe('watchdog de falta de atividade', () => {
     const MIN = 60_000;
 

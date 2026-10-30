@@ -4,14 +4,14 @@
 //
 // `log_months` (o arquivo dos meses consolidados) guarda, por mês, contagem e duração (`runs`), tokens
 // (`tokens`) e custo (`cost`), cada um no total e por `phase`/`card_type`/`model`/`tool`/`effort`/
-// `profile` (ver RUN_DIMS em rollup.ts) — mas nunca as dimensões `card`, `agent`, `skill`, `used_tool`
-// nem `mcp_tool`. Em `tokens` e `cost` o `n` é quantas execuções tinham o número, não quantas houve: é
+// `profile`/`failure_class` (ver RUN_DIMS em rollup.ts) — mas nunca as dimensões `card`, `agent`, `skill`,
+// `used_tool` nem `mcp_tool`. Em `tokens` e `cost` o `n` é quantas execuções tinham o número, não quantas houve: é
 // daí que saem `measuredRuns` (de `tokens`) e `costedRuns` (de `cost`) de um mês arquivado, e uma
 // métrica sem nenhuma medição continua "não medido" (null), nunca zero.
 //
 // O arquivo guarda marginais, não cruzamentos: existe "custo por modelo" e "custo por workflow", mas não
 // "custo por modelo dentro de um workflow". Por isso ele serve a UMA dimensão por consulta (RF-10): um mês
-// consolidado só entra na agregação quando a consulta pede uma dessas seis dimensões (ou nenhuma) e não
+// consolidado só entra na agregação quando a consulta pede uma dessas dimensões (ou nenhuma) e não
 // tem outro filtro além de período/card — workflow incluído. Qualquer outra combinação não tem como ser
 // montada a partir de um total já fundido, e o mês fica de fora dos números — mas sempre listado em
 // `archivedMonths`, para a resposta nunca fingir silêncio.
@@ -67,7 +67,9 @@ export type MetricsDim =
   | 'skill'
   | 'used_tool'
   | 'mcp_tool'
-  | 'bash_command';
+  | 'bash_command'
+  /** a classe da falha da execução (#1099): transient, deterministic, budget ou canceled; vazio = sem classe */
+  | 'failure_class';
 
 /**
  * As dimensões de inventário e o `kind` de `ai_run_usage` que cada uma lê (o CHECK da tabela).
@@ -85,11 +87,12 @@ const INVENTORY_KIND: Partial<Record<MetricsDim, InventoryKind | 'bash'>> = {
  * As dimensões que `log_months` também guarda (ver RUN_DIMS de rollup.ts), em `runs`, `tokens` e `cost`. As
  * outras — `card` e as de inventário — só existem no detalhe. O `mode` entrou na história 12: um mês arquivado
  * antes dela não tem o corte, e as execuções dele ficam de fora do recorte por modo (nenhuma tinha modo gravado).
+ * O `failure_class` (#1099) segue a mesma regra: um mês arquivado antes da migração 55 fica fora desse corte.
  */
-const ARCHIVE_DIMS = new Set<MetricsDim>(['phase', 'card_type', 'model', 'tool', 'mode', 'effort', 'profile']);
+const ARCHIVE_DIMS = new Set<MetricsDim>(['phase', 'card_type', 'model', 'tool', 'mode', 'effort', 'profile', 'failure_class']);
 
 /** Coluna de `ai_runs` por dimensão, para as que vêm direto de lá (não de `ai_run_usage`). */
-const RUN_COLUMN: Record<MetricsBreakdownDim, string> = {
+const RUN_COLUMN: Record<MetricsBreakdownDim | 'failure_class', string> = {
   phase: 'phase',
   card_type: 'card_type',
   model: 'model',
@@ -97,6 +100,7 @@ const RUN_COLUMN: Record<MetricsBreakdownDim, string> = {
   mode: 'mode',
   effort: 'effort',
   profile: 'profile',
+  failure_class: 'failure_class',
 };
 
 export interface MetricsQuery {
@@ -519,7 +523,7 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
   if (dim === 'card') acc = detailByCard(db, boardId, query);
   else if (inventoryKind) acc = detailByInventory(db, boardId, query, inventoryKind);
   else {
-    // aqui `dim` já não é `card` nem de inventário: sobram as seis colunas de `ai_runs` (RUN_COLUMN), ou o total
+    // aqui `dim` já não é `card` nem de inventário: sobram as colunas de `ai_runs` (RUN_COLUMN), ou o total
     const column = dim ? RUN_COLUMN[dim as keyof typeof RUN_COLUMN] : null;
     acc = detailByRunColumn(db, boardId, query, column);
     // meses arquivados só entram quando a dimensão existe em log_months e não há outro filtro (RF-05)

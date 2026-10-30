@@ -57,9 +57,11 @@
 - The heartbeat tries to unblock blocked stories: the AI looks for the cause, fixes what it can and returns the work to the queue; only what depends on you stays blocked.
 - `npm run eval` evaluates a model on reference stories and writes the scoreboard (#1105).
 - Five reference stories for model evaluation, with the proof that the acceptance fails without the solution and passes with it (#1233).
+- Each run records its failure class (transient, deterministic, usage limit or interrupted), and `get_metrics` groups by `failure_class` (#1099).
 
 ### Changed
 
+- A transient failure with no effect (network, 5xx error, overload) is retried on its own, up to 3 times, waiting 30 s, 2 min and 5 min, instead of blocking the card; in the Implementation phase, the unit too (#1099).
 - A new board starts with the Short track rule on; existing boards keep their choice (#1107).
 - When a card's model runs out of its usage limit, the board asks whether to wait for the limit to come back or continue with another available model, and saves the choice on the card; autonomous mode keeps the fallback rule.
 - The model pickers (chat, card, agents and rules) only offer agents that can answer now.
