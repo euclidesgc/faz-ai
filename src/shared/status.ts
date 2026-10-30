@@ -1,12 +1,13 @@
 /** Status de trabalho do card: diz em que pé está e com quem está a pendência (a pessoa ou a IA). */
 
-export type CardStatus = 'ready' | 'running' | 'waiting_answer' | 'waiting_review' | 'approved' | 'blocked';
+export type CardStatus = 'ready' | 'running' | 'verifying' | 'waiting_answer' | 'waiting_review' | 'approved' | 'blocked';
 export type StatusOwner = 'ai' | 'human';
 
 /** Os estados são fixos (o servidor aplica regras sobre eles); rótulo e cor são ajustáveis em Aparência. */
 export const CARD_STATUSES: { id: CardStatus; label: string; color: string; owner: StatusOwner; hint: string }[] = [
   { id: 'ready', label: 'Pronto', color: '#4c8dff', owner: 'ai', hint: 'A IA pode trabalhar no card' },
   { id: 'running', label: 'Em execução', color: '#9b59b6', owner: 'ai', hint: 'Uma sessão de IA está trabalhando no card' },
+  { id: 'verifying', label: 'Verificando', color: '#17a2b8', owner: 'ai', hint: 'O board está rodando as checagens da coluna' },
   { id: 'waiting_answer', label: 'Aguardando resposta', color: '#f5a623', owner: 'human', hint: 'A IA fez uma pergunta na conversa' },
   {
     id: 'waiting_review',

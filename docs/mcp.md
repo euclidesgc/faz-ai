@@ -180,6 +180,7 @@ Cada card em que a IA atua tem um status de trabalho, devolvido em `work` por `g
 | --- | --- | --- |
 | `ready` | IA | O card entrou numa coluna em que a IA atua, a pessoa escreveu na conversa (com o card bloqueado, aguardando resposta ou revisão) ou a IA devolveu o card com `release_card` |
 | `running` | IA | `start_work` (numa sub-tarefa na primeira coluna do workflow filho, também a move para a coluna seguinte, quando é aberta e não exige aprovação) |
+| `verifying` | IA | só o board (portões determinísticos); a IA não o define nem mexe no card enquanto durar |
 | `waiting_answer` | Pessoa | `ask_question` ou `ask_questions` |
 | `waiting_review` | Pessoa | `request_review` |
 | `approved` | IA | A pessoa aprovou e o board não pôde mover o card (não há ferramenta para a IA aprovar; a aprovação normal já leva o card à próxima coluna) |

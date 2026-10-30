@@ -40,7 +40,7 @@ export const MCP_INSTRUCTIONS =
   'Board kanban do projeto (Faz AI). Antes de trabalhar nele, leia o fluxo com get_skill faz-ai-fluxo e siga-o. As histórias (workflow pai) passam pelas fases do fluxo, que são as colunas, uma por vez até a conclusão; ' +
   'as sub-tarefas (workflow filho) ficam ligadas a uma história. Cards: pelo número (#12). Sinalize o progresso com move_card. ' +
   'Sem pedido específico, comece por get_pending_work: ele lista o que está com você. get_board (colunas, tipos, campos, agentes): Plan, refinar, editar board. ' +
-  '`work`: "ready" e "approved" estão com você; "waiting_review", "waiting_answer" e "blocked", com a pessoa. ' +
+  '`work`: "ready" e "approved" estão com você ("verifying": só o board mexe); "waiting_review", "waiting_answer" e "blocked", com a pessoa. ' +
   'Ao começar um card chame start_work (numa sub-tarefa, já a move para Em andamento) e siga `phase` do get_card; conclua com move_card e `comment`. Nas colunas com `requiresApproval`, ao terminar o trabalho da fase chame request_review e PARE: ' +
   'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +
   '`model` do get_card é o modelo que deve executar o card, e `tool` o perfil de CLI da execução (o do modelo do card, do agente ou da regra; sem modelo, o perfil padrão): se for outro, avise a pessoa. ' +

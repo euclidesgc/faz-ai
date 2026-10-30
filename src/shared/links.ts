@@ -105,7 +105,7 @@ export function subtaskWaves(state: BoardState, storyId: Id): SubtaskWaves {
   const open = state.cards.filter((c) => c.parentId === storyId && isLive(c) && !closed(state, c)).sort((a, b) => a.number - b.number);
   const out: SubtaskWaves = { ready: [], waiting: [], withPerson: [], running: [] };
   for (const c of open) {
-    if (c.status === 'running') out.running.push(c);
+    if (c.status === 'running' || c.status === 'verifying') out.running.push(c);
     else if (c.status && statusInfo(c.status).owner === 'human') out.withPerson.push(c);
     else if (openPredecessors(state, c.id).length) out.waiting.push(c);
     else out.ready.push(c);
