@@ -265,6 +265,25 @@ until you resume it. With the tool's login expired, the autopilot and the heartb
 sign-in to come back, without spending runs. The heartbeat does not drive autonomous stories, which
 belong to the autopilot, except to unblock a blocked one (see Heartbeat).
 
+## Run stalled without activity (watchdog)
+
+Besides the per-run timeout, the board stops a card run when the tool goes **N minutes without any
+output** (stdout or stderr). Any output resets the count, so a long run that keeps working is not
+affected. The value is set in Settings → Automação (Automation), under **Encerrar sem atividade após**
+(Stop after no activity for) (default 20 min, from 0 to 240; 0 turns it off).
+
+- **Where it applies:** card runs with a stream (Claude Code, Cursor, Kimi and Gemini in `stream-json`)
+  and the ACP transport. Text output (including the fallback to text), API mode, the chat and the
+  profile and context tests rely on the timeout alone.
+- **How it shows:** the card conversation says "A execução do … ficou sem atividade por N min e foi
+  encerrada" (the run of the tool went N min without activity and was stopped), with the end of the
+  output; the channel log says "Encerrada por falta de atividade."; in the usage log and in the metrics
+  the outcome stays `timeout`.
+- **What happens to the card:** it is blocked. Not even in autonomous mode is it approved or advanced.
+- **Shorter timeout:** if the timeout hits first, the timeout applies.
+- **Known limit:** the ceiling of a single terminal command in Cursor has not been validated. If a
+  command runs past the value without emitting output, raise the value or use 0.
+
 ## Card stuck in "Em execução" (running)
 
 A card is "Em execução" only while an AI session is on it. If the session that marked it ended

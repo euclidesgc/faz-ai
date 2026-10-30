@@ -247,6 +247,69 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     expect(rows().map((r) => r.outcome)).toEqual(['failed', 'stopped', 'timeout']);
   });
 
+  describe('watchdog de falta de atividade', () => {
+    const MIN = 60_000;
+
+    it('silêncio por idleMinutes encerra com stalled e desfecho timeout; a saída reinicia o relógio', () => {
+      vi.useFakeTimers();
+      const run = gateway().run(call({ idleMinutes: 2 }));
+      const ends: AiRunEnd[] = [];
+      run.onExit((e) => ends.push(e));
+      // saída periódica (stdout e stderr) não encerra
+      for (let i = 0; i < 4; i++) {
+        vi.advanceTimersByTime(MIN + 30_000);
+        procs[0]!.write('.');
+      }
+      expect(ends).toHaveLength(0);
+      vi.advanceTimersByTime(2 * MIN + 1);
+      expect(ends).toHaveLength(1);
+      expect(ends[0]).toMatchObject({ stalled: true, timedOut: true, outcome: 'timeout', stopped: false });
+      expect(rows()[0]!.outcome).toBe('timeout');
+    });
+
+    it('sem idleMinutes, ou com 0, não encerra por silêncio', () => {
+      vi.useFakeTimers();
+      const ends: AiRunEnd[] = [];
+      gateway()
+        .run(call())
+        .onExit((e) => ends.push(e));
+      gateway()
+        .run(call({ idleMinutes: 0 }))
+        .onExit((e) => ends.push(e));
+      vi.advanceTimersByTime(29 * MIN);
+      expect(ends).toHaveLength(0);
+    });
+
+    it('o tempo limite menor vence: timedOut sem stalled', () => {
+      vi.useFakeTimers();
+      const ends: AiRunEnd[] = [];
+      gateway()
+        .run(call({ timeoutMinutes: 1, idleMinutes: 5 }))
+        .onExit((e) => ends.push(e));
+      vi.advanceTimersByTime(MIN + 1000);
+      expect(ends[0]).toMatchObject({ timedOut: true, stalled: false, outcome: 'timeout' });
+    });
+
+    it('a repetição em texto (format text) não arma o relógio', () => {
+      vi.useFakeTimers();
+      const started: { format: string; exit: (c: number | null) => void; err: (t: string) => void }[] = [];
+      const textSpawn: SpawnFn = (command, _cwd, out) => {
+        let listener: (code: number | null, error?: Error) => void = () => {};
+        const p = { format: command.format, exit: (c: number | null) => listener(c), err: (t: string) => out(t, 'stderr') };
+        started.push(p);
+        return { onExit: (fn) => (listener = fn), kill: () => p.exit(143) };
+      };
+      const g = new AiGateway({ boardId: router.boardId, runLog: createRunLog(db), spawn: textSpawn });
+      const ends: AiRunEnd[] = [];
+      g.run(call({ idleMinutes: 1 })).onExit((e) => ends.push(e));
+      started[0]!.err("error: unknown option '--output-format'\n");
+      started[0]!.exit(1);
+      expect(started[1]!.format).toBe('text');
+      vi.advanceTimersByTime(5 * MIN);
+      expect(ends).toHaveLength(0);
+    });
+  });
+
   it('o empréstimo do arquivo MCP do projeto usa a raiz do gateway e volta no tempo limite (relógio falso)', () => {
     vi.useFakeTimers();
     const coordination = path.join(dir, 'coordenacao');
