@@ -5,6 +5,7 @@ import { parseRules } from '../../shared/rules';
 import type { CardStatus } from '../../shared/status';
 import { newId, now } from '../db/ids';
 import { all, num, one, run, str, transaction, type Row } from '../db/query';
+import { EscalationRepo } from './escalationRepo';
 
 /** Status de um card ao entrar numa coluna: "Pronto" onde a IA atua, vazio nas demais. */
 const entryStatus = (col: Row): CardStatus | null => (num(col.ai_active) === 1 && str(col.category) === 'open' ? 'ready' : null);
@@ -458,9 +459,12 @@ export class CardRepo {
     return ids;
   }
 
-  /** gate_runs não tem chave estrangeira: o registro das checagens sai junto com o card. */
+  /** gate_runs e model_escalations não têm chave estrangeira: o registro sai junto com o card. */
   private deleteGateRuns(cardIds: string[]): void {
-    for (const id of cardIds) run(this.db, 'DELETE FROM gate_runs WHERE card_id = ?', [id]);
+    for (const id of cardIds) {
+      run(this.db, 'DELETE FROM gate_runs WHERE card_id = ?', [id]);
+      new EscalationRepo(this.db).deleteForCard(id);
+    }
   }
 
   emptyTrash(boardId: string): string[] {

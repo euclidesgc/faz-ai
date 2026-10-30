@@ -4,7 +4,15 @@ import { legacyFallbackProposals, parseLegacyFallbacks } from '../../../shared/l
 import { builtinPolicyCatalog } from '../../../shared/policyManagement';
 import type { AiTool } from '../../../shared/harness';
 import type { FieldDef } from '../../../shared/model';
-import { EFFORT_FIELD, defaultModelOf, modelFieldOf, suggestModel, type ModelOption, type ModelRule } from '../../../shared/models';
+import {
+  EFFORT_FIELD,
+  defaultModelOf,
+  isHandPicked,
+  modelFieldOf,
+  suggestModel,
+  type ModelOption,
+  type ModelRule,
+} from '../../../shared/models';
 import { cliOfValue } from '../../../shared/runTarget';
 import { valueOf } from '../../../shared/selectors';
 import { newId } from '../../db/ids';
@@ -164,7 +172,7 @@ export function applySuggestion(ctx: BoardContext, cardId: string, previous: str
   if (!card || !field || !s.board.rules.autoApplyModelSuggestion) return;
   const current = valueOf(s, cardId, field.id);
   const next = suggestModel(s, card);
-  if ((current === null || current === previous) && next !== current) ctx.cards.setFieldValue(cardId, field.id, next);
+  if (!isHandPicked(s, card, previous) && next !== current) ctx.cards.setFieldValue(cardId, field.id, next);
 }
 
 /**

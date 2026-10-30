@@ -41,7 +41,7 @@ let state: BoardState;
 let repo: GateRepo;
 let sessions: Set<string>;
 let finishListeners: ((cardId: string) => void)[];
-let calls: { complete: [string, string][]; fail: [string, string, string][]; handled: unknown[] };
+let calls: { complete: [string, string][]; fail: [string, string, string][]; failedChecks: (string | undefined)[]; handled: unknown[] };
 let owns: boolean;
 let deps: GateDeps;
 let executor: GateExecutor;
@@ -87,12 +87,15 @@ beforeEach(async () => {
   setChecks(check('Typecheck', js("console.log('ok')")));
   sessions = new Set();
   finishListeners = [];
-  calls = { complete: [], fail: [], handled: [] };
+  calls = { complete: [], fail: [], failedChecks: [], handled: [] };
   owns = true;
   const router: GateRouter = {
     snapshot: () => state,
     completeGate: (id, sha) => void calls.complete.push([id, sha]),
-    failGate: (id, result, body) => void calls.fail.push([id, result, body]),
+    failGate: (id, result, body, failedCheck) => {
+      calls.fail.push([id, result, body]);
+      calls.failedChecks.push(failedCheck);
+    },
     handle: (msg) => void calls.handled.push(msg),
   };
   deps = {
@@ -173,6 +176,8 @@ describe('GateExecutor.run', () => {
     expect(calls.complete).toEqual([]);
     expect(calls.fail[0]![1]).toBe('failed');
     expect(calls.fail[0]![2]).toContain('**Lenta** falhou (tempo esgotado em 1s)');
+    // o nome da checagem que falhou vai ao router (a subida de modelo o cita); `interrupted` não leva nome
+    expect(calls.failedChecks).toEqual(['Lenta']);
     const pid = Number(fs.readFileSync(pidFile, 'utf8'));
     await waitFor(() => dead(pid));
   });

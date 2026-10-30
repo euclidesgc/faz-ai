@@ -10,6 +10,7 @@
 - Cada coluna ganha uma lista de checagens (nome, comando e tempo limite), editada em Configurações › Workflows e lida pela IA em `get_board`; a execução vem numa próxima versão (#1096).
 - Novo status **Verificando** (o board roda as checagens da coluna) e tabela `gate_runs` com o registro de cada execução; o executor vem numa próxima versão (#1253).
 - Colunas com checagens viram portão: a IA só avança o card se todas passarem (#1253).
+- Quando uma checagem falha, o board sobe o modelo da correção um nível sozinho (#1108).
 - O botão **Sugerir pelo projeto** na tela de checagens da coluna propõe typecheck, lint e testes a partir dos scripts do projeto, sem gravar até a pessoa aceitar (#1254).
 - Tela **Uso da cota** no Claude Code, com o limite crítico que antecipa a troca para o reserva (#1114).
 - Painel Métricas ganha o bloco Custo por entrega, por tipo, esforço, modelo e agente (#1224).

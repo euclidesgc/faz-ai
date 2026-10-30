@@ -427,6 +427,18 @@ regras tem só nome, condições e modelo sugerido. **Preencher o modelo sugerid
 acima das regras, preenche o campo Modelo ao criar ou mudar um card, se ele estiver vazio ou com a
 sugestão anterior; um modelo escolhido à mão nunca é trocado.
 
+**Subir o modelo quando uma checagem falha.** Quando uma checagem da coluna falha (em **Configurações →
+Workflows e colunas**), o board sobe o modelo da correção sozinho, sem a IA escolher: o card volta para
+**Pronto** e roda de novo com o modelo do nível acima. A subida segue a **escada** de modelos do agente,
+do mais barato ao mais forte; sem escada para o agente, ela sobe só o esforço do mesmo modelo, do menor ao
+maior. A escada de cada agente fica guardada no board; a tela para editá-la vem numa próxima versão. Um
+modelo escolhido à mão nunca é trocado, e a subida vale **uma vez** por card e coluna: se a checagem falhar
+de novo depois dela, o card vai para a pessoa como bloqueado. Quando a história tem sub-tarefas na fase que
+falhou, a subida vale para a próxima sub-tarefa de correção que a IA criar, com o modelo de referência na
+última sub-tarefa concluída da fase. A subida nunca baixa o modelo que a correção já tem, e cada uma fica
+registrada na conversa, com o modelo de antes, o de depois e o nome da checagem. Sem nível acima (o topo da
+escada, ou um modelo fora do catálogo), o board só avisa na conversa e a correção segue com o modelo atual.
+
 ## Regras de fallback
 
 Quando um modelo esgota o limite de uso (a cota) num card com você no circuito (fora do modo autônomo e

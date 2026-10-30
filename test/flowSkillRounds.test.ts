@@ -46,6 +46,18 @@ describe('rodadas da Implementação', () => {
     expect(FLOW_TEXT).toMatch(/Uma história que usa o código de outra depende dela/);
   });
 
+  it('a correção depois do fechamento: o board sobe o modelo um nível quando a checagem falha, a sessão não escolhe nem pede modelo e a segunda falha vai para a pessoa', () => {
+    const rodadas = FLOW_SKILLS.find((s) => s.name === 'faz-ai-implementacao-rodadas')!;
+    expect(rodadas.body).toMatch(/Quando uma checagem do board falha, ele sobe sozinho o\s+modelo da correção um nível/);
+    expect(rodadas.body).toMatch(/uma vez por unidade/);
+    expect(rodadas.body).toMatch(/você não escolhe nem pede modelo para ela/);
+    expect(rodadas.body).toMatch(/Na segunda\s+falha, o card vai para a pessoa/);
+    // a correção vem depois do fechamento, no mesmo passo que manda criá-la
+    expect(rodadas.body.indexOf('sobe sozinho o')).toBeGreaterThan(
+      rodadas.body.indexOf('crie uma sub-tarefa de correção com Fase = esta coluna'),
+    );
+  });
+
   it('a nota das rodadas no get_card diz o que o board executa, que a sessão cria e para, e aponta a skill', () => {
     expect(SUBTASKS_NOW_NOTE).toContain('withPerson');
     expect(SUBTASKS_NOW_NOTE).toMatch(/não são suas/);
@@ -127,5 +139,11 @@ describe('Revisão antes do pull request', () => {
     expect(revisao).toMatch(/só passa no teste/);
     expect(revisao).toMatch(/diretriz clara[\s\S]*corrige agora/);
     expect(revisao).toMatch(/ambíguo[\s\S]*`ask_questions`[\s\S]*modo autônomo[\s\S]*menos complexo/);
+  });
+
+  it('a correção criada pela Revisão tem o modelo escolhido pelo board: a sessão não escolhe modelo para ela', () => {
+    const revisao = FLOW_TEXT.slice(FLOW_TEXT.indexOf('## Revisão'), FLOW_TEXT.indexOf('## Homologação'));
+    expect(revisao).toMatch(/o board sobe o modelo dela sozinho quando uma checagem falha/);
+    expect(revisao).toMatch(/você não escolhe modelo para ela/);
   });
 });

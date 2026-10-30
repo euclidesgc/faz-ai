@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 55;
+export const SCHEMA_VERSION = 56;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -688,6 +688,25 @@ const MIGRATIONS: Record<number, string> = {
     -- sessão fechada sem desfecho (unknown) ou execução anterior a esta versão.
     ALTER TABLE ai_runs ADD COLUMN failure_class TEXT;
   `,
+  56: `
+    -- #1108: subida de modelo da correção quando a checagem falha; uma por unidade (card + coluna do portão).
+    -- status: pending (a correção ainda não foi criada) | applied. Sem chave estrangeira: o repositório de
+    -- cards apaga as linhas do card por conta própria. Tabela nova e vazia, nada migra.
+    CREATE TABLE model_escalations (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL,
+      column_id TEXT NOT NULL,
+      gate_run_id TEXT NOT NULL,
+      check_name TEXT NOT NULL,
+      from_model TEXT NOT NULL,
+      to_model TEXT NOT NULL,
+      target_card_id TEXT,
+      status TEXT NOT NULL CHECK (status IN ('pending','applied')),
+      created_at INTEGER NOT NULL,
+      applied_at INTEGER,
+      UNIQUE (card_id, column_id)
+    );
+  `,
 };
 
 /**
@@ -765,6 +784,10 @@ export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
   55: `
     -- a versão anterior não conhece a classe da falha; ela se perde com a coluna
     ALTER TABLE ai_runs DROP COLUMN failure_class;
+  `,
+  56: `
+    -- a versão anterior não conhece a subida de modelo; a tabela e o histórico dela saem
+    DROP TABLE IF EXISTS model_escalations;
   `,
 };
 

@@ -41,6 +41,8 @@ import { EMPTY_CHAT, type ChatState } from '../../shared/chat';
 import { agentProfiles } from '../../shared/execution';
 import { columnsOf, isLive } from '../../shared/selectors';
 import { BOARD_AUTHOR } from '../../shared/gitflow';
+import { applyPending, onGateFailed, type EscalationDeps } from '../modelEscalation';
+import { EscalationRepo } from '../repositories/escalationRepo';
 import type { AttachmentStore } from '../attachments';
 import { runUnsupported } from '../headless';
 import { catalogTool, isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
@@ -288,9 +290,16 @@ export class MessageRouter {
   /** a marca de gravações quando o cache foi montado (`changeKey`): uma gravação por qualquer repositório o invalida */
   private cachedChanges = '';
   readonly store: AttachmentStore;
+  /** o serviço da subida de modelo quando o portão falha (#1108) */
+  private readonly escalation: EscalationDeps;
 
   constructor(dbHandle: DbHandle, opts: RouterOptions) {
     this.ctx = new BoardContext(dbHandle, opts);
+    this.escalation = {
+      ctx: this.ctx,
+      repo: new EscalationRepo(dbHandle.db),
+      log: (line) => (opts.log ?? console.error)(line),
+    };
     this.executions = new RunMcpSessions({
       repo: () => this.work,
       state: () => this.snapshot(),
@@ -989,6 +998,16 @@ export class MessageRouter {
     this.gateListeners.push(fn);
   }
 
+  /** A sub-tarefa de correção recém-criada recebe a subida de modelo pendente da história (#1108). */
+  applyEscalationToNewCard(cardId: string): void {
+    try {
+      applyPending(this.escalation, cardId);
+    } catch (e) {
+      this.escalation.log(`Subida de modelo pendente não aplicada a ${cardId}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    this.changed();
+  }
+
   /**
    * Desfecho do portão: as checagens passaram em `sha`. Método interno do host, fora de `WebviewToHost` e do MCP:
    * a IA não forja o "passou". O card só segue se continua `verifying` na coluna em que o portão abriu; o movimento
@@ -1031,8 +1050,9 @@ export class MessageRouter {
   /**
    * Desfecho do portão: uma checagem falhou, estourou o tempo ou a verificação foi interrompida. O card volta para
    * `ready` na coluna de origem com o fim da saída na conversa; se já saiu de `verifying`, só o registro é fechado.
+   * Só o resultado `failed` pode subir o modelo da correção (`onGateFailed`); `failedCheck` é o nome da checagem.
    */
-  failGate(gateRunId: string, result: 'failed' | 'interrupted', body: string): void {
+  failGate(gateRunId: string, result: 'failed' | 'interrupted', body: string, failedCheck?: string): void {
     const ctx = this.ctx;
     const gate = ctx.gateRuns.get(gateRunId);
     if (!gate || gate.result !== 'running') return;
@@ -1041,6 +1061,14 @@ export class MessageRouter {
     if (card && isLive(card) && card.status === 'verifying' && card.columnId === gate.columnId) {
       ctx.comments.add(card.id, BOARD_AUTHOR, body, 'ai');
       ctx.cards.setStatus(card.id, 'ready', '', BOARD_AUTHOR);
+      // falha fechada: um erro na subida de modelo é só registrado, o card já voltou para a IA com a saída
+      if (result === 'failed') {
+        try {
+          onGateFailed(this.escalation, gate, failedCheck);
+        } catch (e) {
+          this.escalation.log(`Subida de modelo do portão ${gate.id} não aplicada: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
     }
     this.changed();
   }

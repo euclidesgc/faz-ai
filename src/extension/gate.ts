@@ -27,7 +27,8 @@ const DRAIN_MS = 100;
 export interface GateRouter {
   snapshot(): BoardState;
   completeGate(gateRunId: string, sha: string): void;
-  failGate(gateRunId: string, result: 'failed' | 'interrupted', body: string): void;
+  /** `failedCheck`: o nome da checagem que falhou (só no resultado `failed`); a subida de modelo o cita. */
+  failGate(gateRunId: string, result: 'failed' | 'interrupted', body: string, failedCheck?: string): void;
   handle(msg: WebviewToHost, origin: { author?: string; source?: 'ai' | 'human' }): unknown;
 }
 
@@ -153,9 +154,9 @@ export class GateExecutor {
     }
   }
 
-  private fail(gateRunId: string, result: 'failed' | 'interrupted', body: string): void {
+  private fail(gateRunId: string, result: 'failed' | 'interrupted', body: string, failedCheck?: string): void {
     try {
-      this.deps.router.failGate(gateRunId, result, body);
+      this.deps.router.failGate(gateRunId, result, body, failedCheck);
     } catch (e) {
       this.deps.log(`O desfecho do portão ${gateRunId} não foi gravado: ${message(e)}`);
     }
@@ -200,7 +201,12 @@ export class GateExecutor {
               ? `encerrada pelo sinal ${out.signal ?? 'desconhecido'}`
               : `código ${out.code}`;
           const tail = tailOf(out.output);
-          return this.fail(gateRunId, 'failed', `**${check.name}** falhou (${motivo})${tail ? `\n\n\`\`\`\n${tail}\n\`\`\`` : ''}`);
+          return this.fail(
+            gateRunId,
+            'failed',
+            `**${check.name}** falhou (${motivo})${tail ? `\n\n\`\`\`\n${tail}\n\`\`\`` : ''}`,
+            check.name,
+          );
         }
       }
       router.completeGate(gateRunId, sha);

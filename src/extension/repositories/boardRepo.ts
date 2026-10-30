@@ -1,3 +1,4 @@
+import { MODEL_LADDERS_KEY, parseLadders, type ModelLadders } from '../../shared/modelLadder';
 import { AiProfileRepo } from './aiProfileRepo';
 import { createHash } from 'node:crypto';
 import { ArtifactRepo } from './artifactRepo';
@@ -62,6 +63,11 @@ export class BoardRepo {
   getMeta(key: string): string | undefined {
     const row = one(this.db, 'SELECT value FROM meta WHERE key = ?', [key]);
     return row ? str(row.value) : undefined;
+  }
+
+  /** A escada de modelos por perfil de CLI (meta `model_ladders`); vazia quando a pessoa não definiu. */
+  modelLadders(_boardId: string): ModelLadders {
+    return parseLadders(this.getMeta(MODEL_LADDERS_KEY));
   }
 
   /**
