@@ -190,7 +190,10 @@ describe('orquestrador com processo, ponte, disco e trava reais', () => {
     const a = subtask('A');
     mode = 'transient';
     await orchestrator.drive(storyId, 'heartbeat');
-    await vi.waitFor(() => expect(router.work.records().find((w) => w.cardId === a)?.state).toBe('waiting'), { timeout: 10_000, interval: 50 });
+    await vi.waitFor(() => expect(router.work.records().find((w) => w.cardId === a)?.state).toBe('waiting'), {
+      timeout: 10_000,
+      interval: 50,
+    });
     await orchestrator.settled();
     expect(router.work.latest(router.work.records().find((w) => w.cardId === a)!.id)?.outcome).toBe('retry-safe');
     mode = 'done';
@@ -206,6 +209,21 @@ describe('orquestrador com processo, ponte, disco e trava reais', () => {
     await completed(2);
     expect(starts[1]).toBe(a);
   });
+  it('a execução manual durante a espera do backoff transitório substitui a espera', async () => {
+    const a = subtask('A');
+    mode = 'transient';
+    await orchestrator.drive(storyId, 'heartbeat');
+    await vi.waitFor(() => expect(router.work.records().find((w) => w.cardId === a)?.state).toBe('waiting'), {
+      timeout: 10_000,
+      interval: 50,
+    });
+    await orchestrator.settled();
+    mode = 'done';
+    expect((await orchestrator.drive(storyId, 'heartbeat')).kind).toBe('wait');
+    expect((await orchestrator.drive(storyId, 'manual')).kind).toBe('started');
+    await completed(2);
+    expect(starts.slice(0, 2)).toEqual([a, a]);
+  }, 15_000);
   it('dois gatilhos disputam uma posse; três filhas escrevem em sequência e o fechamento roda uma vez', async () => {
     const a = subtask('A');
     const b = subtask('B');

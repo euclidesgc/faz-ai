@@ -173,7 +173,8 @@ export class Orchestrator {
       const unitKey = plan.units[0]!.key;
       const until = this.notBefore.get(unitKey);
       if (until !== undefined) {
-        if (until > Date.now()) {
+        // a pessoa que pede a execução à mão substitui a espera, como no runner dos cards
+        if (origin !== 'manual' && until > Date.now()) {
           const at = new Date(until).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
           return { kind: 'wait', reason: `Aguardando nova tentativa às ${at} (falha transitória).` };
         }
