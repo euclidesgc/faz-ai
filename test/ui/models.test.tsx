@@ -245,3 +245,38 @@ describe('regras de modelo em inglês', () => {
     }
   });
 });
+
+describe('Conectar agentes: a escada de modelos', () => {
+  const entries = () => {
+    const m = state().board.modelCatalog.filter((x) => x.tool === tool());
+    return m.flatMap((o) => (o.efforts.length ? o.efforts.slice(0, 1).map((e) => `${o.id}@${e}`) : [o.id])).slice(0, 3);
+  };
+
+  it('sem escada mostra o aviso e deixa adicionar só modelos do catálogo', () => {
+    board.router.handle({ type: 'models.ladder.set', tool: tool(), ladder: [] });
+    syncStore(board.router);
+    show();
+    expect(screen.getByText('Sem escada: sobe só o esforço.')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Adicionar à escada' })).toBeEnabled();
+  });
+
+  it('sobe, desce e remove, e desabilita nas pontas', async () => {
+    const ladder = entries();
+    expect(ladder.length).toBeGreaterThanOrEqual(2);
+    board.router.handle({ type: 'models.ladder.set', tool: tool(), ladder });
+    syncStore(board.router);
+    show();
+    const ups = screen.getAllByRole('button', { name: /^Subir / });
+    const downs = screen.getAllByRole('button', { name: /^Descer / });
+    expect(ups[0]).toBeDisabled();
+    expect(downs[downs.length - 1]).toBeDisabled();
+    await userEvent.click(downs[0]!);
+    expect(lastSent('models.ladder.set')).toEqual({
+      type: 'models.ladder.set',
+      tool: tool(),
+      ladder: [ladder[1], ladder[0], ...ladder.slice(2)],
+    });
+    await userEvent.click(screen.getAllByRole('button', { name: /da escada$/ })[0]!);
+    expect((lastSent('models.ladder.set') as { ladder: string[] }).ladder).toHaveLength(ladder.length - 1);
+  });
+});

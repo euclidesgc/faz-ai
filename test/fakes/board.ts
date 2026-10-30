@@ -76,6 +76,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
       aiProfiles: structuredClone([...BUILTIN_PROFILES]),
       modelCatalog: [],
       modelRules: [],
+      modelLadders: {},
       appearance: DEFAULT_APPEARANCE,
       templateVersion: 1,
       runner: DEFAULT_RUNNER,

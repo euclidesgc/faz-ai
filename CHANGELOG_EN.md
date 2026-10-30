@@ -6,6 +6,7 @@
 
 ### Added
 
+- Per-agent model ladder editor in Settings › Connect agents, below the suggestion rules (#1312).
 - The AI ends the phase reply with a JSON block (`DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT` or `BLOCKED`); if it is missing or invalid, the board asks for a repair in the same session (#1098).
 - A watchdog stops a card run whose tool goes N minutes without any output, with the reason in the conversation (#1103).
 - The **Sugerir pelo projeto** (suggest from the project) button on the column checks screen proposes typecheck, lint and test checks from the project scripts, saving nothing until the person accepts (#1254).

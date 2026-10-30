@@ -194,3 +194,33 @@ describe('"Sugerir regras" e as faixas de esforço de outros perfis', () => {
     expect(rules.some((r) => r.id === 'r-Alto')).toBe(false);
   });
 });
+
+describe('models.ladder.set', () => {
+  const ladderOf = (r: MessageRouter) => r.snapshot().board.modelLadders;
+  const toolOf = (r: MessageRouter) => r.snapshot().board.aiProfiles[0]!.id;
+
+  it('escada válida persiste e aparece no estado', () => {
+    const router = new MessageRouter(dbHandle as never, opts());
+    const tool = toolOf(router);
+    router.handle({ type: 'models.ladder.set', tool, ladder: [`${tool}:a`, `${tool}:b@high`] });
+    expect(ladderOf(router)).toEqual({ [tool]: [`${tool}:a`, `${tool}:b@high`] });
+    expect(ladderOf(new MessageRouter(dbHandle as never, opts()))).toEqual(ladderOf(router));
+  });
+
+  it('escada inválida é rejeitada e nada é gravado', () => {
+    const router = new MessageRouter(dbHandle as never, opts());
+    const tool = toolOf(router);
+    expect(() => router.handle({ type: 'models.ladder.set', tool, ladder: ['a', ''] })).toThrow();
+    expect(() => router.handle({ type: 'models.ladder.set', tool, ladder: ['a', 'a'] })).toThrow();
+    expect(() => router.handle({ type: 'models.ladder.set', tool: 'nao-existe', ladder: ['a'] })).toThrow();
+    expect(ladderOf(router)).toEqual({});
+  });
+
+  it('lista vazia remove só a chave do agente', () => {
+    const router = new MessageRouter(dbHandle as never, opts());
+    const tool = toolOf(router);
+    router.handle({ type: 'models.ladder.set', tool, ladder: ['x', 'y'] });
+    router.handle({ type: 'models.ladder.set', tool, ladder: [] });
+    expect(ladderOf(router)).toEqual({});
+  });
+});

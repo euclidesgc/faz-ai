@@ -4,6 +4,7 @@ import { t } from '../../../i18n';
 import { useBoardStore } from '../../../store/boardStore';
 import { SwitchField } from '../../ui';
 import { DependsOn } from '../DependsOn';
+import { ModelLadderEditor } from '../ModelLadderEditor';
 import { ModelRulesEditor } from '../ModelRulesEditor';
 
 /**
@@ -12,7 +13,7 @@ import { ModelRulesEditor } from '../ModelRulesEditor';
  * agente aberto: vale para o board inteiro, com qualquer agente conectado, e não para um agente só.
  */
 export function ModelSuggestion() {
-  const { modelRules, rules } = useBoardStore((s) => s.state!.board);
+  const { modelRules, rules, aiTool } = useBoardStore((s) => s.state!.board);
   return (
     <section className="model-suggestion">
       {/* o preencher sozinho vem logo abaixo do título da seção, e não acima dele, colado nas regras de fallback */}
@@ -39,6 +40,7 @@ export function ModelSuggestion() {
           </Card>
         }
       />
+      <ModelLadderEditor tool={aiTool} />
     </section>
   );
 }
