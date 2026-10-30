@@ -16,3 +16,6 @@ board-harness/
 
 # trecho da documentação do Claude Code como a página publica: a leitura é testada contra o original
 test/fixtures/claude-model-config.md
+
+# placares gerados pela avaliação de modelos: formato próprio e estável
+evals/scoreboard/

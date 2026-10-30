@@ -120,6 +120,38 @@ personalizado ACP, o agente do catálogo); use sempre `driverOf(perfil)` para a 
 `executorOf(perfil)` para a execução, nunca `base` direto. Antes de codificar algo de uma ferramenta, leia a
 documentação oficial atual dela e cite a fonte no comentário.
 
+## Avaliação de modelos
+
+`npm run eval -- --model <perfil>:<modelo>@<esforço>` conduz as histórias de referência de
+`evals/stories/` pelo board real, com o modelo escolhido, e grava o placar em `evals/scoreboard/`. As
+opções: `--stories a,b` (só estas histórias), `--timeout <min>` (tempo limite de cada uma, no lugar do
+da história), `--keep` (mantém a pasta temporária e mostra o caminho) e `--out <pasta>` (outro lugar para
+o placar). Exemplo: `npm run eval -- --model claude:opus@medium --stories slugify`.
+
+Cada história roda num board temporário, em pasta nova: nada da pasta de dados da pessoa é aberto. A
+rodada, porém, **gasta tokens** do modelo escolhido e usa o login da CLI da pessoa; por isso ela nunca
+entra no `npm test` nem no `validate`.
+
+Uma história de referência é a pasta `evals/stories/<id>/`, com:
+
+- `story.json`: `title`, `description`, `startPhase` (padrão `Plan`), `timeoutMinutes` (padrão 30) e
+  `acceptance`, com o `command` e o `timeoutSeconds` (padrão 120);
+- `repo/`: o projeto de partida, copiado para a pasta temporária e commitado como "Estado inicial";
+- `acceptance/`: os testes de aceitação, copiados para `.eval-acceptance/` só depois que a história é
+  entregue. Ela é aceita quando o comando de aceitação sai com código 0.
+
+A avaliação para quando a história entra na Homologação, a última coluna em que a IA atua: ali o modo
+autônomo é desligado e a execução da Revisão termina com o consumo medido. Se o tempo acabar antes, o
+autopiloto para e as execuções têm 30 s para terminar. Se a história ficar com a pessoa (bloqueada ou
+com uma pergunta), a rodada registra o motivo e segue para a próxima.
+
+Para criar uma história de referência, monte a pasta acima com um projeto pequeno e testes de aceitação
+que digam sem ambiguidade quando a história está pronta, e confira com `--stories <id>`.
+
+Rodada manual: `evals/cli.ts` (a linha de comando) e `evals/lib/hostBoard.ts` (o board real de cada
+história) não têm teste automático. Quando um dos dois muda, rode `npm run eval -- --model <modelo>
+--stories slugify` e confira o placar gravado.
+
 ## Changelog
 
 O changelog segue o Keep a Changelog, com uma seção por versão e os títulos **Adicionado**,
