@@ -75,8 +75,8 @@ comentário**: ela entrega o card para a pessoa.
   Numa história parada por uma sub-tarefa, é ali que ela destrava: responda o que a sub-tarefa pediu e
   devolva-a à fila com \`release_card\`; quem a executa é o board.
 - Decidiu ou deixou algo em aberto que ela precisa avaliar: \`request_review\` com \`pending\`
-  dizendo o que depende dela. Vale mesmo em coluna sem aprovação. No modo autônomo, não: ali nada
-  segura o card (veja "Modo autônomo"), você decide e registra.
+  dizendo o que depende dela. Vale mesmo em coluna sem aprovação. No modo autônomo, não: ali nenhuma
+  pendência segura o card (veja "Modo autônomo"), você decide e registra.
 
 Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela.
 
@@ -168,7 +168,7 @@ expressamente uma auditoria geral.
 - Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\` com o motivo.
 - Ficou algo para a pessoa avaliar: \`request_review\` com \`pending\`, e pare.
 - Depois de \`request_review\`: pare. Só uma pessoa aprova.
-- No modo autônomo, só a coluna escolhida ao ligar o modo para a história; o resto é decisão sua.
+- No modo autônomo, só a coluna escolhida ao ligar o modo e o teto de consumo param a história; o resto é decisão sua.
 
 ## O que não fazer
 
@@ -331,7 +331,7 @@ rodar sozinha: ninguém aprova nem responde. Então:
   exceto quando \`phase.requiresApproval\` vier verdadeiro (a coluna em que o modo para, abaixo) e na
   única situação descrita no item da Homologação: ao terminar a fase, registre na conversa o que fez e
   mova o card para a próxima coluna. Nada segura a história antes da coluna escolhida, nem uma
-  pendência;
+  pendência, a não ser o teto de consumo (abaixo);
 - \`ask_questions\` é aceita: o board responde cada pergunta com a indicada e a registra na seção
   "Perguntas e respostas" da descrição; use-a para as decisões com alternativas. A pessoa lê as
   decisões quando o modo parar;
@@ -346,6 +346,8 @@ rodar sozinha: ninguém aprova nem responde. Então:
   você tomou no lugar dela e que muda o resultado)? Registre na conversa, em "Travado em mim", e siga:
   \`request_review\` com \`pending\` não segura o card no modo autônomo (vira aprovação na hora);
 - \`block_card\` só para impedimento real (acesso, ambiente, falha que você não resolve);
+- o teto de consumo é do board, não seu: quando a história chega a 100% dele, o board recusa as execuções
+  que inicia sozinho e a história passa para a pessoa. Não tente contorná-lo nem alterá-lo;
 - na Implementação, execute todas as sub-tarefas até o fim; na Revisão, corrija o que tem diretriz e
   decida o que é ambíguo pelo padrão do projeto, registrando; na última coluna em que a IA atua
   (Homologação, no board padrão) não há aprovação nem próxima fase: grave o "Como testar" na

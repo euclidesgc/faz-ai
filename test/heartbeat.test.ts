@@ -19,6 +19,7 @@ import {
 import type { AiRunMode } from '../src/shared/runner';
 import type { AiRunOrigin } from '../src/shared/log';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { BudgetExceeded } from '../src/extension/budget';
 import { UsageLimitHeld } from '../src/extension/runner';
 import { isUnblockNote } from '../src/shared/orchestration';
 import { BUG_TYPE } from '../src/shared/priority';
@@ -42,6 +43,7 @@ let runner: {
   fail: boolean;
   /** ids cujo início automático o runner recusa por pausa de limite de uso */
   held: Set<string>;
+  overBudget: Set<string>;
   start(id: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(id: string): void;
   onDidFinish(fn: (id: string) => void): void;
@@ -99,8 +101,10 @@ beforeEach(async () => {
     modes: [],
     fail: false,
     held: new Set<string>(),
+    overBudget: new Set<string>(),
     start(id, origin, mode) {
       if (this.held.has(id)) throw new UsageLimitHeld('claude', now + 600_000, 'Claude Code');
+      if (this.overBudget.has(id)) throw new BudgetExceeded(id, 1_200_000, 1_000_000);
       if (this.fail) throw new Error('ferramenta indisponível');
       this.running.push(id);
       this.started.push(id);
@@ -155,6 +159,25 @@ describe('heartbeat', () => {
     expect(log.some((l) => /1 história\(s\) esperando/.test(l))).toBe(true);
     // a pausa venceu: a próxima rodada executa a A
     runner.held.clear();
+    runner.finish('ready');
+    heartbeat.runNow();
+    expect(runner.started.map(number)).toContain(1);
+  });
+
+  it('história no teto de consumo: só ela espera, a outra segue, a fila não é esvaziada e a recusa é registrada uma vez', () => {
+    create('A', 'Implementação'); // #1
+    create('B', 'Implementação'); // #2
+    setStatus(1, 'ready');
+    setStatus(2, 'ready');
+    runner.overBudget.add(card(1).id);
+    heartbeat.runNow();
+    expect(runner.started.map(number)).toEqual([2]);
+    runner.finish('ready');
+    heartbeat.runNow();
+    expect(log.filter((l) => /teto de consumo/.test(l))).toHaveLength(1);
+    expect(log.some((l) => /ferramenta indisponível/.test(l))).toBe(false);
+    // a pessoa subiu o teto: a próxima rodada executa a A
+    runner.overBudget.clear();
     runner.finish('ready');
     heartbeat.runNow();
     expect(runner.started.map(number)).toContain(1);

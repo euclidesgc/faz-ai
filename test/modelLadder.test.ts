@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextTier, parseLadders, tierRank } from '../src/shared/modelLadder';
+import { nextTier, parseLadders, previousTier, tierRank } from '../src/shared/modelLadder';
 import { isHandPicked, type ModelOption } from '../src/shared/models';
 import type { BoardState, Card } from '../src/shared/model';
 
@@ -72,5 +72,26 @@ describe('isHandPicked', () => {
   it('com previous compara com ele', () => {
     expect(isHandPicked(state('b', 'a'), card, 'b')).toBe(false);
     expect(isHandPicked(state('b', 'a'), card, null)).toBe(true);
+  });
+});
+
+describe('previousTier', () => {
+  const ladders = { claude: ['claude:haiku', 'claude:sonnet@medium', 'claude:opus@high', 'claude:fora'] };
+  it('usa a escada do perfil', () => {
+    expect(previousTier(catalog, ladders, 'claude', 'claude:opus@high')).toBe('claude:sonnet@medium');
+    expect(previousTier(catalog, ladders, 'claude', 'claude:sonnet@medium')).toBe('claude:haiku');
+  });
+  it('primeiro degrau da escada: null', () => {
+    expect(previousTier(catalog, ladders, 'claude', 'claude:haiku')).toBeNull();
+  });
+  it('sem escada desce o esforço do mesmo modelo', () => {
+    expect(previousTier(catalog, {}, 'claude', 'claude:sonnet@high')).toBe('claude:sonnet@medium');
+    expect(previousTier(catalog, {}, 'claude', 'claude:sonnet')).toBe('claude:sonnet@low');
+    expect(previousTier(catalog, { outro: ['x'] }, 'claude', 'claude:opus@high')).toBe('claude:opus@low');
+  });
+  it('primeiro esforço, sem esforço e fora do catálogo: null', () => {
+    expect(previousTier(catalog, {}, 'claude', 'claude:sonnet@low')).toBeNull();
+    expect(previousTier(catalog, {}, 'claude', 'claude:haiku')).toBeNull();
+    expect(previousTier(catalog, {}, 'claude', 'claude:nada@high')).toBeNull();
   });
 });

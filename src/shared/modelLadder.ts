@@ -68,3 +68,19 @@ export function tierRank(catalog: readonly ModelOption[], ladders: ModelLadders,
   if (at >= 0) return at;
   return effortOf(catalog, value)?.index ?? -1;
 }
+
+/**
+ * Nível abaixo de `current`, simétrica de `nextTier`: o item anterior da escada do perfil
+ * (se estiver no catálogo), senão o esforço anterior do mesmo modelo, senão null (já no primeiro degrau).
+ */
+export function previousTier(catalog: readonly ModelOption[], ladders: ModelLadders, profileId: string, current: string): string | null {
+  const ladder = ladders[profileId] ?? [];
+  const at = ladder.indexOf(current);
+  if (at >= 0) {
+    const prev = ladder[at - 1];
+    return prev !== undefined && inCatalog(catalog, prev) ? prev : null;
+  }
+  const e = effortOf(catalog, current);
+  if (!e || e.index <= 0) return null;
+  return `${e.option.id}@${e.option.efforts[e.index - 1]}`;
+}

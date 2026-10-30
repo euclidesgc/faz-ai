@@ -6,6 +6,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Autopilot, MAX_RUNS_WITHOUT_PROGRESS, autopilotRuns, autopilotStep } from '../src/extension/autopilot';
+import { BudgetExceeded } from '../src/extension/budget';
 import { UsageLimitHeld } from '../src/extension/runner';
 import { openInMemory } from '../src/extension/db/database';
 import { heartbeatTargets } from '../src/extension/heartbeat';
@@ -40,6 +41,7 @@ let runner: {
   failToStart: string | null;
   /** recusa o início automático como o runner faz com o perfil pausado por limite de uso */
   heldByLimit: boolean;
+  overBudget: Set<string>;
   start(id: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(id: string): void;
   onDidFinish(fn: (id: string, mode?: AiRunMode, failureClass?: FailureClass | null) => void): void;
@@ -117,12 +119,14 @@ beforeEach(async () => {
     modes: [],
     failToStart: null,
     heldByLimit: false,
+    overBudget: new Set<string>(),
     holding: new Set(),
     retryHold(id) {
       return this.holding.has(id) ? 'Aguardando nova tentativa' : null;
     },
     start(id, origin, mode) {
       if (this.heldByLimit) throw new UsageLimitHeld('claude', 4_000_000_000_000, 'Claude Code');
+      if (this.overBudget.has(id)) throw new BudgetExceeded(id, 1_200_000, 1_000_000);
       if (this.failToStart) throw new Error(this.failToStart);
       this.running.push(id);
       this.started.push(id);
@@ -761,6 +765,21 @@ describe('autopiloto', () => {
     router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!!' } });
     flush();
     expect(runner.started).toEqual([card(1).id]);
+  });
+
+  it('história no teto de consumo: não é falha, o autopiloto segue ligado, registra uma vez e a outra história roda', () => {
+    create('A', 'PRD');
+    create('B', 'PRD');
+    runner.overBudget.add(card(1).id);
+    yolo(1);
+    expect(autopilot.isActive).toBe(true);
+    expect(router.snapshot().autopilot.note).toBeNull();
+    yolo(2);
+    router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!' } });
+    flush();
+    expect(autopilot.isActive).toBe(true);
+    expect(runner.started).toEqual([card(2).id]);
+    expect(log.filter((l) => /teto de consumo/.test(l))).toHaveLength(1);
   });
 
   it('a pausa fica gravada no board: ao reabrir o editor não liga sozinho; retomar limpa a pausa e liga (#220)', () => {

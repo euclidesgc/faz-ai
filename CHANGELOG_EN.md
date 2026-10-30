@@ -67,6 +67,7 @@
 - The board picks the reviewer model of the **Revisão** (review) sub-task: another agent or model, never the cheap one (#1111).
 - Settings › Connect agents gains the **Reviewer model** field, to fix the model used when only one agent is ready (#1111).
 - The **Revisão** (review) sub-task of `revisor-de-codigo` only closes with `VEREDITO: APROVADO|REPROVADO|NÃO COMPROVADO` in the `comment`; rounds are recorded, round 2+ carries the previous findings and the diff since, and the story only leaves the review with the last verdict APROVADO (a 3rd round without approval blocks it) (#1324).
+- Per-story consumption ceiling: the board warns at 80% and refuses automatic runs at 100%; the settings screen comes next (#1112).
 
 ### Changed
 

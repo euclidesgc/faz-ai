@@ -31,6 +31,7 @@ import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { gatewayFor } from './helpers/gateway';
+import { BudgetExceeded } from '../src/extension/budget';
 import { executionPlan } from '../src/extension/execution';
 import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from '../src/extension/unitAdvice';
 import { FLOW_LINE } from '../src/extension/promptContext';
@@ -2100,6 +2101,31 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     procs[1]!.exit(0);
     expect(router.snapshot().usageLimit).toEqual([]);
     expect(runner.usageHold(storyId)).toBeNull();
+  });
+
+  it('teto de consumo: o guarda confere só o início que não é troca por política; a recusa não gasta execução e a manual segue (#1112)', () => {
+    useSonnetMedium();
+    const seen: string[] = [];
+    let refuse = true;
+    deps.budget = {
+      check: (id, origin, mode) => {
+        seen.push(`${origin}/${mode}`);
+        if (refuse && origin !== 'manual') throw new BudgetExceeded(id, 1_200_000, 1_000_000);
+      },
+    };
+    runner = new AiRunner(router, deps);
+    expect(() => runner.start(storyId, 'heartbeat')).toThrow(BudgetExceeded);
+    expect(() => runner.start(storyId, 'autopilot', 'refine')).toThrow(BudgetExceeded);
+    expect(procs).toHaveLength(0);
+    expect(card().status).not.toBe('running');
+    runner.start(storyId, 'manual');
+    expect(procs).toHaveLength(1);
+    expect(seen).toEqual(['heartbeat/phase', 'autopilot/refine', 'manual/phase']);
+    // abaixo do teto o início automático segue como antes
+    runner.stop(storyId);
+    refuse = false;
+    runner.start(storyId, 'heartbeat');
+    expect(procs).toHaveLength(2);
   });
 
   it('pausa vencida: a primeira execução automática é o teste e, se o limite esgotar de novo, a pausa estende com backoff (#1047)', () => {
