@@ -20,7 +20,10 @@ const TOOL_CALL =
 const OK = '{"type":"result","subtype":"success","is_error":false,"result":"Pronto","session_id":"s1"}\n';
 
 /** `plan(n)` diz o que a n-ésima execução (de 1) faz; `replyOnOk` é o gesto que a execução boa faz no card. */
-function fakeCli(plan: (n: number) => 'network' | 'tool-then-network' | 'ok', replyOnOk: () => void): { spawn: SpawnFn; calls: () => number } {
+function fakeCli(
+  plan: (n: number) => 'network' | 'tool-then-network' | 'ok',
+  replyOnOk: () => void,
+): { spawn: SpawnFn; calls: () => number } {
   let calls = 0;
   const spawn: SpawnFn = (_command, _cwd, out) => {
     const kind = plan(++calls);
@@ -45,12 +48,11 @@ const status = (w: CardWorld) => w.router.snapshot().cards.find((c) => c.id === 
 
 describe('cenário: card cuja rede cai', () => {
   it('cai 2 vezes, espera 30 s e 2 min, e na terceira execução conclui', async () => {
-    let w!: CardWorld;
     const cli = fakeCli(
       (n) => (n < 3 ? 'network' : 'ok'),
-      () => w.router.handle({ type: 'comment.add', cardId: w.cardId, body: 'Feito.' }, { author: 'Claude Code', source: 'ai' }),
+      () => world!.router.handle({ type: 'comment.add', cardId: world!.cardId, body: 'Feito.' }, { author: 'Claude Code', source: 'ai' }),
     );
-    w = world = await cardWorld({ profile: 'claude', tools: CONDUTOR_TOOLS, spawn: cli.spawn });
+    const w = (world = await cardWorld({ profile: 'claude', tools: CONDUTOR_TOOLS, spawn: cli.spawn }));
     vi.useFakeTimers();
     await w.run();
     expect(cli.calls()).toBe(1);
@@ -75,7 +77,10 @@ describe('cenário: card cuja rede cai', () => {
   });
 
   it('falha transitória depois de uma chamada de ferramenta bloqueia sem repetir', async () => {
-    const cli = fakeCli(() => 'tool-then-network', () => {});
+    const cli = fakeCli(
+      () => 'tool-then-network',
+      () => {},
+    );
     world = await cardWorld({ profile: 'claude', tools: CONDUTOR_TOOLS, spawn: cli.spawn });
     vi.useFakeTimers();
     await world.run();
@@ -87,7 +92,10 @@ describe('cenário: card cuja rede cai', () => {
   });
 
   it('quatro falhas seguidas bloqueiam com 1 + 3 execuções', async () => {
-    const cli = fakeCli(() => 'network', () => {});
+    const cli = fakeCli(
+      () => 'network',
+      () => {},
+    );
     world = await cardWorld({ profile: 'claude', tools: CONDUTOR_TOOLS, spawn: cli.spawn });
     vi.useFakeTimers();
     await world.run();
