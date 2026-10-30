@@ -200,7 +200,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test:cli-real": "vitest run --config vitest.cli-real.config.ts",
-    "validate": "node scripts/validate.mjs"
+    "validate": "node scripts/validate.mjs",
+    "eval": "npm run build:ext && node evals/run.mjs"
   },
   "devDependencies": {
     "@dnd-kit/core": "^6.1.0",

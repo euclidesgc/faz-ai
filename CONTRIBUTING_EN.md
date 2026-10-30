@@ -121,6 +121,40 @@ fields (for a custom ACP profile, the catalog agent); always use `driverOf(profi
 connection and `executorOf(profile)` for the execution, never `base` directly. Before coding anything tool-specific, read
 the tool's current official documentation and cite the source in the comment.
 
+## Model evaluation
+
+`npm run eval -- --model <profile>:<model>@<effort>` runs the reference stories in `evals/stories/`
+through the real board, with the chosen model, and writes the scoreboard to `evals/scoreboard/`. The
+options: `--stories a,b` (only these stories), `--timeout <min>` (time limit for each one, instead of
+the story's), `--keep` (keeps the temporary folder and shows its path) and `--out <folder>` (another
+place for the scoreboard). Example: `npm run eval -- --model claude:opus@medium --stories slugify`.
+
+Each story runs on a temporary board, in a new folder: nothing from the person's data folder is opened.
+The run, however, **spends tokens** of the chosen model and uses the person's CLI login; that is why it
+never runs in `npm test` or `validate`.
+
+A reference story is the folder `evals/stories/<id>/`, with:
+
+- `story.json`: `title`, `description`, `startPhase` (default `Plan`), `timeoutMinutes` (default 30) and
+  `acceptance`, with the `command` and the `timeoutSeconds` (default 120);
+- `repo/`: the starting project, copied to the temporary folder and committed as "Estado inicial"
+  (initial state);
+- `acceptance/`: the acceptance tests, copied to `.eval-acceptance/` only after the story is delivered.
+  The story is accepted when the acceptance command exits with code 0.
+
+The evaluation stops when the story reaches Acceptance, the last column where the AI works:
+there the autonomous mode is turned off and the Review run that brought the card there finishes with its
+usage measured. If time runs out first, the autopilot stops and the runs have 30 s to finish. If the
+story is left with the person (blocked or with a question), the round records the reason and moves on to
+the next one.
+
+To create a reference story, build the folder above with a small project and acceptance tests that say
+without ambiguity when the story is done, and check it with `--stories <id>`.
+
+Manual round: `evals/cli.ts` (the command line) and `evals/lib/hostBoard.ts` (the real board of each
+story) have no automated test. When one of them changes, run `npm run eval -- --model <model>
+--stories slugify` and check the scoreboard written.
+
 ## Changelog
 
 The changelog follows Keep a Changelog, with one section per version and the **Added**, **Changed**,
