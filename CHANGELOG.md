@@ -8,6 +8,7 @@
 
 - Watchdog encerra a execução de card cuja ferramenta fica N minutos sem nenhuma saída, com o motivo na conversa (#1103).
 - Cada coluna ganha uma lista de checagens (nome, comando e tempo limite), editada em Configurações › Workflows e lida pela IA em `get_board`; a execução vem numa próxima versão (#1096).
+- O botão **Sugerir pelo projeto** na tela de checagens da coluna propõe typecheck, lint e testes a partir dos scripts do projeto, sem gravar até a pessoa aceitar (#1254).
 - Tela **Uso da cota** no Claude Code, com o limite crítico que antecipa a troca para o reserva (#1114).
 - Painel Métricas ganha o bloco Custo por entrega, por tipo, esforço, modelo e agente (#1224).
 - O bloco Retrabalho do painel Métricas mostra o retrabalho por agente e as execuções sem resultado (#1224).

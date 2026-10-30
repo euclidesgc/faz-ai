@@ -3,7 +3,19 @@ import { TextField } from '@radix-ui/themes';
 import type { Column, ColumnCheck } from '../../../../shared/model';
 import { CHECK_TIMEOUT_DEFAULT, CHECK_TIMEOUT_MAX, CHECK_TIMEOUT_MIN, columnChecksError } from '../../../../shared/columnChecks';
 import { settings } from '../../../commands';
-import { ActionButton, ActionIconButton, DeleteButton, FormField, IconArrowDown, IconArrowUp, IconPlus, NumberField } from '../../ui';
+import { requestProjectProfile } from '../../../request';
+import { mergeSuggestions, suggestChecks, suggestedCheckName } from '../../../../shared/suggestChecks';
+import {
+  ActionButton,
+  ActionIconButton,
+  DeleteButton,
+  FormField,
+  IconArrowDown,
+  IconArrowUp,
+  IconPlus,
+  IconSuggest,
+  NumberField,
+} from '../../ui';
 import { t } from '../../../i18n';
 
 /** Aviso da linha cujo campo ficou vazio: o campo volta ao valor gravado e o motivo fica à vista. */
@@ -19,6 +31,34 @@ export function ChecksEditor({ column }: { column: Column }) {
   const [name, setName] = useState('');
   const [command, setCommand] = useState('');
   const [timeoutSec, setTimeoutSec] = useState(CHECK_TIMEOUT_DEFAULT);
+
+  // a sugestão é só uma proposta na tela: nada é gravado até a pessoa aceitar
+  const [proposal, setProposal] = useState<string[] | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const suggest = async () => {
+    setSuggesting(true);
+    setNotice(null);
+    setProposal(null);
+    try {
+      const profile = await requestProjectProfile();
+      const missing = mergeSuggestions(
+        checks.map((c) => c.command),
+        suggestChecks(profile),
+      ).slice(checks.length);
+      if (missing.length) setProposal(missing);
+      else setNotice(t('Nenhuma checagem reconhecida neste projeto.'));
+    } catch {
+      setNotice(t('Não foi possível ler o projeto.'));
+    } finally {
+      setSuggesting(false);
+    }
+  };
+  const acceptProposal = () => {
+    if (!proposal) return;
+    save([...checks, ...proposal.map((command) => ({ name: suggestedCheckName(command), command, timeoutSec: CHECK_TIMEOUT_DEFAULT }))]);
+    setProposal(null);
+  };
 
   const save = (next: ColumnCheck[]) => settings.updateColumn(column.id, { checks: next });
   const change = (index: number, patch: Partial<ColumnCheck>) => {
@@ -165,6 +205,49 @@ export function ChecksEditor({ column }: { column: Column }) {
           </ol>
         )}
       </FormField>
+      <div className="checks-suggest">
+        <ActionButton
+          size="1"
+          variant="soft"
+          color="gray"
+          hint={t('Propõe checagens a partir dos scripts do projeto; nada é gravado até você aceitar')}
+          loading={suggesting}
+          onClick={suggest}
+        >
+          <IconSuggest /> {t('Sugerir pelo projeto')}
+        </ActionButton>
+        {notice && (
+          <p role="status" className="checks-suggest-notice">
+            {notice}
+          </p>
+        )}
+        {proposal && (
+          <div className="checks-proposal" role="group" aria-label={t('Checagens sugeridas')}>
+            <p className="checks-suggest-notice">{t('Sugeridas pelo projeto (ainda não gravadas):')}</p>
+            <ul>
+              {proposal.map((command) => (
+                <li key={command}>
+                  <code>{command}</code>
+                </li>
+              ))}
+            </ul>
+            <div className="row-actions">
+              <ActionButton size="1" hint={t('Grava as checagens sugeridas ao fim da lista')} onClick={acceptProposal}>
+                {t('Adicionar sugeridas')}
+              </ActionButton>
+              <ActionButton
+                size="1"
+                variant="ghost"
+                color="gray"
+                hint={t('Descarta a sugestão sem gravar nada')}
+                onClick={() => setProposal(null)}
+              >
+                {t('Descartar')}
+              </ActionButton>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

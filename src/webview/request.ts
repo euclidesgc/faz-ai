@@ -199,3 +199,38 @@ export function requestExecutionPolicy(
     }
   });
 }
+
+/** O perfil do projeto (scripts, ferramentas) para sugerir checagens; só leitura, o erro do host vem na rejeição. */
+export function requestProjectProfile(timeout: number = REQUEST_TIMEOUT_MS): Promise<import('../shared/projectProfile').ProjectProfile> {
+  const requestId = newRequestId();
+  const end = beginRequest();
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      off();
+      clearTimeout(timer);
+      pending.delete(cancel);
+      end();
+    };
+    const cancel = () => {
+      cleanup();
+      reject(new Error(REQUEST_CANCELLED_MESSAGE));
+    };
+    const off = onHostMessage((message) => {
+      if (message.type !== 'harness.project.profileResult' || message.requestId !== requestId) return;
+      cleanup();
+      if (message.profile) resolve(message.profile);
+      else reject(new Error(message.error ?? 'Não foi possível ler o projeto.'));
+    });
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(REQUEST_TIMEOUT_MESSAGE));
+    }, timeout);
+    pending.add(cancel);
+    try {
+      postToHost({ type: 'harness.project.profile', requestId });
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
+}
