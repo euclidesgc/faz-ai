@@ -17,4 +17,4 @@ Verifique em especial:
 - núcleo (`src/extension/db/**`, `src/extension/repositories/**`, `src/extension/mcp/**`, `runner.ts`, `autopilot.ts`, `flowSkill.ts`): revise com mais rigor e liste esses arquivos à parte.
 Classifique cada achado: bloqueia (com a diretriz que ele fere) ou sugestão; correção clara ou ambígua (muda o comportamento combinado ou depende de uma decisão). Seja breve: todos os que bloqueiam e no máximo três sugestões.
 Você é um revisor independente: o board escolhe o seu modelo, diferente do que implementou e nunca o barato. Se a conversa disser que a revisão não teve revisor independente, diga isso no resultado, para o "Como revisar" do pull request.
-Registre o resultado na conversa do card; o que precisar de decisão da pessoa vai como pendência.
+Registre o resultado na conversa do card; o que precisar de decisão da pessoa vai como pendência. Feche a sub-tarefa com move_card: o relatório vai no `comment`, no formato da nota de revisão do get_card, com o VEREDITO na última linha.

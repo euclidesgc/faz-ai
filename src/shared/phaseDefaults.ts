@@ -603,9 +603,26 @@ const REVIEWER_MODEL_NEW =
 const reviewerModel = (name: string, d: PhaseDefault): PhaseDefault =>
   name === 'Revisão' ? { ...d, instruction: d.instruction.replace(REVIEWER_MODEL_OLD, REVIEWER_MODEL_NEW) } : d;
 
-/** Os textos padrão atuais (versão 20): os da versão 19 com o modelo do revisor escolhido pelo board na Revisão. */
-export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+/** Os textos padrão da versão 20: os da versão 19 com o modelo do revisor escolhido pelo board na Revisão. */
+const PHASE_DEFAULTS_V20: Record<string, PhaseDefault> = Object.fromEntries(
   Object.entries(PHASE_DEFAULTS_V19).map(([name, d]) => [name, reviewerModel(name, d)]),
+);
+
+// A versão 21 põe o veredito na Revisão: a sub-tarefa de revisão fecha com APROVADO, REPROVADO ou NÃO COMPROVADO, e só
+// o APROVADO da última rodada deixa a história sair. A versão 20 mandava "delegar" ao revisor, o que contradizia a
+// sub-tarefa que o board executa (crie e pare).
+const REVISAO_INSTRUCTION_V21 = [
+  'Revise a entrega antes do pull request, na branch e na pasta de trabalho da história (workspace no get_card).',
+  '1. Rode as checagens do projeto: as que ele define para typecheck, lint, testes e build (package.json, Makefile, CLAUDE.md, AGENTS.md ou a documentação de desenvolvimento).',
+  '2. Revise o diff da história contra a base (git diff <base>...HEAD) com um olhar independente: crie uma sub-tarefa de revisão (Fase = Revisão) com o agente revisor-de-codigo, se ele estiver nos agentes do board, e pare: o board a executa numa sessão nova e chama você de novo; o board escolhe o modelo do revisor (outro, nunca o barato), então não defina Modelo na sub-tarefa. Sem o agente, revise você mesmo pelo mesmo roteiro. Se a conversa disser que não houve revisor independente, registre isso no "Como revisar". Procure também o código que só passa no teste: teste novo que já passa no commit base (não testa nada), teste existente alterado junto com o código que ele cobre, try/catch que engole erro, cast forçado e acoplamento novo entre módulos.',
+  '3. Trate cada achado. O que tem diretriz clara (regra do projeto, padrão já usado no código, teste que falha) você corrige agora, delegando ao especialista quando houver, e registra na conversa. O que é ambíguo ou muda o comportamento combinado é decisão da pessoa: ask_questions (no modo autônomo, o board responde com a indicada) e pare.',
+  '4. Depois das correções, rode as checagens de novo e faça o commit na branch da história. Sem permissão para rodar comandos, revise lendo o código e registre na conversa o que falta rodar. Se a coluna tem checagens, o board as roda de novo quando você move a história: o card vai a Verificando, então pare e não chame mais nada nele; se falharem, ele volta para ready com a saída na conversa, e você corrige e tenta de novo.',
+  '5. Registre na conversa o resultado (o que foi checado, o que foi corrigido e as sugestões que ficaram de fora): ele alimenta o "Como revisar" do pull request. Se o veredito da última rodada não for APROVADO, corrija os achados e crie a sub-tarefa de revisão da rodada seguinte, em vez de mover a história. Com APROVADO, mova a história para a próxima coluna.',
+].join('\n');
+
+/** Os textos padrão atuais (versão 21): os da versão 20 com a Revisão que fecha com o veredito de cada rodada. */
+export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+  Object.entries(PHASE_DEFAULTS_V20).map(([name, d]) => [name, name === 'Revisão' ? { ...d, instruction: REVISAO_INSTRUCTION_V21 } : d]),
 );
 
 /** Textos padrão anteriores de uma fase e o que a versão atual traz de novo, para a atualização do board. */
@@ -657,10 +674,11 @@ export const PHASE_HISTORY: Record<string, PhaseHistory> = {
       PHASE_DEFAULTS_V12.Revisão!.instruction,
       PHASE_DEFAULTS_V18.Revisão!.instruction,
       PHASE_DEFAULTS_V19.Revisão!.instruction,
+      PHASE_DEFAULTS_V20.Revisão!.instruction,
     ],
     templates: [],
     change:
-      'o achado que muda o comportamento combinado vira pergunta por ask_questions; se a coluna tem checagens, o board as roda ao mover a história, o card vai a Verificando (a IA para) e, se falharem, volta para ready com a saída na conversa; o board escolhe o modelo do revisor (outro, nunca o barato) e a sub-tarefa de revisão não define Modelo',
+      'o achado que muda o comportamento combinado vira pergunta por ask_questions; se a coluna tem checagens, o board as roda ao mover a história, o card vai a Verificando (a IA para) e, se falharem, volta para ready com a saída na conversa; o board escolhe o modelo do revisor (outro, nunca o barato) e a sub-tarefa de revisão não define Modelo; a sub-tarefa de revisão fecha com APROVADO, REPROVADO ou NÃO COMPROVADO, e sem APROVADO na última rodada a história não sai da Revisão (a rodada seguinte é uma nova sub-tarefa, e a terceira sem APROVADO bloqueia a história)',
   },
   Implementação: {
     instructions: [IMPLEMENTATION_INSTRUCTION_V5, PHASE_DEFAULTS_V17.Implementação!.instruction],

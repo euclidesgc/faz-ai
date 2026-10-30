@@ -159,7 +159,8 @@ modelo do card, rules e skills obrigatórias e pendências com a pessoa) em meno
 o tamanho em que o Claude Code corta as instruções de cada servidor e a descrição de cada ferramenta
 (documentação de 2026-10-13). O detalhe de cada passo fica onde a IA o lê quando precisa: na
 descrição da ferramenta, nas notas do `get_card` (como `subtasksNowNote`, com as rodadas da
-Implementação) e nas skills do fluxo. As notas do `get_card` são curtas e só aparecem quando o estado do
+Implementação, ou `reviewNote`, com o relatório e o veredito da sub-tarefa de revisão independente) e nas
+skills do fluxo. As notas do `get_card` são curtas e só aparecem quando o estado do
 card pede; o texto completo fica em skills por assunto (`faz-ai-harness-do-card`,
 `faz-ai-workspace-e-pr`, `faz-ai-implementacao-rodadas`, `faz-ai-revisao-e-homologacao` e
 `faz-ai-modo-autonomo`), que a nota aponta pelo nome.

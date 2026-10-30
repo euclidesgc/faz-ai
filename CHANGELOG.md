@@ -65,6 +65,7 @@
 - O painel de Métricas ganha o corte por classe da falha, e a aba Consumo do card, a coluna Classe da falha (#1298).
 - O board escolhe o modelo do revisor da sub-tarefa de Revisão: outro agente ou modelo, nunca o barato (#1111).
 - Configurações › Conectar agentes ganha o campo **Modelo do revisor**, para fixar o modelo quando só há um agente pronto (#1111).
+- A sub-tarefa de Revisão do `revisor-de-codigo` só fecha com `VEREDITO: APROVADO|REPROVADO|NÃO COMPROVADO` no `comment`; as rodadas ficam registradas, a rodada 2+ traz os achados anteriores e o diff desde então, e a história só sai da Revisão com o último veredito APROVADO (a 3ª rodada sem aprovação a bloqueia) (#1324).
 
 ### Alterado
 

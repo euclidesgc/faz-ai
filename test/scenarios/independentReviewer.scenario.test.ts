@@ -2,6 +2,9 @@
 // sub-tarefa de implementação com um modelo, a IA (cliente do servidor MCP de verdade) cria a sub-tarefa de Revisão e o
 // board escolhe o modelo dela: outro e nunca o barato. A execução da revisão passa o `--model` ao processo falso da CLI.
 // Só o processo da CLI é falso.
+import { execFileSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -123,5 +126,84 @@ describe('cenário: a revisão nasce com outro modelo', () => {
     w.router.applyReviewerModelToNewCard(review.id);
     expect(modelOf(review.id)).toBe('claude:haiku');
     expect(textOf(review.id).filter((b) => b.includes('definido pelo board'))).toHaveLength(1);
+  });
+});
+
+const git = (cwd: string, ...args: string[]): string =>
+  execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8' }).trim();
+
+describe('cenário: rodadas e portão de saída da Revisão (#1324)', () => {
+  it('REPROVADO → rodada 2 com o diff e os achados → NÃO COMPROVADO segura → APROVADO libera a saída', async () => {
+    const { w, textOf } = await scenario(true);
+    git(w.project, 'init', '-q');
+    fs.writeFileSync(path.join(w.project, 'a.txt'), '1');
+    git(w.project, 'add', '.');
+    git(w.project, 'commit', '-q', '-m', 'um');
+    w.router.handle({
+      type: 'harness.agent.create',
+      input: {
+        name: 'revisor-de-codigo',
+        description: 'Revisão.',
+        body: 'Revise.',
+        model: '',
+        tools: ['Read'],
+        deniedTools: [],
+        skills: [],
+        mcp: [],
+      },
+    });
+    const s = w.router.snapshot();
+    const parent = s.workflows.find((x) => x.kind === 'parent')!;
+    const column = (name: string) => s.columns.find((c) => c.workflowId === parent.id && c.name === name)!;
+    // a implementação já terminou: a história chega à Revisão sem sub-tarefa em aberto
+    const child = s.workflows.find((x) => x.kind === 'child')!;
+    const implemented = s.cards.find((c) => c.title === 'Implementar')!;
+    const done = s.columns.find((c) => c.workflowId === child.id && c.category === 'done')!;
+    w.router.handle({ type: 'card.move', cardId: implemented.id, columnId: done.id, position: Number.MAX_SAFE_INTEGER });
+    w.router.handle({ type: 'card.move', cardId: w.storyId, columnId: column('Revisão').id, position: Number.MAX_SAFE_INTEGER });
+    const story = () => w.router.snapshot().cards.find((c) => c.id === w.storyId)!;
+    const call = (name: string, args: Record<string, unknown>) => client!.callTool({ name, arguments: args });
+
+    const open = async (title: string) => {
+      const res = await call('create_card', { title, parent: story().number, profile: 'revisor-de-codigo', fields: { Fase: 'Revisão' } });
+      expect(res.isError).not.toBe(true);
+      return w.router.snapshot().cards.find((c) => c.title === title)!;
+    };
+    const close = (card: { number: number }, comment: string) => call('move_card', { card: card.number, column: 'Concluído', comment });
+    const exit = () => call('move_card', { card: story().number, column: 'Homologação' });
+    const advance = (file: string) => {
+      fs.writeFileSync(path.join(w.project, file), file);
+      git(w.project, 'add', '.');
+      git(w.project, 'commit', '-q', '-m', file);
+    };
+
+    // rodada 1: REPROVADO segura a saída
+    const first = await open('Revisão 1');
+    const base = git(w.project, 'rev-parse', 'HEAD');
+    expect((await close(first, '- A1 [bloqueia] a.txt:1: sem teste\nNão checado: nada\nVEREDITO: REPROVADO')).isError).not.toBe(true);
+    expect((await exit()).isError).toBe(true);
+
+    // a correção entra e a rodada 2 nasce com os achados e o diff desde o commit da rodada 1
+    advance('b.txt');
+    const second = await open('Revisão 2');
+    const description = w.router.snapshot().cards.find((c) => c.id === second.id)!.description;
+    expect(description).toContain('## Rodada 2');
+    expect(description).toContain('A1 [bloqueia] a.txt:1: sem teste');
+    expect(description).toContain(`git diff ${base}...HEAD`);
+    expect(textOf(first.id).join('\n')).toContain('VEREDITO: REPROVADO');
+
+    // NÃO COMPROVADO também segura; APROVADO libera
+    expect(
+      (await close(second, '- A1 [bloqueia] a.txt:1: sem teste [RESOLVIDO]\nNão checado:\n- a integração\nVEREDITO: NÃO COMPROVADO'))
+        .isError,
+    ).not.toBe(true);
+    expect((await exit()).isError).toBe(true);
+    advance('c.txt');
+    const third = await open('Revisão 3');
+    expect((await close(third, '- A1 [bloqueia] a.txt:1: sem teste [RESOLVIDO]\nNão checado: nada\nVEREDITO: APROVADO')).isError).not.toBe(
+      true,
+    );
+    expect((await exit()).isError).not.toBe(true);
+    expect(story().columnId).toBe(column('Homologação').id);
   });
 });

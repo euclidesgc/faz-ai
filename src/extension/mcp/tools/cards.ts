@@ -4,6 +4,7 @@ import { linkProblem } from '../../../shared/links';
 import { columnsOf } from '../../../shared/selectors';
 import { BRIEF_SECTIONS, REQUIRED_BRIEF_SECTIONS } from '../../../shared/subtaskBrief';
 import { cardStatus, cardSummary, findCard, findColumn, findField, findType } from '../format';
+import { isClosingReview, isLeavingReview } from '../../reviewRoundApply';
 import { cardArg, fieldsArg } from './args';
 import { END, addChecklist, aiOrigin, detail, findProfile, live, setFields, validateFields } from './helpers';
 import type { DefineTool, ToolContext } from './registry';
@@ -90,6 +91,8 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       if (derivedFrom) router.handle({ type: 'card.derive', cardId: id, fromId: derivedFrom.id }, aiOrigin(ctx));
       if (origin) router.handle({ type: 'card.yolo.inherit', cardId: id, fromId: origin.id }, aiOrigin(ctx));
       if (profile) router.handle({ type: 'card.execProfile.set', cardId: id, profileId: profile.id }, aiOrigin(ctx));
+      // depois do agente: o bloco "Rodada N" só vale na revisão do `revisor-de-codigo`, e vai ao fim da descrição
+      if (parent) router.appendReviewRoundBlock(id);
       const checklistItems = a.checklist?.length ? addChecklist(router, id, a.checklist) : undefined;
       // o resumo basta para seguir o Plan; o detalhe (phase, notas, workspace) vem pelo get_card
       const after = router.snapshot();
@@ -128,7 +131,7 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'move_card',
-    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto, e um card só avança de uma coluna que exige aprovação (`requiresApproval` em get_board) quando o status dele é "approved". Para uma coluna de conclusão, o checklist do card não pode ter item em aberto: marque com update_checklist_item o que fez e apague com delete_checklist_item o que não se aplica. Um card arquivado é desarquivado ao ser movido. `comment` grava a mensagem de conclusão na conversa depois do movimento (equivale a move_card + add_comment); um movimento recusado não grava nada. Ao sair para a frente de uma coluna com checagens (`checks` em get_board) o card não se move na hora: fica em "Verificando" (o resultado traz `gate`), o board roda as checagens e você PARA; passando, o card vai ao destino; falhando, volta para "ready" com o fim da saída na conversa, e o `comment` não é gravado.',
+    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto, e um card só avança de uma coluna que exige aprovação (`requiresApproval` em get_board) quando o status dele é "approved". Para uma coluna de conclusão, o checklist do card não pode ter item em aberto: marque com update_checklist_item o que fez e apague com delete_checklist_item o que não se aplica. Um card arquivado é desarquivado ao ser movido. `comment` grava a mensagem de conclusão na conversa depois do movimento (equivale a move_card + add_comment); um movimento recusado não grava nada. Ao sair para a frente de uma coluna com checagens (`checks` em get_board) o card não se move na hora: fica em "Verificando" (o resultado traz `gate`), o board roda as checagens e você PARA; passando, o card vai ao destino; falhando, volta para "ready" com o fim da saída na conversa, e o `comment` não é gravado. Fechar a sub-tarefa de revisão (agente revisor-de-codigo) exige `VEREDITO: APROVADO|REPROVADO|NÃO COMPROVADO` na última linha do `comment`; sem ele o card não se move. A história só sai da Revisão se a última rodada for APROVADO.',
     {
       card: cardArg,
       column: z.string().describe('Nome da coluna de destino'),
@@ -149,15 +152,35 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
         throw new Error(
           `Não é possível concluir #${card.number}: ${open.length} item(ns) do checklist em aberto (${open.map((i) => `"${i.text}" [${i.id}]`).join(', ')}). Marque com update_checklist_item o que foi feito e apague com delete_checklist_item o que não se aplica; depois mova de novo.`,
         );
-      if (card.archivedAt !== null)
-        router.handle({ type: 'card.unarchive', cardId: card.id, columnId: column.id, position: a.position ?? END }, aiOrigin(ctx));
-      else
-        router.handle(
-          { type: 'card.move', cardId: card.id, columnId: column.id, position: a.position ?? END, cancelChildren: a.cancel_subtasks },
-          aiOrigin(ctx),
-        );
+      // revisão independente (#1324): o veredito válido fecha a sub-tarefa e a história só sai com a última rodada APROVADO
+      let recorded = false;
+      if (isClosingReview(s, card, column)) {
+        const closed = router.closeReviewSubtask(card.id, a.comment);
+        if (!closed.ok) throw new Error(closed.problem);
+        recorded = true;
+      } else if (isLeavingReview(s, card, column)) {
+        const exit = router.reviewExitGate(card.id);
+        if (!exit.ok) {
+          if (exit.block) router.handle({ type: 'card.status.set', cardId: card.id, status: 'blocked', note: exit.reason }, aiOrigin(ctx));
+          throw new Error(exit.reason);
+        }
+      }
+      try {
+        if (card.archivedAt !== null)
+          router.handle({ type: 'card.unarchive', cardId: card.id, columnId: column.id, position: a.position ?? END }, aiOrigin(ctx));
+        else
+          router.handle(
+            { type: 'card.move', cardId: card.id, columnId: column.id, position: a.position ?? END, cancelChildren: a.cancel_subtasks },
+            aiOrigin(ctx),
+          );
+      } catch (e) {
+        if (recorded) router.discardReviewRound(card.id);
+        throw e;
+      }
       // o portão das checagens não move o card: ele fica "Verificando" e a mensagem de conclusão ainda não vale
       const verifying = router.snapshot().cards.find((c) => c.id === card.id)?.status === 'verifying';
+      // o card não saiu da coluna: a rodada só vale quando o fechamento se completa
+      if (verifying && recorded) router.discardReviewRound(card.id);
       // só depois do movimento aceito: a recusa lança antes e a conversa fica como estava
       if (a.comment && !verifying) router.handle({ type: 'comment.add', cardId: card.id, body: a.comment }, aiOrigin(ctx));
       const after = router.snapshot();
