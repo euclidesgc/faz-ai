@@ -340,3 +340,26 @@ economizar tokens.
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
   (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm
   detalhe e só agregam os totais já consolidados.
+
+## Placar da avaliação de modelos
+
+`npm run eval` grava cada rodada num arquivo JSON em `evals/scoreboard/`, com a data e o modelo no nome
+(por exemplo, `2026-10-29T183000Z-claude-opus-medium.json`). É uma medida controlada, com histórias de
+referência, para comparar modelos; não é o consumo do board. Como rodar e como criar histórias de
+referência está em [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+- `summary`: a rodada toda. `accepted` e `acceptanceRate` contam as histórias aceitas; `tokens` soma
+  entrada, leitura de cache, criação de cache e saída, com o `total`; `tokensPerAccepted` divide esse
+  total pelas aceitas; `costUsd` soma o custo que a ferramenta informou; `runs` conta as execuções, e
+  `durationMs`, o tempo de relógio das histórias.
+- `stories`: uma linha por história. `end` diz como ela terminou (`delivered`, quando chegou à
+  Homologação; `blocked`, quando ficou com a pessoa; `timeout`, quando acabou o tempo). `accepted` e
+  `acceptance` (código de saída e tempo dos testes de aceitação) dizem o acerto. Os demais campos são os
+  do `summary`, para a história.
+- `modelMismatches`: quantas execuções rodaram com um modelo diferente do pedido. Se for diferente de
+  zero, a rodada não compara o mesmo modelo.
+- `signals`: `reviewFixes` (commits feitos na Revisão), `testFailures` (`npm test` que falhou) e
+  `commitsAfterPr` (commits depois do pull request). São aproximações, como as do Retrabalho.
+
+Valor não medido aparece como `null`, nunca como zero, e uma soma em que nenhuma execução foi medida
+também é `null`. O custo só existe quando a ferramenta o informa; o Cursor não informa.

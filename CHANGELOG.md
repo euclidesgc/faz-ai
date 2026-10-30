@@ -50,6 +50,7 @@
 - Nova trilha direta: a história da trilha curta com plano de até uns 3 arquivos é implementada pela própria sessão, sem sub-tarefas (#1107).
 - A ferramenta MCP `update_rules` aceita a regra `shortTrack` (#1107).
 - Os commits feitos numa execução do board ganham os trailers `Faz-AI-*` com card, fase e execução (#1101).
+- `npm run eval` avalia um modelo em histórias de referência e grava o placar (#1105).
 
 ### Alterado
 
