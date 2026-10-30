@@ -2356,14 +2356,19 @@ describe('modo autônomo (YOLO)', () => {
     expect(() => router.handle({ type: 'card.yolo.inherit', cardId: card(2).id, fromId: card(1).id })).toThrow('card.yolo.set');
   });
 
-  it('should link the new card to the origin when autonomous_from is used', async () => {
+  it('a história criada com autonomous_from depende da de origem', async () => {
     const story = (await call('create_card', { title: 'Grande', column: 'Discovery' })).data;
     setYolo(1, true);
     const part = (await call('create_card', { title: 'Parte 2', autonomous_from: 1 })).data;
 
-    expect((await call('get_card', { card: 1 })).data.links.related).toMatchObject([{ id: part.id }]);
-    expect((await call('get_card', { card: part.id })).data.links.related).toMatchObject([{ id: story.id }]);
-    expect(router.snapshot().links).toHaveLength(1);
+    // dependência, não só relação: a parte seguinte espera o código da anterior (#1233 começou sem o da #1105)
+    expect((await call('get_card', { card: 1 })).data.links.precedes).toMatchObject([{ id: part.id }]);
+    expect((await call('get_card', { card: part.id })).data.links.dependsOn).toMatchObject([{ id: story.id }]);
+    // na pilha (derived_from da mesma origem), a branch já traz o código da origem: só relacionadas
+    const stacked = (await call('create_card', { title: 'Parte 3', autonomous_from: 1, derived_from: 1 })).data;
+    expect((await call('get_card', { card: stacked.id })).data.links.related).toMatchObject([{ id: story.id }]);
+    expect((await call('get_card', { card: stacked.id })).data.links.dependsOn).toBeUndefined();
+    expect(router.snapshot().links).toHaveLength(2);
   });
 
   it('should not duplicate the link when one already exists between the cards', async () => {

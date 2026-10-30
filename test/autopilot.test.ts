@@ -666,6 +666,23 @@ describe('autopiloto', () => {
     expect(runner.started).toEqual([card(1).id, card(1).id]);
   });
 
+  it('com a pausa da pessoa, a história que a IA cria a partir de outra em modo autônomo espera; a que a pessoa liga religa', () => {
+    create('A', 'PRD');
+    yolo(1);
+    autopilot.pause();
+    // a IA divide a história: a parte nova herda o modo (autonomous_from) e depende da origem
+    create('B', 'Backlog');
+    router.handle({ type: 'card.yolo.inherit', cardId: card(2).id, fromId: card(1).id }, { source: 'ai' });
+    flush();
+    expect(autopilot.isActive).toBe(false);
+    expect(router.snapshot().board.runner.autopilotPaused).toBe(true);
+    // a pessoa liga o modo numa história: é o gesto dela, e ele desfaz a pausa
+    create('C', 'PRD');
+    yolo(3);
+    flush();
+    expect(autopilot.isActive).toBe(true);
+  });
+
   it('fila só de histórias entregues não religa o autopiloto ao abrir o editor', () => {
     create('A', 'Homologação');
     yolo(1);
