@@ -7,7 +7,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { createBoardHost, type BoardHost } from '../src/extension/host/boardHost';
-import { REPLY_BUSY } from '../src/extension/runner';
+import { NOT_SERVING_BOARD, REPLY_BUSY } from '../src/extension/runner';
 
 let root: string;
 let host: BoardHost | undefined;
@@ -31,8 +31,9 @@ afterEach(async () => {
 });
 
 /** Uma história na Implementação com uma sub-tarefa. */
-async function board() {
+async function board(ownsBoard?: () => boolean) {
   host = await createBoardHost({
+    ownsBoard,
     storageDir: path.join(root, 'dados'),
     wasmDir: path.resolve(__dirname, '../node_modules/sql.js/dist'),
     folderPath: path.join(root, 'projeto'),
@@ -76,5 +77,13 @@ it('a resposta à pessoa recusa enquanto outra execução da mesma história est
   vi.spyOn(host!.runner, 'running', 'get').mockReturnValue([sub]);
   const start = vi.spyOn(host!.runner, 'start').mockImplementation(() => {});
   await expect(Promise.resolve(host!.runAi(story, 'reply'))).rejects.toThrow(REPLY_BUSY);
+  expect(start).not.toHaveBeenCalled();
+});
+
+it('a janela que não serve o board recusa chamar a IA, com o motivo, em vez de rodar uma execução sem o board', async () => {
+  const { story, sub } = await board(() => false);
+  const start = vi.spyOn(host!.runner, 'start').mockImplementation(() => {});
+  await expect(Promise.resolve(host!.runAi(sub, 'summarize'))).rejects.toThrow(NOT_SERVING_BOARD);
+  await expect(Promise.resolve(host!.runAi(story))).rejects.toThrow(NOT_SERVING_BOARD);
   expect(start).not.toHaveBeenCalled();
 });

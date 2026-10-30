@@ -56,7 +56,7 @@ import { BaseConflictChecker } from '../baseConflict';
 import { ghProcess } from '../branchRename';
 import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
-import { AiRunner, REPLY_BUSY } from '../runner';
+import { AiRunner, NOT_SERVING_BOARD, REPLY_BUSY } from '../runner';
 import { BOARD_AUTHOR } from '../../shared/gitflow';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
 import { driverFor, driverOf } from '../ai/drivers';
@@ -1237,6 +1237,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       }
     },
     async runAi(cardId: string, mode?: AiRunMode) {
+      if (!ownsNow()) throw new Error(NOT_SERVING_BOARD);
       const s = router.snapshot();
       const card = s.cards.find((c) => c.id === cardId);
       const story = card?.parentId ? s.cards.find((c) => c.id === card.parentId) : card;
