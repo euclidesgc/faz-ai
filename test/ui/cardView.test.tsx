@@ -65,6 +65,16 @@ describe('CardView', () => {
     expect(container.querySelector('article')).not.toHaveClass('mine');
   });
 
+  it('Verificando: rótulo, dono IA, LED verde aceso e sem destaque de pendência com a pessoa', () => {
+    patchCard(board.subId, { status: 'verifying', statusAt: Date.now() });
+    const { container } = show(board.subId);
+    const badge = container.querySelector('.status-badge')!;
+    expect(badge).toHaveTextContent('Pendência com a IA: Verificando');
+    expect(badge.getAttribute('title')).toContain('O board está rodando as checagens da coluna');
+    expect(container.querySelector('.ai-led')).toHaveClass('working');
+    expect(container.querySelector('article')).not.toHaveClass('mine');
+  });
+
   it('bloqueado mostra o motivo no tooltip do status', () => {
     patchCard(board.subId, { status: 'blocked', statusReason: 'Falta a chave da API', statusAt: Date.now() });
     const { container } = show(board.subId);

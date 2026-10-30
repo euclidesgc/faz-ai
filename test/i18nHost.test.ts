@@ -296,7 +296,8 @@ describe('i18n dos rótulos compartilhados (src/shared)', () => {
   it('as traduções saem em inglês, sem sobra de português', () => {
     setLocale('en');
     expect(t(THEMES[1]!.label)).toBe('Light');
-    expect(t(CARD_STATUSES[2]!.label)).toBe('Waiting for answer');
+    expect(t(CARD_STATUSES[2]!.label)).toBe('Verifying');
+    expect(t(CARD_STATUSES[3]!.label)).toBe('Waiting for answer');
     expect(t(OWNER_LABEL.human)).toBe('with you');
     expect(t(HARNESS_KINDS[3]!.label)).toBe('Subagents');
     expect(t(HARNESS_SCOPES[1]!.label)).toBe('Global');
