@@ -1,7 +1,13 @@
 import { renderThemed } from './setup';
 import { afterEach, describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { EMPTY_REWORK, type MetricsPanelResult, type MetricsPanelSections, type MetricsRework } from '../../src/shared/metrics';
+import {
+  EMPTY_REWORK,
+  type MetricsPanelResult,
+  type MetricsPanelSections,
+  type MetricsRework,
+  type MetricsUnfinishedRow,
+} from '../../src/shared/metrics';
 
 // Os sinais da IA (#605) zerados: as telas deles são de outra sub-tarefa.
 const noSignals = EMPTY_REWORK.aiSignals;
@@ -123,6 +129,71 @@ describe('bloco Retrabalho', () => {
     show({ ...EMPTY_REWORK, aiSignals: { ...EMPTY_REWORK.aiSignals, bashRuns: 1 } });
     expect(screen.queryByText('Nenhuma revisão nem história concluída neste período.')).toBeNull();
     expect(screen.getAllByText('0 em 0 execuções (autônomas: 0)')).toHaveLength(2);
+  });
+
+  it('retrabalho por agente: agente vazio aparece como "sem agente"', () => {
+    show({
+      phases: [{ phase: 'PRD', reviews: 3, approved: 1, adjusted: 2, resolved: 0, firstPass: 0, ...noSignals }],
+      models: [],
+      agents: [
+        { agent: 'backend-node', reviews: 2, adjusted: 1 },
+        { agent: '', reviews: 1, adjusted: 1 },
+      ],
+      unfinished: EMPTY_REWORK.unfinished,
+      escapes: EMPTY_REWORK.escapes,
+      aiSignals: EMPTY_REWORK.aiSignals,
+    });
+    const byAgent = screen.getByRole('table', { name: 'Retrabalho por agente' });
+    const backend = within(byAgent).getByRole('row', { name: /backend-node/ });
+    expect(
+      within(backend)
+        .getAllByRole('cell')
+        .map((c) => c.textContent),
+    ).toEqual(['2', '1']);
+    expect(within(byAgent).getByRole('rowheader', { name: 'sem agente' })).toBeInTheDocument();
+  });
+
+  it('execuções sem resultado por modelo e por agente, com o detalhe no title e o aviso de aproximação', () => {
+    const row = (
+      value: string,
+      runs: number,
+      unfinished: number,
+      failed: number,
+      timeout: number,
+      stopped: number,
+    ): MetricsUnfinishedRow => ({
+      value,
+      runs,
+      unfinished,
+      failed,
+      timeout,
+      stopped,
+    });
+    show({
+      phases: [{ phase: 'PRD', reviews: 1, approved: 1, adjusted: 0, resolved: 1, firstPass: 1, ...noSignals }],
+      models: [],
+      agents: [],
+      unfinished: { models: [row('opus', 10, 3, 1, 1, 1)], agents: [row('', 4, 1, 0, 1, 0)] },
+      escapes: EMPTY_REWORK.escapes,
+      aiSignals: EMPTY_REWORK.aiSignals,
+    });
+    const byModel = screen.getByRole('table', { name: 'Execuções sem resultado por modelo' });
+    expect(within(byModel).getByRole('rowheader', { name: 'opus' })).toBeInTheDocument();
+    const cell = within(byModel).getByText('3 de 10');
+    expect(cell).toHaveAttribute('title', 'falhou: 1; tempo esgotado: 1; interrompida: 1');
+    const byAgent = screen.getByRole('table', { name: 'Execuções sem resultado por agente' });
+    expect(within(byAgent).getByRole('rowheader', { name: 'sem agente' })).toBeInTheDocument();
+    expect(within(byAgent).getByText('1 de 4')).toHaveAttribute('title', 'falhou: 0; tempo esgotado: 1; interrompida: 0');
+    expect(screen.getByText(/Execuções sem resultado são uma aproximação/)).toBeInTheDocument();
+  });
+
+  it('só com execuções sem resultado, o bloco não diz que está vazio', () => {
+    show({
+      ...EMPTY_REWORK,
+      unfinished: { models: [{ value: 'opus', runs: 2, unfinished: 1, failed: 1, timeout: 0, stopped: 0 }], agents: [] },
+    });
+    expect(screen.queryByText('Nenhuma revisão nem história concluída neste período.')).toBeNull();
+    expect(screen.getByRole('table', { name: 'Execuções sem resultado por modelo' })).toBeInTheDocument();
   });
 
   it('em inglês', () => {

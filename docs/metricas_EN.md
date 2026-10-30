@@ -283,6 +283,18 @@ and also in the board opened in the browser.
   apply only to Claude Code since Bash commands started being recorded, and the Review phase is
   recognized by its name. With no run with recorded Bash in the period, the signal is "not measured",
   not zero.
+- **Rework by agent** ("Retrabalho por agente"). A table with the reviews asked and the change requests
+  of each agent, by the run that asked for the review. Right below, **Runs without a result** by model
+  and by agent, in the format `3 of 10` (how many of those runs ended without a result, out of how many
+  ran). It counts failure, timeout and interruption; it is an approximation, because an interrupted run
+  may have left useful work behind. Runs in progress are not counted.
+- **Cost per delivery** ("Custo por entrega"). The tokens of the stories completed in the period: a
+  summary with the completed stories and those with measured tokens, the table by type and effort
+  (mean and median per story), and the tables by type and model and by type and agent, with tokens per
+  story and change requests. A story that used more than one model or agent appears under each of them,
+  so the model and agent rows do not add up to the total. Only stories whose runs the kept detail still
+  has are counted, and the type and effort are the story's current values. Tokens without a measure
+  show as "not measured".
 
 ### Retention and notes
 

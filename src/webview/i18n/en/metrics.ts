@@ -188,6 +188,15 @@ export const metrics: Record<string, string> = {
   'nenhuma história concluída no período': 'no story done in the period',
   'Retrabalho por fase': 'Rework by phase',
   'Retrabalho por modelo': 'Rework by model',
+  'Retrabalho por agente': 'Rework by agent',
+  'sem agente': 'no agent',
+  'Execuções sem resultado por modelo': 'Runs without a result by model',
+  'Execuções sem resultado por agente': 'Runs without a result by agent',
+  'Sem resultado': 'No result',
+  'falhou: {failed}; tempo esgotado: {timeout}; interrompida: {stopped}': 'failed: {failed}; timed out: {timeout}; stopped: {stopped}',
+  '{n} de {runs}': '{n} of {runs}',
+  'Execuções sem resultado são uma aproximação: falha, tempo esgotado ou interrupção. Uma execução interrompida pode ter deixado trabalho útil. As execuções em andamento não entram na conta.':
+    'Runs without a result are an approximation: failure, timeout or interruption. An interrupted run may have left useful work. Runs still in progress are not counted.',
   'Revisões pedidas': 'Reviews requested',
   '{n} de {total}': '{n} of {total}',
   'Conta só a resposta de uma pessoa: aprovar ou pedir ajustes. A aprovação automática do modo autônomo não é revisão. "De primeira" é a primeira resposta da pessoa àquele card naquela fase; o ajuste conta para o modelo da execução que pediu a revisão.':
@@ -320,4 +329,25 @@ export const metrics: Record<string, string> = {
     'No category has measured cost in this period, so there are no bars to draw. Choose another measure or read the numbers in the table.',
   'Nenhuma categoria tem tokens medidos neste período, então não há barras para desenhar. Escolha outra medida ou leia os números na tabela.':
     'No category has measured tokens in this period, so there are no bars to draw. Choose another measure or read the numbers in the table.',
+  'Nenhuma história concluída neste período.': 'No story done in this period.',
+  'Histórias concluídas': 'Done stories',
+  'Histórias com tokens medidos': 'Stories with measured tokens',
+  Histórias: 'Stories',
+  Medidas: 'Measured',
+  Esforço: 'Effort',
+  'Tokens por história': 'Tokens per story',
+  'Custo por entrega': 'Cost per delivery',
+  'Custo por entrega por tipo e esforço': 'Cost per delivery by type and effort',
+  'Custo por entrega por tipo e modelo': 'Cost per delivery by type and model',
+  'Custo por entrega por tipo e agente': 'Cost per delivery by type and agent',
+  'Os tokens das histórias concluídas no período, por tipo, esforço, modelo e agente.':
+    'The tokens of the stories done in the period, by type, effort, model and agent.',
+  'Só entram as histórias concluídas cujas execuções o detalhe ainda guarda: com a retenção, histórias antigas ficam fora destas tabelas.':
+    'Only done stories whose runs the detail still keeps are counted: with retention, older stories are left out of these tables.',
+  'O tipo e o esforço são os valores atuais da história, não os de quando ela foi executada.':
+    'The type and effort are the current values of the story, not those from when it ran.',
+  'Uma história que usou mais de um modelo ou agente aparece em cada um deles, então as linhas de modelo e de agente não somam o total.':
+    'A story that used more than one model or agent shows up under each of them, so the model and agent rows do not add up to the total.',
+  'Linhas além do limite de {cap} por tabela ficaram de fora: {n} no total.':
+    'Rows beyond the limit of {cap} per table were left out: {n} in total.',
 };
