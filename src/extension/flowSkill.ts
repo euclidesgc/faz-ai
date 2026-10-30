@@ -276,13 +276,18 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
    do board, e pare: o board a executa e chama você de novo e escolhe o modelo do revisor (outro, nunca o barato): não defina \`Modelo\` nela. Sem o agente, revise você mesmo. Se a conversa disser que não houve revisor independente, registre isso no "Como revisar" do pull request. Além dos defeitos,
    procure o código que só passa no teste: teste novo que já passa no commit base, teste existente
    alterado junto com o código que ele cobre, try/catch que engole erro, cast forçado e acoplamento
-   novo entre módulos.
+   novo entre módulos. O relatório da sub-tarefa (achados, \`Não checado\`, \`VEREDITO\`) está na nota de revisão do \`get_card\` dela.
 3. Trate cada achado. O que tem diretriz clara (regra do projeto, padrão já usado no código, teste
    que falha) você corrige agora (ou cria uma sub-tarefa de correção com o especialista e para, para o board executá-la; o board sobe o modelo dela sozinho quando uma checagem falha, e você não escolhe modelo para ela) e registra na conversa. O que é ambíguo
    ou muda o comportamento combinado é decisão da pessoa: \`ask_questions\` e pare (no modo autônomo,
    decida pelo padrão do projeto e pelo caminho menos complexo, registre e siga).
+   O veredito manda na rodada: \`APROVADO\` segue para o passo 4; \`REPROVADO\` ou \`NÃO COMPROVADO\` não. Nesse caso
+   corrija os achados (ou confira você mesmo o que ficou não checado) e crie a sub-tarefa de revisão da rodada
+   seguinte, cuja descrição traz o bloco \`Rodada N\` com os achados anteriores. Depois de três rodadas sem
+   \`APROVADO\`, o board bloqueia a história e a pessoa decide.
 4. Rode as checagens de novo, faça o commit, registre o resultado na conversa (ele alimenta o "Como
-   revisar" do pull request) e mova a história para a próxima coluna.
+   revisar" do pull request) e mova a história para a próxima coluna. Com a revisão do \`revisor-de-codigo\`,
+   só o \`APROVADO\` da última rodada libera a saída: sem ele, o board recusa o movimento.
 
 ## Homologação
 

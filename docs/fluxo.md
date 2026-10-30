@@ -114,12 +114,17 @@ do código rápida depois:
   a parte anterior ainda não tem branch, a derivada espera por ela antes de criar a sua.
 - **Revisão antes do pull request.** Depois da Implementação, a coluna **Revisão** roda as checagens
   do projeto (typecheck, lint, testes e build, como o projeto os define) e revisa o diff da história
-  com um olhar independente: delega ao agente `revisor-de-codigo`, numa sessão nova, quando ele está
+  com um olhar independente: cria uma sub-tarefa de revisão com o agente `revisor-de-codigo`, que o board executa numa sessão nova, quando ele está
   entre os agentes do board. Além dos defeitos, a revisão procura o código que só passa no teste
   (teste novo que já passava antes da mudança, teste alterado junto com o código que ele cobre,
   try/catch que engole erro, cast forçado, acoplamento novo). O que tem diretriz clara é corrigido na
   hora; o que é ambíguo ou muda o comportamento combinado vira pergunta para você, e a IA para. A
   coluna não pede aprovação: o resultado fica na conversa e entra no **Como revisar** do PR.
+  A revisão independente fecha com um veredito, na última linha do relatório: **APROVADO**, **REPROVADO** ou
+  **NÃO COMPROVADO** (um item que a revisão não conseguiu checar). Só o **APROVADO** da última rodada deixa a
+  história sair da Revisão. Um veredito diferente cria a rodada seguinte, numa sub-tarefa nova que traz os
+  achados da anterior, e a história não sai. A terceira rodada sem APROVADO bloqueia a história para a
+  pessoa decidir. Sem o agente `revisor-de-codigo`, não há rodadas nem essa trava.
   O modelo dessa revisão quem escolhe é o board, não a IA: um agente pronto diferente do que implementou
   a história ou, se só há um, outro modelo dele, nunca o nível barato. Se você fixou o **Modelo do
   revisor** em Conectar agentes, ele vale quando nenhum dos dois existe. Sem revisor independente, a

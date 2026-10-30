@@ -459,11 +459,13 @@ export class CardRepo {
     return ids;
   }
 
-  /** gate_runs e model_escalations não têm chave estrangeira: o registro sai junto com o card. */
+  /** gate_runs, model_escalations e review_rounds não têm chave estrangeira: o registro sai junto com o card. */
   private deleteGateRuns(cardIds: string[]): void {
     for (const id of cardIds) {
       run(this.db, 'DELETE FROM gate_runs WHERE card_id = ?', [id]);
       new EscalationRepo(this.db).deleteForCard(id);
+      // as rodadas da revisão (sem chave estrangeira): as da história e as da sub-tarefa
+      run(this.db, 'DELETE FROM review_rounds WHERE story_id = ? OR subtask_id = ?', [id, id]);
     }
   }
 

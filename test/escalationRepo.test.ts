@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import initSqlJs, { type Database } from 'sql.js';
 import { openInMemory } from '../src/extension/db/database';
-import { DOWN_MIGRATIONS, migrate, migrateDown, SCHEMA_VERSION } from '../src/extension/db/schema';
+import { DOWN_MIGRATIONS, migrate, migrateDown } from '../src/extension/db/schema';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { CardRepo } from '../src/extension/repositories/cardRepo';
 import { EscalationRepo } from '../src/extension/repositories/escalationRepo';
@@ -92,20 +92,20 @@ describe('migração → model_escalations', () => {
   it('cria a tabela vazia, preserva os dados antigos e desce removendo-a', async () => {
     const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
     const old = new SQL.Database();
-    migrate(old, SCHEMA_VERSION - 1);
+    migrate(old, 55);
     old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
     const has = () => old.exec("SELECT COUNT(*) FROM sqlite_master WHERE name = 'model_escalations'")[0]!.values[0]![0];
     expect(has()).toBe(0);
 
-    migrate(old);
+    migrate(old, 56);
 
-    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe('56');
     expect(has()).toBe(1);
     expect(old.exec('SELECT COUNT(*) FROM model_escalations')[0]!.values[0]![0]).toBe(0);
     expect(old.exec('SELECT name FROM boards')[0]!.values).toEqual([['Projeto']]);
 
-    expect(DOWN_MIGRATIONS[SCHEMA_VERSION]).toBeDefined();
-    migrateDown(old, SCHEMA_VERSION - 1);
+    expect(DOWN_MIGRATIONS[56]).toBeDefined();
+    migrateDown(old, 55);
     expect(has()).toBe(0);
     expect(old.exec('SELECT name FROM boards')[0]!.values).toEqual([['Projeto']]);
   });

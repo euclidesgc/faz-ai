@@ -44,6 +44,15 @@ import { BOARD_AUTHOR } from '../../shared/gitflow';
 import { applyPending, onGateFailed, type EscalationDeps } from '../modelEscalation';
 import { EscalationRepo } from '../repositories/escalationRepo';
 import { applyReviewerModel } from '../reviewerModelApply';
+import {
+  appendRoundBlock,
+  closeReviewSubtask,
+  discardRound,
+  storyExitGate,
+  type CloseResult,
+  type ExitResult,
+  type ReviewRoundDeps,
+} from '../reviewRoundApply';
 import type { AttachmentStore } from '../attachments';
 import { runUnsupported } from '../headless';
 import { catalogTool, isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
@@ -1016,6 +1025,31 @@ export class MessageRouter {
   applyReviewerModelToNewCard(cardId: string, aiSetModel = false): void {
     applyReviewerModel({ ctx: this.ctx, log: this.escalation.log }, cardId, aiSetModel);
     this.changed();
+  }
+
+  /** O bloco "Rodada N" da revisão 2+ que o create_card acabou de criar (#1324). Nunca lança. */
+  appendReviewRoundBlock(cardId: string): void {
+    appendRoundBlock(this.reviewRoundDeps(), cardId);
+    this.changed();
+  }
+
+  /** O veredito do comment fecha a sub-tarefa de revisão e grava a rodada, ou diz o motivo da recusa (#1324). */
+  closeReviewSubtask(cardId: string, comment: string | undefined): CloseResult {
+    return closeReviewSubtask(this.reviewRoundDeps(), cardId, comment);
+  }
+
+  /** Desfaz a rodada gravada quando o movimento da sub-tarefa não se completou (#1324). */
+  discardReviewRound(cardId: string): void {
+    discardRound(this.reviewRoundDeps(), cardId);
+  }
+
+  /** O portão de saída da história da Revisão: a última rodada precisa ser APROVADO (#1324). */
+  reviewExitGate(storyId: string): ExitResult {
+    return storyExitGate(this.reviewRoundDeps(), storyId);
+  }
+
+  private reviewRoundDeps(): ReviewRoundDeps {
+    return { ctx: this.ctx, log: this.escalation.log, state: () => this.snapshot() };
   }
 
   /**

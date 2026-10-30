@@ -122,13 +122,18 @@ code review quick later:
   story waits for it before creating its own.
 - **Review before the pull request.** After Implementação, the **Revisão** (review) column runs the
   project's checks (typecheck, lint, tests and build, as the project defines them) and reviews the
-  story's diff with independent eyes: it delegates to the `revisor-de-codigo` agent, in a new
-  session, when that agent is among the board's agents. Besides defects, the review looks for code
+  story's diff with independent eyes: it creates a review sub-task with the `revisor-de-codigo` agent,
+  which the board runs in a new session, when that agent is among the board's agents. Besides defects, the review looks for code
   that only passes the test (a new test that already passed before the change, a test changed
   together with the code it covers, a try/catch that swallows errors, a forced cast, new coupling).
   What has a clear guideline is fixed right away; what is ambiguous or changes the agreed behavior
   becomes a question for you, and the AI stops. The column doesn't ask for approval: the result stays
   in the conversation and goes into the PR's **Como revisar** (how to review).
+  The independent review ends with a verdict, on the report's last line: **APROVADO** (approved),
+  **REPROVADO** (rejected) or **NÃO COMPROVADO** (not proven, an item the review couldn't check). Only the
+  last round's **APROVADO** lets the story leave Revisão. Any other verdict creates the next round, in a new
+  sub-task that carries the earlier findings, and the story doesn't leave. The third round without APROVADO
+  blocks the story for you to decide. Without the `revisor-de-codigo` agent, there are no rounds and no such gate.
   The board, not the AI, picks this review's model: a ready agent different from the one that implemented
   the story or, if there is only one, another model of it, never the cheap tier. If you set the **Modelo
   do revisor** (reviewer model) in Connect agents, it applies when neither exists. Without an independent
