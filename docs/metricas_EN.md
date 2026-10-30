@@ -67,7 +67,12 @@ reuse the same ownership. After confirmed termination, the previous configuratio
 preserving servers added by the person. Conflicting changes to the `faz-ai` entry or invalid JSON
 are not overwritten. When the CLI exits, the board ends what it left in its process group (the
 `cursor-agent` leaves a `worker-server` with language servers that would live for minutes) and waits up
-to 5 s for the group to end. Without confirmation that the process tree has ended, the lease is retained and
+to 5 s for the group to end. What the CLI starts in a new group (Claude Code puts each terminal command
+in a group of its own) escapes that signal: if the command dies midway, the processes it started are
+left orphaned. So the board records every 10 s the CLI descendants outside its group and, on Stop or
+when the CLI exits, ends the recorded ones still alive (SIGTERM and, 1 s later, SIGKILL), along with
+the orphans of a recorded group; a PID reused by another process, with a different start, is never
+signaled. Without confirmation that the process tree has ended, the lease is retained and
 a new run on that file is refused. The launcher receives the CLI command only after its identity is
 journaled. On startup, a demonstrably dead owner allows recovery of preparations whose command was
 never released and recorded process groups with confirmed termination. Old or ambiguous journals

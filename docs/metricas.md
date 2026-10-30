@@ -67,7 +67,12 @@ formato reutilizam a mesma posse. Ao terminar com confirmação, o arquivo volta
 preservando servidores acrescentados pela pessoa. Alterações conflitantes da entrada `faz-ai` ou JSON
 inválido não são sobrescritos. Quando a CLI sai, o board encerra o que ela deixou no grupo de processos
 (o `cursor-agent` deixa um `worker-server` com servidores de linguagem, que viveria minutos) e espera
-até 5 s pelo fim do grupo. Sem confirmação do fim da árvore de processos, o empréstimo fica
+até 5 s pelo fim do grupo. O que a CLI abre num grupo novo (o Claude Code põe cada comando do terminal
+num grupo próprio) escapa desse sinal: se o comando cai no meio, os processos que ele iniciou ficam
+órfãos. Por isso o board anota a cada 10 s os descendentes da CLI que estão fora do grupo dela e, ao
+Parar ou quando a CLI sai, encerra os anotados que continuam vivos (SIGTERM e, 1 s depois, SIGKILL),
+junto com os órfãos de um grupo anotado; um PID reutilizado por outro processo, de início diferente,
+nunca é sinalizado. Sem confirmação do fim da árvore de processos, o empréstimo fica
 retido e uma nova execução no mesmo arquivo é recusada. O launcher recebe o comando da CLI somente
 depois de sua identidade ser gravada no diário. Na abertura, um dono comprovadamente morto permite
 recuperar preparações sem comando liberado e grupos registrados cujo término foi confirmado.
