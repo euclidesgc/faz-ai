@@ -87,6 +87,8 @@ export function applyReviewStatus(
 function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author: string, byAi: boolean): void {
   const note = msg.note?.trim() ?? '';
   if (msg.status === 'approved' && byAi) throw new Error('Só uma pessoa pode aprovar um card.');
+  // "Verificando" só nasce do portão (`startGate`): a IA que se pusesse nele travaria o card sem execução alguma
+  if (msg.status === 'verifying' && byAi) throw new Error('Só o board põe um card em "Verificando", ao rodar as checagens da coluna.');
   if (msg.status === 'blocked' && !note) throw new Error('Informe o motivo do bloqueio.');
   // a devolução do status anterior (`restore` do runner) só grava o status: não é aprovação nova, então não
   // dispara o merge nem avança a história, e não mexe no modo autônomo (#1102). Também não passa pelo portão

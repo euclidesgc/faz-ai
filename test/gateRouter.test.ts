@@ -113,6 +113,18 @@ describe('gatilho do portão: card.move da IA', () => {
   });
 });
 
+describe('status "Verificando"', () => {
+  it('a IA não põe o card em "Verificando" pelo card.status.set: só o portão faz isso', () => {
+    withChecks('Implementação');
+    create('H', 'Implementação');
+    ai({ type: 'card.status.set', cardId: card(1).id, status: 'running' });
+    expect(() => ai({ type: 'card.status.set', cardId: card(1).id, status: 'verifying' })).toThrow(/Verificando/);
+    expect(card(1).status).toBe('running');
+    expect(gateOf(1)).toHaveLength(0);
+    expect(fired).toHaveLength(0);
+  });
+});
+
 describe('gatilho do portão: request_review', () => {
   it('grava o resumo na conversa antes do portão e não entrega o card', () => {
     withChecks('Implementação');

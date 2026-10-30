@@ -98,6 +98,10 @@ describe('expandCommand', () => {
   it('um nome com $& ou cifrão não vira padrão de troca', () => {
     expect(expandCommand('x {changed_files}', { base: 'b', changedFiles: ['$&.ts'] })).toBe("x '$&.ts'");
   });
+
+  it('um arquivo com marcador no nome não tira a base das aspas', () => {
+    expect(expandCommand('lint {changed_files}', { base: '$(touch${IFS}x)', changedFiles: ['a{base}b.ts'] })).toBe("lint 'a{base}b.ts'");
+  });
 });
 
 describe('tailOf', () => {
