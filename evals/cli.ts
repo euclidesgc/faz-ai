@@ -11,7 +11,7 @@ import { parseModel } from './lib/evalBoard';
 import { openHostBoard } from './lib/hostBoard';
 import { runStory } from './lib/runStory';
 import { scoreStory, summarize, writeScoreboard, type StoryScore } from './lib/scoreboard';
-import { loadStories, prepareProject, runAcceptance, type AcceptanceResult } from './lib/stories';
+import { loadStories, prepareProject, runAcceptance, UnknownStoryError, type AcceptanceResult } from './lib/stories';
 
 const ROOT = path.resolve(__dirname, '..', '..');
 
@@ -20,7 +20,7 @@ const HELP = `Avaliação de modelos do Faz AI: roda as histórias de referênci
 Uso: npm run eval -- --model <perfil>:<modelo>@<esforço> [opções]
 
   --model <valor>     modelo avaliado, por exemplo claude:opus@medium (obrigatória)
-  --stories <a,b>     só estas histórias (padrão: todas de evals/stories)
+  --story <a,b>       só estas histórias (padrão: todas de evals/stories); --stories também vale
   --timeout <min>     tempo limite por história, em minutos (padrão: o da história)
   --keep              mantém a pasta temporária de cada história e mostra o caminho
   --out <pasta>       onde gravar o placar (padrão: evals/scoreboard)
@@ -48,7 +48,7 @@ function parseArgs(args: string[]): Options {
     return v;
   };
   const model = value('--model');
-  const stories = value('--stories');
+  const stories = value('--story') ?? value('--stories');
   const timeout = value('--timeout');
   const out = value('--out');
   const keep = rest.includes('--keep');
@@ -98,7 +98,14 @@ async function main(): Promise<number> {
     return 1;
   }
   const config = parseModel(opts.model);
-  const stories = loadStories(path.join(ROOT, 'evals', 'stories'), opts.stories);
+  let stories;
+  try {
+    stories = loadStories(path.join(ROOT, 'evals', 'stories'), opts.stories);
+  } catch (err) {
+    if (!(err instanceof UnknownStoryError)) throw err;
+    process.stderr.write(`eval: ${err.message}\n`);
+    return 2;
+  }
   if (stories.length === 0) throw new Error('Nenhuma história de referência em evals/stories.');
 
   let interrupted = false;
@@ -117,6 +124,7 @@ async function main(): Promise<number> {
       prepareProject(story, path.join(root, 'project'));
       const board = await openHostBoard(root, config, (line) => process.stdout.write(`   ${line}\n`));
       current = board.autopilot;
+      const { router } = board;
       const periodStart = Date.now();
       let closed = false;
       try {
@@ -127,12 +135,20 @@ async function main(): Promise<number> {
           break;
         }
         const acceptance: AcceptanceResult | null = run.end === 'delivered' ? await runAcceptance(story, board.projectDir) : null;
+        // os documentos da fase moram no card da história: confere pelo nome, antes de fechar o board
+        const have = new Set(
+          router
+            .snapshot()
+            .attachments.filter((a) => a.artifact)
+            .map((a) => a.filename),
+        );
+        const missingArtifacts = run.end === 'delivered' ? story.requiredArtifacts.filter((f) => !have.has(f)) : [];
         closed = true;
         const log = await board.close({ start: periodStart, end: Date.now() });
-        const score = scoreStory(story, run, log, acceptance, config);
+        const score = scoreStory(story, run, log, acceptance, config, missingArtifacts);
         scores.push(score);
         process.stdout.write(
-          `${story.id}: ${score.accepted ? 'aceita' : 'não aceita'} (${score.end}) em ${Math.round(score.durationMs / 1000)} s, ${score.runs} execução(ões)\n`,
+          `${story.id}: ${score.accepted ? 'aceita' : 'não aceita'} (${score.end}${score.missingArtifacts.length > 0 ? `; faltam os anexos ${score.missingArtifacts.join(', ')}` : ''}) em ${Math.round(score.durationMs / 1000)} s, ${score.runs} execução(ões)\n`,
         );
       } finally {
         if (!closed) await board.close({ start: periodStart, end: Date.now() }).catch(() => undefined);
