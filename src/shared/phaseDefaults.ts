@@ -589,9 +589,23 @@ const REVIEW_GATE_NEW =
 const reviewGate = (name: string, d: PhaseDefault): PhaseDefault =>
   name === 'Revisão' ? { ...d, instruction: d.instruction.replace(REVIEW_GATE_RERUN, REVIEW_GATE_NEW) } : d;
 
-/** Os textos padrão atuais (versão 19): os da versão 18 com o portão de checagens na Revisão. */
-export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+/** Os textos padrão da versão 19: os da versão 18 com o portão de checagens na Revisão. */
+const PHASE_DEFAULTS_V19: Record<string, PhaseDefault> = Object.fromEntries(
   Object.entries(PHASE_DEFAULTS_V18).map(([name, d]) => [name, reviewGate(name, d)]),
+);
+
+// A versão 20 diz que o board escolhe o modelo do revisor (outro, nunca o barato) e que a IA não o define; sem revisor
+// independente, a Revisão registra isso no "Como revisar".
+const REVIEWER_MODEL_OLD =
+  'delegue ao agente revisor-de-codigo, se ele estiver nos agentes do board, numa sessão nova; senão, revise você mesmo pelo mesmo roteiro.';
+const REVIEWER_MODEL_NEW =
+  'delegue ao agente revisor-de-codigo, se ele estiver nos agentes do board, numa sessão nova: o board escolhe o modelo do revisor (outro, nunca o barato), então não defina Modelo na sub-tarefa; senão, revise você mesmo pelo mesmo roteiro. Se a conversa disser que não houve revisor independente, registre isso no "Como revisar".';
+const reviewerModel = (name: string, d: PhaseDefault): PhaseDefault =>
+  name === 'Revisão' ? { ...d, instruction: d.instruction.replace(REVIEWER_MODEL_OLD, REVIEWER_MODEL_NEW) } : d;
+
+/** Os textos padrão atuais (versão 20): os da versão 19 com o modelo do revisor escolhido pelo board na Revisão. */
+export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+  Object.entries(PHASE_DEFAULTS_V19).map(([name, d]) => [name, reviewerModel(name, d)]),
 );
 
 /** Textos padrão anteriores de uma fase e o que a versão atual traz de novo, para a atualização do board. */
@@ -639,10 +653,14 @@ export const PHASE_HISTORY: Record<string, PhaseHistory> = {
       'na trilha curta, com plano de até uns 3 arquivos, o plano é registrado e a história é implementada sem sub-tarefas; a descrição de cada sub-tarefa passa a ter as seções Objetivo, Pronto quando, Pode tocar e Não pode tocar (Decisões anteriores é opcional), com o esqueleto no modelo do plano, e o board confere as quatro obrigatórias antes de executar; as sub-tarefas passam a ser a menor parte da entrega que se verifica sozinha: as pequenas da mesma área e do mesmo agente se juntam, e a documentação pequena vai com a última de código; o plano parte do DISCOVERY quando a história veio pela trilha curta, sem PRD nem Spec; o documento perde a seção "Perguntas para você": as dúvidas com alternativas vão por ask_questions antes de escrevê-lo',
   },
   Revisão: {
-    instructions: [PHASE_DEFAULTS_V12.Revisão!.instruction, PHASE_DEFAULTS_V18.Revisão!.instruction],
+    instructions: [
+      PHASE_DEFAULTS_V12.Revisão!.instruction,
+      PHASE_DEFAULTS_V18.Revisão!.instruction,
+      PHASE_DEFAULTS_V19.Revisão!.instruction,
+    ],
     templates: [],
     change:
-      'o achado que muda o comportamento combinado vira pergunta por ask_questions; se a coluna tem checagens, o board as roda ao mover a história, o card vai a Verificando (a IA para) e, se falharem, volta para ready com a saída na conversa',
+      'o achado que muda o comportamento combinado vira pergunta por ask_questions; se a coluna tem checagens, o board as roda ao mover a história, o card vai a Verificando (a IA para) e, se falharem, volta para ready com a saída na conversa; o board escolhe o modelo do revisor (outro, nunca o barato) e a sub-tarefa de revisão não define Modelo',
   },
   Implementação: {
     instructions: [IMPLEMENTATION_INSTRUCTION_V5, PHASE_DEFAULTS_V17.Implementação!.instruction],

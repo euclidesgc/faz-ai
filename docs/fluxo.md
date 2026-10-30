@@ -120,6 +120,10 @@ do código rápida depois:
   try/catch que engole erro, cast forçado, acoplamento novo). O que tem diretriz clara é corrigido na
   hora; o que é ambíguo ou muda o comportamento combinado vira pergunta para você, e a IA para. A
   coluna não pede aprovação: o resultado fica na conversa e entra no **Como revisar** do PR.
+  O modelo dessa revisão quem escolhe é o board, não a IA: um agente pronto diferente do que implementou
+  a história ou, se só há um, outro modelo dele, nunca o nível barato. Se você fixou o **Modelo do
+  revisor** em Conectar agentes, ele vale quando nenhum dos dois existe. Sem revisor independente, a
+  conversa diz que a revisão ficou com o mesmo modelo. Ver [Modelo do revisor](configuracoes.md#modelo-do-revisor).
 - **Portão de checagens.** Uma coluna pode ter checagens (nome, comando e tempo limite, em **Configurações › Workflows e colunas**, na coluna **Checagens**). Quando a IA tenta mover o card para a frente ou pedir a revisão dele nessa coluna, o board roda as checagens, em ordem, na pasta da história, e o card fica em **Verificando** até terminar (a IA para). Se todas passarem, o movimento ou o pedido de revisão segue e o commit verificado fica registrado. Se alguma falhar, ou não terminar (tempo esgotado, pasta em uso, sessão da IA que não acaba a tempo), o card volta para **Pronto** com o fim da saída na conversa, e a IA corrige e tenta de novo. Nos comandos, `{base}` vira a branch de base da história e `{changed_files}` a lista dos arquivos alterados em relação a ela. Quando você move o card, ele não passa pelo portão; voltar de coluna ou cancelar também não.
 - **Correção com modelo acima.** Quando o portão falha, o board sobe o modelo da correção um nível sem
   a IA escolher (a escada do agente ou, sem escada, o esforço), e a correção roda de novo. Só a checagem

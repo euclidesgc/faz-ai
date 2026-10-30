@@ -63,6 +63,8 @@
 - Cinco histórias de referência para a avaliação de modelos, com a prova de que o aceite falha sem a solução e passa com ela (#1233).
 - Cada execução grava a classe da falha (transitória, determinística, limite de uso ou interrompida), e `get_metrics` agrupa por `failure_class` (#1099).
 - O painel de Métricas ganha o corte por classe da falha, e a aba Consumo do card, a coluna Classe da falha (#1298).
+- O board escolhe o modelo do revisor da sub-tarefa de Revisão: outro agente ou modelo, nunca o barato (#1111).
+- Configurações › Conectar agentes ganha o campo **Modelo do revisor**, para fixar o modelo quando só há um agente pronto (#1111).
 
 ### Alterado
 
@@ -104,6 +106,7 @@
 - O card selecionado aparece em relevo, com sombra à direita e embaixo.
 - O número do card aberto fica na barra do topo, ao lado do LED.
 - A execução que espera vaga diz quais cards ocupam as vagas, qual é o limite e onde ajustá-lo.
+- A IA não define o modelo da sub-tarefa de Revisão: o board o escolhe, e a conversa registra qual (#1111).
 
 ### Removido
 

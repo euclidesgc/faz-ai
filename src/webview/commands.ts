@@ -223,6 +223,7 @@ export const settings = {
   detectModels: (tool: AiTool) => req({ type: 'settings.models.detect', tool }),
   setModelRules: (rules: ModelRule[]) => req({ type: 'settings.modelRules.set', rules }),
   setModelLadder: (tool: AiTool, ladder: string[]) => req({ type: 'models.ladder.set', tool, ladder }),
+  setReviewerModel: (value: string | null) => req({ type: 'settings.reviewerModel.set', value }),
   suggestModelRules: (tool: AiTool) => req({ type: 'settings.modelRules.suggest', tool }),
 };
 

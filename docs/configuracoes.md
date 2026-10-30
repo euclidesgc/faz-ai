@@ -441,6 +441,30 @@ falhou, a subida vale para a próxima sub-tarefa de correção que a IA criar, c
 registrada na conversa, com o modelo de antes, o de depois e o nome da checagem. Sem nível acima (o topo da
 escada, ou um modelo fora do catálogo), o board só avisa na conversa e a correção segue com o modelo atual.
 
+## Modelo do revisor
+
+A sub-tarefa de **Revisão** de uma história (Fase = Revisão, com o agente `revisor-de-codigo`) não recebe
+o modelo da IA: o board o escolhe quando a IA a cria, para que a revisão seja feita por outro modelo que
+não o da implementação. A ordem é esta, e o primeiro caso que vale decide:
+
+1. um agente pronto diferente do que implementou a história, no modelo de entrada dele (o primeiro que não
+   é o nível barato);
+2. se só há um agente pronto, outro modelo dele que não seja o barato nem o da implementação;
+3. o **Modelo do revisor** que você fixou, se for independente da implementação e não for o barato;
+4. sem revisor independente, o modelo que a sub-tarefa já tinha, se não for o barato; senão o primeiro modelo
+   que não é o barato do agente.
+
+O nível barato é o primeiro degrau da escada do agente (ou, sem escada, o de menor preço de saída, quando
+pelo menos dois modelos do agente têm preço), e o board nunca o escolhe como revisor. Um modelo escolhido à mão no card nunca é trocado. Se a IA passar um
+modelo no campo Modelo da sub-tarefa de Revisão, ele só fica quando já é independente da implementação e não
+é o barato. A conversa do card e da história registra o modelo escolhido, a implementação de referência e o
+motivo, e diz quando não houve revisor independente.
+
+O campo **Modelo do revisor** fica no fim do painel do agente, em **Conectar agentes**, acima de **Sugestão
+de modelo**. Ele vale para o board inteiro, não para um agente só: **Automático** deixa a escolha com o board,
+e um modelo do catálogo (com o esforço que você quiser) entra no caso 3. A dica da tela diz: "Usado quando só
+há um agente pronto; nunca o nível barato." Um modelo que saiu do catálogo volta a **Automático**.
+
 ## Regras de fallback
 
 Quando um modelo esgota o limite de uso (a cota) num card com você no circuito (fora do modo autônomo e

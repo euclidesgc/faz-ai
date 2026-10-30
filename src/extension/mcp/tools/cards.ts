@@ -1,8 +1,9 @@
 import { z } from 'zod';
+import { MODEL_FIELD } from '../../../shared/boardFields';
 import { linkProblem } from '../../../shared/links';
 import { columnsOf } from '../../../shared/selectors';
 import { BRIEF_SECTIONS, REQUIRED_BRIEF_SECTIONS } from '../../../shared/subtaskBrief';
-import { cardStatus, cardSummary, findCard, findColumn, findType } from '../format';
+import { cardStatus, cardSummary, findCard, findColumn, findField, findType } from '../format';
 import { cardArg, fieldsArg } from './args';
 import { END, addChecklist, aiOrigin, detail, findProfile, live, setFields, validateFields } from './helpers';
 import type { DefineTool, ToolContext } from './registry';
@@ -13,7 +14,7 @@ const BRIEF_TITLES = REQUIRED_BRIEF_SECTIONS.join(', ').replace(/, ([^,]*)$/, ' 
 export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
   tool(
     'create_card',
-    `Cria um card. Com \`parent\`, cria uma sub-tarefa daquela história (no workflow filho); sem \`parent\`, cria uma história (no workflow pai). \`profile\` escolhe o agente e \`checklist\` cria os itens na mesma chamada. Devolve o card resumido (mais \`checklistItems\`, com ids, quando criou itens); o detalhe (phase, notas, workspace) vem pelo get_card. Numa sub-tarefa de fase de código, use as seções ${BRIEF_TITLES} (e ${BRIEF_SECTIONS.decisions}, se houver): o board confere antes de executar. O modelo da correção criada depois de uma checagem que falhou é escolhido pelo board.`,
+    `Cria um card. Com \`parent\`, cria uma sub-tarefa daquela história (no workflow filho); sem \`parent\`, cria uma história (no workflow pai). \`profile\` escolhe o agente e \`checklist\` cria os itens na mesma chamada. Devolve o card resumido (mais \`checklistItems\`, com ids, quando criou itens); o detalhe (phase, notas, workspace) vem pelo get_card. Numa sub-tarefa de fase de código, use as seções ${BRIEF_TITLES} (e ${BRIEF_SECTIONS.decisions}, se houver): o board confere antes de executar. O modelo da correção criada depois de uma checagem que falhou é escolhido pelo board. Na sub-tarefa de Revisão o board escolhe o modelo (outro, nunca o barato); não o defina.`,
     {
       title: z.string().min(1),
       description: z.string().optional().describe('Markdown'),
@@ -76,7 +77,14 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       const id = router.createCard({ typeId: type.id, columnId: column.id, parentId: parent?.id ?? null, title: a.title }, aiOrigin(ctx));
       if (a.description) router.handle({ type: 'card.update', cardId: id, patch: { description: a.description } });
       setFields(router, s, id, a.fields, aiOrigin(ctx));
-      if (parent) router.applyEscalationToNewCard(id);
+      if (parent) {
+        router.applyEscalationToNewCard(id);
+        // a IA informou o Modelo: conta como dela (o board o troca se for o barato ou o mesmo do implementador)
+        router.applyReviewerModelToNewCard(
+          id,
+          Object.keys(a.fields ?? {}).some((name) => findField(s, name).name === MODEL_FIELD),
+        );
+      }
       for (const dep of dependsOn) router.handle({ type: 'link.add', fromId: dep.id, toId: id, kind: 'precedes' }, aiOrigin(ctx));
       // a pilha vem antes do modo: a herança decide o vínculo (dependência ou relação) pela origem da pilha
       if (derivedFrom) router.handle({ type: 'card.derive', cardId: id, fromId: derivedFrom.id }, aiOrigin(ctx));

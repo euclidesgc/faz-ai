@@ -15,6 +15,12 @@ describe('conjunto de skills do fluxo (#588)', () => {
     const revisao = FLOW_SKILLS.find((k) => k.name === 'faz-ai-revisao-e-homologacao')!;
     expect(revisao.body).toContain('portão do fluxo');
   });
+  it('a Revisão: o board escolhe o modelo do revisor, a IA não o define, e a falta de revisor independente vai ao "Como revisar" (#1111)', () => {
+    const revisao = FLOW_SKILLS.find((k) => k.name === 'faz-ai-revisao-e-homologacao')!;
+    expect(revisao.body).toContain('escolhe o modelo do revisor (outro, nunca o barato): não defina `Modelo` nela');
+    expect(revisao.body).toContain('não houve revisor independente, registre isso no "Como revisar"');
+    expect(FLOW_SKILL.body).not.toContain('modelo do revisor');
+  });
   it('comando longo roda em segundo plano e é conferido em intervalos curtos, sem espera calada', () => {
     expect(FLOW_SKILL.body).toContain('rode-o em segundo plano com a saída num arquivo');
     expect(FLOW_SKILL.body).toContain('intervalos curtos');
