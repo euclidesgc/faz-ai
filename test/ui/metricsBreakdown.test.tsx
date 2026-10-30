@@ -157,7 +157,13 @@ describe('Breakdown: o seletor e o título', () => {
     renderThemed(
       <Connected
         sections={sectionsWith(
-          cut('failure_class', [cell('', { runs: 9 }), cell('transient', { runs: 3 }), cell('deterministic', { runs: 2 }), cell('budget'), cell('canceled')]),
+          cut('failure_class', [
+            cell('', { runs: 9 }),
+            cell('transient', { runs: 3 }),
+            cell('deterministic', { runs: 2 }),
+            cell('budget'),
+            cell('canceled'),
+          ]),
         )}
       />,
     );

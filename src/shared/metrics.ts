@@ -135,7 +135,16 @@ export interface MetricsPanelResult {
 export type MetricsBreakdownDim = 'phase' | 'card_type' | 'model' | 'tool' | 'mode' | 'effort' | 'profile' | 'failure_class';
 
 /** Na ordem do seletor. */
-export const METRICS_BREAKDOWN_DIMS: MetricsBreakdownDim[] = ['phase', 'card_type', 'model', 'tool', 'mode', 'effort', 'profile', 'failure_class'];
+export const METRICS_BREAKDOWN_DIMS: MetricsBreakdownDim[] = [
+  'phase',
+  'card_type',
+  'model',
+  'tool',
+  'mode',
+  'effort',
+  'profile',
+  'failure_class',
+];
 
 /** As quatro medidas de cada categoria (RF-02). A barra mostra uma; as quatro vão em texto. */
 export type MetricsMeasure = 'cost' | 'tokens' | 'runs' | 'duration';
