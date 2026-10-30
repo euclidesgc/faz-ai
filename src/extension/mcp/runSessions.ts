@@ -232,6 +232,8 @@ export class RunMcpSessions {
       'snapshot',
       'handle',
       'createCard',
+      // só leitura: o id do portão que o move_card/request_review devolve à IA
+      'runningGate',
       'addAttachmentFiles',
       'getAttachment',
       'readHarnessFile',

@@ -35,8 +35,9 @@ export function shellQuote(arg: string): string {
 export function expandCommand(command: string, vars: { base: string; changedFiles: string[] }): string {
   const files = vars.changedFiles.map(shellQuote).join(' ');
   const base = shellQuote(vars.base);
-  // função de troca: um `$&` no nome do arquivo não pode ser lido como padrão do replace
-  return command.replace(/\{changed_files\}/g, () => files).replace(/\{base\}/g, () => base);
+  // uma passada só: um arquivo chamado `{base}` não pode ter o marcador trocado depois, já dentro das aspas dele, o que
+  // tiraria a base das aspas. A função de troca impede que um `$&` no nome seja lido como padrão do replace
+  return command.replace(/\{(changed_files|base)\}/g, (_, name: string) => (name === 'base' ? base : files));
 }
 
 /** O fim da saída de uma checagem: as últimas linhas, limitadas também em caracteres (o que a IA precisa ler). */
