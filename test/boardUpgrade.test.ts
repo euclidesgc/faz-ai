@@ -299,7 +299,7 @@ describe('atualização do board para o padrão atual', () => {
 
   it('versão 10: a Homologação com o texto da 0.39 passa a abrir o pull request com --base em workspace.prBase; a personalizada fica', () => {
     upgradeBoard(db, boardId);
-    expect(BOARD_TEMPLATE_VERSION).toBe(18);
+    expect(BOARD_TEMPLATE_VERSION).toBe(19);
     const settings = new SettingsRepo(db);
     // o texto da versão 9 é o segundo do histórico (o terceiro é o da 14, antes do passo do hotfix)
     const v9 = PHASE_HISTORY['Homologação']!.instructions[1]!;
@@ -443,7 +443,7 @@ describe('atualização do board para o padrão atual', () => {
   });
 
   it('versão 17 (#1110): o Plan pede as seções na descrição da sub-tarefa; o Plan padrão v16 sobe e o personalizado fica', () => {
-    expect(BOARD_TEMPLATE_VERSION).toBe(18);
+    expect(BOARD_TEMPLATE_VERSION).toBe(19);
     const plan = PHASE_DEFAULTS['Plan']!;
     for (const name of REQUIRED_BRIEF_SECTIONS) expect(plan.instruction).toContain(`"${name}"`);
     expect(plan.instruction).toContain(
@@ -521,6 +521,31 @@ describe('atualização do board para o padrão atual', () => {
     expect(pendingUpgrade(db, boardId)).toEqual([]);
     upgradeBoard(db, boardId);
     expect(col('Implementação').aiInstruction).toBe('minha implementação');
+  });
+
+  it('versão 19 (#1274): a Revisão explica o portão e o Verificando; o texto padrão anterior sobe e o personalizado fica', () => {
+    const review = PHASE_DEFAULTS['Revisão']!.instruction;
+    expect(review).toContain('Verificando');
+    expect(review).toContain('pare');
+    expect(review).toContain('volta para ready com a saída na conversa');
+    const history = PHASE_HISTORY['Revisão']!;
+    expect(history.instructions).not.toContain(review);
+    expect(history.instructions.at(-1)).not.toContain('Verificando');
+    expect(history.change).toContain('Verificando');
+
+    upgradeBoard(db, boardId);
+    const settings = new SettingsRepo(db);
+    settings.updateColumn(col('Revisão').id, { aiInstruction: history.instructions.at(-1)! });
+    run(db, 'UPDATE boards SET template_version = 18 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([`Coluna "Revisão": ${history.change}.`]);
+    upgradeBoard(db, boardId);
+    expect(col('Revisão').aiInstruction).toBe(review);
+
+    settings.updateColumn(col('Revisão').id, { aiInstruction: 'minha revisão' });
+    run(db, 'UPDATE boards SET template_version = 18 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+    upgradeBoard(db, boardId);
+    expect(col('Revisão').aiInstruction).toBe('minha revisão');
   });
 
   it('pelo roteador: o board antigo avisa o que muda e é atualizado por mensagem, com cópia de segurança', () => {

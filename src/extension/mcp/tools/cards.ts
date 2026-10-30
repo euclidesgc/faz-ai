@@ -77,8 +77,9 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       if (a.description) router.handle({ type: 'card.update', cardId: id, patch: { description: a.description } });
       setFields(router, s, id, a.fields, aiOrigin(ctx));
       for (const dep of dependsOn) router.handle({ type: 'link.add', fromId: dep.id, toId: id, kind: 'precedes' }, aiOrigin(ctx));
-      if (origin) router.handle({ type: 'card.yolo.inherit', cardId: id, fromId: origin.id }, aiOrigin(ctx));
+      // a pilha vem antes do modo: a herança decide o vínculo (dependência ou relação) pela origem da pilha
       if (derivedFrom) router.handle({ type: 'card.derive', cardId: id, fromId: derivedFrom.id }, aiOrigin(ctx));
+      if (origin) router.handle({ type: 'card.yolo.inherit', cardId: id, fromId: origin.id }, aiOrigin(ctx));
       if (profile) router.handle({ type: 'card.execProfile.set', cardId: id, profileId: profile.id }, aiOrigin(ctx));
       const checklistItems = a.checklist?.length ? addChecklist(router, id, a.checklist) : undefined;
       // o resumo basta para seguir o Plan; o detalhe (phase, notas, workspace) vem pelo get_card
@@ -118,7 +119,7 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'move_card',
-    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto, e um card só avança de uma coluna que exige aprovação (`requiresApproval` em get_board) quando o status dele é "approved". Para uma coluna de conclusão, o checklist do card não pode ter item em aberto: marque com update_checklist_item o que fez e apague com delete_checklist_item o que não se aplica. Um card arquivado é desarquivado ao ser movido. `comment` grava a mensagem de conclusão na conversa depois do movimento (equivale a move_card + add_comment); um movimento recusado não grava nada.',
+    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto, e um card só avança de uma coluna que exige aprovação (`requiresApproval` em get_board) quando o status dele é "approved". Para uma coluna de conclusão, o checklist do card não pode ter item em aberto: marque com update_checklist_item o que fez e apague com delete_checklist_item o que não se aplica. Um card arquivado é desarquivado ao ser movido. `comment` grava a mensagem de conclusão na conversa depois do movimento (equivale a move_card + add_comment); um movimento recusado não grava nada. Ao sair para a frente de uma coluna com checagens (`checks` em get_board) o card não se move na hora: fica em "Verificando" (o resultado traz `gate`), o board roda as checagens e você PARA; passando, o card vai ao destino; falhando, volta para "ready" com o fim da saída na conversa, e o `comment` não é gravado.',
     {
       card: cardArg,
       column: z.string().describe('Nome da coluna de destino'),
@@ -146,8 +147,10 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
           { type: 'card.move', cardId: card.id, columnId: column.id, position: a.position ?? END, cancelChildren: a.cancel_subtasks },
           aiOrigin(ctx),
         );
+      // o portão das checagens não move o card: ele fica "Verificando" e a mensagem de conclusão ainda não vale
+      const verifying = router.snapshot().cards.find((c) => c.id === card.id)?.status === 'verifying';
       // só depois do movimento aceito: a recusa lança antes e a conversa fica como estava
-      if (a.comment) router.handle({ type: 'comment.add', cardId: card.id, body: a.comment }, aiOrigin(ctx));
+      if (a.comment && !verifying) router.handle({ type: 'comment.add', cardId: card.id, body: a.comment }, aiOrigin(ctx));
       const after = router.snapshot();
       const result: Record<string, unknown> = {
         card: cardSummary(
@@ -155,6 +158,14 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
           after.cards.find((c) => c.id === card.id)!,
         ),
       };
+      if (verifying) {
+        const gate = router.runningGate(card.id);
+        if (gate) result.gate = { id: gate.id, status: 'verifying' };
+        result.next =
+          'Pare aqui. O card não se moveu: está em "Verificando" e o board roda as checagens da coluna. Não mova o card nem continue o trabalho dele. Passando, o card vai ao destino; falhando, volta para "ready" com o fim da saída na conversa.' +
+          (a.comment ? ' Atenção: a mensagem de conclusão não foi gravada: grave-a de novo quando o card chegar ao destino.' : '');
+        return result;
+      }
       // equivalente ao aviso que a interface dá quando a última sub-tarefa em aberto termina
       const parent = card.parentId ? after.cards.find((c) => c.id === card.parentId) : undefined;
       if (parent && column.category !== 'open' && cardStatus(after, parent) === 'open') {

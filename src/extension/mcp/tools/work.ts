@@ -20,17 +20,18 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
     ref: string | number,
     status: 'running' | 'waiting_review' | 'waiting_answer' | 'blocked',
     note: string | undefined,
-    next: string,
+    next: string | ((verifying: boolean) => string),
     pending = false,
   ) => {
     const card = live(findCard(router.snapshot(), ref));
     const after = router.handle({ type: 'card.status.set', cardId: card.id, status, note, pending }, aiOrigin(ctx));
+    const now = after.cards.find((c) => c.id === card.id)!;
+    // o pedido de revisão em coluna com checagens não entrega o card: ele fica "Verificando" e o board decide
+    const gate = now.status === 'verifying' ? router.runningGate(card.id) : null;
     return {
-      card: cardSummary(
-        after,
-        after.cards.find((c) => c.id === card.id)!,
-      ),
-      next,
+      card: cardSummary(after, now),
+      ...(gate ? { gate: { id: gate.id, status: 'verifying' } } : {}),
+      next: typeof next === 'string' ? next : next(now.status === 'verifying'),
     };
   };
 
@@ -62,6 +63,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
   tool(
     'request_review',
     'Entrega o trabalho da fase para revisão de uma pessoa (status "waiting_review") e registra o resumo na conversa do card. Depois de chamar, PARE: só uma pessoa aprova. Se ela pedir ajustes, o card volta para "ready" com o pedido na conversa; quando aprovar, o status vira "approved" e você move o card. ' +
+      'Em coluna com checagens (`checks` em get_board) o card não é entregue na hora: fica em "Verificando" (o resultado traz `gate`), o board roda as checagens e você PARA; passando, o pedido de revisão segue; falhando, o card volta para "ready" com o fim da saída na conversa. ' +
       'Use `pending` para o que ficou dependendo da pessoa e não é pergunta com opções (dado, acesso, ponto em aberto que ela precisa avaliar); decisão com alternativas vai por ask_questions: a pendência vai para a conversa e o card fica com ela. No modo autônomo nada segura o card (nem `pending`): decida você, registre e siga. Nunca registre uma pendência só num comentário e siga adiante.',
     {
       card: cardArg,
@@ -87,15 +89,18 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
         a.card,
         'waiting_review',
         note,
-        stop
-          ? 'Pare aqui. Esta era a última fase que a pessoa liberou para o modo autônomo: o modo foi desligado e a revisão é dela. Não mova o card nem continue o trabalho dele.'
-          : yolo
-            ? pending
-              ? 'Modo autônomo (YOLO): a pendência não segura o card, que foi aprovado automaticamente. Decida você mesmo pelo padrão do projeto e pelo caminho menos complexo, registre a decisão e o motivo (na conversa e no documento da fase), mova o card para a próxima coluna e siga.'
-              : 'Modo autônomo (YOLO): o card foi aprovado automaticamente. Mova-o para a próxima coluna e siga o trabalho.'
-            : pending
-              ? 'Pare aqui. A pendência está com a pessoa: não mova o card nem continue o trabalho dele até ela resolver e aprovar ou pedir ajustes.'
-              : 'Pare aqui. Não mova o card nem continue o trabalho dele até uma pessoa aprovar ou pedir ajustes.',
+        (verifying) =>
+          verifying
+            ? 'Pare aqui. O card está em "Verificando": o board roda as checagens da coluna. Não mova o card nem continue o trabalho dele. Passando, o pedido de revisão segue; falhando, o card volta para "ready" com o fim da saída na conversa.'
+            : stop
+              ? 'Pare aqui. Esta era a última fase que a pessoa liberou para o modo autônomo: o modo foi desligado e a revisão é dela. Não mova o card nem continue o trabalho dele.'
+              : yolo
+                ? pending
+                  ? 'Modo autônomo (YOLO): a pendência não segura o card, que foi aprovado automaticamente. Decida você mesmo pelo padrão do projeto e pelo caminho menos complexo, registre a decisão e o motivo (na conversa e no documento da fase), mova o card para a próxima coluna e siga.'
+                  : 'Modo autônomo (YOLO): o card foi aprovado automaticamente. Mova-o para a próxima coluna e siga o trabalho.'
+                : pending
+                  ? 'Pare aqui. A pendência está com a pessoa: não mova o card nem continue o trabalho dele até ela resolver e aprovar ou pedir ajustes.'
+                  : 'Pare aqui. Não mova o card nem continue o trabalho dele até uma pessoa aprovar ou pedir ajustes.',
         Boolean(pending),
       );
     },

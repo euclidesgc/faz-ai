@@ -129,6 +129,7 @@ code review quick later:
   What has a clear guideline is fixed right away; what is ambiguous or changes the agreed behavior
   becomes a question for you, and the AI stops. The column doesn't ask for approval: the result stays
   in the conversation and goes into the PR's **Como revisar** (how to review).
+- **Check gate.** A column can have checks (name, command and timeout, in Settings › **Workflows and columns**, in the **Checks** column). When the AI tries to move the card forward or to request its review in that column, the board runs the checks, in order, in the story's folder, and the card stays in **Verificando** (verifying) until they finish (the AI stops). If they all pass, the move or the review request goes ahead and the verified commit is recorded. If one fails, or they don't finish (timed out, folder in use, the AI's session doesn't end in time), the card goes back to **Pronto** (ready) with the end of the output in the conversation, and the AI fixes it and tries again. In the commands, `{base}` becomes the story's base branch and `{changed_files}` the list of files changed against it. When you move the card yourself, it doesn't go through the gate; moving back or cancelling doesn't either.
 - **A pull request that explains the delivery.** In Homologação, the PR body brings the **Objetivo**
   (goal), **O que foi feito** (what was done), **Como revisar** (how to review: where to start
   reading, the order of the commits and the size of the diff), the **Decisões** (decisions: why the

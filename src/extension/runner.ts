@@ -24,7 +24,7 @@ import { limitChoice } from '../shared/limitChoice';
 import { MAX_TRANSIENT_RETRIES, retryDelay, type FailureClass } from '../shared/failureClass';
 import { activityKindOf } from '../shared/activity';
 import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from './unitAdvice';
-import { isDirectTrackStory } from '../shared/orchestration';
+import { isDirectTrackStory, phaseSubtasks } from '../shared/orchestration';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { exceedsRunLimit, RUN_CACHE_READ_LIMIT } from '../shared/runLimit';
 import { columnOf, isLive } from '../shared/selectors';
@@ -1111,6 +1111,11 @@ export class AiRunner {
     // de modo autônomo devolver o card para "ready".
     const story = storyOf(this.router.snapshot(), card);
     if (story && this.router.settleDelivery(story.id)) return;
+    // a sessão da história numa fase com branch criou as sub-tarefas da fase e parou, como o pedido manda: quem as
+    // executa é o board, então a história volta para a fila em vez de bloquear por "encerrou sem responder". Era o
+    // bloqueio mais comum na Revisão (a sessão cria a sub-tarefa de revisão e para) e na Implementação
+    const handedToBoard = this.createdPhaseSubtasks(card, run.exec.startedAt);
+    if (handedToBoard) return void this.setStatus(cardId, 'ready', toolLabel);
     // em modo autônomo não há pessoa para esperar: o card volta para a IA seguir (o autopiloto limita as voltas sem progresso)
     if (replied && isYolo(this.router.snapshot(), card)) return void this.setStatus(cardId, 'ready', toolLabel);
     // respondeu na conversa e encerrou: a vez é da pessoa
@@ -1185,6 +1190,15 @@ export class AiRunner {
     timer.unref?.();
     this.retryHolds.set(cardId, { until, timer, attempt });
     return 'scheduled';
+  }
+
+  /** A execução de `card` (uma história) criou, desde `since`, sub-tarefas da fase em que a história está agora. */
+  private createdPhaseSubtasks(card: Card, since: number): boolean {
+    if (card.parentId) return false;
+    const s = this.router.snapshot();
+    const story = s.cards.find((c) => c.id === card.id);
+    if (!story) return false;
+    return phaseSubtasks(s, story).some((c) => c.createdAt >= since && columnOf(s, c)?.category === 'open');
   }
 
   /** O log e a conversa explicam por que a execução começa noutro modelo que o pedido (RF11, RF12). */

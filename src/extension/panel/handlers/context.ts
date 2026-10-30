@@ -11,6 +11,7 @@ import { AttachmentRepo } from '../../repositories/attachmentRepo';
 import { BoardRepo } from '../../repositories/boardRepo';
 import { CardRepo } from '../../repositories/cardRepo';
 import { ChecklistRepo } from '../../repositories/checklistRepo';
+import { GateRepo } from '../../repositories/gateRepo';
 import { LinkRepo } from '../../repositories/linkRepo';
 import { CommentRepo } from '../../repositories/commentRepo';
 import { SettingsRepo } from '../../repositories/settingsRepo';
@@ -51,6 +52,8 @@ export class BoardContext {
   readonly executionPolicies: ExecutionPolicyRepo;
   readonly cards: CardRepo;
   readonly checklist: ChecklistRepo;
+  /** o registro das execuções do portão (`gate_runs`) */
+  readonly gateRuns: GateRepo;
   readonly links: LinkRepo;
   readonly settings: SettingsRepo;
   readonly comments: CommentRepo;
@@ -66,6 +69,8 @@ export class BoardContext {
   boardId: string;
   /** cards aprovados por uma pessoa; o router avisa depois de gravar */
   readonly approved: string[] = [];
+  /** ids de `gate_runs` recém-criados; o router avisa o executor depois de gravar */
+  readonly gates: string[] = [];
   /** cards em que a IA está executando agora (informado pelo executor): a importação recusa enquanto houver */
   aiRuns: string[] = [];
   /** arquivos de export lidos e validados, à espera da confirmação da pessoa, por token */
@@ -87,6 +92,7 @@ export class BoardContext {
     this.executionPolicies = new ExecutionPolicyRepo(db);
     this.cards = new CardRepo(db);
     this.checklist = new ChecklistRepo(db);
+    this.gateRuns = new GateRepo(db);
     this.links = new LinkRepo(db);
     this.settings = new SettingsRepo(db);
     this.comments = new CommentRepo(db);

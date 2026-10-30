@@ -10,6 +10,7 @@
 - The **Sugerir pelo projeto** (suggest from the project) button on the column checks screen proposes typecheck, lint and test checks from the project scripts, saving nothing until the person accepts (#1254).
 - Each column gets a list of checks (name, command and timeout), edited in Settings › Workflows and read by the AI in `get_board`; running them arrives in a later version (#1096).
 - New **Verifying** status (the board runs the column checks) and a `gate_runs` table recording each run; the executor arrives in a later version (#1253).
+- Columns with checks become a gate: the AI only moves the card forward if they all pass (#1253).
 - **Quota usage** block for Claude Code, with the critical limit that brings forward the switch to the reserve (#1114).
 - Metrics panel gains the Cost per delivery block, by type, effort, model and agent (#1224).
 - The Rework block in the Metrics panel shows rework by agent and runs without a result (#1224).
@@ -115,6 +116,9 @@
 
 ### Fixed
 
+- A story session that creates the phase sub-tasks and stops goes back to the queue instead of blocking with "ended without replying".
+- A story the AI creates in autonomous mode from another one, outside a stack, depends on it: it no longer starts before the origin reaches the base.
+- Splitting an autonomous story no longer resumes the autopilot the person paused.
 - An autonomous story whose working folder was deleted stops with the reason, instead of the autopilot calling the AI nonstop.
 - Reloading the window or reinstalling the extension no longer reports the board as open elsewhere.
 - A window that does not serve the board refuses to call the AI with the reason, instead of starting a run that cannot reach the board, and takes over the board when the other one closes.

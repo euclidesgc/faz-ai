@@ -46,6 +46,12 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
    - se ficou algo dependendo da pessoa (veja "Pendências com a pessoa"), entregue com \`request_review\` e \`pending\`, e **pare**;
    - se \`phase.requiresApproval\` for verdadeiro, chame \`request_review\` na história, com um resumo do que fez e do que a pessoa deve olhar, e **pare**;
    - senão, mova o card para a próxima coluna.
+5. Portão de checagens: se a coluna tem checagens, o board as roda quando você move o card para a frente ou
+   pede a revisão (a pessoa que arrasta o card não passa por ele). A resposta da ferramenta diz que o card foi a
+   Verificando: **pare** e não chame mais nada nele, só o board mexe enquanto ele está nesse status. Se as
+   checagens falharem, o card volta para \`ready\` com a saída na conversa: leia-a, corrija e tente de novo.
+   Se passarem, o board conclui o movimento ou o pedido de revisão e registra o commit verificado. O \`comment\`
+   do \`move_card\` não é gravado enquanto o card está em Verificando: grave-o de novo quando o card chegar ao destino.
 
 ## Pendências com a pessoa
 
@@ -251,7 +257,8 @@ const REVISAO_BODY = `# Revisão e Homologação
 
 Depois da Implementação e antes do pull request, a história passa pela Revisão:
 
-1. Rode as checagens do projeto (typecheck, lint, testes e build, como o projeto os define).
+1. Rode as checagens do projeto (typecheck, lint, testes e build, como o projeto os define). Se a coluna
+   tem checagens, o portão do fluxo vale ao mover a história ou pedir a revisão (passo 4).
 2. Revise o diff da história contra a base com um olhar independente: crie uma
    sub-tarefa de revisão (Fase = Revisão) com o agente \`revisor-de-codigo\`, se ele estiver nos agentes
    do board, e pare: o board a executa e chama você de novo; sem o agente, revise você mesmo. Além dos defeitos,

@@ -9,6 +9,7 @@
 - Watchdog encerra a execução de card cuja ferramenta fica N minutos sem nenhuma saída, com o motivo na conversa (#1103).
 - Cada coluna ganha uma lista de checagens (nome, comando e tempo limite), editada em Configurações › Workflows e lida pela IA em `get_board`; a execução vem numa próxima versão (#1096).
 - Novo status **Verificando** (o board roda as checagens da coluna) e tabela `gate_runs` com o registro de cada execução; o executor vem numa próxima versão (#1253).
+- Colunas com checagens viram portão: a IA só avança o card se todas passarem (#1253).
 - O botão **Sugerir pelo projeto** na tela de checagens da coluna propõe typecheck, lint e testes a partir dos scripts do projeto, sem gravar até a pessoa aceitar (#1254).
 - Tela **Uso da cota** no Claude Code, com o limite crítico que antecipa a troca para o reserva (#1114).
 - Painel Métricas ganha o bloco Custo por entrega, por tipo, esforço, modelo e agente (#1224).
@@ -115,6 +116,9 @@
 
 ### Corrigido
 
+- A sessão da história que cria as sub-tarefas da fase e para volta para a fila, em vez de bloquear por "encerrou sem responder".
+- A história que a IA cria em modo autônomo a partir de outra, fora de uma pilha, depende dela: não começa antes de a origem chegar à base.
+- Dividir uma história em modo autônomo não religa mais o autopiloto que a pessoa pausou.
 - A história em modo autônomo cuja pasta de trabalho foi apagada para com o motivo, em vez de o autopiloto chamar a IA sem parar.
 - Ao recarregar a janela ou reinstalar a extensão, o board não acusa mais estar aberto em outro lugar.
 - A janela que não atende o board recusa chamar a IA com o motivo, em vez de rodar uma execução que não alcança o board, e assume o board quando a outra fecha.
