@@ -35,7 +35,11 @@ describe('limites efetivos da orquestração', () => {
       perProfile: { claude: 1 },
     });
     const reader: WorkRuntime = { ...writer, activity: 'text', workspace: null, writer: false };
-    expect(admit(writer, [reader], limits)).toMatchObject({ ok: false, reason: 'O teto do perfil foi atingido.' });
+    expect(admit(writer, [{ ...reader, label: '#7' }], limits)).toEqual({
+      ok: false,
+      reason:
+        'Já há 1 execução do perfil claude rodando (#7), e a política de execução permite 1 desse perfil ao mesmo tempo. Ela começa sozinha quando uma vaga liberar.',
+    });
     expect(
       admit(
         writer,
@@ -45,11 +49,45 @@ describe('limites efetivos da orquestração', () => {
         ],
         limits,
       ),
-    ).toMatchObject({ ok: false, reason: 'O teto global de processos foi atingido.' });
+    ).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('Já há 2 execuções de IA rodando, e o teto global da política de execução é 2.'),
+    });
     expect(admit(reader, [], limits)).toEqual({ ok: true });
     expect(admit({ ...writer, workspace: null }, [], limits)).toMatchObject({ ok: false });
     expect(() => effectiveLimits(DEFAULT_RUNNER, 'worktree', { globalProcesses: 0 })).toThrow('inválido');
     expect(() => effectiveLimits(DEFAULT_RUNNER, 'worktree', { perProfile: { claude: Number.NaN } })).toThrow('inválido');
+  });
+  it('a recusa pelo limite da atividade diz quem ocupa a vaga, o limite e onde ajustar', () => {
+    const busy = [
+      { ...writer, workspace: '/real/a', label: '#3' },
+      { ...writer, workspace: '/real/b', label: '#3' },
+    ];
+    const off = effectiveLimits({ ...DEFAULT_RUNNER, parallel: false }, 'worktree');
+    expect(admit(writer, busy.slice(0, 1), off)).toEqual({
+      ok: false,
+      reason:
+        'Já há 1 execução mexendo no código rodando (#3), e o limite é 1 ao mesmo tempo: "Tocar histórias em paralelo" está desligado em Configurações → Automação. Ela começa sozinha quando uma vaga liberar.',
+    });
+    const shared = effectiveLimits({ ...DEFAULT_RUNNER, parallel: true }, 'branch');
+    expect(admit(writer, busy.slice(0, 1), shared)).toMatchObject({
+      reason: expect.stringContaining('"Worktree por história" (Configurações → Git)'),
+    });
+    const two = effectiveLimits({ ...DEFAULT_RUNNER, parallel: true, parallelStories: 2 }, 'worktree');
+    expect(admit(writer, busy, two)).toMatchObject({
+      reason: expect.stringContaining(
+        'Já há 2 execuções mexendo no código rodando (#3), e o limite é 2 ao mesmo tempo: o limite vem de "Histórias ao mesmo tempo"',
+      ),
+    });
+    const reader: WorkRuntime = { ...writer, activity: 'text', workspace: null, writer: false };
+    expect(
+      admit(reader, [{ ...reader, label: '#9' }], effectiveLimits({ ...DEFAULT_RUNNER, parallelStories: 1 }, 'worktree')),
+    ).toMatchObject({
+      reason: expect.stringContaining('Já há 1 execução só de texto rodando (#9), e o limite é 1'),
+    });
+    expect(admit(writer, [{ ...writer, label: '#5' }], two)).toMatchObject({
+      reason: expect.stringContaining('A pasta desta execução já tem outra IA escrevendo (#5)'),
+    });
   });
   it('migra o pedido ausente para dois e normaliza apenas configuração do runner', () => {
     expect(parseRunner('{}').parallelSubtasks).toBe(2);

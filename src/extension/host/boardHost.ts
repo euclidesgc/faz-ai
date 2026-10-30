@@ -31,7 +31,7 @@ import { Orchestrator } from '../orchestrator';
 import { orchestratesStory, effectiveLimits, LIVE_WORK_STATES, sameAsLastNote } from '../../shared/orchestration';
 import { terminateProcessGroup } from '../processIdentity';
 import { CommentRepo } from '../repositories/commentRepo';
-import type { AiActivity } from '../../shared/model';
+import { cardRef, type AiActivity } from '../../shared/model';
 import { admissionRegimeOf, type AiRunMode } from '../../shared/runner';
 import { columnOf } from '../../shared/selectors';
 import { Heartbeat } from '../heartbeat';
@@ -1004,6 +1004,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
             profile: s.board.aiTool,
             workspace: fs.existsSync(dir) ? fs.realpathSync(dir) : dir,
             writer: true,
+            ...(card ? { label: cardRef(card) } : {}),
           };
         });
     },

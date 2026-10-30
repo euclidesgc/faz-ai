@@ -86,6 +86,7 @@
 - A IA recebe no máximo as últimas 20 mensagens da conversa (#1076).
 - O card selecionado aparece em relevo, com sombra à direita e embaixo.
 - O número do card aberto fica na barra do topo, ao lado do LED.
+- A execução que espera vaga diz quais cards ocupam as vagas, qual é o limite e onde ajustá-lo.
 
 ### Removido
 

@@ -569,7 +569,9 @@ describe('Diagnóstico do ambiente', () => {
         },
         limits: {
           branchProcesses: 2,
+          branchReason: 'Histórias ao mesmo tempo',
           textProcesses: 4,
+          textReason: 'Histórias ao mesmo tempo',
           writersPerWorkspace: 1,
           subtasks: { requested: 3, effective: 1, reason: 'Rodam uma por vez.' },
           globalProcesses: null,
