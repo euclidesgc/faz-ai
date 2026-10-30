@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- A história é bloqueada depois de 3 falhas iguais, com o limite em Configurações › Automação (#1097).
 - Editor da escada de modelos por agente em Configurações › Conectar agentes, abaixo das regras de sugestão (#1312).
 - A IA termina a resposta da fase com um bloco JSON (`DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT` ou `BLOCKED`); se faltar ou vier inválido, o board pede o reparo na mesma sessão (#1098).
 - Watchdog encerra a execução de card cuja ferramenta fica N minutos sem nenhuma saída, com o motivo na conversa (#1103).

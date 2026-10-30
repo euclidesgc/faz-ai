@@ -236,6 +236,22 @@ avanço; bloquear uma história libera a fila para seguir com a próxima, em vez
 que emperram podem gastar até 3 execuções cada, em todas da fila). Ao destravar o card, ele continua
 sozinho.
 
+**Disjuntor de falhas repetidas.** Outro freio conta as falhas iguais de cada história, sem depender
+do progresso. Cada falha ganha uma assinatura, formada pela coluna, pela origem (a execução da IA ou a
+checagem da coluna) e pela mensagem do erro, sem números, datas, caminhos temporários e hashes e cortada
+em 240 caracteres: duas falhas com a mesma mensagem normalizada são a mesma falha. Só somam a falha
+determinística de uma execução e a checagem que falhou. A falha transitória, que o board já repete
+sozinho, e a execução interrompida não entram. Ao chegar a 3 ocorrências da mesma assinatura na história
+(o card e as sub-tarefas dele), o board bloqueia a história e registra na conversa a assinatura e o
+histórico das ocorrências, para você conferir a causa antes de destravar.
+
+A contagem não zera quando outra etapa dá certo: um sucesso no meio não reinicia a conta, então o ciclo
+de implementar, passar e falhar de novo na verificação também para. Depois de destravar, a conta
+recomeça do zero: a mesma falha precisa de novas ocorrências para bloquear de novo. O limite é o campo
+**Falhas iguais até bloquear** em Configurações → Automação (de 2 a 10, padrão 3) e vale a partir do fim
+da próxima execução. Refinar, resumir, responder na conversa, resolver conflito e desbloquear não
+disparam a avaliação.
+
 ### Botão do modo autônomo e comandos
 
 O **botão do modo autônomo** no topo do board existe sempre que há história em aberto e diz o que o

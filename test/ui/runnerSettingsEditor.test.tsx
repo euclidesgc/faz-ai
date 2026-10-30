@@ -70,4 +70,19 @@ describe('RunnerSettings dentro do editor', () => {
     show();
     expect(screen.queryByText(/Regime compatível ligado para o board inteiro/)).toBeNull();
   });
+
+  it('o limite de falhas iguais mostra o padrão, grava o número digitado e ajusta fora da faixa (2 a 10)', async () => {
+    show();
+    const field = screen.getByLabelText('Falhas iguais até bloquear');
+    expect(field).toHaveValue(3);
+    await userEvent.clear(field);
+    await userEvent.type(field, '5{Enter}');
+    expect(lastSent('settings.board.update').patch).toEqual({ runner: { failureLimit: 5 } });
+    await userEvent.clear(field);
+    await userEvent.type(field, '99{Enter}');
+    expect(lastSent('settings.board.update').patch).toEqual({ runner: { failureLimit: 10 } });
+    await userEvent.clear(field);
+    await userEvent.type(field, '1{Enter}');
+    expect(lastSent('settings.board.update').patch).toEqual({ runner: { failureLimit: 2 } });
+  });
 });

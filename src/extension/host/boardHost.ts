@@ -61,6 +61,8 @@ import { BOARD_AUTHOR } from '../../shared/gitflow';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
 import { GateExecutor } from '../gate';
 import { GateRepo } from '../repositories/gateRepo';
+import { AiRunRepo } from '../log/aiRunRepo';
+import { FailureBreaker } from '../failureBreaker';
 import { driverFor, driverOf } from '../ai/drivers';
 import { baseInfo, type AiTool } from '../../shared/harness';
 import { checkRequirements, profileInstallUrl } from '../requirements';
@@ -1049,6 +1051,19 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     return ready;
   };
   if (ownsBoard) void ensureOrchestrator().catch((e: unknown) => o.log(`Orquestrador: ${e instanceof Error ? e.message : String(e)}`));
+  // o disjuntor por assinatura de falha (#1097): avalia no fim de cada execução e de cada checagem. Registrado
+  // antes do autopiloto: se os dois disjuntores dispararem juntos, o primeiro bloqueia e o outro vê a história
+  // com a pessoa e sai. Só a janela dona avalia
+  const failureBreaker = new FailureBreaker({
+    router,
+    runs: new AiRunRepo(handle.db),
+    gates: new GateRepo(handle.db),
+    limit: () => router.snapshot().board.runner.failureLimit,
+    log: o.log,
+  });
+  runner.onDidFinish((cardId, mode) => {
+    if (ownsNow()) failureBreaker.check(cardId, mode);
+  });
   // o portão das checagens da coluna: quando a IA tenta sair de uma coluna que as tem, o executor roda os comandos na
   // pasta da história e devolve o desfecho ao router. Existe em toda janela, mas só a dona executa e recupera
   // (`ownsBoard` é conferido a cada chamada)
@@ -1063,6 +1078,8 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     log: o.log,
     git,
     shellPath: async () => pathEnv,
+    // o disjuntor por assinatura avalia no fim da checagem que falhou (#1097)
+    onFailed: (cardId) => failureBreaker.check(cardId),
   });
   router.onGate((gateRunId) => void gateExecutor.run(gateRunId));
   // a janela que fechou no meio de um portão deixou o card "Verificando" sem executor: volta para a IA na abertura

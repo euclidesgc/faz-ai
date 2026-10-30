@@ -1096,11 +1096,11 @@ export class MessageRouter {
    * `ready` na coluna de origem com o fim da saída na conversa; se já saiu de `verifying`, só o registro é fechado.
    * Só o resultado `failed` pode subir o modelo da correção (`onGateFailed`); `failedCheck` é o nome da checagem.
    */
-  failGate(gateRunId: string, result: 'failed' | 'interrupted', body: string, failedCheck?: string): void {
+  failGate(gateRunId: string, result: 'failed' | 'interrupted', body: string, failedCheck?: string, signature = ''): void {
     const ctx = this.ctx;
     const gate = ctx.gateRuns.get(gateRunId);
     if (!gate || gate.result !== 'running') return;
-    ctx.gateRuns.finish(gate.id, result, body);
+    ctx.gateRuns.finish(gate.id, result, body, signature);
     const card = ctx.state().cards.find((c) => c.id === gate.cardId);
     if (card && isLive(card) && card.status === 'verifying' && card.columnId === gate.columnId) {
       ctx.comments.add(card.id, BOARD_AUTHOR, body, 'ai');

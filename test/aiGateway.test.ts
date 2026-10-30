@@ -285,6 +285,29 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
       expect(rows()[0]!.failureClass).toBe('canceled');
     });
 
+    it('sucesso não grava a assinatura', () => {
+      finishWith(0, CLAUDE_OUTPUT);
+      expect(rows()[0]!.failureSignature).toBeNull();
+    });
+
+    it('transient não grava a assinatura', () => {
+      finishWith(1, 'Error: socket hang up\n');
+      expect(rows()[0]!.failureSignature).toBeNull();
+    });
+
+    it('deterministic grava coluna | run | mensagem normalizada', () => {
+      finishWith(1, 'Error: arquivo 12 inexistente\n');
+      expect(rows()[0]!.failureSignature).toBe(' | run | error: arquivo inexistente');
+    });
+
+    it('budget e canceled não gravam a assinatura', () => {
+      const run = gateway().run(call());
+      run.stop();
+      procs[0]!.exit(143);
+      expect(rows()[0]!.failureClass).toBe('canceled');
+      expect(rows()[0]!.failureSignature).toBeNull();
+    });
+
     it('stalled: deterministic', () => {
       vi.useFakeTimers();
       const run = gateway().run(call({ idleMinutes: 2 }));

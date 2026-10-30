@@ -22,6 +22,8 @@ export interface RunLog {
   describeRequired?(id: string, config: AiRunConfig): void;
   /** Fecha a linha com o desfecho e o código de saída, quando houver. */
   finish(id: string, outcome: AiRunOutcome, exitCode?: number | null, failureClass?: FailureClass | null): void;
+  /** Grava a assinatura da falha determinística da execução (#1097). */
+  setFailureSignature?(id: string, signature: string): void;
   /** Grava o consumo e o inventário medidos, de uma vez, junto do desfecho. `measure: 'none'` grava só "não medido". */
   measure(id: string, report: RunReport, check?: RunCheck): void;
   /**
@@ -65,6 +67,10 @@ export function createRunLog(db: Database, log?: (line: string) => void): RunLog
     finish(id, outcome, exitCode, failureClass) {
       if (!id) return;
       guard(() => runs.finish(id, outcome, exitCode, failureClass));
+    },
+    setFailureSignature(id, signature) {
+      if (!id) return;
+      guard(() => runs.setFailureSignature(id, signature));
     },
     measure(id, report, check) {
       if (!id) return;

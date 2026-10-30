@@ -1,5 +1,6 @@
 import { Callout, Card } from '@radix-ui/themes';
 import {
+  FAILURE_LIMIT_RANGE,
   HEARTBEAT_RANGE,
   IDLE_RANGE,
   PARALLEL_RANGE,
@@ -110,6 +111,21 @@ export function RunnerSettings() {
                 value={runner.idleMinutes}
                 unit={t('minutos')}
                 onCommit={(idleMinutes) => settings.updateBoard({ runner: { idleMinutes } })}
+              />
+            )}
+          </FormField>
+          <FormField
+            label={t('Falhas iguais até bloquear')}
+            hint={t('Depois dessa quantidade de falhas iguais na mesma história, o board a bloqueia.')}
+          >
+            {(id) => (
+              <NumberField
+                id={id}
+                min={FAILURE_LIMIT_RANGE.min}
+                max={FAILURE_LIMIT_RANGE.max}
+                value={runner.failureLimit}
+                unit={t('falhas')}
+                onCommit={(failureLimit) => settings.updateBoard({ runner: { failureLimit } })}
               />
             )}
           </FormField>

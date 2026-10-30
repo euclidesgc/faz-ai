@@ -6,6 +6,7 @@
 
 ### Added
 
+- The story is blocked after 3 identical failures, with the limit in Settings › Automation (#1097).
 - Per-agent model ladder editor in Settings › Connect agents, below the suggestion rules (#1312).
 - The AI ends the phase reply with a JSON block (`DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT` or `BLOCKED`); if it is missing or invalid, the board asks for a repair in the same session (#1098).
 - A watchdog stops a card run whose tool goes N minutes without any output, with the reason in the conversation (#1103).

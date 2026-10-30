@@ -242,6 +242,22 @@ with no progress; blocking a story frees the queue to move on to the next one, i
 up (a story that keeps getting stuck can spend up to 3 runs each, across the whole queue). Once you
 unblock the card it carries on by itself.
 
+**Repeated-failure circuit breaker.** A further brake counts each story's identical failures,
+regardless of progress. Every failure gets a signature made of the column, the origin (the AI run or the
+column check) and the error message, with numbers, dates, temporary paths and hashes removed and cut at
+240 characters: two failures with the same normalized message are the same failure. Only a run's
+deterministic failure and a failed check count. A transient failure, which the board already retries on
+its own, and an interrupted run do not. When the same signature reaches 3 occurrences in the story (the
+card and its sub-tasks), the board blocks the story and writes the signature and the history of
+occurrences in the conversation, so you can check the cause before unblocking.
+
+The count does not reset when another step succeeds: a success in between does not restart it, so the
+cycle of implementing, passing and then failing the check again also stops. After you unblock, the count
+starts over: the same failure needs new occurrences to block again. The limit is the **Identical failures
+before blocking** field in Settings → Automação (Automation), from 2 to 10, default 3, and it applies from
+the end of the next run. Refine, summarize, conversation replies, conflict resolution and unblock runs do
+not trigger the check.
+
 ### Autonomous mode button and commands
 
 The **autonomous mode button** at the top of the board exists whenever there is an open story and

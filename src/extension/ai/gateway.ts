@@ -1,4 +1,5 @@
 import type { AcpSpawnFn } from './acp/provider';
+import { failureSignature, runFailureMessage } from '../../shared/failureSignature';
 import { classifyFailure, type FailureClass } from '../../shared/failureClass';
 import { executorOf, type Executor } from './drivers';
 import { executorProfile, providerFor } from './providers';
@@ -532,6 +533,17 @@ export class AiGateway {
         tail: outputTail,
       });
       runLog.finish(runId, outcome, code, failureClass);
+      // só a falha determinística tem assinatura (#1097); grava antes do AiRunEnd, para o avaliador já enxergá-la
+      if (failureClass === 'deterministic') {
+        runLog.setFailureSignature?.(
+          runId,
+          failureSignature(
+            call.context.columnName,
+            'run',
+            runFailureMessage({ errorMessage: error?.message ?? null, tail: outputTail, code, timedOut, stalled }),
+          ),
+        );
+      }
       const safeReport = {
         ...rawReport,
         answer: redact(rawReport.answer),
