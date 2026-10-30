@@ -431,7 +431,9 @@ sugestão anterior; um modelo escolhido à mão nunca é trocado.
 Workflows e colunas**), o board sobe o modelo da correção sozinho, sem a IA escolher: o card volta para
 **Pronto** e roda de novo com o modelo do nível acima. A subida segue a **escada** de modelos do agente,
 do mais barato ao mais forte; sem escada para o agente, ela sobe só o esforço do mesmo modelo, do menor ao
-maior. A escada de cada agente fica guardada no board; a tela para editá-la vem numa próxima versão. Um
+maior. A escada de cada agente se edita em **Conectar agentes**, abaixo das regras de sugestão: uma lista numerada
+do mais barato ao mais forte, com subir, descer, remover e adicionar (só modelos do catálogo do agente que
+ainda não estão nela); lista vazia mostra "Sem escada: sobe só o esforço". Um
 modelo escolhido à mão nunca é trocado, e a subida vale **uma vez** por card e coluna: se a checagem falhar
 de novo depois dela, o card vai para a pessoa como bloqueado. Quando a história tem sub-tarefas na fase que
 falhou, a subida vale para a próxima sub-tarefa de correção que a IA criar, com o modelo de referência na

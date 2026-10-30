@@ -13,6 +13,7 @@ import {
   type ModelOption,
   type ModelRule,
 } from '../../../shared/models';
+import { parseLadders } from '../../../shared/modelLadder';
 import { cliOfValue } from '../../../shared/runTarget';
 import { valueOf } from '../../../shared/selectors';
 import { newId } from '../../db/ids';
@@ -248,6 +249,23 @@ export const modelHandlers = {
   'settings.modelRules.set': (msg, ctx) => {
     ctx.boards.setModelRules(ctx.boardId, msg.rules);
     proposeLegacyFallbacks(ctx);
+    return true;
+  },
+  'models.ladder.set': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('A escada de modelos só pode ser alterada pela pessoa.');
+    const { board } = ctx.state();
+    if (!board.aiProfiles.some((p) => p.id === msg.tool)) throw new Error(`Agente desconhecido: ${msg.tool}.`);
+    const list: unknown = msg.ladder;
+    if (!Array.isArray(list) || list.some((v) => typeof v !== 'string' || v === '')) {
+      throw new Error('A escada deve ser uma lista de modelos (tool:modelo@esforço).');
+    }
+    const ladder = list as string[];
+    if (new Set(ladder).size !== ladder.length) throw new Error('A escada não pode repetir um modelo.');
+    // o formato é o do parser que lê a escada na subida: o que ele descartaria é inválido aqui
+    if (ladder.length && parseLadders(JSON.stringify({ [msg.tool]: ladder }))[msg.tool]?.length !== ladder.length) {
+      throw new Error('Escada de modelos inválida.');
+    }
+    ctx.boards.setModelLadder(ctx.boardId, msg.tool, ladder);
     return true;
   },
   'settings.modelRules.suggest': (msg, ctx) => {

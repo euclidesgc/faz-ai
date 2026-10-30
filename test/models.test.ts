@@ -100,6 +100,7 @@ describe('suggestModelRule e suggestModel', () => {
       aiProfiles: [],
       modelCatalog: [],
       modelRules,
+      modelLadders: {},
       appearance: DEFAULT_APPEARANCE,
       templateVersion: 1,
       runner: DEFAULT_RUNNER,

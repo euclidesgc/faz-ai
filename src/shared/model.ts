@@ -1,4 +1,5 @@
 import type { AiProfile } from './aiProfiles';
+import type { ModelLadders } from './modelLadder';
 import type { ImportPreview } from './artifactImport';
 import type { OrphanReport } from './orphans';
 import type { BoardRequirement } from './requirements';
@@ -54,6 +55,8 @@ export interface Board {
   modelCatalog: ModelOption[];
   /** sugestão de modelo conforme os campos do card */
   modelRules: ModelRule[];
+  /** escada de modelos por perfil de CLI (`tool:model@effort`, do mais barato ao mais forte); vem da meta, não de coluna */
+  modelLadders: ModelLadders;
   /** tema e tipografia do board */
   appearance: Appearance;
   /** versão do board padrão aplicada a este board */

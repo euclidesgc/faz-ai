@@ -70,6 +70,13 @@ export class BoardRepo {
     return parseLadders(this.getMeta(MODEL_LADDERS_KEY));
   }
 
+  /** Grava a escada de um perfil de CLI; lista vazia remove a chave do perfil (a subida volta a ser só de esforço). */
+  setModelLadder(boardId: string, profileId: string, ladder: string[]): void {
+    const { [profileId]: _old, ...rest } = this.modelLadders(boardId);
+    const next: ModelLadders = ladder.length ? { ...rest, [profileId]: ladder } : rest;
+    this.setMeta(MODEL_LADDERS_KEY, JSON.stringify(next));
+  }
+
   /**
    * A ciência do regime compatível de um perfil, no passo do Conectar: sobe a revisão daquele perfil e
    * devolve a nova. É um ato da pessoa na tela, que o host grava; não há mensagem da tela que a escreva.
@@ -141,6 +148,7 @@ export class BoardRepo {
       aiProfiles,
       modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)),
       modelRules: parseModelRules(str(row.model_rules_json)),
+      modelLadders: this.modelLadders(str(row.id)),
       appearance: parseAppearance(str(row.appearance_json)),
       templateVersion: num(row.template_version),
       runner: parseRunner(str(row.runner_json)),
@@ -370,6 +378,7 @@ export class BoardRepo {
       aiProfiles,
       modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)),
       modelRules: parseModelRules(str(b.model_rules_json)),
+      modelLadders: this.modelLadders(boardId),
       appearance: parseAppearance(str(b.appearance_json)),
       templateVersion: num(b.template_version),
       runner: parseRunner(str(b.runner_json)),

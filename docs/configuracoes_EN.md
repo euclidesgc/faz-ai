@@ -460,8 +460,10 @@ by hand is never replaced.
 and columns**), the board raises the model of the fix on its own, without the AI choosing: the card goes
 back to **Pronto** (ready) and runs again with the model one level up. The raise follows the agent's
 **ladder** of models, from the cheapest to the strongest; without a ladder for the agent, it only raises the
-effort of the same model, from the lowest to the highest. Each agent's ladder is stored in the board; the
-screen to edit it comes in a later version. A model chosen by hand is never changed, and the raise happens
+effort of the same model, from the lowest to the highest. Each agent's ladder is edited in **Conectar agentes**, below the
+suggestion rules: a numbered list from the cheapest to the strongest, with move up, move down, remove and add
+(only catalog models of the agent that are not in it yet); an empty list shows "no ladder: only the effort
+goes up". A model chosen by hand is never changed, and the raise happens
 **once** per card and column: if the check fails again after it, the card goes to the person as blocked. When
 the story has sub-tasks in the phase that failed, the raise applies to the next fix sub-task the AI creates,
 with the reference model taken from the last sub-task finished in the phase. The raise never lowers the model

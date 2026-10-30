@@ -347,6 +347,8 @@ export type WebviewToHost =
   | { type: 'settings.modelRules.set'; rules: ModelRule[] }
   /** recria as regras "Esforço → modelo" com os modelos da ferramenta */
   | { type: 'settings.modelRules.suggest'; tool: AiTool }
+  /** grava a escada de modelos de um perfil (só a pessoa; lista vazia remove); inválida: erro e nada é gravado */
+  | { type: 'models.ladder.set'; tool: AiTool; ladder: string[] }
   | { type: 'settings.rules.update'; patch: Partial<BoardRules> }
   /** relê o harness do disco (a pasta do usuário não é vigiada) */
   | { type: 'harness.refresh' }
