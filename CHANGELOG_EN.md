@@ -117,6 +117,7 @@
 
 ### Fixed
 
+- A phase closing (or story session) that failed stops the story with the reason, instead of the autopilot calling the AI endlessly with "the unit or folder is already reserved".
 - A story session that creates the phase sub-tasks and stops goes back to the queue instead of blocking with "ended without replying".
 - A story the AI creates in autonomous mode from another one, outside a stack, depends on it: it no longer starts before the origin reaches the base.
 - Splitting an autonomous story no longer resumes the autopilot the person paused.
