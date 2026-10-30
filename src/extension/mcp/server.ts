@@ -163,6 +163,29 @@ class SocketTransport implements Transport {
   }
 }
 
+export const SERVED_ELSEWHERE = 'Já existe um servidor MCP do Faz AI para esta pasta.';
+
+/**
+ * `startMcpServer` que espera o socket liberar antes de concluir que outro lugar serve a pasta. Ao recarregar a
+ * janela ou reinstalar a extensão, o editor sobe o host novo antes de o anterior terminar de sair, e o socket
+ * dele ainda responde por alguns segundos: sem esperar, a janela avisava "já está aberto em outro lugar" e
+ * ficava sem servir o board até recarregar de novo.
+ */
+export async function startMcpServerWhenFree(
+  address: string,
+  opts: McpOptions,
+  wait: { attempts: number; delayMs: number } = { attempts: 15, delayMs: 1000 },
+): Promise<() => void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await startMcpServer(address, opts);
+    } catch (e) {
+      if (!(e instanceof Error && e.message === SERVED_ELSEWHERE) || attempt >= wait.attempts) throw e;
+      await new Promise((r) => setTimeout(r, wait.delayMs));
+    }
+  }
+}
+
 function isAlive(address: string): Promise<boolean> {
   return new Promise((resolve) => {
     const probe = net.connect(address);
@@ -184,7 +207,7 @@ export async function startMcpServer(address: string, opts: McpOptions): Promise
     fs.mkdirSync(path.dirname(address), { recursive: true, mode: 0o700 });
     if (fs.existsSync(address)) {
       // outra janela do VSCode já atende esta pasta; um socket sem dono é resto de uma sessão anterior
-      if (await isAlive(address)) throw new Error('Já existe um servidor MCP do Faz AI para esta pasta.');
+      if (await isAlive(address)) throw new Error(SERVED_ELSEWHERE);
       fs.rmSync(address, { force: true });
     }
   }
@@ -203,9 +226,7 @@ export async function startMcpServer(address: string, opts: McpOptions): Promise
   });
   await new Promise<void>((resolve, reject) => {
     // no Windows o pipe nomeado em uso por outra janela falha com EADDRINUSE: é o mesmo caso do socket vivo
-    listener.once('error', (e: NodeJS.ErrnoException) =>
-      reject(isPipe && e.code === 'EADDRINUSE' ? new Error('Já existe um servidor MCP do Faz AI para esta pasta.') : e),
-    );
+    listener.once('error', (e: NodeJS.ErrnoException) => reject(isPipe && e.code === 'EADDRINUSE' ? new Error(SERVED_ELSEWHERE) : e));
     listener.listen(address, () => {
       listener.removeAllListeners('error');
       resolve();

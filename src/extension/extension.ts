@@ -5,7 +5,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { bindBranchRenamePrompt } from './branchRenamePrompt';
 import { createBoardHost, type BoardHost } from './host/boardHost';
-import { startMcpServer } from './mcp/server';
+import { SERVED_ELSEWHERE, startMcpServerWhenFree } from './mcp/server';
 import { readBridgeVersion, socketPath, stableBridgePath, workspaceKey, writeBridgeVersion } from './mcp/socketPath';
 import { registerCursorProject } from './mcp/clientConfig';
 import { installCursorHook } from './mcp/cursorHooks';
@@ -77,6 +77,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const storage = context.globalStorageUri.fsPath;
   const wasmDir = path.join(context.extensionPath, 'dist');
   let routerPromise: Promise<MessageRouter> | undefined;
+  // o board decide na criação se esta janela é a dona (`ownsBoard`): espera a subida do servidor MCP terminar
+  let mcpStarting: Promise<unknown> = Promise.resolve();
   const viewState = new ViewStateStore(context.workspaceState);
   // por pessoa, não por pasta: um aviso dispensado aqui não volta em outro projeto
   const prefs = new PrefsStore(context.globalState);
@@ -92,6 +94,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const f = folder();
     if (!f) return Promise.resolve(undefined);
     routerPromise ??= (async () => {
+      await mcpStarting;
       const log = (line: string) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`);
       host = await createBoardHost({
         storageDir: storage,
@@ -422,7 +425,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       void installBoardCursorHook(context, bridgePath, output, editorName !== 'cursor');
       // em segundo plano: a CLI da ferramenta pode demorar, e o servidor do board não depende dela
       ensureUserInstall(context, f.uri.fsPath, bridgePath, output, []);
-      stopMcp = await startMcpServer(socketPath(f.uri.fsPath), {
+      const starting = startMcpServerWhenFree(socketPath(f.uri.fsPath), {
         getRouter,
         getRunner: async () => {
           await getRouter();
@@ -431,8 +434,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         workspaceDir: f.uri.fsPath,
         version: String((context.extension.packageJSON as { version?: string }).version ?? '0'),
       });
+      mcpStarting = starting.catch(() => undefined);
+      stopMcp = await starting;
     } catch (e) {
-      servedElsewhere = e instanceof Error && e.message.startsWith('Já existe');
+      servedElsewhere = e instanceof Error && e.message === SERVED_ELSEWHERE;
       console.warn(`Faz AI: servidor MCP não iniciado: ${e instanceof Error ? e.message : String(e)}`);
     }
     // com o heartbeat ligado nesta pasta, o board precisa estar carregado para a rotina rodar sem ninguém abri-lo
