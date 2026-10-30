@@ -19,3 +19,7 @@ test/fixtures/claude-model-config.md
 
 # placares gerados pela avaliação de modelos: formato próprio e estável
 evals/scoreboard/
+
+# histórias de referência da avaliação: fixtures (projetos de exemplo, aceite e solução) com formato próprio
+evals/stories/
+test/evals/fixtures/

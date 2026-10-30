@@ -34,6 +34,12 @@ describe('scoreStory', () => {
     expect(s.modelMismatches).toBe(2);
   });
 
+  it('anexo exigido que faltou reprova a história mesmo com o aceite passando', () => {
+    const s = scoreStory(story, run(), log([]), ok, config, ['PLAN.md']);
+    expect(s).toMatchObject({ accepted: false, missingArtifacts: ['PLAN.md'] });
+    expect(scoreStory(story, run(), log([]), ok, config).missingArtifacts).toEqual([]);
+  });
+
   it('aceita só com delivered e exit 0; acceptance é null nos outros finais', () => {
     const fail: AcceptanceResult = { passed: false, exitCode: 1, durationMs: 9, output: '' };
     expect(scoreStory(story, run(), log([]), ok, config)).toMatchObject({ accepted: true, acceptance: { exitCode: 0, durationMs: 50 } });
@@ -130,6 +136,7 @@ describe('scoreboardFile e writeScoreboard', () => {
       'modelMismatches',
       'signals',
       'acceptance',
+      'missingArtifacts',
     ]);
     // chaves embaralhadas na entrada saem na mesma ordem
     const shuffled = { ...b, stories: [Object.fromEntries(Object.entries(s).reverse()) as typeof s] };

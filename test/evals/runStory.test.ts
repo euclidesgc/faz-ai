@@ -11,7 +11,8 @@ import { columnOf } from '../../src/shared/selectors';
 import { evalWorld, type EvalAct, type EvalWorld } from './evalWorld';
 
 const CONFIG = parseModel('claude:sonnet@high');
-const STORIES_ROOT = path.resolve(__dirname, '../../evals/stories');
+// a história slugify é só fixture do teste: o conjunto real fica em evals/stories
+const STORIES_ROOT = path.resolve(__dirname, 'fixtures/stories');
 
 let world: EvalWorld | undefined;
 afterEach(async () => {
@@ -27,6 +28,7 @@ const story = (patch: Partial<ReferenceStory> = {}): ReferenceStory => ({
   startPhase: 'Plan',
   timeoutMinutes: 1,
   acceptance: { command: ['node', '-e', ''], timeoutSeconds: 10 },
+  requiredArtifacts: [],
   dir: STORIES_ROOT,
   ...patch,
 });

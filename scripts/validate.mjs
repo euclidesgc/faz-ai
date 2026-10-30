@@ -18,6 +18,12 @@ const FORMATTED = /\.(ts|tsx|js|mjs|cjs|json|css|html|md|ya?ml)$/;
 /** Os arquivos que o `vitest related` sabe ligar aos testes. */
 const RELATED = /^(src|test)\/.*\.(ts|tsx)$/;
 
+/**
+ * Testes que uma mudança em certa pasta liga sem importar o código dela: as histórias de referência da avaliação
+ * (`evals/`) são dados lidos em tempo de execução, e só a prova do conjunto os confere (#1233).
+ */
+const EXTRA_TESTS = [{ prefix: 'evals/', test: 'test/evals/referenceSet.test.ts' }];
+
 const results = [];
 
 function git(args) {
@@ -105,6 +111,9 @@ if (format.length) await step('prettier', 'npx', ['prettier', '--check', '--igno
 else skip('prettier', 'nenhum arquivo que o prettier cobre');
 
 const related = changed.filter((f) => RELATED.test(f));
+for (const { prefix, test } of EXTRA_TESTS) {
+  if (changed.some((f) => f.startsWith(prefix)) && !related.includes(test)) related.push(test);
+}
 if (related.length)
   await step('vitest related', 'npx', ['vitest', 'related', '--run', '--passWithNoTests', ...related], `${related.length} arquivo(s)`);
 else skip('vitest related', 'nenhum arquivo de src/ ou test/ alterado');

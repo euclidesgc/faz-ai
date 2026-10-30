@@ -1,0 +1,7 @@
+{
+  "title": "Criar o componente renderTaskList",
+  "description": "Este pacote Node (sem dependências, ES modules) monta HTML com funções puras que devolvem texto; veja `src/card.js` como modelo e `src/html.js` (`escapeHtml`).\n\nCrie `renderTaskList(tasks)` em `src/taskList.js` (`export function renderTaskList`). Cada tarefa é `{ id, title, done }`.\n\nFormato exato do HTML:\n- com tarefas, devolve `<ul class=\"task-list\" role=\"list\">` com um `<li class=\"task\" data-id=\"…\" data-done=\"true|false\">` por tarefa, com o título dentro;\n- o título e o id passam por `escapeHtml` (um `<script>` ou um `&` no título nunca saem crus);\n- a tarefa concluída (`done: true`) ganha `aria-checked=\"true\"` e a classe `task--done` além de `task` (`class=\"task task--done\"`); a aberta não tem `aria-checked`;\n- lista vazia devolve exatamente `<p class=\"empty\">Nenhuma tarefa</p>`;\n- a função não altera o array recebido.\n\nAdicione testes em `test/` com `node --test`.",
+  "startPhase": "Plan",
+  "timeoutMinutes": 30,
+  "acceptance": { "command": ["node", "--test", ".eval-acceptance/*.test.js"], "timeoutSeconds": 60 }
+}

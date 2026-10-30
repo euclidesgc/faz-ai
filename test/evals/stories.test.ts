@@ -15,7 +15,7 @@ afterEach(() => {
   for (const d of tmp.splice(0)) fs.rmSync(d, { recursive: true, force: true });
 });
 
-const realRoot = path.resolve(__dirname, '../../evals/stories');
+const realRoot = path.resolve(__dirname, 'fixtures/stories');
 
 function fakeStory(acceptance: { command: string[]; timeoutSeconds: number }, testFile: string): ReferenceStory {
   const dir = mk();
@@ -23,7 +23,7 @@ function fakeStory(acceptance: { command: string[]; timeoutSeconds: number }, te
   fs.mkdirSync(path.join(dir, 'acceptance'));
   fs.writeFileSync(path.join(dir, 'repo', 'a.txt'), 'x');
   fs.writeFileSync(path.join(dir, 'acceptance', 'check.test.js'), testFile);
-  return { id: 'f', title: 't', description: 'd', startPhase: 'Plan', timeoutMinutes: 30, acceptance, dir };
+  return { id: 'f', title: 't', description: 'd', startPhase: 'Plan', timeoutMinutes: 30, acceptance, requiredArtifacts: [], dir };
 }
 
 describe('loadStories', () => {

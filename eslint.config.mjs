@@ -10,7 +10,18 @@ export default tseslint.config(
   // saídas de build e os scripts de build/release (fora do tsconfig) ficam de fora, e também `.claude/`,
   // onde ficam as worktrees locais das sessões: cópias do repositório que o lint contaria em dobro
   {
-    ignores: ['dist/**', 'node_modules/**', 'releases/**', 'esbuild.mjs', 'scripts/**', '.impeccable/**', '.claude/**', 'board-harness/**'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'releases/**',
+      'esbuild.mjs',
+      'scripts/**',
+      '.impeccable/**',
+      '.claude/**',
+      'board-harness/**',
+      'evals/stories/**',
+      'test/evals/fixtures/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

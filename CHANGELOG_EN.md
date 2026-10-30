@@ -52,6 +52,7 @@
 - Commits made in a board run get the `Faz-AI-*` trailers with card, phase and run (#1101).
 - The heartbeat tries to unblock blocked stories: the AI looks for the cause, fixes what it can and returns the work to the queue; only what depends on you stays blocked.
 - `npm run eval` evaluates a model on reference stories and writes the scoreboard (#1105).
+- Five reference stories for model evaluation, with the proof that the acceptance fails without the solution and passes with it (#1233).
 
 ### Changed
 

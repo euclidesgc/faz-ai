@@ -23,6 +23,8 @@ export interface StoryScore {
   modelMismatches: number;
   signals: EvalLog['signals'];
   acceptance: { exitCode: number | null; durationMs: number } | null;
+  /** anexos exigidos pela história que não apareceram (a história só é aceita sem nenhum faltando) */
+  missingArtifacts: string[];
 }
 
 export interface RoundSummary {
@@ -58,12 +60,13 @@ export function scoreStory(
   log: EvalLog,
   acceptance: AcceptanceResult | null,
   config: EvalConfig,
+  missingArtifacts: string[] = [],
 ): StoryScore {
   const delivered = run.end === 'delivered';
   const accept = delivered ? acceptance : null;
   return {
     id: run.storyId,
-    accepted: delivered && accept !== null && accept.exitCode === 0,
+    accepted: delivered && accept !== null && accept.exitCode === 0 && missingArtifacts.length === 0,
     end: run.end,
     endNote: run.endNote,
     durationMs: run.endedAt - run.startedAt,
@@ -79,6 +82,7 @@ export function scoreStory(
     modelMismatches: log.runs.filter((r) => r.model !== modelOf(config)).length,
     signals: { ...log.signals },
     acceptance: accept ? { exitCode: accept.exitCode, durationMs: accept.durationMs } : null,
+    missingArtifacts: [...missingArtifacts],
   };
 }
 
@@ -166,6 +170,7 @@ export function serialize(board: Scoreboard): string {
         commitsAfterPr: st.signals.commitsAfterPr,
       },
       acceptance: st.acceptance ? { exitCode: st.acceptance.exitCode, durationMs: st.acceptance.durationMs } : null,
+      missingArtifacts: [...st.missingArtifacts],
     })),
   };
   return `${JSON.stringify(ordered, null, 2)}\n`;

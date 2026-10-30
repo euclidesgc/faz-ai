@@ -52,6 +52,7 @@
 - Os commits feitos numa execução do board ganham os trailers `Faz-AI-*` com card, fase e execução (#1101).
 - O heartbeat tenta destravar as histórias bloqueadas: a IA procura a causa, resolve o que consegue e devolve o trabalho à fila; só fica bloqueada a que depende de você.
 - `npm run eval` avalia um modelo em histórias de referência e grava o placar (#1105).
+- Cinco histórias de referência para a avaliação de modelos, com a prova de que o aceite falha sem a solução e passa com ela (#1233).
 
 ### Alterado
 
