@@ -353,3 +353,26 @@ tokens.
 - Always tells you when the board's history started and which periods have only monthly totals
   (without per-run detail). Periods outside the retention window (6 months by default) have no
   detail and aggregate only the already-consolidated totals.
+
+## Model evaluation scoreboard
+
+`npm run eval` writes each round to a JSON file in `evals/scoreboard/`, with the date and the model in
+the name (for example, `2026-10-29T183000Z-claude-opus-medium.json`). It is a controlled measure, with
+reference stories, to compare models; it is not the board's usage. How to run it and how to create
+reference stories is in [CONTRIBUTING_EN.md](../CONTRIBUTING_EN.md).
+
+- `summary`: the whole round. `accepted` and `acceptanceRate` count the accepted stories; `tokens` adds
+  input, cache read, cache write and output, with the `total`; `tokensPerAccepted` divides that total
+  by the accepted stories; `costUsd` adds up the cost the tool reported; `runs` counts the runs, and
+  `durationMs` is the wall-clock time of the stories.
+- `stories`: one row per story. `end` says how it finished (`delivered`, when it reached Acceptance;
+  `blocked`, when it was left with the person; `timeout`, when the time ran out). `accepted` and
+  `acceptance` (exit code and time of the acceptance tests) say whether it passed. The other fields are
+  the `summary`'s, for the story.
+- `modelMismatches`: how many runs ran with a model other than the one requested. If it is not zero, the
+  round is not comparing the same model.
+- `signals`: `reviewFixes` (commits made in Review), `testFailures` (failed `npm test`) and
+  `commitsAfterPr` (commits after the pull request). They are approximations, like the Rework ones.
+
+A value not measured appears as `null`, never as zero, and a sum in which no run was measured is also
+`null`. The cost only exists when the tool reports it; Cursor does not report it.
