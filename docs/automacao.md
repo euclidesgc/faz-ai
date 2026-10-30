@@ -48,6 +48,18 @@ relógio do board que, a cada rodada, primeiro arruma o board e depois decide o 
   conferência é pulada com uma linha no log), se a branch conflita com a base atual no origin. Se
   conflita, avisa na conversa uma vez por commit da branch, com os arquivos, para a IA atualizar a
   branch e resolver antes de abrir o PR. Nada muda no card nem nas branches.
+- **Tenta destravar as histórias bloqueadas**: a história, ou uma sub-tarefa dela, bloqueada pela IA ou
+  pelo board ganha uma execução de desbloqueio, uma por história, antes do trabalho novo e logo depois
+  dos conflitos de pull request. A IA procura a causa real e a resolve: roda as checagens que a
+  sub-tarefa não pôde rodar, faz o commit, traz a base certa, corrige base, modelo ou agente e registra
+  a dependência com outro card (`link_cards`). Resolvida, devolve as sub-tarefas à fila e a própria
+  história volta para a fila. Só continua bloqueada quando a causa depende de você (decisão de produto,
+  credencial, acesso, gasto), e a conversa diz o que ela precisa. Ficam de fora o bloqueio que você
+  pôs, o de limite de uso (a arrumação o devolve), a história com mensagem sua sem resposta e a que já
+  tem execução em andamento. Cada conjunto de motivos é tentado uma vez, e no máximo três tentativas
+  seguidas sem um gesto seu; cada tentativa fica na conversa com a nota "Tentativa de desbloqueio
+  (chave): …". Vale também no modo autônomo, e a barra de atividade mostra a execução como
+  "desbloqueando".
 - **Resume a conversa** das histórias com três ou mais mensagens desde o último resumo, ou duas que
   somem muito texto (ao menos uma da IA), antes de trabalhar a fase; a IA passa a receber só o resumo
   e o que vier depois dele.
@@ -77,8 +89,11 @@ relógio do board que, a cada rodada, primeiro arruma o board e depois decide o 
 - A fila da rodada segue a ordem do board: os bugs primeiro; depois a história mais à direita (a mais
   adiantada termina antes de uma nova começar); na mesma coluna, de cima para baixo. O que decide é a
   posição do card, não o número dele nem o que já foi aprovado.
-- Cards que estão com você (aguardando revisão ou resposta, bloqueados) não são tocados, a menos que
-  você tenha deixado uma mensagem sem resposta na conversa.
+- Dentro da fila, os conflitos de pull request vêm primeiro, depois as tentativas de desbloqueio, e só
+  então o trabalho novo.
+- Cards que estão com você (aguardando revisão ou resposta) não são tocados, a menos que você tenha
+  deixado uma mensagem sem resposta na conversa. Um bloqueio posto pela IA ou pelo board é tentado de
+  destravar; o que você pôs fica como está.
 - As execuções usam a mesma permissão e o mesmo tempo limite do botão "Trabalhar na fase".
 
 Quais colunas exigem aprovação, e em quais a IA atua, se define em Configurações → Workflows e
@@ -90,7 +105,8 @@ As atividades **sem branch** (refinar, resumir e as fases que só produzem docum
 PRD, Spec e Plan no board padrão; vale a coluna que tem artefato antes da fase de código) rodam ao
 mesmo tempo em qualquer modo de workspace, até **Histórias ao mesmo tempo** (duas por padrão, até
 seis), mesmo com **Tocar histórias em paralelo** desligado. As atividades **com branch**
-(Implementação e Homologação) seguem o limite de antes: uma por vez fora do worktree.
+(Implementação e Homologação) seguem o limite de antes: uma por vez fora do worktree. As de desbloqueio
+e de conflito contam como as com branch.
 
 No modo "Worktree por história", **Tocar histórias em paralelo** (Configurações → Automação;
 nasce desligado) faz o heartbeat tocar várias histórias com branch ao mesmo
@@ -240,7 +256,8 @@ que você tenha pausado: a pausa fica gravada no board (sobrevive a reabrir o ed
 ligar o modo numa história, a limpa; fechar o editor não conta como pausa. Depois de uma falha ao
 iniciar a ferramenta de IA, o autopiloto não religa sozinho até você retomar. Com o login da
 ferramenta vencido, o autopiloto e o heartbeat esperam o login voltar, sem gastar execuções. O
-heartbeat não toca histórias em modo autônomo; elas são do autopiloto.
+heartbeat não toca histórias em modo autônomo, que são do autopiloto, a não ser para destravar uma
+bloqueada (ver Heartbeat).
 
 ## Card preso em "Em execução"
 

@@ -35,7 +35,15 @@ describe('rodadas da Implementação', () => {
 
   it('a skill só manda testar e fazer commit quando a permissão inclui o terminal', () => {
     expect(implementacao).toMatch(/sem terminal|não pode rodar comandos/i);
-    expect(implementacao).toMatch(/quem tem permissão/);
+    // sem terminal a sub-tarefa conclui dizendo o que falta rodar, em vez de bloquear a história por isso
+    expect(implementacao).toMatch(/não bloqueie\s+por isso/);
+    expect(implementacao).toMatch(/conclua a sub-tarefa com `move_card`/);
+    expect(implementacao).toMatch(/quem tem o terminal/);
+  });
+
+  it('a skill manda registrar a dependência entre cards com link_cards/depends_on em vez de só bloquear', () => {
+    expect(FLOW_TEXT).toMatch(/registre a dependência com `link_cards` \(`depends_on`\)/);
+    expect(FLOW_TEXT).toMatch(/Uma história que usa o código de outra depende dela/);
   });
 
   it('a nota das rodadas no get_card diz o que o board executa, que a sessão cria e para, e aponta a skill', () => {

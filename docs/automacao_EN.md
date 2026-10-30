@@ -51,6 +51,18 @@ does.
   it does, it posts a notice in the conversation once per branch commit, with the files, for the AI
   to update the branch and resolve it before opening the PR. Nothing changes on the card or the
   branches.
+- **Tries to unblock blocked stories**: the story, or one of its sub-tasks, blocked by the AI or by the
+  board gets one unblock run per story, before new work and right after the pull request conflicts.
+  The AI looks for the real cause and fixes it: it runs the checks the sub-task could not run, commits,
+  brings in the right base, fixes the base, model or agent, and records a dependency on another card
+  (`link_cards`). Once fixed, it returns the sub-tasks to the queue and the story itself goes back to
+  the queue. It stays blocked only when the cause depends on you (a product decision, a credential,
+  access, spending), and the conversation says what it needs. Left out: a block you set, a usage-limit
+  block (tidying returns it), a story with an unanswered message from you, and one with a run in
+  progress. Each set of reasons is tried once, and at most three tries in a row without a move from
+  you; each try is noted in the conversation as "Tentativa de desbloqueio (chave): …" (the note text is
+  in Portuguese). It also applies in autonomous mode, and the activity bar shows the run as
+  "unblocking".
 - **Summarizes the conversation** of stories with three or more messages since the last summary, or
   two that add up to a lot of text (at least one from the AI), before working on the phase; the AI
   then receives only the summary and what comes after it.
@@ -80,8 +92,10 @@ does.
 - The round follows the board order: bugs first; then the rightmost story (the most advanced one
   finishes before a new one starts); within a column, top to bottom. What decides is the card's
   position, not its number nor what has already been approved.
-- Cards that are with you (waiting for review or an answer, blocked) are not touched, unless you
-  left an unanswered message in the conversation.
+- Within the queue, pull request conflicts come first, then the unblock attempts, and only then new work.
+- Cards that are with you (waiting for review or an answer) are not touched, unless you left an
+  unanswered message in the conversation. A block put by the AI or by the board is tried for unblocking;
+  one you put stays as it is.
 - Runs use the same permission and time limit as the "Trabalhar na fase" button.
 
 Which columns require approval, and in which ones the AI works, is set in Configurações → Workflows
@@ -94,7 +108,7 @@ as Discovery, PRD, Spec and Plan on the default board; the rule is any column wi
 before the code phase) run at the same time in any workspace mode, up to **Histórias ao mesmo
 tempo** (two by default, up to six), even with **Tocar histórias em paralelo** off. Activities
 **with a branch** (Implementation and Homologation) keep the previous limit: one at a time outside
-the worktree.
+the worktree. Unblock and conflict runs count as the ones with a branch.
 
 In "Worktree por história" mode, **Tocar histórias em paralelo** (Settings → Automação, automation;
 off by default) makes the heartbeat drive several branch stories at once, each in its own
@@ -248,8 +262,8 @@ story, unless you paused it: the pause is recorded on the board (it survives reo
 and "Retomar" (resume), or turning the mode on for a story, clears it; closing the editor does not
 count as a pause. After a failure to start the AI tool, the autopilot does not start itself again
 until you resume it. With the tool's login expired, the autopilot and the heartbeat wait for the
-sign-in to come back, without spending runs. The heartbeat does not drive autonomous stories; they
-belong to the autopilot.
+sign-in to come back, without spending runs. The heartbeat does not drive autonomous stories, which
+belong to the autopilot, except to unblock a blocked one (see Heartbeat).
 
 ## Card stuck in "Em execução" (running)
 

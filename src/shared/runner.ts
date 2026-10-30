@@ -21,9 +21,10 @@ export type AdmissionRegime = 'exclusive' | 'compatible';
  * nem mudar o status; `conflict` atualiza a branch da história a partir da base do pull request em
  * conflito (merge, checagens, commit e push), sem trabalhar a fase, e no fim o card volta ao status
  * que tinha; `reply` responde à última mensagem da pessoa (ou faz o que ela pede), mesmo com o card ou a
- * história bloqueados, sem trabalhar a fase além do pedido.
+ * história bloqueados, sem trabalhar a fase além do pedido; `unblock` é a execução do heartbeat numa história
+ * bloqueada pela IA ou pelo board: resolve a causa do bloqueio e devolve o trabalho à fila, sem trabalhar a fase.
  */
-export type AiRunMode = 'phase' | 'refine' | 'summarize' | 'conflict' | 'reply';
+export type AiRunMode = 'phase' | 'refine' | 'summarize' | 'conflict' | 'reply' | 'unblock';
 
 export interface RunnerConfig {
   permission: RunnerPermission;

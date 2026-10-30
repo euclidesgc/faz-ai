@@ -450,6 +450,8 @@ de novo, inclusive a que falhou ao começar; só tirar o bloqueio, sem mudar a c
 outra vez. A mesma nota não se repete na conversa: sem nada novo, o board só atualiza o motivo do
 bloqueio. Se a pessoa agiu e a história parou pelo mesmo motivo, vem uma vez a versão que explica o que
 aconteceu e o que costuma faltar. O resultado de uma tentativa igual ao da anterior também não se repete.
+Antes de esperar a pessoa, o heartbeat tenta destravar a história: a IA procura a causa e resolve o que
+consegue (detalhes em [automacao.md](automacao.md)).
 
 Nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica
 negada; no Cursor e no Kimi Code, sem bloqueio comprovado, a capacidade fica "desconhecida" e a

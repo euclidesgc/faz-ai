@@ -58,7 +58,9 @@ comentário**: ela entrega o card para a pessoa.
   em \`pending\`), \`ask_question\` para pergunta aberta. Faça as perguntas na história: a descrição dela é o
   insumo dos documentos. Pergunta sem resposta depois do envio: decida pelo padrão do projeto e registre
   a decisão na seção "Perguntas e respostas" (\`update_card\`) e na conversa.
-- Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\`.
+- Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\`. Quando o que
+  falta é outro card terminar, registre a dependência com \`link_cards\` (\`depends_on\`) e diga qual no
+  motivo: o heartbeat devolve o card à fila e o board só o executa depois que o outro for concluído.
 - A mensagem da pessoa devolve a vez à IA, com o card bloqueado ou não: leia, responda ou faça o pedido.
   Numa história parada por uma sub-tarefa, é ali que ela destrava: responda o que a sub-tarefa pediu e
   devolva-a à fila com \`release_card\`; quem a executa é o board.
@@ -109,6 +111,10 @@ história; a segunda, da primeira derivada, e assim por diante). No modo autôno
 \`autonomous_from\` = esta história em todas, na ordem: a fila já empilha cada uma sobre a anterior. A
 branch de cada derivada parte da branch da anterior, e o pull request dela é empilhado sobre o da
 anterior (\`workspace.baseBranch\` e \`workspace.prBase\` no \`get_card\`). Quando a anterior é concluída, o board passa a base da seguinte (e a do pull request dela) para a base da anterior, normalmente a \`develop\`, e avisa na conversa: siga sempre o \`workspace.baseBranch\` atual e, se ele mudou, traga a nova base para a branch com \`git fetch origin <base>\` e \`git merge origin/<base>\`, sem rebase nem push forçado.
+Uma história que usa o código de outra depende dela: registre com \`depends_on\` no \`create_card\` (ou
+\`link_cards\` depois), também entre histórias que não são derivadas uma da outra. É essa dependência que
+põe a outra antes na fila e empilha a branch sobre a dela; sem ela, a história começa sem o código de que
+precisa e para bloqueada.
 
 Declare a ordem entre elas: em \`create_card\`, \`depends_on\` lista as sub-tarefas que precisam
 terminar antes (ou use \`link_cards\` com \`depends_on\` depois). Uma sub-tarefa depende de outra
@@ -230,8 +236,9 @@ parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build
 executar outras sub-tarefas.
 
 Testes, build e commit dependem do terminal. Se você não pode rodar comandos nesta execução (permissão
-sem terminal, como "Board e arquivos do projeto"), não tente: implemente, verifique lendo o código e
-registre na conversa o que falta rodar. Essa parte fica para quem tem permissão.
+sem terminal, como "Board e arquivos do projeto", ou um agente sem a ferramenta), não tente e não bloqueie
+por isso: implemente, verifique lendo o código e conclua a sub-tarefa com \`move_card\`, dizendo no
+\`comment\` o que falta rodar. Essa parte fica para quem tem o terminal (a Revisão da história).
 
 \`start_work\` recusa a sub-tarefa que ainda depende de outra em aberto. Se duas sub-tarefas precisarem
 do mesmo arquivo, registre a dependência com \`link_cards\`: o board executa uma de cada vez de qualquer

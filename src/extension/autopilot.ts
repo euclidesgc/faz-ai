@@ -333,8 +333,16 @@ export class Autopilot {
     const story = card && (card.parentId ? s.cards.find((c) => c.id === card.parentId) : card);
     if (mode === 'summarize' && story && this.summarizing.has(story.id)) this.replaceWithSummary(s, story);
     // refinar, resumir e resolver conflito não movem a história de propósito: não contam como execução sem progresso
-    // a resposta a uma mensagem da pessoa não é uma volta da fase: não conta para o limite de voltas sem progresso
-    if (story?.yolo && this.active && mode !== 'refine' && mode !== 'summarize' && mode !== 'conflict' && mode !== 'reply')
+    // a resposta a uma mensagem da pessoa e o desbloqueio do heartbeat não são voltas da fase: não contam para o limite
+    if (
+      story?.yolo &&
+      this.active &&
+      mode !== 'refine' &&
+      mode !== 'summarize' &&
+      mode !== 'conflict' &&
+      mode !== 'reply' &&
+      mode !== 'unblock'
+    )
       this.checkProgress(s, story);
     // decide depois dos demais ouvintes do fim da execução: o heartbeat guarda a vaga para o autopiloto
     // quando a execução que terminou era dele, e a toma quando era do autopiloto (as filas se intercalam)
