@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
@@ -9,13 +9,18 @@ import {
   heartbeatIdleReason,
   heartbeatQueue,
   heartbeatTargets,
+  MAX_UNBLOCK_ATTEMPTS,
   refineTargets,
   summaryTargets,
+  unblockKey,
+  unblockNote,
+  unblockTargets,
 } from '../src/extension/heartbeat';
 import type { AiRunMode } from '../src/shared/runner';
 import type { AiRunOrigin } from '../src/shared/log';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { UsageLimitHeld } from '../src/extension/runner';
+import { isUnblockNote } from '../src/shared/orchestration';
 import { BUG_TYPE } from '../src/shared/priority';
 import type { CardStatus } from '../src/shared/status';
 
@@ -810,5 +815,153 @@ describe('heartbeat: conflito no pull request (#747)', () => {
     pending.clear(); // o PR deixou de ter conflito
     runner.finish();
     expect(runner.started.map(number)).toEqual([1]);
+  });
+});
+
+describe('heartbeat: desbloqueio de história bloqueada pela IA ou pelo board', () => {
+  const AI = { author: 'Claude Code', source: 'ai' } as const;
+  const ids = () => unblockTargets(router.snapshot()).map((c) => c.number);
+  /** bloqueia como a IA (ou o board) faria: o `statusBy` não é a pessoa */
+  const block = (n: number, reason = 'não consegui rodar o typecheck') =>
+    router.handle({ type: 'card.status.set', cardId: card(n).id, status: 'blocked', note: reason }, AI);
+  const say = (n: number, body: string, source: 'human' | 'ai' = 'human') =>
+    router.handle({ type: 'comment.add', cardId: card(n).id, body }, source === 'ai' ? AI : undefined);
+  /** cada gesto fica em um instante próprio: os testes comparam o horário das mensagens */
+  const tick = () => vi.setSystemTime(Date.now() + 1000);
+  const keyOf = (n: number) => unblockKey(router.snapshot(), card(n));
+  const withAct = () => {
+    heartbeat = new Heartbeat(runner, {
+      snapshot: () => router.snapshot(),
+      now: () => now,
+      log: (l) => log.push(l),
+      act: (m) => router.handle(m, AI),
+    });
+  };
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-01T12:00:00Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('unblockTargets: inclui a história com sub-tarefa bloqueada e a própria história bloqueada pela IA', () => {
+    create('Com sub-tarefa parada', 'Implementação'); // #1
+    create('passo', 'Em andamento', 1); // #2
+    create('Bloqueada', 'Implementação'); // #3
+    create('Livre', 'Implementação'); // #4
+    block(2);
+    block(3, 'a base está errada');
+    expect(ids()).toEqual([1, 3]);
+  });
+
+  it('unblockTargets: exclui o bloqueio posto pela pessoa, o de limite de uso e a história sem bloqueio', () => {
+    create('Da pessoa', 'Implementação'); // #1
+    create('Limite', 'Implementação'); // #2
+    create('Sub da pessoa', 'Implementação'); // #3
+    create('passo', 'Em andamento', 3); // #4
+    create('Misto', 'Implementação'); // #5
+    create('passo', 'Em andamento', 5); // #6
+    setStatus(1, 'blocked', 'aguardando o fornecedor');
+    block(2, 'You have hit your usage limit, resets in 2 hours');
+    setStatus(4, 'blocked', 'faremos depois');
+    block(5); // a história bloqueada pela IA...
+    setStatus(6, 'blocked', 'a pessoa pediu para esperar'); // ...mas uma sub-tarefa é espera combinada com a pessoa
+    expect(ids()).toEqual([]);
+  });
+
+  it('unblockTargets: exclui a história com execução em andamento e a com mensagem da pessoa sem resposta', () => {
+    create('Rodando', 'Implementação'); // #1
+    create('passo', 'Em andamento', 1); // #2
+    create('Com pergunta', 'Implementação'); // #3
+    create('passo', 'Em andamento', 3); // #4
+    block(1);
+    router.handle({ type: 'card.status.set', cardId: card(2).id, status: 'running' }, AI);
+    block(4);
+    setStatus(3, null); // sem status: a mensagem da pessoa é o que está pendente com a IA
+    expect(ids()).toEqual([3]);
+    tick();
+    say(3, 'e agora, o que fazer?'); // a resposta a ela trata o bloqueio
+    expect(ids()).toEqual([]);
+    tick();
+    say(3, 'respondido', 'ai');
+    expect(ids()).toEqual([3]);
+  });
+
+  it('unblockTargets: a chave já tentada não roda de novo, e um motivo novo volta a entrar', () => {
+    create('Bloqueada', 'Implementação'); // #1
+    block(1, 'falta rodar o teste');
+    expect(ids()).toEqual([1]);
+    tick();
+    say(1, unblockNote(keyOf(1)), 'ai');
+    expect(ids()).toEqual([]);
+    // a execução achou outra causa: outro motivo, outra chave, outra tentativa
+    const tried = keyOf(1);
+    tick();
+    block(1, 'agora falta o acesso ao registro');
+    expect(keyOf(1)).not.toBe(tried);
+    expect(ids()).toEqual([1]);
+  });
+
+  it(`unblockTargets: para depois de ${MAX_UNBLOCK_ATTEMPTS} tentativas desde o último gesto da pessoa, e a mensagem dela zera a conta`, () => {
+    create('Teimosa', 'Implementação'); // #1
+    for (let i = 0; i < MAX_UNBLOCK_ATTEMPTS; i++) {
+      tick();
+      block(1, `motivo ${i}`);
+      expect(ids()).toEqual([1]);
+      tick();
+      say(1, unblockNote(keyOf(1)), 'ai');
+    }
+    tick();
+    block(1, 'mais um motivo novo');
+    expect(ids()).toEqual([]);
+    tick();
+    say(1, 'olhei e a base é a develop'); // gesto da pessoa: devolve a história à IA
+    tick();
+    say(1, 'certo, vou conferir', 'ai'); // a resposta tratada
+    tick();
+    block(1, 'a base da develop não tem o commit'); // bloqueou de novo, com motivo novo
+    expect(ids()).toEqual([1]);
+  });
+
+  it('unblockTargets: inclui a história em modo autônomo', () => {
+    create('Autônoma', 'Implementação'); // #1
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true });
+    block(1);
+    expect(ids()).toEqual([1]);
+  });
+
+  it('heartbeatQueue põe o desbloqueio antes da fase e depois do conflito', () => {
+    create('Pronta', 'Implementação'); // #1
+    create('Bloqueada', 'Implementação'); // #2
+    block(2);
+    setStatus(1, 'ready');
+    expect(heartbeatQueue(router.snapshot())).toEqual([
+      { id: card(2).id, mode: 'unblock' },
+      { id: card(1).id, mode: 'phase' },
+    ]);
+  });
+
+  it('a rodada inicia o desbloqueio e grava a nota com a chave depois de começar', () => {
+    withAct();
+    create('Bloqueada', 'Implementação'); // #1
+    block(1, 'a base está errada');
+    const key = keyOf(1);
+    expect(heartbeat.runNow()).toBe(1);
+    expect(runner.modes).toEqual(['unblock']);
+    expect(runner.origins).toEqual(['heartbeat']);
+    expect(log.some((l) => l.includes('#1 (desbloqueio)'))).toBe(true);
+    const notes = router.snapshot().comments.filter((c) => c.cardId === card(1).id && isUnblockNote(c));
+    expect(notes.map((c) => c.body)).toEqual([unblockNote(key)]);
+    expect(notes[0]!.source).toBe('ai');
+  });
+
+  it('o desbloqueio recusado pelo limite de uso não grava a nota nem gasta a tentativa', () => {
+    withAct();
+    create('Bloqueada', 'Implementação'); // #1
+    block(1);
+    runner.held.add(card(1).id);
+    heartbeat.runNow();
+    expect(runner.started).toEqual([]);
+    expect(router.snapshot().comments.filter((c) => c.cardId === card(1).id && isUnblockNote(c))).toEqual([]);
+    expect(ids()).toEqual([1]);
   });
 });

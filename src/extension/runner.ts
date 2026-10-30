@@ -336,6 +336,7 @@ const MODE_ACTION: Record<AiRunMode, ContextAction> = {
   summarize: 'summary',
   conflict: 'conflict',
   reply: 'work',
+  unblock: 'work',
 };
 
 /** A troca por limite acontece sem perguntar à pessoa: autopiloto ou modo autônomo. */
@@ -417,6 +418,28 @@ export const replyPrompt = (ref: string, context: PromptContext = NO_CONTEXT, ad
     'Trabalhe só neste card e nas sub-tarefas dele. Não pergunte nada fora da conversa do card: ninguém está acompanhando esta sessão.',
   ].join('\n');
 
+/**
+ * O que a IA recebe na execução de desbloqueio do heartbeat: a história (ou uma sub-tarefa dela) está bloqueada
+ * pela IA ou pelo board, e ninguém vai destravá-la por ela. A execução resolve a causa (o que a sub-tarefa não
+ * pôde fazer, a base errada, a dependência que faltava registrar) e devolve o trabalho à fila; só mantém o bloqueio
+ * quando a causa depende mesmo da pessoa. Sem trabalhar a fase: quem segue com as sub-tarefas é o board.
+ */
+export const unblockPrompt = (ref: string, context: PromptContext = NO_CONTEXT, advice: string[] = []): string =>
+  [
+    `Destrave a história ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai". Ela (ou uma sub-tarefa dela) está bloqueada, e ninguém vai destravá-la por você: resolva a causa do bloqueio e devolva o trabalho à fila. NÃO é trabalhar a fase.`,
+    ...context.always,
+    ...context.card,
+    'Leia a história com get_card (conversa, sub-tarefas e `workspace`) e, em cada card bloqueado, o motivo (`work.reason`) e as últimas mensagens da conversa dele.',
+    '1. Ache a causa real, conferindo no projeto e no board: o motivo pode estar desatualizado (a causa já foi resolvida) ou descrever só o sintoma.',
+    '2. Resolva a causa você mesmo, na pasta de trabalho da história (`workspace`, sem trocar de branch): rode os comandos e as checagens que a sub-tarefa não pôde rodar e corrija o que acusarem, faça o commit do que ficou pronto, traga a base certa com git fetch e git merge (nunca rebase nem push --force), corrija a base com set_base_branch, ou o modelo, o agente e a descrição de uma sub-tarefa.',
+    '3. Se a causa é outro card que ainda não terminou, registre a dependência com link_cards (depends_on) quando ela ainda não estiver no board: o board só executa a história de novo depois que o outro card for concluído. Se esse card também estiver bloqueado, diga qual é na conversa; ele entra na próxima rodada de desbloqueio.',
+    '4. Resolvida a causa (ou registrada a dependência), devolva à fila com release_card cada sub-tarefa bloqueada e registre com add_comment, na conversa da história, a causa, o que você fez e o que conferiu. A história volta para a fila sozinha quando esta execução termina. Não execute as sub-tarefas nem trabalhe a fase, nem por subagente: quem segue é o board.',
+    'Mantenha o bloqueio só quando a causa depende mesmo da pessoa: uma decisão de produto que só ela pode tomar, ou credencial, acesso, conta ou gasto que esta sessão não tem. Nesse caso chame block_card na história com o motivo, o que você conferiu e exatamente o que a pessoa precisa fazer; sem block_card, a história volta para a fila.',
+    'Um bloqueio que é uma espera combinada com a pessoa (como "faremos depois de X" ou "desbloqueie quando for a hora") não é seu: chame block_card na história com o mesmo motivo, sem mexer em mais nada.',
+    ...advice,
+    'Trabalhe só nesta história e nas sub-tarefas dela. Não pergunte nada fora da conversa do card: ninguém está acompanhando esta sessão.',
+  ].join('\n');
+
 export const REPLY_AUTONOMOUS_ADVICE =
   'MODO AUTÔNOMO (YOLO): ninguém responde perguntas nesta história. Não use ask_question nem request_review: decida pelo padrão do projeto, registre a decisão na conversa e deixe a fase para o board seguir, sem mover o card.';
 
@@ -494,6 +517,7 @@ export class AiRunner {
     const summarize = mode === 'summarize';
     const conflict = mode === 'conflict';
     const reply = mode === 'reply';
+    const unblock = mode === 'unblock';
     // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo.
     // A execução de conflito segue a permissão (e o modelo) da fase: precisa de git e das checagens, como ela
     const autonomous = !refine && !summarize && isYolo(state, card);
@@ -599,7 +623,7 @@ export class AiRunner {
             this.deps.gateway.cursorHookReady?.(),
           );
           const permissionAdvice = refine || summarize ? null : PERMISSION_ADVICE[permission];
-          const stopAdvice = autonomous && !conflict ? yoloStopAdvice(state, card) : null;
+          const stopAdvice = autonomous && !conflict && !unblock ? yoloStopAdvice(state, card) : null;
           // a sessão da história numa fase de código só cria as sub-tarefas: quem as executa é o board
           const storySessionAdvice =
             options.workId === undefined && !card.parentId && mode === 'phase' && activityKindOf(state, card, 'phase') === 'branch'
@@ -612,6 +636,7 @@ export class AiRunner {
           if (summarize) log('Resumir a conversa: lê as mensagens e grava um resumo, sem mover o card nem mudar o status.');
           if (conflict) log('Resolver conflito: atualiza a branch a partir da base do pull request, sem trabalhar a fase.');
           if (reply) log('Responder à pessoa: lê a última mensagem da conversa e responde ou faz o pedido, mesmo com o bloqueio.');
+          if (unblock) log('Desbloquear: resolve a causa do bloqueio da história e devolve o trabalho à fila, sem trabalhar a fase.');
           log(plan.summary.join(' | '));
           activityModel = plan.manifest.model?.name ?? null;
           activityEffort = plan.manifest.model?.effort ?? null;
@@ -660,19 +685,24 @@ export class AiRunner {
                           ...plan.advice,
                           ...(permissionAdvice ? [permissionAdvice] : []),
                         ])
-                      : cardPrompt(
-                          cardRef(card),
-                          contextLines(state, card),
-                          [
-                            ...(stopAdvice ? [stopAdvice] : []),
-                            ...(storySessionAdvice ? [storySessionAdvice] : []),
+                      : unblock
+                        ? unblockPrompt(cardRef(card), contextLines(state, card), [
                             ...plan.advice,
                             ...(permissionAdvice ? [permissionAdvice] : []),
-                            ...(options.advice ?? []),
-                          ],
-                          autonomous,
-                          needsTriage(state, card),
-                        ),
+                          ])
+                        : cardPrompt(
+                            cardRef(card),
+                            contextLines(state, card),
+                            [
+                              ...(stopAdvice ? [stopAdvice] : []),
+                              ...(storySessionAdvice ? [storySessionAdvice] : []),
+                              ...plan.advice,
+                              ...(permissionAdvice ? [permissionAdvice] : []),
+                              ...(options.advice ?? []),
+                            ],
+                            autonomous,
+                            needsTriage(state, card),
+                          ),
               permission,
               addDirs: this.router.aiWorkDirs(),
               exec: plan.input,
@@ -1001,6 +1031,17 @@ export class AiRunner {
           cardId,
           body: `O limite de uso do plano do ${toolLabel} esgotou. O card voltou para a IA; as execuções automáticas desse perfil ficam pausadas até as ${limitClock(pause.resumeAt, now)}, quando a fila tenta de novo.${offered}${output}`,
         },
+        { author: RUNNER_AUTHOR, source: 'ai' },
+      );
+      return void this.restore(cardId, run);
+    }
+    // desbloqueio: quem mantém o bloqueio chama block_card (o status deixa de ser "running" e vale o que a IA
+    // decidiu, acima); terminar sem ele é destravar, e a história volta para a fila. O que falhou devolve o bloqueio
+    // que estava: um bloqueio novo com o motivo da falha mudaria a chave, e a rodada seguinte tentaria sem fim
+    if (run.mode === 'unblock') {
+      if (!failure) return void this.setStatus(cardId, 'ready', toolLabel);
+      this.router.handle(
+        { type: 'comment.add', cardId, body: `O desbloqueio não terminou. ${failure}` },
         { author: RUNNER_AUTHOR, source: 'ai' },
       );
       return void this.restore(cardId, run);

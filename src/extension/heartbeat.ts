@@ -12,7 +12,7 @@ import { activityKindOf, runningByKind, type ActivityKind } from '../shared/acti
 import { USAGE_LIMIT_TEXT } from '../shared/conversation';
 import { isWithHuman } from '../shared/story';
 import { autopilotStep, needsSummary, type StoryDriver } from './autopilot';
-import { orchestratesStory } from '../shared/orchestration';
+import { isUnblockNote, orchestratesStory, UNBLOCK_MARK } from '../shared/orchestration';
 import { UsageLimitHeld } from './runner';
 
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
@@ -144,6 +144,67 @@ export function usageLimitBlocked(s: BoardState): Card[] {
   return s.cards.filter((c) => isLive(c) && c.status === 'blocked' && USAGE_LIMIT_TEXT.test(c.statusReason));
 }
 
+/** Quantas tentativas de desbloqueio seguidas, sem um gesto da pessoa entre elas, a mesma história recebe. */
+export const MAX_UNBLOCK_ATTEMPTS = 3;
+
+/** Uma impressão curta do texto, para a nota da tentativa dizer a que bloqueio ela se refere. */
+function fingerprintOf(text: string): string {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) >>> 0;
+  return h.toString(16).padStart(8, '0');
+}
+
+/**
+ * A chave do bloqueio da história: os motivos de todos os cards bloqueados da família. A mesma chave já
+ * tentada não roda de novo; um motivo novo (a execução anterior achou outra causa) ganha outra tentativa.
+ */
+export function unblockKey(s: BoardState, story: Card): string {
+  const family = [story, ...childrenOf(s, story.id).filter(isLive)];
+  const reasons = family
+    .filter((c) => c.status === 'blocked')
+    .map((c) => `${c.id}:${c.statusReason.trim()}`)
+    .sort();
+  return fingerprintOf(reasons.join('\n'));
+}
+
+/** A nota com que a rodada abre a tentativa: a marca, a chave do bloqueio e o que a execução vai fazer. */
+export const unblockNote = (key: string): string =>
+  `${UNBLOCK_MARK} (${key}): o heartbeat chamou a IA para resolver a causa do bloqueio desta história e devolver o trabalho à fila. Se a causa depender de você, ela continua bloqueada com o que falta.`;
+
+/**
+ * Histórias que a rodada tenta destravar: a história ou uma sub-tarefa dela bloqueada pela IA ou pelo board.
+ * Bloqueio não é fim de linha: a causa costuma ser algo que a própria IA resolve (rodar uma checagem que a
+ * sub-tarefa não podia, trazer a base certa, registrar uma dependência), e esperar a pessoa parava o board.
+ * Ficam de fora o bloqueio que a pessoa pôs (é uma espera combinada com ela), o de limite de uso (a arrumação
+ * devolve), a história com mensagem da pessoa sem resposta (a resposta trata) ou com execução em andamento, e
+ * a que já teve esta mesma chave tentada ou `MAX_UNBLOCK_ATTEMPTS` tentativas desde o último gesto da pessoa.
+ * Entram as do modo autônomo: o autopiloto não mexe em história bloqueada. Pura.
+ */
+export function unblockTargets(s: BoardState): Card[] {
+  const unanswered = new Set(pendingWork(s).ai.unanswered.map((c) => c.id));
+  return s.cards
+    .filter((story) => {
+      if (!isLive(story) || story.parentId || columnOf(s, story)?.category !== 'open') return false;
+      const family = [story, ...childrenOf(s, story.id).filter((c) => isLive(c) && columnOf(s, c)?.category === 'open')];
+      const blocked = family.filter((c) => c.status === 'blocked');
+      if (!blocked.length) return false;
+      if (blocked.some((c) => c.statusBy === s.currentUser || USAGE_LIMIT_TEXT.test(c.statusReason))) return false;
+      if (unanswered.has(story.id) || family.some((c) => isAiWorking(s, c))) return false;
+      if (cardCliProblem(s, story) || cardRunUnsupported(s, story)) return false;
+      const ids = new Set(family.map((c) => c.id));
+      const lastHuman = Math.max(
+        0,
+        ...s.comments.filter((m) => ids.has(m.cardId) && m.source === 'human').map((m) => m.createdAt),
+        ...family.filter((c) => c.statusBy === s.currentUser && c.statusAt !== null).map((c) => c.statusAt!),
+      );
+      const tries = s.comments.filter((m) => m.cardId === story.id && isUnblockNote(m));
+      const key = unblockKey(s, story);
+      if (tries.some((m) => m.body.startsWith(`${UNBLOCK_MARK} (${key})`))) return false;
+      return tries.filter((m) => m.createdAt > lastHuman).length < MAX_UNBLOCK_ATTEMPTS;
+    })
+    .sort((a, b) => a.number - b.number);
+}
+
 /** Histórias paradas com a pessoa há `STALE_DAYS` ou mais, ainda sem o aviso desta parada na conversa. */
 export function staleWithHuman(s: BoardState, now: number): Card[] {
   const limit = STALE_DAYS * 24 * 60 * 60_000;
@@ -180,8 +241,8 @@ export function conflictTargets(s: BoardState, pending: ReadonlySet<string>): Ca
 
 /**
  * A fila de uma rodada: cada história uma vez, com o que fazer nela. Os conflitos de pull request vêm
- * primeiro (a história com conflito trabalha a fase só na rodada seguinte), depois resumir antes de
- * trabalhar a fase, resumos e refinamentos.
+ * primeiro (a história com conflito trabalha a fase só na rodada seguinte), depois os desbloqueios, depois
+ * resumir antes de trabalhar a fase, resumos e refinamentos.
  */
 export function heartbeatQueue(s: BoardState, conflicts: ReadonlySet<string> = new Set()): HeartbeatItem[] {
   const items: HeartbeatItem[] = [];
@@ -192,6 +253,8 @@ export function heartbeatQueue(s: BoardState, conflicts: ReadonlySet<string> = n
     items.push({ id: card.id, mode });
   };
   for (const card of conflictTargets(s, conflicts)) push(card, 'conflict');
+  // a história bloqueada vem antes do trabalho novo: destravar é o que libera as que dependem dela
+  for (const card of unblockTargets(s)) push(card, 'unblock');
   const summaries = new Set(summaryTargets(s).map((c) => c.id));
   for (const card of heartbeatTargets(s)) push(card, summaries.has(card.id) ? 'summarize' : 'phase');
   for (const card of summaryTargets(s)) push(card, 'summarize');
@@ -245,6 +308,7 @@ const MODE_LABEL: Record<AiRunMode, string> = {
   summarize: 'resumir',
   conflict: 'conflito',
   reply: 'resposta',
+  unblock: 'desbloqueio',
 };
 
 /**
@@ -430,6 +494,7 @@ export class Heartbeat {
     if (item.mode === 'refine') return refineTargets(s).find((c) => c.id === item.id);
     if (item.mode === 'summarize') return summaryTargets(s).find((c) => c.id === item.id);
     if (item.mode === 'conflict') return conflictTargets(s, this.conflicts()).find((c) => c.id === item.id);
+    if (item.mode === 'unblock') return unblockTargets(s).find((c) => c.id === item.id);
     return heartbeatTargets(s).find((c) => c.id === item.id);
   }
 
@@ -470,7 +535,13 @@ export class Heartbeat {
       }
       try {
         if (item.mode === 'phase' && this.deps.driver && orchestratesStory(current, card)) this.drive(this.deps.driver, card);
-        else this.runner.start(item.id, 'heartbeat', item.mode);
+        else {
+          const key = item.mode === 'unblock' ? unblockKey(current, card) : null;
+          this.runner.start(item.id, 'heartbeat', item.mode);
+          // a nota marca a chave como tentada e devolve as sub-tarefas à IA; só depois de a execução começar,
+          // senão uma recusa (perfil pausado pelo limite de uso) gastava a tentativa sem ter rodado
+          if (key) this.deps.act?.({ type: 'comment.add', cardId: card.id, body: unblockNote(key) });
+        }
         counts[kind]++;
       } catch (e) {
         // perfil pausado pelo limite de uso: só as histórias dele ficam para a rodada em que a pausa vencer; os outros

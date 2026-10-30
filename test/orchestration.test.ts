@@ -3,10 +3,12 @@ import {
   admit,
   blockNote,
   effectiveLimits,
+  handedBackAt,
   orchestrableSubtasks,
   reconcileOutcome,
   repeatedBlockNote,
   stoppedReason,
+  UNBLOCK_MARK,
   storyPlan,
   workKey,
   type WorkEvidence,
@@ -244,6 +246,30 @@ describe('plano puro de rodadas', () => {
     expect(workKey('subtask', s, story, a)).toBe([...done].at(-1));
     a.statusBy = 'a';
     expect(done.has(workKey('subtask', s, story, a))).toBe(false);
+  });
+  it('a nota de tentativa de desbloqueio do heartbeat conta como gesto da pessoa, só quando é da IA e começa pela marca', () => {
+    const s = state();
+    const a = s.cards[1]!;
+    const note = (cardId: string, at: number, body: string, source: 'human' | 'ai' = 'ai') =>
+      s.comments.push({ id: `n${at}`, cardId, author: 'Faz AI', source, body, createdAt: at, updatedAt: at });
+    expect(handedBackAt(s, a)).toBe(0);
+    // uma mensagem qualquer da IA não devolve a vez
+    note(story.id, 5, 'Resolvi a causa.');
+    expect(handedBackAt(s, a)).toBe(0);
+    // a marca num texto da IA que não abre com ela também não
+    note(story.id, 6, `Veja: ${UNBLOCK_MARK}`);
+    expect(handedBackAt(s, a)).toBe(0);
+    // a nota na conversa da história devolve a sub-tarefa, e a chave dela muda para rodar de novo
+    const before = workKey('subtask', s, story, a);
+    note(story.id, 10, `${UNBLOCK_MARK} (abc12345): o heartbeat chamou a IA.`);
+    expect(handedBackAt(s, a)).toBe(10);
+    expect(workKey('subtask', s, story, a)).not.toBe(before);
+    // a nota de outra história não conta
+    note('outra', 50, `${UNBLOCK_MARK} (abc12345): x`);
+    expect(handedBackAt(s, a)).toBe(10);
+    // vale o gesto mais recente, da pessoa ou da nota
+    note(a.id, 20, 'segue', 'human');
+    expect(handedBackAt(s, a)).toBe(20);
   });
   it('a parada numa sub-tarefa com a pessoa traz o motivo dela e os passos para destravar', () => {
     const s = state();

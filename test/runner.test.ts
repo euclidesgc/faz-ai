@@ -19,6 +19,7 @@ import {
   replyPrompt,
   REPLY_AUTONOMOUS_ADVICE,
   summarizePrompt,
+  unblockPrompt,
   UsageLimitHeld,
   yoloStopAdvice,
 } from '../src/extension/runner';
@@ -353,6 +354,22 @@ it('replyPrompt responde à última mensagem da pessoa, mesmo com o bloqueio, e 
   expect(prompt).not.toContain(AUTONOMOUS_ADVICE);
   expect(prompt.indexOf('Contexto fixo deste board.')).toBeLessThan(prompt.indexOf('Leia o card'));
   expect(prompt.indexOf('Aviso de permissão.')).toBeLessThan(prompt.indexOf('Trabalhe só neste card'));
+  expect(prompt).not.toContain('Faça o trabalho da fase');
+});
+
+it('unblockPrompt manda achar e resolver a causa, registrar a dependência, devolver as sub-tarefas e só manter o bloqueio se depender da pessoa', () => {
+  const prompt = unblockPrompt('#1', { always: ['Contexto fixo deste board.'], card: [] }, ['Aviso de permissão.']);
+  expect(prompt).toMatch(/^Destrave a história #1 .* NÃO é trabalhar a fase\./);
+  expect(prompt).toContain('release_card');
+  expect(prompt).toContain('link_cards');
+  expect(prompt).toContain('depends_on');
+  expect(prompt).toContain('block_card');
+  expect(prompt).toContain('sem block_card, a história volta para a fila');
+  expect(prompt).toContain('nunca rebase nem push --force');
+  expect(prompt).toContain('Não execute as sub-tarefas');
+  expect(prompt).toContain('espera combinada com a pessoa');
+  expect(prompt.indexOf('Contexto fixo deste board.')).toBeLessThan(prompt.indexOf('Leia a história'));
+  expect(prompt.indexOf('Aviso de permissão.')).toBeLessThan(prompt.indexOf('Trabalhe só nesta história'));
   expect(prompt).not.toContain('Faça o trabalho da fase');
 });
 
@@ -981,6 +998,47 @@ describe('executor da IA', () => {
       runner.stop(storyId);
       expect(card().status).toBe('waiting_review');
       expect(finished).toEqual(['conflict']);
+    });
+  });
+
+  describe('Desbloquear a história (heartbeat)', () => {
+    const blockByAi = (note: string) => ai({ type: 'card.status.set', cardId: storyId, status: 'blocked', note });
+
+    it('leva o pedido de desbloqueio e o log diz que é a execução de desbloqueio, como atividade de branch', () => {
+      blockByAi('A base está errada.');
+      runner.start(storyId, 'heartbeat', 'unblock');
+      expect(procs[0]!.command.stdin).toContain('Destrave a história #1');
+      expect(procs[0]!.command.stdin).not.toContain('Faça o trabalho da fase');
+      expect(log.join('\n')).toContain('[#1] Desbloquear: resolve a causa do bloqueio da história');
+      expect(router.snapshot().aiActivity[0]).toMatchObject({ mode: 'unblock', origin: 'heartbeat' });
+    });
+
+    it('terminar sem block_card devolve a história à fila (ready)', () => {
+      blockByAi('A base está errada.');
+      runner.start(storyId, 'heartbeat', 'unblock');
+      expect(card().status).toBe('running');
+      ai({ type: 'comment.add', cardId: storyId, body: 'Troquei a base e conferi.' });
+      procs[0]!.exit(0);
+      expect(card().status).toBe('ready');
+    });
+
+    it('a IA que mantém o bloqueio com block_card fica bloqueada com o motivo dela', () => {
+      blockByAi('A base está errada.');
+      runner.start(storyId, 'heartbeat', 'unblock');
+      blockByAi('Preciso de uma credencial que só a pessoa tem.');
+      procs[0]!.exit(0);
+      expect(card()).toMatchObject({ status: 'blocked', statusReason: 'Preciso de uma credencial que só a pessoa tem.' });
+    });
+
+    it('falha do processo volta ao bloqueio anterior, com o motivo, e avisa na conversa que o desbloqueio não terminou', () => {
+      blockByAi('A base está errada.');
+      runner.start(storyId, 'heartbeat', 'unblock');
+      procs[0]!.exit(1);
+      // o motivo não muda: um motivo novo mudaria a chave e a rodada seguinte tentaria sem fim
+      expect(card()).toMatchObject({ status: 'blocked', statusReason: 'A base está errada.' });
+      expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
+      expect(lastMessage()!.body).toContain('O desbloqueio não terminou.');
+      expect(lastMessage()!.body).toContain('código 1');
     });
   });
 

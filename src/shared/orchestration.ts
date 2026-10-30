@@ -89,14 +89,22 @@ export function orchestratesStory(s: BoardState, story: Card): boolean {
   );
 }
 /**
+ * Parte estável da nota com que o heartbeat abre uma tentativa de desbloqueio na conversa da história. A nota
+ * conta como gesto da pessoa (`handedBackAt`): a execução de desbloqueio faz o que a pessoa faria para destravar.
+ */
+export const UNBLOCK_MARK = 'Tentativa de desbloqueio';
+export const isUnblockNote = (m: { source?: string | null; body: string }): boolean => m.source === 'ai' && m.body.startsWith(UNBLOCK_MARK);
+/**
  * O último gesto da pessoa numa sub-tarefa, ou 0: mensagem na conversa dela ou na da história (é na história
  * que a pessoa destrava as sub-tarefas) e o status que ela mesma definiu. Entra na chave da sub-tarefa: a que
  * já rodou nesta fase só roda de novo quando a pessoa a devolve à IA. Sem isso, a sub-tarefa respondida voltava
- * a "Pronto" e nunca mais era executada, e a história ficava parada esperando por ela.
+ * a "Pronto" e nunca mais era executada, e a história ficava parada esperando por ela. A tentativa de desbloqueio
+ * do heartbeat vale como esse gesto: sem ela, a sub-tarefa que a execução destravou continuava marcada como
+ * já tentada, e a história parava de novo no mesmo ponto.
  */
 export function handedBackAt(s: BoardState, card: Card): number {
   const where = new Set([card.id, card.parentId]);
-  const said = s.comments.filter((m) => where.has(m.cardId) && m.source === 'human').map((m) => m.createdAt);
+  const said = s.comments.filter((m) => where.has(m.cardId) && (m.source === 'human' || isUnblockNote(m))).map((m) => m.createdAt);
   const set = card.statusBy === s.currentUser && card.statusAt !== null ? [card.statusAt] : [];
   return Math.max(0, ...said, ...set);
 }
