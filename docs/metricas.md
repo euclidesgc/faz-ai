@@ -258,6 +258,17 @@ pelo navegador.
   histórias concluídas foram autônomas. São aproximações (commit ≈ correção), valem só para o Claude
   Code desde o registro de comandos de Bash, e a fase Revisão é reconhecida pelo nome. Sem execução
   com registro de Bash no período, o sinal fica "não medido", não zero.
+- **Retrabalho por agente.** Uma tabela com as revisões pedidas e os pedidos de ajuste de cada agente,
+  pela execução que pediu a revisão. Logo abaixo, **Execuções sem resultado** por modelo e por agente,
+  no formato `3 de 10` (quantas dessas execuções ficaram sem resultado, de quantas rodaram). Conta falha,
+  tempo esgotado e interrupção; é uma aproximação, porque uma execução interrompida pode ter deixado
+  trabalho útil. As execuções em andamento não entram na conta.
+- **Custo por entrega.** Os tokens das histórias concluídas no período: um resumo com as histórias
+  concluídas e as que têm tokens medidos, a tabela por tipo e esforço (média e mediana por história) e
+  as tabelas por tipo e modelo e por tipo e agente, com tokens por história e pedidos de ajuste. Uma
+  história que usou mais de um modelo ou agente aparece em cada um deles, então as linhas de modelo e
+  de agente não somam o total. Só entram as histórias cujas execuções o detalhe guardado ainda tem, e o
+  tipo e o esforço são os valores atuais da história. Tokens sem medida aparecem como "não medido".
 
 ### Retenção e avisos
 

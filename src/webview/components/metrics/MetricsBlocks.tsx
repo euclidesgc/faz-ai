@@ -7,6 +7,7 @@ import { MetricsBlock, MetricsBlockGroup } from './MetricsBlock';
 import { CardRanking, PhaseRanking } from './RankingTable';
 import { DwellTable, LeadTable } from './Times';
 import { ReworkTables } from './Rework';
+import { DeliveryTables } from './Delivery';
 
 /**
  * Os cinco blocos abaixo da série por mês (card 173): cortes, permanência por fase, lead time, os dois
@@ -62,6 +63,15 @@ export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
         result={result}
       >
         <ReworkTables result={result} sections={sections} />
+      </MetricsBlock>
+
+      <MetricsBlock
+        title={t('Custo por entrega')}
+        intro={t('Os tokens das histórias concluídas no período, por tipo, esforço, modelo e agente.')}
+        horizon="detail"
+        result={result}
+      >
+        <DeliveryTables result={result} sections={sections} />
       </MetricsBlock>
 
       <MetricsBlockGroup

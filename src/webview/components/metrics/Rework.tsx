@@ -2,7 +2,7 @@ import { useId } from 'react';
 import { t } from '../../i18n';
 import { formatNumber, intlLocale } from './format';
 import type { MetricsBlockProps } from './MetricsBlock';
-import type { MetricsAiSignal } from '../../../shared/metrics';
+import type { MetricsAiSignal, MetricsUnfinishedRow } from '../../../shared/metrics';
 
 /** Fração em porcentagem inteira, no idioma da tela. */
 const percent = (part: number, whole: number): string =>
@@ -17,12 +17,44 @@ const percent = (part: number, whole: number): string =>
  */
 export function ReworkTables({ sections }: MetricsBlockProps) {
   const uid = useId();
-  const { phases, models, escapes, aiSignals } = sections.rework;
+  const { phases, models, agents, unfinished, escapes, aiSignals } = sections.rework;
   const resolved = phases.reduce((n, p) => n + p.resolved, 0);
   const firstPass = phases.reduce((n, p) => n + p.firstPass, 0);
   const adjusted = phases.reduce((n, p) => n + p.adjusted, 0);
-  if (!phases.length && !escapes.stories && !aiSignals.bashRuns)
+  // Execução sem resultado também conta: um período só com falhas não é um período vazio.
+  if (!phases.length && !escapes.stories && !aiSignals.bashRuns && !unfinished.models.length && !unfinished.agents.length)
     return <p className="metrics-times-empty">{t('Nenhuma revisão nem história concluída neste período.')}</p>;
+  // A célula mostra "{n} de {runs}"; o title detalha o que o `outcome` registrou (RF7).
+  const unfinishedTable = (caption: string, label: string, blank: string, rows: MetricsUnfinishedRow[]) => (
+    <table className="metrics-table">
+      <caption className="sr-only">{caption}</caption>
+      <thead className="metrics-sticky-head">
+        <tr>
+          <th scope="col">{label}</th>
+          <th scope="col" className="is-number">
+            {t('Sem resultado')}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.value}>
+            <th scope="row">{r.value || blank}</th>
+            <td
+              className="is-number"
+              title={t('falhou: {failed}; tempo esgotado: {timeout}; interrompida: {stopped}', {
+                failed: formatNumber(r.failed),
+                timeout: formatNumber(r.timeout),
+                stopped: formatNumber(r.stopped),
+              })}
+            >
+              {t('{n} de {runs}', { n: formatNumber(r.unfinished), runs: formatNumber(r.runs) })}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
   const signalText = (s: MetricsAiSignal, unit: 'runs' | 'stories') =>
     !aiSignals.bashRuns
       ? t('não medido')
@@ -141,12 +173,48 @@ export function ReworkTables({ sections }: MetricsBlockProps) {
           </tbody>
         </table>
       )}
+      {agents.length > 0 && (
+        <table className="metrics-table">
+          <caption className="sr-only">{t('Retrabalho por agente')}</caption>
+          <thead className="metrics-sticky-head">
+            <tr>
+              <th scope="col">{t('Agente')}</th>
+              <th scope="col" className="is-number">
+                {t('Revisões pedidas')}
+              </th>
+              <th scope="col" className="is-number">
+                {t('Pedidos de ajuste')}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {agents.map((a) => (
+              <tr key={a.agent}>
+                <th scope="row">{a.agent || t('sem agente')}</th>
+                <td className="is-number">{formatNumber(a.reviews)}</td>
+                <td className="is-number">{formatNumber(a.adjusted)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {unfinished.models.length > 0 &&
+        unfinishedTable(t('Execuções sem resultado por modelo'), t('Modelo'), t('não definido'), unfinished.models)}
+      {unfinished.agents.length > 0 &&
+        unfinishedTable(t('Execuções sem resultado por agente'), t('Agente'), t('sem agente'), unfinished.agents)}
       <div id={`${uid}-n`} className="metrics-times-notes">
         <p className="metrics-times-hint">
           {t(
             'Conta só a resposta de uma pessoa: aprovar ou pedir ajustes. A aprovação automática do modo autônomo não é revisão. "De primeira" é a primeira resposta da pessoa àquele card naquela fase; o ajuste conta para o modelo da execução que pediu a revisão.',
           )}
         </p>
+        {(unfinished.models.length > 0 || unfinished.agents.length > 0) && (
+          <p className="metrics-times-hint">
+            {t(
+              'Execuções sem resultado são uma aproximação: falha, tempo esgotado ou interrupção. Uma execução interrompida pode ter deixado trabalho útil. As execuções em andamento não entram na conta.',
+            )}
+          </p>
+        )}
         <p className="metrics-times-hint">
           {t(
             'Os sinais da IA são aproximações (um commit conta como uma correção) e valem só para o Claude Code, desde o registro de comandos de Bash; "autônomas" é a parte feita em execuções do modo autônomo. Sem execução com registro de Bash no período, o sinal fica "não medido".',
