@@ -113,6 +113,7 @@
 
 ### Corrigido
 
+- A sessão da história que cria as sub-tarefas da fase e para volta para a fila, em vez de bloquear por "encerrou sem responder".
 - A história que a IA cria em modo autônomo a partir de outra, fora de uma pilha, depende dela: não começa antes de a origem chegar à base.
 - Dividir uma história em modo autônomo não religa mais o autopiloto que a pessoa pausou.
 - A história em modo autônomo cuja pasta de trabalho foi apagada para com o motivo, em vez de o autopiloto chamar a IA sem parar.
