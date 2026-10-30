@@ -151,7 +151,8 @@ describe('cenário: o portão das checagens da coluna', () => {
     await w.executor.run(w.opened[0]!);
     expect(w.card().status).toBe('ready');
     expect(w.columnName()).toBe('Implementação');
-    expect(w.comments().at(-1)).toContain('esperado 2, recebeu 3');
+    // depois da falha vem o aviso da subida de modelo (#1108): a saída da checagem está num comentário anterior
+    expect(w.comments().some((c) => c.includes('esperado 2, recebeu 3'))).toBe(true);
     const [first] = w.repo.listFor(w.card().id);
     expect(first).toMatchObject({ kind: 'move', result: 'failed' });
     expect(first!.outputTail).toContain('esperado 2, recebeu 3');

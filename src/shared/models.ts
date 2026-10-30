@@ -244,6 +244,18 @@ export function suggestModel(state: BoardState, card: Card): string | null {
   return suggestModelRule(state, card)?.model ?? null;
 }
 
+/**
+ * O modelo do card foi escolhido à mão: há valor e ele não é o que as regras sugerem agora (ou, com `previous`, a
+ * sugestão anterior). Quem escolheu igual à sugestão é tratado como automático.
+ */
+export function isHandPicked(state: BoardState, card: Card, previous?: string | null): boolean {
+  const field = modelFieldOf(state, card);
+  if (!field) return false;
+  const current = valueOf(state, card.id, field.id);
+  if (current === null || current === undefined) return false;
+  return current !== (previous === undefined ? suggestModel(state, card) : previous);
+}
+
 /** Texto de uma regra, ex.: `Esforço = Alto E Tags = backend OU Tipo = Bug`. */
 export function describeRule(
   state: BoardState,

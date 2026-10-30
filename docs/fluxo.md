@@ -121,6 +121,14 @@ do código rápida depois:
   hora; o que é ambíguo ou muda o comportamento combinado vira pergunta para você, e a IA para. A
   coluna não pede aprovação: o resultado fica na conversa e entra no **Como revisar** do PR.
 - **Portão de checagens.** Uma coluna pode ter checagens (nome, comando e tempo limite, em **Configurações › Workflows e colunas**, na coluna **Checagens**). Quando a IA tenta mover o card para a frente ou pedir a revisão dele nessa coluna, o board roda as checagens, em ordem, na pasta da história, e o card fica em **Verificando** até terminar (a IA para). Se todas passarem, o movimento ou o pedido de revisão segue e o commit verificado fica registrado. Se alguma falhar, ou não terminar (tempo esgotado, pasta em uso, sessão da IA que não acaba a tempo), o card volta para **Pronto** com o fim da saída na conversa, e a IA corrige e tenta de novo. Nos comandos, `{base}` vira a branch de base da história e `{changed_files}` a lista dos arquivos alterados em relação a ela. Quando você move o card, ele não passa pelo portão; voltar de coluna ou cancelar também não.
+- **Correção com modelo acima.** Quando o portão falha, o board sobe o modelo da correção um nível sem
+  a IA escolher (a escada do agente ou, sem escada, o esforço), e a correção roda de novo. Só a checagem
+  do board dispara essa subida: a IA não a pede, e o parecer dela sobre a falha não conta. A subida vale uma vez por
+  card e coluna: se o portão falhar de novo depois dela, o card vai para a pessoa como bloqueado. Um
+  modelo escolhido à mão nunca muda, e a subida nunca baixa o modelo que a correção já tem. Com sub-tarefas
+  na fase, a subida vale para a próxima sub-tarefa de correção que a IA criar. Cada subida aparece na
+  conversa, com o modelo de antes, o de depois e o nome da checagem. Detalhes da escada em
+  [configuracoes.md](configuracoes.md#sugestão-de-modelo-para-cada-card).
 - **Pull request que explica a entrega.** Na Homologação, o corpo do PR traz o **Objetivo**, **O que
   foi feito**, **Como revisar** (por onde começar a ler, a ordem dos commits e o tamanho do diff), as
   **Decisões** (por que o caminho escolhido, as alternativas descartadas e os desvios do plano) e o

@@ -13,7 +13,7 @@ const BRIEF_TITLES = REQUIRED_BRIEF_SECTIONS.join(', ').replace(/, ([^,]*)$/, ' 
 export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
   tool(
     'create_card',
-    `Cria um card. Com \`parent\`, cria uma sub-tarefa daquela história (no workflow filho); sem \`parent\`, cria uma história (no workflow pai). \`profile\` escolhe o agente e \`checklist\` cria os itens na mesma chamada. Devolve o card resumido (mais \`checklistItems\`, com ids, quando criou itens); o detalhe (phase, notas, workspace) vem pelo get_card. Numa sub-tarefa de fase de código, use as seções ${BRIEF_TITLES} (e ${BRIEF_SECTIONS.decisions}, se houver): o board confere antes de executar.`,
+    `Cria um card. Com \`parent\`, cria uma sub-tarefa daquela história (no workflow filho); sem \`parent\`, cria uma história (no workflow pai). \`profile\` escolhe o agente e \`checklist\` cria os itens na mesma chamada. Devolve o card resumido (mais \`checklistItems\`, com ids, quando criou itens); o detalhe (phase, notas, workspace) vem pelo get_card. Numa sub-tarefa de fase de código, use as seções ${BRIEF_TITLES} (e ${BRIEF_SECTIONS.decisions}, se houver): o board confere antes de executar. O modelo da correção criada depois de uma checagem que falhou é escolhido pelo board.`,
     {
       title: z.string().min(1),
       description: z.string().optional().describe('Markdown'),
@@ -76,6 +76,7 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       const id = router.createCard({ typeId: type.id, columnId: column.id, parentId: parent?.id ?? null, title: a.title }, aiOrigin(ctx));
       if (a.description) router.handle({ type: 'card.update', cardId: id, patch: { description: a.description } });
       setFields(router, s, id, a.fields, aiOrigin(ctx));
+      if (parent) router.applyEscalationToNewCard(id);
       for (const dep of dependsOn) router.handle({ type: 'link.add', fromId: dep.id, toId: id, kind: 'precedes' }, aiOrigin(ctx));
       // a pilha vem antes do modo: a herança decide o vínculo (dependência ou relação) pela origem da pilha
       if (derivedFrom) router.handle({ type: 'card.derive', cardId: id, fromId: derivedFrom.id }, aiOrigin(ctx));

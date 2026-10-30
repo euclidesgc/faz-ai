@@ -205,7 +205,9 @@ pela IA, depois do movimento aceito; um movimento recusado não grava nada. `cre
 card resumido, como `move_card` e `start_work`, mais `checklistItems` (com ids) quando criou itens; o
 detalhe (`phase`, `execution`, notas) vem pelo `get_card`. `set_card_profile` também devolve o resumo.
 A descrição do `create_card` pede, numa sub-tarefa de fase de código, as seções `Objetivo`, `Pronto quando`,
-`Pode tocar` e `Não pode tocar` (e `Decisões anteriores`, se houver): o board confere antes de executar.
+`Pode tocar` e `Não pode tocar` (e `Decisões anteriores`, se houver): o board confere antes de executar. Numa sub-tarefa de correção criada
+depois de uma checagem que falhou, o board escolhe o modelo (um nível acima); não o defina, porque a subida
+é do board e o campo Modelo que a IA passar só vale se não for mais baixo que o alvo.
 `add_checklist_item` aceita `text` (um item) ou `items` (vários, na ordem). `move_card` para uma coluna de
 conclusão recusa o card com item do checklist em aberto e lista os itens com os ids: a IA marca o que fez
 com `update_checklist_item` e apaga o que não se aplica com `delete_checklist_item`.

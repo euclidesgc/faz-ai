@@ -456,6 +456,19 @@ automaticamente** (fill in the suggested model automatically), right above the r
 field when a card is created or changes, if it is empty or holds the previous suggestion; a model chosen
 by hand is never replaced.
 
+**Raising the model when a check fails.** When a check of the column fails (in **Settings → Workflows
+and columns**), the board raises the model of the fix on its own, without the AI choosing: the card goes
+back to **Pronto** (ready) and runs again with the model one level up. The raise follows the agent's
+**ladder** of models, from the cheapest to the strongest; without a ladder for the agent, it only raises the
+effort of the same model, from the lowest to the highest. Each agent's ladder is stored in the board; the
+screen to edit it comes in a later version. A model chosen by hand is never changed, and the raise happens
+**once** per card and column: if the check fails again after it, the card goes to the person as blocked. When
+the story has sub-tasks in the phase that failed, the raise applies to the next fix sub-task the AI creates,
+with the reference model taken from the last sub-task finished in the phase. The raise never lowers the model
+the fix already has, and each one is recorded in the conversation, with the earlier model, the new one and the
+check name. With no level above (the top of the ladder, or a model outside the catalog), the board only
+warns in the conversation and the fix keeps the current model.
+
 ## Fallback rules
 
 When a model runs out of usage quota on a card with you in the loop (outside autonomous mode and the

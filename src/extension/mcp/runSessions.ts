@@ -232,6 +232,8 @@ export class RunMcpSessions {
       'snapshot',
       'handle',
       'createCard',
+      // a subida de modelo pendente da história, aplicada na correção que o create_card acabou de criar (#1108)
+      'applyEscalationToNewCard',
       // só leitura: o id do portão que o move_card/request_review devolve à IA
       'runningGate',
       'addAttachmentFiles',

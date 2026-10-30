@@ -244,7 +244,9 @@ A sua sessão na história faz só o trabalho de planejar, exceto na trilha dire
    verifique o conjunto como o projeto define (typecheck e testes, com terminal), faça o commit na
    branch da história, marque os itens do checklist da história e mova a história. Os resultados de cada sub-tarefa estão na conversa da
    história. Se a verificação falhar, corrija ou crie uma sub-tarefa de correção com Fase = esta coluna
-   e pare: o board a executa e chama você de novo.
+   e pare: o board a executa e chama você de novo. Quando uma checagem do board falha, ele sobe sozinho o
+   modelo da correção um nível (uma vez por unidade): você não escolhe nem pede modelo para ela. Na segunda
+   falha, o card vai para a pessoa.
 
 Quem executa **uma** sub-tarefa (o board chama você só nela) segue o ciclo: \`start_work\` (que já leva a sub-tarefa para "Em andamento"),
 faça o trabalho na pasta da história (\`workspace\` no \`get_card\`), verifique só a sua
@@ -276,7 +278,7 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
    alterado junto com o código que ele cobre, try/catch que engole erro, cast forçado e acoplamento
    novo entre módulos.
 3. Trate cada achado. O que tem diretriz clara (regra do projeto, padrão já usado no código, teste
-   que falha) você corrige agora (ou cria uma sub-tarefa de correção com o especialista e para, para o board executá-la) e registra na conversa. O que é ambíguo
+   que falha) você corrige agora (ou cria uma sub-tarefa de correção com o especialista e para, para o board executá-la; o board sobe o modelo dela sozinho quando uma checagem falha, e você não escolhe modelo para ela) e registra na conversa. O que é ambíguo
    ou muda o comportamento combinado é decisão da pessoa: \`ask_questions\` e pare (no modo autônomo,
    decida pelo padrão do projeto e pelo caminho menos complexo, registre e siga).
 4. Rode as checagens de novo, faça o commit, registre o resultado na conversa (ele alimenta o "Como
