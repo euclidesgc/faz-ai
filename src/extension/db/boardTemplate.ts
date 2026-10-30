@@ -16,7 +16,7 @@ import { all, bool, num, one, run, str, transaction } from './query';
  * Board padrão. Cada mudança no padrão sobe a versão; boards criados antes são atualizados no
  * lugar (com confirmação), sem recriar nada: os cards continuam na coluna em que estavam.
  */
-export const BOARD_TEMPLATE_VERSION = 18;
+export const BOARD_TEMPLATE_VERSION = 19;
 
 export interface TemplateColumn {
   name: string;

@@ -5,6 +5,13 @@ import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 import { BRIEF_SECTIONS, REQUIRED_BRIEF_SECTIONS } from '../src/shared/subtaskBrief';
 
 describe('conjunto de skills do fluxo (#588)', () => {
+  it('o portão de checagens: parar em Verificando e, se falhar, ready com a saída na conversa (#1274)', () => {
+    expect(FLOW_SKILL.body).toContain('Verificando');
+    expect(FLOW_SKILL.body).toContain('**pare**');
+    expect(FLOW_SKILL.body).toContain('volta para \`ready\` com a saída na conversa'.replace(/\\/g, ''));
+    const revisao = FLOW_SKILLS.find((k) => k.name === 'faz-ai-revisao-e-homologacao')!;
+    expect(revisao.body).toContain('portão do fluxo');
+  });
   it('explica o valor por perfil, sem lista fixa de CLIs', () => {
     const harness = FLOW_SKILLS.find((k) => k.name === 'faz-ai-harness-do-card')!;
     expect(harness.body).toContain('<perfil>:<modelo>@<esforço>');
