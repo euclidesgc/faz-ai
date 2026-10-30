@@ -19,7 +19,8 @@ formata tudo. Para o `git blame` pular o commit que só formatou o código:
 prettier nos arquivos alterados contra `origin/develop`, `vitest related` e os cenários de ponta a
 ponta do card em `test/scenarios/`. Encerrado no meio (Ctrl+C, tempo esgotado no terminal da IA), ele
 encerra o passo em curso junto; e o worker do Vitest sai sozinho quando o Vitest principal cai
-(`test/workerParent.ts`), em vez de ficar órfão rodando testes.
+(`test/workerParent.ts`), mesmo preso num laço do código sob teste, em vez de ficar órfão rodando
+testes.
 
 Pressione `F5` para abrir o Extension Development Host. O código fica em `src/extension` (host e
 servidor MCP), `src/webview` (interface em React), `src/shared` (modelo, protocolo e as regras do
