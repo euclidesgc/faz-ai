@@ -319,7 +319,10 @@ export interface PolicyLimits {
 }
 export interface EffectiveLimits {
   branchProcesses: number;
+  /** de onde vem `branchProcesses` e onde se ajusta, para a recusa dizer à pessoa */
+  branchReason: string;
   textProcesses: number;
+  textReason: string;
   writersPerWorkspace: 1;
   subtasks: { requested: number; effective: 1; reason: string | null };
   globalProcesses: number | null;
@@ -332,7 +335,9 @@ export function effectiveLimits(runner: RunnerConfig, gitMode: string, policy?: 
     if (!Number.isSafeInteger(value) || value < 1) throw new Error('Limite explícito de processos inválido.');
   return {
     branchProcesses: parallelLimit(runner, gitMode),
+    branchReason: branchLimitReason(runner, gitMode),
     textProcesses: textLimit(runner),
+    textReason: PARALLEL_STORIES_SETTING,
     writersPerWorkspace: 1,
     subtasks: {
       requested: runner.parallelSubtasks,
@@ -343,12 +348,27 @@ export function effectiveLimits(runner: RunnerConfig, gitMode: string, policy?: 
     perProfile: profiles,
   };
 }
+const PARALLEL_STORIES_SETTING = 'o limite vem de "Histórias ao mesmo tempo", em Configurações → Automação';
+function branchLimitReason(runner: RunnerConfig, gitMode: string): string {
+  if (gitMode !== 'worktree')
+    return 'fora do modo "Worktree por história" (Configurações → Git) as histórias dividem a mesma pasta, então só uma mexe no código por vez';
+  if (!runner.parallel) return '"Tocar histórias em paralelo" está desligado em Configurações → Automação';
+  return PARALLEL_STORIES_SETTING;
+}
 export interface WorkRuntime {
   activity: ActivityKind;
   profile: string | null;
   workspace: string | null;
   writer: boolean;
+  /** o card que ocupa a vaga (#12), para a recusa dizer quem está rodando */
+  label?: string;
 }
+/** "#3, #7" dos cards que ocupam as vagas; vazio quando nenhum tem rótulo. */
+function holders(rows: readonly WorkRuntime[]): string {
+  const labels = [...new Set(rows.flatMap((r) => (r.label ? [r.label] : [])))];
+  return labels.length ? ` (${labels.join(', ')})` : '';
+}
+const runs = (n: number) => (n === 1 ? '1 execução' : `${n} execuções`);
 /** Cada entrada viva reserva uma vaga, inclusive durante a reconciliação. Paths já devem ser reais. */
 export function admit(
   unit: WorkRuntime,
@@ -356,16 +376,29 @@ export function admit(
   limits: EffectiveLimits,
 ): { ok: true } | { ok: false; reason: string } {
   const deny = (reason: string) => ({ ok: false as const, reason });
+  const wait = 'Ela começa sozinha quando uma vaga liberar.';
   if (unit.writer && !unit.workspace) return deny('A pasta real do escritor não foi determinada.');
-  if (unit.writer && live.some((r) => r.writer && r.workspace === unit.workspace))
-    return deny('A pasta já tem um escritor ou aguarda reconciliação.');
-  if (limits.globalProcesses !== null && live.length >= limits.globalProcesses) return deny('O teto global de processos foi atingido.');
+  const sameFolder = unit.writer ? live.filter((r) => r.writer && r.workspace === unit.workspace) : [];
+  if (sameFolder.length)
+    return deny(
+      `A pasta desta execução já tem outra IA escrevendo${holders(sameFolder)}, ou aguardando a conferência do fim. Uma pasta aceita uma execução por vez. ${wait}`,
+    );
+  if (limits.globalProcesses !== null && live.length >= limits.globalProcesses)
+    return deny(
+      `Já há ${runs(live.length)} de IA rodando${holders(live)}, e o teto global da política de execução é ${limits.globalProcesses}. ${wait}`,
+    );
   const profileCap = unit.profile === null ? undefined : limits.perProfile[unit.profile];
-  if (profileCap !== undefined && live.filter((r) => r.profile === unit.profile).length >= profileCap)
-    return deny('O teto do perfil foi atingido.');
-  if (
-    live.filter((r) => r.activity === unit.activity).length >= (unit.activity === 'branch' ? limits.branchProcesses : limits.textProcesses)
-  )
-    return deny('O limite efetivo desta atividade foi atingido.');
+  const sameProfile = live.filter((r) => r.profile === unit.profile);
+  if (profileCap !== undefined && sameProfile.length >= profileCap)
+    return deny(
+      `Já há ${runs(sameProfile.length)} do perfil ${unit.profile} rodando${holders(sameProfile)}, e a política de execução permite ${profileCap} desse perfil ao mesmo tempo. ${wait}`,
+    );
+  const branch = unit.activity === 'branch';
+  const sameActivity = live.filter((r) => r.activity === unit.activity);
+  const cap = branch ? limits.branchProcesses : limits.textProcesses;
+  if (sameActivity.length >= cap)
+    return deny(
+      `Já há ${runs(sameActivity.length)} ${branch ? 'mexendo no código' : 'só de texto'} rodando${holders(sameActivity)}, e o limite é ${cap} ao mesmo tempo: ${branch ? limits.branchReason : limits.textReason}. ${wait}`,
+    );
   return { ok: true };
 }

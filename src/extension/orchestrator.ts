@@ -1,5 +1,5 @@
 import * as fs from 'node:fs';
-import type { BoardState } from '../shared/model';
+import { cardRef, type BoardState } from '../shared/model';
 import type { AiRunOrigin } from '../shared/log';
 import {
   admit,
@@ -179,6 +179,11 @@ export class Orchestrator {
       await observed;
     } while (observed !== this.tail);
   }
+  /** #12 do card, para a recusa da admissão dizer quem ocupa a vaga */
+  private ref(id: string | null): string | undefined {
+    const card = id ? this.options.state().cards.find((c) => c.id === id) : undefined;
+    return card ? cardRef(card) : undefined;
+  }
   private baseline(work: WorkRecord): Baseline | null {
     try {
       const parsed = JSON.parse(this.options.repo().latest(work.id)?.workspaceBefore ?? 'null') as Baseline | null;
@@ -227,6 +232,7 @@ export class Orchestrator {
         profile: this.baseline(w)?.profile ?? runtime.profile,
         workspace: w.workspace,
         writer: true,
+        label: this.ref(w.cardId ?? w.storyId),
       }));
     occupied.push(...this.options.otherProcesses());
     const admission = admit(

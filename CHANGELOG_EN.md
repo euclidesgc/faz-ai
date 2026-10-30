@@ -84,6 +84,7 @@
 - The AI receives at most the last 20 conversation messages (#1076).
 - The selected card stands out in relief, with a shadow to the right and below.
 - The open card's number sits in the top bar, next to the LED.
+- A run waiting for a slot says which cards hold the slots, what the limit is and where to change it.
 
 ### Removed
 
