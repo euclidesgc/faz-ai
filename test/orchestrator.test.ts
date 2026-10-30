@@ -17,6 +17,7 @@ import { startMcpServer } from '../src/extension/mcp/server';
 import { socketPath } from '../src/extension/mcp/socketPath';
 import { acquireWorkspace } from '../src/extension/workspaceLock';
 import { processGroupState, terminateProcessGroup } from '../src/extension/processIdentity';
+import { CONCERN_MARK, CONTEXT_DONE_MARK, CONTEXT_MARK } from '../src/shared/subtaskOutcome';
 
 let dir: string;
 let workspace: string;
@@ -30,7 +31,18 @@ let orchestrator: Orchestrator;
 let options: OrchestratorOptions;
 let executions: Map<string, AiExecution>;
 let starts: string[];
-let mode: 'done' | 'partial' | 'hold' | 'fix' | 'nofix' | 'transient';
+let mode:
+  | 'done'
+  | 'partial'
+  | 'hold'
+  | 'fix'
+  | 'nofix'
+  | 'transient'
+  | 'needs-context'
+  | 'needs-context-crash'
+  | 'blocked'
+  | 'concerns'
+  | 'declared';
 let fixing: string[] = [];
 let logs: string[];
 const wasm = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -499,6 +511,166 @@ describe('orquestrador com processo, ponte, disco e trava reais', () => {
       expect(blocked[0]![1]).toContain('descrição');
       expect((await orchestrator.drive(storyId, 'manual')).kind).toBe('paused');
       expect(starts).toEqual([storyId]);
+    }, 20_000);
+  });
+  describe('desfecho declarado no bloco final da sub-tarefa', () => {
+    const card = (id: string) => router.snapshot().cards.find((c) => c.id === id)!;
+    const onSub = (id: string) => router.snapshot().comments.filter((c) => c.cardId === id);
+    const onStory = () => router.snapshot().comments.filter((c) => c.cardId === storyId);
+    const blocked: [string, string][] = [];
+    const advices: string[][] = [];
+    let ends: Parameters<NonNullable<Parameters<OrchestratorOptions['starter']['start']>[1]['onExit']>>[0][] = [];
+    beforeEach(() => {
+      blocked.length = 0;
+      advices.length = 0;
+      ends = [];
+      // os mesmos ganchos do host: bloqueia o card, grava a nota e a ressalva na história
+      options.block = (id, reason) => {
+        router.handle({ type: 'card.status.set', cardId: id, status: 'blocked', note: reason }, { author: 'Faz AI', source: 'ai' });
+        blocked.push([id, reason]);
+      };
+      options.note = (id, body) => {
+        new CommentRepo(handle.db).add(id, 'Faz AI', body, 'ai');
+      };
+      options.concern = (id, body) => {
+        new CommentRepo(handle.db).add(id, 'Faz AI', body, 'ai');
+      };
+      const realStart = options.starter.start.bind(options.starter);
+      options.starter.start = (id, opts) => {
+        advices.push(opts.advice ?? []);
+        realStart(id, { ...opts, onExit: (end) => (ends.push(end), opts.onExit?.(end)) });
+      };
+    });
+    const failed = async (count: number) => {
+      await vi.waitFor(() => expect(router.work.records().filter((w) => w.state === 'failed')).toHaveLength(count), {
+        timeout: 10_000,
+        interval: 50,
+      });
+      await orchestrator.settled();
+    };
+
+    it('NEEDS_CONTEXT: a sub-tarefa não conclui, o pedido fica na conversa dela e a sessão da história a completa', async () => {
+      const a = subtask('A', `${validBrief()}\n\nSem o caminho.`);
+      mode = 'needs-context';
+      await orchestrator.drive(storyId, 'manual');
+      await failed(1);
+      const record = router.work.records().find((w) => w.cardId === a)!;
+      expect(router.work.latest(record.id)?.outcome).toBe('needs-decision');
+      expect(record.reason).toContain(CONTEXT_MARK);
+      expect(record.reason).toContain('Preciso de: o caminho do módulo');
+      expect(onSub(a).filter((c) => c.body.includes(CONTEXT_MARK))).toHaveLength(1);
+      expect(onStory().some((c) => c.body.includes('precisa de revisão') && c.body.includes(CONTEXT_MARK))).toBe(true);
+      expect(card(a).status).not.toBe('blocked');
+      expect(logs.some((l) => l.startsWith('Bloco final: NEEDS_CONTEXT, rota needs-context'))).toBe(true);
+      // o próximo drive abre a sessão da história com o pedido de contexto, e a descrição nova devolve a sub-tarefa
+      mode = 'fix';
+      fixing = [a];
+      await orchestrator.drive(storyId, 'manual');
+      await vi.waitFor(() => expect(router.work.records().filter((w) => w.cardId === a && w.state === 'done')).toHaveLength(1), {
+        timeout: 15_000,
+        interval: 50,
+      });
+      await orchestrator.settled();
+      expect(starts.slice(0, 3)).toEqual([a, storyId, a]);
+      expect(advices[1]!.join('\n')).toContain('pediu contexto: falta o arquivo');
+      expect(advices[1]!.join('\n')).toContain('Falta: o caminho do módulo');
+      expect(router.work.records().find((w) => w.kind === 'story')?.state).toBe('done');
+      expect(onSub(a).filter((c) => c.body.startsWith(CONTEXT_DONE_MARK))).toHaveLength(1);
+    }, 30_000);
+
+    it('descrição igual depois da sessão de contexto: nenhuma nota de contexto completado e a história pausa', async () => {
+      const a = subtask('A');
+      mode = 'needs-context';
+      await orchestrator.drive(storyId, 'manual');
+      await failed(1);
+      mode = 'nofix';
+      await orchestrator.drive(storyId, 'manual');
+      await vi.waitFor(() => expect(router.work.records().find((w) => w.kind === 'story')?.state).toBe('done'), {
+        timeout: 15_000,
+        interval: 50,
+      });
+      await orchestrator.settled();
+      expect(onSub(a).some((c) => c.body.startsWith(CONTEXT_DONE_MARK))).toBe(false);
+      // a história pausa com a pessoa e um novo drive não reenvia a mesma descrição
+      await vi.waitFor(() => expect(blocked.find(([id]) => id === storyId)?.[1]).toContain('a descrição continua a mesma'), {
+        timeout: 10_000,
+      });
+      expect((await orchestrator.drive(storyId, 'manual')).kind).toBe('paused');
+      expect(starts).toEqual([a, storyId]);
+    }, 30_000);
+
+    it('BLOCKED: o board bloqueia a sub-tarefa com o motivo e a unidade chega como com a pessoa', async () => {
+      const a = subtask('A');
+      mode = 'blocked';
+      await orchestrator.drive(storyId, 'manual');
+      await vi.waitFor(() => expect(blocked).toHaveLength(1), { timeout: 10_000, interval: 50 });
+      await orchestrator.settled();
+      expect(blocked[0]![0]).toBe(a);
+      expect(blocked[0]![1]).toContain('a credencial expirou');
+      expect(blocked[0]![1]).toContain('sem acesso ao serviço');
+      expect(card(a).status).toBe('blocked');
+      expect(router.work.latest(router.work.records()[0]!.id)?.outcome).toBe('with-person');
+    });
+
+    it('DONE_WITH_CONCERNS: a sub-tarefa conclui e a ressalva entra uma vez na conversa da história', async () => {
+      const a = subtask('A');
+      mode = 'concerns';
+      await orchestrator.drive(storyId, 'manual');
+      await completed(2);
+      const concerns = onStory().filter((c) => c.body.startsWith(CONCERN_MARK));
+      expect(concerns).toHaveLength(1);
+      expect(concerns[0]!.body).toContain(`#${card(a).number}`);
+      expect(concerns[0]!.body).toContain('o teste de carga não rodou');
+      expect(logs.some((l) => l.startsWith('Bloco final: DONE_WITH_CONCERNS, rota concern'))).toBe(true);
+    }, 20_000);
+
+    it('DONE sem inconsistência não gera ressalva nem nota', async () => {
+      subtask('A');
+      mode = 'declared';
+      await orchestrator.drive(storyId, 'manual');
+      await completed(2);
+      expect(onStory().some((c) => c.body.startsWith(CONCERN_MARK))).toBe(false);
+      expect(logs.some((l) => l.startsWith('Bloco final: DONE, rota none'))).toBe(true);
+    }, 20_000);
+
+    it('sem bloco: o comportamento é o de hoje e o log registra a ausência', async () => {
+      subtask('A');
+      mode = 'done';
+      await orchestrator.drive(storyId, 'manual');
+      await completed(2);
+      expect(logs.some((l) => l.startsWith('Bloco final: ausente'))).toBe(true);
+      expect(blocked).toEqual([]);
+    }, 20_000);
+
+    it('falha do processo não lê o bloco: a decisão é a de sempre, sem pedido de contexto nem log do bloco', async () => {
+      const a = subtask('A');
+      mode = 'needs-context-crash';
+      await orchestrator.drive(storyId, 'manual');
+      await failed(1);
+      const record = router.work.records().find((w) => w.cardId === a)!;
+      expect(record.reason ?? '').not.toContain(CONTEXT_MARK);
+      expect(onSub(a).some((c) => c.body.includes(CONTEXT_MARK))).toBe(false);
+      expect(logs.some((l) => l.startsWith('Bloco final'))).toBe(false);
+    }, 20_000);
+
+    it('a rota repetida (reconciliação refeita depois de uma queda) não duplica ressalva nem bloqueio', async () => {
+      const a = subtask('A');
+      mode = 'concerns';
+      await orchestrator.drive(storyId, 'manual');
+      await completed(2);
+      const work = router.work.records().find((w) => w.cardId === a)!;
+      const end = ends.find((e) => e.report.answer.includes('DONE_WITH_CONCERNS'))!;
+      const internals = orchestrator as unknown as {
+        declare(w: typeof work, c: ReturnType<typeof card>, s: ReturnType<typeof card>, e: typeof end, ev: object): unknown;
+      };
+      const evidence = { cardClosed: true, cardWithPerson: false, mutations: 1, workspaceChanged: true };
+      internals.declare(work, card(a), card(storyId), end, evidence);
+      internals.declare(work, card(a), card(storyId), end, evidence);
+      expect(onStory().filter((c) => c.body.startsWith(CONCERN_MARK))).toHaveLength(1);
+      // o BLOCKED repetido chega com o card já com a pessoa: a rota é none e o bloqueio não se repete
+      const blockedEnd = { ...end, report: { ...end.report, answer: 'x\n{"outcome":"BLOCKED","summary":"s","failure_reason":"r"}' } };
+      internals.declare(work, card(a), card(storyId), blockedEnd, { ...evidence, cardClosed: false, cardWithPerson: true });
+      expect(blocked).toEqual([]);
     }, 20_000);
   });
 });

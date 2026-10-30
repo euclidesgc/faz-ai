@@ -18,6 +18,7 @@ import { DEFAULT_RUNNER, parseRunner } from '../src/shared/runner';
 import { boardState, card, column, sub } from './fakes/board';
 import { validBrief } from './fixtures/subtaskBrief';
 import { isBriefKey } from '../src/shared/subtaskBrief';
+import { contextReason, CONTEXT_DONE_MARK, CONTEXT_MARK, isContextKey, MAX_CONTEXT_REQUESTS } from '../src/shared/subtaskOutcome';
 import { NOT_REPEATED } from '../src/extension/aiOutput/errors';
 
 describe('limites efetivos da orquestração', () => {
@@ -116,6 +117,15 @@ describe('decisão de reconciliação', () => {
     expect(reconcileOutcome(evidence)).toEqual({ kind: 'needs-decision', reason: NOT_REPEATED });
     expect(reconcileOutcome({ ...evidence, cardClosed: true })).toEqual({ kind: 'done' });
     expect(reconcileOutcome({ ...evidence, cardWithPerson: true })).toEqual({ kind: 'with-person' });
+  });
+  it('pedido de contexto declarado vira needs-decision com a marca', () => {
+    const declared = { kind: 'needs-context', summary: 's', pending: 'p' } as const;
+    const r = reconcileOutcome({ ...evidence, declared, card: { description: 'x' } });
+    expect(r).toMatchObject({ kind: 'needs-decision', reason: expect.stringContaining('**Pedido de contexto**') });
+    expect(reconcileOutcome({ ...evidence, declared, cardClosed: true })).toEqual({ kind: 'done' });
+    expect(reconcileOutcome({ ...evidence, declared, cardWithPerson: true })).toEqual({ kind: 'with-person' });
+    for (const d of [{ kind: 'none' }, { kind: 'block', reason: 'r' }, { kind: 'concern', text: 't' }] as const)
+      expect(reconcileOutcome({ ...evidence, declared: d })).toEqual({ kind: 'needs-decision', reason: NOT_REPEATED });
   });
   it('não libera recursos com descendente vivo, mesmo com card concluído', () => {
     expect(reconcileOutcome({ ...evidence, processGone: false, cardClosed: true })).toMatchObject({ kind: 'unconfirmed' });
@@ -455,5 +465,115 @@ describe('plano puro de rodadas', () => {
     ];
     expect(orchestrableSubtasks(s, story).map((c) => c.id)).toEqual(['b']);
     expect(storyPlan(s, story, live, new Set())).toMatchObject({ kind: 'units', units: [{ cardId: 'b' }] });
+  });
+});
+
+describe('sessão de contexto no plano da história', () => {
+  const story = card('story', { columnId: 'doing', number: 1 });
+  type Comment = ReturnType<typeof boardState>['comments'][number];
+  const OLD = validBrief();
+  function state() {
+    const a = sub('a', story.id, 'todo', { number: 2, description: OLD });
+    const b = sub('b', story.id, 'todo', { number: 3, description: validBrief() });
+    const s = boardState({ cards: [story, a, b] });
+    s.columns = s.columns.map((p) => ({ ...p, aiActive: p.id === 'doing' }));
+    return s;
+  }
+  const request = (description: string) => contextReason({ description }, { summary: 'falta o arquivo', pending: 'o caminho do módulo' });
+  const failedLive = (s: ReturnType<typeof state>, reason: string, extra: Record<string, unknown> = {}) => {
+    const a = s.cards[1]!;
+    return {
+      byCard: new Map<string, never>([
+        [a.id, { state: 'failed', key: workKey('subtask', s, story, a), kind: 'subtask', reason, updatedAt: 1, ...extra } as never],
+      ]),
+    };
+  };
+  const note = (s: ReturnType<typeof state>, cardId: string, at: number, body: string, source: 'human' | 'ai' = 'ai') =>
+    s.comments.push({ id: `c${at}`, cardId, author: 'x', source, body, createdAt: at, updatedAt: at } as Comment);
+
+  it('a sub-tarefa que pediu contexto abre a unidade story com a chave de contexto, antes da próxima', () => {
+    const s = state();
+    const plan = storyPlan(s, story, failedLive(s, request(OLD)), new Set());
+    expect(plan).toMatchObject({ kind: 'units', units: [{ kind: 'story', cardId: story.id }] });
+    const key = plan.kind === 'units' ? plan.units[0]!.key : '';
+    expect(isContextKey(key)).toBe(true);
+    expect(isBriefKey(key)).toBe(false);
+  });
+  it('falha comum (sem a marca) não abre a sessão de contexto: segue a parada de hoje', () => {
+    const s = state();
+    expect(storyPlan(s, story, failedLive(s, 'caiu a rede'), new Set())).toMatchObject({ units: [{ kind: 'subtask', cardId: 'b' }] });
+  });
+  it('descrição igual depois da sessão pausa a história, e a sessão que falhou também', () => {
+    const s = state();
+    const live = failedLive(s, request(OLD));
+    const plan = storyPlan(s, story, live, new Set());
+    const key = plan.kind === 'units' ? plan.units[0]!.key : '';
+    const paused = storyPlan(s, story, live, new Set([key]));
+    expect(paused).toMatchObject({ kind: 'paused' });
+    expect(paused.kind === 'paused' && paused.reason).toContain('a descrição continua a mesma');
+    const own = { state: 'failed' as const, key, kind: 'story' as const, updatedAt: 2 };
+    const both = { byCard: new Map([...live.byCard, [story.id, own as never]]) };
+    expect(storyPlan(s, story, both, new Set())).toMatchObject({ kind: 'paused' });
+  });
+  it('um gesto da pessoa na história devolve a sub-tarefa (a chave dela muda) em vez de repetir a sessão', () => {
+    const s = state();
+    const live = failedLive(s, request(OLD));
+    const first = storyPlan(s, story, live, new Set());
+    const key = first.kind === 'units' ? first.units[0]!.key : '';
+    note(s, story.id, 50, 'complete a descrição', 'human');
+    expect(storyPlan(s, story, live, new Set([key]))).toMatchObject({ kind: 'units', units: [{ kind: 'subtask', cardId: 'a' }] });
+  });
+  it('mais de MAX_CONTEXT_REQUESTS pedidos desde o gesto da pessoa pausa com o limite', () => {
+    const s = state();
+    const a = s.cards[1]!;
+    const live = failedLive(s, request(OLD));
+    for (let i = 1; i <= MAX_CONTEXT_REQUESTS; i++) note(s, a.id, i * 10, `${CONTEXT_MARK} (x): pedido ${i}`);
+    expect(storyPlan(s, story, live, new Set())).toMatchObject({ kind: 'units', units: [{ kind: 'story' }] });
+    note(s, a.id, 100, `${CONTEXT_MARK} (x): pedido extra`);
+    const paused = storyPlan(s, story, live, new Set());
+    expect(paused).toMatchObject({ kind: 'paused' });
+    expect(paused.kind === 'paused' && paused.reason).toContain(`mais de ${MAX_CONTEXT_REQUESTS} vezes`);
+    // a pessoa interveio: a contagem recomeça
+    note(s, a.id, 200, 'segue', 'human');
+    expect(storyPlan(s, story, failedLive(s, request(OLD)), new Set())).toMatchObject({ kind: 'units', units: [{ kind: 'story' }] });
+  });
+  it('a nota de contexto completado conta em handedBackAt e troca a workKey, mas não zera o teto', () => {
+    const s = state();
+    const a = s.cards[1]!;
+    const before = workKey('subtask', s, story, a);
+    note(s, a.id, 30, `${CONTEXT_DONE_MARK}: a descrição mudou; a sub-tarefa roda de novo.`);
+    expect(handedBackAt(s, a)).toBe(30);
+    expect(workKey('subtask', s, story, a)).not.toBe(before);
+    // só a IA, e só abrindo com a marca
+    note(s, a.id, 40, `${CONTEXT_DONE_MARK}: x`, 'human');
+    note(s, a.id, 50, `Veja ${CONTEXT_DONE_MARK}`);
+    expect(handedBackAt(s, a)).toBe(40);
+  });
+  it('rerun após a nota: a falha da chave antiga deixa de valer e a sub-tarefa volta a ser a próxima', () => {
+    const s = state();
+    const live = failedLive(s, request(OLD));
+    note(s, s.cards[1]!.id, 30, `${CONTEXT_DONE_MARK}: a descrição mudou; a sub-tarefa roda de novo.`);
+    expect(storyPlan(s, story, live, new Set())).toMatchObject({ kind: 'units', units: [{ kind: 'subtask', cardId: 'a' }] });
+  });
+  it('nunca reenvia a mesma descrição: o pedido repetido com o mesmo hash cai na chave já feita', () => {
+    const s = state();
+    const live = failedLive(s, request(OLD));
+    const key = (storyPlan(s, story, live, new Set()) as { units: { key: string }[] }).units[0]!.key;
+    // a sub-tarefa rodou de novo, pediu outra vez com a descrição que não mudou: mesma chave, pausa
+    expect(storyPlan(s, story, failedLive(s, request(OLD)), new Set([key]))).toMatchObject({ kind: 'paused' });
+    // com descrição nova o hash muda e a sessão é nova
+    expect(storyPlan(s, story, failedLive(s, request(`${OLD}\n\nmais`)), new Set([key]))).toMatchObject({ kind: 'units' });
+  });
+  it('não sobrepõe a conferência de brief: a descrição inválida vem antes', () => {
+    const s = state();
+    s.cards[2]!.description = '';
+    const plan = storyPlan(s, story, failedLive(s, request(OLD)), new Set());
+    const key = plan.kind === 'units' ? plan.units[0]!.key : '';
+    expect(isBriefKey(key)).toBe(true);
+  });
+  it('sub-tarefa com a pessoa não abre a sessão de contexto', () => {
+    const s = state();
+    s.cards[1]!.status = 'blocked';
+    expect(storyPlan(s, story, failedLive(s, request(OLD)), new Set())).toMatchObject({ units: [{ kind: 'subtask', cardId: 'b' }] });
   });
 });
