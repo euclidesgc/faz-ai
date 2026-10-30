@@ -79,8 +79,9 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
 /**
  * Tabelas que ficam fora do arquivo mesmo tendo `board_id` (o teste do `sqlite_master` as ignora).
  * `gate_runs` é o registro local das checagens (sha e saída de uma pasta desta máquina): não viaja.
+ * `model_escalations` aponta para uma linha de `gate_runs` e só vale para a unidade em andamento: fica junto.
  */
-export const NOT_EXPORTED = ['boards', 'log_months', 'ai_work', 'ai_work_attempts', 'gate_runs'];
+export const NOT_EXPORTED = ['boards', 'log_months', 'ai_work', 'ai_work_attempts', 'gate_runs', 'model_escalations'];
 
 /** Colunas de `boards` que nunca saem no arquivo: `workspace_key` liga o board à pasta desta máquina. */
 export const OMIT_BOARD_KEYS = ['workspace_key'];

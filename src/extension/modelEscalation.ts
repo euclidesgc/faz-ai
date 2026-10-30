@@ -166,4 +166,4 @@ const risen = (state: BoardState, from: string, to: string, check: string): stri
   `Modelo subiu de ${modelLabel(state.board.modelCatalog, from)} para ${modelLabel(state.board.modelCatalog, to)} porque a checagem "${check}" falhou.`;
 
 const noTier = (state: BoardState, current: string, profile: string | undefined): string =>
-  `Sem nível acima de ${current ? modelLabel(state.board.modelCatalog, current) : 'o modelo padrão'} para o agente ${profile ?? 'sem perfil'}.`;
+  `Sem nível acima ${current ? `de ${modelLabel(state.board.modelCatalog, current)}` : 'do modelo padrão'} para o agente ${profile ?? 'sem perfil'}.`;
