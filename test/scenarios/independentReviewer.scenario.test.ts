@@ -10,7 +10,14 @@ import type { ModelOption } from '../../src/shared/models';
 import { valueOf } from '../../src/shared/selectors';
 import { storyWorld, type StoryWorld } from './storyWorld';
 
-const opt = (model: string): ModelOption => ({ id: `claude:${model}`, tool: 'claude', model, label: model, efforts: [], defaultEffort: null });
+const opt = (model: string): ModelOption => ({
+  id: `claude:${model}`,
+  tool: 'claude',
+  model,
+  label: model,
+  efforts: [],
+  defaultEffort: null,
+});
 
 let world: StoryWorld | undefined;
 let client: Client | undefined;
@@ -31,7 +38,12 @@ async function scenario(ladder: boolean, implementer = 'claude:opus') {
   const model = () => w.router.snapshot().fieldDefs.find((f) => f.kind === 'model')!;
   w.router.handle({ type: 'field.setValue', cardId: impl, fieldId: model().id, value: implementer });
 
-  const server = createMcpServer({ getRouter: async () => w.router, getRunner: async () => w.runner, workspaceDir: w.project, version: 'test' });
+  const server = createMcpServer({
+    getRouter: async () => w.router,
+    getRunner: async () => w.runner,
+    workspaceDir: w.project,
+    version: 'test',
+  });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.connect(a);
   client = new Client({ name: 'claude-code', version: '1' });
